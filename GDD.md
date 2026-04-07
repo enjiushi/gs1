@@ -879,9 +879,13 @@ Weather should pressure more than one system at once.
 
 Use this prototype interpretation:
 
-- `weatherHeat` mainly increases worker hydration drain, worker energy drain, and heat-linked plant density pressure
-- `weatherWind` mainly increases exposure, work difficulty, and protection demand
-- `weatherSand` mainly increases burial, visibility loss, movement penalties, and device damage risk
+- `weatherHeat` mainly increases worker hydration drain, worker energy drain, exposed `Player Condition` risk, tile moisture loss, and the heat-linked share of plant `growthPressure`
+- `weatherWind` mainly increases exposure, work difficulty, wind-protection demand, exposed-tile erosion pressure, and the wind-linked share of plant `growthPressure`
+- `weatherSand` mainly increases burial, visibility loss, movement penalties, burial-driven soil setback, the sand-and-burial share of plant `growthPressure`, and device damage risk
+
+Design consistency rule:
+
+- each weather channel should leave readable artifacts on at least 3 layers at once when relevant: player pressure, land/tile condition, and plant growth or degeneration
 
 When `eventState` is `Peak`, also apply event-type-specific multipliers to:
 
