@@ -353,10 +353,17 @@ Derived local modifiers rebuilt every fixed simulation step:
 - `tileShade`
 - `tileWaterSupport`
 
-Occupancy intensity or condition values:
+Plant runtime values:
 
 - `tilePlantDensity`
+- `growthPressure`
+
+Cover runtime values:
+
 - `tileGroundCoverDensity`
+
+Structure runtime values:
+
 - `deviceIntegrity`
 - `deviceEfficiency`
 
@@ -389,6 +396,7 @@ Display rule:
 - `tileSoilFertility`, `tileMoisture`, and `tileSoilSalinity` should be visible through tile inspection and relevant overlays because they are the core land-quality state
 - `tileWindProtection`, `tileShade`, and `tileWaterSupport` are contextual local modifiers; they should usually appear in tile inspection, overlays, or placement previews rather than as permanent HUD bars
 - `tileGroundCoverDensity` belongs to the occupying ground-cover object, not to the underlying terrain soil state
+- `growthPressure` is an internal derived plant-pressure variable; the player should mainly read its effect through density change and `plantTrendState`, not through a raw number
 - Money, `Reputation`, `Faction Reputation`, stack counts, `fullyGrownTileCount`, `siteCompletionTileThreshold`, and `campaignDaysRemaining` are native integers and should display as exact integers
 - `tileSoilFertility` is the long-lived land-improvement meter used at runtime; it affects both plant growth speed and how well the tile retains moisture
 - `tileSoilSalinity` should also be shown through a simple overlay or inspection readout because it directly affects plant choice on some tiles
@@ -450,13 +458,17 @@ The tile model should separate different kinds of state instead of treating ever
 |---|---|---|---|
 | `terrainDefinition` | Base terrain identity and hard placement flags | `terrainTypeId`, `tileTraversable`, `tilePlantable` | Static `Ground` or `Rock` role |
 | `terrainSoilState` | Persistent quality of plantable ground | `tileSoilFertility`, `tileMoisture`, `tileSoilSalinity` | Only meaningful on plantable `Ground` |
-| `occupancyState` | What currently sits on the tile | `groundCoverTypeId`, `tileGroundCoverDensity`, `plantTypeId`, `tilePlantDensity`, `plantTrendState`, `structureTypeId`, `deviceIntegrity`, `deviceEfficiency` | Plants, cover, and structures use their own state |
+| `occupancyState` | What currently occupies the tile | `plantTypeId`, `groundCoverTypeId`, `structureTypeId` | Answers only what is present, not the state of that occupant |
+| `plantState` | Runtime state of the current living plant | `tilePlantDensity`, `plantTrendState`, `growthPressure` | Exists only if `plantTypeId` is present |
+| `coverState` | Runtime state of the current ground cover | `tileGroundCoverDensity` | Exists only if `groundCoverTypeId` is present |
+| `structureState` | Runtime state of the current structure | `deviceIntegrity`, `deviceEfficiency` | Exists only if `structureTypeId` is present |
 | `derivedLocalModifiers` | Nearby support rebuilt every step | `tileWindProtection`, `tileShade`, `tileWaterSupport` | From plants, devices, and rock; not persistent land quality |
-| `overlayState` | Temporary site pressure or tags | `tileSandBurial`, task marker, repair state | Hazard-driven or interaction-driven |
+| `temporaryTileState` | Temporary tile-only hazard state | `tileSandBurial` | Prototype uses burial as the only true temporary tile state |
 
 Important cleanup rule:
 
 - `tileGroundCoverDensity` is occupancy state for the current ground cover, not a terrain quality meter
+- `occupancyState` should only answer what is on the tile; density, trend, integrity, and efficiency belong to their own runtime states
 - `tileWindProtection`, `tileShade`, and `tileWaterSupport` are derived local modifiers, not persistent terrain state
 - the prototype should not use a separate `tileSoilStability` meter
 
@@ -470,7 +482,7 @@ Each tile should conceptually contain these layers:
 | `groundCoverLayer` | `1` | Surface-cover type or material that prepares or protects land beneath living plants | `Straw Checkerboard` |
 | `livingPlantLayer` | `1` plant type | Main living plant type occupying the tile; density measures how much of that type fills the tile | Any living prototype plant |
 | `structureLayer` | `1` footprint reservation per tile | Player-built support devices and camp structures | Shelter, irrigation device, sensor, workshop, solar utility |
-| `dynamicOverlayLayer` | many transient flags | Temporary state, not persistent occupancy identity | Burial, task marker, repair state |
+| `dynamicOverlayLayer` | many transient flags | Temporary state, not persistent occupancy identity | Burial |
 
 For prototype simplicity:
 
@@ -485,6 +497,7 @@ Clarification:
 
 - `groundCoverLayer` means non-living or plant-derived surface cover that sits under later living plants and helps prepare land
 - `device` means a player-built support utility or camp structure, not a plant and not a consumable item
+- task markers, repair markers, reservation flags, and similar workflow indicators should belong to their own systems, not to prototype tile state
 
 #### Terrain Flags
 
@@ -1730,6 +1743,7 @@ Each occupied `livingPlantLayer` tile should have these authoritative runtime va
 - `plantTypeId`
 - `tilePlantDensity` in range `0-100`
 - `plantTrendState`
+- `growthPressure` in range `0-100`
 - `tileMoisture`
 - `tileSoilFertility`
 - `tileSoilSalinity`
@@ -1745,28 +1759,53 @@ If the same tile also contains `groundCoverLayer`, that cover contributes throug
 
 Important modeling rule:
 
+- `plantTypeId`, `groundCoverTypeId`, and `structureTypeId` answer occupancy identity only
+- `tilePlantDensity`, `plantTrendState`, and `growthPressure` belong to plant state, not to occupancy identity
+- `deviceIntegrity` and `deviceEfficiency` belong to structure state, not to occupancy identity
 - `tileGroundCoverDensity` belongs to the current ground-cover occupant, not to the underlying terrain soil state
 - `tileWindProtection`, `tileShade`, and `tileWaterSupport` are derived local modifiers rebuilt each fixed simulation step
 - the prototype should not use a separate `tileSoilStability` meter or a separately stored `tilePlantStress` value
 
-Each prototype plant definition should also provide these runtime tuning fields:
+Each prototype plant definition should also provide these definition parameters. These are tuning parameters and player-facing readout inputs, not new runtime state categories:
+
+Placement:
 
 | Field | Range | Meaning |
 |---|---|---|
 | `plantHeightClass` | `Low`, `Medium`, or `Tall` | How much vertical space the plant occupies for structure-sharing validation |
+
+Growth tuning:
+
+| Field | Range | Meaning |
+|---|---|---|
 | `growthRate` | `0-100` | How quickly density rises when conditions are good |
 | `supportNeed` | `0-100` | Minimum average local support needed before density grows reliably |
-| `waterNeed` | `0-100` | Minimum moisture needed to avoid ongoing dehydration stress |
-| `fertilityNeed` | `0-100` | Minimum fertility needed to maintain growth |
+| `waterNeed` | `0-100` | Minimum moisture needed before water shortage starts raising `growthPressure` |
+| `fertilityNeed` | `0-100` | Minimum fertility needed before poor soil starts raising `growthPressure` |
+
+Resistance profile:
+
+| Field | Range | Meaning |
+|---|---|---|
 | `saltTolerance` | `0-100` | How strongly the plant resists salinity-based density-cap reduction |
-| `salinityReductionPower` | `0-100` | How strongly this plant gradually reduces `tileSoilSalinity` while healthy |
-| `heatTolerance` | `0-100` | How much ambient heat the plant can endure before taking heat stress |
-| `windResistance` | `0-100` | How much ambient wind and erosion pressure the plant can endure |
-| `sandTolerance` | `0-100` | How much sand intensity and burial pressure the plant can endure |
+| `heatTolerance` | `0-100` | How much ambient heat the plant can endure before heat starts raising `growthPressure` |
+| `windResistance` | `0-100` | How much ambient wind and erosion pressure the plant can endure before wind starts raising `growthPressure` |
+| `sandTolerance` | `0-100` | How much sand intensity and burial pressure the plant can endure before sand starts raising `growthPressure` |
+
+Ecological contribution profile:
+
+| Field | Range | Meaning |
+|---|---|---|
 | `protectionPower` | `0-100` | How strongly this plant contributes to nearby `tileWindProtection` |
 | `shadePower` | `0-100` | How strongly this plant contributes to nearby `tileShade` |
 | `waterSupportPower` | `0-100` | How strongly this plant contributes to nearby `tileWaterSupport` if it has a moisture-support identity |
 | `fertilityImprovePower` | `0-100` | How strongly this plant gradually improves `tileSoilFertility` while healthy |
+| `salinityReductionPower` | `0-100` | How strongly this plant gradually reduces `tileSoilSalinity` while healthy |
+
+Expansion and output profile:
+
+| Field | Range | Meaning |
+|---|---|---|
 | `spreadReadiness` | `0-100` | Minimum site support quality needed before this plant may spread |
 | `spreadChance` | `0-100` | Relative chance to create one new starter tile during an ecology pulse |
 | `outputDependency` | `0-100` | How badly output collapses when the tile is losing density or unsupported |
@@ -1866,39 +1905,23 @@ First compute plant-read inputs:
 
 - `waterReadiness = tileMoisture + tileWaterSupport * 0.35`
 - `fertilityReadiness = tileSoilFertility`
+- `waterPressure = max(0, waterNeed - waterReadiness)`
+- `fertilityPressure = max(0, fertilityNeed - fertilityReadiness)`
 - `heatPressure = max(0, weatherHeat - heatTolerance - tileShade * 0.50 - tileMoisture * 0.20)`
 - `windPressure = max(0, weatherWind - windResistance - tileWindProtection * 0.60)`
 - `sandPressure = max(0, weatherSand - sandTolerance - tileWindProtection * 0.40 - tileGroundCoverDensity * 0.25)`
 - `burialPressure = max(0, tileSandBurial - sandTolerance)`
+- `growthPressure = clamp(waterPressure * 0.26 + fertilityPressure * 0.20 + heatPressure * 0.18 + windPressure * 0.16 + sandPressure * 0.22 + burialPressure * 0.24, 0, 100)`
 
-A living plant may gain density this step only if all of these are true:
-
-- `tileSandBurial < 70`
-- `waterReadiness >= waterNeed - 10`
-- `fertilityReadiness >= fertilityNeed - 10`
-- `heatPressure < 40`
-- `windPressure < 40`
-- `sandPressure < 40`
-- `burialPressure < 40`
-
-If those conditions are met:
+A living plant grows best when `growthPressure` is low and local support is high.
 
 - `densityGainPerMinute = 0`
 - `densityLossPerMinute = 0`
 - `supportQuality = (waterReadiness + fertilityReadiness + tileWindProtection + tileShade) / 4`
 - `growthReadiness = max(0, supportQuality - supportNeed + 20) / 100`
-- `densityGainPerMinute = (growthRate / 100) * 1.6 * growthReadiness * max(0, salinityDensityCap - tilePlantDensity) / 100`
-
-If those conditions are not met, density can fall:
-
-- `densityGainPerMinute = 0`
-- `densityLossPerMinute = 0`
-- if `waterReadiness < waterNeed`, apply `densityLossPerMinute += 0.25 + (waterNeed - waterReadiness) * 0.03`
-- if `fertilityReadiness < fertilityNeed`, apply `densityLossPerMinute += 0.15 + (fertilityNeed - fertilityReadiness) * 0.02`
-- if `heatPressure > 0`, apply `densityLossPerMinute += heatPressure * 0.03`
-- if `windPressure > 0`, apply `densityLossPerMinute += windPressure * 0.03`
-- if `sandPressure > 0`, apply `densityLossPerMinute += sandPressure * 0.04`
-- if `burialPressure > 0`, apply `densityLossPerMinute += 0.30 + burialPressure * 0.03`
+- `baseGrowthPerMinute = (growthRate / 100) * 1.6 * growthReadiness * max(0, salinityDensityCap - tilePlantDensity) / 100`
+- `densityGainPerMinute = baseGrowthPerMinute * clamp(1 - growthPressure / 55, 0, 1)`
+- if `growthPressure > 35`, apply `densityLossPerMinute += (growthPressure - 35) * 0.04`
 - if `tilePlantDensity > salinityDensityCap`, apply `densityLossPerMinute += 0.4 + (tilePlantDensity - salinityDensityCap) * 0.06`
 - if an extreme hazard is in peak phase and the plant's weakest exposure channel is currently failing, apply an additional event-defined density loss modifier
 
@@ -1927,9 +1950,9 @@ Use these prototype rules:
 | `plantTrendState` | Condition |
 |---|---|
 | `Empty` | no living plant on the tile |
-| `Growing` | `tilePlantDensity > 0` and `densityGainPerMinute > densityLossPerMinute + 0.05` |
+| `Growing` | `tilePlantDensity > 0`, `growthPressure < 45`, and `densityGainPerMinute > densityLossPerMinute + 0.05` |
 | `Holding` | `tilePlantDensity > 0` and not `Growing`, `Withering`, or `Dead` |
-| `Withering` | `tilePlantDensity > 0` and (`tilePlantDensity <= 15` or `densityLossPerMinute > densityGainPerMinute + 0.05`) |
+| `Withering` | `tilePlantDensity > 0` and (`growthPressure >= 60` or `tilePlantDensity <= 15` or `densityLossPerMinute > densityGainPerMinute + 0.05`) |
 | `Dead` | `tilePlantDensity <= 0` after resolution |
 
 Death cleanup rule:
@@ -1945,7 +1968,7 @@ Output should degrade before a plant dies so the player feels pressure early.
 Prototype rule:
 
 - plants with output should multiply their base yield by `tilePlantDensity / 100`
-- `outputPenalty = max(max(0, waterNeed - waterReadiness), max(0, fertilityNeed - fertilityReadiness), heatPressure, windPressure, sandPressure, burialPressure) / 100`
+- `outputPenalty = growthPressure / 100`
 - then multiply again by `clamp(1 - outputPenalty * (outputDependency / 100), 0, 1)`
 - if `plantTrendState` is `Withering`, output is forced to `0`
 
@@ -1962,7 +1985,7 @@ A tile is eligible only if all of these are true:
 - `supportQuality = (waterReadiness + tileSoilFertility + tileWindProtection + tileShade) / 4`
 - the plant definition allows natural spread
 - `tilePlantDensity >= 85`
-- `densityGainPerMinute > densityLossPerMinute`
+- `growthPressure <= 15`
 - `tileSandBurial < 30`
 - `waterReadiness >= waterNeed`
 - `tileSoilFertility >= fertilityNeed`
