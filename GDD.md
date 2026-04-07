@@ -396,7 +396,9 @@ Display rule:
 - `tileSoilFertility`, `tileMoisture`, and `tileSoilSalinity` should be visible through tile inspection and relevant overlays because they are the core land-quality state
 - `tileWindProtection`, `tileShade`, and `tileWaterSupport` are contextual local modifiers; they should usually appear in tile inspection, overlays, or placement previews rather than as permanent HUD bars
 - `tileGroundCoverDensity` belongs to the occupying ground-cover object, not to the underlying terrain soil state
-- `growthPressure` is an internal derived plant-pressure variable; the player should mainly read its effect through density change and `plantTrendState`, not through a raw number
+- `growthPressure` is an internal derived plant-pressure variable; the player should not need the raw number, but tile inspection should expose a stable pressure breakdown such as `waterContribution`, `soilContribution`, `windContribution`, and `heatContribution`
+- the inspection UI should report the strongest current contribution as the `Primary Limiter` and may also report the second strongest as a `Secondary Limiter`
+- `tileSoilSalinity` should stay a separate growth-cap warning rather than being folded into `growthPressure`, because salinity is a placement and rehabilitation issue, not the same kind of short-term growth pressure
 - Money, `Reputation`, `Faction Reputation`, stack counts, `fullyGrownTileCount`, `siteCompletionTileThreshold`, and `campaignDaysRemaining` are native integers and should display as exact integers
 - `tileSoilFertility` is the long-lived land-improvement meter used at runtime; it affects both plant growth speed and how well the tile retains moisture
 - `tileSoilSalinity` should also be shown through a simple overlay or inspection readout because it directly affects plant choice on some tiles
@@ -1568,6 +1570,8 @@ Density readability rule:
 
 - UI should be able to show the current density value or density-state label when the tile is inspected or highlighted
 - tile art should also communicate density directly, with more visible plant mass, spread, or fullness as density rises
+- when a planted tile is inspected, the player should also be able to see why that density is improving or collapsing through a short diagnosis rather than only a raw pressure value
+- that diagnosis should use stable grouped causes such as `Needs Water`, `Poor Soil / Burial`, `Too Exposed`, and `Too Hot`, even if the internal formulas behind those groups change during tuning
 - the player should not need to rely on text alone to tell whether a tile is still fragile or already mature
 
 For prototype tuning:
@@ -1911,9 +1915,49 @@ First compute plant-read inputs:
 - `windPressure = max(0, weatherWind - windResistance - tileWindProtection * 0.60)`
 - `sandPressure = max(0, weatherSand - sandTolerance - tileWindProtection * 0.40 - tileGroundCoverDensity * 0.25)`
 - `burialPressure = max(0, tileSandBurial - sandTolerance)`
-- `growthPressure = clamp(waterPressure * 0.26 + fertilityPressure * 0.20 + heatPressure * 0.18 + windPressure * 0.16 + sandPressure * 0.22 + burialPressure * 0.24, 0, 100)`
+- `waterContribution = waterPressure * 0.26`
+- `soilContribution = fertilityPressure * 0.20 + burialPressure * 0.24`
+- `windContribution = windPressure * 0.16 + sandPressure * 0.22`
+- `heatContribution = heatPressure * 0.18`
+- `growthPressure = clamp(waterContribution + soilContribution + windContribution + heatContribution, 0, 100)`
 
 A living plant grows best when `growthPressure` is low and local support is high.
+
+#### Growth Pressure Reporting Rules
+
+`growthPressure` is the internal final plant-pressure value, but the player should be shown a grouped diagnosis rather than the raw formula.
+
+Prototype reporting rule:
+
+- every planted tile should expose a player-facing breakdown with these stable grouped channels:
+- `waterContribution`
+- `soilContribution`
+- `windContribution`
+- `heatContribution`
+- these grouped channels are derived diagnostic values for inspection and UI; they do not need to be stored as separate persistent save-state fields
+
+Grouping rule:
+
+- `waterContribution` should represent moisture shortage after current water support is considered
+- `soilContribution` should represent poor fertility plus burial-related land pressure
+- `windContribution` should represent raw exposure from wind and sand after current protection is considered
+- `heatContribution` should represent heat exposure after current shade and moisture relief are considered
+- if tuning later adds or changes sub-factors, engineering may rebalance which internal sub-terms feed which grouped channel, but the player-facing grouped channels should remain stable unless there is a strong usability reason to change them
+
+Player-facing limiter rule:
+
+- sort the current grouped channels by value
+- show the highest one as the `Primary Limiter`
+- optionally show the second highest one as the `Secondary Limiter`
+- the player should be able to understand from inspection whether the current patch mainly needs water, better soil recovery, more wind protection, or more heat relief
+- `tileSoilSalinity` should be reported separately as a density-cap warning, not as one of the short-term pressure buckets
+
+Prototype diagnosis examples:
+
+- dominant `waterContribution` -> `Needs Water`
+- dominant `soilContribution` -> `Poor Soil` or `Buried`
+- dominant `windContribution` -> `Too Exposed`
+- dominant `heatContribution` -> `Too Hot`
 
 - `densityGainPerMinute = 0`
 - `densityLossPerMinute = 0`
