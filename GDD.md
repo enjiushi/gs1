@@ -427,7 +427,7 @@ Each tile should conceptually contain these layers:
 
 | Layer | Max Occupancy | Purpose | Prototype Examples |
 |---|---|---|---|
-| `terrainLayer` | `1` | Base terrain definition and core flags | `PureSand`, `PoorSoil`, `FirmSoil`, `Rock`, `WaterEdge` |
+| `terrainLayer` | `1` | Base terrain definition and core flags | `Ground`, `Rock` |
 | `groundCoverLayer` | `1` | Surface-cover type or material that prepares or protects land beneath living plants | `Straw Checkerboard` |
 | `livingPlantLayer` | `1` plant type | Main living plant type occupying the tile; density measures how much of that type fills the tile | Any living prototype plant |
 | `structureLayer` | `1` footprint reservation per tile | Player-built support devices and camp structures | Shelter, irrigation device, sensor, workshop, solar utility |
@@ -460,21 +460,18 @@ Buildability rule:
 
 Recommended prototype interpretation:
 
-| Terrain | Traversable | Plantable | Starting `tileSoilFertility` | Notes |
+| Terrain | Traversable | Plantable | Prototype Role | Notes |
 |---|---|---|---|---|
-| `PureSand` | Yes | Yes | `5` | Most hostile open tile; best early use case for `Straw Checkerboard` |
-| `PoorSoil` | Yes | Yes | `25` | Weak early tile that wants support |
-| `FirmSoil` | Yes | Yes | `55` | Safest general-purpose tile class |
-| `Rock` | No | No | `0` | Hard blocker |
-| `WaterEdge` | No | No | `0` | Boundary / feature tile, not prototype play space |
+| `Ground` | Yes | Yes | Main playable terrain | Tile quality should come from runtime meters such as `tileSoilFertility`, `tileMoisture`, `tileSoilSalinity`, `tileSoilStability`, and `tileSandBurial`, not from many separate terrain classes |
+| `Rock` | No | No | Hard blocker terrain | Cannot grow plants or host structures, but should be able to provide local shade and wind protection to nearby `Ground` tiles if that support rule is used |
 
-Engineering can later expand terrain types, but the prototype should keep the flag behavior simple.
+Engineering can later expand terrain types, but the prototype should keep the base terrain layer simple.
 
-For the prototype, terrain type is the easiest way to set fertility baseline. Runtime systems should then modify `tileSoilFertility` continuously from that starting value.
+For the prototype, most meaningful ground variation should come from tile meters rather than many terrain IDs. Base terrain should answer "is this playable ground or a blocker?" while runtime meters answer "how good is this tile right now?"
 
 #### Prototype Secondary Tile Traits
 
-For the prototype, plantable tiles may also carry one salinity trait independent of base `terrainTypeId`:
+For the prototype, plantable `Ground` tiles may also carry one salinity trait independent of base `terrainTypeId`:
 
 - `tileSoilSalinity` in range `0-100`
 
@@ -486,7 +483,7 @@ Prototype interpretation:
 
 Important rule:
 
-- `tileSoilSalinity` should be authored or generated as a tile trait layered on top of `PureSand`, `PoorSoil`, or `FirmSoil`, not as a whole separate terrain type
+- `tileSoilSalinity` should be authored or generated as a tile trait layered on top of `Ground`, not as a whole separate terrain type
 - this keeps the prototype simple while still adding a meaningful placement decision
 
 #### Device Footprints
