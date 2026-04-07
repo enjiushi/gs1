@@ -1248,13 +1248,17 @@ This keeps completion bookkeeping readable and concrete.
 
 ### Contractors
 
-Contractors are optional paid help, not a permanent workforce. Each contractor has a finite amount of daily work-energy. They automatically contribute to valid in-progress tasks such as planting, building, or hauling. If no work remains or they exhaust their energy, they leave.
+Contractors are optional paid help, not a permanent workforce. In the prototype, hiring contractors should create a paid contractor work pool rather than a fragile per-call estimate. That work pool can be assigned to valid in-progress tasks such as planting, building, or hauling whenever the player wants.
 
 This system keeps hired labor useful but simple:
 
 - No deep AI scheduling in v1
 - No persistent named colony crew
 - Labor is a money-for-time tradeoff
+- purchased contractor work should only be consumed by actual completed work, not by the player's imperfect prediction
+- if the player assigns too much contractor help to a task, any unused remainder should stay in the current site's contractor work pool for later use
+- if there is no valid work to do, contractor help should simply remain idle instead of being wasted
+- the player's decision should be when to spend contractor work, not how perfectly to estimate the exact remaining labor on a task
 
 ### Power And Utilities
 
