@@ -1264,6 +1264,15 @@ This system keeps hired labor useful but simple:
 
 There is no fuel economy in v1. Solar-backed devices and purchased infrastructure support site operations. This keeps the focus on water, ecology, and weather rather than fossil fuel logistics.
 
+Prototype solar-economy rule:
+
+- `Solar Array` output should first satisfy the player's current camp and device utility demand
+- only operational surplus electricity after current local consumption should be sellable
+- surplus electricity should be sold through the `Field Phone`, not through a separate terminal device
+- surplus electricity should be treated as a site-summary export value, not as a carried inventory item
+- exported electricity should be a low-value side income: it should sell for less than normal harvested goods and much less than crafted value-added goods such as fruit juice
+- solar income should reward a well-maintained support base, but it should never outcompete the main plant, contract, and crafting economy
+
 ### Prototype Device Roster (Prototype)
 
 The prototype should use a small device set that supports the plant game, worker survival, forecasting, and recovery without turning the project into a full utility-network sim.
@@ -1315,7 +1324,7 @@ Prototype rules:
 | `Drip Irrigator` | Irrigation | `1x2` | `AnyHeight` | `money 180`, `parts 4` | Adds steady moisture support to nearby plant tiles and helps low-density plants establish | Efficiency collapses when buried, damaged, or if local water support is too low |
 | `Wind Fence` | Protection utility | `1x2` | `None` | `money 100`, `parts 2` | Adds local `tileWindProtection`, especially useful for exposed edges and storm-facing lanes | Provides little recovery value and degrades under repeated sand pressure |
 | `Weather Mast` | Sensor | `1x1` | `None` | `money 160`, `parts 3` | Improves forecast precision, earlier warnings, and exposure readouts for planning | Storm hits and burial can reduce forecast quality until repaired or cleared |
-| `Solar Array` | Solar utility | `2x2` | `LowOnly` | `money 220`, `parts 5` | Improves nearby `deviceEfficiency` and supports stable utility output without fuel logistics | Storm damage and burial can sharply reduce output until repaired or cleared |
+| `Solar Array` | Solar utility | `2x2` | `LowOnly` | `money 220`, `parts 5` | Improves nearby `deviceEfficiency`, supports stable utility output without fuel logistics, and can create small sellable surplus electricity when site demand is already covered | Storm damage and burial can sharply reduce output until repaired or cleared |
 | `Field Workshop` | Workshop / Repair | `2x2` | `None` | `money 200`, `parts 4` | Enables repairs and simple field crafting actions | Slower to restore after major damage and wants a reasonably safe camp core |
 
 #### Structure Family Roles
@@ -1327,7 +1336,7 @@ Use these family expectations in prototype tuning:
 - protection utilities should mainly improve `tileWindProtection`, `tileShade`, or both, and reduce storm losses
 - sensors should mainly improve forecast lead time, forecast precision, and hazard readout clarity
 - workshops should mainly enable repair and emergency-prep actions, not deep production chains
-- solar utilities should mainly improve nearby `deviceEfficiency`, not create a separate power-minigame
+- solar utilities should mainly improve nearby `deviceEfficiency` and optionally generate a small low-value export surplus, not create a separate power-minigame
 
 Prototype faction-gating note:
 
@@ -2612,6 +2621,7 @@ The main economic inputs are:
 - Government contract rewards
 - Field output from stable plants
 - Selling approved goods through the `Field Phone`
+- Selling surplus electricity through the `Field Phone` after local utility demand is already covered
 
 The main economic outputs are:
 
@@ -2623,6 +2633,12 @@ The main economic outputs are:
 - Purchasing revealed `Site Unlockables` on the current site
 
 Contract rewards should vary enough to change decision-making between runs. Some campaigns should tempt the player with better short-term cash, while others reward plant progression, utility access, or safer expansion. Payback randomness should reshape priorities, not invalidate planning.
+
+Prototype sell-value hierarchy:
+
+- crafted value-added goods should sell for the highest prices
+- normal harvested goods should sit in the middle
+- exported surplus electricity should sit clearly below harvest value and mainly function as supplemental income from a strong solar setup
 
 Money is the short-term tactical currency. It is primarily for surviving and scaling the current `Site`. If the player spends money on a revealed `Site Unlockable` or on a premium direct-purchase unlockable, that money is not available for water, labor, or emergency recovery on the same site.
 
