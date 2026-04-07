@@ -333,6 +333,7 @@ World and campaign values:
 - `playerNourishment`
 - `playerEnergy`
 - `playerMorale`
+- `campDurability`
 - `fullyGrownTileCount`
 - `siteCompletionTileThreshold`
 - `campaignDaysRemaining`
@@ -402,6 +403,7 @@ Display rule:
 - Money, `Reputation`, `Faction Reputation`, stack counts, `fullyGrownTileCount`, `siteCompletionTileThreshold`, and `campaignDaysRemaining` are native integers and should display as exact integers
 - `tileSoilFertility` is the long-lived land-improvement meter used at runtime; it affects both plant growth speed and how well the tile retains moisture
 - `tileSoilSalinity` should also be shown through a simple overlay or inspection readout because it directly affects plant choice on some tiles
+- `campDurability` should be visible as a base-condition meter because it directly controls how much protection and recovery value the camp can still provide
 
 #### Fixed-Step Update Order
 
@@ -412,7 +414,7 @@ For each fixed simulation step, resolve systems in this order:
 3. Resolve completed player, contractor, and device actions for this step such as watering, clearing burial, repair completion, or planting completion.
 4. Rebuild derived local modifiers from current tile contents and nearby effects, especially `tileWindProtection`, `tileShade`, `tileWaterSupport`, and active device output.
 5. Apply ongoing exposure and consumption to the worker, contractors, devices, and vulnerable stored resources.
-6. Apply hazard pressure and environmental damage for this step, including erosion, plant density loss, burial gain, device damage, and resource loss.
+6. Apply hazard pressure and environmental damage for this step, including erosion, plant density loss, burial gain, device damage, camp durability loss, and resource loss.
 7. Apply recovery and beneficial change for this step, including plant density gain, salinity reduction, soil-fertility improvement, moisture recovery from watering or support, player recovery, and site stabilization gains, if current conditions allow.
 8. Recompute threshold-derived states such as density labels, plant trend states, death, or restored pocket status.
 9. Run slower pulse checks whose timers have elapsed, including natural spread attempts, output pulses, task trigger checks, and other low-frequency site logic.
@@ -1059,20 +1061,28 @@ That tradeoff is the core feeling. Harsh events should create agency through dan
 
 ## 10. Site Management
 
-### Camp Support
+### Player Base
 
-Each `Site` includes a light support camp rather than a full colony. The camp provides the minimum infrastructure needed to survive and work effectively.
+Each `Site` includes a player base camp rather than an abstract support camp or a full colony. The base is the player's anchored safe core on the site: the place where they shelter, store harvest and water, place camp-side crafting or utility devices, receive deliveries, and recover between field pushes.
 
-Core camp functions:
+Core base functions:
 
-- Shelter and recovery
-- Storage
-- Crafting
+- Shelter and recovery for the player
+- Storage for harvest, water, seeds, parts, and other carried supplies
+- Placement space for camp-side crafting, repair, and utility devices
 - Delivery intake for phone-ordered supplies and hires
 - Limited contractor coordination
-- Water and utility support
+- Strong local wind, heat, and dust protection compared with open field tiles
 
-The camp should feel expandable, but it is not a city builder in v1.
+Prototype base durability rule:
+
+- the base should have `campDurability` in the `0-100` range
+- the base should provide a strong local protection pocket by default, but its effective wind, heat, dust, and recovery protection should scale down as `campDurability` falls
+- normal harsh conditions should chip away at exposed `campDurability` over time, while major hazard events should remove it much faster
+- nearby protection plants, favorable terrain shape, and dedicated shelter or protection structures should reduce or fully offset base durability loss if the camp edge is well sheltered
+- if `campDurability` falls too far, camp-side recovery, storage safety, and nearby utility reliability should all weaken until the base is repaired or re-protected
+
+The base should feel expandable, but it is not a city builder in v1.
 
 ### Site Completion And Campaign Time
 
