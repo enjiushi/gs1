@@ -1400,8 +1400,8 @@ Plants are role-based rather than based on exact real species in the first draft
 
 The long-term taxonomy can still use three broad families:
 
-- Protector plants: reduce wind, shield neighboring tiles, and help young growth survivep
-- Restorative plants: improve soil fertility, reduce erosion, retain moisture, or lower local heat pressure.
+- Protector plants: reduce wind, provide shade, lower local heat pressure, shield neighboring tiles, and help young growth survive.
+- Restorative plants: improve soil fertility, reduce erosion, retain moisture, or gradually reduce tile salinity.
 - Output plants: provide limited economic or food value without replacing the restoration focus.
 
 For the prototype, however, the more important lens is four gameplay roles:
@@ -1413,7 +1413,7 @@ For the prototype, however, the more important lens is four gameplay roles:
 
 Each prototype plant should combine 2 of these roles so even a very small roster can still create placement decisions and simple combo stories.
 
-Some prototype plants can also carry a secondary worker-support identity, but the main balance reading should still come from these core ecological roles.
+Some prototype plants can also carry a secondary worker-support identity or salinity-rehabilitation identity through `Salt Tolerance` and `Salinity Reduction` tags, but the main balance reading should still come from these core ecological roles.
 
 ### Plant Traits
 
@@ -1453,7 +1453,7 @@ For prototype concept verification, the plant system should stay intentionally s
 
 - mixed-role plants are more interesting than single-purpose plants
 - neighbor-tile effects create readable placement decisions
-- protection, anti-dehydration, fertilization, and output can form a satisfying loop
+- protection, anti-dehydration, fertilization, output, and salinity rehabilitation can form a satisfying loop
 - players enjoy building small local combos under environmental pressure
 
 The prototype target is a few plants, not a full roster. If this smaller set is not fun, expanding the content count will not solve the core problem.
