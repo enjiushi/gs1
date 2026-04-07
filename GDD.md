@@ -793,7 +793,7 @@ The prototype only needs a small event set:
 | Event | Typical Modifier Pattern | Main Gameplay Pressure |
 |---|---|---|
 | `HeatWave` | high `eventHeatModifier`, small `eventWindModifier`, small `eventSandModifier` | hydration drain, energy drain, exposed worker pressure, weak seedling survival |
-| `Sandstorm` | medium `eventHeatModifier`, high `eventWindModifier`, very high `eventSandModifier` | visibility collapse, burial, plant density loss, device damage, movement pressure |
+| `Sandstorm` | medium `eventHeatModifier`, high `eventWindModifier`, very high `eventSandModifier` | visibility collapse, extreme wind-sand exposure, burial, device damage, movement pressure |
 | `CompoundFront` | high values in all three channels | rare prototype high-tier event that tests the full support layout |
 
 Prototype limits:
@@ -887,14 +887,23 @@ Design consistency rule:
 
 - each weather channel should leave readable artifacts on at least 3 layers at once when relevant: player pressure, land/tile condition, and plant growth or degeneration
 
-When `eventState` is `Peak`, also apply event-type-specific multipliers to:
+When `eventState` is `Peak`, the event should mainly push the weather system itself into extreme values rather than bypassing it with separate direct plant-damage rules.
 
-- exposure-driven plant density loss
+During `Peak`, event-type-specific multipliers should mainly apply to:
+
+- `eventHeatModifier`
+- `eventWindModifier`
+- `eventSandModifier`
+- worker outdoor action speed penalties
+- worker hydration and energy drain
+- device damage pressure
+
+Those extreme weather values should then be what actually causes:
+
+- high plant `growthPressure`
 - plant density loss on under-protected tiles
 - `tileSandBurial` gain
 - `deviceEfficiency` loss
-- worker outdoor action speed
-- worker hydration and energy drain
 
 When `eventState` enters `Aftermath`, the event should stop dealing peak pressure, but it should leave behind recoverable problems:
 
@@ -1998,7 +2007,7 @@ Prototype diagnosis examples:
 - `densityGainPerMinute = baseGrowthPerMinute * clamp(1 - growthPressure / 55, 0, 1)`
 - if `growthPressure > 35`, apply `densityLossPerMinute += (growthPressure - 35) * 0.04`
 - if `tilePlantDensity > salinityDensityCap`, apply `densityLossPerMinute += 0.4 + (tilePlantDensity - salinityDensityCap) * 0.06`
-- if an extreme hazard is in peak phase and the plant's weakest exposure channel is currently failing, apply an additional event-defined density loss modifier
+- peak-phase events should increase plant danger by driving `weatherHeat`, `weatherWind`, or `weatherSand` higher through event modifiers, not by adding a separate direct plant-density-loss term
 
 Fragility modifier:
 
