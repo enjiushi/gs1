@@ -1240,8 +1240,9 @@ Never hazard-destroy:
 For prototype architecture, use these relationships:
 
 - `fullyGrownTileCount` is the explicit completion value that matters for finishing a site
-- inventory, shelter, water, and devices matter because they help the player create and preserve more `Fully Grown Tile`s
-- changing inventory should affect what the player can build, plant, repair, or carry, not silently change a hidden site-completion meter
+- inventory, shelter, water, and devices are separate support systems; they do not change completion directly
+- those support systems matter because they change what actions the player can perform, how safely the player can perform them, and how well planted tiles can survive and mature over time
+- inventory changes should only affect practical action capacity such as carrying, planting, building, repair, watering, or harvest flow
 
 This keeps completion bookkeeping readable and concrete.
 
