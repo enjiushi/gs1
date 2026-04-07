@@ -1198,7 +1198,7 @@ Use these prototype resource-flow rules:
 - structure construction can consume from `workerPack`
 - harvesting places goods into `workerPack` first
 - selling through the `Field Phone` should require goods to be present in `campStorage`, not only in `workerPack`
-- camp-side crafting and repair devices should be allowed to consume required materials directly from shared `campStorage`
+- camp-side crafting devices should be allowed to consume required materials directly from shared `campStorage`
 - for the prototype, there should be no distance-cost rule between `Container`s and camp crafting devices, because both are restricted to the player base area
 - `Water Container`s can be transferred from `workerPack` or `campStorage` into a `Water Tank` through a valid water transfer interaction, increasing that tank's `deviceStoredWater`
 - connected `Drip Irrigator`s consume `deviceStoredWater` from linked `Water Tank`s rather than directly consuming water from `workerPack` or `campStorage`
@@ -1308,7 +1308,7 @@ Each prototype structure definition should provide:
 | `waterStorageCapacity` | Maximum stored water if the structure is a water-storage device |
 | `waterUsePerMinute` | Stored-water consumption rate if the structure actively irrigates |
 | `forecastSupport` | Forecast precision and warning support if any |
-| `craftingSupport` | Whether this device unlocks crafting or repair actions |
+| `craftingSupport` | Whether this device unlocks camp crafting actions |
 
 Prototype rules:
 
@@ -1335,7 +1335,7 @@ Prototype rules:
 | `Wind Fence` | Protection utility | `1x1` | `None` | `money 100`, `parts 2` | Adds local `tileWindProtection`, especially useful for exposed edges and storm-facing lanes | Provides little recovery value and degrades under repeated sand pressure |
 | `Weather Mast` | Sensor | `1x1` | `None` | `money 160`, `parts 3` | Improves forecast precision, earlier warnings, and exposure readouts for planning | Storm hits and burial can reduce forecast quality until repaired or cleared |
 | `Solar Array` | Solar utility | `1x1` | `LowOnly` | `money 220`, `parts 5` | Improves nearby `deviceEfficiency`, supports stable utility output without fuel logistics, and can create small sellable surplus electricity when site demand is already covered | Storm damage and burial can sharply reduce output until repaired or cleared |
-| `Field Workshop` | Workshop / Repair | `1x1` | `None` | `money 200`, `parts 4` | Enables repairs and simple field crafting actions | Slower to restore after major damage and wants a reasonably safe camp core |
+| `Field Workshop` | Workshop / Crafting | `1x1` | `None` | `money 200`, `parts 4` | Enables camp crafting actions using materials from shared `campStorage` | Crafting access depends on the workshop staying intact and reachable |
 
 #### Structure Family Roles
 
@@ -1345,7 +1345,7 @@ Use these family expectations in prototype tuning:
 - irrigation devices should mainly improve water access, `tileMoisture`, and low-density plant survival, but only while connected stored water is available
 - protection utilities should mainly improve `tileWindProtection`, `tileShade`, or both, and reduce storm losses
 - sensors should mainly improve forecast lead time, forecast precision, and hazard readout clarity
-- workshops should mainly enable repair and emergency-prep actions, not deep production chains
+- workshops should mainly enable simple camp crafting and material conversion, not repair automation or deep production chains
 - solar utilities should mainly improve nearby `deviceEfficiency` and optionally generate a small low-value export surplus, not create a separate power-minigame
 
 Prototype faction-gating note:
@@ -1390,7 +1390,7 @@ This roster should create a few clear early strategic patterns:
 - use `Water Tank` plus linked `Drip Irrigator`s to help fragile starter plants survive their first growth window, while keeping the tanks filled
 - use `Weather Mast` to turn forecast knowledge into a real planning advantage
 - use `Solar Array` to make a mature support pocket feel operationally stronger instead of just greener
-- use `Field Workshop` to recover faster after major hazard events instead of waiting passively
+- use `Field Workshop` to craft useful supplies from stored materials; it does not directly speed up hazard recovery by itself
 
 ## 11. Ecology And Restoration Systems
 
