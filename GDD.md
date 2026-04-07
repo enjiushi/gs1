@@ -82,9 +82,9 @@ These terms are stable and should be used consistently in future design, UI, and
 | `Camp Support` | The light support infrastructure on a `Site`, including shelter, `Container`s, service devices, and hired labor access. |
 | `Player Condition` | The worker's physical and mental state, represented by survival meters such as hydration, hunger, energy, and morale. |
 | `Aftermath Relief Offer` | A faction support offer that can appear after a harsh event enters `Aftermath`; its strength depends on current `Faction Reputation` and site damage. |
-| `Protection Coverage` | The total local protection on a tile or patch from plant adjacency, terrain shelter, devices, and temporary field reinforcement; higher coverage reduces how hard hazards can hit that area. |
+| `Wind Protection` | The total local wind-erosion shielding on a tile or patch from plant adjacency, terrain shelter, and devices; higher protection reduces exposure damage and fertility loss. |
 | `Plant Density` | The current strength and maturity of living cover or plant-derived starter cover on a tile or cluster; higher density means stronger traits, better survival, and possible natural spread for living plants, while lower density means weaker effects and higher hazard vulnerability. |
-| `Plant Stress` | Accumulated environmental pressure on a planted tile; if unmanaged, it pushes the plant toward withering or death. |
+| `Plant Trend` | The derived direction of plant density on a tile, shown as `Growing`, `Holding`, or `Withering`, based on whether the patch is gaining or losing density. |
 | `Plant Trait` | A special property attached to a plant family or unlocked variant that modifies placement value, survival, or local ecological effects. |
 | `Regional Support Output` | The passive benefit a stabilized `Site` contributes to nearby sites on the `Regional Map`, including loadout resources and small ecological spillover effects such as protection or fertility support. |
 
@@ -127,7 +127,7 @@ The long-term replay goal is for players to finish a campaign and immediately im
 4. Pursue whichever `Site Task`s best fit the current terrain, weather, active tech build, short-term reward priorities, and desired faction alignment.
 5. Prepare tiles and place early protective or restorative plants in the most exposed lanes first.
 6. Build key support devices such as irrigation, sensors, or service stations.
-7. Watch weak low-density zones for `Plant Stress`, erosion, burial, and other degeneration before they spread.
+7. Watch weak low-density zones for density loss, erosion, burial, and other degeneration before they spread.
 8. Balance personal survival against site growth, repairs, contract deadlines, and the pressure to finish current tasks so new opportunities can enter the pool.
 9. Use the `Field Phone` to spend money on revealed `Site Unlockables`, supplies, harsh-event response, or contractors when needed.
 10. Use normal field work such as burial clearing, watering, and repair under harsh-event pressure when needed to protect planted regions or rescue failing utility lines; sometimes sacrifice one fringe area to save a core patch, then evaluate any `Aftermath Relief Offer`s once the event breaks.
@@ -142,7 +142,7 @@ The intended prototype rhythm is:
 1. Read the current terrain and forecast, then identify the most dangerous exposed patch.
 2. Spend limited early money and energy on a small protective plant combo or support device.
 3. Try to survive the next heat spike, wind lane, sandburst, or erosion window.
-4. If the patch survives, use its output, safety, or restored stability to unlock a better plant or tool.
+4. If the patch survives, use its output, safety, or restored fertility to unlock a better plant or tool.
 5. Expand into a new patch or upgrade the first one from safe to productive.
 6. When the environment hits back, choose whether to rescue the failing area with normal work, or abandon it and save the core, knowing that harsh-event conditions make every outdoor action slower, riskier, and more exhausting.
 7. Reinvest the gains from survival into the next stronger combo.
@@ -150,7 +150,7 @@ The intended prototype rhythm is:
 This creates the intended strategy arc:
 
 - good choices create safer land, stronger plants, more output, and easier future expansion
-- bad choices create stress, withering, money loss, risky rescue work, and local collapse that must be reversed deliberately
+- bad choices create density loss, withering, money loss, risky rescue work, and local collapse that must be reversed deliberately
 
 The important prototype target is not perfect simulation. It is to make each planted patch feel like a strategic bet that can either mature into a thriving foothold or slide into a costly recovery problem.
 
@@ -210,7 +210,7 @@ Each `Site` should be generated with enough variation that replaying the same ca
 - Exposure to wind corridors
 - Shelter opportunities
 - Water access or lack of it
-- Soil stability baseline
+- Soil fertility baseline
 - Terrain difficulty for the fixed early plant unlock set
 - Contract-friendly versus survival-hostile terrain
 
@@ -317,7 +317,13 @@ This keeps the simulation readable and stable while still feeling continuous to 
 
 Use internal continuous values for simulation, but present most player-facing meters as floored integers in UI.
 
+Important cleanup rule:
+
+- terrain soil state, occupancy state, temporary overlay state, and derived local modifiers should stay conceptually separate even if engineering stores them on one tile runtime struct
+
 Continuous runtime values:
+
+World and campaign values:
 
 - `worldTimeMinutes`
 - `weatherHeat`
@@ -327,18 +333,30 @@ Continuous runtime values:
 - `playerHunger`
 - `playerEnergy`
 - `playerMorale`
-- `tilePlantDensity`
-- `tileGroundCoverDensity`
-- `tilePlantStress`
-- `tileProtectionCoverage`
-- `tileMoisture`
-- `tileSoilFertility`
-- `tileSoilSalinity`
-- `tileSoilStability`
-- `tileSandBurial`
 - `fullyGrownTileCount`
 - `siteCompletionTileThreshold`
 - `campaignDaysRemaining`
+
+Persistent terrain soil meters on plantable `Ground`:
+
+- `tileSoilFertility`
+- `tileMoisture`
+- `tileSoilSalinity`
+
+Temporary or hazard-driven overlay values:
+
+- `tileSandBurial`
+
+Derived local modifiers rebuilt every fixed simulation step:
+
+- `tileWindProtection`
+- `tileShade`
+- `tileWaterSupport`
+
+Occupancy intensity or condition values:
+
+- `tilePlantDensity`
+- `tileGroundCoverDensity`
 - `deviceIntegrity`
 - `deviceEfficiency`
 
@@ -368,8 +386,11 @@ Display rule:
 - Continuous player-facing meters use internal float values, but UI can present them as bars with the current number shown on the bar
 - Density labels such as `Seeded`, `Young`, `Established`, and `Dense` should be the main plant state shown to the player; a separate derived trend label such as `Growing`, `Holding`, or `Withering` can show whether that density is improving or collapsing
 - `Plant Density` should be shown both in UI and in tile art; a denser tile should visibly contain more plant coverage, volume, or fullness than a sparse tile
+- `tileSoilFertility`, `tileMoisture`, and `tileSoilSalinity` should be visible through tile inspection and relevant overlays because they are the core land-quality state
+- `tileWindProtection`, `tileShade`, and `tileWaterSupport` are contextual local modifiers; they should usually appear in tile inspection, overlays, or placement previews rather than as permanent HUD bars
+- `tileGroundCoverDensity` belongs to the occupying ground-cover object, not to the underlying terrain soil state
 - Money, `Reputation`, `Faction Reputation`, stack counts, `fullyGrownTileCount`, `siteCompletionTileThreshold`, and `campaignDaysRemaining` are native integers and should display as exact integers
-- `tileSoilFertility` is the main continuous fertility value used at runtime; terrain type sets the starting baseline, and plants, decay, moisture, and hazards modify it over time
+- `tileSoilFertility` is the long-lived land-improvement meter used at runtime; it affects both plant growth speed and how well the tile retains moisture
 - `tileSoilSalinity` should also be shown through a simple overlay or inspection readout because it directly affects plant choice on some tiles
 
 #### Fixed-Step Update Order
@@ -378,11 +399,11 @@ For each fixed simulation step, resolve systems in this order:
 
 1. Advance `worldTimeMinutes`, `dayIndex`, and current day-phase tags.
 2. Advance weather timelines, forecast certainty timers, and extreme-event phase state.
-3. Resolve completed player, contractor, and device actions for this step such as watering, clearing burial, emergency reinforcement, repair completion, or planting completion.
-4. Rebuild derived local support values from current tile contents and nearby effects, especially `tileProtectionCoverage`, moisture support, fertility support, shade support, and active device output.
+3. Resolve completed player, contractor, and device actions for this step such as watering, clearing burial, repair completion, or planting completion.
+4. Rebuild derived local modifiers from current tile contents and nearby effects, especially `tileWindProtection`, `tileShade`, `tileWaterSupport`, and active device output.
 5. Apply ongoing exposure and consumption to the worker, contractors, devices, and vulnerable stored resources.
-6. Apply hazard pressure and environmental damage for this step, including `tilePlantStress`, `tilePlantDensity` loss, burial gain, device damage, and resource loss.
-7. Apply recovery and beneficial change for this step, including plant density gain, stress reduction, player recovery, and site stabilization gains, if current conditions allow.
+6. Apply hazard pressure and environmental damage for this step, including erosion, plant density loss, burial gain, device damage, and resource loss.
+7. Apply recovery and beneficial change for this step, including plant density gain, salinity reduction, soil-fertility improvement, moisture recovery from watering or support, player recovery, and site stabilization gains, if current conditions allow.
 8. Recompute threshold-derived states such as density labels, plant trend states, death, or restored pocket status.
 9. Run slower pulse checks whose timers have elapsed, including natural spread attempts, output pulses, task trigger checks, and other low-frequency site logic.
 
@@ -396,11 +417,11 @@ This order matters:
 
 Use these timing rules for prototype consistency:
 
-- `Plant Stress` resolves continuously every fixed simulation step
+- terrain soil meter changes resolve continuously every fixed simulation step
 - hazard damage resolves continuously every fixed simulation step
 - player recovery and drain resolve continuously every fixed simulation step
 - plant density gain and loss resolve continuously every fixed simulation step
-- density-state and life-state transitions resolve immediately after each fixed simulation step based on current threshold values
+- density-state and trend-state transitions resolve immediately after each fixed simulation step based on current threshold values
 - natural spread resolves discretely on an `ecologyPulse`
 
 Recommended pulse values:
@@ -411,7 +432,7 @@ Recommended pulse values:
 This means:
 
 - growth feels continuous
-- stress feels continuous
+- erosion and moisture loss feel continuous
 - hazards feel continuous
 - spread remains readable and discrete instead of noisy every frame
 
@@ -420,6 +441,24 @@ For the prototype, engineering should treat the internal float values as authori
 ### Tile And Occupancy Rules (Prototype)
 
 The prototype should use one shared tile contract for simulation, placement, save data, overlays, and basic reachability checks.
+
+#### Prototype Tile State Categories
+
+The tile model should separate different kinds of state instead of treating every value as generic "tile state."
+
+| State Type | What It Represents | Prototype Fields | Notes |
+|---|---|---|---|
+| `terrainDefinition` | Base terrain identity and hard placement flags | `terrainTypeId`, `tileTraversable`, `tilePlantable` | Static `Ground` or `Rock` role |
+| `terrainSoilState` | Persistent quality of plantable ground | `tileSoilFertility`, `tileMoisture`, `tileSoilSalinity` | Only meaningful on plantable `Ground` |
+| `occupancyState` | What currently sits on the tile | `groundCoverTypeId`, `tileGroundCoverDensity`, `plantTypeId`, `tilePlantDensity`, `plantTrendState`, `structureTypeId`, `deviceIntegrity`, `deviceEfficiency` | Plants, cover, and structures use their own state |
+| `derivedLocalModifiers` | Nearby support rebuilt every step | `tileWindProtection`, `tileShade`, `tileWaterSupport` | From plants, devices, and rock; not persistent land quality |
+| `overlayState` | Temporary site pressure or tags | `tileSandBurial`, task marker, repair state | Hazard-driven or interaction-driven |
+
+Important cleanup rule:
+
+- `tileGroundCoverDensity` is occupancy state for the current ground cover, not a terrain quality meter
+- `tileWindProtection`, `tileShade`, and `tileWaterSupport` are derived local modifiers, not persistent terrain state
+- the prototype should not use a separate `tileSoilStability` meter
 
 #### Prototype Tile Layers
 
@@ -431,7 +470,7 @@ Each tile should conceptually contain these layers:
 | `groundCoverLayer` | `1` | Surface-cover type or material that prepares or protects land beneath living plants | `Straw Checkerboard` |
 | `livingPlantLayer` | `1` plant type | Main living plant type occupying the tile; density measures how much of that type fills the tile | Any living prototype plant |
 | `structureLayer` | `1` footprint reservation per tile | Player-built support devices and camp structures | Shelter, irrigation device, sensor, workshop, solar utility |
-| `dynamicOverlayLayer` | many transient flags | Temporary state, not persistent occupancy identity | Burial, emergency reinforcement, task marker, repair state |
+| `dynamicOverlayLayer` | many transient flags | Temporary state, not persistent occupancy identity | Burial, task marker, repair state |
 
 For prototype simplicity:
 
@@ -462,29 +501,33 @@ Recommended prototype interpretation:
 
 | Terrain | Traversable | Plantable | Prototype Role | Notes |
 |---|---|---|---|---|
-| `Ground` | Yes | Yes | Main playable terrain | Tile quality should come from runtime meters such as `tileSoilFertility`, `tileMoisture`, `tileSoilSalinity`, `tileSoilStability`, and `tileSandBurial`, not from many separate terrain classes |
+| `Ground` | Yes | Yes | Main playable terrain | Tile quality should come from soil meters such as `tileSoilFertility`, `tileMoisture`, and `tileSoilSalinity`, plus overlay pressure such as `tileSandBurial` and nearby derived modifiers |
 | `Rock` | No | No | Hard blocker terrain | Cannot grow plants or host structures, but should be able to provide local shade and wind protection to nearby `Ground` tiles if that support rule is used |
 
 Engineering can later expand terrain types, but the prototype should keep the base terrain layer simple.
 
 For the prototype, most meaningful ground variation should come from tile meters rather than many terrain IDs. Base terrain should answer "is this playable ground or a blocker?" while runtime meters answer "how good is this tile right now?"
 
-#### Prototype Secondary Tile Traits
+#### Persistent Soil Meters
 
-For the prototype, plantable `Ground` tiles may also carry one salinity trait independent of base `terrainTypeId`:
+For the prototype, every plantable `Ground` tile should carry these three soil meters:
 
+- `tileSoilFertility` in range `0-100`
+- `tileMoisture` in range `0-100`
 - `tileSoilSalinity` in range `0-100`
 
 Prototype interpretation:
 
-- low salinity tiles should be broadly safe for most plants
-- medium salinity tiles should push the player toward tougher or more supportive plants
-- high salinity tiles should strongly encourage salt-tolerant or salt-reducing plants
+- `tileSoilFertility` is the long-lived land-improvement meter; it raises plant growth speed and slows moisture loss by improving water retention
+- `tileMoisture` is the short-lived water-availability meter; it speeds growth when sufficient and slows or reverses it when too low
+- `tileSoilSalinity` is the rehabilitation meter; it should influence which plants can thrive on the tile by capping density, not by acting as a hidden death timer
 
-Important rule:
+Important rules:
 
-- `tileSoilSalinity` should be authored or generated as a tile trait layered on top of `Ground`, not as a whole separate terrain type
-- this keeps the prototype simple while still adding a meaningful placement decision
+- these soil meters belong to plantable `Ground`, not to `Rock`
+- plants, watering, devices, decay, and hazards may modify these meters over time
+- fertility and salinity are persistent land-quality values, while moisture is the most volatile soil meter
+- wind and sand should express erosion through exposure and burial, not through a separate stability meter
 
 #### Device Footprints
 
@@ -629,9 +672,9 @@ For prototype validation, the environment should constantly push against the pla
 | Pressure | Strategic Purpose | Main Side Effects |
 |---|---|---|
 | Heat stress | Forces timing, hydration planning, and anti-dehydration planting | Faster player hydration loss, slower outdoor work, increased plant water demand, weaker seedling establishment |
-| Wind abrasion | Rewards windbreaks and exposed-lane planning | Faster `Plant Stress` gain on exposed tiles, reduced young-plant survival, stronger erosion pressure, harder outdoor work |
-| Sand burial | Creates reactive rescue decisions and maintenance work | Plants and devices can become partially buried, adjacency bonuses weaken, irrigation efficiency drops, movement through the zone slows until cleared |
-| Constant erosion | Prevents idle passive growth and punishes weak layouts over time | Exposed tiles lose soil stability, young plants can regress, dead tiles become harder to re-use, neighboring tiles become more vulnerable |
+| Wind abrasion | Rewards windbreaks and exposed-lane planning | Faster density loss or slower growth on exposed tiles, reduced young-plant survival, stronger erosion pressure, harder outdoor work |
+| Sand burial | Creates reactive rescue decisions and maintenance work | Plants and devices can become partially buried, local support weakens, irrigation efficiency drops, movement through the zone slows until cleared |
+| Constant erosion | Prevents idle passive growth and punishes weak layouts over time | Exposed tiles lose fertility over time, young plants can regress, dead tiles become harder to re-use, neighboring tiles become more vulnerable |
 | Dust fouling | Makes weather have lingering operational consequences even after the storm passes | Solar utilities lose efficiency, sensors become less reliable, shelter or irrigation upkeep becomes more urgent until cleaned or repaired |
 
 These pressures should interact. A strong layout can absorb one or two bad conditions. A weak layout should start to unravel when multiple pressures stack.
@@ -740,7 +783,7 @@ Every extreme event should move through the same phase model:
 | `Inactive` | No active extreme event | Weather comes only from baseline curve and minor gust noise |
 | `Warning` | Forecasted approach window | No large direct modifier yet; player receives warning and prep time |
 | `Build` | Pressure begins rising | Work becomes riskier, visibility may start dropping, and exposed zones start taking meaningful pressure |
-| `Peak` | Main danger window | Strongest modifiers, strongest burial or hydration punishment, main emergency-action phase |
+| `Peak` | Main danger window | Strongest modifiers, strongest burial or hydration punishment, and the most dangerous field-work window |
 | `Decay` | Event is weakening | Still dangerous, but the player can begin broader recovery actions |
 | `Aftermath` | Lingering site disruption | Lower ambient pressure than peak, but burial, fouling, morale hit, and repair backlog remain |
 
@@ -794,13 +837,13 @@ Weather should pressure more than one system at once.
 
 Use this prototype interpretation:
 
-- `weatherHeat` mainly increases worker hydration drain, worker energy drain, and heat-linked plant stress
+- `weatherHeat` mainly increases worker hydration drain, worker energy drain, and heat-linked plant density pressure
 - `weatherWind` mainly increases exposure, work difficulty, and protection demand
 - `weatherSand` mainly increases burial, visibility loss, movement penalties, and device fouling
 
 When `eventState` is `Peak`, also apply event-type-specific multipliers to:
 
-- plant stress gain
+- exposure-driven plant density loss
 - plant density loss on under-protected tiles
 - `tileSandBurial` gain
 - `deviceEfficiency` loss
@@ -853,20 +896,20 @@ Extreme events should also act as the main stress test for plant strategy. A wel
 
 Extreme hazards should not punish every layout equally. The prototype should clearly reward smart placement and layered protection.
 
-Each threatened patch should effectively compare hazard intensity against its local `Protection Coverage`.
+Each threatened patch should effectively compare hazard intensity against its local protection mix, especially `tileWindProtection`, `tileShade`, and moisture support.
 
-Main sources of `Protection Coverage`:
+Main sources of local protection:
 
 - correct support-plant adjacency
 - terrain shelter or favorable terrain shape
-- nearby support devices such as irrigation, shelter, or temporary windbreaks
-- temporary field reinforcement from recent manual intervention
+- nearby support devices such as irrigation, shelter, shade, or windbreaks
+- strong own-tile density and ground cover on the threatened patch
 
 Prototype hazard outcome bands:
 
-- low `Protection Coverage`: severe `Plant Density` loss, strong `Plant Stress`, likely withering or death, and major follow-up recovery cost
-- moderate `Protection Coverage`: noticeable damage and disruption, but the patch remains functional enough to rescue
-- high `Protection Coverage`: the patch largely holds, suffering only limited density loss, temporary stress, reduced output windows, or repair needs
+- low local protection: severe `Plant Density` loss, likely withering or death, and major follow-up recovery cost
+- moderate local protection: noticeable damage and disruption, but the patch remains functional enough to rescue
+- high local protection: the patch largely holds, suffering only limited density loss, reduced output windows, or repair needs
 
 This is a key reward loop. If the player reads the site correctly and builds protection with strategy, extreme weather should still feel dangerous, but it should no longer feel equally destructive. Good planning should convert a disaster into a manageable setback.
 
@@ -1170,7 +1213,8 @@ Each prototype structure definition should provide:
 | `buildTimeMinutes` | In-game minutes required to complete construction |
 | `baseIntegrity` | Starting `deviceIntegrity` value |
 | `burialSensitivity` | How quickly the device loses effectiveness from sand burial |
-| `protectionAura` | Local protection contribution if any |
+| `windProtectionAura` | Local wind-erosion protection contribution if any |
+| `shadeAura` | Local heat or shade contribution if any |
 | `recoveryAura` | Local worker-recovery contribution if any |
 | `waterSupport` | Local moisture or water-readiness support if any |
 | `forecastSupport` | Forecast precision and warning support if any |
@@ -1192,7 +1236,7 @@ Prototype rules:
 | `Shade Canopy` | Shelter / Heat relief | `1x2` | `None` | `money 120`, `parts 3` | Creates a stronger heat-relief pocket for worker recovery and nearby fragile plants | Loses efficiency quickly in strong wind if exposed |
 | `Water Tank` | Water support | `1x1` | `None` | `money 140`, `parts 3` | Increases accessible site water readiness and serves as a local source for watering actions | Can be buried or temporarily inaccessible if the camp zone is compromised |
 | `Drip Irrigator` | Irrigation | `1x2` | `AnyHeight` | `money 180`, `parts 4` | Adds steady moisture support to nearby plant tiles and helps low-density plants establish | Efficiency collapses when buried, damaged, or if local water support is too low |
-| `Wind Fence` | Protection utility | `1x2` | `None` | `money 100`, `parts 2` | Adds local `tileProtectionCoverage`, especially useful for exposed edges and storm-facing lanes | Provides little recovery value and degrades under repeated sand pressure |
+| `Wind Fence` | Protection utility | `1x2` | `None` | `money 100`, `parts 2` | Adds local `tileWindProtection`, especially useful for exposed edges and storm-facing lanes | Provides little recovery value and degrades under repeated sand pressure |
 | `Weather Mast` | Sensor | `1x1` | `None` | `money 160`, `parts 3` | Improves forecast precision, earlier warnings, and exposure readouts for planning | Dust fouling and storm hits reduce forecast quality until cleaned or repaired |
 | `Solar Array` | Solar utility | `2x2` | `LowOnly` | `money 220`, `parts 5` | Improves nearby `deviceEfficiency` and supports stable utility output without fuel logistics | Dust fouling sharply reduces output unless maintained |
 | `Field Workshop` | Workshop / Repair | `2x2` | `None` | `money 200`, `parts 4` | Enables repairs and simple field crafting actions | Slower to restore after major damage and wants a reasonably safe camp core |
@@ -1203,7 +1247,7 @@ Use these family expectations in prototype tuning:
 
 - shelter family devices should mainly improve worker safety, camp protection, and recovery speed
 - irrigation devices should mainly improve water access, `tileMoisture`, and low-density plant survival
-- protection utilities should mainly improve `tileProtectionCoverage` and reduce storm losses
+- protection utilities should mainly improve `tileWindProtection`, `tileShade`, or both, and reduce storm losses
 - sensors should mainly improve forecast lead time, forecast precision, and hazard readout clarity
 - workshops should mainly enable repair and emergency-prep actions, not deep production chains
 - solar utilities should mainly improve nearby `deviceEfficiency`, not create a separate power-minigame
@@ -1261,7 +1305,7 @@ Plants are role-based rather than based on exact real species in the first draft
 The long-term taxonomy can still use three broad families:
 
 - Protector plants: reduce wind, shield neighboring tiles, and help young growth survivep
-- Restorative plants: improve soil stability, reduce erosion, retain moisture, or lower local heat pressure.
+- Restorative plants: improve soil fertility, reduce erosion, retain moisture, or lower local heat pressure.
 - Output plants: provide limited economic or food value without replacing the restoration focus.
 
 For the prototype, however, the more important lens is four gameplay roles:
@@ -1442,7 +1486,7 @@ This keeps the early site loop readable:
 - protect and maintain it through the fragile growth phase
 - survive the local weather check
 - let the patch gain density and become more self-sustaining
-- collect a visible output or stability improvement
+- collect a visible output or fertility improvement
 - reinvest into the next combo
 
 ### Prototype Combo Logic
@@ -1528,7 +1572,7 @@ Each plant should gain clearer value as density rises so growth feels meaningful
 | `Straw Checkerboard` | Fresh straw grid gives immediate sand-fix value on bare sand and strong own-tile wind reduction, but little fertility yet | Starts trapping sand and calming the surface; adjacent starter plants establish more safely | Holds dune movement well while building a better base for nearby living plants through trapped fines and early organic matter | Best barren-tile conversion state; strongest establishment support for nearby living plants, still no output and no natural spread |
 | `Wind Reed` | Minor own-tile wind reduction only | Small adjacent wind reduction and slight dehydration relief | Reliable windbreak for adjacent tiles and better support for nearby fragile plants | Strong perimeter barrier that greatly helps nearby low-density plants survive storms |
 | `Shade Cactus` | Small local shade and weak comfort value | Noticeable local heat relief and slower adjacent water loss | Strong cool pocket; nearby short rests become safer and more efficient | Best local anti-dehydration support and strongest `Energy` and `Morale` recovery feel in its pocket |
-| `Root Binder` | Slight soil lock on its own tile | Modest erosion reduction and fertility support | Solid adjacent fertility and erosion resistance for patch building | Strongest ground-stability anchor and best support for future spread into nearby empty tiles |
+| `Root Binder` | Slight soil lock on its own tile | Modest erosion reduction and fertility support | Solid adjacent fertility and erosion resistance for patch building | Strongest ground-fertility anchor and best support for future spread into nearby empty tiles |
 | `Salt Bean` | Very little yield and slight soil enrichment | Small yield if protected and modest fertility support | Reliable modest output plus good support for neighboring growth | Strong sustained output and stronger enrichment for adjacent tiles and future patch expansion |
 | `Sunfruit Vine` | Almost no yield and extremely fragile without support | Small yield only if nearby support exists | Strong output if protection and fertility remain in place | Peak output state; still support-dependent, but finally resilient enough to justify major protection effort |
 | `Dew Grass` | Faint moisture-softening effect and almost no resilience by itself | Noticeable anti-dryness support and weak fertility improvement | Reliable bridge plant that helps nearby fragile tiles stay alive | Mature moisture-net plant that makes neighboring expansion meaningfully easier |
@@ -1552,7 +1596,7 @@ Important prototype traits for the added plants:
 - `Medicinal Sage`: support-output plant that helps a patch feel inhabited and worth returning to
 - `Sand Willow`: high-work anchor that creates a strong refuge core when the player commits enough support
 
-### Plant Stress And Degeneration (Prototype)
+### Plant Density And Degeneration (Prototype)
 
 Plants should follow a simple visible survival model. They are not guaranteed to grow just because they were placed.
 
@@ -1578,17 +1622,17 @@ Prototype density results:
 - sparse density: little output, fragile protection, high risk of withering on the next bad weather window
 - collapsed density: effective tile failure, usually followed by death or full replacement need
 
-`Protection Coverage` should strongly influence how much density is lost during a severe event:
+`tileWindProtection`, `tileShade`, and nearby water support should strongly influence how much density is lost during a severe event:
 
-- weak coverage: density can collapse quickly
-- decent coverage: density falls, but the patch usually remains worth saving
-- strong coverage: density loss is limited and the patch keeps most of its role value
+- weak local support: density can collapse quickly
+- decent local support: density falls, but the patch usually remains worth saving
+- strong local support: density loss is limited and the patch keeps most of its role value
 
 This is one of the main prototype rewards for good strategy. The player should be able to see that the same hazard which ruins an exposed patch only partially dents a well-supported patch.
 
 Low-density plants should be the most vulnerable part of the lifecycle. This is where the player's maintenance and planning matter most. A patch that survives long enough to become `Established` or `Dense` should be much better at enduring normal site pressure.
 
-`Plant Stress` should come mainly from:
+Density loss should come mainly from:
 
 - wrong plant choice for the current tile exposure
 - poor adjacency or missing support plants
@@ -1597,7 +1641,7 @@ Low-density plants should be the most vulnerable part of the lifecycle. This is 
 - sand burial left uncleared
 - nearby dead tiles reopening the zone to exposure
 
-Good choices lower `Plant Stress` and let a patch become stable. Bad choices raise `Plant Stress` until the patch loses value or collapses.
+Good choices reduce exposure and let a patch become stable. Bad choices create repeated density loss until the patch loses value or collapses.
 
 Good maintenance in the early phase should include:
 
@@ -1623,7 +1667,7 @@ Good spiral example:
 Bad spiral example:
 
 - The player plants greedy output in an exposed lane
-- Heat, wind, or erosion quickly cause `Plant Stress`
+- Heat, wind, or erosion quickly cause rapid density loss
 - `Plant Density` falls, so output drops and neighbor bonuses weaken
 - A major event also burns stored supplies and worsens `Player Condition`
 - The player earns less money and delays recovery purchases
@@ -1685,15 +1729,25 @@ Each occupied `livingPlantLayer` tile should have these authoritative runtime va
 
 - `plantTypeId`
 - `tilePlantDensity` in range `0-100`
-- `tilePlantStress` in range `0-100`
 - `plantTrendState`
-- `tileGroundCoverDensity`
 - `tileMoisture`
 - `tileSoilFertility`
 - `tileSoilSalinity`
-- `tileSoilStability`
-- `tileProtectionCoverage`
+- `tileWindProtection`
+- `tileShade`
+- `tileWaterSupport`
 - `tileSandBurial`
+
+If the same tile also contains `groundCoverLayer`, that cover contributes through:
+
+- `groundCoverTypeId`
+- `tileGroundCoverDensity`
+
+Important modeling rule:
+
+- `tileGroundCoverDensity` belongs to the current ground-cover occupant, not to the underlying terrain soil state
+- `tileWindProtection`, `tileShade`, and `tileWaterSupport` are derived local modifiers rebuilt each fixed simulation step
+- the prototype should not use a separate `tileSoilStability` meter or a separately stored `tilePlantStress` value
 
 Each prototype plant definition should also provide these runtime tuning fields:
 
@@ -1706,14 +1760,16 @@ Each prototype plant definition should also provide these runtime tuning fields:
 | `fertilityNeed` | `0-100` | Minimum fertility needed to maintain growth |
 | `saltTolerance` | `0-100` | How strongly the plant resists salinity-based density-cap reduction |
 | `salinityReductionPower` | `0-100` | How strongly this plant gradually reduces `tileSoilSalinity` while healthy |
-| `stabilityNeed` | `0-100` | Minimum soil stability needed to avoid erosion-related stress |
 | `heatTolerance` | `0-100` | How much ambient heat the plant can endure before taking heat stress |
-| `windTolerance` | `0-100` | How much ambient wind the plant can endure before taking wind stress |
+| `windResistance` | `0-100` | How much ambient wind and erosion pressure the plant can endure |
 | `sandTolerance` | `0-100` | How much sand intensity and burial pressure the plant can endure |
-| `protectionPower` | `0-100` | How strongly this plant contributes to `tileProtectionCoverage` |
+| `protectionPower` | `0-100` | How strongly this plant contributes to nearby `tileWindProtection` |
+| `shadePower` | `0-100` | How strongly this plant contributes to nearby `tileShade` |
+| `waterSupportPower` | `0-100` | How strongly this plant contributes to nearby `tileWaterSupport` if it has a moisture-support identity |
+| `fertilityImprovePower` | `0-100` | How strongly this plant gradually improves `tileSoilFertility` while healthy |
 | `spreadReadiness` | `0-100` | Minimum site support quality needed before this plant may spread |
 | `spreadChance` | `0-100` | Relative chance to create one new starter tile during an ecology pulse |
-| `outputDependency` | `0-100` | How badly output collapses when the tile is stressed or unsupported |
+| `outputDependency` | `0-100` | How badly output collapses when the tile is losing density or unsupported |
 
 Prototype note:
 
@@ -1724,77 +1780,66 @@ Prototype note:
 Ground-cover definitions should provide a smaller parallel data set:
 
 - `groundCoverProtectionPower`
+- `groundCoverMoistureHoldPower`
 - `groundCoverDecayRate`
-- `groundCoverStabilityLiftRate`
 - `groundCoverFertilityLiftRate`
 
-#### Protection Coverage Build Rules
+#### Derived Local Modifier Build Rules
 
-`tileProtectionCoverage` should be rebuilt every fixed simulation step from nearby support. Clamp the final result to `0-100`.
+`tileWindProtection`, `tileShade`, and `tileWaterSupport` should be rebuilt every fixed simulation step from nearby support. Clamp each final result to `0-100`.
 
 Use this prototype contribution budget:
 
-| Source | Max Contribution | Rule |
-|---|---|---|
-| Own-tile living plant | `40` | `40 * (protectionPower / 100) * (tilePlantDensity / 100)` |
-| Own-tile ground cover | `25` | `25 * (groundCoverProtectionPower / 100) * (tileGroundCoverDensity / 100)` |
-| Each orthogonal neighboring living plant | `5` each, `20` total | `5 * (neighbor protectionPower / 100) * (neighbor density / 100)` |
-| Nearby protective device or shelter aura | `15` total | Scale by device protection rating and `deviceEfficiency` |
-| Emergency reinforcement overlay | `20` flat | Added only while the temporary field-reinforcement state is active |
+| Source | `tileWindProtection` | `tileShade` | `tileWaterSupport` | Rule |
+|---|---|---|---|---|
+| Own-tile living plant | `35` | `25` | `10` | Scale by plant density and the relevant plant trait |
+| Own-tile ground cover | `20` | `0` | `0` | Scale by cover density and `groundCoverProtectionPower` |
+| Each orthogonal neighboring living plant | `5` each, `20` total | `4` each, `16` total | `3` each, `12` total | Scale by neighbor density and the relevant plant trait |
+| Nearby device or rock shelter | `25` total | `25` total | `40` total | Scale by device aura, `deviceEfficiency`, or authored rock shelter value |
 
 Rules:
 
 - only orthogonal neighbors contribute in the prototype
-- diagonal neighbors do not contribute to `tileProtectionCoverage`
-- if a tile has no living plant and no ground cover, nearby support may still create some protection, but the tile remains empty until planted or spread into
+- diagonal neighbors do not contribute
+- if a tile has no living plant and no ground cover, nearby support may still create useful local modifiers, but the tile remains empty until planted or spread into
+- rock protection should usually be low-radius and local, just enough to make lee-side placement readable
 - `Straw Checkerboard` uses the own-tile ground-cover contribution, not the living-plant contribution
 
-This budget keeps protection readable:
+This budget keeps local support readable:
 
-- same-tile commitment matters most
-- perimeter building matters second
-- devices and urgent manual work can save a bad situation, but should not fully replace ecological layout
+- wind protection is the main erosion shield
+- shade mainly counters heat and moisture drain
+- water support helps weak tiles establish but does not replace real `tileMoisture`
 
-#### Stress Resolution Rules
+#### Soil Meter Interaction Rules
 
-Every fixed simulation step, each living plant tile should accumulate or shed stress. Use `tilePlantStress` as the main short-term danger value.
+Every fixed simulation step, each plantable `Ground` tile should update its soil meters from weather, occupancy, and support.
 
-First compute raw support deficits:
+Moisture rule:
 
-- `waterDeficit = max(0, waterNeed - tileMoisture)`
-- `fertilityDeficit = max(0, fertilityNeed - tileSoilFertility)`
-- `stabilityDeficit = max(0, stabilityNeed - tileSoilStability)`
+- `moistureDrainPerMinute = max(0, 0.18 + weatherHeat * 0.008 + weatherWind * 0.004 - tileShade * 0.004 - tileSoilFertility * 0.003 - groundCoverMoistureHoldPower * (tileGroundCoverDensity / 100) * 0.10)`
+- `tileMoisture += (wateringGainPerMinute + irrigationGainPerMinute - moistureDrainPerMinute) * stepMinutes`
+- clamp `tileMoisture` to `0-100`
 
-Then compute raw exposure pressure:
+Fertility rule:
 
-- `heatPressure = max(0, weatherHeat - heatTolerance - tileMoisture * 0.20)`
-- `windPressure = max(0, weatherWind - windTolerance - tileProtectionCoverage * 0.50)`
-- `sandPressure = max(0, weatherSand - sandTolerance - tileProtectionCoverage * 0.35 - tileGroundCoverDensity * 0.25)`
-- `burialPressure = max(0, tileSandBurial - sandTolerance)`
+- `plantWindResistance = windResistance * (tilePlantDensity / 100)` if a living plant is present, otherwise `0`
+- `erosionPressure = max(0, weatherWind * 0.70 + weatherSand * 0.90 - tileWindProtection - plantWindResistance - tileGroundCoverDensity * 0.30)`
+- `fertilityLossPerMinute = erosionPressure * 0.03 + max(0, tileSandBurial - 25) * 0.015`
+- `fertilityGainPerMinute = fertilityImprovePower * (tilePlantDensity / 100) * 0.02 + groundCoverFertilityLiftRate * (tileGroundCoverDensity / 100) * 0.02`
+- `tileSoilFertility += (fertilityGainPerMinute - fertilityLossPerMinute) * stepMinutes`
+- clamp `tileSoilFertility` to `0-100`
 
-Prototype per-minute stress gain:
+Interpretation:
 
-- `stressGainPerMinute = waterDeficit * 0.08 + fertilityDeficit * 0.05 + stabilityDeficit * 0.06 + heatPressure * 0.10 + windPressure * 0.10 + sandPressure * 0.12 + burialPressure * 0.10`
-
-Prototype per-minute stress recovery:
-
-- `stressRecoveryPerMinute = max(0, tileMoisture - waterNeed) * 0.03 + max(0, tileSoilFertility - fertilityNeed) * 0.02 + max(0, tileProtectionCoverage - 50) * 0.02`
-
-Fragility modifier:
-
-- if `tilePlantDensity < 25`, multiply `stressGainPerMinute` by `1.35`
-- if `tilePlantDensity >= 80`, multiply `stressGainPerMinute` by `0.80`
-
-Final step resolution:
-
-- `tilePlantStress += (stressGainPerMinute - stressRecoveryPerMinute) * stepMinutes`
-- clamp `tilePlantStress` to `0-100`
-
-This gives low-density plants a dangerous early phase and makes dense protected patches more resilient without making them invulnerable.
+- `tileSoilFertility` is the long-term land quality meter
+- higher fertility directly improves plant growth speed and indirectly improves moisture retention by slowing moisture loss
+- exposed wind and sand erode fertility directly; there is no separate hidden stability meter
+- uncleared burial can permanently set back a tile over time by converting some temporary burial pressure into fertility loss
 
 #### Salinity Density-Cap Rules
 
-In the prototype, salinity should not directly add plant stress. Instead, it should limit how dense a plant can become on that tile.
+In the prototype, salinity should not directly add plant damage. Instead, it should limit how dense a plant can become on that tile.
 
 Use this runtime interpretation:
 
@@ -1817,31 +1862,50 @@ Interpretation:
 
 `tilePlantDensity` should change every fixed simulation step, not only during long pulses.
 
+First compute plant-read inputs:
+
+- `waterReadiness = tileMoisture + tileWaterSupport * 0.35`
+- `fertilityReadiness = tileSoilFertility`
+- `heatPressure = max(0, weatherHeat - heatTolerance - tileShade * 0.50 - tileMoisture * 0.20)`
+- `windPressure = max(0, weatherWind - windResistance - tileWindProtection * 0.60)`
+- `sandPressure = max(0, weatherSand - sandTolerance - tileWindProtection * 0.40 - tileGroundCoverDensity * 0.25)`
+- `burialPressure = max(0, tileSandBurial - sandTolerance)`
+
 A living plant may gain density this step only if all of these are true:
 
-- `tilePlantStress < 60`
 - `tileSandBurial < 70`
-- `tileMoisture >= waterNeed - 10`
-- `tileSoilFertility >= fertilityNeed - 10`
-- `tileSoilStability >= stabilityNeed - 10`
+- `waterReadiness >= waterNeed - 10`
+- `fertilityReadiness >= fertilityNeed - 10`
+- `heatPressure < 40`
+- `windPressure < 40`
+- `sandPressure < 40`
+- `burialPressure < 40`
 
 If those conditions are met:
 
 - `densityGainPerMinute = 0`
 - `densityLossPerMinute = 0`
-- `supportQuality = (tileMoisture + tileSoilFertility + tileSoilStability + tileProtectionCoverage) / 4`
+- `supportQuality = (waterReadiness + fertilityReadiness + tileWindProtection + tileShade) / 4`
 - `growthReadiness = max(0, supportQuality - supportNeed + 20) / 100`
 - `densityGainPerMinute = (growthRate / 100) * 1.6 * growthReadiness * max(0, salinityDensityCap - tilePlantDensity) / 100`
 
-If those conditions are not met, or if `tilePlantStress` is high, density can fall:
+If those conditions are not met, density can fall:
 
 - `densityGainPerMinute = 0`
 - `densityLossPerMinute = 0`
-- if `tilePlantStress >= 60`, apply `densityLossPerMinute += 0.8 + (tilePlantStress - 60) * 0.04`
-- if `tilePlantStress >= 80`, apply an additional `+1.0` density loss per minute
-- if `tileSandBurial >= 80`, apply an additional `+1.2` density loss per minute
+- if `waterReadiness < waterNeed`, apply `densityLossPerMinute += 0.25 + (waterNeed - waterReadiness) * 0.03`
+- if `fertilityReadiness < fertilityNeed`, apply `densityLossPerMinute += 0.15 + (fertilityNeed - fertilityReadiness) * 0.02`
+- if `heatPressure > 0`, apply `densityLossPerMinute += heatPressure * 0.03`
+- if `windPressure > 0`, apply `densityLossPerMinute += windPressure * 0.03`
+- if `sandPressure > 0`, apply `densityLossPerMinute += sandPressure * 0.04`
+- if `burialPressure > 0`, apply `densityLossPerMinute += 0.30 + burialPressure * 0.03`
 - if `tilePlantDensity > salinityDensityCap`, apply `densityLossPerMinute += 0.4 + (tilePlantDensity - salinityDensityCap) * 0.06`
 - if an extreme hazard is in peak phase and the plant's weakest exposure channel is currently failing, apply an additional event-defined density loss modifier
+
+Fragility modifier:
+
+- if `tilePlantDensity < 25`, multiply `densityLossPerMinute` by `1.35`
+- if `tilePlantDensity >= 80`, multiply `densityLossPerMinute` by `0.80`
 
 Final step resolution:
 
@@ -1852,7 +1916,7 @@ Prototype placement values:
 
 - direct player planting creates a new living plant tile at `tilePlantDensity = 20`
 - natural spread creates a new living plant tile at `tilePlantDensity = 20`
-- a newly created tile should start with `tilePlantStress = 15` so early support still matters
+- a newly created tile should begin in a fragile state because low starting density makes early support still matter
 
 #### Plant Trend State Rules
 
@@ -1863,14 +1927,14 @@ Use these prototype rules:
 | `plantTrendState` | Condition |
 |---|---|
 | `Empty` | no living plant on the tile |
-| `Growing` | `tilePlantDensity > 0`, `tilePlantStress < 50`, and `densityGainPerMinute > densityLossPerMinute + 0.05` |
+| `Growing` | `tilePlantDensity > 0` and `densityGainPerMinute > densityLossPerMinute + 0.05` |
 | `Holding` | `tilePlantDensity > 0` and not `Growing`, `Withering`, or `Dead` |
-| `Withering` | `tilePlantDensity > 0` and (`tilePlantStress >= 75` or `tilePlantDensity <= 15` or `densityLossPerMinute > densityGainPerMinute + 0.05`) |
+| `Withering` | `tilePlantDensity > 0` and (`tilePlantDensity <= 15` or `densityLossPerMinute > densityGainPerMinute + 0.05`) |
 | `Dead` | `tilePlantDensity <= 0` after resolution |
 
 Death cleanup rule:
 
-- when a plant reaches `Dead`, clear `plantTypeId`, reset `tilePlantDensity` and `tilePlantStress` to `0`, reduce `tileSoilStability` by `8`, reduce `tileSoilFertility` by `5`, and increase `tileSandBurial` by `10`
+- when a plant reaches `Dead`, clear `plantTypeId`, reset `tilePlantDensity` to `0`, reduce `tileSoilFertility` by `5`, and increase `tileSandBurial` by `10`
 
 This cleanup creates the intended punishment for bad decisions without making the whole site unrecoverable.
 
@@ -1881,7 +1945,8 @@ Output should degrade before a plant dies so the player feels pressure early.
 Prototype rule:
 
 - plants with output should multiply their base yield by `tilePlantDensity / 100`
-- then multiply again by `1 - ((tilePlantStress / 100) * (outputDependency / 100))`
+- `outputPenalty = max(max(0, waterNeed - waterReadiness), max(0, fertilityNeed - fertilityReadiness), heatPressure, windPressure, sandPressure, burialPressure) / 100`
+- then multiply again by `clamp(1 - outputPenalty * (outputDependency / 100), 0, 1)`
 - if `plantTrendState` is `Withering`, output is forced to `0`
 
 This makes greedy output plants visibly stop paying back before they fully collapse.
@@ -1894,14 +1959,13 @@ Each eligible source tile may attempt at most one spread per pulse.
 
 A tile is eligible only if all of these are true:
 
-- `supportQuality = (tileMoisture + tileSoilFertility + tileSoilStability + tileProtectionCoverage) / 4`
+- `supportQuality = (waterReadiness + tileSoilFertility + tileWindProtection + tileShade) / 4`
 - the plant definition allows natural spread
 - `tilePlantDensity >= 85`
-- `tilePlantStress < 25`
+- `densityGainPerMinute > densityLossPerMinute`
 - `tileSandBurial < 30`
-- `tileMoisture >= waterNeed`
+- `waterReadiness >= waterNeed`
 - `tileSoilFertility >= fertilityNeed`
-- `tileSoilStability >= stabilityNeed`
 - `supportQuality >= spreadReadiness`
 - `salinityDensityCap >= 85`
 - current extreme hazard phase is not `Peak`
@@ -1913,16 +1977,16 @@ Candidate target rules:
 - target must have no living plant
 - target must have no `structureLayer`
 - target must have `tileSoilFertility >= fertilityNeed - 10`
-- target must have `tileSoilStability >= stabilityNeed - 10`
-- target must have `tileProtectionCoverage >= 20` or `tileGroundCoverDensity >= 20`
+- target must have `tileMoisture + tileWaterSupport * 0.35 >= waterNeed - 10`
+- target must have `tileWindProtection >= 20` or `tileGroundCoverDensity >= 20`
 - target must offer `salinityDensityCap >= 40` for the spreading plant
 
 Selection and success rules:
 
 - gather all valid candidate targets
-- choose the target with the highest `tileSoilFertility + tileMoisture + tileProtectionCoverage - tileSandBurial - tileSoilSalinity * 0.25`
+- choose the target with the highest `tileSoilFertility + tileMoisture + tileWindProtection + tileShade - tileSandBurial - tileSoilSalinity * 0.25`
 - roll spread success using `spreadChance`
-- on success, place the new tile at `tilePlantDensity = 20` and `tilePlantStress = 15`
+- on success, place the new tile at `tilePlantDensity = 20`
 
 Special rule:
 
@@ -1942,7 +2006,7 @@ Simple runtime rule:
 
 Prototype beneficial-change rule:
 
-- if a living plant has `tilePlantDensity >= 50` and `tilePlantStress < 50`, reduce `tileSoilSalinity` by `salinityReductionPower * 0.002 * stepMinutes`
+- if a living plant has `tilePlantDensity >= 50` and `plantTrendState != Withering`, reduce `tileSoilSalinity` by `salinityReductionPower * 0.002 * stepMinutes`
 
 Clamp rule:
 
@@ -1959,13 +2023,13 @@ Design intent:
 
 `Straw Checkerboard` should follow a separate prototype rule set:
 
-- it uses `groundCoverTypeId` and `tileGroundCoverDensity`, not `plantTypeId` and `tilePlantStress`
+- it uses `groundCoverTypeId` and `tileGroundCoverDensity`, not `plantTypeId` and `plantTrendState`
 - it can exist on the same tile as one living plant type
 - it does not produce output
 - it does not enter `plantTrendState`
 - it does not naturally spread
 - it slowly loses `tileGroundCoverDensity` over time, especially during severe hazards
-- while present, it should gradually increase `tileSoilStability` and slowly improve `tileSoilFertility`
+- while present, it should gradually increase `tileSoilFertility`, add `tileWindProtection`, and slightly reduce moisture loss on its own tile
 
 Prototype decay target:
 
@@ -2290,7 +2354,7 @@ Key rules:
 - Completing a `Site Task` should always grant its guaranteed `Faction Reputation` payout from the publishing `Faction`
 - That `Faction Reputation` payout should be guaranteed on completion, but its amount should scale by task tier or level and task type rather than being chosen from the reward draft
 - A good task choice should depend on current tech build, short-term reward need, active faction events, expected assistant value, current forecast risk, and how many acceptance slots are already committed
-- Tasks should often emerge from live site problems such as a stressed plant cluster, buried irrigation line, failing windbreak, or vulnerable harvest patch
+- Tasks should often emerge from live site problems such as a regressing plant cluster, buried irrigation line, failing windbreak, or vulnerable harvest patch
 - The task pool should refresh periodically over time; when a refresh happens, some tasks can rotate out and new ones can appear
 - Each refresh should also generate a small number of `Task Chain`s when possible
 - If a chain step is left unaccepted on the board, it may rotate out on refresh and break the remaining chain opportunity
@@ -2541,7 +2605,7 @@ Useful milestone layers:
 
 - Contract milestone rewards: each major contract should have 2 to 4 small sub-objectives with immediate payouts
 - `Site Task` completion rewards: the primary 5 to 10 minute target-and-reward layer, centered on revealing a `Task Reward Draft` and choosing `1` unlock, modifier, or resource reward rather than just taking raw cash
-- Zone restoration thresholds: when a local area crosses a stability threshold, it grants a burst reward
+- Zone restoration thresholds: when a local area crosses a restoration threshold, it grants a burst reward
 - Daily field goals: each morning can surface a few lightweight optional objectives tied to current weather and site state
 - Plant chain milestones: first windbreak, first stable food patch, first storm-proof cluster, first medicinal harvest
 - Survival recovery milestones: reaching safe water, safe shelter, or stable energy before a forecasted event
@@ -3386,7 +3450,7 @@ The player should feel pressure, but not have to manage many overlapping bars in
 - keep plant states simple but visible:
 - newly placed and fragile
 - established and protective
-- stressed / regressing
+- regressing / withering
 - do not require the full plant roster or deep adjacency modeling
 
 This is enough to prove that restoration choices change survival and site stability.
@@ -3552,10 +3616,10 @@ This checklist is here to help inspect the whole loop before moving into code-st
 - [x] Tile layers, occupancy rules, and terrain fertility baseline
 - [x] Player condition, environmental pressure, and hazard philosophy
 - [x] Hazard and weather runtime model
-- [x] Emergency field action runtime model
+- [x] Harsh-event field-work runtime model
 - [x] Resource and inventory model
 - [x] Prototype device roster
-- [x] Prototype plant roster, density ladder, stress, degeneration, and spread
+- [x] Prototype plant roster, density ladder, degeneration, and spread
 - [x] Contract board direction and site-task reward model
 - [x] Persistent progression direction
 - [x] Site unlockables, run modifiers, and commendation direction
@@ -3624,19 +3688,19 @@ A forecast warns about a heat wave or sandstorm. The player can respond through 
 
 ### Extreme Hazard Event Check
 
-At least some site runs should contain genuinely fierce environmental events that make failure feel possible for a limited time. During those windows, music, rendering, audio, and survival pressure should all escalate together so the player feels immersed, excited, and uncertain about the outcome. The player should also be forced into meaningful protective choices rather than only waiting passively. If the player survives, the post-event release should feel clearly rewarding and memorable. Survival should not mean zero damage; a bad event should often leave behind reduced `Plant Density`, damaged supplies, lower output, and a real comeback problem. However, strong `Protection Coverage` should materially reduce the damage. Testers should be able to see that good strategic placement changes the result from catastrophic collapse to manageable loss.
+At least some site runs should contain genuinely fierce environmental events that make failure feel possible for a limited time. During those windows, music, rendering, audio, and survival pressure should all escalate together so the player feels immersed, excited, and uncertain about the outcome. The player should also be forced into meaningful protective choices rather than only waiting passively. If the player survives, the post-event release should feel clearly rewarding and memorable. Survival should not mean zero damage; a bad event should often leave behind reduced `Plant Density`, damaged supplies, lower output, and a real comeback problem. However, strong local protection should materially reduce the damage. Testers should be able to see that good strategic placement changes the result from catastrophic collapse to manageable loss.
 
-### Emergency Action Check
+### Harsh-Event Field Work Check
 
 During a severe sandstorm or heat event, the player should be able to perform at least one meaningful normal field action such as burial clearing, watering, or repair that visibly saves or stabilizes part of the site. The player should feel that a specific patch lived because they intervened under pressure, not only because pre-existing passive bonuses absorbed the damage.
 
 ### Restoration Readability
 
-Plant placement creates visible local effects on erosion, wind, heat, moisture, or soil stability. Even with only the prototype plant set, the player should be able to understand how the land is changing because of their decisions and why one small combo is working better than another.
+Plant placement creates visible local effects on erosion, wind, heat, moisture, or soil fertility. Even with only the prototype plant set, the player should be able to understand how the land is changing because of their decisions and why one small combo is working better than another.
 
 ### Plant Degeneration Check
 
-If the player places the wrong plant in the wrong zone, that mistake should become visible through `Plant Stress`, weaker effects, withering, or death. If the player places the right support plants and support devices first, the same zone should be noticeably more survivable and productive.
+If the player places the wrong plant in the wrong zone, that mistake should become visible through density loss, weaker effects, withering, or death. If the player places the right support plants and support devices first, the same zone should be noticeably more survivable and productive.
 
 ### Plant Growth Check
 
