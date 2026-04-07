@@ -690,7 +690,6 @@ For prototype validation, the environment should constantly push against the pla
 | Wind abrasion | Rewards windbreaks and exposed-lane planning | Faster density loss or slower growth on exposed tiles, reduced young-plant survival, stronger erosion pressure, harder outdoor work |
 | Sand burial | Creates reactive rescue decisions and maintenance work | Plants and devices can become partially buried, local support weakens, irrigation efficiency drops, movement through the zone slows until cleared |
 | Constant erosion | Prevents idle passive growth and punishes weak layouts over time | Exposed tiles lose fertility over time, young plants can regress, dead tiles become harder to re-use, neighboring tiles become more vulnerable |
-| Dust fouling | Makes weather have lingering operational consequences even after the storm passes | Solar utilities lose efficiency, sensors become less reliable, shelter or irrigation upkeep becomes more urgent until cleaned or repaired |
 
 These pressures should interact. A strong layout can absorb one or two bad conditions. A weak layout should start to unravel when multiple pressures stack.
 
@@ -780,7 +779,7 @@ The prototype only needs a small event set:
 | Event | Typical Modifier Pattern | Main Gameplay Pressure |
 |---|---|---|
 | `HeatWave` | high `eventHeatModifier`, small `eventWindModifier`, small `eventSandModifier` | hydration drain, energy drain, exposed worker pressure, weak seedling survival |
-| `Sandstorm` | medium `eventHeatModifier`, high `eventWindModifier`, very high `eventSandModifier` | visibility collapse, burial, plant density loss, device fouling, movement pressure |
+| `Sandstorm` | medium `eventHeatModifier`, high `eventWindModifier`, very high `eventSandModifier` | visibility collapse, burial, plant density loss, device damage, movement pressure |
 | `CompoundFront` | high values in all three channels | rare prototype high-tier event that tests the full support layout |
 
 Prototype limits:
@@ -800,7 +799,7 @@ Every extreme event should move through the same phase model:
 | `Build` | Pressure begins rising | Work becomes riskier, visibility may start dropping, and exposed zones start taking meaningful pressure |
 | `Peak` | Main danger window | Strongest modifiers, strongest burial or hydration punishment, and the most dangerous field-work window |
 | `Decay` | Event is weakening | Still dangerous, but the player can begin broader recovery actions |
-| `Aftermath` | Lingering site disruption | Lower ambient pressure than peak, but burial, fouling, morale hit, and repair backlog remain |
+| `Aftermath` | Lingering site disruption | Lower ambient pressure than peak, but burial, damage, morale hit, and repair backlog remain |
 
 Prototype duration targets:
 
@@ -854,7 +853,7 @@ Use this prototype interpretation:
 
 - `weatherHeat` mainly increases worker hydration drain, worker energy drain, and heat-linked plant density pressure
 - `weatherWind` mainly increases exposure, work difficulty, and protection demand
-- `weatherSand` mainly increases burial, visibility loss, movement penalties, and device fouling
+- `weatherSand` mainly increases burial, visibility loss, movement penalties, and device damage risk
 
 When `eventState` is `Peak`, also apply event-type-specific multipliers to:
 
@@ -868,7 +867,7 @@ When `eventState` is `Peak`, also apply event-type-specific multipliers to:
 When `eventState` enters `Aftermath`, the event should stop dealing peak pressure, but it should leave behind recoverable problems:
 
 - extra `tileSandBurial`
-- reduced `deviceEfficiency` from dust or damage
+- reduced `deviceEfficiency` from burial or damage
 - possible camp storage disruption if the camp was exposed
 - lower short-term worker morale until the site feels under control again
 - possible `Aftermath Relief Offer`s from high-reputation factions, giving the player a recovery choice rather than automatic rescue
@@ -1240,7 +1239,7 @@ Prototype rules:
 - device effects should resolve through local aura, adjacency, or simple site-summary contributions, not through full pipe or wire simulation
 - duplicate devices of the same type should stack at `100%` for the first copy and `50%` for each additional overlapping copy
 - a disabled device keeps occupying its footprint until repaired or removed
-- `deviceIntegrity` tracks structural health, while `deviceEfficiency` tracks current functional output after burial, dust, storm damage, or solar support
+- `deviceIntegrity` tracks structural health, while `deviceEfficiency` tracks current functional output after burial, storm damage, or solar support
 - if a structure allows plant sharing, the structure still occupies the tile for buildability and repair logic, but the allowed living plant may remain on that tile and continue resolving its own density and support effects
 
 #### Prototype Structure Set
@@ -1252,8 +1251,8 @@ Prototype rules:
 | `Water Tank` | Water support | `1x1` | `None` | `money 140`, `parts 3` | Increases accessible site water readiness and serves as a local source for watering actions | Can be buried or temporarily inaccessible if the camp zone is compromised |
 | `Drip Irrigator` | Irrigation | `1x2` | `AnyHeight` | `money 180`, `parts 4` | Adds steady moisture support to nearby plant tiles and helps low-density plants establish | Efficiency collapses when buried, damaged, or if local water support is too low |
 | `Wind Fence` | Protection utility | `1x2` | `None` | `money 100`, `parts 2` | Adds local `tileWindProtection`, especially useful for exposed edges and storm-facing lanes | Provides little recovery value and degrades under repeated sand pressure |
-| `Weather Mast` | Sensor | `1x1` | `None` | `money 160`, `parts 3` | Improves forecast precision, earlier warnings, and exposure readouts for planning | Dust fouling and storm hits reduce forecast quality until cleaned or repaired |
-| `Solar Array` | Solar utility | `2x2` | `LowOnly` | `money 220`, `parts 5` | Improves nearby `deviceEfficiency` and supports stable utility output without fuel logistics | Dust fouling sharply reduces output unless maintained |
+| `Weather Mast` | Sensor | `1x1` | `None` | `money 160`, `parts 3` | Improves forecast precision, earlier warnings, and exposure readouts for planning | Storm hits and burial can reduce forecast quality until repaired or cleared |
+| `Solar Array` | Solar utility | `2x2` | `LowOnly` | `money 220`, `parts 5` | Improves nearby `deviceEfficiency` and supports stable utility output without fuel logistics | Storm damage and burial can sharply reduce output until repaired or cleared |
 | `Field Workshop` | Workshop / Repair | `2x2` | `None` | `money 200`, `parts 4` | Enables repairs and simple field crafting actions | Slower to restore after major damage and wants a reasonably safe camp core |
 
 #### Structure Family Roles
@@ -3876,7 +3875,7 @@ Leaving, failing, or restarting a site should reset its site unlock pool, clear 
 
 - Use role-based plant families first, then replace with more specific species later if realism becomes a production goal.
 - Do not expand the plant roster beyond the prototype set until 2-role plants, neighbor effects, and support-dependent output are clearly fun in testing.
-- Keep the first pressure model small. Prototype with a few readable forces such as heat, wind abrasion, burial, erosion, and dust fouling before adding more exotic hazards.
+- Keep the first pressure model small. Prototype with a few readable forces such as heat, wind abrasion, burial, and erosion before adding more exotic hazards.
 - Validate density growth early. The prototype should prove that fragile starter plants can be nursed into self-sustaining patches and that limited natural spread feels like an earned payoff.
 - Validate density-based reward feedback early. Dense restored pockets should sound calmer, feel safer, and provide noticeably better `Energy` and `Morale` recovery than exposed desert.
 - Validate the bare-sand opener early. `Straw Checkerboard` should be strong enough to make pure sand playable, but it should still function as a setup tool that wants living cover to follow it.
