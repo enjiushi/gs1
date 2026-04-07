@@ -676,9 +676,15 @@ The environment is represented through visible site conditions rather than hidde
 
 - Heat
 - Wind
-- Sand
+- Dust
 
 These are not just flavor. They directly affect work speed, exposure risk, plant survival, erosion, and device performance.
+
+Player-facing label rule:
+
+- use `Heat`, `Wind`, and `Dust` as the readable forecast and UI channel names
+- keep `weatherSand` as the internal runtime field name if engineering prefers it
+- avoid using real-world air-quality labels such as `PM2.5` as the main gameplay readout, because the prototype is communicating desert field danger, airborne sand, visibility loss, and burial risk rather than a narrow pollution sim
 
 ### Prototype Environmental Pressure Suite
 
@@ -723,6 +729,14 @@ Weather should also be a major source of replayability. Each campaign and `Site`
 
 This ensures that even similar loadouts or tech plans create different stories across runs.
 
+Player-facing forecast channel rule:
+
+- the forecast should present three clear site-wide weather channels:
+- `Heat`
+- `Wind`
+- `Dust`
+- these should be shown as readable meters, bars, or severity bands rather than hidden numbers once the relevant university forecast upgrades are unlocked
+
 ### Hazard And Weather Runtime Model (Prototype)
 
 The prototype should treat weather as one shared site-wide runtime system that constantly updates `weatherHeat`, `weatherWind`, and `weatherSand`, then layers rarer extreme events on top.
@@ -735,7 +749,7 @@ Use these runtime fields:
 |---|---|---|
 | `weatherHeat` | Continuous `0-100` | Current site-wide heat pressure |
 | `weatherWind` | Continuous `0-100` | Current site-wide wind pressure |
-| `weatherSand` | Continuous `0-100` | Current site-wide airborne sand and visibility pressure |
+| `weatherSand` | Continuous `0-100` | Current site-wide airborne sand, dust-load, and visibility pressure; shown to the player as `Dust` |
 | `siteHeatBias` | Continuous `-20` to `20` | Site-specific baseline heat tendency |
 | `siteWindBias` | Continuous `-20` to `20` | Site-specific baseline wind tendency |
 | `siteSandBias` | Continuous `-20` to `20` | Site-specific baseline loose-sand tendency |
@@ -817,8 +831,20 @@ Prototype forecast output should include:
 
 - predicted event type if one is likely
 - predicted start window
-- predicted intensity band for heat, wind, and sand
+- predicted intensity band for `Heat`, `Wind`, and `Dust`
 - `forecastConfidence`
+
+Forecast readability ladder:
+
+- base readout: event type, rough start window, and broad weather severity language such as `Low`, `Medium`, or `High`
+- first university forecast upgrade: visible `Heat`, `Wind`, and `Dust` channel meters or bars
+- later forecast upgrade: narrower intensity ranges and tighter start windows
+- later forecast upgrade: better confidence readout and clearer identification of which channel is the main threat
+
+Important naming rule:
+
+- the player-facing third channel should be called `Dust` or `Dust Load`, not `Sand`, because it is communicating airborne density, visibility pressure, and burial threat together
+- `weatherSand` may still remain the runtime field name behind that readout
 
 Base prototype forecast values:
 
@@ -839,6 +865,8 @@ Improvement effects:
 - smaller intensity error band
 - smaller start-time error band
 - higher `forecastConfidence`
+- earlier access to visible `Heat`, `Wind`, and `Dust` channel readouts
+- clearer identification of which weather channel is expected to be most dangerous
 
 Important rule:
 
@@ -2326,6 +2354,12 @@ Prototype assistant:
 - `Device Upgrade Support`
 - immediate sample reward should feel technical: one temporary upgrade module, improved forecast window, or boosted device efficiency the player must capitalize on now
 
+Forecast identity:
+
+- the university should be the main prototype source of advanced weather readouts
+- its upgrades should progressively reveal better `Heat`, `Wind`, and `Dust` forecast meters rather than jumping straight to perfect certainty
+- its information advantage should help the player prepare the right response before a hazard window, not erase hazard tension completely
+
 Random-event flavor:
 
 - field trial grant
@@ -2350,6 +2384,8 @@ Tech-branch rough themes:
 - better sensors
 - stronger device efficiency
 - improved forecast precision
+- visible `Heat`, `Wind`, and `Dust` weather meters
+- clearer main-threat forecast diagnosis
 - better draft quality control
 - plant-device synergy
 
@@ -2958,7 +2994,7 @@ Recommended prototype sequence:
 - a university-only `Contract Board` slice and `Tutorial Task Set` that stays focused on university-style jobs for this site
 - previously unlocked factions remain part of long-term progression, but the board still withholds cross-faction comparison here so the player can learn the university's style cleanly
 - `Accepted Task Cap = 2`
-- first fuller forecast/device-planning gameplay
+- first fuller forecast/device-planning gameplay, including clearer `Heat`, `Wind`, and `Dust` readouts once the university forecast concept is introduced
 - Player lesson: "This faction improves precision, devices, and planning quality"
 
 5. `Site 4: Full Prototype Board Proof`
