@@ -1294,6 +1294,11 @@ Use these family expectations in prototype tuning:
 - workshops should mainly enable repair and emergency-prep actions, not deep production chains
 - solar utilities should mainly improve nearby `deviceEfficiency`, not create a separate power-minigame
 
+Prototype faction-gating note:
+
+- `Drip Irrigator`, `Solar Array`, `Weather Mast`, and any `Checkerboard Deployment Machine` variant should primarily sit inside the `Autonomous Region Agricultural University` unlock path for the prototype
+- `Forestry Bureau of Autonomous Region` should still care deeply about water and plant survival, but in prototype it should express that through plant choices, ecology tasks, and support rewards rather than a competing device roster
+
 #### Device Effect Footprint Rules
 
 For the prototype, each device should use one of these simple effect models:
@@ -2109,7 +2114,7 @@ Core fantasy:
 
 Player promise:
 
-- "If I back this faction, I get better information, better devices, and stronger optimization once my basics are stable"
+- "If I back this faction, I get better information, targeted infrastructure, and stronger optimization once my basics are stable"
 
 Onboarding focus:
 
@@ -2119,16 +2124,19 @@ Onboarding focus:
 
 Basic tutorial task types:
 
-- place a sensor or survey post
-- calibrate one device
+- deploy one `Precision Irrigation Line`
+- place one `Solar Shade Rack`
+- operate one `Checkerboard Deployment Machine`
 - scan one risk zone
 - maintain one technical support line through a weather window
 
 Normal task bias:
 
+- precision irrigation deployment
+- solar-shade support placement
+- checkerboard mechanized deployment
 - surveys
 - calibration
-- sensor work
 - device optimization
 - forecast-driven sustain jobs
 - high-precision experiment contracts
@@ -2146,13 +2154,30 @@ Random-event flavor:
 - calibration drift
 - failed experiment
 
+Prototype-exclusive device identity:
+
+- `Precision Irrigation Line`
+- `Solar Shade Rack`
+- `Checkerboard Deployment Machine`
+- for the prototype, these should be university-gated `Site Unlockables`, university task rewards, or university branch unlocks rather than neutral equipment shared equally across factions
+- the player should feel that the university's advantage is not abstract science alone, but visible field infrastructure that changes one patch's survival, efficiency, or preparation quality right now
+
 Tech-branch rough themes:
 
+- precision irrigation efficiency
+- solar-shade microclimate support
+- faster checkerboard deployment
 - better sensors
 - stronger device efficiency
-- better draft quality control
 - improved forecast precision
+- better draft quality control
 - plant-device synergy
+
+Later demo / full-game expansion direction:
+
+- deeper university water-tech can expand into `Deep Well Pump`, brackish-groundwater use, pretreatment, and salt-reduction treatment
+- realistic treatment directions include membrane-based desalination, electrodialysis, and other brackish-water processing methods
+- this branch is intentionally out of prototype scope because it adds too much simulation, maintenance, and balance work for the first playable build
 
 Weakness / tradeoff direction:
 
@@ -2869,7 +2894,7 @@ In the faction prototype, this layer is split into three named branches under on
 |---|---|---|---|
 | `Village Committee` | Tempo, labor flexibility, emergency cleanup, contract throughput | `Workforce Support` | extra contractor capacity, faster repairs, lower hauling friction, deadline forgiveness, stronger chain completion |
 | `Forestry Bureau of Autonomous Region` | Ecological resilience, conservative expansion, harsh-event endurance | `Plant-Water Support` | stronger seedling survival, irrigation efficiency, erosion control, density protection, post-event replanting |
-| `Autonomous Region Agricultural University` | Precision, research, forecasting, device-led optimization | `Device Upgrade Support` | better sensors, stronger device efficiency, experimental trials, better task-quality control, plant-device synergy |
+| `Autonomous Region Agricultural University` | Precision, research, forecasting, device-led optimization | `Device Upgrade Support` | precision irrigation, solar-shade support, checkerboard mechanization, better sensors, stronger device efficiency |
 
 Prototype unlock rule:
 
@@ -2898,7 +2923,7 @@ Branch emphasis should be readable:
 
 - `Village Committee` leans toward work tempo, delivery flow, emergency repair, and pragmatic field logistics
 - `Forestry Bureau of Autonomous Region` leans toward plant survival, water efficiency, anti-erosion defense, and event recovery
-- `Autonomous Region Agricultural University` leans toward devices, sensors, precision planning, and experimental efficiency
+- `Autonomous Region Agricultural University` leans toward visible technical infrastructure such as precision irrigation, solar-backed microclimate support, checkerboard deployment, sensors, and precision planning
 
 This tree should improve planning and resilience without erasing the desert's danger. It should also create meaningful long-horizon tradeoffs. The player should not unlock everything quickly enough for every campaign to converge into the same build.
 
@@ -3320,9 +3345,14 @@ This is enough to prove that restoration choices change survival and site stabil
 
 Use only the smallest device set needed to express the later factions:
 
-- `1` basic water-support device or trench tool for the forestry side
-- `1` basic sensor / survey / forecast-support device for the university side
-- advanced device families, deeper calibration systems, and broad utility categories can be deferred
+- for the prototype, the main technical device family should belong to `Autonomous Region Agricultural University`
+- recommended university prototype set:
+- `Precision Irrigation Line`
+- `Solar Shade Rack`
+- optional simplified `Checkerboard Deployment Machine` as a university action, assistant, or site unlockable
+- `Forestry Bureau of Autonomous Region` does not need its own separate device family in the prototype; it can stay defined by plants, recovery logic, and water-sensitive ecology tasks
+- deeper groundwater pumping, brackish-water use, and salt-treatment branches can be deferred to demo or full-game scope
+- advanced device families, deeper calibration systems, and broad utility categories can still be deferred
 
 The university must exist in play, but it does not need a full technical sandbox.
 
