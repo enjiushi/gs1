@@ -436,11 +436,11 @@ Each tile should conceptually contain these layers:
 For prototype simplicity:
 
 - a tile may contain both `groundCoverLayer` and `livingPlantLayer`
-- a tile may not contain both `livingPlantLayer` and `structureLayer`
 - a tile may not contain both `groundCoverLayer` and `structureLayer`
+- a tile may contain both `livingPlantLayer` and `structureLayer` only if the placed structure explicitly supports plant sharing and the plant's height class is allowed by that structure
 - dynamic overlays do not count as occupancy conflicts
 
-This means `Straw Checkerboard` can prepare a tile and later coexist with one living plant type, but devices still reserve clear build space.
+This means `Straw Checkerboard` can prepare a tile and later coexist with one living plant type, while some structures may also coexist with certain living plants if their sharing rule allows it.
 
 Clarification:
 
@@ -510,9 +510,12 @@ Use these hard rules:
 - one ground-cover type or material per tile maximum
 - one structure-footprint reservation per tile maximum
 - living plants can be planted onto tiles that already have `Straw Checkerboard`
-- structures cannot be placed onto tiles already containing a living plant
 - structures cannot be placed onto tiles already containing `Straw Checkerboard`
 - `Straw Checkerboard` cannot be placed onto tiles already reserved by a structure
+- a structure may share a tile with one living plant only if that structure's `plantShareRule` allows it
+- if a structure allows plant sharing, the tile's living plant must have a `plantHeightClass` at or below the structure's `sharedPlantHeightLimit`
+- if a structure does not allow plant sharing, placing it still requires the tile to contain no living plant
+- if a living plant would grow or be replaced into a height class above the placed structure's allowed sharing limit, that tile becomes an invalid target for that plant until the structure is removed or the plant is changed
 
 This keeps the prototype readable and prevents hidden overlap logic.
 
@@ -541,7 +544,7 @@ Plant placement validates in this order:
 
 1. Target tile is in bounds.
 2. `tilePlantable = true`.
-3. Tile is not reserved by a structure.
+3. If the tile is reserved by a structure, that structure must allow plant sharing for this plant's `plantHeightClass`.
 4. `livingPlantLayer` is empty.
 5. Additional ecological success or failure is handled by the plant systems, not by hidden placement rejection, except where a specific content rule says otherwise.
 
@@ -557,7 +560,7 @@ Structure placement validates in this order:
 1. Every footprint tile is in bounds.
 2. Every footprint tile has `tileTraversable = true`.
 3. No footprint tile is reserved by another structure.
-4. No footprint tile contains a living plant.
+4. If a footprint tile contains a living plant, the structure's `plantShareRule` must allow that plant's `plantHeightClass`.
 5. No footprint tile contains ground cover.
 
 Occupancy validation should happen before any cost is paid or any action timer begins.
@@ -1160,6 +1163,8 @@ Each prototype structure definition should provide:
 |---|---|
 | `structureTypeId` | Unique runtime identity for the structure |
 | `footprintClass` | `1x1`, `1x2`, or `2x2` |
+| `plantShareRule` | Whether the structure may share its footprint with a living plant: `None`, `LowOnly`, `UpToMedium`, or `AnyHeight` |
+| `sharedPlantHeightLimit` | Highest allowed `plantHeightClass` on the same tile if sharing is enabled |
 | `buildMoneyCost` | Exact integer money cost |
 | `buildPartsCost` | Exact `partsBundle` cost |
 | `buildTimeMinutes` | In-game minutes required to complete construction |
@@ -1177,19 +1182,20 @@ Prototype rules:
 - duplicate devices of the same type should stack at `100%` for the first copy and `50%` for each additional overlapping copy
 - a disabled device keeps occupying its footprint until repaired or removed
 - `deviceIntegrity` tracks structural health, while `deviceEfficiency` tracks current functional output after burial, dust, storm damage, or solar support
+- if a structure allows plant sharing, the structure still occupies the tile for buildability and repair logic, but the allowed living plant may remain on that tile and continue resolving its own density and support effects
 
 #### Prototype Structure Set
 
-| Structure | Family | Footprint | Build Cost (Temp) | Main Function | Failure Pressure |
-|---|---|---|---|---|---|
-| `Field Tent` | Shelter | `1x1` | `money 80`, `parts 2` | Creates a small safe rest point and improves short rest recovery on nearby tiles | Can be wind-damaged or buried; weak during severe storms without nearby protection |
-| `Shade Canopy` | Shelter / Heat relief | `1x2` | `money 120`, `parts 3` | Creates a stronger heat-relief pocket for worker recovery and nearby fragile plants | Loses efficiency quickly in strong wind if exposed |
-| `Water Tank` | Water support | `1x1` | `money 140`, `parts 3` | Increases accessible site water readiness and serves as a local source for watering actions | Can be buried or temporarily inaccessible if the camp zone is compromised |
-| `Drip Irrigator` | Irrigation | `1x2` | `money 180`, `parts 4` | Adds steady moisture support to nearby plant tiles and helps low-density plants establish | Efficiency collapses when buried, damaged, or if local water support is too low |
-| `Wind Fence` | Protection utility | `1x2` | `money 100`, `parts 2` | Adds local `tileProtectionCoverage`, especially useful for exposed edges and storm-facing lanes | Provides little recovery value and degrades under repeated sand pressure |
-| `Weather Mast` | Sensor | `1x1` | `money 160`, `parts 3` | Improves forecast precision, earlier warnings, and exposure readouts for planning | Dust fouling and storm hits reduce forecast quality until cleaned or repaired |
-| `Solar Array` | Solar utility | `2x2` | `money 220`, `parts 5` | Improves nearby `deviceEfficiency` and supports stable utility output without fuel logistics | Dust fouling sharply reduces output unless maintained |
-| `Field Workshop` | Workshop / Repair | `2x2` | `money 200`, `parts 4` | Enables repairs, emergency-cover preparation, and simple field crafting actions | Slower to restore after major damage and wants a reasonably safe camp core |
+| Structure | Family | Footprint | Plant Sharing | Build Cost (Temp) | Main Function | Failure Pressure |
+|---|---|---|---|---|---|---|
+| `Field Tent` | Shelter | `1x1` | `None` | `money 80`, `parts 2` | Creates a small safe rest point and improves short rest recovery on nearby tiles | Can be wind-damaged or buried; weak during severe storms without nearby protection |
+| `Shade Canopy` | Shelter / Heat relief | `1x2` | `None` | `money 120`, `parts 3` | Creates a stronger heat-relief pocket for worker recovery and nearby fragile plants | Loses efficiency quickly in strong wind if exposed |
+| `Water Tank` | Water support | `1x1` | `None` | `money 140`, `parts 3` | Increases accessible site water readiness and serves as a local source for watering actions | Can be buried or temporarily inaccessible if the camp zone is compromised |
+| `Drip Irrigator` | Irrigation | `1x2` | `AnyHeight` | `money 180`, `parts 4` | Adds steady moisture support to nearby plant tiles and helps low-density plants establish | Efficiency collapses when buried, damaged, or if local water support is too low |
+| `Wind Fence` | Protection utility | `1x2` | `None` | `money 100`, `parts 2` | Adds local `tileProtectionCoverage`, especially useful for exposed edges and storm-facing lanes | Provides little recovery value and degrades under repeated sand pressure |
+| `Weather Mast` | Sensor | `1x1` | `None` | `money 160`, `parts 3` | Improves forecast precision, earlier warnings, and exposure readouts for planning | Dust fouling and storm hits reduce forecast quality until cleaned or repaired |
+| `Solar Array` | Solar utility | `2x2` | `LowOnly` | `money 220`, `parts 5` | Improves nearby `deviceEfficiency` and supports stable utility output without fuel logistics | Dust fouling sharply reduces output unless maintained |
+| `Field Workshop` | Workshop / Repair | `2x2` | `None` | `money 200`, `parts 4` | Enables repairs and simple field crafting actions | Slower to restore after major damage and wants a reasonably safe camp core |
 
 #### Structure Family Roles
 
@@ -1206,6 +1212,12 @@ Prototype faction-gating note:
 
 - `Drip Irrigator`, `Solar Array`, `Weather Mast`, and any `Checkerboard Deployment Machine` variant should primarily sit inside the `Autonomous Region Agricultural University` unlock path for the prototype
 - `Forestry Bureau of Autonomous Region` should still care deeply about water and plant survival, but in prototype it should express that through plant choices, ecology tasks, and support rewards rather than a competing device roster
+
+Prototype plant-sharing examples:
+
+- `Solar Array` should be able to share with `Low` vegetation only
+- `Drip Irrigator` should be able to share with any living plant height in the prototype
+- fully blocking structures such as `Water Tank`, `Weather Mast`, `Wind Fence`, and any future `Water Pump` should use `plantShareRule = None`
 
 #### Device Effect Footprint Rules
 
@@ -1273,10 +1285,27 @@ Example trait directions:
 - Lower water demand
 - Better salt tolerance
 - Soil salinity reduction
+- Height class
 - Stronger adjacent wind reduction
 - Faster establishment
 - Better output value
 - Improved synergy with nearby devices
+
+#### Plant Height Class (Prototype)
+
+For the prototype, every living plant should also have a simple height tag used for structure-sharing rules:
+
+- `Low`
+- `Medium`
+- `Tall`
+
+Design intent:
+
+- `Low` plants can coexist with the broadest set of shared structures
+- `Medium` plants may coexist only with more permissive elevated structures
+- `Tall` plants usually want open tiles and should be blocked by most shared infrastructure
+
+This is mainly here so structures such as irrigation lines or solar racks can share space with some plants without making tile occupancy unreadable.
 
 ### Prototype Plant Design Goal
 
@@ -1369,6 +1398,29 @@ Design intent:
 - `Salt Bean` should make the salinity system legible immediately
 - `Root Binder` and `Sand Willow` should create follow-up progression on difficult tiles
 - low-tolerance plants should teach the player that some land must be prepared before high-value planting is realistic
+
+### Prototype Plant Height Tags (Temp Design)
+
+To support structure-sharing rules, the prototype plant roster should also carry a simple height tag:
+
+| Plant | Height Class | Structure-Sharing Read |
+|---|---|---|
+| `Straw Checkerboard` | `N/A` | Ground cover only; structure sharing with living plants does not apply |
+| `Wind Reed` | `Low` | Good candidate for sharing under `Solar Array` or through `Drip Irrigator` |
+| `Shade Cactus` | `Medium` | Usually too tall for low-clearance shared structures |
+| `Root Binder` | `Low` | Good under technical support structures that allow low plants |
+| `Salt Bean` | `Low` | Good candidate for shared irrigation and solar-support tiles |
+| `Sunfruit Vine` | `Low` | Can share with permissive structures but still depends on broader support |
+| `Dew Grass` | `Low` | Good bridge plant for shared low-clearance support lanes |
+| `Thorn Shrub` | `Medium` | Usually blocked by low-clearance shared structures |
+| `Medicinal Sage` | `Low` | Can share with low-clearance support structures |
+| `Sand Willow` | `Tall` | Should usually require an open tile with no shared structure overhead |
+
+Design intent:
+
+- low vegetation enables denser technical layouts
+- medium and tall plants force the player to reserve more open ecological space
+- this gives structures and plant choice another readable tradeoff without requiring a complicated layering sim
 
 ### Prototype Plant Progression (Temp Design)
 
@@ -1647,6 +1699,7 @@ Each prototype plant definition should also provide these runtime tuning fields:
 
 | Field | Range | Meaning |
 |---|---|---|
+| `plantHeightClass` | `Low`, `Medium`, or `Tall` | How much vertical space the plant occupies for structure-sharing validation |
 | `growthRate` | `0-100` | How quickly density rises when conditions are good |
 | `supportNeed` | `0-100` | Minimum average local support needed before density grows reliably |
 | `waterNeed` | `0-100` | Minimum moisture needed to avoid ongoing dehydration stress |
