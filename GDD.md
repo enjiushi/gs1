@@ -350,7 +350,7 @@ Discrete or integer runtime values:
 - `plantTypeId`
 - `structureTypeId`
 - `plantDensityState`
-- `plantLifeState`
+- `plantTrendState`
 - `taskState`
 - `contractState`
 - `eventState`
@@ -366,7 +366,7 @@ Discrete or integer runtime values:
 Display rule:
 
 - Continuous player-facing meters use internal float values, but UI can present them as bars with the current number shown on the bar
-- Density and life labels such as `Seeded`, `Young`, `Established`, `Dense`, `Stressed`, or `Withering` are threshold-derived states, not separately tuned hidden values
+- Density labels such as `Seeded`, `Young`, `Established`, and `Dense` should be the main plant state shown to the player; a separate derived trend label such as `Growing`, `Holding`, or `Withering` can show whether that density is improving or collapsing
 - `Plant Density` should be shown both in UI and in tile art; a denser tile should visibly contain more plant coverage, volume, or fullness than a sparse tile
 - Money, `Reputation`, `Faction Reputation`, stack counts, `fullyGrownTileCount`, `siteCompletionTileThreshold`, and `campaignDaysRemaining` are native integers and should display as exact integers
 - `tileSoilFertility` is the main continuous fertility value used at runtime; terrain type sets the starting baseline, and plants, decay, moisture, and hazards modify it over time
@@ -383,7 +383,7 @@ For each fixed simulation step, resolve systems in this order:
 5. Apply ongoing exposure and consumption to the worker, contractors, devices, and vulnerable stored resources.
 6. Apply hazard pressure and environmental damage for this step, including `tilePlantStress`, `tilePlantDensity` loss, burial gain, device damage, and resource loss.
 7. Apply recovery and beneficial change for this step, including plant density gain, stress reduction, player recovery, and site stabilization gains, if current conditions allow.
-8. Recompute threshold-derived states such as density labels, plant life states, withering, death, or restored pocket status.
+8. Recompute threshold-derived states such as density labels, plant trend states, death, or restored pocket status.
 9. Run slower pulse checks whose timers have elapsed, including natural spread attempts, output pulses, task trigger checks, and other low-frequency site logic.
 
 This order matters:
@@ -1507,12 +1507,17 @@ Important prototype traits for the added plants:
 
 Plants should follow a simple visible survival model. They are not guaranteed to grow just because they were placed.
 
-| State | Meaning | Gameplay Result |
+Primary player-facing read:
+
+- density is the plant's main state on a tile
+- the tile should show a density label such as `Seeded`, `Young`, `Established`, or `Dense`
+- a lighter trend label should show whether that density is improving or collapsing
+
+| Trend State | Meaning | Gameplay Result |
 |---|---|---|
-| `Establishing` | In `Seeded` or `Young` density and still fragile | Partial effect only, high sensitivity to heat, wind, and burial |
-| `Stable` | In `Established` or `Dense` density and surviving local conditions | Strong tile effect, stronger neighbor effect, eligible for reliable output |
-| `Stressed` | The plant is mismatched, under-watered, or overexposed | Reduced output, weaker neighbor bonuses, visible warning feedback |
-| `Withering` | The plant is close to failure | Little or no output, little or no support value, short rescue window |
+| `Growing` | The current density is increasing | Effects are improving and the patch is moving toward a safer state |
+| `Holding` | The current density is broadly stable | The patch is surviving, but not rapidly improving |
+| `Withering` | The current density is falling or close to collapse | Output and support value are weakening; the player has a short rescue window |
 | `Dead` | The plant is lost | Seeds, labor, time, and money are wasted; the tile becomes exposed again and often worsens local erosion |
 
 Severe events should not only kill plants outright. They should often reduce `Plant Density` first, creating partial fallback before full collapse.
@@ -1632,7 +1637,7 @@ Each occupied `livingPlantLayer` tile should have these authoritative runtime va
 - `plantTypeId`
 - `tilePlantDensity` in range `0-100`
 - `tilePlantStress` in range `0-100`
-- `plantLifeState`
+- `plantTrendState`
 - `tileGroundCoverDensity`
 - `tileMoisture`
 - `tileSoilFertility`
@@ -1799,19 +1804,18 @@ Prototype placement values:
 - natural spread creates a new living plant tile at `tilePlantDensity = 20`
 - a newly created tile should start with `tilePlantStress = 15` so early support still matters
 
-#### Life-State Threshold Rules
+#### Plant Trend State Rules
 
-`plantLifeState` should be derived from current density and stress after each fixed simulation step.
+`plantTrendState` should be derived from current density plus the current direction of change after each fixed simulation step.
 
 Use these prototype rules:
 
-| `plantLifeState` | Condition |
+| `plantTrendState` | Condition |
 |---|---|
 | `Empty` | no living plant on the tile |
-| `Establishing` | `tilePlantDensity > 0` and `tilePlantDensity < 50` and `tilePlantStress < 50` |
-| `Stable` | `tilePlantDensity >= 50` and `tilePlantStress < 50` |
-| `Stressed` | `tilePlantDensity > 0` and `tilePlantStress >= 50` and `tilePlantStress < 75` |
-| `Withering` | `tilePlantDensity > 0` and (`tilePlantStress >= 75` or `tilePlantDensity <= 15`) |
+| `Growing` | `tilePlantDensity > 0`, `tilePlantStress < 50`, and `densityGainPerMinute > densityLossPerMinute + 0.05` |
+| `Holding` | `tilePlantDensity > 0` and not `Growing`, `Withering`, or `Dead` |
+| `Withering` | `tilePlantDensity > 0` and (`tilePlantStress >= 75` or `tilePlantDensity <= 15` or `densityLossPerMinute > densityGainPerMinute + 0.05`) |
 | `Dead` | `tilePlantDensity <= 0` after resolution |
 
 Death cleanup rule:
@@ -1828,7 +1832,7 @@ Prototype rule:
 
 - plants with output should multiply their base yield by `tilePlantDensity / 100`
 - then multiply again by `1 - ((tilePlantStress / 100) * (outputDependency / 100))`
-- if `plantLifeState` is `Withering`, output is forced to `0`
+- if `plantTrendState` is `Withering`, output is forced to `0`
 
 This makes greedy output plants visibly stop paying back before they fully collapse.
 
@@ -1908,7 +1912,7 @@ Design intent:
 - it uses `groundCoverTypeId` and `tileGroundCoverDensity`, not `plantTypeId` and `tilePlantStress`
 - it can exist on the same tile as one living plant type
 - it does not produce output
-- it does not enter `plantLifeState`
+- it does not enter `plantTrendState`
 - it does not naturally spread
 - it slowly loses `tileGroundCoverDensity` over time, especially during severe hazards
 - while present, it should gradually increase `tileSoilStability` and slowly improve `tileSoilFertility`
