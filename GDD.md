@@ -960,11 +960,12 @@ Main sources of local protection:
 - nearby support devices such as irrigation, shelter, shade, or windbreaks
 - strong own-tile density and ground cover on the threatened patch
 
-Prototype hazard outcome bands:
+Prototype hazard state-impact bands:
 
-- low local protection: severe `Plant Density` loss, likely withering or death, and major follow-up recovery cost
-- moderate local protection: noticeable damage and disruption, but the patch remains functional enough to rescue
-- high local protection: the patch largely holds, suffering only limited density loss, reduced output windows, or repair needs
+- these bands should describe how hazard pressure changes tile, plant, and structure state first; visible survival or collapse should emerge from those state changes rather than from separate scripted outcome rules
+- low local protection: peak weather should drive strong `tileSandBurial` gain, faster `tileMoisture` loss, and clear erosion-driven `tileSoilFertility` setback; plants on the patch should see high `windContribution`, `heatContribution`, or `soilContribution`, pushing `growthPressure` up quickly; exposed structures should lose `deviceEfficiency` rapidly and may begin losing `deviceIntegrity`; this combination should usually push `plantTrendState` toward `Withering`, cut `tilePlantDensity` sharply, and create a major recovery burden
+- moderate local protection: peak weather should still add some `tileSandBurial`, moisture loss, and limited fertility setback, but not at immediate-collapse speed; `growthPressure` should spike during the worst window and cause noticeable but recoverable `tilePlantDensity` loss; structures may suffer partial `deviceEfficiency` loss or light damage while remaining usable; the patch should stay functional enough to rescue if the player responds in time
+- high local protection: peak weather should cause only light `tileSandBurial`, controlled moisture loss, and little or no lasting fertility setback; `growthPressure` should remain manageable enough that `tilePlantDensity` mostly holds, with `plantTrendState` often returning from `Holding` to `Growing` after the peak passes; structures should need only light clearing or repair, with limited `deviceEfficiency` loss; the visible result should be a resilient patch rather than a reset
 
 This is a key reward loop. If the player reads the site correctly and builds protection with strategy, extreme weather should still feel dangerous, but it should no longer feel equally destructive. Good planning should convert a disaster into a manageable setback.
 
