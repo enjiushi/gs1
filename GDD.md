@@ -81,7 +81,6 @@ These terms are stable and should be used consistently in future design, UI, and
 | `Site Output Modifier` | A persistent bonus trait attached to a stabilized site's regional support output, such as increased wind protection, fertility support, specific resource yield, or support range. |
 | `Camp Support` | The light support infrastructure on a `Site`, including shelter, `Container`s, service devices, and hired labor access. |
 | `Player Condition` | The worker's physical and mental state, represented by survival meters such as hydration, hunger, energy, and morale. |
-| `Emergency Field Action` | A common manual field intervention that creates short-lived protection, rescue, or stabilization on a limited part of the site. These actions are expensive in energy, time, and often materials, and their results have temporary durability, so they are usually most efficient right before or during a harsh event rather than as routine early overbuilding. |
 | `Aftermath Relief Offer` | A faction support offer that can appear after a harsh event enters `Aftermath`; its strength depends on current `Faction Reputation` and site damage. |
 | `Protection Coverage` | The total local protection on a tile or patch from plant adjacency, terrain shelter, devices, and temporary field reinforcement; higher coverage reduces how hard hazards can hit that area. |
 | `Plant Density` | The current strength and maturity of living cover or plant-derived starter cover on a tile or cluster; higher density means stronger traits, better survival, and possible natural spread for living plants, while lower density means weaker effects and higher hazard vulnerability. |
@@ -130,8 +129,8 @@ The long-term replay goal is for players to finish a campaign and immediately im
 6. Build key support devices such as irrigation, sensors, or service stations.
 7. Watch weak low-density zones for `Plant Stress`, erosion, burial, and other degeneration before they spread.
 8. Balance personal survival against site growth, repairs, contract deadlines, and the pressure to finish current tasks so new opportunities can enter the pool.
-9. Use the `Field Phone` to spend money on revealed `Site Unlockables`, supplies, emergency response, or contractors when needed.
-10. Use high-cost `Emergency Field Action`s when needed to protect planted regions or rescue failing utility lines, keeping in mind that their temporary protection decays over time and is usually most efficient right before or during major weather events; sometimes sacrifice one fringe area to save a core patch, then evaluate any `Aftermath Relief Offer`s once the event breaks.
+9. Use the `Field Phone` to spend money on revealed `Site Unlockables`, supplies, harsh-event response, or contractors when needed.
+10. Use normal field work such as burial clearing, watering, and repair under harsh-event pressure when needed to protect planted regions or rescue failing utility lines; sometimes sacrifice one fringe area to save a core patch, then evaluate any `Aftermath Relief Offer`s once the event breaks.
 11. Convert surviving short-term gains into denser self-sustaining cover and the next safer expansion.
 
 ### Prototype Strategic Pressure Loop
@@ -145,13 +144,13 @@ The intended prototype rhythm is:
 3. Try to survive the next heat spike, wind lane, sandburst, or erosion window.
 4. If the patch survives, use its output, safety, or restored stability to unlock a better plant or tool.
 5. Expand into a new patch or upgrade the first one from safe to productive.
-6. When the environment hits back, choose whether to rescue the failing area, reinforce it with an `Emergency Field Action`, or abandon it and save the core, knowing that these interventions cost real energy and lose value if committed too early.
+6. When the environment hits back, choose whether to rescue the failing area with normal work, or abandon it and save the core, knowing that harsh-event conditions make every outdoor action slower, riskier, and more exhausting.
 7. Reinvest the gains from survival into the next stronger combo.
 
 This creates the intended strategy arc:
 
 - good choices create safer land, stronger plants, more output, and easier future expansion
-- bad choices create stress, withering, money loss, emergency spending, and local collapse that must be reversed deliberately
+- bad choices create stress, withering, money loss, risky rescue work, and local collapse that must be reversed deliberately
 
 The important prototype target is not perfect simulation. It is to make each planted patch feel like a strategic bet that can either mature into a thriving foothold or slide into a costly recovery problem.
 
@@ -258,7 +257,7 @@ The campaign ends when the `Campaign Clock` runs out. The player's success is me
 
 To reduce control complexity, the prototype should avoid a quick-slot-driven interaction model. The player only needs to keep the required `Item`s in carried `Inventory`.
 
-For any interaction, construction, planting, repair, or emergency action that requires `Item`s:
+For any interaction, construction, planting, repair, or other field work that requires `Item`s:
 
 - show the required `Item` icon and amount at the bottom right of the interaction prompt
 - if the required amount is present in carried `Inventory`, show that requirement in green
@@ -692,7 +691,7 @@ Use these runtime fields:
 Core rule:
 
 - `weatherHeat`, `weatherWind`, and `weatherSand` are site-wide ambient values
-- local terrain, plants, devices, and emergency actions do not rewrite the weather itself
+- local terrain, plants, devices, and player field work do not rewrite the weather itself
 - they change how hard the weather lands on a given tile, worker, device, or storage area
 
 #### Baseline Daily Weather Curve
@@ -900,169 +899,64 @@ The recovery phase after a major event should be a strategy phase of its own. Th
 
 The game should reward correct triage. Coming back from a bad event should feel like solving a hard strategic knot, not only paying a repair tax.
 
-### Emergency Field Actions
+### Harsh-Event Work Under Pressure
 
-`Emergency Field Action`s should be common manual interventions the player can choose whenever site conditions justify them. They are not restricted to extreme-weather windows. However, because they cost substantial energy, time, and often materials, and because their protective results decay away, they should usually be most efficient when used shortly before or during a harsh event.
+The prototype should not use a separate `Emergency Field Action` system. Instead, harsh events should make ordinary field work become dangerous, exhausting, and strategically expensive.
 
-This timing tension is important. If the player spends too much time and energy building temporary protection in calm conditions, they should lose productivity, slow expansion, and reduce their ability to capitalize on the safer window. If they wait too long, the event may hit before the intervention is ready.
+This means the player still uses normal verbs:
 
-`Emergency Field Action`s should be:
+- clear burial from a plant tile, route, or device footprint
+- repair a damaged irrigator, pump, or support device
+- water a struggling patch
+- move supplies, reconnect access, or retreat to shelter
 
-- limited in scope so the player can save part of a site, not everything at once
-- available in normal play as well as during harsh events
-- expensive enough in time, hydration, energy, and materials that overusing them reduces expansion and contract productivity
-- fast and physical, with immediate visible results on the targeted zone
-- temporary in result, with durability that decays over time until the protection or reinforcement is gone
-- strong enough to matter, but not so strong that preparation becomes irrelevant
+The tension should come from conditions, not from a special rescue menu.
 
-Prototype examples:
+During severe hazards, the player should often be able to save only one or two of the following:
 
-- stake down an exposed young plant cluster before a sandburst tears through it
-- deploy an emergency cover or temporary windbreak to protect one small patch for a limited window
-- clear sand off a key irrigation line or plant row so the patch keeps functioning
-- perform emergency watering on a high-value patch during a heat spike
-- reinforce a vulnerable support device so nearby plants keep their protection or water supply
-- cut losses by shutting down or abandoning one fringe zone to preserve the central patch
-
-Sandstorm response should be especially important. During a severe sandstorm, the player should often be able to choose one or two of the following:
-
-- save the seedling line
-- save the irrigation path
-- save the output patch
-- protect the camp edge
+- the seedling line
+- the irrigation path
+- the output patch
+- the camp edge
 
 They should usually not be able to save everything.
 
-The best emergency actions should often preserve `Plant Density`, stored resources, or a key utility chain rather than simply preventing binary death. Saving 60 percent of a crop patch or keeping one irrigation lane alive can be the difference between a recoverable setback and a full downward spiral.
+The design target is still "I saved that patch," but the reason should be that the player chose the right ordinary job to risk under terrible conditions.
 
-Because these interventions decay, they should create a meaningful timing question:
+### Harsh-Event Work Rules (Prototype)
 
-- build too early and the temporary protection wears down before the main pressure arrives
-- build too late and the action may not complete before the damage begins
-- build at the right moment and the player gets the maximum survival value for the cost
-
-This creates the intended emotional pattern:
-
-- forecast arrives
-- player prepares what they can
-- the storm hits harder than normal conditions
-- the player runs targeted rescue actions in terrible visibility and pressure
-- part of the site survives because of what the player did, not only because of passive stats
-
-The design target is "I saved that patch" rather than "the numbers happened to work out."
-
-### Emergency Action Costs, Productivity Tradeoff, And Decay
-
-`Emergency Field Action`s should feel powerful because they are costly, tiring, and temporary.
-
-Typical costs and risks:
-
-- high hydration and energy loss while outside
-- slower movement and reduced visibility
-- increased chance of leaving another zone unattended
-- immediate money or resource spending for covers, repair kits, or emergency water
-- possible damage to the worker's schedule, delaying other tasks or contract progress
-- opportunity cost against planting, maintenance, harvesting, and expansion while conditions are still manageable
-
-Durability rule:
-
-- the product of an `Emergency Field Action` should have temporary durability rather than lasting as a permanent structure
-- temporary covers, braces, reinforcement, or patch repairs should lose strength over time and eventually disappear
-- harsh weather may accelerate that decay, but calm time should still consume part of the limited useful window
-- this should make pre-event timing meaningful instead of rewarding constant advance spam
-
-This tradeoff is important. `Emergency Field Action`s should be powerful enough to create agency, but expensive enough that prevention, layout planning, and choosing when not to intervene still matter.
-
-### Emergency Field Action Rules (Prototype)
-
-The prototype should formalize these actions as short, high-cost, targeted interventions the player performs manually during normal play or during `Warning`, `Build`, `Peak`, `Decay`, and `Aftermath` when the specific action allows it.
-
-#### Emergency Action Runtime Contract
-
-Each emergency action definition should provide:
-
-| Field | Meaning |
-|---|---|
-| `actionId` | Unique runtime identity |
-| `availabilityWindow` | Whether the action is usable in normal play, specific event phases, or both |
-| `targetShape` | Single tile, orthogonal cluster, or one device footprint |
-| `baseActionMinutes` | In-game minutes required to finish |
-| `hydrationCost` | Immediate or over-action hydration spend |
-| `energyCost` | Immediate or over-action energy spend |
-| `itemCost` | Required resource item if any |
-| `moneyCost` | Direct emergency spend if any |
-| `successEffect` | Exact state change on completion |
-| `effectDurabilityMinutes` | How long the temporary result remains useful before fully decaying |
-| `effectDecayRule` | How the temporary result weakens over time or under hazard pressure |
-| `failureRisk` | Extra danger if the player attempts it in a bad window |
+The prototype should formalize this as normal player actions performed under event-modified pressure during `Warning`, `Build`, `Peak`, `Decay`, and `Aftermath`, rather than as separate action types.
 
 Core rules:
 
-- only the player performs `Emergency Field Action`s in the prototype
-- contractors do not execute emergency actions automatically
-- only one emergency action can be performed at a time
-- emergency actions resolve on completion, not every partial frame
-- if the player cancels an action before completion, no main rescue effect is applied
-
-#### Prototype Emergency Actions
-
-| Action | Target | Cost | Main Effect |
-|---|---|---|---|
-| `Deploy Cover` | `1` tile | `1 coverRoll`, medium hydration and energy | Adds temporary field reinforcement, giving up to `+20` `tileProtectionCoverage`, then decays over `120` in-game minutes until gone |
-| `Clear Burial` | `1` tile or `1` small device footprint | high energy, low hydration | Reduces `tileSandBurial` by `25` and restores buried interaction or support value; no long-duration protection remains |
-| `Emergency Watering` | `1` plant tile | `1 waterContainer`, medium hydration and energy | Adds `+25` `tileMoisture` and reduces `tilePlantStress` by `10` on the target tile; the benefit fades as moisture is consumed |
-| `Field Repair` | `1` device footprint | `1 repairKit`, medium energy | Restores `deviceIntegrity` and `deviceEfficiency` by a prototype amount so the device functions again; emergency patch quality can degrade again under later pressure |
-| `Stake And Brace` | `1` low-density plant tile | `1 partsBundle`, medium hydration and energy | Gives a temporary density-loss reduction modifier that decays over time and is strongest if applied close to the hazard window |
-
-Prototype effect targets:
-
-- `Deploy Cover` is the main "save this patch right now" action
-- `Clear Burial` is the main "keep the lane or utility alive" action
-- `Emergency Watering` is the main heat-wave rescue action
-- `Field Repair` is the main utility-chain rescue action
-- `Stake And Brace` is the main seedling-survival rescue action
-
-#### Emergency Action Limits
-
-To preserve tension, these actions must stay local, scarce, and inefficient as a default spam strategy.
-
-Use these prototype limits:
-
-- an emergency action may affect only `1` target at a time
-- temporary field reinforcement from `Deploy Cover` may be active on at most `3` targets at once
-- emergency actions should consume from `workerPack`, not `campStorage`
-- if the worker is in critical survival danger, action start should be blocked until they recover enough to act
-- temporary protection should tick down continuously once created, even if the harsh event has not started yet
-
-This ensures the player chooses what to save instead of blanketing the whole site in emergency immunity.
-
-#### Exposure And Interruption Rules
-
-Emergency actions should feel more dangerous in worse event phases.
+- no dedicated emergency-only action menu is required
+- no temporary emergency-only structures or covers are required
+- the player should still be able to perform normal field work if the target is reachable and they are physically capable of acting
+- only the player performs this urgent manual work in the prototype
+- only one manual action can be performed at a time
+- if the player cancels an action before completion, no main work effect is applied
 
 Prototype exposure rules:
 
-- during `Build`, emergency action time is multiplied by `1.15`
-- during `Peak`, emergency action time is multiplied by `1.35`
-- during `Peak`, hydration and energy drain from the current weather continue on top of the action's direct cost
-- if visibility is critically low during a `Sandstorm`, movement to the target should often be the real cost, not only the action itself
+- during `Build`, outdoor action time is multiplied by `1.15`
+- during `Peak`, outdoor action time is multiplied by `1.35`
+- during `Peak`, hydration and energy drain from the current weather continue on top of the action's direct work cost
+- if visibility is critically low during a `Sandstorm`, movement to the target should often be the real cost, not only the work itself
+- if the worker is already in critical survival danger, action start should be blocked until they recover enough to act
 
 Prototype interruption rules:
 
 - being forced to shelter, collapsing from `Player Condition`, or manually canceling should interrupt the action
-- interrupted actions apply no rescue effect
-- consumed item cost should be spent only on successful completion, except `Emergency Watering`, which spends the water as soon as the pour begins
+- interrupted actions apply no completion effect
+- item costs should be spent only on successful completion unless the normal base action already consumes the resource at action start
 
-#### Design Intent
-
-This system should create hard but readable rescue choices:
+Design intent:
 
 - save the seedlings or save the irrigator
-- spend a `coverRoll` now or keep it for the next forecasted event
 - rescue the fringe output tile or protect the camp edge
-- go outside during `Peak` for a heroic save or accept a smaller loss and recover faster after
+- go outside during `Peak` for a risky fix or accept a smaller loss and recover faster after
 
-That tradeoff is the core feeling. Emergency actions should create agency, not erase consequence.
+That tradeoff is the core feeling. Harsh events should create agency through dangerous normal work, not through a parallel emergency-action subsystem.
 
 ## 10. Site Management
 
@@ -1130,12 +1024,11 @@ These are the exact prototype `Item` categories that can be stored, moved, consu
 
 | Resource | Runtime Identity | Stack Size | Main Uses |
 |---|---|---|---|
-| Water Container | `waterContainer` | `5` | Hydration, watering, emergency response |
+| Water Container | `waterContainer` | `5` | Hydration and watering |
 | Food Pack | `foodPack` | `5` | Hunger recovery, recovery prep |
 | Medicine Pack | `medicinePack` | `3` | Recovery support after harsh conditions |
-| Repair Kit | `repairKit` | `3` | Structure/device repair, emergency fixes |
+| Repair Kit | `repairKit` | `3` | Structure and device repair |
 | Parts Bundle | `partsBundle` | `10` | Device construction and some repairs |
-| Emergency Cover Roll | `coverRoll` | `5` | Temporary storm response and emergency protection |
 | Seed Bundle | `seedBundle:<plantTypeId>` | `10` | Plant placement for a specific plant type |
 | Harvest Good | `harvestGood:<outputTypeId>` | `10` | Sale or contract delivery |
 
@@ -1188,7 +1081,7 @@ Use these prototype resource-flow rules:
 - each purchased package should arrive at camp after `30` in-game minutes if the camp delivery point is operational
 - delivered items enter `campStorage`, not `workerPack`
 - the player can transfer items between `campStorage` and `workerPack` only while interacting with a `Container` or another explicitly valid storage access point
-- plant placement and emergency field actions consume from `workerPack`
+- plant placement, repair work, and burial clearing consume from `workerPack` when they require carried items
 - structure construction can consume from `workerPack`
 - harvesting places goods into `workerPack` first
 - selling through the `Field Phone` should require goods to be present in `campStorage`, not only in `workerPack`
@@ -1202,7 +1095,7 @@ To keep prototype logic readable, hazards should interact with resources by loca
 Worker-carried resources:
 
 - are not randomly destroyed just by bad weather in normal play
-- are consumed by direct use, recovery, construction, planting, or emergency action cost
+- are consumed by direct use, recovery, construction, planting, repair, or other field-work cost
 - can be lost only through explicit failure or a specifically authored event, not through hidden attrition rules
 
 Camp-stored resources:
@@ -1218,7 +1111,6 @@ Prototype vulnerable categories:
 - `medicinePack`
 - `repairKit`
 - `partsBundle`
-- `coverRoll`
 - `seedBundle:*`
 - `harvestGood:*`
 
@@ -1657,7 +1549,7 @@ Good maintenance in the early phase should include:
 
 - watering or restoring water access on time
 - giving the plant enough nearby protection
-- reducing exposure through better placement or emergency action
+- reducing exposure through better placement or urgent field work
 - preserving fertile support tiles and adjacent helper plants
 
 The player should feel that they are nursing a fragile patch toward self-sufficiency. Once the patch is dense enough, it should require less rescue frequency and start paying back the effort with stronger protection, output, or spread.
@@ -1806,7 +1698,7 @@ This budget keeps protection readable:
 
 - same-tile commitment matters most
 - perimeter building matters second
-- devices and emergency actions can save a bad situation, but should not fully replace ecological layout
+- devices and urgent manual work can save a bad situation, but should not fully replace ecological layout
 
 #### Stress Resolution Rules
 
@@ -3468,7 +3360,7 @@ The university must exist in play, but it does not need a full technical sandbox
 - low / high temperature spike
 - `Sandstorm`
 - one additional authored pressure package if needed for variety, such as pest or insect pressure
-- keep only `1` emergency field action
+- do not implement a separate `Emergency Field Action` system in the prototype
 - harsh-environment severity should scale by site:
 - `Site 1`: low severity introduction
 - `Site 2`: medium severity event with real aftermath
@@ -3652,7 +3544,7 @@ This checklist is here to help inspect the whole loop before moving into code-st
 ### Prototype Health Check
 
 - [x] The prototype already has enough tension to be fun if pacing and UI are handled well
-- [x] The plant game is no longer passive because hazards, density loss, emergency action, and comeback decisions all matter
+- [x] The plant game is no longer passive because hazards, density loss, risky harsh-event work, and comeback decisions all matter
 - [x] The regional layer is strong enough to support meaningful site-order strategy
 - [ ] The prototype is not yet safe for large-scale implementation without the missing contracts above
 
@@ -3682,7 +3574,7 @@ At least some site runs should contain genuinely fierce environmental events tha
 
 ### Emergency Action Check
 
-`Emergency Field Action`s should be usable as part of normal site play, but they should feel most valuable around harsh events because their benefits are temporary and expensive. During a severe sandstorm or heat event, the player should be able to perform at least one meaningful `Emergency Field Action` that visibly saves or stabilizes part of the site. The player should feel that a specific patch lived because they intervened, not only because pre-existing passive bonuses absorbed the damage.
+During a severe sandstorm or heat event, the player should be able to perform at least one meaningful normal field action such as burial clearing, watering, or repair that visibly saves or stabilizes part of the site. The player should feel that a specific patch lived because they intervened under pressure, not only because pre-existing passive bonuses absorbed the damage.
 
 ### Restoration Readability
 
@@ -3807,7 +3699,7 @@ Leaving, failing, or restarting a site should reset its site unlock pool, clear 
 - Keep contractor behavior simple until the core survival and restoration loop is proven.
 - Make forecasting, tile feedback, and support extraction readable early, because they are central to the game's identity.
 - Plants must not become fire-and-forget timers. Validate that harsh conditions, degeneration, and recovery decisions create strategy every few minutes of site play.
-- Prototype `Emergency Field Action`s early. Extreme weather should include risky, limited, hands-on rescue actions so the player feels they fought back and saved something tangible.
+- Prototype harsh-event work pressure early. Extreme weather should include risky, limited, hands-on burial clearing, repair, or rescue work so the player feels they fought back and saved something tangible.
 - Validate partial degradation, not only full destruction. Reduced `Plant Density`, damaged supplies, weakened output, and worsened `Player Condition` should create the prototype's most interesting comeback decisions.
 - Treat replayability as a core production requirement, not post-launch polish. Procedural map generation, contract variety, event variety, and meaningful tech branching should be validated early in prototype milestones.
 - Validate the dual-layer progression structure early. The `Persistent Tech Tree` must feel campaign-defining, while site unlocks and modifiers must feel fresh on each site without overwhelming the player.
