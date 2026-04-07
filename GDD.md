@@ -80,7 +80,7 @@ These terms are stable and should be used consistently in future design, UI, and
 | `Container` | A camp storage object that can be built or bought on-site and used to store `Item`s outside the player's carried `Inventory`. |
 | `Site Output Modifier` | A persistent bonus trait attached to a stabilized site's regional support output, such as increased wind protection, fertility support, specific resource yield, or support range. |
 | `Camp Support` | The light support infrastructure on a `Site`, including shelter, `Container`s, service devices, and hired labor access. |
-| `Player Condition` | The worker's physical and mental state, represented by survival meters such as hydration, hunger, energy, and morale. |
+| `Player Condition` | The worker's physical and mental state, represented by survival meters such as hydration, nourishment, energy, and morale. |
 | `Aftermath Relief Offer` | A faction support offer that can appear after a harsh event enters `Aftermath`; its strength depends on current `Faction Reputation` and site damage. |
 | `Wind Protection` | The total local wind-erosion shielding on a tile or patch from plant adjacency, terrain shelter, and devices; higher protection reduces exposure damage and fertility loss. |
 | `Plant Density` | The current strength and maturity of living cover or plant-derived starter cover on a tile or cluster; higher density means stronger traits, better survival, and possible natural spread for living plants, while lower density means weaker effects and higher hazard vulnerability. |
@@ -330,7 +330,7 @@ World and campaign values:
 - `weatherWind`
 - `weatherSand`
 - `playerHydration`
-- `playerHunger`
+- `playerNourishment`
 - `playerEnergy`
 - `playerMorale`
 - `fullyGrownTileCount`
@@ -641,13 +641,13 @@ This keeps tile identity stable in saves and easier to reason about in code.
 The player has explicit, separate meters:
 
 - Hydration
-- Hunger
+- Nourishment
 - Energy
 - Morale
 
 These are the core `Player Condition` values. They are always relevant, but not all decline at the same speed or for the same reasons.
 
-Hydration is the most urgent meter in hot conditions. Hunger is slower, but important for sustained efficiency. Energy limits daily work output and pushes rest timing. Morale reflects comfort, momentum, and psychological strain under isolation and repeated setbacks.
+Hydration is the most urgent meter in hot conditions. `Nourishment` is slower, but important for sustained efficiency and recovery. Energy limits daily work output and pushes rest timing. Morale reflects comfort, momentum, and psychological strain under isolation and repeated setbacks.
 
 Current prototype gameplay effect for `Morale`:
 
@@ -1082,7 +1082,7 @@ These are the exact prototype `Item` categories that can be stored, moved, consu
 | Resource | Runtime Identity | Stack Size | Main Uses |
 |---|---|---|---|
 | Water Container | `waterContainer` | `5` | Hydration and watering |
-| Food Pack | `foodPack` | `5` | Hunger recovery, recovery prep |
+| Food Pack | `foodPack` | `5` | `Nourishment` recovery, recovery prep |
 | Medicine Pack | `medicinePack` | `3` | Recovery support after harsh conditions |
 | Repair Kit | `repairKit` | `3` | Structure and device repair |
 | Parts Bundle | `partsBundle` | `10` | Device construction and some repairs |
@@ -3501,7 +3501,7 @@ This keeps the board strategic without requiring the full late-game board econom
 - `Energy`
 - one simple camp rest / shelter function
 - one simple water refill / purchase loop
-- `Hunger` and broader morale interactions beyond work-efficiency impact can be deferred or represented indirectly
+- `Nourishment` and broader morale interactions beyond work-efficiency impact can be deferred or represented indirectly
 
 The player should feel pressure, but not have to manage many overlapping bars in the first prototype.
 
