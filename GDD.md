@@ -1469,6 +1469,7 @@ To keep the first prototype understandable:
 - The player should be able to understand a placement decision in a few seconds
 - The player should only place the lowest-density starter version of a plant; stronger plant states should come from growth, not instant deployment
 - Density should be the main driver of plant power, survival, and natural spread
+- Salty tiles should create visibly different plant choices, with some plants occupying them early and others mainly preparing them for later crops
 - One plant-derived starter material is allowed as a special exception for extremely poor sand: it follows the density ladder for prototype simplicity, but it is used to prepare land rather than behave like a normal living plant
 
 ### Prototype Plant Set (Temp Design)
@@ -1480,10 +1481,10 @@ The following plants are temporary prototype placeholders. Their names, values, 
 | `Straw Checkerboard` | Protection + Fertility setup | Medium | Low | Plant-derived straw grid placed on bare sand; immediately reduces near-surface wind and sand movement on its own tile and helps trap drifting sand | Adjacent tiles gain erosion relief, slightly better establishment odds, and gradual soil-building support over time | Critical opener for least fertile or pure sand tiles; converts hostile sand into a foothold for later living plants |
 | `Wind Reed` | Protection + Anti-dehydration | Medium | Low | Cheap early plant that reduces wind damage and slows dehydration on its own tile | Adjacent tiles get small wind reduction and slight dehydration relief | First safety plant; teaches line placement and perimeter thinking |
 | `Shade Cactus` | Anti-dehydration + Worker support | Medium | Low | Strong local heat reduction and low water demand | Adjacent tiles lose water more slowly; nearby work zones feel safer during hot periods | Teaches oasis pockets, camp-edge defense, and local survival planning |
-| `Root Binder` | Fertilize + Protection | Medium | Medium | Stabilizes soil and reduces erosion on its own tile | Adjacent tiles gain fertility and mild erosion resistance | Teaches groundwork and setup before high-value planting |
-| `Salt Bean` | Output + Fertilize | Medium | Medium | Produces modest food or sellable yield if the tile is stable enough | Adjacent tiles gain a small fertility bonus that helps future crops | Teaches low-risk output and the value of mixed production rows |
+| `Root Binder` | Fertilize + Protection | Medium | Medium | Stabilizes soil, reduces erosion, and slowly improves difficult ground on its own tile | Adjacent tiles gain fertility and mild erosion resistance, helping surrounding salty tiles recover over time | Teaches groundwork and setup before high-value planting |
+| `Salt Bean` | Output + Fertilize | Medium | Medium | Produces modest food or sellable yield if the tile is stable enough while also serving as the main early salt-rehab crop | Adjacent tiles gain a small fertility bonus and light salinity-recovery support that helps future crops | Teaches low-risk output and the value of mixed production rows on difficult land |
 | `Sunfruit Vine` | Output + Anti-dehydration synergy | High | High | High output but weak when exposed | Adjacent shaded or fertilized tiles improve its performance; it also gives small output synergy to nearby output plants | Teaches greedy high-reward planting that depends on support plants |
-| `Dew Grass` | Anti-dehydration + Fertilize | Medium | Low | Captures trace moisture and softens local dryness on poor soil | Adjacent tiles gain slight moisture retention and a small fertility bump | Gentle bridge plant for expanding from safe patches into dry but not fully dead land |
+| `Dew Grass` | Anti-dehydration + Fertilize | Medium | Low | Captures trace moisture and softens local dryness on poor or mildly salty soil | Adjacent tiles gain slight moisture retention, a small fertility bump, and weak salinity-rehab support | Gentle bridge plant for expanding from safe patches into dry but not fully dead land |
 | `Thorn Shrub` | Protection + Output | Medium | Medium | Tough shrub that creates a sturdier barrier and a small fiber or resin yield | Adjacent tiles gain minor wind buffering and a little protection against density loss | Teaches productive perimeter building instead of pure defense |
 | `Medicinal Sage` | Output + Worker support | Medium | Medium | Produces a modest herb yield and improves comfort in its immediate area | Adjacent tiles slightly improve short-rest efficiency and morale feel when conditions are stable | Teaches support-economy patches and non-food output value |
 | `Sand Willow` | Protection + Anti-dehydration anchor | High | High | Large anchor plant that creates strong local shelter and heat relief when sustained | Adjacent tiles gain one of the strongest protection and dehydration-relief effects in the prototype roster | Late prototype anchor plant for turning one hard-earned zone into a true refuge core |
@@ -1501,10 +1502,10 @@ For prototype clarity, each plant should also carry a small trait package. These
 | `Straw Checkerboard` | `Sand Fixation`, `Surface Roughness`, `Establishment Boost`, `Organic Decay` | `No Yield`, `No Natural Spread`, weak as a long-term solution without follow-up living cover |
 | `Wind Reed` | `Fast Establishment`, `Flexible Windbreak`, `Moisture Hold`, `Storm Recovery` | Effect ceiling is moderate; wants other plants behind it to convert safety into real value |
 | `Shade Cactus` | `Deep Shade`, `Low Water Demand`, `Heat Buffer`, `Comfort Pocket` | Best in concentrated pockets rather than long exposed lines |
-| `Root Binder` | `Soil Lock`, `Erosion Anchor`, `Fertility Lift`, `Spread Support` | Medium work and low direct payoff by itself; shines when followed by other plants |
-| `Salt Bean` | `Modest Yield`, `Soil Enrichment`, `Early Output`, `Patch Builder` | Output drops hard if protection and fertility are not maintained |
+| `Root Binder` | `Soil Lock`, `Erosion Anchor`, `Fertility Lift`, `Salinity Prep` | Medium work and low direct payoff by itself; shines when followed by other plants |
+| `Salt Bean` | `Modest Yield`, `Soil Enrichment`, `Salt Rehab`, `Patch Builder` | Output drops hard if protection and fertility are not maintained |
 | `Sunfruit Vine` | `High Yield`, `Support Hungry`, `Shade Hungry`, `Fertility Hungry` | Very fragile in exposed or low-support zones; high rescue demand |
-| `Dew Grass` | `Dew Capture`, `Dryland Bridge`, `Soft Fertility`, `Low Work` | Lower peak payoff than harder specialist plants |
+| `Dew Grass` | `Dew Capture`, `Dryland Bridge`, `Soft Fertility`, `Light Salt Relief` | Lower peak payoff than harder specialist plants |
 | `Thorn Shrub` | `Tough Barrier`, `Edge Yield`, `Density Retention`, `Harsh Tolerance` | Not the best at pure defense or pure output; wins by doing both reasonably well |
 | `Medicinal Sage` | `Herb Yield`, `Comfort Aura`, `Rest Boost`, `Stable-Zone Preference` | Wants an already somewhat safe pocket before it feels worth the slot |
 | `Sand Willow` | `Refuge Canopy`, `Deep Root Anchor`, `Strong Shade`, `Refuge Core` | High early maintenance and high cost before it becomes a major payoff plant |
@@ -1595,7 +1596,8 @@ This early set should already support a few clear placement stories:
 - `Wind Reed` + `Shade Cactus`: create a survivable edge or protected work pocket
 - `Wind Reed` + `Thorn Shrub`: build a perimeter that both protects and slowly pays back
 - `Shade Cactus` + `Medicinal Sage`: create a support pocket that feels good to stand and recover in
-- `Root Binder` + `Salt Bean`: turn unstable land into a modest productive patch
+- `Root Binder` + `Salt Bean`: turn unstable salty land into a modest productive patch
+- `Dew Grass` + `Salt Bean`: open a mild-salinity lane that still needs water-sensitive support
 - `Root Binder` + `Sunfruit Vine`: set up a high-reward crop that feels earned
 - `Root Binder` + `Sand Willow`: build a refuge core that can hold against repeated weather pressure
 - `Wind Reed` + `Sunfruit Vine`: protect a risky output line from collapse
@@ -1612,10 +1614,10 @@ Core growth rules:
 
 - The player can only plant the initial low-density state
 - Low-density plants are fragile, weak, and highly dependent on support
-- If water, fertility, protection, and weather conditions are good enough, density rises over time
+- If water, fertility, salinity suitability, protection, and weather conditions are good enough, density rises over time
 - As density rises, the plant's own-tile effect and neighbor-tile effect become stronger
 - A sufficiently healthy dense tile can spread into an orthogonally adjacent empty tile without direct player planting
-- Natural spread should only happen if the target tile is empty and fertile enough to sustain life
+- Natural spread should only happen if the target tile is empty, fertile enough, and not an obviously wrong salinity match for the spreading plant
 
 Special exception:
 
@@ -1670,13 +1672,13 @@ Each plant should gain clearer value as density rises so growth feels meaningful
 | `Straw Checkerboard` | Fresh straw grid gives immediate sand-fix value on bare sand and strong own-tile wind reduction, but little fertility yet | Starts trapping sand and calming the surface; adjacent starter plants establish more safely | Holds dune movement well while building a better base for nearby living plants through trapped fines and early organic matter | Best barren-tile conversion state; strongest establishment support for nearby living plants, still no output and no natural spread |
 | `Wind Reed` | Minor own-tile wind reduction only | Small adjacent wind reduction and slight dehydration relief | Reliable windbreak for adjacent tiles and better support for nearby fragile plants | Strong perimeter barrier that greatly helps nearby low-density plants survive storms |
 | `Shade Cactus` | Small local shade and weak comfort value | Noticeable local heat relief and slower adjacent water loss | Strong cool pocket; nearby short rests become safer and more efficient | Best local anti-dehydration support and strongest `Energy` and `Morale` recovery feel in its pocket |
-| `Root Binder` | Slight soil lock on its own tile | Modest erosion reduction and fertility support | Solid adjacent fertility and erosion resistance for patch building | Strongest ground-fertility anchor and best support for future spread into nearby empty tiles |
-| `Salt Bean` | Very little yield and slight soil enrichment | Small yield if protected and modest fertility support | Reliable modest output plus good support for neighboring growth | Strong sustained output and stronger enrichment for adjacent tiles and future patch expansion |
+| `Root Binder` | Slight soil lock on its own tile | Modest erosion reduction, fertility support, and early salinity prep | Solid adjacent fertility, erosion resistance, and steady salinity rehab for patch building | Strongest ground-fertility anchor and best support for future spread into nearby difficult tiles |
+| `Salt Bean` | Very little yield and slight soil enrichment | Small yield if protected, with visible early salinity reduction | Reliable modest output plus good support for neighboring growth on salty land | Strong sustained output, stronger enrichment, and the clearest prototype salinity-rehab payoff |
 | `Sunfruit Vine` | Almost no yield and extremely fragile without support | Small yield only if nearby support exists | Strong output if protection and fertility remain in place | Peak output state; still support-dependent, but finally resilient enough to justify major protection effort |
-| `Dew Grass` | Faint moisture-softening effect and almost no resilience by itself | Noticeable anti-dryness support and weak fertility improvement | Reliable bridge plant that helps nearby fragile tiles stay alive | Mature moisture-net plant that makes neighboring expansion meaningfully easier |
+| `Dew Grass` | Faint moisture-softening effect and almost no resilience by itself | Noticeable anti-dryness support, weak fertility improvement, and light salt relief | Reliable bridge plant that helps nearby fragile or mildly salty tiles stay alive | Mature moisture-net plant that makes neighboring expansion meaningfully easier |
 | `Thorn Shrub` | Small barrier value and almost no yield | Tougher edge plant with minor fiber or resin return | Reliable perimeter piece that both protects and contributes a modest output stream | Strong productive barrier that can anchor site edges without being purely defensive |
 | `Medicinal Sage` | Slight comfort cue and almost no harvest value | Small herb output and light rest-support feeling nearby | Reliable support-output patch with noticeable short-rest benefit | Best worker-comfort crop in the prototype; strong morale feel and useful herb value |
-| `Sand Willow` | Weak sapling with little shelter and high rescue demand | Begins creating real shade and local wind interruption if kept alive | Strong shelter anchor with clear anti-dehydration value for surrounding tiles | One of the strongest refuge-core plants in the prototype, with major protection and rest value once earned |
+| `Sand Willow` | Weak sapling with little shelter and high rescue demand | Begins creating real shade and local wind interruption if kept alive | Strong shelter anchor with clear anti-dehydration value and medium salinity-rehab value for surrounding tiles | One of the strongest refuge-core plants in the prototype, with major protection, rest value, and difficult-land recovery once earned |
 
 Important prototype traits for `Straw Checkerboard`:
 
@@ -1733,6 +1735,7 @@ Low-density plants should be the most vulnerable part of the lifecycle. This is 
 Density loss should come mainly from:
 
 - wrong plant choice for the current tile exposure
+- wrong plant choice for the current tile salinity
 - poor adjacency or missing support plants
 - water shortage or delayed maintenance
 - severe heat or wind hitting a fragile patch
@@ -1747,6 +1750,7 @@ Good maintenance in the early phase should include:
 - giving the plant enough nearby protection
 - reducing exposure through better placement or urgent field work
 - preserving fertile support tiles and adjacent helper plants
+- using salt-tolerant or salinity-reducing plants when the tile is not yet ready for greedy crops
 
 The player should feel that they are nursing a fragile patch toward self-sufficiency. Once the patch is dense enough, it should require less rescue frequency and start paying back the effort with stronger protection, output, or spread.
 
@@ -1758,7 +1762,7 @@ Good spiral example:
 
 - The player places `Wind Reed` and `Root Binder` in an exposed lane
 - The patch survives a harsh weather window
-- That survival protects a later `Salt Bean` or `Sunfruit Vine`
+- That survival protects a later `Salt Bean` or prepares the lane for a later `Sunfruit Vine`
 - The new output funds more tech, supplies, or repairs
 - The site becomes easier to expand safely
 
@@ -1789,6 +1793,7 @@ Prototype comeback priorities:
 
 - rebuild the core protective lane so more tiles do not unravel
 - restore water or utility flow so the site can function again
+- keep one salinity-rehab lane alive so later high-value planting is still possible
 - rescue one output patch to restore money flow
 - recover `Player Condition` so the worker can perform meaningful outdoor actions again
 - accept a temporary setback on fringe tiles while saving the central patch
@@ -2206,6 +2211,7 @@ Plants affect nearby tiles in readable ways. Effects may include:
 - Heat mitigation
 - Soil improvement
 - Moisture support
+- Salinity reduction
 
 Effect strength should scale with `Plant Density`. A low-density tile should offer limited support, while an `Established` or `Dense` tile should provide much stronger local value.
 
@@ -2216,6 +2222,7 @@ The player should be able to understand why a placement matters by reading the t
 A planted tile is not automatically safe. Young or poorly supported growth can be eroded by time, wind, or sandstorms. Successful restoration requires:
 
 - The right plant in the right place
+- The right plant for the tile's current salinity
 - Enough water or support
 - Protection from severe exposure
 - Follow-up maintenance
@@ -2224,7 +2231,7 @@ This makes restoration feel earned rather than decorative.
 
 ### Regional Ecology Effects
 
-As sites become stable, their plant systems contribute to nearby `Site`s through reduced hazard intensity and stronger starting conditions. This is the main expression of the game's regional restoration fantasy.
+As sites become stable, their plant systems contribute to nearby `Site`s through reduced hazard intensity, cleaner starting land conditions, and stronger starting support pockets. This is the main expression of the game's regional restoration fantasy.
 
 ## 12. Economy, Contracts, And Progression
 
