@@ -367,6 +367,7 @@ Structure runtime values:
 
 - `deviceIntegrity`
 - `deviceEfficiency`
+- `deviceStoredWater`
 
 Discrete or integer runtime values:
 
@@ -404,6 +405,7 @@ Display rule:
 - `tileSoilFertility` is the long-lived land-improvement meter used at runtime; it affects both plant growth speed and how well the tile retains moisture
 - `tileSoilSalinity` should also be shown through a simple overlay or inspection readout because it directly affects plant choice on some tiles
 - `campDurability` should be visible as a base-condition meter because it directly controls how much protection and recovery value the camp can still provide
+- `deviceStoredWater` should be visible on `Water Tank`s and on connected irrigation inspection because it directly controls whether linked `Drip Irrigator`s can operate
 
 #### Fixed-Step Update Order
 
@@ -465,7 +467,7 @@ The tile model should separate different kinds of state instead of treating ever
 | `occupancyState` | What currently occupies the tile | `plantTypeId`, `groundCoverTypeId`, `structureTypeId` | Answers only what is present, not the state of that occupant |
 | `plantState` | Runtime state of the current living plant | `tilePlantDensity`, `plantTrendState`, `growthPressure` | Exists only if `plantTypeId` is present |
 | `coverState` | Runtime state of the current ground cover | `tileGroundCoverDensity` | Exists only if `groundCoverTypeId` is present |
-| `structureState` | Runtime state of the current structure | `deviceIntegrity`, `deviceEfficiency` | Exists only if `structureTypeId` is present |
+| `structureState` | Runtime state of the current structure | `deviceIntegrity`, `deviceEfficiency`, `deviceStoredWater` | `deviceStoredWater` is mainly meaningful for water-storage structures |
 | `derivedLocalModifiers` | Nearby support rebuilt every step | `tileWindProtection`, `tileShade`, `tileWaterSupport` | From plants, devices, and rock; not persistent land quality |
 | `temporaryTileState` | Temporary tile-only hazard state | `tileSandBurial` | Prototype uses burial as the only true temporary tile state |
 
@@ -548,19 +550,18 @@ Important rules:
 
 #### Device Footprints
 
-Prototype devices should support only these footprint classes:
+Prototype devices should support only this footprint class:
 
 - `1x1`
-- `2x2`
 
 Rules:
 
-- all footprint tiles must pass placement validation
-- all footprint tiles become `tileReservedByStructure = true`
-- footprint rotation is orthogonal only
-- if a device is removed, all reserved tiles are released together
+- the single target tile must pass placement validation
+- the target tile becomes `tileReservedByStructure = true`
+- rotation can still exist for visuals or directional effects, but not for footprint size
+- if a device is removed, its reserved tile is released
 
-Long defensive lines should come from repeated placement or plant lines, not special long structure footprints in the first prototype.
+Long defensive lines should come from repeated `1x1` placement or plant lines, not special long structure footprints in the first prototype.
 
 #### Occupancy Coexistence Rules
 
@@ -617,11 +618,11 @@ Ground-cover placement validates in this order:
 
 Structure placement validates in this order:
 
-1. Every footprint tile is in bounds.
-2. Every footprint tile has `tileTraversable = true`.
-3. No footprint tile is reserved by another structure.
-4. If a footprint tile contains a living plant, the structure's `plantShareRule` must allow that plant's `plantHeightClass`.
-5. No footprint tile contains ground cover.
+1. Target tile is in bounds.
+2. Target tile has `tileTraversable = true`.
+3. Target tile is not reserved by another structure.
+4. If the target tile contains a living plant, the structure's `plantShareRule` must allow that plant's `plantHeightClass`.
+5. Target tile contains no ground cover.
 
 Occupancy validation should happen before any cost is paid or any action timer begins.
 
@@ -1199,6 +1200,8 @@ Use these prototype resource-flow rules:
 - selling through the `Field Phone` should require goods to be present in `campStorage`, not only in `workerPack`
 - camp-side crafting and repair devices should be allowed to consume required materials directly from shared `campStorage`
 - for the prototype, there should be no distance-cost rule between `Container`s and camp crafting devices, because both are restricted to the player base area
+- `Water Container`s can be transferred from `workerPack` or `campStorage` into a `Water Tank` through a valid water transfer interaction, increasing that tank's `deviceStoredWater`
+- connected `Drip Irrigator`s consume `deviceStoredWater` from linked `Water Tank`s rather than directly consuming water from `workerPack` or `campStorage`
 
 This keeps the carried `Inventory` important without forcing a full hauling sim.
 
@@ -1290,7 +1293,7 @@ Each prototype structure definition should provide:
 | Field | Meaning |
 |---|---|
 | `structureTypeId` | Unique runtime identity for the structure |
-| `footprintClass` | `1x1`, `1x2`, or `2x2` |
+| `footprintClass` | `1x1` in the prototype |
 | `plantShareRule` | Whether the structure may share its footprint with a living plant: `None`, `LowOnly`, `UpToMedium`, or `AnyHeight` |
 | `sharedPlantHeightLimit` | Highest allowed `plantHeightClass` on the same tile if sharing is enabled |
 | `buildMoneyCost` | Exact integer money cost |
@@ -1302,6 +1305,8 @@ Each prototype structure definition should provide:
 | `shadeAura` | Local heat or shade contribution if any |
 | `recoveryAura` | Local worker-recovery contribution if any |
 | `waterSupport` | Local moisture or water-readiness support if any |
+| `waterStorageCapacity` | Maximum stored water if the structure is a water-storage device |
+| `waterUsePerMinute` | Stored-water consumption rate if the structure actively irrigates |
 | `forecastSupport` | Forecast precision and warning support if any |
 | `craftingSupport` | Whether this device unlocks crafting or repair actions |
 
@@ -1313,26 +1318,31 @@ Prototype rules:
 - `deviceIntegrity` tracks structural health, while `deviceEfficiency` tracks current functional output after burial, storm damage, or solar support
 - if a structure allows plant sharing, the structure still occupies the tile for buildability and repair logic, but the allowed living plant may remain on that tile and continue resolving its own density and support effects
 - a camp-side device with `craftingSupport` should be able to read required materials from shared `campStorage` without first moving them into `workerPack`
+- `Water Tank` should use `deviceStoredWater` as a real runtime reserve that can be filled and drained during the site
+- `Drip Irrigator` should only provide irrigation support while at least one linked `Water Tank` still has `deviceStoredWater > 0`
+- for the prototype, a tank link should be a simple logical connection rather than a pipe-building system
+- one `Drip Irrigator` may link to multiple `Water Tank`s, and its water draw should be split as evenly as possible across all linked tanks that still contain water
+- if all linked tanks are empty, the `Drip Irrigator` should remain placed but provide no irrigation effect until water is available again
 
 #### Prototype Structure Set
 
 | Structure | Family | Footprint | Plant Sharing | Build Cost (Temp) | Main Function | Failure Pressure |
 |---|---|---|---|---|---|---|
 | `Field Tent` | Shelter | `1x1` | `None` | `money 80`, `parts 2` | Creates a small safe rest point and improves short rest recovery on nearby tiles | Can be wind-damaged or buried; weak during severe storms without nearby protection |
-| `Shade Canopy` | Shelter / Heat relief | `1x2` | `None` | `money 120`, `parts 3` | Creates a stronger heat-relief pocket for worker recovery and nearby fragile plants | Loses efficiency quickly in strong wind if exposed |
-| `Water Tank` | Water support | `1x1` | `None` | `money 140`, `parts 3` | Increases accessible site water readiness and serves as a local source for watering actions | Can be buried or temporarily inaccessible if the camp zone is compromised |
-| `Drip Irrigator` | Irrigation | `1x2` | `AnyHeight` | `money 180`, `parts 4` | Adds steady moisture support to nearby plant tiles and helps low-density plants establish | Efficiency collapses when buried, damaged, or if local water support is too low |
-| `Wind Fence` | Protection utility | `1x2` | `None` | `money 100`, `parts 2` | Adds local `tileWindProtection`, especially useful for exposed edges and storm-facing lanes | Provides little recovery value and degrades under repeated sand pressure |
+| `Shade Canopy` | Shelter / Heat relief | `1x1` | `None` | `money 120`, `parts 3` | Creates a stronger heat-relief pocket for worker recovery and nearby fragile plants | Loses efficiency quickly in strong wind if exposed |
+| `Water Tank` | Water support | `1x1` | `None` | `money 140`, `parts 3` | Stores site water for watering actions and for linked `Drip Irrigator`s | Can be buried, damaged, or emptied, making connected irrigation collapse until refilled |
+| `Drip Irrigator` | Irrigation | `1x1` | `AnyHeight` | `money 180`, `parts 4` | Adds steady moisture support to nearby plant tiles while consuming water from one or more linked `Water Tank`s | Provides no irrigation if linked tanks are empty; efficiency also collapses when buried or damaged |
+| `Wind Fence` | Protection utility | `1x1` | `None` | `money 100`, `parts 2` | Adds local `tileWindProtection`, especially useful for exposed edges and storm-facing lanes | Provides little recovery value and degrades under repeated sand pressure |
 | `Weather Mast` | Sensor | `1x1` | `None` | `money 160`, `parts 3` | Improves forecast precision, earlier warnings, and exposure readouts for planning | Storm hits and burial can reduce forecast quality until repaired or cleared |
-| `Solar Array` | Solar utility | `2x2` | `LowOnly` | `money 220`, `parts 5` | Improves nearby `deviceEfficiency`, supports stable utility output without fuel logistics, and can create small sellable surplus electricity when site demand is already covered | Storm damage and burial can sharply reduce output until repaired or cleared |
-| `Field Workshop` | Workshop / Repair | `2x2` | `None` | `money 200`, `parts 4` | Enables repairs and simple field crafting actions | Slower to restore after major damage and wants a reasonably safe camp core |
+| `Solar Array` | Solar utility | `1x1` | `LowOnly` | `money 220`, `parts 5` | Improves nearby `deviceEfficiency`, supports stable utility output without fuel logistics, and can create small sellable surplus electricity when site demand is already covered | Storm damage and burial can sharply reduce output until repaired or cleared |
+| `Field Workshop` | Workshop / Repair | `1x1` | `None` | `money 200`, `parts 4` | Enables repairs and simple field crafting actions | Slower to restore after major damage and wants a reasonably safe camp core |
 
 #### Structure Family Roles
 
 Use these family expectations in prototype tuning:
 
 - shelter family devices should mainly improve worker safety, camp protection, and recovery speed
-- irrigation devices should mainly improve water access, `tileMoisture`, and low-density plant survival
+- irrigation devices should mainly improve water access, `tileMoisture`, and low-density plant survival, but only while connected stored water is available
 - protection utilities should mainly improve `tileWindProtection`, `tileShade`, or both, and reduce storm losses
 - sensors should mainly improve forecast lead time, forecast precision, and hazard readout clarity
 - workshops should mainly enable repair and emergency-prep actions, not deep production chains
@@ -1364,8 +1374,8 @@ Recommended mapping:
 
 - `Field Tent`: orthogonal aura `1`
 - `Shade Canopy`: orthogonal aura `1`
-- `Water Tank`: own-tile plus site-summary water contribution
-- `Drip Irrigator`: orthogonal aura `1`
+- `Water Tank`: own-tile stored-water source plus direct interaction point for refilling or transfer
+- `Drip Irrigator`: orthogonal aura `1`, but only while linked tanks still contain water
 - `Wind Fence`: orthogonal aura `1`, biased toward exposed perimeter placement
 - `Weather Mast`: site-summary only
 - `Solar Array`: orthogonal aura `2`
@@ -1377,7 +1387,7 @@ This roster should create a few clear early strategic patterns:
 
 - build a small protected camp core before overextending planting lines
 - use `Wind Fence`, `Straw Checkerboard`, and early protection plants together on exposed edges
-- use `Water Tank` plus `Drip Irrigator` to help fragile starter plants survive their first growth window
+- use `Water Tank` plus linked `Drip Irrigator`s to help fragile starter plants survive their first growth window, while keeping the tanks filled
 - use `Weather Mast` to turn forecast knowledge into a real planning advantage
 - use `Solar Array` to make a mature support pocket feel operationally stronger instead of just greener
 - use `Field Workshop` to recover faster after major hazard events instead of waiting passively
