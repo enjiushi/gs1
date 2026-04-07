@@ -335,7 +335,6 @@ Continuous runtime values:
 - `tileMoisture`
 - `tileSoilFertility`
 - `tileSoilSalinity`
-- `tileNativeSalinity`
 - `tileSoilStability`
 - `tileSandBurial`
 - `fullyGrownTileCount`
@@ -373,7 +372,6 @@ Display rule:
 - Money, `Reputation`, `Faction Reputation`, stack counts, `fullyGrownTileCount`, `siteCompletionTileThreshold`, and `campaignDaysRemaining` are native integers and should display as exact integers
 - `tileSoilFertility` is the main continuous fertility value used at runtime; terrain type sets the starting baseline, and plants, decay, moisture, and hazards modify it over time
 - `tileSoilSalinity` should also be shown through a simple overlay or inspection readout because it directly affects plant choice on some tiles
-- `tileNativeSalinity` is an authored background pressure value; it should usually stay hidden from the player and exist mainly to drive salinity rebound behavior
 
 #### Fixed-Step Update Order
 
@@ -477,10 +475,9 @@ For the prototype, terrain type is the easiest way to set fertility baseline. Ru
 
 #### Prototype Secondary Tile Traits
 
-For the prototype, plantable tiles may also carry a salinity pair independent of base `terrainTypeId`:
+For the prototype, plantable tiles may also carry one salinity trait independent of base `terrainTypeId`:
 
 - `tileSoilSalinity` in range `0-100`
-- `tileNativeSalinity` in range `0-100`
 
 Prototype interpretation:
 
@@ -488,14 +485,9 @@ Prototype interpretation:
 - medium salinity tiles should push the player toward tougher or more supportive plants
 - high salinity tiles should strongly encourage salt-tolerant or salt-reducing plants
 
-Interpretation rule:
-
-- `tileSoilSalinity` is the current surface salinity the player is actively managing
-- `tileNativeSalinity` is the tile's background tendency to become salty again under bad conditions
-
 Important rule:
 
-- `tileSoilSalinity` and `tileNativeSalinity` should be authored or generated as tile traits layered on top of `PureSand`, `PoorSoil`, or `FirmSoil`, not as whole separate terrain types
+- `tileSoilSalinity` should be authored or generated as a tile trait layered on top of `PureSand`, `PoorSoil`, or `FirmSoil`, not as a whole separate terrain type
 - this keeps the prototype simple while still adding a meaningful placement decision
 
 #### Device Footprints
@@ -1753,7 +1745,6 @@ Each occupied `livingPlantLayer` tile should have these authoritative runtime va
 - `tileMoisture`
 - `tileSoilFertility`
 - `tileSoilSalinity`
-- `tileNativeSalinity`
 - `tileSoilStability`
 - `tileProtectionCoverage`
 - `tileSandBurial`
@@ -1998,20 +1989,14 @@ The prototype should treat salinity as one extra local land-quality pressure, no
 Simple runtime rule:
 
 - each tile keeps its current `tileSoilSalinity`
-- each tile also keeps a hidden `tileNativeSalinity` representing its background salt pressure
+- salinity should begin as an authored tile condition, not as a dynamically rebounding chemistry system
 - healthy plants with salinity-mitigation traits may reduce current salinity gradually over time
-- current salinity may slowly rebound upward toward `tileNativeSalinity` under hot, exposed, poorly protected conditions
-- harsh events do not need to manipulate salinity directly in the prototype unless later tuning proves that necessary
+- harsh events do not need to manipulate salinity directly in the prototype
+- salinity is therefore mainly a rehabilitation layer: bad at the start, better after deliberate restoration
 
 Prototype beneficial-change rule:
 
 - if a living plant has `tilePlantDensity >= 50` and `tilePlantStress < 50`, reduce `tileSoilSalinity` by `salinityReductionPower * 0.002 * stepMinutes`
-
-Prototype rebound rule:
-
-- if `weatherHeat >= 50`, `tileMoisture >= 30`, and `tileProtectionCoverage < 40`, increase `tileSoilSalinity` toward `tileNativeSalinity`
-- recommended rebound shape: `salinityReboundPerMinute = max(0, tileNativeSalinity - tileSoilSalinity) * 0.02 * (weatherHeat / 100) * ((40 - tileProtectionCoverage) / 40)`
-- if `tileProtectionCoverage >= 40`, rebound should be very weak or zero
 
 Clamp rule:
 
@@ -2022,6 +2007,7 @@ Design intent:
 - salt-tolerant plants let the player occupy difficult tiles earlier
 - salt-reducing plants let the player improve those tiles for later, more demanding species
 - low-tolerance plants on salty tiles should plateau at weak density rather than immediately taking direct salinity damage
+- once a tile has been rehabilitated, the prototype should not constantly threaten to undo that progress through hidden salinity rebound
 
 #### Ground-Cover Decay And Setup Rule
 
