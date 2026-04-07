@@ -335,6 +335,7 @@ Continuous runtime values:
 - `tileMoisture`
 - `tileSoilFertility`
 - `tileSoilSalinity`
+- `tileNativeSalinity`
 - `tileSoilStability`
 - `tileSandBurial`
 - `fullyGrownTileCount`
@@ -372,6 +373,7 @@ Display rule:
 - Money, `Reputation`, `Faction Reputation`, stack counts, `fullyGrownTileCount`, `siteCompletionTileThreshold`, and `campaignDaysRemaining` are native integers and should display as exact integers
 - `tileSoilFertility` is the main continuous fertility value used at runtime; terrain type sets the starting baseline, and plants, decay, moisture, and hazards modify it over time
 - `tileSoilSalinity` should also be shown through a simple overlay or inspection readout because it directly affects plant choice on some tiles
+- `tileNativeSalinity` is an authored background pressure value; it should usually stay hidden from the player and exist mainly to drive salinity rebound behavior
 
 #### Fixed-Step Update Order
 
@@ -475,9 +477,10 @@ For the prototype, terrain type is the easiest way to set fertility baseline. Ru
 
 #### Prototype Secondary Tile Traits
 
-For the prototype, plantable tiles may also carry one secondary terrain-pressure trait independent of base `terrainTypeId`:
+For the prototype, plantable tiles may also carry a salinity pair independent of base `terrainTypeId`:
 
 - `tileSoilSalinity` in range `0-100`
+- `tileNativeSalinity` in range `0-100`
 
 Prototype interpretation:
 
@@ -485,9 +488,14 @@ Prototype interpretation:
 - medium salinity tiles should push the player toward tougher or more supportive plants
 - high salinity tiles should strongly encourage salt-tolerant or salt-reducing plants
 
+Interpretation rule:
+
+- `tileSoilSalinity` is the current surface salinity the player is actively managing
+- `tileNativeSalinity` is the tile's background tendency to become salty again under bad conditions
+
 Important rule:
 
-- `tileSoilSalinity` should be authored or generated as a tile trait layered on top of `PureSand`, `PoorSoil`, or `FirmSoil`, not as a whole separate terrain type
+- `tileSoilSalinity` and `tileNativeSalinity` should be authored or generated as tile traits layered on top of `PureSand`, `PoorSoil`, or `FirmSoil`, not as whole separate terrain types
 - this keeps the prototype simple while still adding a meaningful placement decision
 
 #### Device Footprints
@@ -1457,8 +1465,8 @@ These trait combinations should be the main language for future tuning passes. I
 
 To keep the first salinity pass light, the prototype only needs two extra plant-facing tags:
 
-- `Salt Tolerance`: how well the plant survives on salty tiles
-- `Salinity Reduction`: how strongly the plant gradually improves salty soil for future planting
+- `Salt Tolerance`: how much density the plant can still retain on salty tiles
+- `Salinity Reduction`: how strongly the plant gradually improves current tile salinity for future planting
 
 This should be enough to make salty tiles create real placement choices without adding a broader chemistry or water-quality simulation.
 
@@ -1745,6 +1753,7 @@ Each occupied `livingPlantLayer` tile should have these authoritative runtime va
 - `tileMoisture`
 - `tileSoilFertility`
 - `tileSoilSalinity`
+- `tileNativeSalinity`
 - `tileSoilStability`
 - `tileProtectionCoverage`
 - `tileSandBurial`
@@ -1757,7 +1766,7 @@ Each prototype plant definition should also provide these runtime tuning fields:
 | `supportNeed` | `0-100` | Minimum average local support needed before density grows reliably |
 | `waterNeed` | `0-100` | Minimum moisture needed to avoid ongoing dehydration stress |
 | `fertilityNeed` | `0-100` | Minimum fertility needed to maintain growth |
-| `saltTolerance` | `0-100` | How much soil salinity the plant can endure before taking salt stress |
+| `saltTolerance` | `0-100` | How strongly the plant resists salinity-based density-cap reduction |
 | `salinityReductionPower` | `0-100` | How strongly this plant gradually reduces `tileSoilSalinity` while healthy |
 | `stabilityNeed` | `0-100` | Minimum soil stability needed to avoid erosion-related stress |
 | `heatTolerance` | `0-100` | How much ambient heat the plant can endure before taking heat stress |
@@ -1823,12 +1832,11 @@ Then compute raw exposure pressure:
 - `heatPressure = max(0, weatherHeat - heatTolerance - tileMoisture * 0.20)`
 - `windPressure = max(0, weatherWind - windTolerance - tileProtectionCoverage * 0.50)`
 - `sandPressure = max(0, weatherSand - sandTolerance - tileProtectionCoverage * 0.35 - tileGroundCoverDensity * 0.25)`
-- `salinityPressure = max(0, tileSoilSalinity - saltTolerance - tileMoisture * 0.10)`
 - `burialPressure = max(0, tileSandBurial - sandTolerance)`
 
 Prototype per-minute stress gain:
 
-- `stressGainPerMinute = waterDeficit * 0.08 + fertilityDeficit * 0.05 + stabilityDeficit * 0.06 + heatPressure * 0.10 + windPressure * 0.10 + sandPressure * 0.12 + salinityPressure * 0.08 + burialPressure * 0.10`
+- `stressGainPerMinute = waterDeficit * 0.08 + fertilityDeficit * 0.05 + stabilityDeficit * 0.06 + heatPressure * 0.10 + windPressure * 0.10 + sandPressure * 0.12 + burialPressure * 0.10`
 
 Prototype per-minute stress recovery:
 
@@ -1846,6 +1854,27 @@ Final step resolution:
 
 This gives low-density plants a dangerous early phase and makes dense protected patches more resilient without making them invulnerable.
 
+#### Salinity Density-Cap Rules
+
+In the prototype, salinity should not directly add plant stress. Instead, it should limit how dense a plant can become on that tile.
+
+Use this runtime interpretation:
+
+- salt-tolerant plants should still reach strong density on salty tiles
+- low-tolerance plants should survive more weakly there, plateau earlier, and feel like the wrong long-term choice
+- this makes salinity a strategic placement and rehabilitation problem rather than an immediate death sentence
+
+Prototype rule:
+
+- `salinityOverage = max(0, tileSoilSalinity - saltTolerance)`
+- `salinityDensityCap = clamp(100 - salinityOverage * 1.25, 20, 100)`
+
+Interpretation:
+
+- if `tileSoilSalinity <= saltTolerance`, the plant keeps its normal `100` density ceiling
+- if salinity rises above tolerance, the plant's effective maximum density falls
+- a higher `saltTolerance` does not remove salinity from the system; it simply preserves more usable density on difficult tiles
+
 #### Density Gain And Density Loss Rules
 
 `tilePlantDensity` should change every fixed simulation step, not only during long pulses.
@@ -1856,7 +1885,6 @@ A living plant may gain density this step only if all of these are true:
 - `tileSandBurial < 70`
 - `tileMoisture >= waterNeed - 10`
 - `tileSoilFertility >= fertilityNeed - 10`
-- `tileSoilSalinity <= saltTolerance + 10`
 - `tileSoilStability >= stabilityNeed - 10`
 
 If those conditions are met:
@@ -1865,7 +1893,7 @@ If those conditions are met:
 - `densityLossPerMinute = 0`
 - `supportQuality = (tileMoisture + tileSoilFertility + tileSoilStability + tileProtectionCoverage) / 4`
 - `growthReadiness = max(0, supportQuality - supportNeed + 20) / 100`
-- `densityGainPerMinute = (growthRate / 100) * 1.6 * growthReadiness * (1 - tilePlantDensity / 120)`
+- `densityGainPerMinute = (growthRate / 100) * 1.6 * growthReadiness * max(0, salinityDensityCap - tilePlantDensity) / 100`
 
 If those conditions are not met, or if `tilePlantStress` is high, density can fall:
 
@@ -1874,7 +1902,7 @@ If those conditions are not met, or if `tilePlantStress` is high, density can fa
 - if `tilePlantStress >= 60`, apply `densityLossPerMinute += 0.8 + (tilePlantStress - 60) * 0.04`
 - if `tilePlantStress >= 80`, apply an additional `+1.0` density loss per minute
 - if `tileSandBurial >= 80`, apply an additional `+1.2` density loss per minute
-- if `tileSoilSalinity > saltTolerance + 20`, apply an additional `+0.6` density loss per minute
+- if `tilePlantDensity > salinityDensityCap`, apply `densityLossPerMinute += 0.4 + (tilePlantDensity - salinityDensityCap) * 0.06`
 - if an extreme hazard is in peak phase and the plant's weakest exposure channel is currently failing, apply an additional event-defined density loss modifier
 
 Final step resolution:
@@ -1936,9 +1964,9 @@ A tile is eligible only if all of these are true:
 - `tileSandBurial < 30`
 - `tileMoisture >= waterNeed`
 - `tileSoilFertility >= fertilityNeed`
-- `tileSoilSalinity <= saltTolerance`
 - `tileSoilStability >= stabilityNeed`
 - `supportQuality >= spreadReadiness`
+- `salinityDensityCap >= 85`
 - current extreme hazard phase is not `Peak`
 
 Candidate target rules:
@@ -1948,14 +1976,14 @@ Candidate target rules:
 - target must have no living plant
 - target must have no `structureLayer`
 - target must have `tileSoilFertility >= fertilityNeed - 10`
-- target must have `tileSoilSalinity <= saltTolerance + 10`
 - target must have `tileSoilStability >= stabilityNeed - 10`
 - target must have `tileProtectionCoverage >= 20` or `tileGroundCoverDensity >= 20`
+- target must offer `salinityDensityCap >= 40` for the spreading plant
 
 Selection and success rules:
 
 - gather all valid candidate targets
-- choose the target with the highest `tileSoilFertility + tileMoisture + tileProtectionCoverage - tileSandBurial`
+- choose the target with the highest `tileSoilFertility + tileMoisture + tileProtectionCoverage - tileSandBurial - tileSoilSalinity * 0.25`
 - roll spread success using `spreadChance`
 - on success, place the new tile at `tilePlantDensity = 20` and `tilePlantStress = 15`
 
@@ -1965,23 +1993,35 @@ Special rule:
 
 #### Prototype Salinity Resolution Rule
 
-The prototype should treat salinity as one extra local pressure, not as a full soil-chemistry simulation.
+The prototype should treat salinity as one extra local land-quality pressure, not as a full soil-chemistry simulation.
 
 Simple runtime rule:
 
 - each tile keeps its current `tileSoilSalinity`
-- healthy plants with salinity-mitigation traits may reduce it gradually over time
+- each tile also keeps a hidden `tileNativeSalinity` representing its background salt pressure
+- healthy plants with salinity-mitigation traits may reduce current salinity gradually over time
+- current salinity may slowly rebound upward toward `tileNativeSalinity` under hot, exposed, poorly protected conditions
 - harsh events do not need to manipulate salinity directly in the prototype unless later tuning proves that necessary
 
 Prototype beneficial-change rule:
 
 - if a living plant has `tilePlantDensity >= 50` and `tilePlantStress < 50`, reduce `tileSoilSalinity` by `salinityReductionPower * 0.002 * stepMinutes`
+
+Prototype rebound rule:
+
+- if `weatherHeat >= 50`, `tileMoisture >= 30`, and `tileProtectionCoverage < 40`, increase `tileSoilSalinity` toward `tileNativeSalinity`
+- recommended rebound shape: `salinityReboundPerMinute = max(0, tileNativeSalinity - tileSoilSalinity) * 0.02 * (weatherHeat / 100) * ((40 - tileProtectionCoverage) / 40)`
+- if `tileProtectionCoverage >= 40`, rebound should be very weak or zero
+
+Clamp rule:
+
 - clamp `tileSoilSalinity` to `0-100`
 
 Design intent:
 
-- salt-tolerant plants let the player survive on difficult tiles earlier
+- salt-tolerant plants let the player occupy difficult tiles earlier
 - salt-reducing plants let the player improve those tiles for later, more demanding species
+- low-tolerance plants on salty tiles should plateau at weak density rather than immediately taking direct salinity damage
 
 #### Ground-Cover Decay And Setup Rule
 
