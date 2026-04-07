@@ -1179,7 +1179,10 @@ Example inventory pressure:
 Container rules:
 
 - `Container`s should be buyable or buildable camp objects in the current design
-- interacting with a `Container` opens access to camp storage transfer
+- interacting with any `Container` opens access to the shared `campStorage` transfer view rather than only that one object's personal slots
+- the storage UI should support a one-click quick-transfer action from `workerPack` to `campStorage` that automatically merges into existing stacks first and then fills valid empty slots
+- the storage UI should support the reverse quick-transfer action from a selected `campStorage` stack into `workerPack`, again merging into existing stacks first and then filling valid empty slots
+- the storage UI should support `Store All` and `Take All` actions so the player does not need to move common stacks one by one
 - losing, burying, or exposing camp `Container`s can put stored `Item`s at risk during harsh events
 
 #### Resource Flow Rules
@@ -1194,6 +1197,8 @@ Use these prototype resource-flow rules:
 - structure construction can consume from `workerPack`
 - harvesting places goods into `workerPack` first
 - selling through the `Field Phone` should require goods to be present in `campStorage`, not only in `workerPack`
+- camp-side crafting and repair devices should be allowed to consume required materials directly from shared `campStorage`
+- for the prototype, there should be no distance-cost rule between `Container`s and camp crafting devices, because both are restricted to the player base area
 
 This keeps the carried `Inventory` important without forcing a full hauling sim.
 
@@ -1293,6 +1298,7 @@ Prototype rules:
 - a disabled device keeps occupying its footprint until repaired or removed
 - `deviceIntegrity` tracks structural health, while `deviceEfficiency` tracks current functional output after burial, storm damage, or solar support
 - if a structure allows plant sharing, the structure still occupies the tile for buildability and repair logic, but the allowed living plant may remain on that tile and continue resolving its own density and support effects
+- a camp-side device with `craftingSupport` should be able to read required materials from shared `campStorage` without first moving them into `workerPack`
 
 #### Prototype Structure Set
 
