@@ -67,7 +67,7 @@ These terms are stable and should be used consistently in future design and impl
 | `Task Pool Size` | The maximum number of concurrently offered `Site Task`s shown for the current `Site` in the `Contract Board`, upgradable through the `Persistent Tech Tree`. |
 | `Accepted Task Cap` | The maximum number of `Site Task`s the player may have accepted at the same time; accepted tasks are pinned until completed or withdrawn through a costly emergency rule that should only reduce trust earned during the current site. |
 | `Task Tier` | The rarity and difficulty level of a `Site Task`, which controls how often it appears, how hard it is to finish, and how strong its rewards feel. |
-| `Task Reward Draft` | The choice set revealed after completing a `Site Task`, typically with `3` or more options; the options can include `Site Unlockables`, `Run Modifier`s, or resource-focused rewards, but not every draft must include an unlockable. |
+| `Task Reward Draft` | The choice set shown on a `Site Task` before acceptance, typically with `3` or more options; on completion, the player claims `1` option from that task's draft. The options can include `Site Unlockables`, `Run Modifier`s, or resource-focused rewards, but not every draft must include an unlockable. |
 | `Task Reward Package` | A money, resources, or mixed tactical-bundle option that can appear inside a `Task Reward Draft`. |
 | `Run Modifier` | A site-session-only rule-changing effect such as better sell prices, work efficiency, plant growth rate, or weather response; it lasts only for the current site session and is lost if the player leaves, fails, or restarts that site. |
 | `Task Chain` | A linked set of tasks generated inside a task pool refresh; each task pays normal rewards, but completing the full chain grants an extra reward and encourages priority-based planning. |
@@ -114,7 +114,7 @@ The long-term replay goal is for players to finish a campaign and immediately im
 6. Open that site's `Contract Board` during the active session, then receive the current site-task and unlock pool for that site, with each `Site Task` carrying a publishing `Faction`, a place in the refreshable task pool, and rewards shaped by the current `Persistent Tech Tree` build.
 7. Survive the day cycle while establishing basic `Camp Support`.
 8. Plant, build, craft, maintain, and respond to weather.
-9. Complete `Site Task`s to reveal `Task Reward Draft`s, choose from whatever mix of unlockables, modifiers, or resource rewards the draft offers, and use money either on revealed `Site Unlockables` or on very expensive direct-purchase unlockables when needed.
+9. Complete `Site Task`s, claim `1` option from each task's shown `Task Reward Draft`, and use money either on resulting `Site Unlockables` or on very expensive direct-purchase unlockables when needed.
 10. Fulfill site-task goals and any optional bonus objectives.
 11. Stabilize the site enough to extract `Regional Support Output`.
 12. Return to the `Regional Map`, unlock new options, and choose the next priority.
@@ -2436,6 +2436,7 @@ Key rules:
 - The game should not allow free task abandonment, because accepting a task is itself the strategic commitment
 - If an escape hatch is needed, use one `Emergency Withdrawal` per site session at most; it should reduce only the current site's already-earned trust with that task's publisher and should never subtract previously banked reputation from earlier sites
 - Faction-published tasks should bias reward drafts, `Faction Reputation` gain, and `Faction Assistant` availability
+- Each `Site Task` should display one `Task Reward Draft` before the player accepts it
 - Completing a `Site Task` should always grant its guaranteed `Faction Reputation` payout from the publishing `Faction`
 - That `Faction Reputation` payout should be guaranteed on completion, but its amount should scale by task tier or level and task type rather than being chosen from the reward draft
 - A good task choice should depend on current tech build, short-term reward need, active faction events, expected assistant value, current forecast risk, and how many acceptance slots are already committed
@@ -2451,8 +2452,7 @@ Key rules:
 - The highest-tier tasks should feel like jackpot spawns: rare enough to be exciting when they appear in a refresh, and hard enough that completing them feels memorable
 - Jackpot-tier tasks should often grant or offer a `Run Modifier`, not just a bigger resource reward
 - Tasks should feel local and practical, not abstract checklist filler
-- Completing a `Site Task` should first award its guaranteed `Faction Reputation` gain, with the amount based on task tier or level, then reveal one `Task Reward Draft`
-- Completing a `Site Task` should reveal one `Task Reward Draft`
+- Completing a `Site Task` should first award its guaranteed `Faction Reputation` gain, with the amount based on task tier or level, then let the player claim `1` option from that task's already-shown `Task Reward Draft`
 - A `Task Reward Draft` should usually contain `3` or more options
 - A `Task Reward Draft` should not be required to contain a `Site Unlockable`; some drafts should instead focus on modifiers, money, resources, or mixed tactical bundles
 - Draft options can include:
@@ -2520,14 +2520,14 @@ Typical `Site Task` examples:
 
 Typical rewards:
 
-- Reveal a `Task Reward Draft` with `3` or more options
-- Let the player choose 1 reward from unlockables, modifiers, or resource-focused bundles
+- Show a `Task Reward Draft` with `3` or more options on the task before acceptance
+- On completion, let the player choose `1` reward from unlockables, modifiers, or resource-focused bundles in that task's shown draft
 - Always grant the guaranteed publisher `Faction Reputation` payout on completion before the choice is made; the amount should scale with task tier or level
 - If the chosen result is a `Site Unlockable`, reveal it for current-site purchase or use
 - If the chosen result is a `Run Modifier`, activate it immediately for the current site session
 - One-time delivery drops or contractor offers when appropriate
 
-The design goal is that the player can finish a `Site Task`, automatically gain trust with its publisher, receive a clear reward draft, and make one meaningful tactical choice right away. That single choice should still create strong tension: reveal a new plant or device, activate a site-wide modifier, or take immediate money and resources.
+The design goal is that the player can inspect a clear reward draft before accepting a `Site Task`, finish that task, automatically gain trust with its publisher, and then make one meaningful tactical choice right away. That single choice should still create strong tension: reveal a new plant or device, activate a site-wide modifier, or take immediate money and resources.
 
 The `Task Reward Draft` should scale clearly with `Task Tier`. Higher-tier tasks should feel distinctly better, not just slightly larger.
 
@@ -2582,7 +2582,7 @@ Sell-value hierarchy:
 
 Money is the short-term tactical currency. It is primarily for surviving and scaling the current `Site`. If the player spends money on a revealed `Site Unlockable` or on a premium direct-purchase unlockable, that money is not available for water, labor, or emergency recovery on the same site.
 
-`Site Task`s should always grant guaranteed publisher `Faction Reputation` on completion, with the amount scaling by task tier or level, then offer some mix of `Site Unlockables`, `Run Modifier`s, money, or resources through deliberate `Task Reward Draft` choice. Not every draft needs to surface an unlockable. Their main job is still to create momentum, reveal fitting local options, and point the player toward useful next actions. Direct cash should come mainly from tasks, selling output, and other larger economic flows.
+`Site Task`s should always show a visible `Task Reward Draft` before acceptance, then grant guaranteed publisher `Faction Reputation` on completion, with the amount scaling by task tier or level, and let the player claim `1` option from that draft. Not every draft needs to surface an unlockable. Their main job is still to create momentum, reveal fitting local options, and point the player toward useful next actions. Direct cash should come mainly from tasks, selling output, and other larger economic flows.
 
 ### Site Unlock And Modifier Loop
 
@@ -2590,8 +2590,7 @@ The main per-site engagement loop should be:
 
 - Complete a `Site Task`
 - Gain the task's guaranteed publisher `Faction Reputation`, with the amount based on task tier or level
-- Receive a `Task Reward Draft`, typically with `3` or more choices
-- Choose `1` reward option from whatever that draft offers, which may include unlockables, modifiers, or resource-focused bundles
+- Claim `1` reward option from that task's visible `Task Reward Draft`, typically with `3` or more choices
 - If the chosen result is a `Site Unlockable`, spend money to purchase or use it when needed
 - If the wanted unlockable did not appear from tasks, optionally buy it from the direct-purchase list at very high money cost
 - If the chosen result is a `Run Modifier`, let it reshape the current site session immediately
@@ -2626,7 +2625,7 @@ If the game needs to feel more compelling and hard to put down, it should consta
 
 Short-term targets should usually be visible within the next few minutes of play. In this design, they should come mainly from four sources:
 
-- The current `Site Task` that will reveal the next `Task Reward Draft`
+- The current `Site Task` whose visible `Task Reward Draft` looks most valuable right now
 - The current revealed `Site Unlockable` the player is trying to afford or use
 - The current refreshable pool of visible `Site Task`s
 - The next visible ecology, survival, or zone threshold on the current `Site`
@@ -2645,7 +2644,7 @@ Good examples include:
 
 Recommended short-term reward sources:
 
-- Newly revealed `Task Reward Draft`s
+- Visible `Task Reward Draft`s attached to current tasks
 - Newly revealed or newly discounted chosen `Site Unlockables`
 - Chosen `Task Reward Package`s containing money, resources, or mixed tactical bundles
 - Rare high-tier `Site Task`s appearing in the refreshed pool
@@ -2681,7 +2680,7 @@ If the design cannot present that clearly, depth will feel like clutter instead 
 To keep players engaged without relying on pure randomness, the game should present goals at multiple layers at the same time:
 
 - Immediate target: a 1 to 3 minute task such as finishing one tile cluster, placing one missing support plant, buying one needed supply, or surviving the next danger window
-- Short target: a 5 to 10 minute task such as finishing a windbreak line, completing one `Site Task` to reveal a reward draft, choosing one local unlock or modifier, or harvesting a patch
+- Short target: a 5 to 10 minute task such as finishing a windbreak line, completing one `Site Task` to claim `1` reward from its visible draft, choosing one local unlock or modifier, or harvesting a patch
 - Site phase target: a 10 to 20 minute task such as stabilizing a zone, securing food independence, making the camp storm-safe, or hitting the next ecology threshold
 - Campaign target: a longer objective such as restoring a linked corridor, raising `Reputation` to the next tier, unlocking a key `Persistent Tech Tree` node, or opening a new strategic site
 
@@ -2694,7 +2693,7 @@ To support this cadence, larger goals should have milestone support, but the gam
 Useful milestone layers:
 
 - Phase milestone rewards: each major site phase should have 2 to 4 small sub-objectives with immediate payouts
-- `Site Task` completion rewards: the primary 5 to 10 minute target-and-reward layer, centered on revealing a `Task Reward Draft` and choosing `1` unlock, modifier, or resource reward rather than just taking raw cash
+- `Site Task` completion rewards: the primary 5 to 10 minute target-and-reward layer, centered on claiming `1` unlock, modifier, or resource reward from a task's visible `Task Reward Draft` rather than just taking raw cash
 - Zone restoration thresholds: when a local area crosses a restoration threshold, it grants a burst reward
 - Daily field goals: each morning can surface a few lightweight optional objectives tied to current weather and site state
 - Plant chain milestones: first windbreak, first stable food patch, first storm-proof cluster, first medicinal harvest
@@ -2750,7 +2749,7 @@ To make the game more compelling without feeling manipulative, these systems wou
 
 `Reputation` should function as thresholded trust, not consumable currency. Reaching a threshold unlocks access to new tech levels and support tiers; choosing a tech node does not reduce current reputation. `Faction Reputation` should behave the same way inside each branch.
 
-For clarity, `Faction Reputation` from `Site Task`s should usually be a guaranteed completion payout tied to the task's publisher, with the amount scaling by task tier or level, while the post-task draft should stay focused on immediate tactical rewards.
+For clarity, `Faction Reputation` from `Site Task`s should usually be a guaranteed completion payout tied to the task's publisher, with the amount scaling by task tier or level, while the task's visible reward draft should stay focused on immediate tactical rewards.
 
 If a current-site penalty such as `Emergency Withdrawal` exists, it should only reduce trust earned during the current site session before that session's gains are folded into the persistent totals. It should never spend or erase trust already banked from previous sites.
 
@@ -3001,9 +3000,10 @@ Faction tech choices should bias these local offers rather than replacing them. 
 
 Task-driven and money-fallback access rules:
 
-- completing a `Site Task` reveals a `Task Reward Draft`, typically with `3` or more options
+- each `Site Task` should show a `Task Reward Draft`, typically with `3` or more options, before the player accepts it
 - the options can include `Site Unlockables`, `Run Modifier`s, or resource-focused rewards
 - not every `Task Reward Draft` should contain a `Site Unlockable`
+- on completion, the player claims `1` option from that task's shown draft
 - if the player chooses a `Site Unlockable`, it becomes available on the current site and may still require money to purchase or use
 - the site should also maintain a small direct-purchase list of tech-eligible `Site Unlockables`
 - direct-purchase prices should be deliberately very high so task-earned unlocks remain the efficient path
@@ -3528,7 +3528,7 @@ This is the minimum that still lets the player compare factions instead of only 
 - no free task abandonment in the prototype
 - every completed task grants:
 - guaranteed publisher `Faction Reputation`
-- one immediate reward package or a small reward draft
+- one shown immediate reward package or one shown small reward draft from which the player claims `1` option on completion
 - `Faction Reputation` amount is fixed by the task definition, but scales by task level or tier
 - no `Task Chain`s in the minimum playable build
 - no jackpot-tier tasks in the minimum playable build
@@ -3779,7 +3779,7 @@ These scenarios define whether the design is behaving correctly in current-build
 
 ### New Site
 
-The player can choose a `Loadout`, enter a `Site`, understand immediate survival pressure, receive only the currently unlocked gameplay concepts, see an initial readable pool of `Site Task`s appropriate to their current onboarding step, and complete an initial task that reveals a clear `Task Reward Draft` without relying on hidden rules.
+The player can choose a `Loadout`, enter a `Site`, understand immediate survival pressure, receive only the currently unlocked gameplay concepts, see an initial readable pool of `Site Task`s appropriate to their current onboarding step, see each task's reward draft clearly enough to make a choice, and complete an initial task without relying on hidden rules.
 
 ### First 5 Minutes Check
 
@@ -3860,7 +3860,7 @@ While a `Site` is still unrestored, the player should consistently have immediat
 
 ### Site Task Check
 
-During a normal site run, the player should be able to see a limited but refreshed pool of `Site Task`s, understand each task's publishing `Faction`, commit to no more than `3` accepted tasks at once in the current design, finish them in roughly 5 to 10 minutes, and feel that task rewards meaningfully feed the next local decision. Completing a task should always grant its guaranteed `Faction Reputation` payout, with the amount scaling by task tier or level, and most `Site Task`s should then reveal a `Task Reward Draft` with `3` or more options. Those options should be able to include `Site Unlockables`, `Run Modifier`s, and `Task Reward Package`s containing money, resources, or mixed tactical bundles. `Task Pool Size` and `Accepted Task Cap` upgrades in the `Persistent Tech Tree` should noticeably change how many short-term opportunities the player can pursue at once.
+During a normal site run, the player should be able to see a limited but refreshed pool of `Site Task`s, understand each task's publishing `Faction`, commit to no more than `3` accepted tasks at once in the current design, finish them in roughly 5 to 10 minutes, and feel that task rewards meaningfully feed the next local decision. Completing a task should always grant its guaranteed `Faction Reputation` payout, with the amount scaling by task tier or level, and most `Site Task`s should already show a `Task Reward Draft` with `3` or more options before acceptance. On completion, the player should claim `1` option from that draft. Those options should be able to include `Site Unlockables`, `Run Modifier`s, and `Task Reward Package`s containing money, resources, or mixed tactical bundles. `Task Pool Size` and `Accepted Task Cap` upgrades in the `Persistent Tech Tree` should noticeably change how many short-term opportunities the player can pursue at once.
 
 ### Task Tier Excitement Check
 
@@ -3902,7 +3902,7 @@ Two campaigns with different faction-tech paths should produce different viable 
 
 ### Tech-Money Loop Check
 
-On a typical `Site`, the player should be able to follow a satisfying loop of completing a task, seeing a `Task Reward Draft`, choosing `1` reward, using that choice to reveal an unlock, activate a modifier, or gain immediate resources, then converting that payoff into better protection, output, or momentum that points toward the next draft.
+On a typical `Site`, the player should be able to follow a satisfying loop of reviewing a task's visible reward draft, choosing to accept that task, completing it, claiming `1` reward, using that choice to reveal an unlock, activate a modifier, or gain immediate resources, then converting that payoff into better protection, output, or momentum that points toward the next draft.
 
 ### Currency Separation Check
 
@@ -3928,7 +3928,7 @@ Leaving, failing, or restarting a site should reset its site unlock pool, clear 
 - Validate partial degradation, not only full destruction. Reduced `Plant Density`, damaged supplies, weakened output, and worsened `Player Condition` should create the current build's most interesting comeback decisions.
 - Treat replayability as a core production requirement, not post-launch polish. Procedural map generation, task-board variety, event variety, and meaningful tech branching should be validated in early milestones.
 - Validate the dual-layer progression structure early. The `Persistent Tech Tree` must feel campaign-defining, while site unlocks and modifiers must feel fresh on each site without overwhelming the player.
-- Validate generated `Site Task`s early. The 5 to 10 minute task loop should feel practical, varied, and tightly connected to reward-draft reveal, local unlock purchasing, modifier pivots, and restoration progress.
+- Validate generated `Site Task`s early. The 5 to 10 minute task loop should feel practical, varied, and tightly connected to visible reward-draft choice, local unlock purchasing, modifier pivots, and restoration progress.
 - Validate task-tier excitement early. High-tier task spawn rates, readability, and reward strength should be tuned so jackpot appearances feel rare and thrilling rather than noisy or disappointing.
 - Validate jackpot modifiers, task chains, and `Site Commendation`s early. These systems should create memorable site-run pivots and meaningful recognition, not just sit as decorative bonuses.
 - Validate extreme hazard events early. The harshest environmental moments should become emotional peaks driven by survival pressure, music, and rendering, not just bigger damage numbers.
