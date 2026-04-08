@@ -1139,6 +1139,14 @@ Shared item-definition fields:
 | `itemTags` | Freeform descriptive tags such as `drinkable`, `edible`, `medical`, `plantingStock`, `deployableKit`, `repairSupply`, `harvested`, `crafted`, `spoilable`, or `fragile` |
 | `useCapabilities` | Explicit action verbs such as `drink`, `eat`, `useMedicine`, `plant`, `deployStructure`, `repair`, `craftInput`, `transferWater`, or `sell` |
 
+Runtime item meters:
+
+| Meter | Meaning |
+|---|---|
+| `itemQuantity` | Current amount held in this runtime item entry or stack. This is the live quantity, while `stackSize` is only the per-slot maximum. |
+| `itemCondition` | Current physical usability for items that can be damaged, especially `mechanical`, `repairSupply`, `buildSupply`, `fragile`, or `deployableKit` items. |
+| `itemFreshness` | Current usable freshness for `spoilable` items such as water, food, medicine, or crafted consumables. |
+
 Important rule:
 
 - systems should check `useCapabilities`, `itemTags`, and `linkedContentId`, not a hard-coded item class
@@ -1146,6 +1154,10 @@ Important rule:
 - if an item can deploy a structure, it should expose `deployStructure` and point its `linkedContentId` to a structure type
 - if an item can be consumed, it should expose the relevant consume capability such as `eat`, `drink`, or `useMedicine`
 - future hybrid items should be possible by combining tags and capabilities without adding a new base type
+- every runtime item entry should always carry `itemQuantity`
+- `itemCondition` is only meaningful for items whose tags or capabilities imply physical damage can matter
+- `itemFreshness` is only meaningful for items with the `spoilable` tag
+- meters that do not apply to a given item should remain at their inert defaults and should not create special-case branching elsewhere
 
 Acquisition and sale rules:
 
@@ -1154,21 +1166,23 @@ Acquisition and sale rules:
 - `HarvestOnly` is a source rule, not a separate gameplay type
 - stack size is a real carrying constraint, not just a presentation label
 - if the player wants to carry more than one stack limit of the same `Item`, the excess must occupy additional `Inventory` slots
+- `itemQuantity` may never exceed `stackSize` on one stack
+- if `itemQuantity` reaches `0`, that runtime item entry should be removed
 - `Reputation` is not an inventory item and never exists in storage
 
 Recommended simplified item catalog:
 
-| Item | Runtime Identity | Item Tags | Use Capabilities | Source Rule | Stack Size | Main Uses |
-|---|---|---|---|---|---|---|
-| Water Container | `waterContainer` | `drinkable`, `waterCarrier`, `spoilable` | `drink`, `transferWater`, `sell` | `BuyOnly` | `5` | Hydration and filling `Water Tank`s |
-| Food Pack | `foodPack` | `edible`, `spoilable` | `eat`, `sell` | `BuyOnly` | `5` | `Nourishment` recovery and basic survival prep |
-| Medicine Pack | `medicinePack` | `medical`, `consumable`, `spoilable` | `useMedicine`, `sell` | `BuyOnly` | `3` | `Health` recovery after harsh conditions |
-| Crafted Food / Drink | `craftedFood:<recipeId>` | `crafted`, `edible` or `drinkable`, `valueAdded`, `spoilable` | `eat` or `drink`, `sell` | `CraftOnly` or `BuyOrCraft` | `5` | High-value sale or stronger recovery; examples include fruit juice recipes unlocked by tech |
-| Repair Kit | `repairKit` | `repairSupply`, `mechanical` | `repair`, `sell` | `BuyOnly` or `BuyOrCraft` | `3` | Structure and device repair |
-| Parts Bundle | `partsBundle` | `buildSupply`, `mechanical`, `craftingIngredient` | `build`, `repair`, `craftInput`, `sell` | `BuyOnly` or `BuyOrCraft` | `10` | Device construction, upgrades, and some repairs |
-| Device Kit | `deviceKit:<structureTypeId>` | `deployableKit`, `mechanical` | `deployStructure`, `sell` | `BuyOnly` or `BuyOrCraft` | `1` | Placement of one site device |
-| Seed Bundle | `seedBundle:<plantTypeId>` | `plantingStock`, `fragile` | `plant`, `sell` | `BuyOnly` or `BuyOrCraft` | `10` | Plant placement for a specific plant type |
-| Harvest Good | `harvestGood:<outputTypeId>` | `harvested`, `craftingIngredient` | `craftInput`, `sell` | `HarvestOnly` | `10` | Sale or crafting ingredient |
+| Item | Runtime Identity | Item Tags | Use Capabilities | Runtime Item Meters | Source Rule | Stack Size | Main Uses |
+|---|---|---|---|---|---|---|---|
+| Water Container | `waterContainer` | `drinkable`, `waterCarrier`, `spoilable` | `drink`, `transferWater`, `sell` | `itemQuantity`, `itemFreshness` | `BuyOnly` | `5` | Hydration and filling `Water Tank`s |
+| Food Pack | `foodPack` | `edible`, `spoilable` | `eat`, `sell` | `itemQuantity`, `itemFreshness` | `BuyOnly` | `5` | `Nourishment` recovery and basic survival prep |
+| Medicine Pack | `medicinePack` | `medical`, `consumable`, `spoilable` | `useMedicine`, `sell` | `itemQuantity`, `itemFreshness` | `BuyOnly` | `3` | `Health` recovery after harsh conditions |
+| Crafted Food / Drink | `craftedFood:<recipeId>` | `crafted`, `edible` or `drinkable`, `valueAdded`, `spoilable` | `eat` or `drink`, `sell` | `itemQuantity`, `itemFreshness` | `CraftOnly` or `BuyOrCraft` | `5` | High-value sale or stronger recovery; examples include fruit juice recipes unlocked by tech |
+| Repair Kit | `repairKit` | `repairSupply`, `mechanical` | `repair`, `sell` | `itemQuantity`, `itemCondition` | `BuyOnly` or `BuyOrCraft` | `3` | Structure and device repair |
+| Parts Bundle | `partsBundle` | `buildSupply`, `mechanical`, `craftingIngredient` | `build`, `repair`, `craftInput`, `sell` | `itemQuantity`, `itemCondition` | `BuyOnly` or `BuyOrCraft` | `10` | Device construction, upgrades, and some repairs |
+| Device Kit | `deviceKit:<structureTypeId>` | `deployableKit`, `mechanical` | `deployStructure`, `sell` | `itemQuantity`, `itemCondition` | `BuyOnly` or `BuyOrCraft` | `1` | Placement of one site device |
+| Seed Bundle | `seedBundle:<plantTypeId>` | `plantingStock`, `fragile` | `plant`, `sell` | `itemQuantity`, `itemCondition` | `BuyOnly` or `BuyOrCraft` | `10` | Plant placement for a specific plant type |
+| Harvest Good | `harvestGood:<outputTypeId>` | `harvested`, `craftingIngredient` | `craftInput`, `sell` | `itemQuantity` | `HarvestOnly` | `10` | Sale or crafting ingredient |
 
 #### Layer 3: Inventory And Containers
 
@@ -1229,12 +1243,12 @@ To keep the logic readable, hazards should interact with items by location:
 Worker-carried items:
 
 - are not randomly destroyed just by bad weather in normal play
-- are consumed by direct use, recovery, construction, planting, repair, or other field-work cost
+- are mainly changed through direct use, recovery, construction, planting, repair, transfer, or other field-work cost, which should usually reduce `itemQuantity`
 - can be lost only through explicit failure or a specifically authored event, not through hidden attrition rules
 
 Camp-stored items:
 
-- can be buried, damaged, spoiled, or partially lost during severe hazard events if the camp is exposed
+- can lose `itemQuantity`, `itemCondition`, or `itemFreshness` during severe hazard events if the camp is exposed
 - are better protected when the camp has stronger shelter structures and nearby protection
 - should be vulnerable through readable item tags and authored examples rather than through a hard-coded item category table:
 
@@ -4048,6 +4062,7 @@ This summary should include only core runtime meters and the core plant-side val
 | Weather meters | `weatherHeat`, `weatherWind`, `weatherDust` | Site-wide ambient weather outputs after baseline site conditions and current event meters are combined. |
 | Resolved local weather meters | `tileHeat`, `tileWind`, `tileDust` | Per-tile weather result after site weather, local support, and shelter are combined. They bridge site weather and final terrain or plant pressure. |
 | Worker state meters | `playerHealth`, `playerHydration`, `playerNourishment`, `playerEnergyCap`, `playerEnergy`, `playerMorale`, `playerWorkEfficiency` | Core worker survival and performance meters. They represent the worker's current physical and mental condition plus the resolved action-energy modifier used during site play. |
+| Item state meters | `itemQuantity`, `itemCondition`, `itemFreshness` | Core runtime item-stack meters. `itemQuantity` tracks how much of a stack remains, `itemCondition` tracks damage-sensitive item usability, and `itemFreshness` tracks spoilable item usability. |
 | Persistent terrain soil meters | `tileSoilFertility`, `tileMoisture`, `tileSoilSalinity` | Long-lived or short-lived land condition on plantable `Ground`. These meters determine what can grow well. |
 | Temporary tile pressure | `tileSandBurial` | Recoverable sand overlay created mainly by sandstorms. If ignored, it can create lasting fertility loss. |
 | Plant meters | `tilePlantDensity`, `growthPressure`, `salinityDensityCap` | Shared plant-side runtime meters. `tilePlantDensity` tracks current plant presence, `growthPressure` governs growth-capable plants, and `salinityDensityCap` is the plant-side density ceiling created by salty ground. |
@@ -4090,6 +4105,14 @@ This summary should include only core runtime meters and the core plant-side val
 | `playerEnergy` | Work actions, rest recovery, `playerHealth`, `playerEnergyCap`, `playerWorkEfficiency` | None | Main short-term work-capacity meter and end-consumption meter. It should be clamped by `playerEnergyCap`, while low `playerWorkEfficiency` should raise the effective energy cost of each action and drain this meter faster. |
 | `playerMorale` | Safe rest, dense-cover recovery pockets, harsh-event aftermath, current site setbacks and recovery progress | `playerWorkEfficiency` | Worker comfort and psychological stability meter. Low morale should make routine work more energy-expensive or less reliable rather than directly lowering the energy meter. |
 | `playerWorkEfficiency` | `playerHealth`, `playerEnergy`, `playerEnergyCap`, `playerMorale`, `tileHeat`, `tileWind`, `tileDust`, workload strain | Action energy cost, `playerEnergy` | Resolved worker-output meter. This should be the main gameplay-facing meter for how expensive each action is. Worse local weather should mainly hurt the player by lowering this meter, which raises energy cost per action. |
+
+### Item State Meter Relationships
+
+| Meter | Impacted by | Impact to | Notes |
+|---|---|---|---|
+| `itemQuantity` | Buying, crafting, harvesting, transfers between `workerPack`, `campStorage`, and `pendingDeliveryQueue`, planting, building, repair, consume actions, selling, hazard-side partial loss | Inventory occupancy, action availability, sale payout, `deviceStoredWater` when water is transferred | Core stack-count meter. It should always be clamped between `0` and `stackSize`, and the stack should be removed when it reaches `0`. |
+| `itemCondition` | Severe hazard damage on exposed stored items, authored item-damage events | Action availability, sale payout | Meaningful mainly for items whose tags imply physical integrity matters, such as `mechanical`, `repairSupply`, `buildSupply`, `fragile`, or `deployableKit`. |
+| `itemFreshness` | Severe hazard spoilage on exposed stored items, authored spoilage events | Action availability, worker recovery value, sale payout | Meaningful mainly for items with the `spoilable` tag, such as water, food, medicine, or crafted consumables. |
 
 ### Terrain Meter Relationships
 
@@ -4159,10 +4182,11 @@ Use this loop as the core mental model:
 1. Event state updates `eventHeatPressure`, `eventWindPressure`, and `eventDustPressure`.
 2. Weather updates `weatherHeat`, `weatherWind`, and `weatherDust` from baseline site conditions plus current event meters.
 3. Site weather plus active `Per-Site Modifier`s, local plants, `Straw Checkerboard`, protective structures, and terrain shelter resolve `tileHeat`, `tileWind`, and `tileDust`.
-4. Worker state updates `playerHealth`, `playerHydration`, `playerNourishment`, `playerEnergyCap`, `playerEnergy`, `playerMorale`, and `playerWorkEfficiency` from local weather, active `Per-Site Modifier`s, work, rest, supplies, medicine, and recovery context.
-5. Resolved local weather, active `Per-Site Modifier`s, irrigation, and plant contribution values update terrain pressure: moisture drain, burial, fertility change, and salinity change.
-6. Terrain state plus resolved local weather and plant resistance values feed `growthPressure`.
-7. `growthPressure`, `salinityDensityCap`, `growable`, and `constantWitherRate` determine plant density change.
-8. Healthy plants feed back into the tile by improving fertility, reducing salinity, holding soil against erosion-driven loss, adding shade, adding wind protection, or supporting moisture; non-growable plants such as `Straw Checkerboard` use the same shared contribution logic, but their current density steadily falls through `constantWitherRate`.
-9. Damaged or dead plants reduce local support, which can expose nearby tiles and create a recoverable downward spiral.
+4. Worker state updates `playerHealth`, `playerHydration`, `playerNourishment`, `playerEnergyCap`, `playerEnergy`, `playerMorale`, and `playerWorkEfficiency` from local weather, active `Per-Site Modifier`s, work, rest, and valid item use such as `drink`, `eat`, or `useMedicine`.
+5. Item state updates `itemQuantity`, `itemCondition`, and `itemFreshness` from use, transfers, harvest gain, sales, and hazard-side damage or spoilage on exposed stored items.
+6. Resolved local weather, active `Per-Site Modifier`s, irrigation, and plant contribution values update terrain pressure: moisture drain, burial, fertility change, and salinity change.
+7. Terrain state plus resolved local weather and plant resistance values feed `growthPressure`.
+8. `growthPressure`, `salinityDensityCap`, `growable`, and `constantWitherRate` determine plant density change.
+9. Healthy plants feed back into the tile by improving fertility, reducing salinity, holding soil against erosion-driven loss, adding shade, adding wind protection, or supporting moisture; non-growable plants such as `Straw Checkerboard` use the same shared contribution logic, but their current density steadily falls through `constantWitherRate`.
+10. Damaged or dead plants reduce local support, which can expose nearby tiles and create a recoverable downward spiral.
 
