@@ -3027,6 +3027,7 @@ Source families:
 Authoring rules:
 
 - a modifier should target explicit meters or meter-rate channels, not vague flavor bonuses
+- content-facing modifier names should map into one or more generic modifier channels such as `heatModifier`, `moistureModifier`, or `workEfficiencyModifier` for implementation
 - a modifier may change plant-side meter flow such as `tileMoisture`, `tileSoilFertility`, `tileSoilSalinity`, `growthPressure`, `salinityDensityCap`, or density gain and loss on `tilePlantDensity`
 - a modifier may change player-side meter flow such as `playerHydration`, `playerHealth`, `playerNourishment`, `playerEnergyCap`, `playerMorale`, or `playerWorkEfficiency`
 - a modifier should reshape the existing meter model instead of bypassing it with hidden direct plant death, instant worker collapse, or special-case scripted survival
@@ -3039,16 +3040,16 @@ Authoring rules:
 
 Use concrete modifier families like these:
 
-| Modifier family | Typical source | Main meter targets | Design purpose |
+| Modifier family | Typical source | Main modifier channels | Design purpose |
 |---|---|---|---|
-| `Cool Shift Protocol` | `Run Modifier` or `Nearby-Site Aura` | `playerHydration`, `playerWorkEfficiency`, `tileHeat` | Reduces heat-side worker strain so exposed outdoor actions remain cheaper for longer in hot sites. |
-| `Recovery Rotation` | `Nearby-Site Aura` or `Run Modifier` | `playerHealth`, `playerMorale`, `playerEnergy` | Improves recovery quality during shelter or base downtime so the player can rebound faster after harsh-event pushes. |
-| `Field Ration Support` | `Nearby-Site Aura` or `Run Modifier` | `playerNourishment`, `playerEnergyCap` | Slows long-session worker decline and keeps the usable energy ceiling steadier during extended work windows. |
-| `Moisture Hold Order` | `Run Modifier` or `Nearby-Site Aura` | `tileMoisture`, `growthPressure` | Slows moisture loss on plantable tiles and helps young patches hold low pressure for longer. |
-| `Rooting Window` | `Run Modifier` | `growthPressure`, `tilePlantDensity` | Gives fresh plantings a short establishment window by reducing plant-side pressure and improving early density gain while support is good. |
-| `Soil Rehab Push` | `Run Modifier` or `Nearby-Site Aura` | `tileSoilFertility`, `tileSoilSalinity`, `salinityDensityCap` | Speeds rehabilitation of damaged or salty land so transition patches become productive sooner. |
-| `Shelterbelt Coordination` | `Run Modifier` | `tileWind`, `tileDust`, `growthPressure`, `playerWorkEfficiency` | Strengthens protection-led play by reducing resolved local wind and dust pressure, indirectly helping both plants and field labor. |
-| `Salt Transition Program` | `Nearby-Site Aura` or `Run Modifier` | `tileSoilSalinity`, `salinityDensityCap`, `tilePlantDensity` | Makes salty pockets more workable for salt-tolerant lines and shortens the time needed to convert them into stable ground. |
+| `Cool Shift Protocol` | `Run Modifier` or `Nearby-Site Aura` | `heatModifier`, `hydrationModifier`, `workEfficiencyModifier` | Reduces heat-side worker strain so exposed outdoor actions remain cheaper for longer in hot sites. |
+| `Recovery Rotation` | `Nearby-Site Aura` or `Run Modifier` | `healthModifier`, `moraleModifier`, `energyModifier` | Improves recovery quality during shelter or base downtime so the player can rebound faster after harsh-event pushes. |
+| `Field Ration Support` | `Nearby-Site Aura` or `Run Modifier` | `nourishmentModifier`, `energyCapModifier` | Slows long-session worker decline and keeps the usable energy ceiling steadier during extended work windows. |
+| `Moisture Hold Order` | `Run Modifier` or `Nearby-Site Aura` | `moistureModifier`, `growthPressureModifier` | Slows moisture loss on plantable tiles and helps young patches hold low pressure for longer. |
+| `Rooting Window` | `Run Modifier` | `growthPressureModifier`, `plantDensityModifier` | Gives fresh plantings a short establishment window by reducing plant-side pressure and improving early density gain while support is good. |
+| `Soil Rehab Push` | `Run Modifier` or `Nearby-Site Aura` | `fertilityModifier`, `salinityModifier`, `salinityDensityCapModifier` | Speeds rehabilitation of damaged or salty land so transition patches become productive sooner. |
+| `Shelterbelt Coordination` | `Run Modifier` | `windModifier`, `dustModifier`, `growthPressureModifier`, `workEfficiencyModifier` | Strengthens protection-led play by reducing resolved local wind and dust pressure, indirectly helping both plants and field labor. |
+| `Salt Transition Program` | `Nearby-Site Aura` or `Run Modifier` | `salinityModifier`, `salinityDensityCapModifier`, `plantDensityModifier` | Makes salty pockets more workable for salt-tolerant lines and shortens the time needed to convert them into stable ground. |
 
 Nearby-site support should usually use lower-intensity versions of these same modifier families, while task-earned modifiers can use stronger or more conditional versions that create a real style pivot for the current run.
 
@@ -4088,20 +4089,28 @@ This summary should include only core runtime meters and the core plant-side val
 
 `Straw Checkerboard` should be authored through the same shared plant rows: start it at maximum `tilePlantDensity`, set `growable = false`, set a positive `constantWitherRate`, set `auraSize` as needed for setup reach, keep `growthPressure` at `0`, and rely on normal shared contribution values such as `fertilityImprovePower`.
 
-### Per-Site Modifier To Meter Relationships
+### Per-Site Modifier Channel Relationships
 
-`Per-Site Modifier`s and `Nearby-Site Aura`s are not persistent runtime meters, but they directly alter how core meters change during a site session. Use this table as the implementation-facing reference for modifier authoring.
+`Per-Site Modifier`s and `Nearby-Site Aura`s are not persistent runtime meters, but for code they should compile into generic signed modifier channels. Each named modifier then becomes a bundle of one or more channels plus values and duration rules.
 
-| Modifier family | Typical source | Impact to | Notes |
-|---|---|---|---|
-| `Cool Shift Protocol` | `Run Modifier`, `Nearby-Site Aura` | `tileHeat`, `playerHydration`, `playerWorkEfficiency` | Lowers heat-side worker strain through the normal heat and worker meter flow instead of granting direct free energy. |
-| `Recovery Rotation` | `Run Modifier`, `Nearby-Site Aura` | `playerHealth`, `playerMorale`, `playerEnergy` | Strengthens recovery-side worker meters, especially when the player returns to shelter or downtime windows. |
-| `Field Ration Support` | `Run Modifier`, `Nearby-Site Aura` | `playerNourishment`, `playerEnergyCap` | Keeps the usable energy ceiling steadier during long work windows by supporting nourishment-side decline. |
-| `Moisture Hold Order` | `Run Modifier`, `Nearby-Site Aura` | `tileMoisture` | Slows moisture loss on plantable ground, which then lowers `growthPressure` through the normal terrain-to-plant chain. |
-| `Rooting Window` | `Run Modifier` | `growthPressure`, `tilePlantDensity` | Gives fresh plantings a short establishment window by reducing plant-side pressure and improving early density gain while support is adequate. |
-| `Soil Rehab Push` | `Run Modifier`, `Nearby-Site Aura` | `tileSoilFertility`, `tileSoilSalinity`, `salinityDensityCap` | Speeds rehabilitation of damaged or salty land so weak tiles recover into useful planting ground sooner. |
-| `Shelterbelt Coordination` | `Run Modifier` | `tileWind`, `tileDust`, `playerWorkEfficiency` | Reduces resolved local wind and dust pressure first, which then indirectly improves both plant conditions and field labor efficiency. |
-| `Salt Transition Program` | `Run Modifier`, `Nearby-Site Aura` | `tileSoilSalinity`, `salinityDensityCap`, `tilePlantDensity` | Makes salty pockets more workable by easing the salinity-side density ceiling and helping transition plants hold density. |
+| Modifier channel | Impact to | Notes |
+|---|---|---|
+| `heatModifier` | `tileHeat` | Generic local-heat adjustment channel. Negative values reduce resolved heat pressure; positive values raise it. |
+| `windModifier` | `tileWind` | Generic local-wind adjustment channel. Negative values reduce resolved wind pressure; positive values raise it. |
+| `dustModifier` | `tileDust` | Generic local-dust adjustment channel. Negative values reduce resolved dust pressure; positive values raise it. |
+| `moistureModifier` | `tileMoisture` | Generic tile-moisture adjustment channel. It should change moisture flow without bypassing the normal terrain model. |
+| `fertilityModifier` | `tileSoilFertility` | Generic soil-fertility adjustment channel for rehab, erosion recovery, or support effects. |
+| `salinityModifier` | `tileSoilSalinity` | Generic soil-salinity adjustment channel for salt buildup or salt reduction effects. |
+| `growthPressureModifier` | `growthPressure` | Generic plant-pressure adjustment channel. Negative values ease plant pressure; positive values increase stress. |
+| `salinityDensityCapModifier` | `salinityDensityCap` | Generic adjustment channel for the salinity-side density cap on plants. |
+| `plantDensityModifier` | `tilePlantDensity` | Generic density gain or density loss adjustment channel for special establishment or degradation effects. |
+| `healthModifier` | `playerHealth` | Generic worker-health adjustment channel, usually used for recovery support or hazard-side health pressure. |
+| `hydrationModifier` | `playerHydration` | Generic worker-hydration adjustment channel, usually used for heat relief or hydration-preservation effects. |
+| `nourishmentModifier` | `playerNourishment` | Generic nourishment adjustment channel for ration support or long-session upkeep effects. |
+| `energyCapModifier` | `playerEnergyCap` | Generic usable-energy-ceiling adjustment channel. |
+| `energyModifier` | `playerEnergy` | Generic direct energy adjustment channel. Use this sparingly and prefer `workEfficiencyModifier` or `energyCapModifier` when possible. |
+| `moraleModifier` | `playerMorale` | Generic morale adjustment channel for recovery pockets, setbacks, or comfort-side support. |
+| `workEfficiencyModifier` | `playerWorkEfficiency` | Generic worker-output adjustment channel. This is the main modifier hook for changing action energy cost without bypassing the worker meter model. |
 
 ### Main Causal Loop
 
