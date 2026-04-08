@@ -4028,8 +4028,8 @@ This summary should include only core runtime meters and the core plant-side val
 | Persistent terrain soil meters | `tileSoilFertility`, `tileMoisture`, `tileSoilSalinity` | Long-lived or short-lived land condition on plantable `Ground`. These meters determine what can grow well. |
 | Temporary tile pressure | `tileSandBurial` | Recoverable sand overlay created mainly by sandstorms. If ignored, it can create lasting fertility loss. |
 | Derived local modifiers | `tileWindProtection`, `tileShade`, `tileWaterSupport` | Rebuilt each simulation step from plants, `Straw Checkerboard`, devices, rock shelter, and active support. They protect or support the tile but are not permanent terrain quality. |
-| Plant meters | `tilePlantDensity`, `growthPressure`, `salinityDensityCap` | Shared plant-side runtime meters. Living plants use `growthPressure` for density gain and loss. `Straw Checkerboard` also uses `tilePlantDensity`, but it starts at maximum density, never gains density, and steadily loses density into `tileSoilFertility`. `salinityDensityCap` is the plant-side density ceiling created by salty ground. |
-| Plant behavior values | `growable`, `constantWitherRate` | Core plant-side behavior values. `growable` decides whether favorable conditions may increase density, while `constantWitherRate` applies steady density loss. Normal plants use `growable = true` and `constantWitherRate = 0`; `Straw Checkerboard` uses `growable = false` and a positive `constantWitherRate`. |
+| Plant meters | `tilePlantDensity`, `growthPressure`, `salinityDensityCap` | Shared plant-side runtime meters. `tilePlantDensity` tracks current plant presence, `growthPressure` governs growth-capable plants, and `salinityDensityCap` is the plant-side density ceiling created by salty ground. |
+| Plant behavior values | `growable`, `constantWitherRate` | Core plant-side behavior values. `growable` decides whether favorable conditions may increase density, while `constantWitherRate` applies steady density loss to plant density when defined. |
 | Plant resistance values | `saltTolerance`, `heatTolerance`, `windResistance`, `sandTolerance` | Plant-definition values that turn salinity, heat, wind, and sand pressure into species-specific density limits and pressure resistance. |
 | Plant contribution values | `protectionPower`, `shadePower`, `waterSupportPower`, `fertilityImprovePower`, `salinityReductionPower` | Plant-definition values that let plants feed back into terrain and local modifiers by adding wind protection, shade, water support, fertility recovery, and salinity recovery. `Straw Checkerboard` uses the same contribution values through its current `tilePlantDensity`. |
 
@@ -4067,12 +4067,6 @@ This summary should include only core runtime meters and the core plant-side val
 | `tileSoilSalinity` | Authored starting salinity, `salinityReductionPower`, `tilePlantDensity` | `salinityDensityCap` | Strategic placement and rehabilitation meter. Salinity reduction scales through current plant density. |
 | `tileSandBurial` | `weatherSand`, burial-clearing actions | `tileSoilFertility`, `growthPressure` | Temporary overlay state rather than long-term soil quality. |
 
-### Straw Checkerboard Density Rule
-
-| Plant meter | Impacted by | Impact to | Notes |
-|---|---|---|---|
-| `tilePlantDensity` on `Straw Checkerboard` | Placement at maximum density, `constantWitherRate` | `tileWindProtection`, `tileSoilFertility` | `Straw Checkerboard` uses the same plant density meter as other plants, but `growable = false` and a positive `constantWitherRate` make it wither steadily instead of regrowing. |
-
 ### Local Modifiers To Terrain And Plant Pressure
 
 | Modifier | Impacted by | Impact to | Notes |
@@ -4097,7 +4091,7 @@ This summary should include only core runtime meters and the core plant-side val
 | `windResistance` | Plant definition only | `growthPressure` | Lowers wind-side growth pressure. |
 | `sandTolerance` | Plant definition only | `growthPressure` | Covers sand exposure and burial-side pressure. |
 
-For `Straw Checkerboard`, use the same plant-definition rows through current `tilePlantDensity`. It begins at maximum density, uses `growable = false`, uses a positive `constantWitherRate`, keeps `growthPressure` at zero, and converts density loss into `tileSoilFertility`.
+`Straw Checkerboard` should be authored through the same shared plant rows: start it at maximum `tilePlantDensity`, set `growable = false`, set a positive `constantWitherRate`, keep `growthPressure` at `0`, and let its density loss feed `tileSoilFertility`.
 
 ### Basic Meter Reverse Reference
 
@@ -4121,16 +4115,16 @@ List only core meters and core plant-side values here. Do not expand into helper
 | `tileSoilFertility` | `fertilityImprovePower`, `tilePlantDensity`, `weatherWind`, `weatherSand`, `tileWindProtection`, `tileSandBurial` | `tileMoisture`, `growthPressure` | Long-term land quality meter. |
 | `tileSoilSalinity` | Authored starting salinity, `salinityReductionPower`, `tilePlantDensity` | `salinityDensityCap` | Salty-ground rehabilitation meter. |
 | `tileSandBurial` | `weatherSand`, burial-clearing actions | `tileSoilFertility`, `growthPressure` | Temporary burial overlay. |
-| `growthPressure` | `tileMoisture`, `tileSoilFertility`, `tileSandBurial`, `weatherHeat`, `weatherWind`, `weatherSand`, `tileWindProtection`, `tileShade`, `tileWaterSupport`, `heatTolerance`, `windResistance`, `sandTolerance` | `tilePlantDensity` | Final plant pressure meter. `Straw Checkerboard` keeps this at zero. |
+| `growthPressure` | `tileMoisture`, `tileSoilFertility`, `tileSandBurial`, `weatherHeat`, `weatherWind`, `weatherSand`, `tileWindProtection`, `tileShade`, `tileWaterSupport`, `heatTolerance`, `windResistance`, `sandTolerance` | `tilePlantDensity` | Final plant pressure meter for growth-capable plants. |
 | `salinityDensityCap` | `tileSoilSalinity`, `saltTolerance` | `tilePlantDensity` | Plant-side density ceiling on salty ground. |
-| `tilePlantDensity` | `growthPressure`, `salinityDensityCap`, `growable`, `constantWitherRate` | `tileWindProtection`, `tileShade`, `tileWaterSupport`, `tileMoisture`, `tileSoilFertility`, `tileSoilSalinity` | Current plant strength and effect scale. |
+| `tilePlantDensity` | `growthPressure`, `salinityDensityCap`, `growable`, `constantWitherRate` | `tileWindProtection`, `tileShade`, `tileWaterSupport`, `tileMoisture`, `tileSoilFertility`, `tileSoilSalinity` | Current plant strength and effect scale. Positive `constantWitherRate` creates steady density loss for plant types that use it. |
 
 ### Plant Meters And Density Limit
 
 | Plant meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `tilePlantDensity` | `growthPressure`, `salinityDensityCap`, `growable`, `constantWitherRate` | `tileWindProtection`, `tileShade`, `tileWaterSupport`, `tileMoisture`, `tileSoilFertility`, `tileSoilSalinity` | Current plant strength. Higher density means stronger plant-side effect if that species provides it. |
-| `growthPressure` | `tileMoisture`, `tileSoilFertility`, `tileSandBurial`, `weatherHeat`, `weatherWind`, `weatherSand`, `tileWindProtection`, `tileShade`, `tileWaterSupport`, plant resistance profile | `tilePlantDensity` | Final plant pressure meter for living plants. `Straw Checkerboard` keeps this at zero because `growable` is `false` and `constantWitherRate` handles its density loss. |
+| `tilePlantDensity` | `growthPressure`, `salinityDensityCap`, `growable`, `constantWitherRate` | `tileWindProtection`, `tileShade`, `tileWaterSupport`, `tileMoisture`, `tileSoilFertility`, `tileSoilSalinity` | Current plant strength. Higher density means stronger plant-side effect if that species provides it, while positive `constantWitherRate` creates steady density loss for plant types that use it. |
+| `growthPressure` | `tileMoisture`, `tileSoilFertility`, `tileSandBurial`, `weatherHeat`, `weatherWind`, `weatherSand`, `tileWindProtection`, `tileShade`, `tileWaterSupport`, plant resistance profile | `tilePlantDensity` | Final plant pressure meter for growth-capable plants. |
 | `salinityDensityCap` | `tileSoilSalinity`, `saltTolerance` | `tilePlantDensity` | Separate plant-side density ceiling for salty ground. |
 
 ### Main Causal Loop
