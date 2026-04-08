@@ -3028,10 +3028,12 @@ Authoring rules:
 
 - a modifier should target explicit meters or meter-rate channels, not vague flavor bonuses
 - content-facing modifier names should map into one or more generic modifier channels such as `heatModifier`, `moistureModifier`, or `workEfficiencyModifier` for implementation
+- each modifier channel should carry a signed percentage effect on its target meter's final update step rather than acting like a separate base-value source
 - a modifier may change plant-side meter flow such as `tileMoisture`, `tileSoilFertility`, `tileSoilSalinity`, `growthPressure`, `salinityDensityCap`, or density gain and loss on `tilePlantDensity`
 - a modifier may change player-side meter flow such as `playerHydration`, `playerHealth`, `playerNourishment`, `playerEnergyCap`, `playerMorale`, or `playerWorkEfficiency`
 - a modifier should reshape the existing meter model instead of bypassing it with hidden direct plant death, instant worker collapse, or special-case scripted survival
 - a modifier should reduce difficulty pressure and create an advantage, but should never make the player invincible or remove the need to keep managing core survival meters
+- different active modifiers that use the same channel should add together before the final percentage is applied
 - task-earned modifiers should usually be stronger, more conditional, and more strategy-shaping than nearby-site aura modifiers
 - nearby-site aura modifiers should usually start active, stay readable, and focus on one support channel rather than many tiny bonuses at once
 - stacking should stay capped and readable; one site should usually have only a few meaningful active modifiers rather than a long invisible buff list
@@ -4111,6 +4113,13 @@ This summary should include only core runtime meters and the core plant-side val
 | `energyModifier` | `playerEnergy` | Generic direct energy adjustment channel. Use this sparingly and prefer `workEfficiencyModifier` or `energyCapModifier` when possible. |
 | `moraleModifier` | `playerMorale` | Generic morale adjustment channel for recovery pockets, setbacks, or comfort-side support. |
 | `workEfficiencyModifier` | `playerWorkEfficiency` | Generic worker-output adjustment channel. This is the main modifier hook for changing action energy cost without bypassing the worker meter model. |
+
+Channel application rule:
+
+- each channel value should be interpreted as a signed percentage on the target meter's final update step
+- all active sources that affect the same channel should add together into one total channel modifier for that update
+- the summed channel modifier should be applied only after the target meter's normal base change is already resolved
+- channel totals should be clamped by tuning limits so stacked support still lowers pressure without deleting the underlying challenge
 
 ### Main Causal Loop
 
