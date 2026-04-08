@@ -2237,14 +2237,19 @@ Design rule:
 
 ### Meter Groups
 
-| Group | Meters | Role |
+This summary should include both runtime meters and the plant-definition values that directly drive the meter model.
+
+| Group | Meters / values | Role |
 |---|---|---|
 | Weather meters | `weatherHeat`, `weatherWind`, `weatherSand` | Site-wide ambient pressure. Extreme events mainly push these meters higher instead of directly damaging plants. |
 | Persistent terrain soil meters | `tileSoilFertility`, `tileMoisture`, `tileSoilSalinity` | Long-lived or short-lived land condition on plantable `Ground`. These meters determine what can grow well. |
 | Temporary tile pressure | `tileSandBurial` | Recoverable sand overlay created mainly by sandstorms. If ignored, it can create lasting fertility loss. |
 | Derived local modifiers | `tileWindProtection`, `tileShade`, `tileWaterSupport` | Rebuilt each simulation step from plants, `Straw Checkerboard`, devices, rock shelter, and active support. They protect or support the tile but are not permanent terrain quality. |
 | Plant meters | `tilePlantDensity`, `growthPressure` | Shared runtime plant meters. Living plants use `growthPressure` for density gain and loss. `Straw Checkerboard` also uses `tilePlantDensity`, but it starts at maximum density, never gains density, and steadily loses density into `tileSoilFertility`. |
-| Derived plant limits | `salinityDensityCap`, grouped pressure contributions | Derived values used for growth and diagnosis. They should not become separate persistent terrain meters. |
+| Plant growth values | `growthRate`, `supportNeed`, `waterNeed`, `fertilityNeed` | Plant-definition values that decide how quickly density can rise and how easily poor support turns into plant-side pressure. |
+| Plant resistance values | `saltTolerance`, `heatTolerance`, `windResistance`, `sandTolerance` | Plant-definition values that turn salinity, heat, wind, and sand pressure into species-specific density limits and pressure resistance. |
+| Plant contribution values | `protectionPower`, `shadePower`, `waterSupportPower`, `fertilityImprovePower`, `salinityReductionPower` | Plant-definition values that let plants feed back into terrain and local modifiers by adding wind protection, shade, water support, fertility recovery, and salinity recovery. `Straw Checkerboard` uses the same contribution values through its current `tilePlantDensity`. |
+| Derived plant limits | `salinityDensityCap`, `waterContribution`, `soilContribution`, `windContribution`, `heatContribution` | Derived values used for growth and diagnosis. They should not become separate persistent terrain meters. |
 
 ### Weather To Terrain And Plant Pressure
 
