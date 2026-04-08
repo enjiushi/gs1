@@ -4080,7 +4080,7 @@ This summary should include only core runtime meters and the core plant-side val
 | Plant resistance values | `saltTolerance`, `heatTolerance`, `windResistance`, `dustTolerance` | Plant-definition values that turn salinity, heat, wind, and dust pressure into species-specific density limits and pressure resistance. |
 | Object contribution meters | `windProtectionPower`, `heatProtectionPower`, `dustProtectionPower`, `fertilityImprovePower`, `salinityReductionPower` | Shared local contribution meters. Plants, devices, and terrain shelter may feed them; plant definition sets plant-side ceilings, `auraSize` defines plant-side reach, and `tilePlantDensity` scales plant-side output. |
 
-### Event To Weather Pressure
+### Event Meter Relationships
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
@@ -4088,7 +4088,23 @@ This summary should include only core runtime meters and the core plant-side val
 | `eventWindPressure` | Current event archetype, current event phase, `eventTier` | `weatherWind` | Event-side wind channel. |
 | `eventDustPressure` | Current event archetype, current event phase, `eventTier` | `weatherDust` | Event-side dust channel. |
 
-### Worker State Relationships
+### Weather Meter Relationships
+
+| Meter | Impacted by | Impact to | Notes |
+|---|---|---|---|
+| `weatherHeat` | Daily heat curve, site heat bias, `eventHeatPressure` | `tileHeat` | Site-wide heat should resolve into local heat before it affects terrain, plants, or worker meters. |
+| `weatherWind` | Daily wind curve, site wind bias, gust variation, `eventWindPressure` | `tileWind` | Site-wide wind should resolve into local wind before it affects terrain, plants, or worker meters. |
+| `weatherDust` | Site dust bias, current wind, recent-event aftermath, `eventDustPressure` | `tileDust` | Site-wide dust pressure should resolve into local dust before it affects terrain, plants, or worker meters. |
+
+### Resolved Local Weather Meter Relationships
+
+| Meter | Impacted by | Impact to | Notes |
+|---|---|---|---|
+| `tileHeat` | `weatherHeat`, `heatProtectionPower` | `playerHydration`, `playerHealth`, `playerWorkEfficiency`, `tileMoisture`, `growthPressure` | Final local heat pressure. It should hurt worker output through `playerWorkEfficiency`, not by directly draining `playerEnergy`. |
+| `tileWind` | `weatherWind`, `windProtectionPower` | `playerWorkEfficiency`, `tileMoisture`, `tileSoilFertility`, `growthPressure` | Final local wind exposure. It should hurt worker output through `playerWorkEfficiency`, not by directly draining `playerEnergy`. |
+| `tileDust` | `weatherDust`, `dustProtectionPower` | `playerHealth`, `playerWorkEfficiency`, `tileSandBurial`, `tileSoilFertility`, `growthPressure` | Final local dust exposure. It should hurt worker output through `playerWorkEfficiency`, not by directly draining `playerEnergy`. |
+
+### Worker State Meter Relationships
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
@@ -4100,31 +4116,7 @@ This summary should include only core runtime meters and the core plant-side val
 | `playerMorale` | Safe rest, dense-cover recovery pockets, harsh-event aftermath, current site setbacks and recovery progress | `playerWorkEfficiency` | Worker comfort and psychological stability meter. Low morale should make routine work more energy-expensive or less reliable rather than directly lowering the energy meter. |
 | `playerWorkEfficiency` | `playerHealth`, `playerEnergy`, `playerEnergyCap`, `playerMorale`, `tileHeat`, `tileWind`, `tileDust`, workload strain | Action energy cost, `playerEnergy` | Resolved worker-output meter. This should be the main gameplay-facing meter for how expensive each action is. Worse local weather should mainly hurt the player by lowering this meter, which raises energy cost per action. |
 
-### Weather To Local Weather Resolution
-
-| Meter | Impacted by | Impact to | Notes |
-|---|---|---|---|
-| `weatherHeat` | Daily heat curve, site heat bias, `eventHeatPressure` | `tileHeat` | Site-wide heat should resolve into local heat before it affects terrain, plant pressure, or worker meters. |
-| `weatherWind` | Daily wind curve, site wind bias, gust variation, `eventWindPressure` | `tileWind` | Site-wide wind should resolve into local wind before it affects terrain or plant pressure. |
-| `weatherDust` | Site dust bias, current wind, recent-event aftermath, `eventDustPressure` | `tileDust` | Site-wide dust pressure should resolve into local dust before it affects terrain, plant pressure, or worker meters. |
-
-### Resolved Local Weather To Worker State
-
-| Meter | Impacted by | Impact to | Notes |
-|---|---|---|---|
-| `tileHeat` | `weatherHeat`, `heatProtectionPower` | `playerHydration`, `playerHealth`, `playerWorkEfficiency` | Final local heat pressure should be the worker-facing heat meter on the current tile. It mainly drives hydration loss, exposure health risk, and lower `playerWorkEfficiency`, which then raises action energy cost. |
-| `tileWind` | `weatherWind`, `windProtectionPower` | `playerWorkEfficiency` | Final local wind exposure should be the worker-facing wind meter on the current tile. It mainly raises outdoor action energy cost through lower `playerWorkEfficiency`. |
-| `tileDust` | `weatherDust`, `dustProtectionPower`, `windProtectionPower` | `playerHealth`, `playerWorkEfficiency` | Final local dust exposure should be the worker-facing dust meter on the current tile. It mainly creates abrasion, breathing strain, visibility burden, and lower `playerWorkEfficiency`, which raises action energy cost. |
-
-### Resolved Local Weather To Terrain And Plant Pressure
-
-| Meter | Impacted by | Impact to | Notes |
-|---|---|---|---|
-| `tileHeat` | `weatherHeat`, `heatProtectionPower` | `tileMoisture`, `growthPressure` | Final local heat pressure after site heat and local mitigation are combined directly into the resolved meter. |
-| `tileWind` | `weatherWind`, `windProtectionPower` | `tileMoisture`, `tileSoilFertility`, `growthPressure` | Final local wind exposure after site wind and local protection are combined directly into the resolved meter. |
-| `tileDust` | `weatherDust`, `dustProtectionPower`, `windProtectionPower` | `tileSandBurial`, `tileSoilFertility`, `growthPressure` | Final local dust exposure after site dust and local mitigation are combined directly into the resolved meter. |
-
-### Terrain To Plant Growth
+### Terrain Meter Relationships
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
@@ -4133,14 +4125,14 @@ This summary should include only core runtime meters and the core plant-side val
 | `tileSoilSalinity` | Authored starting salinity, `salinityReductionPower` | `salinityDensityCap` | Strategic placement and rehabilitation meter. |
 | `tileSandBurial` | `tileDust`, burial-clearing actions | `tileSoilFertility`, `growthPressure` | Temporary overlay state rather than long-term soil quality. |
 
-### Plant Behavior Values And Contribution Chain
+### Plant, Resistance, And Object Contribution Relationships
 
-| Value | Impacted by | Impact to | Notes |
+| Meter / value | Impacted by | Impact to | Notes |
 |---|---|---|---|
 | `growable` | Plant definition only | `tilePlantDensity` | Allows favorable conditions to create density gain. If `false`, low `growthPressure` does not produce positive growth. |
 | `constantWitherRate` | Plant definition only | `tilePlantDensity` | Applies steady density loss every fixed simulation step. |
 | `auraSize` | Plant definition only | Reach of plant-fed `windProtectionPower`, `heatProtectionPower`, `dustProtectionPower`, `fertilityImprovePower`, and `salinityReductionPower` | Shared plant-side contribution reach value. `0` means own tile only, and larger values extend plant-side contribution reach by Manhattan distance. |
-| `windProtectionPower` | Object definition only, `tilePlantDensity`, `deviceEfficiency`, `auraSize` | `tileWind`, `tileDust` | Shared local wind-protection meter. Any object with positive wind protection may feed it. Plant density scales plant-side output, while device efficiency scales device-side output. |
+| `windProtectionPower` | Object definition only, `tilePlantDensity`, `deviceEfficiency`, `auraSize` | `tileWind` | Shared local wind-protection meter. Any object with positive wind protection may feed it. Plant density scales plant-side output, while device efficiency scales device-side output. |
 | `heatProtectionPower` | Object definition only, `tilePlantDensity`, `deviceEfficiency`, `auraSize` | `tileHeat` | Shared local heat-protection meter. Any object with positive heat protection may feed it. Plant density scales plant-side output, while device efficiency scales device-side output. |
 | `dustProtectionPower` | Object definition only, `tilePlantDensity`, `deviceEfficiency`, `auraSize` | `tileDust` | Shared local dust-protection meter. Any object with positive dust protection may feed it. Plant density scales plant-side output, while device efficiency scales device-side output. |
 | `fertilityImprovePower` | Object definition only, `tilePlantDensity`, `deviceEfficiency`, `auraSize` | `tileSoilFertility` | Shared local soil-building meter. Plant density scales plant-side output, while device efficiency scales device-side output when a device supports soil recovery. |
@@ -4149,45 +4141,11 @@ This summary should include only core runtime meters and the core plant-side val
 | `heatTolerance` | Plant definition only | `growthPressure` | Lowers heat-side growth pressure. |
 | `windResistance` | Plant definition only | `growthPressure` | Lowers wind-side growth pressure. |
 | `dustTolerance` | Plant definition only | `growthPressure` | Covers dust exposure and burial-side pressure. |
-
-`Straw Checkerboard` should be authored through the same shared plant rows: start it at maximum `tilePlantDensity`, set `growable = false`, set a positive `constantWitherRate`, set `auraSize` as needed for setup reach, keep `growthPressure` at `0`, and let its density loss feed `tileSoilFertility`.
-
-### Basic Meter Reverse Reference
-
-This table is the reverse lookup for this meter-relationship chapter. Use it when the question is "what changes this core meter?" rather than "what does this meter affect?"
-
-List only core meters and core plant-side values here. Do not expand into helper formulas or UI diagnosis outputs inside this table.
-
-| Driven meter | Impacted by | Impact to | Notes |
-|---|---|---|---|
-| `eventHeatPressure` | Current event archetype, current event phase, `eventTier` | `weatherHeat` | Event-side heat meter. |
-| `eventWindPressure` | Current event archetype, current event phase, `eventTier` | `weatherWind` | Event-side wind meter. |
-| `eventDustPressure` | Current event archetype, current event phase, `eventTier` | `weatherDust` | Event-side dust meter. |
-| `playerHealth` | Rest and shelter recovery, medicine, harsh outdoor exposure, dangerous field work, `tileHeat`, `tileDust`, low `playerHydration`, low `playerNourishment` | `playerEnergy`, `playerWorkEfficiency` | Core worker health meter. |
-| `playerHydration` | Drinking actions, water items, time, `tileHeat`, outdoor work | `playerEnergyCap` | Core worker hydration meter. |
-| `playerNourishment` | Eating actions, food items, time, outdoor work | `playerEnergyCap` | Core worker nourishment meter. |
-| `playerEnergyCap` | `playerHydration`, `playerNourishment` | `playerEnergy` | Core worker usable-energy ceiling. |
-| `playerEnergy` | Work actions, rest recovery, `playerHealth`, `playerEnergyCap`, `playerWorkEfficiency` | None | Core worker action-capacity meter and end-consumption meter. Low `playerWorkEfficiency` should raise action energy cost and drain this meter faster. |
-| `playerMorale` | Safe rest, dense-cover recovery pockets, harsh-event aftermath, current site setbacks and recovery progress | `playerWorkEfficiency` | Core worker morale meter. |
-| `playerWorkEfficiency` | `playerHealth`, `playerEnergy`, `playerEnergyCap`, `playerMorale`, `tileHeat`, `tileWind`, `tileDust`, workload strain | Action energy cost, `playerEnergy` | Core worker output meter. |
-| `tileHeat` | `weatherHeat`, `heatProtectionPower` | `playerHydration`, `playerHealth`, `playerWorkEfficiency`, `tileMoisture`, `growthPressure` | Final local heat pressure. It should hurt worker output through `playerWorkEfficiency`, not by directly draining `playerEnergy`. |
-| `tileWind` | `weatherWind`, `windProtectionPower` | `playerWorkEfficiency`, `tileMoisture`, `tileSoilFertility`, `growthPressure` | Final local wind exposure. It should hurt worker output through `playerWorkEfficiency`, not by directly draining `playerEnergy`. |
-| `tileDust` | `weatherDust`, `dustProtectionPower`, `windProtectionPower` | `playerHealth`, `playerWorkEfficiency`, `tileSandBurial`, `tileSoilFertility`, `growthPressure` | Final local dust exposure. It should hurt worker output through `playerWorkEfficiency`, not by directly draining `playerEnergy`. |
-| `tileMoisture` | Watering, direct irrigation such as `Drip Irrigator`, `tileHeat`, `tileWind`, `tileSoilFertility` | `growthPressure` | Stored water on the tile. |
-| `tileSoilFertility` | `fertilityImprovePower`, `tileWind`, `tileDust`, `tileSandBurial` | `tileMoisture`, `growthPressure` | Long-term land quality meter. |
-| `tileSoilSalinity` | Authored starting salinity, `salinityReductionPower` | `salinityDensityCap` | Salty-ground rehabilitation meter. |
-| `tileSandBurial` | `tileDust`, burial-clearing actions | `tileSoilFertility`, `growthPressure` | Temporary burial overlay. |
 | `growthPressure` | `tileMoisture`, `tileSoilFertility`, `tileSandBurial`, `tileHeat`, `tileWind`, `tileDust`, `heatTolerance`, `windResistance`, `dustTolerance` | `tilePlantDensity` | Final plant pressure meter for growth-capable plants. |
 | `salinityDensityCap` | `tileSoilSalinity`, `saltTolerance` | `tilePlantDensity` | Plant-side density ceiling on salty ground. |
 | `tilePlantDensity` | `growthPressure`, `salinityDensityCap`, `growable`, `constantWitherRate` | `windProtectionPower`, `heatProtectionPower`, `dustProtectionPower`, `fertilityImprovePower`, `salinityReductionPower` | Current plant strength and effect scale. Higher density strengthens the plant-fed share of the shared object contribution meters first, while `auraSize` controls how far those plant-side contributions can reach. |
 
-### Plant Meters And Density Limit
-
-| Plant meter | Impacted by | Impact to | Notes |
-|---|---|---|---|
-| `tilePlantDensity` | `growthPressure`, `salinityDensityCap`, `growable`, `constantWitherRate` | `windProtectionPower`, `heatProtectionPower`, `dustProtectionPower`, `fertilityImprovePower`, `salinityReductionPower` | Current plant strength. Higher density first strengthens the plant-fed share of the shared object contribution meters for species that provide them, while `auraSize` determines how far those plant-side contributions can reach and positive `constantWitherRate` creates steady density loss for plant types that use it. |
-| `growthPressure` | `tileMoisture`, `tileSoilFertility`, `tileSandBurial`, `tileHeat`, `tileWind`, `tileDust`, plant resistance profile | `tilePlantDensity` | Final plant pressure meter for growth-capable plants. |
-| `salinityDensityCap` | `tileSoilSalinity`, `saltTolerance` | `tilePlantDensity` | Separate plant-side density ceiling for salty ground. |
+`Straw Checkerboard` should be authored through the same shared plant rows: start it at maximum `tilePlantDensity`, set `growable = false`, set a positive `constantWitherRate`, set `auraSize` as needed for setup reach, keep `growthPressure` at `0`, and let its density loss feed `tileSoilFertility`.
 
 ### Main Causal Loop
 
