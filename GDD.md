@@ -8,7 +8,7 @@ Document goal: Define the v1 design clearly enough for prototyping, production p
 
 `Desert Restoration Survival Strategy` is a single-player PC game about surviving and reversing desertification in a remote China-inspired desert region. The player controls one government-backed field worker who enters dangerous restoration sites, endures heat, thirst, wind, and sandstorms, establishes light camp infrastructure, plants resilient species, completes faction-published site tasks, and gradually turns a failing landscape into a stable ecological network.
 
-The game combines direct on-foot play with site-scale strategy. The player is not a commander floating above the world and not a combat hero. The fantasy is physical work under environmental pressure: carrying enough water, reading the forecast, choosing where to plant first, protecting young growth from erosion, and deciding when to spend limited funds on tools, devices, contractors, or another day of survival.
+The game combines direct on-foot play with site-scale strategy. The player is not a commander floating above the world and not a combat hero. The fantasy is physical work under environmental pressure: carrying enough water, reading the forecast, choosing where to plant first, protecting young growth from erosion, and deciding when to spend limited funds on supplies, devices, contractors, or another day of survival.
 
 ## 2. Product Summary
 
@@ -62,24 +62,24 @@ These terms are stable and should be used consistently in future design and impl
 | `Learning Budget` | The maximum amount of genuinely new gameplay the player is expected to absorb from one site game's rewards and unlocks; reputation pacing should keep this budget small. |
 | `Onboarding Task` | An authored early-campaign task whose purpose is to teach one faction or major gameplay layer through real play and permanently unlock it for future sites. |
 | `Tutorial Task Set` | A manually authored set of early faction tasks that temporarily overrides normal refresh rules until the player has completed each intended basic task type at least once. |
-| `Site Unlockables` | The site-scoped plants, devices, tools, and other temporary options for the current `Site`; they are primarily revealed through some task rewards, but a limited subset can also be bought directly for very high money cost. Only options already permitted by the `Persistent Tech Tree` may appear in the pool. |
+| `Site Unlockables` | The site-scoped plants, devices, field actions, and other temporary options for the current `Site`; they are primarily revealed through some task rewards, but a limited subset can also be bought directly for very high money cost. Only options already permitted by the `Persistent Tech Tree` may appear in the pool. |
 | `Site Task` | A short 5 to 10 minute objective generated from the current site's state, listed in the `Contract Board`, and used to provide immediate goals and quick rewards. |
 | `Task Pool Size` | The maximum number of concurrently offered `Site Task`s shown for the current `Site` in the `Contract Board`, upgradable through the `Persistent Tech Tree`. |
 | `Accepted Task Cap` | The maximum number of `Site Task`s the player may have accepted at the same time; accepted tasks are pinned until completed or withdrawn through a costly emergency rule that should only reduce trust earned during the current site. |
 | `Task Tier` | The rarity and difficulty level of a `Site Task`, which controls how often it appears, how hard it is to finish, and how strong its rewards feel. |
-| `Task Reward Draft` | The choice set shown on a `Site Task` before acceptance, typically with `2` options; on completion, the player claims `1` option from that task's draft. The options can include `Site Unlockables`, `Run Modifier`s, or resource-focused rewards, but not every draft must include an unlockable. |
-| `Task Reward Package` | A money, resources, or mixed tactical-bundle option that can appear inside a `Task Reward Draft`. |
+| `Task Reward Draft` | The choice set shown on a `Site Task` before acceptance, typically with `2` options; on completion, the player claims `1` option from that task's draft. The options can include `Site Unlockables`, `Run Modifier`s, or item-focused rewards, but not every draft must include an unlockable. |
+| `Task Reward Package` | A money, item-bundle, or mixed tactical-bundle option that can appear inside a `Task Reward Draft`. |
 | `Per-Site Modifier` | The shared runtime format for any temporary effect that changes meter behavior on the current `Site` only. It may come from a claimed `Run Modifier` during the site or from a passive `Nearby-Site Aura` applied at deployment. It should reduce pressure or shift priorities, not delete the site's core danger. |
 | `Run Modifier` | A task- or reward-draft-sourced `Per-Site Modifier` that activates during the current site session, usually with stronger or more directional effects than nearby support. It is lost if the player leaves, fails, or restarts that site. |
 | `Task Chain` | A linked set of tasks generated inside a task pool refresh; chain tasks should be visually distinct on the `Contract Board`, accepted chain tasks should bias future refreshes toward related follow-up tasks, each task still pays normal rewards, and completing the full chain grants an extra reward. |
 | `Site Commendation` | A government-issued prize awarded when a `Site` is successfully restored; it includes a title plus a cited reason based on how the site was completed, giving the player recognition and a clear record of progress. |
 | `Campaign Clock` | The fixed campaign time limit that pressures the player to complete as many `Site`s as possible before the run ends. |
 | `Fully Grown Tile` | A planted tile that has reached the mature density state counted toward `Site` completion. |
-| `Loadout` | The supplies, seeds, tools, and devices chosen before entering a `Site`. |
+| `Loadout` | The starting food items, seed items, and device items chosen before entering a `Site`. |
 | `Inventory` | The player's slot-based carried storage for `Item`s during a `Site` session. Capacity is limited and can be expanded by the `Persistent Tech Tree`. |
 | `Item` | Any carriable object that can occupy `Inventory` or `Container` slots. In the current design, every item should belong to one of four simple item types: `device`, `seed`, `harvest`, or `food`. |
 | `Container` | A camp storage object that can be built or bought on-site and used to store `Item`s outside the player's carried `Inventory`. |
-| `Site Output Modifier` | A persistent bonus trait attached to a stabilized site's regional support output, such as increased wind protection, fertility support, specific resource yield, or support range. These traits usually strengthen that site's exported `Nearby-Site Aura` or `Resource Loadout Output`. |
+| `Site Output Modifier` | A persistent bonus trait attached to a stabilized site's regional support output, such as increased wind protection, fertility support, specific loadout-item yield, or support range. These traits usually strengthen that site's exported `Nearby-Site Aura` or `Loadout Item Output`. |
 | `Nearby-Site Aura` | A passive `Per-Site Modifier` package projected from adjacent stabilized sites into the current site session before deployment. It should be weaker and steadier than a claimed `Run Modifier`, usually focuses on one support channel or one linked pair of meters, and should never grant full hazard immunity. |
 | `Camp Support` | The light support infrastructure on a `Site`, including shelter, `Container`s, service devices, and hired labor access. |
 | `Player Condition` | The worker's physical and mental state, represented by survival and output meters such as health, hydration, nourishment, energy cap, energy, morale, and work efficiency. |
@@ -88,7 +88,7 @@ These terms are stable and should be used consistently in future design and impl
 | `Plant Density` | The current strength and maturity of living cover or plant-derived starter cover on a tile or cluster; higher density means stronger traits, better survival, and possible natural spread for living plants, while lower density means weaker effects and higher hazard vulnerability. |
 | `Plant Trend` | The derived direction of plant density on a tile, shown as `Growing`, `Holding`, or `Withering`, based on whether the patch is gaining or losing density. |
 | `Plant Trait` | A special property attached to a plant family or unlocked variant that modifies placement value, survival, or local ecological effects. |
-| `Regional Support Output` | The passive benefit a stabilized `Site` contributes to nearby sites on the `Regional Map`, including loadout resources and small `Nearby-Site Aura` effects such as protection, fertility support, or recovery support. |
+| `Regional Support Output` | The passive benefit a stabilized `Site` contributes to nearby sites on the `Regional Map`, including loadout item packages and small `Nearby-Site Aura` effects such as protection, fertility support, or recovery support. |
 
 ## 5. Player Fantasy And Setting
 
@@ -144,7 +144,7 @@ The intended rhythm is:
 1. Read the current terrain and forecast, then identify the most dangerous exposed patch.
 2. Spend limited early money and energy on a small protective plant combo or support device.
 3. Try to survive the next heat spike, wind lane, sandburst, or erosion window.
-4. If the patch survives, use its output, safety, or restored fertility to unlock a better plant or tool.
+4. If the patch survives, use its output, safety, or restored fertility to unlock a better plant or support device.
 5. Expand into a new patch or upgrade the first one from safe to productive.
 6. When the environment hits back, choose whether to rescue the failing area with normal work, or abandon it and save the core, knowing that harsh-event conditions make every outdoor action riskier and more energy-expensive.
 7. Reinvest the gains from survival into the next stronger combo.
@@ -182,7 +182,7 @@ Each candidate `Site` should define at minimum:
 - its completion state and whether it is an unresolved target or a completed support site
 - its major terrain and weather pressures
 - its current nearby support contributors
-- the exact support modifiers those nearby sites provide, such as wind protection, heat protection, fertility support, resource export, or extended support range
+- the exact support modifiers those nearby sites provide, such as wind protection, heat protection, fertility support, loadout item export, or extended support range
 - any especially important `Site Output Modifier`s affecting why that site is strategically valuable
 
 The `Regional Map` should be procedural enough that each campaign creates a new strategic puzzle. Variety should come from:
@@ -214,7 +214,7 @@ Procedural generation should create different problem shapes, not random noise. 
 Sites influence nearby sites in two ways:
 
 - `Nearby-Site Aura`: stabilized plant cover and regional output can grant small wind, heat, fertility, moisture, or recovery advantages to adjacent sites.
-- Resource support: successful sites can contribute limited loadout resources and starting help to nearby sites.
+- Loadout item support: successful sites can contribute limited loadout item packages and starting help to nearby sites.
 
 ### No Revisits In Current Design
 
@@ -238,8 +238,8 @@ The campaign ends when the `Campaign Clock` runs out. The player's success is me
 
 - Movement: `WASD`
 - Aiming and interaction targeting: mouse cursor
-- Primary action: use tool / interact
-- Secondary action: alternate tool function / cancel
+- Primary action: interact / use current action
+- Secondary action: alternate interaction / cancel
 - Placement mode: move into reach of a tile or object, then place or interact through the cursor-directed action
 - Inventory: open the carried `Inventory` and manage `Item`s
 - Phone: open the `Field Phone` for tasks, buying, selling, and hiring
@@ -250,7 +250,7 @@ To reduce control complexity, the game should avoid a quick-slot-driven interact
 
 For any interaction, construction, planting, repair, or other field work that requires `Item`s:
 
-- if all requirements are satisfied, the interaction can be performed directly without separately equipping the needed tool or consumable into a quick slot
+- if all requirements are satisfied, the interaction can be performed directly without separately equipping the needed item into a quick slot
 
 This should reduce control burden and keep the decision space focused on what the player chooses to carry rather than on rapid slot swapping.
 
@@ -263,14 +263,14 @@ Core phone functions:
 - Review and accept jobs from the current site's `Contract Board`
 - Review the current site's `Site Task` pool and its refresh timing
 - Review `Faction Reputation`, current `Faction Assistant` support, and unlocked faction-tech thresholds
-- Buy water, food, medicine, seeds, tools, and approved support equipment
+- Buy `food`, `seed`, and `device` items such as water, rations, medicine, seeds, and support device kits
 - Sell stored items, harvested output, or crafted goods
 - Hire temporary contractors
 - Spend money on revealed `Site Unlockables` on the current site
 - Buy limited direct-purchase `Site Unlockables` at premium prices when task rewards did not provide the wanted option
 - Track funds, incoming rewards, and current spending pressure
 
-The phone should feel practical and grounded, like an everyday field tool adapted to harsh remote work.
+The phone should feel practical and grounded, like an everyday field phone adapted to harsh remote work.
 
 ### Camera
 
@@ -374,7 +374,7 @@ Discrete or integer runtime values:
 - `campStorageSlotCount`
 - `money`
 - `reputation`
-- item counts such as water containers, food packs, repair kits, seeds, and harvested goods
+- item counts such as water containers, food packs, repair kits, device kits, seeds, and harvested goods
 
 #### Fixed-Step Update Order
 
@@ -384,7 +384,7 @@ For each fixed simulation step, resolve systems in this order:
 2. Advance weather timelines, forecast certainty timers, and extreme-event phase state.
 3. Resolve completed player, contractor, and device actions for this step such as watering, clearing burial, repair completion, or planting completion.
 4. Resolve local weather meters for each tile, especially `tileHeat`, `tileWind`, and `tileDust`, from current site weather plus current local support, shelter, terrain cover, and active device output.
-5. Apply ongoing exposure and consumption to the worker, contractors, devices, and vulnerable stored resources.
+5. Apply ongoing exposure and consumption to the worker, contractors, devices, and vulnerable stored items.
 6. Apply hazard pressure and environmental damage for this step, including erosion, plant density loss, burial gain, device damage, camp durability loss, and resource loss.
 7. Apply recovery and beneficial change for this step, including plant density gain, plant constant-wither loss, salinity reduction, soil-fertility improvement, moisture recovery from watering or irrigation, moisture-loss reduction from protective effects, player recovery, and site stabilization gains, if current conditions allow.
 8. Recompute threshold-derived cleanup states such as death or restored pocket status.
@@ -934,7 +934,7 @@ Extreme events should also be interactive. The player should not only wait them 
 
 - Which zone to protect first
 - Whether to sacrifice one exposed area to save another
-- Whether to spend emergency money or resources immediately
+- Whether to spend emergency money or item stock immediately
 - Whether to risk going outside for a critical action or stay sheltered and lose ground elsewhere
 
 This creates tension plus agency, which is far more exciting than passive damage intake.
@@ -1092,13 +1092,13 @@ The campaign-level pressure should come from time:
 - the player is trying to complete as many sites as possible before the `Campaign Clock` expires
 - this means each site session naturally pushes the player toward finishing efficiently rather than lingering for optional optimization
 
-### Resource And Inventory Model
+### Item And Inventory Model
 
 The game should separate economy and progression data into three layers:
 
 1. Explicit completion and campaign-time counters
 2. Simplified item definitions for inventory and gameplay actions
-3. Inventory locations that define where those resources physically exist
+3. Inventory locations that define where those items physically exist
 
 #### Layer 1: Completion And Campaign Counters
 
@@ -1175,14 +1175,14 @@ The game should support these carried-storage and camp-storage locations:
 
 Rules:
 
-- a slot holds one stack of one resource type
+- a slot holds one stack of one exact `Item`
 - one slot cannot exceed that `Item`'s listed stack size
 - stack splitting and merging should be supported
 - empty slots are explicit
 - future tech can expand `workerPackSlotCount` or `campStorageSlotCount`, but the game should start at `6` and `24`
 - `campStorageSlotCount` should represent the total capacity provided by current camp `Container`s
 - the player should only be able to carry a limited working set away from camp, even if the camp has much more storage available
-- carrying a lot of one resource type should therefore compete directly with carrying tools, seeds, devices, medicine, or repair materials
+- carrying a lot of one exact `Item` should therefore compete directly with carrying food items, seed items, device items, or harvested goods
 
 Example inventory pressure:
 
@@ -1196,9 +1196,9 @@ Container rules:
 - interacting with any `Container` should access the shared `campStorage` rather than only that one object's personal slots
 - losing, burying, or exposing camp `Container`s can put stored `Item`s at risk during harsh events
 
-#### Resource Flow Rules
+#### Item Flow Rules
 
-Use these resource-flow rules:
+Use these item-flow rules:
 
 - phone purchases create a package in `pendingDeliveryQueue`
 - each purchased package should arrive at camp after `30` in-game minutes if the camp delivery point is operational
@@ -1215,17 +1215,17 @@ Use these resource-flow rules:
 
 This keeps the carried `Inventory` important without forcing a full hauling sim.
 
-#### Hazard Interaction Rules For Resources
+#### Hazard Interaction Rules For Items
 
-To keep the logic readable, hazards should interact with resources by location:
+To keep the logic readable, hazards should interact with items by location:
 
-Worker-carried resources:
+Worker-carried items:
 
 - are not randomly destroyed just by bad weather in normal play
 - are consumed by direct use, recovery, construction, planting, repair, or other field-work cost
 - can be lost only through explicit failure or a specifically authored event, not through hidden attrition rules
 
-Camp-stored resources:
+Camp-stored items:
 
 - can be buried, damaged, spoiled, or partially lost during severe hazard events if the camp is exposed
 - are better protected when the camp has stronger shelter structures and nearby protection
@@ -1662,7 +1662,7 @@ Important traits for `Straw Checkerboard`:
 - helps trap sand and fine particles instead of only resisting damage
 - uses normal `fertilityImprovePower` and protection traits while its current density remains high
 - strongly helps low-density living plants survive nearby
-- has no direct output economy and no self-spread, so it remains a setup tool rather than a full solution
+- has no direct output economy and no self-spread, so it remains a setup method rather than a full solution
 
 Important traits for the added plants:
 
@@ -2466,15 +2466,15 @@ Key rules:
 - Every `Site Task` should have a `Task Tier`
 - Higher `Task Tier`s should spawn less often, be harder to complete, and produce stronger `Task Reward Draft` quality
 - The highest-tier tasks should feel like jackpot spawns: rare enough to be exciting when they appear in a refresh, and hard enough that completing them feels memorable
-- Jackpot-tier tasks should often grant or offer a `Run Modifier`, not just a bigger resource reward
+- Jackpot-tier tasks should often grant or offer a `Run Modifier`, not just a bigger item-bundle reward
 - Tasks should feel local and practical, not abstract checklist filler
 - Completing a `Site Task` should first award its guaranteed `Faction Reputation` gain, with the amount based on task tier or level, then let the player claim `1` option from that task's already-shown `Task Reward Draft`
 - A `Task Reward Draft` should usually contain `2` options
-- A `Task Reward Draft` should not be required to contain a `Site Unlockable`; some drafts should instead focus on modifiers, money, resources, or mixed tactical bundles
+- A `Task Reward Draft` should not be required to contain a `Site Unlockable`; some drafts should instead focus on modifiers, money, item bundles, or mixed tactical bundles
 - Draft options can include:
-- a `Site Unlockable` such as a plant, device, tool, or other site-scoped option
+- a `Site Unlockable` such as a plant, device, field action, or other site-scoped option
 - a `Run Modifier`
-- a `Task Reward Package` containing money, resources, or a mixed tactical bundle
+- a `Task Reward Package` containing money, item bundles, or a mixed tactical bundle
 - if the chosen option is a `Site Unlockable`, it becomes available on the current site and may still require money to purchase or use
 - if the chosen option is a `Run Modifier`, it activates immediately for the current site session only
 - if the player leaves, fails, or restarts the current site session, all active `Run Modifier`s from that session are lost
@@ -2486,8 +2486,8 @@ This tier model is temporary design scaffolding and should be refined later thro
 
 | Tier | Spawn Rate | Challenge | Reward Draft Quality | Reward Feel |
 |---|---|---|---|---|
-| `Level 1 Routine` | Common | Straightforward, low-risk local work | Basic `3`-option draft quality | Small but useful choices |
-| `Level 2 Standard` | Common | Moderate field effort or timing | Solid `3`-option draft quality | Useful unlock, modifier, or resource choices |
+| `Level 1 Routine` | Common | Straightforward, low-risk local work | Basic `2`-option draft quality | Small but useful choices |
+| `Level 2 Standard` | Common | Moderate field effort or timing | Solid `2`-option draft quality | Useful unlock, modifier, or item-bundle choices |
 | `Level 3 Priority` | Uncommon | Demands stronger planning or site setup | Better draft quality and better option mix | Clearly valuable mixed choices |
 | `Level 4 Elite` | Rare | Difficult, often weather-sensitive or layout-sensitive | High-quality draft with stronger unlockables, premium bundles, or modifier access | Large upside with stronger strategic pivots |
 | `Level 5 Jackpot` | Very rare | Hard to spawn, hard to complete, and risky under site conditions | Top-end draft quality with exciting site-shaping choices | Outstanding choices plus strong `Run Modifier` potential intended to create a real excitement spike without removing core site danger |
@@ -2539,13 +2539,13 @@ Typical `Site Task` examples:
 Typical rewards:
 
 - Show a `Task Reward Draft` with `2` options on the task before acceptance
-- On completion, let the player choose `1` reward from unlockables, modifiers, or resource-focused bundles in that task's shown draft
+- On completion, let the player choose `1` reward from unlockables, modifiers, or item-focused bundles in that task's shown draft
 - Always grant the guaranteed publisher `Faction Reputation` payout on completion before the choice is made; the amount should scale with task tier or level
 - If the chosen result is a `Site Unlockable`, reveal it for current-site purchase or use
 - If the chosen result is a `Run Modifier`, activate it immediately for the current site session
 - One-time delivery drops or contractor offers when appropriate
 
-The design goal is that the player can inspect a clear reward draft before accepting a `Site Task`, finish that task, automatically gain trust with its publisher, and then make one meaningful tactical choice right away. That single choice should still create strong tension: reveal a new plant or device, activate a site-wide modifier, or take immediate money and resources.
+The design goal is that the player can inspect a clear reward draft before accepting a `Site Task`, finish that task, automatically gain trust with its publisher, and then make one meaningful tactical choice right away. That single choice should still create strong tension: reveal a new plant or device, activate a site-wide modifier, or take immediate money and item bundles.
 
 The `Task Reward Draft` should scale clearly with `Task Tier`. Higher-tier tasks should feel distinctly better, not just slightly larger.
 
@@ -2568,13 +2568,13 @@ Task-chain rules:
 - if the player accepts one or more chain tasks, the next task-pool refresh should bias new tasks toward related follow-up tasks from those accepted chains
 - that bias should continue the chain opportunity, not guarantee the entire chain for free
 - completing the full chain should grant an extra bonus reward on top of the normal task rewards
-- that chain-completion bonus can be a stronger `Task Reward Draft`, a premium resource bundle, a fixed extra `Reputation` or `Faction Reputation` payout, or better `Run Modifier` odds
+- that chain-completion bonus can be a stronger `Task Reward Draft`, a premium item bundle, a fixed extra `Reputation` or `Faction Reputation` payout, or better `Run Modifier` odds
 
 Task chaining creates momentum. The player stops thinking only about the current task and starts thinking "if I finish this chain step now, the next refresh is more likely to offer the follow-up, the full chain still pays extra, and I keep my board moving toward that payoff." That is exactly the kind of pressure that turns "one more task" into a longer, satisfying session.
 
 ### Funding Loop
 
-All money-related actions are performed through the `Field Phone`. This keeps the economy diegetic and personal: the player checks jobs, spends money, sells output, and hires labor through the same in-world tool they carry into the field.
+All money-related actions are performed through the `Field Phone`. This keeps the economy diegetic and personal: the player checks jobs, spends money, sells output, and hires labor through the same in-world phone they carry into the field.
 
 The main economic inputs are:
 
@@ -2590,7 +2590,7 @@ The main economic outputs are:
 - Buying solar or support devices
 - Buying food or medicine
 - Hiring contractors
-- Purchasing seeds, parts, or specialized tools
+- Purchasing seed items, device parts, or specialized device kits
 - Purchasing revealed `Site Unlockables` on the current site
 
 Task rewards should vary enough to change decision-making between runs. Some campaigns should tempt the player with better short-term cash, while others reward plant progression, utility access, or safer expansion. Payback randomness should reshape priorities, not invalidate planning.
@@ -2616,7 +2616,7 @@ The main per-site engagement loop should be:
 - If the chosen result is a `Site Unlockable`, spend money to purchase or use it when needed
 - If the wanted unlockable did not appear from tasks, optionally buy it from the direct-purchase list at very high money cost
 - If the chosen result is a `Run Modifier`, let it reshape the current site session immediately
-- If the chosen result is a resource bundle, use it to stabilize or accelerate the site right away
+- If the chosen result is an item bundle, use it to stabilize or accelerate the site right away
 - Use that new option to increase output, site safety, or ecological stability
 - Earn more money through better survival, better production, and larger economic flows
 - Complete more local tasks that reveal the next set of desirable reward choices
@@ -2628,14 +2628,14 @@ The important design principle is that site progression should not only offer pa
 - A new plant family or plant variant
 - A new device or support structure
 - A stronger irrigation or shelter option
-- A better tile treatment tool
+- A better tile treatment method
 - A more efficient harvesting or hauling method
 
-That way, task completion naturally creates the next target: the player now wants to purchase the newly chosen unlockable, place the new plant, test the new tool, use the new structure, or exploit the new modifier window.
+That way, task completion naturally creates the next target: the player now wants to purchase the newly chosen unlockable, place the new plant, test the new device, use the new structure, or exploit the new modifier window.
 
 To avoid frustration, the player should always have multiple visible `Site Task`s in the pool, and each completed task should present a meaningful but limited draft rather than a single forced result. This keeps local site progression task-driven without becoming overly rigid.
 
-The mixed reward draft creates the planning layer. A player who is short on cash may choose money, a player preparing for expansion may choose resources, and a player chasing a stronger local build may choose a plant, device, or modifier instead. The faction relationship gain happens automatically, so the player is not asked to choose between strategic identity and immediate usefulness.
+The mixed reward draft creates the planning layer. A player who is short on cash may choose money, a player preparing for expansion may choose item bundles, and a player chasing a stronger local build may choose a plant, device, or modifier instead. The faction relationship gain happens automatically, so the player is not asked to choose between strategic identity and immediate usefulness.
 
 Rare high-tier tasks add a third emotional layer: jackpot anticipation. When the pool refreshes, the player should feel that there is always a chance of seeing something unusually valuable and exciting.
 
@@ -2668,7 +2668,7 @@ Recommended short-term reward sources:
 
 - Visible `Task Reward Draft`s attached to current tasks
 - Newly revealed or newly discounted chosen `Site Unlockables`
-- Chosen `Task Reward Package`s containing money, resources, or mixed tactical bundles
+- Chosen `Task Reward Package`s containing money, item bundles, or mixed tactical bundles
 - Rare high-tier `Site Task`s appearing in the refreshed pool
 - Temporary discounts or purchase windows for site unlocks
 - Immediate morale or safety improvement when a plant cluster becomes functional
@@ -2715,7 +2715,7 @@ To support this cadence, larger goals should have milestone support, but the gam
 Useful milestone layers:
 
 - Phase milestone rewards: each major site phase should have 2 to 4 small sub-objectives with immediate payouts
-- `Site Task` completion rewards: the primary 5 to 10 minute target-and-reward layer, centered on claiming `1` unlock, modifier, or resource reward from a task's visible `Task Reward Draft` rather than just taking raw cash
+- `Site Task` completion rewards: the primary 5 to 10 minute target-and-reward layer, centered on claiming `1` unlock, modifier, or item-bundle reward from a task's visible `Task Reward Draft` rather than just taking raw cash
 - Zone restoration thresholds: when a local area crosses a restoration threshold, it grants a burst reward
 - Daily field goals: each morning can surface a few lightweight optional objectives tied to current weather and site state
 - Plant chain milestones: first windbreak, first stable food patch, first storm-proof cluster, first medicinal harvest
@@ -2795,9 +2795,9 @@ In the current design, a loadout can include:
 
 - Starting food and recovery supplies
 - Seed stock
-- Basic tools
+- Basic device items
 - Utility devices
-- Material bundles such as parts, repair kits, or cover rolls
+- Loose device supplies such as parts bundles or repair kits
 - Small starting protection bonuses from `Nearby-Site Aura`
 
 Important water rule:
@@ -2820,7 +2820,7 @@ Loadout size and quality depend on the `Persistent Tech Tree` and nearby support
 Longer-term, nearby-site support can include categories such as:
 
 - Seed Support
-- Material Support
+- Device Support
 - Camp Support
 - Forecast Support
 - Logistics Support
@@ -2830,7 +2830,7 @@ Longer-term, nearby-site support can include categories such as:
 
 Scope note:
 
-- for the first playable, only activate `Resource Loadout` output plus small `Nearby-Site Aura` bonuses
+- for the first playable, only activate `Loadout Item Output` plus small `Nearby-Site Aura` bonuses
 - `Nearby-Site Aura` should currently focus on wind protection, heat protection, and fertility support
 
 #### Regional Support Rules
@@ -2839,7 +2839,7 @@ Use these temporary rules:
 
 - only stabilized sites adjacent to the target site contribute support
 - each contributing site should produce a small exportable support package every `3` regional days
-- each contributing site may provide `Resource Loadout Output` for pre-deployment assembly
+- each contributing site may provide `Loadout Item Output` for pre-deployment assembly
 - each contributing site may also provide a passive `Nearby-Site Aura` on the new site, especially small wind protection, heat protection, fertility support, moisture retention, or worker recovery support
 - these bonuses should be noticeable but deliberately small; they should help the player start better, not solve the new site
 
@@ -2865,7 +2865,7 @@ Interpretation:
 - a site's support output should depend on its certified completion state plus its plant composition
 - only medium-density and high-density plant tiles should contribute meaningfully to regional output
 - different plant roles should contribute to different support channels at the same time
-- this means one site can export some resources, some wind protection, some heat protection, and some fertility support together
+- this means one site can export some loadout items, some wind protection, some heat protection, and some fertility support together
 
 #### Temporary Productivity Rule
 
@@ -2885,7 +2885,7 @@ Engineering direction:
 
 Recommended channel examples:
 
-- `resourceLoadoutOutput = siteYieldScore * resourceLoadoutParam`
+- `loadoutItemOutput = siteYieldScore * loadoutItemParam`
 - `regionalWindProtection = siteYieldScore * protectionParam * protectionCompositionFactor`
 - `regionalHeatProtection = siteYieldScore * antiDehydrationParam * antiDehydrationCompositionFactor`
 - `regionalFertilitySupport = siteYieldScore * fertilizeParam * fertilizeCompositionFactor`
@@ -2902,7 +2902,7 @@ Regional support should create a meaningful edge, but it must not trivialize new
 
 Use these limits:
 
-- `Resource Loadout Output` should improve the opening phase, not replace the early survival scramble
+- `Loadout Item Output` should improve the opening phase, not replace the early survival scramble
 - wind and heat protection bonuses should feel like a small safety cushion, not full hazard immunity
 - fertility-side `Nearby-Site Aura` should help one early patch establish more reliably, not make barren land fully solved
 - stronger harsh sites should still require preparation, adaptation, and good local strategy even if nearby support exists
@@ -2916,7 +2916,7 @@ Modifier directions:
 - increase exported wind protection by `x%`
 - increase exported heat protection by `x%`
 - increase exported fertility support by `x%`
-- increase one specific resource output by `x%`
+- increase one specific loadout-item output by `x%`
 - increase regional support effect range by `x%`
 
 Stacking note:
@@ -2933,7 +2933,7 @@ Interpretation:
 
 - if a nearby stabilized site exports increased wind protection, the player should feel encouraged to lean harder into wind-protection plants or layouts on the new site
 - if a nearby stabilized site exports increased fertility support, the player should feel encouraged to invest earlier into fertilize-focused expansion
-- if a nearby stabilized site exports a boosted resource category, the player should feel pushed toward using that stronger opening more aggressively
+- if a nearby stabilized site exports a boosted loadout-item category, the player should feel pushed toward using that stronger opening more aggressively
 
 This is desirable. The point is not only to make the next site slightly easier. The point is to make certain nearby sites strategically important because their bonus traits reshape the best opening approach on adjacent harsh sites.
 
@@ -3009,7 +3009,7 @@ It focuses on:
 - Plant upgrades
 - Better starting loadout options
 - `Task Pool Size` increases and better `Site Task` quality
-- Irrigation tools
+- Irrigation devices
 - Sensors and forecasting
 - Shelter efficiency
 - Crafting support
@@ -3027,11 +3027,11 @@ This tree should improve planning and resilience without erasing the desert's da
 
 `Site Unlockables` are the site-only progression layer. Every time the player enters a `Site`, a fresh random pool of local options is generated. That pool is built only from content already enabled by the `Persistent Tech Tree`, and it resets when leaving, failing, or restarting the site.
 
-This system should work like a curated random reward pool, not a fully fixed tree and not pure chaos. Each site should offer a different subset of plants, devices, tools, and other temporary options, which means the player's short-term priorities and local build style naturally change from site to site.
+This system should work like a curated random reward pool, not a fully fixed tree and not pure chaos. Each site should offer a different subset of plants, devices, field actions, and other temporary options, which means the player's short-term priorities and local build style naturally change from site to site.
 
 The main acquisition path should be task rewards, but task rewards should not be the only path. If the player wants a specific local unlockable and the relevant task drafts do not offer it, the site should also expose a limited direct-purchase fallback for tech-eligible unlockables at very high money cost.
 
-Faction tech choices should bias these local offers rather than replacing them. A `Village Committee` build should surface more labor and tempo tools, an `Autonomous Region Agricultural University` build should surface more device and precision options, and a `Forestry Bureau of Autonomous Region` build should surface more plant and water-resilience options.
+Faction tech choices should bias these local offers rather than replacing them. A `Village Committee` build should surface more labor and tempo support options, an `Autonomous Region Agricultural University` build should surface more device and precision options, and a `Forestry Bureau of Autonomous Region` build should surface more plant and water-resilience options.
 
 #### Per-Site Modifier Definition
 
@@ -3076,7 +3076,7 @@ Nearby-site support should usually use lower-intensity versions of these same mo
 Task-driven and money-fallback access rules:
 
 - each `Site Task` should show a `Task Reward Draft`, typically with `2` options, before the player accepts it
-- the options can include `Site Unlockables`, `Run Modifier`s, or resource-focused rewards
+- the options can include `Site Unlockables`, `Run Modifier`s, or item-focused rewards
 - not every `Task Reward Draft` should contain a `Site Unlockable`
 - on completion, the player claims `1` option from that task's shown draft
 - if the player chooses a `Site Unlockable`, it becomes available on the current site and may still require money to purchase or use
@@ -3086,7 +3086,7 @@ Task-driven and money-fallback access rules:
 - if the player chooses a `Run Modifier`, it activates immediately and lasts only for the current site session
 - if the player restarts, fails, or leaves that site, active `Run Modifier`s are lost and a fresh site reward pool is generated on the next attempt
 
-Because revealed unlockables still compete with water, food, tools, devices, and contractor spending, local progression decisions remain real survival tradeoffs instead of free progression.
+Because revealed unlockables still compete with food items, seed items, device items, and contractor spending, local progression decisions remain real survival tradeoffs instead of free progression.
 
 The design goals of this system are:
 
@@ -3100,7 +3100,7 @@ The design goals of this system are:
 
 - New plants or temporary access to plant families suited to the current site
 - New devices and support structures
-- New tools or field actions
+- New field actions or support methods
 - Local work-efficiency improvements
 - Temporary planting bonuses
 - Faster construction or hauling
@@ -3238,7 +3238,7 @@ Recommended sequence:
 1. `Campaign Start Baseline`
 - Available concepts: movement, interaction, one danger meter, one immediate survival objective, basic camp setup, one basic plant or starter cover option, and one simple authored local objective
 - Locked concepts: factions, assistants, faction tech branches, normal contract-board comparison, task chains, harsh-event relief, advanced forecasting, advanced plants and devices
-- Player lesson: "I can survive and improve the site with a minimal toolset"
+- Player lesson: "I can survive and improve the site with a minimal survival kit"
 
 2. `Site 1: Village Committee Unlock`
 - Use one authored `Onboarding Task` focused on practical labor, repair, hauling, or community coordination
@@ -3671,7 +3671,7 @@ The university must exist in play, but it does not need a full technical sandbox
 - harsh-environment severity should scale by site:
 - `Site 1`: low severity introduction
 - `Site 2`: medium severity event with real aftermath
-- `Site 3`: higher severity event that pressures the new university tools
+- `Site 3`: higher severity event that pressures the new university devices and forecast advantages
 - `Site 4`: `2-3` escalating waves, each harder than the last
 - each major event or wave must still include:
 - warning time
@@ -3929,7 +3929,7 @@ After a severe hazard event, the player should usually have more than one urgent
 
 ### Short-Term Reward Check
 
-During normal site play, the player should almost always have at least one nearby achievable target that can quickly pay out in a local unlock opportunity, a modifier opportunity, money, resources, safety, and fixed faction trust.
+During normal site play, the player should almost always have at least one nearby achievable target that can quickly pay out in a local unlock opportunity, a modifier opportunity, money, item bundles, safety, and fixed faction trust.
 
 ### Cognitive Load Check
 
@@ -3941,7 +3941,7 @@ While a `Site` is still unrestored, the player should consistently have immediat
 
 ### Site Task Check
 
-During a normal site run, the player should be able to see a limited but refreshed pool of `Site Task`s, understand each task's publishing `Faction`, commit to no more than `3` accepted tasks at once in the current design, finish them in roughly 5 to 10 minutes, and feel that task rewards meaningfully feed the next local decision. Completing a task should always grant its guaranteed `Faction Reputation` payout, with the amount scaling by task tier or level, and most `Site Task`s should already show a `Task Reward Draft` with `2` options before acceptance. On completion, the player should claim `1` option from that draft. Those options should be able to include `Site Unlockables`, `Run Modifier`s, and `Task Reward Package`s containing money, resources, or mixed tactical bundles. `Task Pool Size` and `Accepted Task Cap` upgrades in the `Persistent Tech Tree` should noticeably change how many short-term opportunities the player can pursue at once.
+During a normal site run, the player should be able to see a limited but refreshed pool of `Site Task`s, understand each task's publishing `Faction`, commit to no more than `3` accepted tasks at once in the current design, finish them in roughly 5 to 10 minutes, and feel that task rewards meaningfully feed the next local decision. Completing a task should always grant its guaranteed `Faction Reputation` payout, with the amount scaling by task tier or level, and most `Site Task`s should already show a `Task Reward Draft` with `2` options before acceptance. On completion, the player should claim `1` option from that draft. Those options should be able to include `Site Unlockables`, `Run Modifier`s, and `Task Reward Package`s containing money, item bundles, or mixed tactical bundles. `Task Pool Size` and `Accepted Task Cap` upgrades in the `Persistent Tech Tree` should noticeably change how many short-term opportunities the player can pursue at once.
 
 ### Task Tier Excitement Check
 
@@ -3983,7 +3983,7 @@ Two campaigns with different faction-tech paths should produce different viable 
 
 ### Tech-Money Loop Check
 
-On a typical `Site`, the player should be able to follow a satisfying loop of reviewing a task's visible reward draft, choosing to accept that task, completing it, claiming `1` reward, using that choice to reveal an unlock, activate a modifier, or gain immediate resources, then converting that payoff into better protection, output, or momentum that points toward the next draft.
+On a typical `Site`, the player should be able to follow a satisfying loop of reviewing a task's visible reward draft, choosing to accept that task, completing it, claiming `1` reward, using that choice to reveal an unlock, activate a modifier, or gain immediate item bundles, then converting that payoff into better protection, output, or momentum that points toward the next draft.
 
 ### Currency Separation Check
 
