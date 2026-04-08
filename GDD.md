@@ -2166,7 +2166,7 @@ As sites become stable, their plant systems contribute to nearby `Site`s through
 
 The `Contract Board` is the main in-session progression driver. It is available only while the player is inside an active `Site` session, and it tracks the current site's active faction-published `Site Task` pool. It should not be used from the `Regional Map` when the player is still deciding where to deploy next.
 
-Every `Site Task` should be published by one of three government-backed factions operating inside the same restoration program. The publishing faction must be visible on the board because it affects more than flavor: it changes reputation gain, assistant availability, random-event pools, and which long-term tech branches become easier to pursue.
+Every `Site Task` should be published by one of three participating factions operating inside the same restoration program. The publishing faction must be visible on the board because it affects more than flavor: it changes reputation gain, assistant availability, random-event pools, and which long-term tech branches become easier to pursue.
 
 | Faction | Board identity | Strategic pressure | Assistant |
 |---|---|---|---|
