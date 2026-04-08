@@ -3993,7 +3993,7 @@ This meter-relationship chapter defines how worker, terrain, plant, and weather 
 Design rule:
 
 - meters should affect each other through explicit relationships, not hidden outcome shortcuts
-- tables in this chapter should list only core meters and core plant-side values; math-stage helper variables and presentation diagnosis outputs belong outside this chapter
+- tables in this chapter should list only core meters and core plant-side values; math-stage helper variables and presentation diagnosis outputs belong outside this chapter, except for small cross-reference tables that show how non-meter systems such as `Per-Site Modifier`s alter core meter flow
 - site weather should first resolve into local `tileHeat`, `tileWind`, and `tileDust`
 - resolved local weather then changes terrain pressure and plant pressure
 - terrain state changes plant growth, density cap, and recovery potential
@@ -4084,15 +4084,30 @@ This summary should include only core runtime meters and the core plant-side val
 
 `Straw Checkerboard` should be authored through the same shared plant rows: start it at maximum `tilePlantDensity`, set `growable = false`, set a positive `constantWitherRate`, set `auraSize` as needed for setup reach, keep `growthPressure` at `0`, and rely on normal shared contribution values such as `fertilityImprovePower`.
 
+### Per-Site Modifier To Meter Relationships
+
+`Per-Site Modifier`s and `Nearby-Site Aura`s are not persistent runtime meters, but they directly alter how core meters change during a site session. Use this table as the implementation-facing reference for modifier authoring.
+
+| Modifier family | Typical source | Impact to | Notes |
+|---|---|---|---|
+| `Cool Shift Protocol` | `Run Modifier`, `Nearby-Site Aura` | `tileHeat`, `playerHydration`, `playerWorkEfficiency` | Lowers heat-side worker strain through the normal heat and worker meter flow instead of granting direct free energy. |
+| `Recovery Rotation` | `Run Modifier`, `Nearby-Site Aura` | `playerHealth`, `playerMorale`, `playerEnergy` | Strengthens recovery-side worker meters, especially when the player returns to shelter or downtime windows. |
+| `Field Ration Support` | `Run Modifier`, `Nearby-Site Aura` | `playerNourishment`, `playerEnergyCap` | Keeps the usable energy ceiling steadier during long work windows by supporting nourishment-side decline. |
+| `Moisture Hold Order` | `Run Modifier`, `Nearby-Site Aura` | `tileMoisture` | Slows moisture loss on plantable ground, which then lowers `growthPressure` through the normal terrain-to-plant chain. |
+| `Rooting Window` | `Run Modifier` | `growthPressure`, `tilePlantDensity` | Gives fresh plantings a short establishment window by reducing plant-side pressure and improving early density gain while support is adequate. |
+| `Soil Rehab Push` | `Run Modifier`, `Nearby-Site Aura` | `tileSoilFertility`, `tileSoilSalinity`, `salinityDensityCap` | Speeds rehabilitation of damaged or salty land so weak tiles recover into useful planting ground sooner. |
+| `Shelterbelt Coordination` | `Run Modifier` | `tileWind`, `tileDust`, `playerWorkEfficiency` | Reduces resolved local wind and dust pressure first, which then indirectly improves both plant conditions and field labor efficiency. |
+| `Salt Transition Program` | `Run Modifier`, `Nearby-Site Aura` | `tileSoilSalinity`, `salinityDensityCap`, `tilePlantDensity` | Makes salty pockets more workable by easing the salinity-side density ceiling and helping transition plants hold density. |
+
 ### Main Causal Loop
 
 Use this loop as the core mental model:
 
 1. Event state updates `eventHeatPressure`, `eventWindPressure`, and `eventDustPressure`.
 2. Weather updates `weatherHeat`, `weatherWind`, and `weatherDust` from baseline site conditions plus current event meters.
-3. Site weather plus local plants, `Straw Checkerboard`, protective structures, and terrain shelter resolve `tileHeat`, `tileWind`, and `tileDust`.
-4. Worker state updates `playerHealth`, `playerHydration`, `playerNourishment`, `playerEnergyCap`, `playerEnergy`, `playerMorale`, and `playerWorkEfficiency` from local weather, work, rest, supplies, medicine, and recovery context.
-5. Resolved local weather, irrigation, and plant contribution values update terrain pressure: moisture drain, burial, fertility change, and salinity change.
+3. Site weather plus active `Per-Site Modifier`s, local plants, `Straw Checkerboard`, protective structures, and terrain shelter resolve `tileHeat`, `tileWind`, and `tileDust`.
+4. Worker state updates `playerHealth`, `playerHydration`, `playerNourishment`, `playerEnergyCap`, `playerEnergy`, `playerMorale`, and `playerWorkEfficiency` from local weather, active `Per-Site Modifier`s, work, rest, supplies, medicine, and recovery context.
+5. Resolved local weather, active `Per-Site Modifier`s, irrigation, and plant contribution values update terrain pressure: moisture drain, burial, fertility change, and salinity change.
 6. Terrain state plus resolved local weather and plant resistance values feed `growthPressure`.
 7. `growthPressure`, `salinityDensityCap`, `growable`, and `constantWitherRate` determine plant density change.
 8. Healthy plants feed back into the tile by improving fertility, reducing salinity, holding soil against erosion-driven loss, adding shade, adding wind protection, or supporting moisture; non-growable plants such as `Straw Checkerboard` use the same shared contribution logic, but their current density steadily falls through `constantWitherRate`.
