@@ -1890,7 +1890,7 @@ Important modeling rule:
 - `tileHeat`, `tileWind`, and `tileDust` are resolved local weather meters rebuilt each fixed simulation step after site weather and local modifiers are combined
 - the prototype should not use a separate `tileSoilStability` meter or a separately stored `tilePlantStress` value
 
-Each prototype plant definition should also provide these plant-side values and readouts. These are not new runtime state categories. Core simulation should use the end-of-document relationship-summary chapter as the canonical meter reference, while the UI may expose summary readouts derived from that plant profile.
+Each prototype plant definition should also provide these plant-side values and readouts. These are not new runtime state categories. Core simulation should use the end-of-document meter-relationship chapter as the canonical meter reference, while the UI may expose summary readouts derived from that plant profile.
 
 Placement:
 
@@ -4035,9 +4035,9 @@ Leaving, failing, or restarting a site should reset its site unlock pool, clear 
 - Keep money, `Reputation`, and `Faction Reputation` legible in UI and tuning. Players should immediately understand why a reward gives money, total trust, faction trust, or a combination of them, and what each one is for.
 
 
-## 21. Terrain, Plant, Weather, And Worker Relationship Summary
+## 21. Meter Relationship
 
-This summary chapter defines the directional relationship model between worker, terrain, plant, and weather systems. It is not the final tuning math. The purpose is to keep the simulation readable before exact coefficients are balanced.
+This meter-relationship chapter defines how worker, terrain, plant, and weather meters connect to each other. It is not the final tuning math. Its purpose is to make the runtime system readable before exact coefficients are balanced, and to act as the implementation-facing reference for program structure.
 
 Design rule:
 
@@ -4137,7 +4137,7 @@ This summary should include only core runtime meters and the core plant-side val
 
 ### Basic Meter Reverse Reference
 
-This table is the reverse lookup for this summary chapter. Use it when the question is "what changes this core meter?" rather than "what does this meter affect?"
+This table is the reverse lookup for this meter-relationship chapter. Use it when the question is "what changes this core meter?" rather than "what does this meter affect?"
 
 List only core meters and core plant-side values here. Do not expand into helper formulas or UI diagnosis outputs inside this table.
 
