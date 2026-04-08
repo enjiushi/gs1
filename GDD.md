@@ -1912,7 +1912,6 @@ Behavior profile:
 |---|---|---|
 | `growable` | Boolean | Whether favorable conditions are allowed to increase `tilePlantDensity` |
 | `constantWitherRate` | `0-100` | Fixed density-loss rate applied every fixed simulation step; normal plants use `0`, while `Straw Checkerboard` uses a positive value |
-| `auraSize` | Small integer `0-2` | Maximum Manhattan-distance reach of this plant's positive contribution values; `0` means own tile only |
 
 Player-facing plant profile readouts:
 
@@ -1936,13 +1935,14 @@ Ecological contribution profile:
 
 | Field | Range | Meaning |
 |---|---|---|
+| `auraSize` | Small integer `0-2` | Maximum Manhattan-distance reach of this object's positive contribution values; `0` means own tile only |
 | `windProtectionPower` | `0-100` | How strongly this plant reduces nearby `tileWind` |
 | `heatProtectionPower` | `0-100` | How strongly this plant reduces nearby `tileHeat` |
 | `dustProtectionPower` | `0-100` | How strongly this plant reduces nearby `tileDust` |
 | `fertilityImprovePower` | `0-100` | How strongly this plant gradually improves `tileSoilFertility` while healthy and how strongly it pushes back against erosion-driven fertility loss in the prototype |
 | `salinityReductionPower` | `0-100` | How strongly this plant gradually reduces `tileSoilSalinity` while healthy |
 
-These contribution traits are plant-side inputs into the shared object contribution meters. `auraSize` determines how far they can reach, and current `tilePlantDensity` scales how much of each contribution is currently active.
+These contribution traits are plant-side inputs into the shared object contribution meters. `auraSize` belongs to the same contribution family and determines how far those contribution values can reach, while current `tilePlantDensity` scales how much of each contribution is currently active.
 
 Expansion and output profile:
 
@@ -4076,9 +4076,9 @@ This summary should include only core runtime meters and the core plant-side val
 | Persistent terrain soil meters | `tileSoilFertility`, `tileMoisture`, `tileSoilSalinity` | Long-lived or short-lived land condition on plantable `Ground`. These meters determine what can grow well. |
 | Temporary tile pressure | `tileSandBurial` | Recoverable sand overlay created mainly by sandstorms. If ignored, it can create lasting fertility loss. |
 | Plant meters | `tilePlantDensity`, `growthPressure`, `salinityDensityCap` | Shared plant-side runtime meters. `tilePlantDensity` tracks current plant presence, `growthPressure` governs growth-capable plants, and `salinityDensityCap` is the plant-side density ceiling created by salty ground. |
-| Plant behavior values | `growable`, `constantWitherRate`, `auraSize` | Core plant-side behavior values. `growable` decides whether favorable conditions may increase density, `constantWitherRate` applies steady density loss to plant density when defined, and `auraSize` defines the reach of positive plant-side contribution values. |
+| Plant behavior values | `growable`, `constantWitherRate` | Core plant-side behavior values. `growable` decides whether favorable conditions may increase density, and `constantWitherRate` applies steady density loss to plant density when defined. |
 | Plant resistance values | `saltTolerance`, `heatTolerance`, `windResistance`, `dustTolerance` | Plant-definition values that turn salinity, heat, wind, and dust pressure into species-specific density limits and pressure resistance. |
-| Object contribution meters | `windProtectionPower`, `heatProtectionPower`, `dustProtectionPower`, `fertilityImprovePower`, `salinityReductionPower` | Shared local contribution meters. Plants, devices, and terrain shelter may feed them; plant definition sets plant-side ceilings, `auraSize` defines plant-side reach, and `tilePlantDensity` scales plant-side output. |
+| Object contribution meters | `auraSize`, `windProtectionPower`, `heatProtectionPower`, `dustProtectionPower`, `fertilityImprovePower`, `salinityReductionPower` | Shared local contribution values and meters. Plants, devices, and terrain shelter may feed them; object definition sets local contribution ceilings and reach, while `tilePlantDensity` scales plant-side output. |
 
 ### Event Meter Relationships
 
@@ -4131,7 +4131,7 @@ This summary should include only core runtime meters and the core plant-side val
 |---|---|---|---|
 | `growable` | Plant definition only | `tilePlantDensity` | Allows favorable conditions to create density gain. If `false`, low `growthPressure` does not produce positive growth. |
 | `constantWitherRate` | Plant definition only | `tilePlantDensity` | Applies steady density loss every fixed simulation step. |
-| `auraSize` | Plant definition only | Reach of plant-fed `windProtectionPower`, `heatProtectionPower`, `dustProtectionPower`, `fertilityImprovePower`, and `salinityReductionPower` | Shared plant-side contribution reach value. `0` means own tile only, and larger values extend plant-side contribution reach by Manhattan distance. |
+| `auraSize` | Object definition only | Reach of `windProtectionPower`, `heatProtectionPower`, `dustProtectionPower`, `fertilityImprovePower`, and `salinityReductionPower` | Shared contribution reach value. `0` means own tile only, and larger values extend contribution reach by Manhattan distance. |
 | `windProtectionPower` | Object definition only, `tilePlantDensity`, `deviceEfficiency`, `auraSize` | `tileWind` | Shared local wind-protection meter. Any object with positive wind protection may feed it. Plant density scales plant-side output, while device efficiency scales device-side output. |
 | `heatProtectionPower` | Object definition only, `tilePlantDensity`, `deviceEfficiency`, `auraSize` | `tileHeat` | Shared local heat-protection meter. Any object with positive heat protection may feed it. Plant density scales plant-side output, while device efficiency scales device-side output. |
 | `dustProtectionPower` | Object definition only, `tilePlantDensity`, `deviceEfficiency`, `auraSize` | `tileDust` | Shared local dust-protection meter. Any object with positive dust protection may feed it. Plant density scales plant-side output, while device efficiency scales device-side output. |
