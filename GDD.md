@@ -4090,9 +4090,9 @@ This summary should include only core runtime meters and the core plant-side val
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `weatherHeat` | Daily heat curve, site heat bias, `eventHeatPressure` | `tileHeat`, worker hydration drain, worker energy drain | Site-wide heat should resolve into local heat before it affects terrain or plants. |
-| `weatherWind` | Daily wind curve, site wind bias, gust variation, `eventWindPressure` | `tileWind` | Site-wide wind should resolve into local wind before it affects terrain or plants. |
-| `weatherSand` | Site sand bias, current wind, recent-event aftermath, `eventSandPressure` | `tileDust` | Site-wide sand and dust should resolve into local dust before it affects terrain or plants. |
+| `weatherHeat` | Daily heat curve, site heat bias, `eventHeatPressure` | `tileHeat`, `playerHydration`, `playerEnergy` | Site-wide heat should resolve into local heat before it affects terrain, plant pressure, or worker meters. |
+| `weatherWind` | Daily wind curve, site wind bias, gust variation, `eventWindPressure` | `tileWind` | Site-wide wind should resolve into local wind before it affects terrain or plant pressure. |
+| `weatherSand` | Site sand bias, current wind, recent-event aftermath, `eventSandPressure` | `tileDust`, `playerHealth` | Site-wide sand and dust should resolve into local dust before it affects terrain, plant pressure, or worker meters. |
 
 ### Resolved Local Weather To Terrain And Plant Pressure
 
