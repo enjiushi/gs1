@@ -909,9 +909,9 @@ Weather should pressure more than one system at once.
 
 Use this prototype interpretation:
 
-- `weatherHeat` mainly raises `tileHeat`, worker hydration drain, worker energy drain, and exposed `playerHealth` risk; `tileHeat` then drives tile moisture loss and the heat-linked share of plant `growthPressure`
-- `weatherWind` mainly raises `tileWind`, exposure, work difficulty, and wind-protection demand; `tileWind` then drives exposed-tile erosion pressure, moisture loss, and the wind-linked share of plant `growthPressure`
-- `weatherSand` mainly raises `tileDust`, visibility loss, movement penalties, airborne-sand danger, and exposed `playerHealth` risk; `tileDust` then drives burial, soil setback, the dust-linked share of plant `growthPressure`, and device damage risk
+- `weatherHeat` mainly raises `tileHeat`; `tileHeat` then drives worker hydration loss, worker energy loss, severe exposure health risk, tile moisture loss, and the heat-linked share of plant `growthPressure`
+- `weatherWind` mainly raises `tileWind`; `tileWind` then drives harder outdoor work, worker energy pressure, exposed-tile erosion pressure, moisture loss, and the wind-linked share of plant `growthPressure`
+- `weatherSand` mainly raises `tileDust`; `tileDust` then drives worker health risk, exhausting movement burden, burial, soil setback, the dust-linked share of plant `growthPressure`, and device damage risk
 
 Design consistency rule:
 
@@ -4080,19 +4080,27 @@ This summary should include only core runtime meters and the core plant-side val
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `playerHealth` | Rest and shelter recovery, medicine, harsh outdoor exposure, dangerous field work, low `playerHydration`, low `playerNourishment` | `playerEnergy`, worker action efficiency, risky-action safety, collapse risk | Slow physical-condition meter. Low health should make the worker less resilient and less efficient even if short-term energy is restored. |
-| `playerHydration` | Drinking actions, water items, `weatherHeat`, outdoor work, rest and shelter recovery | `playerEnergy` | Most urgent worker survival meter in hot conditions. Low hydration should make the worker tire more easily. |
+| `playerHealth` | Rest and shelter recovery, medicine, harsh outdoor exposure, dangerous field work, `tileHeat`, `tileDust`, low `playerHydration`, low `playerNourishment` | `playerEnergy`, worker action efficiency, risky-action safety, collapse risk | Slow physical-condition meter. Low health should make the worker less resilient and less efficient even if short-term energy is restored. |
+| `playerHydration` | Drinking actions, water items, `tileHeat`, outdoor work, rest and shelter recovery | `playerEnergy` | Most urgent worker survival meter in hot conditions. Local heat should make hydration fall faster on exposed tiles. |
 | `playerNourishment` | Eating actions, food items, time, outdoor work, rest recovery | `playerEnergy` | Slower-moving worker support meter for sustained efficiency and recovery. |
-| `playerEnergy` | Work actions, `weatherHeat`, rest recovery, `playerHealth`, `playerHydration`, `playerNourishment` | Worker action capacity | Main short-term work-capacity meter. Low energy limits how much meaningful field work the player can do. |
+| `playerEnergy` | Work actions, `tileHeat`, `tileWind`, `tileDust`, rest recovery, `playerHealth`, `playerHydration`, `playerNourishment` | Worker action capacity | Main short-term work-capacity meter. Low energy limits how much meaningful field work the player can do. |
 | `playerMorale` | Safe rest, dense-cover recovery pockets, harsh-event aftermath, current site setbacks and recovery progress | worker action efficiency | Worker comfort and psychological stability meter. Low morale should make routine work slower or less reliable rather than directly lowering the energy meter. |
 
 ### Weather To Local Weather Resolution
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `weatherHeat` | Daily heat curve, site heat bias, `eventHeatPressure` | `tileHeat`, `playerHydration`, `playerEnergy` | Site-wide heat should resolve into local heat before it affects terrain, plant pressure, or worker meters. |
+| `weatherHeat` | Daily heat curve, site heat bias, `eventHeatPressure` | `tileHeat` | Site-wide heat should resolve into local heat before it affects terrain, plant pressure, or worker meters. |
 | `weatherWind` | Daily wind curve, site wind bias, gust variation, `eventWindPressure` | `tileWind` | Site-wide wind should resolve into local wind before it affects terrain or plant pressure. |
-| `weatherSand` | Site sand bias, current wind, recent-event aftermath, `eventSandPressure` | `tileDust`, `playerHealth` | Site-wide sand and dust should resolve into local dust before it affects terrain, plant pressure, or worker meters. |
+| `weatherSand` | Site sand bias, current wind, recent-event aftermath, `eventSandPressure` | `tileDust` | Site-wide sand and dust should resolve into local dust before it affects terrain, plant pressure, or worker meters. |
+
+### Resolved Local Weather To Worker State
+
+| Meter | Impacted by | Impact to | Notes |
+|---|---|---|---|
+| `tileHeat` | `weatherHeat`, nearby `heatProtectionPower`, `auraSize`, shelter structures, solar-panel sharing, rock shelter, `heatProtectionAura` | `playerHydration`, `playerEnergy`, `playerHealth` | Final local heat pressure should be the worker-facing heat meter on the current tile. It mainly drives hydration loss and fatigue, while severe exposure can also damage health. |
+| `tileWind` | `weatherWind`, nearby `windProtectionPower`, `auraSize`, `Wind Fence`, rock shelter, `windProtectionAura` | `playerEnergy` | Final local wind exposure should be the worker-facing wind meter on the current tile. It mainly makes outdoor work harder and more exhausting. |
+| `tileDust` | `weatherSand`, nearby `dustProtectionPower`, `auraSize`, `Wind Fence`, rock shelter, `dustProtectionAura`, `windProtectionAura` | `playerHealth`, `playerEnergy` | Final local dust exposure should be the worker-facing dust meter on the current tile. It mainly creates abrasion, breathing strain, visibility burden, and exhausting movement pressure. |
 
 ### Resolved Local Weather To Terrain And Plant Pressure
 
@@ -4141,14 +4149,14 @@ List only core meters and core plant-side values here. Do not expand into helper
 | `eventHeatPressure` | Current event archetype, current event phase, `eventTier` | `weatherHeat` | Event-side heat meter. |
 | `eventWindPressure` | Current event archetype, current event phase, `eventTier` | `weatherWind` | Event-side wind meter. |
 | `eventSandPressure` | Current event archetype, current event phase, `eventTier` | `weatherSand` | Event-side sand meter. |
-| `playerHealth` | Rest and shelter recovery, medicine, harsh outdoor exposure, dangerous field work, low `playerHydration`, low `playerNourishment` | `playerEnergy`, worker action efficiency, risky-action safety, collapse risk | Core worker health meter. |
-| `playerHydration` | Drinking actions, water items, `weatherHeat`, outdoor work, rest and shelter recovery | `playerEnergy` | Core worker hydration meter. |
+| `playerHealth` | Rest and shelter recovery, medicine, harsh outdoor exposure, dangerous field work, `tileHeat`, `tileDust`, low `playerHydration`, low `playerNourishment` | `playerEnergy`, worker action efficiency, risky-action safety, collapse risk | Core worker health meter. |
+| `playerHydration` | Drinking actions, water items, `tileHeat`, outdoor work, rest and shelter recovery | `playerEnergy` | Core worker hydration meter. |
 | `playerNourishment` | Eating actions, food items, time, outdoor work, rest recovery | `playerEnergy` | Core worker nourishment meter. |
-| `playerEnergy` | Work actions, `weatherHeat`, rest recovery, `playerHealth`, `playerHydration`, `playerNourishment` | Worker action capacity | Core worker action-capacity meter. |
+| `playerEnergy` | Work actions, `tileHeat`, `tileWind`, `tileDust`, rest recovery, `playerHealth`, `playerHydration`, `playerNourishment` | Worker action capacity | Core worker action-capacity meter. |
 | `playerMorale` | Safe rest, dense-cover recovery pockets, harsh-event aftermath, current site setbacks and recovery progress | worker action efficiency | Core worker morale meter. |
-| `tileHeat` | `weatherHeat`, nearby `heatProtectionPower`, `auraSize`, shelter structures, solar-panel sharing, rock shelter, `heatProtectionAura` | `tileMoisture`, `growthPressure` | Final local heat pressure. |
-| `tileWind` | `weatherWind`, nearby `windProtectionPower`, `auraSize`, `Wind Fence`, rock shelter, `windProtectionAura` | `tileMoisture`, `tileSoilFertility`, `growthPressure` | Final local wind exposure. |
-| `tileDust` | `weatherSand`, nearby `dustProtectionPower`, `auraSize`, `Wind Fence`, rock shelter, `dustProtectionAura`, `windProtectionAura` | `tileSandBurial`, `tileSoilFertility`, `growthPressure` | Final local sand and dust exposure. |
+| `tileHeat` | `weatherHeat`, nearby `heatProtectionPower`, `auraSize`, shelter structures, solar-panel sharing, rock shelter, `heatProtectionAura` | `playerHydration`, `playerEnergy`, `playerHealth`, `tileMoisture`, `growthPressure` | Final local heat pressure. |
+| `tileWind` | `weatherWind`, nearby `windProtectionPower`, `auraSize`, `Wind Fence`, rock shelter, `windProtectionAura` | `playerEnergy`, `tileMoisture`, `tileSoilFertility`, `growthPressure` | Final local wind exposure. |
+| `tileDust` | `weatherSand`, nearby `dustProtectionPower`, `auraSize`, `Wind Fence`, rock shelter, `dustProtectionAura`, `windProtectionAura` | `playerHealth`, `playerEnergy`, `tileSandBurial`, `tileSoilFertility`, `growthPressure` | Final local sand and dust exposure. |
 | `tileMoisture` | Watering, direct irrigation such as `Drip Irrigator`, `tileHeat`, `tileWind`, `tileSoilFertility` | `growthPressure` | Stored water on the tile. |
 | `tileSoilFertility` | nearby `fertilityImprovePower`, `auraSize`, `tileWind`, `tileDust`, `tileSandBurial` | `tileMoisture`, `growthPressure` | Long-term land quality meter. |
 | `tileSoilSalinity` | Authored starting salinity, nearby `salinityReductionPower`, `auraSize` | `salinityDensityCap` | Salty-ground rehabilitation meter. |
@@ -4171,8 +4179,8 @@ Use this loop as the prototype mental model:
 
 1. Event state updates `eventHeatPressure`, `eventWindPressure`, and `eventSandPressure`.
 2. Weather updates `weatherHeat`, `weatherWind`, and `weatherSand` from baseline site conditions plus current event meters.
-3. Worker state updates `playerHealth`, `playerHydration`, `playerNourishment`, `playerEnergy`, and `playerMorale` from weather, work, rest, supplies, medicine, and recovery context.
-4. Site weather plus local plants, `Straw Checkerboard`, protective structures, and terrain shelter resolve `tileHeat`, `tileWind`, and `tileDust`.
+3. Site weather plus local plants, `Straw Checkerboard`, protective structures, and terrain shelter resolve `tileHeat`, `tileWind`, and `tileDust`.
+4. Worker state updates `playerHealth`, `playerHydration`, `playerNourishment`, `playerEnergy`, and `playerMorale` from local weather, work, rest, supplies, medicine, and recovery context.
 5. Resolved local weather, irrigation, and plant contribution values update terrain pressure: moisture drain, burial, fertility change, and salinity change.
 6. Terrain state plus resolved local weather and plant resistance values feed `growthPressure`.
 7. `growthPressure`, `salinityDensityCap`, `growable`, and `constantWitherRate` determine plant density change.
