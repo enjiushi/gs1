@@ -133,11 +133,11 @@ The long-term replay goal is for players to finish a campaign and immediately im
 10. Use normal field work such as burial clearing, watering, and repair under harsh-event pressure when needed to protect planted regions or rescue failing utility lines; sometimes sacrifice one fringe area to save a core patch, then evaluate any `Aftermath Relief Offer`s once the event breaks.
 11. Convert surviving short-term gains into denser self-sustaining cover and the next safer expansion.
 
-### Prototype Strategic Pressure Loop
+### Strategic Pressure Loop
 
 For the first playable, the core site loop should not be "place plants and wait." It should be "stabilize, survive, exploit, repair, and expand."
 
-The intended prototype rhythm is:
+The intended rhythm is:
 
 1. Read the current terrain and forecast, then identify the most dangerous exposed patch.
 2. Spend limited early money and energy on a small protective plant combo or support device.
@@ -152,7 +152,7 @@ This creates the intended strategy arc:
 - good choices create safer land, stronger plants, more output, and easier future expansion
 - bad choices create density loss, withering, money loss, risky rescue work, and local collapse that must be reversed deliberately
 
-The important prototype target is not perfect simulation. It is to make each planted patch feel like a strategic bet that can either mature into a thriving foothold or slide into a costly recovery problem.
+The important target is not perfect simulation. It is to make each planted patch feel like a strategic bet that can either mature into a thriving foothold or slide into a costly recovery problem.
 
 ## 7. World Structure
 
@@ -244,7 +244,7 @@ The campaign ends when the `Campaign Clock` runs out. The player's success is me
 
 ### Interaction Requirement Rule
 
-To reduce control complexity, the prototype should avoid a quick-slot-driven interaction model. The player only needs to keep the required `Item`s in carried `Inventory`.
+To reduce control complexity, the game should avoid a quick-slot-driven interaction model. The player only needs to keep the required `Item`s in carried `Inventory`.
 
 For any interaction, construction, planting, repair, or other field work that requires `Item`s:
 
@@ -286,9 +286,9 @@ Placement is tile or plot based. This improves clarity for:
 
 Large devices can still have footprint differences, but all placement decisions should resolve to understandable tile logic.
 
-### Runtime Simulation Contract (Prototype)
+### Runtime Simulation Contract
 
-The prototype should use frame `deltaTime` for rendering, animation, and input responsiveness, but core gameplay simulation should not run directly on raw frame time. Instead, frame `deltaTime` should feed a fixed-step simulation accumulator.
+The game should use frame `deltaTime` for rendering, animation, and input responsiveness, but core gameplay simulation should not run directly on raw frame time. Instead, frame `deltaTime` should feed a fixed-step simulation accumulator.
 
 Core time contract:
 
@@ -397,7 +397,7 @@ This order matters:
 
 #### Resolution Timing Rules
 
-Use these timing rules for prototype consistency:
+Use these timing rules for consistency:
 
 - terrain soil meter changes resolve continuously every fixed simulation step
 - hazard damage resolves continuously every fixed simulation step
@@ -418,15 +418,15 @@ This means:
 - hazards feel continuous
 - spread remains readable and discrete instead of noisy every frame
 
-### Tile And Occupancy Rules (Prototype)
+### Tile And Occupancy Rules
 
-The prototype should use one shared tile contract for simulation, placement, save data, overlays, and basic reachability checks.
+The game should use one shared tile contract for simulation, placement, save data, overlays, and basic reachability checks.
 
-#### Prototype Tile State Categories
+#### Tile State Categories
 
 The tile model should separate different kinds of state instead of treating every value as generic "tile state."
 
-| State Type | What It Represents | Prototype Fields | Notes |
+| State Type | What It Represents | Fields | Notes |
 |---|---|---|---|
 | `terrainDefinition` | Base terrain identity and hard placement flags | `terrainTypeId`, `tileTraversable`, `tilePlantable` | Static `Ground` or `Rock` role |
 | `terrainSoilState` | Persistent quality of plantable ground | `tileSoilFertility`, `tileMoisture`, `tileSoilSalinity` | Only meaningful on plantable `Ground` |
@@ -434,28 +434,28 @@ The tile model should separate different kinds of state instead of treating ever
 | `plantState` | Runtime state of the current living plant or `Straw Checkerboard` cover | `tilePlantDensity`, `growthPressure` | `Plant Trend` is derived for display rather than stored as separate plant state; `Straw Checkerboard` uses the same density meter and shared plant contribution model, but with `growable = false` and a positive `constantWitherRate` |
 | `structureState` | Runtime state of the current structure | `deviceIntegrity`, `deviceEfficiency`, `deviceStoredWater` | `deviceStoredWater` is mainly meaningful for water-storage structures |
 | `resolvedLocalWeatherState` | Final local weather intensity after site weather, local support, and shelter effects are combined | `tileHeat`, `tileWind`, `tileDust` | Bridging layer between weather/support logic and final terrain or plant changes |
-| `temporaryTileState` | Temporary tile-only hazard state | `tileSandBurial` | Prototype uses burial as the only true temporary tile state |
+| `temporaryTileState` | Temporary tile-only hazard state | `tileSandBurial` | Burial is the only true temporary tile state in the current design |
 
 Important cleanup rule:
 
 - `occupancyState` should only answer what is on the tile; density, integrity, and efficiency belong to their own runtime states, while `Plant Trend` is a derived state
 - `Straw Checkerboard` uses `groundCoverTypeId` for occupancy identity, reuses plant trait fields for its effects, and uses `tilePlantDensity` with `growable = false` plus a positive `constantWitherRate`
 - `tileHeat`, `tileWind`, and `tileDust` are resolved local weather meters, not persistent terrain state
-- the prototype should not use a separate `tileSoilStability` meter
+- the game should not use a separate `tileSoilStability` meter
 
-#### Prototype Tile Layers
+#### Tile Layers
 
 Each tile should conceptually contain these layers:
 
-| Layer | Max Occupancy | Purpose | Prototype Examples |
+| Layer | Max Occupancy | Purpose | Examples |
 |---|---|---|---|
 | `terrainLayer` | `1` | Base terrain definition and core flags | `Ground`, `Rock` |
 | `groundCoverLayer` | `1` | Surface-cover type or material that prepares or protects land beneath living plants | `Straw Checkerboard` |
-| `livingPlantLayer` | `1` plant type | Main living plant type occupying the tile; density measures how much of that type fills the tile | Any living prototype plant |
+| `livingPlantLayer` | `1` plant type | Main living plant type occupying the tile; density measures how much of that type fills the tile | Any living plant from the current set |
 | `structureLayer` | `1` footprint reservation per tile | Player-built support devices and camp structures | Shelter, irrigation device, sensor, workshop, solar utility |
 | `dynamicOverlayLayer` | many transient flags | Temporary state, not persistent occupancy identity | Burial |
 
-For prototype simplicity:
+For simplicity:
 
 - a tile may contain both `groundCoverLayer` and `livingPlantLayer`
 - a tile may not contain both `groundCoverLayer` and `structureLayer`
@@ -468,7 +468,7 @@ Clarification:
 
 - `groundCoverLayer` means non-living or plant-derived surface cover that sits under later living plants and helps prepare land
 - `device` means a player-built support utility or camp structure, not a plant and not a consumable item
-- task markers, repair markers, reservation flags, and similar workflow indicators should belong to their own systems, not to prototype tile state
+- task markers, repair markers, reservation flags, and similar workflow indicators should belong to their own systems, not to tile runtime state
 
 #### Terrain Flags
 
@@ -479,28 +479,28 @@ Each tile should expose two core placement and movement flags:
 
 Buildability rule:
 
-- if a tile is `tileTraversable = true`, it is buildable in the prototype unless another occupancy or content rule blocks it
+- if a tile is `tileTraversable = true`, it is buildable in the current design unless another occupancy or content rule blocks it
 
-Recommended prototype interpretation:
+Recommended interpretation:
 
-| Terrain | Traversable | Plantable | Prototype Role | Notes |
+| Terrain | Traversable | Plantable | Role | Notes |
 |---|---|---|---|---|
 | `Ground` | Yes | Yes | Main playable terrain | Tile quality should come from soil meters such as `tileSoilFertility`, `tileMoisture`, and `tileSoilSalinity`, plus overlay pressure such as `tileSandBurial` and nearby resolved local weather |
 | `Rock` | No | No | Hard blocker terrain | Cannot grow plants or host structures, but should be able to provide local shade and wind protection to nearby `Ground` tiles if that support rule is used |
 
-Engineering can later expand terrain types, but the prototype should keep the base terrain layer simple.
+Engineering can later expand terrain types, but the game should keep the base terrain layer simple.
 
-For the prototype, most meaningful ground variation should come from tile meters rather than many terrain IDs. Base terrain should answer "is this playable ground or a blocker?" while runtime meters answer "how good is this tile right now?"
+Most meaningful ground variation should come from tile meters rather than many terrain IDs. Base terrain should answer "is this playable ground or a blocker?" while runtime meters answer "how good is this tile right now?"
 
 #### Persistent Soil Meters
 
-For the prototype, every plantable `Ground` tile should carry these three soil meters:
+Every plantable `Ground` tile should carry these three soil meters:
 
 - `tileSoilFertility` in range `0-100`
 - `tileMoisture` in range `0-100`
 - `tileSoilSalinity` in range `0-100`
 
-Prototype interpretation:
+Interpretation:
 
 - `tileSoilFertility` is the long-lived land-improvement meter; it raises plant growth speed, sets the tile's maximum moisture capacity, and slows moisture reduction
 - `tileMoisture` is the short-lived water-availability meter; it speeds growth when sufficient and slows or reverses it when too low
@@ -515,7 +515,7 @@ Important rules:
 
 #### Device Footprints
 
-Prototype devices should support only this footprint class:
+Devices should support only this footprint class:
 
 - `1x1`
 
@@ -526,7 +526,7 @@ Rules:
 - rotation can still exist for visuals or directional effects, but not for footprint size
 - if a device is removed, its reserved tile is released
 
-Long defensive lines should come from repeated `1x1` placement or plant lines, not special long structure footprints in the first prototype.
+Long defensive lines should come from repeated `1x1` placement or plant lines, not special long structure footprints in the first playable.
 
 #### Occupancy Coexistence Rules
 
@@ -543,13 +543,13 @@ Use these hard rules:
 - if a structure does not allow plant sharing, placing it still requires the tile to contain no living plant
 - if a living plant would grow or be replaced into a height class above the placed structure's allowed sharing limit, that tile becomes an invalid target for that plant until the structure is removed or the plant is changed
 
-This keeps the prototype readable and prevents hidden overlap logic.
+This keeps the system readable and prevents hidden overlap logic.
 
 #### Movement And Pathing Rules
 
 The player moves in continuous world space, but tile flags should still control collision, valid reachability, and action legality.
 
-Prototype movement rules:
+Movement rules:
 
 - impassable terrain blocks movement entirely
 - solid structure footprints block movement entirely
@@ -557,12 +557,12 @@ Prototype movement rules:
 - dense plants and burial may apply movement slowdown, but not hard blocking, unless a future plant explicitly says otherwise
 - pathing and reachability checks should use orthogonal grid neighbors first to stay aligned with adjacency logic
 
-For prototype simplicity, reachability only needs to answer:
+For simplicity, reachability only needs to answer:
 
 - can the player physically stand on or reach this tile
 - is the tile connected to the camp or current actor position through passable tiles
 
-Full advanced NPC navigation is not required for v1 prototype architecture.
+Full advanced NPC navigation is not required for v1 architecture.
 
 #### Placement Validation Rules
 
@@ -620,7 +620,7 @@ These are the core `Player Condition` values. They are always relevant, but not 
 
 Health is the slower physical-condition meter. It reflects injury, illness risk, and bodily wear from repeated harsh exposure or risky field work. Hydration is the most urgent meter in hot conditions. `Nourishment` is slower, but important for sustained efficiency and recovery. `Energy Cap` is the currently usable ceiling on `Energy`, mainly limited by thirst and hunger. Energy limits daily work output and pushes rest timing, but it should not be fully usable when `Energy Cap` is low. Morale reflects comfort, momentum, and psychological strain under isolation and repeated setbacks. `Work Efficiency` is the resolved worker-output meter that turns current condition and local exposure into action energy cost.
 
-Current prototype gameplay effect for `Health`:
+Current gameplay effect for `Health`:
 
 - `Health` should drop from dangerous outdoor exposure, severe exhaustion, and risky harsh-event work
 - low `Health` should reduce safe work capacity even if the player has recovered some `Energy`
@@ -628,21 +628,21 @@ Current prototype gameplay effect for `Health`:
 - low `Health` should slow recovery and make collapse or forced retreat more likely
 - shelter, rest, and medicine should recover `Health` more slowly than `Energy`
 
-Current prototype gameplay effect for `Morale`:
+Current gameplay effect for `Morale`:
 
 - `Morale` should directly modify `Work Efficiency`
 - when `Morale` is low, routine work should cost more energy or feel less reliable
 - when `Morale` is stable or high, normal `Work Efficiency` is preserved
 - for the current design, this is the minimum concrete `Morale` effect required; broader morale interactions can be added later if needed
 
-Current prototype gameplay effect for `Energy Cap`:
+Current gameplay effect for `Energy Cap`:
 
 - `Hydration` and `Nourishment` should be the main meters that limit `Energy Cap`
 - when `Energy Cap` is low, the worker may still own some stored `Energy`, but only a smaller usable portion should be available for action planning
 - recovery of `Hydration` and `Nourishment` should restore `Energy Cap` faster than rebuilding fully spent `Energy`
 - `Energy Cap` should make thirst and hunger feel immediately restrictive without forcing direct collapse of every other worker meter
 
-### Dense Cover Recovery (Prototype)
+### Dense Cover Recovery
 
 Dense restored plant cover should become a practical recovery aid, not only a visual reward.
 
@@ -666,9 +666,9 @@ The environment is represented through visible site conditions rather than hidde
 
 These are not just flavor. They directly affect action energy cost, exposure risk, plant survival, erosion, and device performance.
 
-### Prototype Environmental Pressure Suite
+### Environmental Pressure Suite
 
-For prototype validation, the environment should constantly push against the player's layout. Plants should not behave like passive timers. A planted area should only prosper if the player chose the right plant mix, support, and timing for that zone.
+For validation, the environment should constantly push against the player's layout. Plants should not behave like passive timers. A planted area should only prosper if the player chose the right plant mix, support, and timing for that zone.
 
 | Pressure | Strategic Purpose | Main Side Effects |
 |---|---|---|
@@ -717,9 +717,9 @@ Player-facing forecast channel rule:
 - `Dust`
 - these should be shown as readable meters, bars, or severity bands rather than hidden numbers once the relevant university forecast upgrades are unlocked
 
-### Hazard And Weather Runtime Model (Prototype)
+### Hazard And Weather Runtime Model
 
-The prototype should treat weather as one shared site-wide runtime system that constantly updates `weatherHeat`, `weatherWind`, and `weatherDust`, while rarer extreme events run through their own event-side meter layer on top.
+The game should treat weather as one shared site-wide runtime system that constantly updates `weatherHeat`, `weatherWind`, and `weatherDust`, while rarer extreme events run through their own event-side meter layer on top.
 
 #### Weather Runtime Fields
 
@@ -770,13 +770,13 @@ Resolution rule:
 
 Outside of extreme events, weather should still follow a readable daily rhythm.
 
-Prototype baseline behavior:
+Baseline behavior:
 
 - `weatherHeat` should be lowest overnight, rise through morning, peak around midday, then fall in evening
 - `weatherWind` should fluctuate more than heat and can spike during exposed parts of the day even without a named event
 - `weatherDust` should be partly derived from wind, site dust bias, and recent hazard aftermath
 
-Use this prototype relationship:
+Use this relationship:
 
 - `weatherHeat` should come from the daily heat curve plus site bias plus current `eventHeatPressure`
 - `weatherWind` should come from the daily wind curve plus site bias plus gust variation plus current `eventWindPressure`
@@ -787,19 +787,19 @@ Engineering note:
 - `dayHeatCurve` and `dayWindCurve` can be authored as simple curves rather than hand-written formulas
 - `gustNoise` should be low-amplitude short variation, not full randomness spikes with no warning
 
-#### Prototype Extreme Event Archetypes
+#### Extreme Event Archetypes
 
-The prototype only needs a small event set:
+The current design only needs a small event set:
 
 | Event | Typical Event-Meter Pattern | Main Gameplay Pressure |
 |---|---|---|
 | `HeatWave` | high `eventHeatPressure`, small `eventWindPressure`, small `eventDustPressure` | hydration drain, energy drain, exposed worker pressure, weak seedling survival |
 | `Sandstorm` | medium `eventHeatPressure`, high `eventWindPressure`, very high `eventDustPressure` | visibility collapse, extreme wind-sand exposure, burial, device damage, movement pressure |
-| `CompoundFront` | high values in all three channels | rare prototype high-tier event that tests the full support layout |
+| `CompoundFront` | high values in all three channels | rare high-tier event that tests the full support layout |
 
-Prototype limits:
+Limits:
 
-- during the first three prototype sites, a normal site day should have `0` or `1` major extreme event most of the time
+- during the first three onboarding sites, a normal site day should have `0` or `1` major extreme event most of the time
 - back-to-back extreme events or authored wave sequences should be rare and mainly reserved for the fourth-site proof case or later high-tier campaign pressure
 - `CompoundFront` can be used as a capstone late-wave pressure spike if needed, but it should remain uncommon enough that it feels memorable rather than routine
 
@@ -807,7 +807,7 @@ Prototype limits:
 
 Every extreme event should move through the same phase model:
 
-| `eventState` | Purpose | Prototype Behavior |
+| `eventState` | Purpose | Behavior |
 |---|---|---|
 | `Inactive` | No active extreme event | Weather comes only from baseline curve and minor gust noise |
 | `Warning` | Forecasted approach window | No large direct modifier yet; player receives warning and prep time |
@@ -816,7 +816,7 @@ Every extreme event should move through the same phase model:
 | `Decay` | Event is weakening | Still dangerous, but the player can begin broader recovery actions |
 | `Aftermath` | Lingering site disruption | Lower ambient pressure than peak, but burial, damage, morale hit, and repair backlog remain |
 
-Prototype duration targets:
+Duration targets:
 
 - `Warning`: `60-180` in-game minutes
 - `Build`: `30-90` in-game minutes
@@ -828,14 +828,14 @@ Prototype duration targets:
 
 Forecasting should be imperfect, but actionable.
 
-Prototype forecast output should include:
+Forecast output should include:
 
 - predicted event type if one is likely
 - predicted start window
 - predicted intensity band for `Heat`, `Wind`, and `Dust`
 - `forecastConfidence`
 
-Base prototype forecast values:
+Base forecast values:
 
 - `forecastLeadMinutes = 180`
 - base intensity error band = `+/- 15`
@@ -866,7 +866,7 @@ Important rule:
 
 Weather should pressure more than one system at once.
 
-Use this prototype interpretation:
+Use this interpretation:
 
 - `weatherHeat` mainly raises `tileHeat`; `tileHeat` then drives worker hydration loss, lower worker `playerWorkEfficiency`, severe exposure health risk, tile moisture loss, and the heat-linked share of plant `growthPressure`
 - `weatherWind` mainly raises `tileWind`; `tileWind` then drives harder outdoor work, lower worker `playerWorkEfficiency`, exposed-tile erosion pressure, moisture loss, and the wind-linked share of plant `growthPressure`
@@ -939,7 +939,7 @@ This creates tension plus agency, which is far more exciting than passive damage
 
 Extreme events should also act as the main stress test for plant strategy. A low-pressure, well-protected patch should come out damaged but alive. A greedy or badly matched patch should risk rapid degeneration, withering, or outright death.
 
-Extreme hazards should not punish every layout equally. The prototype should clearly reward smart placement and layered protection.
+Extreme hazards should not punish every layout equally. The game should clearly reward smart placement and layered protection.
 
 Each threatened patch should effectively compare its resolved `tileHeat`, `tileWind`, and `tileDust` against current `tileMoisture`, `tileSoilFertility`, and plant density.
 
@@ -950,7 +950,7 @@ Main sources of local protection:
 - nearby support devices such as irrigation, shelter, shade, or windbreaks
 - strong own-tile density and ground cover on the threatened patch
 
-Prototype hazard state-impact bands:
+Hazard state-impact bands:
 
 - these bands should describe how hazard pressure changes tile, plant, and structure state first; visible survival or collapse should emerge from those state changes rather than from separate scripted outcome rules
 - low local protection: peak weather should drive strong `tileSandBurial` gain, faster `tileMoisture` loss, and clear erosion-driven `tileSoilFertility` setback; plants on the patch should see `growthPressure` rise quickly from wind and dust exposure, heat stress, and worsening soil state; exposed structures should lose `deviceEfficiency` rapidly and may begin losing `deviceIntegrity`; this combination should usually derive a `Withering` trend label, cut `tilePlantDensity` sharply, and create a major recovery burden
@@ -990,7 +990,7 @@ The game should reward correct triage. Coming back from a bad event should feel 
 
 ### Harsh-Event Work Under Pressure
 
-The prototype should not use a separate `Emergency Field Action` system. Instead, harsh events should make ordinary field work become dangerous, exhausting, and strategically expensive.
+The game should not use a separate `Emergency Field Action` system. Instead, harsh events should make ordinary field work become dangerous, exhausting, and strategically expensive.
 
 This means the player still uses normal verbs:
 
@@ -1012,20 +1012,20 @@ They should usually not be able to save everything.
 
 The design target is still "I saved that patch," but the reason should be that the player chose the right ordinary job to risk under terrible conditions.
 
-### Harsh-Event Work Rules (Prototype)
+### Harsh-Event Work Rules
 
-The prototype should formalize this as normal player actions performed under event-modified pressure during `Warning`, `Build`, `Peak`, `Decay`, and `Aftermath`, rather than as separate action types.
+The game should formalize this as normal player actions performed under event-modified pressure during `Warning`, `Build`, `Peak`, `Decay`, and `Aftermath`, rather than as separate action types.
 
 Core rules:
 
 - no dedicated emergency-only action menu is required
 - no temporary emergency-only structures or covers are required
 - the player should still be able to perform normal field work if the target is reachable and they are physically capable of acting
-- only the player performs this urgent manual work in the prototype
+- only the player performs this urgent manual work in the current design
 - only one manual action can be performed at a time
 - if the player cancels an action before completion, no main work effect is applied
 
-Prototype exposure rules:
+Exposure rules:
 
 - during `Build`, outdoor action time is multiplied by `1.15`
 - during `Peak`, outdoor action time is multiplied by `1.35`
@@ -1033,7 +1033,7 @@ Prototype exposure rules:
 - if visibility is critically low during a `Sandstorm`, movement to the target should often be the real cost, not only the work itself
 - if the worker is already in critical survival danger, action start should be blocked until they recover enough to act
 
-Prototype interruption rules:
+Interruption rules:
 
 - being forced to shelter, collapsing from `Player Condition`, or manually canceling should interrupt the action
 - interrupted actions apply no completion effect
@@ -1062,7 +1062,7 @@ Core base functions:
 - Limited contractor coordination
 - Strong local wind, heat, and dust protection compared with open field tiles
 
-Prototype base durability rule:
+Base durability rule:
 
 - the base should have `campDurability` in the `0-100` range
 - the base should provide a strong local protection pocket by default, but its effective wind, heat, dust, and recovery protection should scale down as `campDurability` falls
@@ -1090,9 +1090,9 @@ The campaign-level pressure should come from time:
 - the player is trying to complete as many sites as possible before the `Campaign Clock` expires
 - this means each site session naturally pushes the player toward finishing efficiently rather than lingering for optional optimization
 
-### Resource And Inventory Model (Prototype)
+### Resource And Inventory Model
 
-The prototype should separate economy and progression data into three layers:
+The game should separate economy and progression data into three layers:
 
 1. Explicit completion and campaign-time counters
 2. Exact itemized resources for inventory and gameplay actions
@@ -1117,7 +1117,7 @@ Important rule:
 
 #### Layer 2: Exact Itemized Resources
 
-These are the exact prototype `Item` categories that can be stored, moved, consumed, bought, sold, or damaged.
+These are the exact `Item` categories that can be stored, moved, consumed, bought, sold, or damaged.
 
 | Resource | Runtime Identity | Stack Size | Main Uses |
 |---|---|---|---|
@@ -1129,7 +1129,7 @@ These are the exact prototype `Item` categories that can be stored, moved, consu
 | Seed Bundle | `seedBundle:<plantTypeId>` | `10` | Plant placement for a specific plant type |
 | Harvest Good | `harvestGood:<outputTypeId>` | `10` | Sale or contract delivery |
 
-Prototype note:
+Note:
 
 - tools and portable devices should also be treated as `Item`s, usually as single-slot or low-stack entries when they are carriable
 - stack size is a real carrying constraint, not just a presentation label
@@ -1139,7 +1139,7 @@ Prototype note:
 
 #### Layer 3: Inventory And Containers
 
-The prototype should support these carried-storage and camp-storage locations:
+The game should support these carried-storage and camp-storage locations:
 
 | Location | Runtime Identity | Capacity | Purpose |
 |---|---|---|---|
@@ -1153,7 +1153,7 @@ Rules:
 - one slot cannot exceed that `Item`'s listed stack size
 - stack splitting and merging should be supported
 - empty slots are explicit
-- future tech can expand `workerPackSlotCount` or `campStorageSlotCount`, but the prototype should start at `6` and `24`
+- future tech can expand `workerPackSlotCount` or `campStorageSlotCount`, but the game should start at `6` and `24`
 - `campStorageSlotCount` should represent the total capacity provided by current camp `Container`s
 - the player should only be able to carry a limited working set away from camp, even if the camp has much more storage available
 - carrying a lot of one resource type should therefore compete directly with carrying tools, seeds, devices, medicine, or repair materials
@@ -1172,7 +1172,7 @@ Container rules:
 
 #### Resource Flow Rules
 
-Use these prototype resource-flow rules:
+Use these resource-flow rules:
 
 - phone purchases create a package in `pendingDeliveryQueue`
 - each purchased package should arrive at camp after `30` in-game minutes if the camp delivery point is operational
@@ -1183,7 +1183,7 @@ Use these prototype resource-flow rules:
 - harvesting places goods into `workerPack` first
 - selling through the `Field Phone` should require goods to be present in `campStorage`, not only in `workerPack`
 - camp-side crafting devices should be allowed to consume required materials directly from shared `campStorage`
-- for the prototype, there should be no distance-cost rule between `Container`s and camp crafting devices, because both are restricted to the player base area
+- there should be no distance-cost rule between `Container`s and camp crafting devices, because both are restricted to the player base area
 - `Water Container`s can be transferred from `workerPack` or `campStorage` into a `Water Tank` through a valid water transfer interaction, increasing that tank's `deviceStoredWater`
 - connected `Drip Irrigator`s consume `deviceStoredWater` from linked `Water Tank`s rather than directly consuming water from `workerPack` or `campStorage`
 
@@ -1191,7 +1191,7 @@ This keeps the carried `Inventory` important without forcing a full hauling sim.
 
 #### Hazard Interaction Rules For Resources
 
-To keep prototype logic readable, hazards should interact with resources by location:
+To keep the logic readable, hazards should interact with resources by location:
 
 Worker-carried resources:
 
@@ -1205,7 +1205,7 @@ Camp-stored resources:
 - are better protected when the camp has stronger shelter structures and nearby protection
 - should be vulnerable by category in readable ways:
 
-Prototype vulnerable categories:
+Vulnerable categories:
 
 - `waterContainer`
 - `foodPack`
@@ -1224,7 +1224,7 @@ Never hazard-destroy:
 
 #### Completion / Inventory Relationship
 
-For prototype architecture, use these relationships:
+For the current architecture, use these relationships:
 
 - `fullyGrownTileCount` is the explicit completion value that matters for finishing a site
 - inventory, shelter, water, and devices are separate support systems; they do not change completion directly
@@ -1235,7 +1235,7 @@ This keeps completion bookkeeping readable and concrete.
 
 ### Contractors
 
-Contractors are optional paid help, not a permanent workforce. In the prototype, hiring contractors should create a paid contractor work pool rather than a fragile per-call estimate. That work pool can be assigned to valid in-progress tasks such as planting, building, or hauling whenever the player wants.
+Contractors are optional paid help, not a permanent workforce. In the current design, hiring contractors should create a paid contractor work pool rather than a fragile per-call estimate. That work pool can be assigned to valid in-progress tasks such as planting, building, or hauling whenever the player wants.
 
 This system keeps hired labor useful but simple:
 
@@ -1251,7 +1251,7 @@ This system keeps hired labor useful but simple:
 
 There is no fuel economy in v1. Solar-backed devices and purchased infrastructure support site operations. This keeps the focus on water, ecology, and weather rather than fossil fuel logistics.
 
-Prototype solar-economy rule:
+Solar-economy rule:
 
 - `Solar Array` output should first satisfy the player's current camp and device utility demand
 - only operational surplus electricity after current local consumption should be sellable
@@ -1260,24 +1260,24 @@ Prototype solar-economy rule:
 - exported electricity should be a low-value side income: it should sell for less than normal harvested goods and much less than crafted value-added goods such as fruit juice
 - solar income should reward a well-maintained support base, but it should never outcompete the main plant, contract, and crafting economy
 
-### Prototype Device Roster (Prototype)
+### Device Roster
 
-The prototype should use a small device set that supports the plant game, worker survival, forecasting, and recovery without turning the project into a full utility-network sim.
+The game should use a small device set that supports the plant game, worker survival, forecasting, and recovery without turning the project into a full utility-network sim.
 
 Important override:
 
-- there is no buy or sell terminal device in the prototype
+- there is no buy or sell terminal device in the current design
 - all buying, selling, hiring, and tech purchasing remain `Field Phone` interactions
 - physical site devices exist to support survival, ecology, forecasting, storage, and repair work
 
 #### Device Runtime Contract
 
-Each prototype structure definition should provide:
+Each structure definition should provide:
 
 | Field | Meaning |
 |---|---|
 | `structureTypeId` | Unique runtime identity for the structure |
-| `footprintClass` | `1x1` in the prototype |
+| `footprintClass` | `1x1` in the current design |
 | `plantShareRule` | Whether the structure may share its footprint with a living plant: `None`, `LowOnly`, `UpToMedium`, or `AnyHeight` |
 | `sharedPlantHeightLimit` | Highest allowed `plantHeightClass` on the same tile if sharing is enabled |
 | `buildMoneyCost` | Exact integer money cost |
@@ -1294,7 +1294,7 @@ Each prototype structure definition should provide:
 | `forecastSupport` | Forecast precision and warning support if any |
 | `craftingSupport` | Whether this device unlocks camp crafting actions |
 
-Prototype rules:
+Rules:
 
 - device effects should resolve through shared object contribution meters, adjacency, or simple site-summary contributions, not through full pipe or wire simulation
 - duplicate devices of the same type should stack at `100%` for the first copy and `50%` for each additional overlapping copy
@@ -1304,11 +1304,11 @@ Prototype rules:
 - a camp-side device with `craftingSupport` should be able to read required materials from shared `campStorage` without first moving them into `workerPack`
 - `Water Tank` should use `deviceStoredWater` as a real runtime reserve that can be filled and drained during the site
 - `Drip Irrigator` should only provide irrigation support while at least one linked `Water Tank` still has `deviceStoredWater > 0`
-- for the prototype, a tank link should be a simple logical connection rather than a pipe-building system
+- in the current design, a tank link should be a simple logical connection rather than a pipe-building system
 - one `Drip Irrigator` may link to multiple `Water Tank`s, and its water draw should be split as evenly as possible across all linked tanks that still contain water
 - if all linked tanks are empty, the `Drip Irrigator` should remain placed but provide no irrigation effect until water is available again
 
-#### Prototype Structure Set
+#### Structure Set
 
 | Structure | Family | Footprint | Plant Sharing | Build Cost (Temp) | Main Function | Failure Pressure |
 |---|---|---|---|---|---|---|
@@ -1323,7 +1323,7 @@ Prototype rules:
 
 #### Structure Family Roles
 
-Use these family expectations in prototype tuning:
+Use these family expectations in tuning:
 
 - shelter family devices should mainly improve worker safety, camp protection, and recovery speed
 - irrigation devices should mainly improve water access, `tileMoisture`, and low-density plant survival, but only while connected stored water is available
@@ -1332,22 +1332,22 @@ Use these family expectations in prototype tuning:
 - workshops should mainly enable simple camp crafting and material conversion, not repair automation or deep production chains
 - solar utilities should mainly improve nearby `deviceEfficiency` and optionally generate a small low-value export surplus, not create a separate power-minigame
 
-Prototype faction-gating note:
+Faction-gating note:
 
-- `Drip Irrigator`, `Solar Array`, `Weather Mast`, and any `Checkerboard Deployment Machine` variant should primarily sit inside the `Autonomous Region Agricultural University` unlock path for the prototype
-- `Forestry Bureau of Autonomous Region` should still care deeply about water and plant survival, but in prototype it should express that through plant choices, ecology tasks, and support rewards rather than a competing device roster
+- `Drip Irrigator`, `Solar Array`, `Weather Mast`, and any `Checkerboard Deployment Machine` variant should primarily sit inside the `Autonomous Region Agricultural University` unlock path in the current design
+- `Forestry Bureau of Autonomous Region` should still care deeply about water and plant survival, but in the current design it should express that through plant choices, ecology tasks, and support rewards rather than a competing device roster
 
-Prototype plant-sharing examples:
+Plant-sharing examples:
 
 - `Solar Array` should be able to share with `Low` vegetation only
-- `Drip Irrigator` should be able to share with any living plant height in the prototype
+- `Drip Irrigator` should be able to share with any living plant height in the current design
 - fully blocking structures such as `Water Tank`, `Weather Mast`, `Wind Fence`, and any future `Water Pump` should use `plantShareRule = None`
 
 #### Device Effect Footprint Rules
 
-For the prototype, each device should use one of these simple effect models:
+Each device should use one of these simple effect models:
 
-| Effect Model | Use Case | Prototype Rule |
+| Effect Model | Use Case | Rule |
 |---|---|---|
 | Own-tile only | Storage, workshop occupancy, local shelter anchor | Effect applies only to the device tile and direct interaction point |
 | Orthogonal aura `1` | Small shelter or irrigation support | Device affects its own tile plus the 4 orthogonal neighboring tiles |
@@ -1365,7 +1365,7 @@ Recommended mapping:
 - `Solar Array`: orthogonal aura `2`
 - `Field Workshop`: own-tile only
 
-#### Prototype Device Design Intent
+#### Device Design Intent
 
 This roster should create a few clear early strategic patterns:
 
@@ -1388,16 +1388,16 @@ The long-term taxonomy can still use three broad families:
 - Restorative plants: improve soil fertility, reduce erosion, expand soil moisture capacity through soil improvement, or gradually reduce tile salinity.
 - Output plants: provide limited economic or food value without replacing the restoration focus.
 
-For the prototype, however, the more important lens is four gameplay roles:
+In the current design, however, the more important lens is four gameplay roles:
 
 - Protection
 - Anti-dehydration
 - Fertilize
 - Output
 
-Each prototype plant should combine 2 of these roles so even a very small roster can still create placement decisions and simple combo stories.
+Each plant should combine 2 of these roles so even a very small roster can still create placement decisions and simple combo stories.
 
-Some prototype plants can also carry a secondary worker-support identity or salinity-rehabilitation identity through `Salt Tolerance` and `Salinity Reduction` tags, but the main balance reading should still come from these core ecological roles.
+Some plants in the current set can also carry a secondary worker-support identity or salinity-rehabilitation identity through `Salt Tolerance` and `Salinity Reduction` tags, but the main balance reading should still come from these core ecological roles.
 
 ### Plant Traits
 
@@ -1416,9 +1416,9 @@ Example trait directions:
 - Better output value
 - Improved synergy with nearby devices
 
-#### Plant Height Class (Prototype)
+#### Plant Height Class
 
-For the prototype, every living plant should also have a simple height tag used for structure-sharing rules:
+Every living plant should also have a simple height tag used for structure-sharing rules:
 
 - `Low`
 - `Medium`
@@ -1432,20 +1432,20 @@ Design intent:
 
 This is mainly here so structures such as irrigation lines or solar racks can share space with some plants without making tile occupancy unreadable.
 
-### Prototype Plant Design Goal
+### Plant Design Goal
 
-For prototype concept verification, the plant system should stay intentionally small. The first playable does not need a realistic or complete ecosystem. It only needs enough plant variety to test whether:
+For concept verification, the plant system should stay intentionally small. The first playable does not need a realistic or complete ecosystem. It only needs enough plant variety to test whether:
 
 - mixed-role plants are more interesting than single-purpose plants
 - neighbor-tile effects create readable placement decisions
 - protection, anti-dehydration, fertilization, output, and salinity rehabilitation can form a satisfying loop
 - players enjoy building small local combos under environmental pressure
 
-The prototype target is a few plants, not a full roster. If this smaller set is not fun, expanding the content count will not solve the core problem.
+The current target is a few plants, not a full roster. If this smaller set is not fun, expanding the content count will not solve the core problem.
 
-### Prototype Plant Rules (Temp Design)
+### Plant Rules (Temp Design)
 
-To keep the first prototype understandable:
+To keep the first playable understandable:
 
 - Each plant should combine 2 roles rather than being purely one thing
 - Each plant should have a direct effect on its own tile, and any neighborhood effect should come from positive contribution values plus shared `auraSize`
@@ -1457,11 +1457,11 @@ To keep the first prototype understandable:
 - Salty tiles should create visibly different plant choices, with some plants occupying them early and others mainly preparing them for later crops
 - One plant-derived starter material is allowed for extremely poor sand: `Straw Checkerboard` starts at maximum `tilePlantDensity`, uses the shared plant trait fields with notable `windProtectionPower`, `dustProtectionPower`, and `fertilityImprovePower`, and uses `growable = false` plus a positive `constantWitherRate` while its `growthPressure` stays `0`
 
-### Prototype Plant Set (Temp Design)
+### Plant Set (Temp Design)
 
-The following plants are temporary prototype placeholders. Their names, values, visuals, and real-world grounding should be refined later. Right now the goal is to verify the concept with a small, mixed-role set.
+The following plants are temporary placeholders for the current build. Their names, values, visuals, and real-world grounding should be refined later. Right now the goal is to verify the concept with a small, mixed-role set.
 
-| Plant | Role Mix | Effect Ceiling (Temp) | Work Demand (Temp) | Own Tile Effect | Neighbor Tile Effect | Prototype Use |
+| Plant | Role Mix | Effect Ceiling (Temp) | Work Demand (Temp) | Own Tile Effect | Neighbor Tile Effect | Use |
 |---|---|---|---|---|---|---|
 | `Straw Checkerboard` | Protection + Fertility setup | Medium | Low | Plant-derived straw grid placed on bare sand; it starts with strong near-surface wind and sand reduction on its own tile, while its shared contribution powers scale down as density decays over time | Adjacent tiles gain early erosion relief, slightly better establishment odds, and a temporary protection buffer while the checkerboard is still fresh | Critical opener for least fertile or pure sand tiles; makes hostile sand workable for later living plants |
 | `Wind Reed` | Protection + Anti-dehydration | Medium | Low | Cheap early plant that reduces wind damage and slows dehydration on its own tile | Adjacent tiles get small wind reduction and slight dehydration relief | First safety plant; teaches line placement and perimeter thinking |
@@ -1472,15 +1472,15 @@ The following plants are temporary prototype placeholders. Their names, values, 
 | `Dew Grass` | Anti-dehydration + Fertilize | Medium | Low | Captures trace moisture and softens local dryness on poor or mildly salty soil | Adjacent tiles gain slight moisture retention, a small fertility bump, and weak salinity-rehab support | Gentle bridge plant for expanding from safe patches into dry but not fully dead land |
 | `Thorn Shrub` | Protection + Output | Medium | Medium | Tough shrub that creates a sturdier barrier and a small fiber or resin yield | Adjacent tiles gain minor wind buffering and a little protection against density loss | Teaches productive perimeter building instead of pure defense |
 | `Medicinal Sage` | Output + Worker support | Medium | Medium | Produces a modest herb yield and improves comfort in its immediate area | Adjacent tiles slightly improve short-rest efficiency and morale feel when conditions are stable | Teaches support-economy patches and non-food output value |
-| `Sand Willow` | Protection + Anti-dehydration anchor | High | High | Large anchor plant that creates strong local shelter and heat relief when sustained | Adjacent tiles gain one of the strongest protection and dehydration-relief effects in the prototype roster | Late prototype anchor plant for turning one hard-earned zone into a true refuge core |
+| `Sand Willow` | Protection + Anti-dehydration anchor | High | High | Large anchor plant that creates strong local shelter and heat relief when sustained | Adjacent tiles gain one of the strongest protection and dehydration-relief effects in the current set | Late anchor plant for turning one hard-earned zone into a true refuge core |
 
-`Straw Checkerboard` is inspired by the real Chinese straw checkerboard dune-control method, abstracted here into a prototype-friendly plant-authored ground-cover option for sand fixation and land preparation.
+`Straw Checkerboard` is inspired by the real Chinese straw checkerboard dune-control method, abstracted here into a plant-authored ground-cover option for sand fixation and land preparation.
 
-`Effect Ceiling` is the rough maximum payoff of a dense healthy tile. `Work Demand` is the rough amount of setup, maintenance, and rescue attention the plant usually asks for before it feels dependable. Both are temporary tuning tags for prototype iteration, not locked balance values.
+`Effect Ceiling` is the rough maximum payoff of a dense healthy tile. `Work Demand` is the rough amount of setup, maintenance, and rescue attention the plant usually asks for before it feels dependable. Both are temporary tuning tags for iteration, not locked balance values.
 
-### Prototype Trait Tags And Values (Temp Design)
+### Trait Tags And Values (Temp Design)
 
-For prototype clarity, each plant should also carry a small trait package. These are temporary design tags, not final balance values, but they define what makes one plant feel different from another beyond density state alone.
+For clarity, each plant should also carry a small trait package. These are temporary design tags, not final balance values, but they define what makes one plant feel different from another beyond density state alone.
 
 | Plant | Core Trait Combination | Main Risk Or Dependency |
 |---|---|---|
@@ -1497,20 +1497,20 @@ For prototype clarity, each plant should also carry a small trait package. These
 
 These trait combinations should be the main language for future tuning passes. If a plant feels weak or redundant later, adjust its trait package first before replacing the whole plant concept.
 
-Salinity trait values should live with the rest of the plant trait data rather than as a separate system. To keep the first salinity pass light, the prototype only needs two extra plant-facing trait values:
+Salinity trait values should live with the rest of the plant trait data rather than as a separate system. To keep the first salinity pass light, the current design only needs two extra plant-facing trait values:
 
 - `Salt Tolerance`: how much density the plant can still retain on salty tiles
 - `Salinity Reduction`: how strongly the plant gradually improves current tile salinity for future planting
 
 This should be enough to make salty tiles create real placement choices without adding a broader chemistry or water-quality simulation.
 
-| Plant | Salt Tolerance | Salinity Reduction | Prototype Salty-Tile Role |
+| Plant | Salt Tolerance | Salinity Reduction | Salty-Tile Role |
 |---|---|---|---|
 | `Straw Checkerboard` | `N/A` | `None` | Ground cover setup layer; it can help prepare the surface, but it is not a true saline-soil answer by itself |
 | `Wind Reed` | `Medium` | `Low` | Acceptable first stabilizer on mildly salty exposed tiles |
 | `Shade Cactus` | `Medium` | `None` | Can survive some salinity, but mainly solves heat and dehydration |
 | `Root Binder` | `Medium` | `Medium` | Good support plant for gradually improving difficult soil |
-| `Salt Bean` | `High` | `High` | Primary prototype salt specialist and best early answer for highly salty tiles |
+| `Salt Bean` | `High` | `High` | Primary salt specialist and best early answer for highly salty tiles |
 | `Sunfruit Vine` | `Low` | `None` | Poor choice for salty land unless the tile is improved first |
 | `Dew Grass` | `Medium` | `Low` | Bridge plant for moderately salty tiles that still need moisture support |
 | `Thorn Shrub` | `Medium` | `Low` | Tough secondary option for harsher perimeter pockets |
@@ -1523,9 +1523,9 @@ Design intent:
 - `Root Binder` and `Sand Willow` should create follow-up progression on difficult tiles
 - low-tolerance plants should teach the player that some land must be prepared before high-value planting is realistic
 
-### Prototype Plant Height Tags (Temp Design)
+### Plant Height Tags (Temp Design)
 
-To support structure-sharing rules, the prototype plant roster should also carry a simple height tag:
+To support structure-sharing rules, the current plant set should also carry a simple height tag:
 
 | Plant | Height Class | Structure-Sharing Read |
 |---|---|---|
@@ -1546,15 +1546,15 @@ Design intent:
 - medium and tall plants force the player to reserve more open ecological space
 - this gives structures and plant choice another readable tradeoff without requiring a complicated layering sim
 
-### Prototype Plant Progression (Temp Design)
+### Plant Progression (Temp Design)
 
-The prototype should use the plant roster to create short-term goals, not only long-term restoration.
+The game should use the plant roster to create short-term goals, not only long-term restoration.
 
 - Starting plant access should use a fixed early-session progression, not procedural variation from site to site
 - Begin each new `Site` with only one basic starter option available, preferably `Straw Checkerboard`
 - Use early `Site Task`s, onboarding rewards, or early `Task Reward Draft`s to unlock the rest of the fixed basic plant set for that site, especially `Wind Reed` and `Root Binder`
 - After that fixed early unlock track, let further early rewards reveal `Shade Cactus`, `Dew Grass`, or `Salt Bean`, with `Salt Bean` prioritized on sites featuring meaningful salty-tile pockets
-- Put `Thorn Shrub` and `Medicinal Sage` in the mid-prototype reveal band so the player starts seeing more distinct patch identities
+- Put `Thorn Shrub` and `Medicinal Sage` in the mid-scope reveal band so the player starts seeing more distinct patch identities
 - Hold `Sand Willow` and `Sunfruit Vine` slightly later so they feel like tempting payoff plants rather than early traps
 - Make at least one short-term objective in the opening phase plant-related, such as fixing a bare sand lane, establishing a windbreak, stabilizing a dry patch, or producing a first safe harvest
 
@@ -1569,7 +1569,7 @@ This keeps the early site loop readable:
 - collect a visible output or fertility improvement
 - reinvest into the next combo
 
-### Prototype Combo Logic
+### Combo Logic
 
 This early set should already support a few clear placement stories:
 
@@ -1587,11 +1587,11 @@ This early set should already support a few clear placement stories:
 - `Shade Cactus` + `Sunfruit Vine`: reduce dehydration pressure on a greedy output plant
 - `Sand Willow` + `Medicinal Sage`: create a late safe zone with strong recovery feel and support value
 
-The prototype should not aim for perfect balance yet. It should aim for understandable combo moments where the player can feel "this plant supports that plant."
+The game should not aim for perfect balance yet. It should aim for understandable combo moments where the player can feel "this plant supports that plant."
 
-### Plant Growth And Spread (Prototype)
+### Plant Growth And Spread
 
-For the prototype, plants should not appear at full strength when placed. The player is planting a starter foothold, not a finished ecosystem.
+Plants should not appear at full strength when placed. The player is planting a starter foothold, not a finished ecosystem.
 
 Core growth rules:
 
@@ -1620,25 +1620,25 @@ This means density is doing several jobs at once:
 
 The intended fantasy is that the player establishes life, protects it through its weakest phase, and then gradually earns a patch that can hold itself together and start reclaiming nearby ground.
 
-### Plant Density Meter (Prototype)
+### Plant Density Meter
 
-The prototype should treat `tilePlantDensity` as one continuous meter rather than a separate ladder of named growth states.
+The game should treat `tilePlantDensity` as one continuous meter rather than a separate ladder of named growth states.
 
-For prototype tuning:
+For tuning:
 
 - direct player planting creates a new tile at `20` density
 - natural spread creates a new tile at `20` density
 - trait strength should scale smoothly with `tilePlantDensity` rather than through fixed named stages
 
-### Plant Density Scaling Rule (Prototype)
+### Plant Density Scaling Rule
 
-Each living plant should gain clearer value as density rises so growth feels meaningful rather than cosmetic. In the prototype, plant contribution strength, output strength, and local support value should scale linearly with `tilePlantDensity` unless a later plant-specific exception is explicitly authored. `Straw Checkerboard` uses the same density meter and the same contribution scaling rule, but with `growable = false` and positive `constantWitherRate`.
+Each living plant should gain clearer value as density rises so growth feels meaningful rather than cosmetic. In the current design, plant contribution strength, output strength, and local support value should scale linearly with `tilePlantDensity` unless a later plant-specific exception is explicitly authored. `Straw Checkerboard` uses the same density meter and the same contribution scaling rule, but with `growable = false` and positive `constantWitherRate`.
 
 - direct player planting creates a living plant tile at `20` density
 - natural spread creates a living plant tile at `20` density
 - `Straw Checkerboard` starts at `100` density and then steadily decays
 
-Important prototype traits for `Straw Checkerboard`:
+Important traits for `Straw Checkerboard`:
 
 - can be placed on pure sand or the least fertile empty tiles
 - starts at maximum `tilePlantDensity` and then gradually loses density over time
@@ -1649,14 +1649,14 @@ Important prototype traits for `Straw Checkerboard`:
 - strongly helps low-density living plants survive nearby
 - has no direct output economy and no self-spread, so it remains a setup tool rather than a full solution
 
-Important prototype traits for the added plants:
+Important traits for the added plants:
 
 - `Dew Grass`: low work bridge plant that smooths expansion into dry tiles without creating huge direct output
 - `Thorn Shrub`: perimeter plant that mixes safety and modest economy so defense can feel productive
 - `Medicinal Sage`: support-output plant that helps a patch feel inhabited and worth returning to
 - `Sand Willow`: high-work anchor that creates a strong refuge core when the player commits enough support
 
-### Plant Density And Degeneration (Prototype)
+### Plant Density And Degeneration
 
 Plants should follow a simple visible survival model. They are not guaranteed to grow just because they were placed.
 
@@ -1675,7 +1675,7 @@ Primary player-facing read:
 
 Severe events should not only kill plants outright. They should often reduce `Plant Density` first, creating partial fallback before full collapse.
 
-Prototype density results:
+Density results:
 
 - high density: strong output, strong own-tile effect, strong neighbor support
 - reduced density: lower output, weaker protection, weaker neighbor bonuses
@@ -1688,7 +1688,7 @@ Prototype density results:
 - moderate local pressure: density falls, but the patch usually remains worth saving
 - low local pressure: density loss is limited and the patch keeps most of its role value
 
-This is one of the main prototype rewards for good strategy. The player should be able to see that the same hazard which ruins an exposed patch only partially dents a low-pressure, well-protected patch.
+This is one of the main rewards for good strategy. The player should be able to see that the same hazard which ruins an exposed patch only partially dents a low-pressure, well-protected patch.
 
 Low-density plants should be the most vulnerable part of the lifecycle. This is where the player's maintenance and planning matter most. A patch that survives long enough to reach high density should be much better at enduring normal site pressure.
 
@@ -1714,9 +1714,9 @@ Good maintenance in the early phase should include:
 
 The player should feel that they are nursing a fragile patch toward self-sufficiency. Once the patch is dense enough, it should require less rescue frequency and start paying back the effort with stronger protection, output, or spread.
 
-### Local Collapse And Recovery (Prototype)
+### Local Collapse And Recovery
 
-The prototype should support both upward and downward spirals.
+The game should support both upward and downward spirals.
 
 Good spiral example:
 
@@ -1745,11 +1745,11 @@ The key design goal is that failure should be painful but playable. A downward s
 
 This makes strategy matter. Good planning creates thriving momentum. Bad planning creates recoverable but expensive problems.
 
-### Comeback Priorities After A Bad Event (Prototype)
+### Comeback Priorities After A Bad Event
 
 After a severe hazard event, the player should not be able to restore everything immediately. A strong comeback decision usually means picking the highest-leverage recovery target first.
 
-Prototype comeback priorities:
+Comeback priorities:
 
 - rebuild the core protective lane so more tiles do not unravel
 - restore water or utility flow so the site can function again
@@ -1760,9 +1760,9 @@ Prototype comeback priorities:
 
 This prioritization is part of the intended strategy. The player should feel pressure to ask, "what gets me back into a stable position fastest?"
 
-### Density And Natural Expansion (Prototype)
+### Density And Natural Expansion
 
-The prototype should let successful plant patches begin reclaiming nearby land on their own.
+The game should let successful plant patches begin reclaiming nearby land on their own.
 
 Natural expansion rules:
 
@@ -1774,7 +1774,7 @@ Natural expansion rules:
 
 This keeps player agency intact. The player still decides where the first footholds go, which species are introduced, and which zones get support first. Growth and spread are the earned payoff for that earlier strategy.
 
-Natural spread also improves the restoration fantasy for the prototype:
+Natural spread also improves the restoration fantasy:
 
 - the player is not manually planting every final tile
 - successful systems begin reproducing visible life
@@ -1782,9 +1782,9 @@ Natural spread also improves the restoration fantasy for the prototype:
 
 The most important balance rule is that natural spread should feel like a reward for a well-built patch, not a replacement for decision-making.
 
-### Plant Resolution Rules (Prototype)
+### Plant Resolution Rules
 
-The prototype now needs one explicit runtime contract for how plants actually resolve each fixed simulation step. This section is the implementation-facing version of the plant rules described above.
+The system now needs one explicit runtime contract for how plants actually resolve each fixed simulation step. This section is the implementation-facing version of the plant rules described above.
 
 #### Plant Runtime Data Contract
 
@@ -1815,9 +1815,9 @@ Important modeling rule:
 - `deviceIntegrity` and `deviceEfficiency` belong to structure state, not to occupancy identity
 - `Straw Checkerboard` is a ground-cover occupant that reuses plant trait fields, starts at full `tilePlantDensity`, and uses `growable = false` plus a positive `constantWitherRate`
 - `tileHeat`, `tileWind`, and `tileDust` are resolved local weather meters rebuilt each fixed simulation step after site weather and current local support are combined
-- the prototype should not use a separate `tileSoilStability` meter or a separately stored `tilePlantStress` value
+- the game should not use a separate `tileSoilStability` meter or a separately stored `tilePlantStress` value
 
-Each prototype plant definition should also provide these plant-side values. These are not new runtime state categories. Core simulation should use the end-of-document meter-relationship chapter as the canonical meter reference.
+Each plant definition should also provide these plant-side values. These are not new runtime state categories. Core simulation should use the end-of-document meter-relationship chapter as the canonical meter reference.
 
 Placement:
 
@@ -1849,7 +1849,7 @@ Ecological contribution profile:
 | `windProtectionPower` | `0-100` | How strongly this plant reduces nearby `tileWind` |
 | `heatProtectionPower` | `0-100` | How strongly this plant reduces nearby `tileHeat` |
 | `dustProtectionPower` | `0-100` | How strongly this plant reduces nearby `tileDust` |
-| `fertilityImprovePower` | `0-100` | How strongly this plant gradually improves `tileSoilFertility` while healthy and how strongly it pushes back against erosion-driven fertility loss in the prototype |
+| `fertilityImprovePower` | `0-100` | How strongly this plant gradually improves `tileSoilFertility` while healthy and how strongly it pushes back against erosion-driven fertility loss in the current design |
 | `salinityReductionPower` | `0-100` | How strongly this plant gradually reduces `tileSoilSalinity` while healthy |
 
 These contribution traits are plant-side inputs into the shared object contribution meters. `auraSize` belongs to the same contribution family and determines how far those contribution values can reach, while current `tilePlantDensity` scales how much of each contribution is currently active.
@@ -1862,22 +1862,22 @@ Expansion and output profile:
 | `spreadChance` | `0-100` | Relative chance to create one new starter tile during an ecology pulse |
 | `outputDependency` | `0-100` | How badly output collapses as `tilePlantDensity` falls |
 
-Prototype note:
+Note:
 
-- the current roster tables can keep using design language such as `Low`, `Medium`, and `High`
+- the current set tables can keep using design language such as `Low`, `Medium`, and `High`
 
-Ground-cover definitions should not define a separate trait family. For the prototype, `Straw Checkerboard` should use the same trait fields as plants, especially non-zero `windProtectionPower`, `dustProtectionPower`, and `fertilityImprovePower`, set `growable = false`, set `constantWitherRate` to a positive value, set `auraSize` as needed for local setup support, set spread-related fields to `0`, and use the shared runtime meter `tilePlantDensity`, which starts full and steadily loses density while present.
+Ground-cover definitions should not define a separate trait family. In the current design, `Straw Checkerboard` should use the same trait fields as plants, especially non-zero `windProtectionPower`, `dustProtectionPower`, and `fertilityImprovePower`, set `growable = false`, set `constantWitherRate` to a positive value, set `auraSize` as needed for local setup support, set spread-related fields to `0`, and use the shared runtime meter `tilePlantDensity`, which starts full and steadily loses density while present.
 
 #### Object Contribution And Resolved Local Weather Build Rules
 
 Shared object contribution meters should be rebuilt every fixed simulation step from nearby plants, devices, and terrain shelter. Then `tileHeat`, `tileWind`, and `tileDust` should be rebuilt from site weather plus those current local contribution meters and kept within their normal meter ranges.
 
-Use this prototype contribution pattern:
+Use this contribution pattern:
 
 | Source | Reach | `windProtectionPower` | `heatProtectionPower` | `dustProtectionPower` | Rule |
 |---|---|---|---|---|---|
 | Own-tile living plant or ground cover | Own tile always | Add current local contribution | Add current local contribution | Add current local contribution | Scale by current `tilePlantDensity` and the relevant shared plant contribution values |
-| Neighbor tile within plant `auraSize` | Manhattan distance `<= auraSize` | Add small to medium contribution | Add small to medium contribution | Add small to medium contribution | Only positive plant contribution values reach neighbors; keep neighbor effect weaker than own-tile effect in the prototype |
+| Neighbor tile within plant `auraSize` | Manhattan distance `<= auraSize` | Add small to medium contribution | Add small to medium contribution | Add small to medium contribution | Only positive plant contribution values reach neighbors; keep neighbor effect weaker than own-tile effect in the current design |
 | Nearby device or rock shelter | Device footprint or authored shelter range | Add medium to strong contribution | Add medium to strong contribution | Add light to medium contribution | Scale by device power, `deviceEfficiency`, or authored rock-shelter value |
 
 Rules:
@@ -1922,7 +1922,7 @@ Fertility rule:
 - `tileWind` and `tileDust` create erosion pressure
 - local support should already be reflected inside resolved `tileWind` and `tileDust`, so terrain fertility reads those resolved meters instead of reading raw support values again
 - `tileSandBurial` adds additional fertility loss if left uncleared
-- `fertilityImprovePower` is the prototype's full soil-building trait: on healthy tiles and on nearby tiles inside plant `auraSize`, it raises `tileSoilFertility` and also fights part of the fertility loss caused by erosion and burial
+- `fertilityImprovePower` is the full soil-building trait: on healthy tiles and on nearby tiles inside plant `auraSize`, it raises `tileSoilFertility` and also fights part of the fertility loss caused by erosion and burial
 - `Straw Checkerboard` uses the same `fertilityImprovePower` logic while present; because its `tilePlantDensity` falls through `constantWitherRate`, its anti-erosion value and soil-building value both fade automatically over time
 - when `tilePlantDensity` is exhausted, clear the checkerboard from the tile
 - `tileSoilFertility` should stay within its normal meter range
@@ -1932,15 +1932,15 @@ Interpretation:
 - `tileSoilFertility` is the long-term land quality meter
 - higher fertility directly improves plant growth speed, raises the tile's maximum moisture capacity, and slows moisture reduction without directly adding moisture
 - erosion means direct `tileSoilFertility` reduction caused by wind-and-sand exposure; there is no separate hidden stability meter
-- high `tileHeat` should not directly cause erosion in the prototype, but it can indirectly make erosion more likely by draining moisture, increasing plant `growthPressure`, and weakening cover if the player ignores it
+- high `tileHeat` should not directly cause erosion, but it can indirectly make erosion more likely by draining moisture, increasing plant `growthPressure`, and weakening cover if the player ignores it
 - local protection sources such as plants, `Wind Fence`, and rock shelter lower resolved `tileWind` and `tileDust`, which then reduces wind-and-sand-driven `tileSoilFertility` loss
-- the prototype should not use a separate erosion-control trait; `fertilityImprovePower` should handle both long-term soil improvement and the pushback against erosion-driven fertility loss
+- the game should not use a separate erosion-control trait; `fertilityImprovePower` should handle both long-term soil improvement and the pushback against erosion-driven fertility loss
 - `Straw Checkerboard` should begin as strong protection, then gradually lose that protection and its other density-scaled contribution strength as `tilePlantDensity` falls
 - uncleared burial can permanently set back a tile over time by converting some temporary burial pressure into fertility loss
 
 #### Salinity Density-Cap Rules
 
-In the prototype, salinity should not directly add plant damage. Instead, it should limit how dense a plant can become on that tile.
+Salinity should not directly add plant damage. Instead, it should limit how dense a plant can become on that tile.
 
 Use this runtime interpretation:
 
@@ -1948,7 +1948,7 @@ Use this runtime interpretation:
 - low-tolerance plants should survive more weakly there, plateau earlier, and feel like the wrong long-term choice
 - this makes salinity a strategic placement and rehabilitation problem rather than an immediate death sentence
 
-Prototype rule:
+Rule:
 
 - if `tileSoilSalinity` is comfortably within a plant's `saltTolerance`, that plant should keep its normal density ceiling
 - if `tileSoilSalinity` rises beyond the plant's `saltTolerance`, that plant's usable density ceiling should fall
@@ -1964,7 +1964,7 @@ Interpretation:
 
 `tilePlantDensity` should change every fixed simulation step, not only during long pulses.
 
-Use this prototype logic:
+Use this logic:
 
 - derive water readiness from current `tileMoisture`
 - derive soil readiness from `tileSoilFertility` plus the current burial situation
@@ -1993,7 +1993,7 @@ Density resolution rule:
 - dense established plants should hold more steadily under normal pressure
 - peak-phase events should increase plant danger mainly by pushing the weather meters higher, not by bypassing the meter model with a separate direct plant-damage rule
 
-Prototype placement rule:
+Placement rule:
 
 - direct planting should create a new living plant tile in a fragile low-density state
 - natural spread should also create a new living plant tile in a fragile low-density state
@@ -2002,7 +2002,7 @@ Prototype placement rule:
 
 `Plant Trend` should be derived from current density plus the current direction of change after each fixed simulation step. It is a derived state, not a separate plant trait or authoritative runtime meter.
 
-Use these prototype rules:
+Use these rules:
 
 | `Plant Trend` label | Meaning |
 |---|---|
@@ -2022,7 +2022,7 @@ This cleanup creates the intended punishment for bad decisions without making th
 
 Output should degrade before a plant dies so the player feels pressure early.
 
-Prototype rule:
+Rule:
 
 - plants with output should pay back more when `tilePlantDensity` is high
 - high `growthPressure` should reduce output indirectly by pushing `tilePlantDensity` down before the plant dies
@@ -2066,19 +2066,19 @@ Special rule:
 
 - `Straw Checkerboard` never uses natural spread because it is a `groundCoverLayer` preparation object, not a living plant
 
-#### Prototype Salinity Resolution Rule
+#### Salinity Resolution Rule
 
-The prototype should treat salinity as one extra local land-quality pressure, not as a full soil-chemistry simulation.
+The game should treat salinity as one extra local land-quality pressure, not as a full soil-chemistry simulation.
 
 Simple runtime rule:
 
 - each tile keeps its current `tileSoilSalinity`
 - salinity should begin as an authored tile condition, not as a dynamically rebounding chemistry system
 - healthy plants with salinity-mitigation traits may reduce current salinity gradually over time
-- harsh events do not need to manipulate salinity directly in the prototype
+- harsh events do not need to manipulate salinity directly
 - salinity is therefore mainly a rehabilitation layer: bad at the start, better after deliberate restoration
 
-Prototype beneficial-change rule:
+Beneficial-change rule:
 
 - healthy established plants with `salinityReductionPower` should gradually reduce `tileSoilSalinity` over time on their own tile and on nearby tiles inside their contribution reach
 - badly stressed or collapsing plants should not rehabilitate salinity effectively
@@ -2089,7 +2089,7 @@ Design intent:
 - salt-tolerant plants let the player occupy difficult tiles earlier
 - salt-reducing plants let the player improve those tiles for later, more demanding species
 - low-tolerance plants on salty tiles should plateau at weak density rather than immediately taking direct salinity damage
-- once a tile has been rehabilitated, the prototype should not constantly threaten to undo that progress through hidden salinity rebound
+- once a tile has been rehabilitated, the game should not constantly threaten to undo that progress through hidden salinity rebound
 
 #### Straw Checkerboard Shared Plant Configuration
 
@@ -2105,18 +2105,18 @@ Design intent:
 - it can exist on the same tile as one living plant type
 - it does not produce output
 - it does not naturally spread
-- it does not regrow through the living-plant density ladder in the prototype because `growable` is `false`
+- it does not regrow through the living-plant density ladder because `growable` is `false`
 - `constantWitherRate` steadily reduces `tilePlantDensity` over time through the same generic density logic used by other plant-authored occupants
 - as `tilePlantDensity` falls, its `windProtectionPower`, `dustProtectionPower`, and `fertilityImprovePower` contributions fade automatically because those values scale through current density
 - when `tilePlantDensity` reaches `0`, clear the checkerboard from the tile
 
-Prototype setup target:
+Setup target:
 
 - treat `Straw Checkerboard` as a front-loaded setup layer that makes hostile sand workable, then gradually lose temporary protection and soil-support strength as its current density falls
 
-### Prototype Verification Questions
+### Ecology Verification Questions
 
-The plant prototype should answer these questions early:
+The plant system should answer these questions early:
 
 - Is placing plants for adjacency fun, or only optimal?
 - Can players quickly understand why one layout survives and another fails?
@@ -2145,7 +2145,7 @@ The player should be able to understand why a placement matters from tile condit
 
 ### Stability And Erosion
 
-In this prototype, erosion means `tileSoilFertility` reduction from wind-and-sand exposure. Wind is the main driver, airborne sand makes it worse, and heat only contributes indirectly by drying tiles or weakening plant cover. A planted tile is therefore not automatically safe. Young or high-pressure growth can still lose soil quality when its local protection is too weak.
+Here, erosion means `tileSoilFertility` reduction from wind-and-sand exposure. Wind is the main driver, airborne sand makes it worse, and heat only contributes indirectly by drying tiles or weakening plant cover. A planted tile is therefore not automatically safe. Young or high-pressure growth can still lose soil quality when its local protection is too weak.
 
 Successful restoration requires:
 
@@ -2168,9 +2168,9 @@ As sites become stable, their plant systems contribute to nearby `Site`s through
 
 The `Contract Board` is the main in-session progression driver. It is available only while the player is inside an active `Site` session, and it tracks that site's government-backed contracts plus the current site's active `Site Task` pool. It should not be used from the `Regional Map` when the player is still deciding where to deploy next.
 
-For the prototype, every contract and every `Site Task` should be published by one of three government-backed factions operating inside the same restoration program. The publishing faction must be visible on the board because it affects more than flavor: it changes reputation gain, assistant availability, random-event pools, and which long-term tech branches become easier to pursue.
+Every contract and every `Site Task` should be published by one of three government-backed factions operating inside the same restoration program. The publishing faction must be visible on the board because it affects more than flavor: it changes reputation gain, assistant availability, random-event pools, and which long-term tech branches become easier to pursue.
 
-| Faction | Board identity | Strategic pressure | Prototype assistant |
+| Faction | Board identity | Strategic pressure | Assistant |
 |---|---|---|---|
 | `Village Committee` | Local coordination, labor, and practical logistics | More tempo-driven jobs, repairs, deliveries, and fast deadline chains | `Workforce Support` |
 | `Forestry Bureau of Autonomous Region` | Ecological stabilization, nursery access, and recovery planning | More plant-survival, anti-erosion, replanting, and water-sensitive jobs | `Plant-Water Support` |
@@ -2180,7 +2180,7 @@ This faction layer should make the `Contract Board` more strategic and replayabl
 
 ### Rough Faction Profiles
 
-These are rough prototype-facing faction identities. They are not final content counts or final balance, but they should be strong enough to guide onboarding, task generation, rewards, and tech-branch direction.
+These are rough faction identities for the current build. They are not final content counts or final balance, but they should be strong enough to guide onboarding, task generation, rewards, and tech-branch direction.
 
 #### `Village Committee`
 
@@ -2216,7 +2216,7 @@ Normal task bias:
 - fast delivery
 - emergency labor contracts
 
-Prototype assistant:
+Assistant:
 
 - `Workforce Support`
 - immediate sample reward should feel concrete: a temporary labor crew, fast build window, or instant cleanup push the player must exploit now
@@ -2276,7 +2276,7 @@ Normal task bias:
 - water-sensitive sustain tasks
 - post-event ecological recovery
 
-Prototype assistant:
+Assistant:
 
 - `Plant-Water Support`
 - immediate sample reward should feel alive: saplings, mulch, water delivery, or temporary plant-survival support the player uses right away
@@ -2339,31 +2339,31 @@ Normal task bias:
 - forecast-driven sustain jobs
 - high-precision experiment contracts
 
-Prototype assistant:
+Assistant:
 
 - `Device Upgrade Support`
 - immediate sample reward should feel technical: one temporary upgrade module, improved forecast window, or boosted device efficiency the player must capitalize on now
 
 Forecast identity:
 
-- the university should be the main prototype source of advanced weather forecasting
+- the university should be the main source of advanced weather forecasting
 - its upgrades should progressively improve `Heat`, `Wind`, and `Dust` forecast detail rather than jumping straight to perfect certainty
 - its information advantage should help the player prepare the right response before a hazard window, not erase hazard tension completely
 
 Random-event flavor:
 
 - field trial grant
-- prototype shipment
+- research shipment
 - survey bonus
 - calibration drift
 - failed experiment
 
-Prototype-exclusive device identity:
+Device identity in current scope:
 
 - `Precision Irrigation Line`
 - `Solar Shade Rack`
 - `Checkerboard Deployment Machine`
-- for the prototype, these should be university-gated `Site Unlockables`, university task rewards, or university branch unlocks rather than neutral equipment shared equally across factions
+- in the current design, these should be university-gated `Site Unlockables`, university task rewards, or university branch unlocks rather than neutral equipment shared equally across factions
 - the player should feel that the university's advantage is not abstract science alone, but visible field infrastructure that changes one patch's survival, efficiency, or preparation quality right now
 
 Tech-branch rough themes:
@@ -2383,7 +2383,7 @@ Later demo / full-game expansion direction:
 
 - deeper university water-tech can expand into `Deep Well Pump`, brackish-groundwater use, pretreatment, and salt-reduction treatment
 - realistic treatment directions include membrane-based desalination, electrodialysis, and other brackish-water processing methods
-- this branch is intentionally out of prototype scope because it adds too much simulation, maintenance, and balance work for the first playable build
+- this branch is intentionally out of current scope because it adds too much simulation, maintenance, and balance work for the first playable build
 
 Weakness / tradeoff direction:
 
@@ -2420,16 +2420,16 @@ Contracts are the medium and long-form structure of a site or campaign. They sho
 
 `Site Task`s are short 5 to 10 minute objectives generated from the current `Site` state. They appear in a live task pool inside the `Contract Board`. Their job is to keep the player moving from one reachable payoff to the next while the site is still unrestored.
 
-In the faction prototype, `Site Task`s should feel like field assignments drawn from a live board rather than timeless side chores. The player should always be able to see which `Faction` published the task, whether they still have free acceptance slots, and what kind of long-term relationship or assistant support the task advances.
+In the current faction model, `Site Task`s should feel like field assignments drawn from a live board rather than timeless side chores. The player should always be able to see which `Faction` published the task, whether they still have free acceptance slots, and what kind of long-term relationship or assistant support the task advances.
 
-For onboarding, the game should not start by exposing the fully unlocked task board. Instead, task-board complexity should be unlocked concept by concept. The first site should begin with the minimum real task model needed to create momentum, then expand toward the full prototype rules after the player has already used each previous layer once.
+For onboarding, the game should not start by exposing the fully unlocked task board. Instead, task-board complexity should be unlocked concept by concept. The first site should begin with the minimum real task model needed to create momentum, then expand toward the full rules after the player has already used each previous layer once.
 
 Key rules:
 
 - The `Contract Board` shows a limited concurrent pool of available `Site Task`s
 - This `Task Pool Size` can be upgraded through the `Persistent Tech Tree`
-- Fully unlocked prototype board composition should start with `2` visible tasks per active `Faction`; with `3` factions this means `6` visible tasks on the normal starter board
-- The fully unlocked prototype should also have an `Accepted Task Cap` of `3`
+- Fully unlocked board composition should start with `2` visible tasks per active `Faction`; with `3` factions this means `6` visible tasks on the normal starter board
+- The fully unlocked board should also have an `Accepted Task Cap` of `3`
 - During onboarding `Site 1` to `Site 3`, the board should only publish tasks from the featured faction of that specific site
 - Multi-faction board comparison should begin on `Site 4`, after the player has learned all three faction styles in isolation
 - During onboarding, board breadth and accepted-task count should be set first by onboarding stage, then later expanded further by `Persistent Tech Tree` upgrades
@@ -2440,7 +2440,7 @@ Key rules:
 - The player must explicitly accept a task to commit one of their acceptance slots
 - Accepted tasks move into an active list and do not rotate out on refresh
 - Unaccepted tasks remain on the board and may rotate out when the pool refreshes
-- The prototype should not allow free task abandonment, because accepting a task is itself the strategic commitment
+- The game should not allow free task abandonment, because accepting a task is itself the strategic commitment
 - If an escape hatch is needed, use one `Emergency Withdrawal` per site session at most; it should cost `Faction Reputation` with the publisher and keep that acceptance slot blocked until the next board refresh
 - Faction-published tasks should bias reward drafts, `Faction Reputation` gain, and `Faction Assistant` availability
 - Completing a `Site Task` should always grant its guaranteed `Faction Reputation` payout from the publishing `Faction`
@@ -2462,7 +2462,7 @@ Key rules:
 - A `Task Reward Draft` should usually contain `3` or more options
 - A `Task Reward Draft` should not be required to contain a `Site Unlockable`; some drafts should instead focus on modifiers, money, resources, or mixed tactical bundles
 - Draft options can include:
-- a `Site Unlockable` such as a plant, device, tool, or other prototype option
+- a `Site Unlockable` such as a plant, device, tool, or other site-scoped option
 - a `Run Modifier`
 - a `Task Reward Package` containing money, resources, or a mixed tactical bundle
 - if the chosen option is a `Site Unlockable`, it becomes available on the current site and may still require money to purchase or use
@@ -2497,7 +2497,7 @@ Example `Run Modifier` directions:
 - Irrigation efficiency is dramatically increased
 - Contractor output is boosted during harsh-weather windows
 
-Important prototype rule:
+Important rule:
 
 - `Run Modifier`s last only for the current site session
 - restarting, failing, or leaving that site clears them
@@ -2550,7 +2550,7 @@ Example chain directions:
 
 Task-chain rules:
 
-- each refresh should generate a prototype-appropriate number of chains based on `Task Pool Size`
+- each refresh should generate a small number of chains based on `Task Pool Size`
 - chain tasks should be visibly linked in the `Contract Board`
 - each task inside a chain should still give a normal task reward for its tier
 - completing the full chain should grant an extra bonus reward on top of the normal task rewards
@@ -2580,7 +2580,7 @@ The main economic outputs are:
 
 Contract rewards should vary enough to change decision-making between runs. Some campaigns should tempt the player with better short-term cash, while others reward plant progression, utility access, or safer expansion. Payback randomness should reshape priorities, not invalidate planning.
 
-Prototype sell-value hierarchy:
+Sell-value hierarchy:
 
 - crafted value-added goods should sell for the highest prices
 - normal harvested goods should sit in the middle
@@ -2749,32 +2749,32 @@ To make the game more compelling without feeling manipulative, these systems wou
 
 ### Reputation Loop
 
-`Reputation` is separate from money. In the faction prototype, campaign trust now has two linked layers:
+`Reputation` is separate from money. In the current faction model, campaign trust now has two linked layers:
 
 - `Reputation`: total campaign standing with the restoration program, earned progressively from official work and never spent
 - `Faction Reputation`: cumulative standing with each individual `Faction`, earned mainly from that faction's contracts, `Site Task`s, faction events, and aligned follow-through
 
 `Reputation` should function as thresholded trust, not consumable currency. Reaching a threshold unlocks access to new tech levels and support tiers; choosing a tech node does not reduce current reputation. `Faction Reputation` should behave the same way inside each branch.
 
-For prototype readability, `Faction Reputation` from `Site Task`s should usually be a guaranteed completion payout tied to the task's publisher, with the amount scaling by task tier or level, while the post-task draft should stay focused on immediate tactical rewards.
+For clarity, `Faction Reputation` from `Site Task`s should usually be a guaranteed completion payout tied to the task's publisher, with the amount scaling by task tier or level, while the post-task draft should stay focused on immediate tactical rewards.
 
 This keeps campaign progression distinct from site survival, preserves the satisfaction of steady institutional growth, and turns contract choice into a strategic identity decision rather than only a payout decision.
 
 ### Loadout
 
-Before entering a site, the player chooses a `Loadout`. For the prototype, the loadout should not be bought freely before deployment. Instead, it is assembled on the `Regional Map` from `Regional Support Output` provided by nearby stabilized sites.
+Before entering a site, the player chooses a `Loadout`. In the current design, the loadout should not be bought freely before deployment. Instead, it is assembled on the `Regional Map` from `Regional Support Output` provided by nearby stabilized sites.
 
-Prototype loadout rules:
+Loadout rules:
 
 - only nearby stabilized sites may contribute loadout support for a new deployment
-- "nearby" should mean directly adjacent sites on the `Regional Map` in the prototype
+- "nearby" should mean directly adjacent sites on the `Regional Map` in the current design
 - each eligible nearby site contributes a limited exportable package every few regional days
 - the player chooses which available nearby-site support to bring into the new run
 - nearby-site support packages and passive modifiers should be available before deployment
 - `Persistent Tech Tree` upgrades may increase loadout capacity or improve how efficiently nearby support is used
 - on-site money spending still exists after deployment through the `Field Phone`, but pre-deployment loadout should come from nearby support rather than open purchase
 
-For the prototype, a loadout can include:
+In the current design, a loadout can include:
 
 - Starting food and recovery supplies
 - Seed stock
@@ -2787,16 +2787,16 @@ Important water rule:
 
 - water is not a generic regional output from plant productivity
 - the normal water source remains on-site buying or direct site features such as an oasis or lake
-- future special-case oasis sites may grant unique water-related support, but this should not be part of the generic prototype support model
+- future special-case oasis sites may grant unique water-related support, but this should not be part of the generic support model
 - each new deployment should begin with a small fixed water amount so the opening minutes remain fair
 - that fixed water amount is baseline deployment support, not `Regional Support Output`
 - if the player needs more water, they must either earn money and buy it on-site or extract it from an oasis or lake when the site allows that
 
 Loadout size and quality depend on the `Persistent Tech Tree` and nearby support. This gives the campaign a meaningful preparation phase before each deployment and makes regional site order strategically important.
 
-### Regional Support Output (Prototype)
+### Regional Support Output
 
-`Regional Support Output` is the prototype system that makes restored nearby sites matter before the player enters the next site.
+`Regional Support Output` is the system that makes restored nearby sites matter before the player enters the next site.
 
 #### Long-Term Support Category List
 
@@ -2811,14 +2811,14 @@ Longer-term, nearby-site support can include categories such as:
 - Ecology Support
 - Emergency Reserve
 
-Prototype scope note:
+Scope note:
 
-- for the first prototype, only activate `Resource Loadout` output plus small ecological spillover bonuses
+- for the first playable, only activate `Resource Loadout` output plus small ecological spillover bonuses
 - ecological spillover should currently focus on wind protection, heat protection, and fertility support
 
-#### Prototype Regional Support Rules
+#### Regional Support Rules
 
-Use these temporary prototype rules:
+Use these temporary rules:
 
 - only stabilized sites adjacent to the target site contribute support
 - each contributing site should produce a small exportable support package every `3` regional days
@@ -2830,7 +2830,7 @@ Use these temporary prototype rules:
 
 Do not force a site into only one dominant support type. A restored site should export support based on the full composition of what the player built there.
 
-Prototype interpretation:
+Interpretation:
 
 - a site's support output should depend on its certified completion state plus its plant composition
 - only medium-density and high-density plant tiles should contribute meaningfully to regional output
@@ -2839,7 +2839,7 @@ Prototype interpretation:
 
 #### Temporary Productivity Rule
 
-For prototype implementation, use a simple tunable rule rather than final balance math.
+For implementation, use a simple tunable rule rather than final balance math.
 
 Recommended temporary model:
 
@@ -2847,7 +2847,7 @@ Recommended temporary model:
 - multiply that score by temporary tuning parameters to derive exported support strength
 - tune those parameters later through testing
 
-Prototype engineering direction:
+Engineering direction:
 
 - each contributing plant tile adds a small `siteYield` contribution based on plant type and current density
 - sum those contributions into one `siteYieldScore`
@@ -2860,7 +2860,7 @@ Recommended channel examples:
 - `regionalHeatProtection = siteYieldScore * antiDehydrationParam * antiDehydrationCompositionFactor`
 - `regionalFertilitySupport = siteYieldScore * fertilizeParam * fertilizeCompositionFactor`
 
-This keeps the prototype simple:
+This keeps the system simple:
 
 - output scales with how successful the site is
 - plant composition still matters
@@ -2881,7 +2881,7 @@ Use these limits:
 
 Some sites can be made strategically higher-priority by giving them a persistent `Site Output Modifier`.
 
-Prototype modifier directions:
+Modifier directions:
 
 - increase exported wind protection by `x%`
 - increase exported heat protection by `x%`
@@ -2889,17 +2889,17 @@ Prototype modifier directions:
 - increase one specific resource output by `x%`
 - increase regional support effect range by `x%`
 
-Prototype stacking note:
+Stacking note:
 
 - the number of `Site Output Modifier`s on a site should be tunable
-- most sites should have `0-1` meaningful modifier in the prototype
+- most sites should have `0-1` meaningful modifier in the current design
 - especially strategic or rare sites can have more, but the system should avoid stacking so many traits that the next site becomes solved automatically
 
 #### Session-Shaping Synergy Rule
 
 Nearby-site bonus traits should actively influence how the next site session is played.
 
-Prototype interpretation:
+Interpretation:
 
 - if a nearby stabilized site exports increased wind protection, the player should feel encouraged to lean harder into wind-protection plants or layouts on the new site
 - if a nearby stabilized site exports increased fertility support, the player should feel encouraged to invest earlier into fertilize-focused expansion
@@ -2925,7 +2925,7 @@ Onboarding philosophy:
 - New concepts should be unlocked one by one through actual play, not mainly through tutorial text
 - A concept should usually unlock only after the player has used the previous concept successfully at least once
 - The first three site games should function as a controlled onboarding arc
-- The first site should not begin with the fully unlocked prototype rule set, even if later sites do
+- The first site should not begin with the fully unlocked current rule set, even if later sites do
 - During onboarding, "not yet relevant" should usually mean "not yet unlocked," not "already running but hidden somewhere"
 - `Onboarding Task`s should introduce the biggest structural systems for the first time, while the `Persistent Tech Tree` may still introduce smaller new gameplay as long as the `Learning Budget` stays low
 
@@ -2940,7 +2940,7 @@ The early campaign should teach the loop in pieces through real unlocks, not in 
 
 Use the first three site games as a controlled faction-unlock ladder, then use the fourth site as the first full-system proof site. Each of the first three sites should focus on one new faction and one new style of decision-making.
 
-Recommended prototype sequence:
+Recommended sequence:
 
 1. `Campaign Start Baseline`
 - Available concepts: movement, interaction, one danger meter, one immediate survival objective, basic camp setup, one basic plant or starter cover option, and one simple authored local objective
@@ -2984,9 +2984,9 @@ Recommended prototype sequence:
 - first fuller forecast/device-planning gameplay once the university forecast concept is introduced
 - Player lesson: "This faction improves precision, devices, and planning quality"
 
-5. `Site 4: Full Prototype Board Proof`
+5. `Site 4: Full Board Proof`
 - Start the site with all `3` factions already unlocked
-- The `Contract Board` now uses the full prototype presentation with all `3` factions active, normal `6` visible tasks, and `Accepted Task Cap = 3`
+- The `Contract Board` now uses the full presentation with all `3` factions active, normal `6` visible tasks, and `Accepted Task Cap = 3`
 - This is the first site where the player should make real cross-faction comparisons between labor, plant-water, and device-oriented tasks
 - Harsh events should arrive in escalating waves so the player gets a full picture of preparation, response, recovery, and renewed commitment under pressure
 - Player lesson: "The full game is about choosing between faction paths while repeated site pressure keeps changing what matters most"
@@ -3033,7 +3033,7 @@ Use a strict `Learning Budget` across the early and mid campaign:
 - The first immediate sample of each faction's assistant reward
 - Faction availability on future contract boards
 - Faction branch visibility in the `Persistent Tech Tree`
-- Early board complexity gates such as faction count on the board and accepted-task count during the first four prototype sites
+- Early board complexity gates such as faction count on the board and accepted-task count during the first four onboarding sites
 - Early `Tutorial Task Set`s that force the player to complete each basic task type once before normal board refresh begins
 - The first meaningful understanding of what makes one faction different from another
 
@@ -3091,15 +3091,15 @@ High replay value depends on making progression choices meaningfully different a
 
 The `Persistent Tech Tree` is the long-term campaign progression layer. It lasts for the whole campaign and shapes the player's durable capabilities and strategic identity.
 
-In the faction prototype, this layer is split into three named branches under one shared program umbrella. It is unlocked through cumulative `Reputation` thresholds plus branch-specific `Faction Reputation` requirements, not money.
+In the current faction model, this layer is split into three named branches under one shared program umbrella. It is unlocked through cumulative `Reputation` thresholds plus branch-specific `Faction Reputation` requirements, not money.
 
-| Faction | Strategic identity | Prototype assistant | Example branch themes |
+| Faction | Strategic identity | Assistant | Example branch themes |
 |---|---|---|---|
 | `Village Committee` | Tempo, labor flexibility, emergency cleanup, contract throughput | `Workforce Support` | extra contractor capacity, faster repairs, lower hauling friction, deadline forgiveness, stronger chain completion |
 | `Forestry Bureau of Autonomous Region` | Ecological resilience, conservative expansion, harsh-event endurance | `Plant-Water Support` | stronger seedling survival, irrigation efficiency, erosion control, density protection, post-event replanting |
 | `Autonomous Region Agricultural University` | Precision, research, forecasting, device-led optimization | `Device Upgrade Support` | precision irrigation, solar-shade support, checkerboard mechanization, better sensors, stronger device efficiency |
 
-Prototype unlock rule:
+Unlock rule:
 
 - `Reputation` unlocks tech levels progressively across the campaign
 - each newly reached `Reputation` threshold grants a limited number of `Faction Tech Picks` for that level
@@ -3160,7 +3160,7 @@ The design goals of this system are:
 - Add adaptation pressure to local terrain and weather
 - Prevent site play from becoming fully scripted
 - Increase replay value without deleting long-term campaign progress
-- Stay flexible during prototype development so new unlockable categories can be added later without breaking the model
+- Stay flexible during early development so new unlockable categories can be added later without breaking the model
 
 `Site Unlockables` should favor temporary or site-scoped options such as:
 
@@ -3195,7 +3195,7 @@ When the player successfully restores a `Site`, the government should award a `S
 - the cited reason should reflect how the site was restored, not just that it was restored
 - commendations should be recorded in campaign history so the player can look back at what they achieved
 
-Prototype commendation reason directions:
+Commendation reason directions:
 
 - `Storm-Proof Recovery`: restored while surviving major hazard pressure with low collapse
 - `Low-Water Restoration`: restored with unusually efficient water use
@@ -3208,19 +3208,19 @@ Design intent:
 - the player should feel formally recognized, not just numerically rewarded
 - the commendation should make site completion feel memorable
 - modifiers, unlock choices, task priorities, and recovery style should all be able to influence which commendation reason is earned
-- commendations can later become a source of prestige, `Reputation`, or secondary campaign bonuses if prototype testing shows that extra reward is useful
+- commendations can later become a source of prestige, `Reputation`, or secondary campaign bonuses if early testing shows that extra reward is useful
 
 ### Random Events
 
 Random events add situational variety on top of the core simulation. They should be grounded in the setting and tied to survival, logistics, weather, or policy rather than combat spectacle.
 
-In the faction prototype, a large share of random events should be faction-scoped rather than fully neutral. The board should feel different when the `Village Committee` is pushing practical labor opportunities, the `Autonomous Region Agricultural University` is pushing research goals, or the `Forestry Bureau of Autonomous Region` is reacting to ecological damage.
+In the current faction model, a large share of random events should be faction-scoped rather than fully neutral. The board should feel different when the `Village Committee` is pushing practical labor opportunities, the `Autonomous Region Agricultural University` is pushing research goals, or the `Forestry Bureau of Autonomous Region` is reacting to ecological damage.
 
 | Faction | Favorable event direction | Tense event direction | Likely gameplay effect |
 |---|---|---|---|
 | `Village Committee` | Volunteer push, local delivery convoy, community repair day | labor shortage, road delay, local budget diversion | changes workforce cost, repair tempo, and short-deadline task density |
 | `Forestry Bureau of Autonomous Region` | sapling allocation, emergency irrigation dispatch, erosion-control campaign | nursery shortage, water rationing, failed planting batch | changes plant stock, water support, and harsh-event recovery options |
-| `Autonomous Region Agricultural University` | field trial grant, prototype shipment, survey bonus | failed experiment, calibration drift, academic audit | changes device quality, forecast precision, and research-task value |
+| `Autonomous Region Agricultural University` | field trial grant, research shipment, survey bonus | failed experiment, calibration drift, academic audit | changes device quality, forecast precision, and research-task value |
 
 Neutral event categories can still include:
 
@@ -3236,14 +3236,14 @@ Events should create pivots and memorable stories, but they must remain readable
 
 After a harsh event enters `Aftermath`, factions should evaluate whether to offer help based on current `Faction Reputation`, recent task history, and the site's current damage profile.
 
-Prototype rules:
+Rules:
 
 - each of the three factions rolls separately for a possible `Aftermath Relief Offer`
 - higher `Faction Reputation` improves offer chance, response speed, package strength, and subsidy level
 - relief should be a strategic choice, not an automatic bailout; accepting one offer can weaken or lock out another during the same aftermath window
 - relief should solve part of the recovery knot, not erase it
 
-Prototype relief directions:
+Relief directions:
 
 | Faction | Relief style |
 |---|---|
@@ -3284,7 +3284,7 @@ The design target is setbacks rather than total campaign reset. The player shoul
 
 ### Plant Content
 
-| Prototype Role | Purpose | Prototype Placeholder |
+| Role | Purpose | Current Placeholder |
 |---|---|---|
 | Sand-fix starter | Makes bare sand workable for later restoration | `Straw Checkerboard` |
 | Protection | Shields tiles, young plants, or work zones | `Wind Reed`, `Root Binder`, `Thorn Shrub`, `Sand Willow` |
@@ -3294,7 +3294,7 @@ The design target is setbacks rather than total campaign reset. The player shoul
 | Output | Provides food or limited sellable yield | `Salt Bean`, `Sunfruit Vine`, `Thorn Shrub`, `Medicinal Sage` |
 | Worker support | Improves comfort, recovery feel, or safe rest value | `Shade Cactus`, `Medicinal Sage`, `Sand Willow` dense pocket support |
 
-Section 11's prototype plant set is the current working content target. The prototype should stay at a hand-picked 10-entry roster, including one plant-derived starter material, until combo readability, progression fun, and role overlap are proven in playtests.
+Section 11's current plant set is the current working content target. The game should stay at a hand-picked 10-entry roster, including one plant-derived starter material, until combo readability, progression fun, and role overlap are proven in playtests.
 
 ### Device Content
 
@@ -3403,6 +3403,8 @@ These are explicit non-goals for the first version:
 ## 17. Minimum Playable Prototype
 
 This chapter defines the smallest prototype that is still worth building. It should use as little feature breadth as possible, but it must still preserve the full loop sketch the game is trying to sell: survival pressure, faction-published tasks, guaranteed faction reputation, small tech growth, harsh-event recovery, and a sense that the next site plays differently because of the player's choices.
+
+Prototype-specific scope language, temporary content counts, and first-playable constraints should be centralized in this chapter. Earlier chapters should define the core game model in neutral system terms.
 
 The key scope rule is:
 
@@ -3687,19 +3689,19 @@ If those beats work, the project has a real prototype foundation. If they do not
 
 ## 18. Implementation Readiness Checklist
 
-This checklist is here to help inspect the whole loop before moving into code-structure planning. It separates what is already concrete enough for prototype implementation from what still needs a tighter contract.
+This checklist is here to help inspect the whole loop before moving into code-structure planning. It separates what is already concrete enough for implementation from what still needs a tighter contract.
 
-### Current Prototype Assessment
+### Current Scope Assessment
 
-- Verdict: the current prototype is strong enough to build and playtest
+- Verdict: the current build is strong enough to build and playtest
 - Main strength: the game already has a real pressure loop built from survival, hazards, strategic planting, short-term tasks, emergency rescue, and regional preparation
-- Main strength: the prototype has multiple reward layers, including site stabilization, task rewards, modifiers, commendations, and nearby-site support
+- Main strength: the current build has multiple reward layers, including site stabilization, task rewards, modifiers, commendations, and nearby-site support
 - Main strength: the regional order layer now adds meaningful campaign strategy rather than just map traversal
 - Main risk: cognitive load is still high, so onboarding and information flow will matter a lot
 - Main risk: task generation, nearby-site support, and modifier tuning could become either too weak to matter or strong enough to flatten difficulty
 - Main risk: some progression and meta systems are conceptually solid but still not numerically or structurally defined enough for direct implementation
 
-### Defined Enough For Prototype Coding
+### Defined Enough For Current-Scope Coding
 
 - [x] Core gameplay loop and campaign loop
 - [x] Runtime simulation cadence and update order
@@ -3708,8 +3710,8 @@ This checklist is here to help inspect the whole loop before moving into code-st
 - [x] Hazard and weather runtime model
 - [x] Harsh-event field-work runtime model
 - [x] Resource and inventory model
-- [x] Prototype device roster
-- [x] Prototype plant roster, density ladder, degeneration, and spread
+- [x] Device roster
+- [x] Plant roster, density ladder, degeneration, and spread
 - [x] Contract board direction and site-task reward model
 - [x] Persistent progression direction
 - [x] Site unlockables, run modifiers, and commendation direction
@@ -3747,16 +3749,16 @@ This checklist is here to help inspect the whole loop before moving into code-st
 - [ ] Off-screen simulation contract
 - [ ] Save data boundaries
 
-### Prototype Health Check
+### Current Scope Health Check
 
-- [x] The prototype already has enough tension to be fun if pacing and information flow are handled well
+- [x] The current build already has enough tension to be fun if pacing and information flow are handled well
 - [x] The plant game is no longer passive because hazards, density loss, risky harsh-event work, and comeback decisions all matter
 - [x] The regional layer is strong enough to support meaningful site-order strategy
-- [ ] The prototype is not yet safe for large-scale implementation without the missing contracts above
+- [ ] The current build is not yet safe for large-scale implementation without the missing contracts above
 
 ## 19. Acceptance Scenarios
 
-These scenarios define whether the design is behaving correctly in prototype and production reviews.
+These scenarios define whether the design is behaving correctly in current-build reviews and later production reviews.
 
 ### New Site
 
@@ -3784,7 +3786,7 @@ During a severe sandstorm or heat event, the player should be able to perform at
 
 ### Restoration Readability
 
-Plant placement creates visible local effects on erosion, wind, heat, moisture, soil fertility, or salinity rehab. Even with only the prototype plant set, the player should be able to understand how the land is changing because of their decisions and why one small combo is working better than another.
+Plant placement creates visible local effects on erosion, wind, heat, moisture, soil fertility, or salinity rehab. Even with only the current plant set, the player should be able to understand how the land is changing because of their decisions and why one small combo is working better than another.
 
 ### Plant Degeneration Check
 
@@ -3806,9 +3808,9 @@ When the player builds a local cluster of mostly medium-density or high-density 
 
 When two similar patches face the same severe weather, the better-protected patch should clearly perform better. It should keep more `Plant Density`, lose less output, retain more neighbor protection, and require less recovery work afterward. Players should feel that strategy earned survival, not that they got lucky.
 
-### Prototype Plant Fun Check
+### Plant Fun Check
 
-Within one early-to-mid `Site` run, the player should be able to use the 10-entry prototype plant roster to build at least one defensive combo, one support or recovery combo, and one output combo. Those combos should feel different, readable, and worth chasing even before the site is fully restored.
+Within one early-to-mid `Site` run, the player should be able to use the 10-entry current plant set to build at least one defensive combo, one support or recovery combo, and one output combo. Those combos should feel different, readable, and worth chasing even before the site is fully restored.
 
 ### Recovery Spiral Check
 
@@ -3841,7 +3843,7 @@ While a `Site` is still unrestored, the player should consistently have immediat
 
 ### Site Task Check
 
-During a normal site run, the player should be able to see a limited but refreshed pool of `Site Task`s, understand each task's publishing `Faction`, commit to no more than `3` accepted tasks at once in the prototype, finish them in roughly 5 to 10 minutes, and feel that task rewards meaningfully feed the next local decision. Completing a task should always grant its guaranteed `Faction Reputation` payout, with the amount scaling by task tier or level, and most `Site Task`s should then reveal a `Task Reward Draft` with `3` or more options. Those options should be able to include `Site Unlockables`, `Run Modifier`s, and `Task Reward Package`s containing money, resources, or mixed tactical bundles. `Task Pool Size` and `Accepted Task Cap` upgrades in the `Persistent Tech Tree` should noticeably change how many short-term opportunities the player can pursue at once.
+During a normal site run, the player should be able to see a limited but refreshed pool of `Site Task`s, understand each task's publishing `Faction`, commit to no more than `3` accepted tasks at once in the current design, finish them in roughly 5 to 10 minutes, and feel that task rewards meaningfully feed the next local decision. Completing a task should always grant its guaranteed `Faction Reputation` payout, with the amount scaling by task tier or level, and most `Site Task`s should then reveal a `Task Reward Draft` with `3` or more options. Those options should be able to include `Site Unlockables`, `Run Modifier`s, and `Task Reward Package`s containing money, resources, or mixed tactical bundles. `Task Pool Size` and `Accepted Task Cap` upgrades in the `Persistent Tech Tree` should noticeably change how many short-term opportunities the player can pursue at once.
 
 ### Task Tier Excitement Check
 
@@ -3896,23 +3898,23 @@ Leaving, failing, or restarting a site should reset its site unlock pool, clear 
 ## 20. Production Notes
 
 - Use role-based plant families first, then replace with more specific species later if realism becomes a production goal.
-- Do not expand the plant roster beyond the prototype set until 2-role plants, neighbor effects, and support-dependent output are clearly fun in testing.
-- Keep the first pressure model small. Prototype with a few readable forces such as heat, wind abrasion, burial, erosion, and salinity pressure before adding more exotic hazards.
-- Validate density growth early. The prototype should prove that fragile starter plants can be nursed into self-sustaining patches and that limited natural spread feels like an earned payoff.
+- Do not expand the plant roster beyond the current set until 2-role plants, neighbor effects, and support-dependent output are clearly fun in testing.
+- Keep the first pressure model small. Start with a few readable forces such as heat, wind abrasion, burial, erosion, and salinity pressure before adding more exotic hazards.
+- Validate density growth early. The game should prove that fragile starter plants can be nursed into self-sustaining patches and that limited natural spread feels like an earned payoff.
 - Validate density-based reward feedback early. Dense restored pockets should sound calmer, feel safer, and provide noticeably better `Energy` and `Morale` recovery than exposed desert.
 - Validate the bare-sand opener early. `Straw Checkerboard` should begin strong enough to make pure sand playable, then visibly lose protection and other density-scaled contribution strength as its current density falls.
-- Prototype site play before expanding narrative or world flavor.
+- Validate site play before expanding narrative or world flavor.
 - Keep contractor behavior simple until the core survival and restoration loop is proven.
 - Make forecasting, tile feedback, and support extraction readable early, because they are central to the game's identity.
 - Plants must not become fire-and-forget timers. Validate that harsh conditions, degeneration, and recovery decisions create strategy every few minutes of site play.
-- Prototype harsh-event work pressure early. Extreme weather should include risky, limited, hands-on burial clearing, repair, or rescue work so the player feels they fought back and saved something tangible.
-- Validate partial degradation, not only full destruction. Reduced `Plant Density`, damaged supplies, weakened output, and worsened `Player Condition` should create the prototype's most interesting comeback decisions.
-- Treat replayability as a core production requirement, not post-launch polish. Procedural map generation, contract variety, event variety, and meaningful tech branching should be validated early in prototype milestones.
+- Validate harsh-event work pressure early. Extreme weather should include risky, limited, hands-on burial clearing, repair, or rescue work so the player feels they fought back and saved something tangible.
+- Validate partial degradation, not only full destruction. Reduced `Plant Density`, damaged supplies, weakened output, and worsened `Player Condition` should create the current build's most interesting comeback decisions.
+- Treat replayability as a core production requirement, not post-launch polish. Procedural map generation, contract variety, event variety, and meaningful tech branching should be validated in early milestones.
 - Validate the dual-layer progression structure early. The `Persistent Tech Tree` must feel campaign-defining, while site unlocks and modifiers must feel fresh on each site without overwhelming the player.
 - Validate generated `Site Task`s early. The 5 to 10 minute task loop should feel practical, varied, and tightly connected to reward-draft reveal, local unlock purchasing, modifier pivots, and restoration progress.
 - Validate task-tier excitement early. High-tier task spawn rates, readability, and reward strength should be tuned so jackpot appearances feel rare and thrilling rather than noisy or disappointing.
 - Validate jackpot modifiers, task chains, and `Site Commendation`s early. These systems should create memorable site-run pivots and meaningful recognition, not just sit as decorative bonuses.
-- Prototype extreme hazard events early. The harshest environmental moments should become emotional peaks driven by survival pressure, music, and rendering, not just bigger damage numbers.
+- Validate extreme hazard events early. The harshest environmental moments should become emotional peaks driven by survival pressure, music, and rendering, not just bigger damage numbers.
 - Validate onboarding and cognitive load early. The first session must teach the loop in layers without overwhelming the player.
 - Keep money, `Reputation`, and `Faction Reputation` clearly separated in reward and progression design.
 
@@ -4017,7 +4019,7 @@ This summary should include only core runtime meters and the core plant-side val
 
 ### Main Causal Loop
 
-Use this loop as the prototype mental model:
+Use this loop as the core mental model:
 
 1. Event state updates `eventHeatPressure`, `eventWindPressure`, and `eventDustPressure`.
 2. Weather updates `weatherHeat`, `weatherWind`, and `weatherDust` from baseline site conditions plus current event meters.
