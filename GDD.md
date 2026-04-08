@@ -397,7 +397,6 @@ Display rule:
 - `tileHeat`, `tileWind`, and `tileDust` are resolved local weather meters; they are useful in tile inspection, advanced overlays, or debugging views because they bridge site weather and final tile or plant pressure
 - `Straw Checkerboard` should be inspected through current `tilePlantDensity` plus its current protection and soil-building value; it is not a regrowing living plant
 - `growthPressure` is an internal derived plant-pressure variable; the player should not need the raw number, but tile inspection should expose a stable pressure breakdown such as `waterContribution`, `soilContribution`, `windContribution`, and `heatContribution`
-- the inspection UI should report the strongest current contribution as the `Primary Limiter` and may also report the second strongest as a `Secondary Limiter`
 - `tileSoilSalinity` should stay a separate growth-cap warning rather than being folded into `growthPressure`, because salinity is a placement and rehabilitation issue, not the same kind of short-term growth pressure
 - Money, `Reputation`, `Faction Reputation`, stack counts, `fullyGrownTileCount`, `siteCompletionTileThreshold`, and `campaignDaysRemaining` are native integers and should display as exact integers
 - `tileSoilFertility` is the long-lived land-improvement meter used at runtime; it affects plant growth speed, the tile's maximum moisture capacity, and how quickly stored moisture is lost
@@ -2059,24 +2058,9 @@ Grouping rule:
 - `heatContribution` should represent heat exposure from `tileHeat` after plant heat resistance and moisture relief are considered
 - if tuning later adds or changes sub-factors, engineering may rebalance which internal sub-terms feed which grouped channel, but the player-facing grouped channels should remain stable unless there is a strong usability reason to change them
 
-Player-facing limiter rule:
-
-- sort the current grouped channels by value
-- show the highest one as the `Primary Limiter`
-- optionally show the second highest one as the `Secondary Limiter`
-- the player should be able to understand from inspection whether the current patch mainly needs water, better soil recovery, more wind protection, or more heat relief
-- `tileSoilSalinity` should be reported separately as a density-cap warning, not as one of the short-term pressure buckets
-
-Prototype diagnosis examples:
-
-- dominant `waterContribution` -> `Needs Water`
-- dominant `soilContribution` -> `Poor Soil` or `Buried`
-- dominant `windContribution` -> `Too Exposed`
-- dominant `heatContribution` -> `Too Hot`
-
 Density resolution rule:
 
-- low `growthPressure` and good local support should increase `tilePlantDensity`
+- low `growthPressure` should increase `tilePlantDensity`
 - if `growable` is `false`, favorable conditions should not create positive density gain
 - high `growthPressure` should reduce `tilePlantDensity`
 - `constantWitherRate` should apply steady density loss every fixed simulation step
