@@ -910,7 +910,7 @@ Use this prototype interpretation:
 
 - `weatherHeat` mainly raises `tileHeat`, worker hydration drain, worker energy drain, and exposed `playerHealth` risk; `tileHeat` then drives tile moisture loss and the heat-linked share of plant `growthPressure`
 - `weatherWind` mainly raises `tileWind`, exposure, work difficulty, and wind-protection demand; `tileWind` then drives exposed-tile erosion pressure, moisture loss, and the wind-linked share of plant `growthPressure`
-- `weatherSand` mainly raises `tileDust`, visibility loss, movement penalties, airborne-sand danger, and exposed `playerHealth` risk; `tileDust` then drives burial, soil setback, the sand-linked share of plant `growthPressure`, and device damage risk
+- `weatherSand` mainly raises `tileDust`, visibility loss, movement penalties, airborne-sand danger, and exposed `playerHealth` risk; `tileDust` then drives burial, soil setback, the dust-linked share of plant `growthPressure`, and device damage risk
 
 Design consistency rule:
 
@@ -993,7 +993,7 @@ Main sources of local protection:
 Prototype hazard state-impact bands:
 
 - these bands should describe how hazard pressure changes tile, plant, and structure state first; visible survival or collapse should emerge from those state changes rather than from separate scripted outcome rules
-- low local protection: peak weather should drive strong `tileSandBurial` gain, faster `tileMoisture` loss, and clear erosion-driven `tileSoilFertility` setback; plants on the patch should see `growthPressure` rise quickly from wind and sand exposure, heat stress, and worsening soil state; exposed structures should lose `deviceEfficiency` rapidly and may begin losing `deviceIntegrity`; this combination should usually derive a `Withering` trend label, cut `tilePlantDensity` sharply, and create a major recovery burden
+- low local protection: peak weather should drive strong `tileSandBurial` gain, faster `tileMoisture` loss, and clear erosion-driven `tileSoilFertility` setback; plants on the patch should see `growthPressure` rise quickly from wind and dust exposure, heat stress, and worsening soil state; exposed structures should lose `deviceEfficiency` rapidly and may begin losing `deviceIntegrity`; this combination should usually derive a `Withering` trend label, cut `tilePlantDensity` sharply, and create a major recovery burden
 - moderate local protection: peak weather should still add some `tileSandBurial`, moisture loss, and limited fertility setback, but not at immediate-collapse speed; `growthPressure` should spike during the worst window and cause noticeable but recoverable `tilePlantDensity` loss; structures may suffer partial `deviceEfficiency` loss or light damage while remaining usable; the patch should stay functional enough to rescue if the player responds in time
 - high local protection: peak weather should cause only light `tileSandBurial`, controlled moisture loss, and little or no lasting fertility setback; `growthPressure` should remain manageable enough that `tilePlantDensity` mostly holds, with the derived trend label often returning from `Holding` to `Growing` after the peak passes; structures should need only light clearing or repair, with limited `deviceEfficiency` loss; the visible result should be a resilient patch rather than a reset
 
@@ -1917,7 +1917,7 @@ Resistance profile:
 | `saltTolerance` | `0-100` | How strongly the plant resists salinity-based density-cap reduction |
 | `heatTolerance` | `0-100` | How much ambient heat the plant can endure before heat starts raising `growthPressure` |
 | `windResistance` | `0-100` | How much ambient wind and erosion pressure the plant can endure before wind starts raising `growthPressure` |
-| `sandTolerance` | `0-100` | How much sand intensity and burial pressure the plant can endure before sand starts raising `growthPressure` |
+| `dustTolerance` | `0-100` | How much dust intensity and burial pressure the plant can endure before dust starts raising `growthPressure` |
 
 Ecological contribution profile:
 
@@ -2043,7 +2043,7 @@ Use this prototype logic:
 
 - derive water readiness from current `tileMoisture`
 - derive soil readiness from `tileSoilFertility` plus the current burial situation
-- derive wind and sand exposure from `tileWind`, `tileDust`, and the plant's own resistances
+- derive wind and dust exposure from `tileWind`, `tileDust`, and the plant's own resistances
 - derive heat exposure from `tileHeat`, `tileMoisture`, and the plant's `heatTolerance`
 - combine these grouped pressures into `growthPressure`
 
@@ -4059,7 +4059,7 @@ This summary should include only core runtime meters and the core plant-side val
 | Temporary tile pressure | `tileSandBurial` | Recoverable sand overlay created mainly by sandstorms. If ignored, it can create lasting fertility loss. |
 | Plant meters | `tilePlantDensity`, `growthPressure`, `salinityDensityCap` | Shared plant-side runtime meters. `tilePlantDensity` tracks current plant presence, `growthPressure` governs growth-capable plants, and `salinityDensityCap` is the plant-side density ceiling created by salty ground. |
 | Plant behavior values | `growable`, `constantWitherRate` | Core plant-side behavior values. `growable` decides whether favorable conditions may increase density, while `constantWitherRate` applies steady density loss to plant density when defined. |
-| Plant resistance values | `saltTolerance`, `heatTolerance`, `windResistance`, `sandTolerance` | Plant-definition values that turn salinity, heat, wind, and sand pressure into species-specific density limits and pressure resistance. |
+| Plant resistance values | `saltTolerance`, `heatTolerance`, `windResistance`, `dustTolerance` | Plant-definition values that turn salinity, heat, wind, and dust pressure into species-specific density limits and pressure resistance. |
 | Plant contribution meters | `protectionPower`, `shadePower`, `moistureProtectionPower`, `fertilityImprovePower`, `salinityReductionPower` | Current plant-side contribution meters. Species definition sets their ceiling, and `tilePlantDensity` scales how much of each contribution is currently active. `Straw Checkerboard` uses the same contribution chain through its current `tilePlantDensity`. |
 
 ### Event To Weather Pressure
@@ -4119,7 +4119,7 @@ This summary should include only core runtime meters and the core plant-side val
 | `saltTolerance` | Plant definition only | `salinityDensityCap` | Preserves usable density on salty ground. |
 | `heatTolerance` | Plant definition only | `growthPressure` | Lowers heat-side growth pressure. |
 | `windResistance` | Plant definition only | `growthPressure` | Lowers wind-side growth pressure. |
-| `sandTolerance` | Plant definition only | `growthPressure` | Covers sand exposure and burial-side pressure. |
+| `dustTolerance` | Plant definition only | `growthPressure` | Covers dust exposure and burial-side pressure. |
 
 `Straw Checkerboard` should be authored through the same shared plant rows: start it at maximum `tilePlantDensity`, set `growable = false`, set a positive `constantWitherRate`, keep `growthPressure` at `0`, and let its density loss feed `tileSoilFertility`.
 
@@ -4146,7 +4146,7 @@ List only core meters and core plant-side values here. Do not expand into helper
 | `tileSoilFertility` | `fertilityImprovePower`, `tileWind`, `tileDust`, `tileSandBurial` | `tileMoisture`, `growthPressure` | Long-term land quality meter. |
 | `tileSoilSalinity` | Authored starting salinity, `salinityReductionPower` | `salinityDensityCap` | Salty-ground rehabilitation meter. |
 | `tileSandBurial` | `tileDust`, burial-clearing actions | `tileSoilFertility`, `growthPressure` | Temporary burial overlay. |
-| `growthPressure` | `tileMoisture`, `tileSoilFertility`, `tileSandBurial`, `tileHeat`, `tileWind`, `tileDust`, `heatTolerance`, `windResistance`, `sandTolerance` | `tilePlantDensity` | Final plant pressure meter for growth-capable plants. |
+| `growthPressure` | `tileMoisture`, `tileSoilFertility`, `tileSandBurial`, `tileHeat`, `tileWind`, `tileDust`, `heatTolerance`, `windResistance`, `dustTolerance` | `tilePlantDensity` | Final plant pressure meter for growth-capable plants. |
 | `salinityDensityCap` | `tileSoilSalinity`, `saltTolerance` | `tilePlantDensity` | Plant-side density ceiling on salty ground. |
 | `tilePlantDensity` | `growthPressure`, `salinityDensityCap`, `growable`, `constantWitherRate` | `protectionPower`, `shadePower`, `moistureProtectionPower`, `fertilityImprovePower`, `salinityReductionPower` | Current plant strength and effect scale. Higher density strengthens plant-side contribution meters first, rather than pushing terrain directly. |
 
