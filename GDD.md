@@ -2429,7 +2429,7 @@ Key rules:
 - Fully unlocked board composition should start with `2` visible tasks per active `Faction`; with `3` factions this means `6` visible tasks on the normal starter board
 - The fully unlocked board should also have an `Accepted Task Cap` of `3`
 - Every `Site Task` should show its publishing `Faction`
-- Tasks should refresh based on terrain, weather, weak zones, current plants, available tech, and currently accepted tasks
+- The task pool should refresh on its own periodic cadence
 - The player must explicitly accept a task to commit one of their acceptance slots
 - Accepted tasks move into an active list and do not rotate out on refresh
 - Unaccepted tasks remain on the board and may rotate out when the pool refreshes
@@ -2440,7 +2440,8 @@ Key rules:
 - That `Faction Reputation` payout should be guaranteed on completion, but its amount should scale by task tier or level and task type rather than being chosen from the reward draft
 - A good task choice should depend on current tech build, short-term reward need, active faction events, expected assistant value, current forecast risk, and how many acceptance slots are already committed
 - Tasks should often emerge from live site problems such as a regressing plant cluster, buried irrigation line, failing windbreak, or vulnerable harvest patch
-- The task pool should refresh periodically over time; when a refresh happens, some tasks can rotate out and new ones can appear
+- When a refresh happens, some tasks can rotate out and new ones can appear
+- The newly generated tasks may draw from current site context such as terrain, weather, weak zones, current plants, available tech, and currently accepted tasks
 - Each refresh should also generate a small number of `Task Chain`s when possible
 - If a chain step is left unaccepted on the board, it may rotate out on refresh and break the remaining chain opportunity
 - The player should feel encouraged to complete accepted tasks quickly, because finished tasks free acceptance slots and let the next commitment matter
