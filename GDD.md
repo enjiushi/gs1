@@ -69,7 +69,7 @@ These terms are stable and should be used consistently in future design and impl
 | `Task Tier` | The rarity and difficulty level of a `Site Task`, which controls how often it appears, how hard it is to finish, and how strong its rewards feel. |
 | `Task Reward Draft` | The choice set shown on a `Site Task` before acceptance, typically with `2` options; on completion, the player claims `1` option from that task's draft. The options can include `Site Unlockables`, `Run Modifier`s, or resource-focused rewards, but not every draft must include an unlockable. |
 | `Task Reward Package` | A money, resources, or mixed tactical-bundle option that can appear inside a `Task Reward Draft`. |
-| `Per-Site Modifier` | The shared runtime format for any temporary effect that changes meter behavior on the current `Site` only. It may come from a claimed `Run Modifier` during the site or from a passive `Nearby-Site Aura` applied at deployment. |
+| `Per-Site Modifier` | The shared runtime format for any temporary effect that changes meter behavior on the current `Site` only. It may come from a claimed `Run Modifier` during the site or from a passive `Nearby-Site Aura` applied at deployment. It should reduce pressure or shift priorities, not delete the site's core danger. |
 | `Run Modifier` | A task- or reward-draft-sourced `Per-Site Modifier` that activates during the current site session, usually with stronger or more directional effects than nearby support. It is lost if the player leaves, fails, or restarts that site. |
 | `Task Chain` | A linked set of tasks generated inside a task pool refresh; each task pays normal rewards, but completing the full chain grants an extra reward and encourages priority-based planning. |
 | `Site Commendation` | A government-issued prize awarded when a `Site` is successfully restored; it includes a title plus a cited reason based on how the site was completed, giving the player recognition and a clear record of progress. |
@@ -80,7 +80,7 @@ These terms are stable and should be used consistently in future design and impl
 | `Item` | Any carriable object that can occupy `Inventory` or `Container` slots, including seeds, tools, portable devices, materials, medicines, water, and harvested goods. |
 | `Container` | A camp storage object that can be built or bought on-site and used to store `Item`s outside the player's carried `Inventory`. |
 | `Site Output Modifier` | A persistent bonus trait attached to a stabilized site's regional support output, such as increased wind protection, fertility support, specific resource yield, or support range. These traits usually strengthen that site's exported `Nearby-Site Aura` or `Resource Loadout Output`. |
-| `Nearby-Site Aura` | A passive `Per-Site Modifier` package projected from adjacent stabilized sites into the current site session before deployment. It should be weaker and steadier than a claimed `Run Modifier`, and usually focuses on one support channel or one linked pair of meters. |
+| `Nearby-Site Aura` | A passive `Per-Site Modifier` package projected from adjacent stabilized sites into the current site session before deployment. It should be weaker and steadier than a claimed `Run Modifier`, usually focuses on one support channel or one linked pair of meters, and should never grant full hazard immunity. |
 | `Camp Support` | The light support infrastructure on a `Site`, including shelter, `Container`s, service devices, and hired labor access. |
 | `Player Condition` | The worker's physical and mental state, represented by survival and output meters such as health, hydration, nourishment, energy cap, energy, morale, and work efficiency. |
 | `Aftermath Relief Offer` | A faction support offer that can appear after a harsh event enters `Aftermath`; its strength depends on current `Faction Reputation` and site damage. |
@@ -2476,7 +2476,7 @@ This tier model is temporary design scaffolding and should be refined later thro
 | `Level 2 Standard` | Common | Moderate field effort or timing | Solid `3`-option draft quality | Useful unlock, modifier, or resource choices |
 | `Level 3 Priority` | Uncommon | Demands stronger planning or site setup | Better draft quality and better option mix | Clearly valuable mixed choices |
 | `Level 4 Elite` | Rare | Difficult, often weather-sensitive or layout-sensitive | High-quality draft with stronger unlockables, premium bundles, or modifier access | Large upside with stronger strategic pivots |
-| `Level 5 Jackpot` | Very rare | Hard to spawn, hard to complete, and risky under site conditions | Top-end draft quality with exciting site-changing choices | Outstanding choices plus strong `Run Modifier` potential intended to create a real excitement spike |
+| `Level 5 Jackpot` | Very rare | Hard to spawn, hard to complete, and risky under site conditions | Top-end draft quality with exciting site-shaping choices | Outstanding choices plus strong `Run Modifier` potential intended to create a real excitement spike without removing core site danger |
 
 Reward scaling should feel obvious. A higher-tier task should not only be numerically better; it should look and feel more important when it appears in the pool.
 
@@ -2498,7 +2498,7 @@ Important rule:
 - `Run Modifier`s last only for the current site session
 - restarting, failing, or leaving that site clears them
 
-The emotional target is not just "nice, bigger reward." It is "holy shit, this changes my whole run." That kind of spike creates stronger memory, stronger identity, and much higher excitement when a jackpot-tier task appears.
+The emotional target is not just "nice, bigger reward." It is closer to "this really changes my priorities for this run." That kind of spike creates stronger memory, stronger identity, and much higher excitement when a jackpot-tier task appears, without making the player feel safe from the site's core threats.
 
 Run modifiers must avoid creating one obviously best outcome. A good modifier should feel powerful, but also situational, synergistic, or commitment-based rather than universally dominant.
 
@@ -2507,6 +2507,8 @@ Anti-dominant-strategy rules for modifiers:
 - Strong modifiers should push a style, not solve every problem
 - Modifier value should depend on site conditions, current tech, and player choices
 - Some modifiers should be incredible in one run and merely solid in another
+- Modifiers should reduce pressure, not create hazard immunity or worker invincibility
+- Modifiers should not fully remove the need to manage hydration, nourishment, protection, burial, or recovery
 - Commitment bonuses are good; universal auto-picks are bad
 - Players should be excited to see different modifiers, not only fish for one best one
 
@@ -2832,6 +2834,7 @@ Use these rules:
 - a `Nearby-Site Aura` activates at deployment and lasts for the full site session
 - a `Nearby-Site Aura` should usually be weaker than a claimed `Run Modifier`
 - a `Nearby-Site Aura` should usually focus on one support channel or one linked pair of meters
+- a `Nearby-Site Aura` should lower early pressure or support one opening plan, not nullify harsh weather or survival upkeep
 - good nearby aura directions include small `tileHeat` relief, small `tileWind` relief, small `tileMoisture` retention, small `tileSoilFertility` support, small `playerHydration` preservation, or small `playerHealth` and `playerMorale` recovery support
 - nearby aura effects should still act through the existing meter model; they should not bypass the meter system with direct scripted outcomes
 
@@ -3027,6 +3030,7 @@ Authoring rules:
 - a modifier may change plant-side meter flow such as `tileMoisture`, `tileSoilFertility`, `tileSoilSalinity`, `growthPressure`, `salinityDensityCap`, or density gain and loss on `tilePlantDensity`
 - a modifier may change player-side meter flow such as `playerHydration`, `playerHealth`, `playerNourishment`, `playerEnergyCap`, `playerMorale`, or `playerWorkEfficiency`
 - a modifier should reshape the existing meter model instead of bypassing it with hidden direct plant death, instant worker collapse, or special-case scripted survival
+- a modifier should reduce difficulty pressure and create an advantage, but should never make the player invincible or remove the need to keep managing core survival meters
 - task-earned modifiers should usually be stronger, more conditional, and more strategy-shaping than nearby-site aura modifiers
 - nearby-site aura modifiers should usually start active, stay readable, and focus on one support channel rather than many tiny bonuses at once
 - stacking should stay capped and readable; one site should usually have only a few meaningful active modifiers rather than a long invisible buff list
@@ -3918,11 +3922,11 @@ Task tiers should be clearly readable, and higher-tier tasks should feel meaning
 
 ### Run Modifier Check
 
-At least some jackpot-tier task outcomes should grant `Run Modifier`s that feel powerful enough to change the player's strategy for the rest of the current site session. The correct player reaction should be closer to "this changes my whole run" than "this is just a slightly bigger reward."
+At least some jackpot-tier task outcomes should grant `Run Modifier`s that feel powerful enough to change the player's strategy for the rest of the current site session. The correct player reaction should be closer to "this gives me a strong new angle" than "this makes me safe no matter what happens."
 
 ### Modifier Balance Check
 
-Run modifiers should feel exciting and powerful without collapsing replayability into one best outcome. If players consistently fish for a single modifier because it dominates too many site conditions, modifier design or spawn rules need revision.
+Run modifiers should feel exciting and powerful without collapsing replayability into one best outcome. If players consistently fish for a single modifier because it dominates too many site conditions, or if a modifier makes players feel effectively invincible against hazards, modifier design or spawn rules need revision.
 
 ### Task Chain Check
 
