@@ -654,6 +654,7 @@ Current prototype gameplay effect for `Health`:
 
 - `Health` should drop from dangerous outdoor exposure, severe exhaustion, and risky harsh-event work
 - low `Health` should reduce safe work capacity even if the player has recovered some `Energy`
+- low `Health` should also reduce worker action efficiency, making physically demanding tasks take longer or feel less reliable
 - low `Health` should slow recovery and make collapse or forced retreat more likely
 - shelter, rest, and medicine should recover `Health` more slowly than `Energy`
 
@@ -4079,7 +4080,7 @@ This summary should include only core runtime meters and the core plant-side val
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `playerHealth` | Rest and shelter recovery, medicine, harsh outdoor exposure, dangerous field work, low `playerHydration`, low `playerNourishment` | `playerEnergy`, risky-action safety, collapse risk | Slow physical-condition meter. Low health should make the worker less resilient even if short-term energy is restored. |
+| `playerHealth` | Rest and shelter recovery, medicine, harsh outdoor exposure, dangerous field work, low `playerHydration`, low `playerNourishment` | `playerEnergy`, worker action efficiency, risky-action safety, collapse risk | Slow physical-condition meter. Low health should make the worker less resilient and less efficient even if short-term energy is restored. |
 | `playerHydration` | Drinking actions, water items, `weatherHeat`, outdoor work, rest and shelter recovery | `playerEnergy` | Most urgent worker survival meter in hot conditions. Low hydration should make the worker tire more easily. |
 | `playerNourishment` | Eating actions, food items, time, outdoor work, rest recovery | `playerEnergy` | Slower-moving worker support meter for sustained efficiency and recovery. |
 | `playerEnergy` | Work actions, `weatherHeat`, rest recovery, `playerHealth`, `playerHydration`, `playerNourishment`, `playerMorale` | Worker action capacity | Main short-term work-capacity meter. Low energy limits how much meaningful field work the player can do. |
@@ -4140,7 +4141,7 @@ List only core meters and core plant-side values here. Do not expand into helper
 | `eventHeatPressure` | Current event archetype, current event phase, `eventTier` | `weatherHeat` | Event-side heat meter. |
 | `eventWindPressure` | Current event archetype, current event phase, `eventTier` | `weatherWind` | Event-side wind meter. |
 | `eventSandPressure` | Current event archetype, current event phase, `eventTier` | `weatherSand` | Event-side sand meter. |
-| `playerHealth` | Rest and shelter recovery, medicine, harsh outdoor exposure, dangerous field work, low `playerHydration`, low `playerNourishment` | `playerEnergy`, risky-action safety, collapse risk | Core worker health meter. |
+| `playerHealth` | Rest and shelter recovery, medicine, harsh outdoor exposure, dangerous field work, low `playerHydration`, low `playerNourishment` | `playerEnergy`, worker action efficiency, risky-action safety, collapse risk | Core worker health meter. |
 | `playerHydration` | Drinking actions, water items, `weatherHeat`, outdoor work, rest and shelter recovery | `playerEnergy` | Core worker hydration meter. |
 | `playerNourishment` | Eating actions, food items, time, outdoor work, rest recovery | `playerEnergy` | Core worker nourishment meter. |
 | `playerEnergy` | Work actions, `weatherHeat`, rest recovery, `playerHealth`, `playerHydration`, `playerNourishment`, `playerMorale` | Worker action capacity | Core worker action-capacity meter. |
