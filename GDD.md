@@ -400,7 +400,7 @@ Display rule:
 - the inspection UI should report the strongest current contribution as the `Primary Limiter` and may also report the second strongest as a `Secondary Limiter`
 - `tileSoilSalinity` should stay a separate growth-cap warning rather than being folded into `growthPressure`, because salinity is a placement and rehabilitation issue, not the same kind of short-term growth pressure
 - Money, `Reputation`, `Faction Reputation`, stack counts, `fullyGrownTileCount`, `siteCompletionTileThreshold`, and `campaignDaysRemaining` are native integers and should display as exact integers
-- `tileSoilFertility` is the long-lived land-improvement meter used at runtime; it affects both plant growth speed and how well the tile retains moisture
+- `tileSoilFertility` is the long-lived land-improvement meter used at runtime; it affects plant growth speed, the tile's maximum moisture capacity, and how quickly stored moisture is lost
 - `tileSoilSalinity` should also be shown through a simple overlay or inspection readout because it directly affects plant choice on some tiles
 - `campDurability` should be visible as a base-condition meter because it directly controls how much protection and recovery value the camp can still provide
 - `deviceStoredWater` should be visible on `Water Tank`s and on connected irrigation inspection because it directly controls whether linked `Drip Irrigator`s can operate
@@ -536,7 +536,7 @@ For the prototype, every plantable `Ground` tile should carry these three soil m
 
 Prototype interpretation:
 
-- `tileSoilFertility` is the long-lived land-improvement meter; it raises plant growth speed and slows moisture loss by improving water retention
+- `tileSoilFertility` is the long-lived land-improvement meter; it raises plant growth speed, sets the tile's maximum moisture capacity, and slows moisture reduction
 - `tileMoisture` is the short-lived water-availability meter; it speeds growth when sufficient and slows or reverses it when too low
 - `tileSoilSalinity` is the rehabilitation meter; it should influence which plants can thrive on the tile by capping density, not by acting as a hidden death timer
 
@@ -1440,7 +1440,7 @@ Plants are role-based rather than based on exact real species in the first draft
 The long-term taxonomy can still use three broad families:
 
 - Protector plants: reduce wind, provide shade, lower local heat pressure, shield neighboring tiles, and help young growth survive.
-- Restorative plants: improve soil fertility, reduce erosion, retain moisture, or gradually reduce tile salinity.
+- Restorative plants: improve soil fertility, reduce erosion, expand soil moisture capacity through soil improvement, or gradually reduce tile salinity.
 - Output plants: provide limited economic or food value without replacing the restoration focus.
 
 For the prototype, however, the more important lens is four gameplay roles:
@@ -1978,7 +1978,7 @@ Moisture rule:
 - `tileHeat` and `tileWind` increase moisture loss
 - `watering` and direct irrigation such as `Drip Irrigator` increase `tileMoisture`
 - local support should already be reflected inside resolved `tileHeat` and `tileWind`, so terrain moisture reads those resolved meters instead of reading raw support values again
-- higher `tileSoilFertility` also helps the tile retain moisture better
+- higher `tileSoilFertility` raises the tile's maximum `tileMoisture` capacity and slows moisture reduction, but does not directly add moisture
 - `tileMoisture` should stay within its normal meter range
 
 Fertility rule:
@@ -1994,7 +1994,7 @@ Fertility rule:
 Interpretation:
 
 - `tileSoilFertility` is the long-term land quality meter
-- higher fertility directly improves plant growth speed and indirectly improves moisture retention by slowing moisture loss
+- higher fertility directly improves plant growth speed, raises the tile's maximum moisture capacity, and slows moisture reduction without directly adding moisture
 - erosion means direct `tileSoilFertility` reduction caused by wind-and-sand exposure; there is no separate hidden stability meter
 - high `tileHeat` should not directly cause erosion in the prototype, but it can indirectly make erosion more likely by draining moisture, increasing plant `growthPressure`, and weakening cover if the player ignores it
 - local protection sources such as plants, `Wind Fence`, and rock shelter lower resolved `tileWind` and `tileDust`, which then reduces wind-and-sand-driven `tileSoilFertility` loss
@@ -4092,8 +4092,8 @@ This summary should include only core runtime meters and the core plant-side val
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `tileMoisture` | Watering, direct irrigation such as `Drip Irrigator`, `tileHeat`, `tileWind`, `tileSoilFertility` | `growthPressure` | Stored water on the tile. Better moisture lowers plant pressure and softens heat stress. |
-| `tileSoilFertility` | `fertilityImprovePower`, `tileWind`, `tileDust`, `tileSandBurial` | `tileMoisture`, `growthPressure` | Long-term land quality meter. Better fertility both improves plant performance and helps the tile retain moisture. |
+| `tileMoisture` | Watering, direct irrigation such as `Drip Irrigator`, `tileHeat`, `tileWind`, `tileSoilFertility` | `growthPressure` | Stored water on the tile. Better moisture lowers plant pressure and softens heat stress. `tileSoilFertility` raises the maximum moisture capacity and slows moisture reduction, while watering and irrigation increase the current amount. |
+| `tileSoilFertility` | `fertilityImprovePower`, `tileWind`, `tileDust`, `tileSandBurial` | `tileMoisture`, `growthPressure` | Long-term land quality meter. Better fertility improves plant performance, raises the tile's maximum moisture capacity, and slows moisture reduction, but does not directly add moisture by itself. |
 | `tileSoilSalinity` | Authored starting salinity, `salinityReductionPower` | `salinityDensityCap` | Strategic placement and rehabilitation meter. |
 | `tileSandBurial` | `tileDust`, burial-clearing actions | `tileSoilFertility`, `growthPressure` | Temporary overlay state rather than long-term soil quality. |
 
