@@ -75,9 +75,9 @@ These terms are stable and should be used consistently in future design and impl
 | `Site Commendation` | A government-issued prize awarded when a `Site` is successfully restored; it includes a title plus a cited reason based on how the site was completed, giving the player recognition and a clear record of progress. |
 | `Campaign Clock` | The fixed campaign time limit that pressures the player to complete as many `Site`s as possible before the run ends. |
 | `Fully Grown Tile` | A planted tile that has reached the mature density state counted toward `Site` completion. |
-| `Loadout` | The starting food items, seed items, and device items chosen before entering a `Site`. |
+| `Loadout` | The starting carried items and support packages chosen before entering a `Site`, such as water, seed bundles, repair supplies, or deployable kits. |
 | `Inventory` | The player's slot-based carried storage for `Item`s during a `Site` session. Capacity is limited and can be expanded by the `Persistent Tech Tree`. |
-| `Item` | Any carriable object that can occupy `Inventory` or `Container` slots. In the current design, every item should belong to one of four simple item types: `device`, `seed`, `harvest`, or `food`. |
+| `Item` | Any carriable object that can occupy `Inventory` or `Container` slots. In the current design, every item should use one shared data schema, with behavior decided by data-driven tags, capabilities, and linked content rather than by a fixed top-level item type. |
 | `Container` | A camp storage object that can be built or bought on-site and used to store `Item`s outside the player's carried `Inventory`. |
 | `Site Output Modifier` | A persistent bonus trait attached to a stabilized site's regional support output, such as increased wind protection, fertility support, specific loadout-item yield, or support range. These traits usually strengthen that site's exported `Nearby-Site Aura` or `Loadout Item Output`. |
 | `Nearby-Site Aura` | A passive `Per-Site Modifier` package projected from adjacent stabilized sites into the current site session before deployment. It should be weaker and steadier than a claimed `Run Modifier`, usually focuses on one support channel or one linked pair of meters, and should never grant full hazard immunity. |
@@ -263,7 +263,7 @@ Core phone functions:
 - Review and accept jobs from the current site's `Contract Board`
 - Review the current site's `Site Task` pool and its refresh timing
 - Review `Faction Reputation`, current `Faction Assistant` support, and unlocked faction-tech thresholds
-- Buy `food`, `seed`, and `device` items such as water, rations, medicine, seeds, and support device kits
+- Buy site items such as water, rations, medicine, seed bundles, repair supplies, and support device kits
 - Sell stored items, harvested output, or crafted goods
 - Hire temporary contractors
 - Spend money on revealed `Site Unlockables` on the current site
@@ -385,7 +385,7 @@ For each fixed simulation step, resolve systems in this order:
 3. Resolve completed player, contractor, and device actions for this step such as watering, clearing burial, repair completion, or planting completion.
 4. Resolve local weather meters for each tile, especially `tileHeat`, `tileWind`, and `tileDust`, from current site weather plus current local support, shelter, terrain cover, and active device output.
 5. Apply ongoing exposure and consumption to the worker, contractors, devices, and vulnerable stored items.
-6. Apply hazard pressure and environmental damage for this step, including erosion, plant density loss, burial gain, device damage, camp durability loss, and resource loss.
+6. Apply hazard pressure and environmental damage for this step, including erosion, plant density loss, burial gain, device damage, camp durability loss, and stored-item loss.
 7. Apply recovery and beneficial change for this step, including plant density gain, plant constant-wither loss, salinity reduction, soil-fertility improvement, moisture recovery from watering or irrigation, moisture-loss reduction from protective effects, player recovery, and site stabilization gains, if current conditions allow.
 8. Recompute threshold-derived cleanup states such as death or restored pocket status.
 9. Run slower pulse checks whose timers have elapsed, including natural spread attempts, output pulses, task trigger checks, and other low-frequency site logic.
@@ -1119,49 +1119,56 @@ Important rule:
 
 #### Layer 2: Item Definition
 
-The item system should be simpler and more implementation-friendly than the older resource breakdown. Every carriable `Item` should use one shared definition and belong to one of only four item types.
+The item system should be simpler and more implementation-friendly than the older resource breakdown. Every carriable `Item` should use one shared definition. Gameplay should not branch on a fixed top-level item-type enum. Instead, item behavior should come from shared fields, tags, capabilities, and linked content.
+
+This means a water container, a medicine pack, a seed bundle, and a device kit all use the same schema. What changes between them is not their table shape, but their data:
+
+- the tags that describe what kind of item they are
+- the capabilities that describe what the player may do with them
+- the linked content they point at, if they deploy, plant, or unlock something specific
 
 Shared item-definition fields:
 
 | Field | Meaning |
 |---|---|
 | `itemId` | Unique runtime identity for this exact item entry |
-| `itemType` | One of `device`, `seed`, `harvest`, or `food` |
 | `stackSize` | Maximum quantity held in one slot |
 | `sourceRule` | How the item enters the site economy: `BuyOnly`, `CraftOnly`, `BuyOrCraft`, or `HarvestOnly` |
 | `sellValue` | Money gained when sold through the `Field Phone` |
 | `linkedContentId` | Optional related plant, structure, output, or recipe id |
-| `useTags` | Short tags such as `planting`, `consumable`, `repair`, `build`, `craftingIngredient`, or `sale` |
+| `itemTags` | Freeform descriptive tags such as `drinkable`, `edible`, `medical`, `plantingStock`, `deployableKit`, `repairSupply`, `harvested`, `crafted`, `spoilable`, or `fragile` |
+| `useCapabilities` | Explicit action verbs such as `drink`, `eat`, `useMedicine`, `plant`, `deployStructure`, `repair`, `craftInput`, `transferWater`, or `sell` |
 
-Item-type meanings:
+Important rule:
 
-- `device`: placeable device kits plus loose technical supplies such as `repairKit` or `partsBundle`
-- `seed`: planting stock for a specific plant line
-- `harvest`: raw field output gathered from plants and used for sale or crafting input
-- `food`: all consumable survival and recovery goods, including drinkable water, packed food, medicine-like recovery supplies, and crafted edible or drinkable products such as fruit juice
+- systems should check `useCapabilities`, `itemTags`, and `linkedContentId`, not a hard-coded item class
+- if an item can be planted, it should expose `plant` and point its `linkedContentId` to a plant line
+- if an item can deploy a structure, it should expose `deployStructure` and point its `linkedContentId` to a structure type
+- if an item can be consumed, it should expose the relevant consume capability such as `eat`, `drink`, or `useMedicine`
+- future hybrid items should be possible by combining tags and capabilities without adding a new base type
 
 Acquisition and sale rules:
 
 - every item should be sellable through the `Field Phone`
-- each non-harvest item should explicitly state whether it is `BuyOnly`, `CraftOnly`, or `BuyOrCraft`
-- `harvest` items are the one simple exception: they enter inventory from field harvesting and therefore use `HarvestOnly`
+- each item should explicitly state whether it is `BuyOnly`, `CraftOnly`, `BuyOrCraft`, or `HarvestOnly`
+- `HarvestOnly` is a source rule, not a separate gameplay type
 - stack size is a real carrying constraint, not just a presentation label
 - if the player wants to carry more than one stack limit of the same `Item`, the excess must occupy additional `Inventory` slots
 - `Reputation` is not an inventory item and never exists in storage
 
 Recommended simplified item catalog:
 
-| Item | Runtime Identity | Item Type | Source Rule | Stack Size | Main Uses |
-|---|---|---|---|---|---|
-| Water Container | `waterContainer` | `food` | `BuyOnly` | `5` | Hydration and filling `Water Tank`s |
-| Food Pack | `foodPack` | `food` | `BuyOnly` | `5` | `Nourishment` recovery and basic survival prep |
-| Medicine Pack | `medicinePack` | `food` | `BuyOnly` | `3` | `Health` recovery after harsh conditions |
-| Crafted Food / Drink | `craftedFood:<recipeId>` | `food` | `CraftOnly` or `BuyOrCraft` | `5` | High-value sale or stronger recovery; examples include fruit juice recipes unlocked by tech |
-| Repair Kit | `repairKit` | `device` | `BuyOnly` or `BuyOrCraft` | `3` | Structure and device repair |
-| Parts Bundle | `partsBundle` | `device` | `BuyOnly` or `BuyOrCraft` | `10` | Device construction, upgrades, and some repairs |
-| Device Kit | `deviceKit:<structureTypeId>` | `device` | `BuyOnly` or `BuyOrCraft` | `1` | Placement of one site device |
-| Seed Bundle | `seedBundle:<plantTypeId>` | `seed` | `BuyOnly` or `BuyOrCraft` | `10` | Plant placement for a specific plant type |
-| Harvest Good | `harvestGood:<outputTypeId>` | `harvest` | `HarvestOnly` | `10` | Sale or crafting ingredient |
+| Item | Runtime Identity | Item Tags | Use Capabilities | Source Rule | Stack Size | Main Uses |
+|---|---|---|---|---|---|---|
+| Water Container | `waterContainer` | `drinkable`, `waterCarrier`, `spoilable` | `drink`, `transferWater`, `sell` | `BuyOnly` | `5` | Hydration and filling `Water Tank`s |
+| Food Pack | `foodPack` | `edible`, `spoilable` | `eat`, `sell` | `BuyOnly` | `5` | `Nourishment` recovery and basic survival prep |
+| Medicine Pack | `medicinePack` | `medical`, `consumable`, `spoilable` | `useMedicine`, `sell` | `BuyOnly` | `3` | `Health` recovery after harsh conditions |
+| Crafted Food / Drink | `craftedFood:<recipeId>` | `crafted`, `edible` or `drinkable`, `valueAdded`, `spoilable` | `eat` or `drink`, `sell` | `CraftOnly` or `BuyOrCraft` | `5` | High-value sale or stronger recovery; examples include fruit juice recipes unlocked by tech |
+| Repair Kit | `repairKit` | `repairSupply`, `mechanical` | `repair`, `sell` | `BuyOnly` or `BuyOrCraft` | `3` | Structure and device repair |
+| Parts Bundle | `partsBundle` | `buildSupply`, `mechanical`, `craftingIngredient` | `build`, `repair`, `craftInput`, `sell` | `BuyOnly` or `BuyOrCraft` | `10` | Device construction, upgrades, and some repairs |
+| Device Kit | `deviceKit:<structureTypeId>` | `deployableKit`, `mechanical` | `deployStructure`, `sell` | `BuyOnly` or `BuyOrCraft` | `1` | Placement of one site device |
+| Seed Bundle | `seedBundle:<plantTypeId>` | `plantingStock`, `fragile` | `plant`, `sell` | `BuyOnly` or `BuyOrCraft` | `10` | Plant placement for a specific plant type |
+| Harvest Good | `harvestGood:<outputTypeId>` | `harvested`, `craftingIngredient` | `craftInput`, `sell` | `HarvestOnly` | `10` | Sale or crafting ingredient |
 
 #### Layer 3: Inventory And Containers
 
@@ -1182,7 +1189,7 @@ Rules:
 - future tech can expand `workerPackSlotCount` or `campStorageSlotCount`, but the game should start at `6` and `24`
 - `campStorageSlotCount` should represent the total capacity provided by current camp `Container`s
 - the player should only be able to carry a limited working set away from camp, even if the camp has much more storage available
-- carrying a lot of one exact `Item` should therefore compete directly with carrying food items, seed items, device items, or harvested goods
+- carrying a lot of one exact `Item` should therefore compete directly with carrying water, seed bundles, repair supplies, device kits, or harvested goods
 
 Example inventory pressure:
 
@@ -1229,14 +1236,14 @@ Camp-stored items:
 
 - can be buried, damaged, spoiled, or partially lost during severe hazard events if the camp is exposed
 - are better protected when the camp has stronger shelter structures and nearby protection
-- should be vulnerable by category in readable ways:
+- should be vulnerable through readable item tags and authored examples rather than through a hard-coded item category table:
 
-Vulnerable categories:
+Common vulnerability patterns:
 
-- `food` items such as water, rations, medicine, or crafted consumables
-- `seed` items
-- `harvest` items
-- loose `device` items stored in camp, especially `repairKit`, `partsBundle`, or unplaced `deviceKit:*`
+- `spoilable` items such as water, rations, medicine, or crafted consumables
+- `plantingStock` items such as seed bundles
+- `harvested` items such as gathered crop output
+- `mechanical` or `deployableKit` items stored loose in camp, especially `repairKit`, `partsBundle`, or unplaced `deviceKit:*`
 
 Never hazard-destroy:
 
@@ -2590,7 +2597,7 @@ The main economic outputs are:
 - Buying solar or support devices
 - Buying food or medicine
 - Hiring contractors
-- Purchasing seed items, device parts, or specialized device kits
+- Purchasing seed bundles, parts bundles, or specialized device kits
 - Purchasing revealed `Site Unlockables` on the current site
 
 Task rewards should vary enough to change decision-making between runs. Some campaigns should tempt the player with better short-term cash, while others reward plant progression, utility access, or safer expansion. Payback randomness should reshape priorities, not invalidate planning.
@@ -2793,11 +2800,11 @@ Loadout rules:
 
 In the current design, a loadout can include:
 
-- Starting food and recovery supplies
-- Seed stock
-- Basic device items
-- Utility devices
-- Loose device supplies such as parts bundles or repair kits
+- Water and other recovery supplies
+- Seed bundles
+- Repair supplies
+- Device kits
+- Utility-support packages
 - Small starting protection bonuses from `Nearby-Site Aura`
 
 Important water rule:
@@ -3086,7 +3093,7 @@ Task-driven and money-fallback access rules:
 - if the player chooses a `Run Modifier`, it activates immediately and lasts only for the current site session
 - if the player restarts, fails, or leaves that site, active `Run Modifier`s are lost and a fresh site reward pool is generated on the next attempt
 
-Because revealed unlockables still compete with food items, seed items, device items, and contractor spending, local progression decisions remain real survival tradeoffs instead of free progression.
+Because revealed unlockables still compete with water, recovery supplies, seed bundles, device kits, and contractor spending, local progression decisions remain real survival tradeoffs instead of free progression.
 
 The design goals of this system are:
 
@@ -4076,9 +4083,9 @@ This summary should include only core runtime meters and the core plant-side val
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `playerHealth` | Rest and shelter recovery, medicine, harsh outdoor exposure, dangerous field work, `tileHeat`, `tileDust`, low `playerHydration`, low `playerNourishment` | `playerEnergy`, `playerWorkEfficiency` | Slow physical-condition meter. Low health should make the worker less resilient and less efficient even if short-term energy is restored. |
-| `playerHydration` | Drinking actions, water items, time, `tileHeat`, outdoor work | `playerEnergyCap` | Most urgent worker survival meter in hot conditions. Local heat should make hydration fall faster on exposed tiles, which then limits how much energy can actually be used. |
-| `playerNourishment` | Eating actions, food items, time, outdoor work | `playerEnergyCap` | Slower-moving worker support meter for sustained efficiency and recovery. It should mainly limit the usable energy ceiling instead of directly draining `playerEnergy`. |
+| `playerHealth` | Rest and shelter recovery, items with `useMedicine` capability, harsh outdoor exposure, dangerous field work, `tileHeat`, `tileDust`, low `playerHydration`, low `playerNourishment` | `playerEnergy`, `playerWorkEfficiency` | Slow physical-condition meter. Low health should make the worker less resilient and less efficient even if short-term energy is restored. |
+| `playerHydration` | Drinking actions, items with `drink` capability, time, `tileHeat`, outdoor work | `playerEnergyCap` | Most urgent worker survival meter in hot conditions. Local heat should make hydration fall faster on exposed tiles, which then limits how much energy can actually be used. |
+| `playerNourishment` | Eating actions, items with `eat` capability, time, outdoor work | `playerEnergyCap` | Slower-moving worker support meter for sustained efficiency and recovery. It should mainly limit the usable energy ceiling instead of directly draining `playerEnergy`. |
 | `playerEnergyCap` | `playerHydration`, `playerNourishment` | `playerEnergy` | Usable energy ceiling. Low cap should throttle how much stored energy the worker may actually access. |
 | `playerEnergy` | Work actions, rest recovery, `playerHealth`, `playerEnergyCap`, `playerWorkEfficiency` | None | Main short-term work-capacity meter and end-consumption meter. It should be clamped by `playerEnergyCap`, while low `playerWorkEfficiency` should raise the effective energy cost of each action and drain this meter faster. |
 | `playerMorale` | Safe rest, dense-cover recovery pockets, harsh-event aftermath, current site setbacks and recovery progress | `playerWorkEfficiency` | Worker comfort and psychological stability meter. Low morale should make routine work more energy-expensive or less reliable rather than directly lowering the energy meter. |
