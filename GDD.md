@@ -2302,8 +2302,8 @@ Design rule:
 | Terrain meter | Higher value does | Lower value does | Main modifiers |
 |---|---|---|---|
 | `tileMoisture` | Reduces water shortage, lowers `waterContribution`, and supports density gain | Raises `waterContribution`, slows or reverses growth, and can cause density loss | Watering, rain if added later, `Drip Irrigator` |
-| `tileSoilFertility` | Improves growth readiness | Raises `soilContribution` and slows growth | Fertility-improving plants, `Straw Checkerboard` setup effect, erosion, burial left uncleared |
-| `tileSoilSalinity` | Low salinity allows normal density cap for more plants | High salinity reduces `salinityDensityCap` for low-tolerance plants | Authored starting salinity, `salinityReductionPower` |
+| `tileSoilFertility` | Improves growth readiness and lowers `soilContribution` | Raises `soilContribution` and slows growth | Fertility-improving plants, `Straw Checkerboard` setup effect, erosion, burial left uncleared |
+| `tileSoilSalinity` | Reduces `salinityDensityCap` for low-tolerance plants | Allows normal density cap for more plants | Authored starting salinity, `salinityReductionPower` |
 | `tileSandBurial` | More burial increases soil pressure and can cause lasting fertility loss if ignored | Clearing burial restores the tile toward normal operation | Sandstorms increase it; player clearing reduces it |
 
 ### Checkerboard Setup To Terrain And Protection
