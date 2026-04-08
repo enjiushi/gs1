@@ -2274,7 +2274,7 @@ This summary should include only core runtime meters and the core plant-side val
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `tileMoisture` | Watering, irrigation, `weatherHeat`, `weatherWind`, `tileShade`, `tileSoilFertility`, `Straw Checkerboard` local cover effect | `growthPressure` | Stored water on the tile. Better moisture lowers plant pressure and softens heat stress. |
+| `tileMoisture` | Watering, irrigation, `weatherHeat`, `weatherWind`, `tileSoilFertility` | `growthPressure` | Stored water on the tile. Better moisture lowers plant pressure and softens heat stress. |
 | `tileSoilFertility` | `fertilityImprovePower`, `Straw Checkerboard` density loss, `weatherWind`, `weatherSand`, `tileWindProtection`, `tileSandBurial` | `tileMoisture`, `growthPressure` | Long-term land quality meter. Better fertility both improves plant performance and helps the tile retain moisture. |
 | `tileSoilSalinity` | Authored starting salinity, `salinityReductionPower` | `salinityDensityCap` | Strategic placement and rehabilitation meter. |
 | `tileSandBurial` | `weatherSand`, burial-clearing actions | `tileSoilFertility`, `growthPressure` | Temporary overlay state rather than long-term soil quality. |
@@ -2283,14 +2283,14 @@ This summary should include only core runtime meters and the core plant-side val
 
 | Plant meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `tilePlantDensity` on `Straw Checkerboard` | Placement at maximum density, time-based decay | `tileWindProtection`, `tileMoisture`, `tileSoilFertility` | `Straw Checkerboard` uses the same plant density meter as other plants, but only decays and never regrows. |
+| `tilePlantDensity` on `Straw Checkerboard` | Placement at maximum density, time-based decay | `tileWindProtection`, `tileSoilFertility` | `Straw Checkerboard` uses the same plant density meter as other plants, but only decays and never regrows. |
 
 ### Local Modifiers To Terrain And Plant Pressure
 
 | Modifier | Impacted by | Impact to | Notes |
 |---|---|---|---|
 | `tileWindProtection` | `protectionPower`, `tilePlantDensity`, `Wind Fence`, rock shelter, dense living cover | `tileSoilFertility`, `growthPressure` | Main local shielding modifier. |
-| `tileShade` | `shadePower`, `tilePlantDensity`, shelter structures, solar-panel sharing, rock shape | `tileMoisture`, `growthPressure` | Main local cooling modifier. |
+| `tileShade` | `shadePower`, `tilePlantDensity`, shelter structures, solar-panel sharing, rock shape | `growthPressure` | Main local cooling modifier. |
 | `tileWaterSupport` | `waterSupportPower`, `tilePlantDensity`, `Drip Irrigator`, water devices, faction support if added later | `growthPressure` | Improves readiness without replacing real `tileMoisture`. |
 
 ### Plant Traits To Tile Effects
@@ -2321,9 +2321,9 @@ List only core meters and core plant-side values here. Do not expand into helper
 | `eventWindPressure` | Current event archetype, current event phase, `eventTier` | `weatherWind` | Event-side wind meter. |
 | `eventSandPressure` | Current event archetype, current event phase, `eventTier` | `weatherSand` | Event-side sand meter. |
 | `tileWindProtection` | `protectionPower`, `tilePlantDensity`, `Wind Fence`, rock shelter | `tileSoilFertility`, `growthPressure` | Local shielding meter for wind and sand. |
-| `tileShade` | `shadePower`, `tilePlantDensity`, shelter structures, solar-panel sharing, rock shelter | `tileMoisture`, `growthPressure` | Local cooling meter. |
+| `tileShade` | `shadePower`, `tilePlantDensity`, shelter structures, solar-panel sharing, rock shelter | `growthPressure` | Local cooling meter. |
 | `tileWaterSupport` | `waterSupportPower`, `tilePlantDensity`, `Drip Irrigator`, water devices | `growthPressure` | Water-readiness support that does not replace stored moisture. |
-| `tileMoisture` | Watering, irrigation, `weatherHeat`, `weatherWind`, `tileShade`, `tileSoilFertility`, `Straw Checkerboard` local cover effect | `growthPressure` | Stored water on the tile. |
+| `tileMoisture` | Watering, irrigation, `weatherHeat`, `weatherWind`, `tileSoilFertility` | `growthPressure` | Stored water on the tile. |
 | `tileSoilFertility` | `fertilityImprovePower`, `Straw Checkerboard` density loss, `weatherWind`, `weatherSand`, `tileWindProtection`, `tileSandBurial` | `tileMoisture`, `growthPressure` | Long-term land quality meter. |
 | `tileSoilSalinity` | Authored starting salinity, `salinityReductionPower` | `salinityDensityCap` | Salty-ground rehabilitation meter. |
 | `tileSandBurial` | `weatherSand`, burial-clearing actions | `tileSoilFertility`, `growthPressure` | Temporary burial overlay. |
