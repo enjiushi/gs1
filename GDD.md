@@ -71,7 +71,7 @@ These terms are stable and should be used consistently in future design and impl
 | `Task Reward Package` | A money, resources, or mixed tactical-bundle option that can appear inside a `Task Reward Draft`. |
 | `Per-Site Modifier` | The shared runtime format for any temporary effect that changes meter behavior on the current `Site` only. It may come from a claimed `Run Modifier` during the site or from a passive `Nearby-Site Aura` applied at deployment. It should reduce pressure or shift priorities, not delete the site's core danger. |
 | `Run Modifier` | A task- or reward-draft-sourced `Per-Site Modifier` that activates during the current site session, usually with stronger or more directional effects than nearby support. It is lost if the player leaves, fails, or restarts that site. |
-| `Task Chain` | A linked set of tasks generated inside a task pool refresh; each task pays normal rewards, but completing the full chain grants an extra reward and encourages priority-based planning. |
+| `Task Chain` | A linked set of tasks generated inside a task pool refresh; chain tasks should be visually distinct on the `Contract Board`, accepted chain tasks should bias future refreshes toward related follow-up tasks, each task still pays normal rewards, and completing the full chain grants an extra reward. |
 | `Site Commendation` | A government-issued prize awarded when a `Site` is successfully restored; it includes a title plus a cited reason based on how the site was completed, giving the player recognition and a clear record of progress. |
 | `Campaign Clock` | The fixed campaign time limit that pressures the player to complete as many `Site`s as possible before the run ends. |
 | `Fully Grown Tile` | A planted tile that has reached the mature density state counted toward `Site` completion. |
@@ -2446,6 +2446,7 @@ Key rules:
 - When a refresh happens, some tasks can rotate out and new ones can appear
 - The newly generated tasks may draw from current site context such as terrain, weather, weak zones, current plants, available tech, and currently accepted tasks
 - Each refresh should also generate a small number of `Task Chain`s when possible
+- If the player has already accepted one or more chain tasks, the next refresh should bias newly generated tasks toward follow-up tasks from those active chains when appropriate
 - If a chain step is left unaccepted on the board, it may rotate out on refresh and break the remaining chain opportunity
 - The player should feel encouraged to complete accepted tasks quickly, because finished tasks free acceptance slots and let the next commitment matter
 - Because tasks differ in difficulty and reward shape, players can naturally self-select the easier ones or the ones rewarding what they currently want
@@ -2549,8 +2550,10 @@ Example chain directions:
 Task-chain rules:
 
 - each refresh should generate a small number of chains based on `Task Pool Size`
-- chain tasks should be visibly linked in the `Contract Board`
+- chain tasks should be visibly linked and visually distinct in the `Contract Board`
 - each task inside a chain should still give a normal task reward for its tier
+- if the player accepts one or more chain tasks, the next task-pool refresh should bias new tasks toward related follow-up tasks from those accepted chains
+- that bias should continue the chain opportunity, not guarantee the entire chain for free
 - completing the full chain should grant an extra bonus reward on top of the normal task rewards
 - that chain-completion bonus can be a stronger `Task Reward Draft`, a premium resource bundle, a fixed extra `Reputation` or `Faction Reputation` payout, or better `Run Modifier` odds
 
@@ -3933,7 +3936,7 @@ Run modifiers should feel exciting and powerful without collapsing replayability
 
 ### Task Chain Check
 
-Task pools should sometimes generate clear `Task Chain`s with visibly linked tasks. Each task in the chain should pay normal rewards, but completing the whole chain should grant an extra reward worth planning around. Players should be able to notice and exploit those chains rather than experiencing the task pool as a flat list of disconnected errands.
+Task pools should sometimes generate clear `Task Chain`s with tasks that are both visibly linked and visually distinct from normal board entries. If the player accepts part of a chain, later refreshes should tend to offer related follow-up tasks so the chain can continue without becoming guaranteed. Each task in the chain should pay normal rewards, but completing the whole chain should grant an extra reward worth planning around. Players should be able to notice and exploit those chains rather than experiencing the task pool as a flat list of disconnected errands.
 
 ### Site Commendation Check
 
