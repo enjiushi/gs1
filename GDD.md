@@ -328,7 +328,7 @@ World and campaign values:
 - `worldTimeMinutes`
 - `weatherHeat`
 - `weatherWind`
-- `weatherSand`
+- `weatherDust`
 - `playerHealth`
 - `playerHydration`
 - `playerNourishment`
@@ -692,7 +692,7 @@ These are not just flavor. They directly affect work speed, exposure risk, plant
 Player-facing label rule:
 
 - use `Heat`, `Wind`, and `Dust` as the readable forecast and UI channel names
-- keep `weatherSand` as the internal runtime field name if engineering prefers it
+- keep `weatherDust` as the internal runtime field name if engineering prefers it
 - avoid using real-world air-quality labels such as `PM2.5` as the main gameplay readout, because the prototype is communicating desert field danger, airborne sand, visibility loss, and burial risk rather than a narrow pollution sim
 
 ### Prototype Environmental Pressure Suite
@@ -748,7 +748,7 @@ Player-facing forecast channel rule:
 
 ### Hazard And Weather Runtime Model (Prototype)
 
-The prototype should treat weather as one shared site-wide runtime system that constantly updates `weatherHeat`, `weatherWind`, and `weatherSand`, while rarer extreme events run through their own event-side meter layer on top.
+The prototype should treat weather as one shared site-wide runtime system that constantly updates `weatherHeat`, `weatherWind`, and `weatherDust`, while rarer extreme events run through their own event-side meter layer on top.
 
 #### Weather Runtime Fields
 
@@ -758,10 +758,10 @@ Use these runtime fields:
 |---|---|---|
 | `weatherHeat` | Continuous `0-100` | Current site-wide heat pressure |
 | `weatherWind` | Continuous `0-100` | Current site-wide wind pressure |
-| `weatherSand` | Continuous `0-100` | Current site-wide airborne sand, dust-load, and visibility pressure; shown to the player as `Dust` |
+| `weatherDust` | Continuous `0-100` | Current site-wide airborne sand, dust-load, and visibility pressure; shown to the player as `Dust` |
 | `siteHeatBias` | Continuous `-20` to `20` | Site-specific baseline heat tendency |
 | `siteWindBias` | Continuous `-20` to `20` | Site-specific baseline wind tendency |
-| `siteSandBias` | Continuous `-20` to `20` | Site-specific baseline loose-sand tendency |
+| `siteDustBias` | Continuous `-20` to `20` | Site-specific baseline loose-dust tendency |
 | `forecastConfidence` | Continuous `0-100` | How trustworthy the current forecast is |
 | `forecastLeadMinutes` | Continuous | How much warning time the forecast currently gives |
 | `eventTypeId` | Discrete | Current extreme event archetype or `None` |
@@ -769,12 +769,12 @@ Use these runtime fields:
 | `eventTier` | Discrete | Relative severity band for the current event |
 | `eventHeatPressure` | Continuous `0-100` | Current event-side heat pressure that feeds `weatherHeat` |
 | `eventWindPressure` | Continuous `0-100` | Current event-side wind pressure that feeds `weatherWind` |
-| `eventSandPressure` | Continuous `0-100` | Current event-side sand and dust pressure that feeds `weatherSand` |
+| `eventDustPressure` | Continuous `0-100` | Current event-side dust pressure that feeds `weatherDust` |
 
 Core rule:
 
-- `weatherHeat`, `weatherWind`, and `weatherSand` are site-wide ambient values
-- `eventHeatPressure`, `eventWindPressure`, and `eventSandPressure` are site-wide event meters that can sit at `0` when no harsh event is active
+- `weatherHeat`, `weatherWind`, and `weatherDust` are site-wide ambient values
+- `eventHeatPressure`, `eventWindPressure`, and `eventDustPressure` are site-wide event meters that can sit at `0` when no harsh event is active
 - local terrain, plants, devices, and player field work do not rewrite the weather itself
 - they change how hard the weather lands on a given tile, worker, device, or storage area
 
@@ -803,13 +803,13 @@ Prototype baseline behavior:
 
 - `weatherHeat` should be lowest overnight, rise through morning, peak around midday, then fall in evening
 - `weatherWind` should fluctuate more than heat and can spike during exposed parts of the day even without a named event
-- `weatherSand` should be partly derived from wind, site sand bias, and recent hazard aftermath
+- `weatherDust` should be partly derived from wind, site dust bias, and recent hazard aftermath
 
 Use this prototype relationship:
 
 - `weatherHeat` should come from the daily heat curve plus site bias plus current `eventHeatPressure`
 - `weatherWind` should come from the daily wind curve plus site bias plus gust variation plus current `eventWindPressure`
-- `weatherSand` should come from site sand bias, current wind, current `eventSandPressure`, and recent-event aftermath
+- `weatherDust` should come from site dust bias, current wind, current `eventDustPressure`, and recent-event aftermath
 
 Engineering note:
 
@@ -822,8 +822,8 @@ The prototype only needs a small event set:
 
 | Event | Typical Event-Meter Pattern | Main Gameplay Pressure |
 |---|---|---|
-| `HeatWave` | high `eventHeatPressure`, small `eventWindPressure`, small `eventSandPressure` | hydration drain, energy drain, exposed worker pressure, weak seedling survival |
-| `Sandstorm` | medium `eventHeatPressure`, high `eventWindPressure`, very high `eventSandPressure` | visibility collapse, extreme wind-sand exposure, burial, device damage, movement pressure |
+| `HeatWave` | high `eventHeatPressure`, small `eventWindPressure`, small `eventDustPressure` | hydration drain, energy drain, exposed worker pressure, weak seedling survival |
+| `Sandstorm` | medium `eventHeatPressure`, high `eventWindPressure`, very high `eventDustPressure` | visibility collapse, extreme wind-sand exposure, burial, device damage, movement pressure |
 | `CompoundFront` | high values in all three channels | rare prototype high-tier event that tests the full support layout |
 
 Prototype limits:
@@ -874,7 +874,7 @@ Forecast readability ladder:
 Important naming rule:
 
 - the player-facing third channel should be called `Dust` or `Dust Load`, not `Sand`, because it is communicating airborne density, visibility pressure, and burial threat together
-- `weatherSand` may still remain the runtime field name behind that readout
+- `weatherDust` may still remain the runtime field name behind that readout
 
 Base prototype forecast values:
 
@@ -911,7 +911,7 @@ Use this prototype interpretation:
 
 - `weatherHeat` mainly raises `tileHeat`; `tileHeat` then drives worker hydration loss, worker energy loss, severe exposure health risk, tile moisture loss, and the heat-linked share of plant `growthPressure`
 - `weatherWind` mainly raises `tileWind`; `tileWind` then drives harder outdoor work, worker energy pressure, exposed-tile erosion pressure, moisture loss, and the wind-linked share of plant `growthPressure`
-- `weatherSand` mainly raises `tileDust`; `tileDust` then drives worker health risk, exhausting movement burden, burial, soil setback, the dust-linked share of plant `growthPressure`, and device damage risk
+- `weatherDust` mainly raises `tileDust`; `tileDust` then drives worker health risk, exhausting movement burden, burial, soil setback, the dust-linked share of plant `growthPressure`, and device damage risk
 
 Design consistency rule:
 
@@ -923,7 +923,7 @@ During `Peak`, the event should mainly raise:
 
 - `eventHeatPressure`
 - `eventWindPressure`
-- `eventSandPressure`
+- `eventDustPressure`
 - worker outdoor action speed penalties
 - worker hydration and energy drain
 - worker health risk from severe exposure
@@ -948,7 +948,7 @@ This phase is important because the strategy game continues after the spectacle 
 
 ### Extreme Hazard Events
 
-In addition to normal heat, wind, and sand pressure, some sites should experience extreme hazard events that make the environment temporarily fierce and genuinely threatening. These are not routine background conditions. They are short periods where survival, shelter, preparation, and site layout are put under serious stress.
+In addition to normal heat, wind, and dust pressure, some sites should experience extreme hazard events that make the environment temporarily fierce and genuinely threatening. These are not routine background conditions. They are short periods where survival, shelter, preparation, and site layout are put under serious stress.
 
 Example extreme event directions:
 
@@ -3680,7 +3680,7 @@ The university must exist in play, but it does not need a full technical sandbox
 
 #### Weather And Harsh Event
 
-- keep baseline heat, wind, and sand pressure in simplified form
+- keep baseline heat, wind, and dust pressure in simplified form
 - use a small authored harsh-environment set rather than a large random catalog
 - recommended prototype hazard set:
 - low / high temperature spike
@@ -4057,8 +4057,8 @@ This summary should include only core runtime meters and the core plant-side val
 
 | Group | Meters / values | Role |
 |---|---|---|
-| Event meters | `eventHeatPressure`, `eventWindPressure`, `eventSandPressure` | Site-wide harsh-event channel meters. They represent current event force and feed the weather layer rather than acting as weather themselves. |
-| Weather meters | `weatherHeat`, `weatherWind`, `weatherSand` | Site-wide ambient weather outputs after baseline site conditions and current event meters are combined. |
+| Event meters | `eventHeatPressure`, `eventWindPressure`, `eventDustPressure` | Site-wide harsh-event channel meters. They represent current event force and feed the weather layer rather than acting as weather themselves. |
+| Weather meters | `weatherHeat`, `weatherWind`, `weatherDust` | Site-wide ambient weather outputs after baseline site conditions and current event meters are combined. |
 | Resolved local weather meters | `tileHeat`, `tileWind`, `tileDust` | Per-tile weather result after site weather, local support, and shelter are combined. They bridge site weather and final terrain or plant pressure. |
 | Worker state meters | `playerHealth`, `playerHydration`, `playerNourishment`, `playerEnergy`, `playerMorale` | Core worker survival and performance meters. They represent the worker's current physical and mental condition during site play. |
 | Persistent terrain soil meters | `tileSoilFertility`, `tileMoisture`, `tileSoilSalinity` | Long-lived or short-lived land condition on plantable `Ground`. These meters determine what can grow well. |
@@ -4074,7 +4074,7 @@ This summary should include only core runtime meters and the core plant-side val
 |---|---|---|---|
 | `eventHeatPressure` | Current event archetype, current event phase, `eventTier` | `weatherHeat` | Event-side heat channel. When no harsh event is active, this should sit at or near `0`. |
 | `eventWindPressure` | Current event archetype, current event phase, `eventTier` | `weatherWind` | Event-side wind channel. |
-| `eventSandPressure` | Current event archetype, current event phase, `eventTier` | `weatherSand` | Event-side sand and dust channel. |
+| `eventDustPressure` | Current event archetype, current event phase, `eventTier` | `weatherDust` | Event-side dust channel. |
 
 ### Worker State Relationships
 
@@ -4092,7 +4092,7 @@ This summary should include only core runtime meters and the core plant-side val
 |---|---|---|---|
 | `weatherHeat` | Daily heat curve, site heat bias, `eventHeatPressure` | `tileHeat` | Site-wide heat should resolve into local heat before it affects terrain, plant pressure, or worker meters. |
 | `weatherWind` | Daily wind curve, site wind bias, gust variation, `eventWindPressure` | `tileWind` | Site-wide wind should resolve into local wind before it affects terrain or plant pressure. |
-| `weatherSand` | Site sand bias, current wind, recent-event aftermath, `eventSandPressure` | `tileDust` | Site-wide sand and dust should resolve into local dust before it affects terrain, plant pressure, or worker meters. |
+| `weatherDust` | Site dust bias, current wind, recent-event aftermath, `eventDustPressure` | `tileDust` | Site-wide dust pressure should resolve into local dust before it affects terrain, plant pressure, or worker meters. |
 
 ### Resolved Local Weather To Worker State
 
@@ -4100,7 +4100,7 @@ This summary should include only core runtime meters and the core plant-side val
 |---|---|---|---|
 | `tileHeat` | `weatherHeat`, nearby `heatProtectionPower`, `auraSize`, shelter structures, solar-panel sharing, rock shelter, `heatProtectionAura` | `playerHydration`, `playerEnergy`, `playerHealth` | Final local heat pressure should be the worker-facing heat meter on the current tile. It mainly drives hydration loss and fatigue, while severe exposure can also damage health. |
 | `tileWind` | `weatherWind`, nearby `windProtectionPower`, `auraSize`, `Wind Fence`, rock shelter, `windProtectionAura` | `playerEnergy` | Final local wind exposure should be the worker-facing wind meter on the current tile. It mainly makes outdoor work harder and more exhausting. |
-| `tileDust` | `weatherSand`, nearby `dustProtectionPower`, `auraSize`, `Wind Fence`, rock shelter, `dustProtectionAura`, `windProtectionAura` | `playerHealth`, `playerEnergy` | Final local dust exposure should be the worker-facing dust meter on the current tile. It mainly creates abrasion, breathing strain, visibility burden, and exhausting movement pressure. |
+| `tileDust` | `weatherDust`, nearby `dustProtectionPower`, `auraSize`, `Wind Fence`, rock shelter, `dustProtectionAura`, `windProtectionAura` | `playerHealth`, `playerEnergy` | Final local dust exposure should be the worker-facing dust meter on the current tile. It mainly creates abrasion, breathing strain, visibility burden, and exhausting movement pressure. |
 
 ### Resolved Local Weather To Terrain And Plant Pressure
 
@@ -4108,7 +4108,7 @@ This summary should include only core runtime meters and the core plant-side val
 |---|---|---|---|
 | `tileHeat` | `weatherHeat`, nearby `heatProtectionPower`, `auraSize`, shelter structures, solar-panel sharing, rock shelter, `heatProtectionAura` | `tileMoisture`, `growthPressure` | Final local heat pressure after site heat and local mitigation are combined directly into the resolved meter. |
 | `tileWind` | `weatherWind`, nearby `windProtectionPower`, `auraSize`, `Wind Fence`, rock shelter, `windProtectionAura` | `tileMoisture`, `tileSoilFertility`, `growthPressure` | Final local wind exposure after site wind and local protection are combined directly into the resolved meter. |
-| `tileDust` | `weatherSand`, nearby `dustProtectionPower`, `auraSize`, `Wind Fence`, rock shelter, `dustProtectionAura`, `windProtectionAura` | `tileSandBurial`, `tileSoilFertility`, `growthPressure` | Final local sand and dust exposure after site dust and local mitigation are combined directly into the resolved meter. |
+| `tileDust` | `weatherDust`, nearby `dustProtectionPower`, `auraSize`, `Wind Fence`, rock shelter, `dustProtectionAura`, `windProtectionAura` | `tileSandBurial`, `tileSoilFertility`, `growthPressure` | Final local dust exposure after site dust and local mitigation are combined directly into the resolved meter. |
 
 ### Terrain To Plant Growth
 
@@ -4148,7 +4148,7 @@ List only core meters and core plant-side values here. Do not expand into helper
 |---|---|---|---|
 | `eventHeatPressure` | Current event archetype, current event phase, `eventTier` | `weatherHeat` | Event-side heat meter. |
 | `eventWindPressure` | Current event archetype, current event phase, `eventTier` | `weatherWind` | Event-side wind meter. |
-| `eventSandPressure` | Current event archetype, current event phase, `eventTier` | `weatherSand` | Event-side sand meter. |
+| `eventDustPressure` | Current event archetype, current event phase, `eventTier` | `weatherDust` | Event-side dust meter. |
 | `playerHealth` | Rest and shelter recovery, medicine, harsh outdoor exposure, dangerous field work, `tileHeat`, `tileDust`, low `playerHydration`, low `playerNourishment` | `playerEnergy`, worker action efficiency, risky-action safety, collapse risk | Core worker health meter. |
 | `playerHydration` | Drinking actions, water items, `tileHeat`, outdoor work, rest and shelter recovery | `playerEnergy` | Core worker hydration meter. |
 | `playerNourishment` | Eating actions, food items, time, outdoor work, rest recovery | `playerEnergy` | Core worker nourishment meter. |
@@ -4156,7 +4156,7 @@ List only core meters and core plant-side values here. Do not expand into helper
 | `playerMorale` | Safe rest, dense-cover recovery pockets, harsh-event aftermath, current site setbacks and recovery progress | worker action efficiency | Core worker morale meter. |
 | `tileHeat` | `weatherHeat`, nearby `heatProtectionPower`, `auraSize`, shelter structures, solar-panel sharing, rock shelter, `heatProtectionAura` | `playerHydration`, `playerEnergy`, `playerHealth`, `tileMoisture`, `growthPressure` | Final local heat pressure. |
 | `tileWind` | `weatherWind`, nearby `windProtectionPower`, `auraSize`, `Wind Fence`, rock shelter, `windProtectionAura` | `playerEnergy`, `tileMoisture`, `tileSoilFertility`, `growthPressure` | Final local wind exposure. |
-| `tileDust` | `weatherSand`, nearby `dustProtectionPower`, `auraSize`, `Wind Fence`, rock shelter, `dustProtectionAura`, `windProtectionAura` | `playerHealth`, `playerEnergy`, `tileSandBurial`, `tileSoilFertility`, `growthPressure` | Final local sand and dust exposure. |
+| `tileDust` | `weatherDust`, nearby `dustProtectionPower`, `auraSize`, `Wind Fence`, rock shelter, `dustProtectionAura`, `windProtectionAura` | `playerHealth`, `playerEnergy`, `tileSandBurial`, `tileSoilFertility`, `growthPressure` | Final local dust exposure. |
 | `tileMoisture` | Watering, direct irrigation such as `Drip Irrigator`, `tileHeat`, `tileWind`, `tileSoilFertility` | `growthPressure` | Stored water on the tile. |
 | `tileSoilFertility` | nearby `fertilityImprovePower`, `auraSize`, `tileWind`, `tileDust`, `tileSandBurial` | `tileMoisture`, `growthPressure` | Long-term land quality meter. |
 | `tileSoilSalinity` | Authored starting salinity, nearby `salinityReductionPower`, `auraSize` | `salinityDensityCap` | Salty-ground rehabilitation meter. |
@@ -4177,8 +4177,8 @@ List only core meters and core plant-side values here. Do not expand into helper
 
 Use this loop as the prototype mental model:
 
-1. Event state updates `eventHeatPressure`, `eventWindPressure`, and `eventSandPressure`.
-2. Weather updates `weatherHeat`, `weatherWind`, and `weatherSand` from baseline site conditions plus current event meters.
+1. Event state updates `eventHeatPressure`, `eventWindPressure`, and `eventDustPressure`.
+2. Weather updates `weatherHeat`, `weatherWind`, and `weatherDust` from baseline site conditions plus current event meters.
 3. Site weather plus local plants, `Straw Checkerboard`, protective structures, and terrain shelter resolve `tileHeat`, `tileWind`, and `tileDust`.
 4. Worker state updates `playerHealth`, `playerHydration`, `playerNourishment`, `playerEnergy`, and `playerMorale` from local weather, work, rest, supplies, medicine, and recovery context.
 5. Resolved local weather, irrigation, and plant contribution values update terrain pressure: moisture drain, burial, fertility change, and salinity change.
@@ -4186,3 +4186,4 @@ Use this loop as the prototype mental model:
 7. `growthPressure`, `salinityDensityCap`, `growable`, and `constantWitherRate` determine plant density change.
 8. Healthy plants feed back into the tile by improving fertility, reducing salinity, holding soil against erosion-driven loss, adding shade, adding wind protection, or supporting moisture, while non-growable plants such as `Straw Checkerboard` steadily trade density into fertility through `constantWitherRate`.
 9. Damaged or dead plants reduce local support, which can expose nearby tiles and create a recoverable downward spiral.
+
