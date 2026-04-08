@@ -661,7 +661,7 @@ Current prototype gameplay effect for `Health`:
 Current prototype gameplay effect for `Morale`:
 
 - `Morale` should directly modify work efficiency
-- when `Morale` is low, the player should spend more `Energy` to perform the same work
+- when `Morale` is low, the player should perform routine work more slowly or less reliably
 - when `Morale` is stable or high, normal action efficiency is preserved
 - for the current design, this is the minimum concrete `Morale` effect required; broader morale interactions can be added later if needed
 
@@ -675,7 +675,7 @@ When the player is standing or resting inside a local planted pocket where most 
 - `Morale` recovers faster because the player feels protected and sees clear proof of progress
 - the area feels less psychologically harsh even if the wider site boundary is still hostile
 
-This matters mechanically because better `Morale` helps the player keep normal work efficiency instead of paying an increased `Energy` cost on routine actions.
+This matters mechanically because better `Morale` helps the player keep normal work efficiency instead of suffering slower or less reliable routine actions.
 
 This is an important emotional payoff. The player should feel they have created a small survivable paradise inside a dangerous desert, even before the whole `Site` is restored.
 
@@ -4083,8 +4083,8 @@ This summary should include only core runtime meters and the core plant-side val
 | `playerHealth` | Rest and shelter recovery, medicine, harsh outdoor exposure, dangerous field work, low `playerHydration`, low `playerNourishment` | `playerEnergy`, worker action efficiency, risky-action safety, collapse risk | Slow physical-condition meter. Low health should make the worker less resilient and less efficient even if short-term energy is restored. |
 | `playerHydration` | Drinking actions, water items, `weatherHeat`, outdoor work, rest and shelter recovery | `playerEnergy` | Most urgent worker survival meter in hot conditions. Low hydration should make the worker tire more easily. |
 | `playerNourishment` | Eating actions, food items, time, outdoor work, rest recovery | `playerEnergy` | Slower-moving worker support meter for sustained efficiency and recovery. |
-| `playerEnergy` | Work actions, `weatherHeat`, rest recovery, `playerHealth`, `playerHydration`, `playerNourishment`, `playerMorale` | Worker action capacity | Main short-term work-capacity meter. Low energy limits how much meaningful field work the player can do. |
-| `playerMorale` | Safe rest, dense-cover recovery pockets, harsh-event aftermath, current site setbacks and recovery progress | `playerEnergy`, worker action efficiency | Worker comfort and psychological stability meter. Low morale should increase the effective energy cost of routine work. |
+| `playerEnergy` | Work actions, `weatherHeat`, rest recovery, `playerHealth`, `playerHydration`, `playerNourishment` | Worker action capacity | Main short-term work-capacity meter. Low energy limits how much meaningful field work the player can do. |
+| `playerMorale` | Safe rest, dense-cover recovery pockets, harsh-event aftermath, current site setbacks and recovery progress | worker action efficiency | Worker comfort and psychological stability meter. Low morale should make routine work slower or less reliable rather than directly lowering the energy meter. |
 
 ### Weather To Local Weather Resolution
 
@@ -4144,8 +4144,8 @@ List only core meters and core plant-side values here. Do not expand into helper
 | `playerHealth` | Rest and shelter recovery, medicine, harsh outdoor exposure, dangerous field work, low `playerHydration`, low `playerNourishment` | `playerEnergy`, worker action efficiency, risky-action safety, collapse risk | Core worker health meter. |
 | `playerHydration` | Drinking actions, water items, `weatherHeat`, outdoor work, rest and shelter recovery | `playerEnergy` | Core worker hydration meter. |
 | `playerNourishment` | Eating actions, food items, time, outdoor work, rest recovery | `playerEnergy` | Core worker nourishment meter. |
-| `playerEnergy` | Work actions, `weatherHeat`, rest recovery, `playerHealth`, `playerHydration`, `playerNourishment`, `playerMorale` | Worker action capacity | Core worker action-capacity meter. |
-| `playerMorale` | Safe rest, dense-cover recovery pockets, harsh-event aftermath, current site setbacks and recovery progress | `playerEnergy`, worker action efficiency | Core worker morale meter. |
+| `playerEnergy` | Work actions, `weatherHeat`, rest recovery, `playerHealth`, `playerHydration`, `playerNourishment` | Worker action capacity | Core worker action-capacity meter. |
+| `playerMorale` | Safe rest, dense-cover recovery pockets, harsh-event aftermath, current site setbacks and recovery progress | worker action efficiency | Core worker morale meter. |
 | `tileHeat` | `weatherHeat`, nearby `heatProtectionPower`, `auraSize`, shelter structures, solar-panel sharing, rock shelter, `heatProtectionAura` | `tileMoisture`, `growthPressure` | Final local heat pressure. |
 | `tileWind` | `weatherWind`, nearby `windProtectionPower`, `auraSize`, `Wind Fence`, rock shelter, `windProtectionAura` | `tileMoisture`, `tileSoilFertility`, `growthPressure` | Final local wind exposure. |
 | `tileDust` | `weatherSand`, nearby `dustProtectionPower`, `auraSize`, `Wind Fence`, rock shelter, `dustProtectionAura`, `windProtectionAura` | `tileSandBurial`, `tileSoilFertility`, `growthPressure` | Final local sand and dust exposure. |
