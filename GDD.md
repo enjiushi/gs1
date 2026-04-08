@@ -2257,6 +2257,7 @@ This summary should include only core runtime meters and the core plant-side val
 |---|---|---|
 | Event meters | `eventHeatPressure`, `eventWindPressure`, `eventSandPressure` | Site-wide harsh-event channel meters. They represent current event force and feed the weather layer rather than acting as weather themselves. |
 | Weather meters | `weatherHeat`, `weatherWind`, `weatherSand` | Site-wide ambient weather outputs after baseline site conditions and current event meters are combined. |
+| Worker state meters | `playerHydration`, `playerNourishment`, `playerEnergy`, `playerMorale` | Core worker survival and performance meters. They represent the worker's current physical and mental condition during site play. |
 | Persistent terrain soil meters | `tileSoilFertility`, `tileMoisture`, `tileSoilSalinity` | Long-lived or short-lived land condition on plantable `Ground`. These meters determine what can grow well. |
 | Temporary tile pressure | `tileSandBurial` | Recoverable sand overlay created mainly by sandstorms. If ignored, it can create lasting fertility loss. |
 | Derived local modifiers | `tileWindProtection`, `tileShade`, `tileWaterSupport` | Rebuilt each simulation step from plants, `Straw Checkerboard`, devices, rock shelter, and active support. They protect or support the tile but are not permanent terrain quality. |
@@ -2272,6 +2273,15 @@ This summary should include only core runtime meters and the core plant-side val
 | `eventHeatPressure` | Current event archetype, current event phase, `eventTier` | `weatherHeat` | Event-side heat channel. When no harsh event is active, this should sit at or near `0`. |
 | `eventWindPressure` | Current event archetype, current event phase, `eventTier` | `weatherWind` | Event-side wind channel. |
 | `eventSandPressure` | Current event archetype, current event phase, `eventTier` | `weatherSand` | Event-side sand and dust channel. |
+
+### Worker State Relationships
+
+| Meter | Impacted by | Impact to | Notes |
+|---|---|---|---|
+| `playerHydration` | Drinking actions, water items, `weatherHeat`, outdoor work, rest and shelter recovery | `playerEnergy` | Most urgent worker survival meter in hot conditions. Low hydration should make the worker tire more easily. |
+| `playerNourishment` | Eating actions, food items, time, outdoor work, rest recovery | `playerEnergy` | Slower-moving worker support meter for sustained efficiency and recovery. |
+| `playerEnergy` | Work actions, `weatherHeat`, rest recovery, `playerHydration`, `playerNourishment`, `playerMorale` | Worker action capacity | Main short-term work-capacity meter. Low energy limits how much meaningful field work the player can do. |
+| `playerMorale` | Safe rest, dense-cover recovery pockets, harsh-event aftermath, current site setbacks and recovery progress | `playerEnergy`, worker action efficiency | Worker comfort and psychological stability meter. Low morale should increase the effective energy cost of routine work. |
 
 ### Weather To Terrain And Plant Pressure
 
@@ -2333,6 +2343,10 @@ List only core meters and core plant-side values here. Do not expand into helper
 | `eventHeatPressure` | Current event archetype, current event phase, `eventTier` | `weatherHeat` | Event-side heat meter. |
 | `eventWindPressure` | Current event archetype, current event phase, `eventTier` | `weatherWind` | Event-side wind meter. |
 | `eventSandPressure` | Current event archetype, current event phase, `eventTier` | `weatherSand` | Event-side sand meter. |
+| `playerHydration` | Drinking actions, water items, `weatherHeat`, outdoor work, rest and shelter recovery | `playerEnergy` | Core worker hydration meter. |
+| `playerNourishment` | Eating actions, food items, time, outdoor work, rest recovery | `playerEnergy` | Core worker nourishment meter. |
+| `playerEnergy` | Work actions, `weatherHeat`, rest recovery, `playerHydration`, `playerNourishment`, `playerMorale` | Worker action capacity | Core worker action-capacity meter. |
+| `playerMorale` | Safe rest, dense-cover recovery pockets, harsh-event aftermath, current site setbacks and recovery progress | `playerEnergy`, worker action efficiency | Core worker morale meter. |
 | `tileWindProtection` | `protectionPower`, `tilePlantDensity`, `Wind Fence`, rock shelter | `tileSoilFertility`, `growthPressure` | Local shielding meter for wind and sand. |
 | `tileShade` | `shadePower`, `tilePlantDensity`, shelter structures, solar-panel sharing, rock shelter | `growthPressure` | Local cooling meter. |
 | `tileWaterSupport` | `waterSupportPower`, `tilePlantDensity`, `Drip Irrigator`, water devices | `growthPressure` | Water-readiness support that does not replace stored moisture. |
@@ -2358,12 +2372,13 @@ Use this loop as the prototype mental model:
 
 1. Event state updates `eventHeatPressure`, `eventWindPressure`, and `eventSandPressure`.
 2. Weather updates `weatherHeat`, `weatherWind`, and `weatherSand` from baseline site conditions plus current event meters.
-3. Local plants, `Straw Checkerboard`, devices, and terrain shelter rebuild `tileWindProtection`, `tileShade`, and `tileWaterSupport`.
-4. Weather, local modifiers, and plant contribution values update terrain pressure: moisture drain, burial, fertility change, and salinity change.
-5. Terrain, weather, local modifiers, and plant resistance values feed `growthPressure`.
-6. `growthPressure`, `salinityDensityCap`, `growable`, and `constantWitherRate` determine plant density change.
-7. Healthy plants feed back into the tile by improving fertility, reducing salinity, holding soil against erosion-driven loss, adding shade, adding wind protection, or supporting moisture, while non-growable plants such as `Straw Checkerboard` steadily trade density into fertility through `constantWitherRate`.
-8. Damaged or dead plants reduce local support, which can expose nearby tiles and create a recoverable downward spiral.
+3. Worker state updates `playerHydration`, `playerNourishment`, `playerEnergy`, and `playerMorale` from weather, work, rest, supplies, and recovery context.
+4. Local plants, `Straw Checkerboard`, devices, and terrain shelter rebuild `tileWindProtection`, `tileShade`, and `tileWaterSupport`.
+5. Weather, local modifiers, and plant contribution values update terrain pressure: moisture drain, burial, fertility change, and salinity change.
+6. Terrain, weather, local modifiers, and plant resistance values feed `growthPressure`.
+7. `growthPressure`, `salinityDensityCap`, `growable`, and `constantWitherRate` determine plant density change.
+8. Healthy plants feed back into the tile by improving fertility, reducing salinity, holding soil against erosion-driven loss, adding shade, adding wind protection, or supporting moisture, while non-growable plants such as `Straw Checkerboard` steadily trade density into fertility through `constantWitherRate`.
+9. Damaged or dead plants reduce local support, which can expose nearby tiles and create a recoverable downward spiral.
 
 ## 13. Economy, Contracts, And Progression
 
