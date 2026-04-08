@@ -4092,7 +4092,7 @@ This summary should include only core runtime meters and the core plant-side val
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `playerHealth` | Rest and shelter recovery, medicine, harsh outdoor exposure, dangerous field work, `tileHeat`, `tileDust`, low `playerHydration`, low `playerNourishment` | `playerEnergy`, `playerWorkEfficiency`, risky-action safety, collapse risk | Slow physical-condition meter. Low health should make the worker less resilient and less efficient even if short-term energy is restored. |
+| `playerHealth` | Rest and shelter recovery, medicine, harsh outdoor exposure, dangerous field work, `tileHeat`, `tileDust`, low `playerHydration`, low `playerNourishment` | `playerEnergy`, `playerWorkEfficiency` | Slow physical-condition meter. Low health should make the worker less resilient and less efficient even if short-term energy is restored. |
 | `playerHydration` | Drinking actions, water items, `tileHeat`, outdoor work, rest and shelter recovery | `playerEnergyCap` | Most urgent worker survival meter in hot conditions. Local heat should make hydration fall faster on exposed tiles, which then limits how much energy can actually be used. |
 | `playerNourishment` | Eating actions, food items, time, outdoor work, rest recovery | `playerEnergyCap` | Slower-moving worker support meter for sustained efficiency and recovery. It should mainly limit the usable energy ceiling instead of directly draining `playerEnergy`. |
 | `playerEnergyCap` | `playerHydration`, `playerNourishment`, recovery conditions | `playerEnergy`, `playerWorkEfficiency` | Usable energy ceiling. Low cap should throttle how much stored energy the worker may actually access and should indirectly worsen action energy cost even before raw energy reaches zero. |
@@ -4163,7 +4163,7 @@ List only core meters and core plant-side values here. Do not expand into helper
 | `eventHeatPressure` | Current event archetype, current event phase, `eventTier` | `weatherHeat` | Event-side heat meter. |
 | `eventWindPressure` | Current event archetype, current event phase, `eventTier` | `weatherWind` | Event-side wind meter. |
 | `eventDustPressure` | Current event archetype, current event phase, `eventTier` | `weatherDust` | Event-side dust meter. |
-| `playerHealth` | Rest and shelter recovery, medicine, harsh outdoor exposure, dangerous field work, `tileHeat`, `tileDust`, low `playerHydration`, low `playerNourishment` | `playerEnergy`, `playerWorkEfficiency`, risky-action safety, collapse risk | Core worker health meter. |
+| `playerHealth` | Rest and shelter recovery, medicine, harsh outdoor exposure, dangerous field work, `tileHeat`, `tileDust`, low `playerHydration`, low `playerNourishment` | `playerEnergy`, `playerWorkEfficiency` | Core worker health meter. |
 | `playerHydration` | Drinking actions, water items, `tileHeat`, outdoor work, rest and shelter recovery | `playerEnergyCap` | Core worker hydration meter. |
 | `playerNourishment` | Eating actions, food items, time, outdoor work, rest recovery | `playerEnergyCap` | Core worker nourishment meter. |
 | `playerEnergyCap` | `playerHydration`, `playerNourishment`, recovery conditions | `playerEnergy`, `playerWorkEfficiency` | Core worker usable-energy ceiling. |
