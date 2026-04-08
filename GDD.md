@@ -67,7 +67,7 @@ These terms are stable and should be used consistently in future design and impl
 | `Task Pool Size` | The maximum number of concurrently offered `Site Task`s shown for the current `Site` in the `Contract Board`, upgradable through the `Persistent Tech Tree`. |
 | `Accepted Task Cap` | The maximum number of `Site Task`s the player may have accepted at the same time; accepted tasks are pinned until completed or withdrawn through a costly emergency rule that should only reduce trust earned during the current site. |
 | `Task Tier` | The rarity and difficulty level of a `Site Task`, which controls how often it appears, how hard it is to finish, and how strong its rewards feel. |
-| `Task Reward Draft` | The choice set shown on a `Site Task` before acceptance, typically with `3` or more options; on completion, the player claims `1` option from that task's draft. The options can include `Site Unlockables`, `Run Modifier`s, or resource-focused rewards, but not every draft must include an unlockable. |
+| `Task Reward Draft` | The choice set shown on a `Site Task` before acceptance, typically with `2` options; on completion, the player claims `1` option from that task's draft. The options can include `Site Unlockables`, `Run Modifier`s, or resource-focused rewards, but not every draft must include an unlockable. |
 | `Task Reward Package` | A money, resources, or mixed tactical-bundle option that can appear inside a `Task Reward Draft`. |
 | `Run Modifier` | A site-session-only rule-changing effect such as better sell prices, work efficiency, plant growth rate, or weather response; it lasts only for the current site session and is lost if the player leaves, fails, or restarts that site. |
 | `Task Chain` | A linked set of tasks generated inside a task pool refresh; each task pays normal rewards, but completing the full chain grants an extra reward and encourages priority-based planning. |
@@ -2453,7 +2453,7 @@ Key rules:
 - Jackpot-tier tasks should often grant or offer a `Run Modifier`, not just a bigger resource reward
 - Tasks should feel local and practical, not abstract checklist filler
 - Completing a `Site Task` should first award its guaranteed `Faction Reputation` gain, with the amount based on task tier or level, then let the player claim `1` option from that task's already-shown `Task Reward Draft`
-- A `Task Reward Draft` should usually contain `3` or more options
+- A `Task Reward Draft` should usually contain `2` options
 - A `Task Reward Draft` should not be required to contain a `Site Unlockable`; some drafts should instead focus on modifiers, money, resources, or mixed tactical bundles
 - Draft options can include:
 - a `Site Unlockable` such as a plant, device, tool, or other site-scoped option
@@ -2520,7 +2520,7 @@ Typical `Site Task` examples:
 
 Typical rewards:
 
-- Show a `Task Reward Draft` with `3` or more options on the task before acceptance
+- Show a `Task Reward Draft` with `2` options on the task before acceptance
 - On completion, let the player choose `1` reward from unlockables, modifiers, or resource-focused bundles in that task's shown draft
 - Always grant the guaranteed publisher `Faction Reputation` payout on completion before the choice is made; the amount should scale with task tier or level
 - If the chosen result is a `Site Unlockable`, reveal it for current-site purchase or use
@@ -2590,7 +2590,7 @@ The main per-site engagement loop should be:
 
 - Complete a `Site Task`
 - Gain the task's guaranteed publisher `Faction Reputation`, with the amount based on task tier or level
-- Claim `1` reward option from that task's visible `Task Reward Draft`, typically with `3` or more choices
+- Claim `1` reward option from that task's visible `Task Reward Draft`, typically with `2` choices
 - If the chosen result is a `Site Unlockable`, spend money to purchase or use it when needed
 - If the wanted unlockable did not appear from tasks, optionally buy it from the direct-purchase list at very high money cost
 - If the chosen result is a `Run Modifier`, let it reshape the current site session immediately
@@ -3000,7 +3000,7 @@ Faction tech choices should bias these local offers rather than replacing them. 
 
 Task-driven and money-fallback access rules:
 
-- each `Site Task` should show a `Task Reward Draft`, typically with `3` or more options, before the player accepts it
+- each `Site Task` should show a `Task Reward Draft`, typically with `2` options, before the player accepts it
 - the options can include `Site Unlockables`, `Run Modifier`s, or resource-focused rewards
 - not every `Task Reward Draft` should contain a `Site Unlockable`
 - on completion, the player claims `1` option from that task's shown draft
@@ -3860,7 +3860,7 @@ While a `Site` is still unrestored, the player should consistently have immediat
 
 ### Site Task Check
 
-During a normal site run, the player should be able to see a limited but refreshed pool of `Site Task`s, understand each task's publishing `Faction`, commit to no more than `3` accepted tasks at once in the current design, finish them in roughly 5 to 10 minutes, and feel that task rewards meaningfully feed the next local decision. Completing a task should always grant its guaranteed `Faction Reputation` payout, with the amount scaling by task tier or level, and most `Site Task`s should already show a `Task Reward Draft` with `3` or more options before acceptance. On completion, the player should claim `1` option from that draft. Those options should be able to include `Site Unlockables`, `Run Modifier`s, and `Task Reward Package`s containing money, resources, or mixed tactical bundles. `Task Pool Size` and `Accepted Task Cap` upgrades in the `Persistent Tech Tree` should noticeably change how many short-term opportunities the player can pursue at once.
+During a normal site run, the player should be able to see a limited but refreshed pool of `Site Task`s, understand each task's publishing `Faction`, commit to no more than `3` accepted tasks at once in the current design, finish them in roughly 5 to 10 minutes, and feel that task rewards meaningfully feed the next local decision. Completing a task should always grant its guaranteed `Faction Reputation` payout, with the amount scaling by task tier or level, and most `Site Task`s should already show a `Task Reward Draft` with `2` options before acceptance. On completion, the player should claim `1` option from that draft. Those options should be able to include `Site Unlockables`, `Run Modifier`s, and `Task Reward Package`s containing money, resources, or mixed tactical bundles. `Task Pool Size` and `Accepted Task Cap` upgrades in the `Persistent Tech Tree` should noticeably change how many short-term opportunities the player can pursue at once.
 
 ### Task Tier Excitement Check
 
