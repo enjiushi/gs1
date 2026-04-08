@@ -961,7 +961,7 @@ Main sources of local protection:
 Prototype hazard state-impact bands:
 
 - these bands should describe how hazard pressure changes tile, plant, and structure state first; visible survival or collapse should emerge from those state changes rather than from separate scripted outcome rules
-- low local protection: peak weather should drive strong `tileSandBurial` gain, faster `tileMoisture` loss, and clear erosion-driven `tileSoilFertility` setback; plants on the patch should see high `windContribution`, `heatContribution`, or `soilContribution`, pushing `growthPressure` up quickly; exposed structures should lose `deviceEfficiency` rapidly and may begin losing `deviceIntegrity`; this combination should usually derive a `Withering` trend label, cut `tilePlantDensity` sharply, and create a major recovery burden
+- low local protection: peak weather should drive strong `tileSandBurial` gain, faster `tileMoisture` loss, and clear erosion-driven `tileSoilFertility` setback; plants on the patch should see `growthPressure` rise quickly from wind and sand exposure, heat stress, and worsening soil state; exposed structures should lose `deviceEfficiency` rapidly and may begin losing `deviceIntegrity`; this combination should usually derive a `Withering` trend label, cut `tilePlantDensity` sharply, and create a major recovery burden
 - moderate local protection: peak weather should still add some `tileSandBurial`, moisture loss, and limited fertility setback, but not at immediate-collapse speed; `growthPressure` should spike during the worst window and cause noticeable but recoverable `tilePlantDensity` loss; structures may suffer partial `deviceEfficiency` loss or light damage while remaining usable; the patch should stay functional enough to rescue if the player responds in time
 - high local protection: peak weather should cause only light `tileSandBurial`, controlled moisture loss, and little or no lasting fertility setback; `growthPressure` should remain manageable enough that `tilePlantDensity` mostly holds, with the derived trend label often returning from `Holding` to `Growing` after the peak passes; structures should need only light clearing or repair, with limited `deviceEfficiency` loss; the visible result should be a resilient patch rather than a reset
 
@@ -1968,7 +1968,7 @@ Interpretation:
 - higher fertility directly improves plant growth speed and indirectly improves moisture retention by slowing moisture loss
 - erosion means direct `tileSoilFertility` reduction caused by wind-and-sand exposure; there is no separate hidden stability meter
 - heat should not directly cause erosion in the prototype, but it can indirectly make erosion more likely by draining moisture, increasing plant `growthPressure`, and weakening cover if the player ignores it
-- local protection such as `tileWindProtection` reduces raw `erosionPressure`
+- local protection such as `tileWindProtection` reduces wind-and-sand-driven `tileSoilFertility` loss
 - the prototype should not use a separate erosion-control trait; `fertilityImprovePower` should handle both long-term soil improvement and the pushback against erosion-driven fertility loss
 - `Straw Checkerboard` should begin as strong protection, then gradually trade away that protection as its material is converted into fertility
 - uncleared burial can permanently set back a tile over time by converting some temporary burial pressure into fertility loss
