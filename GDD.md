@@ -77,7 +77,7 @@ These terms are stable and should be used consistently in future design and impl
 | `Fully Grown Tile` | A planted tile that has reached the mature density state counted toward `Site` completion. |
 | `Loadout` | The supplies, seeds, tools, and devices chosen before entering a `Site`. |
 | `Inventory` | The player's slot-based carried storage for `Item`s during a `Site` session. Capacity is limited and can be expanded by the `Persistent Tech Tree`. |
-| `Item` | Any carriable object that can occupy `Inventory` or `Container` slots, including seeds, tools, portable devices, materials, medicines, water, and harvested goods. |
+| `Item` | Any carriable object that can occupy `Inventory` or `Container` slots. In the current design, every item should belong to one of four simple item types: `device`, `seed`, `harvest`, or `food`. |
 | `Container` | A camp storage object that can be built or bought on-site and used to store `Item`s outside the player's carried `Inventory`. |
 | `Site Output Modifier` | A persistent bonus trait attached to a stabilized site's regional support output, such as increased wind protection, fertility support, specific resource yield, or support range. These traits usually strengthen that site's exported `Nearby-Site Aura` or `Resource Loadout Output`. |
 | `Nearby-Site Aura` | A passive `Per-Site Modifier` package projected from adjacent stabilized sites into the current site session before deployment. It should be weaker and steadier than a claimed `Run Modifier`, usually focuses on one support channel or one linked pair of meters, and should never grant full hazard immunity. |
@@ -264,7 +264,7 @@ Core phone functions:
 - Review the current site's `Site Task` pool and its refresh timing
 - Review `Faction Reputation`, current `Faction Assistant` support, and unlocked faction-tech thresholds
 - Buy water, food, medicine, seeds, tools, and approved support equipment
-- Sell harvested output or approved goods
+- Sell stored items, harvested output, or crafted goods
 - Hire temporary contractors
 - Spend money on revealed `Site Unlockables` on the current site
 - Buy limited direct-purchase `Site Unlockables` at premium prices when task rewards did not provide the wanted option
@@ -1097,7 +1097,7 @@ The campaign-level pressure should come from time:
 The game should separate economy and progression data into three layers:
 
 1. Explicit completion and campaign-time counters
-2. Exact itemized resources for inventory and gameplay actions
+2. Simplified item definitions for inventory and gameplay actions
 3. Inventory locations that define where those resources physically exist
 
 #### Layer 1: Completion And Campaign Counters
@@ -1117,27 +1117,51 @@ Important rule:
 - `money` is both a summary value and the exact site-run currency
 - `campaignDaysRemaining` is the main long-horizon pressure value in the campaign
 
-#### Layer 2: Exact Itemized Resources
+#### Layer 2: Item Definition
 
-These are the exact `Item` categories that can be stored, moved, consumed, bought, sold, or damaged.
+The item system should be simpler and more implementation-friendly than the older resource breakdown. Every carriable `Item` should use one shared definition and belong to one of only four item types.
 
-| Resource | Runtime Identity | Stack Size | Main Uses |
-|---|---|---|---|
-| Water Container | `waterContainer` | `5` | Hydration and watering |
-| Food Pack | `foodPack` | `5` | `Nourishment` recovery, recovery prep |
-| Medicine Pack | `medicinePack` | `3` | Recovery support after harsh conditions |
-| Repair Kit | `repairKit` | `3` | Structure and device repair |
-| Parts Bundle | `partsBundle` | `10` | Device construction and some repairs |
-| Seed Bundle | `seedBundle:<plantTypeId>` | `10` | Plant placement for a specific plant type |
-| Harvest Good | `harvestGood:<outputTypeId>` | `10` | Sale or task delivery |
+Shared item-definition fields:
 
-Note:
+| Field | Meaning |
+|---|---|
+| `itemId` | Unique runtime identity for this exact item entry |
+| `itemType` | One of `device`, `seed`, `harvest`, or `food` |
+| `stackSize` | Maximum quantity held in one slot |
+| `sourceRule` | How the item enters the site economy: `BuyOnly`, `CraftOnly`, `BuyOrCraft`, or `HarvestOnly` |
+| `sellValue` | Money gained when sold through the `Field Phone` |
+| `linkedContentId` | Optional related plant, structure, output, or recipe id |
+| `useTags` | Short tags such as `planting`, `consumable`, `repair`, `build`, `craftingIngredient`, or `sale` |
 
-- tools and portable devices should also be treated as `Item`s, usually as single-slot or low-stack entries when they are carriable
+Item-type meanings:
+
+- `device`: placeable device kits plus loose technical supplies such as `repairKit` or `partsBundle`
+- `seed`: planting stock for a specific plant line
+- `harvest`: raw field output gathered from plants and used for sale or crafting input
+- `food`: all consumable survival and recovery goods, including drinkable water, packed food, medicine-like recovery supplies, and crafted edible or drinkable products such as fruit juice
+
+Acquisition and sale rules:
+
+- every item should be sellable through the `Field Phone`
+- each non-harvest item should explicitly state whether it is `BuyOnly`, `CraftOnly`, or `BuyOrCraft`
+- `harvest` items are the one simple exception: they enter inventory from field harvesting and therefore use `HarvestOnly`
 - stack size is a real carrying constraint, not just a presentation label
 - if the player wants to carry more than one stack limit of the same `Item`, the excess must occupy additional `Inventory` slots
-- this should be especially visible for seeds, water containers, harvested goods, and other common stackable resources
 - `Reputation` is not an inventory item and never exists in storage
+
+Recommended simplified item catalog:
+
+| Item | Runtime Identity | Item Type | Source Rule | Stack Size | Main Uses |
+|---|---|---|---|---|---|
+| Water Container | `waterContainer` | `food` | `BuyOnly` | `5` | Hydration and filling `Water Tank`s |
+| Food Pack | `foodPack` | `food` | `BuyOnly` | `5` | `Nourishment` recovery and basic survival prep |
+| Medicine Pack | `medicinePack` | `food` | `BuyOnly` | `3` | `Health` recovery after harsh conditions |
+| Crafted Food / Drink | `craftedFood:<recipeId>` | `food` | `CraftOnly` or `BuyOrCraft` | `5` | High-value sale or stronger recovery; examples include fruit juice recipes unlocked by tech |
+| Repair Kit | `repairKit` | `device` | `BuyOnly` or `BuyOrCraft` | `3` | Structure and device repair |
+| Parts Bundle | `partsBundle` | `device` | `BuyOnly` or `BuyOrCraft` | `10` | Device construction, upgrades, and some repairs |
+| Device Kit | `deviceKit:<structureTypeId>` | `device` | `BuyOnly` or `BuyOrCraft` | `1` | Placement of one site device |
+| Seed Bundle | `seedBundle:<plantTypeId>` | `seed` | `BuyOnly` or `BuyOrCraft` | `10` | Plant placement for a specific plant type |
+| Harvest Good | `harvestGood:<outputTypeId>` | `harvest` | `HarvestOnly` | `10` | Sale or crafting ingredient |
 
 #### Layer 3: Inventory And Containers
 
@@ -1183,7 +1207,7 @@ Use these resource-flow rules:
 - plant placement, repair work, and burial clearing consume from `workerPack` when they require carried items
 - structure construction can consume from `workerPack`
 - harvesting places goods into `workerPack` first
-- selling through the `Field Phone` should require goods to be present in `campStorage`, not only in `workerPack`
+- selling through the `Field Phone` should require items to be present in `campStorage`, not only in `workerPack`
 - camp-side crafting devices should be allowed to consume required materials directly from shared `campStorage`
 - there should be no distance-cost rule between `Container`s and camp crafting devices, because both are restricted to the player base area
 - `Water Container`s can be transferred from `workerPack` or `campStorage` into a `Water Tank` through a valid water transfer interaction, increasing that tank's `deviceStoredWater`
@@ -1209,13 +1233,10 @@ Camp-stored resources:
 
 Vulnerable categories:
 
-- `waterContainer`
-- `foodPack`
-- `medicinePack`
-- `repairKit`
-- `partsBundle`
-- `seedBundle:*`
-- `harvestGood:*`
+- `food` items such as water, rations, medicine, or crafted consumables
+- `seed` items
+- `harvest` items
+- loose `device` items stored in camp, especially `repairKit`, `partsBundle`, or unplaced `deviceKit:*`
 
 Never hazard-destroy:
 
@@ -2559,7 +2580,7 @@ The main economic inputs are:
 
 - `Site Task` rewards
 - Field output from stable plants
-- Selling approved goods through the `Field Phone`
+- Selling stored items through the `Field Phone`
 - Selling crafted value-added goods through the `Field Phone`, such as juice made from harvested fruit
 - Selling surplus electricity through the `Field Phone` after local utility demand is already covered
 
