@@ -1693,21 +1693,9 @@ For prototype tuning:
 - natural spread creates a new tile at `20` density
 - trait strength should scale smoothly with `tilePlantDensity` rather than through fixed named stages
 
-### Prototype Plant Density Profiles (Temp Design)
+### Plant Density Scaling Rule (Prototype)
 
-Each living plant should gain clearer value as density rises so growth feels meaningful rather than cosmetic. `Straw Checkerboard` uses the same density meter, but it only decays over time instead of growing upward like a living plant.
-
-| Plant | Low Density | Medium Density | High Density |
-|---|---|---|---|
-| `Wind Reed` | Minor own-tile wind reduction only | Reliable windbreak and slight dehydration relief | Strong perimeter barrier that greatly helps nearby low-density plants survive storms |
-| `Shade Cactus` | Small local shade and weak comfort value | Noticeable local heat relief and slower adjacent water loss | Best local anti-dehydration support and strongest `Energy` and `Morale` recovery feel in its pocket |
-| `Root Binder` | Slight soil lock on its own tile | Solid fertility support, erosion resistance, and early salinity rehab | Strongest ground-fertility anchor and best support for future spread into nearby difficult tiles |
-| `Salt Bean` | Very little yield and slight soil enrichment | Reliable modest output plus visible salinity reduction | Strong sustained output, stronger enrichment, and the clearest prototype salinity-rehab payoff |
-| `Sunfruit Vine` | Almost no yield and extremely fragile without support | Strong output only if protection and fertility remain in place | Peak output state; still support-dependent, but resilient enough to justify major protection effort |
-| `Dew Grass` | Faint moisture-softening effect and almost no resilience by itself | Reliable bridge plant that helps nearby fragile or mildly salty tiles stay alive | Mature moisture-net plant that makes neighboring expansion meaningfully easier |
-| `Thorn Shrub` | Small barrier value and almost no yield | Reliable perimeter piece that both protects and contributes a modest output stream | Strong productive barrier that can anchor site edges without being purely defensive |
-| `Medicinal Sage` | Slight comfort cue and almost no harvest value | Reliable support-output patch with noticeable short-rest benefit | Best worker-comfort crop in the prototype; strong morale feel and useful herb value |
-| `Sand Willow` | Weak sapling with little shelter and high rescue demand | Strong shelter anchor with clear anti-dehydration value and medium salinity-rehab value for surrounding tiles | One of the strongest refuge-core plants in the prototype, with major protection, rest value, and difficult-land recovery once earned |
+Each living plant should gain clearer value as density rises so growth feels meaningful rather than cosmetic. In the prototype, plant contribution strength, output strength, and local support value should scale linearly with `tilePlantDensity` unless a later plant-specific exception is explicitly authored. `Straw Checkerboard` uses the same density meter, but it only decays over time instead of growing upward like a living plant.
 
 Important prototype traits for `Straw Checkerboard`:
 
