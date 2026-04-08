@@ -737,7 +737,7 @@ Player-facing forecast channel rule:
 
 ### Hazard And Weather Runtime Model (Prototype)
 
-The prototype should treat weather as one shared site-wide runtime system that constantly updates `weatherHeat`, `weatherWind`, and `weatherSand`, then layers rarer extreme events on top.
+The prototype should treat weather as one shared site-wide runtime system that constantly updates `weatherHeat`, `weatherWind`, and `weatherSand`, while rarer extreme events run through their own event-side meter layer on top.
 
 #### Weather Runtime Fields
 
@@ -756,10 +756,14 @@ Use these runtime fields:
 | `eventTypeId` | Discrete | Current extreme event archetype or `None` |
 | `eventState` | Discrete | `Inactive`, `Warning`, `Build`, `Peak`, `Decay`, or `Aftermath` |
 | `eventTier` | Discrete | Relative severity band for the current event |
+| `eventHeatPressure` | Continuous `0-100` | Current event-side heat pressure that feeds `weatherHeat` |
+| `eventWindPressure` | Continuous `0-100` | Current event-side wind pressure that feeds `weatherWind` |
+| `eventSandPressure` | Continuous `0-100` | Current event-side sand and dust pressure that feeds `weatherSand` |
 
 Core rule:
 
 - `weatherHeat`, `weatherWind`, and `weatherSand` are site-wide ambient values
+- `eventHeatPressure`, `eventWindPressure`, and `eventSandPressure` are site-wide event meters that can sit at `0` when no harsh event is active
 - local terrain, plants, devices, and player field work do not rewrite the weather itself
 - they change how hard the weather lands on a given tile, worker, device, or storage area
 
@@ -775,9 +779,9 @@ Prototype baseline behavior:
 
 Use this prototype relationship:
 
-- `weatherHeat` should come from the daily heat curve plus site bias plus current event pressure
-- `weatherWind` should come from the daily wind curve plus site bias plus gust variation plus current event pressure
-- `weatherSand` should come from site sand bias, current wind, and recent-event aftermath
+- `weatherHeat` should come from the daily heat curve plus site bias plus current `eventHeatPressure`
+- `weatherWind` should come from the daily wind curve plus site bias plus gust variation plus current `eventWindPressure`
+- `weatherSand` should come from site sand bias, current wind, current `eventSandPressure`, and recent-event aftermath
 
 Engineering note:
 
@@ -788,10 +792,10 @@ Engineering note:
 
 The prototype only needs a small event set:
 
-| Event | Typical Modifier Pattern | Main Gameplay Pressure |
+| Event | Typical Event-Meter Pattern | Main Gameplay Pressure |
 |---|---|---|
-| `HeatWave` | high `eventHeatModifier`, small `eventWindModifier`, small `eventSandModifier` | hydration drain, energy drain, exposed worker pressure, weak seedling survival |
-| `Sandstorm` | medium `eventHeatModifier`, high `eventWindModifier`, very high `eventSandModifier` | visibility collapse, extreme wind-sand exposure, burial, device damage, movement pressure |
+| `HeatWave` | high `eventHeatPressure`, small `eventWindPressure`, small `eventSandPressure` | hydration drain, energy drain, exposed worker pressure, weak seedling survival |
+| `Sandstorm` | medium `eventHeatPressure`, high `eventWindPressure`, very high `eventSandPressure` | visibility collapse, extreme wind-sand exposure, burial, device damage, movement pressure |
 | `CompoundFront` | high values in all three channels | rare prototype high-tier event that tests the full support layout |
 
 Prototype limits:
@@ -887,11 +891,11 @@ Design consistency rule:
 
 When `eventState` is `Peak`, the event should mainly push the weather system itself into extreme values rather than bypassing it with separate direct plant-damage rules.
 
-During `Peak`, event-type-specific multipliers should mainly apply to:
+During `Peak`, the event should mainly raise:
 
-- `eventHeatModifier`
-- `eventWindModifier`
-- `eventSandModifier`
+- `eventHeatPressure`
+- `eventWindPressure`
+- `eventSandPressure`
 - worker outdoor action speed penalties
 - worker hydration and energy drain
 - device damage pressure
@@ -2241,7 +2245,8 @@ This summary should include only core runtime meters and the core plant-side val
 
 | Group | Meters / values | Role |
 |---|---|---|
-| Weather meters | `weatherHeat`, `weatherWind`, `weatherSand` | Site-wide ambient pressure. Extreme events mainly push these meters higher instead of directly damaging plants. |
+| Event meters | `eventHeatPressure`, `eventWindPressure`, `eventSandPressure` | Site-wide harsh-event channel meters. They represent current event force and feed the weather layer rather than acting as weather themselves. |
+| Weather meters | `weatherHeat`, `weatherWind`, `weatherSand` | Site-wide ambient weather outputs after baseline site conditions and current event meters are combined. |
 | Persistent terrain soil meters | `tileSoilFertility`, `tileMoisture`, `tileSoilSalinity` | Long-lived or short-lived land condition on plantable `Ground`. These meters determine what can grow well. |
 | Temporary tile pressure | `tileSandBurial` | Recoverable sand overlay created mainly by sandstorms. If ignored, it can create lasting fertility loss. |
 | Derived local modifiers | `tileWindProtection`, `tileShade`, `tileWaterSupport` | Rebuilt each simulation step from plants, `Straw Checkerboard`, devices, rock shelter, and active support. They protect or support the tile but are not permanent terrain quality. |
@@ -2249,14 +2254,21 @@ This summary should include only core runtime meters and the core plant-side val
 | Plant resistance values | `saltTolerance`, `heatTolerance`, `windResistance`, `sandTolerance` | Plant-definition values that turn salinity, heat, wind, and sand pressure into species-specific density limits and pressure resistance. |
 | Plant contribution values | `protectionPower`, `shadePower`, `waterSupportPower`, `fertilityImprovePower`, `salinityReductionPower` | Plant-definition values that let plants feed back into terrain and local modifiers by adding wind protection, shade, water support, fertility recovery, and salinity recovery. `Straw Checkerboard` uses the same contribution values through its current `tilePlantDensity`. |
 
+### Event To Weather Pressure
+
+| Meter | Impacted by | Impact to | Notes |
+|---|---|---|---|
+| `eventHeatPressure` | Current event archetype, current event phase, `eventTier` | `weatherHeat` | Event-side heat channel. When no harsh event is active, this should sit at or near `0`. |
+| `eventWindPressure` | Current event archetype, current event phase, `eventTier` | `weatherWind` | Event-side wind channel. |
+| `eventSandPressure` | Current event archetype, current event phase, `eventTier` | `weatherSand` | Event-side sand and dust channel. |
+
 ### Weather To Terrain And Plant Pressure
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `weatherHeat` | Daily heat curve, site heat bias, current event pressure | `tileMoisture`, `growthPressure`, worker hydration drain, worker energy drain | Heat should not directly reduce `tileSoilFertility` in the prototype. |
-| `weatherWind` | Daily wind curve, site wind bias, gust variation, current event pressure | `tileSoilFertility`, `growthPressure` | Wind is the main direct driver of erosion, where erosion means `tileSoilFertility` reduction. |
-| `weatherSand` | Site sand bias, current wind, recent-event aftermath, current event pressure | `tileSandBurial`, `tileSoilFertility`, `growthPressure` | Sand becomes more dangerous when wind is high or during sandstorm events. |
-| `eventHeatModifier`, `eventWindModifier`, `eventSandModifier` | Current event archetype and current event phase | `weatherHeat`, `weatherWind`, `weatherSand` | Events should mostly push weather meters, not bypass the model with direct plant-damage rules. |
+| `weatherHeat` | Daily heat curve, site heat bias, `eventHeatPressure` | `tileMoisture`, `growthPressure`, worker hydration drain, worker energy drain | Heat should not directly reduce `tileSoilFertility` in the prototype. |
+| `weatherWind` | Daily wind curve, site wind bias, gust variation, `eventWindPressure` | `tileSoilFertility`, `growthPressure` | Wind is the main direct driver of erosion, where erosion means `tileSoilFertility` reduction. |
+| `weatherSand` | Site sand bias, current wind, recent-event aftermath, `eventSandPressure` | `tileSandBurial`, `tileSoilFertility`, `growthPressure` | Sand becomes more dangerous when wind is high or during sandstorm events. |
 
 ### Terrain To Plant Growth
 
@@ -2305,6 +2317,9 @@ List only core meters and core plant-side values here. Do not expand into helper
 
 | Driven meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
+| `eventHeatPressure` | Current event archetype, current event phase, `eventTier` | `weatherHeat` | Event-side heat meter. |
+| `eventWindPressure` | Current event archetype, current event phase, `eventTier` | `weatherWind` | Event-side wind meter. |
+| `eventSandPressure` | Current event archetype, current event phase, `eventTier` | `weatherSand` | Event-side sand meter. |
 | `tileWindProtection` | `protectionPower`, `tilePlantDensity`, `Wind Fence`, rock shelter | `tileSoilFertility`, `growthPressure` | Local shielding meter for wind and sand. |
 | `tileShade` | `shadePower`, `tilePlantDensity`, shelter structures, solar-panel sharing, rock shelter | `tileMoisture`, `growthPressure` | Local cooling meter. |
 | `tileWaterSupport` | `waterSupportPower`, `tilePlantDensity`, `Drip Irrigator`, water devices | `growthPressure` | Water-readiness support that does not replace stored moisture. |
@@ -2328,13 +2343,14 @@ List only core meters and core plant-side values here. Do not expand into helper
 
 Use this loop as the prototype mental model:
 
-1. Weather updates `weatherHeat`, `weatherWind`, and `weatherSand`.
-2. Local plants, `Straw Checkerboard`, devices, and terrain shelter rebuild `tileWindProtection`, `tileShade`, and `tileWaterSupport`.
-3. Weather, local modifiers, and checkerboard density decay update terrain pressure: moisture drain, erosion pressure, burial, checkerboard-driven fertility gain, and fertility change.
-4. Terrain, weather, local modifiers, and plant resistance values feed `growthPressure`.
-5. `growthPressure` and `salinityDensityCap` determine living-plant density change, while `Straw Checkerboard` only loses `tilePlantDensity` through time decay.
-6. Healthy plants feed back into the tile by improving fertility, reducing salinity, holding soil against erosion-driven loss, adding shade, adding wind protection, or supporting moisture, while `Straw Checkerboard` slowly trades lost density into fertility.
-7. Damaged or dead plants reduce local support, which can expose nearby tiles and create a recoverable downward spiral.
+1. Event state updates `eventHeatPressure`, `eventWindPressure`, and `eventSandPressure`.
+2. Weather updates `weatherHeat`, `weatherWind`, and `weatherSand` from baseline site conditions plus current event meters.
+3. Local plants, `Straw Checkerboard`, devices, and terrain shelter rebuild `tileWindProtection`, `tileShade`, and `tileWaterSupport`.
+4. Weather, local modifiers, and checkerboard density decay update terrain pressure: moisture drain, burial, checkerboard-driven fertility gain, and fertility change.
+5. Terrain, weather, local modifiers, and plant resistance values feed `growthPressure`.
+6. `growthPressure` and `salinityDensityCap` determine living-plant density change, while `Straw Checkerboard` only loses `tilePlantDensity` through time decay.
+7. Healthy plants feed back into the tile by improving fertility, reducing salinity, holding soil against erosion-driven loss, adding shade, adding wind protection, or supporting moisture, while `Straw Checkerboard` slowly trades lost density into fertility.
+8. Damaged or dead plants reduce local support, which can expose nearby tiles and create a recoverable downward spiral.
 
 ## 13. Economy, Contracts, And Progression
 
