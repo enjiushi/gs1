@@ -2267,11 +2267,11 @@ Random-event flavor:
 
 Tech-branch rough themes:
 
-- faster repairs
-- lower hauling friction
-- better contractor efficiency
-- stronger deadline recovery
-- more forgiving task-chain tempo
+- new field food and drink recipes
+- stronger recovery recipes
+- stronger endurance recipes
+- better recipe preservation and comfort
+- more reliable work-tempo sustain through crafted consumables
 
 Weakness / tradeoff direction:
 
@@ -2327,11 +2327,11 @@ Random-event flavor:
 
 Tech-branch rough themes:
 
-- seedling survival
-- irrigation efficiency
-- density protection
-- erosion control
-- better post-event recovery
+- new restoration plants
+- better plant establishment
+- stronger protection coverage
+- stronger soil and salinity rehabilitation
+- better post-event ecological recovery
 
 Weakness / tradeoff direction:
 
@@ -2402,10 +2402,10 @@ Device identity in current scope:
 
 Tech-branch rough themes:
 
-- precision irrigation efficiency
-- solar-shade microclimate support
-- faster checkerboard deployment
-- better sensors
+- new field devices
+- stronger device calibration
+- stronger device hardening
+- stronger field support envelope
 - stronger device efficiency
 - improved forecast precision
 - visible `Heat`, `Wind`, and `Dust` weather meters
@@ -2973,8 +2973,9 @@ What persists globally across the campaign:
 - `Reputation`
 - `Faction Reputation`
 - `Persistent Tech Tree` unlocks and chosen faction-tech nodes
-- Plant unlocks and plant upgrades
-- Gear unlocks
+- Village recipe unlocks and recipe updates
+- Forestry plant unlocks and plant updates
+- University device unlocks and device updates
 - `Regional Support Output` from stabilized sites
 
 What mostly resets when entering a new site:
@@ -3001,48 +3002,128 @@ High replay value depends on making progression choices meaningfully different a
 - Different `Site Unlockable` draws, modifier combinations, and site-specific upgrade paths
 - Different cash-versus-trust task economies across runs
 
-### Persistent Tech Tree
+### Faction Technology
 
-The `Persistent Tech Tree` is the long-term campaign progression layer. It lasts for the whole campaign and shapes the player's durable capabilities and strategic identity.
+The `Persistent Tech Tree` is the long-term campaign progression layer. In the current design, it should stay small, readable, and data-driven. Faction technology should mainly do two things:
 
-In the current faction model, this layer is split into three named branches under one shared program umbrella. It is unlocked through cumulative `Reputation` thresholds plus branch-specific `Faction Reputation` requirements, not money.
+- unlock branch-defining content
+- apply persistent modifier updates to that unlocked content
 
-| Faction | Strategic identity | Assistant | Example branch themes |
+The tree should not become a huge mixed list of unrelated bonuses. Neutral utility nodes may still exist for broad campaign systems such as inventory size or board capacity, but the three faction branches should stay focused on their signature content families and their signature play styles.
+
+#### Technology Design Rules
+
+- faction technology should use one shared node schema rather than bespoke logic per faction
+- every branch should own one signature unlock family
+- each unlocked content piece should expose exactly `3` reusable update families in the current design
+- update nodes should target already-defined meters or already-defined content values
+- branch identity should come from what kind of content is unlocked and what meter directions its updates favor
+- reputation pacing should stay slow enough that the player usually unlocks only `1` major node or `2` smaller nodes after one site
+
+#### Shared Technology Node Definition
+
+Use one shared technology-row format for faction and neutral nodes:
+
+| Field | Meaning |
+|---|---|
+| `techNodeId` | Unique identity for this technology node |
+| `factionId` | `VillageCommittee`, `ForestryBureau`, `AgriculturalUniversity`, or `NeutralProgram` |
+| `nodeKind` | `unlockContent`, `contentUpdate`, or `neutralUtility` |
+| `tier` | Broad progression band gated by `Reputation` |
+| `linkedContentFamily` | `recipe`, `plant`, `device`, or `utility` |
+| `linkedContentId` | Optional `recipeId`, `plantTypeId`, `structureTypeId`, or utility id |
+| `updateFamilyId` | Optional update-family key used only by `contentUpdate` nodes |
+| `reputationRequirement` | Campaign-wide `Reputation` gate |
+| `factionReputationRequirement` | Branch-specific `Faction Reputation` gate |
+| `prerequisiteNodeIds` | Small prerequisite list for authored branch sequencing |
+| `modifierBundle` | Data-driven list of target meters or content values plus signed modifier values |
+
+Important rule:
+
+- `unlockContent` nodes make the linked content eligible for future use
+- `contentUpdate` nodes permanently modify one already unlocked piece of linked content
+- `neutralUtility` nodes should stay rare and should cover only small cross-faction basics such as slot count or board capacity
+- technology should not require a different code path per faction; the faction identity should mostly come from content family plus modifier bundle data
+
+#### Technology Progression Meters
+
+Technology should remain tied to a tiny set of progression meters:
+
+| Meter | Meaning |
+|---|---|
+| `reputation` | Campaign-wide trust that unlocks higher tech tiers and additional tech picks |
+| `factionReputation[factionId]` | Branch-specific trust that gates faction nodes and improves branch-side follow-through |
+| `availableTechPicks` | Unspent campaign technology picks available to claim nodes |
+
+Important rule:
+
+- unlocked node state is persistent boolean progression, not a separate meter
+- update-family completion on one unlockable should also be stored as node state, not as a hidden stat ladder
+- the runtime impact should come from the linked node's `modifierBundle`, not from a special hard-coded branch bonus table
+
+#### Branch Content Rule
+
+Each faction should own one signature content family:
+
+| Faction | Signature content family | Assistant | Core branch promise |
 |---|---|---|---|
-| `Village Committee` | Tempo, labor flexibility, emergency cleanup, task throughput | `Workforce Support` | extra contractor capacity, faster repairs, lower hauling friction, deadline forgiveness, stronger chain completion |
-| `Forestry Bureau of Autonomous Region` | Ecological resilience, conservative expansion, harsh-event endurance | `Plant-Water Support` | stronger seedling survival, irrigation efficiency, erosion control, density protection, post-event replanting |
-| `Autonomous Region Agricultural University` | Precision, research, forecasting, device-led optimization | `Device Upgrade Support` | precision irrigation, solar-shade support, checkerboard mechanization, better sensors, stronger device efficiency |
+| `Village Committee` | `recipe` | `Workforce Support` | Better field food and drink recipes that stabilize worker condition, comfort, and work tempo |
+| `Forestry Bureau of Autonomous Region` | `plant` | `Plant-Water Support` | Better restoration plants that establish faster, protect harder, and rehabilitate land more reliably |
+| `Autonomous Region Agricultural University` | `device` | `Device Upgrade Support` | Better technical devices that perform more efficiently, survive hazards better, and shape the local field environment |
 
-Unlock rule:
+Delivery rule:
 
-- `Reputation` unlocks tech levels progressively across the campaign
-- each newly reached `Reputation` threshold grants a limited number of `Faction Tech Picks` for that level
-- each node also requires a matching `Faction Reputation` amount inside its branch
-- choosing a node does not consume either reputation value; the meaningful scarcity is which picks the player commits to over the campaign
-- higher levels should demand materially more `Reputation` and `Faction Reputation`, so high-end nodes belong to players who consistently invest in that relationship
+- village recipe unlocks should add permanent recipes to the `Field Workshop` or other camp crafting access
+- forestry plant unlocks should add new tech-eligible plant options to the `Site Unlockable` pool
+- university device unlocks should add new tech-eligible device options to the `Site Unlockable` pool
+- if a faction branch wants to influence other content later, it should usually do so through modifier bundles or neutral utility nodes rather than by stealing another branch's main unlock family
 
-This model preserves the feeling of steady institutional growth while still forcing build choice. The player earns trust progressively, but cannot take every powerful node in the same campaign.
+#### Shared Node Kinds
 
-It focuses on:
+Use only these three node kinds in the current design:
 
-- Worker protection
-- Plant unlocks
-- Plant upgrades
-- Better starting loadout options
-- `Task Pool Size` increases and better `Site Task` quality
-- Irrigation devices
-- Sensors and forecasting
-- Shelter efficiency
-- Crafting support
-- Site utility devices
+| Node kind | Use | Notes |
+|---|---|---|
+| `unlockContent` | Unlock one branch-defining recipe, plant, or device | This is the node that makes a new linked content row available at all. |
+| `contentUpdate` | Apply one persistent modifier update to one unlocked content row | Each unlocked content row should expose exactly `3` update families. |
+| `neutralUtility` | Small non-faction campaign utility | Keep these few so the faction branches stay readable. |
 
-Branch emphasis should be readable:
+#### Per-Unlockable Update Rule
 
-- `Village Committee` leans toward work tempo, delivery flow, emergency repair, and pragmatic field logistics
-- `Forestry Bureau of Autonomous Region` leans toward plant survival, water efficiency, anti-erosion defense, and event recovery
-- `Autonomous Region Agricultural University` leans toward visible technical infrastructure such as precision irrigation, solar-backed microclimate support, checkerboard deployment, sensors, and precision planning
+Every unlocked content row should own exactly `3` persistent update families in the current design. These update families should be reusable templates driven by data, not unique one-off hand-coded logic.
 
-This tree should improve planning and resilience without erasing the desert's danger. It should also create meaningful long-horizon tradeoffs. The player should not unlock everything quickly enough for every campaign to converge into the same build.
+| Faction | Signature content | Update family | Main target meters / values | Design intent |
+|---|---|---|---|---|
+| `Village Committee` | `recipe` | `Recovery Blend` | `playerHealth`, `playerHydration`, `playerNourishment` | Make crafted food and drink better at restoring survival condition after hard field work. |
+| `Village Committee` | `recipe` | `Endurance Blend` | `playerEnergyCap`, `playerEnergy`, `playerWorkEfficiency` | Make food and drink better at sustaining long work windows and reducing work slowdown. |
+| `Village Committee` | `recipe` | `Comfort Blend` | `playerMorale`, `itemFreshness` | Make crafted goods better at maintaining morale and staying usable for longer. |
+| `Forestry Bureau of Autonomous Region` | `plant` | `Establishment Update` | `growthPressure`, `plantDensityModifier`, `salinityDensityCap` | Help a new plant establish on difficult land and hold density sooner. |
+| `Forestry Bureau of Autonomous Region` | `plant` | `Protection Update` | `windProtectionPower`, `heatProtectionPower`, `dustProtectionPower`, `auraSize` | Make the plant provide stronger local protection once it is established. |
+| `Forestry Bureau of Autonomous Region` | `plant` | `Rehab Update` | `fertilityImprovePower`, `salinityReductionPower` | Make the plant better at long-term land recovery and soil rehabilitation. |
+| `Autonomous Region Agricultural University` | `device` | `Calibration Update` | `deviceEfficiency`, linked device primary output values | Make the device perform its main job more efficiently once deployed. |
+| `Autonomous Region Agricultural University` | `device` | `Hardening Update` | `deviceIntegrity`, `burialSensitivity` | Make the device more durable and less vulnerable to harsh conditions. |
+| `Autonomous Region Agricultural University` | `device` | `Field Envelope Update` | `auraSize`, `windProtectionPower`, `heatProtectionPower`, `dustProtectionPower`, linked device support values | Make the device shape a stronger local support pocket around itself. |
+
+Important rule:
+
+- not every target in a family applies to every linked content row
+- a content row should use only the targets that already exist on that content row
+- this keeps the system data-driven: one update family template can serve many plants, recipes, or devices without new code
+
+#### Prototype Technology Slice
+
+For the prototype, keep the branch content count tiny but structurally complete:
+
+- `1` neutral starter utility node is enough for basic campaign support
+- each faction should have `1` branch-defining content unlock in the first playable
+- each of those first unlocks should already expose its `3` update families
+- this means the first complete prototype tech package is `1` neutral node plus `4` nodes per faction: `1` unlock node and `3` update nodes
+
+This is enough to show:
+
+- that each faction has a different identity
+- that content unlock and content upgrade are different decisions
+- that technology modifies existing meters instead of inventing a parallel stat game
 
 ### Site Unlockables And Run Modifiers
 
@@ -3052,7 +3133,7 @@ This system should work like a curated random reward pool, not a fully fixed tre
 
 The main acquisition path should be task rewards, but task rewards should not be the only path. If the player wants a specific local unlockable and the relevant task drafts do not offer it, the site should also expose a limited direct-purchase fallback for tech-eligible unlockables at very high money cost.
 
-Faction tech choices should bias these local offers rather than replacing them. A `Village Committee` build should surface more labor and tempo support options, an `Autonomous Region Agricultural University` build should surface more device and precision options, and a `Forestry Bureau of Autonomous Region` build should surface more plant and water-resilience options.
+Faction tech choices should bias these local offers rather than replacing them. A `Forestry Bureau of Autonomous Region` build should surface more plant options, an `Autonomous Region Agricultural University` build should surface more device and precision options, and a `Village Committee` build should broaden permanent crafting-recipe options while still biasing the board toward labor and tempo support.
 
 #### Per-Site Modifier Definition
 
@@ -3353,16 +3434,13 @@ Use a strict `Learning Budget` across the early and mid campaign:
 
 #### Unlocked By `Persistent Tech Tree`
 
-- New plants, upgraded plants, and broader plant families after the baseline starter option
-- New devices, upgraded devices, and better device efficiency
-- Better forecasts, sensors, and planning precision after the university concepts exist
+- New `Village Committee` food and drink recipes plus recipe updates
+- New `Forestry Bureau of Autonomous Region` plants plus plant updates
+- New `Autonomous Region Agricultural University` devices plus device updates
+- Better forecasts and planning precision after university concepts exist
 - Better irrigation, seedling survival, erosion control, and recovery depth after forestry concepts exist
-- Bigger `Task Pool Size`
-- Accepted-task capacity upgrades beyond the onboarding baseline if later desired
-- Better reward-draft quality, larger draft size, and stronger task-quality control
-- Task chains and more advanced board interactions
+- Small neutral utility upgrades such as bigger `Task Pool Size`, extra accepted-task capacity if desired later, or small loadout and inventory improvements
 - Stronger or more flexible faction-assistant usage after the player already understands what the assistant does
-- Loadout improvements, worker protection, shelter efficiency, and other long-horizon resilience upgrades
 
 This separation is important, but it should not be treated as an absolute ban. It is acceptable for the `Persistent Tech Tree` to unlock a new gameplay element for the first time. The real rule is that the player must not unlock too many unfamiliar things at once. Reputation pacing, tier gates, and faction requirements should keep each site's post-run learning load small enough that the next site becomes a chance to practice one or two fresh ideas rather than a flood of new systems.
 
@@ -3729,9 +3807,9 @@ This preserves the key promise that reputation matters during crisis recovery.
 - tech can introduce new things, but the `Learning Budget` must stay low
 - recommended minimum node count:
 - `1` neutral starter node
-- `2` `Village Committee` nodes
-- `2` `Forestry Bureau of Autonomous Region` nodes
-- `2` `Autonomous Region Agricultural University` nodes
+- `1` `Village Committee` recipe unlock plus `3` recipe update nodes
+- `1` `Forestry Bureau of Autonomous Region` plant unlock plus `3` plant update nodes
+- `1` `Autonomous Region Agricultural University` device unlock plus `3` device update nodes
 
 This is enough to make reputation and site completion feel forward-looking without building a full long-form metagame.
 
@@ -4061,6 +4139,7 @@ This summary should include only core runtime meters and the core plant-side val
 | Event meters | `eventHeatPressure`, `eventWindPressure`, `eventDustPressure` | Site-wide harsh-event channel meters. They represent current event force and feed the weather layer rather than acting as weather themselves. |
 | Weather meters | `weatherHeat`, `weatherWind`, `weatherDust` | Site-wide ambient weather outputs after baseline site conditions and current event meters are combined. |
 | Resolved local weather meters | `tileHeat`, `tileWind`, `tileDust` | Per-tile weather result after site weather, local support, and shelter are combined. They bridge site weather and final terrain or plant pressure. |
+| Technology progression meters | `reputation`, `factionReputation[factionId]`, `availableTechPicks` | Campaign progression meters that gate faction tiers, node eligibility, and permanent tech claims. |
 | Worker state meters | `playerHealth`, `playerHydration`, `playerNourishment`, `playerEnergyCap`, `playerEnergy`, `playerMorale`, `playerWorkEfficiency` | Core worker survival and performance meters. They represent the worker's current physical and mental condition plus the resolved action-energy modifier used during site play. |
 | Item state meters | `itemQuantity`, `itemCondition`, `itemFreshness` | Core runtime item-stack meters. `itemQuantity` tracks how much of a stack remains, `itemCondition` tracks damage-sensitive item usability, and `itemFreshness` tracks spoilable item usability. |
 | Persistent terrain soil meters | `tileSoilFertility`, `tileMoisture`, `tileSoilSalinity` | Long-lived or short-lived land condition on plantable `Ground`. These meters determine what can grow well. |
@@ -4106,6 +4185,19 @@ This summary should include only core runtime meters and the core plant-side val
 | `playerMorale` | Safe rest, dense-cover recovery pockets, harsh-event aftermath, current site setbacks and recovery progress | `playerWorkEfficiency` | Worker comfort and psychological stability meter. Low morale should make routine work more energy-expensive or less reliable rather than directly lowering the energy meter. |
 | `playerWorkEfficiency` | `playerHealth`, `playerEnergy`, `playerEnergyCap`, `playerMorale`, `tileHeat`, `tileWind`, `tileDust`, workload strain | Action energy cost, `playerEnergy` | Resolved worker-output meter. This should be the main gameplay-facing meter for how expensive each action is. Worse local weather should mainly hurt the player by lowering this meter, which raises energy cost per action. |
 
+### Technology Progression Meter Relationships
+
+| Meter | Impacted by | Impact to | Notes |
+|---|---|---|---|
+| `reputation` | Site completion, selected task rewards, commendations, major campaign progress | Tech-tier eligibility, `availableTechPicks` | Campaign-wide trust meter. It should unlock broader tech bands and grant new pick opportunities, but should never be spent. |
+| `factionReputation[factionId]` | Completed tasks from that faction, faction events, aftermath follow-through | Faction-node eligibility, aftermath relief quality, faction-side event quality | Branch-specific trust meter. It should gate faction technology depth and improve same-faction support quality. |
+| `availableTechPicks` | Reaching authored `reputation` thresholds, rare milestone rewards if added later | `unlockContent` and `contentUpdate` node claims | Pick-scarcity meter for permanent tech choice. The player spends picks, not `reputation` itself, when claiming nodes. |
+
+Important rule:
+
+- `techNodeUnlocked` and `contentUpdateUnlocked` should be stored as persistent node-state booleans, not as separate meters
+- technology should modify content by attaching persistent `modifierBundle`s to linked recipes, plants, or devices before those rows are used in site play
+
 ### Item State Meter Relationships
 
 | Meter | Impacted by | Impact to | Notes |
@@ -4113,6 +4205,22 @@ This summary should include only core runtime meters and the core plant-side val
 | `itemQuantity` | Buying, crafting, harvesting, transfers between `workerPack`, `campStorage`, and `pendingDeliveryQueue`, planting, building, repair, consume actions, selling, hazard-side partial loss | Inventory occupancy, action availability, sale payout, `deviceStoredWater` when water is transferred | Core stack-count meter. It should always be clamped between `0` and `stackSize`, and the stack should be removed when it reaches `0`. |
 | `itemCondition` | Severe hazard damage on exposed stored items, authored item-damage events | Action availability, sale payout | Meaningful mainly for items whose tags imply physical integrity matters, such as `mechanical`, `repairSupply`, `buildSupply`, `fragile`, or `deployableKit`. |
 | `itemFreshness` | Severe hazard spoilage on exposed stored items, authored spoilage events | Action availability, worker recovery value, sale payout | Meaningful mainly for items with the `spoilable` tag, such as water, food, medicine, or crafted consumables. |
+
+### Technology Content Update Relationships
+
+Technology content updates are not separate runtime meters. They are persistent modifier bundles attached to linked content rows. Use the shared target meters and values below:
+
+| Faction | Update family | Impact to | Notes |
+|---|---|---|---|
+| `Village Committee` | `Recovery Blend` | `playerHealth`, `playerHydration`, `playerNourishment` | Applies when the linked recipe item is consumed. |
+| `Village Committee` | `Endurance Blend` | `playerEnergyCap`, `playerEnergy`, `playerWorkEfficiency` | Applies when the linked recipe item is consumed. |
+| `Village Committee` | `Comfort Blend` | `playerMorale`, `itemFreshness` | Lets field food stay useful longer and support comfort. |
+| `Forestry Bureau of Autonomous Region` | `Establishment Update` | `growthPressure`, `plantDensityModifier`, `salinityDensityCap` | Applies to the linked plant definition. |
+| `Forestry Bureau of Autonomous Region` | `Protection Update` | `windProtectionPower`, `heatProtectionPower`, `dustProtectionPower`, `auraSize` | Applies to the linked plant definition. |
+| `Forestry Bureau of Autonomous Region` | `Rehab Update` | `fertilityImprovePower`, `salinityReductionPower` | Applies to the linked plant definition. |
+| `Autonomous Region Agricultural University` | `Calibration Update` | `deviceEfficiency`, linked device primary output values | Applies to the linked device definition. |
+| `Autonomous Region Agricultural University` | `Hardening Update` | `deviceIntegrity`, `burialSensitivity` | Applies to the linked device definition and harsh-event durability behavior. |
+| `Autonomous Region Agricultural University` | `Field Envelope Update` | `auraSize`, `windProtectionPower`, `heatProtectionPower`, `dustProtectionPower`, linked device support values | Applies only to the support values present on the linked device row. |
 
 ### Terrain Meter Relationships
 
@@ -4179,14 +4287,15 @@ Channel application rule:
 
 Use this loop as the core mental model:
 
-1. Event state updates `eventHeatPressure`, `eventWindPressure`, and `eventDustPressure`.
-2. Weather updates `weatherHeat`, `weatherWind`, and `weatherDust` from baseline site conditions plus current event meters.
-3. Site weather plus active `Per-Site Modifier`s, local plants, `Straw Checkerboard`, protective structures, and terrain shelter resolve `tileHeat`, `tileWind`, and `tileDust`.
-4. Worker state updates `playerHealth`, `playerHydration`, `playerNourishment`, `playerEnergyCap`, `playerEnergy`, `playerMorale`, and `playerWorkEfficiency` from local weather, active `Per-Site Modifier`s, work, rest, and valid item use such as `drink`, `eat`, or `useMedicine`.
-5. Item state updates `itemQuantity`, `itemCondition`, and `itemFreshness` from use, transfers, harvest gain, sales, and hazard-side damage or spoilage on exposed stored items.
-6. Resolved local weather, active `Per-Site Modifier`s, irrigation, and plant contribution values update terrain pressure: moisture drain, burial, fertility change, and salinity change.
-7. Terrain state plus resolved local weather and plant resistance values feed `growthPressure`.
-8. `growthPressure`, `salinityDensityCap`, `growable`, and `constantWitherRate` determine plant density change.
-9. Healthy plants feed back into the tile by improving fertility, reducing salinity, holding soil against erosion-driven loss, adding shade, adding wind protection, or supporting moisture; non-growable plants such as `Straw Checkerboard` use the same shared contribution logic, but their current density steadily falls through `constantWitherRate`.
-10. Damaged or dead plants reduce local support, which can expose nearby tiles and create a recoverable downward spiral.
+1. Persistent technology first resolves which recipes, plants, and devices exist in this campaign and which content-update `modifierBundle`s are attached to those linked content rows.
+2. Event state updates `eventHeatPressure`, `eventWindPressure`, and `eventDustPressure`.
+3. Weather updates `weatherHeat`, `weatherWind`, and `weatherDust` from baseline site conditions plus current event meters.
+4. Site weather plus active `Per-Site Modifier`s, local plants, `Straw Checkerboard`, protective structures, and terrain shelter resolve `tileHeat`, `tileWind`, and `tileDust`.
+5. Worker state updates `playerHealth`, `playerHydration`, `playerNourishment`, `playerEnergyCap`, `playerEnergy`, `playerMorale`, and `playerWorkEfficiency` from local weather, active `Per-Site Modifier`s, work, rest, and valid item use such as `drink`, `eat`, or `useMedicine`.
+6. Item state updates `itemQuantity`, `itemCondition`, and `itemFreshness` from use, transfers, harvest gain, sales, and hazard-side damage or spoilage on exposed stored items.
+7. Resolved local weather, active `Per-Site Modifier`s, irrigation, and plant contribution values update terrain pressure: moisture drain, burial, fertility change, and salinity change.
+8. Terrain state plus resolved local weather and plant resistance values feed `growthPressure`.
+9. `growthPressure`, `salinityDensityCap`, `growable`, and `constantWitherRate` determine plant density change.
+10. Healthy plants feed back into the tile by improving fertility, reducing salinity, holding soil against erosion-driven loss, adding shade, adding wind protection, or supporting moisture; non-growable plants such as `Straw Checkerboard` use the same shared contribution logic, but their current density steadily falls through `constantWitherRate`.
+11. Damaged or dead plants reduce local support, which can expose nearby tiles and create a recoverable downward spiral.
 
