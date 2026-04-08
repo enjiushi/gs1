@@ -354,6 +354,12 @@ Derived local modifiers rebuilt every fixed simulation step:
 - `heatModifier`
 - `moistureModifier`
 
+Resolved local weather meters rebuilt every fixed simulation step:
+
+- `tileHeat`
+- `tileWind`
+- `tileDust`
+
 Plant runtime values:
 
 - `tilePlantDensity`
@@ -392,6 +398,7 @@ Display rule:
 - `Plant Density` should be shown both in UI and in tile art; a denser tile should visibly contain more plant coverage, volume, or fullness than a sparse tile
 - `tileSoilFertility`, `tileMoisture`, and `tileSoilSalinity` should be visible through tile inspection and relevant overlays because they are the core land-quality state
 - `windModifier`, `heatModifier`, and `moistureModifier` are contextual local modifiers; they should usually appear in tile inspection, overlays, or placement previews rather than as permanent HUD bars
+- `tileHeat`, `tileWind`, and `tileDust` are resolved local weather meters; they are useful in tile inspection, advanced overlays, or debugging views because they bridge site weather and final tile or plant pressure
 - `Straw Checkerboard` should be inspected through current `tilePlantDensity` plus its current protection and soil-building value; it is not a regrowing living plant
 - `growthPressure` is an internal derived plant-pressure variable; the player should not need the raw number, but tile inspection should expose a stable pressure breakdown such as `waterContribution`, `soilContribution`, `windContribution`, and `heatContribution`
 - the inspection UI should report the strongest current contribution as the `Primary Limiter` and may also report the second strongest as a `Secondary Limiter`
@@ -410,15 +417,17 @@ For each fixed simulation step, resolve systems in this order:
 2. Advance weather timelines, forecast certainty timers, and extreme-event phase state.
 3. Resolve completed player, contractor, and device actions for this step such as watering, clearing burial, repair completion, or planting completion.
 4. Rebuild derived local modifiers from current tile contents and nearby effects, especially `windModifier`, `heatModifier`, `moistureModifier`, and active device output.
-5. Apply ongoing exposure and consumption to the worker, contractors, devices, and vulnerable stored resources.
-6. Apply hazard pressure and environmental damage for this step, including erosion, plant density loss, burial gain, device damage, camp durability loss, and resource loss.
-7. Apply recovery and beneficial change for this step, including plant density gain, plant constant-wither loss, salinity reduction, soil-fertility improvement, moisture recovery from watering or irrigation, moisture-loss reduction from protective effects, player recovery, and site stabilization gains, if current conditions allow.
-8. Recompute threshold-derived display labels such as density labels and `Plant Trend`, plus real cleanup states such as death or restored pocket status.
-9. Run slower pulse checks whose timers have elapsed, including natural spread attempts, output pulses, task trigger checks, and other low-frequency site logic.
+5. Resolve local weather meters for each tile, especially `tileHeat`, `tileWind`, and `tileDust`, from current site weather plus current local modifiers.
+6. Apply ongoing exposure and consumption to the worker, contractors, devices, and vulnerable stored resources.
+7. Apply hazard pressure and environmental damage for this step, including erosion, plant density loss, burial gain, device damage, camp durability loss, and resource loss.
+8. Apply recovery and beneficial change for this step, including plant density gain, plant constant-wither loss, salinity reduction, soil-fertility improvement, moisture recovery from watering or irrigation, moisture-loss reduction from protective effects, player recovery, and site stabilization gains, if current conditions allow.
+9. Recompute threshold-derived display labels such as density labels and `Plant Trend`, plus real cleanup states such as death or restored pocket status.
+10. Run slower pulse checks whose timers have elapsed, including natural spread attempts, output pulses, task trigger checks, and other low-frequency site logic.
 
 This order matters:
 
 - completed actions should be allowed to protect a tile before hazard damage for that step if they finished in time
+- resolved local weather should be known before hazard damage, terrain updates, and plant growth are evaluated
 - hazard pressure should be applied before growth and recovery so dangerous conditions still feel dangerous
 - growth should happen after support and recovery are known, not before
 
@@ -464,6 +473,7 @@ The tile model should separate different kinds of state instead of treating ever
 | `plantState` | Runtime state of the current living plant or `Straw Checkerboard` cover | `tilePlantDensity`, `growthPressure` | `Plant Trend` is derived for display rather than stored as separate plant state; `Straw Checkerboard` uses the same density meter but only decays into fertility over time |
 | `structureState` | Runtime state of the current structure | `deviceIntegrity`, `deviceEfficiency`, `deviceStoredWater` | `deviceStoredWater` is mainly meaningful for water-storage structures |
 | `derivedLocalModifiers` | Nearby support rebuilt every step | `windModifier`, `heatModifier`, `moistureModifier` | From plants, moisture-protection structures, and rock; not persistent land quality |
+| `resolvedLocalWeatherState` | Final local weather intensity after site weather and local modifiers are combined | `tileHeat`, `tileWind`, `tileDust` | Bridging layer between weather/modifier logic and final terrain or plant changes |
 | `temporaryTileState` | Temporary tile-only hazard state | `tileSandBurial` | Prototype uses burial as the only true temporary tile state |
 
 Important cleanup rule:
@@ -471,6 +481,7 @@ Important cleanup rule:
 - `occupancyState` should only answer what is on the tile; density, integrity, and efficiency belong to their own runtime states, while `Plant Trend` is a derived display label
 - `Straw Checkerboard` uses `groundCoverTypeId` for occupancy identity, reuses plant trait fields for its effects, and uses `tilePlantDensity` with time-based decay instead of growth
 - `windModifier`, `heatModifier`, and `moistureModifier` are derived local modifiers, not persistent terrain state
+- `tileHeat`, `tileWind`, and `tileDust` are resolved local weather meters, not persistent terrain state
 - the prototype should not use a separate `tileSoilStability` meter
 
 #### Prototype Tile Layers
@@ -767,6 +778,23 @@ Core rule:
 - local terrain, plants, devices, and player field work do not rewrite the weather itself
 - they change how hard the weather lands on a given tile, worker, device, or storage area
 
+#### Resolved Local Weather Fields
+
+These are per-tile runtime meters, not site-wide weather replacements. They are the local resolved weather result after site weather is filtered through tile modifiers and shelter.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `tileHeat` | Continuous `0-100` | Final local heat pressure on one tile after site heat and local mitigation are combined |
+| `tileWind` | Continuous `0-100` | Final local wind exposure on one tile after site wind and local protection are combined |
+| `tileDust` | Continuous `0-100` | Final local sand and dust exposure on one tile after site sand, dust, and local mitigation are combined |
+
+Resolution rule:
+
+- site weather stays global
+- `windModifier`, `heatModifier`, and `moistureModifier` do not change the global weather values
+- instead, they change the resolved local results `tileHeat`, `tileWind`, and `tileDust`
+- those resolved local weather meters then drive tile moisture loss, burial, fertility setback, and the weather-linked parts of plant pressure
+
 #### Baseline Daily Weather Curve
 
 Outside of extreme events, weather should still follow a readable daily rhythm.
@@ -881,9 +909,9 @@ Weather should pressure more than one system at once.
 
 Use this prototype interpretation:
 
-- `weatherHeat` mainly increases worker hydration drain, worker energy drain, exposed `Player Condition` risk, tile moisture loss, and the heat-linked share of plant `growthPressure`; it does not directly subtract soil in the prototype
-- `weatherWind` mainly increases exposure, work difficulty, wind-protection demand, exposed-tile erosion pressure, and the wind-linked share of plant `growthPressure`
-- `weatherSand` mainly increases burial, visibility loss, movement penalties, airborne-sand erosion pressure, burial-driven soil setback, the sand-and-burial share of plant `growthPressure`, and device damage risk
+- `weatherHeat` mainly raises `tileHeat`, worker hydration drain, worker energy drain, and exposed `Player Condition` risk; `tileHeat` then drives tile moisture loss and the heat-linked share of plant `growthPressure`
+- `weatherWind` mainly raises `tileWind`, exposure, work difficulty, and wind-protection demand; `tileWind` then drives exposed-tile erosion pressure, moisture loss, and the wind-linked share of plant `growthPressure`
+- `weatherSand` mainly raises `tileDust`, visibility loss, movement penalties, and airborne-sand danger; `tileDust` then drives burial, soil setback, the sand-linked share of plant `growthPressure`, and device damage risk
 
 Design consistency rule:
 
@@ -953,7 +981,7 @@ Extreme events should also act as the main stress test for plant strategy. A wel
 
 Extreme hazards should not punish every layout equally. The prototype should clearly reward smart placement and layered protection.
 
-Each threatened patch should effectively compare hazard intensity against its local protection mix, especially `windModifier`, `heatModifier`, `moistureModifier`, and current `tileMoisture`.
+Each threatened patch should effectively compare its resolved `tileHeat`, `tileWind`, and `tileDust` against current `tileMoisture`, `tileSoilFertility`, and plant density.
 
 Main sources of local protection:
 
@@ -1834,6 +1862,9 @@ Each occupied `livingPlantLayer` tile should have these authoritative runtime va
 - `plantTypeId`
 - `tilePlantDensity` in range `0-100`
 - `growthPressure` in range `0-100`
+- `tileHeat`
+- `tileWind`
+- `tileDust`
 - `tileMoisture`
 - `tileSoilFertility`
 - `tileSoilSalinity`
@@ -1856,6 +1887,7 @@ Important modeling rule:
 - `deviceIntegrity` and `deviceEfficiency` belong to structure state, not to occupancy identity
 - `Straw Checkerboard` is a ground-cover occupant that reuses plant trait fields, starts at full `tilePlantDensity`, uses `growable = false` plus a positive `constantWitherRate`, and resolves its density loss through that behavior rather than through normal plant growth
 - `windModifier`, `heatModifier`, and `moistureModifier` are derived local modifiers rebuilt each fixed simulation step
+- `tileHeat`, `tileWind`, and `tileDust` are resolved local weather meters rebuilt each fixed simulation step after site weather and local modifiers are combined
 - the prototype should not use a separate `tileSoilStability` meter or a separately stored `tilePlantStress` value
 
 Each prototype plant definition should also provide these plant-side values and readouts. These are not new runtime state categories. Core simulation should use the end-of-document relationship-summary chapter as the canonical meter reference, while the UI may expose summary readouts derived from that plant profile.
@@ -1956,16 +1988,16 @@ Use these relationship rules instead of locked formulas:
 
 Moisture rule:
 
-- `weatherHeat` and `weatherWind` increase moisture loss
+- `tileHeat` and `tileWind` increase moisture loss
 - `watering` and direct irrigation such as `Drip Irrigator` increase `tileMoisture`
-- `heatModifier` and `moistureModifier` both reduce how quickly `tileMoisture` is lost
+- the local modifier layer should already be reflected inside resolved `tileHeat` and `tileWind`, so terrain moisture reads those resolved meters instead of reading raw modifier values again
 - higher `tileSoilFertility` also helps the tile retain moisture better
 - `tileMoisture` should stay within its normal meter range
 
 Fertility rule:
 
-- `weatherWind` and `weatherSand` create erosion pressure
-- `windModifier` reduces how much of that erosion pressure reaches the tile
+- `tileWind` and `tileDust` create erosion pressure
+- the local modifier layer should already be reflected inside resolved `tileWind` and `tileDust`, so terrain fertility reads those resolved meters instead of reading raw modifier values again
 - `tileSandBurial` adds additional fertility loss if left uncleared
 - `fertilityImprovePower` is the prototype's full soil-building trait: it raises `tileSoilFertility` on healthy tiles and also fights part of the fertility loss caused by erosion and burial
 - `Straw Checkerboard` uses the same `fertilityImprovePower` logic while present; because its `tilePlantDensity` falls through `constantWitherRate`, its anti-erosion value and soil-building value both fade automatically over time
@@ -1977,8 +2009,8 @@ Interpretation:
 - `tileSoilFertility` is the long-term land quality meter
 - higher fertility directly improves plant growth speed and indirectly improves moisture retention by slowing moisture loss
 - erosion means direct `tileSoilFertility` reduction caused by wind-and-sand exposure; there is no separate hidden stability meter
-- heat should not directly cause erosion in the prototype, but it can indirectly make erosion more likely by draining moisture, increasing plant `growthPressure`, and weakening cover if the player ignores it
-- local protection such as `windModifier` reduces wind-and-sand-driven `tileSoilFertility` loss
+- high `tileHeat` should not directly cause erosion in the prototype, but it can indirectly make erosion more likely by draining moisture, increasing plant `growthPressure`, and weakening cover if the player ignores it
+- local protection such as `windModifier` lowers resolved `tileWind` and `tileDust`, which then reduces wind-and-sand-driven `tileSoilFertility` loss
 - the prototype should not use a separate erosion-control trait; `fertilityImprovePower` should handle both long-term soil improvement and the pushback against erosion-driven fertility loss
 - `Straw Checkerboard` should begin as strong protection, then gradually trade away that protection as its material is converted into fertility
 - uncleared burial can permanently set back a tile over time by converting some temporary burial pressure into fertility loss
@@ -2013,8 +2045,8 @@ Use this prototype logic:
 
 - derive water readiness from current `tileMoisture`
 - derive soil readiness from `tileSoilFertility` plus the current burial situation
-- derive wind and sand exposure from `weatherWind`, `weatherSand`, `windModifier`, and the plant's own resistances
-- derive heat exposure from `weatherHeat`, `heatModifier`, `tileMoisture`, and the plant's `heatTolerance`
+- derive wind and sand exposure from `tileWind`, `tileDust`, and the plant's own resistances
+- derive heat exposure from `tileHeat`, `tileMoisture`, and the plant's `heatTolerance`
 - combine these grouped pressures into `growthPressure`
 
 A living plant grows best when `growthPressure` is low and local support is high.
@@ -2036,8 +2068,8 @@ Grouping rule:
 
 - `waterContribution` should represent moisture shortage after current `moistureModifier` is considered
 - `soilContribution` should represent poor fertility plus burial-related land pressure
-- `windContribution` should represent raw exposure from wind and sand after current `windModifier` is considered
-- `heatContribution` should represent heat exposure after current `heatModifier` and moisture relief are considered
+- `windContribution` should represent raw exposure from `tileWind` and `tileDust` after plant resistances are considered
+- `heatContribution` should represent heat exposure from `tileHeat` after plant heat resistance and moisture relief are considered
 - if tuning later adds or changes sub-factors, engineering may rebalance which internal sub-terms feed which grouped channel, but the player-facing grouped channels should remain stable unless there is a strong usability reason to change them
 
 Player-facing limiter rule:
@@ -4009,7 +4041,8 @@ Design rule:
 
 - meters should affect each other through explicit relationships, not hidden outcome shortcuts
 - tables in this chapter should list only core meters and core plant-side values; math-stage helper variables and UI diagnosis outputs belong outside this chapter
-- weather changes terrain pressure and plant pressure
+- site weather should first resolve into local `tileHeat`, `tileWind`, and `tileDust`
+- resolved local weather then changes terrain pressure and plant pressure
 - terrain state changes plant growth, density cap, and recovery potential
 - plants, `Straw Checkerboard`, devices, and terrain shelter create local modifiers that protect or improve terrain over time
 - visible outcomes such as density loss, recovery, spread, or collapse should emerge from meter changes
@@ -4022,6 +4055,7 @@ This summary should include only core runtime meters and the core plant-side val
 |---|---|---|
 | Event meters | `eventHeatPressure`, `eventWindPressure`, `eventSandPressure` | Site-wide harsh-event channel meters. They represent current event force and feed the weather layer rather than acting as weather themselves. |
 | Weather meters | `weatherHeat`, `weatherWind`, `weatherSand` | Site-wide ambient weather outputs after baseline site conditions and current event meters are combined. |
+| Resolved local weather meters | `tileHeat`, `tileWind`, `tileDust` | Per-tile weather result after site weather and local modifiers are combined. They bridge site weather and final terrain or plant pressure. |
 | Worker state meters | `playerHydration`, `playerNourishment`, `playerEnergy`, `playerMorale` | Core worker survival and performance meters. They represent the worker's current physical and mental condition during site play. |
 | Persistent terrain soil meters | `tileSoilFertility`, `tileMoisture`, `tileSoilSalinity` | Long-lived or short-lived land condition on plantable `Ground`. These meters determine what can grow well. |
 | Temporary tile pressure | `tileSandBurial` | Recoverable sand overlay created mainly by sandstorms. If ignored, it can create lasting fertility loss. |
@@ -4048,30 +4082,38 @@ This summary should include only core runtime meters and the core plant-side val
 | `playerEnergy` | Work actions, `weatherHeat`, rest recovery, `playerHydration`, `playerNourishment`, `playerMorale` | Worker action capacity | Main short-term work-capacity meter. Low energy limits how much meaningful field work the player can do. |
 | `playerMorale` | Safe rest, dense-cover recovery pockets, harsh-event aftermath, current site setbacks and recovery progress | `playerEnergy`, worker action efficiency | Worker comfort and psychological stability meter. Low morale should increase the effective energy cost of routine work. |
 
-### Weather To Terrain And Plant Pressure
+### Weather To Local Weather Resolution
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `weatherHeat` | Daily heat curve, site heat bias, `eventHeatPressure` | `tileMoisture`, `growthPressure`, worker hydration drain, worker energy drain | Heat should not directly reduce `tileSoilFertility` in the prototype. |
-| `weatherWind` | Daily wind curve, site wind bias, gust variation, `eventWindPressure` | `tileSoilFertility`, `growthPressure` | Wind is the main direct driver of erosion, where erosion means `tileSoilFertility` reduction. |
-| `weatherSand` | Site sand bias, current wind, recent-event aftermath, `eventSandPressure` | `tileSandBurial`, `tileSoilFertility`, `growthPressure` | Sand becomes more dangerous when wind is high or during sandstorm events. |
+| `weatherHeat` | Daily heat curve, site heat bias, `eventHeatPressure` | `tileHeat`, worker hydration drain, worker energy drain | Site-wide heat should resolve into local heat before it affects terrain or plants. |
+| `weatherWind` | Daily wind curve, site wind bias, gust variation, `eventWindPressure` | `tileWind` | Site-wide wind should resolve into local wind before it affects terrain or plants. |
+| `weatherSand` | Site sand bias, current wind, recent-event aftermath, `eventSandPressure` | `tileDust` | Site-wide sand and dust should resolve into local dust before it affects terrain or plants. |
+
+### Local Modifiers To Resolved Local Weather
+
+| Modifier | Impacted by | Impact to | Notes |
+|---|---|---|---|
+| `windModifier` | `protectionPower`, `tilePlantDensity`, `Wind Fence`, rock shelter, dense living cover | `tileWind`, `tileDust` | Main local wind-and-sand mitigation modifier. |
+| `heatModifier` | `shadePower`, `tilePlantDensity`, shelter structures, solar-panel sharing, rock shape | `tileHeat` | Main local heat-mitigation modifier. |
+| `moistureModifier` | `moistureProtectionPower`, `tilePlantDensity`, `moistureProtectionAura`, dense local cover | `tileHeat`, `tileDust` | Local moisture-retention modifier that softens local drying and loose-surface exposure. It is not a second water-storage meter and it is not direct irrigation. |
+
+### Resolved Local Weather To Terrain And Plant Pressure
+
+| Meter | Impacted by | Impact to | Notes |
+|---|---|---|---|
+| `tileHeat` | `weatherHeat`, `heatModifier`, `moistureModifier` | `tileMoisture`, `growthPressure` | Final local heat pressure after site heat and local mitigation are combined. |
+| `tileWind` | `weatherWind`, `windModifier` | `tileMoisture`, `tileSoilFertility`, `growthPressure` | Final local wind exposure after site wind and local protection are combined. |
+| `tileDust` | `weatherSand`, `windModifier`, `moistureModifier` | `tileSandBurial`, `tileSoilFertility`, `growthPressure` | Final local sand and dust exposure after site dust and local mitigation are combined. |
 
 ### Terrain To Plant Growth
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `tileMoisture` | Watering, direct irrigation such as `Drip Irrigator`, `weatherHeat`, `weatherWind`, `tileSoilFertility`, `heatModifier`, `moistureModifier` | `growthPressure` | Stored water on the tile. Better moisture lowers plant pressure and softens heat stress. Local heat and moisture modifiers reduce how quickly moisture is lost. |
-| `tileSoilFertility` | `fertilityImprovePower`, `tilePlantDensity`, `weatherWind`, `weatherSand`, `windModifier`, `tileSandBurial` | `tileMoisture`, `growthPressure` | Long-term land quality meter. Better fertility both improves plant performance and helps the tile retain moisture. Plant-side fertility help scales through current density. |
+| `tileMoisture` | Watering, direct irrigation such as `Drip Irrigator`, `tileHeat`, `tileWind`, `tileSoilFertility` | `growthPressure` | Stored water on the tile. Better moisture lowers plant pressure and softens heat stress. |
+| `tileSoilFertility` | `fertilityImprovePower`, `tilePlantDensity`, `tileWind`, `tileDust`, `tileSandBurial` | `tileMoisture`, `growthPressure` | Long-term land quality meter. Better fertility both improves plant performance and helps the tile retain moisture. Plant-side fertility help scales through current density. |
 | `tileSoilSalinity` | Authored starting salinity, `salinityReductionPower`, `tilePlantDensity` | `salinityDensityCap` | Strategic placement and rehabilitation meter. Salinity reduction scales through current plant density. |
-| `tileSandBurial` | `weatherSand`, burial-clearing actions | `tileSoilFertility`, `growthPressure` | Temporary overlay state rather than long-term soil quality. |
-
-### Local Modifiers To Terrain And Plant Pressure
-
-| Modifier | Impacted by | Impact to | Notes |
-|---|---|---|---|
-| `windModifier` | `protectionPower`, `tilePlantDensity`, `Wind Fence`, rock shelter, dense living cover | `tileSoilFertility`, `growthPressure` | Main local wind-and-sand mitigation modifier. |
-| `heatModifier` | `shadePower`, `tilePlantDensity`, shelter structures, solar-panel sharing, rock shape | `tileMoisture`, `growthPressure` | Main local heat-mitigation modifier. |
-| `moistureModifier` | `moistureProtectionPower`, `tilePlantDensity`, `moistureProtectionAura`, dense local cover | `tileMoisture` | Local moisture-retention modifier. It changes how quickly moisture is lost, but it is not a second water-storage meter and it is not direct irrigation. |
+| `tileSandBurial` | `tileDust`, burial-clearing actions | `tileSoilFertility`, `growthPressure` | Temporary overlay state rather than long-term soil quality. |
 
 ### Plant Definition Values To Tile And Density Effects
 
@@ -4106,14 +4148,17 @@ List only core meters and core plant-side values here. Do not expand into helper
 | `playerNourishment` | Eating actions, food items, time, outdoor work, rest recovery | `playerEnergy` | Core worker nourishment meter. |
 | `playerEnergy` | Work actions, `weatherHeat`, rest recovery, `playerHydration`, `playerNourishment`, `playerMorale` | Worker action capacity | Core worker action-capacity meter. |
 | `playerMorale` | Safe rest, dense-cover recovery pockets, harsh-event aftermath, current site setbacks and recovery progress | `playerEnergy`, worker action efficiency | Core worker morale meter. |
-| `windModifier` | `protectionPower`, `tilePlantDensity`, `Wind Fence`, rock shelter | `tileSoilFertility`, `growthPressure` | Local wind-and-sand mitigation meter. |
-| `heatModifier` | `shadePower`, `tilePlantDensity`, shelter structures, solar-panel sharing, rock shelter | `tileMoisture`, `growthPressure` | Local heat-mitigation meter. |
-| `moistureModifier` | `moistureProtectionPower`, `tilePlantDensity`, `moistureProtectionAura`, dense local cover | `tileMoisture` | Local moisture-retention meter. |
-| `tileMoisture` | Watering, direct irrigation such as `Drip Irrigator`, `weatherHeat`, `weatherWind`, `tileSoilFertility`, `heatModifier`, `moistureModifier` | `growthPressure` | Stored water on the tile. |
-| `tileSoilFertility` | `fertilityImprovePower`, `tilePlantDensity`, `weatherWind`, `weatherSand`, `windModifier`, `tileSandBurial` | `tileMoisture`, `growthPressure` | Long-term land quality meter. |
+| `windModifier` | `protectionPower`, `tilePlantDensity`, `Wind Fence`, rock shelter | `tileWind`, `tileDust` | Local wind-and-sand mitigation meter. |
+| `heatModifier` | `shadePower`, `tilePlantDensity`, shelter structures, solar-panel sharing, rock shelter | `tileHeat` | Local heat-mitigation meter. |
+| `moistureModifier` | `moistureProtectionPower`, `tilePlantDensity`, `moistureProtectionAura`, dense local cover | `tileHeat`, `tileDust` | Local moisture-retention meter. |
+| `tileHeat` | `weatherHeat`, `heatModifier`, `moistureModifier` | `tileMoisture`, `growthPressure` | Final local heat pressure. |
+| `tileWind` | `weatherWind`, `windModifier` | `tileMoisture`, `tileSoilFertility`, `growthPressure` | Final local wind exposure. |
+| `tileDust` | `weatherSand`, `windModifier`, `moistureModifier` | `tileSandBurial`, `tileSoilFertility`, `growthPressure` | Final local sand and dust exposure. |
+| `tileMoisture` | Watering, direct irrigation such as `Drip Irrigator`, `tileHeat`, `tileWind`, `tileSoilFertility` | `growthPressure` | Stored water on the tile. |
+| `tileSoilFertility` | `fertilityImprovePower`, `tilePlantDensity`, `tileWind`, `tileDust`, `tileSandBurial` | `tileMoisture`, `growthPressure` | Long-term land quality meter. |
 | `tileSoilSalinity` | Authored starting salinity, `salinityReductionPower`, `tilePlantDensity` | `salinityDensityCap` | Salty-ground rehabilitation meter. |
-| `tileSandBurial` | `weatherSand`, burial-clearing actions | `tileSoilFertility`, `growthPressure` | Temporary burial overlay. |
-| `growthPressure` | `tileMoisture`, `tileSoilFertility`, `tileSandBurial`, `weatherHeat`, `weatherWind`, `weatherSand`, `windModifier`, `heatModifier`, `heatTolerance`, `windResistance`, `sandTolerance` | `tilePlantDensity` | Final plant pressure meter for growth-capable plants. |
+| `tileSandBurial` | `tileDust`, burial-clearing actions | `tileSoilFertility`, `growthPressure` | Temporary burial overlay. |
+| `growthPressure` | `tileMoisture`, `tileSoilFertility`, `tileSandBurial`, `tileHeat`, `tileWind`, `tileDust`, `heatTolerance`, `windResistance`, `sandTolerance` | `tilePlantDensity` | Final plant pressure meter for growth-capable plants. |
 | `salinityDensityCap` | `tileSoilSalinity`, `saltTolerance` | `tilePlantDensity` | Plant-side density ceiling on salty ground. |
 | `tilePlantDensity` | `growthPressure`, `salinityDensityCap`, `growable`, `constantWitherRate` | `windModifier`, `heatModifier`, `moistureModifier`, `tileSoilFertility`, `tileSoilSalinity` | Current plant strength and effect scale. Positive `constantWitherRate` creates steady density loss for plant types that use it. |
 
@@ -4122,7 +4167,7 @@ List only core meters and core plant-side values here. Do not expand into helper
 | Plant meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
 | `tilePlantDensity` | `growthPressure`, `salinityDensityCap`, `growable`, `constantWitherRate` | `windModifier`, `heatModifier`, `moistureModifier`, `tileSoilFertility`, `tileSoilSalinity` | Current plant strength. Higher density means stronger plant-side effect if that species provides it, while positive `constantWitherRate` creates steady density loss for plant types that use it. |
-| `growthPressure` | `tileMoisture`, `tileSoilFertility`, `tileSandBurial`, `weatherHeat`, `weatherWind`, `weatherSand`, `windModifier`, `heatModifier`, plant resistance profile | `tilePlantDensity` | Final plant pressure meter for growth-capable plants. |
+| `growthPressure` | `tileMoisture`, `tileSoilFertility`, `tileSandBurial`, `tileHeat`, `tileWind`, `tileDust`, plant resistance profile | `tilePlantDensity` | Final plant pressure meter for growth-capable plants. |
 | `salinityDensityCap` | `tileSoilSalinity`, `saltTolerance` | `tilePlantDensity` | Separate plant-side density ceiling for salty ground. |
 
 ### Main Causal Loop
@@ -4132,9 +4177,10 @@ Use this loop as the prototype mental model:
 1. Event state updates `eventHeatPressure`, `eventWindPressure`, and `eventSandPressure`.
 2. Weather updates `weatherHeat`, `weatherWind`, and `weatherSand` from baseline site conditions plus current event meters.
 3. Worker state updates `playerHydration`, `playerNourishment`, `playerEnergy`, and `playerMorale` from weather, work, rest, supplies, and recovery context.
-4. Local plants, `Straw Checkerboard`, moisture-protection structures, and terrain shelter rebuild `windModifier`, `heatModifier`, and `moistureModifier`, while irrigation devices add direct `tileMoisture`.
-5. Weather, local modifiers, and plant contribution values update terrain pressure: moisture drain, burial, fertility change, and salinity change.
-6. Terrain, weather, local modifiers, and plant resistance values feed `growthPressure`.
-7. `growthPressure`, `salinityDensityCap`, `growable`, and `constantWitherRate` determine plant density change.
-8. Healthy plants feed back into the tile by improving fertility, reducing salinity, holding soil against erosion-driven loss, adding shade, adding wind protection, or supporting moisture, while non-growable plants such as `Straw Checkerboard` steadily trade density into fertility through `constantWitherRate`.
-9. Damaged or dead plants reduce local support, which can expose nearby tiles and create a recoverable downward spiral.
+4. Local plants, `Straw Checkerboard`, moisture-protection structures, and terrain shelter rebuild `windModifier`, `heatModifier`, and `moistureModifier`.
+5. Site weather plus local modifiers resolve `tileHeat`, `tileWind`, and `tileDust`.
+6. Resolved local weather, irrigation, and plant contribution values update terrain pressure: moisture drain, burial, fertility change, and salinity change.
+7. Terrain state plus resolved local weather and plant resistance values feed `growthPressure`.
+8. `growthPressure`, `salinityDensityCap`, `growable`, and `constantWitherRate` determine plant density change.
+9. Healthy plants feed back into the tile by improving fertility, reducing salinity, holding soil against erosion-driven loss, adding shade, adding wind protection, or supporting moisture, while non-growable plants such as `Straw Checkerboard` steadily trade density into fertility through `constantWitherRate`.
+10. Damaged or dead plants reduce local support, which can expose nearby tiles and create a recoverable downward spiral.
