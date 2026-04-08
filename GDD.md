@@ -988,7 +988,7 @@ Extreme events should also be interactive. The player should not only wait them 
 
 This creates tension plus agency, which is far more exciting than passive damage intake.
 
-Extreme events should also act as the main stress test for plant strategy. A well-supported patch should come out damaged but alive. A greedy or badly matched patch should risk rapid degeneration, withering, or outright death.
+Extreme events should also act as the main stress test for plant strategy. A low-pressure, well-protected patch should come out damaged but alive. A greedy or badly matched patch should risk rapid degeneration, withering, or outright death.
 
 Extreme hazards should not punish every layout equally. The prototype should clearly reward smart placement and layered protection.
 
@@ -1425,7 +1425,7 @@ This roster should create a few clear early strategic patterns:
 
 - build a small protected camp core before overextending planting lines
 - use `Wind Fence`, `Straw Checkerboard`, and early protection plants together on exposed edges
-- use `Water Tank` plus linked `Drip Irrigator`s to help fragile starter plants survive their first growth window, while keeping the tanks filled
+- use `Water Tank` plus linked `Drip Irrigator`s to keep moisture pressure low for fragile starter plants during their first growth window, while keeping the tanks filled
 - use `Weather Mast` to turn forecast knowledge into a real planning advantage
 - use `Solar Array` to make a mature support pocket feel operationally stronger instead of just greener
 - use `Field Workshop` to craft useful supplies from stored materials; it does not directly speed up hazard recovery by itself
@@ -1438,7 +1438,7 @@ Plants are role-based rather than based on exact real species in the first draft
 
 The long-term taxonomy can still use three broad families:
 
-- Protector plants: reduce wind, provide shade, lower local heat pressure, shield neighboring tiles, and help young growth survive.
+- Protector plants: reduce wind, provide shade, lower local heat pressure, shield neighboring tiles, and lower growth pressure on fragile plants.
 - Restorative plants: improve soil fertility, reduce erosion, expand soil moisture capacity through soil improvement, or gradually reduce tile salinity.
 - Output plants: provide limited economic or food value without replacing the restoration focus.
 
@@ -1650,8 +1650,8 @@ For the prototype, plants should not appear at full strength when placed. The pl
 Core growth rules:
 
 - The player can only plant the initial low-density state
-- Low-density plants are fragile, weak, and highly dependent on support
-- If water, fertility, salinity suitability, protection, and weather conditions are good enough, density rises over time
+- Low-density plants are fragile, weak, and easily pushed into high `growthPressure`
+- If water, fertility, salinity suitability, protection, and weather conditions keep `growthPressure` low enough, density rises over time
 - As density rises, the plant's own-tile effect and neighbor-tile effect become stronger
 - A sufficiently healthy dense tile can spread into an orthogonally adjacent empty tile without direct player planting
 - Natural spread should only happen if the target tile is empty, fertile enough, and not an obviously wrong salinity match for the spreading plant
@@ -1746,11 +1746,11 @@ Prototype density results:
 
 `tileHeat`, `tileWind`, `tileDust`, and healthy `tileMoisture` should strongly influence how much density is lost during a severe event:
 
-- weak local support: density can collapse quickly
-- decent local support: density falls, but the patch usually remains worth saving
-- strong local support: density loss is limited and the patch keeps most of its role value
+- high local pressure: density can collapse quickly
+- moderate local pressure: density falls, but the patch usually remains worth saving
+- low local pressure: density loss is limited and the patch keeps most of its role value
 
-This is one of the main prototype rewards for good strategy. The player should be able to see that the same hazard which ruins an exposed patch only partially dents a well-supported patch.
+This is one of the main prototype rewards for good strategy. The player should be able to see that the same hazard which ruins an exposed patch only partially dents a low-pressure, well-protected patch.
 
 Low-density plants should be the most vulnerable part of the lifecycle. This is where the player's maintenance and planning matter most. A patch that survives long enough to reach high density should be much better at enduring normal site pressure.
 
@@ -1831,7 +1831,7 @@ Natural expansion rules:
 - only high-density tiles can attempt natural spread
 - spread should check orthogonally adjacent tiles first
 - the destination tile must be empty
-- the destination tile must be fertile enough or otherwise sufficiently supported
+- the destination tile must be fertile enough and otherwise suitable enough that the new starter plant is not immediately pushed into extreme `growthPressure`
 - natural spread should create a new low-density tile, not a free mature tile
 
 This keeps player agency intact. The player still decides where the first footholds go, which species are introduced, and which zones get support first. Growth and spread are the earned payoff for that earlier strategy.
@@ -1920,7 +1920,7 @@ Expansion and output profile:
 
 | Field | Range | Meaning |
 |---|---|---|
-| `spreadReadiness` | `0-100` | Minimum site support quality needed before this plant may spread |
+| `spreadReadiness` | `0-100` | Minimum low-pressure readiness needed before this plant may spread reliably |
 | `spreadChance` | `0-100` | Relative chance to create one new starter tile during an ecology pulse |
 | `outputDependency` | `0-100` | How badly output collapses when the tile is losing density or unsupported |
 
@@ -2083,7 +2083,7 @@ Use these prototype rules:
 | `Plant Trend` label | Meaning |
 |---|---|
 | `Empty` | No living plant is currently on the tile. |
-| `Growing` | The plant is gaining density because local support is currently better than pressure. |
+| `Growing` | The plant is gaining density because current `growthPressure` is low enough. |
 | `Holding` | The plant is broadly stable, with density neither rising nor collapsing quickly. |
 | `Withering` | The plant is losing density because current pressure, burial, or tile mismatch is too high. |
 | `Dead` | The plant has collapsed and is removed from the tile. |
@@ -2221,7 +2221,7 @@ The player should be able to understand why a placement matters by reading the t
 
 ### Stability And Erosion
 
-In this prototype, erosion means `tileSoilFertility` reduction from wind-and-sand exposure. Wind is the main driver, airborne sand makes it worse, and heat only contributes indirectly by drying tiles or weakening plant cover. A planted tile is therefore not automatically safe. Young or poorly supported growth can still lose soil quality when its local protection is too weak.
+In this prototype, erosion means `tileSoilFertility` reduction from wind-and-sand exposure. Wind is the main driver, airborne sand makes it worse, and heat only contributes indirectly by drying tiles or weakening plant cover. A planted tile is therefore not automatically safe. Young or high-pressure growth can still lose soil quality when its local protection is too weak.
 
 Successful restoration requires:
 
@@ -3876,11 +3876,11 @@ Plant placement creates visible local effects on erosion, wind, heat, moisture, 
 
 ### Plant Degeneration Check
 
-If the player places the wrong plant in the wrong zone, that mistake should become visible through density loss, weaker effects, withering, or death. If the player places the right support plants and support devices first, the same zone should be noticeably more survivable and productive.
+If the player places the wrong plant in the wrong zone, that mistake should become visible through density loss, weaker effects, withering, or death. If the player places the right support plants and support devices first, lowering local pressure enough, the same zone should be noticeably more survivable and productive.
 
 ### Plant Growth Check
 
-The player should only be able to place fragile low-density starter plants. Over time, a well-supported living patch should visibly grow into stronger density states, gain stronger traits, and eventually become capable of limited natural spread into nearby empty fertile and salinity-suitable tiles. A badly supported patch should stall, stay vulnerable, or regress instead.
+The player should only be able to place fragile low-density starter plants. Over time, a low-pressure living patch should visibly grow into stronger density states, gain stronger traits, and eventually become capable of limited natural spread into nearby empty fertile and salinity-suitable tiles. A high-pressure patch should stall, stay vulnerable, or regress instead.
 
 ### Bare Sand Conversion Check
 
