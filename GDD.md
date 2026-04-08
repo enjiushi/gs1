@@ -377,7 +377,6 @@ Discrete or integer runtime values:
 - `plantTypeId`
 - `structureTypeId`
 - `plantDensityState`
-- `plantTrendState`
 - `taskState`
 - `contractState`
 - `eventState`
@@ -419,7 +418,7 @@ For each fixed simulation step, resolve systems in this order:
 5. Apply ongoing exposure and consumption to the worker, contractors, devices, and vulnerable stored resources.
 6. Apply hazard pressure and environmental damage for this step, including erosion, plant density loss, burial gain, device damage, camp durability loss, and resource loss.
 7. Apply recovery and beneficial change for this step, including plant density gain, salinity reduction, soil-fertility improvement, moisture recovery from watering or support, player recovery, and site stabilization gains, if current conditions allow.
-8. Recompute threshold-derived states such as density labels, plant trend states, death, or restored pocket status.
+8. Recompute threshold-derived display labels such as density labels and `Plant Trend`, plus real cleanup states such as death or restored pocket status.
 9. Run slower pulse checks whose timers have elapsed, including natural spread attempts, output pulses, task trigger checks, and other low-frequency site logic.
 
 This order matters:
@@ -436,7 +435,7 @@ Use these timing rules for prototype consistency:
 - hazard damage resolves continuously every fixed simulation step
 - player recovery and drain resolve continuously every fixed simulation step
 - plant density gain and loss resolve continuously every fixed simulation step
-- density-state and trend-state transitions resolve immediately after each fixed simulation step based on current threshold values
+- density labels and `Plant Trend` display labels resolve immediately after each fixed simulation step based on current threshold values
 - natural spread resolves discretely on an `ecologyPulse`
 
 Recommended pulse values:
@@ -466,7 +465,7 @@ The tile model should separate different kinds of state instead of treating ever
 | `terrainDefinition` | Base terrain identity and hard placement flags | `terrainTypeId`, `tileTraversable`, `tilePlantable` | Static `Ground` or `Rock` role |
 | `terrainSoilState` | Persistent quality of plantable ground | `tileSoilFertility`, `tileMoisture`, `tileSoilSalinity` | Only meaningful on plantable `Ground` |
 | `occupancyState` | What currently occupies the tile | `plantTypeId`, `groundCoverTypeId`, `structureTypeId` | Answers only what is present, not the state of that occupant |
-| `plantState` | Runtime state of the current living plant | `tilePlantDensity`, `plantTrendState`, `growthPressure` | Exists only if `plantTypeId` is present |
+| `plantState` | Runtime state of the current living plant | `tilePlantDensity`, `growthPressure` | `Plant Trend` is derived for display rather than stored as separate plant state |
 | `coverState` | Runtime state of the current ground cover | `tileGroundCoverDensity` | Exists only if `groundCoverTypeId` is present |
 | `structureState` | Runtime state of the current structure | `deviceIntegrity`, `deviceEfficiency`, `deviceStoredWater` | `deviceStoredWater` is mainly meaningful for water-storage structures |
 | `derivedLocalModifiers` | Nearby support rebuilt every step | `tileWindProtection`, `tileShade`, `tileWaterSupport` | From plants, devices, and rock; not persistent land quality |
@@ -475,7 +474,7 @@ The tile model should separate different kinds of state instead of treating ever
 Important cleanup rule:
 
 - `tileGroundCoverDensity` is occupancy state for the current ground cover, not a terrain quality meter; in the prototype, `Straw Checkerboard` uses it as fixed setup strength
-- `occupancyState` should only answer what is on the tile; density, trend, integrity, and efficiency belong to their own runtime states
+- `occupancyState` should only answer what is on the tile; density, integrity, and efficiency belong to their own runtime states, while `Plant Trend` is a derived display label
 - `tileWindProtection`, `tileShade`, and `tileWaterSupport` are derived local modifiers, not persistent terrain state
 - the prototype should not use a separate `tileSoilStability` meter
 
@@ -967,9 +966,9 @@ Main sources of local protection:
 Prototype hazard state-impact bands:
 
 - these bands should describe how hazard pressure changes tile, plant, and structure state first; visible survival or collapse should emerge from those state changes rather than from separate scripted outcome rules
-- low local protection: peak weather should drive strong `tileSandBurial` gain, faster `tileMoisture` loss, and clear erosion-driven `tileSoilFertility` setback; plants on the patch should see high `windContribution`, `heatContribution`, or `soilContribution`, pushing `growthPressure` up quickly; exposed structures should lose `deviceEfficiency` rapidly and may begin losing `deviceIntegrity`; this combination should usually push `plantTrendState` toward `Withering`, cut `tilePlantDensity` sharply, and create a major recovery burden
+- low local protection: peak weather should drive strong `tileSandBurial` gain, faster `tileMoisture` loss, and clear erosion-driven `tileSoilFertility` setback; plants on the patch should see high `windContribution`, `heatContribution`, or `soilContribution`, pushing `growthPressure` up quickly; exposed structures should lose `deviceEfficiency` rapidly and may begin losing `deviceIntegrity`; this combination should usually derive a `Withering` trend label, cut `tilePlantDensity` sharply, and create a major recovery burden
 - moderate local protection: peak weather should still add some `tileSandBurial`, moisture loss, and limited fertility setback, but not at immediate-collapse speed; `growthPressure` should spike during the worst window and cause noticeable but recoverable `tilePlantDensity` loss; structures may suffer partial `deviceEfficiency` loss or light damage while remaining usable; the patch should stay functional enough to rescue if the player responds in time
-- high local protection: peak weather should cause only light `tileSandBurial`, controlled moisture loss, and little or no lasting fertility setback; `growthPressure` should remain manageable enough that `tilePlantDensity` mostly holds, with `plantTrendState` often returning from `Holding` to `Growing` after the peak passes; structures should need only light clearing or repair, with limited `deviceEfficiency` loss; the visible result should be a resilient patch rather than a reset
+- high local protection: peak weather should cause only light `tileSandBurial`, controlled moisture loss, and little or no lasting fertility setback; `growthPressure` should remain manageable enough that `tilePlantDensity` mostly holds, with the derived trend label often returning from `Holding` to `Growing` after the peak passes; structures should need only light clearing or repair, with limited `deviceEfficiency` loss; the visible result should be a resilient patch rather than a reset
 
 This is a key reward loop. If the player reads the site correctly and builds protection with strategy, extreme weather should still feel dangerous, but it should no longer feel equally destructive. Good planning should convert a disaster into a manageable setback.
 
@@ -1832,7 +1831,6 @@ Each occupied `livingPlantLayer` tile should have these authoritative runtime va
 
 - `plantTypeId`
 - `tilePlantDensity` in range `0-100`
-- `plantTrendState`
 - `growthPressure` in range `0-100`
 - `tileMoisture`
 - `tileSoilFertility`
@@ -1850,7 +1848,8 @@ If the same tile also contains `groundCoverLayer`, that cover contributes throug
 Important modeling rule:
 
 - `plantTypeId`, `groundCoverTypeId`, and `structureTypeId` answer occupancy identity only
-- `tilePlantDensity`, `plantTrendState`, and `growthPressure` belong to plant state, not to occupancy identity
+- `tilePlantDensity` and `growthPressure` belong to plant state, not to occupancy identity
+- `Plant Trend` belongs to player-facing display and should be derived from density direction and pressure, not stored as a separate authoritative plant state
 - `deviceIntegrity` and `deviceEfficiency` belong to structure state, not to occupancy identity
 - `tileGroundCoverDensity` belongs to the current ground-cover occupant, not to the underlying terrain soil state
 - `tileWindProtection`, `tileShade`, and `tileWaterSupport` are derived local modifiers rebuilt each fixed simulation step
@@ -2075,13 +2074,13 @@ Prototype placement values:
 - natural spread creates a new living plant tile at `tilePlantDensity = 20`
 - a newly created tile should begin in a fragile state because low starting density makes early support still matter
 
-#### Plant Trend State Rules
+#### Plant Trend Display Rules
 
-`plantTrendState` should be derived from current density plus the current direction of change after each fixed simulation step.
+`Plant Trend` should be derived from current density plus the current direction of change after each fixed simulation step. It is a player-facing display label, not a separate plant trait or authoritative runtime meter.
 
 Use these prototype rules:
 
-| `plantTrendState` | Condition |
+| `Plant Trend` label | Condition |
 |---|---|
 | `Empty` | no living plant on the tile |
 | `Growing` | `tilePlantDensity > 0`, `growthPressure < 45`, and `densityGainPerMinute > densityLossPerMinute + 0.05` |
@@ -2104,7 +2103,7 @@ Prototype rule:
 - plants with output should multiply their base yield by `tilePlantDensity / 100`
 - `outputPenalty = growthPressure / 100`
 - then multiply again by `clamp(1 - outputPenalty * (outputDependency / 100), 0, 1)`
-- if `plantTrendState` is `Withering`, output is forced to `0`
+- if the current values derive the `Withering` trend label, output is forced to `0`
 
 This makes greedy output plants visibly stop paying back before they fully collapse.
 
@@ -2163,7 +2162,7 @@ Simple runtime rule:
 
 Prototype beneficial-change rule:
 
-- if a living plant has `tilePlantDensity >= 50` and `plantTrendState != Withering`, reduce `tileSoilSalinity` by `salinityReductionPower * 0.002 * stepMinutes`
+- if a living plant has `tilePlantDensity >= 50` and is not currently deriving the `Withering` trend label, reduce `tileSoilSalinity` by `salinityReductionPower * 0.002 * stepMinutes`
 
 Clamp rule:
 
@@ -2180,10 +2179,10 @@ Design intent:
 
 `Straw Checkerboard` should follow a separate prototype rule set:
 
-- it uses `groundCoverTypeId` and `tileGroundCoverDensity`, not `plantTypeId` and `plantTrendState`
+- it uses `groundCoverTypeId` and `tileGroundCoverDensity`, not `plantTypeId` or `Plant Trend`
 - it can exist on the same tile as one living plant type
 - it does not produce output
-- it does not enter `plantTrendState`
+- it does not derive a `Plant Trend` label
 - it does not naturally spread
 - on placement, set `tileGroundCoverDensity = groundCoverFixedDensity`
 - it does not grow or decay its `tileGroundCoverDensity` in the prototype
@@ -2261,7 +2260,8 @@ Design rule:
 | Persistent terrain soil meters | `tileSoilFertility`, `tileMoisture`, `tileSoilSalinity` | Long-lived or short-lived land condition on plantable `Ground`. These meters determine what can grow well. |
 | Temporary tile pressure | `tileSandBurial` | Recoverable sand overlay created mainly by sandstorms. If ignored, it can create lasting fertility loss. |
 | Derived local modifiers | `tileWindProtection`, `tileShade`, `tileWaterSupport` | Rebuilt each simulation step from plants, ground cover, devices, rock shelter, and active support. They protect or support the tile but are not permanent terrain quality. |
-| Living plant state | `tilePlantDensity`, `plantTrendState`, `growthPressure` | Current plant strength, direction, and internal short-term pressure. |
+| Living plant state | `tilePlantDensity`, `growthPressure` | Current plant strength and internal short-term pressure. |
+| Plant display labels | Density label, `Plant Trend` | Derived labels shown to the player, such as `Seeded`, `Young`, `Established`, `Dense`, `Growing`, `Holding`, or `Withering`. |
 | Derived plant limits | `salinityDensityCap`, grouped pressure contributions | Derived values used for growth and diagnosis. They should not become separate persistent terrain meters. |
 | Ground cover state | `tileGroundCoverDensity` | Current ground-cover strength. For `Straw Checkerboard`, this is fixed setup strength, not a growing density ladder. |
 
@@ -2313,9 +2313,9 @@ Design rule:
 | `soilContribution` | `tileSoilFertility`, `tileSandBurial`, plant `fertilityNeed` and `sandTolerance` | Shows whether the plant is limited by poor soil or burial. |
 | `windContribution` | `weatherWind`, `weatherSand`, `tileWindProtection`, `tileGroundCoverDensity`, plant resistances | Shows whether the plant is too exposed to wind and sand. |
 | `heatContribution` | `weatherHeat`, `tileShade`, `tileMoisture`, plant `heatTolerance` | Shows whether the plant is too hot. |
-| `growthPressure` | Sum of grouped pressure contributions | Low pressure allows growth. High pressure causes density loss and may push `plantTrendState` toward `Withering`. |
+| `growthPressure` | Sum of grouped pressure contributions | Low pressure allows growth. High pressure causes density loss and may derive a `Withering` trend label. |
 | `salinityDensityCap` | `tileSoilSalinity`, plant `saltTolerance` | Limits how dense the plant can become on salty ground. It should be shown as a separate density-cap warning, not mixed into `growthPressure`. |
-| `plantTrendState` | Current density, density gain, density loss, `growthPressure` | Reports whether the plant is `Growing`, `Holding`, `Withering`, or `Dead`. |
+| `Plant Trend` label | Current density, density gain, density loss, `growthPressure` | Player-facing label reporting whether the plant is `Growing`, `Holding`, or `Withering`. It is derived and should not be treated as a separate simulation meter. |
 
 ### Main Causal Loop
 
@@ -2325,7 +2325,7 @@ Use this loop as the prototype mental model:
 2. Local plants, ground cover, devices, and terrain shelter rebuild `tileWindProtection`, `tileShade`, and `tileWaterSupport`.
 3. Weather and local modifiers update terrain pressure: moisture drain, erosion pressure, burial, and fertility change.
 4. Terrain and weather feed plant pressure: water shortage, poor soil or burial, wind/sand exposure, and heat exposure.
-5. `growthPressure` and `salinityDensityCap` determine density gain, density loss, and trend state.
+5. `growthPressure` and `salinityDensityCap` determine density gain, density loss, and derived trend display.
 6. Healthy plants feed back into the tile by improving fertility, reducing salinity, reducing erosion, adding shade, adding wind protection, or supporting moisture.
 7. Damaged or dead plants reduce local support, which can expose nearby tiles and create a recoverable downward spiral.
 
