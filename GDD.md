@@ -1895,15 +1895,6 @@ Behavior profile:
 | `growable` | Boolean | Whether favorable conditions are allowed to increase `tilePlantDensity` |
 | `constantWitherRate` | `0-100` | Fixed density-loss rate applied every fixed simulation step; normal plants use `0`, while `Straw Checkerboard` uses a positive value |
 
-Player-facing plant profile readouts:
-
-| Field | Range | Meaning |
-|---|---|---|
-| `growthRate` | `0-100` | Player-facing summary of how quickly this plant usually gains density when supported |
-| `supportNeed` | `0-100` | Player-facing summary of how much local support this plant usually wants before it feels reliable |
-| `waterNeed` | `0-100` | Player-facing summary of how thirsty the plant is under normal site pressure |
-| `fertilityNeed` | `0-100` | Player-facing summary of how much soil quality the plant usually wants before it thrives |
-
 Resistance profile:
 
 | Field | Range | Meaning |
