@@ -2300,7 +2300,7 @@ Design rule:
 
 | Terrain meter | Higher value does | Lower value does | Main modifiers |
 |---|---|---|---|
-| `tileMoisture` | Reduces water shortage, supports density gain, softens heat pressure | Raises `waterContribution`, slows or reverses growth, and can cause density loss | Watering, rain if added later, `Drip Irrigator`, `tileWaterSupport`, `tileShade`, `tileSoilFertility` |
+| `tileMoisture` | Reduces water shortage, lowers `waterContribution`, supports density gain, and softens heat pressure | Raises `waterContribution`, slows or reverses growth, and can cause density loss | Watering, rain if added later, `Drip Irrigator`, `tileWaterSupport`, `tileShade`, `tileSoilFertility` |
 | `tileSoilFertility` | Improves growth readiness and moisture retention | Raises `soilContribution`, slows growth, makes spread and recovery harder | Fertility-improving plants, `Straw Checkerboard` setup effect, erosion, burial left uncleared |
 | `tileSoilSalinity` | Low salinity allows normal density cap for more plants | High salinity reduces `salinityDensityCap` for low-tolerance plants | `saltTolerance` resists the cap reduction; `salinityReductionPower` lowers salinity over time while the plant is healthy |
 | `tileSandBurial` | More burial increases soil pressure and can cause lasting fertility loss if ignored | Clearing burial restores the tile toward normal operation | Sandstorms increase it; player clearing, protection, and good placement reduce its long-term damage |
