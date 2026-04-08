@@ -2036,7 +2036,7 @@ Use this prototype logic:
 - derive heat exposure from `tileHeat`, `tileMoisture`, and the plant's `heatTolerance`
 - combine these grouped pressures into `growthPressure`
 
-A living plant grows best when `growthPressure` is low and local support is high.
+A living plant grows best when `growthPressure` is low. Local support should matter only by lowering that pressure, not by bypassing it with a separate direct growth bonus.
 
 #### Growth Pressure Reporting Rules
 
