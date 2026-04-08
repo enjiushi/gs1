@@ -65,7 +65,7 @@ These terms are stable and should be used consistently in future design and impl
 | `Site Unlockables` | The site-scoped plants, devices, tools, and other temporary options for the current `Site`; they are primarily revealed through some task rewards, but a limited subset can also be bought directly for very high money cost. Only options already permitted by the `Persistent Tech Tree` may appear in the pool. |
 | `Site Task` | A short 5 to 10 minute objective generated from the current site's state, listed in the `Contract Board`, and used to provide immediate goals and quick rewards. |
 | `Task Pool Size` | The maximum number of concurrently offered `Site Task`s shown for the current `Site` in the `Contract Board`, upgradable through the `Persistent Tech Tree`. |
-| `Accepted Task Cap` | The maximum number of `Site Task`s the player may have accepted at the same time; accepted tasks are pinned until completed or withdrawn through a costly emergency rule. |
+| `Accepted Task Cap` | The maximum number of `Site Task`s the player may have accepted at the same time; accepted tasks are pinned until completed or withdrawn through a costly emergency rule that should only reduce trust earned during the current site. |
 | `Task Tier` | The rarity and difficulty level of a `Site Task`, which controls how often it appears, how hard it is to finish, and how strong its rewards feel. |
 | `Task Reward Draft` | The choice set revealed after completing a `Site Task`, typically with `3` or more options; the options can include `Site Unlockables`, `Run Modifier`s, or resource-focused rewards, but not every draft must include an unlockable. |
 | `Task Reward Package` | A money, resources, or mixed tactical-bundle option that can appear inside a `Task Reward Draft`. |
@@ -2434,7 +2434,7 @@ Key rules:
 - Accepted tasks move into an active list and do not rotate out on refresh
 - Unaccepted tasks remain on the board and may rotate out when the pool refreshes
 - The game should not allow free task abandonment, because accepting a task is itself the strategic commitment
-- If an escape hatch is needed, use one `Emergency Withdrawal` per site session at most; it should cost `Faction Reputation` with the publisher and keep that acceptance slot blocked until the next board refresh
+- If an escape hatch is needed, use one `Emergency Withdrawal` per site session at most; it should reduce only the current site's already-earned trust with that task's publisher and should never subtract previously banked reputation from earlier sites
 - Faction-published tasks should bias reward drafts, `Faction Reputation` gain, and `Faction Assistant` availability
 - Completing a `Site Task` should always grant its guaranteed `Faction Reputation` payout from the publishing `Faction`
 - That `Faction Reputation` payout should be guaranteed on completion, but its amount should scale by task tier or level and task type rather than being chosen from the reward draft
@@ -2751,6 +2751,8 @@ To make the game more compelling without feeling manipulative, these systems wou
 `Reputation` should function as thresholded trust, not consumable currency. Reaching a threshold unlocks access to new tech levels and support tiers; choosing a tech node does not reduce current reputation. `Faction Reputation` should behave the same way inside each branch.
 
 For clarity, `Faction Reputation` from `Site Task`s should usually be a guaranteed completion payout tied to the task's publisher, with the amount scaling by task tier or level, while the post-task draft should stay focused on immediate tactical rewards.
+
+If a current-site penalty such as `Emergency Withdrawal` exists, it should only reduce trust earned during the current site session before that session's gains are folded into the persistent totals. It should never spend or erase trust already banked from previous sites.
 
 This keeps campaign progression distinct from site survival, preserves the satisfaction of steady institutional growth, and turns task choice into a strategic identity decision rather than only a payout decision.
 
