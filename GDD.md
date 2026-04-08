@@ -2568,6 +2568,7 @@ The main economic inputs are:
 - `Site Task` rewards
 - Field output from stable plants
 - Selling approved goods through the `Field Phone`
+- Selling crafted value-added goods through the `Field Phone`, such as juice made from harvested fruit
 - Selling surplus electricity through the `Field Phone` after local utility demand is already covered
 
 The main economic outputs are:
@@ -2584,6 +2585,7 @@ Task rewards should vary enough to change decision-making between runs. Some cam
 Sell-value hierarchy:
 
 - crafted value-added goods should sell for the highest prices
+- higher-value crafted products should require recipe or processing-tech unlocks before they become available
 - normal harvested goods should sit in the middle
 - exported surplus electricity should sit clearly below harvest value and mainly function as supplemental income from a strong solar setup
 
