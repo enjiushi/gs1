@@ -1512,7 +1512,7 @@ This should be enough to make salty tiles create real placement choices without 
 | `Root Binder` | `Medium` | `Medium` | Good support plant for gradually improving difficult soil |
 | `Salt Bean` | `High` | `High` | Primary salt specialist and best early answer for highly salty tiles |
 | `Sunfruit Vine` | `Low` | `None` | Poor choice for salty land unless the tile is improved first |
-| `Dew Grass` | `Medium` | `Low` | Bridge plant for moderately salty tiles that still need moisture support |
+| `Dew Grass` | `Medium` | `Low` | Bridge plant for moderately salty tiles that still need fertility recovery and gentler dryness |
 | `Thorn Shrub` | `Medium` | `Low` | Tough secondary option for harsher perimeter pockets |
 | `Medicinal Sage` | `Low` | `None` | Wants a cleaner, safer tile before it feels worthwhile |
 | `Sand Willow` | `High` | `Medium` | Late stronger anchor for salty refuge-building once support is in place |
@@ -1923,7 +1923,7 @@ Fertility rule:
 - local support should already be reflected inside resolved `tileWind` and `tileDust`, so terrain fertility reads those resolved meters instead of reading raw support values again
 - `tileSandBurial` adds additional fertility loss if left uncleared
 - `fertilityImprovePower` is the full soil-building trait: on healthy tiles and on nearby tiles inside plant `auraSize`, it raises `tileSoilFertility` and also fights part of the fertility loss caused by erosion and burial
-- `Straw Checkerboard` uses the same `fertilityImprovePower` logic while present; because its `tilePlantDensity` falls through `constantWitherRate`, its anti-erosion value and soil-building value both fade automatically over time
+- `Straw Checkerboard` uses the same `fertilityImprovePower` logic while present; because its `tilePlantDensity` falls through `constantWitherRate`, its total soil-building effect and its pushback against erosion-driven fertility loss both fade automatically over time
 - when `tilePlantDensity` is exhausted, clear the checkerboard from the tile
 - `tileSoilFertility` should stay within its normal meter range
 
@@ -2133,10 +2133,8 @@ The plant system should answer these questions early:
 Plants affect nearby tiles in readable ways. Effects may include:
 
 - Wind reduction
-- Erosion reduction
 - Heat mitigation
 - Soil improvement
-- Moisture support
 - Salinity reduction
 
 Effect strength should scale with `Plant Density`. A low-density tile should offer limited support, while a medium-density or high-density tile should provide much stronger local value.
@@ -2153,7 +2151,7 @@ Successful restoration requires:
 - The right plant for the tile's current salinity
 - Enough water or support
 - Protection from severe exposure
-- Enough anti-erosion support from plants, ground cover, terrain shelter, or devices
+- Enough soil improvement and exposure protection from plants, ground cover, terrain shelter, or devices
 - Follow-up maintenance
 
 This makes restoration feel earned rather than decorative.
