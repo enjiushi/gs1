@@ -1897,7 +1897,7 @@ Ecological contribution profile:
 |---|---|---|
 | `protectionPower` | `0-100` | How strongly this plant contributes to nearby `tileWindProtection` |
 | `shadePower` | `0-100` | How strongly this plant contributes to nearby `tileShade` |
-| `waterSupportPower` | `0-100` | How strongly this plant contributes to nearby `tileWaterSupport` if it has a moisture-support identity |
+| `waterSupportPower` | `0-100` | How strongly this plant contributes to nearby `tileWaterSupport` and to direct tile-moisture support while healthy |
 | `fertilityImprovePower` | `0-100` | How strongly this plant gradually improves `tileSoilFertility` while healthy and how strongly it pushes back against erosion-driven fertility loss in the prototype |
 | `salinityReductionPower` | `0-100` | How strongly this plant gradually reduces `tileSoilSalinity` while healthy |
 
@@ -1958,9 +1958,8 @@ Moisture rule:
 
 - `weatherHeat` and `weatherWind` increase moisture loss
 - `watering` and `irrigation` increase `tileMoisture`
-- `tileShade` slows moisture loss
+- `waterSupportPower` raises `tileMoisture` through current `tilePlantDensity`
 - higher `tileSoilFertility` also helps the tile retain moisture better
-- fresh `Straw Checkerboard` can add a small temporary moisture-help effect while its density remains high
 - `tileMoisture` should stay within its normal meter range
 
 Fertility rule:
@@ -2286,7 +2285,7 @@ This summary should include only core runtime meters and the core plant-side val
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `tileMoisture` | Watering, irrigation, `weatherHeat`, `weatherWind`, `tileSoilFertility` | `growthPressure` | Stored water on the tile. Better moisture lowers plant pressure and softens heat stress. |
+| `tileMoisture` | Watering, irrigation, `weatherHeat`, `weatherWind`, `tileSoilFertility`, `waterSupportPower`, `tilePlantDensity` | `growthPressure` | Stored water on the tile. Better moisture lowers plant pressure and softens heat stress. Plant-side moisture support scales through current density. |
 | `tileSoilFertility` | `fertilityImprovePower`, `tilePlantDensity`, `weatherWind`, `weatherSand`, `tileWindProtection`, `tileSandBurial` | `tileMoisture`, `growthPressure` | Long-term land quality meter. Better fertility both improves plant performance and helps the tile retain moisture. Plant-side fertility help scales through current density. |
 | `tileSoilSalinity` | Authored starting salinity, `salinityReductionPower`, `tilePlantDensity` | `salinityDensityCap` | Strategic placement and rehabilitation meter. Salinity reduction scales through current plant density. |
 | `tileSandBurial` | `weatherSand`, burial-clearing actions | `tileSoilFertility`, `growthPressure` | Temporary overlay state rather than long-term soil quality. |
@@ -2313,7 +2312,7 @@ This summary should include only core runtime meters and the core plant-side val
 | `constantWitherRate` | Plant definition only | `tilePlantDensity` | Applies steady density loss every fixed simulation step. |
 | `protectionPower` | Plant definition only | `tileWindProtection` | Scales with current `tilePlantDensity`. |
 | `shadePower` | Plant definition only | `tileShade` | Scales with `tilePlantDensity`. |
-| `waterSupportPower` | Plant definition only | `tileWaterSupport` | Scales with current `tilePlantDensity`. |
+| `waterSupportPower` | Plant definition only | `tileWaterSupport`, `tileMoisture` | Scales with current `tilePlantDensity`. |
 | `fertilityImprovePower` | Plant definition only | `tileSoilFertility` | Prototype soil-building and soil-holding trait. |
 | `salinityReductionPower` | Plant definition only | `tileSoilSalinity` | Separate from short-term `growthPressure`. |
 | `saltTolerance` | Plant definition only | `salinityDensityCap` | Preserves usable density on salty ground. |
@@ -2337,19 +2336,19 @@ List only core meters and core plant-side values here. Do not expand into helper
 | `tileWindProtection` | `protectionPower`, `tilePlantDensity`, `Wind Fence`, rock shelter | `tileSoilFertility`, `growthPressure` | Local shielding meter for wind and sand. |
 | `tileShade` | `shadePower`, `tilePlantDensity`, shelter structures, solar-panel sharing, rock shelter | `growthPressure` | Local cooling meter. |
 | `tileWaterSupport` | `waterSupportPower`, `tilePlantDensity`, `Drip Irrigator`, water devices | `growthPressure` | Water-readiness support that does not replace stored moisture. |
-| `tileMoisture` | Watering, irrigation, `weatherHeat`, `weatherWind`, `tileSoilFertility` | `growthPressure` | Stored water on the tile. |
+| `tileMoisture` | Watering, irrigation, `weatherHeat`, `weatherWind`, `tileSoilFertility`, `waterSupportPower`, `tilePlantDensity` | `growthPressure` | Stored water on the tile. |
 | `tileSoilFertility` | `fertilityImprovePower`, `tilePlantDensity`, `weatherWind`, `weatherSand`, `tileWindProtection`, `tileSandBurial` | `tileMoisture`, `growthPressure` | Long-term land quality meter. |
 | `tileSoilSalinity` | Authored starting salinity, `salinityReductionPower`, `tilePlantDensity` | `salinityDensityCap` | Salty-ground rehabilitation meter. |
 | `tileSandBurial` | `weatherSand`, burial-clearing actions | `tileSoilFertility`, `growthPressure` | Temporary burial overlay. |
 | `growthPressure` | `tileMoisture`, `tileSoilFertility`, `tileSandBurial`, `weatherHeat`, `weatherWind`, `weatherSand`, `tileWindProtection`, `tileShade`, `tileWaterSupport`, `heatTolerance`, `windResistance`, `sandTolerance` | `tilePlantDensity` | Final plant pressure meter. `Straw Checkerboard` keeps this at zero. |
 | `salinityDensityCap` | `tileSoilSalinity`, `saltTolerance` | `tilePlantDensity` | Plant-side density ceiling on salty ground. |
-| `tilePlantDensity` | `growthPressure`, `salinityDensityCap`, `growable`, `constantWitherRate` | `tileWindProtection`, `tileShade`, `tileWaterSupport`, `tileSoilFertility`, `tileSoilSalinity` | Current plant strength and effect scale. |
+| `tilePlantDensity` | `growthPressure`, `salinityDensityCap`, `growable`, `constantWitherRate` | `tileWindProtection`, `tileShade`, `tileWaterSupport`, `tileMoisture`, `tileSoilFertility`, `tileSoilSalinity` | Current plant strength and effect scale. |
 
 ### Plant Meters And Density Limit
 
 | Plant meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `tilePlantDensity` | `growthPressure`, `salinityDensityCap`, `growable`, `constantWitherRate` | `tileWindProtection`, `tileShade`, `tileWaterSupport`, `tileSoilFertility`, `tileSoilSalinity` | Current plant strength. Higher density means stronger plant-side effect if that species provides it. |
+| `tilePlantDensity` | `growthPressure`, `salinityDensityCap`, `growable`, `constantWitherRate` | `tileWindProtection`, `tileShade`, `tileWaterSupport`, `tileMoisture`, `tileSoilFertility`, `tileSoilSalinity` | Current plant strength. Higher density means stronger plant-side effect if that species provides it. |
 | `growthPressure` | `tileMoisture`, `tileSoilFertility`, `tileSandBurial`, `weatherHeat`, `weatherWind`, `weatherSand`, `tileWindProtection`, `tileShade`, `tileWaterSupport`, plant resistance profile | `tilePlantDensity` | Final plant pressure meter for living plants. `Straw Checkerboard` keeps this at zero because `growable` is `false` and `constantWitherRate` handles its density loss. |
 | `salinityDensityCap` | `tileSoilSalinity`, `saltTolerance` | `tilePlantDensity` | Separate plant-side density ceiling for salty ground. |
 
