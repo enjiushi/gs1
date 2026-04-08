@@ -2420,7 +2420,7 @@ The task board is the main structured motivation layer of a site run. It should 
 
 In the current faction model, `Site Task`s should feel like field assignments drawn from a live board rather than timeless side chores. The player should always be able to see which `Faction` published the task, whether they still have free acceptance slots, and what kind of long-term relationship or assistant support the task advances.
 
-For onboarding, the game should not start by exposing the fully unlocked task board. Instead, task-board complexity should be unlocked concept by concept. The first site should begin with the minimum real task model needed to create momentum, then expand toward the full rules after the player has already used each previous layer once.
+Onboarding-specific board staging, featured-faction sites, `Tutorial Task Set` behavior, and early accepted-task-cap rules are defined in Chapter 13. The rules below describe the general task-board model that the game should settle into once those onboarding gates are cleared.
 
 Key rules:
 
@@ -2428,11 +2428,6 @@ Key rules:
 - This `Task Pool Size` can be upgraded through the `Persistent Tech Tree`
 - Fully unlocked board composition should start with `2` visible tasks per active `Faction`; with `3` factions this means `6` visible tasks on the normal starter board
 - The fully unlocked board should also have an `Accepted Task Cap` of `3`
-- During onboarding `Site 1` to `Site 3`, the board should only publish tasks from the featured faction of that specific site
-- Multi-faction board comparison should begin on `Site 4`, after the player has learned all three faction styles in isolation
-- During onboarding, board breadth and accepted-task count should be set first by onboarding stage, then later expanded further by `Persistent Tech Tree` upgrades
-- The first faction board opened by onboarding should use a `Tutorial Task Set`
-- While a `Tutorial Task Set` is active, the board should not expire or refresh normally; it should stay stable until the player has completed all required basic task types in that set
 - Every `Site Task` should show its publishing `Faction`
 - Tasks should refresh based on terrain, weather, weak zones, current plants, available tech, and currently accepted tasks
 - The player must explicitly accept a task to commit one of their acceptance slots
@@ -2913,143 +2908,6 @@ Design intent:
 - a site with a strong modifier can become a high-priority strategic target even if its immediate local rewards are not the biggest
 - bonus traits should create meaningful synergy with plant composition and opening strategy, not just flat background bonuses
 
-### Early Onboarding Curve
-
-The first 30 minutes are critical. This design has high systemic depth, so early onboarding must be staged very carefully. The player should feel capable and curious, not flooded.
-
-Onboarding philosophy:
-
-- The player should access the minimum number of gameplay concepts needed to play well right now
-- New concepts should be unlocked one by one through actual play, not mainly through tutorial text
-- A concept should usually unlock only after the player has used the previous concept successfully at least once
-- The first three site games should function as a controlled onboarding arc
-- The first site should not begin with the fully unlocked current rule set, even if later sites do
-- During onboarding, "not yet relevant" should usually mean "not yet unlocked," not "already running but hidden somewhere"
-- `Onboarding Task`s should introduce the biggest structural systems for the first time, while the `Persistent Tech Tree` may still introduce smaller new gameplay as long as the `Learning Budget` stays low
-
-The onboarding goal is:
-
-- not too slow, so the player feels momentum quickly
-- not too complex, so the player understands the cause-and-effect of each layer before the next one arrives
-
-The early campaign should teach the loop in pieces through real unlocks, not in one full-system dump.
-
-#### Early-Campaign Faction Unlock Arc
-
-Use the first three site games as a controlled faction-unlock ladder, then use the fourth site as the first full-system proof site. Each of the first three sites should focus on one new faction and one new style of decision-making.
-
-Recommended sequence:
-
-1. `Campaign Start Baseline`
-- Available concepts: movement, interaction, one danger meter, one immediate survival objective, basic camp setup, one basic plant or starter cover option, and one simple authored local objective
-- Locked concepts: factions, assistants, faction tech branches, normal contract-board comparison, task chains, harsh-event relief, advanced forecasting, advanced plants and devices
-- Player lesson: "I can survive and improve the site with a minimal toolset"
-
-2. `Site 1: Village Committee Unlock`
-- Use one authored `Onboarding Task` focused on practical labor, repair, hauling, or community coordination
-- The `Contract Board` itself should unlock only after this first onboarding task is completed, during the same site game
-- Unlocks on completion:
-- `Village Committee` as the first permanent faction
-- automatic `Village Committee` trust gain on future village tasks
-- `Village Committee` branch visibility in the `Persistent Tech Tree`
-- immediate one-time `Workforce Support` reward that should be used right away on the site
-- `Contract Board Lite` with only `Village Committee` work
-- a `Tutorial Task Set` of basic village tasks such as repair, hauling, and cleanup
-- `Accepted Task Cap = 2`
-- While this first village tutorial board is active, it should not refresh normally; it should remain stable until the player has completed every authored basic village task type once
-- Player lesson: "This faction solves problems through labor tempo and practical field support"
-
-3. `Site 2: Forestry Bureau of Autonomous Region Unlock`
-- Start the site with `Village Committee` already known, then introduce one authored `Onboarding Task` about replanting, water support, erosion control, or seedling rescue
-- Unlocks on completion:
-- `Forestry Bureau of Autonomous Region` as the second permanent faction
-- its tech branch visibility in the `Persistent Tech Tree`
-- immediate one-time `Plant-Water Support` reward that should be used right away
-- a forestry-only `Contract Board` slice with a forestry-flavored `Tutorial Task Set` covering the basic plant-side task types the player must learn before normal refresh behavior resumes
-- `Accepted Task Cap = 2`
-- first clear introduction to ecology-first recovery logic
-- Player lesson: "This faction is about plant survival, water stability, and long-term resilience"
-
-4. `Site 3: Autonomous Region Agricultural University Unlock`
-- Start the site with the first two factions already known, then introduce one authored `Onboarding Task` built around survey work, calibration, devices, or field science
-- Unlocks on completion:
-- `Autonomous Region Agricultural University` as the third permanent faction
-- its tech branch visibility in the `Persistent Tech Tree`
-- immediate one-time `Device Upgrade Support` reward that should be used right away
-- a university-only `Contract Board` slice and `Tutorial Task Set` that stays focused on university-style jobs for this site
-- previously unlocked factions remain part of long-term progression, but the board still withholds cross-faction comparison here so the player can learn the university's style cleanly
-- `Accepted Task Cap = 2`
-- first fuller forecast/device-planning gameplay once the university forecast concept is introduced
-- Player lesson: "This faction improves precision, devices, and planning quality"
-
-5. `Site 4: Full Board Proof`
-- Start the site with all `3` factions already unlocked
-- The `Contract Board` now uses the full presentation with all `3` factions active, normal `6` visible tasks, and `Accepted Task Cap = 3`
-- This is the first site where the player should make real cross-faction comparisons between labor, plant-water, and device-oriented tasks
-- Harsh events should arrive in escalating waves so the player gets a full picture of preparation, response, recovery, and renewed commitment under pressure
-- Player lesson: "The full game is about choosing between faction paths while repeated site pressure keeps changing what matters most"
-
-6. `Post-Onboarding Normal Campaign`
-- After the fourth site, the game should shift to the normal contract-board model
-- All three factions can publish work
-- Onboarding tasks are done; future complexity mainly comes from `Persistent Tech Tree` choices, stronger sites, and event pressure
-
-This sequence matters because it gives the player a whole site to understand each faction's identity before the next one enters the decision space.
-
-#### Unlock Ownership Model
-
-Use this rule consistently:
-
-- `Onboarding Task`s should unlock the largest structural concepts for the first time
-- the `Persistent Tech Tree` may both deepen existing concepts and introduce some new gameplay, but only in a tightly controlled amount
-- campaign-start baseline should contain only the minimum verbs needed to survive and complete the first onboarding objective
-
-##### Learning Budget Rule
-
-Use a strict `Learning Budget` across the early and mid campaign:
-
-- one site should usually award enough `Reputation` and `Faction Reputation` for only `1` major tech unlock or `2` minor tech unlocks
-- a "major" unlock means a new thing the player must actively learn to use, such as a new device family, a new plant family, task chains, or a new assistant behavior rule
-- a "minor" unlock means a numeric or quality improvement on a concept the player already knows
-- if a site's rewards would unlock too many new ideas at once, reduce the reputation payout or gate some nodes to later tiers
-- the goal is not to prevent the tech tree from introducing new things; the goal is to make sure the player only needs to learn a few new things per site game
-
-##### Available At Campaign Start
-
-- Movement and interaction
-- Core survival pressure and one readable danger meter
-- Basic camp setup such as water access, rest, and one simple repair or placement action
-- One basic plant or starter ground-cover option, with the rest of the basic plant set unlocked during the site session
-- One authored local objective or onboarding objective
-- Minimal phone usage for essential survival and objective tracking
-
-##### Unlocked By `Onboarding Task`
-
-- The first `Contract Board` unlock itself through the first faction onboarding task
-- The first appearance of each `Faction`
-- The first appearance of each faction's task style
-- The first immediate sample of each faction's assistant reward
-- Faction availability on future contract boards
-- Faction branch visibility in the `Persistent Tech Tree`
-- Early board complexity gates such as faction count on the board and accepted-task count during the first four onboarding sites
-- Early `Tutorial Task Set`s that force the player to complete each basic task type once before normal board refresh begins
-- The first meaningful understanding of what makes one faction different from another
-
-##### Unlocked By `Persistent Tech Tree`
-
-- New plants, upgraded plants, and broader plant families after the baseline starter option
-- New devices, upgraded devices, and better device efficiency
-- Better forecasts, sensors, and planning precision after the university concepts exist
-- Better irrigation, seedling survival, erosion control, and recovery depth after forestry concepts exist
-- Bigger `Task Pool Size`
-- Accepted-task capacity upgrades beyond the onboarding baseline if later desired
-- Better reward-draft quality, larger draft size, and stronger task-quality control
-- Task chains and more advanced board interactions
-- Stronger or more flexible faction-assistant usage after the player already understands what the assistant does
-- Loadout improvements, worker protection, shelter efficiency, and other long-horizon resilience upgrades
-
-This separation is important, but it should not be treated as an absolute ban. It is acceptable for the `Persistent Tech Tree` to unlock a new gameplay element for the first time. The real rule is that the player must not unlock too many unfamiliar things at once. Reputation pacing, tier gates, and faction requirements should keep each site's post-run learning load small enough that the next site becomes a chance to practice one or two fresh ideas rather than a flood of new systems.
-
 ### Global Progression
 
 What persists globally across the campaign:
@@ -3251,7 +3109,165 @@ Relief directions:
 
 This makes reputation matter even when the run is going badly. A player with stronger institutional relationships should recover from a severe event more cleanly than a player who ignored those ties.
 
-## 13. Failure, Restart, And Recovery
+## 13. Onboarding And Tutorial Flow
+
+This chapter centralizes onboarding, tutorial gating, early board exposure, and learning-budget rules. Other chapters may reference these rules, but they should not redefine the full onboarding flow.
+
+### Onboarding Philosophy
+
+The first 30 minutes are critical. This design has high systemic depth, so early onboarding must be staged very carefully. The player should feel capable and curious, not flooded.
+
+Core philosophy:
+
+- The player should access the minimum number of gameplay concepts needed to play well right now
+- New concepts should be unlocked one by one through actual play, not mainly through tutorial text
+- A concept should usually unlock only after the player has used the previous concept successfully at least once
+- The first three site games should function as a controlled onboarding arc
+- The first site should not begin with the fully unlocked current rule set, even if later sites do
+- During onboarding, "not yet relevant" should usually mean "not yet unlocked," not "already running but hidden somewhere"
+- `Onboarding Task`s should introduce the biggest structural systems for the first time, while the `Persistent Tech Tree` may still introduce smaller new gameplay as long as the `Learning Budget` stays low
+
+The onboarding goal is:
+
+- not too slow, so the player feels momentum quickly
+- not too complex, so the player understands the cause-and-effect of each layer before the next one arrives
+
+The early campaign should teach the loop in pieces through real unlocks, not in one full-system dump.
+
+### Task Board Tutorial Rules
+
+The `Contract Board` should be part of onboarding, not something the player sees fully formed on the first minute of the first site.
+
+Use these tutorial-stage board rules:
+
+- the `Contract Board` itself should unlock only after the first faction `Onboarding Task`
+- during onboarding `Site 1` to `Site 3`, the board should only publish tasks from the featured faction of that specific site
+- multi-faction board comparison should begin on `Site 4`, after the player has learned all three faction styles in isolation
+- during onboarding, board breadth and accepted-task count should be set first by onboarding stage, then later expanded further by `Persistent Tech Tree` upgrades
+- the first faction board opened by onboarding should use a `Tutorial Task Set`
+- while a `Tutorial Task Set` is active, the board should not expire or refresh normally; it should stay stable until the player has completed all required basic task types in that set
+- onboarding sites should keep `Accepted Task Cap = 2`
+- the first full board should use all `3` factions, `6` visible tasks, and `Accepted Task Cap = 3`
+
+These rules ensure the player learns what a faction board feels like before the game starts asking them to compare multiple factions at once.
+
+### Early-Campaign Faction Unlock Arc
+
+Use the first three site games as a controlled faction-unlock ladder, then use the fourth site as the first full-system proof site. Each of the first three sites should focus on one new faction and one new style of decision-making.
+
+Recommended sequence:
+
+1. `Campaign Start Baseline`
+- Available concepts: movement, interaction, one danger meter, one immediate survival objective, basic camp setup, one basic plant or starter cover option, and one simple authored local objective
+- Locked concepts: factions, assistants, faction tech branches, normal contract-board comparison, task chains, harsh-event relief, advanced forecasting, advanced plants and devices
+- Player lesson: "I can survive and improve the site with a minimal toolset"
+
+2. `Site 1: Village Committee Unlock`
+- Use one authored `Onboarding Task` focused on practical labor, repair, hauling, or community coordination
+- The `Contract Board` itself should unlock only after this first onboarding task is completed, during the same site game
+- Unlocks on completion:
+- `Village Committee` as the first permanent faction
+- automatic `Village Committee` trust gain on future village tasks
+- `Village Committee` branch visibility in the `Persistent Tech Tree`
+- immediate one-time `Workforce Support` reward that should be used right away on the site
+- `Contract Board Lite` with only `Village Committee` work
+- a `Tutorial Task Set` of basic village tasks such as repair, hauling, and cleanup
+- `Accepted Task Cap = 2`
+- While this first village tutorial board is active, it should not refresh normally; it should remain stable until the player has completed every authored basic village task type once
+- Player lesson: "This faction solves problems through labor tempo and practical field support"
+
+3. `Site 2: Forestry Bureau of Autonomous Region Unlock`
+- Start the site with `Village Committee` already known, then introduce one authored `Onboarding Task` about replanting, water support, erosion control, or seedling rescue
+- Unlocks on completion:
+- `Forestry Bureau of Autonomous Region` as the second permanent faction
+- its tech branch visibility in the `Persistent Tech Tree`
+- immediate one-time `Plant-Water Support` reward that should be used right away
+- a forestry-only `Contract Board` slice with a forestry-flavored `Tutorial Task Set` covering the basic plant-side task types the player must learn before normal refresh behavior resumes
+- `Accepted Task Cap = 2`
+- first clear introduction to ecology-first recovery logic
+- Player lesson: "This faction is about plant survival, water stability, and long-term resilience"
+
+4. `Site 3: Autonomous Region Agricultural University Unlock`
+- Start the site with the first two factions already known, then introduce one authored `Onboarding Task` built around survey work, calibration, devices, or field science
+- Unlocks on completion:
+- `Autonomous Region Agricultural University` as the third permanent faction
+- its tech branch visibility in the `Persistent Tech Tree`
+- immediate one-time `Device Upgrade Support` reward that should be used right away
+- a university-only `Contract Board` slice and `Tutorial Task Set` that stays focused on university-style jobs for this site
+- previously unlocked factions remain part of long-term progression, but the board still withholds cross-faction comparison here so the player can learn the university's style cleanly
+- `Accepted Task Cap = 2`
+- first fuller forecast/device-planning gameplay once the university forecast concept is introduced
+- Player lesson: "This faction improves precision, devices, and planning quality"
+
+5. `Site 4: Full Board Proof`
+- Start the site with all `3` factions already unlocked
+- The `Contract Board` now uses the full presentation with all `3` factions active, normal `6` visible tasks, and `Accepted Task Cap = 3`
+- This is the first site where the player should make real cross-faction comparisons between labor, plant-water, and device-oriented tasks
+- Harsh events should arrive in escalating waves so the player gets a full picture of preparation, response, recovery, and renewed commitment under pressure
+- Player lesson: "The full game is about choosing between faction paths while repeated site pressure keeps changing what matters most"
+
+6. `Post-Onboarding Normal Campaign`
+- After the fourth site, the game should shift to the normal contract-board model
+- All three factions can publish work
+- Onboarding tasks are done; future complexity mainly comes from `Persistent Tech Tree` choices, stronger sites, and event pressure
+
+This sequence matters because it gives the player a whole site to understand each faction's identity before the next one enters the decision space.
+
+### Unlock Ownership Model
+
+Use this rule consistently:
+
+- `Onboarding Task`s should unlock the largest structural concepts for the first time
+- the `Persistent Tech Tree` may both deepen existing concepts and introduce some new gameplay, but only in a tightly controlled amount
+- campaign-start baseline should contain only the minimum verbs needed to survive and complete the first onboarding objective
+
+#### Learning Budget Rule
+
+Use a strict `Learning Budget` across the early and mid campaign:
+
+- one site should usually award enough `Reputation` and `Faction Reputation` for only `1` major tech unlock or `2` minor tech unlocks
+- a "major" unlock means a new thing the player must actively learn to use, such as a new device family, a new plant family, task chains, or a new assistant behavior rule
+- a "minor" unlock means a numeric or quality improvement on a concept the player already knows
+- if a site's rewards would unlock too many new ideas at once, reduce the reputation payout or gate some nodes to later tiers
+- the goal is not to prevent the tech tree from introducing new things; the goal is to make sure the player only needs to learn a few new things per site game
+
+#### Available At Campaign Start
+
+- Movement and interaction
+- Core survival pressure and one readable danger meter
+- Basic camp setup such as water access, rest, and one simple repair or placement action
+- One basic plant or starter ground-cover option, with the rest of the basic plant set unlocked during the site session
+- One authored local objective or onboarding objective
+- Minimal phone usage for essential survival and objective tracking
+
+#### Unlocked By `Onboarding Task`
+
+- The `Contract Board` itself first unlocks through the first faction onboarding task
+- The first appearance of each `Faction`
+- The first appearance of each faction's task style
+- The first immediate sample of each faction's assistant reward
+- Faction availability on future contract boards
+- Faction branch visibility in the `Persistent Tech Tree`
+- Early board complexity gates such as faction count on the board and accepted-task count during the first four onboarding sites
+- Early `Tutorial Task Set`s that force the player to complete each basic task type once before normal board refresh begins
+- The first meaningful understanding of what makes one faction different from another
+
+#### Unlocked By `Persistent Tech Tree`
+
+- New plants, upgraded plants, and broader plant families after the baseline starter option
+- New devices, upgraded devices, and better device efficiency
+- Better forecasts, sensors, and planning precision after the university concepts exist
+- Better irrigation, seedling survival, erosion control, and recovery depth after forestry concepts exist
+- Bigger `Task Pool Size`
+- Accepted-task capacity upgrades beyond the onboarding baseline if later desired
+- Better reward-draft quality, larger draft size, and stronger task-quality control
+- Task chains and more advanced board interactions
+- Stronger or more flexible faction-assistant usage after the player already understands what the assistant does
+- Loadout improvements, worker protection, shelter efficiency, and other long-horizon resilience upgrades
+
+This separation is important, but it should not be treated as an absolute ban. It is acceptable for the `Persistent Tech Tree` to unlock a new gameplay element for the first time. The real rule is that the player must not unlock too many unfamiliar things at once. Reputation pacing, tier gates, and faction requirements should keep each site's post-run learning load small enough that the next site becomes a chance to practice one or two fresh ideas rather than a flood of new systems.
+
+## 14. Failure, Restart, And Recovery
 
 ### Site Failure
 
@@ -3278,7 +3294,7 @@ This reinforces regional interdependence and makes overextending into risky site
 
 The design target is setbacks rather than total campaign reset. The player should recover through planning, support routing, and better preparation, not by losing all global progress.
 
-## 14. Content Taxonomy
+## 15. Content Taxonomy
 
 ### Plant Content
 
@@ -3309,7 +3325,7 @@ In this document, `device` means a player-built support utility or camp structur
 
 There is no separate trade terminal in v1. Buying, selling, and hiring are handled through the `Field Phone`.
 
-### Contract Content
+### Task Content
 
 | Goal Type | Typical Ask |
 |---|---|
@@ -3317,7 +3333,7 @@ There is no separate trade terminal in v1. Buying, selling, and hiring are handl
 | Sustain | Maintain viability through a weather window |
 | Deliver | Produce requested output or milestone results |
 
-## 15. Presentation Direction
+## 16. Presentation Direction
 
 ### Visual Style
 
@@ -3386,7 +3402,7 @@ The visual style must still support strategy readability:
 - Important support devices stand out
 - The player can quickly identify safe versus dangerous areas
 
-## 16. V1 Boundaries
+## 17. V1 Boundaries
 
 These are explicit non-goals for the first version:
 
@@ -3398,7 +3414,7 @@ These are explicit non-goals for the first version:
 - No fully open-world seamless map
 - No highly realistic policy simulation
 
-## 17. Minimum Playable Prototype
+## 18. Minimum Playable Prototype
 
 This chapter defines the smallest prototype that is still worth building. It should use as little feature breadth as possible, but it must still preserve the full loop sketch the game is trying to sell: survival pressure, faction-published tasks, guaranteed faction reputation, small tech growth, harsh-event recovery, and a sense that the next site plays differently because of the player's choices.
 
@@ -3685,7 +3701,7 @@ The minimum playable prototype is successful if a playtester can:
 
 If those beats work, the project has a real prototype foundation. If they do not, the correct response is to improve this small loop before adding more systems.
 
-## 18. Implementation Readiness Checklist
+## 19. Implementation Readiness Checklist
 
 This checklist is here to help inspect the whole loop before moving into code-structure planning. It separates what is already concrete enough for implementation from what still needs a tighter contract.
 
@@ -3754,7 +3770,7 @@ This checklist is here to help inspect the whole loop before moving into code-st
 - [x] The regional layer is strong enough to support meaningful site-order strategy
 - [ ] The current build is not yet safe for large-scale implementation without the missing contracts above
 
-## 19. Acceptance Scenarios
+## 20. Acceptance Scenarios
 
 These scenarios define whether the design is behaving correctly in current-build reviews and later production reviews.
 
@@ -3893,7 +3909,7 @@ Money should clearly function as the current-site tactical currency for survival
 
 Leaving, failing, or restarting a site should reset its site unlock pool, clear its active `Run Modifier`s, and preserve all intended `Persistent Tech Tree` progress.
 
-## 20. Production Notes
+## 21. Production Notes
 
 - Use role-based plant families first, then replace with more specific species later if realism becomes a production goal.
 - Do not expand the plant roster beyond the current set until 2-role plants, neighbor effects, and support-dependent output are clearly fun in testing.
@@ -3917,7 +3933,7 @@ Leaving, failing, or restarting a site should reset its site unlock pool, clear 
 - Keep money, `Reputation`, and `Faction Reputation` clearly separated in reward and progression design.
 
 
-## 21. Meter Relationship
+## 22. Meter Relationship
 
 This meter-relationship chapter defines how worker, terrain, plant, and weather meters connect to each other. It is not the final tuning math. Its purpose is to make the runtime system readable before exact coefficients are balanced, and to act as the implementation-facing reference for program structure.
 
