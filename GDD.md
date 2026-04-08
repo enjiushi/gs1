@@ -3144,8 +3144,8 @@ Use these tutorial-stage board rules:
 - during onboarding `Site 1` to `Site 3`, the board should only publish tasks from the featured faction of that specific site
 - multi-faction board comparison should begin on `Site 4`, after the player has learned all three faction styles in isolation
 - during onboarding, board breadth and accepted-task count should be set first by onboarding stage, then later expanded further by `Persistent Tech Tree` upgrades
-- the first faction board opened by onboarding should use a `Tutorial Task Set`
-- while a `Tutorial Task Set` is active, the board should not expire or refresh normally; it should stay stable until the player has completed all required basic task types in that set
+- each onboarding site's featured-faction board should use its own `Tutorial Task Set`
+- while an onboarding `Tutorial Task Set` is active, that featured-faction board should not expire or refresh normally; it should stay stable until the player has completed all required basic task types in that set
 - onboarding sites should keep `Accepted Task Cap = 2`
 - the first full board should use all `3` factions, `6` visible tasks, and `Accepted Task Cap = 3`
 
