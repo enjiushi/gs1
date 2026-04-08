@@ -45,14 +45,14 @@ Create a survival strategy game where the player feels the harshness of desert f
 
 ## 4. Core Design Terms
 
-These terms are stable and should be used consistently in future design, UI, and implementation discussions.
+These terms are stable and should be used consistently in future design and implementation discussions.
 
 | Term | Definition |
 |---|---|
 | `Site` | A playable restoration area on the regional map with its own terrain, hazards, contract goals, local resources, and camp state. |
-| `Regional Map` | The campaign-level planning map containing multiple connected `Site`s, their adjacency, regional conditions, available site starts, site-detail panels, support links, and access to faction-tech selection. |
-| `Contract Board` | The on-site progression screen available only during an active `Site` session; it contains the current site's faction-published contracts plus the active `Site Task` pool that drives site progression and rewards. |
-| `Field Phone` | The player's in-world interface for money-related actions during a `Site` session; it supports the on-site `Contract Board` plus buying, selling, hiring, and related field planning screens. |
+| `Regional Map` | The campaign-level planning layer containing multiple connected `Site`s, their adjacency, regional conditions, available site starts, support links, and access to faction-tech selection. |
+| `Contract Board` | The on-site progression system available only during an active `Site` session; it contains the current site's faction-published contracts plus the active `Site Task` pool that drives site progression and rewards. |
+| `Field Phone` | The player's in-world access point for money-related actions during a `Site` session; it supports the on-site `Contract Board` plus buying, selling, hiring, and related field planning actions. |
 | `Reputation` | The cumulative campaign-level government standing resource earned progressively from official work; it is never spent and instead gates faction-tech tiers and broader program trust. |
 | `Persistent Tech Tree` | The long-term campaign progression layer formed by three faction tech branches plus any neutral program-wide upgrades. |
 | `Faction` | One of the three institutional backers on the `Contract Board`; each `Faction` has its own play style, task bias, random events, assistant support, and tech branch. |
@@ -107,8 +107,8 @@ The long-term replay goal is for players to finish a campaign and immediately im
 ### Campaign Loop
 
 1. Review the `Regional Map`, off-screen site states, and which `Site`s are currently startable.
-2. Click candidate `Site`s to inspect their terrain summary, weather tendencies, local constraints, and the support modifiers currently provided by nearby stabilized sites.
-3. Review and purchase available `Persistent Tech Tree` nodes from the faction-tech interface on the `Regional Map`.
+2. Review candidate `Site`s for terrain summary, weather tendencies, local constraints, and the support modifiers currently provided by nearby stabilized sites.
+3. Review and purchase available `Persistent Tech Tree` nodes before deployment.
 4. Assemble a `Loadout` from nearby-site support plus currently unlocked campaign options.
 5. Choose the target `Site` and deploy into it.
 6. Open that site's `Contract Board` during the active session, then receive the current site-task and unlock pool for that site, with each `Site Task` carrying a publishing `Faction`, a place in the refreshable task pool, and rewards shaped by the current `Persistent Tech Tree` build.
@@ -160,32 +160,21 @@ The important prototype target is not perfect simulation. It is to make each pla
 
 The campaign plays across a large random map made of multiple connected `Site`s. Sites are selectable rather than fully open-world continuous. This keeps scope manageable while allowing strategic route planning and meaningful adjacency.
 
-Regional-map readability rule:
+Regional-map site states:
 
-- each `Site` must be visually distinguished first by completion state, not only by biome, adjacency, or difficulty
-- the player should be able to tell at a glance which sites are incomplete, completed, or still locked before clicking any node
-- this distinction should not rely on tiny text alone
-- for the prototype, completed sites can simply use visibly greener or plant-covered node art, which should be sufficient to communicate that they are restored
-- completed sites should read as secured regional assets
-- incomplete startable sites should read as current playable targets
-- locked sites should read as unavailable future targets
-
-Recommended prototype state groups on the `Regional Map`:
-
-- `Locked`: unavailable, visually subdued, and clearly not selectable for immediate deployment
-- `Available`: not yet completed and currently startable; these should stand out as the main next-site choices
-- `Completed`: successfully restored and contributing `Regional Support Output`; these should look stable and resolved
+-- `Locked`: unavailable and not startable for immediate deployment
+-- `Available`: not yet completed and currently startable
+-- `Completed`: successfully restored and contributing `Regional Support Output`
 
 Each `Site` has:
 
 - A biome variant within the desert theme
 - Weather tendencies
 - Terrain features
-- A local site-information panel on the `Regional Map`
 - Different starting constraints
 - Potential links to neighboring sites
 
-When the player clicks a `Site` on the `Regional Map`, the site panel should show at minimum:
+Each candidate `Site` should define at minimum:
 
 - whether the site can currently be started or must remain locked
 - its completion state and whether it is an unresolved target or a completed support site
@@ -253,22 +242,19 @@ The campaign ends when the `Campaign Clock` runs out. The player's success is me
 - Inventory: open the carried `Inventory` and manage `Item`s
 - Phone: open the `Field Phone` for contracts, buying, selling, and hiring
 
-### Interaction Requirement UI
+### Interaction Requirement Rule
 
 To reduce control complexity, the prototype should avoid a quick-slot-driven interaction model. The player only needs to keep the required `Item`s in carried `Inventory`.
 
 For any interaction, construction, planting, repair, or other field work that requires `Item`s:
 
-- show the required `Item` icon and amount at the bottom right of the interaction prompt
-- if the required amount is present in carried `Inventory`, show that requirement in green
-- if the player lacks the required amount in carried `Inventory`, show it in red
 - if all requirements are satisfied, the interaction can be performed directly without separately equipping the needed tool or consumable into a quick slot
 
 This should reduce control burden and keep the decision space focused on what the player chooses to carry rather than on rapid slot swapping.
 
 ### Field Phone
 
-The `Field Phone` is the main diegetic interface for money-related interactions during an active `Site` session. Pre-deployment planning belongs to the `Regional Map`, not the phone. Once deployed, the player uses the phone for field economics and for opening the current site's `Contract Board`.
+The `Field Phone` is the main diegetic access point for money-related interactions during an active `Site` session. Pre-deployment planning belongs to the `Regional Map`, not the phone. Once deployed, the player uses the phone for field economics and for opening the current site's `Contract Board`.
 
 Core phone functions:
 
@@ -315,7 +301,7 @@ This keeps the simulation readable and stable while still feeling continuous to 
 
 #### Canonical Runtime Value Types
 
-Use internal continuous values for simulation, but present most player-facing meters as floored integers in UI.
+Use internal continuous values for simulation.
 
 Important cleanup rule:
 
@@ -388,22 +374,6 @@ Discrete or integer runtime values:
 - `reputation`
 - item counts such as water containers, food packs, repair kits, seeds, and harvested goods
 
-Display rule:
-
-- Continuous player-facing meters use internal float values, but UI can present them as bars with the current number shown on the bar
-- `Plant Density` should be the main plant state shown to the player; the UI can show the current density number or bar directly, and a lighter trend label such as `Growing`, `Holding`, or `Withering` can show whether that density is improving or collapsing
-- `Plant Density` should be shown both in UI and in tile art; a denser tile should visibly contain more plant coverage, volume, or fullness than a sparse tile
-- `tileSoilFertility`, `tileMoisture`, and `tileSoilSalinity` should be visible through tile inspection and relevant overlays because they are the core land-quality state
-- `tileHeat`, `tileWind`, and `tileDust` are resolved local weather meters; they are useful in tile inspection, advanced overlays, or debugging views because they bridge site weather and final tile or plant pressure
-- `Straw Checkerboard` should be inspected through current `tilePlantDensity` plus its current protection and soil-building value; it is not a regrowing living plant
-- `growthPressure` is an internal derived plant-pressure variable; the player should not need the raw number, but tile inspection should expose a stable pressure breakdown such as `waterContribution`, `soilContribution`, `windContribution`, and `heatContribution`
-- `tileSoilSalinity` should stay a separate growth-cap warning rather than being folded into `growthPressure`, because salinity is a placement and rehabilitation issue, not the same kind of short-term growth pressure
-- Money, `Reputation`, `Faction Reputation`, stack counts, `fullyGrownTileCount`, `siteCompletionTileThreshold`, and `campaignDaysRemaining` are native integers and should display as exact integers
-- `tileSoilFertility` is the long-lived land-improvement meter used at runtime; it affects plant growth speed, the tile's maximum moisture capacity, and how quickly stored moisture is lost
-- `tileSoilSalinity` should also be shown through a simple overlay or inspection readout because it directly affects plant choice on some tiles
-- `campDurability` should be visible as a base-condition meter because it directly controls how much protection and recovery value the camp can still provide
-- `deviceStoredWater` should be visible on `Water Tank`s and on connected irrigation inspection because it directly controls whether linked `Drip Irrigator`s can operate
-
 #### Fixed-Step Update Order
 
 For each fixed simulation step, resolve systems in this order:
@@ -415,7 +385,7 @@ For each fixed simulation step, resolve systems in this order:
 5. Apply ongoing exposure and consumption to the worker, contractors, devices, and vulnerable stored resources.
 6. Apply hazard pressure and environmental damage for this step, including erosion, plant density loss, burial gain, device damage, camp durability loss, and resource loss.
 7. Apply recovery and beneficial change for this step, including plant density gain, plant constant-wither loss, salinity reduction, soil-fertility improvement, moisture recovery from watering or irrigation, moisture-loss reduction from protective effects, player recovery, and site stabilization gains, if current conditions allow.
-8. Recompute threshold-derived display labels such as density labels and `Plant Trend`, plus real cleanup states such as death or restored pocket status.
+8. Recompute threshold-derived cleanup states such as death or restored pocket status.
 9. Run slower pulse checks whose timers have elapsed, including natural spread attempts, output pulses, task trigger checks, and other low-frequency site logic.
 
 This order matters:
@@ -434,7 +404,6 @@ Use these timing rules for prototype consistency:
 - player recovery and drain resolve continuously every fixed simulation step
 - plant density gain and loss resolve continuously every fixed simulation step
 - `constantWitherRate` loss resolves continuously every fixed simulation step
-- density labels and `Plant Trend` display labels resolve immediately after each fixed simulation step based on current threshold values
 - natural spread resolves discretely on an `ecologyPulse`
 
 Recommended pulse values:
@@ -448,8 +417,6 @@ This means:
 - erosion and moisture loss feel continuous
 - hazards feel continuous
 - spread remains readable and discrete instead of noisy every frame
-
-For the prototype, engineering should treat the internal float values as authoritative and the UI values as presentation only.
 
 ### Tile And Occupancy Rules (Prototype)
 
@@ -471,7 +438,7 @@ The tile model should separate different kinds of state instead of treating ever
 
 Important cleanup rule:
 
-- `occupancyState` should only answer what is on the tile; density, integrity, and efficiency belong to their own runtime states, while `Plant Trend` is a derived display label
+- `occupancyState` should only answer what is on the tile; density, integrity, and efficiency belong to their own runtime states, while `Plant Trend` is a derived state
 - `Straw Checkerboard` uses `groundCoverTypeId` for occupancy identity, reuses plant trait fields for its effects, and uses `tilePlantDensity` with `growable = false` plus a positive `constantWitherRate`
 - `tileHeat`, `tileWind`, and `tileDust` are resolved local weather meters, not persistent terrain state
 - the prototype should not use a separate `tileSoilStability` meter
@@ -699,12 +666,6 @@ The environment is represented through visible site conditions rather than hidde
 
 These are not just flavor. They directly affect action energy cost, exposure risk, plant survival, erosion, and device performance.
 
-Player-facing label rule:
-
-- use `Heat`, `Wind`, and `Dust` as the readable forecast and UI channel names
-- keep `weatherDust` as the internal runtime field name if engineering prefers it
-- avoid using real-world air-quality labels such as `PM2.5` as the main gameplay readout, because the prototype is communicating desert field danger, airborne sand, visibility loss, and burial risk rather than a narrow pollution sim
-
 ### Prototype Environmental Pressure Suite
 
 For prototype validation, the environment should constantly push against the player's layout. Plants should not behave like passive timers. A planted area should only prosper if the player chose the right plant mix, support, and timing for that zone.
@@ -874,18 +835,6 @@ Prototype forecast output should include:
 - predicted intensity band for `Heat`, `Wind`, and `Dust`
 - `forecastConfidence`
 
-Forecast readability ladder:
-
-- base readout: event type, rough start window, and broad weather severity language such as `Low`, `Medium`, or `High`
-- first university forecast upgrade: visible `Heat`, `Wind`, and `Dust` channel meters or bars
-- later forecast upgrade: narrower intensity ranges and tighter start windows
-- later forecast upgrade: better confidence readout and clearer identification of which channel is the main threat
-
-Important naming rule:
-
-- the player-facing third channel should be called `Dust` or `Dust Load`, not `Sand`, because it is communicating airborne density, visibility pressure, and burial threat together
-- `weatherDust` may still remain the runtime field name behind that readout
-
 Base prototype forecast values:
 
 - `forecastLeadMinutes = 180`
@@ -905,7 +854,7 @@ Improvement effects:
 - smaller intensity error band
 - smaller start-time error band
 - higher `forecastConfidence`
-- earlier access to visible `Heat`, `Wind`, and `Dust` channel readouts
+- earlier access to more precise channel-specific forecast information
 - clearer identification of which weather channel is expected to be most dangerous
 
 Important rule:
@@ -1151,7 +1100,7 @@ The prototype should separate economy and progression data into three layers:
 
 #### Layer 1: Completion And Campaign Counters
 
-These values are used for HUD readability, task generation, and high-level site-state checks:
+These values are used for task generation and high-level site-state checks:
 
 | Counter | Runtime Field | Type | Meaning |
 |---|---|---|---|
@@ -1183,7 +1132,7 @@ These are the exact prototype `Item` categories that can be stored, moved, consu
 Prototype note:
 
 - tools and portable devices should also be treated as `Item`s, usually as single-slot or low-stack entries when they are carriable
-- stack size is a real carrying constraint, not just a UI label
+- stack size is a real carrying constraint, not just a presentation label
 - if the player wants to carry more than one stack limit of the same `Item`, the excess must occupy additional `Inventory` slots
 - this should be especially visible for seeds, water containers, harvested goods, and other common stackable resources
 - `Reputation` is not an inventory item and never exists in storage
@@ -1218,10 +1167,7 @@ Example inventory pressure:
 Container rules:
 
 - `Container`s should be buyable or buildable camp objects in the current design
-- interacting with any `Container` opens access to the shared `campStorage` transfer view rather than only that one object's personal slots
-- the storage UI should support a one-click quick-transfer action from `workerPack` to `campStorage` that automatically merges into existing stacks first and then fills valid empty slots
-- the storage UI should support the reverse quick-transfer action from a selected `campStorage` stack into `workerPack`, again merging into existing stacks first and then filling valid empty slots
-- the storage UI should support `Store All` and `Take All` actions so the player does not need to move common stacks one by one
+- interacting with any `Container` should access the shared `campStorage` rather than only that one object's personal slots
 - losing, burying, or exposing camp `Container`s can put stored `Item`s at risk during harsh events
 
 #### Resource Flow Rules
@@ -1371,7 +1317,7 @@ Prototype rules:
 | `Water Tank` | Water support | `1x1` | `None` | `money 140`, `parts 3` | Stores site water for watering actions and for linked `Drip Irrigator`s | Can be buried, damaged, or emptied, making connected irrigation collapse until refilled |
 | `Drip Irrigator` | Irrigation | `1x1` | `AnyHeight` | `money 180`, `parts 4` | Adds steady direct `tileMoisture` gain to nearby plant tiles while consuming water from one or more linked `Water Tank`s | Provides no irrigation if linked tanks are empty; efficiency also collapses when buried or damaged |
 | `Wind Fence` | Protection utility | `1x1` | `None` | `money 100`, `parts 2` | Lowers local `tileWind` and `tileDust`, especially useful for exposed edges and storm-facing lanes | Provides little recovery value and degrades under repeated sand pressure |
-| `Weather Mast` | Sensor | `1x1` | `None` | `money 160`, `parts 3` | Improves forecast precision, earlier warnings, and exposure readouts for planning | Storm hits and burial can reduce forecast quality until repaired or cleared |
+| `Weather Mast` | Sensor | `1x1` | `None` | `money 160`, `parts 3` | Improves forecast precision, earlier warnings, and planning quality | Storm hits and burial can reduce forecast quality until repaired or cleared |
 | `Solar Array` | Solar utility | `1x1` | `LowOnly` | `money 220`, `parts 5` | Improves nearby `deviceEfficiency`, supports stable utility output without fuel logistics, and can create small sellable surplus electricity when site demand is already covered | Storm damage and burial can sharply reduce output until repaired or cleared |
 | `Field Workshop` | Workshop / Crafting | `1x1` | `None` | `money 200`, `parts 4` | Enables camp crafting actions using materials from shared `campStorage` | Crafting access depends on the workshop staying intact and reachable |
 
@@ -1382,7 +1328,7 @@ Use these family expectations in prototype tuning:
 - shelter family devices should mainly improve worker safety, camp protection, and recovery speed
 - irrigation devices should mainly improve water access, `tileMoisture`, and low-density plant survival, but only while connected stored water is available
 - protection utilities should mainly reduce local `tileWind`, `tileDust`, `tileHeat`, or some combination of them, and reduce storm losses
-- sensors should mainly improve forecast lead time, forecast precision, and hazard readout clarity
+- sensors should mainly improve forecast lead time and forecast precision
 - workshops should mainly enable simple camp crafting and material conversion, not repair automation or deep production chains
 - solar utilities should mainly improve nearby `deviceEfficiency` and optionally generate a small low-value export surplus, not create a separate power-minigame
 
@@ -1676,15 +1622,7 @@ The intended fantasy is that the player establishes life, protects it through it
 
 ### Plant Density Meter (Prototype)
 
-The prototype should treat `tilePlantDensity` as one readable continuous meter rather than a separate ladder of named growth states.
-
-Density readability rule:
-
-- UI should be able to show the current density value or density bar when the tile is inspected or highlighted
-- tile art should also communicate density directly, with more visible plant mass, spread, or fullness as density rises
-- when a planted tile is inspected, the player should also be able to see why that density is improving or collapsing through a short diagnosis rather than only a raw pressure value
-- that diagnosis should use stable grouped causes such as `Needs Water`, `Poor Soil / Burial`, `Too Exposed`, and `Too Hot`, even if the internal formulas behind those groups change during tuning
-- the player should not need to rely on text alone to tell whether a tile is still fragile or already mature
+The prototype should treat `tilePlantDensity` as one continuous meter rather than a separate ladder of named growth states.
 
 For prototype tuning:
 
@@ -1879,7 +1817,7 @@ Important modeling rule:
 - `tileHeat`, `tileWind`, and `tileDust` are resolved local weather meters rebuilt each fixed simulation step after site weather and current local support are combined
 - the prototype should not use a separate `tileSoilStability` meter or a separately stored `tilePlantStress` value
 
-Each prototype plant definition should also provide these plant-side values and readouts. These are not new runtime state categories. Core simulation should use the end-of-document meter-relationship chapter as the canonical meter reference, while the UI may expose summary readouts derived from that plant profile.
+Each prototype plant definition should also provide these plant-side values. These are not new runtime state categories. Core simulation should use the end-of-document meter-relationship chapter as the canonical meter reference.
 
 Placement:
 
@@ -1927,9 +1865,8 @@ Expansion and output profile:
 Prototype note:
 
 - the current roster tables can keep using design language such as `Low`, `Medium`, and `High`
-- if engineering stores these readouts internally, treat them as UI-facing profile values rather than as separate core simulation meters
 
-Ground-cover definitions should not define a separate trait family. For the prototype, `Straw Checkerboard` should use the same trait fields as plants, especially non-zero `windProtectionPower`, `dustProtectionPower`, and `fertilityImprovePower`, set `growable = false`, set `constantWitherRate` to a positive value, set `auraSize` as needed for local setup support, set growth and spread readouts to `0`, and use the shared runtime meter `tilePlantDensity`, which starts full and steadily loses density while present.
+Ground-cover definitions should not define a separate trait family. For the prototype, `Straw Checkerboard` should use the same trait fields as plants, especially non-zero `windProtectionPower`, `dustProtectionPower`, and `fertilityImprovePower`, set `growable = false`, set `constantWitherRate` to a positive value, set `auraSize` as needed for local setup support, set spread-related fields to `0`, and use the shared runtime meter `tilePlantDensity`, which starts full and steadily loses density while present.
 
 #### Object Contribution And Resolved Local Weather Build Rules
 
@@ -2037,20 +1974,7 @@ Use this prototype logic:
 
 A living plant grows best when `growthPressure` is low. Local support should matter only by lowering that pressure, not by bypassing it with a separate direct growth bonus.
 
-#### Growth Pressure Reporting Rules
-
-`growthPressure` is the internal final plant-pressure value, but the player should be shown a grouped diagnosis rather than the raw formula.
-
-Prototype reporting rule:
-
-- every planted tile should expose a player-facing breakdown with these stable grouped channels:
-- `waterContribution`
-- `soilContribution`
-- `windContribution`
-- `heatContribution`
-- these grouped channels are derived diagnostic values for inspection and UI; they do not need to be stored as separate persistent save-state fields
-
-Grouping rule:
+#### Growth Pressure Grouping Rule
 
 - `waterContribution` should represent moisture shortage from current `tileMoisture`
 - `soilContribution` should represent poor fertility plus burial-related land pressure
@@ -2076,7 +2000,7 @@ Prototype placement rule:
 
 #### Plant Trend Display Rules
 
-`Plant Trend` should be derived from current density plus the current direction of change after each fixed simulation step. It is a player-facing display label, not a separate plant trait or authoritative runtime meter.
+`Plant Trend` should be derived from current density plus the current direction of change after each fixed simulation step. It is a derived state, not a separate plant trait or authoritative runtime meter.
 
 Use these prototype rules:
 
@@ -2217,7 +2141,7 @@ Plants affect nearby tiles in readable ways. Effects may include:
 
 Effect strength should scale with `Plant Density`. A low-density tile should offer limited support, while a medium-density or high-density tile should provide much stronger local value.
 
-The player should be able to understand why a placement matters by reading the tile overlay and nearby conditions.
+The player should be able to understand why a placement matters from tile conditions and nearby state.
 
 ### Stability And Erosion
 
@@ -2422,8 +2346,8 @@ Prototype assistant:
 
 Forecast identity:
 
-- the university should be the main prototype source of advanced weather readouts
-- its upgrades should progressively reveal better `Heat`, `Wind`, and `Dust` forecast meters rather than jumping straight to perfect certainty
+- the university should be the main prototype source of advanced weather forecasting
+- its upgrades should progressively improve `Heat`, `Wind`, and `Dust` forecast detail rather than jumping straight to perfect certainty
 - its information advantage should help the player prepare the right response before a hazard window, not erase hazard tension completely
 
 Random-event flavor:
@@ -2494,7 +2418,7 @@ Contracts are the medium and long-form structure of a site or campaign. They sho
 
 ### Site Tasks
 
-`Site Task`s are short 5 to 10 minute objectives generated from the current `Site` state. They appear in a live task pool inside the `Contract Board` and can also be surfaced on the HUD while the player is on the `Site`. Their job is to keep the player moving from one reachable payoff to the next while the site is still unrestored.
+`Site Task`s are short 5 to 10 minute objectives generated from the current `Site` state. They appear in a live task pool inside the `Contract Board`. Their job is to keep the player moving from one reachable payoff to the next while the site is still unrestored.
 
 In the faction prototype, `Site Task`s should feel like field assignments drawn from a live board rather than timeless side chores. The player should always be able to see which `Faction` published the task, whether they still have free acceptance slots, and what kind of long-term relationship or assistant support the task advances.
 
@@ -2745,11 +2669,8 @@ This game has many overlapping systems: tasks, chains, reward drafts, unlockable
 Core cognitive-load rules:
 
 - The player should never need to process every system at once
-- The UI should always emphasize only the most relevant next 1 to 3 decisions
-- Advanced layers should stay visually quiet until they matter
-- Rare and high-impact information should be more noticeable than routine background information
-- The main solution to overload should be `Concept Unlock`s, not only better UI layout
-- In onboarding, a system the player cannot yet act on should usually remain actually locked rather than merely visible but unexplained
+- The main solution to overload should be `Concept Unlock`s
+- In onboarding, a system the player cannot yet act on should usually remain actually locked
 
 At any given moment, the player should mainly understand:
 
@@ -2821,17 +2742,10 @@ This keeps the player moving between local urgency and larger ambition.
 
 To make the game more compelling without feeling manipulative, these systems would fit well:
 
-- Visible objective stack: always show one immediate goal, a few near-term goals, and one campaign goal on the HUD or `Field Phone`
-- Task-tier presentation: high-tier and jackpot-tier tasks should have clear visual treatment, stronger labels, and a small reveal stinger when they appear in a refreshed pool
-- Task-pool reveal tension: refreshes should have a readable reveal cadence, with a little suspense or tease when strong tasks appear instead of an instant flat list swap
 - Streaked ecological feedback: let connected restorations create visible chain reactions, such as a whole edge becoming calmer after one more plant line is finished
-- Commendation preview signals: surface which kinds of government recognition the player is currently trending toward, such as storm-proof recovery, low-water restoration, or rapid stabilization
 - Commitment bonuses: some combinations of `Site Unlockables`, modifiers, and task choices should reward leaning harder into one style rather than always broadening out
 - `Site Commendation`s: reward successful site completions with a government prize that names the achievement reason, such as zero-collapse restore, low-water restore, or storm-proof restore, with optional `Reputation`, prestige, or future bonuses
-- Daily recommendations: each morning the game can suggest a few context-aware "good next steps" based on weather, contract status, and weak zones
-- Near-miss reward tuning: when the player is close to a milestone, make that fact obvious so they are motivated to finish it before stopping
 - Optional post-restore tasks are removed from the current design to avoid adding revisit complexity before the regional loop is fully understood
-- Progressive disclosure UI: keep deeper systems collapsed or lightly surfaced until they become relevant, but prefer true `Concept Unlock`s during onboarding instead of relying only on hidden menus or muted widgets
 
 ### Reputation Loop
 
@@ -2856,7 +2770,7 @@ Prototype loadout rules:
 - "nearby" should mean directly adjacent sites on the `Regional Map` in the prototype
 - each eligible nearby site contributes a limited exportable package every few regional days
 - the player chooses which available nearby-site support to bring into the new run
-- the `Regional Map` site-detail panel should preview these available support packages and passive modifiers before deployment
+- nearby-site support packages and passive modifiers should be available before deployment
 - `Persistent Tech Tree` upgrades may increase loadout capacity or improve how efficiently nearby support is used
 - on-site money spending still exists after deployment through the `Field Phone`, but pre-deployment loadout should come from nearby support rather than open purchase
 
@@ -3067,7 +2981,7 @@ Recommended prototype sequence:
 - a university-only `Contract Board` slice and `Tutorial Task Set` that stays focused on university-style jobs for this site
 - previously unlocked factions remain part of long-term progression, but the board still withholds cross-faction comparison here so the player can learn the university's style cleanly
 - `Accepted Task Cap = 2`
-- first fuller forecast/device-planning gameplay, including clearer `Heat`, `Wind`, and `Dust` readouts once the university forecast concept is introduced
+- first fuller forecast/device-planning gameplay once the university forecast concept is introduced
 - Player lesson: "This faction improves precision, devices, and planning quality"
 
 5. `Site 4: Full Prototype Board Proof`
@@ -3413,7 +3327,7 @@ The game uses simplified models with a painterly visual treatment. The desert pa
 
 ### Environmental Feeling
 
-Heat, sandstorms, and extreme hazard events must be felt, not just displayed in UI. The presentation should use:
+Heat, sandstorms, and extreme hazard events must be felt, not just represented through numbers. The presentation should use:
 
 - Haze and shimmer for heat
 - Visibility loss during sandstorms
@@ -3557,7 +3471,7 @@ For the first minimum playable build, implement the following.
 - no procedural regional map
 - no off-screen site simulation
 - no site revisits
-- `1` simple between-site progression screen after each site
+- `1` simple between-site progression step after each site
 
 The prototype does not need open campaign routing. It only needs enough between-site structure to make upgrades matter.
 
@@ -3721,7 +3635,7 @@ This is enough to make reputation and site completion feel forward-looking witho
 - device roster
 - economy breadth
 - forecast precision model
-- UI presentation depth
+- presentation depth
 
 #### Safely Defer
 
@@ -3781,7 +3695,7 @@ This checklist is here to help inspect the whole loop before moving into code-st
 - Main strength: the game already has a real pressure loop built from survival, hazards, strategic planting, short-term tasks, emergency rescue, and regional preparation
 - Main strength: the prototype has multiple reward layers, including site stabilization, task rewards, modifiers, commendations, and nearby-site support
 - Main strength: the regional order layer now adds meaningful campaign strategy rather than just map traversal
-- Main risk: cognitive load is still high, so UI and onboarding will matter a lot
+- Main risk: cognitive load is still high, so onboarding and information flow will matter a lot
 - Main risk: task generation, nearby-site support, and modifier tuning could become either too weak to matter or strong enough to flatten difficulty
 - Main risk: some progression and meta systems are conceptually solid but still not numerically or structurally defined enough for direct implementation
 
@@ -3819,7 +3733,6 @@ This checklist is here to help inspect the whole loop before moving into code-st
 
 ### Still Missing As Formal Sections
 
-- [ ] UI information contract
 - [ ] Save data boundaries
 - [ ] Explicit off-screen simulation section with formulas instead of high-level description
 - [ ] Explicit failure and restart numeric section instead of mostly design intent
@@ -3832,12 +3745,11 @@ This checklist is here to help inspect the whole loop before moving into code-st
 - [ ] `Regional Support Output` numeric contract
 - [ ] Failure and restart contract
 - [ ] Off-screen simulation contract
-- [ ] UI information contract
 - [ ] Save data boundaries
 
 ### Prototype Health Check
 
-- [x] The prototype already has enough tension to be fun if pacing and UI are handled well
+- [x] The prototype already has enough tension to be fun if pacing and information flow are handled well
 - [x] The plant game is no longer passive because hazards, density loss, risky harsh-event work, and comeback decisions all matter
 - [x] The regional layer is strong enough to support meaningful site-order strategy
 - [ ] The prototype is not yet safe for large-scale implementation without the missing contracts above
@@ -4001,8 +3913,8 @@ Leaving, failing, or restarting a site should reset its site unlock pool, clear 
 - Validate task-tier excitement early. High-tier task spawn rates, readability, and reward strength should be tuned so jackpot appearances feel rare and thrilling rather than noisy or disappointing.
 - Validate jackpot modifiers, task chains, and `Site Commendation`s early. These systems should create memorable site-run pivots and meaningful recognition, not just sit as decorative bonuses.
 - Prototype extreme hazard events early. The harshest environmental moments should become emotional peaks driven by survival pressure, music, and rendering, not just bigger damage numbers.
-- Validate onboarding and cognitive load early. The first session must teach the loop in layers, and the live UI must make the current danger, current opportunity, and next decision legible at a glance.
-- Keep money, `Reputation`, and `Faction Reputation` legible in UI and tuning. Players should immediately understand why a reward gives money, total trust, faction trust, or a combination of them, and what each one is for.
+- Validate onboarding and cognitive load early. The first session must teach the loop in layers without overwhelming the player.
+- Keep money, `Reputation`, and `Faction Reputation` clearly separated in reward and progression design.
 
 
 ## 21. Meter Relationship
@@ -4012,7 +3924,7 @@ This meter-relationship chapter defines how worker, terrain, plant, and weather 
 Design rule:
 
 - meters should affect each other through explicit relationships, not hidden outcome shortcuts
-- tables in this chapter should list only core meters and core plant-side values; math-stage helper variables and UI diagnosis outputs belong outside this chapter
+- tables in this chapter should list only core meters and core plant-side values; math-stage helper variables and presentation diagnosis outputs belong outside this chapter
 - site weather should first resolve into local `tileHeat`, `tileWind`, and `tileDust`
 - resolved local weather then changes terrain pressure and plant pressure
 - terrain state changes plant growth, density cap, and recovery potential
