@@ -57,7 +57,7 @@ These terms are stable and should be used consistently in future design and impl
 | `Persistent Tech Tree` | The long-term campaign progression layer formed by three faction tech branches plus any neutral program-wide upgrades. |
 | `Faction` | One of the three institutional backers on the `Contract Board`; each `Faction` has its own play style, task bias, random events, assistant support, and tech branch. |
 | `Faction Reputation` | The cumulative standing value with one specific `Faction`, earned mainly through that faction's tasks and events; it unlocks branch nodes and improves post-event help. |
-| `Faction Assistant` | A temporary support package provided by a `Faction`, such as workforce aid, device upgrades, or plant-water support. |
+| `Faction Assistant` | A temporary signature support package provided by a `Faction`. In the current design, each faction should expose only one clear assistant package: `Workforce Support`, `Plant-Water Support`, or `Device Upgrade Support`. |
 | `Concept Unlock` | A real progression gate used during onboarding, where a new gameplay concept becomes available only after the player has meaningfully used the previous one; this is not just a tutorial popup or hidden full system. |
 | `Learning Budget` | The maximum amount of genuinely new gameplay the player is expected to absorb from one site game's rewards and unlocks; reputation pacing should keep this budget small. |
 | `Onboarding Task` | An authored early-campaign task whose purpose is to teach one faction or major gameplay layer through real play and permanently unlock it for future sites. |
@@ -846,7 +846,7 @@ Base forecast values:
 
 Improvement sources:
 
-- `Weather Mast`
+- `Autonomous Region Agricultural University` tech or support that improves forecast range or certainty
 - persistent tech that improves forecast range or certainty
 - site-scoped unlocks or modifiers that improve local site precision
 
@@ -1264,13 +1264,15 @@ Solar-economy rule:
 
 ### Device Roster
 
-The game should use a small device set that supports the plant game, worker survival, forecasting, and recovery without turning the project into a full utility-network sim.
+The game should use a very small core device set that supports irrigation, protection, crafting, and light solar utility without turning the project into a full utility-network sim.
 
 Important override:
 
 - there is no buy or sell terminal device in the current design
 - all buying, selling, hiring, and tech purchasing remain `Field Phone` interactions
-- physical site devices exist to support survival, ecology, forecasting, storage, and repair work
+- physical site devices exist to support survival, ecology, storage, crafting, and repair work
+- the player base already covers basic shelter and recovery in the current design, so separate tent or canopy shelter devices should be deferred
+- advanced forecast precision should mainly come from `Autonomous Region Agricultural University` support and tech rather than from a separate placeable sensor device
 
 #### Device Runtime Contract
 
@@ -1289,11 +1291,9 @@ Each structure definition should provide:
 | `burialSensitivity` | How quickly the device loses effectiveness from sand burial |
 | `windProtectionPower` | Shared local wind-protection contribution if any |
 | `heatProtectionPower` | Shared local heat-protection contribution if any |
-| `recoveryAura` | Local worker-recovery contribution if any |
 | `dustProtectionPower` | Shared local dust-protection contribution if any |
 | `waterStorageCapacity` | Maximum stored water if the structure is a water-storage device |
 | `waterUsePerMinute` | Stored-water consumption rate if the structure actively irrigates |
-| `forecastSupport` | Forecast precision and warning support if any |
 | `craftingSupport` | Whether this device unlocks camp crafting actions |
 
 Rules:
@@ -1314,36 +1314,33 @@ Rules:
 
 | Structure | Family | Footprint | Plant Sharing | Build Cost (Temp) | Main Function | Failure Pressure |
 |---|---|---|---|---|---|---|
-| `Field Tent` | Shelter | `1x1` | `None` | `money 80`, `parts 2` | Creates a small safe rest point and improves short rest recovery on nearby tiles | Can be wind-damaged or buried; weak during severe storms without nearby protection |
-| `Shade Canopy` | Shelter / Heat relief | `1x1` | `None` | `money 120`, `parts 3` | Creates a stronger heat-relief pocket for worker recovery and nearby fragile plants | Loses efficiency quickly in strong wind if exposed |
 | `Water Tank` | Water support | `1x1` | `None` | `money 140`, `parts 3` | Stores site water for watering actions and for linked `Drip Irrigator`s | Can be buried, damaged, or emptied, making connected irrigation collapse until refilled |
 | `Drip Irrigator` | Irrigation | `1x1` | `AnyHeight` | `money 180`, `parts 4` | Adds steady direct `tileMoisture` gain to nearby plant tiles while consuming water from one or more linked `Water Tank`s | Provides no irrigation if linked tanks are empty; efficiency also collapses when buried or damaged |
 | `Wind Fence` | Protection utility | `1x1` | `None` | `money 100`, `parts 2` | Lowers local `tileWind` and `tileDust`, especially useful for exposed edges and storm-facing lanes | Provides little recovery value and degrades under repeated sand pressure |
-| `Weather Mast` | Sensor | `1x1` | `None` | `money 160`, `parts 3` | Improves forecast precision, earlier warnings, and planning quality | Storm hits and burial can reduce forecast quality until repaired or cleared |
-| `Solar Array` | Solar utility | `1x1` | `LowOnly` | `money 220`, `parts 5` | Improves nearby `deviceEfficiency`, supports stable utility output without fuel logistics, and can create small sellable surplus electricity when site demand is already covered | Storm damage and burial can sharply reduce output until repaired or cleared |
+| `Solar Array` | Solar utility / Heat relief | `1x1` | `LowOnly` | `money 220`, `parts 5` | Improves nearby `deviceEfficiency`, provides light local heat relief, supports stable utility output without fuel logistics, and can create small sellable surplus electricity when site demand is already covered | Storm damage and burial can sharply reduce output until repaired or cleared |
 | `Field Workshop` | Workshop / Crafting | `1x1` | `None` | `money 200`, `parts 4` | Enables camp crafting actions using materials from shared `campStorage` | Crafting access depends on the workshop staying intact and reachable |
 
 #### Structure Family Roles
 
 Use these family expectations in tuning:
 
-- shelter family devices should mainly improve worker safety, camp protection, and recovery speed
+- the player base should provide the main shelter and recovery function in the current design, so separate shelter-device families can be deferred
 - irrigation devices should mainly improve water access, `tileMoisture`, and low-density plant survival, but only while connected stored water is available
 - protection utilities should mainly reduce local `tileWind`, `tileDust`, `tileHeat`, or some combination of them, and reduce storm losses
-- sensors should mainly improve forecast lead time and forecast precision
 - workshops should mainly enable simple camp crafting and material conversion, not repair automation or deep production chains
 - solar utilities should mainly improve nearby `deviceEfficiency` and optionally generate a small low-value export surplus, not create a separate power-minigame
 
 Faction-gating note:
 
-- `Drip Irrigator`, `Solar Array`, `Weather Mast`, and any `Checkerboard Deployment Machine` variant should primarily sit inside the `Autonomous Region Agricultural University` unlock path in the current design
+- `Drip Irrigator` and `Solar Array` should primarily sit inside the `Autonomous Region Agricultural University` unlock path in the current design
+- `Water Tank`, `Wind Fence`, and `Field Workshop` may stay neutral or lightly gated so the whole game does not depend on a large device tree
 - `Forestry Bureau of Autonomous Region` should still care deeply about water and plant survival, but in the current design it should express that through plant choices, ecology tasks, and support rewards rather than a competing device roster
 
 Plant-sharing examples:
 
 - `Solar Array` should be able to share with `Low` vegetation only
 - `Drip Irrigator` should be able to share with any living plant height in the current design
-- fully blocking structures such as `Water Tank`, `Weather Mast`, `Wind Fence`, and any future `Water Pump` should use `plantShareRule = None`
+- fully blocking structures such as `Water Tank`, `Wind Fence`, and any future `Water Pump` should use `plantShareRule = None`
 
 #### Device Effect Footprint Rules
 
@@ -1351,19 +1348,15 @@ Each device should use one of these simple effect models:
 
 | Effect Model | Use Case | Rule |
 |---|---|---|
-| Own-tile only | Storage, workshop occupancy, local shelter anchor | Effect applies only to the device tile and direct interaction point |
-| Orthogonal aura `1` | Small shelter or irrigation support | Device affects its own tile plus the 4 orthogonal neighboring tiles |
-| Orthogonal aura `2` | Larger refuge or solar support | Device affects its own tile plus all tiles within Manhattan distance `2` |
-| Site-summary only | Forecasting or site meter support | Device changes site-wide summary behavior without directly changing each tile |
+| Own-tile only | Storage or workshop occupancy | Effect applies only to the device tile and direct interaction point |
+| Orthogonal aura `1` | Irrigation or wind protection support | Device affects its own tile plus the 4 orthogonal neighboring tiles |
+| Orthogonal aura `2` | Larger solar or heat-relief support | Device affects its own tile plus all tiles within Manhattan distance `2` |
 
 Recommended mapping:
 
-- `Field Tent`: orthogonal aura `1`
-- `Shade Canopy`: orthogonal aura `1`
 - `Water Tank`: own-tile stored-water source plus direct interaction point for refilling or transfer
 - `Drip Irrigator`: orthogonal aura `1`, but only while linked tanks still contain water
 - `Wind Fence`: orthogonal aura `1`, biased toward exposed perimeter placement
-- `Weather Mast`: site-summary only
 - `Solar Array`: orthogonal aura `2`
 - `Field Workshop`: own-tile only
 
@@ -1374,8 +1367,7 @@ This roster should create a few clear early strategic patterns:
 - build a small protected camp core before overextending planting lines
 - use `Wind Fence`, `Straw Checkerboard`, and early protection plants together on exposed edges
 - use `Water Tank` plus linked `Drip Irrigator`s to keep moisture pressure low for fragile starter plants during their first growth window, while keeping the tanks filled
-- use `Weather Mast` to turn forecast knowledge into a real planning advantage
-- use `Solar Array` to make a mature support pocket feel operationally stronger instead of just greener
+- use `Solar Array` to make a mature support pocket feel operationally stronger and slightly cooler instead of just greener
 - use `Field Workshop` to craft useful supplies from stored materials; it does not directly speed up hazard recovery by itself
 
 ## 11. Ecology And Restoration Systems
@@ -2176,6 +2168,8 @@ Every `Site Task` should be published by one of three participating factions ope
 | `Forestry Bureau of Autonomous Region` | Ecological stabilization, nursery access, and recovery planning | More plant-survival, anti-erosion, replanting, and water-sensitive jobs | `Plant-Water Support` |
 | `Autonomous Region Agricultural University` | Research, field science, and experimental operations | More device, survey, precision, and forecasting jobs | `Device Upgrade Support` |
 
+In the current design, each faction should expose only this one assistant package rather than a larger assistant roster.
+
 This faction layer should make the `Contract Board` more strategic and replayable. The player's question is no longer only "what pays best right now?" It is also "which relationship, assistant, and tech route do I want before the next pressure spike?"
 
 ### Rough Faction Profiles
@@ -2219,7 +2213,7 @@ Normal task bias:
 Assistant:
 
 - `Workforce Support`
-- immediate sample reward should feel concrete: a temporary labor crew, fast build window, or instant cleanup push the player must exploit now
+- this should stay one fixed signature package in the current design: a temporary labor crew with a small reusable work pool for build, repair, hauling, and cleanup tasks
 
 Random-event flavor:
 
@@ -2279,7 +2273,7 @@ Normal task bias:
 Assistant:
 
 - `Plant-Water Support`
-- immediate sample reward should feel alive: saplings, mulch, water delivery, or temporary plant-survival support the player uses right away
+- this should stay one fixed signature package in the current design: a temporary plant-survival bundle that adds emergency water and seedling protection to vulnerable patches
 
 Random-event flavor:
 
@@ -2322,17 +2316,15 @@ Onboarding focus:
 
 Basic tutorial task types:
 
-- deploy one `Precision Irrigation Line`
-- place one `Solar Shade Rack`
-- operate one `Checkerboard Deployment Machine`
+- deploy one `Drip Irrigator`
+- place one `Solar Array`
 - scan one risk zone
 - maintain one technical support line through a weather window
 
 Normal task bias:
 
 - precision irrigation deployment
-- solar-shade support placement
-- checkerboard mechanized deployment
+- solar support placement
 - surveys
 - calibration
 - device optimization
@@ -2342,7 +2334,7 @@ Normal task bias:
 Assistant:
 
 - `Device Upgrade Support`
-- immediate sample reward should feel technical: one temporary upgrade module, improved forecast window, or boosted device efficiency the player must capitalize on now
+- this should stay one fixed signature package in the current design: a temporary technical support package that boosts placed device efficiency and forecast precision during the current site
 
 Forecast identity:
 
@@ -2360,9 +2352,9 @@ Random-event flavor:
 
 Device identity in current scope:
 
-- `Precision Irrigation Line`
-- `Solar Shade Rack`
-- `Checkerboard Deployment Machine`
+- `Drip Irrigator`
+- `Solar Array`
+- `Water Tank`
 - in the current design, these should be university-gated `Site Unlockables`, university task rewards, or university branch unlocks rather than neutral equipment shared equally across factions
 - the player should feel that the university's advantage is not abstract science alone, but visible field infrastructure that changes one patch's survival, efficiency, or preparation quality right now
 
@@ -3630,13 +3622,18 @@ This is enough to prove that restoration choices change survival and site stabil
 
 Use only the smallest device set needed to express the later factions:
 
-- for the prototype, the main technical device family should belong to `Autonomous Region Agricultural University`
-- recommended university prototype set:
-- `Precision Irrigation Line`
-- `Solar Shade Rack`
-- optional simplified `Checkerboard Deployment Machine` as a university action, assistant, or site unlockable
+- keep the whole prototype on one small shared core roster:
+- `Water Tank`
+- `Drip Irrigator`
+- `Wind Fence`
+- `Solar Array`
+- `Field Workshop`
+- for the prototype, the main technical device advantage should belong to `Autonomous Region Agricultural University`
+- recommended university prototype emphasis:
+- `Drip Irrigator`
+- `Solar Array`
 - `Forestry Bureau of Autonomous Region` does not need its own separate device family in the prototype; it can stay defined by plants, recovery logic, and water-sensitive ecology tasks
-- deeper groundwater pumping, brackish-water use, and salt-treatment branches can be deferred to demo or full-game scope
+- separate shelter devices, dedicated sensor devices, `Checkerboard Deployment Machine`, deeper groundwater pumping, brackish-water use, and salt-treatment branches can all be deferred to demo or full-game scope
 - advanced device families, deeper calibration systems, and broad utility categories can still be deferred
 
 The university must exist in play, but it does not need a full technical sandbox.
@@ -3668,6 +3665,7 @@ The prototype does not need a huge event catalog. It needs a readable escalation
 These are part of the loop and should stay in the prototype, but in reduced form:
 
 - each faction only needs `1` assistant support package
+- that support package should stay fixed for the whole prototype rather than branching into multiple assistant variants
 - after major harsh events, each unlocked faction may offer one simple relief package
 - relief quality should depend on reputation band with that faction
 - use a small banded model such as low / medium / high reputation rather than a complex formula
