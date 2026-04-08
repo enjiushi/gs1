@@ -1860,7 +1860,7 @@ Expansion and output profile:
 |---|---|---|
 | `spreadReadiness` | `0-100` | Minimum low-pressure readiness needed before this plant may spread reliably |
 | `spreadChance` | `0-100` | Relative chance to create one new starter tile during an ecology pulse |
-| `outputDependency` | `0-100` | How badly output collapses when the tile is losing density or unsupported |
+| `outputDependency` | `0-100` | How badly output collapses as `tilePlantDensity` falls |
 
 Prototype note:
 
@@ -2025,8 +2025,8 @@ Output should degrade before a plant dies so the player feels pressure early.
 Prototype rule:
 
 - plants with output should pay back more when `tilePlantDensity` is high
-- high `growthPressure` should reduce output before the plant dies
-- plants with stronger `outputDependency` should lose output faster when they are unsupported
+- high `growthPressure` should reduce output indirectly by pushing `tilePlantDensity` down before the plant dies
+- plants with stronger `outputDependency` should lose output faster as `tilePlantDensity` falls
 - if the tile is clearly `Withering`, output should stop
 
 This makes greedy output plants visibly stop paying back before they fully collapse.
