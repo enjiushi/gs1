@@ -359,6 +359,10 @@ Plant runtime values:
 - `tilePlantDensity`
 - `growthPressure`
 
+Checkerboard runtime values:
+
+- `checkerboardSetupStrength`
+
 Structure runtime values:
 
 - `deviceIntegrity`
@@ -392,7 +396,7 @@ Display rule:
 - `Plant Density` should be shown both in UI and in tile art; a denser tile should visibly contain more plant coverage, volume, or fullness than a sparse tile
 - `tileSoilFertility`, `tileMoisture`, and `tileSoilSalinity` should be visible through tile inspection and relevant overlays because they are the core land-quality state
 - `tileWindProtection`, `tileShade`, and `tileWaterSupport` are contextual local modifiers; they should usually appear in tile inspection, overlays, or placement previews rather than as permanent HUD bars
-- `Straw Checkerboard` should be inspected as a fixed setup layer with plant-like trait effects, not as a separate ground-cover-density meter
+- `Straw Checkerboard` should be inspected as a degrading setup layer with remaining `checkerboardSetupStrength` plus current protection and soil-building value, not as a living growth state
 - `growthPressure` is an internal derived plant-pressure variable; the player should not need the raw number, but tile inspection should expose a stable pressure breakdown such as `waterContribution`, `soilContribution`, `windContribution`, and `heatContribution`
 - the inspection UI should report the strongest current contribution as the `Primary Limiter` and may also report the second strongest as a `Secondary Limiter`
 - `tileSoilSalinity` should stay a separate growth-cap warning rather than being folded into `growthPressure`, because salinity is a placement and rehabilitation issue, not the same kind of short-term growth pressure
@@ -412,7 +416,7 @@ For each fixed simulation step, resolve systems in this order:
 4. Rebuild derived local modifiers from current tile contents and nearby effects, especially `tileWindProtection`, `tileShade`, `tileWaterSupport`, and active device output.
 5. Apply ongoing exposure and consumption to the worker, contractors, devices, and vulnerable stored resources.
 6. Apply hazard pressure and environmental damage for this step, including erosion, plant density loss, burial gain, device damage, camp durability loss, and resource loss.
-7. Apply recovery and beneficial change for this step, including plant density gain, salinity reduction, soil-fertility improvement, moisture recovery from watering or support, player recovery, and site stabilization gains, if current conditions allow.
+7. Apply recovery and beneficial change for this step, including plant density gain, checkerboard setup decay, salinity reduction, soil-fertility improvement, moisture recovery from watering or support, player recovery, and site stabilization gains, if current conditions allow.
 8. Recompute threshold-derived display labels such as density labels and `Plant Trend`, plus real cleanup states such as death or restored pocket status.
 9. Run slower pulse checks whose timers have elapsed, including natural spread attempts, output pulses, task trigger checks, and other low-frequency site logic.
 
@@ -430,6 +434,7 @@ Use these timing rules for prototype consistency:
 - hazard damage resolves continuously every fixed simulation step
 - player recovery and drain resolve continuously every fixed simulation step
 - plant density gain and loss resolve continuously every fixed simulation step
+- `checkerboardSetupStrength` decay resolves continuously every fixed simulation step
 - density labels and `Plant Trend` display labels resolve immediately after each fixed simulation step based on current threshold values
 - natural spread resolves discretely on an `ecologyPulse`
 
@@ -461,6 +466,7 @@ The tile model should separate different kinds of state instead of treating ever
 | `terrainSoilState` | Persistent quality of plantable ground | `tileSoilFertility`, `tileMoisture`, `tileSoilSalinity` | Only meaningful on plantable `Ground` |
 | `occupancyState` | What currently occupies the tile | `plantTypeId`, `groundCoverTypeId`, `structureTypeId` | Answers only what is present, not the state of that occupant |
 | `plantState` | Runtime state of the current living plant | `tilePlantDensity`, `growthPressure` | `Plant Trend` is derived for display rather than stored as separate plant state |
+| `checkerboardState` | Runtime state of the current checkerboard setup layer | `checkerboardSetupStrength` | Exists only if `groundCoverTypeId` is present; starts full and decays into fertility over time |
 | `structureState` | Runtime state of the current structure | `deviceIntegrity`, `deviceEfficiency`, `deviceStoredWater` | `deviceStoredWater` is mainly meaningful for water-storage structures |
 | `derivedLocalModifiers` | Nearby support rebuilt every step | `tileWindProtection`, `tileShade`, `tileWaterSupport` | From plants, devices, and rock; not persistent land quality |
 | `temporaryTileState` | Temporary tile-only hazard state | `tileSandBurial` | Prototype uses burial as the only true temporary tile state |
@@ -468,7 +474,8 @@ The tile model should separate different kinds of state instead of treating ever
 Important cleanup rule:
 
 - `occupancyState` should only answer what is on the tile; density, integrity, and efficiency belong to their own runtime states, while `Plant Trend` is a derived display label
-- `Straw Checkerboard` uses `groundCoverTypeId` for occupancy identity, reuses plant trait fields for its effects, and does not introduce a separate runtime density meter
+- `checkerboardSetupStrength` belongs to checkerboard state, not to terrain soil state or living plant state
+- `Straw Checkerboard` uses `groundCoverTypeId` for occupancy identity, reuses plant trait fields for its effects, and decays through `checkerboardSetupStrength` instead of the living-plant density ladder
 - `tileWindProtection`, `tileShade`, and `tileWaterSupport` are derived local modifiers, not persistent terrain state
 - the prototype should not use a separate `tileSoilStability` meter
 
@@ -1465,7 +1472,7 @@ To keep the first prototype understandable:
 - The player should only place the lowest-density starter version of a plant; stronger plant states should come from growth, not instant deployment
 - Density should be the main driver of plant power, survival, and natural spread
 - Salty tiles should create visibly different plant choices, with some plants occupying them early and others mainly preparing them for later crops
-- One plant-derived starter material is allowed as a special exception for extremely poor sand: `Straw Checkerboard` reuses plant trait fields, but its effect strength is fixed and its `growthPressure` is always `0`
+- One plant-derived starter material is allowed as a special exception for extremely poor sand: `Straw Checkerboard` starts at maximum `checkerboardSetupStrength`, then slowly trades that setup strength into fertility while its `growthPressure` stays `0`
 
 ### Prototype Plant Set (Temp Design)
 
@@ -1473,7 +1480,7 @@ The following plants are temporary prototype placeholders. Their names, values, 
 
 | Plant | Role Mix | Effect Ceiling (Temp) | Work Demand (Temp) | Own Tile Effect | Neighbor Tile Effect | Prototype Use |
 |---|---|---|---|---|---|---|
-| `Straw Checkerboard` | Protection + Fertility setup | Medium | Low | Plant-derived straw grid placed on bare sand; immediately reduces near-surface wind and sand movement on its own tile and helps trap drifting sand | Adjacent tiles gain erosion relief, slightly better establishment odds, and gradual soil-building support over time | Critical opener for least fertile or pure sand tiles; converts hostile sand into a foothold for later living plants |
+| `Straw Checkerboard` | Protection + Fertility setup | Medium | Low | Plant-derived straw grid placed on bare sand; it starts with strong near-surface wind and sand reduction on its own tile, then slowly breaks down into soil-building value over time | Adjacent tiles gain early erosion relief, slightly better establishment odds, and a temporary protection buffer while the checkerboard is still fresh | Critical opener for least fertile or pure sand tiles; converts hostile sand into a foothold for later living plants |
 | `Wind Reed` | Protection + Anti-dehydration | Medium | Low | Cheap early plant that reduces wind damage and slows dehydration on its own tile | Adjacent tiles get small wind reduction and slight dehydration relief | First safety plant; teaches line placement and perimeter thinking |
 | `Shade Cactus` | Anti-dehydration + Worker support | Medium | Low | Strong local heat reduction and low water demand | Adjacent tiles lose water more slowly; nearby work zones feel safer during hot periods | Teaches oasis pockets, camp-edge defense, and local survival planning |
 | `Root Binder` | Fertilize + Protection | Medium | Medium | Stabilizes soil, reduces erosion, and slowly improves difficult ground on its own tile | Adjacent tiles gain fertility and mild erosion resistance, helping surrounding salty tiles recover over time | Teaches groundwork and setup before high-value planting |
@@ -1494,7 +1501,7 @@ For prototype clarity, each plant should also carry a small trait package. These
 
 | Plant | Core Trait Combination | Main Risk Or Dependency |
 |---|---|---|
-| `Straw Checkerboard` | `Sand Fixation`, `Surface Roughness`, `Establishment Boost`, `Organic Matter Setup` | `No Yield`, `No Natural Spread`, weak as a long-term solution without follow-up living cover |
+| `Straw Checkerboard` | `Sand Fixation`, `Surface Roughness`, `Establishment Boost`, `Organic Matter Setup` | `No Yield`, `No Natural Spread`, protection fades over time as its material converts into fertility |
 | `Wind Reed` | `Fast Establishment`, `Flexible Windbreak`, `Moisture Hold`, `Storm Recovery` | Effect ceiling is moderate; wants other plants behind it to convert safety into real value |
 | `Shade Cactus` | `Deep Shade`, `Low Water Demand`, `Heat Buffer`, `Comfort Pocket` | Best in concentrated pockets rather than long exposed lines |
 | `Root Binder` | `Soil Lock`, `Erosion Anchor`, `Fertility Lift`, `Salinity Prep` | Medium work and low direct payoff by itself; shines when followed by other plants |
@@ -1617,7 +1624,8 @@ Special exception:
 - `Straw Checkerboard` is a plant-derived starter material rather than a living plant
 - It should not produce output and should not naturally spread
 - It should reuse the same plant trait fields as living plants for protection, setup, and soil-support effects
-- Its effect strength should be fixed while present; it does not grow through the living-plant density ladder, and its `growthPressure` is always `0`
+- It should begin at `checkerboardSetupStrength = 100`, then gradually lose setup strength over time while converting that loss into fertility
+- It does not grow through the living-plant density ladder, and its `growthPressure` is always `0`
 - It is especially valuable on pure sand or near-barren tiles where normal living plants would struggle to establish immediately
 
 This means density is doing several jobs at once:
@@ -1659,7 +1667,7 @@ For prototype tuning:
 
 ### Prototype Plant Density Profiles (Temp Design)
 
-Each living plant should gain clearer value as density rises so growth feels meaningful rather than cosmetic. `Straw Checkerboard` is excluded from the density ladder because it reuses plant traits at fixed setup strength.
+Each living plant should gain clearer value as density rises so growth feels meaningful rather than cosmetic. `Straw Checkerboard` is excluded from the density ladder because it uses `checkerboardSetupStrength`, which only decays over time.
 
 | Plant | `Seeded` (`1-24`) | `Young` (`25-49`) | `Established` (`50-79`) | `Dense` (`80-100`) |
 |---|---|---|---|---|
@@ -1676,11 +1684,11 @@ Each living plant should gain clearer value as density rises so growth feels mea
 Important prototype traits for `Straw Checkerboard`:
 
 - can be placed on pure sand or the least fertile empty tiles
-- uses fixed setup strength while present, not `Seeded / Young / Established / Dense` growth states
+- starts at maximum `checkerboardSetupStrength` and then gradually loses setup strength over time
 - reuses the same plant trait fields as living plants, with `growthPressure = 0`
-- gives immediate wind and sand-movement reduction even before living cover exists
+- gives maximum wind and sand-movement reduction right after placement, even before living cover exists
 - helps trap sand and fine particles instead of only resisting damage
-- contributes basic organic matter and establishment support as a fixed setup effect
+- converts its own lost setup strength into gradual fertility gain and establishment support
 - strongly helps `Seeded` and `Young` living plants survive nearby
 - has no direct output economy and no self-spread, so it remains a setup tool rather than a full solution
 
@@ -1839,7 +1847,8 @@ Each occupied `livingPlantLayer` tile should have these authoritative runtime va
 If the same tile also contains `groundCoverLayer`, that layer contributes through:
 
 - `groundCoverTypeId`
-- the `Straw Checkerboard` plant trait profile, evaluated at fixed authored setup strength
+- `checkerboardSetupStrength`
+- the `Straw Checkerboard` plant trait profile, evaluated through current `checkerboardSetupStrength`
 
 Important modeling rule:
 
@@ -1847,7 +1856,7 @@ Important modeling rule:
 - `tilePlantDensity` and `growthPressure` belong to plant state, not to occupancy identity
 - `Plant Trend` belongs to player-facing display and should be derived from density direction and pressure, not stored as a separate authoritative plant state
 - `deviceIntegrity` and `deviceEfficiency` belong to structure state, not to occupancy identity
-- `Straw Checkerboard` is a ground-cover occupant that reuses plant trait fields, has fixed trait strength, and always resolves `growthPressure = 0`
+- `Straw Checkerboard` is a ground-cover occupant that reuses plant trait fields, starts at full `checkerboardSetupStrength`, slowly loses that setup strength, and always resolves `growthPressure = 0`
 - `tileWindProtection`, `tileShade`, and `tileWaterSupport` are derived local modifiers rebuilt each fixed simulation step
 - the prototype should not use a separate `tileSoilStability` meter or a separately stored `tilePlantStress` value
 
@@ -1902,7 +1911,7 @@ Prototype note:
 - engineering should still store the resolved prototype plant values internally as numeric `0-100` fields
 - `stepMinutes` in the formulas below means the in-game minutes advanced by one fixed simulation step from the runtime contract
 
-Ground-cover definitions should not define a separate trait family. For the prototype, `Straw Checkerboard` should use the same trait fields as plants, set growth and spread values to `0`, and apply those traits at fixed authored setup strength while present.
+Ground-cover definitions should not define a separate trait family. For the prototype, `Straw Checkerboard` should use the same trait fields as plants, set growth and spread values to `0`, and use one runtime meter, `checkerboardSetupStrength`, that starts at `100` and slowly decays into fertility while present.
 
 #### Derived Local Modifier Build Rules
 
@@ -1913,7 +1922,7 @@ Use this prototype contribution budget:
 | Source | `tileWindProtection` | `tileShade` | `tileWaterSupport` | Rule |
 |---|---|---|---|---|
 | Own-tile living plant | `35` | `25` | `10` | Scale by plant density and the relevant plant trait |
-| Own-tile `Straw Checkerboard` setup | `20` | `0` | `0` | Scale by fixed checkerboard setup strength and plant trait `protectionPower` |
+| Own-tile `Straw Checkerboard` setup | `20` | `0` | `0` | Scale by current `checkerboardSetupStrength` and plant trait `protectionPower` |
 | Each orthogonal neighboring living plant | `5` each, `20` total | `4` each, `16` total | `3` each, `12` total | Scale by neighbor density and the relevant plant trait |
 | Nearby device or rock shelter | `25` total | `25` total | `40` total | Scale by device aura, `deviceEfficiency`, or authored rock shelter value |
 
@@ -1923,7 +1932,7 @@ Rules:
 - diagonal neighbors do not contribute
 - if a tile has no living plant and no `Straw Checkerboard`, nearby support may still create useful local modifiers, but the tile remains empty until planted or spread into
 - rock protection should usually be low-radius and local, just enough to make lee-side placement readable
-- `Straw Checkerboard` uses the own-tile setup contribution, not the living-plant density contribution
+- `Straw Checkerboard` uses the own-tile setup contribution scaled by current `checkerboardSetupStrength`, not the living-plant density contribution
 
 This budget keeps local support readable:
 
@@ -1935,7 +1944,13 @@ This budget keeps local support readable:
 
 Every fixed simulation step, each plantable `Ground` tile should update its soil meters from weather, occupancy, and support.
 
-For formulas in this section, `checkerboardSetupScale` means the fixed authored setup strength of `Straw Checkerboard` if present, normalized to `0-1`; otherwise it is `0`. It is a tuning input for that setup layer, not a separate tile meter.
+For formulas in this section, `checkerboardSetupScale` means `checkerboardSetupStrength / 100` if `Straw Checkerboard` is present; otherwise it is `0`. It is the current remaining setup scale of that layer, not a living-plant density meter.
+
+Checkerboard decay rule:
+
+- `checkerboardDecayPerMinute` should be a small mostly steady value while `Straw Checkerboard` is present
+- `checkerboardSetupLossPerStep = min(checkerboardSetupStrength, checkerboardDecayPerMinute * stepMinutes)`
+- use the current `checkerboardSetupScale` to calculate this step's protection and moisture help, then apply `checkerboardSetupLossPerStep`
 
 Moisture rule:
 
@@ -1950,10 +1965,12 @@ Fertility rule:
 - `checkerboardErosionControl = checkerboard.erosionControlPower * checkerboardSetupScale * 0.30` if `Straw Checkerboard` is present, otherwise `0`
 - `erosionPressure = max(0, weatherWind * 0.70 + weatherSand * 0.90 - tileWindProtection - plantErosionControl - checkerboardErosionControl)`
 - `fertilityLossPerMinute = erosionPressure * 0.03 + max(0, tileSandBurial - 25) * 0.015`
-- `livingPlantFertilityGain = livingPlant.fertilityImprovePower * (tilePlantDensity / 100) * 0.02` if a living plant is present, otherwise `0`
-- `checkerboardFertilityGain = checkerboard.fertilityImprovePower * checkerboardSetupScale * 0.02` if `Straw Checkerboard` is present, otherwise `0`
-- `fertilityGainPerMinute = livingPlantFertilityGain + checkerboardFertilityGain`
-- `tileSoilFertility += (fertilityGainPerMinute - fertilityLossPerMinute) * stepMinutes`
+- `livingPlantFertilityGainPerMinute = livingPlant.fertilityImprovePower * (tilePlantDensity / 100) * 0.02` if a living plant is present, otherwise `0`
+- `checkerboardFertilityGainPerStep = checkerboard.fertilityImprovePower * (checkerboardSetupLossPerStep / 100) * 0.50` if `Straw Checkerboard` is present, otherwise `0`
+- `checkerboardSetupStrength -= checkerboardSetupLossPerStep`
+- if `checkerboardSetupStrength <= 0`, clear `groundCoverTypeId`
+- `tileSoilFertility += (livingPlantFertilityGainPerMinute - fertilityLossPerMinute) * stepMinutes + checkerboardFertilityGainPerStep`
+- clamp `checkerboardSetupStrength` to `0-100`
 - clamp `tileSoilFertility` to `0-100`
 
 Interpretation:
@@ -1963,6 +1980,7 @@ Interpretation:
 - erosion means direct `tileSoilFertility` reduction caused by wind-and-sand exposure; there is no separate hidden stability meter
 - heat should not directly cause erosion in the prototype, but it can indirectly make erosion more likely by draining moisture, increasing plant `growthPressure`, and weakening cover if the player ignores it
 - plants reduce erosion through `erosionControlPower`, and strong enough local protection can reduce `erosionPressure` to `0`
+- `Straw Checkerboard` should begin as strong protection, then gradually trade away that protection as its material is converted into fertility
 - uncleared burial can permanently set back a tile over time by converting some temporary burial pressure into fertility loss
 
 #### Salinity Density-Cap Rules
@@ -2131,7 +2149,7 @@ Candidate target rules:
 - target must have no `structureLayer`
 - target must have `tileSoilFertility >= fertilityNeed - 10`
 - target must have `tileMoisture + tileWaterSupport * 0.35 >= waterNeed - 10`
-- target must have `tileWindProtection >= 20` or contain `Straw Checkerboard`
+- target must have `tileWindProtection >= 20` or `checkerboardSetupStrength >= 20`
 - target must offer `salinityDensityCap >= 40` for the spreading plant
 
 Selection and success rules:
@@ -2172,24 +2190,27 @@ Design intent:
 - low-tolerance plants on salty tiles should plateau at weak density rather than immediately taking direct salinity damage
 - once a tile has been rehabilitated, the prototype should not constantly threaten to undo that progress through hidden salinity rebound
 
-#### Straw Checkerboard Fixed-Growth Rule
+#### Straw Checkerboard Setup-Decay Rule
 
-`Straw Checkerboard` should follow a fixed-growth prototype rule set:
+`Straw Checkerboard` should follow a setup-decay prototype rule set:
 
 - it uses `groundCoverTypeId` for layer occupancy so it can prepare land beneath a later living plant
 - it reuses the same plant trait fields as living plants for protection, fertility support, moisture support, and erosion control
-- it applies those traits at fixed authored setup strength while present
+- on placement, set `checkerboardSetupStrength = 100`
 - its `growthPressure` is always `0`
 - it can exist on the same tile as one living plant type
 - it does not produce output
 - it does not derive a `Plant Trend` label
 - it does not naturally spread
-- it does not grow, wither, or decay through the living-plant density ladder in the prototype
-- while present, its fixed setup strength should increase `tileSoilFertility`, add `tileWindProtection`, and slightly reduce moisture loss on its own tile
+- it does not grow or wither through the living-plant density ladder in the prototype
+- instead, `checkerboardSetupStrength` slowly decays over time
+- while `checkerboardSetupStrength` is high, it provides strong `tileWindProtection`, sand resistance help, and establishment support
+- as `checkerboardSetupStrength` falls, its protection fades and the lost setup strength is converted into `tileSoilFertility`
+- when `checkerboardSetupStrength` reaches `0`, clear the checkerboard from the tile
 
 Prototype setup target:
 
-- treat `Straw Checkerboard` as a fixed setup layer that makes hostile sand workable, but still wants follow-up living cover because it has no output, no natural spread, and limited ecological payoff by itself
+- treat `Straw Checkerboard` as a front-loaded setup layer that makes hostile sand workable, then gradually gives up its temporary protection to leave behind better soil for later living cover
 
 ### Prototype Verification Questions
 
@@ -2258,6 +2279,7 @@ Design rule:
 | Weather meters | `weatherHeat`, `weatherWind`, `weatherSand` | Site-wide ambient pressure. Extreme events mainly push these meters higher instead of directly damaging plants. |
 | Persistent terrain soil meters | `tileSoilFertility`, `tileMoisture`, `tileSoilSalinity` | Long-lived or short-lived land condition on plantable `Ground`. These meters determine what can grow well. |
 | Temporary tile pressure | `tileSandBurial` | Recoverable sand overlay created mainly by sandstorms. If ignored, it can create lasting fertility loss. |
+| Checkerboard setup state | `checkerboardSetupStrength` | Remaining strength of `Straw Checkerboard`. It starts high, gives strong early protection, and gradually converts into fertility over time. |
 | Derived local modifiers | `tileWindProtection`, `tileShade`, `tileWaterSupport` | Rebuilt each simulation step from plants, `Straw Checkerboard`, devices, rock shelter, and active support. They protect or support the tile but are not permanent terrain quality. |
 | Living plant state | `tilePlantDensity`, `growthPressure` | Current plant strength and internal short-term pressure. |
 | Derived plant limits | `salinityDensityCap`, grouped pressure contributions | Derived values used for growth and diagnosis. They should not become separate persistent terrain meters. |
@@ -2267,8 +2289,8 @@ Design rule:
 | Source meter | Increases | Reduces or protects against | Notes |
 |---|---|---|---|
 | `weatherHeat` | `tileMoisture` drain, plant `heatContribution`, worker hydration and energy drain | `tileShade`, `tileMoisture`, heat-tolerant plants, shade devices, dense cover | Heat should not directly reduce `tileSoilFertility` in the prototype. It can indirectly worsen erosion risk by drying the tile and weakening plants. |
-| `weatherWind` | wind exposure, erosion pressure, plant `windContribution`, outdoor work difficulty | `tileWindProtection`, `erosionControlPower`, `windResistance`, rock shelter, windbreak devices, fixed `Straw Checkerboard` setup effects | Wind is the main direct driver of erosion, where erosion means `tileSoilFertility` reduction. |
-| `weatherSand` | `tileSandBurial`, airborne-sand erosion pressure, plant sand pressure, visibility and movement penalties, device risk | `tileWindProtection`, fixed `Straw Checkerboard` setup effects, `sandTolerance`, shelter placement, clearing burial | Sand becomes more dangerous when wind is high or during sandstorm events. |
+| `weatherWind` | wind exposure, erosion pressure, plant `windContribution`, outdoor work difficulty | `tileWindProtection`, `erosionControlPower`, `windResistance`, rock shelter, windbreak devices, current `checkerboardSetupStrength` | Wind is the main direct driver of erosion, where erosion means `tileSoilFertility` reduction. |
+| `weatherSand` | `tileSandBurial`, airborne-sand erosion pressure, plant sand pressure, visibility and movement penalties, device risk | `tileWindProtection`, current `checkerboardSetupStrength`, `sandTolerance`, shelter placement, clearing burial | Sand becomes more dangerous when wind is high or during sandstorm events. |
 | Extreme-event modifiers | `eventHeatModifier`, `eventWindModifier`, `eventSandModifier` | Forecasting, preparation, local protection, faction relief after the event | Events should mostly push weather meters, not bypass the model with direct plant-damage rules. |
 
 ### Terrain To Plant Growth
@@ -2280,11 +2302,17 @@ Design rule:
 | `tileSoilSalinity` | Low salinity allows normal density cap for more plants | High salinity reduces `salinityDensityCap` for low-tolerance plants | `saltTolerance` resists the cap reduction; `salinityReductionPower` lowers salinity over time while the plant is healthy |
 | `tileSandBurial` | More burial increases soil pressure and can cause lasting fertility loss if ignored | Clearing burial restores the tile toward normal operation | Sandstorms increase it; player clearing, protection, and good placement reduce its long-term damage |
 
+### Checkerboard Setup To Terrain And Protection
+
+| Meter | Higher value does | Lower value does | Main modifiers |
+|---|---|---|---|
+| `checkerboardSetupStrength` | Gives strong early wind protection, sand interception, and establishment help | Gives less protection because the checkerboard has been spent; more of its value has already been converted into fertility | Placement at `100`, slow time-based decay, conversion into `tileSoilFertility` |
+
 ### Local Modifiers To Terrain And Plant Pressure
 
 | Modifier | Comes from | Main effects |
 |---|---|---|
-| `tileWindProtection` | Protector plants, `Wind Fence`, rock shelter, `Straw Checkerboard`, dense living cover | Reduces wind pressure, sand pressure, erosion pressure, and severe-event density loss. |
+| `tileWindProtection` | Protector plants, `Wind Fence`, rock shelter, `Straw Checkerboard` scaled by `checkerboardSetupStrength`, dense living cover | Reduces wind pressure, sand pressure, erosion pressure, and severe-event density loss. |
 | `tileShade` | Shade plants, shelter structures, solar-panel sharing where applicable, rock shape | Reduces heat pressure and moisture drain; helps nearby work and fragile plants survive heat windows. |
 | `tileWaterSupport` | Moisture-support plants, `Drip Irrigator`, water devices, possibly future faction support | Improves water readiness but does not replace real `tileMoisture`; irrigation still depends on stored water. |
 
@@ -2301,7 +2329,7 @@ Design rule:
 | `saltTolerance` | `salinityDensityCap` | Higher tolerance reduces the density-cap penalty from salty ground, but does not remove salinity by itself. |
 | `heatTolerance`, `windResistance`, `sandTolerance` | `growthPressure` inputs | Higher resistance lowers the related heat, wind, sand, or burial pressure for that plant. |
 
-For `Straw Checkerboard`, read the same trait rows through fixed setup strength instead of `tilePlantDensity`, and keep `growthPressure = 0`.
+For `Straw Checkerboard`, read the same trait rows through current `checkerboardSetupStrength` instead of `tilePlantDensity`, and keep `growthPressure = 0`.
 
 ### Growth Pressure And Density Outcome
 
@@ -2309,9 +2337,9 @@ For `Straw Checkerboard`, read the same trait rows through fixed setup strength 
 |---|---|---|
 | `waterContribution` | `tileMoisture`, `tileWaterSupport`, plant `waterNeed` | Shows whether the plant mainly needs water support. |
 | `soilContribution` | `tileSoilFertility`, `tileSandBurial`, plant `fertilityNeed` and `sandTolerance` | Shows whether the plant is limited by poor soil or burial. |
-| `windContribution` | `weatherWind`, `weatherSand`, `tileWindProtection`, fixed `Straw Checkerboard` setup effects, plant resistances | Shows whether the plant is too exposed to wind and sand. |
+| `windContribution` | `weatherWind`, `weatherSand`, `tileWindProtection`, current `checkerboardSetupStrength`, plant resistances | Shows whether the plant is too exposed to wind and sand. |
 | `heatContribution` | `weatherHeat`, `tileShade`, `tileMoisture`, plant `heatTolerance` | Shows whether the plant is too hot. |
-| `growthPressure` | Sum of grouped pressure contributions | Low pressure allows growth. High pressure causes density loss. For `Straw Checkerboard`, this value is always `0` because it does not grow. |
+| `growthPressure` | Sum of grouped pressure contributions | Low pressure allows growth. High pressure causes density loss. For `Straw Checkerboard`, this value is always `0` because its behavior is handled by `checkerboardSetupStrength` decay instead of plant growth logic. |
 | `salinityDensityCap` | `tileSoilSalinity`, plant `saltTolerance` | Limits how dense the plant can become on salty ground. It should be shown as a separate density-cap warning, not mixed into `growthPressure`. |
 
 ### Main Causal Loop
@@ -2320,10 +2348,10 @@ Use this loop as the prototype mental model:
 
 1. Weather updates `weatherHeat`, `weatherWind`, and `weatherSand`.
 2. Local plants, `Straw Checkerboard`, devices, and terrain shelter rebuild `tileWindProtection`, `tileShade`, and `tileWaterSupport`.
-3. Weather and local modifiers update terrain pressure: moisture drain, erosion pressure, burial, and fertility change.
+3. Weather, local modifiers, and checkerboard decay update terrain pressure: moisture drain, erosion pressure, burial, checkerboard setup loss, and fertility change.
 4. Terrain and weather feed plant pressure: water shortage, poor soil or burial, wind/sand exposure, and heat exposure.
 5. `growthPressure` and `salinityDensityCap` determine density gain and density loss.
-6. Healthy plants feed back into the tile by improving fertility, reducing salinity, reducing erosion, adding shade, adding wind protection, or supporting moisture.
+6. Healthy plants feed back into the tile by improving fertility, reducing salinity, reducing erosion, adding shade, adding wind protection, or supporting moisture, while `Straw Checkerboard` slowly trades remaining setup strength into fertility.
 7. Damaged or dead plants reduce local support, which can expose nearby tiles and create a recoverable downward spiral.
 
 ## 13. Economy, Contracts, And Progression
@@ -3972,7 +4000,7 @@ The player should only be able to place fragile low-density starter plants. Over
 
 ### Bare Sand Conversion Check
 
-On pure sand or the least fertile tiles, the player should have a viable opening move through `Straw Checkerboard`. It should immediately calm the surface enough to matter with fixed setup strength, then create better establishment conditions for later living plants rather than acting as a permanent all-purpose answer by itself.
+On pure sand or the least fertile tiles, the player should have a viable opening move through `Straw Checkerboard`. It should immediately calm the surface enough to matter with maximum initial setup strength, then gradually surrender that protection as it converts into better soil for later living plants rather than acting as a permanent all-purpose answer by itself.
 
 ### Restored Pocket Reward Check
 
@@ -4076,7 +4104,7 @@ Leaving, failing, or restarting a site should reset its site unlock pool, clear 
 - Keep the first pressure model small. Prototype with a few readable forces such as heat, wind abrasion, burial, erosion, and salinity pressure before adding more exotic hazards.
 - Validate density growth early. The prototype should prove that fragile starter plants can be nursed into self-sustaining patches and that limited natural spread feels like an earned payoff.
 - Validate density-based reward feedback early. Dense restored pockets should sound calmer, feel safer, and provide noticeably better `Energy` and `Morale` recovery than exposed desert.
-- Validate the bare-sand opener early. `Straw Checkerboard` should be strong enough to make pure sand playable, but it should still function as a setup tool that wants living cover to follow it.
+- Validate the bare-sand opener early. `Straw Checkerboard` should begin strong enough to make pure sand playable, then visibly lose protection as that setup strength is converted into fertility for later living cover.
 - Prototype site play before expanding narrative or world flavor.
 - Keep contractor behavior simple until the core survival and restoration loop is proven.
 - Make forecasting, tile feedback, and support extraction readable early, because they are central to the game's identity.
