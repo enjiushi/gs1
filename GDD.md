@@ -1697,6 +1697,10 @@ For prototype tuning:
 
 Each living plant should gain clearer value as density rises so growth feels meaningful rather than cosmetic. In the prototype, plant contribution strength, output strength, and local support value should scale linearly with `tilePlantDensity` unless a later plant-specific exception is explicitly authored. `Straw Checkerboard` uses the same density meter, but it only decays over time instead of growing upward like a living plant.
 
+- direct player planting creates a living plant tile at `20` density
+- natural spread creates a living plant tile at `20` density
+- `Straw Checkerboard` starts at `100` density and then steadily decays
+
 Important prototype traits for `Straw Checkerboard`:
 
 - can be placed on pure sand or the least fertile empty tiles
