@@ -80,7 +80,7 @@ These terms are stable and should be used consistently in future design, UI, and
 | `Container` | A camp storage object that can be built or bought on-site and used to store `Item`s outside the player's carried `Inventory`. |
 | `Site Output Modifier` | A persistent bonus trait attached to a stabilized site's regional support output, such as increased wind protection, fertility support, specific resource yield, or support range. |
 | `Camp Support` | The light support infrastructure on a `Site`, including shelter, `Container`s, service devices, and hired labor access. |
-| `Player Condition` | The worker's physical and mental state, represented by survival meters such as health, hydration, nourishment, energy, and morale. |
+| `Player Condition` | The worker's physical and mental state, represented by survival and output meters such as health, hydration, nourishment, energy, morale, and work efficiency. |
 | `Aftermath Relief Offer` | A faction support offer that can appear after a harsh event enters `Aftermath`; its strength depends on current `Faction Reputation` and site damage. |
 | `Wind Protection` | The total local wind-erosion shielding on a tile or patch from plant adjacency, terrain shelter, and devices; higher protection reduces exposure damage and fertility loss. |
 | `Plant Density` | The current strength and maturity of living cover or plant-derived starter cover on a tile or cluster; higher density means stronger traits, better survival, and possible natural spread for living plants, while lower density means weaker effects and higher hazard vulnerability. |
@@ -334,6 +334,7 @@ World and campaign values:
 - `playerNourishment`
 - `playerEnergy`
 - `playerMorale`
+- `playerWorkEfficiency`
 - `campDurability`
 - `fullyGrownTileCount`
 - `siteCompletionTileThreshold`
@@ -645,24 +646,25 @@ The player has explicit, separate meters:
 - Nourishment
 - Energy
 - Morale
+- Work Efficiency
 
 These are the core `Player Condition` values. They are always relevant, but not all decline at the same speed or for the same reasons.
 
-Health is the slower physical-condition meter. It reflects injury, illness risk, and bodily wear from repeated harsh exposure or risky field work. Hydration is the most urgent meter in hot conditions. `Nourishment` is slower, but important for sustained efficiency and recovery. Energy limits daily work output and pushes rest timing. Morale reflects comfort, momentum, and psychological strain under isolation and repeated setbacks.
+Health is the slower physical-condition meter. It reflects injury, illness risk, and bodily wear from repeated harsh exposure or risky field work. Hydration is the most urgent meter in hot conditions. `Nourishment` is slower, but important for sustained efficiency and recovery. Energy limits daily work output and pushes rest timing. Morale reflects comfort, momentum, and psychological strain under isolation and repeated setbacks. `Work Efficiency` is the resolved worker-output meter that turns current condition and local exposure into actual action speed.
 
 Current prototype gameplay effect for `Health`:
 
 - `Health` should drop from dangerous outdoor exposure, severe exhaustion, and risky harsh-event work
 - low `Health` should reduce safe work capacity even if the player has recovered some `Energy`
-- low `Health` should also reduce worker action efficiency, making physically demanding tasks take longer or feel less reliable
+- low `Health` should also reduce `Work Efficiency`, making physically demanding tasks take longer or feel less reliable
 - low `Health` should slow recovery and make collapse or forced retreat more likely
 - shelter, rest, and medicine should recover `Health` more slowly than `Energy`
 
 Current prototype gameplay effect for `Morale`:
 
-- `Morale` should directly modify work efficiency
+- `Morale` should directly modify `Work Efficiency`
 - when `Morale` is low, the player should perform routine work more slowly or less reliably
-- when `Morale` is stable or high, normal action efficiency is preserved
+- when `Morale` is stable or high, normal `Work Efficiency` is preserved
 - for the current design, this is the minimum concrete `Morale` effect required; broader morale interactions can be added later if needed
 
 ### Dense Cover Recovery (Prototype)
@@ -675,7 +677,7 @@ When the player is standing or resting inside a local planted pocket where most 
 - `Morale` recovers faster because the player feels protected and sees clear proof of progress
 - the area feels less psychologically harsh even if the wider site boundary is still hostile
 
-This matters mechanically because better `Morale` helps the player keep normal work efficiency instead of suffering slower or less reliable routine actions.
+This matters mechanically because better `Morale` helps the player keep normal `Work Efficiency` instead of suffering slower or less reliable routine actions.
 
 This is an important emotional payoff. The player should feel they have created a small survivable paradise inside a dangerous desert, even before the whole `Site` is restored.
 
@@ -4061,7 +4063,7 @@ This summary should include only core runtime meters and the core plant-side val
 | Event meters | `eventHeatPressure`, `eventWindPressure`, `eventDustPressure` | Site-wide harsh-event channel meters. They represent current event force and feed the weather layer rather than acting as weather themselves. |
 | Weather meters | `weatherHeat`, `weatherWind`, `weatherDust` | Site-wide ambient weather outputs after baseline site conditions and current event meters are combined. |
 | Resolved local weather meters | `tileHeat`, `tileWind`, `tileDust` | Per-tile weather result after site weather, local support, and shelter are combined. They bridge site weather and final terrain or plant pressure. |
-| Worker state meters | `playerHealth`, `playerHydration`, `playerNourishment`, `playerEnergy`, `playerMorale` | Core worker survival and performance meters. They represent the worker's current physical and mental condition during site play. |
+| Worker state meters | `playerHealth`, `playerHydration`, `playerNourishment`, `playerEnergy`, `playerMorale`, `playerWorkEfficiency` | Core worker survival and performance meters. They represent the worker's current physical and mental condition plus the resolved speed at which the worker converts actions into useful progress during site play. |
 | Persistent terrain soil meters | `tileSoilFertility`, `tileMoisture`, `tileSoilSalinity` | Long-lived or short-lived land condition on plantable `Ground`. These meters determine what can grow well. |
 | Temporary tile pressure | `tileSandBurial` | Recoverable sand overlay created mainly by sandstorms. If ignored, it can create lasting fertility loss. |
 | Plant meters | `tilePlantDensity`, `growthPressure`, `salinityDensityCap` | Shared plant-side runtime meters. `tilePlantDensity` tracks current plant presence, `growthPressure` governs growth-capable plants, and `salinityDensityCap` is the plant-side density ceiling created by salty ground. |
@@ -4081,11 +4083,12 @@ This summary should include only core runtime meters and the core plant-side val
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `playerHealth` | Rest and shelter recovery, medicine, harsh outdoor exposure, dangerous field work, `tileHeat`, `tileDust`, low `playerHydration`, low `playerNourishment` | `playerEnergy`, worker action efficiency, risky-action safety, collapse risk | Slow physical-condition meter. Low health should make the worker less resilient and less efficient even if short-term energy is restored. |
+| `playerHealth` | Rest and shelter recovery, medicine, harsh outdoor exposure, dangerous field work, `tileHeat`, `tileDust`, low `playerHydration`, low `playerNourishment` | `playerEnergy`, `playerWorkEfficiency`, risky-action safety, collapse risk | Slow physical-condition meter. Low health should make the worker less resilient and less efficient even if short-term energy is restored. |
 | `playerHydration` | Drinking actions, water items, `tileHeat`, outdoor work, rest and shelter recovery | `playerEnergy` | Most urgent worker survival meter in hot conditions. Local heat should make hydration fall faster on exposed tiles. |
 | `playerNourishment` | Eating actions, food items, time, outdoor work, rest recovery | `playerEnergy` | Slower-moving worker support meter for sustained efficiency and recovery. |
-| `playerEnergy` | Work actions, `tileHeat`, `tileWind`, `tileDust`, rest recovery, `playerHealth`, `playerHydration`, `playerNourishment` | Worker action capacity | Main short-term work-capacity meter. Low energy limits how much meaningful field work the player can do. |
-| `playerMorale` | Safe rest, dense-cover recovery pockets, harsh-event aftermath, current site setbacks and recovery progress | worker action efficiency | Worker comfort and psychological stability meter. Low morale should make routine work slower or less reliable rather than directly lowering the energy meter. |
+| `playerEnergy` | Work actions, `tileHeat`, `tileWind`, `tileDust`, rest recovery, `playerHealth`, `playerHydration`, `playerNourishment` | `playerWorkEfficiency` | Main short-term work-capacity meter. Low energy should directly drag down the rate at which the player can turn actions into useful progress. |
+| `playerMorale` | Safe rest, dense-cover recovery pockets, harsh-event aftermath, current site setbacks and recovery progress | `playerWorkEfficiency` | Worker comfort and psychological stability meter. Low morale should make routine work slower or less reliable rather than directly lowering the energy meter. |
+| `playerWorkEfficiency` | `playerHealth`, `playerEnergy`, `playerMorale`, `tileHeat`, `tileWind`, `tileDust`, workload strain | Action duration, action throughput, task labor output | Resolved worker-output meter. This should be the main gameplay-facing meter for how quickly the player builds, clears, repairs, harvests, and completes labor. |
 
 ### Weather To Local Weather Resolution
 
@@ -4099,9 +4102,9 @@ This summary should include only core runtime meters and the core plant-side val
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `tileHeat` | `weatherHeat`, `heatProtectionPower` | `playerHydration`, `playerEnergy`, `playerHealth` | Final local heat pressure should be the worker-facing heat meter on the current tile. It mainly drives hydration loss and fatigue, while severe exposure can also damage health. |
-| `tileWind` | `weatherWind`, `windProtectionPower` | `playerEnergy` | Final local wind exposure should be the worker-facing wind meter on the current tile. It mainly makes outdoor work harder and more exhausting. |
-| `tileDust` | `weatherDust`, `dustProtectionPower`, `windProtectionPower` | `playerHealth`, `playerEnergy` | Final local dust exposure should be the worker-facing dust meter on the current tile. It mainly creates abrasion, breathing strain, visibility burden, and exhausting movement pressure. |
+| `tileHeat` | `weatherHeat`, `heatProtectionPower` | `playerHydration`, `playerEnergy`, `playerHealth`, `playerWorkEfficiency` | Final local heat pressure should be the worker-facing heat meter on the current tile. It mainly drives hydration loss and fatigue, while severe exposure can also damage health and slow work. |
+| `tileWind` | `weatherWind`, `windProtectionPower` | `playerEnergy`, `playerWorkEfficiency` | Final local wind exposure should be the worker-facing wind meter on the current tile. It mainly makes outdoor work harder, slower, and more exhausting. |
+| `tileDust` | `weatherDust`, `dustProtectionPower`, `windProtectionPower` | `playerHealth`, `playerEnergy`, `playerWorkEfficiency` | Final local dust exposure should be the worker-facing dust meter on the current tile. It mainly creates abrasion, breathing strain, visibility burden, and exhausting movement pressure. |
 
 ### Resolved Local Weather To Terrain And Plant Pressure
 
@@ -4150,14 +4153,15 @@ List only core meters and core plant-side values here. Do not expand into helper
 | `eventHeatPressure` | Current event archetype, current event phase, `eventTier` | `weatherHeat` | Event-side heat meter. |
 | `eventWindPressure` | Current event archetype, current event phase, `eventTier` | `weatherWind` | Event-side wind meter. |
 | `eventDustPressure` | Current event archetype, current event phase, `eventTier` | `weatherDust` | Event-side dust meter. |
-| `playerHealth` | Rest and shelter recovery, medicine, harsh outdoor exposure, dangerous field work, `tileHeat`, `tileDust`, low `playerHydration`, low `playerNourishment` | `playerEnergy`, worker action efficiency, risky-action safety, collapse risk | Core worker health meter. |
+| `playerHealth` | Rest and shelter recovery, medicine, harsh outdoor exposure, dangerous field work, `tileHeat`, `tileDust`, low `playerHydration`, low `playerNourishment` | `playerEnergy`, `playerWorkEfficiency`, risky-action safety, collapse risk | Core worker health meter. |
 | `playerHydration` | Drinking actions, water items, `tileHeat`, outdoor work, rest and shelter recovery | `playerEnergy` | Core worker hydration meter. |
 | `playerNourishment` | Eating actions, food items, time, outdoor work, rest recovery | `playerEnergy` | Core worker nourishment meter. |
-| `playerEnergy` | Work actions, `tileHeat`, `tileWind`, `tileDust`, rest recovery, `playerHealth`, `playerHydration`, `playerNourishment` | Worker action capacity | Core worker action-capacity meter. |
-| `playerMorale` | Safe rest, dense-cover recovery pockets, harsh-event aftermath, current site setbacks and recovery progress | worker action efficiency | Core worker morale meter. |
-| `tileHeat` | `weatherHeat`, `heatProtectionPower` | `playerHydration`, `playerEnergy`, `playerHealth`, `tileMoisture`, `growthPressure` | Final local heat pressure. |
-| `tileWind` | `weatherWind`, `windProtectionPower` | `playerEnergy`, `tileMoisture`, `tileSoilFertility`, `growthPressure` | Final local wind exposure. |
-| `tileDust` | `weatherDust`, `dustProtectionPower`, `windProtectionPower` | `playerHealth`, `playerEnergy`, `tileSandBurial`, `tileSoilFertility`, `growthPressure` | Final local dust exposure. |
+| `playerEnergy` | Work actions, `tileHeat`, `tileWind`, `tileDust`, rest recovery, `playerHealth`, `playerHydration`, `playerNourishment` | `playerWorkEfficiency` | Core worker action-capacity meter. |
+| `playerMorale` | Safe rest, dense-cover recovery pockets, harsh-event aftermath, current site setbacks and recovery progress | `playerWorkEfficiency` | Core worker morale meter. |
+| `playerWorkEfficiency` | `playerHealth`, `playerEnergy`, `playerMorale`, `tileHeat`, `tileWind`, `tileDust`, workload strain | Action duration, action throughput, task labor output | Core worker output meter. |
+| `tileHeat` | `weatherHeat`, `heatProtectionPower` | `playerHydration`, `playerEnergy`, `playerHealth`, `playerWorkEfficiency`, `tileMoisture`, `growthPressure` | Final local heat pressure. |
+| `tileWind` | `weatherWind`, `windProtectionPower` | `playerEnergy`, `playerWorkEfficiency`, `tileMoisture`, `tileSoilFertility`, `growthPressure` | Final local wind exposure. |
+| `tileDust` | `weatherDust`, `dustProtectionPower`, `windProtectionPower` | `playerHealth`, `playerEnergy`, `playerWorkEfficiency`, `tileSandBurial`, `tileSoilFertility`, `growthPressure` | Final local dust exposure. |
 | `tileMoisture` | Watering, direct irrigation such as `Drip Irrigator`, `tileHeat`, `tileWind`, `tileSoilFertility` | `growthPressure` | Stored water on the tile. |
 | `tileSoilFertility` | `fertilityImprovePower`, `tileWind`, `tileDust`, `tileSandBurial` | `tileMoisture`, `growthPressure` | Long-term land quality meter. |
 | `tileSoilSalinity` | Authored starting salinity, `salinityReductionPower` | `salinityDensityCap` | Salty-ground rehabilitation meter. |
@@ -4181,7 +4185,7 @@ Use this loop as the prototype mental model:
 1. Event state updates `eventHeatPressure`, `eventWindPressure`, and `eventDustPressure`.
 2. Weather updates `weatherHeat`, `weatherWind`, and `weatherDust` from baseline site conditions plus current event meters.
 3. Site weather plus local plants, `Straw Checkerboard`, protective structures, and terrain shelter resolve `tileHeat`, `tileWind`, and `tileDust`.
-4. Worker state updates `playerHealth`, `playerHydration`, `playerNourishment`, `playerEnergy`, and `playerMorale` from local weather, work, rest, supplies, medicine, and recovery context.
+4. Worker state updates `playerHealth`, `playerHydration`, `playerNourishment`, `playerEnergy`, `playerMorale`, and `playerWorkEfficiency` from local weather, work, rest, supplies, medicine, and recovery context.
 5. Resolved local weather, irrigation, and plant contribution values update terrain pressure: moisture drain, burial, fertility change, and salinity change.
 6. Terrain state plus resolved local weather and plant resistance values feed `growthPressure`.
 7. `growthPressure`, `salinityDensityCap`, `growable`, and `constantWitherRate` determine plant density change.
