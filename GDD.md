@@ -38,7 +38,7 @@ Create a survival strategy game where the player feels the harshness of desert f
 - Harsh but fair survival: failure comes from visible physical pressure and planning mistakes, not hidden randomness.
 - Restoration over extraction: the main fantasy is healing land and building resilience, not stripping the environment for profit.
 - Field-work immediacy: the player acts through one worker using direct controls, so every plant, shelter, and trip for water feels personal.
-- Regional ecological spillover: success at one `Site` helps nearby `Site`s through support output and environmental stabilization.
+- Regional nearby-site support: success at one `Site` helps nearby `Site`s through support output and `Nearby-Site Aura`.
 - Readable systems: tile effects, plant roles, weather, and resource pressure must be understandable at a glance.
 - High replay value: every campaign should generate a distinct strategic story through different maps, site conditions, task-board offers, weather patterns, events, rewards, and tech priorities.
 - Fierce hazard drama: certain environmental events should become genuinely dangerous set pieces that make survival uncertain, heighten immersion, and create strong fulfillment if the player endures them.
@@ -69,7 +69,8 @@ These terms are stable and should be used consistently in future design and impl
 | `Task Tier` | The rarity and difficulty level of a `Site Task`, which controls how often it appears, how hard it is to finish, and how strong its rewards feel. |
 | `Task Reward Draft` | The choice set shown on a `Site Task` before acceptance, typically with `2` options; on completion, the player claims `1` option from that task's draft. The options can include `Site Unlockables`, `Run Modifier`s, or resource-focused rewards, but not every draft must include an unlockable. |
 | `Task Reward Package` | A money, resources, or mixed tactical-bundle option that can appear inside a `Task Reward Draft`. |
-| `Run Modifier` | A site-session-only rule-changing effect such as better sell prices, work efficiency, plant growth rate, or weather response; it lasts only for the current site session and is lost if the player leaves, fails, or restarts that site. |
+| `Per-Site Modifier` | The shared runtime format for any temporary effect that changes meter behavior on the current `Site` only. It may come from a claimed `Run Modifier` during the site or from a passive `Nearby-Site Aura` applied at deployment. |
+| `Run Modifier` | A task- or reward-draft-sourced `Per-Site Modifier` that activates during the current site session, usually with stronger or more directional effects than nearby support. It is lost if the player leaves, fails, or restarts that site. |
 | `Task Chain` | A linked set of tasks generated inside a task pool refresh; each task pays normal rewards, but completing the full chain grants an extra reward and encourages priority-based planning. |
 | `Site Commendation` | A government-issued prize awarded when a `Site` is successfully restored; it includes a title plus a cited reason based on how the site was completed, giving the player recognition and a clear record of progress. |
 | `Campaign Clock` | The fixed campaign time limit that pressures the player to complete as many `Site`s as possible before the run ends. |
@@ -78,7 +79,8 @@ These terms are stable and should be used consistently in future design and impl
 | `Inventory` | The player's slot-based carried storage for `Item`s during a `Site` session. Capacity is limited and can be expanded by the `Persistent Tech Tree`. |
 | `Item` | Any carriable object that can occupy `Inventory` or `Container` slots, including seeds, tools, portable devices, materials, medicines, water, and harvested goods. |
 | `Container` | A camp storage object that can be built or bought on-site and used to store `Item`s outside the player's carried `Inventory`. |
-| `Site Output Modifier` | A persistent bonus trait attached to a stabilized site's regional support output, such as increased wind protection, fertility support, specific resource yield, or support range. |
+| `Site Output Modifier` | A persistent bonus trait attached to a stabilized site's regional support output, such as increased wind protection, fertility support, specific resource yield, or support range. These traits usually strengthen that site's exported `Nearby-Site Aura` or `Resource Loadout Output`. |
+| `Nearby-Site Aura` | A passive `Per-Site Modifier` package projected from adjacent stabilized sites into the current site session before deployment. It should be weaker and steadier than a claimed `Run Modifier`, and usually focuses on one support channel or one linked pair of meters. |
 | `Camp Support` | The light support infrastructure on a `Site`, including shelter, `Container`s, service devices, and hired labor access. |
 | `Player Condition` | The worker's physical and mental state, represented by survival and output meters such as health, hydration, nourishment, energy cap, energy, morale, and work efficiency. |
 | `Aftermath Relief Offer` | A faction support offer that can appear after a harsh event enters `Aftermath`; its strength depends on current `Faction Reputation` and site damage. |
@@ -86,7 +88,7 @@ These terms are stable and should be used consistently in future design and impl
 | `Plant Density` | The current strength and maturity of living cover or plant-derived starter cover on a tile or cluster; higher density means stronger traits, better survival, and possible natural spread for living plants, while lower density means weaker effects and higher hazard vulnerability. |
 | `Plant Trend` | The derived direction of plant density on a tile, shown as `Growing`, `Holding`, or `Withering`, based on whether the patch is gaining or losing density. |
 | `Plant Trait` | A special property attached to a plant family or unlocked variant that modifies placement value, survival, or local ecological effects. |
-| `Regional Support Output` | The passive benefit a stabilized `Site` contributes to nearby sites on the `Regional Map`, including loadout resources and small ecological spillover effects such as protection or fertility support. |
+| `Regional Support Output` | The passive benefit a stabilized `Site` contributes to nearby sites on the `Regional Map`, including loadout resources and small `Nearby-Site Aura` effects such as protection, fertility support, or recovery support. |
 
 ## 5. Player Fantasy And Setting
 
@@ -207,11 +209,11 @@ Starting plant access should not be procedurally generated. Each site should beg
 
 Procedural generation should create different problem shapes, not random noise. The player should feel they are solving a new site, not re-learning unreadable chaos.
 
-### Adjacency And Spillover
+### Adjacency And Nearby-Site Aura
 
 Sites influence nearby sites in two ways:
 
-- Ecological spillover: stabilized plant cover can grant small wind, heat, or fertility advantages to adjacent sites.
+- `Nearby-Site Aura`: stabilized plant cover and regional output can grant small wind, heat, fertility, moisture, or recovery advantages to adjacent sites.
 - Resource support: successful sites can contribute limited loadout resources and starting help to nearby sites.
 
 ### No Revisits In Current Design
@@ -2484,12 +2486,12 @@ The strongest jackpot outcomes should not only give bigger rewards. They should 
 
 Example `Run Modifier` directions:
 
-- All plants gain greatly increased storm resistance for the rest of the current site session
-- Water consumption is globally reduced on this site
-- Wind direction becomes more stable and forecastable
-- The next several `Site Unlockable` purchases are free or heavily discounted
-- Irrigation efficiency is dramatically increased
-- Contractor output is boosted during harsh-weather windows
+- `Shelterbelt Coordination`: reduce `tileWind` and `tileDust` pressure across the current site
+- `Moisture Hold Order`: slow `tileMoisture` loss and reduce pressure on young patches
+- `Rooting Window`: lower `growthPressure` and improve early `tilePlantDensity` gain on fresh plantings
+- `Cool Shift Protocol`: reduce heat-side worker strain by helping `playerHydration` and `playerWorkEfficiency`
+- `Soil Rehab Push`: improve `tileSoilFertility` gain and `tileSoilSalinity` reduction during the current site session
+- `Recovery Rotation`: improve shelter-side `playerHealth`, `playerMorale`, and `playerEnergy` recovery after hard pushes
 
 Important rule:
 
@@ -2776,7 +2778,7 @@ In the current design, a loadout can include:
 - Basic tools
 - Utility devices
 - Material bundles such as parts, repair kits, or cover rolls
-- Small starting protection bonuses from nearby-site spillover
+- Small starting protection bonuses from `Nearby-Site Aura`
 
 Important water rule:
 
@@ -2808,8 +2810,8 @@ Longer-term, nearby-site support can include categories such as:
 
 Scope note:
 
-- for the first playable, only activate `Resource Loadout` output plus small ecological spillover bonuses
-- ecological spillover should currently focus on wind protection, heat protection, and fertility support
+- for the first playable, only activate `Resource Loadout` output plus small `Nearby-Site Aura` bonuses
+- `Nearby-Site Aura` should currently focus on wind protection, heat protection, and fertility support
 
 #### Regional Support Rules
 
@@ -2818,8 +2820,20 @@ Use these temporary rules:
 - only stabilized sites adjacent to the target site contribute support
 - each contributing site should produce a small exportable support package every `3` regional days
 - each contributing site may provide `Resource Loadout Output` for pre-deployment assembly
-- each contributing site may also provide passive ecological spillover on the new site, especially wind protection, heat protection, and fertility support
+- each contributing site may also provide a passive `Nearby-Site Aura` on the new site, especially small wind protection, heat protection, fertility support, moisture retention, or worker recovery support
 - these bonuses should be noticeable but deliberately small; they should help the player start better, not solve the new site
+
+#### Nearby-Site Aura Rules
+
+`Nearby-Site Aura` should use the same `Per-Site Modifier` model as task-earned site modifiers, but it should enter the run already active instead of being claimed mid-session.
+
+Use these rules:
+
+- a `Nearby-Site Aura` activates at deployment and lasts for the full site session
+- a `Nearby-Site Aura` should usually be weaker than a claimed `Run Modifier`
+- a `Nearby-Site Aura` should usually focus on one support channel or one linked pair of meters
+- good nearby aura directions include small `tileHeat` relief, small `tileWind` relief, small `tileMoisture` retention, small `tileSoilFertility` support, small `playerHydration` preservation, or small `playerHealth` and `playerMorale` recovery support
+- nearby aura effects should still act through the existing meter model; they should not bypass the meter system with direct scripted outcomes
 
 #### Composition-Based Output Rule
 
@@ -2869,7 +2883,7 @@ Use these limits:
 
 - `Resource Loadout Output` should improve the opening phase, not replace the early survival scramble
 - wind and heat protection bonuses should feel like a small safety cushion, not full hazard immunity
-- fertility spillover should help one early patch establish more reliably, not make barren land fully solved
+- fertility-side `Nearby-Site Aura` should help one early patch establish more reliably, not make barren land fully solved
 - stronger harsh sites should still require preparation, adaptation, and good local strategy even if nearby support exists
 
 #### Site Output Modifiers
@@ -2998,6 +3012,42 @@ The main acquisition path should be task rewards, but task rewards should not be
 
 Faction tech choices should bias these local offers rather than replacing them. A `Village Committee` build should surface more labor and tempo tools, an `Autonomous Region Agricultural University` build should surface more device and precision options, and a `Forestry Bureau of Autonomous Region` build should surface more plant and water-resilience options.
 
+#### Per-Site Modifier Definition
+
+Use `Per-Site Modifier` as the shared runtime definition for any site-only effect that changes how existing meters move during one deployment.
+
+Source families:
+
+- `Run Modifier`: claimed during the site, most commonly from a `Task Reward Draft`; stronger and more build-shaping
+- `Nearby-Site Aura`: applied from adjacent stabilized sites before deployment; weaker, steadier, and active from the start of the session
+
+Authoring rules:
+
+- a modifier should target explicit meters or meter-rate channels, not vague flavor bonuses
+- a modifier may change plant-side meter flow such as `tileMoisture`, `tileSoilFertility`, `tileSoilSalinity`, `growthPressure`, `salinityDensityCap`, or density gain and loss on `tilePlantDensity`
+- a modifier may change player-side meter flow such as `playerHydration`, `playerHealth`, `playerNourishment`, `playerEnergyCap`, `playerMorale`, or `playerWorkEfficiency`
+- a modifier should reshape the existing meter model instead of bypassing it with hidden direct plant death, instant worker collapse, or special-case scripted survival
+- task-earned modifiers should usually be stronger, more conditional, and more strategy-shaping than nearby-site aura modifiers
+- nearby-site aura modifiers should usually start active, stay readable, and focus on one support channel rather than many tiny bonuses at once
+- stacking should stay capped and readable; one site should usually have only a few meaningful active modifiers rather than a long invisible buff list
+
+#### Concrete Per-Site Modifier Families
+
+Use concrete modifier families like these:
+
+| Modifier family | Typical source | Main meter targets | Design purpose |
+|---|---|---|---|
+| `Cool Shift Protocol` | `Run Modifier` or `Nearby-Site Aura` | `playerHydration`, `playerWorkEfficiency`, `tileHeat` | Reduces heat-side worker strain so exposed outdoor actions remain cheaper for longer in hot sites. |
+| `Recovery Rotation` | `Nearby-Site Aura` or `Run Modifier` | `playerHealth`, `playerMorale`, `playerEnergy` | Improves recovery quality during shelter or base downtime so the player can rebound faster after harsh-event pushes. |
+| `Field Ration Support` | `Nearby-Site Aura` or `Run Modifier` | `playerNourishment`, `playerEnergyCap` | Slows long-session worker decline and keeps the usable energy ceiling steadier during extended work windows. |
+| `Moisture Hold Order` | `Run Modifier` or `Nearby-Site Aura` | `tileMoisture`, `growthPressure` | Slows moisture loss on plantable tiles and helps young patches hold low pressure for longer. |
+| `Rooting Window` | `Run Modifier` | `growthPressure`, `tilePlantDensity` | Gives fresh plantings a short establishment window by reducing plant-side pressure and improving early density gain while support is good. |
+| `Soil Rehab Push` | `Run Modifier` or `Nearby-Site Aura` | `tileSoilFertility`, `tileSoilSalinity`, `salinityDensityCap` | Speeds rehabilitation of damaged or salty land so transition patches become productive sooner. |
+| `Shelterbelt Coordination` | `Run Modifier` | `tileWind`, `tileDust`, `growthPressure`, `playerWorkEfficiency` | Strengthens protection-led play by reducing resolved local wind and dust pressure, indirectly helping both plants and field labor. |
+| `Salt Transition Program` | `Nearby-Site Aura` or `Run Modifier` | `tileSoilSalinity`, `salinityDensityCap`, `tilePlantDensity` | Makes salty pockets more workable for salt-tolerant lines and shortens the time needed to convert them into stable ground. |
+
+Nearby-site support should usually use lower-intensity versions of these same modifier families, while task-earned modifiers can use stronger or more conditional versions that create a real style pivot for the current run.
+
 Task-driven and money-fallback access rules:
 
 - each `Site Task` should show a `Task Reward Draft`, typically with `2` options, before the player accepts it
@@ -3032,14 +3082,14 @@ The design goals of this system are:
 - Better tile treatment efficiency
 - Local irrigation or sensor improvements
 
-`Run Modifier`s should favor session-wide state changes such as:
+`Run Modifier`s should usually use stronger or more directional versions of the modifier families above, such as:
 
-- Better selling price on the current site
-- Better worker efficiency
-- Faster plant growth
-- Lower water consumption
-- Better storm resistance
-- Better contractor productivity
+- `Cool Shift Protocol` for `playerHydration` and `playerWorkEfficiency`
+- `Recovery Rotation` or `Field Ration Support` for `playerHealth`, `playerMorale`, `playerNourishment`, and `playerEnergyCap`
+- `Moisture Hold Order` for `tileMoisture`
+- `Rooting Window` for `growthPressure` and `tilePlantDensity`
+- `Shelterbelt Coordination` for `tileWind` and `tileDust`
+- `Soil Rehab Push` for `tileSoilFertility`, `tileSoilSalinity`, and `salinityDensityCap`
 
 Together, the `Persistent Tech Tree`, `Site Unlockables`, and `Run Modifier`s should support both long-term campaign identity and short-term site improvisation. Persistent tech defines what kind of restoration worker the player becomes. Site unlocks and modifiers define how that worker adapts during the current site session.
 
