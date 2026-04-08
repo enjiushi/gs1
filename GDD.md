@@ -391,7 +391,7 @@ Discrete or integer runtime values:
 Display rule:
 
 - Continuous player-facing meters use internal float values, but UI can present them as bars with the current number shown on the bar
-- Density labels such as `Seeded`, `Young`, `Established`, and `Dense` should be the main plant state shown to the player; a separate derived trend label such as `Growing`, `Holding`, or `Withering` can show whether that density is improving or collapsing
+- `Plant Density` should be the main plant state shown to the player; the UI can show the current density number or bar directly, and a lighter trend label such as `Growing`, `Holding`, or `Withering` can show whether that density is improving or collapsing
 - `Plant Density` should be shown both in UI and in tile art; a denser tile should visibly contain more plant coverage, volume, or fullness than a sparse tile
 - `tileSoilFertility`, `tileMoisture`, and `tileSoilSalinity` should be visible through tile inspection and relevant overlays because they are the core land-quality state
 - `tileHeat`, `tileWind`, and `tileDust` are resolved local weather meters; they are useful in tile inspection, advanced overlays, or debugging views because they bridge site weather and final tile or plant pressure
@@ -680,7 +680,7 @@ Current prototype gameplay effect for `Energy Cap`:
 
 Dense restored plant cover should become a practical recovery aid, not only a visual reward.
 
-When the player is standing or resting inside a local planted pocket where most nearby tiles are `Established` or `Dense`, the area should feel safer and more livable:
+When the player is standing or resting inside a local planted pocket where most nearby tiles are medium-density or high-density, the area should feel safer and more livable:
 
 - `Energy` recovers faster during short recovery pauses or rest
 - `Morale` recovers faster because the player feels protected and sees clear proof of progress
@@ -1675,23 +1675,13 @@ This means density is doing several jobs at once:
 
 The intended fantasy is that the player establishes life, protects it through its weakest phase, and then gradually earns a patch that can hold itself together and start reclaiming nearby ground.
 
-### Density Growth States (Prototype)
+### Plant Density Meter (Prototype)
 
-The prototype can treat density as a small readable ladder rather than a complex simulation:
-
-| Density State | Density Range | Meaning | Gameplay Result |
-|---|---|---|---|
-| `Empty` | `0` | No living cover on the tile | No effect; valid target for planting or natural spread if conditions allow |
-| `Seeded` | `1-24` | Just planted by the player or newly spread | Minimal effect, very fragile, no spread |
-| `Young` | `25-49` | Surviving but still dependent on care | Small effect, still vulnerable, no spread |
-| `Established` | `50-79` | Stable enough to function reliably | Good effect strength, better hazard resistance, reliable output |
-| `Dense` | `80-100` | Mature healthy cover | Strong effect strength, strong hazard resistance, eligible for natural spread |
-
-The player should be able to read this state quickly from the tile visuals and overlays.
+The prototype should treat `tilePlantDensity` as one readable continuous meter rather than a separate ladder of named growth states.
 
 Density readability rule:
 
-- UI should be able to show the current density value or density-state label when the tile is inspected or highlighted
+- UI should be able to show the current density value or density bar when the tile is inspected or highlighted
 - tile art should also communicate density directly, with more visible plant mass, spread, or fullness as density rises
 - when a planted tile is inspected, the player should also be able to see why that density is improving or collapsing through a short diagnosis rather than only a raw pressure value
 - that diagnosis should use stable grouped causes such as `Needs Water`, `Poor Soil / Burial`, `Too Exposed`, and `Too Hot`, even if the internal formulas behind those groups change during tuning
@@ -1701,23 +1691,23 @@ For prototype tuning:
 
 - direct player planting creates a new tile at `20` density
 - natural spread creates a new tile at `20` density
-- trait strength can roughly scale as `25% / 50% / 75% / 100%` across `Seeded / Young / Established / Dense`
+- trait strength should scale smoothly with `tilePlantDensity` rather than through fixed named stages
 
 ### Prototype Plant Density Profiles (Temp Design)
 
-Each living plant should gain clearer value as density rises so growth feels meaningful rather than cosmetic. `Straw Checkerboard` uses the same density meter, but it only decays over time instead of growing upward through the living-plant ladder.
+Each living plant should gain clearer value as density rises so growth feels meaningful rather than cosmetic. `Straw Checkerboard` uses the same density meter, but it only decays over time instead of growing upward like a living plant.
 
-| Plant | `Seeded` (`1-24`) | `Young` (`25-49`) | `Established` (`50-79`) | `Dense` (`80-100`) |
-|---|---|---|---|---|
-| `Wind Reed` | Minor own-tile wind reduction only | Small adjacent wind reduction and slight dehydration relief | Reliable windbreak for adjacent tiles and better support for nearby fragile plants | Strong perimeter barrier that greatly helps nearby low-density plants survive storms |
-| `Shade Cactus` | Small local shade and weak comfort value | Noticeable local heat relief and slower adjacent water loss | Strong cool pocket; nearby short rests become safer and more efficient | Best local anti-dehydration support and strongest `Energy` and `Morale` recovery feel in its pocket |
-| `Root Binder` | Slight soil lock on its own tile | Modest erosion reduction, fertility support, and early salinity prep | Solid adjacent fertility, erosion resistance, and steady salinity rehab for patch building | Strongest ground-fertility anchor and best support for future spread into nearby difficult tiles |
-| `Salt Bean` | Very little yield and slight soil enrichment | Small yield if protected, with visible early salinity reduction | Reliable modest output plus good support for neighboring growth on salty land | Strong sustained output, stronger enrichment, and the clearest prototype salinity-rehab payoff |
-| `Sunfruit Vine` | Almost no yield and extremely fragile without support | Small yield only if nearby support exists | Strong output if protection and fertility remain in place | Peak output state; still support-dependent, but finally resilient enough to justify major protection effort |
-| `Dew Grass` | Faint moisture-softening effect and almost no resilience by itself | Noticeable anti-dryness support, weak fertility improvement, and light salt relief | Reliable bridge plant that helps nearby fragile or mildly salty tiles stay alive | Mature moisture-net plant that makes neighboring expansion meaningfully easier |
-| `Thorn Shrub` | Small barrier value and almost no yield | Tougher edge plant with minor fiber or resin return | Reliable perimeter piece that both protects and contributes a modest output stream | Strong productive barrier that can anchor site edges without being purely defensive |
-| `Medicinal Sage` | Slight comfort cue and almost no harvest value | Small herb output and light rest-support feeling nearby | Reliable support-output patch with noticeable short-rest benefit | Best worker-comfort crop in the prototype; strong morale feel and useful herb value |
-| `Sand Willow` | Weak sapling with little shelter and high rescue demand | Begins creating real shade and local wind interruption if kept alive | Strong shelter anchor with clear anti-dehydration value and medium salinity-rehab value for surrounding tiles | One of the strongest refuge-core plants in the prototype, with major protection, rest value, and difficult-land recovery once earned |
+| Plant | Low Density | Medium Density | High Density |
+|---|---|---|---|
+| `Wind Reed` | Minor own-tile wind reduction only | Reliable windbreak and slight dehydration relief | Strong perimeter barrier that greatly helps nearby low-density plants survive storms |
+| `Shade Cactus` | Small local shade and weak comfort value | Noticeable local heat relief and slower adjacent water loss | Best local anti-dehydration support and strongest `Energy` and `Morale` recovery feel in its pocket |
+| `Root Binder` | Slight soil lock on its own tile | Solid fertility support, erosion resistance, and early salinity rehab | Strongest ground-fertility anchor and best support for future spread into nearby difficult tiles |
+| `Salt Bean` | Very little yield and slight soil enrichment | Reliable modest output plus visible salinity reduction | Strong sustained output, stronger enrichment, and the clearest prototype salinity-rehab payoff |
+| `Sunfruit Vine` | Almost no yield and extremely fragile without support | Strong output only if protection and fertility remain in place | Peak output state; still support-dependent, but resilient enough to justify major protection effort |
+| `Dew Grass` | Faint moisture-softening effect and almost no resilience by itself | Reliable bridge plant that helps nearby fragile or mildly salty tiles stay alive | Mature moisture-net plant that makes neighboring expansion meaningfully easier |
+| `Thorn Shrub` | Small barrier value and almost no yield | Reliable perimeter piece that both protects and contributes a modest output stream | Strong productive barrier that can anchor site edges without being purely defensive |
+| `Medicinal Sage` | Slight comfort cue and almost no harvest value | Reliable support-output patch with noticeable short-rest benefit | Best worker-comfort crop in the prototype; strong morale feel and useful herb value |
+| `Sand Willow` | Weak sapling with little shelter and high rescue demand | Strong shelter anchor with clear anti-dehydration value and medium salinity-rehab value for surrounding tiles | One of the strongest refuge-core plants in the prototype, with major protection, rest value, and difficult-land recovery once earned |
 
 Important prototype traits for `Straw Checkerboard`:
 
@@ -1727,7 +1717,7 @@ Important prototype traits for `Straw Checkerboard`:
 - gives maximum wind and sand-movement reduction right after placement, even before living cover exists
 - helps trap sand and fine particles instead of only resisting damage
 - converts its own lost density into gradual fertility gain and establishment support
-- strongly helps `Seeded` and `Young` living plants survive nearby
+- strongly helps low-density living plants survive nearby
 - has no direct output economy and no self-spread, so it remains a setup tool rather than a full solution
 
 Important prototype traits for the added plants:
@@ -1744,7 +1734,7 @@ Plants should follow a simple visible survival model. They are not guaranteed to
 Primary player-facing read:
 
 - density is the plant's main state on a tile
-- the tile should show a density label such as `Seeded`, `Young`, `Established`, or `Dense`
+- the tile should show the current density value or density bar directly
 - a lighter trend label should show whether that density is improving or collapsing
 
 | Trend State | Meaning | Gameplay Result |
@@ -1771,7 +1761,7 @@ Prototype density results:
 
 This is one of the main prototype rewards for good strategy. The player should be able to see that the same hazard which ruins an exposed patch only partially dents a well-supported patch.
 
-Low-density plants should be the most vulnerable part of the lifecycle. This is where the player's maintenance and planning matter most. A patch that survives long enough to become `Established` or `Dense` should be much better at enduring normal site pressure.
+Low-density plants should be the most vulnerable part of the lifecycle. This is where the player's maintenance and planning matter most. A patch that survives long enough to reach high density should be much better at enduring normal site pressure.
 
 Density loss should come mainly from:
 
@@ -1847,7 +1837,7 @@ The prototype should let successful plant patches begin reclaiming nearby land o
 
 Natural expansion rules:
 
-- only `Dense` tiles can attempt natural spread
+- only high-density tiles can attempt natural spread
 - spread should check orthogonally adjacent tiles first
 - the destination tile must be empty
 - the destination tile must be fertile enough or otherwise sufficiently supported
@@ -2259,7 +2249,7 @@ Plants affect nearby tiles in readable ways. Effects may include:
 - Moisture support
 - Salinity reduction
 
-Effect strength should scale with `Plant Density`. A low-density tile should offer limited support, while an `Established` or `Dense` tile should provide much stronger local value.
+Effect strength should scale with `Plant Density`. A low-density tile should offer limited support, while a medium-density or high-density tile should provide much stronger local value.
 
 The player should be able to understand why a placement matters by reading the tile overlay and nearby conditions.
 
@@ -2963,7 +2953,7 @@ Do not force a site into only one dominant support type. A restored site should 
 Prototype interpretation:
 
 - a site's support output should depend on its certified completion state plus its plant composition
-- only `Established` and `Dense` plant tiles should contribute meaningfully to regional output
+- only medium-density and high-density plant tiles should contribute meaningfully to regional output
 - different plant roles should contribute to different support channels at the same time
 - this means one site can export some resources, some wind protection, some heat protection, and some fertility support together
 
@@ -3932,7 +3922,7 @@ On pure sand or the least fertile tiles, the player should have a viable opening
 
 ### Restored Pocket Reward Check
 
-When the player builds a local cluster of mostly `Established` or `Dense` tiles, the area should feel meaningfully different from exposed desert. It should sound calmer and more alive, provide faster `Energy` and `Morale` recovery, and communicate that the player's strategy has created a small protected haven inside the harsh site.
+When the player builds a local cluster of mostly medium-density or high-density tiles, the area should feel meaningfully different from exposed desert. It should sound calmer and more alive, provide faster `Energy` and `Morale` recovery, and communicate that the player's strategy has created a small protected haven inside the harsh site.
 
 ### Protection Reward Check
 
