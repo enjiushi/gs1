@@ -2241,7 +2241,95 @@ This makes restoration feel earned rather than decorative.
 
 As sites become stable, their plant systems contribute to nearby `Site`s through reduced hazard intensity, cleaner starting land conditions, and stronger starting support pockets. This is the main expression of the game's regional restoration fantasy.
 
-## 12. Economy, Contracts, And Progression
+## 12. Terrain, Plant, And Weather Relationship Model
+
+This chapter defines the directional relationship model between terrain, plants, and weather. It is not the final tuning math. The purpose is to keep the simulation readable before exact coefficients are balanced.
+
+Design rule:
+
+- meters should affect each other through explicit relationships, not hidden outcome shortcuts
+- weather changes terrain pressure and plant pressure
+- terrain state changes plant growth, density cap, and recovery potential
+- plants, ground cover, devices, and terrain shelter create local modifiers that protect or improve terrain over time
+- visible outcomes such as withering, recovery, spread, or collapse should emerge from meter changes
+
+### Meter Groups
+
+| Group | Meters | Role |
+|---|---|---|
+| Weather meters | `weatherHeat`, `weatherWind`, `weatherSand` | Site-wide ambient pressure. Extreme events mainly push these meters higher instead of directly damaging plants. |
+| Persistent terrain soil meters | `tileSoilFertility`, `tileMoisture`, `tileSoilSalinity` | Long-lived or short-lived land condition on plantable `Ground`. These meters determine what can grow well. |
+| Temporary tile pressure | `tileSandBurial` | Recoverable sand overlay created mainly by sandstorms. If ignored, it can create lasting fertility loss. |
+| Derived local modifiers | `tileWindProtection`, `tileShade`, `tileWaterSupport` | Rebuilt each simulation step from plants, ground cover, devices, rock shelter, and active support. They protect or support the tile but are not permanent terrain quality. |
+| Living plant state | `tilePlantDensity`, `plantTrendState`, `growthPressure` | Current plant strength, direction, and internal short-term pressure. |
+| Derived plant limits | `salinityDensityCap`, grouped pressure contributions | Derived values used for growth and diagnosis. They should not become separate persistent terrain meters. |
+| Ground cover state | `tileGroundCoverDensity` | Current ground-cover strength. For `Straw Checkerboard`, this is fixed setup strength, not a growing density ladder. |
+
+### Weather To Terrain And Plant Pressure
+
+| Source meter | Increases | Reduces or protects against | Notes |
+|---|---|---|---|
+| `weatherHeat` | `tileMoisture` drain, plant `heatContribution`, worker hydration and energy drain | `tileShade`, `tileMoisture`, heat-tolerant plants, shade devices, dense cover | Heat should not directly reduce `tileSoilFertility` in the prototype. It can indirectly worsen erosion risk by drying the tile and weakening plants. |
+| `weatherWind` | wind exposure, erosion pressure, plant `windContribution`, outdoor work difficulty | `tileWindProtection`, `erosionControlPower`, `windResistance`, rock shelter, windbreak devices, ground cover | Wind is the main direct driver of erosion, where erosion means `tileSoilFertility` reduction. |
+| `weatherSand` | `tileSandBurial`, airborne-sand erosion pressure, plant sand pressure, visibility and movement penalties, device risk | `tileWindProtection`, `tileGroundCoverDensity`, `sandTolerance`, shelter placement, clearing burial | `weatherSand` is shown to the player as `Dust`. It becomes more dangerous when wind is high or during sandstorm events. |
+| Extreme-event modifiers | `eventHeatModifier`, `eventWindModifier`, `eventSandModifier` | Forecasting, preparation, local protection, faction relief after the event | Events should mostly push weather meters, not bypass the model with direct plant-damage rules. |
+
+### Terrain To Plant Growth
+
+| Terrain meter | Higher value does | Lower value does | Main modifiers |
+|---|---|---|---|
+| `tileMoisture` | Reduces water shortage, supports density gain, softens heat pressure | Raises `waterContribution`, slows or reverses growth, can push plant trend toward `Withering` | Watering, rain if added later, `Drip Irrigator`, `tileWaterSupport`, `tileShade`, `tileSoilFertility` |
+| `tileSoilFertility` | Improves growth readiness and moisture retention | Raises `soilContribution`, slows growth, makes spread and recovery harder | Fertility-improving plants, `Straw Checkerboard` setup effect, erosion, burial left uncleared |
+| `tileSoilSalinity` | Low salinity allows normal density cap for more plants | High salinity reduces `salinityDensityCap` for low-tolerance plants | `saltTolerance` resists the cap reduction; `salinityReductionPower` lowers salinity over time while the plant is healthy |
+| `tileSandBurial` | More burial increases soil pressure and can cause lasting fertility loss if ignored | Clearing burial restores the tile toward normal operation | Sandstorms increase it; player clearing, protection, and good placement reduce its long-term damage |
+
+### Local Modifiers To Terrain And Plant Pressure
+
+| Modifier | Comes from | Main effects |
+|---|---|---|
+| `tileWindProtection` | Protector plants, `Wind Fence`, rock shelter, `Straw Checkerboard`, dense ground cover | Reduces wind pressure, sand pressure, erosion pressure, and severe-event density loss. |
+| `tileShade` | Shade plants, shelter structures, solar-panel sharing where applicable, rock shape | Reduces heat pressure and moisture drain; helps nearby work and fragile plants survive heat windows. |
+| `tileWaterSupport` | Moisture-support plants, `Drip Irrigator`, water devices, possibly future faction support | Improves water readiness but does not replace real `tileMoisture`; irrigation still depends on stored water. |
+| `tileGroundCoverDensity` | Ground-cover occupant such as `Straw Checkerboard` | Adds fixed protection and setup value for checkerboard in the prototype; it is not a living-plant density state. |
+
+### Plant Traits To Tile Effects
+
+| Plant trait | Impacts | Direction |
+|---|---|---|
+| `protectionPower` | `tileWindProtection` | Higher trait plus higher `tilePlantDensity` gives stronger local wind protection. |
+| `shadePower` | `tileShade` | Higher trait plus higher `tilePlantDensity` gives stronger heat relief. |
+| `waterSupportPower` | `tileWaterSupport` | Higher trait plus higher `tilePlantDensity` gives stronger local water-readiness support. |
+| `fertilityImprovePower` | `tileSoilFertility` | Healthy plants can gradually increase fertility. |
+| `salinityReductionPower` | `tileSoilSalinity` | Healthy plants can gradually reduce salinity. This is separate from short-term `growthPressure`. |
+| `erosionControlPower` | `erosionPressure` and `tileSoilFertility` loss | Higher trait plus higher `tilePlantDensity` reduces wind-and-sand-driven fertility loss. Strong protection can reduce erosion pressure to `0`. |
+| `saltTolerance` | `salinityDensityCap` | Higher tolerance reduces the density-cap penalty from salty ground, but does not remove salinity by itself. |
+| `heatTolerance`, `windResistance`, `sandTolerance` | `growthPressure` inputs | Higher resistance lowers the related heat, wind, sand, or burial pressure for that plant. |
+
+### Growth Pressure And Density Outcome
+
+| Derived value | Inputs | Meaning |
+|---|---|---|
+| `waterContribution` | `tileMoisture`, `tileWaterSupport`, plant `waterNeed` | Shows whether the plant mainly needs water support. |
+| `soilContribution` | `tileSoilFertility`, `tileSandBurial`, plant `fertilityNeed` and `sandTolerance` | Shows whether the plant is limited by poor soil or burial. |
+| `windContribution` | `weatherWind`, `weatherSand`, `tileWindProtection`, `tileGroundCoverDensity`, plant resistances | Shows whether the plant is too exposed to wind and sand. |
+| `heatContribution` | `weatherHeat`, `tileShade`, `tileMoisture`, plant `heatTolerance` | Shows whether the plant is too hot. |
+| `growthPressure` | Sum of grouped pressure contributions | Low pressure allows growth. High pressure causes density loss and may push `plantTrendState` toward `Withering`. |
+| `salinityDensityCap` | `tileSoilSalinity`, plant `saltTolerance` | Limits how dense the plant can become on salty ground. It should be shown as a separate density-cap warning, not mixed into `growthPressure`. |
+| `plantTrendState` | Current density, density gain, density loss, `growthPressure` | Reports whether the plant is `Growing`, `Holding`, `Withering`, or `Dead`. |
+
+### Main Causal Loop
+
+Use this loop as the prototype mental model:
+
+1. Weather updates `weatherHeat`, `weatherWind`, and `weatherSand`.
+2. Local plants, ground cover, devices, and terrain shelter rebuild `tileWindProtection`, `tileShade`, and `tileWaterSupport`.
+3. Weather and local modifiers update terrain pressure: moisture drain, erosion pressure, burial, and fertility change.
+4. Terrain and weather feed plant pressure: water shortage, poor soil or burial, wind/sand exposure, and heat exposure.
+5. `growthPressure` and `salinityDensityCap` determine density gain, density loss, and trend state.
+6. Healthy plants feed back into the tile by improving fertility, reducing salinity, reducing erosion, adding shade, adding wind protection, or supporting moisture.
+7. Damaged or dead plants reduce local support, which can expose nearby tiles and create a recoverable downward spiral.
+
+## 13. Economy, Contracts, And Progression
 
 ### Contract Board
 
@@ -3342,7 +3430,7 @@ Prototype relief directions:
 
 This makes reputation matter even when the run is going badly. A player with stronger institutional relationships should recover from a severe event more cleanly than a player who ignored those ties.
 
-## 13. Failure, Restart, And Recovery
+## 14. Failure, Restart, And Recovery
 
 ### Site Failure
 
@@ -3369,7 +3457,7 @@ This reinforces regional interdependence and makes overextending into risky site
 
 The design target is setbacks rather than total campaign reset. The player should recover through planning, support routing, and better preparation, not by losing all global progress.
 
-## 14. Content Taxonomy
+## 15. Content Taxonomy
 
 ### Plant Content
 
@@ -3408,7 +3496,7 @@ There is no separate trade terminal in v1. Buying, selling, and hiring are handl
 | Sustain | Maintain viability through a weather window |
 | Deliver | Produce requested output or milestone results |
 
-## 15. Presentation Direction
+## 16. Presentation Direction
 
 ### Visual Style
 
@@ -3477,7 +3565,7 @@ The visual style must still support strategy readability:
 - Important support devices stand out
 - The player can quickly identify safe versus dangerous areas
 
-## 16. V1 Boundaries
+## 17. V1 Boundaries
 
 These are explicit non-goals for the first version:
 
@@ -3489,7 +3577,7 @@ These are explicit non-goals for the first version:
 - No fully open-world seamless map
 - No highly realistic policy simulation
 
-## 17. Minimum Playable Prototype
+## 18. Minimum Playable Prototype
 
 This chapter defines the smallest prototype that is still worth building. It should use as little feature breadth as possible, but it must still preserve the full loop sketch the game is trying to sell: survival pressure, faction-published tasks, guaranteed faction reputation, small tech growth, harsh-event recovery, and a sense that the next site plays differently because of the player's choices.
 
@@ -3774,7 +3862,7 @@ The minimum playable prototype is successful if a playtester can:
 
 If those beats work, the project has a real prototype foundation. If they do not, the correct response is to improve this small loop before adding more systems.
 
-## 18. Implementation Readiness Checklist
+## 19. Implementation Readiness Checklist
 
 This checklist is here to help inspect the whole loop before moving into code-structure planning. It separates what is already concrete enough for prototype implementation from what still needs a tighter contract.
 
@@ -3845,7 +3933,7 @@ This checklist is here to help inspect the whole loop before moving into code-st
 - [x] The regional layer is strong enough to support meaningful site-order strategy
 - [ ] The prototype is not yet safe for large-scale implementation without the missing contracts above
 
-## 19. Acceptance Scenarios
+## 20. Acceptance Scenarios
 
 These scenarios define whether the design is behaving correctly in prototype and production reviews.
 
@@ -3984,7 +4072,7 @@ Money should clearly function as the current-site tactical currency for survival
 
 Leaving, failing, or restarting a site should reset its site unlock pool, clear its active `Run Modifier`s, and preserve all intended `Persistent Tech Tree` progress.
 
-## 20. Production Notes
+## 21. Production Notes
 
 - Use role-based plant families first, then replace with more specific species later if realism becomes a production goal.
 - Do not expand the plant roster beyond the prototype set until 2-role plants, neighbor effects, and support-dependent output are clearly fun in testing.
