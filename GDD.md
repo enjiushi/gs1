@@ -2557,7 +2557,7 @@ Task-chain rules:
 - completing the full chain should grant an extra bonus reward on top of the normal task rewards
 - that chain-completion bonus can be a stronger `Task Reward Draft`, a premium resource bundle, a fixed extra `Reputation` or `Faction Reputation` payout, or better `Run Modifier` odds
 
-Task chaining creates momentum. The player stops thinking "one task" and starts thinking "if I finish this now, the next two tasks get better, the whole chain pays extra, and I free one of my three acceptance slots." That is exactly the kind of pressure that turns "one more task" into a longer, satisfying session.
+Task chaining creates momentum. The player stops thinking only about the current task and starts thinking "if I finish this chain step now, the next refresh is more likely to offer the follow-up, the full chain still pays extra, and I keep my board moving toward that payoff." That is exactly the kind of pressure that turns "one more task" into a longer, satisfying session.
 
 ### Funding Loop
 
