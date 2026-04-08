@@ -6,7 +6,7 @@ Document goal: Define the v1 design clearly enough for prototyping, production p
 
 ## 1. High Concept
 
-`Desert Restoration Survival Strategy` is a single-player PC game about surviving and reversing desertification in a remote China-inspired desert region. The player controls one government-backed field worker who enters dangerous restoration sites, endures heat, thirst, wind, and sandstorms, establishes light camp infrastructure, plants resilient species, fulfills rolling contracts, and gradually turns a failing landscape into a stable ecological network.
+`Desert Restoration Survival Strategy` is a single-player PC game about surviving and reversing desertification in a remote China-inspired desert region. The player controls one government-backed field worker who enters dangerous restoration sites, endures heat, thirst, wind, and sandstorms, establishes light camp infrastructure, plants resilient species, completes faction-published site tasks, and gradually turns a failing landscape into a stable ecological network.
 
 The game combines direct on-foot play with site-scale strategy. The player is not a commander floating above the world and not a combat hero. The fantasy is physical work under environmental pressure: carrying enough water, reading the forecast, choosing where to plant first, protecting young growth from erosion, and deciding when to spend limited funds on tools, devices, contractors, or another day of survival.
 
@@ -24,7 +24,7 @@ The game combines direct on-foot play with site-scale strategy. The player is no
 | Combat | None in v1 |
 | Setting | Present-day, grounded, China-inspired remote desert |
 | Narrative weight | Mostly sandbox with light contextual storytelling |
-| Replay value target | High run-to-run variety through procedural generation, contract variation, events, and strategic progression choices |
+| Replay value target | High run-to-run variety through procedural generation, task-board variation, events, and strategic progression choices |
 | Tech model | Dual-layer progression with cumulative-reputation faction tech branches plus task-revealed site unlocks and session-only modifiers |
 
 ## 3. Vision And Pillars
@@ -40,7 +40,7 @@ Create a survival strategy game where the player feels the harshness of desert f
 - Field-work immediacy: the player acts through one worker using direct controls, so every plant, shelter, and trip for water feels personal.
 - Regional ecological spillover: success at one `Site` helps nearby `Site`s through support output and environmental stabilization.
 - Readable systems: tile effects, plant roles, weather, and resource pressure must be understandable at a glance.
-- High replay value: every campaign should generate a distinct strategic story through different maps, site conditions, contracts, weather patterns, events, rewards, and tech priorities.
+- High replay value: every campaign should generate a distinct strategic story through different maps, site conditions, task-board offers, weather patterns, events, rewards, and tech priorities.
 - Fierce hazard drama: certain environmental events should become genuinely dangerous set pieces that make survival uncertain, heighten immersion, and create strong fulfillment if the player endures them.
 
 ## 4. Core Design Terms
@@ -49,9 +49,9 @@ These terms are stable and should be used consistently in future design and impl
 
 | Term | Definition |
 |---|---|
-| `Site` | A playable restoration area on the regional map with its own terrain, hazards, contract goals, local resources, and camp state. |
+| `Site` | A playable restoration area on the regional map with its own terrain, hazards, task goals, local resources, and camp state. |
 | `Regional Map` | The campaign-level planning layer containing multiple connected `Site`s, their adjacency, regional conditions, available site starts, support links, and access to faction-tech selection. |
-| `Contract Board` | The on-site progression system available only during an active `Site` session; it contains the current site's faction-published contracts plus the active `Site Task` pool that drives site progression and rewards. |
+| `Contract Board` | The on-site progression system available only during an active `Site` session; it contains the current site's faction-published `Site Task` pool that drives site progression and rewards. |
 | `Field Phone` | The player's in-world access point for money-related actions during a `Site` session; it supports the on-site `Contract Board` plus buying, selling, hiring, and related field planning actions. |
 | `Reputation` | The cumulative campaign-level government standing resource earned progressively from official work; it is never spent and instead gates faction-tech tiers and broader program trust. |
 | `Persistent Tech Tree` | The long-term campaign progression layer formed by three faction tech branches plus any neutral program-wide upgrades. |
@@ -90,7 +90,7 @@ These terms are stable and should be used consistently in future design and impl
 
 ## 5. Player Fantasy And Setting
 
-The player is a desert-control worker assigned through a public ecological restoration program. The job is practical, underfunded, and dangerous. Each deployment is a mix of field labor, survival, applied ecology, and contract-driven performance.
+The player is a desert-control worker assigned through a public ecological restoration program. The job is practical, underfunded, and dangerous. Each deployment is a mix of field labor, survival, applied ecology, and task-driven performance.
 
 The setting is inspired by real desert-restoration work in remote Chinese regions, but it is not tied to a specific real province, project, or policy. This allows the game to feel grounded while preserving room for fictional site design, procedural generation, and game-driven clarity.
 
@@ -100,7 +100,7 @@ The emotional arc should move through three phases:
 - Control: the player learns weather patterns, stabilizes key tiles, and builds support capacity.
 - Recovery: the player watches once-hostile ground become productive, protective, and connected to a wider regional effort.
 
-The long-term replay goal is for players to finish a campaign and immediately imagine a different next run: another regional layout, another opening support network, another weather rhythm, another contract economy, and another tech path.
+The long-term replay goal is for players to finish a campaign and immediately imagine a different next run: another regional layout, another opening support network, another weather rhythm, another task-board economy, and another tech path.
 
 ## 6. Core Gameplay Loop
 
@@ -115,7 +115,7 @@ The long-term replay goal is for players to finish a campaign and immediately im
 7. Survive the day cycle while establishing basic `Camp Support`.
 8. Plant, build, craft, maintain, and respond to weather.
 9. Complete `Site Task`s to reveal `Task Reward Draft`s, choose from whatever mix of unlockables, modifiers, or resource rewards the draft offers, and use money either on revealed `Site Unlockables` or on very expensive direct-purchase unlockables when needed.
-10. Fulfill contract goals and any optional bonus objectives.
+10. Fulfill site-task goals and any optional bonus objectives.
 11. Stabilize the site enough to extract `Regional Support Output`.
 12. Return to the `Regional Map`, unlock new options, and choose the next priority.
 
@@ -128,7 +128,7 @@ The long-term replay goal is for players to finish a campaign and immediately im
 5. Prepare tiles and place early protective or restorative plants in the most exposed lanes first.
 6. Build key support devices such as irrigation, sensors, or service stations.
 7. Watch weak low-density zones for density loss, erosion, burial, and other degeneration before they spread.
-8. Balance personal survival against site growth, repairs, contract deadlines, and the pressure to finish current tasks so new opportunities can enter the pool.
+8. Balance personal survival against site growth, repairs, task commitments, and the pressure to finish current tasks so new opportunities can enter the pool.
 9. Use the `Field Phone` to spend money on revealed `Site Unlockables`, supplies, harsh-event response, or contractors when needed.
 10. Use normal field work such as burial clearing, watering, and repair under harsh-event pressure when needed to protect planted regions or rescue failing utility lines; sometimes sacrifice one fringe area to save a core patch, then evaluate any `Aftermath Relief Offer`s once the event breaks.
 11. Convert surviving short-term gains into denser self-sustaining cover and the next safer expansion.
@@ -240,7 +240,7 @@ The campaign ends when the `Campaign Clock` runs out. The player's success is me
 - Secondary action: alternate tool function / cancel
 - Placement mode: move into reach of a tile or object, then place or interact through the cursor-directed action
 - Inventory: open the carried `Inventory` and manage `Item`s
-- Phone: open the `Field Phone` for contracts, buying, selling, and hiring
+- Phone: open the `Field Phone` for tasks, buying, selling, and hiring
 
 ### Interaction Requirement Rule
 
@@ -262,7 +262,7 @@ Core phone functions:
 - Review the current site's `Site Task` pool and its refresh timing
 - Review `Faction Reputation`, current `Faction Assistant` support, and unlocked faction-tech thresholds
 - Buy water, food, medicine, seeds, tools, and approved support equipment
-- Sell harvested output or contract-approved goods
+- Sell harvested output or approved goods
 - Hire temporary contractors
 - Spend money on revealed `Site Unlockables` on the current site
 - Buy limited direct-purchase `Site Unlockables` at premium prices when task rewards did not provide the wanted option
@@ -1106,7 +1106,7 @@ These values are used for task generation and high-level site-state checks:
 |---|---|---|---|
 | Fully Grown Tiles | `fullyGrownTileCount` | Integer | Number of mature planted tiles currently counted toward site completion |
 | Completion Threshold | `siteCompletionTileThreshold` | Integer | Number of fully grown tiles required for the site to count as completed |
-| Funds | `money` | Integer | Contracts, sales, purchases, and hiring |
+| Funds | `money` | Integer | Task rewards, sales, purchases, and hiring |
 | Campaign Days Remaining | `campaignDaysRemaining` | Integer | Remaining campaign time before the run ends |
 
 Important rule:
@@ -1127,7 +1127,7 @@ These are the exact `Item` categories that can be stored, moved, consumed, bough
 | Repair Kit | `repairKit` | `3` | Structure and device repair |
 | Parts Bundle | `partsBundle` | `10` | Device construction and some repairs |
 | Seed Bundle | `seedBundle:<plantTypeId>` | `10` | Plant placement for a specific plant type |
-| Harvest Good | `harvestGood:<outputTypeId>` | `10` | Sale or contract delivery |
+| Harvest Good | `harvestGood:<outputTypeId>` | `10` | Sale or task delivery |
 
 Note:
 
@@ -1258,7 +1258,7 @@ Solar-economy rule:
 - surplus electricity should be sold through the `Field Phone`, not through a separate terminal device
 - surplus electricity should be treated as a site-summary export value, not as a carried inventory item
 - exported electricity should be a low-value side income: it should sell for less than normal harvested goods and much less than crafted value-added goods such as fruit juice
-- solar income should reward a well-maintained support base, but it should never outcompete the main plant, contract, and crafting economy
+- solar income should reward a well-maintained support base, but it should never outcompete the main plant, task, and crafting economy
 
 ### Device Roster
 
@@ -2160,13 +2160,13 @@ This makes restoration feel earned rather than decorative.
 
 As sites become stable, their plant systems contribute to nearby `Site`s through reduced hazard intensity, cleaner starting land conditions, and stronger starting support pockets. This is the main expression of the game's regional restoration fantasy.
 
-## 12. Economy, Contracts, And Progression
+## 12. Economy, Task Board, And Progression
 
 ### Contract Board
 
-The `Contract Board` is the main in-session progression driver. It is available only while the player is inside an active `Site` session, and it tracks that site's government-backed contracts plus the current site's active `Site Task` pool. It should not be used from the `Regional Map` when the player is still deciding where to deploy next.
+The `Contract Board` is the main in-session progression driver. It is available only while the player is inside an active `Site` session, and it tracks the current site's active faction-published `Site Task` pool. It should not be used from the `Regional Map` when the player is still deciding where to deploy next.
 
-Every contract and every `Site Task` should be published by one of three government-backed factions operating inside the same restoration program. The publishing faction must be visible on the board because it affects more than flavor: it changes reputation gain, assistant availability, random-event pools, and which long-term tech branches become easier to pursue.
+Every `Site Task` should be published by one of three government-backed factions operating inside the same restoration program. The publishing faction must be visible on the board because it affects more than flavor: it changes reputation gain, assistant availability, random-event pools, and which long-term tech branches become easier to pursue.
 
 | Faction | Board identity | Strategic pressure | Assistant |
 |---|---|---|---|
@@ -2212,7 +2212,7 @@ Normal task bias:
 - camp support
 - route clearing
 - fast delivery
-- emergency labor contracts
+- emergency labor tasks
 
 Assistant:
 
@@ -2335,7 +2335,7 @@ Normal task bias:
 - calibration
 - device optimization
 - forecast-driven sustain jobs
-- high-precision experiment contracts
+- high-precision experiment tasks
 
 Assistant:
 
@@ -2389,15 +2389,15 @@ Weakness / tradeoff direction:
 - usually asks for more setup and knowledge before the reward is felt
 - can feel weaker than the other factions if the player is still barely surviving
 
-Contract goals mostly fall into three categories:
+`Site Task` goals mostly fall into three categories:
 
 - Restore: establish target plant cover, reduce erosion, or stabilize designated tiles.
 - Sustain: keep a site viable for a period under weather pressure.
 - Deliver: provide requested ecological output, plant stock, or site performance results.
 
-Contracts can include optional bonus objectives for extra funding or special rewards.
+`Site Task`s can include optional bonus objectives for extra funding or special rewards.
 
-Each contract can reward money, `Reputation`, `Faction Reputation`, or a mix of these. This allows jobs to pull the player toward different priorities: short-term site survival, aggressive local scaling, or long-term faction progression.
+Each `Site Task` can reward money, `Reputation`, `Faction Reputation`, or a mix of these. This allows jobs to pull the player toward different priorities: short-term site survival, aggressive local scaling, or long-term faction progression.
 
 The `Contract Board` should be one of the main replayability engines. Variation should come from:
 
@@ -2408,11 +2408,11 @@ The `Contract Board` should be one of the main replayability engines. Variation 
 - Optional objectives that reward aggressive or cautious play
 - Reward packages that support different strategies
 - Variable payback values so the best short-term money choice is not always the best long-term ecological or faction-alignment choice
-- Different mixes of cash payout, fixed `Reputation`, and fixed `Faction Reputation` across contracts
+- Different mixes of cash payout, fixed `Reputation`, and fixed `Faction Reputation` across tasks
 
 The intent is to create the same kind of run-to-run strategic divergence seen in strong sandbox strategy games: the player adapts to the board they get instead of repeating one solved build order every campaign.
 
-Contracts are the medium and long-form structure of a site or campaign. They should not be the only source of momentum. The faster short-term layer should come from the combination of `Site Task`s, `Site Unlockables`, and `Run Modifier`s.
+The task board is the main structured motivation layer of a site run. It should not be the only source of momentum. The faster short-term layer should come from the combination of `Site Task`s, `Site Unlockables`, and `Run Modifier`s.
 
 ### Site Tasks
 
@@ -2434,7 +2434,7 @@ Key rules:
 - The first faction board opened by onboarding should use a `Tutorial Task Set`
 - While a `Tutorial Task Set` is active, the board should not expire or refresh normally; it should stay stable until the player has completed all required basic task types in that set
 - Every `Site Task` should show its publishing `Faction`
-- Tasks should refresh based on terrain, weather, weak zones, current plants, available tech, and open contracts
+- Tasks should refresh based on terrain, weather, weak zones, current plants, available tech, and currently accepted tasks
 - The player must explicitly accept a task to commit one of their acceptance slots
 - Accepted tasks move into an active list and do not rotate out on refresh
 - Unaccepted tasks remain on the board and may rotate out when the pool refreshes
@@ -2562,7 +2562,7 @@ All money-related actions are performed through the `Field Phone`. This keeps th
 
 The main economic inputs are:
 
-- Government contract rewards
+- `Site Task` rewards
 - Field output from stable plants
 - Selling approved goods through the `Field Phone`
 - Selling surplus electricity through the `Field Phone` after local utility demand is already covered
@@ -2576,7 +2576,7 @@ The main economic outputs are:
 - Purchasing seeds, parts, or specialized tools
 - Purchasing revealed `Site Unlockables` on the current site
 
-Contract rewards should vary enough to change decision-making between runs. Some campaigns should tempt the player with better short-term cash, while others reward plant progression, utility access, or safer expansion. Payback randomness should reshape priorities, not invalidate planning.
+Task rewards should vary enough to change decision-making between runs. Some campaigns should tempt the player with better short-term cash, while others reward plant progression, utility access, or safer expansion. Payback randomness should reshape priorities, not invalidate planning.
 
 Sell-value hierarchy:
 
@@ -2586,7 +2586,7 @@ Sell-value hierarchy:
 
 Money is the short-term tactical currency. It is primarily for surviving and scaling the current `Site`. If the player spends money on a revealed `Site Unlockable` or on a premium direct-purchase unlockable, that money is not available for water, labor, or emergency recovery on the same site.
 
-`Site Task`s should always grant guaranteed publisher `Faction Reputation` on completion, with the amount scaling by task tier or level, then offer some mix of `Site Unlockables`, `Run Modifier`s, money, or resources through deliberate `Task Reward Draft` choice. Not every draft needs to surface an unlockable. Their main job is still to create momentum, reveal fitting local options, and point the player toward useful next actions. Direct cash should come mainly from contracts, selling output, and other larger economic flows.
+`Site Task`s should always grant guaranteed publisher `Faction Reputation` on completion, with the amount scaling by task tier or level, then offer some mix of `Site Unlockables`, `Run Modifier`s, money, or resources through deliberate `Task Reward Draft` choice. Not every draft needs to surface an unlockable. Their main job is still to create momentum, reveal fitting local options, and point the player toward useful next actions. Direct cash should come mainly from tasks, selling output, and other larger economic flows.
 
 ### Site Unlock And Modifier Loop
 
@@ -2656,13 +2656,13 @@ Recommended short-term reward sources:
 - Temporary discounts or purchase windows for site unlocks
 - Immediate morale or safety improvement when a plant cluster becomes functional
 
-The design goal is for the player to almost always have one obvious next step that feels achievable and worthwhile. As long as the current `Site` is not fully restored, the game should keep generating fresh small targets from the site's current state, forecast, contracts, and ecology thresholds.
+The design goal is for the player to almost always have one obvious next step that feels achievable and worthwhile. As long as the current `Site` is not fully restored, the game should keep generating fresh small targets from the site's current state, forecast, task pool, and ecology thresholds.
 
 The task-pool refresh should also create anticipation between completions. Even if the player is not ready for the hardest current task, they should feel some excitement about checking the next refresh in case a valuable high-tier opportunity appears. The emotional pressure should come from wanting to free acceptance slots and improve the board, not from fearing arbitrary expiration on already-accepted work.
 
 ### Cognitive Load Guardrails
 
-This game has many overlapping systems: tasks, chains, reward drafts, unlockables, survival meters, weather, economy, modifiers, contracts, and regional progression. That depth is a strength only if the player can parse the current decision space quickly.
+This game has many overlapping systems: tasks, chains, reward drafts, unlockables, survival meters, weather, economy, modifiers, and regional progression. That depth is a strength only if the player can parse the current decision space quickly.
 
 Core cognitive-load rules:
 
@@ -2697,7 +2697,7 @@ To support this cadence, larger goals should have milestone support, but the gam
 
 Useful milestone layers:
 
-- Contract milestone rewards: each major contract should have 2 to 4 small sub-objectives with immediate payouts
+- Phase milestone rewards: each major site phase should have 2 to 4 small sub-objectives with immediate payouts
 - `Site Task` completion rewards: the primary 5 to 10 minute target-and-reward layer, centered on revealing a `Task Reward Draft` and choosing `1` unlock, modifier, or resource reward rather than just taking raw cash
 - Zone restoration thresholds: when a local area crosses a restoration threshold, it grants a burst reward
 - Daily field goals: each morning can surface a few lightweight optional objectives tied to current weather and site state
@@ -2715,7 +2715,7 @@ Recommended site phases:
 - Emergency foothold: secure water, shelter, and a first safe work zone
 - Defensive setup: establish windbreaks, erosion control, and enough resilience to survive bad weather
 - Functional recovery: create stable plant clusters, basic output, and more reliable camp operations
-- Expansion and optimization: connect restored zones, improve efficiency, and pursue higher-value contracts
+- Expansion and optimization: connect restored zones, improve efficiency, and pursue higher-value tasks
 - Restoration certification: reach the site's `Fully Grown Tile` threshold needed for the site to count as completed
 
 Each phase should introduce new small targets that fit the current condition of the `Site`, so progress feels like a sequence of satisfying local wins rather than one long flat grind.
@@ -2750,13 +2750,13 @@ To make the game more compelling without feeling manipulative, these systems wou
 `Reputation` is separate from money. In the current faction model, campaign trust now has two linked layers:
 
 - `Reputation`: total campaign standing with the restoration program, earned progressively from official work and never spent
-- `Faction Reputation`: cumulative standing with each individual `Faction`, earned mainly from that faction's contracts, `Site Task`s, faction events, and aligned follow-through
+- `Faction Reputation`: cumulative standing with each individual `Faction`, earned mainly from that faction's `Site Task`s, faction events, and aligned follow-through
 
 `Reputation` should function as thresholded trust, not consumable currency. Reaching a threshold unlocks access to new tech levels and support tiers; choosing a tech node does not reduce current reputation. `Faction Reputation` should behave the same way inside each branch.
 
 For clarity, `Faction Reputation` from `Site Task`s should usually be a guaranteed completion payout tied to the task's publisher, with the amount scaling by task tier or level, while the post-task draft should stay focused on immediate tactical rewards.
 
-This keeps campaign progression distinct from site survival, preserves the satisfaction of steady institutional growth, and turns contract choice into a strategic identity decision rather than only a payout decision.
+This keeps campaign progression distinct from site survival, preserves the satisfaction of steady institutional growth, and turns task choice into a strategic identity decision rather than only a payout decision.
 
 ### Loadout
 
@@ -3080,10 +3080,10 @@ High replay value depends on making progression choices meaningfully different a
 - Different regional expansion orders
 - Different plant-focused versus infrastructure-focused runs
 - Different faction allegiances, assistant timings, and harsh-event relief profiles
-- Different risk tolerance based on contract offers and weather patterns
+- Different risk tolerance based on task-board offers and weather patterns
 - Different support-network shapes based on which sites stabilize first
 - Different `Site Unlockable` draws, modifier combinations, and site-specific upgrade paths
-- Different cash-versus-trust contract economies across runs
+- Different cash-versus-trust task economies across runs
 
 ### Persistent Tech Tree
 
@@ -3093,7 +3093,7 @@ In the current faction model, this layer is split into three named branches unde
 
 | Faction | Strategic identity | Assistant | Example branch themes |
 |---|---|---|---|
-| `Village Committee` | Tempo, labor flexibility, emergency cleanup, contract throughput | `Workforce Support` | extra contractor capacity, faster repairs, lower hauling friction, deadline forgiveness, stronger chain completion |
+| `Village Committee` | Tempo, labor flexibility, emergency cleanup, task throughput | `Workforce Support` | extra contractor capacity, faster repairs, lower hauling friction, deadline forgiveness, stronger chain completion |
 | `Forestry Bureau of Autonomous Region` | Ecological resilience, conservative expansion, harsh-event endurance | `Plant-Water Support` | stronger seedling survival, irrigation efficiency, erosion control, density protection, post-event replanting |
 | `Autonomous Region Agricultural University` | Precision, research, forecasting, device-led optimization | `Device Upgrade Support` | precision irrigation, solar-shade support, checkerboard mechanization, better sensors, stronger device efficiency |
 
@@ -3825,7 +3825,7 @@ After a severe hazard event, the player should usually have more than one urgent
 
 ### Economy Viability
 
-Contracts, phone-based buying and selling, water purchases, solar-backed support, optional `Site Unlockable` purchases, field output, and contractors create a working economy without combat or fuel systems.
+`Site Task`s, phone-based buying and selling, water purchases, solar-backed support, optional `Site Unlockable` purchases, field output, and contractors create a working economy without combat or fuel systems.
 
 ### Short-Term Reward Check
 
@@ -3875,7 +3875,7 @@ That regional progress should also be visible directly on the `Regional Map`. A 
 
 ### Replayability Check
 
-Multiple fresh campaigns produce noticeably different strategic stories because of changes in `Regional Map` layout, generated site terrain, weather patterns, faction mixes, contract offers, event timing, reward structures, and tech path incentives.
+Multiple fresh campaigns produce noticeably different strategic stories because of changes in `Regional Map` layout, generated site terrain, weather patterns, faction mixes, task-board offers, event timing, reward structures, and tech path incentives.
 
 ### Tech Divergence Check
 
@@ -3907,7 +3907,7 @@ Leaving, failing, or restarting a site should reset its site unlock pool, clear 
 - Plants must not become fire-and-forget timers. Validate that harsh conditions, degeneration, and recovery decisions create strategy every few minutes of site play.
 - Validate harsh-event work pressure early. Extreme weather should include risky, limited, hands-on burial clearing, repair, or rescue work so the player feels they fought back and saved something tangible.
 - Validate partial degradation, not only full destruction. Reduced `Plant Density`, damaged supplies, weakened output, and worsened `Player Condition` should create the current build's most interesting comeback decisions.
-- Treat replayability as a core production requirement, not post-launch polish. Procedural map generation, contract variety, event variety, and meaningful tech branching should be validated in early milestones.
+- Treat replayability as a core production requirement, not post-launch polish. Procedural map generation, task-board variety, event variety, and meaningful tech branching should be validated in early milestones.
 - Validate the dual-layer progression structure early. The `Persistent Tech Tree` must feel campaign-defining, while site unlocks and modifiers must feel fresh on each site without overwhelming the player.
 - Validate generated `Site Task`s early. The 5 to 10 minute task loop should feel practical, varied, and tightly connected to reward-draft reveal, local unlock purchasing, modifier pivots, and restoration progress.
 - Validate task-tier excitement early. High-tier task spawn rates, readability, and reward strength should be tuned so jackpot appearances feel rare and thrilling rather than noisy or disappointing.
