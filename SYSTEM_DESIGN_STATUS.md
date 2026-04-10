@@ -1,20 +1,33 @@
 # System Design Status
 
-Source: [GDD.md](d:/testgame/gs1_upstream/GDD.md)
+Sources:
 
-Purpose: summarize what the current GDD already defines well enough for the next system-design stage, and identify the remaining missing design contracts before we move into code modules, data structures, and game-structure planning.
+- [GDD.md](d:/testgame/gs1_upstream/GDD.md)
+- [GAME_STRUCTURE.md](d:/testgame/gs1_upstream/GAME_STRUCTURE.md)
+
+Purpose: summarize what the current design documents already define well enough for the next system-design stage, and identify the remaining missing design contracts before we move into detailed code modules, data structures, and implementation ownership.
+
+Boundary rule:
+
+- `GDD.md` should stay at gameplay-contract, content-direction, and meter-relationship level.
+- `GAME_STRUCTURE.md` defines the global code framework, ECS world model, command/event pipeline, world-level engine commands, and engine-adapter boundary.
+- Exact structs, field lists, save schemas, and module ownership belong in the later system-design documents.
 
 ## Overall Verdict
 
 - Prototype path: ready to move into system design.
 - Full-campaign path: not fully ready yet.
-- Current strength: the core site loop is already coherent across survival, hazards, planting, devices, tasks, faction reputation, and small tech growth.
-- Current risk: the campaign meta layer and task-generation layer still have missing formal contracts that can cause churn if we jump into large-scale architecture too early.
+- Current strength: the core site loop is already coherent across survival, hazards, planting, devices, tasks, faction reputation, and small tech growth, while the global ECS/command architecture is now explicitly defined.
+- Current risk: the final content-authoring contract is still missing, and save/load remains an intentional later TODO. If we pretend those are already locked, detailed implementation can still churn.
 
 ## What Is Already Stable Enough
 
 These areas are defined strongly enough to start module design and runtime-structure planning now:
 
+- Global world-first ECS architecture
+- Command/event-driven cross-system communication
+- World-level engine-command boundary and engine-adapter boundary
+- Shared schema layering direction from global to feature to game-specific data
 - Core gameplay loop and site loop
 - Fixed-step simulation contract and high-level update order
 - Tile model, occupancy model, tile layers, placement, and sharing rules
@@ -23,77 +36,55 @@ These areas are defined strongly enough to start module design and runtime-struc
 - Worker condition model
 - Player base, containers, water handling, and contractor direction
 - Data-driven item model with runtime item meters
-- Small device roster and device runtime contract
+- Small device roster and device behavior contract
 - Plant roster direction, density model, growth pressure, spread, salinity, and straw checkerboard behavior
-- Contract-board concept, faction publishing, reward-draft direction, chain-task direction, and accepted-task-cap concept
+- Contract-board concept, prototype task model, faction publishing, reward-draft direction, chain-task direction, and accepted-task-cap concept
 - Faction identities, assistants, onboarding order, and prototype four-site arc
-- Data-driven faction-technology model with shared node schema and per-unlockable update families
+- Data-driven faction-technology model with shared node model and per-unlockable update families
 - Meter-relationship chapter as the current implementation-facing causal reference
 
 These areas are good enough that the next step can define code ownership, runtime structs, content-definition tables, and service boundaries without waiting for more game-loop design.
 
 ## What Is Defined But Still Needs One More Contract Pass
 
-These systems are conceptually solid, but still need one tighter design pass before their final runtime schema should be frozen:
-
-- `Site Task` runtime schema
-- exact task refresh timing
-- exact task completion detection rules
-- exact reward-draft generation rules
-- anti-duplication and anti-dead-roll rules for reward drafts
-- exact `Task Chain` generation and continuation rules
-- site certification and completion thresholds
-- exact `Loadout` assembly contract
-- exact regional-support accrual timing
-- exact regional-support export timing
-- exact `Regional Support Output` numeric contract
-- exact `Site Output Modifier` generation and stacking contract
-- failure trigger and restart-recovery contract
-- off-screen site simulation contract
-- economy numeric contract for prices, payouts, contractor costs, and direct-purchase costs
-
-These are not vague ideas anymore, but they are still not tight enough to lock final schemas without risking redesign.
+No remaining prototype-critical gameplay contract is still in this state. The remaining gap is now mainly the content-authoring contract layered on top of the already-defined global framework, while save/load stays intentionally deferred.
 
 ## What Is Still Missing As Formal Design
 
 These areas are the main missing formal sections if we want a safe full-game architecture:
 
-- save-data boundaries
-- persistence ownership by system
-- explicit off-screen simulation formulas
-- explicit failure and restart formulas
-- full campaign-map progression contract beyond the prototype slice
-- final authored-versus-procedural site-content boundary
+- save-data boundaries as a later save/load TODO
 - explicit authoring contract for task templates, event templates, and reward-draft templates
 
 ## Practical Readiness By System
 
 | Area | Status | Why |
 |---|---|---|
+| Global framework and engine boundary | `Ready` | `GAME_STRUCTURE.md` now defines the ECS-world-first architecture, command/event flow, world-level engine commands, and engine-adapter responsibilities. |
 | Site runtime simulation | `Ready` | Update order, meters, causal loop, and tile/runtime state categories are already defined. |
 | Terrain and ecology runtime | `Ready` | Terrain, plant, weather, device, and meter relationships are clear enough for module and struct design. |
-| Inventory and item runtime | `Ready` | Shared item schema, item meters, storage flow, and hazard interaction are already explicit. |
-| Device runtime | `Ready` | Device roster is small and the runtime contract is defined well enough for data tables and instance state. |
-| Faction reputation and tech | `Ready` | Branch identity, node schema, progression meters, and content-update model are already strong enough for persistent-state design. |
-| Contract board runtime | `Yellow` | Strong direction exists, but final task-instance schema and generation rules still need one more contract pass. |
-| Economy runtime | `Yellow` | Economic flow is clear, but numeric tables and exact pricing contracts are still missing. |
-| Campaign meta and nearby-site support | `Yellow/Red` | Good direction exists, but loadout assembly, regional-output timing, and support formulas are not yet formal enough. |
-| Failure, retry, and save systems | `Red` | Still missing formal persistence and restart boundaries. |
-| Off-screen simulation | `Red` | High-level intent exists, but not enough contract detail for safe implementation. |
+| Inventory and item runtime | `Ready` | Shared item model, item meters, storage flow, and hazard interaction are already explicit. |
+| Device runtime | `Ready` | Device roster is small and the behavior contract is defined well enough for data tables and instance state. |
+| Faction reputation and tech | `Ready` | Branch identity, node model, progression meters, and content-update model are already strong enough for persistent-state design. |
+| Contract board runtime | `Ready` | Prototype task data shape, completion, reward-generation, and chain rules are now defined strongly enough for system design. |
+| Economy runtime | `Ready` | Economic flow, buy/sell directions, and relative value hierarchy are clear enough for system design; exact prices stay as later tuning tables. |
+| Campaign meta and nearby-site support | `Ready` | Reveal rules, static adjacency, route choice, campaign-time behavior, authored support packages, export timing, and the single-site-output-modifier rule are now defined strongly enough for system design. |
+| Failure, retry, and save systems | `Ready for prototype` | Failure and retry rules are defined strongly enough for the current prototype path. Save/load remains a later TODO rather than an active blocker for now. |
+| Off-screen simulation | `Ready` | Prototype scope only resolves completed-site exported-support catch-up when the `Regional Map` opens; broader future off-screen simulation stays deferred. |
 
 ## What The Next System-Design Stage Can Safely Produce Now
 
 The next stage can already define these artifacts:
 
-- runtime module boundaries
+- gameplay module boundaries inside the ECS world
 - content-definition tables
 - persistent-state boundaries for systems that are already stable
 - site-session runtime state structs
 - tile and occupancy data structures
 - plant, device, item, recipe, task, and tech definition schemas
 - modifier-bundle representation
-- simulation service boundaries
-- event/update pipeline ownership
+- simulation service boundaries inside the world layer
+- game-specific command/event contracts within the global command pipeline
 
 The next stage should not wait for exact balance numbers. It should instead define the structural contract for how those numbers are stored and applied.
 
@@ -117,9 +108,13 @@ Suggested first-pass code-module split:
 - `TaskBoardModule`
 - `ModifierModule`
 - `FailureRecoveryModule`
-- `SaveLoadModule`
+- `SaveLoadModule` later, when save/load enters scope
 
 The names can change later. The important point is that these ownership lines are now visible in the design.
+
+When the next system-design pass assigns concrete game-state ownership, use this module split as the reference layout. One module may contain multiple closely related systems, but authority should still map back to one owning module rather than being duplicated across several systems.
+
+These gameplay modules should live inside the world-first ECS architecture defined in [GAME_STRUCTURE.md](d:/testgame/gs1_upstream/GAME_STRUCTURE.md). Cross-module interaction should follow command/event flow and shared state access rules rather than direct system-to-system calls.
 
 ## Recommended Core Data Definitions
 
@@ -146,6 +141,8 @@ The next stage should formalize these data definitions first:
 - `WeatherState`
 - `EventState`
 
+These should be treated as game-specific schemas layered on top of the more global schema split already established in [GAME_STRUCTURE.md](d:/testgame/gs1_upstream/GAME_STRUCTURE.md).
+
 ## Recommended First System-Design Order
 
 If the goal is prototype-first implementation, use this order:
@@ -154,10 +151,10 @@ If the goal is prototype-first implementation, use this order:
 2. Tile, plant, weather, and device data structures
 3. Item, inventory, water-transfer, and crafting data structures
 4. Task-board runtime schema and reward-draft schema
-5. Faction reputation and technology persistence schema
-6. Prototype site-flow state machine across the four authored sites
-7. Failure/restart/save boundaries for the prototype path
-8. Regional-support and off-screen systems only after the prototype path is proven
+5. Content-authoring contract for task templates, event templates, and reward-draft templates
+6. Faction reputation and technology persistence schema
+7. Prototype site-flow state machine across the four authored sites
+8. Longer-term regional-support expansion and save/load boundaries only after the prototype path is proven and save/load enters scope
 
 This order follows the current GDD maturity level and avoids overcommitting to campaign-meta systems before the site loop is playable.
 
@@ -165,23 +162,18 @@ This order follows the current GDD maturity level and avoids overcommitting to c
 
 If we want to move beyond prototype-scoped system design into full-game architecture, the next required design documents should be:
 
-- `TASK_RUNTIME_CONTRACT.md`
-- `TASK_GENERATION_AND_REWARD_CONTRACT.md`
-- `LOADOUT_AND_REGIONAL_SUPPORT_CONTRACT.md`
-- `SITE_COMPLETION_AND_CERTIFICATION_CONTRACT.md`
-- `FAILURE_RESTART_AND_SAVE_CONTRACT.md`
-- `OFFSCREEN_SIMULATION_CONTRACT.md`
-- `ECONOMY_NUMERIC_CONTRACT.md`
+- `CONTENT_AUTHORING_CONTRACT.md`
+- `SAVE_BOUNDARIES_CONTRACT.md` later, when save/load enters scope
 
-These do not need final balance. They do need exact field ownership, event timing, and persistence rules.
+These do not need final balance. They do need exact field schemas, generation rules, and later save boundaries when save/load work actually begins.
 
 ## Prototype-Specific Guidance
 
 Because the current target is still the minimum playable prototype, several missing full-game contracts do not need to block the next system-design stage immediately:
 
 - procedural regional-map generation can stay deferred
-- broad off-screen site simulation can stay deferred
-- full save schema can be minimal at first
+- broad off-screen site simulation can stay deferred beyond the prototype catch-up rule
+- full save design can stay deferred for the prototype, but the save-boundary chapter should remain in the backlog because it is still necessary before longer-form architecture is finalized
 - broad economy simulation can stay deferred
 - full regional-support formulas can be stubbed or replaced by authored prototype progression
 
@@ -193,7 +185,8 @@ So the correct reading of the current GDD is:
 ## Final Recommendation
 
 - Proceed now into prototype-focused system design.
-- Freeze runtime ownership for site simulation, ecology, items, devices, tasks, reputation, and technology first.
-- Do one more contract pass on tasks, campaign meta, restart/save, and off-screen logic before committing to final full-game architecture.
+- Keep [GAME_STRUCTURE.md](d:/testgame/gs1_upstream/GAME_STRUCTURE.md) as the global framework contract.
+- Freeze gameplay ownership for site simulation, ecology, items, devices, tasks, reputation, and technology inside that framework first.
+- Do the content-authoring contract pass next, and leave save/load boundaries as an explicit later TODO before committing to final full-game architecture.
 
 That is the cleanest next step from the current GDD state.

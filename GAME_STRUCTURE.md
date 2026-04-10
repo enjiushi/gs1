@@ -1,0 +1,727 @@
+# ECS World Command Architecture Framework (Engine-Independent)
+
+## 1. Overview
+
+This framework defines a world-simulation-first ECS architecture where:
+
+- the ECS world is the single source of truth
+- systems communicate via commands, plus translated feedback events when execution re-enters gameplay
+- the engine is only a rendering and execution adapter
+- the game remains portable across engines
+- gameplay logic stays decoupled from rendering and platform code
+
+The system is designed for:
+
+- engine independence such as Unreal, Godot, custom runtime, or CLI mock
+- multiplayer server authority
+- AI-generated gameplay modules
+- long-term reusable ECS systems
+
+---
+
+## 2. Core Philosophy
+
+### 2.1 World-First Simulation
+
+The ECS world fully defines gameplay state.
+
+> The engine never decides gameplay outcomes.
+
+---
+
+### 2.2 Command-Driven Communication
+
+All cross-system interaction is done through:
+
+- commands for intents, actions, and cross-ownership requests
+- translated feedback events for execution observations that re-enter from the engine adapter
+
+No direct system-to-system calls are allowed.
+
+---
+
+### 2.3 Engine Is A Passive Executor
+
+Engine responsibilities:
+
+- rendering
+- physics execution when needed
+- audio and VFX playback
+- input capture
+- reporting execution-side feedback events such as physics callbacks when needed
+
+The engine does not contain gameplay logic.
+
+Execution-side callbacks are observations, not authority.
+
+They only matter to gameplay after they are translated back into world language and accepted by world systems.
+
+---
+
+### 2.4 Engine Commands Stay In World Abstraction
+
+The world may emit engine commands that are meant for engine execution, but those commands must still remain in the world's abstraction layer.
+
+The world should emit commands like:
+
+- an entity moved from `x` to `y`
+- an attack was resolved
+- an entity appeared or was removed
+
+The world should not emit commands like:
+
+- spawn this particle effect
+- play this engine animation asset
+- create this engine actor type
+
+---
+
+## 3. Architecture Pipeline
+
+```mermaid
+flowchart LR
+    subgraph ENGINE[Engine Layer]
+        A[Input Sources<br/>Engine Input / AI / Network]
+        B[Adapter Input Intake To Core InputState]
+        C[Engine Pre-Physics Update]
+        G[Engine Command Flush Phase 1]
+        H[Engine Physics Tick]
+        I[Adapter Translates Engine Feedback]
+        J[Engine Post-Physics Update]
+        N[Engine Command Flush Phase 2]
+        P[Render / Audio Presentation]
+    end
+
+    subgraph GAME[Game Layer]
+        D[Core Gameplay Phase 1 Entry]
+        E[ECS Tick<br/>Systems + Components]
+        F[Internal Command Flush Phase 1]
+        K[Core Gameplay Phase 2 Entry]
+        L[Translated Feedback Handling Phase]
+        M[Internal Command Flush Phase 2]
+        O[End Of Frame / Updated World State]
+    end
+
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F --> G
+    G --> H
+    H --> I
+    I --> J
+    J --> K
+    K --> L
+    L --> M
+    M --> N
+    N --> P
+    P --> O
+```
+
+Notes:
+
+- the ECS world is the gameplay authority
+- the world command stream is just the internal command flow being flushed and handled
+- engine pre-physics update is where the engine enters core gameplay phase 1
+- core gameplay phase 1 happens before engine-layer physics tick
+- engine post-physics update is where the engine enters core gameplay phase 2
+- core gameplay phase 2 happens after engine-layer physics tick
+- engine commands still belong to the world abstraction layer
+- the engine adapter translates those engine commands into actual engine actions
+- execution-side feedback can return from the engine during physics or other execution, but it must re-enter the world only through translated world-level feedback events
+- execution-side feedback is observational only; it does not decide outcomes by itself, and world systems may accept it, reinterpret it, or ignore it
+- input sources should first be translated by the engine adapter into shared core `InputState` before ECS systems consume them during tick
+- phase 1 may accumulate engine commands that are flushed before engine-layer physics tick
+- translated engine feedback seeds phase-2 world processing
+- phase 2 may also accumulate engine commands, but phase-2 engine flush is terminal for the frame
+- no same-frame gameplay feedback loop continues after phase-2 engine flush
+
+### 3.1 Input Intake Contract
+
+The architecture uses one shared input boundary before gameplay tick.
+
+Rules:
+
+- the engine adapter owns conversion from engine input, AI decisions, network packets, or other runtime input sources into shared `InputState`
+- all `InputState` layout belongs to core schema because it is intended to be shared across games
+- input intake happens before gameplay tick
+- ECS systems should consume shared `InputState`, not engine-native input objects
+- alternate input sources such as replay, recording playback, AI, or multiplayer synchronization should enter through the same adapter-owned input-intake path and produce the same core `InputState`
+
+Clarification:
+
+- in this document, `input intake` means the adapter translates source-specific input data into the shared core `InputState`
+- it does not mean gameplay-specific intent generation
+- gameplay systems later decide how to react to `InputState` during tick
+
+---
+
+## 4. Data Model Design
+
+### 4.1 Core Schema (Global Shared)
+
+Examples of what may belong to core schema:
+
+- `EntityID`
+- `InputState`
+- world queue-entry header and queue envelope rules
+- basic metadata
+- `CommandHeader` for type routing and system ownership
+
+Rules:
+
+- engine independent
+- never game-specific
+- never includes gameplay logic
+- may include cross-game shared runtime state such as shared `InputState` that both feature systems and game systems can read
+- may define the transport-level queue envelope and payload-block rules used by command and feedback-event queues across all games
+- should contain only data that is truly architecture-wide or broadly shared across many games and features
+
+Ownership rule for schemas, components, resources, and queue-entry layouts:
+
+- a data layout should live in the lowest layer that truly owns its meaning and reuse scope
+- core owns architecture-wide data and transport contracts
+- reusable features own reusable gameplay-domain data
+- the game layer owns project-specific composition data
+- a commonly used concept such as position or transform is not automatically core just because many games use it; it belongs in core only if this architecture truly wants it as a universal shared contract
+
+---
+
+### 4.2 Feature Schemas (Reusable Modules)
+
+Reusable gameplay concepts.
+
+Examples:
+
+- `MoveIntent`
+- `ApplyDamage`
+- `ShootCommand`
+- `SpawnIntent`
+- `TranslatedHitContact`
+
+Rules:
+
+- shared across multiple games when applicable
+- no system coupling allowed
+- only define data contracts
+- a feature module should primarily depend on schemas it defines itself plus upper core schemas
+- a feature module should separate its public schema from its private internal schema
+- a feature module must not require direct schema access to a peer feature module's private schema
+- a feature module may intentionally depend on a peer feature module's public schema when that public contract is part of the integration design
+- ordinary reusable cross-feature gameplay interaction should happen through public feature commands
+- game-specific integration commands/shared state belong to the game layer and should be translated there into reusable feature public contracts when needed
+- events are mainly reserved for translated execution feedback that re-enters from the engine-adapter side
+- feature modules may define their own command payload meanings, while still using the shared core queue envelope
+
+Public feature schema may include:
+
+- feature-owned public components or resources that are specific to that feature rather than universally shared core data
+- feature-owned public command layouts
+- feature-owned queue-entry ids that other modules are allowed to consume through that feature's public contract
+
+Private feature schema may include:
+
+- feature-private internal components
+- feature-private internal commands
+- implementation-only layouts that should not be depended on outside that feature
+
+---
+
+### 4.3 Game-Specific Schemas
+
+These:
+
+- are used only in one game
+- extend feature schemas when needed
+- contain gameplay-specific rules and data
+- may define game-specific command and event payload meanings on top of the same shared queue transport
+- may define integration contracts when multiple reusable features need to cooperate only in this specific game
+
+---
+
+## 5. System Design
+
+Each system:
+
+- processes ECS entities with matching components
+- reads and writes world state
+- emits commands and may consume translated feedback events during normal phase handling
+- never directly calls other systems
+
+Example systems:
+
+- `MovementSystem`
+- `WeaponSystem`
+- `ProjectileSystem`
+- `CombatSystem`
+- `AISystem`
+
+Rule:
+
+> Systems depend only on schemas, not on other systems.
+
+Input rule:
+
+- systems may read shared `InputState` during tick
+- if a system owns the relevant ECS data, it may react by writing that owned data directly
+- if reacting to input requires another ownership domain to change, the system should emit commands instead of mutating non-owned state directly
+
+### 5.1 Direct Write Ownership
+
+Each system must have an explicit ECS ownership boundary.
+
+That ownership boundary defines:
+
+- which components, resources, or state blocks the system may write directly
+- which components, resources, or state blocks the system may only read
+- which cross-domain effects must be emitted as commands instead of direct writes
+
+Rules:
+
+- a system may write only the ECS data it owns
+- non-owned ECS data is read-only to that system
+- if a system needs another ownership domain to change, it must emit a command for the owning system or module to resolve
+- command flow is the mechanism for requesting changes in another ownership domain, not only for cosmetic signaling
+
+This prevents hidden coupling through arbitrary shared-state mutation.
+
+### 5.2 Feature-Module Access Boundary
+
+For a system that belongs to a reusable feature module:
+
+- it may access the schemas defined by that feature module
+- it may access upper core schemas
+- it must not directly depend on a peer feature module's private schema
+- it may intentionally depend on a peer feature module's public schema only when that dependency is part of an explicit integration contract
+
+If reusable features need to cooperate, they should do so through:
+
+- public feature schema owned by the feature exposing that contract
+- shared upper-level schemas when the meaning is truly architecture-wide
+- game-specific integration schema when the coupling exists only in this one game, with the game layer responsible for translating that meaning back into reusable feature public contracts if needed
+
+---
+
+## 6. Command System
+
+### 6.1 Command Types
+
+#### A. Internal Commands
+
+Used only inside ECS simulation.
+
+Examples:
+
+- `MoveResolved`
+- `ApplyDamage`
+- `AdjustFactionReputation`
+
+These are not exposed to the engine.
+
+Transport rule:
+
+- internal commands travel through the shared world queue-entry transport
+- the queue transport belongs to core architecture
+- the command meaning does not need to belong to core; feature modules and game-specific layers may define their own payload meaning
+
+---
+
+#### B. Engine Commands (Internal Command Subtype)
+
+These are still internal commands in the world layer, but they are the subset meant for the engine adapter to translate into actual engine actions.
+
+Examples:
+
+- `EntityMoved`
+- `AttackResolved`
+- `EntitySpawned`
+- `EntityRemoved`
+- `StateChanged`
+
+Rules:
+
+- must stay in world abstraction, not engine-native abstraction
+- contain no gameplay logic
+- represent world meaning, not rendering micro-steps
+- the engine adapter decides how to express them with actors, particles, sounds, animation, or physics hooks
+- they should travel through the same internal-command flush and handling flow as other internal commands
+
+---
+
+#### C. Engine Feedback Events
+
+These originate from engine-side execution, mostly from physics or collision callbacks, but they do not enter the world directly as engine-native data.
+
+They are execution observations, not authoritative gameplay outcomes.
+
+Examples:
+
+- physics contact callback
+- overlap begin or end
+- trace hit result
+- animation notify if used as execution feedback
+
+Rules:
+
+- engine feedback must first be captured by the engine adapter
+- the engine adapter must translate it into world-level feedback events before re-entering the ECS world
+- the engine adapter should resolve engine-native references such as actors, bodies, or colliders back into world identifiers before emitting translated feedback
+- translated feedback does not mutate gameplay state by itself; world systems decide whether it has gameplay meaning
+- no gameplay rule may depend directly on raw engine-native callback data
+
+### 6.1.1 Shared Queue Envelope Versus Payload Meaning
+
+The queue mechanism is shared across games, but the meaning of each command or event is layered.
+
+The design rule is:
+
+- core architecture owns the queue transport, entry header, routing metadata, and payload-block contract
+- reusable feature modules may define reusable command and event meanings
+- game-specific layers may define game-specific command and event meanings
+
+So the shared queue is cross-game, but the payload interpretation is not forced into core.
+
+Core should know:
+
+- how a queue entry is queued
+- how it is routed
+- how large the payload block may be
+- which phase and kind the queue entry belongs to
+
+Core should not need to know:
+
+- the gameplay-specific fields of a movement command
+- the gameplay-specific fields of a combat command
+- the gameplay-specific fields of a contract-board or site-session command
+
+This keeps the transport reusable while keeping gameplay meaning modular.
+
+Meaning-ownership rule:
+
+- core owns how queue-entry layouts are described, routed, and queued
+- a feature owns the public command layouts that describe requests against its own public state
+- a game-specific layer owns queue-entry layouts that exist only because this game composes features in a unique way
+
+So a queue-entry definition should live in the lowest layer that truly owns that meaning, not automatically in core.
+
+Data-driven-definition rule:
+
+- the queue transport does not require one host-language struct type per command or event kind
+- the shared queue may carry one generic world queue-entry packet plus an entry id and fixed payload block
+- entry ids are interpreted through shared layout definitions owned by core, feature, or game layers as appropriate
+- a system should decode only the queue-entry layouts its layer is allowed to know
+
+### 6.1.2 Public Command Contracts And Feedback Event Contracts
+
+Not every command contract should be globally visible.
+
+The design should distinguish:
+
+- private feature commands, used only inside one feature
+- public feature commands, intended as part of that feature's reusable contract
+- game-specific integration commands, intended only for this game's composition
+- translated execution-feedback event contracts, which re-enter from the engine-adapter side and are observational input rather than the normal cross-feature gameplay-integration mechanism
+
+This means:
+
+- another reusable feature may intentionally consume a feature's public command definition
+- the game layer may consume reusable feature public commands and game-specific integration commands
+- reusable feature modules should not need to know game-specific integration command layouts directly
+- if game-specific integration should affect a reusable feature, the game layer should translate that meaning into the feature's public command contract
+- translated feedback events should be consumed only by systems that need that execution observation
+- no module should depend on another feature's private command definition
+
+### 6.1.3 Command And Feedback Event Contract Ownership Rule
+
+When deciding where a command or feedback-event contract belongs, use the ownership of the meaning:
+
+- a command should usually belong to the feature that owns the state being requested to change
+- an execution-feedback event should belong to the translated engine-feedback contract that reports that observation back into gameplay
+- if the concept is broadly reusable across several features, it may belong to a separate shared reusable feature contract
+- if the coupling exists only in this one game, the contract should belong to game-specific integration schema
+
+Example direction:
+
+- if one feature wants health to change, it should prefer a health-facing public command layout rather than forcing health to understand the other feature's private attack layout
+- after health resolves that request, other gameplay systems should react through owned state, follow-up commands, or game-specific integration logic instead of assuming a public gameplay-event bus between features
+- the game layer should observe health through public health-facing result/state, not by reaching into attack-private data
+
+Concrete example:
+
+- engine feedback enters gameplay through a translated feedback event such as `TranslatedHitContact`
+- the attack feature validates whether that translated hit should become real gameplay damage
+- the attack feature emits a public health-facing command such as `ApplyDamage`
+- the health feature resolves the HP change inside owned health state
+- the health feature exposes the resolved damage through public health-facing result/state
+- the game layer reads that resolved health result/state, checks whether the target was a protected village asset, applies its own penalty rule, and emits `AdjustFactionReputation`
+- the `FactionReputation` feature resolves that command inside its own owned state
+- no peer feature needs a generic gameplay-event bus for this flow; commands plus owned/public state are enough
+
+This keeps ownership, write authority, and contract meaning aligned.
+
+### 6.1.4 Fixed Payload-Block Rule
+
+Each queued world queue entry should use a fixed-size inline payload block.
+
+The fixed payload block exists so that:
+
+- queue memory stays contiguous
+- pushing and popping queue entries stays allocation-free in the normal case
+- flushing remains cache-friendly
+- queue behavior stays predictable across all games
+
+Design consequences:
+
+- the payload block size is a shared transport limit, not a gameplay rule
+- small gameplay commands and translated feedback events should fit directly into that fixed block
+- if a logical queue entry would exceed the fixed block size, it should not force a different queue structure
+
+Oversized-entry rule:
+
+- the preferred solution is to send an identifier, handle, or reference to data already owned elsewhere in world state
+- if the logical queue entry is naturally a sequence or batch, it may be split into multiple queued entries and reconstructed by the handling logic
+- the queue contract should stay fixed-size even when some gameplay meanings need larger logical data
+
+---
+
+### 6.2 Command Flow
+
+```mermaid
+flowchart LR
+    A[Systems] --> B[InternalCommandQueue]
+    B --> C[Internal Command Flush Phase 1]
+    C --> D[EngineCommandQueue]
+    D --> E[Engine Command Flush Phase 1]
+    E --> F[Engine Feedback Events]
+    F --> G[Translated Feedback Handling Phase]
+    G --> H[InternalCommandQueue]
+    H --> I[Internal Command Flush Phase 2]
+    I --> J[EngineCommandQueue]
+    J --> K[Engine Command Flush Phase 2<br/>Terminal This Frame]
+```
+
+Interpretation:
+
+- systems emit either internal/gameplay commands or engine commands
+- there are two global runtime queues: `InternalCommandQueue` and `EngineCommandQueue`
+- internal/gameplay command flush always happens before engine command flush
+- internal/gameplay command flush drains `InternalCommandQueue` until it is empty
+- engine commands emitted while internal commands are being flushed are appended into `EngineCommandQueue`
+- engine command flush drains `EngineCommandQueue` only after the internal queue is stable
+- engine-side feedback has gameplay meaning only when the adapter emits translated world-level feedback events; otherwise the callback is ignored
+- phase 2 repeats the same queue order
+- the phase-2 engine command flush is terminal for the frame and does not create another same-frame gameplay feedback loop
+
+### 6.3 Command Queue Timing Contract
+
+The core queue behavior is now fixed. The main remaining open implementation note is the lack of a debug/safety guard for accidental infinite command cycles during drain-until-empty behavior.
+
+Locked rules:
+
+- `InternalCommandQueue` is drained strictly FIFO
+- `EngineCommandQueue` also uses FIFO append and drain behavior
+- any command emitted during a flush is appended to its matching queue and resolved later by normal queue order, never executed re-entrantly inside the current handler
+- phase-1 engine execution may emit translated world-level feedback events; those events are consumed by listening systems or the game layer during phase 2, and any follow-up commands they emit are appended into `InternalCommandQueue` for the phase-2 flush
+- phase-2 engine command flush does not emit same-frame gameplay feedback or reopen world processing
+- if a backend still produces callbacks during phase-2 engine command flush, the adapter may translate them into world-level feedback events, but those events must be buffered for the next frame
+- if the adapter does not emit a translated feedback event for a callback, that callback is ignored by gameplay
+
+Current queue rule:
+
+- there are exactly two global queues: `InternalCommandQueue` and `EngineCommandQueue`
+- command flush means internal/gameplay command flush unless otherwise stated
+- internal/gameplay command flush drains `InternalCommandQueue` strictly FIFO until empty
+- engine command flush happens only after internal/gameplay command flush becomes stable
+- phase 1 and phase 2 may both emit engine commands into the same global `EngineCommandQueue`
+- only the phase-1 engine command flush may feed into same-frame execution feedback and world re-entry; phase-2 engine command flush does not
+- phase-2 engine command flush is terminal for the frame
+
+Recommended first safety guard:
+
+- keep a per-flush processed-entry counter in debug builds
+- set a high temporary ceiling such as `10_000` processed queue entries for one flush
+- if that ceiling is exceeded, stop the flush, log the last handled queue-entry ids and types, and fail fast in debug/test builds
+- this is only a development safety net; it does not change normal FIFO behavior or become gameplay logic
+
+Validation note:
+
+- `validation purposes` here means optional debug-time checks that enforce architectural phase rules, not a separate gameplay system
+- example: if a future contract says some command family is illegal during adapter translation or illegal during a specific phase, debug validation can flag that immediately
+- if no such phase-specific bans are wanted yet, the contract should say that explicitly and keep validation limited to queue-shape invariants such as queue kind, phase ordering, and non-re-entrant execution
+
+This two-queue model is usually the safest default because it keeps command emission simple, avoids re-entrant execution, and preserves a readable frame structure.
+
+---
+
+## 7. Engine Adapter Layer
+
+Each engine adapter implements:
+
+- receiving world-level engine commands
+- translating those commands into engine actors, transforms, VFX, SFX, and animation
+- executing physics when needed
+- handling input handoff
+- capturing engine-side feedback events from execution
+- resolving engine-native references back into world identifiers when possible
+- translating those feedback events back into world-level feedback events
+
+Frame-side entry contract:
+
+- during engine pre-physics update, the engine should call the core gameplay phase-1 entry point
+- during engine physics tick, the adapter may collect engine-native callbacks and translate them into world-level feedback records
+- during engine post-physics update, the engine should call the core gameplay phase-2 entry point
+- phase 2 is where translated feedback events are handled first, listening systems or the game layer may emit follow-up commands, then the internal command queue is flushed again, and finally the engine command queue is flushed again
+
+Backends may include:
+
+- Unreal Engine adapter
+- Godot adapter
+- CLI mock adapter
+
+Rules:
+
+- no gameplay logic
+- translation and execution layer only
+- outward engine commands must stay in world abstraction
+- no engine-specific asset concepts may leak back into gameplay schemas
+- adapter behavior should be deterministic with respect to the received engine commands
+- engine-side feedback must re-enter the world through translated world feedback events, not through direct gameplay mutation
+- engine-side feedback is observational input only; the adapter may report what happened in execution, but only world systems may decide the gameplay consequence
+
+---
+
+## 8. Input And Command Flow
+
+The engine adapter should first translate source input into shared core `InputState`.
+
+Gameplay systems then read that `InputState` during tick.
+
+Input does not always need to become commands.
+
+If a system owns the affected gameplay state, it may react directly by writing that owned ECS data.
+
+If input should cause changes in another ownership domain, the system should emit commands.
+
+Examples of input-triggered commands when cross-domain handoff is needed:
+
+- `MoveIntent`
+- `ShootIntent`
+- `InteractionIntent`
+
+Examples of direct owned-state reaction:
+
+- a movement-related system reads `InputState` and updates owned locomotion or transform-related state
+- a camera-related system reads `InputState` and updates owned camera state
+
+Those commands, when emitted, are then processed by ECS systems during normal command flush.
+
+This section is the intended boundary, but the exact ownership and buffering rules of that translation step are still a TODO contract and should be written later as part of the input layer formalization.
+
+Example:
+
+```mermaid
+flowchart LR
+    A[Player Input] --> B[Core InputState]
+    B --> C[Engine Pre-Physics Update]
+    C --> D[Core Gameplay Phase 1]
+    D --> E[Gameplay Systems During Tick]
+    E --> F[Owned State Writes<br/>and Optional Commands]
+    F --> G[Internal Command Flush Phase 1]
+    G --> H[Engine Command Flush Phase 1]
+    H --> I[Engine Physics Tick]
+    I --> J[Adapter Translates Physics / Collision Feedback]
+    J --> K[Engine Post-Physics Update]
+    K --> L[Core Gameplay Phase 2]
+    L --> M[Translated Feedback Handling + Internal Command Flush Phase 2 + Engine Command Flush Phase 2]
+```
+
+The final world-level feedback event should describe the execution observation in world terms such as entity-to-entity contact, overlap, or trace result.
+
+World systems still decide whether that translated feedback causes pickup, damage, blocking, or no gameplay effect at all.
+
+---
+
+## 9. Multiplayer Model (Optional Extension)
+
+### Server Authority Model
+
+The server runs the full ECS simulation:
+
+- processes all inputs
+- executes systems
+- produces authoritative world commands
+- consumes translated execution feedback events that re-enter the world loop
+
+Clients:
+
+- receive engine commands or synchronized world results
+- replay visual results
+- do not run authoritative simulation logic
+
+---
+
+## 10. Build Strategy
+
+### Phase 1: Monolithic Game (Current Phase)
+
+- everything lives in one project
+- strict layering is enforced
+- no early modular extraction
+
+### Phase 2: Extraction After Shipping
+
+Extract only:
+
+- proven reusable systems
+- stable schema definitions
+- repeated gameplay patterns
+
+Rule:
+
+> Extract only after real usage proves reuse value.
+
+---
+
+## 11. Key Constraints
+
+### MUST
+
+- systems communicate only via ECS state plus commands, with translated feedback events reserved for execution observations
+- the engine never affects simulation outcomes
+- engine commands exposed to the adapter must stay in world abstraction
+- engine feedback must re-enter the world through translated world feedback events
+- schemas are strictly separated by scope
+- each system has an explicit direct-write ownership boundary
+- reusable feature-module systems may access their own schemas, upper core schemas, and peer-feature public schemas when an explicit integration contract allows it
+
+### MUST NOT
+
+- direct system-to-system calls
+- gameplay logic inside the engine layer
+- premature abstraction
+- cross-system ownership violations
+- peer-feature private-schema dependency, or peer-feature public-schema dependency without an explicit integration contract, inside reusable feature modules
+
+---
+
+## 12. Mental Model
+
+- ECS world = simulation brain
+- systems = behavior processors
+- commands = world language
+- engine adapter = interpreter and execution bridge
+- engine feedback = execution observations that must be translated back into world language
+- engine = execution device
+
+---
+
+## 13. Final Goal
+
+This architecture enables:
+
+- engine independence
+- reusable ECS gameplay modules
+- AI-assisted system generation
+- multiplayer-ready deterministic design
+- a long-term scalable game framework
