@@ -282,7 +282,7 @@ This keeps the campaign readable and cheap to implement while still letting comp
 
 The campaign ends when the `Campaign Clock` runs out. The player's success is measured mainly by how many `Site`s were completed within that fixed time limit. This makes finishing sites efficiently a core campaign-level goal.
 
-## 8. Controls, Camera, And Interaction
+## 8. Controls, Camera, Interaction, And UI
 
 ### Control Scheme
 
@@ -321,6 +321,38 @@ Core phone functions:
 - Track funds, incoming rewards, and current spending pressure
 
 The phone should feel practical and grounded, like an everyday field phone adapted to harsh remote work.
+
+### Current-Stage UI Direction
+
+The current-stage UI should be as simple as possible and should only support the already-defined prototype loop. The design goal here is not to expose every future subsystem. The goal is to make sure the current gameplay remains fully playable without missing UI blockers.
+
+Core UI rules:
+
+- `Main Menu` should stay minimal: start campaign, continue, settings, and quit
+- the `Regional Map` should be the single campaign-planning hub for site selection, selected-site summary, nearby-site support review, `Loadout` assembly, `Nearby-Site Aura` preview, available `Persistent Tech Tree` picks, and deployment
+- the `Field Phone` should be the single on-site management hub for `Contract Board` tasks, buying, selling, hiring, revealed `Site Unlockables`, and current faction-status review
+- site reward-claim flow and `Aftermath Relief Offer` choice should appear through the same phone flow or the same shared modal family, not as separate large systems
+- site-play HUD should stay compact and always visible, covering current `Hydration`, `Energy`, money, time of day, `Heat`, `Wind`, `Dust`, current event state when relevant, and simple site-completion progress
+- accepted tasks should have a compact always-available tracker during normal site play so the player does not need to reopen the phone for every progress check
+- item description should not become a separate permanent screen; use one contextual inspect panel for tiles, plants, structures, items, and selected regional-map sites
+- carried `Inventory` and camp storage should use one shared management panel rather than separate inventory and storage screen families
+- planting, device placement, repair, watering, burial clearing, and similar explicit field-work choices should use one shared field-actions panel rather than multiple permanent build, plant, and utility panels
+- crafting should stay contextual to the `Field Workshop` and should not become a globally available full-screen system in the current stage
+- full-screen planning UI and pause/system UI should pause time
+
+Current-stage simplification rules:
+
+- merge player-state display and time display into one compact HUD group
+- keep site-info presentation inside the `Regional Map` instead of a separate dedicated site-info screen
+- keep pre-deployment `Loadout` assembly and between-site tech selection inside the `Regional Map` instead of separate full-screen flows
+- merge item-description presentation into the contextual inspect panel
+- avoid separate permanent build, plant, and crafting screen families; use one field-actions panel plus contextual workshop crafting
+- transient decisions such as deploy confirmation, harsh-event warning, task reward claim, relief choice, site failure, and site completion should use one shared modal family
+
+UI blocker rule:
+
+- before system design starts, the UI plan must cover start and continue flow, site selection, nearby-support review, `Loadout` assembly, between-site tech selection, on-site survival readouts, task acceptance, task reward claim, plant and device placement, inventory and storage management, buying and selling, harsh-event response, failure and retry, and return to the campaign layer
+- if any of those steps requires hidden knowledge or too many UI jumps, the current-stage UI plan is not ready yet
 
 ### Camera
 
