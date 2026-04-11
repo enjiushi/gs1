@@ -1,0 +1,15 @@
+#pragma once
+
+#include <cstdint>
+
+enum Gs1Status : std::uint32_t
+{
+    GS1_STATUS_OK = 0,
+    GS1_STATUS_INVALID_ARGUMENT = 1,
+    GS1_STATUS_OUT_OF_MEMORY = 2,
+    GS1_STATUS_INVALID_STATE = 3,
+    GS1_STATUS_NOT_FOUND = 4,
+    GS1_STATUS_BUFFER_EMPTY = 5,
+    GS1_STATUS_NOT_IMPLEMENTED = 6,
+    GS1_STATUS_INTERNAL_ERROR = 7
+};

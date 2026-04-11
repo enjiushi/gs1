@@ -1,0 +1,44 @@
+#pragma once
+
+#include "gs1/export.h"
+#include "gs1/status.h"
+#include "gs1/types.h"
+
+#include <cstdint>
+
+extern "C"
+{
+GS1_API std::uint32_t gs1_get_api_version() GS1_NOEXCEPT;
+GS1_API const char* gs1_get_build_string() GS1_NOEXCEPT;
+
+GS1_API Gs1Status gs1_create_runtime(
+    const Gs1RuntimeCreateDesc* create_desc,
+    Gs1RuntimeHandle** out_runtime) GS1_NOEXCEPT;
+
+GS1_API void gs1_destroy_runtime(
+    Gs1RuntimeHandle* runtime) GS1_NOEXCEPT;
+
+GS1_API Gs1Status gs1_submit_host_events(
+    Gs1RuntimeHandle* runtime,
+    const Gs1HostEvent* events,
+    std::uint32_t event_count) GS1_NOEXCEPT;
+
+GS1_API Gs1Status gs1_submit_feedback_events(
+    Gs1RuntimeHandle* runtime,
+    const Gs1FeedbackEvent* events,
+    std::uint32_t event_count) GS1_NOEXCEPT;
+
+GS1_API Gs1Status gs1_run_phase1(
+    Gs1RuntimeHandle* runtime,
+    const Gs1Phase1Request* request,
+    Gs1Phase1Result* out_result) GS1_NOEXCEPT;
+
+GS1_API Gs1Status gs1_run_phase2(
+    Gs1RuntimeHandle* runtime,
+    const Gs1Phase2Request* request,
+    Gs1Phase2Result* out_result) GS1_NOEXCEPT;
+
+GS1_API Gs1Status gs1_pop_engine_command(
+    Gs1RuntimeHandle* runtime,
+    Gs1EngineCommand* out_command) GS1_NOEXCEPT;
+}

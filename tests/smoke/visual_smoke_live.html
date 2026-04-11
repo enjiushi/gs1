@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>GS1 Visual Adapter</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+  color-scheme: light;
+  --bg-0: #f5ecda;
+  --bg-1: #d9c2a1;
+  --panel: rgba(252, 247, 238, 0.88);
+  --panel-strong: rgba(252, 247, 238, 0.96);
+  --line: rgba(110, 83, 48, 0.18);
+  --ink: #1f2933;
+  --muted: #5f6b76;
+  --accent: #9a6832;
+  --accent-dark: #6f451d;
+  --ok: #6a9861;
+  --locked: #7f8791;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Segoe UI", sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top, rgba(255,255,255,0.65), transparent 44%),
+    linear-gradient(180deg, var(--bg-0), var(--bg-1));
+}
+
+.shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.stage-frame {
+  position: relative;
+  width: min(1400px, 100%);
+  aspect-ratio: 16 / 9;
+  border-radius: 28px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  box-shadow:
+    0 28px 80px rgba(72, 45, 13, 0.18),
+    inset 0 1px 0 rgba(255,255,255,0.5);
+  background: linear-gradient(180deg, #f2eadf, #d7c0a0);
+}
+
+#game-view {
+  position: absolute;
+  inset: 0;
+}
+
+#game-view canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+  padding: 20px;
+}
+
+.hud-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.hud-chip,
+.status-chip,
+.selection-chip {
+  pointer-events: auto;
+  backdrop-filter: blur(14px);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 12px 14px;
+  box-shadow: 0 16px 30px rgba(66, 44, 21, 0.08);
+}
+
+.hud-chip {
+  min-width: 260px;
+}
+
+.hud-chip .eyebrow,
+.selection-chip .eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.hud-chip .title {
+  margin-top: 4px;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.hud-chip .subtitle,
+.selection-chip .subtitle {
+  margin-top: 6px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.status-chip {
+  text-align: right;
+  min-width: 200px;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: pre-line;
+}
+
+.center-layer {
+  flex: 1;
+  display: grid;
+  place-items: center;
+}
+
+.menu-panel {
+  width: min(520px, calc(100% - 48px));
+  padding: 28px 30px;
+  border-radius: 24px;
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  box-shadow:
+    0 24px 60px rgba(66, 44, 21, 0.16),
+    inset 0 1px 0 rgba(255,255,255,0.52);
+  pointer-events: auto;
+}
+
+.menu-panel .eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.menu-panel h1 {
+  margin: 10px 0 8px;
+  font-size: clamp(34px, 5vw, 54px);
+  line-height: 0.95;
+}
+
+.menu-panel p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+  max-width: 42ch;
+}
+
+.menu-actions,
+.action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.action-button {
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 18px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  pointer-events: auto;
+  color: white;
+  background: linear-gradient(180deg, var(--accent), var(--accent-dark));
+  box-shadow: 0 10px 24px rgba(93, 57, 21, 0.28);
+}
+
+.action-button.secondary {
+  background: linear-gradient(180deg, #738392, #556574);
+}
+
+.action-button:disabled {
+  cursor: default;
+  opacity: 0.45;
+  box-shadow: none;
+}
+
+.bottom-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-end;
+}
+
+.selection-chip {
+  max-width: 420px;
+}
+
+.action-bar {
+  justify-content: flex-end;
+  margin-top: 0;
+}
+
+.helper-note {
+  max-width: 360px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(37, 29, 20, 0.48);
+  color: rgba(255,255,255,0.9);
+  font-size: 13px;
+  line-height: 1.5;
+  backdrop-filter: blur(12px);
+}
+
+@media (max-width: 900px) {
+  .overlay {
+    padding: 14px;
+  }
+
+  .stage-frame {
+    aspect-ratio: 9 / 16;
+  }
+
+  .hud-row,
+  .bottom-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .status-chip {
+    text-align: left;
+  }
+
+  .action-bar {
+    justify-content: flex-start;
+  }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="stage-frame">
+    <div id="game-view"></div>
+
+    <div class="overlay">
+      <div class="hud-row">
+        <div class="hud-chip">
+          <div class="eyebrow" id="hud-eyebrow">State</div>
+          <div class="title" id="hud-title">Booting</div>
+          <div class="subtitle" id="hud-subtitle">Waiting for host state.</div>
+        </div>
+
+        <div class="status-chip" id="status-chip">
+          Connecting...
+        </div>
+      </div>
+
+      <div class="center-layer">
+        <div class="menu-panel" id="menu-panel" hidden>
+          <div class="eyebrow" id="menu-eyebrow">Placeholder Main Menu</div>
+          <h1 id="menu-title">GS1</h1>
+          <p id="menu-copy">This live visual adapter is now driving the actual host state. Start a new campaign to move into the regional map.</p>
+          <div class="menu-actions" id="menu-actions"></div>
+        </div>
+      </div>
+
+      <div class="bottom-row">
+        <div class="selection-chip" id="selection-chip">
+          <div class="eyebrow" id="selection-eyebrow">Current View</div>
+          <div class="subtitle" id="selection-text">No selection yet.</div>
+        </div>
+
+        <div class="action-bar" id="context-actions"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="/viewer.js"></script>
+</body>
+</html>

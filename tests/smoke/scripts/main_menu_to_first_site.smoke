@@ -1,0 +1,27 @@
+# NOTE:
+# This file is used only by the text smoke-test host (`gs1_smoke_host`).
+# The live visual adapter (`gs1_visual_smoke_host`) does not load or execute
+# this script anymore.
+
+# Gameplay boot opens the main menu on the first frame.
+wait_app_state MAIN_MENU 60
+
+# Start a campaign and wait for regional map.
+click_ui_action START_NEW_CAMPAIGN
+wait_app_state REGIONAL_MAP 60
+
+# Select the first site.
+click_ui_action SELECT_DEPLOYMENT_SITE 1
+wait_selected_site 1 60
+
+# Validate observable results.
+assert_app_state REGIONAL_MAP
+assert_selected_site 1
+assert_saw_command SET_APP_STATE
+assert_saw_command BEGIN_UI_SETUP
+assert_saw_command UI_ELEMENT_UPSERT
+assert_saw_command BEGIN_REGIONAL_MAP_SNAPSHOT
+assert_saw_command REGIONAL_MAP_SITE_UPSERT
+assert_log_contains Entered main menu.
+assert_log_contains Started new GS1 campaign.
+assert_log_contains Selected deployment site.
