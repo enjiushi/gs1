@@ -8,6 +8,7 @@
 #include "runtime/input_snapshot.h"
 
 #include <deque>
+#include <map>
 #include <optional>
 
 namespace gs1
@@ -38,8 +39,14 @@ private:
     void queue_app_state_command(Gs1AppState app_state);
     void queue_ui_setup_begin_command(
         Gs1UiSetupId setup_id,
+        Gs1UiSetupPresentationType presentation_type,
         std::uint32_t element_count,
         std::uint32_t context_id);
+    void queue_ui_setup_close_command(
+        Gs1UiSetupId setup_id,
+        Gs1UiSetupPresentationType presentation_type);
+    void queue_close_ui_setup_if_open(Gs1UiSetupId setup_id);
+    void queue_close_active_normal_ui_if_open();
     void queue_ui_element_command(
         std::uint32_t element_id,
         Gs1UiElementType element_type,
@@ -79,6 +86,8 @@ private:
     std::deque<Gs1FeedbackEvent> feedback_events_ {};
     GameCommandQueue command_queue_ {};
     std::deque<Gs1EngineCommand> engine_commands_ {};
+    std::map<Gs1UiSetupId, Gs1UiSetupPresentationType> active_ui_setups_ {};
+    std::optional<Gs1UiSetupId> active_normal_ui_setup_ {};
     std::optional<Gs1AppState> last_emitted_app_state_ {};
     bool boot_initialized_ {false};
 };

@@ -57,7 +57,15 @@ enum Gs1UiElementFlags : std::uint32_t
 {
     GS1_UI_ELEMENT_FLAG_NONE = 0,
     GS1_UI_ELEMENT_FLAG_PRIMARY = 1u << 0,
-    GS1_UI_ELEMENT_FLAG_DISABLED = 1u << 1
+    GS1_UI_ELEMENT_FLAG_DISABLED = 1u << 1,
+    GS1_UI_ELEMENT_FLAG_BACKGROUND_CLICK = 1u << 2
+};
+
+enum Gs1UiSetupPresentationType : std::uint32_t
+{
+    GS1_UI_SETUP_PRESENTATION_NONE = 0,
+    GS1_UI_SETUP_PRESENTATION_NORMAL = 1,
+    GS1_UI_SETUP_PRESENTATION_OVERLAY = 2
 };
 
 enum Gs1UiActionType : std::uint32_t
@@ -66,7 +74,8 @@ enum Gs1UiActionType : std::uint32_t
     GS1_UI_ACTION_START_NEW_CAMPAIGN = 1,
     GS1_UI_ACTION_SELECT_DEPLOYMENT_SITE = 2,
     GS1_UI_ACTION_START_SITE_ATTEMPT = 3,
-    GS1_UI_ACTION_RETURN_TO_REGIONAL_MAP = 4
+    GS1_UI_ACTION_RETURN_TO_REGIONAL_MAP = 4,
+    GS1_UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION = 5
 };
 
 enum Gs1FeedbackEventType : std::uint32_t
@@ -170,6 +179,7 @@ enum Gs1EngineCommandType : std::uint32_t
     GS1_ENGINE_COMMAND_BEGIN_UI_SETUP = 16,
     GS1_ENGINE_COMMAND_UI_ELEMENT_UPSERT = 17,
     GS1_ENGINE_COMMAND_END_UI_SETUP = 18,
+    GS1_ENGINE_COMMAND_CLOSE_UI_SETUP = 19,
 
     GS1_ENGINE_COMMAND_BEGIN_SITE_SNAPSHOT = 20,
     GS1_ENGINE_COMMAND_SITE_TILE_UPSERT = 21,
@@ -338,8 +348,17 @@ struct Gs1EngineCommandUiSetupData
 {
     Gs1UiSetupId setup_id;
     Gs1ProjectionMode mode;
+    Gs1UiSetupPresentationType presentation_type;
     std::uint32_t element_count;
     std::uint32_t context_id;
+};
+
+struct Gs1EngineCommandCloseUiSetupData
+{
+    Gs1UiSetupId setup_id;
+    Gs1UiSetupPresentationType presentation_type;
+    std::uint32_t reserved0;
+    std::uint32_t reserved1;
 };
 
 struct Gs1EngineCommandUiElementData
@@ -487,6 +506,7 @@ union Gs1EngineCommandPayload
     Gs1EngineCommandRegionalMapSiteData regional_map_site;
     Gs1EngineCommandRegionalMapLinkData regional_map_link;
     Gs1EngineCommandUiSetupData ui_setup;
+    Gs1EngineCommandCloseUiSetupData close_ui_setup;
     Gs1EngineCommandUiElementData ui_element;
     Gs1EngineCommandSiteSnapshotData site_snapshot;
     Gs1EngineCommandSiteTileData site_tile;

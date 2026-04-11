@@ -113,6 +113,10 @@ std::optional<Gs1UiActionType> parse_ui_action_type(const std::string& value)
     {
         return GS1_UI_ACTION_SELECT_DEPLOYMENT_SITE;
     }
+    if (value == "CLEAR_DEPLOYMENT_SITE_SELECTION")
+    {
+        return GS1_UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION;
+    }
     if (value == "START_SITE_ATTEMPT")
     {
         return GS1_UI_ACTION_START_SITE_ATTEMPT;

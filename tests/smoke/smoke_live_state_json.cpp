@@ -46,6 +46,20 @@ const char* ui_setup_name(Gs1UiSetupId setup_id)
     }
 }
 
+const char* ui_setup_presentation_type_name(Gs1UiSetupPresentationType presentation_type)
+{
+    switch (presentation_type)
+    {
+    case GS1_UI_SETUP_PRESENTATION_NORMAL:
+        return "NORMAL";
+    case GS1_UI_SETUP_PRESENTATION_OVERLAY:
+        return "OVERLAY";
+    case GS1_UI_SETUP_PRESENTATION_NONE:
+    default:
+        return "NONE";
+    }
+}
+
 const char* ui_element_type_name(Gs1UiElementType element_type)
 {
     switch (element_type)
@@ -72,6 +86,8 @@ const char* ui_action_name(Gs1UiActionType action_type)
         return "START_SITE_ATTEMPT";
     case GS1_UI_ACTION_RETURN_TO_REGIONAL_MAP:
         return "RETURN_TO_REGIONAL_MAP";
+    case GS1_UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION:
+        return "CLEAR_DEPLOYMENT_SITE_SELECTION";
     default:
         return "NONE";
     }
@@ -250,6 +266,8 @@ std::string SmokeEngineHost::build_live_state_json() const
 
         json += "{\"setupId\":";
         write_json_string(json, ui_setup_name(setup.setup_id));
+        json += ",\"presentationType\":";
+        write_json_string(json, ui_setup_presentation_type_name(setup.presentation_type));
         json += ",\"contextId\":";
         json += std::to_string(setup.context_id);
         json += ",\"elements\":[";

@@ -64,6 +64,7 @@ private:
     struct ActiveUiSetup final
     {
         Gs1UiSetupId setup_id {GS1_UI_SETUP_NONE};
+        Gs1UiSetupPresentationType presentation_type {GS1_UI_SETUP_PRESENTATION_NONE};
         std::uint32_t context_id {0};
         std::vector<ActiveUiElement> elements {};
     };
@@ -71,6 +72,7 @@ private:
     struct PendingUiSetup final
     {
         Gs1UiSetupId setup_id {GS1_UI_SETUP_NONE};
+        Gs1UiSetupPresentationType presentation_type {GS1_UI_SETUP_PRESENTATION_NONE};
         std::uint32_t context_id {0};
         std::vector<ActiveUiElement> elements {};
     };
@@ -183,6 +185,7 @@ private:
         const Gs1UiAction& requested_action,
         Gs1UiAction& out_action) const;
     void apply_ui_setup_begin(const Gs1EngineCommand& command);
+    void apply_ui_setup_close(const Gs1EngineCommand& command);
     void apply_ui_element_upsert(const Gs1EngineCommand& command);
     void apply_ui_setup_end();
     void apply_regional_map_snapshot_begin(const Gs1EngineCommand& command);

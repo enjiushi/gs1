@@ -116,6 +116,14 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return setup.elements.filter((element) => element.action && element.action.type !== "NONE");
     }
 
+    function getVisibleActionElements(setup) {
+        return getActionElements(setup).filter((element) => (element.flags & 4) === 0);
+    }
+
+    function getBackgroundClickElement(setup) {
+        return getActionElements(setup).find((element) => (element.flags & 4) !== 0) || null;
+    }
+
     function getLabelElements(setup) {
         if (!setup) {
             return [];
@@ -163,7 +171,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     function renderRegionalMapOverlay(state) {
         const selectionSetup = getSetup(state, "REGIONAL_MAP_SELECTION");
         const labels = getLabelElements(selectionSetup);
-        const actions = getActionElements(selectionSetup);
+        const actions = getVisibleActionElements(selectionSetup);
 
         menuPanel.hidden = true;
         selectionEyebrow.textContent = "Regional Map";
@@ -572,7 +580,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     });
 
     renderer.domElement.addEventListener("click", function (event) {
-        if (!latestState || latestState.appState !== "REGIONAL_MAP" || mapPickables.length === 0) {
+        if (!latestState || latestState.appState !== "REGIONAL_MAP") {
             return;
         }
 
@@ -582,17 +590,26 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         raycaster.setFromCamera(pointer, camera);
 
         const hits = raycaster.intersectObjects(mapPickables, false);
-        if (hits.length === 0) {
+        if (hits.length > 0) {
+            postJson("/ui-action", {
+                type: "SELECT_DEPLOYMENT_SITE",
+                targetId: hits[0].object.userData.siteId,
+                arg0: 0,
+                arg1: 0
+            }).catch(() => {
+                statusChip.textContent = "Failed to select site.";
+            });
             return;
         }
 
-        postJson("/ui-action", {
-            type: "SELECT_DEPLOYMENT_SITE",
-            targetId: hits[0].object.userData.siteId,
-            arg0: 0,
-            arg1: 0
-        }).catch(() => {
-            statusChip.textContent = "Failed to select site.";
+        const selectionSetup = getSetup(latestState, "REGIONAL_MAP_SELECTION");
+        const backgroundElement = getBackgroundClickElement(selectionSetup);
+        if (!backgroundElement) {
+            return;
+        }
+
+        postJson("/ui-action", backgroundElement.action).catch(() => {
+            statusChip.textContent = "Failed to send regional map background click.";
         });
     });
 

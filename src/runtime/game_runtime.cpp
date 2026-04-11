@@ -202,6 +202,7 @@ Gs1Status GameRuntime::handle_command(const GameCommand& command)
     {
     case GameCommandType::OpenMainMenu:
     {
+        queue_close_active_normal_ui_if_open();
         app_state_ = GS1_APP_STATE_MAIN_MENU;
         queue_app_state_command(app_state_);
         queue_main_menu_ui_commands();
@@ -212,6 +213,7 @@ Gs1Status GameRuntime::handle_command(const GameCommand& command)
     case GameCommandType::StartNewCampaign:
     {
         const auto& payload = std::get<StartNewCampaignCommand>(command.payload);
+        queue_close_ui_setup_if_open(GS1_UI_SETUP_MAIN_MENU);
         campaign_ = CampaignFactory::create_prototype_campaign(payload.campaign_seed, payload.campaign_days);
         app_state_ = GS1_APP_STATE_REGIONAL_MAP;
         active_site_run_.reset();
@@ -260,9 +262,40 @@ Gs1Status GameRuntime::handle_command(const GameCommand& command)
                 queue_regional_map_site_upsert_command(*previous_site.value());
             }
         }
+        else
+        {
+            queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_SELECTION);
+        }
         queue_regional_map_site_upsert_command(*site.value());
         queue_regional_map_selection_ui_commands();
         queue_log_command("Selected deployment site.");
+        return GS1_STATUS_OK;
+    }
+
+    case GameCommandType::ClearDeploymentSiteSelection:
+    {
+        if (!campaign_.has_value())
+        {
+            return GS1_STATUS_INVALID_STATE;
+        }
+
+        if (!campaign_->regional_map_state.selected_site_id.has_value())
+        {
+            return GS1_STATUS_OK;
+        }
+
+        const auto selected_site_id = campaign_->regional_map_state.selected_site_id.value();
+        campaign_->regional_map_state.selected_site_id.reset();
+        campaign_->loadout_planner_state.selected_target_site_id.reset();
+
+        auto site = find_site_mut(selected_site_id.value);
+        if (site.has_value())
+        {
+            queue_regional_map_site_upsert_command(*site.value());
+        }
+
+        queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_SELECTION);
+        queue_log_command("Cleared deployment site selection.");
         return GS1_STATUS_OK;
     }
 
@@ -286,6 +319,7 @@ Gs1Status GameRuntime::handle_command(const GameCommand& command)
         }
 
         site.value()->attempt_count += 1U;
+        queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_SELECTION);
         active_site_run_ = SiteRunFactory::create_site_run(*campaign_, *site.value());
         campaign_->active_site_id = payload.site_id;
         app_state_ = GS1_APP_STATE_SITE_ACTIVE;
@@ -315,6 +349,7 @@ Gs1Status GameRuntime::handle_command(const GameCommand& command)
         campaign_->app_state = app_state_;
         rebuild_regional_map_caches();
         queue_app_state_command(app_state_);
+        queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_RESULT);
         queue_regional_map_snapshot_commands();
         queue_regional_map_selection_ui_commands();
         return GS1_STATUS_OK;
@@ -420,15 +455,60 @@ void GameRuntime::queue_app_state_command(Gs1AppState app_state)
 
 void GameRuntime::queue_ui_setup_begin_command(
     Gs1UiSetupId setup_id,
+    Gs1UiSetupPresentationType presentation_type,
     std::uint32_t element_count,
     std::uint32_t context_id)
 {
     auto command = make_engine_command(GS1_ENGINE_COMMAND_BEGIN_UI_SETUP);
     command.payload.ui_setup.setup_id = setup_id;
     command.payload.ui_setup.mode = GS1_PROJECTION_MODE_SNAPSHOT;
+    command.payload.ui_setup.presentation_type = presentation_type;
     command.payload.ui_setup.element_count = element_count;
     command.payload.ui_setup.context_id = context_id;
     engine_commands_.push_back(command);
+
+    active_ui_setups_[setup_id] = presentation_type;
+    if (presentation_type == GS1_UI_SETUP_PRESENTATION_NORMAL)
+    {
+        active_normal_ui_setup_ = setup_id;
+    }
+}
+
+void GameRuntime::queue_ui_setup_close_command(
+    Gs1UiSetupId setup_id,
+    Gs1UiSetupPresentationType presentation_type)
+{
+    auto command = make_engine_command(GS1_ENGINE_COMMAND_CLOSE_UI_SETUP);
+    command.payload.close_ui_setup.setup_id = setup_id;
+    command.payload.close_ui_setup.presentation_type = presentation_type;
+    engine_commands_.push_back(command);
+
+    active_ui_setups_.erase(setup_id);
+    if (active_normal_ui_setup_.has_value() && active_normal_ui_setup_.value() == setup_id)
+    {
+        active_normal_ui_setup_.reset();
+    }
+}
+
+void GameRuntime::queue_close_ui_setup_if_open(Gs1UiSetupId setup_id)
+{
+    const auto it = active_ui_setups_.find(setup_id);
+    if (it == active_ui_setups_.end())
+    {
+        return;
+    }
+
+    queue_ui_setup_close_command(setup_id, it->second);
+}
+
+void GameRuntime::queue_close_active_normal_ui_if_open()
+{
+    if (!active_normal_ui_setup_.has_value())
+    {
+        return;
+    }
+
+    queue_close_ui_setup_if_open(active_normal_ui_setup_.value());
 }
 
 void GameRuntime::queue_ui_element_command(
@@ -458,13 +538,16 @@ void GameRuntime::queue_ui_setup_end_command()
 
 void GameRuntime::queue_clear_ui_setup_commands(Gs1UiSetupId setup_id)
 {
-    queue_ui_setup_begin_command(setup_id, 0U, 0U);
-    queue_ui_setup_end_command();
+    queue_close_ui_setup_if_open(setup_id);
 }
 
 void GameRuntime::queue_main_menu_ui_commands()
 {
-    queue_ui_setup_begin_command(GS1_UI_SETUP_MAIN_MENU, 1U, 0U);
+    queue_ui_setup_begin_command(
+        GS1_UI_SETUP_MAIN_MENU,
+        GS1_UI_SETUP_PRESENTATION_NORMAL,
+        1U,
+        0U);
 
     Gs1UiAction action {};
     action.type = GS1_UI_ACTION_START_NEW_CAMPAIGN;
@@ -489,7 +572,11 @@ void GameRuntime::queue_regional_map_selection_ui_commands()
 
     const auto site_id = campaign_->regional_map_state.selected_site_id->value;
 
-    queue_ui_setup_begin_command(GS1_UI_SETUP_REGIONAL_MAP_SELECTION, 2U, site_id);
+    queue_ui_setup_begin_command(
+        GS1_UI_SETUP_REGIONAL_MAP_SELECTION,
+        GS1_UI_SETUP_PRESENTATION_OVERLAY,
+        2U,
+        site_id);
 
     Gs1UiAction no_action {};
     char label_text[64] {};
@@ -513,12 +600,25 @@ void GameRuntime::queue_regional_map_selection_ui_commands()
         deploy_action,
         button_text);
 
+    Gs1UiAction clear_selection_action {};
+    clear_selection_action.type = GS1_UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION;
+    queue_ui_element_command(
+        3U,
+        GS1_UI_ELEMENT_BUTTON,
+        GS1_UI_ELEMENT_FLAG_BACKGROUND_CLICK,
+        clear_selection_action,
+        "");
+
     queue_ui_setup_end_command();
 }
 
 void GameRuntime::queue_site_result_ui_commands(std::uint32_t site_id, Gs1SiteAttemptResult result)
 {
-    queue_ui_setup_begin_command(GS1_UI_SETUP_SITE_RESULT, 2U, site_id);
+    queue_ui_setup_begin_command(
+        GS1_UI_SETUP_SITE_RESULT,
+        GS1_UI_SETUP_PRESENTATION_OVERLAY,
+        2U,
+        site_id);
 
     Gs1UiAction no_action {};
     char label_text[64] {};
@@ -777,6 +877,11 @@ Gs1Status GameRuntime::translate_ui_action_to_command(const Gs1UiAction& action,
         }
         out_command.type = GameCommandType::SelectDeploymentSite;
         out_command.payload = SelectDeploymentSiteCommand {SiteId {action.target_id}};
+        return GS1_STATUS_OK;
+
+    case GS1_UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION:
+        out_command.type = GameCommandType::ClearDeploymentSiteSelection;
+        out_command.payload = ClearDeploymentSiteSelectionCommand {};
         return GS1_STATUS_OK;
 
     case GS1_UI_ACTION_START_SITE_ATTEMPT:

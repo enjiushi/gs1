@@ -35,6 +35,8 @@ const char* command_type_name(Gs1EngineCommandType type)
         return "UI_ELEMENT_UPSERT";
     case GS1_ENGINE_COMMAND_END_UI_SETUP:
         return "END_UI_SETUP";
+    case GS1_ENGINE_COMMAND_CLOSE_UI_SETUP:
+        return "CLOSE_UI_SETUP";
     case GS1_ENGINE_COMMAND_BEGIN_SITE_SNAPSHOT:
         return "BEGIN_SITE_SNAPSHOT";
     case GS1_ENGINE_COMMAND_SITE_TILE_UPSERT:
@@ -112,6 +114,20 @@ const char* ui_setup_name(Gs1UiSetupId setup_id)
     }
 }
 
+const char* ui_setup_presentation_type_name(Gs1UiSetupPresentationType presentation_type)
+{
+    switch (presentation_type)
+    {
+    case GS1_UI_SETUP_PRESENTATION_NORMAL:
+        return "NORMAL";
+    case GS1_UI_SETUP_PRESENTATION_OVERLAY:
+        return "OVERLAY";
+    case GS1_UI_SETUP_PRESENTATION_NONE:
+    default:
+        return "NONE";
+    }
+}
+
 const char* ui_action_name(Gs1UiActionType action_type)
 {
     switch (action_type)
@@ -124,6 +140,8 @@ const char* ui_action_name(Gs1UiActionType action_type)
         return "START_SITE_ATTEMPT";
     case GS1_UI_ACTION_RETURN_TO_REGIONAL_MAP:
         return "RETURN_TO_REGIONAL_MAP";
+    case GS1_UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION:
+        return "CLEAR_DEPLOYMENT_SITE_SELECTION";
     default:
         return "NONE";
     }
@@ -518,8 +536,6 @@ void SmokeEngineHost::flush_engine_commands(const char* stage_label)
         {
         case GS1_ENGINE_COMMAND_SET_APP_STATE:
             current_app_state_ = command.payload.set_app_state.app_state;
-            active_ui_setups_.clear();
-            pending_ui_setup_.reset();
             if (current_app_state_ == GS1_APP_STATE_MAIN_MENU ||
                 current_app_state_ == GS1_APP_STATE_REGIONAL_MAP ||
                 current_app_state_ == GS1_APP_STATE_CAMPAIGN_SETUP ||
@@ -555,6 +571,9 @@ void SmokeEngineHost::flush_engine_commands(const char* stage_label)
 
         case GS1_ENGINE_COMMAND_BEGIN_UI_SETUP:
             apply_ui_setup_begin(command);
+            break;
+        case GS1_ENGINE_COMMAND_CLOSE_UI_SETUP:
+            apply_ui_setup_close(command);
             break;
         case GS1_ENGINE_COMMAND_UI_ELEMENT_UPSERT:
             apply_ui_element_upsert(command);
@@ -690,7 +709,19 @@ void SmokeEngineHost::apply_ui_setup_begin(const Gs1EngineCommand& command)
 {
     pending_ui_setup_ = PendingUiSetup {};
     pending_ui_setup_->setup_id = command.payload.ui_setup.setup_id;
+    pending_ui_setup_->presentation_type = command.payload.ui_setup.presentation_type;
     pending_ui_setup_->context_id = command.payload.ui_setup.context_id;
+}
+
+void SmokeEngineHost::apply_ui_setup_close(const Gs1EngineCommand& command)
+{
+    const auto setup_id = command.payload.close_ui_setup.setup_id;
+    active_ui_setups_.erase(setup_id);
+
+    if (pending_ui_setup_.has_value() && pending_ui_setup_->setup_id == setup_id)
+    {
+        pending_ui_setup_.reset();
+    }
 }
 
 void SmokeEngineHost::apply_ui_element_upsert(const Gs1EngineCommand& command)
@@ -725,8 +756,25 @@ void SmokeEngineHost::apply_ui_setup_end()
 
     ActiveUiSetup setup {};
     setup.setup_id = pending_ui_setup_->setup_id;
+    setup.presentation_type = pending_ui_setup_->presentation_type;
     setup.context_id = pending_ui_setup_->context_id;
     setup.elements = std::move(pending_ui_setup_->elements);
+
+    if (setup.presentation_type == GS1_UI_SETUP_PRESENTATION_NORMAL)
+    {
+        for (auto it = active_ui_setups_.begin(); it != active_ui_setups_.end();)
+        {
+            if (it->second.presentation_type == GS1_UI_SETUP_PRESENTATION_NORMAL)
+            {
+                it = active_ui_setups_.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
+    }
+
     active_ui_setups_[setup.setup_id] = std::move(setup);
     pending_ui_setup_.reset();
 }
@@ -1051,8 +1099,17 @@ std::string SmokeEngineHost::describe_command(const Gs1EngineCommand& command)
     case GS1_ENGINE_COMMAND_BEGIN_UI_SETUP:
         description += " setup=";
         description += ui_setup_name(command.payload.ui_setup.setup_id);
+        description += " type=";
+        description += ui_setup_presentation_type_name(command.payload.ui_setup.presentation_type);
         description += " elements=" + std::to_string(command.payload.ui_setup.element_count);
         description += " context=" + std::to_string(command.payload.ui_setup.context_id);
+        break;
+
+    case GS1_ENGINE_COMMAND_CLOSE_UI_SETUP:
+        description += " setup=";
+        description += ui_setup_name(command.payload.close_ui_setup.setup_id);
+        description += " type=";
+        description += ui_setup_presentation_type_name(command.payload.close_ui_setup.presentation_type);
         break;
 
     case GS1_ENGINE_COMMAND_UI_ELEMENT_UPSERT:

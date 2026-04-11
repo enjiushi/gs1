@@ -36,6 +36,10 @@ std::optional<Gs1UiActionType> parse_ui_action_type(const std::string& value)
     {
         return GS1_UI_ACTION_SELECT_DEPLOYMENT_SITE;
     }
+    if (value == "CLEAR_DEPLOYMENT_SITE_SELECTION")
+    {
+        return GS1_UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION;
+    }
     if (value == "START_SITE_ATTEMPT")
     {
         return GS1_UI_ACTION_START_SITE_ATTEMPT;
@@ -103,6 +107,10 @@ std::optional<Gs1EngineCommandType> parse_engine_command_type(const std::string&
     if (value == "BEGIN_UI_SETUP")
     {
         return GS1_ENGINE_COMMAND_BEGIN_UI_SETUP;
+    }
+    if (value == "CLOSE_UI_SETUP")
+    {
+        return GS1_ENGINE_COMMAND_CLOSE_UI_SETUP;
     }
     if (value == "UI_ELEMENT_UPSERT")
     {

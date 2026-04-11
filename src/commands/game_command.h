@@ -13,6 +13,7 @@ enum class GameCommandType : std::uint32_t
     OpenMainMenu,
     StartNewCampaign,
     SelectDeploymentSite,
+    ClearDeploymentSiteSelection,
     StartSiteAttempt,
     ReturnToRegionalMap,
     MarkSiteCompleted,
@@ -33,6 +34,10 @@ struct OpenMainMenuCommand final
 struct SelectDeploymentSiteCommand final
 {
     SiteId site_id {};
+};
+
+struct ClearDeploymentSiteSelectionCommand final
+{
 };
 
 struct StartSiteAttemptCommand final
@@ -63,6 +68,7 @@ using GameCommandPayload = std::variant<
     OpenMainMenuCommand,
     StartNewCampaignCommand,
     SelectDeploymentSiteCommand,
+    ClearDeploymentSiteSelectionCommand,
     StartSiteAttemptCommand,
     ReturnToRegionalMapCommand,
     MarkSiteCompletedCommand,
