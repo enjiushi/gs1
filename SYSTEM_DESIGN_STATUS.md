@@ -2,8 +2,9 @@
 
 Sources:
 
-- [GDD.md](d:/testgame/gs1_upstream/GDD.md)
-- [GAME_STRUCTURE.md](d:/testgame/gs1_upstream/GAME_STRUCTURE.md)
+- [GDD.md](GDD.md)
+- [GAME_STRUCTURE.md](GAME_STRUCTURE.md)
+- [CONTENT_AUTHORING_CONTRACT.md](CONTENT_AUTHORING_CONTRACT.md)
 
 Purpose: summarize what the current design documents already define well enough for the next system-design stage, and identify the remaining missing design contracts before we move into detailed code modules, data structures, and implementation ownership.
 
@@ -17,8 +18,8 @@ Boundary rule:
 
 - Prototype path: ready to move into system design.
 - Full-campaign path: not fully ready yet.
-- Current strength: the core site loop is already coherent across survival, hazards, planting, devices, tasks, faction reputation, and small tech growth, while the global ECS/command architecture is now explicitly defined.
-- Current risk: the final content-authoring contract is still missing, and save/load remains an intentional later TODO. If we pretend those are already locked, detailed implementation can still churn.
+- Current strength: the core site loop is already coherent across survival, hazards, planting, devices, tasks, faction reputation, and small tech growth; the global ECS/command architecture is explicitly defined; and the missing authoring-side content contract is now formalized.
+- Current risk: save/load boundaries remain an intentional later TODO, so full long-session architecture should still avoid pretending persistence is already solved.
 
 ## What Is Already Stable Enough
 
@@ -47,20 +48,19 @@ These areas are good enough that the next step can define code ownership, runtim
 
 ## What Is Defined But Still Needs One More Contract Pass
 
-No remaining prototype-critical gameplay contract is still in this state. The remaining gap is now mainly the content-authoring contract layered on top of the already-defined global framework, while save/load stays intentionally deferred.
+No remaining prototype-critical gameplay or content-authoring contract is still in this state. The main deferred formal topic is now save/load boundaries for later full-campaign architecture.
 
 ## What Is Still Missing As Formal Design
 
 These areas are the main missing formal sections if we want a safe full-game architecture:
 
 - save-data boundaries as a later save/load TODO
-- explicit authoring contract for task templates, event templates, and reward-draft templates
 
 ## Practical Readiness By System
 
 | Area | Status | Why |
 |---|---|---|
-| Global framework and engine boundary | `Ready` | `GAME_STRUCTURE.md` now defines the ECS-world-first architecture, command/event flow, world-level engine commands, and engine-adapter responsibilities. |
+| Global framework and engine boundary | `Ready` | `GAME_STRUCTURE.md` now defines the ECS-world-first architecture, command/event flow, world-level engine commands, engine-adapter responsibilities, and the input snapshot ownership/buffering contract. |
 | Site runtime simulation | `Ready` | Update order, meters, causal loop, and tile/runtime state categories are already defined. |
 | Terrain and ecology runtime | `Ready` | Terrain, plant, weather, device, and meter relationships are clear enough for module and struct design. |
 | Inventory and item runtime | `Ready` | Shared item model, item meters, storage flow, and hazard interaction are already explicit. |
@@ -114,7 +114,7 @@ The names can change later. The important point is that these ownership lines ar
 
 When the next system-design pass assigns concrete game-state ownership, use this module split as the reference layout. One module may contain multiple closely related systems, but authority should still map back to one owning module rather than being duplicated across several systems.
 
-These gameplay modules should live inside the world-first ECS architecture defined in [GAME_STRUCTURE.md](d:/testgame/gs1_upstream/GAME_STRUCTURE.md). Cross-module interaction should follow command/event flow and shared state access rules rather than direct system-to-system calls.
+These gameplay modules should live inside the world-first ECS architecture defined in [GAME_STRUCTURE.md](GAME_STRUCTURE.md). Cross-module interaction should follow command/event flow and shared state access rules rather than direct system-to-system calls.
 
 ## Recommended Core Data Definitions
 
@@ -141,7 +141,7 @@ The next stage should formalize these data definitions first:
 - `WeatherState`
 - `EventState`
 
-These should be treated as game-specific schemas layered on top of the more global schema split already established in [GAME_STRUCTURE.md](d:/testgame/gs1_upstream/GAME_STRUCTURE.md).
+These should be treated as game-specific schemas layered on top of the more global schema split already established in [GAME_STRUCTURE.md](GAME_STRUCTURE.md).
 
 ## Recommended First System-Design Order
 
@@ -151,10 +151,9 @@ If the goal is prototype-first implementation, use this order:
 2. Tile, plant, weather, and device data structures
 3. Item, inventory, water-transfer, and crafting data structures
 4. Task-board runtime schema and reward-draft schema
-5. Content-authoring contract for task templates, event templates, and reward-draft templates
-6. Faction reputation and technology persistence schema
-7. Prototype site-flow state machine across the four authored sites
-8. Longer-term regional-support expansion and save/load boundaries only after the prototype path is proven and save/load enters scope
+5. Faction reputation and technology persistence schema
+6. Prototype site-flow state machine across the four authored sites
+7. Longer-term regional-support expansion and save/load boundaries only after the prototype path is proven and save/load enters scope
 
 This order follows the current GDD maturity level and avoids overcommitting to campaign-meta systems before the site loop is playable.
 
@@ -162,10 +161,9 @@ This order follows the current GDD maturity level and avoids overcommitting to c
 
 If we want to move beyond prototype-scoped system design into full-game architecture, the next required design documents should be:
 
-- `CONTENT_AUTHORING_CONTRACT.md`
 - `SAVE_BOUNDARIES_CONTRACT.md` later, when save/load enters scope
 
-These do not need final balance. They do need exact field schemas, generation rules, and later save boundaries when save/load work actually begins.
+The authoring-side contract is now covered by [CONTENT_AUTHORING_CONTRACT.md](CONTENT_AUTHORING_CONTRACT.md). The remaining later document is the save-boundary contract when persistence actually enters implementation.
 
 ## Prototype-Specific Guidance
 
@@ -185,8 +183,9 @@ So the correct reading of the current GDD is:
 ## Final Recommendation
 
 - Proceed now into prototype-focused system design.
-- Keep [GAME_STRUCTURE.md](d:/testgame/gs1_upstream/GAME_STRUCTURE.md) as the global framework contract.
+- Keep [GAME_STRUCTURE.md](GAME_STRUCTURE.md) as the global framework contract.
+- Use [CONTENT_AUTHORING_CONTRACT.md](CONTENT_AUTHORING_CONTRACT.md) as the generator/content-schema contract.
 - Freeze gameplay ownership for site simulation, ecology, items, devices, tasks, reputation, and technology inside that framework first.
-- Do the content-authoring contract pass next, and leave save/load boundaries as an explicit later TODO before committing to final full-game architecture.
+- Leave save/load boundaries as an explicit later TODO before committing to final full-game architecture.
 
 That is the cleanest next step from the current GDD state.

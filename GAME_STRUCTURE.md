@@ -10,6 +10,12 @@ This framework defines a world-simulation-first ECS architecture where:
 - the game remains portable across engines
 - gameplay logic stays decoupled from rendering and platform code
 
+Implementation-boundary note:
+
+- when gameplay is shipped as a game DLL or shared library, the engine adapter belongs to the engine/host side, not inside the gameplay DLL
+- the gameplay DLL should expose only engine-agnostic public entry points, world-facing engine commands, and translated feedback/input contracts
+- the engine-side host is responsible for loading the DLL, calling its public API, translating engine-native input into the DLL's input contract, and translating DLL-emitted engine commands into actual engine work
+
 The system is designed for:
 
 - engine independence such as Unreal, Godot, custom runtime, or CLI mock
@@ -132,6 +138,7 @@ Notes:
 - execution-side feedback can return from the engine during physics or other execution, but it must re-enter the world only through translated world-level feedback events
 - execution-side feedback is observational only; it does not decide outcomes by itself, and world systems may accept it, reinterpret it, or ignore it
 - input sources should first be translated by the engine adapter into shared core `InputState` before ECS systems consume them during tick
+- the adapter may also submit translated host-event records in two frame windows: before phase 1 and between phase 1 and phase 2
 - phase 1 may accumulate engine commands that are flushed before engine-layer physics tick
 - translated engine feedback seeds phase-2 world processing
 - phase 2 may also accumulate engine commands, but phase-2 engine flush is terminal for the frame
@@ -154,6 +161,7 @@ Clarification:
 - in this document, `input intake` means the adapter translates source-specific input data into the shared core `InputState`
 - it does not mean gameplay-specific intent generation
 - gameplay systems later decide how to react to `InputState` during tick
+- semantic host-rendered UI interactions are not raw `InputState`; once the host resolves those interactions, it may submit them as translated host events in either allowed frame window
 
 ---
 
@@ -566,10 +574,19 @@ Each engine adapter implements:
 - resolving engine-native references back into world identifiers when possible
 - translating those feedback events back into world-level feedback events
 
+Ownership rule:
+
+- the engine adapter is engine-side infrastructure
+- it should live in the engine host, engine plugin, launcher, or other runtime integration layer that is allowed to touch engine-native APIs
+- it should not be required to live inside the gameplay DLL itself
+- the gameplay side should know only the adapter-facing public contracts, not the engine-native implementation
+
 Frame-side entry contract:
 
+- before engine pre-physics update, the adapter may submit host events already resolved by the host, such as host-rendered UI actions from the previous visible frame
 - during engine pre-physics update, the engine should call the core gameplay phase-1 entry point
 - during engine physics tick, the adapter may collect engine-native callbacks and translate them into world-level feedback records
+- after phase-1 engine-command flush and before engine post-physics update, the adapter may submit another host-event batch for interactions that became resolvable only after phase-1 playback
 - during engine post-physics update, the engine should call the core gameplay phase-2 entry point
 - phase 2 is where translated feedback events are handled first, listening systems or the game layer may emit follow-up commands, then the internal command queue is flushed again, and finally the engine command queue is flushed again
 
@@ -616,7 +633,30 @@ Examples of direct owned-state reaction:
 
 Those commands, when emitted, are then processed by ECS systems during normal command flush.
 
-This section is the intended boundary, but the exact ownership and buffering rules of that translation step are still a TODO contract and should be written later as part of the input layer formalization.
+### 8.1 Input Snapshot Ownership And Buffering Contract
+
+The input boundary is now locked as follows:
+
+- the engine adapter owns all conversion from engine-native input, replay input, AI input, or network input into shared core `InputState`
+- input translation must complete before core gameplay phase 1 begins
+- the adapter should publish one immutable `CurrentInputState` snapshot for the whole frame
+- gameplay phase 1 and gameplay phase 2 must both read the same `CurrentInputState` snapshot; input is not re-sampled between the two phases
+- if the adapter or core input layer needs edge detection such as pressed-this-frame or released-this-frame, that logic should be computed before phase 1 and stored in the shared input snapshot or in a paired core-owned previous-frame snapshot
+- gameplay systems may read shared `InputState`, but they must not mutate it
+- only the adapter or a dedicated core-input preprocessing step may write `InputState`
+- any source input that arrives after the phase-1 cutoff should be buffered for the next frame rather than mutating the current frame's input snapshot
+- semantic host events are a separate ingress path from raw `InputState`; they may be submitted once before phase 1 and once again between phase 1 and phase 2
+- translated engine feedback events from physics, collision, or animation callbacks are not input and must not be folded back into the current frame's `InputState`; they re-enter gameplay only through the translated feedback-event path in phase 2 or a later frame as already defined elsewhere in this document
+- if several input sources can drive the same actor, the adapter must resolve that ownership before publishing the final shared input snapshot; gameplay systems should see one coherent input view, not several competing raw-device views
+- shared core `InputState` may contain normalized buttons, axes, directional values, and one-frame edge flags, but it must not contain game-specific high-level intents that belong to feature or game schemas
+
+Recommended implementation direction:
+
+- keep `CurrentInputState` and `PreviousInputState` as core-owned frame resources
+- compute edge flags during adapter translation or immediate core-input preprocessing
+- treat both snapshots as read-only during gameplay tick
+
+This locks the ownership and buffering boundary strongly enough for later system-design work without forcing one engine-specific implementation.
 
 Example:
 
