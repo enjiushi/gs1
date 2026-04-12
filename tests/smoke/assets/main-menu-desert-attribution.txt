@@ -1,0 +1,22 @@
+Main menu background image
+
+File:
+Desert Clean.png
+
+Source page:
+https://opengameart.org/content/cethiels-desert-background-redux
+
+Direct file used for the local asset:
+https://opengameart.org/sites/default/files/Desert%20Clean.png
+
+Author:
+Cethiel
+
+License:
+Creative Commons CC0
+
+Notes:
+The title-screen asset in this workspace is a locally color-graded derivative
+of the source image above. It is used for the visual smoke main menu
+background so the screen can keep the painted look while shifting into a more
+desaturated, severe campaign mood.

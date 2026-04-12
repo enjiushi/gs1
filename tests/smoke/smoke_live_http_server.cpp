@@ -241,6 +241,20 @@ void SmokeLiveHttpServer::handle_client(std::uintptr_t client_socket_value)
         return;
     }
 
+    if (method == "GET" && path == "/assets/main-menu-desert.png")
+    {
+        const auto image = load_text_file(repo_root_ / "tests" / "smoke" / "assets" / "main-menu-desert.png");
+        if (image.empty())
+        {
+            send_response(client_socket, 404, "Not Found", "text/plain; charset=utf-8", "Missing main menu image.");
+        }
+        else
+        {
+            send_response(client_socket, 200, "OK", "image/png", image);
+        }
+        return;
+    }
+
     if (method == "GET" && path == "/state")
     {
         send_response(client_socket, 200, "OK", "application/json; charset=utf-8", state_callback_());

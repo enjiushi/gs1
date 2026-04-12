@@ -1,6 +1,7 @@
 import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js";
 
 (function () {
+    const stageFrame = document.getElementById("stage-frame");
     const gameView = document.getElementById("game-view");
     const hudEyebrow = document.getElementById("hud-eyebrow");
     const hudTitle = document.getElementById("hud-title");
@@ -9,7 +10,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const menuPanel = document.getElementById("menu-panel");
     const menuEyebrow = document.getElementById("menu-eyebrow");
     const menuTitle = document.getElementById("menu-title");
+    const menuSubtitle = document.getElementById("menu-subtitle");
     const menuCopy = document.getElementById("menu-copy");
+    const menuMeta = document.getElementById("menu-meta");
     const menuActions = document.getElementById("menu-actions");
     const selectionEyebrow = document.getElementById("selection-eyebrow");
     const selectionText = document.getElementById("selection-text");
@@ -143,15 +146,24 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const actionElements = getActionElements(menuSetup);
 
         menuPanel.hidden = false;
-        menuEyebrow.textContent = "Placeholder Main Menu";
+        menuEyebrow.textContent = "Campaign 01";
         menuTitle.textContent = "GS1";
-        menuCopy.textContent = "Start a new campaign to enter the regional map. This UI is intentionally simple, but it is now driven by the live adapter state.";
+        menuSubtitle.textContent = "Desert Restoration Survival";
+        menuCopy.textContent = "The frontier is failing under heat, wind, and moving sand. Establish shelter, hold a line of living cover, and push the campaign site by site before exposed ground takes the region back.";
+        menuMeta.innerHTML =
+            "<span class=\"menu-meta-chip\">4-Site Prototype</span>" +
+            "<span class=\"menu-meta-chip life\">Living Cover</span>" +
+            "<span class=\"menu-meta-chip water\">Water Discipline</span>";
         menuActions.innerHTML = "";
 
         actionElements.forEach((element, index) => {
+            const label =
+                element.action && element.action.type === "START_NEW_CAMPAIGN"
+                    ? "Begin Campaign"
+                    : (element.text || element.action.type);
             menuActions.appendChild(
                 makeButton(
-                    element.text || element.action.type,
+                    label,
                     function () {
                         postJson("/ui-action", element.action).catch(() => {
                             statusChip.textContent = "Failed to send UI action.";
@@ -161,10 +173,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     (element.flags & 2) !== 0
                 )
             );
+
+            const appendedButton = menuActions.lastElementChild;
+            if (appendedButton && element.action && element.action.type === "START_NEW_CAMPAIGN") {
+                appendedButton.classList.add("title-primary-action");
+            }
         });
 
-        selectionEyebrow.textContent = "Flow";
-        selectionText.textContent = "Main menu is active. Click Start New Campaign to transition into the regional map.";
+        selectionEyebrow.textContent = "Situation";
+        selectionText.textContent = "Supplies are thin, cover is fragile, and every deployment begins exposed to dust and heat. Begin the campaign and secure the first living foothold.";
         contextActions.innerHTML = "";
     }
 
@@ -174,21 +191,28 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const actions = getVisibleActionElements(selectionSetup);
 
         menuPanel.hidden = true;
-        selectionEyebrow.textContent = "Regional Map";
+        selectionEyebrow.textContent = "Field Survey";
 
         if (labels.length > 0) {
             selectionText.textContent = labels.map((entry) => entry.text).join(" | ");
         } else if (state.selectedSiteId != null) {
-            selectionText.textContent = "Selected Site " + state.selectedSiteId;
+            selectionText.textContent = "Deployment route prepared for Site " + state.selectedSiteId + ". Review the dossier and commit when ready.";
         } else {
-            selectionText.textContent = "Choose a deployment site.";
+            selectionText.textContent = "Review the campaign survey and choose the next exposed site to stabilize.";
         }
 
         contextActions.innerHTML = "";
         actions.forEach((element) => {
+            let label = element.text || element.action.type;
+            if (element.action && element.action.type === "START_SITE_ATTEMPT") {
+                label = "Deploy To Site " + element.action.targetId;
+            } else if (element.action && element.action.type === "CLEAR_DEPLOYMENT_SITE_SELECTION") {
+                label = "Clear Route";
+            }
+
             contextActions.appendChild(
                 makeButton(
-                    element.text || element.action.type,
+                    label,
                     function () {
                         postJson("/ui-action", element.action).catch(() => {
                             statusChip.textContent = "Failed to send UI action.";
@@ -212,27 +236,32 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function updateOverlay(state) {
+        stageFrame.classList.toggle("main-menu-mode", state.appState === "MAIN_MENU");
+        stageFrame.classList.toggle("regional-map-mode", state.appState === "REGIONAL_MAP");
         hudEyebrow.textContent = "App State";
         hudTitle.textContent = state.appState || "NONE";
 
         switch (state.appState) {
         case "MAIN_MENU":
-            hudSubtitle.textContent = "A live placeholder main menu presented through the visual adapter.";
+            hudSubtitle.textContent = "Austere, painterly, and severe: the campaign opens under hostile conditions.";
             renderMenuOverlay(state);
+            statusChip.textContent = "Prototype Build\nVisual Smoke";
             break;
         case "REGIONAL_MAP":
-            hudSubtitle.textContent = "Select a deployment site to continue the current flow.";
+            hudSubtitle.textContent = "Review the campaign survey board and choose the next deployment route.";
             renderRegionalMapOverlay(state);
+            statusChip.textContent =
+                "Campaign Survey\nFrame " + state.frameNumber +
+                "\nSelected Site: " + (state.selectedSiteId == null ? "none" : state.selectedSiteId);
             break;
         default:
             hudSubtitle.textContent = "The current adapter only styles the core early flow for now.";
             renderFallbackOverlay(state);
+            statusChip.textContent =
+                "Connected\nFrame " + state.frameNumber +
+                "\nSelected Site: " + (state.selectedSiteId == null ? "none" : state.selectedSiteId);
             break;
         }
-
-        statusChip.textContent =
-            "Connected\nFrame " + state.frameNumber +
-            "\nSelected Site: " + (state.selectedSiteId == null ? "none" : state.selectedSiteId);
     }
 
     function renderMainMenuScene() {
@@ -288,23 +317,155 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         camera.lookAt(0, 1.6, 0);
     }
 
-    function renderRegionalMapScene(state) {
-        scene.background = new THREE_NS.Color(0xefe2ca);
-
-        const floor = new THREE_NS.Mesh(
-            new THREE_NS.PlaneGeometry(32, 18),
-            new THREE_NS.MeshStandardMaterial({ color: 0xf2e6d4, roughness: 0.95, metalness: 0.02 })
+    function addMapStroke(points, color, y, opacity) {
+        const geometry = new THREE_NS.BufferGeometry().setFromPoints(
+            points.map((point) => new THREE_NS.Vector3(point.x, y, point.z))
         );
-        floor.rotation.x = -Math.PI / 2;
-        floor.position.y = -0.03;
-        worldGroup.add(floor);
-        worldGroup.add(new THREE_NS.GridHelper(30, 20, 0xd0bf9f, 0xe7dbc8));
+        const line = new THREE_NS.Line(
+            geometry,
+            new THREE_NS.LineBasicMaterial({
+                color: color,
+                transparent: true,
+                opacity: opacity
+            })
+        );
+        worldGroup.add(line);
+    }
+
+    function renderRegionalMapScene(state) {
+        scene.background = new THREE_NS.Color(0xe6cfac);
+
+        const board = new THREE_NS.Mesh(
+            new THREE_NS.BoxGeometry(34.0, 0.72, 22.0),
+            new THREE_NS.MeshStandardMaterial({ color: 0x6c4b2d, roughness: 0.95, metalness: 0.04 })
+        );
+        board.position.set(0, -0.48, 0);
+        worldGroup.add(board);
+
+        const mapSheet = new THREE_NS.Mesh(
+            new THREE_NS.BoxGeometry(31.0, 0.16, 18.8),
+            new THREE_NS.MeshStandardMaterial({ color: 0xd9bf90, roughness: 0.98, metalness: 0.01 })
+        );
+        mapSheet.position.set(0, -0.03, 0);
+        worldGroup.add(mapSheet);
+
+        const mapInset = new THREE_NS.Mesh(
+            new THREE_NS.BoxGeometry(29.8, 0.04, 17.6),
+            new THREE_NS.MeshStandardMaterial({ color: 0xcfae78, roughness: 1.0, metalness: 0.0 })
+        );
+        mapInset.position.set(0, 0.06, 0);
+        worldGroup.add(mapInset);
+
+        const northMarker = new THREE_NS.Mesh(
+            new THREE_NS.ConeGeometry(0.18, 0.6, 3),
+            new THREE_NS.MeshStandardMaterial({ color: 0x53351b, roughness: 0.86, metalness: 0.05 })
+        );
+        northMarker.rotation.x = Math.PI;
+        northMarker.position.set(13.5, 0.28, -7.6);
+        worldGroup.add(northMarker);
 
         const positions = new Map();
         const scale = 0.03;
+        const rawPositions = state.regionalMap.sites.map((site) => ({
+            siteId: site.siteId,
+            rawX: site.mapX * scale,
+            rawZ: -site.mapY * scale
+        }));
 
-        state.regionalMap.sites.forEach((site) => {
-            positions.set(site.siteId, { x: site.mapX * scale, z: -site.mapY * scale });
+        if (rawPositions.length > 0) {
+            const rawXs = rawPositions.map((entry) => entry.rawX);
+            const rawZs = rawPositions.map((entry) => entry.rawZ);
+            const minRawX = Math.min.apply(null, rawXs);
+            const maxRawX = Math.max.apply(null, rawXs);
+            const minRawZ = Math.min.apply(null, rawZs);
+            const maxRawZ = Math.max.apply(null, rawZs);
+            const rawCenterX = (minRawX + maxRawX) * 0.5;
+            const rawCenterZ = (minRawZ + maxRawZ) * 0.5;
+            const useCurvedFallback = (maxRawZ - minRawZ) < 0.4;
+
+            if (useCurvedFallback) {
+                const orderedSites = rawPositions.slice().sort((left, right) => left.rawX - right.rawX);
+                const lastIndex = Math.max(orderedSites.length - 1, 1);
+
+                orderedSites.forEach((entry, index) => {
+                    const normalized = index / lastIndex;
+                    const centered = normalized - 0.5;
+                    positions.set(entry.siteId, {
+                        x: centered * 14.0,
+                        z: Math.sin(normalized * Math.PI) * 3.2 - 1.6 + Math.cos(normalized * Math.PI * 2.0) * 0.45
+                    });
+                });
+            } else {
+                rawPositions.forEach((entry) => {
+                    positions.set(entry.siteId, {
+                        x: entry.rawX - rawCenterX,
+                        z: entry.rawZ - rawCenterZ
+                    });
+                });
+            }
+        }
+
+        [
+            [
+                { x: -12.8, z: -6.4 },
+                { x: -8.5, z: -5.6 },
+                { x: -3.2, z: -6.0 },
+                { x: 2.0, z: -5.0 },
+                { x: 7.4, z: -5.6 },
+                { x: 12.8, z: -4.9 }
+            ],
+            [
+                { x: -13.4, z: -2.4 },
+                { x: -9.1, z: -1.3 },
+                { x: -4.8, z: -2.2 },
+                { x: 0.8, z: -1.0 },
+                { x: 6.5, z: -1.7 },
+                { x: 13.1, z: -0.6 }
+            ],
+            [
+                { x: -13.2, z: 1.8 },
+                { x: -8.2, z: 2.6 },
+                { x: -4.1, z: 1.4 },
+                { x: 2.4, z: 2.2 },
+                { x: 6.8, z: 1.1 },
+                { x: 12.6, z: 2.0 }
+            ],
+            [
+                { x: -12.4, z: 5.6 },
+                { x: -7.2, z: 4.8 },
+                { x: -2.6, z: 5.8 },
+                { x: 2.8, z: 4.7 },
+                { x: 8.0, z: 5.5 },
+                { x: 12.0, z: 4.9 }
+            ]
+        ].forEach((stroke, index) => {
+            addMapStroke(stroke, index % 2 === 0 ? 0xb38859 : 0xc49a67, 0.11, 0.62);
+        });
+
+        [
+            [
+                { x: -11.4, z: -7.0 },
+                { x: -8.6, z: -3.2 },
+                { x: -6.8, z: 0.4 },
+                { x: -5.5, z: 4.2 },
+                { x: -4.2, z: 7.0 }
+            ],
+            [
+                { x: 1.0, z: -7.4 },
+                { x: 0.4, z: -3.3 },
+                { x: 0.8, z: 0.2 },
+                { x: 1.6, z: 3.8 },
+                { x: 2.8, z: 6.8 }
+            ],
+            [
+                { x: 9.6, z: -7.2 },
+                { x: 8.3, z: -4.0 },
+                { x: 7.8, z: -0.5 },
+                { x: 8.7, z: 3.1 },
+                { x: 10.4, z: 6.6 }
+            ]
+        ].forEach((stroke) => {
+            addMapStroke(stroke, 0xa77f50, 0.11, 0.36);
         });
 
         state.regionalMap.links.forEach((link) => {
@@ -314,59 +475,106 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 return;
             }
 
-            const geometry = new THREE_NS.BufferGeometry().setFromPoints([
-                new THREE_NS.Vector3(from.x, 0.09, from.z),
-                new THREE_NS.Vector3(to.x, 0.09, to.z)
-            ]);
-            const line = new THREE_NS.Line(
-                geometry,
-                new THREE_NS.LineBasicMaterial({ color: 0x8b6f4f })
+            const deltaX = to.x - from.x;
+            const deltaZ = to.z - from.z;
+            const length = Math.sqrt(deltaX * deltaX + deltaZ * deltaZ) || 1.0;
+            const normalX = -deltaZ / length;
+            const normalZ = deltaX / length;
+            const midpoint = new THREE_NS.Vector3(
+                (from.x + to.x) * 0.5 + normalX * 0.22,
+                0.16,
+                (from.z + to.z) * 0.5 + normalZ * 0.22
             );
-            worldGroup.add(line);
+            const curve = new THREE_NS.QuadraticBezierCurve3(
+                new THREE_NS.Vector3(from.x, 0.15, from.z),
+                midpoint,
+                new THREE_NS.Vector3(to.x, 0.15, to.z)
+            );
+            const path = new THREE_NS.Mesh(
+                new THREE_NS.TubeGeometry(curve, 18, 0.035, 8, false),
+                new THREE_NS.MeshStandardMaterial({ color: 0x725233, roughness: 0.86, metalness: 0.03 })
+            );
+            worldGroup.add(path);
         });
 
-        state.regionalMap.sites.forEach((site, index) => {
+        state.regionalMap.sites.forEach((site) => {
             const position = positions.get(site.siteId);
             if (!position) {
                 return;
             }
 
-            const stateColor =
-                site.siteState === "AVAILABLE" ? 0x88b173 :
-                site.siteState === "COMPLETED" ? 0xcda261 :
-                0x808995;
+            const markerGroup = new THREE_NS.Group();
+            markerGroup.position.set(position.x, 0.0, position.z);
 
-            const base = new THREE_NS.Mesh(
-                new THREE_NS.CylinderGeometry(0.75, 0.98, 0.34, 28),
-                new THREE_NS.MeshStandardMaterial({ color: stateColor, roughness: 0.78, metalness: 0.08 })
+            const palette =
+                site.siteState === "AVAILABLE"
+                    ? { plinth: 0x816346, badge: 0x6f8756, cloth: 0x99ad74 }
+                    : site.siteState === "COMPLETED"
+                        ? { plinth: 0x785736, badge: 0xb18755, cloth: 0xcab47b }
+                        : { plinth: 0x6d6156, badge: 0x918474, cloth: 0x918474 };
+
+            const plinth = new THREE_NS.Mesh(
+                new THREE_NS.CylinderGeometry(0.72, 0.82, 0.18, 24),
+                new THREE_NS.MeshStandardMaterial({ color: palette.plinth, roughness: 0.9, metalness: 0.05 })
             );
-            base.position.set(position.x, 0.18, position.z);
-            base.userData = { siteId: site.siteId, siteState: site.siteState, pulseOffset: index * 0.8 };
-            worldGroup.add(base);
+            plinth.position.y = 0.12;
+            plinth.userData = { siteId: site.siteId, siteState: site.siteState };
+            markerGroup.add(plinth);
+
+            const badge = new THREE_NS.Mesh(
+                new THREE_NS.CylinderGeometry(0.44, 0.5, 0.12, 18),
+                new THREE_NS.MeshStandardMaterial({ color: palette.badge, roughness: 0.82, metalness: 0.06 })
+            );
+            badge.position.y = 0.27;
+            markerGroup.add(badge);
+
+            const post = new THREE_NS.Mesh(
+                new THREE_NS.CylinderGeometry(0.04, 0.04, 0.4, 8),
+                new THREE_NS.MeshStandardMaterial({ color: 0x3f2c18, roughness: 0.88, metalness: 0.04 })
+            );
+            post.position.y = 0.5;
+            markerGroup.add(post);
+
+            if (site.siteState !== "LOCKED") {
+                const pennant = new THREE_NS.Mesh(
+                    new THREE_NS.BoxGeometry(0.12, 0.28, 0.02),
+                    new THREE_NS.MeshStandardMaterial({ color: palette.cloth, roughness: 0.82, metalness: 0.02 })
+                );
+                pennant.position.set(0.13, 0.64, 0.0);
+                pennant.rotation.z = -0.18;
+                markerGroup.add(pennant);
+            }
 
             if (site.siteState === "AVAILABLE") {
-                mapPickables.push(base);
-
-                const pulseRing = new THREE_NS.Mesh(
-                    new THREE_NS.TorusGeometry(1.05, 0.05, 12, 48),
-                    new THREE_NS.MeshStandardMaterial({ color: 0x6e9a65, emissive: 0x50704a, emissiveIntensity: 0.22 })
-                );
-                pulseRing.rotation.x = Math.PI / 2;
-                pulseRing.position.set(position.x, 0.24, position.z);
-                pulseRing.userData = { pulseOffset: index * 0.8, pulse: true };
-                worldGroup.add(pulseRing);
+                mapPickables.push(plinth);
             }
 
             if ((site.flags & 1) !== 0) {
-                const selectedHalo = new THREE_NS.Mesh(
-                    new THREE_NS.TorusGeometry(1.32, 0.09, 14, 64),
-                    new THREE_NS.MeshStandardMaterial({ color: 0x2f3f4f, emissive: 0x2f3f4f, emissiveIntensity: 0.18 })
+                const selectedRing = new THREE_NS.Mesh(
+                    new THREE_NS.TorusGeometry(1.04, 0.05, 10, 48),
+                    new THREE_NS.MeshStandardMaterial({ color: 0xcfb07a, roughness: 0.72, metalness: 0.18 })
                 );
-                selectedHalo.rotation.x = Math.PI / 2;
-                selectedHalo.position.set(position.x, 0.34, position.z);
-                selectedHalo.userData = { spinZ: 0.46 };
-                worldGroup.add(selectedHalo);
+                selectedRing.rotation.x = Math.PI / 2;
+                selectedRing.position.y = 0.16;
+                markerGroup.add(selectedRing);
+
+                [
+                    { x: -0.84, z: -0.84 },
+                    { x: 0.84, z: -0.84 },
+                    { x: -0.84, z: 0.84 },
+                    { x: 0.84, z: 0.84 }
+                ].forEach((corner) => {
+                    const marker = new THREE_NS.Mesh(
+                        new THREE_NS.BoxGeometry(0.18, 0.06, 0.42),
+                        new THREE_NS.MeshStandardMaterial({ color: 0x5a4126, roughness: 0.88, metalness: 0.04 })
+                    );
+                    marker.position.set(corner.x, 0.15, corner.z);
+                    marker.rotation.y = Math.atan2(corner.x, corner.z);
+                    markerGroup.add(marker);
+                });
             }
+
+            worldGroup.add(markerGroup);
         });
 
         if (state.regionalMap.sites.length > 0) {
@@ -374,11 +582,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             const zs = state.regionalMap.sites.map((site) => positions.get(site.siteId).z);
             const centerX = (Math.min.apply(null, xs) + Math.max.apply(null, xs)) * 0.5;
             const centerZ = (Math.min.apply(null, zs) + Math.max.apply(null, zs)) * 0.5;
-            camera.position.set(centerX + 5.2, 8.4, centerZ + 7.6);
-            camera.lookAt(centerX, 0, centerZ);
+            camera.position.set(centerX + 7.2, 11.2, centerZ + 8.9);
+            camera.lookAt(centerX, 0.25, centerZ);
         } else {
-            camera.position.set(5, 8, 7);
-            camera.lookAt(0, 0, 0);
+            camera.position.set(6.6, 10.5, 8.0);
+            camera.lookAt(0, 0.2, 0);
         }
     }
 
@@ -509,9 +717,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 } else {
                     latestState = state;
                 }
-                statusChip.textContent =
-                    "Connected\nFrame " + state.frameNumber +
-                    "\nSelected Site: " + (state.selectedSiteId == null ? "none" : state.selectedSiteId);
+                if (state.appState !== "MAIN_MENU") {
+                    statusChip.textContent =
+                        "Connected\nFrame " + state.frameNumber +
+                        "\nSelected Site: " + (state.selectedSiteId == null ? "none" : state.selectedSiteId);
+                }
             })
             .catch(() => {
                 statusChip.textContent = "Waiting for host...";
