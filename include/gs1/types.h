@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
+#include <type_traits>
 
 struct Gs1RuntimeHandle;
 
@@ -497,35 +499,67 @@ struct Gs1EngineCommandOneShotCueData
     std::uint32_t arg1;
 };
 
-union Gs1EngineCommandPayload
+struct Gs1EngineCommandPayload
 {
-    Gs1EngineCommandLogTextData log_text;
-    Gs1EngineCommandSetAppStateData set_app_state;
-    Gs1EngineCommandPresentationDirtyData presentation_dirty;
-    Gs1EngineCommandRegionalMapSnapshotData regional_map_snapshot;
-    Gs1EngineCommandRegionalMapSiteData regional_map_site;
-    Gs1EngineCommandRegionalMapLinkData regional_map_link;
-    Gs1EngineCommandUiSetupData ui_setup;
-    Gs1EngineCommandCloseUiSetupData close_ui_setup;
-    Gs1EngineCommandUiElementData ui_element;
-    Gs1EngineCommandSiteSnapshotData site_snapshot;
-    Gs1EngineCommandSiteTileData site_tile;
-    Gs1EngineCommandWorkerData site_worker;
-    Gs1EngineCommandCampData site_camp;
-    Gs1EngineCommandWeatherData site_weather;
-    Gs1EngineCommandInventorySlotData inventory_slot;
-    Gs1EngineCommandTaskData task;
-    Gs1EngineCommandPhoneListingData phone_listing;
-    Gs1EngineCommandHudStateData hud_state;
-    Gs1EngineCommandNotificationData notification;
-    Gs1EngineCommandSiteResultData site_result;
-    Gs1EngineCommandOneShotCueData one_shot_cue;
-    std::uint32_t raw_u32[32];
+    static constexpr std::size_t raw_u32_count = 32U;
+    static constexpr std::size_t byte_count = sizeof(std::uint32_t) * raw_u32_count;
+    static constexpr std::size_t payload_alignment = alignof(std::uint64_t);
+
+    alignas(std::uint64_t) unsigned char raw_bytes[byte_count];
+
+    [[nodiscard]] void* data() noexcept { return raw_bytes; }
+    [[nodiscard]] const void* data() const noexcept { return raw_bytes; }
+
+    template <typename PayloadData>
+    [[nodiscard]] PayloadData& as() noexcept
+    {
+        validate_payload_type<PayloadData>();
+        return *static_cast<PayloadData*>(data());
+    }
+
+    template <typename PayloadData>
+    [[nodiscard]] const PayloadData& as() const noexcept
+    {
+        validate_payload_type<PayloadData>();
+        return *static_cast<const PayloadData*>(data());
+    }
+
+private:
+    template <typename PayloadData>
+    static constexpr void validate_payload_type() noexcept
+    {
+        static_assert(
+            std::is_trivial_v<PayloadData> && std::is_standard_layout_v<PayloadData>,
+            "Engine command payload data must stay POD-like.");
+        static_assert(sizeof(PayloadData) <= byte_count, "Engine command payload data exceeds the raw payload size.");
+        static_assert(
+            alignof(PayloadData) <= payload_alignment,
+            "Engine command payload data requires stronger alignment than the raw payload storage.");
+    }
 };
+
+static_assert(
+    sizeof(Gs1EngineCommandPayload) == Gs1EngineCommandPayload::byte_count,
+    "Engine command payload storage must stay exactly 32 uint32 words.");
+static_assert(
+    alignof(Gs1EngineCommandPayload) == Gs1EngineCommandPayload::payload_alignment,
+    "Engine command payload alignment changed.");
 
 struct Gs1EngineCommand
 {
     std::uint32_t struct_size;
     Gs1EngineCommandType type;
     Gs1EngineCommandPayload payload;
+
+    template <typename PayloadData>
+    [[nodiscard]] PayloadData& payload_as() noexcept
+    {
+        return payload.as<PayloadData>();
+    }
+
+    template <typename PayloadData>
+    [[nodiscard]] const PayloadData& payload_as() const noexcept
+    {
+        return payload.as<PayloadData>();
+    }
 };

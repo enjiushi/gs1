@@ -430,10 +430,11 @@ Gs1Status GameRuntime::handle_command(const GameCommand& command)
 void GameRuntime::queue_log_command(const char* message)
 {
     auto command = make_engine_command(GS1_ENGINE_COMMAND_LOG_TEXT);
-    command.payload.log_text.level = GS1_LOG_LEVEL_INFO;
+    auto& payload = command.payload_as<Gs1EngineCommandLogTextData>();
+    payload.level = GS1_LOG_LEVEL_INFO;
     strncpy_s(
-        command.payload.log_text.text,
-        sizeof(command.payload.log_text.text),
+        payload.text,
+        sizeof(payload.text),
         message,
         _TRUNCATE);
     engine_commands_.push_back(command);
@@ -447,8 +448,9 @@ void GameRuntime::queue_app_state_command(Gs1AppState app_state)
     }
 
     auto command = make_engine_command(GS1_ENGINE_COMMAND_SET_APP_STATE);
-    command.payload.set_app_state.app_state = app_state;
-    command.payload.set_app_state.frame_ordinal = 0U;
+    auto& payload = command.payload_as<Gs1EngineCommandSetAppStateData>();
+    payload.app_state = app_state;
+    payload.frame_ordinal = 0U;
     engine_commands_.push_back(command);
     last_emitted_app_state_ = app_state;
 }
@@ -460,11 +462,12 @@ void GameRuntime::queue_ui_setup_begin_command(
     std::uint32_t context_id)
 {
     auto command = make_engine_command(GS1_ENGINE_COMMAND_BEGIN_UI_SETUP);
-    command.payload.ui_setup.setup_id = setup_id;
-    command.payload.ui_setup.mode = GS1_PROJECTION_MODE_SNAPSHOT;
-    command.payload.ui_setup.presentation_type = presentation_type;
-    command.payload.ui_setup.element_count = element_count;
-    command.payload.ui_setup.context_id = context_id;
+    auto& payload = command.payload_as<Gs1EngineCommandUiSetupData>();
+    payload.setup_id = setup_id;
+    payload.mode = GS1_PROJECTION_MODE_SNAPSHOT;
+    payload.presentation_type = presentation_type;
+    payload.element_count = element_count;
+    payload.context_id = context_id;
     engine_commands_.push_back(command);
 
     active_ui_setups_[setup_id] = presentation_type;
@@ -479,8 +482,9 @@ void GameRuntime::queue_ui_setup_close_command(
     Gs1UiSetupPresentationType presentation_type)
 {
     auto command = make_engine_command(GS1_ENGINE_COMMAND_CLOSE_UI_SETUP);
-    command.payload.close_ui_setup.setup_id = setup_id;
-    command.payload.close_ui_setup.presentation_type = presentation_type;
+    auto& payload = command.payload_as<Gs1EngineCommandCloseUiSetupData>();
+    payload.setup_id = setup_id;
+    payload.presentation_type = presentation_type;
     engine_commands_.push_back(command);
 
     active_ui_setups_.erase(setup_id);
@@ -519,13 +523,14 @@ void GameRuntime::queue_ui_element_command(
     const char* text)
 {
     auto command = make_engine_command(GS1_ENGINE_COMMAND_UI_ELEMENT_UPSERT);
-    command.payload.ui_element.element_id = element_id;
-    command.payload.ui_element.element_type = element_type;
-    command.payload.ui_element.flags = flags;
-    command.payload.ui_element.action = action;
+    auto& payload = command.payload_as<Gs1EngineCommandUiElementData>();
+    payload.element_id = element_id;
+    payload.element_type = element_type;
+    payload.flags = flags;
+    payload.action = action;
     strncpy_s(
-        command.payload.ui_element.text,
-        sizeof(command.payload.ui_element.text),
+        payload.text,
+        sizeof(payload.text),
         text,
         _TRUNCATE);
     engine_commands_.push_back(command);
@@ -656,8 +661,9 @@ void GameRuntime::queue_regional_map_snapshot_commands()
     }
 
     auto begin = make_engine_command(GS1_ENGINE_COMMAND_BEGIN_REGIONAL_MAP_SNAPSHOT);
-    begin.payload.regional_map_snapshot.mode = GS1_PROJECTION_MODE_SNAPSHOT;
-    begin.payload.regional_map_snapshot.site_count = static_cast<std::uint32_t>(campaign_->sites.size());
+    auto& begin_payload = begin.payload_as<Gs1EngineCommandRegionalMapSnapshotData>();
+    begin_payload.mode = GS1_PROJECTION_MODE_SNAPSHOT;
+    begin_payload.site_count = static_cast<std::uint32_t>(campaign_->sites.size());
 
     std::set<std::pair<std::uint32_t, std::uint32_t>> unique_links;
     for (const auto& site : campaign_->sites)
@@ -670,8 +676,8 @@ void GameRuntime::queue_regional_map_snapshot_commands()
         }
     }
 
-    begin.payload.regional_map_snapshot.link_count = static_cast<std::uint32_t>(unique_links.size());
-    begin.payload.regional_map_snapshot.selected_site_id =
+    begin_payload.link_count = static_cast<std::uint32_t>(unique_links.size());
+    begin_payload.selected_site_id =
         campaign_->regional_map_state.selected_site_id.has_value()
             ? campaign_->regional_map_state.selected_site_id->value
             : 0U;
@@ -685,8 +691,9 @@ void GameRuntime::queue_regional_map_snapshot_commands()
     for (const auto& link : unique_links)
     {
         auto link_command = make_engine_command(GS1_ENGINE_COMMAND_REGIONAL_MAP_LINK_UPSERT);
-        link_command.payload.regional_map_link.from_site_id = link.first;
-        link_command.payload.regional_map_link.to_site_id = link.second;
+        auto& payload = link_command.payload_as<Gs1EngineCommandRegionalMapLinkData>();
+        payload.from_site_id = link.first;
+        payload.to_site_id = link.second;
         engine_commands_.push_back(link_command);
     }
 
@@ -701,10 +708,11 @@ void GameRuntime::queue_regional_map_site_upsert_command(const SiteMetaState& si
     }
 
     auto site_command = make_engine_command(GS1_ENGINE_COMMAND_REGIONAL_MAP_SITE_UPSERT);
-    site_command.payload.regional_map_site.site_id = site.site_id.value;
-    site_command.payload.regional_map_site.site_state = site.site_state;
-    site_command.payload.regional_map_site.site_archetype_id = site.site_archetype_id;
-    site_command.payload.regional_map_site.flags =
+    auto& payload = site_command.payload_as<Gs1EngineCommandRegionalMapSiteData>();
+    payload.site_id = site.site_id.value;
+    payload.site_state = site.site_state;
+    payload.site_archetype_id = site.site_archetype_id;
+    payload.flags =
         (campaign_->regional_map_state.selected_site_id.has_value() &&
             campaign_->regional_map_state.selected_site_id->value == site.site_id.value)
         ? 1U
@@ -719,11 +727,11 @@ void GameRuntime::queue_regional_map_site_upsert_command(const SiteMetaState& si
         }
     }
 
-    site_command.payload.regional_map_site.map_x = static_cast<std::int32_t>(map_index * 160);
-    site_command.payload.regional_map_site.map_y = 0;
-    site_command.payload.regional_map_site.support_package_id =
+    payload.map_x = static_cast<std::int32_t>(map_index * 160);
+    payload.map_y = 0;
+    payload.support_package_id =
         site.has_support_package_id ? site.support_package_id : 0U;
-    site_command.payload.regional_map_site.support_preview_mask = 0U;
+    payload.support_preview_mask = 0U;
     engine_commands_.push_back(site_command);
 }
 
@@ -735,11 +743,12 @@ void GameRuntime::queue_site_snapshot_commands()
     }
 
     auto begin = make_engine_command(GS1_ENGINE_COMMAND_BEGIN_SITE_SNAPSHOT);
-    begin.payload.site_snapshot.mode = GS1_PROJECTION_MODE_SNAPSHOT;
-    begin.payload.site_snapshot.site_id = active_site_run_->site_id.value;
-    begin.payload.site_snapshot.site_archetype_id = active_site_run_->site_archetype_id;
-    begin.payload.site_snapshot.width = active_site_run_->tile_grid.width;
-    begin.payload.site_snapshot.height = active_site_run_->tile_grid.height;
+    auto& begin_payload = begin.payload_as<Gs1EngineCommandSiteSnapshotData>();
+    begin_payload.mode = GS1_PROJECTION_MODE_SNAPSHOT;
+    begin_payload.site_id = active_site_run_->site_id.value;
+    begin_payload.site_archetype_id = active_site_run_->site_archetype_id;
+    begin_payload.width = active_site_run_->tile_grid.width;
+    begin_payload.height = active_site_run_->tile_grid.height;
     engine_commands_.push_back(begin);
 
     for (std::uint32_t y = 0; y < active_site_run_->tile_grid.height; ++y)
@@ -751,51 +760,55 @@ void GameRuntime::queue_site_snapshot_commands()
                 static_cast<std::size_t>(x);
 
             auto tile_command = make_engine_command(GS1_ENGINE_COMMAND_SITE_TILE_UPSERT);
-            tile_command.payload.site_tile.x = x;
-            tile_command.payload.site_tile.y = y;
-            tile_command.payload.site_tile.terrain_type_id = active_site_run_->tile_grid.terrain_type_ids[index];
-            tile_command.payload.site_tile.plant_type_id = active_site_run_->tile_grid.plant_type_ids[index].value;
-            tile_command.payload.site_tile.structure_type_id = active_site_run_->tile_grid.structure_type_ids[index].value;
-            tile_command.payload.site_tile.ground_cover_type_id = active_site_run_->tile_grid.ground_cover_type_ids[index];
-            tile_command.payload.site_tile.plant_density = active_site_run_->tile_grid.tile_plant_density[index];
-            tile_command.payload.site_tile.sand_burial = active_site_run_->tile_grid.tile_sand_burial[index];
+            auto& payload = tile_command.payload_as<Gs1EngineCommandSiteTileData>();
+            payload.x = x;
+            payload.y = y;
+            payload.terrain_type_id = active_site_run_->tile_grid.terrain_type_ids[index];
+            payload.plant_type_id = active_site_run_->tile_grid.plant_type_ids[index].value;
+            payload.structure_type_id = active_site_run_->tile_grid.structure_type_ids[index].value;
+            payload.ground_cover_type_id = active_site_run_->tile_grid.ground_cover_type_ids[index];
+            payload.plant_density = active_site_run_->tile_grid.tile_plant_density[index];
+            payload.sand_burial = active_site_run_->tile_grid.tile_sand_burial[index];
             engine_commands_.push_back(tile_command);
         }
     }
 
     auto worker_command = make_engine_command(GS1_ENGINE_COMMAND_SITE_WORKER_UPDATE);
-    worker_command.payload.site_worker.tile_x = static_cast<float>(active_site_run_->worker.tile_coord.x);
-    worker_command.payload.site_worker.tile_y = static_cast<float>(active_site_run_->worker.tile_coord.y);
-    worker_command.payload.site_worker.facing_degrees = active_site_run_->worker.facing_degrees;
-    worker_command.payload.site_worker.health_normalized = active_site_run_->worker.player_health / 100.0f;
-    worker_command.payload.site_worker.hydration_normalized = active_site_run_->worker.player_hydration / 100.0f;
-    worker_command.payload.site_worker.energy_normalized =
+    auto& worker_payload = worker_command.payload_as<Gs1EngineCommandWorkerData>();
+    worker_payload.tile_x = static_cast<float>(active_site_run_->worker.tile_coord.x);
+    worker_payload.tile_y = static_cast<float>(active_site_run_->worker.tile_coord.y);
+    worker_payload.facing_degrees = active_site_run_->worker.facing_degrees;
+    worker_payload.health_normalized = active_site_run_->worker.player_health / 100.0f;
+    worker_payload.hydration_normalized = active_site_run_->worker.player_hydration / 100.0f;
+    worker_payload.energy_normalized =
         active_site_run_->worker.player_energy_cap > 0.0f
             ? (active_site_run_->worker.player_energy / active_site_run_->worker.player_energy_cap)
             : 0.0f;
-    worker_command.payload.site_worker.current_action_kind = static_cast<std::uint32_t>(active_site_run_->site_action.action_kind);
+    worker_payload.current_action_kind = static_cast<std::uint32_t>(active_site_run_->site_action.action_kind);
     engine_commands_.push_back(worker_command);
 
     auto camp_command = make_engine_command(GS1_ENGINE_COMMAND_SITE_CAMP_UPDATE);
-    camp_command.payload.site_camp.tile_x = active_site_run_->camp.camp_anchor_tile.x;
-    camp_command.payload.site_camp.tile_y = active_site_run_->camp.camp_anchor_tile.y;
-    camp_command.payload.site_camp.durability_normalized = active_site_run_->camp.camp_durability / 100.0f;
-    camp_command.payload.site_camp.flags =
+    auto& camp_payload = camp_command.payload_as<Gs1EngineCommandCampData>();
+    camp_payload.tile_x = active_site_run_->camp.camp_anchor_tile.x;
+    camp_payload.tile_y = active_site_run_->camp.camp_anchor_tile.y;
+    camp_payload.durability_normalized = active_site_run_->camp.camp_durability / 100.0f;
+    camp_payload.flags =
         (active_site_run_->camp.delivery_point_operational ? 1U : 0U) |
         (active_site_run_->camp.shared_camp_storage_access_enabled ? 2U : 0U);
     engine_commands_.push_back(camp_command);
 
     auto weather_command = make_engine_command(GS1_ENGINE_COMMAND_SITE_WEATHER_UPDATE);
-    weather_command.payload.site_weather.heat = active_site_run_->weather.weather_heat;
-    weather_command.payload.site_weather.wind = active_site_run_->weather.weather_wind;
-    weather_command.payload.site_weather.dust = active_site_run_->weather.weather_dust;
-    weather_command.payload.site_weather.event_template_id =
+    auto& weather_payload = weather_command.payload_as<Gs1EngineCommandWeatherData>();
+    weather_payload.heat = active_site_run_->weather.weather_heat;
+    weather_payload.wind = active_site_run_->weather.weather_wind;
+    weather_payload.dust = active_site_run_->weather.weather_dust;
+    weather_payload.event_template_id =
         active_site_run_->event.active_event_template_id.has_value()
             ? active_site_run_->event.active_event_template_id->value
             : 0U;
-    weather_command.payload.site_weather.event_phase =
+    weather_payload.event_phase =
         static_cast<Gs1WeatherEventPhase>(active_site_run_->event.event_phase);
-    weather_command.payload.site_weather.phase_minutes_remaining =
+    weather_payload.phase_minutes_remaining =
         static_cast<float>(active_site_run_->event.phase_minutes_remaining);
     engine_commands_.push_back(weather_command);
 
@@ -810,15 +823,16 @@ void GameRuntime::queue_hud_state_command()
     }
 
     auto hud_command = make_engine_command(GS1_ENGINE_COMMAND_HUD_STATE);
-    hud_command.payload.hud_state.player_health = active_site_run_->worker.player_health;
-    hud_command.payload.hud_state.player_hydration = active_site_run_->worker.player_hydration;
-    hud_command.payload.hud_state.player_energy = active_site_run_->worker.player_energy;
-    hud_command.payload.hud_state.current_money = active_site_run_->economy.money;
-    hud_command.payload.hud_state.active_task_count =
+    auto& payload = hud_command.payload_as<Gs1EngineCommandHudStateData>();
+    payload.player_health = active_site_run_->worker.player_health;
+    payload.player_hydration = active_site_run_->worker.player_hydration;
+    payload.player_energy = active_site_run_->worker.player_energy;
+    payload.current_money = active_site_run_->economy.money;
+    payload.active_task_count =
         static_cast<std::uint32_t>(active_site_run_->task_board.accepted_task_ids.size());
-    hud_command.payload.hud_state.current_action_kind =
+    payload.current_action_kind =
         static_cast<std::uint32_t>(active_site_run_->site_action.action_kind);
-    hud_command.payload.hud_state.site_completion_normalized =
+    payload.site_completion_normalized =
         active_site_run_->counters.site_completion_tile_threshold > 0U
             ? static_cast<float>(active_site_run_->counters.fully_grown_tile_count) /
                 static_cast<float>(active_site_run_->counters.site_completion_tile_threshold)
@@ -832,9 +846,10 @@ void GameRuntime::queue_site_result_ready_command(
     std::uint32_t newly_revealed_site_count)
 {
     auto command = make_engine_command(GS1_ENGINE_COMMAND_SITE_RESULT_READY);
-    command.payload.site_result.site_id = site_id;
-    command.payload.site_result.result = result;
-    command.payload.site_result.newly_revealed_site_count = newly_revealed_site_count;
+    auto& payload = command.payload_as<Gs1EngineCommandSiteResultData>();
+    payload.site_id = site_id;
+    payload.result = result;
+    payload.newly_revealed_site_count = newly_revealed_site_count;
     engine_commands_.push_back(command);
 }
 

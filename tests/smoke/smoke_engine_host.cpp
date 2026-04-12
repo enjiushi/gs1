@@ -535,7 +535,9 @@ void SmokeEngineHost::flush_engine_commands(const char* stage_label)
         switch (command.type)
         {
         case GS1_ENGINE_COMMAND_SET_APP_STATE:
-            current_app_state_ = command.payload.set_app_state.app_state;
+        {
+            const auto& payload = command.payload_as<Gs1EngineCommandSetAppStateData>();
+            current_app_state_ = payload.app_state;
             if (current_app_state_ == GS1_APP_STATE_MAIN_MENU ||
                 current_app_state_ == GS1_APP_STATE_REGIONAL_MAP ||
                 current_app_state_ == GS1_APP_STATE_CAMPAIGN_SETUP ||
@@ -552,6 +554,7 @@ void SmokeEngineHost::flush_engine_commands(const char* stage_label)
                 site_result_.reset();
             }
             break;
+        }
 
         case GS1_ENGINE_COMMAND_BEGIN_REGIONAL_MAP_SNAPSHOT:
             apply_regional_map_snapshot_begin(command);
@@ -707,15 +710,17 @@ bool SmokeEngineHost::resolve_available_ui_action(
 
 void SmokeEngineHost::apply_ui_setup_begin(const Gs1EngineCommand& command)
 {
+    const auto& payload = command.payload_as<Gs1EngineCommandUiSetupData>();
     pending_ui_setup_ = PendingUiSetup {};
-    pending_ui_setup_->setup_id = command.payload.ui_setup.setup_id;
-    pending_ui_setup_->presentation_type = command.payload.ui_setup.presentation_type;
-    pending_ui_setup_->context_id = command.payload.ui_setup.context_id;
+    pending_ui_setup_->setup_id = payload.setup_id;
+    pending_ui_setup_->presentation_type = payload.presentation_type;
+    pending_ui_setup_->context_id = payload.context_id;
 }
 
 void SmokeEngineHost::apply_ui_setup_close(const Gs1EngineCommand& command)
 {
-    const auto setup_id = command.payload.close_ui_setup.setup_id;
+    const auto& payload = command.payload_as<Gs1EngineCommandCloseUiSetupData>();
+    const auto setup_id = payload.setup_id;
     active_ui_setups_.erase(setup_id);
 
     if (pending_ui_setup_.has_value() && pending_ui_setup_->setup_id == setup_id)
@@ -731,12 +736,13 @@ void SmokeEngineHost::apply_ui_element_upsert(const Gs1EngineCommand& command)
         return;
     }
 
+    const auto& payload = command.payload_as<Gs1EngineCommandUiElementData>();
     ActiveUiElement element {};
-    element.element_id = command.payload.ui_element.element_id;
-    element.element_type = command.payload.ui_element.element_type;
-    element.flags = command.payload.ui_element.flags;
-    element.action = command.payload.ui_element.action;
-    element.text = command.payload.ui_element.text;
+    element.element_id = payload.element_id;
+    element.element_type = payload.element_type;
+    element.flags = payload.flags;
+    element.action = payload.action;
+    element.text = payload.text;
     pending_ui_setup_->elements.push_back(std::move(element));
 }
 
@@ -781,15 +787,16 @@ void SmokeEngineHost::apply_ui_setup_end()
 
 void SmokeEngineHost::apply_regional_map_snapshot_begin(const Gs1EngineCommand& command)
 {
-    if (command.payload.regional_map_snapshot.mode == GS1_PROJECTION_MODE_SNAPSHOT)
+    const auto& payload = command.payload_as<Gs1EngineCommandRegionalMapSnapshotData>();
+    if (payload.mode == GS1_PROJECTION_MODE_SNAPSHOT)
     {
         regional_map_sites_.clear();
         regional_map_links_.clear();
     }
 
-    if (command.payload.regional_map_snapshot.selected_site_id != 0U)
+    if (payload.selected_site_id != 0U)
     {
-        selected_site_id_ = command.payload.regional_map_snapshot.selected_site_id;
+        selected_site_id_ = payload.selected_site_id;
     }
     else
     {
@@ -799,15 +806,16 @@ void SmokeEngineHost::apply_regional_map_snapshot_begin(const Gs1EngineCommand& 
 
 void SmokeEngineHost::apply_regional_map_site_upsert(const Gs1EngineCommand& command)
 {
+    const auto& payload = command.payload_as<Gs1EngineCommandRegionalMapSiteData>();
     RegionalMapSiteProjection projection {};
-    projection.site_id = command.payload.regional_map_site.site_id;
-    projection.site_state = command.payload.regional_map_site.site_state;
-    projection.site_archetype_id = command.payload.regional_map_site.site_archetype_id;
-    projection.flags = command.payload.regional_map_site.flags;
-    projection.map_x = command.payload.regional_map_site.map_x;
-    projection.map_y = command.payload.regional_map_site.map_y;
-    projection.support_package_id = command.payload.regional_map_site.support_package_id;
-    projection.support_preview_mask = command.payload.regional_map_site.support_preview_mask;
+    projection.site_id = payload.site_id;
+    projection.site_state = payload.site_state;
+    projection.site_archetype_id = payload.site_archetype_id;
+    projection.flags = payload.flags;
+    projection.map_x = payload.map_x;
+    projection.map_y = payload.map_y;
+    projection.support_package_id = payload.support_package_id;
+    projection.support_preview_mask = payload.support_preview_mask;
     regional_map_sites_[projection.site_id] = projection;
 
     if ((projection.flags & 1U) != 0U)
@@ -822,7 +830,8 @@ void SmokeEngineHost::apply_regional_map_site_upsert(const Gs1EngineCommand& com
 
 void SmokeEngineHost::apply_regional_map_site_remove(const Gs1EngineCommand& command)
 {
-    const auto site_id = command.payload.regional_map_site.site_id;
+    const auto& payload = command.payload_as<Gs1EngineCommandRegionalMapSiteData>();
+    const auto site_id = payload.site_id;
     regional_map_sites_.erase(site_id);
     if (selected_site_id_.has_value() && selected_site_id_.value() == site_id)
     {
@@ -832,23 +841,26 @@ void SmokeEngineHost::apply_regional_map_site_remove(const Gs1EngineCommand& com
 
 void SmokeEngineHost::apply_regional_map_link_upsert(const Gs1EngineCommand& command)
 {
+    const auto& payload = command.payload_as<Gs1EngineCommandRegionalMapLinkData>();
     RegionalMapLinkProjection projection {};
-    projection.from_site_id = command.payload.regional_map_link.from_site_id;
-    projection.to_site_id = command.payload.regional_map_link.to_site_id;
-    projection.flags = command.payload.regional_map_link.flags;
+    projection.from_site_id = payload.from_site_id;
+    projection.to_site_id = payload.to_site_id;
+    projection.flags = payload.flags;
     regional_map_links_[make_regional_map_link_key(projection.from_site_id, projection.to_site_id)] = projection;
 }
 
 void SmokeEngineHost::apply_regional_map_link_remove(const Gs1EngineCommand& command)
 {
+    const auto& payload = command.payload_as<Gs1EngineCommandRegionalMapLinkData>();
     regional_map_links_.erase(make_regional_map_link_key(
-        command.payload.regional_map_link.from_site_id,
-        command.payload.regional_map_link.to_site_id));
+        payload.from_site_id,
+        payload.to_site_id));
 }
 
 void SmokeEngineHost::apply_site_snapshot_begin(const Gs1EngineCommand& command)
 {
-    if (command.payload.site_snapshot.mode == GS1_PROJECTION_MODE_DELTA && active_site_snapshot_.has_value())
+    const auto& payload = command.payload_as<Gs1EngineCommandSiteSnapshotData>();
+    if (payload.mode == GS1_PROJECTION_MODE_DELTA && active_site_snapshot_.has_value())
     {
         pending_site_snapshot_ = active_site_snapshot_.value();
     }
@@ -857,12 +869,12 @@ void SmokeEngineHost::apply_site_snapshot_begin(const Gs1EngineCommand& command)
         pending_site_snapshot_ = SiteSnapshotProjection {};
     }
 
-    pending_site_snapshot_->site_id = command.payload.site_snapshot.site_id;
-    pending_site_snapshot_->site_archetype_id = command.payload.site_snapshot.site_archetype_id;
-    pending_site_snapshot_->width = command.payload.site_snapshot.width;
-    pending_site_snapshot_->height = command.payload.site_snapshot.height;
+    pending_site_snapshot_->site_id = payload.site_id;
+    pending_site_snapshot_->site_archetype_id = payload.site_archetype_id;
+    pending_site_snapshot_->width = payload.width;
+    pending_site_snapshot_->height = payload.height;
 
-    if (command.payload.site_snapshot.mode == GS1_PROJECTION_MODE_SNAPSHOT)
+    if (payload.mode == GS1_PROJECTION_MODE_SNAPSHOT)
     {
         pending_site_snapshot_->tiles.clear();
         pending_site_snapshot_->worker.reset();
@@ -878,15 +890,16 @@ void SmokeEngineHost::apply_site_tile_upsert(const Gs1EngineCommand& command)
         return;
     }
 
+    const auto& payload = command.payload_as<Gs1EngineCommandSiteTileData>();
     SiteTileProjection projection {};
-    projection.x = command.payload.site_tile.x;
-    projection.y = command.payload.site_tile.y;
-    projection.terrain_type_id = command.payload.site_tile.terrain_type_id;
-    projection.plant_type_id = command.payload.site_tile.plant_type_id;
-    projection.structure_type_id = command.payload.site_tile.structure_type_id;
-    projection.ground_cover_type_id = command.payload.site_tile.ground_cover_type_id;
-    projection.plant_density = command.payload.site_tile.plant_density;
-    projection.sand_burial = command.payload.site_tile.sand_burial;
+    projection.x = payload.x;
+    projection.y = payload.y;
+    projection.terrain_type_id = payload.terrain_type_id;
+    projection.plant_type_id = payload.plant_type_id;
+    projection.structure_type_id = payload.structure_type_id;
+    projection.ground_cover_type_id = payload.ground_cover_type_id;
+    projection.plant_density = payload.plant_density;
+    projection.sand_burial = payload.sand_burial;
 
     auto& tiles = pending_site_snapshot_->tiles;
     const auto existing = std::find_if(tiles.begin(), tiles.end(), [&](const SiteTileProjection& tile) {
@@ -909,15 +922,16 @@ void SmokeEngineHost::apply_site_worker_update(const Gs1EngineCommand& command)
         return;
     }
 
+    const auto& payload = command.payload_as<Gs1EngineCommandWorkerData>();
     SiteWorkerProjection projection {};
-    projection.tile_x = command.payload.site_worker.tile_x;
-    projection.tile_y = command.payload.site_worker.tile_y;
-    projection.facing_degrees = command.payload.site_worker.facing_degrees;
-    projection.health_normalized = command.payload.site_worker.health_normalized;
-    projection.hydration_normalized = command.payload.site_worker.hydration_normalized;
-    projection.energy_normalized = command.payload.site_worker.energy_normalized;
-    projection.flags = command.payload.site_worker.flags;
-    projection.current_action_kind = command.payload.site_worker.current_action_kind;
+    projection.tile_x = payload.tile_x;
+    projection.tile_y = payload.tile_y;
+    projection.facing_degrees = payload.facing_degrees;
+    projection.health_normalized = payload.health_normalized;
+    projection.hydration_normalized = payload.hydration_normalized;
+    projection.energy_normalized = payload.energy_normalized;
+    projection.flags = payload.flags;
+    projection.current_action_kind = payload.current_action_kind;
     pending_site_snapshot_->worker = projection;
 }
 
@@ -928,11 +942,12 @@ void SmokeEngineHost::apply_site_camp_update(const Gs1EngineCommand& command)
         return;
     }
 
+    const auto& payload = command.payload_as<Gs1EngineCommandCampData>();
     SiteCampProjection projection {};
-    projection.tile_x = command.payload.site_camp.tile_x;
-    projection.tile_y = command.payload.site_camp.tile_y;
-    projection.durability_normalized = command.payload.site_camp.durability_normalized;
-    projection.flags = command.payload.site_camp.flags;
+    projection.tile_x = payload.tile_x;
+    projection.tile_y = payload.tile_y;
+    projection.durability_normalized = payload.durability_normalized;
+    projection.flags = payload.flags;
     pending_site_snapshot_->camp = projection;
 }
 
@@ -943,13 +958,14 @@ void SmokeEngineHost::apply_site_weather_update(const Gs1EngineCommand& command)
         return;
     }
 
+    const auto& payload = command.payload_as<Gs1EngineCommandWeatherData>();
     SiteWeatherProjection projection {};
-    projection.heat = command.payload.site_weather.heat;
-    projection.wind = command.payload.site_weather.wind;
-    projection.dust = command.payload.site_weather.dust;
-    projection.event_template_id = command.payload.site_weather.event_template_id;
-    projection.event_phase = command.payload.site_weather.event_phase;
-    projection.phase_minutes_remaining = command.payload.site_weather.phase_minutes_remaining;
+    projection.heat = payload.heat;
+    projection.wind = payload.wind;
+    projection.dust = payload.dust;
+    projection.event_template_id = payload.event_template_id;
+    projection.event_phase = payload.event_phase;
+    projection.phase_minutes_remaining = payload.phase_minutes_remaining;
     pending_site_snapshot_->weather = projection;
 }
 
@@ -975,24 +991,26 @@ void SmokeEngineHost::apply_site_snapshot_end()
 
 void SmokeEngineHost::apply_hud_state(const Gs1EngineCommand& command)
 {
+    const auto& payload = command.payload_as<Gs1EngineCommandHudStateData>();
     HudProjection projection {};
-    projection.player_health = command.payload.hud_state.player_health;
-    projection.player_hydration = command.payload.hud_state.player_hydration;
-    projection.player_energy = command.payload.hud_state.player_energy;
-    projection.current_money = command.payload.hud_state.current_money;
-    projection.active_task_count = command.payload.hud_state.active_task_count;
-    projection.warning_code = command.payload.hud_state.warning_code;
-    projection.current_action_kind = command.payload.hud_state.current_action_kind;
-    projection.site_completion_normalized = command.payload.hud_state.site_completion_normalized;
+    projection.player_health = payload.player_health;
+    projection.player_hydration = payload.player_hydration;
+    projection.player_energy = payload.player_energy;
+    projection.current_money = payload.current_money;
+    projection.active_task_count = payload.active_task_count;
+    projection.warning_code = payload.warning_code;
+    projection.current_action_kind = payload.current_action_kind;
+    projection.site_completion_normalized = payload.site_completion_normalized;
     hud_state_ = projection;
 }
 
 void SmokeEngineHost::apply_site_result_ready(const Gs1EngineCommand& command)
 {
+    const auto& payload = command.payload_as<Gs1EngineCommandSiteResultData>();
     SiteResultProjection projection {};
-    projection.site_id = command.payload.site_result.site_id;
-    projection.result = command.payload.site_result.result;
-    projection.newly_revealed_site_count = command.payload.site_result.newly_revealed_site_count;
+    projection.site_id = payload.site_id;
+    projection.result = payload.result;
+    projection.newly_revealed_site_count = payload.newly_revealed_site_count;
     site_result_ = projection;
 }
 
@@ -1054,116 +1072,170 @@ std::string SmokeEngineHost::describe_command(const Gs1EngineCommand& command)
     switch (command.type)
     {
     case GS1_ENGINE_COMMAND_LOG_TEXT:
+    {
+        const auto& payload = command.payload_as<Gs1EngineCommandLogTextData>();
         description += " text=";
-        description += command.payload.log_text.text;
+        description += payload.text;
         break;
+    }
 
     case GS1_ENGINE_COMMAND_SET_APP_STATE:
+    {
+        const auto& payload = command.payload_as<Gs1EngineCommandSetAppStateData>();
         description += " state=";
-        description += app_state_name(command.payload.set_app_state.app_state);
+        description += app_state_name(payload.app_state);
         break;
+    }
 
     case GS1_ENGINE_COMMAND_PRESENTATION_DIRTY:
-        description += " flags=" + std::to_string(command.payload.presentation_dirty.dirty_flags);
-        description += " revision=" + std::to_string(command.payload.presentation_dirty.revision);
+    {
+        const auto& payload = command.payload_as<Gs1EngineCommandPresentationDirtyData>();
+        description += " flags=" + std::to_string(payload.dirty_flags);
+        description += " revision=" + std::to_string(payload.revision);
         break;
+    }
 
     case GS1_ENGINE_COMMAND_BEGIN_REGIONAL_MAP_SNAPSHOT:
-        description += " sites=" + std::to_string(command.payload.regional_map_snapshot.site_count);
-        description += " links=" + std::to_string(command.payload.regional_map_snapshot.link_count);
-        description += " selected=" + std::to_string(command.payload.regional_map_snapshot.selected_site_id);
+    {
+        const auto& payload = command.payload_as<Gs1EngineCommandRegionalMapSnapshotData>();
+        description += " sites=" + std::to_string(payload.site_count);
+        description += " links=" + std::to_string(payload.link_count);
+        description += " selected=" + std::to_string(payload.selected_site_id);
         break;
+    }
 
     case GS1_ENGINE_COMMAND_REGIONAL_MAP_SITE_UPSERT:
-        description += " site=" + std::to_string(command.payload.regional_map_site.site_id);
+    {
+        const auto& payload = command.payload_as<Gs1EngineCommandRegionalMapSiteData>();
+        description += " site=" + std::to_string(payload.site_id);
         description += " state=";
-        description += site_state_name(command.payload.regional_map_site.site_state);
-        description += " pos=(" + std::to_string(command.payload.regional_map_site.map_x);
-        description += "," + std::to_string(command.payload.regional_map_site.map_y) + ")";
+        description += site_state_name(payload.site_state);
+        description += " pos=(" + std::to_string(payload.map_x);
+        description += "," + std::to_string(payload.map_y) + ")";
         break;
+    }
 
     case GS1_ENGINE_COMMAND_REGIONAL_MAP_SITE_REMOVE:
-        description += " site=" + std::to_string(command.payload.regional_map_site.site_id);
+    {
+        const auto& payload = command.payload_as<Gs1EngineCommandRegionalMapSiteData>();
+        description += " site=" + std::to_string(payload.site_id);
         break;
+    }
 
     case GS1_ENGINE_COMMAND_REGIONAL_MAP_LINK_UPSERT:
-        description += " from=" + std::to_string(command.payload.regional_map_link.from_site_id);
-        description += " to=" + std::to_string(command.payload.regional_map_link.to_site_id);
+    {
+        const auto& payload = command.payload_as<Gs1EngineCommandRegionalMapLinkData>();
+        description += " from=" + std::to_string(payload.from_site_id);
+        description += " to=" + std::to_string(payload.to_site_id);
         break;
+    }
 
     case GS1_ENGINE_COMMAND_REGIONAL_MAP_LINK_REMOVE:
-        description += " from=" + std::to_string(command.payload.regional_map_link.from_site_id);
-        description += " to=" + std::to_string(command.payload.regional_map_link.to_site_id);
+    {
+        const auto& payload = command.payload_as<Gs1EngineCommandRegionalMapLinkData>();
+        description += " from=" + std::to_string(payload.from_site_id);
+        description += " to=" + std::to_string(payload.to_site_id);
         break;
+    }
 
     case GS1_ENGINE_COMMAND_BEGIN_UI_SETUP:
+    {
+        const auto& payload = command.payload_as<Gs1EngineCommandUiSetupData>();
         description += " setup=";
-        description += ui_setup_name(command.payload.ui_setup.setup_id);
+        description += ui_setup_name(payload.setup_id);
         description += " type=";
-        description += ui_setup_presentation_type_name(command.payload.ui_setup.presentation_type);
-        description += " elements=" + std::to_string(command.payload.ui_setup.element_count);
-        description += " context=" + std::to_string(command.payload.ui_setup.context_id);
+        description += ui_setup_presentation_type_name(payload.presentation_type);
+        description += " elements=" + std::to_string(payload.element_count);
+        description += " context=" + std::to_string(payload.context_id);
         break;
+    }
 
     case GS1_ENGINE_COMMAND_CLOSE_UI_SETUP:
+    {
+        const auto& payload = command.payload_as<Gs1EngineCommandCloseUiSetupData>();
         description += " setup=";
-        description += ui_setup_name(command.payload.close_ui_setup.setup_id);
+        description += ui_setup_name(payload.setup_id);
         description += " type=";
-        description += ui_setup_presentation_type_name(command.payload.close_ui_setup.presentation_type);
+        description += ui_setup_presentation_type_name(payload.presentation_type);
         break;
+    }
 
     case GS1_ENGINE_COMMAND_UI_ELEMENT_UPSERT:
+    {
+        const auto& payload = command.payload_as<Gs1EngineCommandUiElementData>();
         description += " text=";
-        description += command.payload.ui_element.text;
+        description += payload.text;
         description += " action=";
-        description += ui_action_name(command.payload.ui_element.action.type);
-        description += " target=" + std::to_string(command.payload.ui_element.action.target_id);
+        description += ui_action_name(payload.action.type);
+        description += " target=" + std::to_string(payload.action.target_id);
         break;
+    }
 
     case GS1_ENGINE_COMMAND_BEGIN_SITE_SNAPSHOT:
-        description += " site=" + std::to_string(command.payload.site_snapshot.site_id);
-        description += " size=" + std::to_string(command.payload.site_snapshot.width);
-        description += "x" + std::to_string(command.payload.site_snapshot.height);
+    {
+        const auto& payload = command.payload_as<Gs1EngineCommandSiteSnapshotData>();
+        description += " site=" + std::to_string(payload.site_id);
+        description += " size=" + std::to_string(payload.width);
+        description += "x" + std::to_string(payload.height);
         break;
+    }
 
     case GS1_ENGINE_COMMAND_SITE_TILE_UPSERT:
-        description += " x=" + std::to_string(command.payload.site_tile.x);
-        description += " y=" + std::to_string(command.payload.site_tile.y);
+    {
+        const auto& payload = command.payload_as<Gs1EngineCommandSiteTileData>();
+        description += " x=" + std::to_string(payload.x);
+        description += " y=" + std::to_string(payload.y);
         break;
+    }
 
     case GS1_ENGINE_COMMAND_SITE_WORKER_UPDATE:
-        description += " tile=(" + std::to_string(command.payload.site_worker.tile_x);
-        description += "," + std::to_string(command.payload.site_worker.tile_y) + ")";
-        description += " health=" + std::to_string(command.payload.site_worker.health_normalized);
+    {
+        const auto& payload = command.payload_as<Gs1EngineCommandWorkerData>();
+        description += " tile=(" + std::to_string(payload.tile_x);
+        description += "," + std::to_string(payload.tile_y) + ")";
+        description += " health=" + std::to_string(payload.health_normalized);
         break;
+    }
 
     case GS1_ENGINE_COMMAND_SITE_CAMP_UPDATE:
-        description += " tile=(" + std::to_string(command.payload.site_camp.tile_x);
-        description += "," + std::to_string(command.payload.site_camp.tile_y) + ")";
-        description += " durability=" + std::to_string(command.payload.site_camp.durability_normalized);
+    {
+        const auto& payload = command.payload_as<Gs1EngineCommandCampData>();
+        description += " tile=(" + std::to_string(payload.tile_x);
+        description += "," + std::to_string(payload.tile_y) + ")";
+        description += " durability=" + std::to_string(payload.durability_normalized);
         break;
+    }
 
     case GS1_ENGINE_COMMAND_SITE_WEATHER_UPDATE:
-        description += " heat=" + std::to_string(command.payload.site_weather.heat);
-        description += " wind=" + std::to_string(command.payload.site_weather.wind);
-        description += " dust=" + std::to_string(command.payload.site_weather.dust);
+    {
+        const auto& payload = command.payload_as<Gs1EngineCommandWeatherData>();
+        description += " heat=" + std::to_string(payload.heat);
+        description += " wind=" + std::to_string(payload.wind);
+        description += " dust=" + std::to_string(payload.dust);
         description += " phase=";
-        description += weather_phase_name(command.payload.site_weather.event_phase);
+        description += weather_phase_name(payload.event_phase);
         break;
+    }
 
     case GS1_ENGINE_COMMAND_HUD_STATE:
-        description += " health=" + std::to_string(command.payload.hud_state.player_health);
-        description += " hydration=" + std::to_string(command.payload.hud_state.player_hydration);
-        description += " energy=" + std::to_string(command.payload.hud_state.player_energy);
-        description += " completion=" + std::to_string(command.payload.hud_state.site_completion_normalized);
+    {
+        const auto& payload = command.payload_as<Gs1EngineCommandHudStateData>();
+        description += " health=" + std::to_string(payload.player_health);
+        description += " hydration=" + std::to_string(payload.player_hydration);
+        description += " energy=" + std::to_string(payload.player_energy);
+        description += " completion=" + std::to_string(payload.site_completion_normalized);
         break;
+    }
 
     case GS1_ENGINE_COMMAND_SITE_RESULT_READY:
-        description += " site=" + std::to_string(command.payload.site_result.site_id);
+    {
+        const auto& payload = command.payload_as<Gs1EngineCommandSiteResultData>();
+        description += " site=" + std::to_string(payload.site_id);
         description += " result=";
-        description += site_attempt_result_name(command.payload.site_result.result);
-        description += " revealed=" + std::to_string(command.payload.site_result.newly_revealed_site_count);
+        description += site_attempt_result_name(payload.result);
+        description += " revealed=" + std::to_string(payload.newly_revealed_site_count);
         break;
+    }
 
     default:
         break;
