@@ -160,6 +160,39 @@ public:
         float phase_minutes_remaining {0.0f};
     };
 
+    struct SiteInventorySlotProjection final
+    {
+        std::uint32_t item_id {0};
+        float condition {0.0f};
+        float freshness {0.0f};
+        std::uint32_t quantity {0};
+        std::uint32_t slot_index {0};
+        Gs1InventoryContainerKind container_kind {GS1_INVENTORY_CONTAINER_WORKER_PACK};
+        std::uint32_t flags {0};
+    };
+
+    struct SiteTaskProjection final
+    {
+        std::uint32_t task_instance_id {0};
+        std::uint32_t task_template_id {0};
+        std::uint32_t publisher_faction_id {0};
+        std::uint32_t current_progress {0};
+        std::uint32_t target_progress {0};
+        Gs1TaskPresentationListKind list_kind {GS1_TASK_PRESENTATION_LIST_VISIBLE};
+        std::uint32_t flags {0};
+    };
+
+    struct SitePhoneListingProjection final
+    {
+        std::uint32_t listing_id {0};
+        std::uint32_t item_or_unlockable_id {0};
+        std::int32_t price {0};
+        std::uint32_t related_site_id {0};
+        std::uint32_t quantity {0};
+        Gs1PhoneListingPresentationKind listing_kind {GS1_PHONE_LISTING_PRESENTATION_BUY_ITEM};
+        std::uint32_t flags {0};
+    };
+
     struct SiteSnapshotProjection final
     {
         std::uint32_t site_id {0};
@@ -167,6 +200,9 @@ public:
         std::uint32_t width {0};
         std::uint32_t height {0};
         std::vector<SiteTileProjection> tiles {};
+        std::vector<SiteInventorySlotProjection> inventory_slots {};
+        std::vector<SiteTaskProjection> tasks {};
+        std::vector<SitePhoneListingProjection> phone_listings {};
         std::optional<SiteWorkerProjection> worker {};
         std::optional<SiteCampProjection> camp {};
         std::optional<SiteWeatherProjection> weather {};
@@ -237,6 +273,9 @@ private:
     void apply_site_worker_update(const Gs1EngineCommand& command);
     void apply_site_camp_update(const Gs1EngineCommand& command);
     void apply_site_weather_update(const Gs1EngineCommand& command);
+    void apply_site_inventory_slot_upsert(const Gs1EngineCommand& command);
+    void apply_site_task_upsert(const Gs1EngineCommand& command);
+    void apply_site_phone_listing_upsert(const Gs1EngineCommand& command);
     void apply_site_snapshot_end();
     void apply_hud_state(const Gs1EngineCommand& command);
     void apply_site_result_ready(const Gs1EngineCommand& command);

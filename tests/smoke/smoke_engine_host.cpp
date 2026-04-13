@@ -59,6 +59,8 @@ const char* command_type_name(Gs1EngineCommandType type)
         return "SITE_PHONE_LISTING_REMOVE";
     case GS1_ENGINE_COMMAND_END_SITE_SNAPSHOT:
         return "END_SITE_SNAPSHOT";
+    case GS1_ENGINE_COMMAND_SITE_ACTION_UPDATE:
+        return "SITE_ACTION_UPDATE";
     case GS1_ENGINE_COMMAND_HUD_STATE:
         return "HUD_STATE";
     case GS1_ENGINE_COMMAND_NOTIFICATION_PUSH:
@@ -142,6 +144,22 @@ const char* ui_action_name(Gs1UiActionType action_type)
         return "RETURN_TO_REGIONAL_MAP";
     case GS1_UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION:
         return "CLEAR_DEPLOYMENT_SITE_SELECTION";
+    case GS1_UI_ACTION_ACCEPT_TASK:
+        return "ACCEPT_TASK";
+    case GS1_UI_ACTION_CLAIM_TASK_REWARD:
+        return "CLAIM_TASK_REWARD";
+    case GS1_UI_ACTION_BUY_PHONE_LISTING:
+        return "BUY_PHONE_LISTING";
+    case GS1_UI_ACTION_SELL_PHONE_LISTING:
+        return "SELL_PHONE_LISTING";
+    case GS1_UI_ACTION_USE_INVENTORY_ITEM:
+        return "USE_INVENTORY_ITEM";
+    case GS1_UI_ACTION_TRANSFER_INVENTORY_ITEM:
+        return "TRANSFER_INVENTORY_ITEM";
+    case GS1_UI_ACTION_HIRE_CONTRACTOR:
+        return "HIRE_CONTRACTOR";
+    case GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE:
+        return "PURCHASE_SITE_UNLOCKABLE";
     default:
         return "NONE";
     }
@@ -697,6 +715,15 @@ void SmokeEngineHost::flush_engine_commands(const char* stage_label)
         case GS1_ENGINE_COMMAND_SITE_WEATHER_UPDATE:
             apply_site_weather_update(command);
             break;
+        case GS1_ENGINE_COMMAND_SITE_INVENTORY_SLOT_UPSERT:
+            apply_site_inventory_slot_upsert(command);
+            break;
+        case GS1_ENGINE_COMMAND_SITE_TASK_UPSERT:
+            apply_site_task_upsert(command);
+            break;
+        case GS1_ENGINE_COMMAND_SITE_PHONE_LISTING_UPSERT:
+            apply_site_phone_listing_upsert(command);
+            break;
         case GS1_ENGINE_COMMAND_END_SITE_SNAPSHOT:
             apply_site_snapshot_end();
             live_state_patch_mask = pending_site_snapshot_patch_mask_;
@@ -988,6 +1015,9 @@ void SmokeEngineHost::apply_site_snapshot_begin(const Gs1EngineCommand& command)
     {
         pending_site_snapshot_patch_mask_ |= LiveStatePatchField_SiteBootstrap;
         pending_site_snapshot_->tiles.clear();
+        pending_site_snapshot_->inventory_slots.clear();
+        pending_site_snapshot_->tasks.clear();
+        pending_site_snapshot_->phone_listings.clear();
         pending_site_snapshot_->worker.reset();
         pending_site_snapshot_->camp.reset();
         pending_site_snapshot_->weather.reset();
@@ -1082,6 +1112,100 @@ void SmokeEngineHost::apply_site_weather_update(const Gs1EngineCommand& command)
     pending_site_snapshot_->weather = projection;
 }
 
+void SmokeEngineHost::apply_site_inventory_slot_upsert(const Gs1EngineCommand& command)
+{
+    if (!pending_site_snapshot_.has_value())
+    {
+        return;
+    }
+
+    const auto& payload = command.payload_as<Gs1EngineCommandInventorySlotData>();
+    SiteInventorySlotProjection projection {};
+    projection.item_id = payload.item_id;
+    projection.condition = payload.condition;
+    projection.freshness = payload.freshness;
+    projection.quantity = payload.quantity;
+    projection.slot_index = payload.slot_index;
+    projection.container_kind = payload.container_kind;
+    projection.flags = payload.flags;
+
+    auto& slots = pending_site_snapshot_->inventory_slots;
+    const auto existing = std::find_if(slots.begin(), slots.end(), [&](const SiteInventorySlotProjection& slot) {
+        return slot.container_kind == projection.container_kind &&
+            slot.slot_index == projection.slot_index;
+    });
+    if (existing != slots.end())
+    {
+        *existing = projection;
+    }
+    else
+    {
+        slots.push_back(projection);
+    }
+}
+
+void SmokeEngineHost::apply_site_task_upsert(const Gs1EngineCommand& command)
+{
+    if (!pending_site_snapshot_.has_value())
+    {
+        return;
+    }
+
+    const auto& payload = command.payload_as<Gs1EngineCommandTaskData>();
+    SiteTaskProjection projection {};
+    projection.task_instance_id = payload.task_instance_id;
+    projection.task_template_id = payload.task_template_id;
+    projection.publisher_faction_id = payload.publisher_faction_id;
+    projection.current_progress = payload.current_progress;
+    projection.target_progress = payload.target_progress;
+    projection.list_kind = payload.list_kind;
+    projection.flags = payload.flags;
+
+    auto& tasks = pending_site_snapshot_->tasks;
+    const auto existing = std::find_if(tasks.begin(), tasks.end(), [&](const SiteTaskProjection& task) {
+        return task.task_instance_id == projection.task_instance_id;
+    });
+    if (existing != tasks.end())
+    {
+        *existing = projection;
+    }
+    else
+    {
+        tasks.push_back(projection);
+    }
+}
+
+void SmokeEngineHost::apply_site_phone_listing_upsert(const Gs1EngineCommand& command)
+{
+    if (!pending_site_snapshot_.has_value())
+    {
+        return;
+    }
+
+    const auto& payload = command.payload_as<Gs1EngineCommandPhoneListingData>();
+    SitePhoneListingProjection projection {};
+    projection.listing_id = payload.listing_id;
+    projection.item_or_unlockable_id = payload.item_or_unlockable_id;
+    projection.price = payload.price;
+    projection.related_site_id = payload.related_site_id;
+    projection.quantity = payload.quantity;
+    projection.listing_kind = payload.listing_kind;
+    projection.flags = payload.flags;
+
+    auto& listings = pending_site_snapshot_->phone_listings;
+    const auto existing = std::find_if(listings.begin(), listings.end(), [&](const SitePhoneListingProjection& listing) {
+        return listing.listing_id == projection.listing_id;
+    });
+    if (existing != listings.end())
+    {
+        *existing = projection;
+    }
+    else
+    {
+        listings.push_back(projection);
+    }
+}
+
 void SmokeEngineHost::apply_site_snapshot_end()
 {
     if (!pending_site_snapshot_.has_value())
@@ -1096,6 +1220,22 @@ void SmokeEngineHost::apply_site_snapshot_end()
             return lhs.y < rhs.y;
         }
         return lhs.x < rhs.x;
+    });
+    auto& inventory_slots = pending_site_snapshot_->inventory_slots;
+    std::sort(inventory_slots.begin(), inventory_slots.end(), [](const SiteInventorySlotProjection& lhs, const SiteInventorySlotProjection& rhs) {
+        if (lhs.container_kind != rhs.container_kind)
+        {
+            return lhs.container_kind < rhs.container_kind;
+        }
+        return lhs.slot_index < rhs.slot_index;
+    });
+    auto& tasks = pending_site_snapshot_->tasks;
+    std::sort(tasks.begin(), tasks.end(), [](const SiteTaskProjection& lhs, const SiteTaskProjection& rhs) {
+        return lhs.task_instance_id < rhs.task_instance_id;
+    });
+    auto& phone_listings = pending_site_snapshot_->phone_listings;
+    std::sort(phone_listings.begin(), phone_listings.end(), [](const SitePhoneListingProjection& lhs, const SitePhoneListingProjection& rhs) {
+        return lhs.listing_id < rhs.listing_id;
     });
 
     active_site_snapshot_ = std::move(pending_site_snapshot_);
@@ -1345,6 +1485,17 @@ std::string SmokeEngineHost::describe_command(const Gs1EngineCommand& command)
         description += " dust=" + std::to_string(payload.dust);
         description += " phase=";
         description += weather_phase_name(payload.event_phase);
+        break;
+    }
+
+    case GS1_ENGINE_COMMAND_SITE_ACTION_UPDATE:
+    {
+        const auto& payload = command.payload_as<Gs1EngineCommandSiteActionData>();
+        description += " action=" + std::to_string(payload.action_id);
+        description += " kind=" + std::to_string(payload.action_kind);
+        description += " target=(" + std::to_string(payload.target_tile_x);
+        description += "," + std::to_string(payload.target_tile_y) + ")";
+        description += " progress=" + std::to_string(payload.progress_normalized);
         break;
     }
 

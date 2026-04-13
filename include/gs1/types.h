@@ -52,7 +52,9 @@ enum Gs1HostEventType : std::uint8_t
 {
     GS1_HOST_EVENT_NONE = 0,
     GS1_HOST_EVENT_UI_ACTION = 1,
-    GS1_HOST_EVENT_SITE_MOVE_DIRECTION = 2
+    GS1_HOST_EVENT_SITE_MOVE_DIRECTION = 2,
+    GS1_HOST_EVENT_SITE_ACTION_REQUEST = 3,
+    GS1_HOST_EVENT_SITE_ACTION_CANCEL = 4
 };
 
 enum Gs1UiSetupId : std::uint8_t
@@ -92,7 +94,39 @@ enum Gs1UiActionType : std::uint8_t
     GS1_UI_ACTION_SELECT_DEPLOYMENT_SITE = 2,
     GS1_UI_ACTION_START_SITE_ATTEMPT = 3,
     GS1_UI_ACTION_RETURN_TO_REGIONAL_MAP = 4,
-    GS1_UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION = 5
+    GS1_UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION = 5,
+    GS1_UI_ACTION_ACCEPT_TASK = 6,
+    GS1_UI_ACTION_CLAIM_TASK_REWARD = 7,
+    GS1_UI_ACTION_BUY_PHONE_LISTING = 8,
+    GS1_UI_ACTION_SELL_PHONE_LISTING = 9,
+    GS1_UI_ACTION_USE_INVENTORY_ITEM = 10,
+    GS1_UI_ACTION_TRANSFER_INVENTORY_ITEM = 11,
+    GS1_UI_ACTION_HIRE_CONTRACTOR = 12,
+    GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE = 13
+};
+
+enum Gs1SiteActionKind : std::uint8_t
+{
+    GS1_SITE_ACTION_NONE = 0,
+    GS1_SITE_ACTION_PLANT = 1,
+    GS1_SITE_ACTION_BUILD = 2,
+    GS1_SITE_ACTION_REPAIR = 3,
+    GS1_SITE_ACTION_WATER = 4,
+    GS1_SITE_ACTION_CLEAR_BURIAL = 5
+};
+
+enum Gs1SiteActionRequestFlags : std::uint8_t
+{
+    GS1_SITE_ACTION_REQUEST_FLAG_NONE = 0,
+    GS1_SITE_ACTION_REQUEST_FLAG_HAS_PRIMARY_SUBJECT = 1u << 0,
+    GS1_SITE_ACTION_REQUEST_FLAG_HAS_SECONDARY_SUBJECT = 1u << 1,
+    GS1_SITE_ACTION_REQUEST_FLAG_HAS_ITEM = 1u << 2
+};
+
+enum Gs1SiteActionCancelFlags : std::uint32_t
+{
+    GS1_SITE_ACTION_CANCEL_FLAG_NONE = 0,
+    GS1_SITE_ACTION_CANCEL_FLAG_CURRENT_ACTION = 1u << 0
 };
 
 enum Gs1FeedbackEventType : std::uint8_t
@@ -209,6 +243,7 @@ enum Gs1EngineCommandType : std::uint8_t
     GS1_ENGINE_COMMAND_SITE_PHONE_LISTING_UPSERT = 28,
     GS1_ENGINE_COMMAND_SITE_PHONE_LISTING_REMOVE = 29,
     GS1_ENGINE_COMMAND_END_SITE_SNAPSHOT = 30,
+    GS1_ENGINE_COMMAND_SITE_ACTION_UPDATE = 31,
 
     GS1_ENGINE_COMMAND_HUD_STATE = 40,
     GS1_ENGINE_COMMAND_NOTIFICATION_PUSH = 41,
@@ -243,6 +278,26 @@ struct Gs1HostEventSiteMoveDirectionData
     float world_move_z;
 };
 
+struct Gs1HostEventSiteActionRequestData
+{
+    Gs1SiteActionKind action_kind;
+    std::uint8_t flags;
+    std::uint16_t quantity;
+    std::int32_t target_tile_x;
+    std::int32_t target_tile_y;
+    std::uint32_t primary_subject_id;
+    std::uint32_t secondary_subject_id;
+    std::uint32_t item_id;
+};
+
+struct Gs1HostEventSiteActionCancelData
+{
+    std::uint32_t action_id;
+    std::uint32_t flags;
+    std::uint64_t reserved0;
+    std::uint64_t reserved1;
+};
+
 struct Gs1HostEventEmptyData
 {
     std::uint64_t reserved0;
@@ -253,6 +308,8 @@ union Gs1HostEventPayload
 {
     Gs1HostEventUiActionData ui_action;
     Gs1HostEventSiteMoveDirectionData site_move_direction;
+    Gs1HostEventSiteActionRequestData site_action_request;
+    Gs1HostEventSiteActionCancelData site_action_cancel;
     Gs1HostEventEmptyData empty;
 };
 
@@ -403,7 +460,7 @@ struct Gs1EngineCommandWorkerData
     float hydration_normalized;
     float energy_normalized;
     std::uint8_t flags;
-    std::uint8_t current_action_kind;
+    Gs1SiteActionKind current_action_kind;
 };
 
 struct Gs1EngineCommandCampData
@@ -457,6 +514,18 @@ struct Gs1EngineCommandPhoneListingData
     std::uint8_t flags;
 };
 
+struct Gs1EngineCommandSiteActionData
+{
+    std::uint32_t action_id;
+    std::int32_t target_tile_x;
+    std::int32_t target_tile_y;
+    Gs1SiteActionKind action_kind;
+    std::uint8_t flags;
+    std::uint16_t reserved0;
+    float progress_normalized;
+    float minutes_remaining;
+};
+
 struct Gs1EngineCommandHudStateData
 {
     float player_health;
@@ -466,7 +535,7 @@ struct Gs1EngineCommandHudStateData
     float site_completion_normalized;
     std::uint16_t active_task_count;
     std::uint16_t warning_code;
-    std::uint8_t current_action_kind;
+    Gs1SiteActionKind current_action_kind;
 };
 
 struct Gs1EngineCommandNotificationData
@@ -545,6 +614,8 @@ GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1RuntimeCreateDesc, 16U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1UiAction, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventUiActionData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteMoveDirectionData, 12U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteActionRequestData, 24U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteActionCancelData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventEmptyData, 16U);
 static_assert(std::is_standard_layout_v<Gs1HostEventPayload>, "Gs1HostEventPayload must remain standard layout.");
 static_assert(std::is_trivial_v<Gs1HostEventPayload>, "Gs1HostEventPayload must remain trivial.");
@@ -574,6 +645,7 @@ GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandWeatherData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandInventorySlotData, 20U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandTaskData, 20U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandPhoneListingData, 20U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandSiteActionData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandHudStateData, 28U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandNotificationData, 56U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandSiteResultData, 8U);
@@ -597,6 +669,7 @@ static_assert(sizeof(Gs1EngineCommandWeatherData) <= GS1_COMMAND_PAYLOAD_BYTE_CO
 static_assert(sizeof(Gs1EngineCommandInventorySlotData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineCommandTaskData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineCommandPhoneListingData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineCommandSiteActionData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineCommandHudStateData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineCommandNotificationData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineCommandSiteResultData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);

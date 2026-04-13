@@ -4,10 +4,23 @@
 #include "campaign/systems/campaign_system_context.h"
 #include "campaign/systems/loadout_planner_system.h"
 #include "commands/command_dispatcher.h"
+#include "site/systems/action_execution_system.h"
+#include "site/systems/camp_durability_system.h"
+#include "site/systems/device_maintenance_system.h"
+#include "site/systems/device_support_system.h"
+#include "site/systems/ecology_system.h"
+#include "site/systems/economy_phone_system.h"
 #include "site/site_projection_update_flags.h"
+#include "site/systems/inventory_system.h"
+#include "site/systems/local_weather_resolve_system.h"
+#include "site/systems/modifier_system.h"
+#include "site/systems/placement_validation_system.h"
 #include "site/systems/failure_recovery_system.h"
 #include "site/systems/site_completion_system.h"
 #include "site/systems/site_flow_system.h"
+#include "site/systems/task_board_system.h"
+#include "site/systems/weather_event_system.h"
+#include "site/systems/worker_condition_system.h"
 
 #include <algorithm>
 #include <cassert>
@@ -55,6 +68,36 @@ bool tile_coord_in_bounds(const TileGridState& tile_grid, TileCoord coord) noexc
         static_cast<std::uint32_t>(coord.x) < tile_grid.width &&
         static_cast<std::uint32_t>(coord.y) < tile_grid.height;
 }
+
+Gs1TaskPresentationListKind to_task_presentation_list_kind(TaskRuntimeListKind kind) noexcept
+{
+    switch (kind)
+    {
+    case TaskRuntimeListKind::Accepted:
+        return GS1_TASK_PRESENTATION_LIST_ACCEPTED;
+    case TaskRuntimeListKind::Completed:
+        return GS1_TASK_PRESENTATION_LIST_COMPLETED;
+    case TaskRuntimeListKind::Visible:
+    default:
+        return GS1_TASK_PRESENTATION_LIST_VISIBLE;
+    }
+}
+
+Gs1PhoneListingPresentationKind to_phone_listing_presentation_kind(PhoneListingKind kind) noexcept
+{
+    switch (kind)
+    {
+    case PhoneListingKind::SellItem:
+        return GS1_PHONE_LISTING_PRESENTATION_SELL_ITEM;
+    case PhoneListingKind::HireContractor:
+        return GS1_PHONE_LISTING_PRESENTATION_HIRE_CONTRACTOR;
+    case PhoneListingKind::PurchaseUnlockable:
+        return GS1_PHONE_LISTING_PRESENTATION_PURCHASE_UNLOCKABLE;
+    case PhoneListingKind::BuyItem:
+    default:
+        return GS1_PHONE_LISTING_PRESENTATION_BUY_ITEM;
+    }
+}
 }  // namespace
 
 GameRuntime::GameRuntime(Gs1RuntimeCreateDesc create_desc)
@@ -83,6 +126,71 @@ void GameRuntime::initialize_subscription_tables()
         if (LoadoutPlannerSystem::subscribes_to(type))
         {
             subscribers.push_back(CommandSubscriberId::LoadoutPlanner);
+        }
+
+        if (ActionExecutionSystem::subscribes_to(type))
+        {
+            subscribers.push_back(CommandSubscriberId::ActionExecution);
+        }
+
+        if (WeatherEventSystem::subscribes_to(type))
+        {
+            subscribers.push_back(CommandSubscriberId::WeatherEvent);
+        }
+
+        if (WorkerConditionSystem::subscribes_to(type))
+        {
+            subscribers.push_back(CommandSubscriberId::WorkerCondition);
+        }
+
+        if (EcologySystem::subscribes_to(type))
+        {
+            subscribers.push_back(CommandSubscriberId::Ecology);
+        }
+
+        if (TaskBoardSystem::subscribes_to(type))
+        {
+            subscribers.push_back(CommandSubscriberId::TaskBoard);
+        }
+
+        if (PlacementValidationSystem::subscribes_to(type))
+        {
+            subscribers.push_back(CommandSubscriberId::PlacementValidation);
+        }
+
+        if (LocalWeatherResolveSystem::subscribes_to(type))
+        {
+            subscribers.push_back(CommandSubscriberId::LocalWeatherResolve);
+        }
+
+        if (InventorySystem::subscribes_to(type))
+        {
+            subscribers.push_back(CommandSubscriberId::Inventory);
+        }
+
+        if (EconomyPhoneSystem::subscribes_to(type))
+        {
+            subscribers.push_back(CommandSubscriberId::EconomyPhone);
+        }
+
+        if (CampDurabilitySystem::subscribes_to(type))
+        {
+            subscribers.push_back(CommandSubscriberId::CampDurability);
+        }
+
+        if (DeviceSupportSystem::subscribes_to(type))
+        {
+            subscribers.push_back(CommandSubscriberId::DeviceSupport);
+        }
+
+        if (DeviceMaintenanceSystem::subscribes_to(type))
+        {
+            subscribers.push_back(CommandSubscriberId::DeviceMaintenance);
+        }
+
+        if (ModifierSystem::subscribes_to(type))
+        {
+            subscribers.push_back(CommandSubscriberId::Modifier);
         }
     }
 }
@@ -232,6 +340,21 @@ Gs1Status GameRuntime::dispatch_subscribed_command(const GameCommand& command)
         return GS1_STATUS_INVALID_ARGUMENT;
     }
 
+    auto dispatch_to_site_system = [&](auto process_command_fn) -> Gs1Status {
+        if (!campaign_.has_value() || !active_site_run_.has_value())
+        {
+            return GS1_STATUS_INVALID_STATE;
+        }
+
+        SiteSystemContext context {
+            *campaign_,
+            *active_site_run_,
+            command_queue_,
+            fixed_step_seconds_,
+            SiteMoveDirectionInput {}};
+        return process_command_fn(context, command);
+    };
+
     const auto& subscribers = command_subscribers_[command_type_index(command.type)];
     for (const auto subscriber : subscribers)
     {
@@ -261,6 +384,136 @@ Gs1Status GameRuntime::dispatch_subscribed_command(const GameCommand& command)
 
             CampaignSystemContext context {*campaign_};
             const auto status = LoadoutPlannerSystem::process_command(context, command);
+            if (status != GS1_STATUS_OK)
+            {
+                return status;
+            }
+            break;
+        }
+
+        case CommandSubscriberId::ActionExecution:
+        {
+            const auto status = dispatch_to_site_system(ActionExecutionSystem::process_command);
+            if (status != GS1_STATUS_OK)
+            {
+                return status;
+            }
+            break;
+        }
+
+        case CommandSubscriberId::WeatherEvent:
+        {
+            const auto status = dispatch_to_site_system(WeatherEventSystem::process_command);
+            if (status != GS1_STATUS_OK)
+            {
+                return status;
+            }
+            break;
+        }
+
+        case CommandSubscriberId::WorkerCondition:
+        {
+            const auto status = dispatch_to_site_system(WorkerConditionSystem::process_command);
+            if (status != GS1_STATUS_OK)
+            {
+                return status;
+            }
+            break;
+        }
+
+        case CommandSubscriberId::Ecology:
+        {
+            const auto status = dispatch_to_site_system(EcologySystem::process_command);
+            if (status != GS1_STATUS_OK)
+            {
+                return status;
+            }
+            break;
+        }
+
+        case CommandSubscriberId::TaskBoard:
+        {
+            const auto status = dispatch_to_site_system(TaskBoardSystem::process_command);
+            if (status != GS1_STATUS_OK)
+            {
+                return status;
+            }
+            break;
+        }
+
+        case CommandSubscriberId::PlacementValidation:
+        {
+            const auto status = dispatch_to_site_system(PlacementValidationSystem::process_command);
+            if (status != GS1_STATUS_OK)
+            {
+                return status;
+            }
+            break;
+        }
+
+        case CommandSubscriberId::LocalWeatherResolve:
+        {
+            const auto status = dispatch_to_site_system(LocalWeatherResolveSystem::process_command);
+            if (status != GS1_STATUS_OK)
+            {
+                return status;
+            }
+            break;
+        }
+
+        case CommandSubscriberId::Inventory:
+        {
+            const auto status = dispatch_to_site_system(InventorySystem::process_command);
+            if (status != GS1_STATUS_OK)
+            {
+                return status;
+            }
+            break;
+        }
+
+        case CommandSubscriberId::EconomyPhone:
+        {
+            const auto status = dispatch_to_site_system(EconomyPhoneSystem::process_command);
+            if (status != GS1_STATUS_OK)
+            {
+                return status;
+            }
+            break;
+        }
+
+        case CommandSubscriberId::CampDurability:
+        {
+            const auto status = dispatch_to_site_system(CampDurabilitySystem::process_command);
+            if (status != GS1_STATUS_OK)
+            {
+                return status;
+            }
+            break;
+        }
+
+        case CommandSubscriberId::DeviceSupport:
+        {
+            const auto status = dispatch_to_site_system(DeviceSupportSystem::process_command);
+            if (status != GS1_STATUS_OK)
+            {
+                return status;
+            }
+            break;
+        }
+
+        case CommandSubscriberId::DeviceMaintenance:
+        {
+            const auto status = dispatch_to_site_system(DeviceMaintenanceSystem::process_command);
+            if (status != GS1_STATUS_OK)
+            {
+                return status;
+            }
+            break;
+        }
+
+        case CommandSubscriberId::Modifier:
+        {
+            const auto status = dispatch_to_site_system(ModifierSystem::process_command);
             if (status != GS1_STATUS_OK)
             {
                 return status;
@@ -326,6 +579,9 @@ void GameRuntime::sync_after_processed_command(const GameCommand& command)
     case GameCommandType::StartSiteAttempt:
         queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_SELECTION);
         queue_app_state_command(app_state_);
+        break;
+
+    case GameCommandType::SiteRunStarted:
         queue_site_bootstrap_commands();
         queue_hud_state_command();
         queue_log_command("Started site attempt.");
@@ -360,6 +616,27 @@ void GameRuntime::sync_after_processed_command(const GameCommand& command)
     }
 
     case GameCommandType::DeploymentSiteSelectionChanged:
+    case GameCommandType::StartSiteAction:
+    case GameCommandType::CancelSiteAction:
+    case GameCommandType::SiteActionStarted:
+    case GameCommandType::SiteActionCompleted:
+    case GameCommandType::SiteActionFailed:
+    case GameCommandType::SiteGroundCoverPlaced:
+    case GameCommandType::SiteTilePlantingCompleted:
+    case GameCommandType::SiteTileWatered:
+    case GameCommandType::SiteTileBurialCleared:
+    case GameCommandType::WorkerMeterDeltaRequested:
+    case GameCommandType::WorkerMetersChanged:
+    case GameCommandType::TileEcologyChanged:
+    case GameCommandType::RestorationProgressChanged:
+    case GameCommandType::TaskAcceptRequested:
+    case GameCommandType::TaskRewardClaimRequested:
+    case GameCommandType::PhoneListingPurchaseRequested:
+    case GameCommandType::PhoneListingSaleRequested:
+    case GameCommandType::InventoryItemUseRequested:
+    case GameCommandType::InventoryTransferRequested:
+    case GameCommandType::ContractorHireRequested:
+    case GameCommandType::SiteUnlockablePurchaseRequested:
     default:
         break;
     }
@@ -790,7 +1067,8 @@ void GameRuntime::queue_site_worker_update_command()
         active_site_run_->worker.player_energy_cap > 0.0f
             ? (active_site_run_->worker.player_energy / active_site_run_->worker.player_energy_cap)
             : 0.0f;
-    worker_payload.current_action_kind = static_cast<std::uint8_t>(active_site_run_->site_action.action_kind);
+    worker_payload.current_action_kind =
+        static_cast<Gs1SiteActionKind>(active_site_run_->site_action.action_kind);
     engine_commands_.push_back(worker_command);
 }
 
@@ -835,6 +1113,133 @@ void GameRuntime::queue_site_weather_update_command()
     engine_commands_.push_back(weather_command);
 }
 
+void GameRuntime::queue_site_inventory_slot_upsert_command(
+    Gs1InventoryContainerKind container_kind,
+    std::uint32_t slot_index)
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
+
+    const auto& slots =
+        container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK
+            ? active_site_run_->inventory.worker_pack_slots
+            : active_site_run_->inventory.camp_storage_slots;
+    if (slot_index >= slots.size())
+    {
+        return;
+    }
+
+    const auto& slot = slots[slot_index];
+    auto command = make_engine_command(GS1_ENGINE_COMMAND_SITE_INVENTORY_SLOT_UPSERT);
+    auto& payload = command.emplace_payload<Gs1EngineCommandInventorySlotData>();
+    payload.item_id = slot.item_id.value;
+    payload.condition = slot.item_condition;
+    payload.freshness = slot.item_freshness;
+    payload.quantity = static_cast<std::uint16_t>(std::min<std::uint32_t>(slot.item_quantity, 65535U));
+    payload.slot_index = static_cast<std::uint16_t>(slot_index);
+    payload.container_kind = container_kind;
+    payload.flags = slot.occupied ? 1U : 0U;
+    engine_commands_.push_back(command);
+}
+
+void GameRuntime::queue_all_site_inventory_slot_upsert_commands()
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
+
+    for (std::uint32_t index = 0; index < active_site_run_->inventory.worker_pack_slots.size(); ++index)
+    {
+        queue_site_inventory_slot_upsert_command(GS1_INVENTORY_CONTAINER_WORKER_PACK, index);
+    }
+
+    for (std::uint32_t index = 0; index < active_site_run_->inventory.camp_storage_slots.size(); ++index)
+    {
+        queue_site_inventory_slot_upsert_command(GS1_INVENTORY_CONTAINER_CAMP_STORAGE, index);
+    }
+}
+
+void GameRuntime::queue_site_task_upsert_command(std::size_t task_index)
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
+
+    const auto& tasks = active_site_run_->task_board.visible_tasks;
+    if (task_index >= tasks.size())
+    {
+        return;
+    }
+
+    const auto& task = tasks[task_index];
+    auto command = make_engine_command(GS1_ENGINE_COMMAND_SITE_TASK_UPSERT);
+    auto& payload = command.emplace_payload<Gs1EngineCommandTaskData>();
+    payload.task_instance_id = task.task_instance_id.value;
+    payload.task_template_id = task.task_template_id.value;
+    payload.publisher_faction_id = task.publisher_faction_id.value;
+    payload.current_progress = static_cast<std::uint16_t>(std::min<std::uint32_t>(task.current_progress_amount, 65535U));
+    payload.target_progress = static_cast<std::uint16_t>(std::min<std::uint32_t>(task.target_amount, 65535U));
+    payload.list_kind = to_task_presentation_list_kind(task.runtime_list_kind);
+    payload.flags = 1U;
+    engine_commands_.push_back(command);
+}
+
+void GameRuntime::queue_all_site_task_upsert_commands()
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
+
+    for (std::size_t index = 0; index < active_site_run_->task_board.visible_tasks.size(); ++index)
+    {
+        queue_site_task_upsert_command(index);
+    }
+}
+
+void GameRuntime::queue_site_phone_listing_upsert_command(std::size_t listing_index)
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
+
+    const auto& listings = active_site_run_->economy.available_phone_listings;
+    if (listing_index >= listings.size())
+    {
+        return;
+    }
+
+    const auto& listing = listings[listing_index];
+    auto command = make_engine_command(GS1_ENGINE_COMMAND_SITE_PHONE_LISTING_UPSERT);
+    auto& payload = command.emplace_payload<Gs1EngineCommandPhoneListingData>();
+    payload.listing_id = listing.listing_id;
+    payload.item_or_unlockable_id = listing.item_id.value;
+    payload.price = listing.price;
+    payload.related_site_id = active_site_run_->site_id.value;
+    payload.quantity = static_cast<std::uint16_t>(std::min<std::uint32_t>(listing.quantity, 65535U));
+    payload.listing_kind = to_phone_listing_presentation_kind(listing.kind);
+    payload.flags = listing.occupied ? 1U : 0U;
+    engine_commands_.push_back(command);
+}
+
+void GameRuntime::queue_all_site_phone_listing_upsert_commands()
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
+
+    for (std::size_t index = 0; index < active_site_run_->economy.available_phone_listings.size(); ++index)
+    {
+        queue_site_phone_listing_upsert_command(index);
+    }
+}
+
 void GameRuntime::queue_site_bootstrap_commands()
 {
     if (!active_site_run_.has_value())
@@ -847,7 +1252,13 @@ void GameRuntime::queue_site_bootstrap_commands()
     queue_site_worker_update_command();
     queue_site_camp_update_command();
     queue_site_weather_update_command();
+    queue_all_site_inventory_slot_upsert_commands();
+    queue_all_site_task_upsert_commands();
+    queue_all_site_phone_listing_upsert_commands();
     queue_site_snapshot_end_command();
+
+    active_site_run_->pending_projection_update_flags = 0U;
+    clear_pending_site_tile_projection_updates();
 }
 
 void GameRuntime::queue_site_delta_commands(std::uint64_t dirty_flags)
@@ -861,7 +1272,10 @@ void GameRuntime::queue_site_delta_commands(std::uint64_t dirty_flags)
         dirty_flags & (SITE_PROJECTION_UPDATE_TILES |
             SITE_PROJECTION_UPDATE_WORKER |
             SITE_PROJECTION_UPDATE_CAMP |
-            SITE_PROJECTION_UPDATE_WEATHER);
+            SITE_PROJECTION_UPDATE_WEATHER |
+            SITE_PROJECTION_UPDATE_INVENTORY |
+            SITE_PROJECTION_UPDATE_TASKS |
+            SITE_PROJECTION_UPDATE_PHONE);
     if (site_dirty_flags == 0U)
     {
         return;
@@ -889,6 +1303,21 @@ void GameRuntime::queue_site_delta_commands(std::uint64_t dirty_flags)
         queue_site_weather_update_command();
     }
 
+    if ((site_dirty_flags & SITE_PROJECTION_UPDATE_INVENTORY) != 0U)
+    {
+        queue_all_site_inventory_slot_upsert_commands();
+    }
+
+    if ((site_dirty_flags & SITE_PROJECTION_UPDATE_TASKS) != 0U)
+    {
+        queue_all_site_task_upsert_commands();
+    }
+
+    if ((site_dirty_flags & SITE_PROJECTION_UPDATE_PHONE) != 0U)
+    {
+        queue_all_site_phone_listing_upsert_commands();
+    }
+
     queue_site_snapshot_end_command();
 }
 
@@ -908,7 +1337,7 @@ void GameRuntime::queue_hud_state_command()
     payload.active_task_count =
         static_cast<std::uint16_t>(active_site_run_->task_board.accepted_task_ids.size());
     payload.current_action_kind =
-        static_cast<std::uint8_t>(active_site_run_->site_action.action_kind);
+        static_cast<Gs1SiteActionKind>(active_site_run_->site_action.action_kind);
     payload.site_completion_normalized =
         active_site_run_->counters.site_completion_tile_threshold > 0U
             ? static_cast<float>(active_site_run_->counters.fully_grown_tile_count) /
@@ -1068,10 +1497,119 @@ Gs1Status GameRuntime::translate_ui_action_to_command(const Gs1UiAction& action,
         out_command.set_payload(ReturnToRegionalMapCommand {});
         return GS1_STATUS_OK;
 
+    case GS1_UI_ACTION_ACCEPT_TASK:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        out_command.type = GameCommandType::TaskAcceptRequested;
+        out_command.set_payload(TaskAcceptRequestedCommand {action.target_id});
+        return GS1_STATUS_OK;
+
+    case GS1_UI_ACTION_CLAIM_TASK_REWARD:
+        if (action.target_id == 0U ||
+            action.arg0 > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()))
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        out_command.type = GameCommandType::TaskRewardClaimRequested;
+        out_command.set_payload(TaskRewardClaimRequestedCommand {
+            action.target_id,
+            static_cast<std::uint32_t>(action.arg0)});
+        return GS1_STATUS_OK;
+
+    case GS1_UI_ACTION_BUY_PHONE_LISTING:
+        if (action.target_id == 0U ||
+            action.arg0 > static_cast<std::uint64_t>(std::numeric_limits<std::uint16_t>::max()))
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        out_command.type = GameCommandType::PhoneListingPurchaseRequested;
+        out_command.set_payload(PhoneListingPurchaseRequestedCommand {
+            action.target_id,
+            static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0),
+            0U});
+        return GS1_STATUS_OK;
+
+    case GS1_UI_ACTION_SELL_PHONE_LISTING:
+        if (action.target_id == 0U ||
+            action.arg0 > static_cast<std::uint64_t>(std::numeric_limits<std::uint16_t>::max()))
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        out_command.type = GameCommandType::PhoneListingSaleRequested;
+        out_command.set_payload(PhoneListingSaleRequestedCommand {
+            action.target_id,
+            static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0),
+            0U});
+        return GS1_STATUS_OK;
+
+    case GS1_UI_ACTION_HIRE_CONTRACTOR:
+        if (action.target_id == 0U ||
+            action.arg0 > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()))
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        out_command.type = GameCommandType::ContractorHireRequested;
+        out_command.set_payload(ContractorHireRequestedCommand {
+            action.target_id,
+            static_cast<std::uint32_t>(action.arg0)});
+        return GS1_STATUS_OK;
+
+    case GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        out_command.type = GameCommandType::SiteUnlockablePurchaseRequested;
+        out_command.set_payload(SiteUnlockablePurchaseRequestedCommand {action.target_id});
+        return GS1_STATUS_OK;
+
+    case GS1_UI_ACTION_USE_INVENTORY_ITEM:
+    case GS1_UI_ACTION_TRANSFER_INVENTORY_ITEM:
     case GS1_UI_ACTION_NONE:
     default:
         return GS1_STATUS_INVALID_ARGUMENT;
     }
+}
+
+Gs1Status GameRuntime::translate_site_action_request_to_command(
+    const Gs1HostEventSiteActionRequestData& action,
+    GameCommand& out_command) const
+{
+    if (action.action_kind == GS1_SITE_ACTION_NONE)
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    out_command.type = GameCommandType::StartSiteAction;
+    out_command.set_payload(StartSiteActionCommand {
+        action.action_kind,
+        action.flags,
+        action.quantity == 0U ? 1U : action.quantity,
+        action.target_tile_x,
+        action.target_tile_y,
+        action.primary_subject_id,
+        action.secondary_subject_id,
+        action.item_id});
+    return GS1_STATUS_OK;
+}
+
+Gs1Status GameRuntime::translate_site_action_cancel_to_command(
+    const Gs1HostEventSiteActionCancelData& action,
+    GameCommand& out_command) const
+{
+    if (action.action_id == 0U &&
+        (action.flags & GS1_SITE_ACTION_CANCEL_FLAG_CURRENT_ACTION) == 0U)
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    out_command.type = GameCommandType::CancelSiteAction;
+    out_command.set_payload(CancelSiteActionCommand {
+        action.action_id,
+        action.flags});
+    return GS1_STATUS_OK;
 }
 
 Gs1Status GameRuntime::dispatch_host_events(
@@ -1133,6 +1671,44 @@ Gs1Status GameRuntime::dispatch_host_events(
             break;
         }
 
+        case GS1_HOST_EVENT_SITE_ACTION_REQUEST:
+        {
+            GameCommand command {};
+            const auto status =
+                translate_site_action_request_to_command(event.payload.site_action_request, command);
+            if (status != GS1_STATUS_OK)
+            {
+                return status;
+            }
+
+            command_queue_.push_back(command);
+            const auto dispatch_status = dispatch_queued_commands();
+            if (dispatch_status != GS1_STATUS_OK)
+            {
+                return dispatch_status;
+            }
+            break;
+        }
+
+        case GS1_HOST_EVENT_SITE_ACTION_CANCEL:
+        {
+            GameCommand command {};
+            const auto status =
+                translate_site_action_cancel_to_command(event.payload.site_action_cancel, command);
+            if (status != GS1_STATUS_OK)
+            {
+                return status;
+            }
+
+            command_queue_.push_back(command);
+            const auto dispatch_status = dispatch_queued_commands();
+            if (dispatch_status != GS1_STATUS_OK)
+            {
+                return dispatch_status;
+            }
+            break;
+        }
+
         default:
             return GS1_STATUS_INVALID_ARGUMENT;
         }
@@ -1188,6 +1764,18 @@ void GameRuntime::run_fixed_step()
             phase1_site_move_direction_.present}};
 
     SiteFlowSystem::run(context);
+    ModifierSystem::run(context);
+    WeatherEventSystem::run(context);
+    ActionExecutionSystem::run(context);
+    LocalWeatherResolveSystem::run(context);
+    WorkerConditionSystem::run(context);
+    CampDurabilitySystem::run(context);
+    DeviceMaintenanceSystem::run(context);
+    DeviceSupportSystem::run(context);
+    EcologySystem::run(context);
+    InventorySystem::run(context);
+    TaskBoardSystem::run(context);
+    EconomyPhoneSystem::run(context);
     FailureRecoverySystem::run(context);
     SiteCompletionSystem::run(context);
 }

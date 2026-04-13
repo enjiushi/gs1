@@ -188,6 +188,16 @@ Gs1Status CampaignFlowSystem::process_command(
         context.campaign->active_site_id = SiteId {payload.site_id};
         context.app_state = GS1_APP_STATE_SITE_ACTIVE;
         context.campaign->app_state = context.app_state;
+
+        GameCommand site_run_started {};
+        site_run_started.type = GameCommandType::SiteRunStarted;
+        site_run_started.set_payload(SiteRunStartedCommand {
+            context.active_site_run->site_id.value,
+            context.active_site_run->site_run_id.value,
+            context.active_site_run->site_archetype_id,
+            context.active_site_run->attempt_index,
+            context.active_site_run->site_attempt_seed});
+        context.command_queue.push_back(site_run_started);
         return GS1_STATUS_OK;
     }
 

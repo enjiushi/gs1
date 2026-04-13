@@ -88,6 +88,22 @@ const char* ui_action_name(Gs1UiActionType action_type)
         return "RETURN_TO_REGIONAL_MAP";
     case GS1_UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION:
         return "CLEAR_DEPLOYMENT_SITE_SELECTION";
+    case GS1_UI_ACTION_ACCEPT_TASK:
+        return "ACCEPT_TASK";
+    case GS1_UI_ACTION_CLAIM_TASK_REWARD:
+        return "CLAIM_TASK_REWARD";
+    case GS1_UI_ACTION_BUY_PHONE_LISTING:
+        return "BUY_PHONE_LISTING";
+    case GS1_UI_ACTION_SELL_PHONE_LISTING:
+        return "SELL_PHONE_LISTING";
+    case GS1_UI_ACTION_USE_INVENTORY_ITEM:
+        return "USE_INVENTORY_ITEM";
+    case GS1_UI_ACTION_TRANSFER_INVENTORY_ITEM:
+        return "TRANSFER_INVENTORY_ITEM";
+    case GS1_UI_ACTION_HIRE_CONTRACTOR:
+        return "HIRE_CONTRACTOR";
+    case GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE:
+        return "PURCHASE_SITE_UNLOCKABLE";
     default:
         return "NONE";
     }
@@ -140,6 +156,48 @@ const char* site_attempt_result_name(Gs1SiteAttemptResult result)
     case GS1_SITE_ATTEMPT_RESULT_NONE:
     default:
         return "NONE";
+    }
+}
+
+const char* inventory_container_name(Gs1InventoryContainerKind kind)
+{
+    switch (kind)
+    {
+    case GS1_INVENTORY_CONTAINER_CAMP_STORAGE:
+        return "CAMP_STORAGE";
+    case GS1_INVENTORY_CONTAINER_WORKER_PACK:
+    default:
+        return "WORKER_PACK";
+    }
+}
+
+const char* task_list_kind_name(Gs1TaskPresentationListKind kind)
+{
+    switch (kind)
+    {
+    case GS1_TASK_PRESENTATION_LIST_ACCEPTED:
+        return "ACCEPTED";
+    case GS1_TASK_PRESENTATION_LIST_COMPLETED:
+        return "COMPLETED";
+    case GS1_TASK_PRESENTATION_LIST_VISIBLE:
+    default:
+        return "VISIBLE";
+    }
+}
+
+const char* phone_listing_kind_name(Gs1PhoneListingPresentationKind kind)
+{
+    switch (kind)
+    {
+    case GS1_PHONE_LISTING_PRESENTATION_SELL_ITEM:
+        return "SELL_ITEM";
+    case GS1_PHONE_LISTING_PRESENTATION_HIRE_CONTRACTOR:
+        return "HIRE_CONTRACTOR";
+    case GS1_PHONE_LISTING_PRESENTATION_PURCHASE_UNLOCKABLE:
+        return "PURCHASE_UNLOCKABLE";
+    case GS1_PHONE_LISTING_PRESENTATION_BUY_ITEM:
+    default:
+        return "BUY_ITEM";
     }
 }
 
@@ -484,6 +542,87 @@ void append_site_state_json(std::string& json, const std::optional<SmokeEngineHo
         json += std::to_string(weather.phase_minutes_remaining);
         json += '}';
     }
+
+    json += ",\"inventorySlots\":[";
+    for (std::size_t index = 0; index < site_snapshot.inventory_slots.size(); ++index)
+    {
+        const auto& slot = site_snapshot.inventory_slots[index];
+        if (index > 0U)
+        {
+            json.push_back(',');
+        }
+
+        json += "{\"containerKind\":";
+        append_json_string(json, inventory_container_name(slot.container_kind));
+        json += ",\"slotIndex\":";
+        json += std::to_string(slot.slot_index);
+        json += ",\"itemId\":";
+        json += std::to_string(slot.item_id);
+        json += ",\"quantity\":";
+        json += std::to_string(slot.quantity);
+        json += ",\"condition\":";
+        json += std::to_string(slot.condition);
+        json += ",\"freshness\":";
+        json += std::to_string(slot.freshness);
+        json += ",\"flags\":";
+        json += std::to_string(slot.flags);
+        json += '}';
+    }
+    json += "]";
+
+    json += ",\"tasks\":[";
+    for (std::size_t index = 0; index < site_snapshot.tasks.size(); ++index)
+    {
+        const auto& task = site_snapshot.tasks[index];
+        if (index > 0U)
+        {
+            json.push_back(',');
+        }
+
+        json += "{\"taskInstanceId\":";
+        json += std::to_string(task.task_instance_id);
+        json += ",\"taskTemplateId\":";
+        json += std::to_string(task.task_template_id);
+        json += ",\"publisherFactionId\":";
+        json += std::to_string(task.publisher_faction_id);
+        json += ",\"currentProgress\":";
+        json += std::to_string(task.current_progress);
+        json += ",\"targetProgress\":";
+        json += std::to_string(task.target_progress);
+        json += ",\"listKind\":";
+        append_json_string(json, task_list_kind_name(task.list_kind));
+        json += ",\"flags\":";
+        json += std::to_string(task.flags);
+        json += '}';
+    }
+    json += "]";
+
+    json += ",\"phoneListings\":[";
+    for (std::size_t index = 0; index < site_snapshot.phone_listings.size(); ++index)
+    {
+        const auto& listing = site_snapshot.phone_listings[index];
+        if (index > 0U)
+        {
+            json.push_back(',');
+        }
+
+        json += "{\"listingId\":";
+        json += std::to_string(listing.listing_id);
+        json += ",\"itemOrUnlockableId\":";
+        json += std::to_string(listing.item_or_unlockable_id);
+        json += ",\"price\":";
+        json += std::to_string(listing.price);
+        json += ",\"relatedSiteId\":";
+        json += std::to_string(listing.related_site_id);
+        json += ",\"quantity\":";
+        json += std::to_string(listing.quantity);
+        json += ",\"listingKind\":";
+        append_json_string(json, phone_listing_kind_name(listing.listing_kind));
+        json += ",\"flags\":";
+        json += std::to_string(listing.flags);
+        json += '}';
+    }
+    json += "]";
 
     json += '}';
 }

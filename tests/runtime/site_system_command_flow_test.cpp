@@ -1,3 +1,4 @@
+#include "app/campaign_factory.h"
 #include "campaign/campaign_state.h"
 #include "campaign/systems/campaign_system_context.h"
 #include "campaign/systems/campaign_flow_system.h"
@@ -15,7 +16,9 @@ namespace
 {
 using gs1::CampaignState;
 using gs1::CampaignFixedStepContext;
+using gs1::CampaignFlowCommandContext;
 using gs1::CampaignSystemContext;
+using gs1::CampaignFactory;
 using gs1::CampaignFlowSystem;
 using gs1::DayPhase;
 using gs1::DeploymentSiteSelectionChangedCommand;
@@ -25,12 +28,14 @@ using gs1::GameCommandType;
 using gs1::LoadoutPlannerSystem;
 using gs1::SiteCompletionSystem;
 using gs1::SiteAttemptEndedCommand;
+using gs1::SiteRunStartedCommand;
 using gs1::SiteFlowSystem;
 using gs1::SiteId;
 using gs1::SiteRunState;
 using gs1::SiteRunStatus;
 using gs1::SiteSystemContext;
 using gs1::SiteMoveDirectionInput;
+using gs1::StartSiteAttemptCommand;
 
 SiteSystemContext make_site_context(
     CampaignState& campaign,
@@ -70,6 +75,29 @@ int main()
     assert(campaign.campaign_clock_minutes_elapsed > 0.0);
     assert(campaign.campaign_days_remaining == 30U);
     campaign.campaign_clock_minutes_elapsed = 0.0;
+
+    std::optional<CampaignState> active_campaign {
+        CampaignFactory::create_prototype_campaign(42ULL, 30U)};
+    std::optional<SiteRunState> active_site_run {};
+    Gs1AppState app_state = GS1_APP_STATE_REGIONAL_MAP;
+    GameCommandQueue site_start_queue {};
+    CampaignFlowCommandContext flow_context {
+        active_campaign,
+        active_site_run,
+        app_state,
+        site_start_queue};
+    gs1::GameCommand start_site_attempt {};
+    start_site_attempt.type = GameCommandType::StartSiteAttempt;
+    start_site_attempt.set_payload(StartSiteAttemptCommand {1U});
+    assert(CampaignFlowSystem::process_command(flow_context, start_site_attempt) == GS1_STATUS_OK);
+    assert(active_site_run.has_value());
+    assert(app_state == GS1_APP_STATE_SITE_ACTIVE);
+    assert(site_start_queue.size() == 1U);
+    assert(site_start_queue.front().type == GameCommandType::SiteRunStarted);
+    assert(site_start_queue.front().payload_as<SiteRunStartedCommand>().site_id == 1U);
+    assert(site_start_queue.front().payload_as<SiteRunStartedCommand>().site_run_id == 1U);
+    assert(site_start_queue.front().payload_as<SiteRunStartedCommand>().site_archetype_id == 101U);
+    assert(site_start_queue.front().payload_as<SiteRunStartedCommand>().attempt_index == 1U);
 
     SiteRunState site_run {};
     site_run.site_id = SiteId {7U};

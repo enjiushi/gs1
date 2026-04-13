@@ -58,7 +58,20 @@ private:
     enum class CommandSubscriberId : std::uint8_t
     {
         CampaignFlow = 0,
-        LoadoutPlanner = 1
+        LoadoutPlanner = 1,
+        ActionExecution = 2,
+        WeatherEvent = 3,
+        WorkerCondition = 4,
+        Ecology = 5,
+        TaskBoard = 6,
+        PlacementValidation = 7,
+        LocalWeatherResolve = 8,
+        Inventory = 9,
+        EconomyPhone = 10,
+        CampDurability = 11,
+        DeviceSupport = 12,
+        DeviceMaintenance = 13,
+        Modifier = 14
     };
 
     enum class FeedbackEventSubscriberId : std::uint8_t
@@ -103,6 +116,14 @@ private:
     void queue_site_worker_update_command();
     void queue_site_camp_update_command();
     void queue_site_weather_update_command();
+    void queue_site_inventory_slot_upsert_command(
+        Gs1InventoryContainerKind container_kind,
+        std::uint32_t slot_index);
+    void queue_all_site_inventory_slot_upsert_commands();
+    void queue_site_task_upsert_command(std::size_t task_index);
+    void queue_all_site_task_upsert_commands();
+    void queue_site_phone_listing_upsert_command(std::size_t listing_index);
+    void queue_all_site_phone_listing_upsert_commands();
     void queue_site_bootstrap_commands();
     void queue_site_delta_commands(std::uint64_t dirty_flags);
     void queue_hud_state_command();
@@ -115,6 +136,12 @@ private:
     void clear_pending_site_tile_projection_updates() noexcept;
     void flush_site_presentation_if_dirty();
     [[nodiscard]] Gs1Status translate_ui_action_to_command(const Gs1UiAction& action, GameCommand& out_command) const;
+    [[nodiscard]] Gs1Status translate_site_action_request_to_command(
+        const Gs1HostEventSiteActionRequestData& action,
+        GameCommand& out_command) const;
+    [[nodiscard]] Gs1Status translate_site_action_cancel_to_command(
+        const Gs1HostEventSiteActionCancelData& action,
+        GameCommand& out_command) const;
     [[nodiscard]] Gs1Status dispatch_host_events(
         HostEventDispatchStage stage,
         std::uint32_t& out_processed_count);

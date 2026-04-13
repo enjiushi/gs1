@@ -48,6 +48,38 @@ std::optional<Gs1UiActionType> parse_ui_action_type(const std::string& value)
     {
         return GS1_UI_ACTION_RETURN_TO_REGIONAL_MAP;
     }
+    if (value == "ACCEPT_TASK")
+    {
+        return GS1_UI_ACTION_ACCEPT_TASK;
+    }
+    if (value == "CLAIM_TASK_REWARD")
+    {
+        return GS1_UI_ACTION_CLAIM_TASK_REWARD;
+    }
+    if (value == "BUY_PHONE_LISTING")
+    {
+        return GS1_UI_ACTION_BUY_PHONE_LISTING;
+    }
+    if (value == "SELL_PHONE_LISTING")
+    {
+        return GS1_UI_ACTION_SELL_PHONE_LISTING;
+    }
+    if (value == "USE_INVENTORY_ITEM")
+    {
+        return GS1_UI_ACTION_USE_INVENTORY_ITEM;
+    }
+    if (value == "TRANSFER_INVENTORY_ITEM")
+    {
+        return GS1_UI_ACTION_TRANSFER_INVENTORY_ITEM;
+    }
+    if (value == "HIRE_CONTRACTOR")
+    {
+        return GS1_UI_ACTION_HIRE_CONTRACTOR;
+    }
+    if (value == "PURCHASE_SITE_UNLOCKABLE")
+    {
+        return GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE;
+    }
 
     return std::nullopt;
 }
@@ -143,6 +175,10 @@ std::optional<Gs1EngineCommandType> parse_engine_command_type(const std::string&
     if (value == "SITE_WEATHER_UPDATE")
     {
         return GS1_ENGINE_COMMAND_SITE_WEATHER_UPDATE;
+    }
+    if (value == "SITE_ACTION_UPDATE")
+    {
+        return GS1_ENGINE_COMMAND_SITE_ACTION_UPDATE;
     }
     if (value == "HUD_STATE")
     {

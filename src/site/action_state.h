@@ -28,6 +28,13 @@ struct ActionState final
     std::optional<RuntimeActionId> current_action_id {};
     ActionKind action_kind {ActionKind::None};
     std::optional<TileCoord> target_tile {};
+    std::uint32_t primary_subject_id {0};
+    std::uint32_t secondary_subject_id {0};
+    std::uint32_t item_id {0};
+    std::uint32_t placement_reservation_token {0};
+    std::uint16_t quantity {0};
+    std::uint8_t request_flags {0};
+    bool awaiting_placement_reservation {false};
     double remaining_action_minutes {0.0};
     std::vector<ReservedItemStack> reserved_input_item_stacks {};
     std::optional<double> started_at_world_minute {};
