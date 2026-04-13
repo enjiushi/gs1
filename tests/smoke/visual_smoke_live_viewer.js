@@ -642,6 +642,304 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
     }
 
+    function clamp01(value) {
+        return Math.max(0, Math.min(value, 1));
+    }
+
+    function lerp(left, right, amount) {
+        return left + (right - left) * amount;
+    }
+
+    function createCapsulePart(radius, totalLength, material, capSegments, radialSegments) {
+        const cylinderLength = Math.max(totalLength - radius * 2.0, 0.01);
+        return new THREE_NS.Mesh(
+            new THREE_NS.CapsuleGeometry(radius, cylinderLength, capSegments || 4, radialSegments || 8),
+            material
+        );
+    }
+
+    function createLimbChain(options) {
+        const root = new THREE_NS.Group();
+        const joint = new THREE_NS.Group();
+        const end = new THREE_NS.Group();
+
+        const upper = createCapsulePart(options.upperRadius, options.upperLength, options.upperMaterial, 3, 8);
+        upper.position.y = -options.upperLength * 0.5;
+        root.add(upper);
+
+        joint.position.y = -options.upperLength;
+        root.add(joint);
+
+        const lower = createCapsulePart(options.lowerRadius, options.lowerLength, options.lowerMaterial, 3, 8);
+        lower.position.y = -options.lowerLength * 0.5;
+        joint.add(lower);
+
+        end.position.y = -options.lowerLength;
+        joint.add(end);
+
+        if (options.endMesh) {
+            end.add(options.endMesh);
+        }
+
+        return {
+            root: root,
+            joint: joint,
+            end: end
+        };
+    }
+
+    function createHumanoidWorker() {
+        const workerGroup = new THREE_NS.Group();
+        const rigRoot = new THREE_NS.Group();
+        workerGroup.add(rigRoot);
+
+        const materials = {
+            jacket: new THREE_NS.MeshStandardMaterial({ color: 0x2e6965, roughness: 0.76, metalness: 0.04 }),
+            shirt: new THREE_NS.MeshStandardMaterial({ color: 0xd7c7a7, roughness: 0.88, metalness: 0.01 }),
+            pants: new THREE_NS.MeshStandardMaterial({ color: 0x60513e, roughness: 0.82, metalness: 0.03 }),
+            boot: new THREE_NS.MeshStandardMaterial({ color: 0x29221a, roughness: 0.72, metalness: 0.06 }),
+            skin: new THREE_NS.MeshStandardMaterial({ color: 0xe2c59f, roughness: 0.74, metalness: 0.01 }),
+            hat: new THREE_NS.MeshStandardMaterial({ color: 0xb99a6b, roughness: 0.86, metalness: 0.02 }),
+            pack: new THREE_NS.MeshStandardMaterial({ color: 0x6b5637, roughness: 0.84, metalness: 0.04 }),
+            detail: new THREE_NS.MeshStandardMaterial({ color: 0x172b2d, roughness: 0.66, metalness: 0.07 })
+        };
+
+        const shadow = new THREE_NS.Mesh(
+            new THREE_NS.CircleGeometry(0.42, 24),
+            new THREE_NS.MeshBasicMaterial({ color: 0x3d2f1f, transparent: true, opacity: 0.18, depthWrite: false })
+        );
+        shadow.rotation.x = -Math.PI / 2;
+        shadow.scale.y = 0.56;
+        shadow.position.y = 0.018;
+        workerGroup.add(shadow);
+
+        const pelvis = new THREE_NS.Mesh(
+            new THREE_NS.BoxGeometry(0.34, 0.18, 0.22),
+            materials.pants
+        );
+        pelvis.position.y = 0.68;
+        rigRoot.add(pelvis);
+
+        const torso = new THREE_NS.Group();
+        torso.position.y = 0.72;
+        rigRoot.add(torso);
+
+        const torsoCore = createCapsulePart(0.18, 0.58, materials.jacket, 5, 10);
+        torsoCore.position.y = 0.28;
+        torso.add(torsoCore);
+
+        const chestPanel = new THREE_NS.Mesh(
+            new THREE_NS.BoxGeometry(0.20, 0.28, 0.024),
+            materials.shirt
+        );
+        chestPanel.position.set(0, 0.30, 0.174);
+        torso.add(chestPanel);
+
+        const backpack = new THREE_NS.Mesh(
+            new THREE_NS.BoxGeometry(0.28, 0.38, 0.12),
+            materials.pack
+        );
+        backpack.position.set(0, 0.24, -0.19);
+        torso.add(backpack);
+
+        const neck = new THREE_NS.Mesh(
+            new THREE_NS.CylinderGeometry(0.055, 0.065, 0.10, 10),
+            materials.skin
+        );
+        neck.position.y = 0.62;
+        torso.add(neck);
+
+        const head = new THREE_NS.Group();
+        head.position.y = 0.76;
+        torso.add(head);
+
+        const skull = new THREE_NS.Mesh(
+            new THREE_NS.SphereGeometry(0.145, 18, 16),
+            materials.skin
+        );
+        head.add(skull);
+
+        const nose = new THREE_NS.Mesh(
+            new THREE_NS.ConeGeometry(0.025, 0.075, 6),
+            materials.skin
+        );
+        nose.position.set(0, 0.0, 0.142);
+        nose.rotation.x = Math.PI / 2;
+        head.add(nose);
+
+        const eyeBar = new THREE_NS.Mesh(
+            new THREE_NS.BoxGeometry(0.13, 0.022, 0.012),
+            materials.detail
+        );
+        eyeBar.position.set(0, 0.045, 0.133);
+        head.add(eyeBar);
+
+        const hatBrim = new THREE_NS.Mesh(
+            new THREE_NS.CylinderGeometry(0.19, 0.19, 0.028, 22),
+            materials.hat
+        );
+        hatBrim.position.y = 0.13;
+        head.add(hatBrim);
+
+        const hatCrown = new THREE_NS.Mesh(
+            new THREE_NS.CylinderGeometry(0.115, 0.135, 0.11, 18),
+            materials.hat
+        );
+        hatCrown.position.y = 0.20;
+        head.add(hatCrown);
+
+        const chestLight = new THREE_NS.Mesh(
+            new THREE_NS.CylinderGeometry(0.028, 0.028, 0.014, 12),
+            new THREE_NS.MeshStandardMaterial({ color: 0xc6e0d4, emissive: 0x4f8c7d, emissiveIntensity: 0.22 })
+        );
+        chestLight.position.set(0.055, 0.37, 0.192);
+        chestLight.rotation.x = Math.PI / 2;
+        torso.add(chestLight);
+
+        function createBoot(side) {
+            const boot = new THREE_NS.Mesh(
+                new THREE_NS.BoxGeometry(0.12, 0.075, 0.24),
+                materials.boot
+            );
+            boot.position.set(side * 0.01, -0.02, 0.075);
+            return boot;
+        }
+
+        function createHand() {
+            const hand = new THREE_NS.Mesh(
+                new THREE_NS.SphereGeometry(0.055, 10, 8),
+                materials.skin
+            );
+            hand.position.y = -0.02;
+            return hand;
+        }
+
+        const leftLeg = createLimbChain({
+            upperLength: 0.32,
+            lowerLength: 0.33,
+            upperRadius: 0.06,
+            lowerRadius: 0.052,
+            upperMaterial: materials.pants,
+            lowerMaterial: materials.pants,
+            endMesh: createBoot(-1)
+        });
+        leftLeg.root.position.set(-0.095, 0.67, 0.015);
+        rigRoot.add(leftLeg.root);
+
+        const rightLeg = createLimbChain({
+            upperLength: 0.32,
+            lowerLength: 0.33,
+            upperRadius: 0.06,
+            lowerRadius: 0.052,
+            upperMaterial: materials.pants,
+            lowerMaterial: materials.pants,
+            endMesh: createBoot(1)
+        });
+        rightLeg.root.position.set(0.095, 0.67, 0.015);
+        rigRoot.add(rightLeg.root);
+
+        const leftArm = createLimbChain({
+            upperLength: 0.29,
+            lowerLength: 0.27,
+            upperRadius: 0.046,
+            lowerRadius: 0.04,
+            upperMaterial: materials.jacket,
+            lowerMaterial: materials.jacket,
+            endMesh: createHand()
+        });
+        leftArm.root.position.set(-0.245, 0.53, 0.0);
+        torso.add(leftArm.root);
+
+        const rightArm = createLimbChain({
+            upperLength: 0.29,
+            lowerLength: 0.27,
+            upperRadius: 0.046,
+            lowerRadius: 0.04,
+            upperMaterial: materials.jacket,
+            lowerMaterial: materials.jacket,
+            endMesh: createHand()
+        });
+        rightArm.root.position.set(0.245, 0.53, 0.0);
+        torso.add(rightArm.root);
+
+        return {
+            group: workerGroup,
+            rig: {
+                root: rigRoot,
+                torso: torso,
+                pelvis: pelvis,
+                head: head,
+                leftHip: leftLeg.root,
+                rightHip: rightLeg.root,
+                leftKnee: leftLeg.joint,
+                rightKnee: rightLeg.joint,
+                leftAnkle: leftLeg.end,
+                rightAnkle: rightLeg.end,
+                leftShoulder: leftArm.root,
+                rightShoulder: rightArm.root,
+                leftElbow: leftArm.joint,
+                rightElbow: rightArm.joint,
+                leftWrist: leftArm.end,
+                rightWrist: rightArm.end,
+                shadow: shadow
+            }
+        };
+    }
+
+    function updateHumanoidWorkerAnimation(cache, deltaSeconds, elapsed, movementSpeed, distanceToTarget) {
+        const rig = cache.workerRig;
+        if (!rig) {
+            return;
+        }
+
+        const locomotionAmount = clamp01((Math.max(movementSpeed, distanceToTarget * 8.0) - 0.04) / 0.85);
+        const runAmount = clamp01((movementSpeed - 1.55) / 1.35);
+        const cadence = lerp(5.4, 9.7, runAmount) * locomotionAmount;
+        cache.workerAnimPhase += cadence * deltaSeconds;
+
+        const phase = cache.workerAnimPhase;
+        const leftStep = Math.sin(phase);
+        const rightStep = -leftStep;
+        const sideSway = Math.sin(phase * 2.0);
+        const lift = Math.abs(Math.cos(phase));
+        const legSwing = lerp(0.42, 0.78, runAmount) * locomotionAmount;
+        const armSwing = lerp(0.48, 0.92, runAmount) * locomotionAmount;
+        const kneeBend = lerp(0.46, 0.92, runAmount) * locomotionAmount;
+        const idleBreath = Math.sin(elapsed * 1.55);
+
+        rig.root.position.y = lift * lerp(0.018, 0.052, runAmount) * locomotionAmount +
+            idleBreath * 0.006 * (1.0 - locomotionAmount);
+        rig.root.rotation.z = sideSway * lerp(0.012, 0.026, runAmount) * locomotionAmount;
+
+        rig.torso.rotation.x = -lerp(0.025, 0.13, runAmount) * locomotionAmount;
+        rig.torso.rotation.z = -sideSway * lerp(0.026, 0.060, runAmount) * locomotionAmount;
+        rig.pelvis.rotation.z = sideSway * lerp(0.018, 0.040, runAmount) * locomotionAmount;
+
+        rig.leftHip.rotation.set(leftStep * legSwing - 0.02 * locomotionAmount, 0, -0.045);
+        rig.rightHip.rotation.set(rightStep * legSwing - 0.02 * locomotionAmount, 0, 0.045);
+        rig.leftKnee.rotation.x = 0.045 + Math.max(0, -leftStep) * kneeBend;
+        rig.rightKnee.rotation.x = 0.045 + Math.max(0, -rightStep) * kneeBend;
+        rig.leftAnkle.rotation.x = -leftStep * 0.22 * locomotionAmount - rig.leftKnee.rotation.x * 0.18;
+        rig.rightAnkle.rotation.x = -rightStep * 0.22 * locomotionAmount - rig.rightKnee.rotation.x * 0.18;
+
+        rig.leftShoulder.rotation.set(-leftStep * armSwing + 0.05 * locomotionAmount, 0, -0.18);
+        rig.rightShoulder.rotation.set(-rightStep * armSwing + 0.05 * locomotionAmount, 0, 0.18);
+        rig.leftElbow.rotation.x = 0.16 + locomotionAmount * lerp(0.08, 0.36, runAmount) +
+            Math.max(0, leftStep) * 0.14 * locomotionAmount;
+        rig.rightElbow.rotation.x = 0.16 + locomotionAmount * lerp(0.08, 0.36, runAmount) +
+            Math.max(0, rightStep) * 0.14 * locomotionAmount;
+        rig.leftWrist.rotation.x = -0.08 + Math.max(0, -leftStep) * 0.12 * locomotionAmount;
+        rig.rightWrist.rotation.x = -0.08 + Math.max(0, -rightStep) * 0.12 * locomotionAmount;
+
+        rig.head.rotation.x = -rig.torso.rotation.x * 0.55 + idleBreath * 0.012 * (1.0 - locomotionAmount);
+        rig.head.rotation.z = -rig.torso.rotation.z * 0.65;
+        rig.shadow.scale.set(
+            lerp(1.0, 1.16, locomotionAmount),
+            lerp(0.56, 0.70, locomotionAmount),
+            1.0
+        );
+    }
+
     function buildSiteBootstrapSignature(siteBootstrap) {
         return JSON.stringify(
             {
@@ -734,28 +1032,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             worldGroup.add(tent);
         }
 
-        const workerGroup = new THREE_NS.Group();
-        const body = new THREE_NS.Mesh(
-            new THREE_NS.CapsuleGeometry(0.18, 0.45, 4, 8),
-            new THREE_NS.MeshStandardMaterial({ color: 0x2f7f91, roughness: 0.72, metalness: 0.05 })
-        );
-        body.position.y = 0.42;
-        workerGroup.add(body);
-
-        const head = new THREE_NS.Mesh(
-            new THREE_NS.SphereGeometry(0.12, 16, 16),
-            new THREE_NS.MeshStandardMaterial({ color: 0xe6d1b0, roughness: 0.7, metalness: 0.02 })
-        );
-        head.position.y = 0.83;
-        workerGroup.add(head);
-
-        const facingMarker = new THREE_NS.Mesh(
-            new THREE_NS.ConeGeometry(0.08, 0.2, 6),
-            new THREE_NS.MeshStandardMaterial({ color: 0x183b47, roughness: 0.62, metalness: 0.08 })
-        );
-        facingMarker.position.set(0.0, 0.52, 0.28);
-        facingMarker.rotation.x = Math.PI / 2;
-        workerGroup.add(facingMarker);
+        const workerVisual = createHumanoidWorker();
+        const workerGroup = workerVisual.group;
         worldGroup.add(workerGroup);
 
         siteSceneCache = {
@@ -766,6 +1044,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             width: width,
             height: height,
             workerGroup: workerGroup,
+            workerRig: workerVisual.rig,
+            workerInitialized: false,
+            workerAnimPhase: 0,
+            workerVisualSpeed: 0,
             workerTargetX: 0,
             workerTargetZ: 0,
             workerTargetYaw: 0,
@@ -845,9 +1127,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             siteSceneCache.workerTargetZ = cameraTargetZ;
             siteSceneCache.workerTargetYaw = (siteState.worker.facingDegrees || 0) * Math.PI / 180.0;
 
-            if (siteSceneCache.workerGroup.position.lengthSq() === 0) {
+            if (!siteSceneCache.workerInitialized) {
                 siteSceneCache.workerGroup.position.set(cameraTargetX, 0.0, cameraTargetZ);
                 siteSceneCache.workerGroup.rotation.y = siteSceneCache.workerTargetYaw;
+                siteSceneCache.workerInitialized = true;
             }
         }
 
@@ -927,11 +1210,40 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             const workerBlend = blendFactorFromRate(18.0, deltaSeconds);
             const rotationBlend = blendFactorFromRate(16.0, deltaSeconds);
             const cameraBlend = blendFactorFromRate(10.0, deltaSeconds);
+            const previousWorkerX = workerGroup.position.x;
+            const previousWorkerZ = workerGroup.position.z;
+            const distanceToTargetBeforeMove = Math.hypot(
+                siteSceneCache.workerTargetX - previousWorkerX,
+                siteSceneCache.workerTargetZ - previousWorkerZ
+            );
             workerGroup.position.x += (siteSceneCache.workerTargetX - workerGroup.position.x) * workerBlend;
             workerGroup.position.z += (siteSceneCache.workerTargetZ - workerGroup.position.z) * workerBlend;
 
             const yawDelta = normalizeAngleRadians(siteSceneCache.workerTargetYaw - workerGroup.rotation.y);
             workerGroup.rotation.y += yawDelta * rotationBlend;
+
+            const visualMoveDistance = Math.hypot(
+                workerGroup.position.x - previousWorkerX,
+                workerGroup.position.z - previousWorkerZ
+            );
+            const distanceToTarget = Math.hypot(
+                siteSceneCache.workerTargetX - workerGroup.position.x,
+                siteSceneCache.workerTargetZ - workerGroup.position.z
+            );
+            const visualSpeed = deltaSeconds > 0.0 ? visualMoveDistance / deltaSeconds : 0.0;
+            const targetPullSpeed = deltaSeconds > 0.0
+                ? Math.min(distanceToTargetBeforeMove / deltaSeconds, 3.8)
+                : 0.0;
+            const desiredWorkerSpeed = Math.max(visualSpeed, distanceToTarget > 0.006 ? targetPullSpeed : 0.0);
+            const speedBlend = blendFactorFromRate(12.0, deltaSeconds);
+            siteSceneCache.workerVisualSpeed += (desiredWorkerSpeed - siteSceneCache.workerVisualSpeed) * speedBlend;
+            updateHumanoidWorkerAnimation(
+                siteSceneCache,
+                deltaSeconds,
+                elapsed,
+                siteSceneCache.workerVisualSpeed,
+                distanceToTarget
+            );
 
             const desiredCameraX = siteSceneCache.cameraTargetX + 4.6;
             const desiredCameraY = Math.max(siteSceneCache.width, siteSceneCache.height) * 0.72 + 3.0;
