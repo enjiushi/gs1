@@ -20,6 +20,8 @@ public:
         ActivityOnly = 1
     };
 
+    struct LiveStateSnapshot;
+
 public:
     SmokeEngineHost(
         const Gs1RuntimeApi& api,
@@ -30,6 +32,8 @@ public:
     void update(double delta_seconds);
     void update(double delta_seconds, const Gs1InputSnapshot* input_override);
     void queue_ui_action(const Gs1UiAction& action);
+    [[nodiscard]] LiveStateSnapshot capture_live_state_snapshot() const;
+    [[nodiscard]] static std::string build_live_state_json(const LiveStateSnapshot& snapshot);
     [[nodiscard]] std::string build_live_state_json() const;
 
     [[nodiscard]] bool has_inflight_script_directive() const noexcept
@@ -51,7 +55,7 @@ public:
 
     [[nodiscard]] bool saw_command(Gs1EngineCommandType type) const noexcept;
 
-private:
+public:
     struct ActiveUiElement final
     {
         std::uint32_t element_id {0};
@@ -167,6 +171,23 @@ private:
         std::uint32_t site_id {0};
         Gs1SiteAttemptResult result {GS1_SITE_ATTEMPT_RESULT_NONE};
         std::uint32_t newly_revealed_site_count {0};
+    };
+
+public:
+    struct LiveStateSnapshot final
+    {
+        std::uint64_t frame_number {0};
+        std::optional<Gs1AppState> current_app_state {};
+        std::optional<std::uint32_t> selected_site_id {};
+        bool script_failed {false};
+        std::vector<std::string> current_frame_command_entries {};
+        std::vector<std::string> command_log_tail {};
+        std::vector<ActiveUiSetup> active_ui_setups {};
+        std::vector<RegionalMapSiteProjection> regional_map_sites {};
+        std::vector<RegionalMapLinkProjection> regional_map_links {};
+        std::optional<SiteSnapshotProjection> active_site_snapshot {};
+        std::optional<HudProjection> hud_state {};
+        std::optional<SiteResultProjection> site_result {};
     };
 
 private:

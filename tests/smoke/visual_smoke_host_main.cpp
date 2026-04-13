@@ -8,6 +8,8 @@
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
+#include <Windows.h>
+#include <mmsystem.h>
 #include <mutex>
 #include <stdexcept>
 #include <string>
@@ -27,6 +29,28 @@ struct LiveSession final
     SmokeEngineHost host;
     Gs1InputSnapshot input_snapshot {};
     std::mutex mutex {};
+};
+
+class WindowsTimerResolution final
+{
+public:
+    explicit WindowsTimerResolution(UINT period_milliseconds) noexcept
+        : period_milliseconds_(period_milliseconds)
+        , active_(timeBeginPeriod(period_milliseconds_) == TIMERR_NOERROR)
+    {
+    }
+
+    ~WindowsTimerResolution()
+    {
+        if (active_)
+        {
+            timeEndPeriod(period_milliseconds_);
+        }
+    }
+
+private:
+    UINT period_milliseconds_ {0U};
+    bool active_ {false};
 };
 
 std::optional<std::string> extract_string_field(const std::string& body, const char* key)
@@ -136,12 +160,17 @@ void run_live_mode(
     std::uint16_t preferred_port)
 {
     LiveSession session {api, runtime};
+    WindowsTimerResolution timer_resolution {1U};
 
     SmokeLiveHttpServer server {
         repo_root,
         [&session]() {
-            std::scoped_lock lock {session.mutex};
-            return session.host.build_live_state_json();
+            SmokeEngineHost::LiveStateSnapshot snapshot {};
+            {
+                std::scoped_lock lock {session.mutex};
+                snapshot = session.host.capture_live_state_snapshot();
+            }
+            return SmokeEngineHost::build_live_state_json(snapshot);
         },
         [&session](const std::string& body) {
             const auto action_type_name = extract_string_field(body, "type");
@@ -188,13 +217,13 @@ void run_live_mode(
     smoke_log::infof("Press Ctrl+C to stop the host.\n");
 
     constexpr double k_frame_delta_seconds = 1.0 / 60.0;
-    constexpr auto k_frame_time = std::chrono::milliseconds(16);
-
-    auto next_tick = std::chrono::steady_clock::now();
+    constexpr auto k_frame_time =
+        std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double>(
+            k_frame_delta_seconds));
 
     while (true)
     {
-        next_tick += k_frame_time;
+        const auto frame_start = std::chrono::steady_clock::now();
 
         Gs1InputSnapshot input_snapshot {};
         {
@@ -206,7 +235,7 @@ void run_live_mode(
             session.input_snapshot.buttons_released_mask = 0U;
         }
 
-        std::this_thread::sleep_until(next_tick);
+        std::this_thread::sleep_until(frame_start + k_frame_time);
     }
 }
 }  // namespace
@@ -241,7 +270,7 @@ int main(int argc, char** argv)
     Gs1RuntimeCreateDesc create_desc {};
     create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
     create_desc.api_version = api.get_api_version();
-    create_desc.fixed_step_seconds = 0.25;
+    create_desc.fixed_step_seconds = 1.0 / 60.0;
 
     Gs1RuntimeHandle* runtime = nullptr;
     assert(api.create_runtime(&create_desc, &runtime) == GS1_STATUS_OK);

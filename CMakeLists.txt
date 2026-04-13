@@ -84,7 +84,7 @@ if(GS1_BUILD_TESTS)
         ${CMAKE_CURRENT_SOURCE_DIR}/include)
     target_include_directories(gs1_visual_smoke_host PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include)
-    target_link_libraries(gs1_visual_smoke_host PRIVATE ws2_32)
+    target_link_libraries(gs1_visual_smoke_host PRIVATE ws2_32 winmm)
 
     # Ensure the DLL is built before the smoke host is run.
     # This is a build-order dependency, not a link-time dependency.
@@ -96,7 +96,7 @@ if(GS1_BUILD_TESTS)
         NAME gs1_smoke_host
         COMMAND gs1_smoke_host
             $<TARGET_FILE:gs1_game>
-            tests/smoke/scripts/main_menu_to_first_site.smoke)
+            tests/smoke/scripts/main_menu_to_site_active.smoke)
 
     # Resolve the default script path relative to the repository root.
     set_tests_properties(gs1_smoke_host PROPERTIES

@@ -2,7 +2,7 @@
 param(
     [string]$Configuration = "Debug",
     [string]$BuildDir = "build",
-    [string]$ScriptPath = "tests/smoke/scripts/main_menu_to_first_site.smoke",
+    [string]$ScriptPath = "tests/smoke/scripts/main_menu_to_site_active.smoke",
     [switch]$BuildFirst,
     [string]$CMakePath
 )

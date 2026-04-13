@@ -60,12 +60,22 @@ private:
     void queue_site_result_ui_commands(std::uint32_t site_id, Gs1SiteAttemptResult result);
     void queue_regional_map_snapshot_commands();
     void queue_regional_map_site_upsert_command(const SiteMetaState& site);
-    void queue_site_snapshot_commands();
+    void queue_site_snapshot_begin_command(Gs1ProjectionMode mode);
+    void queue_site_snapshot_end_command();
+    void queue_site_tile_upsert_command(std::uint32_t x, std::uint32_t y);
+    void queue_site_worker_update_command();
+    void queue_site_camp_update_command();
+    void queue_site_weather_update_command();
+    void queue_site_bootstrap_commands();
+    void queue_site_delta_commands(std::uint64_t dirty_flags);
     void queue_hud_state_command();
     void queue_site_result_ready_command(
         std::uint32_t site_id,
         Gs1SiteAttemptResult result,
         std::uint32_t newly_revealed_site_count);
+    void mark_site_projection_update_dirty(std::uint64_t dirty_flags) noexcept;
+    void flush_site_presentation_if_dirty();
+    void update_worker_movement_for_fixed_step();
     void consume_input_snapshot(const Gs1InputSnapshot* input);
     [[nodiscard]] Gs1Status translate_ui_action_to_command(const Gs1UiAction& action, GameCommand& out_command) const;
     [[nodiscard]] Gs1Status dispatch_host_events(std::uint32_t& out_processed_count);

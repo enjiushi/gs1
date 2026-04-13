@@ -567,6 +567,7 @@ This two-queue model is usually the safest default because it keeps command emis
 Each engine adapter implements:
 
 - receiving world-level engine commands
+- maintaining projected presentation state and any engine-native object mappings needed to represent long-lived surfaces such as regional map, site world, and host-rendered UI
 - translating those commands into engine actors, transforms, VFX, SFX, and animation
 - executing physics when needed
 - handling input handoff
@@ -603,6 +604,8 @@ Rules:
 - outward engine commands must stay in world abstraction
 - no engine-specific asset concepts may leak back into gameplay schemas
 - adapter behavior should be deterministic with respect to the received engine commands
+- for long-lived presentation surfaces, the adapter should build its projected world from authoritative bootstrap state and then apply later authoritative partial state updates onto that projected world rather than rebuilding the entire surface every frame
+- the adapter should keep stable mapping keys from gameplay-facing identity such as ids or site-local coordinates to engine-native objects and update those mappings when objects are created or removed
 - engine-side feedback must re-enter the world through translated world feedback events, not through direct gameplay mutation
 - engine-side feedback is observational input only; the adapter may report what happened in execution, but only world systems may decide the gameplay consequence
 

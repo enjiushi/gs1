@@ -45,6 +45,8 @@ struct SiteClockState final
 struct WorkerState final
 {
     TileCoord tile_coord {};
+    float tile_position_x {0.0f};
+    float tile_position_y {0.0f};
     float facing_degrees {0.0f};
     float player_health {100.0f};
     float player_hydration {100.0f};
@@ -93,6 +95,6 @@ struct SiteRunState final
     EconomyState economy {};
     ActionState site_action {};
     SiteCounters counters {};
-    std::uint64_t pending_presentation_dirty_flags {0};
+    std::uint64_t pending_projection_update_flags {0};
 };
 }  // namespace gs1

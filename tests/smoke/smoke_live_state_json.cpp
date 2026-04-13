@@ -187,6 +187,11 @@ void SmokeEngineHost::write_json_string(std::string& destination, std::string_vi
 
 std::string SmokeEngineHost::build_live_state_json() const
 {
+    return build_live_state_json(capture_live_state_snapshot());
+}
+
+std::string SmokeEngineHost::build_live_state_json(const LiveStateSnapshot& live_state)
+{
     std::string json {};
     json.reserve(16384);
 
@@ -223,42 +228,40 @@ std::string SmokeEngineHost::build_live_state_json() const
     };
 
     json += "{\"frameNumber\":";
-    json += std::to_string(frame_number_);
+    json += std::to_string(live_state.frame_number);
     json += ",\"appState\":";
-    append_optional_app_state(current_app_state_);
+    append_optional_app_state(live_state.current_app_state);
     json += ",\"selectedSiteId\":";
-    append_optional_u32(selected_site_id_);
+    append_optional_u32(live_state.selected_site_id);
     json += ",\"scriptFailed\":";
-    json += script_failed_ ? "true" : "false";
+    json += live_state.script_failed ? "true" : "false";
 
     json += ",\"commandEntries\":[";
-    for (std::size_t index = 0; index < current_frame_command_entries_.size(); ++index)
+    for (std::size_t index = 0; index < live_state.current_frame_command_entries.size(); ++index)
     {
         if (index > 0U)
         {
             json.push_back(',');
         }
-        write_json_string(json, current_frame_command_entries_[index]);
+        write_json_string(json, live_state.current_frame_command_entries[index]);
     }
     json += "]";
 
     json += ",\"logTail\":[";
-    const std::size_t log_start = command_logs_.size() > 40U ? (command_logs_.size() - 40U) : 0U;
-    for (std::size_t index = log_start; index < command_logs_.size(); ++index)
+    for (std::size_t index = 0; index < live_state.command_log_tail.size(); ++index)
     {
-        if (index > log_start)
+        if (index > 0U)
         {
             json.push_back(',');
         }
-        write_json_string(json, command_logs_[index]);
+        write_json_string(json, live_state.command_log_tail[index]);
     }
     json += "]";
 
-    const auto ui_setups = snapshot_active_ui_setups();
     json += ",\"uiSetups\":[";
-    for (std::size_t setup_index = 0; setup_index < ui_setups.size(); ++setup_index)
+    for (std::size_t setup_index = 0; setup_index < live_state.active_ui_setups.size(); ++setup_index)
     {
-        const auto& setup = ui_setups[setup_index];
+        const auto& setup = live_state.active_ui_setups[setup_index];
         if (setup_index > 0U)
         {
             json.push_back(',');
@@ -297,12 +300,10 @@ std::string SmokeEngineHost::build_live_state_json() const
     }
     json += "]";
 
-    const auto regional_map_sites = snapshot_regional_map_sites();
-    const auto regional_map_links = snapshot_regional_map_links();
     json += ",\"regionalMap\":{\"sites\":[";
-    for (std::size_t site_index = 0; site_index < regional_map_sites.size(); ++site_index)
+    for (std::size_t site_index = 0; site_index < live_state.regional_map_sites.size(); ++site_index)
     {
-        const auto& site = regional_map_sites[site_index];
+        const auto& site = live_state.regional_map_sites[site_index];
         if (site_index > 0U)
         {
             json.push_back(',');
@@ -327,9 +328,9 @@ std::string SmokeEngineHost::build_live_state_json() const
         json += "}";
     }
     json += "],\"links\":[";
-    for (std::size_t link_index = 0; link_index < regional_map_links.size(); ++link_index)
+    for (std::size_t link_index = 0; link_index < live_state.regional_map_links.size(); ++link_index)
     {
-        const auto& link = regional_map_links[link_index];
+        const auto& link = live_state.regional_map_links[link_index];
         if (link_index > 0U)
         {
             json.push_back(',');
@@ -345,26 +346,26 @@ std::string SmokeEngineHost::build_live_state_json() const
     }
     json += "]}";
 
-    json += ",\"siteSnapshot\":";
-    if (!active_site_snapshot_.has_value())
+    json += ",\"siteBootstrap\":";
+    if (!live_state.active_site_snapshot.has_value())
     {
         json += "null";
     }
     else
     {
-        const auto& snapshot = active_site_snapshot_.value();
+        const auto& site_snapshot = live_state.active_site_snapshot.value();
         json += "{\"siteId\":";
-        json += std::to_string(snapshot.site_id);
+        json += std::to_string(site_snapshot.site_id);
         json += ",\"siteArchetypeId\":";
-        json += std::to_string(snapshot.site_archetype_id);
+        json += std::to_string(site_snapshot.site_archetype_id);
         json += ",\"width\":";
-        json += std::to_string(snapshot.width);
+        json += std::to_string(site_snapshot.width);
         json += ",\"height\":";
-        json += std::to_string(snapshot.height);
+        json += std::to_string(site_snapshot.height);
         json += ",\"tiles\":[";
-        for (std::size_t tile_index = 0; tile_index < snapshot.tiles.size(); ++tile_index)
+        for (std::size_t tile_index = 0; tile_index < site_snapshot.tiles.size(); ++tile_index)
         {
-            const auto& tile = snapshot.tiles[tile_index];
+            const auto& tile = site_snapshot.tiles[tile_index];
             if (tile_index > 0U)
             {
                 json.push_back(',');
@@ -390,14 +391,47 @@ std::string SmokeEngineHost::build_live_state_json() const
         }
         json += "]";
 
-        json += ",\"worker\":";
-        if (!snapshot.worker.has_value())
+        json += ",\"camp\":";
+        if (!site_snapshot.camp.has_value())
         {
             json += "null";
         }
         else
         {
-            const auto& worker = snapshot.worker.value();
+            const auto& camp = site_snapshot.camp.value();
+            json += "{\"tileX\":";
+            json += std::to_string(camp.tile_x);
+            json += ",\"tileY\":";
+            json += std::to_string(camp.tile_y);
+            json += ",\"durabilityNormalized\":";
+            json += std::to_string(camp.durability_normalized);
+            json += ",\"flags\":";
+            json += std::to_string(camp.flags);
+            json += "}";
+        }
+
+        json += "}";
+    }
+
+    json += ",\"siteState\":";
+    if (!live_state.active_site_snapshot.has_value())
+    {
+        json += "null";
+    }
+    else
+    {
+        const auto& site_snapshot = live_state.active_site_snapshot.value();
+        json += "{\"siteId\":";
+        json += std::to_string(site_snapshot.site_id);
+
+        json += ",\"worker\":";
+        if (!site_snapshot.worker.has_value())
+        {
+            json += "null";
+        }
+        else
+        {
+            const auto& worker = site_snapshot.worker.value();
             json += "{\"tileX\":";
             json += std::to_string(worker.tile_x);
             json += ",\"tileY\":";
@@ -418,13 +452,13 @@ std::string SmokeEngineHost::build_live_state_json() const
         }
 
         json += ",\"camp\":";
-        if (!snapshot.camp.has_value())
+        if (!site_snapshot.camp.has_value())
         {
             json += "null";
         }
         else
         {
-            const auto& camp = snapshot.camp.value();
+            const auto& camp = site_snapshot.camp.value();
             json += "{\"tileX\":";
             json += std::to_string(camp.tile_x);
             json += ",\"tileY\":";
@@ -437,13 +471,13 @@ std::string SmokeEngineHost::build_live_state_json() const
         }
 
         json += ",\"weather\":";
-        if (!snapshot.weather.has_value())
+        if (!site_snapshot.weather.has_value())
         {
             json += "null";
         }
         else
         {
-            const auto& weather = snapshot.weather.value();
+            const auto& weather = site_snapshot.weather.value();
             json += "{\"heat\":";
             json += std::to_string(weather.heat);
             json += ",\"wind\":";
@@ -463,13 +497,13 @@ std::string SmokeEngineHost::build_live_state_json() const
     }
 
     json += ",\"hud\":";
-    if (!hud_state_.has_value())
+    if (!live_state.hud_state.has_value())
     {
         json += "null";
     }
     else
     {
-        const auto& hud = hud_state_.value();
+        const auto& hud = live_state.hud_state.value();
         json += "{\"playerHealth\":";
         json += std::to_string(hud.player_health);
         json += ",\"playerHydration\":";
@@ -490,13 +524,13 @@ std::string SmokeEngineHost::build_live_state_json() const
     }
 
     json += ",\"siteResult\":";
-    if (!site_result_.has_value())
+    if (!live_state.site_result.has_value())
     {
         json += "null";
     }
     else
     {
-        const auto& site_result = site_result_.value();
+        const auto& site_result = live_state.site_result.value();
         json += "{\"siteId\":";
         json += std::to_string(site_result.site_id);
         json += ",\"result\":";

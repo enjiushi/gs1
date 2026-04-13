@@ -74,6 +74,10 @@ SiteRunState SiteRunFactory::create_site_run(
         run.counters.site_completion_tile_threshold = site_content->site_completion_tile_threshold;
     }
 
+    run.worker.tile_coord = run.camp.camp_anchor_tile;
+    run.worker.tile_position_x = static_cast<float>(run.camp.camp_anchor_tile.x);
+    run.worker.tile_position_y = static_cast<float>(run.camp.camp_anchor_tile.y);
+
     return run;
 }
 }  // namespace gs1

@@ -1368,7 +1368,7 @@ Engine-command examples:
 Current implementation note:
 
 - the public header now defines a richer engine-command schema centered on app-state projection, regional-map projection, semantic UI setup projection, site projection, HUD/UI projection, site results, and one-shot cues
-- the current runtime already emits a useful bootstrap subset of that richer contract: log text, set app state, UI setup batches for menu/panel surfaces, regional-map snapshot commands, site snapshot commands, HUD state, and site result ready
+- the current runtime now emits a practical prototype subset of that richer contract: log text, set app state, UI setup batches for menu/panel surfaces, regional-map snapshot commands, site bootstrap snapshots on site entry/resync, authoritative site partial-update batches after bootstrap, HUD state, and site result ready
 - inventory/task/phone/notification/one-shot cue commands are defined in the schema now but are not fully emitted yet by gameplay runtime code
 
 ### 13.2 Engine Command Contract Shape
@@ -1399,20 +1399,23 @@ Semantic UI setup contract:
 
 Site command contract:
 
-- `BEGIN_SITE_SNAPSHOT` starts a full authoritative site projection update
-- `SITE_TILE_UPSERT` projects one tile cell
-- `SITE_WORKER_UPDATE`, `SITE_CAMP_UPDATE`, and `SITE_WEATHER_UPDATE` project singleton simulation anchors
+- `BEGIN_SITE_SNAPSHOT` with `SNAPSHOT` mode starts a full authoritative site bootstrap/resync batch
+- `BEGIN_SITE_SNAPSHOT` with `DELTA` mode starts an authoritative partial site-update batch against an already projected site world
+- `SITE_TILE_UPSERT` projects one tile cell or changed tile cell
+- `SITE_WORKER_UPDATE`, `SITE_CAMP_UPDATE`, and `SITE_WEATHER_UPDATE` project authoritative site-state slices
 - `SITE_INVENTORY_SLOT_UPSERT`, `SITE_TASK_UPSERT`, and `SITE_PHONE_LISTING_UPSERT` project host-side UI collections when those systems are active
 - `END_SITE_SNAPSHOT` closes the batch
 
 Projection rules:
 
-- snapshot commands describe authoritative visual state rebuilds
-- delta commands describe stable incremental changes after the host already has a valid projection baseline
+- snapshot commands describe authoritative visual rebuild/bootstrap state
+- delta-mode site batches describe authoritative partial state updates after the host already has a valid site projection baseline
 - the host should treat begin/end snapshot commands as transactional fences for the matching presentation surface
 - the host must not infer gameplay state that was never sent; if a surface is host-relevant, the DLL should emit a command for it
 - the gameplay DLL should emit projection commands only when the authoritative gameplay state for that surface actually changed
-- if a specific typed projection command already describes the change, prefer that over emitting an extra generic dirty notification
+- if a specific typed projection command already describes the changed presentation slice, prefer that over emitting an extra generic dirty notification
+- delta-mode site updates should carry authoritative changed state, not arithmetic change amounts; for example worker movement should send the worker's new transform state, not a movement delta to be accumulated by the host
+- adapters should build the long-lived site world from the bootstrap batch, maintain stable object mappings, and apply later site-state slices onto those existing projected objects
 
 ### 13.3 Mock Engine Update Loop
 

@@ -17,7 +17,7 @@ int main(int argc, char** argv)
         : (repo_root / "build" / "Debug" / "gs1_game.dll");
     const std::string script_path = argc > 2
         ? argv[2]
-        : "tests/smoke/scripts/main_menu_to_first_site.smoke";
+        : "tests/smoke/scripts/main_menu_to_site_active.smoke";
 
     const auto log_path = repo_root / "out" / "logs" / "smoke_host_latest.log";
     const bool logging_ready = smoke_log::initialize_file_sink(log_path);
@@ -43,7 +43,7 @@ int main(int argc, char** argv)
     Gs1RuntimeCreateDesc create_desc {};
     create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
     create_desc.api_version = api.get_api_version();
-    create_desc.fixed_step_seconds = 0.25;
+    create_desc.fixed_step_seconds = 1.0 / 60.0;
 
     Gs1RuntimeHandle* runtime = nullptr;
     assert(api.create_runtime(&create_desc, &runtime) == GS1_STATUS_OK);

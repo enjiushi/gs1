@@ -4,6 +4,7 @@
 #include "app/site_run_factory.h"
 #include "commands/command_dispatcher.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cmath>
 #include <cstring>
@@ -42,6 +43,19 @@ DayPhase resolve_day_phase(double world_time_minutes)
     }
     return DayPhase::Night;
 }
+
+constexpr float k_worker_move_speed_tiles_per_second = 3.5f;
+constexpr float k_radians_to_degrees = 57.2957795f;
+
+enum SiteProjectionUpdateFlags : std::uint64_t
+{
+    SITE_PROJECTION_UPDATE_NONE = 0,
+    SITE_PROJECTION_UPDATE_TILES = 1ull << 0,
+    SITE_PROJECTION_UPDATE_WORKER = 1ull << 1,
+    SITE_PROJECTION_UPDATE_CAMP = 1ull << 2,
+    SITE_PROJECTION_UPDATE_WEATHER = 1ull << 3,
+    SITE_PROJECTION_UPDATE_HUD = 1ull << 4
+};
 }  // namespace
 
 GameRuntime::GameRuntime(Gs1RuntimeCreateDesc create_desc)
@@ -151,6 +165,8 @@ Gs1Status GameRuntime::run_phase1(const Gs1Phase1Request& request, Gs1Phase1Resu
         run_fixed_step();
         out_result.fixed_steps_executed += 1U;
     }
+
+    flush_site_presentation_if_dirty();
 
     status = dispatch_queued_commands();
     out_result.engine_commands_queued = static_cast<std::uint32_t>(engine_commands_.size());
@@ -325,7 +341,7 @@ Gs1Status GameRuntime::handle_command(const GameCommand& command)
         app_state_ = GS1_APP_STATE_SITE_ACTIVE;
         campaign_->app_state = app_state_;
         queue_app_state_command(app_state_);
-        queue_site_snapshot_commands();
+        queue_site_bootstrap_commands();
         queue_hud_state_command();
         queue_log_command("Started site attempt.");
         return GS1_STATUS_OK;
@@ -735,7 +751,7 @@ void GameRuntime::queue_regional_map_site_upsert_command(const SiteMetaState& si
     engine_commands_.push_back(site_command);
 }
 
-void GameRuntime::queue_site_snapshot_commands()
+void GameRuntime::queue_site_snapshot_begin_command(Gs1ProjectionMode mode)
 {
     if (!active_site_run_.has_value())
     {
@@ -744,39 +760,59 @@ void GameRuntime::queue_site_snapshot_commands()
 
     auto begin = make_engine_command(GS1_ENGINE_COMMAND_BEGIN_SITE_SNAPSHOT);
     auto& begin_payload = begin.payload_as<Gs1EngineCommandSiteSnapshotData>();
-    begin_payload.mode = GS1_PROJECTION_MODE_SNAPSHOT;
+    begin_payload.mode = mode;
     begin_payload.site_id = active_site_run_->site_id.value;
     begin_payload.site_archetype_id = active_site_run_->site_archetype_id;
     begin_payload.width = active_site_run_->tile_grid.width;
     begin_payload.height = active_site_run_->tile_grid.height;
     engine_commands_.push_back(begin);
+}
 
-    for (std::uint32_t y = 0; y < active_site_run_->tile_grid.height; ++y)
+void GameRuntime::queue_site_snapshot_end_command()
+{
+    engine_commands_.push_back(make_engine_command(GS1_ENGINE_COMMAND_END_SITE_SNAPSHOT));
+}
+
+void GameRuntime::queue_site_tile_upsert_command(std::uint32_t x, std::uint32_t y)
+{
+    if (!active_site_run_.has_value())
     {
-        for (std::uint32_t x = 0; x < active_site_run_->tile_grid.width; ++x)
-        {
-            const auto index =
-                static_cast<std::size_t>(y) * static_cast<std::size_t>(active_site_run_->tile_grid.width) +
-                static_cast<std::size_t>(x);
+        return;
+    }
 
-            auto tile_command = make_engine_command(GS1_ENGINE_COMMAND_SITE_TILE_UPSERT);
-            auto& payload = tile_command.payload_as<Gs1EngineCommandSiteTileData>();
-            payload.x = x;
-            payload.y = y;
-            payload.terrain_type_id = active_site_run_->tile_grid.terrain_type_ids[index];
-            payload.plant_type_id = active_site_run_->tile_grid.plant_type_ids[index].value;
-            payload.structure_type_id = active_site_run_->tile_grid.structure_type_ids[index].value;
-            payload.ground_cover_type_id = active_site_run_->tile_grid.ground_cover_type_ids[index];
-            payload.plant_density = active_site_run_->tile_grid.tile_plant_density[index];
-            payload.sand_burial = active_site_run_->tile_grid.tile_sand_burial[index];
-            engine_commands_.push_back(tile_command);
-        }
+    if (x >= active_site_run_->tile_grid.width || y >= active_site_run_->tile_grid.height)
+    {
+        return;
+    }
+
+    const auto index =
+        static_cast<std::size_t>(y) * static_cast<std::size_t>(active_site_run_->tile_grid.width) +
+        static_cast<std::size_t>(x);
+
+    auto tile_command = make_engine_command(GS1_ENGINE_COMMAND_SITE_TILE_UPSERT);
+    auto& payload = tile_command.payload_as<Gs1EngineCommandSiteTileData>();
+    payload.x = x;
+    payload.y = y;
+    payload.terrain_type_id = active_site_run_->tile_grid.terrain_type_ids[index];
+    payload.plant_type_id = active_site_run_->tile_grid.plant_type_ids[index].value;
+    payload.structure_type_id = active_site_run_->tile_grid.structure_type_ids[index].value;
+    payload.ground_cover_type_id = active_site_run_->tile_grid.ground_cover_type_ids[index];
+    payload.plant_density = active_site_run_->tile_grid.tile_plant_density[index];
+    payload.sand_burial = active_site_run_->tile_grid.tile_sand_burial[index];
+    engine_commands_.push_back(tile_command);
+}
+
+void GameRuntime::queue_site_worker_update_command()
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
     }
 
     auto worker_command = make_engine_command(GS1_ENGINE_COMMAND_SITE_WORKER_UPDATE);
     auto& worker_payload = worker_command.payload_as<Gs1EngineCommandWorkerData>();
-    worker_payload.tile_x = static_cast<float>(active_site_run_->worker.tile_coord.x);
-    worker_payload.tile_y = static_cast<float>(active_site_run_->worker.tile_coord.y);
+    worker_payload.tile_x = active_site_run_->worker.tile_position_x;
+    worker_payload.tile_y = active_site_run_->worker.tile_position_y;
     worker_payload.facing_degrees = active_site_run_->worker.facing_degrees;
     worker_payload.health_normalized = active_site_run_->worker.player_health / 100.0f;
     worker_payload.hydration_normalized = active_site_run_->worker.player_hydration / 100.0f;
@@ -786,6 +822,14 @@ void GameRuntime::queue_site_snapshot_commands()
             : 0.0f;
     worker_payload.current_action_kind = static_cast<std::uint32_t>(active_site_run_->site_action.action_kind);
     engine_commands_.push_back(worker_command);
+}
+
+void GameRuntime::queue_site_camp_update_command()
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
 
     auto camp_command = make_engine_command(GS1_ENGINE_COMMAND_SITE_CAMP_UPDATE);
     auto& camp_payload = camp_command.payload_as<Gs1EngineCommandCampData>();
@@ -796,6 +840,14 @@ void GameRuntime::queue_site_snapshot_commands()
         (active_site_run_->camp.delivery_point_operational ? 1U : 0U) |
         (active_site_run_->camp.shared_camp_storage_access_enabled ? 2U : 0U);
     engine_commands_.push_back(camp_command);
+}
+
+void GameRuntime::queue_site_weather_update_command()
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
 
     auto weather_command = make_engine_command(GS1_ENGINE_COMMAND_SITE_WEATHER_UPDATE);
     auto& weather_payload = weather_command.payload_as<Gs1EngineCommandWeatherData>();
@@ -811,8 +863,77 @@ void GameRuntime::queue_site_snapshot_commands()
     weather_payload.phase_minutes_remaining =
         static_cast<float>(active_site_run_->event.phase_minutes_remaining);
     engine_commands_.push_back(weather_command);
+}
 
-    engine_commands_.push_back(make_engine_command(GS1_ENGINE_COMMAND_END_SITE_SNAPSHOT));
+void GameRuntime::queue_site_bootstrap_commands()
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
+
+    queue_site_snapshot_begin_command(GS1_PROJECTION_MODE_SNAPSHOT);
+
+    for (std::uint32_t y = 0; y < active_site_run_->tile_grid.height; ++y)
+    {
+        for (std::uint32_t x = 0; x < active_site_run_->tile_grid.width; ++x)
+        {
+            queue_site_tile_upsert_command(x, y);
+        }
+    }
+
+    queue_site_worker_update_command();
+    queue_site_camp_update_command();
+    queue_site_weather_update_command();
+    queue_site_snapshot_end_command();
+}
+
+void GameRuntime::queue_site_delta_commands(std::uint64_t dirty_flags)
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
+
+    const auto site_dirty_flags =
+        dirty_flags & (SITE_PROJECTION_UPDATE_TILES |
+            SITE_PROJECTION_UPDATE_WORKER |
+            SITE_PROJECTION_UPDATE_CAMP |
+            SITE_PROJECTION_UPDATE_WEATHER);
+    if (site_dirty_flags == 0U)
+    {
+        return;
+    }
+
+    queue_site_snapshot_begin_command(GS1_PROJECTION_MODE_DELTA);
+
+    if ((site_dirty_flags & SITE_PROJECTION_UPDATE_TILES) != 0U)
+    {
+        for (std::uint32_t y = 0; y < active_site_run_->tile_grid.height; ++y)
+        {
+            for (std::uint32_t x = 0; x < active_site_run_->tile_grid.width; ++x)
+            {
+                queue_site_tile_upsert_command(x, y);
+            }
+        }
+    }
+
+    if ((site_dirty_flags & SITE_PROJECTION_UPDATE_WORKER) != 0U)
+    {
+        queue_site_worker_update_command();
+    }
+
+    if ((site_dirty_flags & SITE_PROJECTION_UPDATE_CAMP) != 0U)
+    {
+        queue_site_camp_update_command();
+    }
+
+    if ((site_dirty_flags & SITE_PROJECTION_UPDATE_WEATHER) != 0U)
+    {
+        queue_site_weather_update_command();
+    }
+
+    queue_site_snapshot_end_command();
 }
 
 void GameRuntime::queue_hud_state_command()
@@ -851,6 +972,98 @@ void GameRuntime::queue_site_result_ready_command(
     payload.result = result;
     payload.newly_revealed_site_count = newly_revealed_site_count;
     engine_commands_.push_back(command);
+}
+
+void GameRuntime::mark_site_projection_update_dirty(std::uint64_t dirty_flags) noexcept
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
+
+    active_site_run_->pending_projection_update_flags |= dirty_flags;
+}
+
+void GameRuntime::flush_site_presentation_if_dirty()
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
+
+    const auto dirty_flags = active_site_run_->pending_projection_update_flags;
+    if (dirty_flags == 0U)
+    {
+        return;
+    }
+
+    queue_site_delta_commands(dirty_flags);
+
+    if ((dirty_flags & SITE_PROJECTION_UPDATE_HUD) != 0U)
+    {
+        queue_hud_state_command();
+    }
+
+    active_site_run_->pending_projection_update_flags = 0U;
+}
+
+void GameRuntime::update_worker_movement_for_fixed_step()
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
+
+    auto& site_run = active_site_run_.value();
+    if (site_run.tile_grid.width == 0U || site_run.tile_grid.height == 0U)
+    {
+        return;
+    }
+
+    const float move_x = input_snapshot_.current.move_x;
+    const float move_y = input_snapshot_.current.move_y;
+    const float move_length_squared = move_x * move_x + move_y * move_y;
+    if (move_length_squared <= 0.0001f)
+    {
+        return;
+    }
+
+    const float move_length = std::sqrt(move_length_squared);
+    const float direction_x = move_x / move_length;
+    const float direction_y = move_y / move_length;
+    const float movement_step = k_worker_move_speed_tiles_per_second * static_cast<float>(fixed_step_seconds_);
+
+    const float max_x = static_cast<float>(site_run.tile_grid.width - 1U);
+    const float max_y = static_cast<float>(site_run.tile_grid.height - 1U);
+    const float unclamped_target_x = site_run.worker.tile_position_x + direction_x * movement_step;
+    const float unclamped_target_y = site_run.worker.tile_position_y + direction_y * movement_step;
+    const float target_x = std::clamp(unclamped_target_x, 0.0f, max_x);
+    const float target_y = std::clamp(unclamped_target_y, 0.0f, max_y);
+
+    const auto target_tile_x = static_cast<std::int32_t>(std::lround(target_x));
+    const auto target_tile_y = static_cast<std::int32_t>(std::lround(target_y));
+    const TileCoord target_tile {target_tile_x, target_tile_y};
+    const auto target_index = site_run.tile_grid.to_index(target_tile);
+
+    if (!site_run.tile_grid.tile_traversable.empty() &&
+        site_run.tile_grid.tile_traversable[target_index] == 0U)
+    {
+        return;
+    }
+
+    const bool position_changed =
+        std::fabs(target_x - site_run.worker.tile_position_x) > 0.0001f ||
+        std::fabs(target_y - site_run.worker.tile_position_y) > 0.0001f;
+    if (!position_changed)
+    {
+        return;
+    }
+
+    site_run.worker.tile_position_x = target_x;
+    site_run.worker.tile_position_y = target_y;
+    site_run.worker.tile_coord = target_tile;
+    site_run.worker.facing_degrees = std::atan2(direction_x, direction_y) * k_radians_to_degrees;
+    mark_site_projection_update_dirty(SITE_PROJECTION_UPDATE_WORKER);
 }
 
 void GameRuntime::consume_input_snapshot(const Gs1InputSnapshot* input)
@@ -1049,6 +1262,8 @@ void GameRuntime::run_fixed_step()
     const auto elapsed_days = static_cast<std::uint32_t>(campaign_->campaign_clock_minutes_elapsed / k_minutes_per_day);
     campaign_->campaign_days_remaining =
         (elapsed_days >= campaign_->campaign_days_total) ? 0U : (campaign_->campaign_days_total - elapsed_days);
+
+    update_worker_movement_for_fixed_step();
 
     if (active_site_run_->worker.player_health <= 0.0f)
     {

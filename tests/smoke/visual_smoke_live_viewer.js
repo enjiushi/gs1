@@ -23,6 +23,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let inputSendInFlight = false;
     let mapPickables = [];
     let latestPresentationSignature = "";
+    let currentSceneKind = "";
+    let siteSceneCache = null;
+    let inputDirty = true;
+    let animationTimeSeconds = 0;
+    let rendererWidth = 0;
+    let rendererHeight = 0;
 
     const inputState = {
         moveX: 0,
@@ -59,6 +65,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     function fitRenderer() {
         const width = Math.max(gameView.clientWidth, 320);
         const height = Math.max(gameView.clientHeight, 240);
+        if (width === rendererWidth && height === rendererHeight) {
+            return;
+        }
+
+        rendererWidth = width;
+        rendererHeight = height;
         renderer.setSize(width, height, false);
         camera.aspect = width / height;
         camera.updateProjectionMatrix();
@@ -88,6 +100,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             disposeObject(child);
         }
         mapPickables = [];
+        siteSceneCache = null;
     }
 
     function postJson(url, payload) {
@@ -132,6 +145,14 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return [];
         }
         return setup.elements.filter((element) => !element.action || element.action.type === "NONE");
+    }
+
+    function getSiteBootstrap(state) {
+        return state.siteBootstrap || null;
+    }
+
+    function getSiteState(state) {
+        return state.siteState || null;
     }
 
     function updateMoveAxis() {
@@ -226,13 +247,38 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function renderFallbackOverlay(state) {
+        const siteBootstrap = getSiteBootstrap(state);
         menuPanel.hidden = true;
         selectionEyebrow.textContent = "Current View";
         selectionText.textContent =
-            state.siteSnapshot
-                ? "Site " + state.siteSnapshot.siteId + " placeholder view."
+            siteBootstrap
+                ? "Site " + siteBootstrap.siteId + " placeholder view."
                 : "Waiting for the next presentation state.";
         contextActions.innerHTML = "";
+    }
+
+    function renderSiteOverlay(state) {
+        const siteBootstrap = getSiteBootstrap(state);
+        const siteState = getSiteState(state);
+        const hud = state.hud;
+        const weather = siteState ? siteState.weather : null;
+
+        menuPanel.hidden = true;
+        selectionEyebrow.textContent = "Site Active";
+        selectionText.textContent = siteBootstrap
+            ? "Site " + siteBootstrap.siteId + " is live. Use WASD to move through the desert staging ground."
+            : "Site bootstrap is loading.";
+        contextActions.innerHTML = "";
+
+        const hydration = hud ? Math.round(hud.playerHydration) : 0;
+        const energy = hud ? Math.round(hud.playerEnergy) : 0;
+        const completion = hud ? Math.round((hud.siteCompletionNormalized || 0) * 100) : 0;
+        const eventPhase = weather ? weather.eventPhase : "NONE";
+        statusChip.textContent =
+            "Site Live\nHydration " + hydration +
+            "\nEnergy " + energy +
+            "\nCompletion " + completion + "%" +
+            "\nEvent " + eventPhase;
     }
 
     function updateOverlay(state) {
@@ -254,6 +300,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 "Campaign Survey\nFrame " + state.frameNumber +
                 "\nSelected Site: " + (state.selectedSiteId == null ? "none" : state.selectedSiteId);
             break;
+        case "SITE_ACTIVE":
+            hudSubtitle.textContent = "Field movement is now live. This slice proves the site scene, camera, and worker control loop.";
+            renderSiteOverlay(state);
+            break;
         default:
             hudSubtitle.textContent = "The current adapter only styles the core early flow for now.";
             renderFallbackOverlay(state);
@@ -265,6 +315,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function renderMainMenuScene() {
+        currentSceneKind = "MAIN_MENU";
         scene.background = new THREE_NS.Color(0xebdcc2);
 
         const floor = new THREE_NS.Mesh(
@@ -333,6 +384,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function renderRegionalMapScene(state) {
+        currentSceneKind = "REGIONAL_MAP";
         scene.background = new THREE_NS.Color(0xe6cfac);
 
         const board = new THREE_NS.Mesh(
@@ -590,70 +642,243 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
     }
 
-    function renderSitePlaceholderScene(state) {
-        scene.background = new THREE_NS.Color(0xeee2cf);
+    function buildSiteBootstrapSignature(siteBootstrap) {
+        return JSON.stringify(
+            {
+                camp: siteBootstrap.camp
+                    ? [siteBootstrap.camp.tileX, siteBootstrap.camp.tileY]
+                    : null,
+                tiles: siteBootstrap.tiles.map((tile) => [
+                tile.x,
+                tile.y,
+                tile.terrainTypeId,
+                tile.plantTypeId,
+                tile.structureTypeId,
+                tile.groundCoverTypeId,
+                Math.round((tile.plantDensity || 0) * 100),
+                Math.round((tile.sandBurial || 0) * 100)
+                ])
+            }
+        );
+    }
+
+    function rebuildStaticSiteScene(siteBootstrap, offsetX, offsetZ, width, height) {
+        clearWorld();
+        currentSceneKind = "SITE_ACTIVE";
+        scene.background = new THREE_NS.Color(0xe7d3b0);
+
+        const desertWidth = Math.max(width + 8, 20);
+        const desertHeight = Math.max(height + 8, 20);
 
         const floor = new THREE_NS.Mesh(
-            new THREE_NS.PlaneGeometry(18, 18),
-            new THREE_NS.MeshStandardMaterial({ color: 0xf0e4d2, roughness: 0.95 })
+            new THREE_NS.PlaneGeometry(desertWidth, desertHeight, 1, 1),
+            new THREE_NS.MeshStandardMaterial({ color: 0xd7bb8b, roughness: 0.98, metalness: 0.01 })
         );
         floor.rotation.x = -Math.PI / 2;
-        floor.position.y = -0.03;
+        floor.position.y = -0.05;
         worldGroup.add(floor);
 
-        if (state.siteSnapshot) {
-            const snapshot = state.siteSnapshot;
-            const width = Math.max(snapshot.width, 1);
-            const height = Math.max(snapshot.height, 1);
-            const offsetX = (width - 1) * 0.5;
-            const offsetZ = (height - 1) * 0.5;
+        const siteBorder = new THREE_NS.Mesh(
+            new THREE_NS.BoxGeometry(width + 0.6, 0.08, height + 0.6),
+            new THREE_NS.MeshStandardMaterial({ color: 0xbc9b67, roughness: 0.95, metalness: 0.02 })
+        );
+        siteBorder.position.set(0, -0.01, 0);
+        worldGroup.add(siteBorder);
 
-            snapshot.tiles.forEach((tile) => {
-                const tileHeight = 0.08 + Math.max(0, Math.min(tile.plantDensity || 0, 1)) * 0.3;
-                const tileMesh = new THREE_NS.Mesh(
-                    new THREE_NS.BoxGeometry(0.94, tileHeight, 0.94),
-                    new THREE_NS.MeshStandardMaterial({ color: 0xcaab7b, roughness: 0.88 })
-                );
-                tileMesh.position.set(tile.x - offsetX, tileHeight * 0.5, tile.y - offsetZ);
-                worldGroup.add(tileMesh);
-            });
+        siteBootstrap.tiles.forEach((tile) => {
+            const plantDensity = Math.max(0, Math.min(tile.plantDensity || 0, 1));
+            const burial = Math.max(0, Math.min(tile.sandBurial || 0, 1));
+            const hasPlant = tile.plantTypeId !== 0 || plantDensity > 0.05;
+            const noise = ((tile.x * 17 + tile.y * 29) % 7) * 0.008;
+            const tileHeight = 0.08 + burial * 0.14 + plantDensity * 0.18 + noise;
+            const tileColor = hasPlant
+                ? 0x97a66d
+                : burial > 0.45
+                    ? 0xdfc090
+                    : 0xc9a776;
 
-            if (snapshot.worker) {
-                const workerMesh = new THREE_NS.Mesh(
-                    new THREE_NS.SphereGeometry(0.32, 18, 18),
-                    new THREE_NS.MeshStandardMaterial({ color: 0x2f7f91 })
+            const tileMesh = new THREE_NS.Mesh(
+                new THREE_NS.BoxGeometry(0.94, tileHeight, 0.94),
+                new THREE_NS.MeshStandardMaterial({ color: tileColor, roughness: 0.9, metalness: 0.02 })
+            );
+            tileMesh.position.set(tile.x - offsetX, tileHeight * 0.5, tile.y - offsetZ);
+            worldGroup.add(tileMesh);
+
+            if (hasPlant) {
+                const reed = new THREE_NS.Mesh(
+                    new THREE_NS.CylinderGeometry(0.04, 0.08, 0.25 + plantDensity * 0.45, 6),
+                    new THREE_NS.MeshStandardMaterial({ color: 0x657c4f, roughness: 0.82, metalness: 0.01 })
                 );
-                workerMesh.position.set(snapshot.worker.tileX - offsetX, 0.42, snapshot.worker.tileY - offsetZ);
-                worldGroup.add(workerMesh);
+                reed.position.set(tile.x - offsetX, tileHeight + 0.16 + plantDensity * 0.12, tile.y - offsetZ);
+                worldGroup.add(reed);
+            }
+        });
+
+        if (siteBootstrap.camp) {
+            const campX = siteBootstrap.camp.tileX - offsetX;
+            const campZ = siteBootstrap.camp.tileY - offsetZ;
+
+            const campPad = new THREE_NS.Mesh(
+                new THREE_NS.CylinderGeometry(0.56, 0.66, 0.12, 18),
+                new THREE_NS.MeshStandardMaterial({ color: 0x866341, roughness: 0.9, metalness: 0.03 })
+            );
+            campPad.position.set(campX, 0.12, campZ);
+            worldGroup.add(campPad);
+
+            const tent = new THREE_NS.Mesh(
+                new THREE_NS.ConeGeometry(0.38, 0.6, 4),
+                new THREE_NS.MeshStandardMaterial({ color: 0xd8d1bf, roughness: 0.85, metalness: 0.02 })
+            );
+            tent.position.set(campX, 0.48, campZ);
+            tent.rotation.y = Math.PI * 0.25;
+            worldGroup.add(tent);
+        }
+
+        const workerGroup = new THREE_NS.Group();
+        const body = new THREE_NS.Mesh(
+            new THREE_NS.CapsuleGeometry(0.18, 0.45, 4, 8),
+            new THREE_NS.MeshStandardMaterial({ color: 0x2f7f91, roughness: 0.72, metalness: 0.05 })
+        );
+        body.position.y = 0.42;
+        workerGroup.add(body);
+
+        const head = new THREE_NS.Mesh(
+            new THREE_NS.SphereGeometry(0.12, 16, 16),
+            new THREE_NS.MeshStandardMaterial({ color: 0xe6d1b0, roughness: 0.7, metalness: 0.02 })
+        );
+        head.position.y = 0.83;
+        workerGroup.add(head);
+
+        const facingMarker = new THREE_NS.Mesh(
+            new THREE_NS.ConeGeometry(0.08, 0.2, 6),
+            new THREE_NS.MeshStandardMaterial({ color: 0x183b47, roughness: 0.62, metalness: 0.08 })
+        );
+        facingMarker.position.set(0.0, 0.52, 0.28);
+        facingMarker.rotation.x = Math.PI / 2;
+        workerGroup.add(facingMarker);
+        worldGroup.add(workerGroup);
+
+        siteSceneCache = {
+            siteId: siteBootstrap.siteId,
+            bootstrapSignature: buildSiteBootstrapSignature(siteBootstrap),
+            offsetX: offsetX,
+            offsetZ: offsetZ,
+            width: width,
+            height: height,
+            workerGroup: workerGroup,
+            workerTargetX: 0,
+            workerTargetZ: 0,
+            workerTargetYaw: 0,
+            cameraTargetX: 0,
+            cameraTargetZ: 0
+        };
+    }
+
+    function normalizeAngleRadians(angle) {
+        while (angle > Math.PI) {
+            angle -= Math.PI * 2;
+        }
+        while (angle < -Math.PI) {
+            angle += Math.PI * 2;
+        }
+        return angle;
+    }
+
+    function blendFactorFromRate(ratePerSecond, deltaSeconds) {
+        return 1.0 - Math.exp(-ratePerSecond * deltaSeconds);
+    }
+
+    function renderSiteScene(state) {
+        scene.background = new THREE_NS.Color(0xe7d3b0);
+        const siteBootstrap = getSiteBootstrap(state);
+        const siteState = getSiteState(state);
+
+        if (!siteBootstrap) {
+            if (currentSceneKind !== "SITE_ACTIVE") {
+                clearWorld();
+                currentSceneKind = "SITE_ACTIVE";
             }
 
-            camera.position.set(width * 0.95, Math.max(width, height), height * 1.25);
-            camera.lookAt(0, 0, 0);
-        } else {
-            const placeholder = new THREE_NS.Mesh(
-                new THREE_NS.BoxGeometry(2.4, 1.2, 2.4),
-                new THREE_NS.MeshStandardMaterial({ color: 0x9f7c53, roughness: 0.82 })
-            );
-            placeholder.position.set(0, 0.6, 0);
-            placeholder.userData = { spinY: 0.12 };
-            worldGroup.add(placeholder);
+            if (!siteSceneCache) {
+                const placeholder = new THREE_NS.Mesh(
+                    new THREE_NS.BoxGeometry(2.4, 1.2, 2.4),
+                    new THREE_NS.MeshStandardMaterial({ color: 0x9f7c53, roughness: 0.82 })
+                );
+                placeholder.position.set(0, 0.6, 0);
+                placeholder.userData = { spinY: 0.12 };
+                worldGroup.add(placeholder);
+            }
+
             camera.position.set(4.5, 5.8, 7.2);
             camera.lookAt(0, 0.5, 0);
+            return;
+        }
+
+        const width = Math.max(siteBootstrap.width, 1);
+        const height = Math.max(siteBootstrap.height, 1);
+        const offsetX = (width - 1) * 0.5;
+        const offsetZ = (height - 1) * 0.5;
+        const bootstrapSignature = buildSiteBootstrapSignature(siteBootstrap);
+
+        const needsStaticRebuild =
+            currentSceneKind !== "SITE_ACTIVE" ||
+            !siteSceneCache ||
+            siteSceneCache.siteId !== siteBootstrap.siteId ||
+            siteSceneCache.width !== width ||
+            siteSceneCache.height !== height ||
+            siteSceneCache.bootstrapSignature !== bootstrapSignature;
+
+        if (needsStaticRebuild) {
+            rebuildStaticSiteScene(siteBootstrap, offsetX, offsetZ, width, height);
+        }
+
+        if (!siteSceneCache) {
+            return;
+        }
+
+        let cameraTargetX = 0;
+        let cameraTargetZ = 0;
+        if (siteState && siteState.worker) {
+            cameraTargetX = siteState.worker.tileX - siteSceneCache.offsetX;
+            cameraTargetZ = siteState.worker.tileY - siteSceneCache.offsetZ;
+            siteSceneCache.workerTargetX = cameraTargetX;
+            siteSceneCache.workerTargetZ = cameraTargetZ;
+            siteSceneCache.workerTargetYaw = (siteState.worker.facingDegrees || 0) * Math.PI / 180.0;
+
+            if (siteSceneCache.workerGroup.position.lengthSq() === 0) {
+                siteSceneCache.workerGroup.position.set(cameraTargetX, 0.0, cameraTargetZ);
+                siteSceneCache.workerGroup.rotation.y = siteSceneCache.workerTargetYaw;
+            }
+        }
+
+        siteSceneCache.cameraTargetX = cameraTargetX;
+        siteSceneCache.cameraTargetZ = cameraTargetZ;
+
+        if (needsStaticRebuild) {
+            camera.position.set(
+                cameraTargetX + 4.6,
+                Math.max(width, height) * 0.72 + 3.0,
+                cameraTargetZ + 5.2
+            );
+            camera.lookAt(cameraTargetX, 0.4, cameraTargetZ);
         }
     }
 
     function rebuildWorld(state) {
-        clearWorld();
-
         switch (state.appState) {
         case "MAIN_MENU":
+            clearWorld();
             renderMainMenuScene();
             break;
         case "REGIONAL_MAP":
+            clearWorld();
             renderRegionalMapScene(state);
             break;
+        case "SITE_ACTIVE":
+            renderSiteScene(state);
+            break;
         default:
-            renderSitePlaceholderScene(state);
+            renderSiteScene(state);
             break;
         }
     }
@@ -670,8 +895,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             selectedSiteId: state.selectedSiteId,
             uiSetups: state.uiSetups,
             regionalMap: state.regionalMap,
-            siteSnapshot: state.siteSnapshot,
-            hud: state.hud,
             siteResult: state.siteResult
         });
     }
@@ -679,7 +902,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     function animate() {
         requestAnimationFrame(animate);
 
-        const elapsed = animationClock.getElapsedTime();
+        const deltaSeconds = Math.min(animationClock.getDelta(), 0.1);
+        animationTimeSeconds += deltaSeconds;
+        const elapsed = animationTimeSeconds;
         worldGroup.traverse((node) => {
             if (node.userData.spinY) {
                 node.rotation.y += node.userData.spinY * 0.01;
@@ -697,6 +922,26 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             }
         });
 
+        if (siteSceneCache && siteSceneCache.workerGroup) {
+            const workerGroup = siteSceneCache.workerGroup;
+            const workerBlend = blendFactorFromRate(18.0, deltaSeconds);
+            const rotationBlend = blendFactorFromRate(16.0, deltaSeconds);
+            const cameraBlend = blendFactorFromRate(10.0, deltaSeconds);
+            workerGroup.position.x += (siteSceneCache.workerTargetX - workerGroup.position.x) * workerBlend;
+            workerGroup.position.z += (siteSceneCache.workerTargetZ - workerGroup.position.z) * workerBlend;
+
+            const yawDelta = normalizeAngleRadians(siteSceneCache.workerTargetYaw - workerGroup.rotation.y);
+            workerGroup.rotation.y += yawDelta * rotationBlend;
+
+            const desiredCameraX = siteSceneCache.cameraTargetX + 4.6;
+            const desiredCameraY = Math.max(siteSceneCache.width, siteSceneCache.height) * 0.72 + 3.0;
+            const desiredCameraZ = siteSceneCache.cameraTargetZ + 5.2;
+            camera.position.x += (desiredCameraX - camera.position.x) * cameraBlend;
+            camera.position.y += (desiredCameraY - camera.position.y) * cameraBlend;
+            camera.position.z += (desiredCameraZ - camera.position.z) * cameraBlend;
+            camera.lookAt(workerGroup.position.x, 0.4, workerGroup.position.z);
+        }
+
         fitRenderer();
         renderer.render(scene, camera);
     }
@@ -710,12 +955,17 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         fetch("/state", { cache: "no-store" })
             .then((response) => response.json())
             .then((state) => {
-                const presentationSignature = buildPresentationSignature(state);
-                if (presentationSignature !== latestPresentationSignature) {
-                    latestPresentationSignature = presentationSignature;
+                if (state.appState === "SITE_ACTIVE") {
+                    latestPresentationSignature = "";
                     renderState(state);
                 } else {
-                    latestState = state;
+                    const presentationSignature = buildPresentationSignature(state);
+                    if (presentationSignature !== latestPresentationSignature) {
+                        latestPresentationSignature = presentationSignature;
+                        renderState(state);
+                    } else {
+                        latestState = state;
+                    }
                 }
                 if (state.appState !== "MAIN_MENU") {
                     statusChip.textContent =
@@ -732,7 +982,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function sendInputState() {
-        if (inputSendInFlight) {
+        if (inputSendInFlight || !inputDirty) {
             return;
         }
 
@@ -746,10 +996,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             buttonsPressedMask: inputState.buttonsPressedMask,
             buttonsReleasedMask: inputState.buttonsReleasedMask
         })
-            .catch(() => {})
-            .finally(() => {
+            .then(() => {
                 inputState.buttonsPressedMask = 0;
                 inputState.buttonsReleasedMask = 0;
+                inputDirty = false;
+            })
+            .catch(() => {})
+            .finally(() => {
                 inputSendInFlight = false;
             });
     }
@@ -765,21 +1018,28 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     window.addEventListener("keydown", function (event) {
         keys.add(event.code);
         updateMoveAxis();
+        inputDirty = true;
+        sendInputState();
     });
 
     window.addEventListener("keyup", function (event) {
         keys.delete(event.code);
         updateMoveAxis();
+        inputDirty = true;
+        sendInputState();
     });
 
     gameView.addEventListener("pointermove", function (event) {
         updateCursorWorld(event);
+        inputDirty = true;
     });
 
     gameView.addEventListener("pointerdown", function (event) {
         updateCursorWorld(event);
         inputState.buttonsDownMask |= 1;
         inputState.buttonsPressedMask |= 1;
+        inputDirty = true;
+        sendInputState();
     });
 
     window.addEventListener("pointerup", function () {
@@ -787,6 +1047,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             inputState.buttonsReleasedMask |= 1;
         }
         inputState.buttonsDownMask &= ~1;
+        inputDirty = true;
+        sendInputState();
     });
 
     renderer.domElement.addEventListener("click", function (event) {
@@ -828,6 +1090,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     fitRenderer();
     animate();
     fetchState();
-    window.setInterval(fetchState, 100);
-    window.setInterval(sendInputState, 66);
+    window.setInterval(fetchState, 16);
+    window.setInterval(sendInputState, 16);
 })();

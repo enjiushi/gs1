@@ -147,6 +147,19 @@ const char* ui_action_name(Gs1UiActionType action_type)
     }
 }
 
+const char* projection_mode_name(Gs1ProjectionMode mode)
+{
+    switch (mode)
+    {
+    case GS1_PROJECTION_MODE_SNAPSHOT:
+        return "SNAPSHOT";
+    case GS1_PROJECTION_MODE_DELTA:
+        return "DELTA";
+    default:
+        return "UNKNOWN";
+    }
+}
+
 const char* site_state_name(Gs1SiteState site_state)
 {
     switch (site_state)
@@ -334,6 +347,31 @@ void SmokeEngineHost::update(double delta_seconds, const Gs1InputSnapshot* input
 void SmokeEngineHost::queue_ui_action(const Gs1UiAction& action)
 {
     pending_pre_phase1_host_events_.push_back(make_ui_action_event(action));
+}
+
+SmokeEngineHost::LiveStateSnapshot SmokeEngineHost::capture_live_state_snapshot() const
+{
+    LiveStateSnapshot snapshot {};
+    snapshot.frame_number = frame_number_;
+    snapshot.current_app_state = current_app_state_;
+    snapshot.selected_site_id = selected_site_id_;
+    snapshot.script_failed = script_failed_;
+    snapshot.current_frame_command_entries = current_frame_command_entries_;
+
+    const std::size_t log_start = command_logs_.size() > 40U ? (command_logs_.size() - 40U) : 0U;
+    snapshot.command_log_tail.reserve(command_logs_.size() - log_start);
+    for (std::size_t index = log_start; index < command_logs_.size(); ++index)
+    {
+        snapshot.command_log_tail.push_back(command_logs_[index]);
+    }
+
+    snapshot.active_ui_setups = snapshot_active_ui_setups();
+    snapshot.regional_map_sites = snapshot_regional_map_sites();
+    snapshot.regional_map_links = snapshot_regional_map_links();
+    snapshot.active_site_snapshot = active_site_snapshot_;
+    snapshot.hud_state = hud_state_;
+    snapshot.site_result = site_result_;
+    return snapshot;
 }
 
 bool SmokeEngineHost::set_inflight_script_directive(SmokeScriptDirective directive)
@@ -1098,6 +1136,8 @@ std::string SmokeEngineHost::describe_command(const Gs1EngineCommand& command)
     case GS1_ENGINE_COMMAND_BEGIN_REGIONAL_MAP_SNAPSHOT:
     {
         const auto& payload = command.payload_as<Gs1EngineCommandRegionalMapSnapshotData>();
+        description += " mode=";
+        description += projection_mode_name(payload.mode);
         description += " sites=" + std::to_string(payload.site_count);
         description += " links=" + std::to_string(payload.link_count);
         description += " selected=" + std::to_string(payload.selected_site_id);
@@ -1174,6 +1214,8 @@ std::string SmokeEngineHost::describe_command(const Gs1EngineCommand& command)
     case GS1_ENGINE_COMMAND_BEGIN_SITE_SNAPSHOT:
     {
         const auto& payload = command.payload_as<Gs1EngineCommandSiteSnapshotData>();
+        description += " mode=";
+        description += projection_mode_name(payload.mode);
         description += " site=" + std::to_string(payload.site_id);
         description += " size=" + std::to_string(payload.width);
         description += "x" + std::to_string(payload.height);
