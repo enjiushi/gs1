@@ -51,7 +51,8 @@ enum Gs1SiteState : std::uint8_t
 enum Gs1HostEventType : std::uint8_t
 {
     GS1_HOST_EVENT_NONE = 0,
-    GS1_HOST_EVENT_UI_ACTION = 1
+    GS1_HOST_EVENT_UI_ACTION = 1,
+    GS1_HOST_EVENT_SITE_MOVE_DIRECTION = 2
 };
 
 enum Gs1UiSetupId : std::uint8_t
@@ -222,19 +223,6 @@ struct Gs1RuntimeCreateDesc
     double fixed_step_seconds;
 };
 
-struct Gs1InputSnapshot
-{
-    std::uint64_t frame_number;
-    float move_x;
-    float move_y;
-    float cursor_world_x;
-    float cursor_world_y;
-    std::uint32_t buttons_down_mask;
-    std::uint32_t buttons_pressed_mask;
-    std::uint32_t buttons_released_mask;
-    std::uint32_t struct_size;
-};
-
 struct Gs1UiAction
 {
     Gs1UiActionType type;
@@ -248,6 +236,13 @@ struct Gs1HostEventUiActionData
     Gs1UiAction action;
 };
 
+struct Gs1HostEventSiteMoveDirectionData
+{
+    float world_move_x;
+    float world_move_y;
+    float world_move_z;
+};
+
 struct Gs1HostEventEmptyData
 {
     std::uint64_t reserved0;
@@ -257,6 +252,7 @@ struct Gs1HostEventEmptyData
 union Gs1HostEventPayload
 {
     Gs1HostEventUiActionData ui_action;
+    Gs1HostEventSiteMoveDirectionData site_move_direction;
     Gs1HostEventEmptyData empty;
 };
 
@@ -284,7 +280,6 @@ struct Gs1Phase1Request
 {
     std::uint32_t struct_size;
     double real_delta_seconds;
-    const Gs1InputSnapshot* input;
 };
 
 struct Gs1Phase1Result
@@ -547,9 +542,9 @@ private:
 };
 
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1RuntimeCreateDesc, 16U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1InputSnapshot, 40U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1UiAction, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventUiActionData, 24U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteMoveDirectionData, 12U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventEmptyData, 16U);
 static_assert(std::is_standard_layout_v<Gs1HostEventPayload>, "Gs1HostEventPayload must remain standard layout.");
 static_assert(std::is_trivial_v<Gs1HostEventPayload>, "Gs1HostEventPayload must remain trivial.");
@@ -558,7 +553,7 @@ static_assert(sizeof(Gs1HostEventPayload) == 24U, "Gs1HostEventPayload size chan
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEvent, 32U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1FeedbackEventData, 16U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1FeedbackEvent, 20U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1Phase1Request, 24U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1Phase1Request, 16U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1Phase1Result, 16U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1Phase2Request, 4U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1Phase2Result, 20U);

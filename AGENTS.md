@@ -14,7 +14,7 @@ This file is a quick orientation guide for agents working in this repository.
 - `src/commands/`: Internal game command IDs, payloads, handlers, and dispatcher.
 - `src/content/`: Prototype content database, loader/validator shells, and content definition types.
 - `src/events/`: Runtime and engine feedback event types.
-- `src/runtime/`: Core runtime loop, fixed-step runner, input snapshots, command queues, random service, and engine command emission.
+- `src/runtime/`: Core runtime loop, fixed-step runner, host-event dispatch plus transient phase-control handling, command queues, random service, and engine command emission.
 - `src/site/`: Active site-run state and site systems for actions, weather, ecology, inventory, economy, task board, camp durability, and completion/failure flow.
 - `src/support/`: Shared support types such as typed IDs.
 - `src/ui/`: View-model and presenter state for HUD, phone, notifications, inspection, regional map, and UI presentation.

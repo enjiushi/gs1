@@ -88,7 +88,7 @@ The world should not emit commands like:
 flowchart LR
     subgraph ENGINE[Engine Layer]
         A[Input Sources<br/>Engine Input / AI / Network]
-        B[Adapter Input Intake To Core InputState]
+        B[Adapter Resolves Semantic Host Events]
         C[Engine Pre-Physics Update]
         G[Engine Command Flush Phase 1]
         H[Engine Physics Tick]
@@ -137,31 +137,31 @@ Notes:
 - the engine adapter translates those engine commands into actual engine actions
 - execution-side feedback can return from the engine during physics or other execution, but it must re-enter the world only through translated world-level feedback events
 - execution-side feedback is observational only; it does not decide outcomes by itself, and world systems may accept it, reinterpret it, or ignore it
-- input sources should first be translated by the engine adapter into shared core `InputState` before ECS systems consume them during tick
-- the adapter may also submit translated host-event records in two frame windows: before phase 1 and between phase 1 and phase 2
+- input sources should first be translated by the engine adapter into semantic host events before gameplay tick
+- the adapter may submit host-event records in two frame windows: before phase 1 and between phase 1 and phase 2; continuous control events needed for phase-1 simulation belong only in the pre-phase-1 window
 - phase 1 may accumulate engine commands that are flushed before engine-layer physics tick
 - translated engine feedback seeds phase-2 world processing
 - phase 2 may also accumulate engine commands, but phase-2 engine flush is terminal for the frame
 - no same-frame gameplay feedback loop continues after phase-2 engine flush
 
-### 3.1 Input Intake Contract
+### 3.1 Host Event Intake Contract
 
-The architecture uses one shared input boundary before gameplay tick.
+The architecture uses one semantic host-event boundary before gameplay tick.
 
 Rules:
 
-- the engine adapter owns conversion from engine input, AI decisions, network packets, or other runtime input sources into shared `InputState`
-- all `InputState` layout belongs to core schema because it is intended to be shared across games
-- input intake happens before gameplay tick
-- ECS systems should consume shared `InputState`, not engine-native input objects
-- alternate input sources such as replay, recording playback, AI, or multiplayer synchronization should enter through the same adapter-owned input-intake path and produce the same core `InputState`
+- the engine adapter owns conversion from engine input, AI decisions, network packets, or other runtime input sources into semantic `HostEvent` records
+- host-event intake happens before gameplay tick; any continuous control needed for phase-1 simulation must be submitted before phase 1 begins
+- gameplay code must not consume engine-native input objects or raw device state
+- alternate input sources such as replay, recording playback, AI, or multiplayer synchronization should enter through the same adapter-owned translation path and produce the same semantic host-event contract
 
 Clarification:
 
-- in this document, `input intake` means the adapter translates source-specific input data into the shared core `InputState`
-- it does not mean gameplay-specific intent generation
-- gameplay systems later decide how to react to `InputState` during tick
-- semantic host-rendered UI interactions are not raw `InputState`; once the host resolves those interactions, it may submit them as translated host events in either allowed frame window
+- in this document, `host-event intake` means the adapter translates source-specific input data into semantic world/gameplay events before submitting them to gameplay
+- this translation may use adapter-owned camera state or presentation-only context when needed
+- a continuous control such as site movement may be expressed as one per-frame semantic host event, for example a world-space move-direction event
+- if no such event is submitted for a frame, gameplay must treat that control as absent for that frame rather than reusing last frame's value
+- semantic host-rendered UI interactions use the same host-event path; translated feedback events remain a separate execution-feedback ingress path
 
 ---
 
@@ -172,8 +172,8 @@ Clarification:
 Examples of what may belong to core schema:
 
 - `EntityID`
-- `InputState`
-- world queue-entry header and queue envelope rules
+- host-event queue envelope rules
+- phase-entry request/response structs
 - basic metadata
 - `CommandHeader` for type routing and system ownership
 
@@ -182,7 +182,7 @@ Rules:
 - engine independent
 - never game-specific
 - never includes gameplay logic
-- may include cross-game shared runtime state such as shared `InputState` that both feature systems and game systems can read
+- may include shared queue/event transport and phase-entry contracts used by host and gameplay runtime code
 - may define the transport-level queue envelope and payload-block rules used by command and feedback-event queues across all games
 - should contain only data that is truly architecture-wide or broadly shared across many games and features
 
@@ -271,7 +271,7 @@ Rule:
 
 Input rule:
 
-- systems may read shared `InputState` during tick
+- systems may consume semantic host events or runtime-prepared transient per-phase control data during tick
 - if a system owns the relevant ECS data, it may react by writing that owned data directly
 - if reacting to input requires another ownership domain to change, the system should emit commands instead of mutating non-owned state directly
 
@@ -613,13 +613,13 @@ Rules:
 
 ## 8. Input And Command Flow
 
-The engine adapter should first translate source input into shared core `InputState`.
+The engine adapter should first translate source input into semantic host events in gameplay language.
 
-Gameplay systems then read that `InputState` during tick.
+Gameplay code then processes those events during phase handling.
 
 Input does not always need to become commands.
 
-If a system owns the affected gameplay state, it may react directly by writing that owned ECS data.
+If a system or runtime phase handler owns the affected gameplay state, it may react directly by writing that owned data.
 
 If input should cause changes in another ownership domain, the system should emit commands.
 
@@ -631,33 +631,32 @@ Examples of input-triggered commands when cross-domain handoff is needed:
 
 Examples of direct owned-state reaction:
 
-- a movement-related system reads `InputState` and updates owned locomotion or transform-related state
-- a camera-related system reads `InputState` and updates owned camera state
+- a movement-related system or runtime phase handler consumes a transient world-space move-direction event and updates owned locomotion state
+- a camera-related system remains adapter-owned and should not leak camera state into gameplay
 
 Those commands, when emitted, are then processed by ECS systems during normal command flush.
 
-### 8.1 Input Snapshot Ownership And Buffering Contract
+### 8.1 Host Event Ownership And Buffering Contract
 
 The input boundary is now locked as follows:
 
-- the engine adapter owns all conversion from engine-native input, replay input, AI input, or network input into shared core `InputState`
+- the engine adapter owns all conversion from engine-native input, replay input, AI input, or network input into semantic host events
 - input translation must complete before core gameplay phase 1 begins
-- the adapter should publish one immutable `CurrentInputState` snapshot for the whole frame
-- gameplay phase 1 and gameplay phase 2 must both read the same `CurrentInputState` snapshot; input is not re-sampled between the two phases
-- if the adapter or core input layer needs edge detection such as pressed-this-frame or released-this-frame, that logic should be computed before phase 1 and stored in the shared input snapshot or in a paired core-owned previous-frame snapshot
-- gameplay systems may read shared `InputState`, but they must not mutate it
-- only the adapter or a dedicated core-input preprocessing step may write `InputState`
-- any source input that arrives after the phase-1 cutoff should be buffered for the next frame rather than mutating the current frame's input snapshot
-- semantic host events are a separate ingress path from raw `InputState`; they may be submitted once before phase 1 and once again between phase 1 and phase 2
-- translated engine feedback events from physics, collision, or animation callbacks are not input and must not be folded back into the current frame's `InputState`; they re-enter gameplay only through the translated feedback-event path in phase 2 or a later frame as already defined elsewhere in this document
-- if several input sources can drive the same actor, the adapter must resolve that ownership before publishing the final shared input snapshot; gameplay systems should see one coherent input view, not several competing raw-device views
-- shared core `InputState` may contain normalized buttons, axes, directional values, and one-frame edge flags, but it must not contain game-specific high-level intents that belong to feature or game schemas
+- continuous control events needed for fixed-step simulation, such as site movement, must be submitted in the pre-phase-1 host-event window
+- gameplay phase 1 may reuse one submitted control event across all fixed steps executed during that same phase 1
+- if no continuous control event arrives for a frame, gameplay must treat that control as absent for that frame
+- gameplay code may derive transient per-phase control caches from submitted host events, but those caches are runtime-owned and cleared each frame
+- any source input that arrives after the phase-1 cutoff should be buffered for the next frame rather than mutating the current frame's submitted host events
+- host events may still be submitted again between phase 1 and phase 2 for discrete resolved interactions or adapter work that completed after the phase-1 flush
+- translated engine feedback events from physics, collision, or animation callbacks are not input and must not be folded back into the current frame's control interpretation; they re-enter gameplay only through the translated feedback-event path in phase 2 or a later frame as already defined elsewhere in this document
+- if several input sources can drive the same actor, the adapter must resolve that ownership before emitting the final semantic host events for that frame
+- raw button, cursor, or camera-state data must not cross the DLL boundary when gameplay can instead consume semantic world-space intent
 
 Recommended implementation direction:
 
-- keep `CurrentInputState` and `PreviousInputState` as core-owned frame resources
-- compute edge flags during adapter translation or immediate core-input preprocessing
-- treat both snapshots as read-only during gameplay tick
+- keep the host-event queue as the only public gameplay ingress path besides phase entry and feedback events
+- derive transient per-phase control data from pre-phase-1 host events when repeated fixed-step consumption is needed
+- clear transient control data at phase boundaries so no last-frame movement or camera-relative intent is retained implicitly
 
 This locks the ownership and buffering boundary strongly enough for later system-design work without forcing one engine-specific implementation.
 
@@ -665,9 +664,9 @@ Example:
 
 ```mermaid
 flowchart LR
-    A[Player Input] --> B[Core InputState]
+    A[Player Input] --> B[Adapter Resolves Semantic Host Events]
     B --> C[Engine Pre-Physics Update]
-    C --> D[Core Gameplay Phase 1]
+    C --> D[Submit Pre-Phase1 Host Events + Enter Gameplay Phase 1]
     D --> E[Gameplay Systems During Tick]
     E --> F[Owned State Writes<br/>and Optional Commands]
     F --> G[Internal Command Flush Phase 1]
@@ -675,7 +674,7 @@ flowchart LR
     H --> I[Engine Physics Tick]
     I --> J[Adapter Translates Physics / Collision Feedback]
     J --> K[Engine Post-Physics Update]
-    K --> L[Core Gameplay Phase 2]
+    K --> L[Submit Between-Phase Host Events + Enter Gameplay Phase 2]
     L --> M[Translated Feedback Handling + Internal Command Flush Phase 2 + Engine Command Flush Phase 2]
 ```
 

@@ -18,16 +18,23 @@
 
 namespace
 {
+struct SiteControlState final
+{
+    bool has_move_input {false};
+    float world_move_x {0.0f};
+    float world_move_y {0.0f};
+    float world_move_z {0.0f};
+};
+
 struct LiveSession final
 {
     explicit LiveSession(const Gs1RuntimeApi& api, Gs1RuntimeHandle* runtime) noexcept
         : host(api, runtime, SmokeEngineHost::LogMode::ActivityOnly)
     {
-        input_snapshot.struct_size = sizeof(Gs1InputSnapshot);
     }
 
     SmokeEngineHost host;
-    Gs1InputSnapshot input_snapshot {};
+    SiteControlState site_control {};
     std::mutex mutex {};
 };
 
@@ -196,16 +203,18 @@ void run_live_mode(
         },
         [&session](const std::string& body) {
             std::scoped_lock lock {session.mutex};
-            session.input_snapshot.move_x = extract_number_field<float>(body, "moveX").value_or(0.0f);
-            session.input_snapshot.move_y = extract_number_field<float>(body, "moveY").value_or(0.0f);
-            session.input_snapshot.cursor_world_x = extract_number_field<float>(body, "cursorWorldX").value_or(0.0f);
-            session.input_snapshot.cursor_world_y = extract_number_field<float>(body, "cursorWorldY").value_or(0.0f);
-            session.input_snapshot.buttons_down_mask =
-                extract_number_field<std::uint32_t>(body, "buttonsDownMask").value_or(0U);
-            session.input_snapshot.buttons_pressed_mask =
-                extract_number_field<std::uint32_t>(body, "buttonsPressedMask").value_or(0U);
-            session.input_snapshot.buttons_released_mask =
-                extract_number_field<std::uint32_t>(body, "buttonsReleasedMask").value_or(0U);
+            session.site_control.has_move_input =
+                extract_number_field<std::uint32_t>(body, "hasMoveInput").value_or(0U) != 0U;
+            session.site_control.world_move_x = extract_number_field<float>(body, "worldMoveX").value_or(0.0f);
+            session.site_control.world_move_y = extract_number_field<float>(body, "worldMoveY").value_or(0.0f);
+            session.site_control.world_move_z = extract_number_field<float>(body, "worldMoveZ").value_or(0.0f);
+
+            if (!session.site_control.has_move_input)
+            {
+                session.site_control.world_move_x = 0.0f;
+                session.site_control.world_move_y = 0.0f;
+                session.site_control.world_move_z = 0.0f;
+            }
         }};
 
     if (!server.start(preferred_port))
@@ -228,13 +237,15 @@ void run_live_mode(
         std::vector<std::string> pending_patches {};
         {
             std::scoped_lock lock {session.mutex};
-            Gs1InputSnapshot input_snapshot = session.input_snapshot;
-            input_snapshot.struct_size = sizeof(Gs1InputSnapshot);
-            session.host.update(k_frame_delta_seconds, &input_snapshot);
+            if (session.site_control.has_move_input)
+            {
+                session.host.queue_site_move_direction(
+                    session.site_control.world_move_x,
+                    session.site_control.world_move_y,
+                    session.site_control.world_move_z);
+            }
+            session.host.update(k_frame_delta_seconds);
             pending_patches = session.host.consume_pending_live_state_patches();
-
-            session.input_snapshot.buttons_pressed_mask = 0U;
-            session.input_snapshot.buttons_released_mask = 0U;
         }
 
         for (const auto& patch : pending_patches)

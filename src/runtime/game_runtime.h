@@ -5,7 +5,6 @@
 #include "site/site_run_state.h"
 #include "gs1/status.h"
 #include "gs1/types.h"
-#include "runtime/input_snapshot.h"
 
 #include <deque>
 #include <map>
@@ -13,7 +12,7 @@
 
 namespace gs1
 {
-inline constexpr std::uint32_t k_api_version = 1;
+inline constexpr std::uint32_t k_api_version = 2;
 inline constexpr double k_default_fixed_step_seconds = 0.25;
 
 class GameRuntime final
@@ -37,6 +36,20 @@ public:
     friend struct GameRuntimeProjectionTestAccess;
 
 private:
+    enum class HostEventDispatchStage : std::uint8_t
+    {
+        Phase1,
+        Phase2
+    };
+
+    struct Phase1SiteMoveDirection final
+    {
+        float world_move_x {0.0f};
+        float world_move_y {0.0f};
+        float world_move_z {0.0f};
+        bool present {false};
+    };
+
     void queue_log_command(const char* message);
     void queue_app_state_command(Gs1AppState app_state);
     void queue_ui_setup_begin_command(
@@ -82,9 +95,10 @@ private:
     void clear_pending_site_tile_projection_updates() noexcept;
     void flush_site_presentation_if_dirty();
     void update_worker_movement_for_fixed_step();
-    void consume_input_snapshot(const Gs1InputSnapshot* input);
     [[nodiscard]] Gs1Status translate_ui_action_to_command(const Gs1UiAction& action, GameCommand& out_command) const;
-    [[nodiscard]] Gs1Status dispatch_host_events(std::uint32_t& out_processed_count);
+    [[nodiscard]] Gs1Status dispatch_host_events(
+        HostEventDispatchStage stage,
+        std::uint32_t& out_processed_count);
     [[nodiscard]] Gs1Status dispatch_feedback_events(std::uint32_t& out_processed_count);
     [[nodiscard]] Gs1Status dispatch_queued_commands();
     void rebuild_regional_map_caches();
@@ -97,7 +111,7 @@ private:
     Gs1AppState app_state_ {GS1_APP_STATE_BOOT};
     std::optional<CampaignState> campaign_ {};
     std::optional<SiteRunState> active_site_run_ {};
-    InputSnapshot input_snapshot_ {};
+    Phase1SiteMoveDirection phase1_site_move_direction_ {};
     std::deque<Gs1HostEvent> host_events_ {};
     std::deque<Gs1FeedbackEvent> feedback_events_ {};
     GameCommandQueue command_queue_ {};

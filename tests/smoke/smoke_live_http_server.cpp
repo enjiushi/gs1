@@ -65,11 +65,11 @@ SmokeLiveHttpServer::SmokeLiveHttpServer(
     std::filesystem::path repo_root,
     GetStringCallback state_callback,
     PostBodyCallback ui_action_callback,
-    PostBodyCallback input_callback)
+    PostBodyCallback site_control_callback)
     : repo_root_(std::move(repo_root))
     , state_callback_(std::move(state_callback))
     , ui_action_callback_(std::move(ui_action_callback))
-    , input_callback_(std::move(input_callback))
+    , site_control_callback_(std::move(site_control_callback))
 {
 }
 
@@ -293,9 +293,9 @@ bool SmokeLiveHttpServer::handle_client(std::uintptr_t client_socket_value)
         return false;
     }
 
-    if (method == "POST" && path == "/input")
+    if (method == "POST" && path == "/site-control")
     {
-        input_callback_(body);
+        site_control_callback_(body);
         send_response(client_socket, 200, "OK", "application/json; charset=utf-8", "{\"ok\":true}");
         return false;
     }

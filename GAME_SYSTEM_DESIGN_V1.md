@@ -35,7 +35,7 @@ DLL boundary rule for v1:
 - engine adapters are host-side code and are not compiled into this DLL
 - the DLL exposes only engine-agnostic public headers and exported entry points
 - build output must package the DLL together with its public headers and import library for host-side integration
-- host-to-game DLL ingress should use input snapshots, host events, translated feedback events, and phase entrypoints
+- host-to-game DLL ingress should use semantic host events, translated feedback events, and phase entrypoints
 - game-to-host DLL egress should use engine commands only
 
 ### 1.2 Non-Goals For V1
@@ -86,7 +86,6 @@ src/
     GameRuntime
     RuntimeClock
     FixedStepRunner
-    InputSnapshot
     CommandQueue
     EngineCommandQueue
     EngineFeedbackBuffer
@@ -209,7 +208,7 @@ Owns:
 
 - fixed-step execution
 - queues
-- input snapshots
+- host-event dispatch plus transient phase-control caches
 - runtime clocks
 - id allocation
 - deterministic rng access
@@ -1305,7 +1304,7 @@ The host-side engine integration layer must provide:
 
 - `queueHostEventsBeforePhase1()`
 - `queueHostEventsBetweenPhases()`
-- `pollInputSnapshot()`
+- `sampleSourceInputAndResolveHostEvents()`
 - `flushEngineCommands()`
 - `collectFeedbackEvents()`
 
@@ -1322,19 +1321,20 @@ The gameplay DLL should expose only the minimum engine-agnostic runtime boundary
 
 Current boundary rule:
 
-- host-to-game data is submitted as input snapshots plus host/feedback events
+- host-to-game data is submitted as host/feedback events plus the per-frame real delta carried by `phase1`
 - game-to-host data is emitted as engine commands
-- input snapshot is supplied at phase entry, not through engine-native callback objects
+- the host must not pass raw button, cursor, or camera-state data across the DLL boundary when it can instead submit semantic host events
 - translated feedback events must already be in world language before entering the DLL
 - host events may be submitted in two windows each frame: once before `phase1` and once after the phase-1 engine-command flush but before `phase2`
-- pre-`phase1` host events are for interactions the host already resolved before gameplay tick, including host-rendered UI actions that should affect phase-1 gameplay
+- pre-`phase1` host events are for interactions or continuous control meaning the host already resolved before gameplay tick, including host-rendered UI actions and per-frame site move-direction events that should affect phase-1 gameplay
 - between-phase host events remain valid for interactions or adapter work that completes after the phase-1 flush
 - per-frame real delta time is supplied to `phase1`; `phase2` is the same frame continuation and does not take a second frame delta
 
 Host-event examples:
 
 - `UI_ACTION`
-- future host-owned semantic interactions that are not raw input snapshots
+- `SITE_MOVE_DIRECTION`
+- future host-owned semantic interactions that are not engine-native raw input
 
 Translated feedback-event examples:
 
@@ -1422,9 +1422,9 @@ Projection rules:
 
 For a simulated or real engine host, one frame update should look like:
 
-1. gather engine input and translate it into the shared input snapshot
+1. gather engine input and translate it into semantic host events; continuous control such as movement should be resolved here using adapter-owned camera state if needed
 2. optionally submit any host events already resolved before gameplay tick
-3. call `phase1(delta_seconds, input_snapshot)`
+3. call `phase1(delta_seconds)`
 4. flush phase-1 engine commands through the engine adapter
 5. optionally submit newly resolved host events plus translated feedback events
 6. call `phase2()`

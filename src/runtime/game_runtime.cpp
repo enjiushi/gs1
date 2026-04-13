@@ -5,6 +5,7 @@
 #include "commands/command_dispatcher.h"
 
 #include <algorithm>
+#include <cassert>
 #include <cstdio>
 #include <cmath>
 #include <cstring>
@@ -115,15 +116,9 @@ Gs1Status GameRuntime::run_phase1(const Gs1Phase1Request& request, Gs1Phase1Resu
         return GS1_STATUS_INVALID_ARGUMENT;
     }
 
-    if (request.input != nullptr && request.input->struct_size != sizeof(Gs1InputSnapshot))
-    {
-        return GS1_STATUS_INVALID_ARGUMENT;
-    }
-
     out_result = {};
     out_result.struct_size = sizeof(Gs1Phase1Result);
-
-    consume_input_snapshot(request.input);
+    phase1_site_move_direction_ = {};
 
     auto status = GS1_STATUS_OK;
     if (!boot_initialized_)
@@ -142,14 +137,16 @@ Gs1Status GameRuntime::run_phase1(const Gs1Phase1Request& request, Gs1Phase1Resu
         boot_initialized_ = true;
     }
 
-    status = dispatch_host_events(out_result.processed_host_event_count);
+    status = dispatch_host_events(HostEventDispatchStage::Phase1, out_result.processed_host_event_count);
     if (status != GS1_STATUS_OK)
     {
+        phase1_site_move_direction_ = {};
         return status;
     }
 
     if (!active_site_run_.has_value())
     {
+        phase1_site_move_direction_ = {};
         out_result.engine_commands_queued = static_cast<std::uint32_t>(engine_commands_.size());
         return GS1_STATUS_OK;
     }
@@ -166,6 +163,7 @@ Gs1Status GameRuntime::run_phase1(const Gs1Phase1Request& request, Gs1Phase1Resu
     flush_site_presentation_if_dirty();
 
     status = dispatch_queued_commands();
+    phase1_site_move_direction_ = {};
     out_result.engine_commands_queued = static_cast<std::uint32_t>(engine_commands_.size());
     return status;
 }
@@ -180,7 +178,7 @@ Gs1Status GameRuntime::run_phase2(const Gs1Phase2Request& request, Gs1Phase2Resu
     out_result = {};
     out_result.struct_size = sizeof(Gs1Phase2Result);
 
-    auto status = dispatch_host_events(out_result.processed_host_event_count);
+    auto status = dispatch_host_events(HostEventDispatchStage::Phase2, out_result.processed_host_event_count);
     if (status != GS1_STATUS_OK)
     {
         return status;
@@ -1113,8 +1111,13 @@ void GameRuntime::update_worker_movement_for_fixed_step()
         return;
     }
 
-    const float move_x = input_snapshot_.current.move_x;
-    const float move_y = input_snapshot_.current.move_y;
+    if (!phase1_site_move_direction_.present)
+    {
+        return;
+    }
+
+    const float move_x = phase1_site_move_direction_.world_move_x;
+    const float move_y = phase1_site_move_direction_.world_move_y;
     const float move_length_squared = move_x * move_x + move_y * move_y;
     if (move_length_squared <= 0.0001f)
     {
@@ -1157,23 +1160,6 @@ void GameRuntime::update_worker_movement_for_fixed_step()
     site_run.worker.tile_coord = target_tile;
     site_run.worker.facing_degrees = std::atan2(direction_x, direction_y) * k_radians_to_degrees;
     mark_site_projection_update_dirty(SITE_PROJECTION_UPDATE_WORKER);
-}
-
-void GameRuntime::consume_input_snapshot(const Gs1InputSnapshot* input)
-{
-    if (input_snapshot_.current.struct_size == sizeof(Gs1InputSnapshot))
-    {
-        input_snapshot_.previous = input_snapshot_.current;
-        input_snapshot_.has_previous = true;
-    }
-
-    input_snapshot_.current = {};
-    input_snapshot_.current.struct_size = sizeof(Gs1InputSnapshot);
-
-    if (input != nullptr)
-    {
-        input_snapshot_.current = *input;
-    }
 }
 
 Gs1Status GameRuntime::translate_ui_action_to_command(const Gs1UiAction& action, GameCommand& out_command) const
@@ -1225,7 +1211,9 @@ Gs1Status GameRuntime::translate_ui_action_to_command(const Gs1UiAction& action,
     }
 }
 
-Gs1Status GameRuntime::dispatch_host_events(std::uint32_t& out_processed_count)
+Gs1Status GameRuntime::dispatch_host_events(
+    HostEventDispatchStage stage,
+    std::uint32_t& out_processed_count)
 {
     out_processed_count = 0U;
 
@@ -1252,6 +1240,33 @@ Gs1Status GameRuntime::dispatch_host_events(std::uint32_t& out_processed_count)
             {
                 return dispatch_status;
             }
+            break;
+        }
+
+        case GS1_HOST_EVENT_SITE_MOVE_DIRECTION:
+        {
+            assert(stage == HostEventDispatchStage::Phase1);
+            if (stage != HostEventDispatchStage::Phase1)
+            {
+                return GS1_STATUS_INVALID_STATE;
+            }
+
+            assert(!phase1_site_move_direction_.present);
+            if (phase1_site_move_direction_.present)
+            {
+                return GS1_STATUS_INVALID_STATE;
+            }
+
+            if (!active_site_run_.has_value() || app_state_ != GS1_APP_STATE_SITE_ACTIVE)
+            {
+                break;
+            }
+
+            const auto& payload = event.payload.site_move_direction;
+            phase1_site_move_direction_.world_move_x = payload.world_move_x;
+            phase1_site_move_direction_.world_move_y = payload.world_move_y;
+            phase1_site_move_direction_.world_move_z = payload.world_move_z;
+            phase1_site_move_direction_.present = true;
             break;
         }
 

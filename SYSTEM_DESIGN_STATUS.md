@@ -60,7 +60,7 @@ These areas are the main missing formal sections if we want a safe full-game arc
 
 | Area | Status | Why |
 |---|---|---|
-| Global framework and engine boundary | `Ready` | `GAME_STRUCTURE.md` now defines the ECS-world-first architecture, command/event flow, world-level engine commands, engine-adapter responsibilities, the input snapshot ownership/buffering contract, and the bootstrap-plus-partial-update adapter projection rule for long-lived presentation surfaces. |
+| Global framework and engine boundary | `Ready` | `GAME_STRUCTURE.md` now defines the ECS-world-first architecture, command/event flow, world-level engine commands, engine-adapter responsibilities, the semantic host-event intake contract, and the bootstrap-plus-partial-update adapter projection rule for long-lived presentation surfaces. |
 | Site runtime simulation | `Ready` | Update order, meters, causal loop, and tile/runtime state categories are already defined. |
 | Terrain and ecology runtime | `Ready` | Terrain, plant, weather, device, and meter relationships are clear enough for module and struct design. |
 | Inventory and item runtime | `Ready` | Shared item model, item meters, storage flow, and hazard interaction are already explicit. |

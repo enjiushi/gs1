@@ -254,31 +254,15 @@ void SmokeEngineHost::queue_feedback_event(const Gs1FeedbackEvent& event)
 
 void SmokeEngineHost::update(double delta_seconds)
 {
-    update(delta_seconds, nullptr);
-}
-
-void SmokeEngineHost::update(double delta_seconds, const Gs1InputSnapshot* input_override)
-{
     frame_number_ += 1U;
     current_frame_command_entries_.clear();
 
     apply_inflight_script_directive();
     submit_host_events(pending_pre_phase1_host_events_, "pre_phase1");
 
-    Gs1InputSnapshot input_snapshot {};
-    input_snapshot.struct_size = sizeof(Gs1InputSnapshot);
-    input_snapshot.frame_number = frame_number_;
-    if (input_override != nullptr)
-    {
-        input_snapshot = *input_override;
-        input_snapshot.struct_size = sizeof(Gs1InputSnapshot);
-        input_snapshot.frame_number = frame_number_;
-    }
-
     Gs1Phase1Request phase1_request {};
     phase1_request.struct_size = sizeof(Gs1Phase1Request);
     phase1_request.real_delta_seconds = delta_seconds;
-    phase1_request.input = &input_snapshot;
 
     Gs1Phase1Result phase1_result {};
     const auto phase1_status = api_->run_phase1(runtime_, &phase1_request, &phase1_result);
@@ -347,6 +331,21 @@ void SmokeEngineHost::update(double delta_seconds, const Gs1InputSnapshot* input
 void SmokeEngineHost::queue_ui_action(const Gs1UiAction& action)
 {
     pending_pre_phase1_host_events_.push_back(make_ui_action_event(action));
+}
+
+void SmokeEngineHost::queue_site_move_direction(float world_move_x, float world_move_y, float world_move_z)
+{
+    const auto duplicate = std::find_if(
+        pending_pre_phase1_host_events_.begin(),
+        pending_pre_phase1_host_events_.end(),
+        [](const Gs1HostEvent& event) {
+            return event.type == GS1_HOST_EVENT_SITE_MOVE_DIRECTION;
+        });
+    assert(duplicate == pending_pre_phase1_host_events_.end());
+    pending_pre_phase1_host_events_.push_back(make_site_move_direction_event(
+        world_move_x,
+        world_move_y,
+        world_move_z));
 }
 
 std::vector<std::string> SmokeEngineHost::consume_pending_live_state_patches()
@@ -1381,5 +1380,18 @@ Gs1HostEvent SmokeEngineHost::make_ui_action_event(const Gs1UiAction& action) no
     Gs1HostEvent event {};
     event.type = GS1_HOST_EVENT_UI_ACTION;
     event.payload.ui_action.action = action;
+    return event;
+}
+
+Gs1HostEvent SmokeEngineHost::make_site_move_direction_event(
+    float world_move_x,
+    float world_move_y,
+    float world_move_z) noexcept
+{
+    Gs1HostEvent event {};
+    event.type = GS1_HOST_EVENT_SITE_MOVE_DIRECTION;
+    event.payload.site_move_direction.world_move_x = world_move_x;
+    event.payload.site_move_direction.world_move_y = world_move_y;
+    event.payload.site_move_direction.world_move_z = world_move_z;
     return event;
 }

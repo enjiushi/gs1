@@ -20,30 +20,29 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     let latestState = null;
     let stateStream = null;
-    let inputSendInFlight = false;
+    let siteControlSendInFlight = false;
     let mapPickables = [];
     let latestPresentationSignature = "";
+    let lastSentSiteControlSignature = "0";
     let currentSceneKind = "";
     let siteSceneCache = null;
-    let inputDirty = true;
     let animationTimeSeconds = 0;
     let rendererWidth = 0;
     let rendererHeight = 0;
 
-    const inputState = {
-        moveX: 0,
-        moveY: 0,
-        cursorWorldX: 0,
-        cursorWorldY: 0,
-        buttonsDownMask: 0,
-        buttonsPressedMask: 0,
-        buttonsReleasedMask: 0
+    const moveAxes = {
+        x: 0,
+        y: 0
     };
 
     const keys = new Set();
     const raycaster = new THREE_NS.Raycaster();
     const pointer = new THREE_NS.Vector2();
     const animationClock = new THREE_NS.Clock();
+    const cameraForwardOnGround = new THREE_NS.Vector3();
+    const cameraRightOnGround = new THREE_NS.Vector3();
+    const desiredMoveOnGround = new THREE_NS.Vector3();
+    const worldUp = new THREE_NS.Vector3(0, 1, 0);
 
     const renderer = new THREE_NS.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -158,8 +157,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     function updateMoveAxis() {
         const x = (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0) - (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0);
         const y = (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
-        inputState.moveX = x;
-        inputState.moveY = y;
+        moveAxes.x = x;
+        moveAxes.y = y;
     }
 
     function renderMenuOverlay(state) {
@@ -1319,74 +1318,108 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         };
     }
 
-    function sendInputState() {
-        if (inputSendInFlight || !inputDirty) {
+    function computeSiteControlState() {
+        if (!latestState || latestState.appState !== "SITE_ACTIVE") {
+            return {
+                hasMoveInput: 0,
+                worldMoveX: 0,
+                worldMoveY: 0,
+                worldMoveZ: 0
+            };
+        }
+
+        if (moveAxes.x === 0 && moveAxes.y === 0) {
+            return {
+                hasMoveInput: 0,
+                worldMoveX: 0,
+                worldMoveY: 0,
+                worldMoveZ: 0
+            };
+        }
+
+        camera.getWorldDirection(cameraForwardOnGround);
+        cameraForwardOnGround.y = 0;
+        if (cameraForwardOnGround.lengthSq() <= 0.000001) {
+            return {
+                hasMoveInput: 0,
+                worldMoveX: 0,
+                worldMoveY: 0,
+                worldMoveZ: 0
+            };
+        }
+
+        cameraForwardOnGround.normalize();
+        cameraRightOnGround.crossVectors(cameraForwardOnGround, worldUp);
+        if (cameraRightOnGround.lengthSq() <= 0.000001) {
+            return {
+                hasMoveInput: 0,
+                worldMoveX: 0,
+                worldMoveY: 0,
+                worldMoveZ: 0
+            };
+        }
+
+        cameraRightOnGround.normalize();
+        desiredMoveOnGround.copy(cameraForwardOnGround).multiplyScalar(moveAxes.y);
+        desiredMoveOnGround.addScaledVector(cameraRightOnGround, moveAxes.x);
+        desiredMoveOnGround.y = 0;
+        if (desiredMoveOnGround.lengthSq() <= 0.000001) {
+            return {
+                hasMoveInput: 0,
+                worldMoveX: 0,
+                worldMoveY: 0,
+                worldMoveZ: 0
+            };
+        }
+
+        desiredMoveOnGround.normalize();
+        return {
+            hasMoveInput: 1,
+            worldMoveX: desiredMoveOnGround.x,
+            worldMoveY: desiredMoveOnGround.z,
+            worldMoveZ: 0
+        };
+    }
+
+    function sendSiteControlState() {
+        if (siteControlSendInFlight) {
             return;
         }
 
-        inputSendInFlight = true;
-        postJson("/input", {
-            moveX: inputState.moveX,
-            moveY: inputState.moveY,
-            cursorWorldX: inputState.cursorWorldX,
-            cursorWorldY: inputState.cursorWorldY,
-            buttonsDownMask: inputState.buttonsDownMask,
-            buttonsPressedMask: inputState.buttonsPressedMask,
-            buttonsReleasedMask: inputState.buttonsReleasedMask
-        })
+        const siteControlState = computeSiteControlState();
+        const signature = siteControlState.hasMoveInput !== 0
+            ? [
+                "1",
+                siteControlState.worldMoveX.toFixed(6),
+                siteControlState.worldMoveY.toFixed(6),
+                siteControlState.worldMoveZ.toFixed(6)
+            ].join(":")
+            : "0";
+        if (signature === lastSentSiteControlSignature) {
+            return;
+        }
+
+        siteControlSendInFlight = true;
+        postJson("/site-control", siteControlState)
             .then(() => {
-                inputState.buttonsPressedMask = 0;
-                inputState.buttonsReleasedMask = 0;
-                inputDirty = false;
+                lastSentSiteControlSignature = signature;
             })
             .catch(() => {})
             .finally(() => {
-                inputSendInFlight = false;
+                siteControlSendInFlight = false;
             });
-    }
-
-    function updateCursorWorld(event) {
-        const rect = gameView.getBoundingClientRect();
-        const x = ((event.clientX - rect.left) / Math.max(rect.width, 1)) * 2 - 1;
-        const y = ((event.clientY - rect.top) / Math.max(rect.height, 1)) * 2 - 1;
-        inputState.cursorWorldX = x;
-        inputState.cursorWorldY = -y;
     }
 
     window.addEventListener("keydown", function (event) {
         keys.add(event.code);
         updateMoveAxis();
-        inputDirty = true;
-        sendInputState();
+        sendSiteControlState();
     });
 
     window.addEventListener("keyup", function (event) {
         keys.delete(event.code);
         updateMoveAxis();
-        inputDirty = true;
-        sendInputState();
-    });
-
-    gameView.addEventListener("pointermove", function (event) {
-        updateCursorWorld(event);
-        inputDirty = true;
-    });
-
-    gameView.addEventListener("pointerdown", function (event) {
-        updateCursorWorld(event);
-        inputState.buttonsDownMask |= 1;
-        inputState.buttonsPressedMask |= 1;
-        inputDirty = true;
-        sendInputState();
-    });
-
-    window.addEventListener("pointerup", function () {
-        if ((inputState.buttonsDownMask & 1) !== 0) {
-            inputState.buttonsReleasedMask |= 1;
-        }
-        inputState.buttonsDownMask &= ~1;
-        inputDirty = true;
-        sendInputState();
+        sendSiteControlState();
     });
 
     renderer.domElement.addEventListener("click", function (event) {
@@ -1428,5 +1461,5 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     fitRenderer();
     animate();
     connectStateStream();
-    window.setInterval(sendInputState, 16);
+    window.setInterval(sendSiteControlState, 16);
 })();
