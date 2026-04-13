@@ -29,6 +29,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let animationTimeSeconds = 0;
     let rendererWidth = 0;
     let rendererHeight = 0;
+    let cameraOrbitDragPointerId = null;
+    let cameraOrbitDragButton = -1;
+    let cameraOrbitDragLastClientX = 0;
+    let cameraOrbitPointerLockActive = false;
 
     const moveAxes = {
         x: 0,
@@ -43,10 +47,17 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const cameraRightOnGround = new THREE_NS.Vector3();
     const desiredMoveOnGround = new THREE_NS.Vector3();
     const worldUp = new THREE_NS.Vector3(0, 1, 0);
+    const siteCameraDefaults = {
+        offsetX: 4.6,
+        offsetZ: 5.2,
+        lookHeight: 0.4,
+        rotateRadiansPerPixel: 0.002
+    };
 
     const renderer = new THREE_NS.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.outputColorSpace = THREE_NS.SRGBColorSpace;
+    renderer.domElement.style.touchAction = "none";
     gameView.appendChild(renderer.domElement);
 
     const scene = new THREE_NS.Scene();
@@ -93,6 +104,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function clearWorld() {
+        stopCameraOrbitDrag();
         while (worldGroup.children.length > 0) {
             const child = worldGroup.children[0];
             worldGroup.remove(child);
@@ -265,7 +277,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         menuPanel.hidden = true;
         selectionEyebrow.textContent = "Site Active";
         selectionText.textContent = siteBootstrap
-            ? "Site " + siteBootstrap.siteId + " is live. Use WASD to move through the desert staging ground."
+            ? "Site " + siteBootstrap.siteId + " is live. Use WASD to move and drag with the middle mouse button to orbit around the worker."
             : "Site bootstrap is loading.";
         contextActions.innerHTML = "";
 
@@ -300,7 +312,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 "\nSelected Site: " + (state.selectedSiteId == null ? "none" : state.selectedSiteId);
             break;
         case "SITE_ACTIVE":
-            hudSubtitle.textContent = "Field movement is now live. This slice proves the site scene, camera, and worker control loop.";
+            hudSubtitle.textContent = "Field movement is now live. Orbit the follow camera with middle drag while navigation keeps following the current view.";
             renderSiteOverlay(state);
             break;
         default:
@@ -960,10 +972,150 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         );
     }
 
-    function rebuildStaticSiteScene(siteBootstrap, offsetX, offsetZ, width, height) {
+    function getSiteCameraHeight(width, height) {
+        return Math.max(width, height) * 0.72 + 3.0;
+    }
+
+    function buildSiteCameraOrbitState(siteBootstrap, width, height, previousCache) {
+        if (previousCache && previousCache.siteId === siteBootstrap.siteId) {
+            return {
+                offsetX: previousCache.cameraOrbitOffsetX,
+                offsetY: getSiteCameraHeight(width, height),
+                offsetZ: previousCache.cameraOrbitOffsetZ
+            };
+        }
+
+        return {
+            offsetX: siteCameraDefaults.offsetX,
+            offsetY: getSiteCameraHeight(width, height),
+            offsetZ: siteCameraDefaults.offsetZ
+        };
+    }
+
+    function rotateSiteCameraOrbit(cache, angleRadians) {
+        if (!cache || Math.abs(angleRadians) <= 0.000001) {
+            return;
+        }
+
+        const cosAngle = Math.cos(angleRadians);
+        const sinAngle = Math.sin(angleRadians);
+        const previousOffsetX = cache.cameraOrbitOffsetX;
+        const previousOffsetZ = cache.cameraOrbitOffsetZ;
+        cache.cameraOrbitOffsetX = previousOffsetX * cosAngle - previousOffsetZ * sinAngle;
+        cache.cameraOrbitOffsetZ = previousOffsetX * sinAngle + previousOffsetZ * cosAngle;
+    }
+
+    function applySiteCameraTransform(cache, focusX, focusZ, blendFactor) {
+        if (!cache) {
+            return;
+        }
+
+        const desiredCameraX = focusX + cache.cameraOrbitOffsetX;
+        const desiredCameraY = cache.cameraOrbitOffsetY;
+        const desiredCameraZ = focusZ + cache.cameraOrbitOffsetZ;
+        if (blendFactor >= 1.0) {
+            camera.position.set(desiredCameraX, desiredCameraY, desiredCameraZ);
+        } else {
+            camera.position.x += (desiredCameraX - camera.position.x) * blendFactor;
+            camera.position.y += (desiredCameraY - camera.position.y) * blendFactor;
+            camera.position.z += (desiredCameraZ - camera.position.z) * blendFactor;
+        }
+        camera.lookAt(focusX, siteCameraDefaults.lookHeight, focusZ);
+    }
+
+    function stopCameraOrbitDrag(pointerId) {
+        if (cameraOrbitDragPointerId == null) {
+            return;
+        }
+        if (pointerId != null && pointerId !== cameraOrbitDragPointerId) {
+            return;
+        }
+
+        if (renderer.domElement.hasPointerCapture(cameraOrbitDragPointerId)) {
+            renderer.domElement.releasePointerCapture(cameraOrbitDragPointerId);
+        }
+
+        cameraOrbitDragPointerId = null;
+        cameraOrbitDragButton = -1;
+        cameraOrbitDragLastClientX = 0;
+    }
+
+    function isSiteActiveView() {
+        return !!latestState && latestState.appState === "SITE_ACTIVE";
+    }
+
+    function getSiteOrbitDragButtonFromEvent(event) {
+        if (!isSiteActiveView()) {
+            return -1;
+        }
+
+        if (event.button === 1) {
+            return 1;
+        }
+
+        return -1;
+    }
+
+    function isSiteOrbitMouseEvent(event) {
+        if (!isSiteActiveView()) {
+            return false;
+        }
+
+        if (getSiteOrbitDragButtonFromEvent(event) >= 0) {
+            return true;
+        }
+
+        if (cameraOrbitDragButton === 1) {
+            return (event.buttons & 4) !== 0;
+        }
+
+        return false;
+    }
+
+    function isSiteCameraOrbitActive() {
+        return cameraOrbitDragPointerId != null;
+    }
+
+    function isSiteCameraPointerLocked() {
+        return document.pointerLockElement === renderer.domElement;
+    }
+
+    function updateCameraOrbitFromDelta(deltaX) {
+        if (!siteSceneCache || Math.abs(deltaX) <= 0.000001) {
+            return;
+        }
+
+        rotateSiteCameraOrbit(siteSceneCache, -deltaX * siteCameraDefaults.rotateRadiansPerPixel);
+        sendSiteControlState();
+    }
+
+    function tryRequestCameraPointerLock() {
+        if (typeof renderer.domElement.requestPointerLock !== "function") {
+            return;
+        }
+
+        try {
+            renderer.domElement.requestPointerLock();
+        } catch (_error) {
+        }
+    }
+
+    function releaseCameraPointerLock() {
+        if (!isSiteCameraPointerLocked() || typeof document.exitPointerLock !== "function") {
+            return;
+        }
+
+        try {
+            document.exitPointerLock();
+        } catch (_error) {
+        }
+    }
+
+    function rebuildStaticSiteScene(siteBootstrap, offsetX, offsetZ, width, height, previousCache) {
         clearWorld();
         currentSceneKind = "SITE_ACTIVE";
         scene.background = new THREE_NS.Color(0xe7d3b0);
+        const cameraOrbitState = buildSiteCameraOrbitState(siteBootstrap, width, height, previousCache);
 
         const desertWidth = Math.max(width + 8, 20);
         const desertHeight = Math.max(height + 8, 20);
@@ -1052,7 +1204,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             workerTargetZ: 0,
             workerTargetYaw: 0,
             cameraTargetX: 0,
-            cameraTargetZ: 0
+            cameraTargetZ: 0,
+            cameraOrbitOffsetX: cameraOrbitState.offsetX,
+            cameraOrbitOffsetY: cameraOrbitState.offsetY,
+            cameraOrbitOffsetZ: cameraOrbitState.offsetZ
         };
     }
 
@@ -1101,6 +1256,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const offsetX = (width - 1) * 0.5;
         const offsetZ = (height - 1) * 0.5;
         const bootstrapSignature = buildSiteBootstrapSignature(siteBootstrap);
+        const previousSiteSceneCache = siteSceneCache;
 
         const needsStaticRebuild =
             currentSceneKind !== "SITE_ACTIVE" ||
@@ -1111,7 +1267,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             siteSceneCache.bootstrapSignature !== bootstrapSignature;
 
         if (needsStaticRebuild) {
-            rebuildStaticSiteScene(siteBootstrap, offsetX, offsetZ, width, height);
+            rebuildStaticSiteScene(siteBootstrap, offsetX, offsetZ, width, height, previousSiteSceneCache);
         }
 
         if (!siteSceneCache) {
@@ -1138,12 +1294,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         siteSceneCache.cameraTargetZ = cameraTargetZ;
 
         if (needsStaticRebuild) {
-            camera.position.set(
-                cameraTargetX + 4.6,
-                Math.max(width, height) * 0.72 + 3.0,
-                cameraTargetZ + 5.2
-            );
-            camera.lookAt(cameraTargetX, 0.4, cameraTargetZ);
+            applySiteCameraTransform(siteSceneCache, cameraTargetX, cameraTargetZ, 1.0);
         }
     }
 
@@ -1209,7 +1360,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             const workerGroup = siteSceneCache.workerGroup;
             const workerBlend = blendFactorFromRate(18.0, deltaSeconds);
             const rotationBlend = blendFactorFromRate(16.0, deltaSeconds);
-            const cameraBlend = blendFactorFromRate(10.0, deltaSeconds);
+            const cameraBlend = cameraOrbitDragPointerId == null ? blendFactorFromRate(10.0, deltaSeconds) : 1.0;
             const previousWorkerX = workerGroup.position.x;
             const previousWorkerZ = workerGroup.position.z;
             const distanceToTargetBeforeMove = Math.hypot(
@@ -1245,13 +1396,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 distanceToTarget
             );
 
-            const desiredCameraX = siteSceneCache.cameraTargetX + 4.6;
-            const desiredCameraY = Math.max(siteSceneCache.width, siteSceneCache.height) * 0.72 + 3.0;
-            const desiredCameraZ = siteSceneCache.cameraTargetZ + 5.2;
-            camera.position.x += (desiredCameraX - camera.position.x) * cameraBlend;
-            camera.position.y += (desiredCameraY - camera.position.y) * cameraBlend;
-            camera.position.z += (desiredCameraZ - camera.position.z) * cameraBlend;
-            camera.lookAt(workerGroup.position.x, 0.4, workerGroup.position.z);
+            applySiteCameraTransform(siteSceneCache, workerGroup.position.x, workerGroup.position.z, cameraBlend);
         }
 
         fitRenderer();
@@ -1420,6 +1565,145 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         keys.delete(event.code);
         updateMoveAxis();
         sendSiteControlState();
+    });
+
+    renderer.domElement.addEventListener("contextmenu", function (event) {
+        if (!isSiteActiveView()) {
+            return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+    }, true);
+
+    renderer.domElement.addEventListener("mousedown", function (event) {
+        if (!isSiteOrbitMouseEvent(event)) {
+            return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+    }, true);
+
+    renderer.domElement.addEventListener("mousemove", function (event) {
+        if (!isSiteOrbitMouseEvent(event) && !isSiteCameraOrbitActive()) {
+            return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+    }, true);
+
+    renderer.domElement.addEventListener("mouseup", function (event) {
+        if (!isSiteOrbitMouseEvent(event) && !(isSiteCameraOrbitActive() && event.button === cameraOrbitDragButton)) {
+            return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+    }, true);
+
+    renderer.domElement.addEventListener("dragstart", function (event) {
+        if (!isSiteActiveView()) {
+            return;
+        }
+        event.preventDefault();
+    }, true);
+
+    renderer.domElement.addEventListener("selectstart", function (event) {
+        if (!isSiteActiveView()) {
+            return;
+        }
+        event.preventDefault();
+    }, true);
+
+    renderer.domElement.addEventListener("auxclick", function (event) {
+        if (!isSiteOrbitMouseEvent(event) && event.button !== 1) {
+            return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+    }, true);
+
+    renderer.domElement.addEventListener("pointerdown", function (event) {
+        const orbitDragButton = getSiteOrbitDragButtonFromEvent(event);
+        if (orbitDragButton < 0 || !siteSceneCache) {
+            return;
+        }
+
+        cameraOrbitDragPointerId = event.pointerId;
+        cameraOrbitDragButton = orbitDragButton;
+        cameraOrbitDragLastClientX = event.clientX;
+        renderer.domElement.setPointerCapture(event.pointerId);
+        tryRequestCameraPointerLock();
+        event.preventDefault();
+        event.stopPropagation();
+    });
+
+    renderer.domElement.addEventListener("pointermove", function (event) {
+        if (cameraOrbitDragPointerId == null || event.pointerId !== cameraOrbitDragPointerId || !siteSceneCache) {
+            return;
+        }
+        if (cameraOrbitPointerLockActive) {
+            event.preventDefault();
+            return;
+        }
+
+        const deltaX = event.clientX - cameraOrbitDragLastClientX;
+        cameraOrbitDragLastClientX = event.clientX;
+        updateCameraOrbitFromDelta(deltaX);
+        event.preventDefault();
+    });
+
+    renderer.domElement.addEventListener("pointerup", function (event) {
+        if (cameraOrbitDragPointerId == null || event.pointerId !== cameraOrbitDragPointerId) {
+            return;
+        }
+        releaseCameraPointerLock();
+        stopCameraOrbitDrag(event.pointerId);
+    });
+
+    renderer.domElement.addEventListener("pointercancel", function (event) {
+        if (cameraOrbitDragPointerId == null || event.pointerId !== cameraOrbitDragPointerId) {
+            return;
+        }
+        releaseCameraPointerLock();
+        stopCameraOrbitDrag(event.pointerId);
+    });
+
+    renderer.domElement.addEventListener("lostpointercapture", function (event) {
+        if (event.pointerId !== cameraOrbitDragPointerId) {
+            return;
+        }
+        cameraOrbitDragPointerId = null;
+        cameraOrbitDragLastClientX = 0;
+    });
+
+    document.addEventListener("pointerlockchange", function () {
+        cameraOrbitPointerLockActive = isSiteCameraPointerLocked();
+        if (!cameraOrbitPointerLockActive && isSiteCameraOrbitActive()) {
+            cameraOrbitDragLastClientX = 0;
+        }
+    });
+
+    document.addEventListener("mousemove", function (event) {
+        if (!cameraOrbitPointerLockActive || !isSiteCameraOrbitActive()) {
+            return;
+        }
+
+        updateCameraOrbitFromDelta(event.movementX || 0);
+        event.preventDefault();
+    }, true);
+
+    document.addEventListener("mouseup", function (event) {
+        if (!isSiteCameraOrbitActive() || event.button !== cameraOrbitDragButton) {
+            return;
+        }
+
+        releaseCameraPointerLock();
+        stopCameraOrbitDrag();
+        event.preventDefault();
+    }, true);
+
+    window.addEventListener("blur", function () {
+        releaseCameraPointerLock();
+        stopCameraOrbitDrag();
     });
 
     renderer.domElement.addEventListener("click", function (event) {
