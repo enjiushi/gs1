@@ -142,135 +142,117 @@ const char* site_attempt_result_name(Gs1SiteAttemptResult result)
         return "NONE";
     }
 }
-}  // namespace
 
-void SmokeEngineHost::write_json_string(std::string& destination, std::string_view value)
+void append_json_string(std::string& json, std::string_view value)
 {
-    destination.push_back('"');
+    json.push_back('"');
 
     for (const char ch : value)
     {
         switch (ch)
         {
         case '\\':
-            destination += "\\\\";
+            json += "\\\\";
             break;
         case '"':
-            destination += "\\\"";
+            json += "\\\"";
             break;
         case '\n':
-            destination += "\\n";
+            json += "\\n";
             break;
         case '\r':
-            destination += "\\r";
+            json += "\\r";
             break;
         case '\t':
-            destination += "\\t";
+            json += "\\t";
             break;
         case '<':
-            destination += "\\u003c";
+            json += "\\u003c";
             break;
         case '>':
-            destination += "\\u003e";
+            json += "\\u003e";
             break;
         case '&':
-            destination += "\\u0026";
+            json += "\\u0026";
             break;
         default:
-            destination.push_back(ch);
+            json.push_back(ch);
             break;
         }
     }
 
-    destination.push_back('"');
+    json.push_back('"');
 }
 
-std::string SmokeEngineHost::build_live_state_json() const
+void append_optional_app_state_json(std::string& json, const std::optional<Gs1AppState>& value)
 {
-    return build_live_state_json(capture_live_state_snapshot());
+    if (!value.has_value())
+    {
+        json += "null";
+        return;
+    }
+
+    append_json_string(json, app_state_name(value.value()));
 }
 
-std::string SmokeEngineHost::build_live_state_json(const LiveStateSnapshot& live_state)
+void append_optional_u32_json(std::string& json, const std::optional<std::uint32_t>& value)
 {
-    std::string json {};
-    json.reserve(16384);
+    if (!value.has_value())
+    {
+        json += "null";
+        return;
+    }
 
-    auto append_optional_app_state = [&](const std::optional<Gs1AppState>& value) {
-        if (!value.has_value())
-        {
-            json += "null";
-            return;
-        }
+    json += std::to_string(value.value());
+}
 
-        write_json_string(json, app_state_name(value.value()));
-    };
+void append_bool_json(std::string& json, bool value)
+{
+    json += value ? "true" : "false";
+}
 
-    auto append_optional_u32 = [&](const std::optional<std::uint32_t>& value) {
-        if (!value.has_value())
-        {
-            json += "null";
-            return;
-        }
+void append_ui_action_json(std::string& json, const Gs1UiAction& action)
+{
+    json += "{\"type\":";
+    append_json_string(json, ui_action_name(action.type));
+    json += ",\"targetId\":";
+    json += std::to_string(action.target_id);
+    json += ",\"arg0\":";
+    json += std::to_string(action.arg0);
+    json += ",\"arg1\":";
+    json += std::to_string(action.arg1);
+    json += '}';
+}
 
-        json += std::to_string(value.value());
-    };
-
-    auto append_ui_action = [&](const Gs1UiAction& action) {
-        json += "{\"type\":";
-        write_json_string(json, ui_action_name(action.type));
-        json += ",\"targetId\":";
-        json += std::to_string(action.target_id);
-        json += ",\"arg0\":";
-        json += std::to_string(action.arg0);
-        json += ",\"arg1\":";
-        json += std::to_string(action.arg1);
-        json += '}';
-    };
-
-    json += "{\"frameNumber\":";
-    json += std::to_string(live_state.frame_number);
-    json += ",\"appState\":";
-    append_optional_app_state(live_state.current_app_state);
-    json += ",\"selectedSiteId\":";
-    append_optional_u32(live_state.selected_site_id);
-    json += ",\"scriptFailed\":";
-    json += live_state.script_failed ? "true" : "false";
-
-    json += ",\"commandEntries\":[";
-    for (std::size_t index = 0; index < live_state.current_frame_command_entries.size(); ++index)
+void append_command_entries_json(std::string& json, const std::vector<std::string>& entries)
+{
+    json += '[';
+    for (std::size_t index = 0; index < entries.size(); ++index)
     {
         if (index > 0U)
         {
             json.push_back(',');
         }
-        write_json_string(json, live_state.current_frame_command_entries[index]);
+        append_json_string(json, entries[index]);
     }
-    json += "]";
+    json += ']';
+}
 
-    json += ",\"logTail\":[";
-    for (std::size_t index = 0; index < live_state.command_log_tail.size(); ++index)
+void append_ui_setups_json(std::string& json, const std::vector<SmokeEngineHost::ActiveUiSetup>& setups)
+{
+    json += '[';
+    for (std::size_t setup_index = 0; setup_index < setups.size(); ++setup_index)
     {
-        if (index > 0U)
-        {
-            json.push_back(',');
-        }
-        write_json_string(json, live_state.command_log_tail[index]);
-    }
-    json += "]";
-
-    json += ",\"uiSetups\":[";
-    for (std::size_t setup_index = 0; setup_index < live_state.active_ui_setups.size(); ++setup_index)
-    {
-        const auto& setup = live_state.active_ui_setups[setup_index];
+        const auto& setup = setups[setup_index];
         if (setup_index > 0U)
         {
             json.push_back(',');
         }
 
         json += "{\"setupId\":";
-        write_json_string(json, ui_setup_name(setup.setup_id));
+        append_json_string(json, ui_setup_name(setup.setup_id));
         json += ",\"presentationType\":";
-        write_json_string(json, ui_setup_presentation_type_name(setup.presentation_type));
+        append_json_string(json, ui_setup_presentation_type_name(setup.presentation_type));
         json += ",\"contextId\":";
         json += std::to_string(setup.context_id);
         json += ",\"elements\":[";
@@ -286,24 +268,30 @@ std::string SmokeEngineHost::build_live_state_json(const LiveStateSnapshot& live
             json += "{\"elementId\":";
             json += std::to_string(element.element_id);
             json += ",\"elementType\":";
-            write_json_string(json, ui_element_type_name(element.element_type));
+            append_json_string(json, ui_element_type_name(element.element_type));
             json += ",\"flags\":";
             json += std::to_string(element.flags);
             json += ",\"text\":";
-            write_json_string(json, element.text);
+            append_json_string(json, element.text);
             json += ",\"action\":";
-            append_ui_action(element.action);
-            json += "}";
+            append_ui_action_json(json, element.action);
+            json += '}';
         }
 
         json += "]}";
     }
-    json += "]";
+    json += ']';
+}
 
-    json += ",\"regionalMap\":{\"sites\":[";
-    for (std::size_t site_index = 0; site_index < live_state.regional_map_sites.size(); ++site_index)
+void append_regional_map_json(
+    std::string& json,
+    const std::vector<SmokeEngineHost::RegionalMapSiteProjection>& sites,
+    const std::vector<SmokeEngineHost::RegionalMapLinkProjection>& links)
+{
+    json += "{\"sites\":[";
+    for (std::size_t site_index = 0; site_index < sites.size(); ++site_index)
     {
-        const auto& site = live_state.regional_map_sites[site_index];
+        const auto& site = sites[site_index];
         if (site_index > 0U)
         {
             json.push_back(',');
@@ -312,7 +300,7 @@ std::string SmokeEngineHost::build_live_state_json(const LiveStateSnapshot& live
         json += "{\"siteId\":";
         json += std::to_string(site.site_id);
         json += ",\"siteState\":";
-        write_json_string(json, site_state_name(site.site_state));
+        append_json_string(json, site_state_name(site.site_state));
         json += ",\"siteArchetypeId\":";
         json += std::to_string(site.site_archetype_id);
         json += ",\"flags\":";
@@ -325,12 +313,12 @@ std::string SmokeEngineHost::build_live_state_json(const LiveStateSnapshot& live
         json += std::to_string(site.support_package_id);
         json += ",\"supportPreviewMask\":";
         json += std::to_string(site.support_preview_mask);
-        json += "}";
+        json += '}';
     }
     json += "],\"links\":[";
-    for (std::size_t link_index = 0; link_index < live_state.regional_map_links.size(); ++link_index)
+    for (std::size_t link_index = 0; link_index < links.size(); ++link_index)
     {
-        const auto& link = live_state.regional_map_links[link_index];
+        const auto& link = links[link_index];
         if (link_index > 0U)
         {
             json.push_back(',');
@@ -342,204 +330,342 @@ std::string SmokeEngineHost::build_live_state_json(const LiveStateSnapshot& live
         json += std::to_string(link.to_site_id);
         json += ",\"flags\":";
         json += std::to_string(link.flags);
-        json += "}";
+        json += '}';
     }
     json += "]}";
+}
 
-    json += ",\"siteBootstrap\":";
-    if (!live_state.active_site_snapshot.has_value())
+void append_site_bootstrap_json(std::string& json, const std::optional<SmokeEngineHost::SiteSnapshotProjection>& snapshot)
+{
+    if (!snapshot.has_value())
+    {
+        json += "null";
+        return;
+    }
+
+    const auto& site_snapshot = snapshot.value();
+    json += "{\"siteId\":";
+    json += std::to_string(site_snapshot.site_id);
+    json += ",\"siteArchetypeId\":";
+    json += std::to_string(site_snapshot.site_archetype_id);
+    json += ",\"width\":";
+    json += std::to_string(site_snapshot.width);
+    json += ",\"height\":";
+    json += std::to_string(site_snapshot.height);
+    json += ",\"tiles\":[";
+
+    for (std::size_t tile_index = 0; tile_index < site_snapshot.tiles.size(); ++tile_index)
+    {
+        const auto& tile = site_snapshot.tiles[tile_index];
+        if (tile_index > 0U)
+        {
+            json.push_back(',');
+        }
+
+        json += "{\"x\":";
+        json += std::to_string(tile.x);
+        json += ",\"y\":";
+        json += std::to_string(tile.y);
+        json += ",\"terrainTypeId\":";
+        json += std::to_string(tile.terrain_type_id);
+        json += ",\"plantTypeId\":";
+        json += std::to_string(tile.plant_type_id);
+        json += ",\"structureTypeId\":";
+        json += std::to_string(tile.structure_type_id);
+        json += ",\"groundCoverTypeId\":";
+        json += std::to_string(tile.ground_cover_type_id);
+        json += ",\"plantDensity\":";
+        json += std::to_string(tile.plant_density);
+        json += ",\"sandBurial\":";
+        json += std::to_string(tile.sand_burial);
+        json += '}';
+    }
+    json += "]";
+
+    json += ",\"camp\":";
+    if (!site_snapshot.camp.has_value())
     {
         json += "null";
     }
     else
     {
-        const auto& site_snapshot = live_state.active_site_snapshot.value();
-        json += "{\"siteId\":";
-        json += std::to_string(site_snapshot.site_id);
-        json += ",\"siteArchetypeId\":";
-        json += std::to_string(site_snapshot.site_archetype_id);
-        json += ",\"width\":";
-        json += std::to_string(site_snapshot.width);
-        json += ",\"height\":";
-        json += std::to_string(site_snapshot.height);
-        json += ",\"tiles\":[";
-        for (std::size_t tile_index = 0; tile_index < site_snapshot.tiles.size(); ++tile_index)
-        {
-            const auto& tile = site_snapshot.tiles[tile_index];
-            if (tile_index > 0U)
-            {
-                json.push_back(',');
-            }
-
-            json += "{\"x\":";
-            json += std::to_string(tile.x);
-            json += ",\"y\":";
-            json += std::to_string(tile.y);
-            json += ",\"terrainTypeId\":";
-            json += std::to_string(tile.terrain_type_id);
-            json += ",\"plantTypeId\":";
-            json += std::to_string(tile.plant_type_id);
-            json += ",\"structureTypeId\":";
-            json += std::to_string(tile.structure_type_id);
-            json += ",\"groundCoverTypeId\":";
-            json += std::to_string(tile.ground_cover_type_id);
-            json += ",\"plantDensity\":";
-            json += std::to_string(tile.plant_density);
-            json += ",\"sandBurial\":";
-            json += std::to_string(tile.sand_burial);
-            json += "}";
-        }
-        json += "]";
-
-        json += ",\"camp\":";
-        if (!site_snapshot.camp.has_value())
-        {
-            json += "null";
-        }
-        else
-        {
-            const auto& camp = site_snapshot.camp.value();
-            json += "{\"tileX\":";
-            json += std::to_string(camp.tile_x);
-            json += ",\"tileY\":";
-            json += std::to_string(camp.tile_y);
-            json += ",\"durabilityNormalized\":";
-            json += std::to_string(camp.durability_normalized);
-            json += ",\"flags\":";
-            json += std::to_string(camp.flags);
-            json += "}";
-        }
-
-        json += "}";
+        const auto& camp = site_snapshot.camp.value();
+        json += "{\"tileX\":";
+        json += std::to_string(camp.tile_x);
+        json += ",\"tileY\":";
+        json += std::to_string(camp.tile_y);
+        json += ",\"durabilityNormalized\":";
+        json += std::to_string(camp.durability_normalized);
+        json += ",\"flags\":";
+        json += std::to_string(camp.flags);
+        json += '}';
     }
 
-    json += ",\"siteState\":";
-    if (!live_state.active_site_snapshot.has_value())
+    json += '}';
+}
+
+void append_site_state_json(std::string& json, const std::optional<SmokeEngineHost::SiteSnapshotProjection>& snapshot)
+{
+    if (!snapshot.has_value())
+    {
+        json += "null";
+        return;
+    }
+
+    const auto& site_snapshot = snapshot.value();
+    json += "{\"siteId\":";
+    json += std::to_string(site_snapshot.site_id);
+
+    json += ",\"worker\":";
+    if (!site_snapshot.worker.has_value())
     {
         json += "null";
     }
     else
     {
-        const auto& site_snapshot = live_state.active_site_snapshot.value();
-        json += "{\"siteId\":";
-        json += std::to_string(site_snapshot.site_id);
-
-        json += ",\"worker\":";
-        if (!site_snapshot.worker.has_value())
-        {
-            json += "null";
-        }
-        else
-        {
-            const auto& worker = site_snapshot.worker.value();
-            json += "{\"tileX\":";
-            json += std::to_string(worker.tile_x);
-            json += ",\"tileY\":";
-            json += std::to_string(worker.tile_y);
-            json += ",\"facingDegrees\":";
-            json += std::to_string(worker.facing_degrees);
-            json += ",\"healthNormalized\":";
-            json += std::to_string(worker.health_normalized);
-            json += ",\"hydrationNormalized\":";
-            json += std::to_string(worker.hydration_normalized);
-            json += ",\"energyNormalized\":";
-            json += std::to_string(worker.energy_normalized);
-            json += ",\"flags\":";
-            json += std::to_string(worker.flags);
-            json += ",\"currentActionKind\":";
-            json += std::to_string(worker.current_action_kind);
-            json += "}";
-        }
-
-        json += ",\"camp\":";
-        if (!site_snapshot.camp.has_value())
-        {
-            json += "null";
-        }
-        else
-        {
-            const auto& camp = site_snapshot.camp.value();
-            json += "{\"tileX\":";
-            json += std::to_string(camp.tile_x);
-            json += ",\"tileY\":";
-            json += std::to_string(camp.tile_y);
-            json += ",\"durabilityNormalized\":";
-            json += std::to_string(camp.durability_normalized);
-            json += ",\"flags\":";
-            json += std::to_string(camp.flags);
-            json += "}";
-        }
-
-        json += ",\"weather\":";
-        if (!site_snapshot.weather.has_value())
-        {
-            json += "null";
-        }
-        else
-        {
-            const auto& weather = site_snapshot.weather.value();
-            json += "{\"heat\":";
-            json += std::to_string(weather.heat);
-            json += ",\"wind\":";
-            json += std::to_string(weather.wind);
-            json += ",\"dust\":";
-            json += std::to_string(weather.dust);
-            json += ",\"eventTemplateId\":";
-            json += std::to_string(weather.event_template_id);
-            json += ",\"eventPhase\":";
-            write_json_string(json, weather_phase_name(weather.event_phase));
-            json += ",\"phaseMinutesRemaining\":";
-            json += std::to_string(weather.phase_minutes_remaining);
-            json += "}";
-        }
-
-        json += "}";
-    }
-
-    json += ",\"hud\":";
-    if (!live_state.hud_state.has_value())
-    {
-        json += "null";
-    }
-    else
-    {
-        const auto& hud = live_state.hud_state.value();
-        json += "{\"playerHealth\":";
-        json += std::to_string(hud.player_health);
-        json += ",\"playerHydration\":";
-        json += std::to_string(hud.player_hydration);
-        json += ",\"playerEnergy\":";
-        json += std::to_string(hud.player_energy);
-        json += ",\"currentMoney\":";
-        json += std::to_string(hud.current_money);
-        json += ",\"activeTaskCount\":";
-        json += std::to_string(hud.active_task_count);
-        json += ",\"warningCode\":";
-        json += std::to_string(hud.warning_code);
+        const auto& worker = site_snapshot.worker.value();
+        json += "{\"tileX\":";
+        json += std::to_string(worker.tile_x);
+        json += ",\"tileY\":";
+        json += std::to_string(worker.tile_y);
+        json += ",\"facingDegrees\":";
+        json += std::to_string(worker.facing_degrees);
+        json += ",\"healthNormalized\":";
+        json += std::to_string(worker.health_normalized);
+        json += ",\"hydrationNormalized\":";
+        json += std::to_string(worker.hydration_normalized);
+        json += ",\"energyNormalized\":";
+        json += std::to_string(worker.energy_normalized);
+        json += ",\"flags\":";
+        json += std::to_string(worker.flags);
         json += ",\"currentActionKind\":";
-        json += std::to_string(hud.current_action_kind);
-        json += ",\"siteCompletionNormalized\":";
-        json += std::to_string(hud.site_completion_normalized);
-        json += "}";
+        json += std::to_string(worker.current_action_kind);
+        json += '}';
     }
 
-    json += ",\"siteResult\":";
-    if (!live_state.site_result.has_value())
+    json += ",\"camp\":";
+    if (!site_snapshot.camp.has_value())
     {
         json += "null";
     }
     else
     {
-        const auto& site_result = live_state.site_result.value();
-        json += "{\"siteId\":";
-        json += std::to_string(site_result.site_id);
-        json += ",\"result\":";
-        write_json_string(json, site_attempt_result_name(site_result.result));
-        json += ",\"newlyRevealedSiteCount\":";
-        json += std::to_string(site_result.newly_revealed_site_count);
-        json += "}";
+        const auto& camp = site_snapshot.camp.value();
+        json += "{\"tileX\":";
+        json += std::to_string(camp.tile_x);
+        json += ",\"tileY\":";
+        json += std::to_string(camp.tile_y);
+        json += ",\"durabilityNormalized\":";
+        json += std::to_string(camp.durability_normalized);
+        json += ",\"flags\":";
+        json += std::to_string(camp.flags);
+        json += '}';
     }
 
+    json += ",\"weather\":";
+    if (!site_snapshot.weather.has_value())
+    {
+        json += "null";
+    }
+    else
+    {
+        const auto& weather = site_snapshot.weather.value();
+        json += "{\"heat\":";
+        json += std::to_string(weather.heat);
+        json += ",\"wind\":";
+        json += std::to_string(weather.wind);
+        json += ",\"dust\":";
+        json += std::to_string(weather.dust);
+        json += ",\"eventTemplateId\":";
+        json += std::to_string(weather.event_template_id);
+        json += ",\"eventPhase\":";
+        append_json_string(json, weather_phase_name(weather.event_phase));
+        json += ",\"phaseMinutesRemaining\":";
+        json += std::to_string(weather.phase_minutes_remaining);
+        json += '}';
+    }
+
+    json += '}';
+}
+
+void append_hud_json(std::string& json, const std::optional<SmokeEngineHost::HudProjection>& hud_state)
+{
+    if (!hud_state.has_value())
+    {
+        json += "null";
+        return;
+    }
+
+    const auto& hud = hud_state.value();
+    json += "{\"playerHealth\":";
+    json += std::to_string(hud.player_health);
+    json += ",\"playerHydration\":";
+    json += std::to_string(hud.player_hydration);
+    json += ",\"playerEnergy\":";
+    json += std::to_string(hud.player_energy);
+    json += ",\"currentMoney\":";
+    json += std::to_string(hud.current_money);
+    json += ",\"activeTaskCount\":";
+    json += std::to_string(hud.active_task_count);
+    json += ",\"warningCode\":";
+    json += std::to_string(hud.warning_code);
+    json += ",\"currentActionKind\":";
+    json += std::to_string(hud.current_action_kind);
+    json += ",\"siteCompletionNormalized\":";
+    json += std::to_string(hud.site_completion_normalized);
+    json += '}';
+}
+
+void append_site_result_json(std::string& json, const std::optional<SmokeEngineHost::SiteResultProjection>& site_result)
+{
+    if (!site_result.has_value())
+    {
+        json += "null";
+        return;
+    }
+
+    const auto& result = site_result.value();
+    json += "{\"siteId\":";
+    json += std::to_string(result.site_id);
+    json += ",\"result\":";
+    append_json_string(json, site_attempt_result_name(result.result));
+    json += ",\"newlyRevealedSiteCount\":";
+    json += std::to_string(result.newly_revealed_site_count);
+    json += '}';
+}
+
+}  // namespace
+
+void SmokeEngineHost::write_json_string(std::string& destination, std::string_view value)
+{
+    append_json_string(destination, value);
+}
+
+std::string SmokeEngineHost::build_live_state_json() const
+{
+    return build_live_state_json(capture_live_state_snapshot());
+}
+
+std::string SmokeEngineHost::build_live_state_json(const LiveStateSnapshot& live_state)
+{
+    std::string json {};
+    json.reserve(16384);
+
+    json += "{\"frameNumber\":";
+    json += std::to_string(live_state.frame_number);
+    json += ",\"appState\":";
+    append_optional_app_state_json(json, live_state.current_app_state);
+    json += ",\"selectedSiteId\":";
+    append_optional_u32_json(json, live_state.selected_site_id);
+    json += ",\"scriptFailed\":";
+    append_bool_json(json, live_state.script_failed);
+    json += ",\"commandEntries\":";
+    append_command_entries_json(json, live_state.current_frame_command_entries);
+    json += ",\"logTail\":";
+    append_command_entries_json(json, live_state.command_log_tail);
+    json += ",\"uiSetups\":";
+    append_ui_setups_json(json, live_state.active_ui_setups);
+    json += ",\"regionalMap\":";
+    append_regional_map_json(json, live_state.regional_map_sites, live_state.regional_map_links);
+    json += ",\"siteBootstrap\":";
+    append_site_bootstrap_json(json, live_state.active_site_snapshot);
+    json += ",\"siteState\":";
+    append_site_state_json(json, live_state.active_site_snapshot);
+    json += ",\"hud\":";
+    append_hud_json(json, live_state.hud_state);
+    json += ",\"siteResult\":";
+    append_site_result_json(json, live_state.site_result);
     json += "}";
+    return json;
+}
+
+std::string SmokeEngineHost::build_live_state_patch_json(
+    const LiveStateSnapshot& snapshot,
+    std::uint32_t field_mask)
+{
+    std::string json {};
+    json.reserve(4096);
+    json += "{\"frameNumber\":";
+    json += std::to_string(snapshot.frame_number);
+
+    bool has_fields = false;
+    const auto append_field = [&](const char* field_name, auto&& append_value) {
+        if (has_fields)
+        {
+            json += ",\"";
+            json += field_name;
+            json += "\":";
+        }
+        else
+        {
+            json += ",\"";
+            json += field_name;
+            json += "\":";
+            has_fields = true;
+        }
+        append_value(json);
+    };
+
+    if ((field_mask & LiveStatePatchField_AppState) != 0U)
+    {
+        append_field("appState", [&](std::string& destination) {
+            append_optional_app_state_json(destination, snapshot.current_app_state);
+        });
+    }
+    if ((field_mask & LiveStatePatchField_SelectedSiteId) != 0U)
+    {
+        append_field("selectedSiteId", [&](std::string& destination) {
+            append_optional_u32_json(destination, snapshot.selected_site_id);
+        });
+    }
+    if ((field_mask & LiveStatePatchField_ScriptFailed) != 0U)
+    {
+        append_field("scriptFailed", [&](std::string& destination) {
+            append_bool_json(destination, snapshot.script_failed);
+        });
+    }
+    if ((field_mask & LiveStatePatchField_UiSetups) != 0U)
+    {
+        append_field("uiSetups", [&](std::string& destination) {
+            append_ui_setups_json(destination, snapshot.active_ui_setups);
+        });
+    }
+    if ((field_mask & LiveStatePatchField_RegionalMap) != 0U)
+    {
+        append_field("regionalMap", [&](std::string& destination) {
+            append_regional_map_json(destination, snapshot.regional_map_sites, snapshot.regional_map_links);
+        });
+    }
+    if ((field_mask & LiveStatePatchField_SiteBootstrap) != 0U)
+    {
+        append_field("siteBootstrap", [&](std::string& destination) {
+            append_site_bootstrap_json(destination, snapshot.active_site_snapshot);
+        });
+    }
+    if ((field_mask & LiveStatePatchField_SiteState) != 0U)
+    {
+        append_field("siteState", [&](std::string& destination) {
+            append_site_state_json(destination, snapshot.active_site_snapshot);
+        });
+    }
+    if ((field_mask & LiveStatePatchField_Hud) != 0U)
+    {
+        append_field("hud", [&](std::string& destination) {
+            append_hud_json(destination, snapshot.hud_state);
+        });
+    }
+    if ((field_mask & LiveStatePatchField_SiteResult) != 0U)
+    {
+        append_field("siteResult", [&](std::string& destination) {
+            append_site_result_json(destination, snapshot.site_result);
+        });
+    }
+
+    if (!has_fields)
+    {
+        return {};
+    }
+
+    json += '}';
     return json;
 }

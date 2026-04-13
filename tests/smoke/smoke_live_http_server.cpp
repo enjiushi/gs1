@@ -148,6 +148,15 @@ void SmokeLiveHttpServer::stop() noexcept
         listen_socket_ = k_invalid_socket;
     }
 
+    {
+        std::scoped_lock lock {event_clients_mutex_};
+        for (const auto client_socket : event_client_sockets_)
+        {
+            closesocket(static_cast<SOCKET>(client_socket));
+        }
+        event_client_sockets_.clear();
+    }
+
     if (server_thread_.joinable())
     {
         server_thread_.join();
@@ -182,25 +191,28 @@ void SmokeLiveHttpServer::server_loop() noexcept
             continue;
         }
 
-        handle_client(static_cast<std::uintptr_t>(client_socket));
-        closesocket(client_socket);
+        const bool keep_open = handle_client(static_cast<std::uintptr_t>(client_socket));
+        if (!keep_open)
+        {
+            closesocket(client_socket);
+        }
     }
 }
 
-void SmokeLiveHttpServer::handle_client(std::uintptr_t client_socket_value)
+bool SmokeLiveHttpServer::handle_client(std::uintptr_t client_socket_value)
 {
     const SOCKET client_socket = static_cast<SOCKET>(client_socket_value);
     std::string request {};
     if (!read_request(client_socket, request))
     {
-        return;
+        return false;
     }
 
     const auto first_line_end = request.find("\r\n");
     if (first_line_end == std::string::npos)
     {
         send_response(client_socket, 400, "Bad Request", "text/plain; charset=utf-8", "Malformed request.");
-        return;
+        return false;
     }
 
     std::istringstream first_line_stream {request.substr(0, first_line_end)};
@@ -224,7 +236,7 @@ void SmokeLiveHttpServer::handle_client(std::uintptr_t client_socket_value)
         {
             send_response(client_socket, 200, "OK", "text/html; charset=utf-8", html);
         }
-        return;
+        return false;
     }
 
     if (method == "GET" && path == "/viewer.js")
@@ -238,7 +250,7 @@ void SmokeLiveHttpServer::handle_client(std::uintptr_t client_socket_value)
         {
             send_response(client_socket, 200, "OK", "application/javascript; charset=utf-8", script);
         }
-        return;
+        return false;
     }
 
     if (method == "GET" && path == "/assets/main-menu-desert.png")
@@ -252,36 +264,68 @@ void SmokeLiveHttpServer::handle_client(std::uintptr_t client_socket_value)
         {
             send_response(client_socket, 200, "OK", "image/png", image);
         }
-        return;
+        return false;
     }
 
     if (method == "GET" && path == "/state")
     {
         send_response(client_socket, 200, "OK", "application/json; charset=utf-8", state_callback_());
-        return;
+        return false;
+    }
+
+    if (method == "GET" && path == "/events")
+    {
+        std::scoped_lock lock {event_clients_mutex_};
+        if (!send_sse_headers(client_socket_value) ||
+            !send_sse_event(client_socket_value, "full-state", state_callback_()))
+        {
+            return false;
+        }
+
+        event_client_sockets_.push_back(client_socket_value);
+        return true;
     }
 
     if (method == "POST" && path == "/ui-action")
     {
         ui_action_callback_(body);
         send_response(client_socket, 200, "OK", "application/json; charset=utf-8", "{\"ok\":true}");
-        return;
+        return false;
     }
 
     if (method == "POST" && path == "/input")
     {
         input_callback_(body);
         send_response(client_socket, 200, "OK", "application/json; charset=utf-8", "{\"ok\":true}");
-        return;
+        return false;
     }
 
     if (method == "GET" && path == "/health")
     {
         send_response(client_socket, 200, "OK", "application/json; charset=utf-8", "{\"ok\":true}");
-        return;
+        return false;
     }
 
     send_response(client_socket, 404, "Not Found", "text/plain; charset=utf-8", "Unknown endpoint.");
+    return false;
+}
+
+void SmokeLiveHttpServer::publish_event(std::string_view event_name, std::string_view data)
+{
+    std::scoped_lock lock {event_clients_mutex_};
+
+    for (auto it = event_client_sockets_.begin(); it != event_client_sockets_.end();)
+    {
+        if (!send_sse_event(*it, event_name, data))
+        {
+            closesocket(static_cast<SOCKET>(*it));
+            it = event_client_sockets_.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
 }
 
 std::string SmokeLiveHttpServer::load_text_file(const std::filesystem::path& path) const
@@ -297,6 +341,63 @@ std::string SmokeLiveHttpServer::load_text_file(const std::filesystem::path& pat
     return stream.str();
 }
 
+bool SmokeLiveHttpServer::send_all(std::uintptr_t client_socket_value, std::string_view payload)
+{
+    const SOCKET client_socket = static_cast<SOCKET>(client_socket_value);
+    const char* data = payload.data();
+    int remaining = static_cast<int>(payload.size());
+    while (remaining > 0)
+    {
+        const int sent = send(client_socket, data, remaining, 0);
+        if (sent <= 0)
+        {
+            return false;
+        }
+
+        data += sent;
+        remaining -= sent;
+    }
+
+    return true;
+}
+
+bool SmokeLiveHttpServer::send_sse_headers(std::uintptr_t client_socket_value)
+{
+    std::ostringstream response {};
+    response << "HTTP/1.1 200 OK\r\n";
+    response << "Content-Type: text/event-stream\r\n";
+    response << "Cache-Control: no-store\r\n";
+    response << "Connection: keep-alive\r\n";
+    response << "X-Accel-Buffering: no\r\n\r\n";
+    return send_all(client_socket_value, response.str());
+}
+
+bool SmokeLiveHttpServer::send_sse_event(
+    std::uintptr_t client_socket_value,
+    std::string_view event_name,
+    std::string_view data)
+{
+    std::ostringstream response {};
+    response << "event: " << event_name << "\n";
+
+    std::size_t line_start = 0U;
+    while (line_start <= data.size())
+    {
+        const auto line_end = data.find('\n', line_start);
+        response << "data: ";
+        if (line_end == std::string_view::npos)
+        {
+            response << data.substr(line_start) << "\n\n";
+            break;
+        }
+
+        response << data.substr(line_start, line_end - line_start) << "\n";
+        line_start = line_end + 1U;
+    }
+
+    return send_all(client_socket_value, response.str());
+}
+
 void SmokeLiveHttpServer::send_response(
     std::uintptr_t client_socket_value,
     int status_code,
@@ -304,8 +405,6 @@ void SmokeLiveHttpServer::send_response(
     const char* content_type,
     const std::string& body)
 {
-    const SOCKET client_socket = static_cast<SOCKET>(client_socket_value);
-
     std::ostringstream response {};
     response << "HTTP/1.1 " << status_code << ' ' << status_text << "\r\n";
     response << "Content-Type: " << content_type << "\r\n";
@@ -314,18 +413,5 @@ void SmokeLiveHttpServer::send_response(
     response << "Content-Length: " << body.size() << "\r\n\r\n";
     response << body;
 
-    const auto text = response.str();
-    const char* data = text.data();
-    int remaining = static_cast<int>(text.size());
-    while (remaining > 0)
-    {
-        const int sent = send(client_socket, data, remaining, 0);
-        if (sent <= 0)
-        {
-            return;
-        }
-
-        data += sent;
-        remaining -= sent;
-    }
+    (void)send_all(client_socket_value, response.str());
 }

@@ -225,14 +225,21 @@ void run_live_mode(
     {
         const auto frame_start = std::chrono::steady_clock::now();
 
-        Gs1InputSnapshot input_snapshot {};
+        std::vector<std::string> pending_patches {};
         {
             std::scoped_lock lock {session.mutex};
-            input_snapshot = session.input_snapshot;
+            Gs1InputSnapshot input_snapshot = session.input_snapshot;
             input_snapshot.struct_size = sizeof(Gs1InputSnapshot);
             session.host.update(k_frame_delta_seconds, &input_snapshot);
+            pending_patches = session.host.consume_pending_live_state_patches();
+
             session.input_snapshot.buttons_pressed_mask = 0U;
             session.input_snapshot.buttons_released_mask = 0U;
+        }
+
+        for (const auto& patch : pending_patches)
+        {
+            server.publish_event("state-patch", patch);
         }
 
         std::this_thread::sleep_until(frame_start + k_frame_time);

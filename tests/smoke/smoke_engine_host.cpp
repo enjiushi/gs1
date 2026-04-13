@@ -349,6 +349,13 @@ void SmokeEngineHost::queue_ui_action(const Gs1UiAction& action)
     pending_pre_phase1_host_events_.push_back(make_ui_action_event(action));
 }
 
+std::vector<std::string> SmokeEngineHost::consume_pending_live_state_patches()
+{
+    auto patches = std::move(pending_live_state_patches_);
+    pending_live_state_patches_.clear();
+    return patches;
+}
+
 SmokeEngineHost::LiveStateSnapshot SmokeEngineHost::capture_live_state_snapshot() const
 {
     LiveStateSnapshot snapshot {};
@@ -569,6 +576,7 @@ void SmokeEngineHost::flush_engine_commands(const char* stage_label)
     while (api_->pop_engine_command(runtime_, &command) == GS1_STATUS_OK)
     {
         seen_commands_.push_back(command.type);
+        std::uint32_t live_state_patch_mask = LiveStatePatchField_None;
 
         switch (command.type)
         {
@@ -591,6 +599,12 @@ void SmokeEngineHost::flush_engine_commands(const char* stage_label)
             {
                 site_result_.reset();
             }
+            live_state_patch_mask =
+                LiveStatePatchField_AppState |
+                LiveStatePatchField_SiteBootstrap |
+                LiveStatePatchField_SiteState |
+                LiveStatePatchField_Hud |
+                LiveStatePatchField_SiteResult;
             break;
         }
 
@@ -599,15 +613,59 @@ void SmokeEngineHost::flush_engine_commands(const char* stage_label)
             break;
         case GS1_ENGINE_COMMAND_REGIONAL_MAP_SITE_UPSERT:
             apply_regional_map_site_upsert(command);
+            if (pending_regional_map_patch_mask_ != LiveStatePatchField_None)
+            {
+                pending_regional_map_patch_mask_ |=
+                    LiveStatePatchField_RegionalMap |
+                    LiveStatePatchField_SelectedSiteId;
+            }
+            else
+            {
+                live_state_patch_mask =
+                    LiveStatePatchField_RegionalMap |
+                    LiveStatePatchField_SelectedSiteId;
+            }
             break;
         case GS1_ENGINE_COMMAND_REGIONAL_MAP_SITE_REMOVE:
             apply_regional_map_site_remove(command);
+            if (pending_regional_map_patch_mask_ != LiveStatePatchField_None)
+            {
+                pending_regional_map_patch_mask_ |=
+                    LiveStatePatchField_RegionalMap |
+                    LiveStatePatchField_SelectedSiteId;
+            }
+            else
+            {
+                live_state_patch_mask =
+                    LiveStatePatchField_RegionalMap |
+                    LiveStatePatchField_SelectedSiteId;
+            }
             break;
         case GS1_ENGINE_COMMAND_REGIONAL_MAP_LINK_UPSERT:
             apply_regional_map_link_upsert(command);
+            if (pending_regional_map_patch_mask_ != LiveStatePatchField_None)
+            {
+                pending_regional_map_patch_mask_ |= LiveStatePatchField_RegionalMap;
+            }
+            else
+            {
+                live_state_patch_mask = LiveStatePatchField_RegionalMap;
+            }
             break;
         case GS1_ENGINE_COMMAND_REGIONAL_MAP_LINK_REMOVE:
             apply_regional_map_link_remove(command);
+            if (pending_regional_map_patch_mask_ != LiveStatePatchField_None)
+            {
+                pending_regional_map_patch_mask_ |= LiveStatePatchField_RegionalMap;
+            }
+            else
+            {
+                live_state_patch_mask = LiveStatePatchField_RegionalMap;
+            }
+            break;
+        case GS1_ENGINE_COMMAND_END_REGIONAL_MAP_SNAPSHOT:
+            live_state_patch_mask = pending_regional_map_patch_mask_;
+            pending_regional_map_patch_mask_ = LiveStatePatchField_None;
             break;
 
         case GS1_ENGINE_COMMAND_BEGIN_UI_SETUP:
@@ -615,12 +673,14 @@ void SmokeEngineHost::flush_engine_commands(const char* stage_label)
             break;
         case GS1_ENGINE_COMMAND_CLOSE_UI_SETUP:
             apply_ui_setup_close(command);
+            live_state_patch_mask = LiveStatePatchField_UiSetups;
             break;
         case GS1_ENGINE_COMMAND_UI_ELEMENT_UPSERT:
             apply_ui_element_upsert(command);
             break;
         case GS1_ENGINE_COMMAND_END_UI_SETUP:
             apply_ui_setup_end();
+            live_state_patch_mask = LiveStatePatchField_UiSetups;
             break;
 
         case GS1_ENGINE_COMMAND_BEGIN_SITE_SNAPSHOT:
@@ -640,13 +700,17 @@ void SmokeEngineHost::flush_engine_commands(const char* stage_label)
             break;
         case GS1_ENGINE_COMMAND_END_SITE_SNAPSHOT:
             apply_site_snapshot_end();
+            live_state_patch_mask = pending_site_snapshot_patch_mask_;
+            pending_site_snapshot_patch_mask_ = LiveStatePatchField_None;
             break;
 
         case GS1_ENGINE_COMMAND_HUD_STATE:
             apply_hud_state(command);
+            live_state_patch_mask = LiveStatePatchField_Hud;
             break;
         case GS1_ENGINE_COMMAND_SITE_RESULT_READY:
             apply_site_result_ready(command);
+            live_state_patch_mask = LiveStatePatchField_SiteResult;
             break;
 
         default:
@@ -674,6 +738,11 @@ void SmokeEngineHost::flush_engine_commands(const char* stage_label)
 
         command_logs_.push_back(log_entry);
         current_frame_command_entries_.push_back(std::move(log_entry));
+
+        if (live_state_patch_mask != LiveStatePatchField_None)
+        {
+            queue_live_state_patch(live_state_patch_mask);
+        }
     }
 }
 
@@ -826,6 +895,9 @@ void SmokeEngineHost::apply_ui_setup_end()
 void SmokeEngineHost::apply_regional_map_snapshot_begin(const Gs1EngineCommand& command)
 {
     const auto& payload = command.payload_as<Gs1EngineCommandRegionalMapSnapshotData>();
+    pending_regional_map_patch_mask_ =
+        LiveStatePatchField_RegionalMap |
+        LiveStatePatchField_SelectedSiteId;
     if (payload.mode == GS1_PROJECTION_MODE_SNAPSHOT)
     {
         regional_map_sites_.clear();
@@ -898,6 +970,7 @@ void SmokeEngineHost::apply_regional_map_link_remove(const Gs1EngineCommand& com
 void SmokeEngineHost::apply_site_snapshot_begin(const Gs1EngineCommand& command)
 {
     const auto& payload = command.payload_as<Gs1EngineCommandSiteSnapshotData>();
+    pending_site_snapshot_patch_mask_ = LiveStatePatchField_SiteState;
     if (payload.mode == GS1_PROJECTION_MODE_DELTA && active_site_snapshot_.has_value())
     {
         pending_site_snapshot_ = active_site_snapshot_.value();
@@ -914,6 +987,7 @@ void SmokeEngineHost::apply_site_snapshot_begin(const Gs1EngineCommand& command)
 
     if (payload.mode == GS1_PROJECTION_MODE_SNAPSHOT)
     {
+        pending_site_snapshot_patch_mask_ |= LiveStatePatchField_SiteBootstrap;
         pending_site_snapshot_->tiles.clear();
         pending_site_snapshot_->worker.reset();
         pending_site_snapshot_->camp.reset();
@@ -951,6 +1025,8 @@ void SmokeEngineHost::apply_site_tile_upsert(const Gs1EngineCommand& command)
     {
         tiles.push_back(projection);
     }
+
+    pending_site_snapshot_patch_mask_ |= LiveStatePatchField_SiteBootstrap;
 }
 
 void SmokeEngineHost::apply_site_worker_update(const Gs1EngineCommand& command)
@@ -1050,6 +1126,20 @@ void SmokeEngineHost::apply_site_result_ready(const Gs1EngineCommand& command)
     projection.result = payload.result;
     projection.newly_revealed_site_count = payload.newly_revealed_site_count;
     site_result_ = projection;
+}
+
+void SmokeEngineHost::queue_live_state_patch(std::uint32_t field_mask)
+{
+    if (field_mask == LiveStatePatchField_None)
+    {
+        return;
+    }
+
+    const auto patch = build_live_state_patch_json(capture_live_state_snapshot(), field_mask);
+    if (!patch.empty())
+    {
+        pending_live_state_patches_.push_back(patch);
+    }
 }
 
 std::vector<SmokeEngineHost::ActiveUiSetup> SmokeEngineHost::snapshot_active_ui_setups() const

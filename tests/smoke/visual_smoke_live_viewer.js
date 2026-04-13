@@ -19,7 +19,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const contextActions = document.getElementById("context-actions");
 
     let latestState = null;
-    let stateFetchInFlight = false;
+    let stateStream = null;
     let inputSendInFlight = false;
     let mapPickables = [];
     let latestPresentationSignature = "";
@@ -601,7 +601,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 mapPickables.push(plinth);
             }
 
-            if ((site.flags & 1) !== 0) {
+            const isSelected = state.selectedSiteId === site.siteId || (site.flags & 1) !== 0;
+            if (isSelected) {
                 const selectedRing = new THREE_NS.Mesh(
                     new THREE_NS.TorusGeometry(1.04, 0.05, 10, 48),
                     new THREE_NS.MeshStandardMaterial({ color: 0xcfb07a, roughness: 0.72, metalness: 0.18 })
@@ -1258,39 +1259,64 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         renderer.render(scene, camera);
     }
 
-    function fetchState() {
-        if (stateFetchInFlight) {
-            return;
+    function normalizeState(state) {
+        if (!state.uiSetups) {
+            state.uiSetups = [];
+        }
+        if (!state.regionalMap) {
+            state.regionalMap = { sites: [], links: [] };
+        }
+        return state;
+    }
+
+    function mergeStatePatch(patch) {
+        return normalizeState(Object.assign({}, latestState || {}, patch));
+    }
+
+    function handleIncomingState(state, forceRender) {
+        const normalizedState = normalizeState(state);
+        if (forceRender || normalizedState.appState === "SITE_ACTIVE") {
+            if (normalizedState.appState === "SITE_ACTIVE") {
+                latestPresentationSignature = "";
+            } else {
+                latestPresentationSignature = buildPresentationSignature(normalizedState);
+            }
+            renderState(normalizedState);
+        } else {
+            const presentationSignature = buildPresentationSignature(normalizedState);
+            if (presentationSignature !== latestPresentationSignature) {
+                latestPresentationSignature = presentationSignature;
+                renderState(normalizedState);
+            } else {
+                latestState = normalizedState;
+            }
         }
 
-        stateFetchInFlight = true;
-        fetch("/state", { cache: "no-store" })
-            .then((response) => response.json())
-            .then((state) => {
-                if (state.appState === "SITE_ACTIVE") {
-                    latestPresentationSignature = "";
-                    renderState(state);
-                } else {
-                    const presentationSignature = buildPresentationSignature(state);
-                    if (presentationSignature !== latestPresentationSignature) {
-                        latestPresentationSignature = presentationSignature;
-                        renderState(state);
-                    } else {
-                        latestState = state;
-                    }
-                }
-                if (state.appState !== "MAIN_MENU") {
-                    statusChip.textContent =
-                        "Connected\nFrame " + state.frameNumber +
-                        "\nSelected Site: " + (state.selectedSiteId == null ? "none" : state.selectedSiteId);
-                }
-            })
-            .catch(() => {
-                statusChip.textContent = "Waiting for host...";
-            })
-            .finally(() => {
-                stateFetchInFlight = false;
-            });
+        if (normalizedState.appState !== "MAIN_MENU") {
+            statusChip.textContent =
+                "Connected\nFrame " + normalizedState.frameNumber +
+                "\nSelected Site: " + (normalizedState.selectedSiteId == null ? "none" : normalizedState.selectedSiteId);
+        }
+    }
+
+    function connectStateStream() {
+        if (stateStream) {
+            stateStream.close();
+        }
+
+        stateStream = new EventSource("/events");
+        stateStream.addEventListener("full-state", function (event) {
+            const state = normalizeState(JSON.parse(event.data));
+            handleIncomingState(state, true);
+        });
+        stateStream.addEventListener("state-patch", function (event) {
+            const patch = JSON.parse(event.data);
+            const state = mergeStatePatch(patch);
+            handleIncomingState(state, false);
+        });
+        stateStream.onerror = function () {
+            statusChip.textContent = "Waiting for host...";
+        };
     }
 
     function sendInputState() {
@@ -1401,7 +1427,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     fitRenderer();
     animate();
-    fetchState();
-    window.setInterval(fetchState, 16);
+    connectStateStream();
     window.setInterval(sendInputState, 16);
 })();

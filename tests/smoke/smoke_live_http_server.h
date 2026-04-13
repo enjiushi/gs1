@@ -4,8 +4,11 @@
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <mutex>
 #include <string>
+#include <string_view>
 #include <thread>
+#include <vector>
 
 class SmokeLiveHttpServer final
 {
@@ -24,13 +27,20 @@ public:
 
     [[nodiscard]] bool start(std::uint16_t preferred_port = 0U);
     void stop() noexcept;
+    void publish_event(std::string_view event_name, std::string_view data);
 
     [[nodiscard]] std::uint16_t port() const noexcept { return port_; }
 
 private:
     void server_loop() noexcept;
-    void handle_client(std::uintptr_t client_socket);
+    [[nodiscard]] bool handle_client(std::uintptr_t client_socket);
     [[nodiscard]] std::string load_text_file(const std::filesystem::path& path) const;
+    static bool send_all(std::uintptr_t client_socket, std::string_view payload);
+    static bool send_sse_headers(std::uintptr_t client_socket);
+    static bool send_sse_event(
+        std::uintptr_t client_socket,
+        std::string_view event_name,
+        std::string_view data);
     static void send_response(
         std::uintptr_t client_socket,
         int status_code,
@@ -46,5 +56,7 @@ private:
     std::atomic<bool> running_ {false};
     std::uintptr_t listen_socket_ {static_cast<std::uintptr_t>(~0ULL)};
     std::thread server_thread_ {};
+    std::mutex event_clients_mutex_ {};
+    std::vector<std::uintptr_t> event_client_sockets_ {};
     std::uint16_t port_ {0};
 };

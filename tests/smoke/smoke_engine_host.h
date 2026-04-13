@@ -20,6 +20,20 @@ public:
         ActivityOnly = 1
     };
 
+    enum LiveStatePatchField : std::uint32_t
+    {
+        LiveStatePatchField_None = 0U,
+        LiveStatePatchField_AppState = 1U << 0,
+        LiveStatePatchField_SelectedSiteId = 1U << 1,
+        LiveStatePatchField_ScriptFailed = 1U << 2,
+        LiveStatePatchField_UiSetups = 1U << 3,
+        LiveStatePatchField_RegionalMap = 1U << 4,
+        LiveStatePatchField_SiteBootstrap = 1U << 5,
+        LiveStatePatchField_SiteState = 1U << 6,
+        LiveStatePatchField_Hud = 1U << 7,
+        LiveStatePatchField_SiteResult = 1U << 8
+    };
+
     struct LiveStateSnapshot;
 
 public:
@@ -32,8 +46,12 @@ public:
     void update(double delta_seconds);
     void update(double delta_seconds, const Gs1InputSnapshot* input_override);
     void queue_ui_action(const Gs1UiAction& action);
+    [[nodiscard]] std::vector<std::string> consume_pending_live_state_patches();
     [[nodiscard]] LiveStateSnapshot capture_live_state_snapshot() const;
     [[nodiscard]] static std::string build_live_state_json(const LiveStateSnapshot& snapshot);
+    [[nodiscard]] static std::string build_live_state_patch_json(
+        const LiveStateSnapshot& snapshot,
+        std::uint32_t field_mask);
     [[nodiscard]] std::string build_live_state_json() const;
 
     [[nodiscard]] bool has_inflight_script_directive() const noexcept
@@ -222,6 +240,7 @@ private:
     void apply_site_snapshot_end();
     void apply_hud_state(const Gs1EngineCommand& command);
     void apply_site_result_ready(const Gs1EngineCommand& command);
+    void queue_live_state_patch(std::uint32_t field_mask);
     static void write_json_string(std::string& destination, std::string_view value);
     [[nodiscard]] std::vector<ActiveUiSetup> snapshot_active_ui_setups() const;
     [[nodiscard]] std::vector<RegionalMapSiteProjection> snapshot_regional_map_sites() const;
@@ -241,12 +260,15 @@ private:
     std::vector<Gs1FeedbackEvent> pending_feedback_events_ {};
     std::vector<std::string> command_logs_ {};
     std::vector<std::string> current_frame_command_entries_ {};
+    std::vector<std::string> pending_live_state_patches_ {};
     std::vector<Gs1EngineCommandType> seen_commands_ {};
     std::map<Gs1UiSetupId, ActiveUiSetup> active_ui_setups_ {};
     std::optional<PendingUiSetup> pending_ui_setup_ {};
     std::map<std::uint32_t, RegionalMapSiteProjection> regional_map_sites_ {};
     std::map<std::uint64_t, RegionalMapLinkProjection> regional_map_links_ {};
+    std::uint32_t pending_regional_map_patch_mask_ {0U};
     std::optional<SiteSnapshotProjection> pending_site_snapshot_ {};
+    std::uint32_t pending_site_snapshot_patch_mask_ {0U};
     std::optional<SiteSnapshotProjection> active_site_snapshot_ {};
     std::optional<HudProjection> hud_state_ {};
     std::optional<SiteResultProjection> site_result_ {};
