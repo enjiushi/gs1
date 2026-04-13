@@ -2,11 +2,25 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
+#include <new>
 #include <type_traits>
 
 struct Gs1RuntimeHandle;
 
-enum Gs1LogLevel : std::uint32_t
+inline constexpr std::size_t GS1_COMMAND_CACHE_LINE_SIZE = 64U;
+inline constexpr std::size_t GS1_COMMAND_PAYLOAD_BYTE_COUNT = GS1_COMMAND_CACHE_LINE_SIZE - sizeof(std::uint8_t);
+
+#define GS1_ASSERT_TRIVIAL_SCHEMA(Type) \
+    static_assert(std::is_standard_layout_v<Type>, #Type " must remain standard layout."); \
+    static_assert(std::is_trivial_v<Type>, #Type " must remain trivial."); \
+    static_assert(std::is_trivially_copyable_v<Type>, #Type " must remain trivially copyable.")
+
+#define GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Type, ExpectedSize) \
+    GS1_ASSERT_TRIVIAL_SCHEMA(Type); \
+    static_assert(sizeof(Type) == (ExpectedSize), #Type " size changed; revisit transport packing.")
+
+enum Gs1LogLevel : std::uint8_t
 {
     GS1_LOG_LEVEL_DEBUG = 0,
     GS1_LOG_LEVEL_INFO = 1,
@@ -14,7 +28,7 @@ enum Gs1LogLevel : std::uint32_t
     GS1_LOG_LEVEL_ERROR = 3
 };
 
-enum Gs1AppState : std::uint32_t
+enum Gs1AppState : std::uint8_t
 {
     GS1_APP_STATE_BOOT = 0,
     GS1_APP_STATE_MAIN_MENU = 1,
@@ -27,20 +41,20 @@ enum Gs1AppState : std::uint32_t
     GS1_APP_STATE_CAMPAIGN_END = 8
 };
 
-enum Gs1SiteState : std::uint32_t
+enum Gs1SiteState : std::uint8_t
 {
     GS1_SITE_STATE_LOCKED = 0,
     GS1_SITE_STATE_AVAILABLE = 1,
     GS1_SITE_STATE_COMPLETED = 2
 };
 
-enum Gs1HostEventType : std::uint32_t
+enum Gs1HostEventType : std::uint8_t
 {
     GS1_HOST_EVENT_NONE = 0,
     GS1_HOST_EVENT_UI_ACTION = 1
 };
 
-enum Gs1UiSetupId : std::uint32_t
+enum Gs1UiSetupId : std::uint8_t
 {
     GS1_UI_SETUP_NONE = 0,
     GS1_UI_SETUP_MAIN_MENU = 1,
@@ -48,14 +62,14 @@ enum Gs1UiSetupId : std::uint32_t
     GS1_UI_SETUP_SITE_RESULT = 3
 };
 
-enum Gs1UiElementType : std::uint32_t
+enum Gs1UiElementType : std::uint8_t
 {
     GS1_UI_ELEMENT_NONE = 0,
     GS1_UI_ELEMENT_BUTTON = 1,
     GS1_UI_ELEMENT_LABEL = 2
 };
 
-enum Gs1UiElementFlags : std::uint32_t
+enum Gs1UiElementFlags : std::uint8_t
 {
     GS1_UI_ELEMENT_FLAG_NONE = 0,
     GS1_UI_ELEMENT_FLAG_PRIMARY = 1u << 0,
@@ -63,14 +77,14 @@ enum Gs1UiElementFlags : std::uint32_t
     GS1_UI_ELEMENT_FLAG_BACKGROUND_CLICK = 1u << 2
 };
 
-enum Gs1UiSetupPresentationType : std::uint32_t
+enum Gs1UiSetupPresentationType : std::uint8_t
 {
     GS1_UI_SETUP_PRESENTATION_NONE = 0,
     GS1_UI_SETUP_PRESENTATION_NORMAL = 1,
     GS1_UI_SETUP_PRESENTATION_OVERLAY = 2
 };
 
-enum Gs1UiActionType : std::uint32_t
+enum Gs1UiActionType : std::uint8_t
 {
     GS1_UI_ACTION_NONE = 0,
     GS1_UI_ACTION_START_NEW_CAMPAIGN = 1,
@@ -80,7 +94,7 @@ enum Gs1UiActionType : std::uint32_t
     GS1_UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION = 5
 };
 
-enum Gs1FeedbackEventType : std::uint32_t
+enum Gs1FeedbackEventType : std::uint8_t
 {
     GS1_FEEDBACK_EVENT_NONE = 0,
     GS1_FEEDBACK_EVENT_PHYSICS_CONTACT = 1,
@@ -88,7 +102,7 @@ enum Gs1FeedbackEventType : std::uint32_t
     GS1_FEEDBACK_EVENT_ANIMATION_NOTIFY = 3
 };
 
-enum Gs1ProjectionMode : std::uint32_t
+enum Gs1ProjectionMode : std::uint8_t
 {
     GS1_PROJECTION_MODE_SNAPSHOT = 0,
     GS1_PROJECTION_MODE_DELTA = 1
@@ -107,7 +121,7 @@ enum Gs1PresentationDirtyFlags : std::uint32_t
     GS1_PRESENTATION_DIRTY_ALL = 0xffffffffu
 };
 
-enum Gs1WeatherEventPhase : std::uint32_t
+enum Gs1WeatherEventPhase : std::uint8_t
 {
     GS1_WEATHER_EVENT_PHASE_NONE = 0,
     GS1_WEATHER_EVENT_PHASE_WARNING = 1,
@@ -117,20 +131,20 @@ enum Gs1WeatherEventPhase : std::uint32_t
     GS1_WEATHER_EVENT_PHASE_AFTERMATH = 5
 };
 
-enum Gs1TaskPresentationListKind : std::uint32_t
+enum Gs1TaskPresentationListKind : std::uint8_t
 {
     GS1_TASK_PRESENTATION_LIST_VISIBLE = 0,
     GS1_TASK_PRESENTATION_LIST_ACCEPTED = 1,
     GS1_TASK_PRESENTATION_LIST_COMPLETED = 2
 };
 
-enum Gs1InventoryContainerKind : std::uint32_t
+enum Gs1InventoryContainerKind : std::uint8_t
 {
     GS1_INVENTORY_CONTAINER_WORKER_PACK = 0,
     GS1_INVENTORY_CONTAINER_CAMP_STORAGE = 1
 };
 
-enum Gs1PhoneListingPresentationKind : std::uint32_t
+enum Gs1PhoneListingPresentationKind : std::uint8_t
 {
     GS1_PHONE_LISTING_PRESENTATION_BUY_ITEM = 0,
     GS1_PHONE_LISTING_PRESENTATION_SELL_ITEM = 1,
@@ -138,7 +152,7 @@ enum Gs1PhoneListingPresentationKind : std::uint32_t
     GS1_PHONE_LISTING_PRESENTATION_PURCHASE_UNLOCKABLE = 3
 };
 
-enum Gs1NotificationKind : std::uint32_t
+enum Gs1NotificationKind : std::uint8_t
 {
     GS1_NOTIFICATION_KIND_INFO = 0,
     GS1_NOTIFICATION_KIND_WARNING = 1,
@@ -147,7 +161,7 @@ enum Gs1NotificationKind : std::uint32_t
     GS1_NOTIFICATION_KIND_SITE_RESULT = 4
 };
 
-enum Gs1OneShotCueKind : std::uint32_t
+enum Gs1OneShotCueKind : std::uint8_t
 {
     GS1_ONE_SHOT_CUE_NONE = 0,
     GS1_ONE_SHOT_CUE_ACTION_COMPLETED = 1,
@@ -157,14 +171,14 @@ enum Gs1OneShotCueKind : std::uint32_t
     GS1_ONE_SHOT_CUE_SITE_FAILED = 5
 };
 
-enum Gs1SiteAttemptResult : std::uint32_t
+enum Gs1SiteAttemptResult : std::uint8_t
 {
     GS1_SITE_ATTEMPT_RESULT_NONE = 0,
     GS1_SITE_ATTEMPT_RESULT_COMPLETED = 1,
     GS1_SITE_ATTEMPT_RESULT_FAILED = 2
 };
 
-enum Gs1EngineCommandType : std::uint32_t
+enum Gs1EngineCommandType : std::uint8_t
 {
     GS1_ENGINE_COMMAND_NONE = 0,
     GS1_ENGINE_COMMAND_LOG_TEXT = 1,
@@ -210,7 +224,6 @@ struct Gs1RuntimeCreateDesc
 
 struct Gs1InputSnapshot
 {
-    std::uint32_t struct_size;
     std::uint64_t frame_number;
     float move_x;
     float move_y;
@@ -219,6 +232,7 @@ struct Gs1InputSnapshot
     std::uint32_t buttons_down_mask;
     std::uint32_t buttons_pressed_mask;
     std::uint32_t buttons_released_mask;
+    std::uint32_t struct_size;
 };
 
 struct Gs1UiAction
@@ -248,7 +262,6 @@ union Gs1HostEventPayload
 
 struct Gs1HostEvent
 {
-    std::uint32_t struct_size;
     Gs1HostEventType type;
     Gs1HostEventPayload payload;
 };
@@ -263,7 +276,6 @@ struct Gs1FeedbackEventData
 
 struct Gs1FeedbackEvent
 {
-    std::uint32_t struct_size;
     Gs1FeedbackEventType type;
     Gs1FeedbackEventData data;
 };
@@ -300,15 +312,12 @@ struct Gs1Phase2Result
 struct Gs1EngineCommandLogTextData
 {
     Gs1LogLevel level;
-    std::uint32_t reserved;
-    char text[120];
+    char text[62];
 };
 
 struct Gs1EngineCommandSetAppStateData
 {
     Gs1AppState app_state;
-    std::uint32_t reserved0;
-    std::uint64_t frame_ordinal;
 };
 
 struct Gs1EngineCommandPresentationDirtyData
@@ -329,57 +338,53 @@ struct Gs1EngineCommandRegionalMapSnapshotData
 struct Gs1EngineCommandRegionalMapSiteData
 {
     std::uint32_t site_id;
-    Gs1SiteState site_state;
     std::uint32_t site_archetype_id;
-    std::uint32_t flags;
     std::int32_t map_x;
     std::int32_t map_y;
     std::uint32_t support_package_id;
-    std::uint32_t support_preview_mask;
+    std::uint16_t support_preview_mask;
+    Gs1SiteState site_state;
+    std::uint8_t flags;
 };
 
 struct Gs1EngineCommandRegionalMapLinkData
 {
     std::uint32_t from_site_id;
     std::uint32_t to_site_id;
-    std::uint32_t flags;
-    std::uint32_t reserved;
+    std::uint8_t flags;
 };
 
 struct Gs1EngineCommandUiSetupData
 {
+    std::uint32_t context_id;
+    std::uint16_t element_count;
     Gs1UiSetupId setup_id;
     Gs1ProjectionMode mode;
     Gs1UiSetupPresentationType presentation_type;
-    std::uint32_t element_count;
-    std::uint32_t context_id;
 };
 
 struct Gs1EngineCommandCloseUiSetupData
 {
     Gs1UiSetupId setup_id;
     Gs1UiSetupPresentationType presentation_type;
-    std::uint32_t reserved0;
-    std::uint32_t reserved1;
 };
 
 struct Gs1EngineCommandUiElementData
 {
+    Gs1UiAction action;
     std::uint32_t element_id;
     Gs1UiElementType element_type;
-    std::uint32_t flags;
-    std::uint32_t reserved0;
-    Gs1UiAction action;
-    char text[64];
+    std::uint8_t flags;
+    char text[26];
 };
 
 struct Gs1EngineCommandSiteSnapshotData
 {
-    Gs1ProjectionMode mode;
     std::uint32_t site_id;
     std::uint32_t site_archetype_id;
-    std::uint32_t width;
-    std::uint32_t height;
+    std::uint16_t width;
+    std::uint16_t height;
+    Gs1ProjectionMode mode;
 };
 
 struct Gs1EngineCommandSiteTileData
@@ -402,8 +407,8 @@ struct Gs1EngineCommandWorkerData
     float health_normalized;
     float hydration_normalized;
     float energy_normalized;
-    std::uint32_t flags;
-    std::uint32_t current_action_kind;
+    std::uint8_t flags;
+    std::uint8_t current_action_kind;
 };
 
 struct Gs1EngineCommandCampData
@@ -411,7 +416,7 @@ struct Gs1EngineCommandCampData
     std::int32_t tile_x;
     std::int32_t tile_y;
     float durability_normalized;
-    std::uint32_t flags;
+    std::uint8_t flags;
 };
 
 struct Gs1EngineCommandWeatherData
@@ -422,41 +427,39 @@ struct Gs1EngineCommandWeatherData
     std::uint32_t event_template_id;
     Gs1WeatherEventPhase event_phase;
     float phase_minutes_remaining;
-    std::uint32_t reserved;
 };
 
 struct Gs1EngineCommandInventorySlotData
 {
-    Gs1InventoryContainerKind container_kind;
-    std::uint32_t slot_index;
     std::uint32_t item_id;
-    std::uint32_t quantity;
     float condition;
     float freshness;
-    std::uint32_t flags;
-    std::uint32_t reserved;
+    std::uint16_t quantity;
+    std::uint16_t slot_index;
+    Gs1InventoryContainerKind container_kind;
+    std::uint8_t flags;
 };
 
 struct Gs1EngineCommandTaskData
 {
     std::uint32_t task_instance_id;
     std::uint32_t task_template_id;
-    Gs1TaskPresentationListKind list_kind;
-    std::uint32_t current_progress;
-    std::uint32_t target_progress;
     std::uint32_t publisher_faction_id;
-    std::uint32_t flags;
+    std::uint16_t current_progress;
+    std::uint16_t target_progress;
+    Gs1TaskPresentationListKind list_kind;
+    std::uint8_t flags;
 };
 
 struct Gs1EngineCommandPhoneListingData
 {
     std::uint32_t listing_id;
-    Gs1PhoneListingPresentationKind listing_kind;
     std::uint32_t item_or_unlockable_id;
     std::int32_t price;
-    std::uint32_t quantity;
-    std::uint32_t flags;
     std::uint32_t related_site_id;
+    std::uint16_t quantity;
+    Gs1PhoneListingPresentationKind listing_kind;
+    std::uint8_t flags;
 };
 
 struct Gs1EngineCommandHudStateData
@@ -465,101 +468,148 @@ struct Gs1EngineCommandHudStateData
     float player_hydration;
     float player_energy;
     std::int32_t current_money;
-    std::uint32_t active_task_count;
-    std::uint32_t warning_code;
-    std::uint32_t current_action_kind;
     float site_completion_normalized;
+    std::uint16_t active_task_count;
+    std::uint16_t warning_code;
+    std::uint8_t current_action_kind;
 };
 
 struct Gs1EngineCommandNotificationData
 {
-    Gs1NotificationKind kind;
     std::uint32_t notification_code;
     std::uint32_t subject_id;
     std::uint32_t arg0;
     std::uint32_t arg1;
-    char text[96];
+    Gs1NotificationKind kind;
+    char text[39];
 };
 
 struct Gs1EngineCommandSiteResultData
 {
     std::uint32_t site_id;
     Gs1SiteAttemptResult result;
-    std::uint32_t newly_revealed_site_count;
-    std::uint32_t reserved;
+    std::uint16_t newly_revealed_site_count;
 };
 
 struct Gs1EngineCommandOneShotCueData
 {
-    Gs1OneShotCueKind cue_kind;
     std::uint32_t subject_id;
     float world_x;
     float world_y;
     std::uint32_t arg0;
     std::uint32_t arg1;
+    Gs1OneShotCueKind cue_kind;
 };
 
-struct Gs1EngineCommandPayload
+struct alignas(GS1_COMMAND_CACHE_LINE_SIZE) Gs1EngineCommand
 {
-    static constexpr std::size_t raw_u32_count = 32U;
-    static constexpr std::size_t byte_count = sizeof(std::uint32_t) * raw_u32_count;
-    static constexpr std::size_t payload_alignment = alignof(std::uint64_t);
-
-    alignas(std::uint64_t) unsigned char raw_bytes[byte_count];
-
-    [[nodiscard]] void* data() noexcept { return raw_bytes; }
-    [[nodiscard]] const void* data() const noexcept { return raw_bytes; }
+    unsigned char payload[GS1_COMMAND_PAYLOAD_BYTE_COUNT];
+    Gs1EngineCommandType type;
 
     template <typename PayloadData>
-    [[nodiscard]] PayloadData& as() noexcept
+    [[nodiscard]] PayloadData& emplace_payload() noexcept
     {
         validate_payload_type<PayloadData>();
-        return *static_cast<PayloadData*>(data());
+        auto* ptr = std::construct_at(reinterpret_cast<PayloadData*>(payload), PayloadData {});
+        return *std::launder(ptr);
     }
 
     template <typename PayloadData>
-    [[nodiscard]] const PayloadData& as() const noexcept
+    [[nodiscard]] PayloadData& emplace_payload(const PayloadData& value) noexcept
     {
         validate_payload_type<PayloadData>();
-        return *static_cast<const PayloadData*>(data());
+        auto* ptr = std::construct_at(reinterpret_cast<PayloadData*>(payload), value);
+        return *std::launder(ptr);
+    }
+
+    template <typename PayloadData>
+    [[nodiscard]] PayloadData& payload_as() noexcept
+    {
+        validate_payload_type<PayloadData>();
+        return *std::launder(reinterpret_cast<PayloadData*>(payload));
+    }
+
+    template <typename PayloadData>
+    [[nodiscard]] const PayloadData& payload_as() const noexcept
+    {
+        validate_payload_type<PayloadData>();
+        return *std::launder(reinterpret_cast<const PayloadData*>(payload));
     }
 
 private:
     template <typename PayloadData>
     static constexpr void validate_payload_type() noexcept
     {
-        static_assert(
-            std::is_trivial_v<PayloadData> && std::is_standard_layout_v<PayloadData>,
-            "Engine command payload data must stay POD-like.");
-        static_assert(sizeof(PayloadData) <= byte_count, "Engine command payload data exceeds the raw payload size.");
-        static_assert(
-            alignof(PayloadData) <= payload_alignment,
-            "Engine command payload data requires stronger alignment than the raw payload storage.");
+        GS1_ASSERT_TRIVIAL_SCHEMA(PayloadData);
+        static_assert(sizeof(PayloadData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT, "Engine command payload data exceeds command payload storage.");
+        static_assert(alignof(PayloadData) <= alignof(Gs1EngineCommand), "Engine command payload data requires stronger alignment than Gs1EngineCommand.");
     }
 };
 
-static_assert(
-    sizeof(Gs1EngineCommandPayload) == Gs1EngineCommandPayload::byte_count,
-    "Engine command payload storage must stay exactly 32 uint32 words.");
-static_assert(
-    alignof(Gs1EngineCommandPayload) == Gs1EngineCommandPayload::payload_alignment,
-    "Engine command payload alignment changed.");
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1RuntimeCreateDesc, 16U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1InputSnapshot, 40U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1UiAction, 24U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventUiActionData, 24U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventEmptyData, 16U);
+static_assert(std::is_standard_layout_v<Gs1HostEventPayload>, "Gs1HostEventPayload must remain standard layout.");
+static_assert(std::is_trivial_v<Gs1HostEventPayload>, "Gs1HostEventPayload must remain trivial.");
+static_assert(std::is_trivially_copyable_v<Gs1HostEventPayload>, "Gs1HostEventPayload must remain trivially copyable.");
+static_assert(sizeof(Gs1HostEventPayload) == 24U, "Gs1HostEventPayload size changed; revisit event packing.");
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEvent, 32U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1FeedbackEventData, 16U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1FeedbackEvent, 20U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1Phase1Request, 24U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1Phase1Result, 16U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1Phase2Request, 4U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1Phase2Result, 20U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandLogTextData, 63U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandSetAppStateData, 1U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandPresentationDirtyData, 16U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandRegionalMapSnapshotData, 16U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandRegionalMapSiteData, 24U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandRegionalMapLinkData, 12U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandUiSetupData, 12U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandCloseUiSetupData, 2U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandUiElementData, 56U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandSiteSnapshotData, 16U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandSiteTileData, 32U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandWorkerData, 28U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandCampData, 16U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandWeatherData, 24U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandInventorySlotData, 20U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandTaskData, 20U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandPhoneListingData, 20U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandHudStateData, 28U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandNotificationData, 56U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandSiteResultData, 8U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandOneShotCueData, 24U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommand, 64U);
 
-struct Gs1EngineCommand
-{
-    std::uint32_t struct_size;
-    Gs1EngineCommandType type;
-    Gs1EngineCommandPayload payload;
+static_assert(sizeof(Gs1EngineCommandLogTextData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineCommandSetAppStateData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineCommandPresentationDirtyData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineCommandRegionalMapSnapshotData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineCommandRegionalMapSiteData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineCommandRegionalMapLinkData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineCommandUiSetupData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineCommandCloseUiSetupData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineCommandUiElementData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineCommandSiteSnapshotData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineCommandSiteTileData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineCommandWorkerData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineCommandCampData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineCommandWeatherData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineCommandInventorySlotData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineCommandTaskData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineCommandPhoneListingData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineCommandHudStateData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineCommandNotificationData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineCommandSiteResultData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineCommandOneShotCueData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineCommand) == GS1_COMMAND_CACHE_LINE_SIZE, "Gs1EngineCommand must fit exactly one cache line.");
+static_assert(alignof(Gs1EngineCommand) == GS1_COMMAND_CACHE_LINE_SIZE, "Gs1EngineCommand must be cache-line aligned.");
+static_assert(offsetof(Gs1EngineCommand, payload) == 0U, "Gs1EngineCommand payload must start at byte zero.");
+static_assert(offsetof(Gs1EngineCommand, type) == GS1_COMMAND_PAYLOAD_BYTE_COUNT, "Gs1EngineCommand type must sit at the tail byte.");
 
-    template <typename PayloadData>
-    [[nodiscard]] PayloadData& payload_as() noexcept
-    {
-        return payload.as<PayloadData>();
-    }
-
-    template <typename PayloadData>
-    [[nodiscard]] const PayloadData& payload_as() const noexcept
-    {
-        return payload.as<PayloadData>();
-    }
-};
+#undef GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT
+#undef GS1_ASSERT_TRIVIAL_SCHEMA

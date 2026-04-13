@@ -54,7 +54,7 @@ GameCommand make_start_campaign_command()
 {
     GameCommand command {};
     command.type = GameCommandType::StartNewCampaign;
-    command.payload = StartNewCampaignCommand {42ULL, 30U};
+    command.set_payload(StartNewCampaignCommand {42ULL, 30U});
     return command;
 }
 
@@ -62,7 +62,7 @@ GameCommand make_start_site_attempt_command(std::uint32_t site_id)
 {
     GameCommand command {};
     command.type = GameCommandType::StartSiteAttempt;
-    command.payload = StartSiteAttemptCommand {SiteId {site_id}};
+    command.set_payload(StartSiteAttemptCommand {site_id});
     return command;
 }
 

@@ -1289,7 +1289,6 @@ std::string SmokeEngineHost::describe_command(const Gs1EngineCommand& command)
 Gs1HostEvent SmokeEngineHost::make_ui_action_event(const Gs1UiAction& action) noexcept
 {
     Gs1HostEvent event {};
-    event.struct_size = sizeof(Gs1HostEvent);
     event.type = GS1_HOST_EVENT_UI_ACTION;
     event.payload.ui_action.action = action;
     return event;
