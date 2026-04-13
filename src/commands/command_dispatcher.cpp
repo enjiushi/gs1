@@ -11,11 +11,13 @@ Gs1Status CommandDispatcher::dispatch_all(GameRuntime& runtime)
         const auto command = runtime.command_queue().front();
         runtime.command_queue().pop_front();
 
-        const auto status = runtime.handle_command(command);
+        const auto status = runtime.dispatch_subscribed_command(command);
         if (status != GS1_STATUS_OK)
         {
             return status;
         }
+
+        runtime.sync_after_processed_command(command);
     }
 
     return GS1_STATUS_OK;

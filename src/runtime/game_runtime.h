@@ -6,14 +6,18 @@
 #include "gs1/status.h"
 #include "gs1/types.h"
 
+#include <array>
+#include <cstdint>
 #include <deque>
 #include <map>
 #include <optional>
+#include <vector>
 
 namespace gs1
 {
 inline constexpr std::uint32_t k_api_version = 2;
 inline constexpr double k_default_fixed_step_seconds = 0.25;
+inline constexpr std::size_t k_feedback_event_type_count = 4U;
 
 class GameRuntime final
 {
@@ -34,6 +38,7 @@ public:
     [[nodiscard]] Gs1Status handle_command(const GameCommand& command);
 
     friend struct GameRuntimeProjectionTestAccess;
+    friend class CommandDispatcher;
 
 private:
     enum class HostEventDispatchStage : std::uint8_t
@@ -50,6 +55,21 @@ private:
         bool present {false};
     };
 
+    enum class CommandSubscriberId : std::uint8_t
+    {
+        CampaignFlow = 0,
+        LoadoutPlanner = 1
+    };
+
+    enum class FeedbackEventSubscriberId : std::uint8_t
+    {
+        Reserved = 0
+    };
+
+    using CommandSubscriberList = std::vector<CommandSubscriberId>;
+    using FeedbackEventSubscriberList = std::vector<FeedbackEventSubscriberId>;
+
+    void initialize_subscription_tables();
     void queue_log_command(const char* message);
     void queue_app_state_command(Gs1AppState app_state);
     void queue_ui_setup_begin_command(
@@ -94,16 +114,16 @@ private:
     void mark_site_tile_projection_dirty(TileCoord coord) noexcept;
     void clear_pending_site_tile_projection_updates() noexcept;
     void flush_site_presentation_if_dirty();
-    void update_worker_movement_for_fixed_step();
     [[nodiscard]] Gs1Status translate_ui_action_to_command(const Gs1UiAction& action, GameCommand& out_command) const;
     [[nodiscard]] Gs1Status dispatch_host_events(
         HostEventDispatchStage stage,
         std::uint32_t& out_processed_count);
     [[nodiscard]] Gs1Status dispatch_feedback_events(std::uint32_t& out_processed_count);
     [[nodiscard]] Gs1Status dispatch_queued_commands();
-    void rebuild_regional_map_caches();
+    [[nodiscard]] Gs1Status dispatch_subscribed_command(const GameCommand& command);
+    [[nodiscard]] Gs1Status dispatch_subscribed_feedback_event(const Gs1FeedbackEvent& event);
+    void sync_after_processed_command(const GameCommand& command);
     void run_fixed_step();
-    std::optional<SiteMetaState*> find_site_mut(std::uint32_t site_id);
 
 private:
     Gs1RuntimeCreateDesc create_desc_ {};
@@ -115,6 +135,8 @@ private:
     std::deque<Gs1HostEvent> host_events_ {};
     std::deque<Gs1FeedbackEvent> feedback_events_ {};
     GameCommandQueue command_queue_ {};
+    std::array<CommandSubscriberList, k_game_command_type_count> command_subscribers_ {};
+    std::array<FeedbackEventSubscriberList, k_feedback_event_type_count> feedback_event_subscribers_ {};
     std::deque<Gs1EngineCommand> engine_commands_ {};
     std::map<Gs1UiSetupId, Gs1UiSetupPresentationType> active_ui_setups_ {};
     std::optional<Gs1UiSetupId> active_normal_ui_setup_ {};

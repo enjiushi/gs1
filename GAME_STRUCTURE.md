@@ -41,6 +41,15 @@ All cross-system interaction is done through:
 
 - commands for intents, actions, and cross-ownership requests
 - translated feedback events for execution observations that re-enter from the engine adapter
+- commands describe gameplay meaning published by a producer, not a private RPC addressed to one named consumer
+- a producer must not encode or assume which systems will listen to a command, or how many listeners there will be
+- zero, one, or many systems may consume the same command if that command's meaning matters to their owned behavior
+- command-schema changes are shared-contract changes and should be kept stable unless the gameplay meaning itself truly changes
+- the command queue should dispatch a command only to systems that explicitly subscribe to that command type
+- systems that do not subscribe to a command type must not process it
+- there is no internal gameplay-event queue; internal cross-system gameplay communication uses commands
+- translated feedback-event queues should use the same enum-indexed subscriber-list dispatch pattern as commands
+- systems should coordinate through subscribed command consumption, translated feedback-event consumption, and owned-state observation only, not through direct peer calls or peer-state writes
 
 No direct system-to-system calls are allowed.
 
@@ -291,6 +300,9 @@ Rules:
 - non-owned ECS data is read-only to that system
 - if a system needs another ownership domain to change, it must emit a command for the owning system or module to resolve
 - command flow is the mechanism for requesting changes in another ownership domain, not only for cosmetic signaling
+- if a system needs to react to another system's published gameplay meaning, it should do so by subscribing to the relevant command type rather than by directly calling that system
+- if a system needs to react to translated execution feedback, it should subscribe to the relevant feedback-event type
+- a system must not bypass the queue by directly mutating another ownership domain even if that state is reachable through a shared runtime context
 
 This prevents hidden coupling through arbitrary shared-state mutation.
 
@@ -444,27 +456,37 @@ This means:
 
 When deciding where a command or feedback-event contract belongs, use the ownership of the meaning:
 
-- a command should usually belong to the feature that owns the state being requested to change
+- a command contract should belong to the lowest layer that owns the gameplay meaning being published
+- a command should not be named or shaped as a private request to one specific consumer system
 - an execution-feedback event should belong to the translated engine-feedback contract that reports that observation back into gameplay
 - if the concept is broadly reusable across several features, it may belong to a separate shared reusable feature contract
 - if the coupling exists only in this one game, the contract should belong to game-specific integration schema
 
 Example direction:
 
-- if one feature wants health to change, it should prefer a health-facing public command layout rather than forcing health to understand the other feature's private attack layout
-- after health resolves that request, other gameplay systems should react through owned state, follow-up commands, or game-specific integration logic instead of assuming a public gameplay-event bus between features
-- the game layer should observe health through public health-facing result/state, not by reaching into attack-private data
+- if one feature validates an attack impact, it should emit a semantic command that describes that impact, not a private RPC addressed only to health
+- health, armor, stagger, threat, analytics, or other systems may listen to that same command if their behavior depends on that meaning
+- each listener must resolve only its own owned state and may emit follow-up commands if more cross-owner effects are needed
+- the game layer should observe results through owned/public state or follow-up commands, not by reaching into another feature's private data
 
 Concrete example:
 
 - engine feedback enters gameplay through a translated feedback event such as `TranslatedHitContact`
 - the attack feature validates whether that translated hit should become real gameplay damage
-- the attack feature emits a public health-facing command such as `ApplyDamage`
-- the health feature resolves the HP change inside owned health state
+- the attack feature emits a semantic gameplay command such as `AttackImpactResolved` that carries source/target identity plus hit power
+- the health feature may listen to that command and resolve HP change inside owned health state
+- an armor-durability or stagger feature may also listen to that same command and resolve its own owned state
+- the command producer does not need to know which systems consumed the command
 - the health feature exposes the resolved damage through public health-facing result/state
 - the game layer reads that resolved health result/state, checks whether the target was a protected village asset, applies its own penalty rule, and emits `AdjustFactionReputation`
 - the `FactionReputation` feature resolves that command inside its own owned state
-- no peer feature needs a generic gameplay-event bus for this flow; commands plus owned/public state are enough
+- no peer feature needs direct calls into another feature for this flow; commands plus owned/public state are enough
+
+Parallel-development rule:
+
+- once a command schema is established, prefer changing listener behavior over changing the schema for one consumer's convenience
+- keeping command layouts stable reduces coupling and lets multiple developers or AI agents work on separate systems in parallel without merge-heavy coordination on command definitions
+- subscription-based command and translated feedback-event queues should be the forcing function that prevents direct cross-system dependencies from creeping back in
 
 This keeps ownership, write authority, and contract meaning aligned.
 

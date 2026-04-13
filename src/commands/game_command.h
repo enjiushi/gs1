@@ -1,6 +1,7 @@
 #pragma once
 
 #include "support/id_types.h"
+#include "gs1/types.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -30,12 +31,16 @@ enum class GameCommandType : std::uint8_t
     StartNewCampaign,
     SelectDeploymentSite,
     ClearDeploymentSiteSelection,
+    DeploymentSiteSelectionChanged,
     StartSiteAttempt,
     ReturnToRegionalMap,
-    MarkSiteCompleted,
-    MarkSiteFailed,
-    PresentLog
+    SiteAttemptEnded,
+    PresentLog,
+    Count
 };
+
+inline constexpr std::size_t k_game_command_type_count =
+    static_cast<std::size_t>(GameCommandType::Count);
 
 struct StartNewCampaignCommand final
 {
@@ -56,6 +61,11 @@ struct ClearDeploymentSiteSelectionCommand final
 {
 };
 
+struct DeploymentSiteSelectionChangedCommand final
+{
+    std::uint32_t selected_site_id;
+};
+
 struct StartSiteAttemptCommand final
 {
     std::uint32_t site_id;
@@ -65,14 +75,10 @@ struct ReturnToRegionalMapCommand final
 {
 };
 
-struct MarkSiteCompletedCommand final
+struct SiteAttemptEndedCommand final
 {
     std::uint32_t site_id;
-};
-
-struct MarkSiteFailedCommand final
-{
-    std::uint32_t site_id;
+    Gs1SiteAttemptResult result;
 };
 
 struct PresentLogCommand final
@@ -84,10 +90,10 @@ GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(OpenMainMenuCommand, 1U);
 GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(StartNewCampaignCommand, 16U);
 GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(SelectDeploymentSiteCommand, 4U);
 GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(ClearDeploymentSiteSelectionCommand, 1U);
+GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(DeploymentSiteSelectionChangedCommand, 4U);
 GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(StartSiteAttemptCommand, 4U);
 GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(ReturnToRegionalMapCommand, 1U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(MarkSiteCompletedCommand, 4U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(MarkSiteFailedCommand, 4U);
+GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(SiteAttemptEndedCommand, 8U);
 GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(PresentLogCommand, 63U);
 
 struct alignas(k_command_cache_line_size) GameCommand final

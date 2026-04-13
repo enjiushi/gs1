@@ -1,13 +1,17 @@
 #include "runtime/game_runtime.h"
 
-#include "app/campaign_factory.h"
-#include "app/site_run_factory.h"
+#include "campaign/systems/campaign_flow_system.h"
+#include "campaign/systems/campaign_system_context.h"
+#include "campaign/systems/loadout_planner_system.h"
 #include "commands/command_dispatcher.h"
+#include "site/site_projection_update_flags.h"
+#include "site/systems/failure_recovery_system.h"
+#include "site/systems/site_completion_system.h"
+#include "site/systems/site_flow_system.h"
 
 #include <algorithm>
 #include <cassert>
 #include <cstdio>
-#include <cmath>
 #include <cstring>
 #include <limits>
 #include <set>
@@ -16,6 +20,26 @@ namespace gs1
 {
 namespace
 {
+std::size_t command_type_index(GameCommandType type) noexcept
+{
+    return static_cast<std::size_t>(type);
+}
+
+bool is_valid_command_type(GameCommandType type) noexcept
+{
+    return command_type_index(type) < k_game_command_type_count;
+}
+
+std::size_t feedback_event_type_index(Gs1FeedbackEventType type) noexcept
+{
+    return static_cast<std::size_t>(type);
+}
+
+bool is_valid_feedback_event_type(Gs1FeedbackEventType type) noexcept
+{
+    return feedback_event_type_index(type) < k_feedback_event_type_count;
+}
+
 Gs1EngineCommand make_engine_command(
     Gs1EngineCommandType type)
 {
@@ -24,29 +48,6 @@ Gs1EngineCommand make_engine_command(
     return command;
 }
 
-DayPhase resolve_day_phase(double world_time_minutes)
-{
-    constexpr double k_minutes_per_day = 1440.0;
-    const double minute_in_day = std::fmod(world_time_minutes, k_minutes_per_day);
-
-    if (minute_in_day < 360.0)
-    {
-        return DayPhase::Dawn;
-    }
-    if (minute_in_day < 900.0)
-    {
-        return DayPhase::Day;
-    }
-    if (minute_in_day < 1140.0)
-    {
-        return DayPhase::Dusk;
-    }
-    return DayPhase::Night;
-}
-
-constexpr float k_worker_move_speed_tiles_per_second = 3.5f;
-constexpr float k_radians_to_degrees = 57.2957795f;
-
 bool tile_coord_in_bounds(const TileGridState& tile_grid, TileCoord coord) noexcept
 {
     return coord.x >= 0 &&
@@ -54,16 +55,6 @@ bool tile_coord_in_bounds(const TileGridState& tile_grid, TileCoord coord) noexc
         static_cast<std::uint32_t>(coord.x) < tile_grid.width &&
         static_cast<std::uint32_t>(coord.y) < tile_grid.height;
 }
-
-enum SiteProjectionUpdateFlags : std::uint64_t
-{
-    SITE_PROJECTION_UPDATE_NONE = 0,
-    SITE_PROJECTION_UPDATE_TILES = 1ull << 0,
-    SITE_PROJECTION_UPDATE_WORKER = 1ull << 1,
-    SITE_PROJECTION_UPDATE_CAMP = 1ull << 2,
-    SITE_PROJECTION_UPDATE_WEATHER = 1ull << 3,
-    SITE_PROJECTION_UPDATE_HUD = 1ull << 4
-};
 }  // namespace
 
 GameRuntime::GameRuntime(Gs1RuntimeCreateDesc create_desc)
@@ -72,6 +63,27 @@ GameRuntime::GameRuntime(Gs1RuntimeCreateDesc create_desc)
     if (create_desc_.fixed_step_seconds > 0.0)
     {
         fixed_step_seconds_ = create_desc_.fixed_step_seconds;
+    }
+
+    initialize_subscription_tables();
+}
+
+void GameRuntime::initialize_subscription_tables()
+{
+    for (std::size_t index = 0; index < k_game_command_type_count; ++index)
+    {
+        const auto type = static_cast<GameCommandType>(index);
+        auto& subscribers = command_subscribers_[index];
+
+        if (CampaignFlowSystem::subscribes_to(type))
+        {
+            subscribers.push_back(CommandSubscriberId::CampaignFlow);
+        }
+
+        if (LoadoutPlannerSystem::subscribes_to(type))
+        {
+            subscribers.push_back(CommandSubscriberId::LoadoutPlanner);
+        }
     }
 }
 
@@ -209,233 +221,148 @@ Gs1Status GameRuntime::pop_engine_command(Gs1EngineCommand& out_command)
 
 Gs1Status GameRuntime::handle_command(const GameCommand& command)
 {
+    command_queue_.push_back(command);
+    return dispatch_queued_commands();
+}
+
+Gs1Status GameRuntime::dispatch_subscribed_command(const GameCommand& command)
+{
+    if (!is_valid_command_type(command.type) || command.type == GameCommandType::Count)
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    const auto& subscribers = command_subscribers_[command_type_index(command.type)];
+    for (const auto subscriber : subscribers)
+    {
+        switch (subscriber)
+        {
+        case CommandSubscriberId::CampaignFlow:
+        {
+            CampaignFlowCommandContext context {
+                campaign_,
+                active_site_run_,
+                app_state_,
+                command_queue_};
+            const auto status = CampaignFlowSystem::process_command(context, command);
+            if (status != GS1_STATUS_OK)
+            {
+                return status;
+            }
+            break;
+        }
+
+        case CommandSubscriberId::LoadoutPlanner:
+        {
+            if (!campaign_.has_value())
+            {
+                break;
+            }
+
+            CampaignSystemContext context {*campaign_};
+            const auto status = LoadoutPlannerSystem::process_command(context, command);
+            if (status != GS1_STATUS_OK)
+            {
+                return status;
+            }
+            break;
+        }
+
+        default:
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+    }
+
+    return GS1_STATUS_OK;
+}
+
+Gs1Status GameRuntime::dispatch_subscribed_feedback_event(const Gs1FeedbackEvent& event)
+{
+    if (!is_valid_feedback_event_type(event.type))
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    const auto& subscribers = feedback_event_subscribers_[feedback_event_type_index(event.type)];
+    for (const auto subscriber : subscribers)
+    {
+        (void)subscriber;
+    }
+
+    return GS1_STATUS_OK;
+}
+
+void GameRuntime::sync_after_processed_command(const GameCommand& command)
+{
     switch (command.type)
     {
     case GameCommandType::OpenMainMenu:
-    {
         queue_close_active_normal_ui_if_open();
-        app_state_ = GS1_APP_STATE_MAIN_MENU;
         queue_app_state_command(app_state_);
         queue_main_menu_ui_commands();
         queue_log_command("Entered main menu.");
-        return GS1_STATUS_OK;
-    }
+        break;
 
     case GameCommandType::StartNewCampaign:
-    {
-        const auto& payload = command.payload_as<StartNewCampaignCommand>();
         queue_close_ui_setup_if_open(GS1_UI_SETUP_MAIN_MENU);
-        campaign_ = CampaignFactory::create_prototype_campaign(payload.campaign_seed, payload.campaign_days);
-        app_state_ = GS1_APP_STATE_REGIONAL_MAP;
-        active_site_run_.reset();
-        rebuild_regional_map_caches();
-        campaign_->app_state = app_state_;
         queue_app_state_command(app_state_);
         queue_regional_map_snapshot_commands();
         queue_regional_map_selection_ui_commands();
         queue_log_command("Started new GS1 campaign.");
-        return GS1_STATUS_OK;
-    }
+        break;
 
     case GameCommandType::SelectDeploymentSite:
-    {
-        if (!campaign_.has_value())
-        {
-            return GS1_STATUS_INVALID_STATE;
-        }
-
-        const auto& payload = command.payload_as<SelectDeploymentSiteCommand>();
-        auto site = find_site_mut(payload.site_id);
-        if (!site.has_value())
-        {
-            return GS1_STATUS_NOT_FOUND;
-        }
-
-        if (site.value()->site_state != GS1_SITE_STATE_AVAILABLE)
-        {
-            return GS1_STATUS_INVALID_STATE;
-        }
-
-        const auto previous_selected_site_id = campaign_->regional_map_state.selected_site_id;
-        if (campaign_->regional_map_state.selected_site_id.has_value() &&
-            campaign_->regional_map_state.selected_site_id->value == payload.site_id)
-        {
-            return GS1_STATUS_OK;
-        }
-
-        campaign_->regional_map_state.selected_site_id = SiteId {payload.site_id};
-        campaign_->loadout_planner_state.selected_target_site_id = SiteId {payload.site_id};
-        if (previous_selected_site_id.has_value())
-        {
-            auto previous_site = find_site_mut(previous_selected_site_id->value);
-            if (previous_site.has_value())
-            {
-                queue_regional_map_site_upsert_command(*previous_site.value());
-            }
-        }
-        else
-        {
-            queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_SELECTION);
-        }
-        queue_regional_map_site_upsert_command(*site.value());
+        queue_regional_map_snapshot_commands();
         queue_regional_map_selection_ui_commands();
         queue_log_command("Selected deployment site.");
-        return GS1_STATUS_OK;
-    }
+        break;
 
     case GameCommandType::ClearDeploymentSiteSelection:
-    {
-        if (!campaign_.has_value())
-        {
-            return GS1_STATUS_INVALID_STATE;
-        }
-
-        if (!campaign_->regional_map_state.selected_site_id.has_value())
-        {
-            return GS1_STATUS_OK;
-        }
-
-        const auto selected_site_id = campaign_->regional_map_state.selected_site_id.value();
-        campaign_->regional_map_state.selected_site_id.reset();
-        campaign_->loadout_planner_state.selected_target_site_id.reset();
-
-        auto site = find_site_mut(selected_site_id.value);
-        if (site.has_value())
-        {
-            queue_regional_map_site_upsert_command(*site.value());
-        }
-
+        queue_regional_map_snapshot_commands();
         queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_SELECTION);
         queue_log_command("Cleared deployment site selection.");
-        return GS1_STATUS_OK;
-    }
+        break;
 
     case GameCommandType::StartSiteAttempt:
-    {
-        if (!campaign_.has_value())
-        {
-            return GS1_STATUS_INVALID_STATE;
-        }
-
-        const auto& payload = command.payload_as<StartSiteAttemptCommand>();
-        auto site = find_site_mut(payload.site_id);
-        if (!site.has_value())
-        {
-            return GS1_STATUS_NOT_FOUND;
-        }
-
-        if (site.value()->site_state != GS1_SITE_STATE_AVAILABLE)
-        {
-            return GS1_STATUS_INVALID_STATE;
-        }
-
-        site.value()->attempt_count += 1U;
         queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_SELECTION);
-        active_site_run_ = SiteRunFactory::create_site_run(*campaign_, *site.value());
-        campaign_->active_site_id = SiteId {payload.site_id};
-        app_state_ = GS1_APP_STATE_SITE_ACTIVE;
-        campaign_->app_state = app_state_;
         queue_app_state_command(app_state_);
         queue_site_bootstrap_commands();
         queue_hud_state_command();
         queue_log_command("Started site attempt.");
-        return GS1_STATUS_OK;
-    }
+        break;
 
     case GameCommandType::ReturnToRegionalMap:
-    {
-        if (!campaign_.has_value())
-        {
-            return GS1_STATUS_INVALID_STATE;
-        }
-
-        if (!active_site_run_.has_value() && campaign_->app_state == GS1_APP_STATE_REGIONAL_MAP)
-        {
-            return GS1_STATUS_OK;
-        }
-
-        active_site_run_.reset();
-        campaign_->active_site_id.reset();
-        app_state_ = GS1_APP_STATE_REGIONAL_MAP;
-        campaign_->app_state = app_state_;
-        rebuild_regional_map_caches();
         queue_app_state_command(app_state_);
         queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_RESULT);
         queue_regional_map_snapshot_commands();
         queue_regional_map_selection_ui_commands();
-        return GS1_STATUS_OK;
-    }
+        break;
 
-    case GameCommandType::MarkSiteCompleted:
+    case GameCommandType::SiteAttemptEnded:
     {
-        if (!campaign_.has_value() || !active_site_run_.has_value())
-        {
-            return GS1_STATUS_INVALID_STATE;
-        }
-
-        const auto& payload = command.payload_as<MarkSiteCompletedCommand>();
-        auto site = find_site_mut(payload.site_id);
-        if (!site.has_value())
-        {
-            return GS1_STATUS_NOT_FOUND;
-        }
-
-        active_site_run_->run_status = SiteRunStatus::Completed;
-        site.value()->site_state = GS1_SITE_STATE_COMPLETED;
-        std::uint32_t newly_revealed_site_count = 0U;
-
-        for (const auto adjacent_site_id : site.value()->adjacent_site_ids)
-        {
-            auto adjacent_site = find_site_mut(adjacent_site_id.value);
-            if (adjacent_site.has_value() && adjacent_site.value()->site_state == GS1_SITE_STATE_LOCKED)
-            {
-                adjacent_site.value()->site_state = GS1_SITE_STATE_AVAILABLE;
-                campaign_->regional_map_state.revealed_site_ids.push_back(adjacent_site_id);
-                newly_revealed_site_count += 1U;
-            }
-        }
-
-        app_state_ = GS1_APP_STATE_SITE_RESULT;
-        campaign_->app_state = app_state_;
-        rebuild_regional_map_caches();
+        const auto& payload = command.payload_as<SiteAttemptEndedCommand>();
+        const auto newly_revealed_site_count =
+            active_site_run_.has_value() ? active_site_run_->result_newly_revealed_site_count : 0U;
         queue_app_state_command(app_state_);
-        queue_site_result_ui_commands(payload.site_id, GS1_SITE_ATTEMPT_RESULT_COMPLETED);
+        queue_site_result_ui_commands(payload.site_id, payload.result);
         queue_site_result_ready_command(
             payload.site_id,
-            GS1_SITE_ATTEMPT_RESULT_COMPLETED,
+            payload.result,
             newly_revealed_site_count);
-        return GS1_STATUS_OK;
-    }
-
-    case GameCommandType::MarkSiteFailed:
-    {
-        if (!campaign_.has_value() || !active_site_run_.has_value())
-        {
-            return GS1_STATUS_INVALID_STATE;
-        }
-
-        const auto& payload = command.payload_as<MarkSiteFailedCommand>();
-        active_site_run_->run_status = SiteRunStatus::Failed;
-        app_state_ = GS1_APP_STATE_SITE_RESULT;
-        campaign_->app_state = app_state_;
-        queue_app_state_command(app_state_);
-        queue_site_result_ui_commands(payload.site_id, GS1_SITE_ATTEMPT_RESULT_FAILED);
-        queue_site_result_ready_command(
-            payload.site_id,
-            GS1_SITE_ATTEMPT_RESULT_FAILED,
-            0U);
-        return GS1_STATUS_OK;
+        break;
     }
 
     case GameCommandType::PresentLog:
     {
         const auto& payload = command.payload_as<PresentLogCommand>();
         queue_log_command(payload.text);
-        return GS1_STATUS_OK;
-    }
+        break;
     }
 
-    return GS1_STATUS_INVALID_ARGUMENT;
+    case GameCommandType::DeploymentSiteSelectionChanged:
+    default:
+        break;
+    }
 }
 
 void GameRuntime::queue_log_command(const char* message)
@@ -1098,70 +1025,6 @@ void GameRuntime::flush_site_presentation_if_dirty()
     clear_pending_site_tile_projection_updates();
 }
 
-void GameRuntime::update_worker_movement_for_fixed_step()
-{
-    if (!active_site_run_.has_value())
-    {
-        return;
-    }
-
-    auto& site_run = active_site_run_.value();
-    if (site_run.tile_grid.width == 0U || site_run.tile_grid.height == 0U)
-    {
-        return;
-    }
-
-    if (!phase1_site_move_direction_.present)
-    {
-        return;
-    }
-
-    const float move_x = phase1_site_move_direction_.world_move_x;
-    const float move_y = phase1_site_move_direction_.world_move_y;
-    const float move_length_squared = move_x * move_x + move_y * move_y;
-    if (move_length_squared <= 0.0001f)
-    {
-        return;
-    }
-
-    const float move_length = std::sqrt(move_length_squared);
-    const float direction_x = move_x / move_length;
-    const float direction_y = move_y / move_length;
-    const float movement_step = k_worker_move_speed_tiles_per_second * static_cast<float>(fixed_step_seconds_);
-
-    const float max_x = static_cast<float>(site_run.tile_grid.width - 1U);
-    const float max_y = static_cast<float>(site_run.tile_grid.height - 1U);
-    const float unclamped_target_x = site_run.worker.tile_position_x + direction_x * movement_step;
-    const float unclamped_target_y = site_run.worker.tile_position_y + direction_y * movement_step;
-    const float target_x = std::clamp(unclamped_target_x, 0.0f, max_x);
-    const float target_y = std::clamp(unclamped_target_y, 0.0f, max_y);
-
-    const auto target_tile_x = static_cast<std::int32_t>(std::lround(target_x));
-    const auto target_tile_y = static_cast<std::int32_t>(std::lround(target_y));
-    const TileCoord target_tile {target_tile_x, target_tile_y};
-    const auto target_index = site_run.tile_grid.to_index(target_tile);
-
-    if (!site_run.tile_grid.tile_traversable.empty() &&
-        site_run.tile_grid.tile_traversable[target_index] == 0U)
-    {
-        return;
-    }
-
-    const bool position_changed =
-        std::fabs(target_x - site_run.worker.tile_position_x) > 0.0001f ||
-        std::fabs(target_y - site_run.worker.tile_position_y) > 0.0001f;
-    if (!position_changed)
-    {
-        return;
-    }
-
-    site_run.worker.tile_position_x = target_x;
-    site_run.worker.tile_position_y = target_y;
-    site_run.worker.tile_coord = target_tile;
-    site_run.worker.facing_degrees = std::atan2(direction_x, direction_y) * k_radians_to_degrees;
-    mark_site_projection_update_dirty(SITE_PROJECTION_UPDATE_WORKER);
-}
-
 Gs1Status GameRuntime::translate_ui_action_to_command(const Gs1UiAction& action, GameCommand& out_command) const
 {
     switch (action.type)
@@ -1288,16 +1151,10 @@ Gs1Status GameRuntime::dispatch_feedback_events(std::uint32_t& out_processed_cou
         feedback_events_.pop_front();
         out_processed_count += 1U;
 
-        switch (event.type)
+        const auto status = dispatch_subscribed_feedback_event(event);
+        if (status != GS1_STATUS_OK)
         {
-        case GS1_FEEDBACK_EVENT_NONE:
-        case GS1_FEEDBACK_EVENT_PHYSICS_CONTACT:
-        case GS1_FEEDBACK_EVENT_TRACE_HIT:
-        case GS1_FEEDBACK_EVENT_ANIMATION_NOTIFY:
-            break;
-
-        default:
-            return GS1_STATUS_INVALID_ARGUMENT;
+            return status;
         }
     }
 
@@ -1309,48 +1166,6 @@ Gs1Status GameRuntime::dispatch_queued_commands()
     return CommandDispatcher::dispatch_all(*this);
 }
 
-void GameRuntime::rebuild_regional_map_caches()
-{
-    if (!campaign_.has_value())
-    {
-        return;
-    }
-
-    auto& map = campaign_->regional_map_state;
-    map.available_site_ids.clear();
-    map.completed_site_ids.clear();
-
-    for (const auto& site : campaign_->sites)
-    {
-        if (site.site_state == GS1_SITE_STATE_AVAILABLE)
-        {
-            map.available_site_ids.push_back(site.site_id);
-        }
-        else if (site.site_state == GS1_SITE_STATE_COMPLETED)
-        {
-            map.completed_site_ids.push_back(site.site_id);
-        }
-    }
-
-    if (map.selected_site_id.has_value())
-    {
-        bool selected_site_still_valid = false;
-        for (const auto available_site_id : map.available_site_ids)
-        {
-            if (available_site_id == map.selected_site_id.value())
-            {
-                selected_site_still_valid = true;
-                break;
-            }
-        }
-
-        if (!selected_site_still_valid)
-        {
-            map.selected_site_id.reset();
-        }
-    }
-}
-
 void GameRuntime::run_fixed_step()
 {
     if (!campaign_.has_value() || !active_site_run_.has_value())
@@ -1358,53 +1173,22 @@ void GameRuntime::run_fixed_step()
         return;
     }
 
-    constexpr double k_step_minutes = 0.2;
-    constexpr double k_minutes_per_day = 1440.0;
+    CampaignFixedStepContext campaign_context {*campaign_};
+    CampaignFlowSystem::run(campaign_context);
 
-    campaign_->campaign_clock_minutes_elapsed += k_step_minutes;
-    active_site_run_->clock.world_time_minutes += k_step_minutes;
-    active_site_run_->clock.day_index =
-        static_cast<std::uint32_t>(active_site_run_->clock.world_time_minutes / k_minutes_per_day);
-    active_site_run_->clock.day_phase = resolve_day_phase(active_site_run_->clock.world_time_minutes);
+    SiteSystemContext context {
+        *campaign_,
+        *active_site_run_,
+        command_queue_,
+        fixed_step_seconds_,
+        SiteMoveDirectionInput {
+            phase1_site_move_direction_.world_move_x,
+            phase1_site_move_direction_.world_move_y,
+            phase1_site_move_direction_.world_move_z,
+            phase1_site_move_direction_.present}};
 
-    const auto elapsed_days = static_cast<std::uint32_t>(campaign_->campaign_clock_minutes_elapsed / k_minutes_per_day);
-    campaign_->campaign_days_remaining =
-        (elapsed_days >= campaign_->campaign_days_total) ? 0U : (campaign_->campaign_days_total - elapsed_days);
-
-    update_worker_movement_for_fixed_step();
-
-    if (active_site_run_->worker.player_health <= 0.0f)
-    {
-        GameCommand command {};
-        command.type = GameCommandType::MarkSiteFailed;
-        command.set_payload(MarkSiteFailedCommand {active_site_run_->site_id.value});
-        command_queue_.push_back(command);
-    }
-    else if (active_site_run_->counters.fully_grown_tile_count >=
-        active_site_run_->counters.site_completion_tile_threshold)
-    {
-        GameCommand command {};
-        command.type = GameCommandType::MarkSiteCompleted;
-        command.set_payload(MarkSiteCompletedCommand {active_site_run_->site_id.value});
-        command_queue_.push_back(command);
-    }
-}
-
-std::optional<SiteMetaState*> GameRuntime::find_site_mut(std::uint32_t site_id)
-{
-    if (!campaign_.has_value())
-    {
-        return std::nullopt;
-    }
-
-    for (auto& site : campaign_->sites)
-    {
-        if (site.site_id.value == site_id)
-        {
-            return &site;
-        }
-    }
-
-    return std::nullopt;
+    SiteFlowSystem::run(context);
+    FailureRecoverySystem::run(context);
+    SiteCompletionSystem::run(context);
 }
 }  // namespace gs1

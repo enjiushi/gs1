@@ -58,9 +58,40 @@ To avoid implementation drift, the following choices are now fixed:
 - use dense arrays for tile simulation instead of one ECS entity per tile
 - use entities only for dynamic actors and action executors that benefit from entity identity
 - use explicit command queues for cross-owner mutation
+- use no internal gameplay-event queue; internal cross-system gameplay communication uses `GameCommand`
 - use authored prototype regional-map adjacency as a plain adjacency list per site
 - use deterministic random seeds per campaign and per site attempt
 - do not implement disk save/load in v1; all persistence is in-process only
+
+### 1.4 System Self-Containment Rule
+
+For v1 implementation, every gameplay system must be treated as a self-contained owner of its state slice.
+
+Rules:
+
+- a system may directly mutate only the state it explicitly owns
+- a system must not directly call a peer gameplay system to make that peer do work
+- a system must not directly mutate another system's owned state, even when both states live inside the same runtime object
+- if a system needs another ownership domain to change, it must express that request through a `GameCommand`
+- cross-system coordination inside gameplay should happen through command flow and owned-state observation, not through direct peer-to-peer write paths
+- a `GameCommand` payload should describe gameplay meaning published by its producer, not a private request addressed to one specific consumer system
+- the producing system must not assume which systems listen to a command, or how many listeners there are
+- multiple systems may listen to the same command and each listener may resolve only its own owned state
+- once a command layout is established, prefer changing listener behavior over reshaping the command for one system's convenience
+- the command queue must dispatch each command only to systems that explicitly subscribe to that command type
+- there is no internal gameplay-event queue; internal cross-system gameplay communication must use `GameCommand`
+- translated feedback-event queues must use the same enum-indexed subscriber-list dispatch pattern as commands
+- systems should coordinate only through subscribed command processing, translated feedback-event processing, and owned/public state, not through direct peer calls
+- if a system is not subscribed to a command or translated feedback-event type, it must not process that message
+- queue subscription should be the hard boundary that prevents cross-system coupling by force rather than by convention alone
+
+Rationale:
+
+- this keeps each system testable in isolation with deterministic command inputs and owned-state outputs
+- this lets different agent sessions or developers modify separate systems asynchronously with fewer hidden write conflicts
+- this keeps ownership boundaries reviewable as the codebase grows
+- this keeps command schemas stable enough that multiple systems can evolve in parallel without repeatedly touching the same command-definition file
+- this lets multiple systems evolve behind stable subscriptions while sharing one message contract instead of encoding pairwise system dependencies
 
 ## 2. Top-Level Code Structure
 
@@ -160,7 +191,6 @@ src/
     handlers/
   events/
     EngineFeedbackEvent
-    RuntimeEvent
   ui/
     UiState
     HudViewModel
@@ -1518,7 +1548,7 @@ For the first playable coding stage, the implementation shape is now locked stro
 - one authoritative campaign state
 - one authoritative site run state
 - dense tile arrays
-- command-driven cross-owner mutation
+- self-contained systems with command-driven cross-owner mutation
 - validated content database
 - explicit system ownership
 - explicit folder structure

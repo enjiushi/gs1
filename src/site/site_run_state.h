@@ -96,6 +96,7 @@ struct SiteRunState final
     EconomyState economy {};
     ActionState site_action {};
     SiteCounters counters {};
+    std::uint32_t result_newly_revealed_site_count {0};
     std::uint64_t pending_projection_update_flags {0};
     bool pending_full_tile_projection_update {false};
     std::vector<TileCoord> pending_tile_projection_updates {};

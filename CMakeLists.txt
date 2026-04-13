@@ -20,8 +20,13 @@ add_library(gs1_game SHARED
     src/app/game_api.cpp
     src/app/campaign_factory.cpp
     src/app/site_run_factory.cpp
+    src/campaign/systems/campaign_flow_system.cpp
+    src/campaign/systems/loadout_planner_system.cpp
     src/commands/command_dispatcher.cpp
     src/content/prototype_content.cpp
+    src/site/systems/failure_recovery_system.cpp
+    src/site/systems/site_completion_system.cpp
+    src/site/systems/site_flow_system.cpp
     src/runtime/game_runtime.cpp
 )
 
@@ -83,9 +88,25 @@ if(GS1_BUILD_TESTS)
         tests/runtime/game_runtime_projection_test.cpp
         src/app/campaign_factory.cpp
         src/app/site_run_factory.cpp
+        src/campaign/systems/campaign_flow_system.cpp
+        src/campaign/systems/loadout_planner_system.cpp
         src/commands/command_dispatcher.cpp
         src/content/prototype_content.cpp
+        src/site/systems/failure_recovery_system.cpp
+        src/site/systems/site_completion_system.cpp
+        src/site/systems/site_flow_system.cpp
         src/runtime/game_runtime.cpp)
+
+    add_executable(gs1_site_system_command_flow_test
+        tests/runtime/site_system_command_flow_test.cpp
+        src/app/campaign_factory.cpp
+        src/app/site_run_factory.cpp
+        src/campaign/systems/campaign_flow_system.cpp
+        src/campaign/systems/loadout_planner_system.cpp
+        src/content/prototype_content.cpp
+        src/site/systems/failure_recovery_system.cpp
+        src/site/systems/site_completion_system.cpp
+        src/site/systems/site_flow_system.cpp)
 
     # The smoke host includes only the public gameplay SDK headers.
     target_include_directories(gs1_smoke_host PRIVATE
@@ -93,6 +114,9 @@ if(GS1_BUILD_TESTS)
     target_include_directories(gs1_visual_smoke_host PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include)
     target_include_directories(gs1_runtime_projection_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_include_directories(gs1_site_system_command_flow_test PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(gs1_visual_smoke_host PRIVATE ws2_32 winmm)
@@ -104,8 +128,10 @@ if(GS1_BUILD_TESTS)
 
     if(MSVC)
         target_compile_options(gs1_runtime_projection_test PRIVATE /W4 /permissive-)
+        target_compile_options(gs1_site_system_command_flow_test PRIVATE /W4 /permissive-)
     else()
         target_compile_options(gs1_runtime_projection_test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(gs1_site_system_command_flow_test PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 
     # Run the smoke host with the built DLL path and the default smoke script.
@@ -119,9 +145,15 @@ if(GS1_BUILD_TESTS)
         NAME gs1_runtime_projection_test
         COMMAND gs1_runtime_projection_test)
 
+    add_test(
+        NAME gs1_site_system_command_flow_test
+        COMMAND gs1_site_system_command_flow_test)
+
     # Resolve the default script path relative to the repository root.
     set_tests_properties(gs1_smoke_host PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(gs1_runtime_projection_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(gs1_site_system_command_flow_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 endif()
