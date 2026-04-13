@@ -47,6 +47,14 @@ DayPhase resolve_day_phase(double world_time_minutes)
 constexpr float k_worker_move_speed_tiles_per_second = 3.5f;
 constexpr float k_radians_to_degrees = 57.2957795f;
 
+bool tile_coord_in_bounds(const TileGridState& tile_grid, TileCoord coord) noexcept
+{
+    return coord.x >= 0 &&
+        coord.y >= 0 &&
+        static_cast<std::uint32_t>(coord.x) < tile_grid.width &&
+        static_cast<std::uint32_t>(coord.y) < tile_grid.height;
+}
+
 enum SiteProjectionUpdateFlags : std::uint64_t
 {
     SITE_PROJECTION_UPDATE_NONE = 0,
@@ -802,6 +810,55 @@ void GameRuntime::queue_site_tile_upsert_command(std::uint32_t x, std::uint32_t 
     engine_commands_.push_back(tile_command);
 }
 
+void GameRuntime::queue_all_site_tile_upsert_commands()
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
+
+    for (std::uint32_t y = 0; y < active_site_run_->tile_grid.height; ++y)
+    {
+        for (std::uint32_t x = 0; x < active_site_run_->tile_grid.width; ++x)
+        {
+            queue_site_tile_upsert_command(x, y);
+        }
+    }
+}
+
+void GameRuntime::queue_pending_site_tile_upsert_commands()
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
+
+    auto& site_run = active_site_run_.value();
+    if (site_run.pending_full_tile_projection_update || site_run.pending_tile_projection_updates.empty())
+    {
+        queue_all_site_tile_upsert_commands();
+        return;
+    }
+
+    std::sort(
+        site_run.pending_tile_projection_updates.begin(),
+        site_run.pending_tile_projection_updates.end(),
+        [](const TileCoord& lhs, const TileCoord& rhs) {
+            if (lhs.y != rhs.y)
+            {
+                return lhs.y < rhs.y;
+            }
+            return lhs.x < rhs.x;
+        });
+
+    for (const auto& coord : site_run.pending_tile_projection_updates)
+    {
+        queue_site_tile_upsert_command(
+            static_cast<std::uint32_t>(coord.x),
+            static_cast<std::uint32_t>(coord.y));
+    }
+}
+
 void GameRuntime::queue_site_worker_update_command()
 {
     if (!active_site_run_.has_value())
@@ -873,15 +930,7 @@ void GameRuntime::queue_site_bootstrap_commands()
     }
 
     queue_site_snapshot_begin_command(GS1_PROJECTION_MODE_SNAPSHOT);
-
-    for (std::uint32_t y = 0; y < active_site_run_->tile_grid.height; ++y)
-    {
-        for (std::uint32_t x = 0; x < active_site_run_->tile_grid.width; ++x)
-        {
-            queue_site_tile_upsert_command(x, y);
-        }
-    }
-
+    queue_all_site_tile_upsert_commands();
     queue_site_worker_update_command();
     queue_site_camp_update_command();
     queue_site_weather_update_command();
@@ -909,13 +958,7 @@ void GameRuntime::queue_site_delta_commands(std::uint64_t dirty_flags)
 
     if ((site_dirty_flags & SITE_PROJECTION_UPDATE_TILES) != 0U)
     {
-        for (std::uint32_t y = 0; y < active_site_run_->tile_grid.height; ++y)
-        {
-            for (std::uint32_t x = 0; x < active_site_run_->tile_grid.width; ++x)
-            {
-                queue_site_tile_upsert_command(x, y);
-            }
-        }
+        queue_pending_site_tile_upsert_commands();
     }
 
     if ((site_dirty_flags & SITE_PROJECTION_UPDATE_WORKER) != 0U)
@@ -981,7 +1024,68 @@ void GameRuntime::mark_site_projection_update_dirty(std::uint64_t dirty_flags) n
         return;
     }
 
+    if ((dirty_flags & SITE_PROJECTION_UPDATE_TILES) != 0U)
+    {
+        active_site_run_->pending_full_tile_projection_update = true;
+    }
+
     active_site_run_->pending_projection_update_flags |= dirty_flags;
+}
+
+void GameRuntime::mark_site_tile_projection_dirty(TileCoord coord) noexcept
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
+
+    auto& site_run = active_site_run_.value();
+    if (!tile_coord_in_bounds(site_run.tile_grid, coord))
+    {
+        return;
+    }
+
+    const auto tile_count = site_run.tile_grid.tile_count();
+    if (site_run.pending_tile_projection_update_mask.size() != tile_count)
+    {
+        site_run.pending_tile_projection_update_mask.assign(tile_count, 0U);
+        site_run.pending_tile_projection_updates.clear();
+    }
+
+    const auto index = site_run.tile_grid.to_index(coord);
+    if (site_run.pending_tile_projection_update_mask[index] == 0U)
+    {
+        site_run.pending_tile_projection_update_mask[index] = 1U;
+        site_run.pending_tile_projection_updates.push_back(coord);
+    }
+
+    site_run.pending_projection_update_flags |= SITE_PROJECTION_UPDATE_TILES;
+}
+
+void GameRuntime::clear_pending_site_tile_projection_updates() noexcept
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
+
+    auto& site_run = active_site_run_.value();
+    for (const auto& coord : site_run.pending_tile_projection_updates)
+    {
+        if (!tile_coord_in_bounds(site_run.tile_grid, coord))
+        {
+            continue;
+        }
+
+        const auto index = site_run.tile_grid.to_index(coord);
+        if (index < site_run.pending_tile_projection_update_mask.size())
+        {
+            site_run.pending_tile_projection_update_mask[index] = 0U;
+        }
+    }
+
+    site_run.pending_tile_projection_updates.clear();
+    site_run.pending_full_tile_projection_update = false;
 }
 
 void GameRuntime::flush_site_presentation_if_dirty()
@@ -1005,6 +1109,7 @@ void GameRuntime::flush_site_presentation_if_dirty()
     }
 
     active_site_run_->pending_projection_update_flags = 0U;
+    clear_pending_site_tile_projection_updates();
 }
 
 void GameRuntime::update_worker_movement_for_fixed_step()

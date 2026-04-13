@@ -79,17 +79,34 @@ if(GS1_BUILD_TESTS)
         tests/smoke/smoke_live_http_server.cpp
         ${GS1_SMOKE_HOST_COMMON_SOURCES})
 
+    add_executable(gs1_runtime_projection_test
+        tests/runtime/game_runtime_projection_test.cpp
+        src/app/campaign_factory.cpp
+        src/app/site_run_factory.cpp
+        src/commands/command_dispatcher.cpp
+        src/content/prototype_content.cpp
+        src/runtime/game_runtime.cpp)
+
     # The smoke host includes only the public gameplay SDK headers.
     target_include_directories(gs1_smoke_host PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include)
     target_include_directories(gs1_visual_smoke_host PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    target_include_directories(gs1_runtime_projection_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(gs1_visual_smoke_host PRIVATE ws2_32 winmm)
 
     # Ensure the DLL is built before the smoke host is run.
     # This is a build-order dependency, not a link-time dependency.
     add_dependencies(gs1_smoke_host gs1_game)
     add_dependencies(gs1_visual_smoke_host gs1_game)
+
+    if(MSVC)
+        target_compile_options(gs1_runtime_projection_test PRIVATE /W4 /permissive-)
+    else()
+        target_compile_options(gs1_runtime_projection_test PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
 
     # Run the smoke host with the built DLL path and the default smoke script.
     add_test(
@@ -98,7 +115,13 @@ if(GS1_BUILD_TESTS)
             $<TARGET_FILE:gs1_game>
             tests/smoke/scripts/main_menu_to_site_active.smoke)
 
+    add_test(
+        NAME gs1_runtime_projection_test
+        COMMAND gs1_runtime_projection_test)
+
     # Resolve the default script path relative to the repository root.
     set_tests_properties(gs1_smoke_host PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(gs1_runtime_projection_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 endif()

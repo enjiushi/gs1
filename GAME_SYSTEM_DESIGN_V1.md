@@ -1410,6 +1410,7 @@ Projection rules:
 
 - snapshot commands describe authoritative visual rebuild/bootstrap state
 - delta-mode site batches describe authoritative partial state updates after the host already has a valid site projection baseline
+- when a site tile changes after bootstrap, the runtime should emit only the authoritative changed tile cells for that batch unless it is intentionally performing a tile-surface resync
 - the host should treat begin/end snapshot commands as transactional fences for the matching presentation surface
 - the host must not infer gameplay state that was never sent; if a surface is host-relevant, the DLL should emit a command for it
 - the gameplay DLL should emit projection commands only when the authoritative gameplay state for that surface actually changed

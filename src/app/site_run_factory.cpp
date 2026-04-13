@@ -77,6 +77,7 @@ SiteRunState SiteRunFactory::create_site_run(
     run.worker.tile_coord = run.camp.camp_anchor_tile;
     run.worker.tile_position_x = static_cast<float>(run.camp.camp_anchor_tile.x);
     run.worker.tile_position_y = static_cast<float>(run.camp.camp_anchor_tile.y);
+    run.pending_tile_projection_update_mask.assign(run.tile_grid.tile_count(), 0U);
 
     return run;
 }

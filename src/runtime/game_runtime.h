@@ -34,6 +34,8 @@ public:
     [[nodiscard]] GameCommandQueue& command_queue() noexcept { return command_queue_; }
     [[nodiscard]] Gs1Status handle_command(const GameCommand& command);
 
+    friend struct GameRuntimeProjectionTestAccess;
+
 private:
     void queue_log_command(const char* message);
     void queue_app_state_command(Gs1AppState app_state);
@@ -63,6 +65,8 @@ private:
     void queue_site_snapshot_begin_command(Gs1ProjectionMode mode);
     void queue_site_snapshot_end_command();
     void queue_site_tile_upsert_command(std::uint32_t x, std::uint32_t y);
+    void queue_all_site_tile_upsert_commands();
+    void queue_pending_site_tile_upsert_commands();
     void queue_site_worker_update_command();
     void queue_site_camp_update_command();
     void queue_site_weather_update_command();
@@ -74,6 +78,8 @@ private:
         Gs1SiteAttemptResult result,
         std::uint32_t newly_revealed_site_count);
     void mark_site_projection_update_dirty(std::uint64_t dirty_flags) noexcept;
+    void mark_site_tile_projection_dirty(TileCoord coord) noexcept;
+    void clear_pending_site_tile_projection_updates() noexcept;
     void flush_site_presentation_if_dirty();
     void update_worker_movement_for_fixed_step();
     void consume_input_snapshot(const Gs1InputSnapshot* input);

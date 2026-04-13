@@ -13,6 +13,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <vector>
 
 namespace gs1
 {
@@ -96,5 +97,8 @@ struct SiteRunState final
     ActionState site_action {};
     SiteCounters counters {};
     std::uint64_t pending_projection_update_flags {0};
+    bool pending_full_tile_projection_update {false};
+    std::vector<TileCoord> pending_tile_projection_updates {};
+    std::vector<std::uint8_t> pending_tile_projection_update_mask {};
 };
 }  // namespace gs1
