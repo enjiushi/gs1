@@ -5,6 +5,7 @@
 This framework defines a world-simulation-first ECS architecture where:
 
 - the ECS world is the single source of truth
+- the common ECS storage model is archetype-style
 - systems communicate via commands, plus translated feedback events when execution re-enters gameplay
 - the engine is only a rendering and execution adapter
 - the game remains portable across engines
@@ -254,6 +255,55 @@ These:
 - contain gameplay-specific rules and data
 - may define game-specific command and event payload meanings on top of the same shared queue transport
 - may define integration contracts when multiple reusable features need to cooperate only in this specific game
+
+---
+
+### 4.4 Archetype-Style ECS Storage Model
+
+The default ECS implementation model is archetype-style storage.
+
+Rules:
+
+- entities that share the same component layout should live in the same archetype storage
+- component storage inside an archetype should remain dense and iteration-friendly
+- systems may rely on archetype-local contiguous iteration when processing large homogeneous sets
+- resources remain valid alongside archetype entity storage; not all world data needs to become entities
+- specialized storage rules are allowed when a domain has stronger invariants than ordinary gameplay entities, as long as that domain still obeys the same ECS ownership and system model
+
+Clarification:
+
+- this document treats archetype ECS as the common framework, not as a special-case optimization
+- a game may still build domain-specific helpers on top of that framework when the domain requires fixed ordering or direct index math
+
+### 4.5 Fixed Dense Tile Domain Inside ECS
+
+Tile data may live inside the common ECS world as a specialized fixed dense domain.
+
+This is still ECS.
+
+It differs from ordinary dynamic entities because tile cells have stronger invariants:
+
+- tile count for one site is fixed after world creation
+- tile order is stable after creation
+- tile storage is dense and row-major
+- `tile_index = y * width + x` remains valid for the whole site lifetime
+- tile systems may intentionally iterate in row-major index order rather than generic unordered query order
+
+Design intent:
+
+- the tile domain should keep the benefits of ECS ownership, shared world access rules, and archetype-based storage
+- the tile domain should also preserve direct spatial indexing, neighbor lookup, and full-grid pass efficiency
+- tiles should not be treated like free-form spawn/despawn gameplay entities once the site world is initialized
+
+Recommended split:
+
+- fixed dense tile entities own map-cell data such as terrain, traversability, soil, local weather fields, occupancy, and other per-cell simulation data
+- dynamic ECS entities own actor/object identity such as characters, dropped items, projectiles, action executors, or any world object whose lifecycle is not one fixed map cell
+- ECS resources own singleton or wide-scope state such as clocks, weather/event globals, task boards, economy state, and campaign/session state
+
+Implementation rule:
+
+- if a tile-heavy system depends on direct index math or stable row-major traversal for correctness or performance, that requirement should be treated as part of the tile-domain contract rather than as an accidental implementation detail
 
 ---
 

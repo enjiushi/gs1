@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.24)
 # Build definition for the gameplay DLL plus the smoke host executable.
 project(gs1_game
     VERSION 0.1.0
-    LANGUAGES CXX)
+    LANGUAGES C CXX)
 
 include(GNUInstallDirs)
 
@@ -22,6 +22,19 @@ file(GLOB_RECURSE GS1_SYSTEM_TEST_SOURCE_FILES CONFIGURE_DEPENDS
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS OFF)
+
+add_library(flecs STATIC
+    third_party/flecs/flecs.c)
+
+target_include_directories(flecs
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/flecs)
+
+set_target_properties(flecs PROPERTIES
+    POSITION_INDEPENDENT_CODE ON)
 
 # Build the pure gameplay runtime as a shared library (the DLL).
 add_library(gs1_game SHARED
@@ -48,6 +61,7 @@ add_library(gs1_game SHARED
     src/site/systems/task_board_system.cpp
     src/site/systems/weather_event_system.cpp
     src/site/systems/worker_condition_system.cpp
+    src/site/site_world.cpp
     src/testing/system_test_asset.cpp
     src/testing/system_test_registry.cpp
     src/runtime/game_runtime.cpp
@@ -67,6 +81,9 @@ target_include_directories(gs1_game
 set_target_properties(gs1_game PROPERTIES
     OUTPUT_NAME "gs1_game"
     WINDOWS_EXPORT_ALL_SYMBOLS OFF)
+
+target_link_libraries(gs1_game
+    PRIVATE flecs)
 
 # Install the DLL/import library and the public headers as the gameplay SDK output.
 install(TARGETS gs1_game
@@ -141,6 +158,7 @@ if(GS1_BUILD_TESTS)
         src/site/systems/task_board_system.cpp
         src/site/systems/weather_event_system.cpp
         src/site/systems/worker_condition_system.cpp
+        src/site/site_world.cpp
         src/runtime/game_runtime.cpp)
 
     add_executable(gs1_site_system_command_flow_test
@@ -165,7 +183,8 @@ if(GS1_BUILD_TESTS)
         src/site/systems/site_flow_system.cpp
         src/site/systems/task_board_system.cpp
         src/site/systems/weather_event_system.cpp
-        src/site/systems/worker_condition_system.cpp)
+        src/site/systems/worker_condition_system.cpp
+        src/site/site_world.cpp)
 
     # The smoke host includes only the public gameplay SDK headers.
     target_include_directories(gs1_smoke_host PRIVATE
@@ -182,6 +201,8 @@ if(GS1_BUILD_TESTS)
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/smoke)
+    target_link_libraries(gs1_runtime_projection_test PRIVATE flecs)
+    target_link_libraries(gs1_site_system_command_flow_test PRIVATE flecs)
     target_link_libraries(gs1_visual_smoke_host PRIVATE ws2_32 winmm)
 
     # Ensure the DLL is built before the smoke host is run.

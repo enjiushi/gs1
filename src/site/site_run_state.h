@@ -12,11 +12,14 @@
 #include "support/id_types.h"
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <vector>
 
 namespace gs1
 {
+class SiteWorld;
+
 enum class SiteRunStatus : std::uint32_t
 {
     Active = 0,
@@ -83,6 +86,7 @@ struct SiteRunState final
     std::uint32_t attempt_index {0};
     std::uint64_t site_attempt_seed {0};
     SiteRunStatus run_status {SiteRunStatus::Active};
+    std::shared_ptr<SiteWorld> site_world {};
     SiteClockState clock {};
     TileGridState tile_grid {};
     WorkerState worker {};

@@ -1,6 +1,9 @@
 #include "app/site_run_factory.h"
 
 #include "content/prototype_content.h"
+#include "site/site_world.h"
+
+#include <memory>
 
 namespace gs1
 {
@@ -77,6 +80,32 @@ SiteRunState SiteRunFactory::create_site_run(
     run.worker.tile_coord = run.camp.camp_anchor_tile;
     run.worker.tile_position_x = static_cast<float>(run.camp.camp_anchor_tile.x);
     run.worker.tile_position_y = static_cast<float>(run.camp.camp_anchor_tile.y);
+    run.site_world = std::make_shared<SiteWorld>();
+    run.site_world->initialize(
+        SiteWorld::CreateDesc {
+            run.site_id,
+            run.site_run_id,
+            run.site_archetype_id,
+            run.camp.camp_anchor_tile,
+            run.camp.camp_durability,
+            run.camp.camp_protection_resolved,
+            run.camp.delivery_point_operational,
+            run.camp.shared_camp_storage_access_enabled,
+            run.worker.tile_coord,
+            run.worker.tile_position_x,
+            run.worker.tile_position_y,
+            run.worker.facing_degrees,
+            run.worker.player_health,
+            run.worker.player_hydration,
+            run.worker.player_nourishment,
+            run.worker.player_energy_cap,
+            run.worker.player_energy,
+            run.worker.player_morale,
+            run.worker.player_work_efficiency,
+            run.worker.is_sheltered,
+            0U,
+            false},
+        run.tile_grid);
     run.pending_tile_projection_update_mask.assign(run.tile_grid.tile_count(), 0U);
 
     return run;

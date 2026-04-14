@@ -55,8 +55,10 @@ To avoid implementation drift, the following choices are now fixed:
 
 - use one `GameRuntime` with one in-memory `CampaignState`
 - use one fixed-step simulation loop for site gameplay
-- use dense arrays for tile simulation instead of one ECS entity per tile
-- use entities only for dynamic actors and action executors that benefit from entity identity
+- use one archetype-style ECS world as the common gameplay data framework
+- represent site tiles as a specialized fixed dense ECS domain with stable row-major ordering
+- allow specialized tile-domain helpers and indexed access such as `tile_index = y * width + x`, while keeping tile data inside the common ECS framework
+- use dynamic ECS entities for actors, items, plants, structures, and action executors when those objects need identity or independent lifecycle
 - use explicit command queues for cross-owner mutation
 - use no internal gameplay-event queue; internal cross-system gameplay communication uses `GameCommand`
 - use authored prototype regional-map adjacency as a plain adjacency list per site
@@ -153,8 +155,9 @@ src/
       LoadoutPlannerSystem
   site/
     SiteRunState
+    SiteWorld
     SiteClockState
-    TileGridState
+    TileDomain
     TileLayers
     WorkerState
     CampState
@@ -381,8 +384,8 @@ Rules:
 1. read selected `SiteMetaState`
 2. derive `siteAttemptSeed`
 3. create empty `SiteRunState`
-4. build tile grid from authored site archetype
-5. initialize worker, camp, inventory, weather, event, modifier, economy, and counters
+4. create `siteWorld` and build the fixed dense tile ECS domain from the authored site archetype
+5. initialize site resources plus worker and other required entities
 6. apply baseline deployment support
 7. apply adjacent completed-site support packages and nearby auras
 8. build direct-purchase unlockable eligibility view
@@ -570,21 +573,18 @@ siteId
 attemptIndex
 siteAttemptSeed
 siteRunStatus                 // Active | Completed | Failed
+siteWorld
 siteClock
-tileGrid
-workerState
-campState
-inventoryState
-contractorState
-weatherState
-eventState
-taskBoardState
-modifierState
-economyState
-siteActionState
 siteCounters
 pendingEnginePresentationDirtyFlags
 ```
+
+Rules:
+
+- `siteWorld` is the authoritative in-site ECS world for this attempt
+- the site world uses archetype-style ECS storage
+- the tile domain is part of `siteWorld`, not a separate non-ECS simulation model
+- singleton gameplay state that does not need entity identity may remain in ECS resources owned by `siteWorld`
 
 ### 6.9 `SiteClockState`
 
@@ -607,46 +607,53 @@ Rules:
 - `taskRefreshAccumulator` uses the authored or tuned board refresh interval
 - `deliveryAccumulator` is used for the `30` minute delivery arrival rule
 
-### 6.10 `TileGridState`
+### 6.10 Fixed Dense Tile ECS Domain
 
-Use a dense row-major grid.
+Use a fixed dense row-major tile domain inside the archetype-style ECS world.
 
 Required fields:
 
 ```text
 width
 height
-terrainTypeId[width * height]
-tileTraversable[...]
-tilePlantable[...]
-tileReservedByStructure[...]
+tileEntityCount = width * height
+stableTileOrder
+TileCoord
+TileTerrain
+TileTraversable
+TilePlantable
+TileReservedByStructure
 
-tileSoilFertility[...]
-tileMoisture[...]
-tileSoilSalinity[...]
-tileSandBurial[...]
+TileSoilFertility
+TileMoisture
+TileSoilSalinity
+TileSandBurial
 
-tileHeat[...]
-tileWind[...]
-tileDust[...]
+TileHeat
+TileWind
+TileDust
 
-plantTypeId[...]
-groundCoverTypeId[...]
-tilePlantDensity[...]
-growthPressure[...]
+TilePlantSlot
+TileGroundCoverSlot
+TilePlantDensity
+TileGrowthPressure
 
-structureTypeId[...]
-deviceIntegrity[...]
-deviceEfficiency[...]
-deviceStoredWater[...]
+TileStructureSlot
+TileDeviceIntegrity
+TileDeviceEfficiency
+TileDeviceStoredWater
 ```
 
 Rules:
 
-- array index is `y * width + x`
+- tile entity count is fixed after site-world creation
+- tile order is stable and row-major for the lifetime of the active site
+- tile index is `y * width + x`
+- tile lookup by coord must be a direct indexed operation, not a hash or unordered search
 - occupancy fields are authoritative and are not duplicated elsewhere
-- `groundCoverTypeId` and `plantTypeId` may coexist only where the GDD sharing rules allow it
-- tiles are not runtime entities in v1
+- `TileGroundCoverSlot` and `TilePlantSlot` may coexist only where the GDD sharing rules allow it
+- tile systems may deliberately iterate in tile-index order when that is required for correctness, determinism, or performance
+- specialized tile-domain management is allowed, but it still belongs to the common ECS framework
 
 ### 6.11 `WorkerState`
 
@@ -892,17 +899,19 @@ siteCompletionTileThreshold
 
 V1 uses a hybrid model:
 
-- tiles and occupancy are dense arrays in `TileGridState`
-- the player worker may be represented as one entity or as `WorkerState` only
-- for v1, use `WorkerState` only unless the target engine already requires actor-entity identity
+- tiles are fixed dense ECS entities inside the site-world tile domain
+- the player worker is an ECS entity
+- dynamic objects with identity should also use ECS entities when that identity matters to gameplay ownership or lifecycle
+- singleton or board-level state that does not need entity identity should live as ECS resources
 
 Recommendation:
 
-- keep only one gameplay actor entity for the player if the engine-side host benefits from stable actor binding
-- do not create entities for every plant or structure in v1
-- presentation-layer spawned objects may still exist engine-side, but gameplay authority stays in the site arrays
+- keep tile entities fixed, densely ordered, and directly indexable
+- let tile-heavy systems operate as row-major tile passes even though the storage is ECS
+- use ordinary dynamic ECS entities for worker, future characters, dropped items, and any object with independent lifecycle
+- presentation-layer spawned objects may still exist engine-side, but gameplay authority stays in the ECS world
 
-This is simpler, faster to code, and fits the tile-heavy simulation better than forcing full ECS everywhere.
+This keeps one common ECS framework while preserving the dense fixed-grid properties that tile-heavy simulation depends on.
 
 ## 8. Command Model For V1
 
@@ -1042,14 +1051,14 @@ Phase rule:
 | System | Owns Direct Writes | Reads | Emits Commands |
 |---|---|---|---|
 | `SiteFlowSystem` | `SiteClockState`, site timers | all site state | task refresh, delivery arrival, completion/failure transitions |
-| `ActionExecutionSystem` | `siteActionState`, completed action results | worker, inventory, tile grid | inventory consume, plant/build/repair completion |
-| `DeviceSupportSystem` | device support/output cache for current step | structure arrays, camp, modifiers | none |
+| `ActionExecutionSystem` | action-related ECS components and completed action results | worker entity, inventory resource, fixed dense tile domain | inventory consume, plant/build/repair completion |
+| `DeviceSupportSystem` | device support/output cache for current step | tile structure/device components, camp, modifiers | none |
 | `WeatherEventSystem` | `WeatherState`, `EventState` | site clock, content defs, modifier state | aftermath relief resolution, presentation updates |
-| `LocalWeatherResolveSystem` | `tileHeat`, `tileWind`, `tileDust` arrays | weather, event, camp, devices, plants, modifiers | none |
+| `LocalWeatherResolveSystem` | tile heat/wind/dust components | weather, event, camp, devices, plants, modifiers | none |
 | `WorkerConditionSystem` | `WorkerState` meters | local weather, modifiers, consumed items, current action | site failure, presentation updates |
 | `CampDurabilitySystem` | `CampState.campDurability` | weather, local protection, event phase | presentation updates |
-| `DeviceMaintenanceSystem` | structure-related arrays | inventory, camp, weather, event, modifiers | device breakdown, water consumption, output updates |
-| `EcologySystem` | soil arrays, plant arrays, `fullyGrownTileCount` | local weather, devices, modifiers | site completion candidate, presentation updates |
+| `DeviceMaintenanceSystem` | tile device-related components | inventory, camp, weather, event, modifiers | device breakdown, water consumption, output updates |
+| `EcologySystem` | tile soil/plant/growth components, `fullyGrownTileCount` | local weather, devices, modifiers | site completion candidate, presentation updates |
 | `InventorySystem` | inventory slots, deliveries | actions, economy, devices, camp | none |
 | `TaskBoardSystem` | task lists, progress, refresh timer | site clock, site counters, item totals, action completions | reward claim, faction reputation gain, chain continuation |
 | `ModifierSystem` | `resolvedChannelTotals` | nearby auras, run modifiers | none |
@@ -1528,7 +1537,7 @@ Code in this order:
 1. `content/` loading, validation, and id indexes
 2. `runtime/` fixed-step runner, queues, rng, ids
 3. `campaign/` state and regional-map flow
-4. `site/` state structs and tile grid
+4. `site/` ECS world foundations, resources, and fixed dense tile domain
 5. weather/event and local-weather resolution
 6. worker condition, camp durability, and inventory
 7. action execution and placement validation
@@ -1547,7 +1556,8 @@ For the first playable coding stage, the implementation shape is now locked stro
 - one game project
 - one authoritative campaign state
 - one authoritative site run state
-- dense tile arrays
+- one archetype-style ECS world for site gameplay
+- one fixed dense row-major tile ECS domain
 - self-contained systems with command-driven cross-owner mutation
 - validated content database
 - explicit system ownership
