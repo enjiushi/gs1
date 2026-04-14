@@ -1,6 +1,8 @@
 #include "gs1/game_api.h"
+#include "gs1/system_test_api.h"
 
 #include "runtime/game_runtime.h"
+#include "testing/system_test_registry.h"
 
 #include <new>
 
@@ -129,5 +131,51 @@ Gs1Status gs1_pop_engine_command(
     }
 
     return runtime->runtime.pop_engine_command(*out_command);
+}
+
+std::uint32_t gs1_get_system_test_api_version() GS1_NOEXCEPT
+{
+    return gs1::testing::k_system_test_api_version;
+}
+
+std::uint32_t gs1_get_system_test_case_count() GS1_NOEXCEPT
+{
+    return static_cast<std::uint32_t>(gs1::testing::registered_source_system_tests().size());
+}
+
+Gs1Status gs1_get_system_test_case_info(
+    std::uint32_t index,
+    Gs1SystemTestCaseInfo* out_info) GS1_NOEXCEPT
+{
+    if (out_info == nullptr || out_info->struct_size != sizeof(Gs1SystemTestCaseInfo))
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    return gs1::testing::fill_system_test_case_info(index, *out_info);
+}
+
+Gs1Status gs1_run_system_test_case(
+    std::uint32_t index,
+    Gs1SystemTestRunResult* out_result) GS1_NOEXCEPT
+{
+    if (out_result == nullptr || out_result->struct_size != sizeof(Gs1SystemTestRunResult))
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    return gs1::testing::run_registered_source_system_test_case(index, *out_result);
+}
+
+Gs1Status gs1_run_system_test_asset_file(
+    const char* asset_path_utf8,
+    Gs1SystemTestRunResult* out_result) GS1_NOEXCEPT
+{
+    if (out_result == nullptr || out_result->struct_size != sizeof(Gs1SystemTestRunResult))
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    return gs1::testing::run_system_test_asset_file(asset_path_utf8, *out_result);
 }
 }

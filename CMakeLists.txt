@@ -7,8 +7,16 @@ project(gs1_game
 
 include(GNUInstallDirs)
 
-# Toggle smoke-test host build without affecting the gameplay DLL target.
-option(GS1_BUILD_TESTS "Build GS1 smoke tests" ON)
+# Toggle test executable builds without affecting the gameplay DLL target.
+option(GS1_BUILD_TESTS "Build GS1 test executables" ON)
+set(
+    GS1_SYSTEM_TEST_SYSTEMS
+    ""
+    CACHE STRING
+    "Semicolon-separated system filters passed to gs1_system_test_host. Empty runs all discovered system tests.")
+
+file(GLOB_RECURSE GS1_SYSTEM_TEST_SOURCE_FILES CONFIGURE_DEPENDS
+    tests/system/source/*.cpp)
 
 # Use a modern, compiler-independent C++ baseline for both targets.
 set(CMAKE_CXX_STANDARD 20)
@@ -40,6 +48,8 @@ add_library(gs1_game SHARED
     src/site/systems/task_board_system.cpp
     src/site/systems/weather_event_system.cpp
     src/site/systems/worker_condition_system.cpp
+    src/testing/system_test_asset.cpp
+    src/testing/system_test_registry.cpp
     src/runtime/game_runtime.cpp
 )
 
@@ -77,6 +87,11 @@ endif()
 if(GS1_BUILD_TESTS)
     enable_testing()
 
+    if(GS1_SYSTEM_TEST_SOURCE_FILES)
+        target_sources(gs1_game PRIVATE
+            ${GS1_SYSTEM_TEST_SOURCE_FILES})
+    endif()
+
     set(GS1_SMOKE_HOST_COMMON_SOURCES
         tests/smoke/smoke_engine_host.cpp
         tests/smoke/smoke_log.cpp
@@ -96,6 +111,11 @@ if(GS1_BUILD_TESTS)
         tests/smoke/visual_smoke_host_main.cpp
         tests/smoke/smoke_live_http_server.cpp
         ${GS1_SMOKE_HOST_COMMON_SOURCES})
+
+    add_executable(gs1_system_test_host
+        tests/system/system_test_host_main.cpp
+        tests/smoke/runtime_dll_loader.cpp
+        src/testing/system_test_asset.cpp)
 
     add_executable(gs1_runtime_projection_test
         tests/runtime/game_runtime_projection_test.cpp
@@ -158,17 +178,24 @@ if(GS1_BUILD_TESTS)
     target_include_directories(gs1_site_system_command_flow_test PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_include_directories(gs1_system_test_host PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/smoke)
     target_link_libraries(gs1_visual_smoke_host PRIVATE ws2_32 winmm)
 
     # Ensure the DLL is built before the smoke host is run.
     # This is a build-order dependency, not a link-time dependency.
     add_dependencies(gs1_smoke_host gs1_game)
     add_dependencies(gs1_visual_smoke_host gs1_game)
+    add_dependencies(gs1_system_test_host gs1_game)
 
     if(MSVC)
+        target_compile_options(gs1_system_test_host PRIVATE /W4 /permissive-)
         target_compile_options(gs1_runtime_projection_test PRIVATE /W4 /permissive-)
         target_compile_options(gs1_site_system_command_flow_test PRIVATE /W4 /permissive-)
     else()
+        target_compile_options(gs1_system_test_host PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(gs1_runtime_projection_test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(gs1_site_system_command_flow_test PRIVATE -Wall -Wextra -Wpedantic)
     endif()
@@ -188,6 +215,21 @@ if(GS1_BUILD_TESTS)
         NAME gs1_site_system_command_flow_test
         COMMAND gs1_site_system_command_flow_test)
 
+    set(GS1_SYSTEM_TEST_HOST_COMMAND
+        gs1_system_test_host
+        $<TARGET_FILE:gs1_game>)
+    if(GS1_SYSTEM_TEST_SYSTEMS)
+        foreach(gs1_system_name IN LISTS GS1_SYSTEM_TEST_SYSTEMS)
+            list(APPEND GS1_SYSTEM_TEST_HOST_COMMAND --system ${gs1_system_name})
+        endforeach()
+    else()
+        list(APPEND GS1_SYSTEM_TEST_HOST_COMMAND --all)
+    endif()
+
+    add_test(
+        NAME gs1_system_test_host
+        COMMAND ${GS1_SYSTEM_TEST_HOST_COMMAND})
+
     # Resolve the default script path relative to the repository root.
     set_tests_properties(gs1_smoke_host PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -195,4 +237,7 @@ if(GS1_BUILD_TESTS)
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(gs1_site_system_command_flow_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(gs1_system_test_host PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        LABELS "system;dll")
 endif()

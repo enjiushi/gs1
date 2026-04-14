@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gs1/game_api.h"
+#include "gs1/system_test_api.h"
 
 #include <string>
 
@@ -15,6 +16,11 @@ struct Gs1RuntimeApi final
     decltype(&gs1_run_phase1) run_phase1 {nullptr};
     decltype(&gs1_run_phase2) run_phase2 {nullptr};
     decltype(&gs1_pop_engine_command) pop_engine_command {nullptr};
+    decltype(&gs1_get_system_test_api_version) get_system_test_api_version {nullptr};
+    decltype(&gs1_get_system_test_case_count) get_system_test_case_count {nullptr};
+    decltype(&gs1_get_system_test_case_info) get_system_test_case_info {nullptr};
+    decltype(&gs1_run_system_test_case) run_system_test_case {nullptr};
+    decltype(&gs1_run_system_test_asset_file) run_system_test_asset_file {nullptr};
 };
 
 class RuntimeDllLoader final
