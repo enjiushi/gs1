@@ -136,41 +136,44 @@ bool totals_match(const ModifierChannelTotals& lhs, const ModifierChannelTotals&
         std::fabs(lhs.work_efficiency - rhs.work_efficiency) <= k_modifier_change_epsilon;
 }
 
-ModifierChannelTotals resolve_owned_totals(const SiteRunState& site_run) noexcept
+ModifierChannelTotals resolve_owned_totals(
+    const ModifierState& modifier_state,
+    const CampState& camp) noexcept
 {
     ModifierChannelTotals totals {};
 
-    for (const auto modifier_id : site_run.modifier.active_nearby_aura_modifier_ids)
+    for (const auto modifier_id : modifier_state.active_nearby_aura_modifier_ids)
     {
         accumulate_totals(totals, apply_nearby_aura_modifier(modifier_id));
     }
 
-    for (const auto modifier_id : site_run.modifier.active_run_modifier_ids)
+    for (const auto modifier_id : modifier_state.active_run_modifier_ids)
     {
         accumulate_totals(totals, apply_run_modifier(modifier_id));
     }
 
-    accumulate_totals(totals, camp_comfort_bias(site_run.camp));
+    accumulate_totals(totals, camp_comfort_bias(camp));
     return clamp_totals(totals);
 }
 
-void resolve_modifier_totals(SiteSystemContext& context)
+void resolve_modifier_totals(SiteSystemContext<ModifierSystem>& context)
 {
-    const auto next_totals = resolve_owned_totals(context.site_run);
-    auto& current_totals = context.site_run.modifier.resolved_channel_totals;
+    const auto next_totals =
+        resolve_owned_totals(context.world.read_modifier(), context.world.read_camp());
+    auto& current_totals = context.world.own_modifier().resolved_channel_totals;
 
     if (!totals_match(current_totals, next_totals))
     {
         current_totals = next_totals;
-        context.site_run.pending_projection_update_flags |= SITE_PROJECTION_UPDATE_HUD;
+        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_HUD);
     }
 }
 
 void handle_site_run_started(
-    SiteSystemContext& context,
+    SiteSystemContext<ModifierSystem>& context,
     const SiteRunStartedCommand& /*payload*/) noexcept
 {
-    auto& modifier_state = context.site_run.modifier;
+    auto& modifier_state = context.world.own_modifier();
     modifier_state.active_run_modifier_ids.clear();
     modifier_state.active_nearby_aura_modifier_ids.clear();
     modifier_state.resolved_channel_totals = {};
@@ -191,7 +194,7 @@ bool ModifierSystem::subscribes_to(GameCommandType type) noexcept
 }
 
 Gs1Status ModifierSystem::process_command(
-    SiteSystemContext& context,
+    SiteSystemContext<ModifierSystem>& context,
     const GameCommand& command)
 {
     if (command.type == GameCommandType::SiteRunStarted)
@@ -202,7 +205,7 @@ Gs1Status ModifierSystem::process_command(
     return GS1_STATUS_OK;
 }
 
-void ModifierSystem::run(SiteSystemContext& context)
+void ModifierSystem::run(SiteSystemContext<ModifierSystem>& context)
 {
     resolve_modifier_totals(context);
 }

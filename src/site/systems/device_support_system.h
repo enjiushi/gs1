@@ -8,10 +8,22 @@ namespace gs1
 class DeviceSupportSystem final
 {
 public:
+    [[nodiscard]] static constexpr SiteSystemAccess access() noexcept
+    {
+        return SiteSystemAccess {
+            "DeviceSupportSystem",
+            site_component_mask_of(
+                SiteComponent::TileLayout,
+                SiteComponent::TileWeather,
+                SiteComponent::DeviceCondition,
+                SiteComponent::DeviceRuntime),
+            site_component_mask_of(SiteComponent::DeviceRuntime)};
+    }
+
     [[nodiscard]] static bool subscribes_to(GameCommandType type) noexcept;
     [[nodiscard]] static Gs1Status process_command(
-        SiteSystemContext& context,
+        SiteSystemContext<DeviceSupportSystem>& context,
         const GameCommand& command);
-    static void run(SiteSystemContext& context);
+    static void run(SiteSystemContext<DeviceSupportSystem>& context);
 };
 }  // namespace gs1

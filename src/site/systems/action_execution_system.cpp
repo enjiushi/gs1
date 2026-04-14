@@ -396,16 +396,16 @@ bool ActionExecutionSystem::subscribes_to(GameCommandType type) noexcept
 }
 
 Gs1Status ActionExecutionSystem::process_command(
-    SiteSystemContext& context,
+    SiteSystemContext<ActionExecutionSystem>& context,
     const GameCommand& command)
 {
+    auto& action_state = context.world.own_action();
     const auto& payload_type = command.type;
     switch (payload_type)
     {
     case GameCommandType::StartSiteAction:
     {
         const auto& payload = command.payload_as<StartSiteActionCommand>();
-        auto& action_state = context.site_run.site_action;
 
         if (has_active_action(action_state))
         {
@@ -439,7 +439,7 @@ Gs1Status ActionExecutionSystem::process_command(
         }
 
         const TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
-        if (!tile_coord_in_bounds(context.site_run.tile_grid, target_tile))
+        if (!tile_coord_in_bounds(context.world.read_tile_grid(), target_tile))
         {
             emit_site_action_failed(
                 context.command_queue,
@@ -482,7 +482,7 @@ Gs1Status ActionExecutionSystem::process_command(
         }
         else
         {
-            action_state.started_at_world_minute = context.site_run.clock.world_time_minutes;
+            action_state.started_at_world_minute = context.world.read_time().world_time_minutes;
             emit_site_action_started(
                 context.command_queue,
                 action_id,
@@ -498,15 +498,14 @@ Gs1Status ActionExecutionSystem::process_command(
                 action_state.quantity);
         }
 
-        context.site_run.pending_projection_update_flags |=
-            SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD;
+        context.world.mark_projection_dirty(
+            SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
         return GS1_STATUS_OK;
     }
 
     case GameCommandType::CancelSiteAction:
     {
         const auto& payload = command.payload_as<CancelSiteActionCommand>();
-        auto& action_state = context.site_run.site_action;
 
         if (!has_active_action(action_state))
         {
@@ -536,14 +535,13 @@ Gs1Status ActionExecutionSystem::process_command(
             0U);
 
         clear_action_state(action_state);
-        context.site_run.pending_projection_update_flags |=
-            SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD;
+        context.world.mark_projection_dirty(
+            SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
         return GS1_STATUS_OK;
     }
 
     case GameCommandType::PlacementReservationAccepted:
     {
-        auto& action_state = context.site_run.site_action;
         if (!is_action_waiting_for_placement(action_state))
         {
             return GS1_STATUS_OK;
@@ -557,7 +555,7 @@ Gs1Status ActionExecutionSystem::process_command(
 
         action_state.awaiting_placement_reservation = false;
         action_state.placement_reservation_token = payload.reservation_token;
-        action_state.started_at_world_minute = context.site_run.clock.world_time_minutes;
+        action_state.started_at_world_minute = context.world.read_time().world_time_minutes;
 
         emit_site_action_started(
             context.command_queue,
@@ -572,14 +570,13 @@ Gs1Status ActionExecutionSystem::process_command(
             action_state.current_action_id->value,
             action_state.action_kind,
             action_state.quantity);
-        context.site_run.pending_projection_update_flags |=
-            SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD;
+        context.world.mark_projection_dirty(
+            SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
         return GS1_STATUS_OK;
     }
 
     case GameCommandType::PlacementReservationRejected:
     {
-        auto& action_state = context.site_run.site_action;
         if (!is_action_waiting_for_placement(action_state))
         {
             return GS1_STATUS_OK;
@@ -601,8 +598,8 @@ Gs1Status ActionExecutionSystem::process_command(
             action_state.primary_subject_id,
             action_state.secondary_subject_id);
         clear_action_state(action_state);
-        context.site_run.pending_projection_update_flags |=
-            SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD;
+        context.world.mark_projection_dirty(
+            SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
         return GS1_STATUS_OK;
     }
 
@@ -611,9 +608,9 @@ Gs1Status ActionExecutionSystem::process_command(
     }
 }
 
-void ActionExecutionSystem::run(SiteSystemContext& context)
+void ActionExecutionSystem::run(SiteSystemContext<ActionExecutionSystem>& context)
 {
-    auto& action_state = context.site_run.site_action;
+    auto& action_state = context.world.own_action();
     if (!is_action_in_progress(action_state))
     {
         return;
@@ -632,7 +629,7 @@ void ActionExecutionSystem::run(SiteSystemContext& context)
     emit_action_fact_commands(context.command_queue, action_state);
     emit_placement_reservation_released(context.command_queue, action_state);
     clear_action_state(action_state);
-    context.site_run.pending_projection_update_flags |=
-        SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD;
+    context.world.mark_projection_dirty(
+        SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
 }
 }  // namespace gs1

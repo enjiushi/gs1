@@ -8,10 +8,23 @@ namespace gs1
 class EcologySystem final
 {
 public:
+    [[nodiscard]] static constexpr SiteSystemAccess access() noexcept
+    {
+        return SiteSystemAccess {
+            "EcologySystem",
+            site_component_mask_of(
+                SiteComponent::TileLayout,
+                SiteComponent::TileEcology,
+                SiteComponent::Counters),
+            site_component_mask_of(
+                SiteComponent::TileEcology,
+                SiteComponent::Counters)};
+    }
+
     [[nodiscard]] static bool subscribes_to(GameCommandType type) noexcept;
     [[nodiscard]] static Gs1Status process_command(
-        SiteSystemContext& context,
+        SiteSystemContext<EcologySystem>& context,
         const GameCommand& command);
-    static void run(SiteSystemContext& context);
+    static void run(SiteSystemContext<EcologySystem>& context);
 };
 }  // namespace gs1

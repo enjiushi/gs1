@@ -98,6 +98,29 @@ Gs1PhoneListingPresentationKind to_phone_listing_presentation_kind(PhoneListingK
         return GS1_PHONE_LISTING_PRESENTATION_BUY_ITEM;
     }
 }
+
+template <typename SiteSystemTag, typename ProcessCommandFn>
+Gs1Status dispatch_site_system_command(
+    ProcessCommandFn process_command_fn,
+    const GameCommand& command,
+    const std::optional<CampaignState>& campaign,
+    std::optional<SiteRunState>& active_site_run,
+    GameCommandQueue& command_queue,
+    double fixed_step_seconds)
+{
+    if (!campaign.has_value() || !active_site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    auto context = make_site_system_context<SiteSystemTag>(
+        *campaign,
+        *active_site_run,
+        command_queue,
+        fixed_step_seconds,
+        SiteMoveDirectionInput {});
+    return process_command_fn(context, command);
+}
 }  // namespace
 
 GameRuntime::GameRuntime(Gs1RuntimeCreateDesc create_desc)
@@ -113,6 +136,42 @@ GameRuntime::GameRuntime(Gs1RuntimeCreateDesc create_desc)
 
 void GameRuntime::initialize_subscription_tables()
 {
+#ifndef NDEBUG
+    const std::array site_system_access_registry {
+        ActionExecutionSystem::access(),
+        WeatherEventSystem::access(),
+        WorkerConditionSystem::access(),
+        EcologySystem::access(),
+        TaskBoardSystem::access(),
+        PlacementValidationSystem::access(),
+        LocalWeatherResolveSystem::access(),
+        InventorySystem::access(),
+        EconomyPhoneSystem::access(),
+        CampDurabilitySystem::access(),
+        DeviceSupportSystem::access(),
+        DeviceMaintenanceSystem::access(),
+        ModifierSystem::access(),
+        FailureRecoverySystem::access(),
+        SiteCompletionSystem::access(),
+        SiteFlowSystem::access()};
+    const auto validation = validate_site_system_access_registry(site_system_access_registry);
+    if (!validation.ok)
+    {
+        std::fprintf(
+            stderr,
+            "Invalid site system access registry: %.*s system=%.*s component=%.*s other=%.*s\n",
+            static_cast<int>(validation.message.size()),
+            validation.message.data(),
+            static_cast<int>(validation.system_name.size()),
+            validation.system_name.data(),
+            static_cast<int>(site_component_name(validation.component).size()),
+            site_component_name(validation.component).data(),
+            static_cast<int>(validation.other_system_name.size()),
+            validation.other_system_name.data());
+        assert(false && "Invalid site system access registry");
+    }
+#endif
+
     for (std::size_t index = 0; index < k_game_command_type_count; ++index)
     {
         const auto type = static_cast<GameCommandType>(index);
@@ -340,21 +399,6 @@ Gs1Status GameRuntime::dispatch_subscribed_command(const GameCommand& command)
         return GS1_STATUS_INVALID_ARGUMENT;
     }
 
-    auto dispatch_to_site_system = [&](auto process_command_fn) -> Gs1Status {
-        if (!campaign_.has_value() || !active_site_run_.has_value())
-        {
-            return GS1_STATUS_INVALID_STATE;
-        }
-
-        SiteSystemContext context {
-            *campaign_,
-            *active_site_run_,
-            command_queue_,
-            fixed_step_seconds_,
-            SiteMoveDirectionInput {}};
-        return process_command_fn(context, command);
-    };
-
     const auto& subscribers = command_subscribers_[command_type_index(command.type)];
     for (const auto subscriber : subscribers)
     {
@@ -393,7 +437,13 @@ Gs1Status GameRuntime::dispatch_subscribed_command(const GameCommand& command)
 
         case CommandSubscriberId::ActionExecution:
         {
-            const auto status = dispatch_to_site_system(ActionExecutionSystem::process_command);
+            const auto status = dispatch_site_system_command<ActionExecutionSystem>(
+                ActionExecutionSystem::process_command,
+                command,
+                campaign_,
+                active_site_run_,
+                command_queue_,
+                fixed_step_seconds_);
             if (status != GS1_STATUS_OK)
             {
                 return status;
@@ -403,7 +453,13 @@ Gs1Status GameRuntime::dispatch_subscribed_command(const GameCommand& command)
 
         case CommandSubscriberId::WeatherEvent:
         {
-            const auto status = dispatch_to_site_system(WeatherEventSystem::process_command);
+            const auto status = dispatch_site_system_command<WeatherEventSystem>(
+                WeatherEventSystem::process_command,
+                command,
+                campaign_,
+                active_site_run_,
+                command_queue_,
+                fixed_step_seconds_);
             if (status != GS1_STATUS_OK)
             {
                 return status;
@@ -413,7 +469,13 @@ Gs1Status GameRuntime::dispatch_subscribed_command(const GameCommand& command)
 
         case CommandSubscriberId::WorkerCondition:
         {
-            const auto status = dispatch_to_site_system(WorkerConditionSystem::process_command);
+            const auto status = dispatch_site_system_command<WorkerConditionSystem>(
+                WorkerConditionSystem::process_command,
+                command,
+                campaign_,
+                active_site_run_,
+                command_queue_,
+                fixed_step_seconds_);
             if (status != GS1_STATUS_OK)
             {
                 return status;
@@ -423,7 +485,13 @@ Gs1Status GameRuntime::dispatch_subscribed_command(const GameCommand& command)
 
         case CommandSubscriberId::Ecology:
         {
-            const auto status = dispatch_to_site_system(EcologySystem::process_command);
+            const auto status = dispatch_site_system_command<EcologySystem>(
+                EcologySystem::process_command,
+                command,
+                campaign_,
+                active_site_run_,
+                command_queue_,
+                fixed_step_seconds_);
             if (status != GS1_STATUS_OK)
             {
                 return status;
@@ -433,7 +501,13 @@ Gs1Status GameRuntime::dispatch_subscribed_command(const GameCommand& command)
 
         case CommandSubscriberId::TaskBoard:
         {
-            const auto status = dispatch_to_site_system(TaskBoardSystem::process_command);
+            const auto status = dispatch_site_system_command<TaskBoardSystem>(
+                TaskBoardSystem::process_command,
+                command,
+                campaign_,
+                active_site_run_,
+                command_queue_,
+                fixed_step_seconds_);
             if (status != GS1_STATUS_OK)
             {
                 return status;
@@ -443,7 +517,13 @@ Gs1Status GameRuntime::dispatch_subscribed_command(const GameCommand& command)
 
         case CommandSubscriberId::PlacementValidation:
         {
-            const auto status = dispatch_to_site_system(PlacementValidationSystem::process_command);
+            const auto status = dispatch_site_system_command<PlacementValidationSystem>(
+                PlacementValidationSystem::process_command,
+                command,
+                campaign_,
+                active_site_run_,
+                command_queue_,
+                fixed_step_seconds_);
             if (status != GS1_STATUS_OK)
             {
                 return status;
@@ -453,7 +533,13 @@ Gs1Status GameRuntime::dispatch_subscribed_command(const GameCommand& command)
 
         case CommandSubscriberId::LocalWeatherResolve:
         {
-            const auto status = dispatch_to_site_system(LocalWeatherResolveSystem::process_command);
+            const auto status = dispatch_site_system_command<LocalWeatherResolveSystem>(
+                LocalWeatherResolveSystem::process_command,
+                command,
+                campaign_,
+                active_site_run_,
+                command_queue_,
+                fixed_step_seconds_);
             if (status != GS1_STATUS_OK)
             {
                 return status;
@@ -463,7 +549,13 @@ Gs1Status GameRuntime::dispatch_subscribed_command(const GameCommand& command)
 
         case CommandSubscriberId::Inventory:
         {
-            const auto status = dispatch_to_site_system(InventorySystem::process_command);
+            const auto status = dispatch_site_system_command<InventorySystem>(
+                InventorySystem::process_command,
+                command,
+                campaign_,
+                active_site_run_,
+                command_queue_,
+                fixed_step_seconds_);
             if (status != GS1_STATUS_OK)
             {
                 return status;
@@ -473,7 +565,13 @@ Gs1Status GameRuntime::dispatch_subscribed_command(const GameCommand& command)
 
         case CommandSubscriberId::EconomyPhone:
         {
-            const auto status = dispatch_to_site_system(EconomyPhoneSystem::process_command);
+            const auto status = dispatch_site_system_command<EconomyPhoneSystem>(
+                EconomyPhoneSystem::process_command,
+                command,
+                campaign_,
+                active_site_run_,
+                command_queue_,
+                fixed_step_seconds_);
             if (status != GS1_STATUS_OK)
             {
                 return status;
@@ -483,7 +581,13 @@ Gs1Status GameRuntime::dispatch_subscribed_command(const GameCommand& command)
 
         case CommandSubscriberId::CampDurability:
         {
-            const auto status = dispatch_to_site_system(CampDurabilitySystem::process_command);
+            const auto status = dispatch_site_system_command<CampDurabilitySystem>(
+                CampDurabilitySystem::process_command,
+                command,
+                campaign_,
+                active_site_run_,
+                command_queue_,
+                fixed_step_seconds_);
             if (status != GS1_STATUS_OK)
             {
                 return status;
@@ -493,7 +597,13 @@ Gs1Status GameRuntime::dispatch_subscribed_command(const GameCommand& command)
 
         case CommandSubscriberId::DeviceSupport:
         {
-            const auto status = dispatch_to_site_system(DeviceSupportSystem::process_command);
+            const auto status = dispatch_site_system_command<DeviceSupportSystem>(
+                DeviceSupportSystem::process_command,
+                command,
+                campaign_,
+                active_site_run_,
+                command_queue_,
+                fixed_step_seconds_);
             if (status != GS1_STATUS_OK)
             {
                 return status;
@@ -503,7 +613,13 @@ Gs1Status GameRuntime::dispatch_subscribed_command(const GameCommand& command)
 
         case CommandSubscriberId::DeviceMaintenance:
         {
-            const auto status = dispatch_to_site_system(DeviceMaintenanceSystem::process_command);
+            const auto status = dispatch_site_system_command<DeviceMaintenanceSystem>(
+                DeviceMaintenanceSystem::process_command,
+                command,
+                campaign_,
+                active_site_run_,
+                command_queue_,
+                fixed_step_seconds_);
             if (status != GS1_STATUS_OK)
             {
                 return status;
@@ -513,7 +629,13 @@ Gs1Status GameRuntime::dispatch_subscribed_command(const GameCommand& command)
 
         case CommandSubscriberId::Modifier:
         {
-            const auto status = dispatch_to_site_system(ModifierSystem::process_command);
+            const auto status = dispatch_site_system_command<ModifierSystem>(
+                ModifierSystem::process_command,
+                command,
+                campaign_,
+                active_site_run_,
+                command_queue_,
+                fixed_step_seconds_);
             if (status != GS1_STATUS_OK)
             {
                 return status;
@@ -1752,31 +1874,130 @@ void GameRuntime::run_fixed_step()
     CampaignFixedStepContext campaign_context {*campaign_};
     CampaignFlowSystem::run(campaign_context);
 
-    SiteSystemContext context {
+    const SiteMoveDirectionInput move_direction {
+        phase1_site_move_direction_.world_move_x,
+        phase1_site_move_direction_.world_move_y,
+        phase1_site_move_direction_.world_move_z,
+        phase1_site_move_direction_.present};
+
+    auto site_flow_context = make_site_system_context<SiteFlowSystem>(
         *campaign_,
         *active_site_run_,
         command_queue_,
         fixed_step_seconds_,
-        SiteMoveDirectionInput {
-            phase1_site_move_direction_.world_move_x,
-            phase1_site_move_direction_.world_move_y,
-            phase1_site_move_direction_.world_move_z,
-            phase1_site_move_direction_.present}};
+        move_direction);
+    SiteFlowSystem::run(site_flow_context);
 
-    SiteFlowSystem::run(context);
-    ModifierSystem::run(context);
-    WeatherEventSystem::run(context);
-    ActionExecutionSystem::run(context);
-    LocalWeatherResolveSystem::run(context);
-    WorkerConditionSystem::run(context);
-    CampDurabilitySystem::run(context);
-    DeviceMaintenanceSystem::run(context);
-    DeviceSupportSystem::run(context);
-    EcologySystem::run(context);
-    InventorySystem::run(context);
-    TaskBoardSystem::run(context);
-    EconomyPhoneSystem::run(context);
-    FailureRecoverySystem::run(context);
-    SiteCompletionSystem::run(context);
+    auto modifier_context = make_site_system_context<ModifierSystem>(
+        *campaign_,
+        *active_site_run_,
+        command_queue_,
+        fixed_step_seconds_,
+        move_direction);
+    ModifierSystem::run(modifier_context);
+
+    auto weather_event_context = make_site_system_context<WeatherEventSystem>(
+        *campaign_,
+        *active_site_run_,
+        command_queue_,
+        fixed_step_seconds_,
+        move_direction);
+    WeatherEventSystem::run(weather_event_context);
+
+    auto action_execution_context = make_site_system_context<ActionExecutionSystem>(
+        *campaign_,
+        *active_site_run_,
+        command_queue_,
+        fixed_step_seconds_,
+        move_direction);
+    ActionExecutionSystem::run(action_execution_context);
+
+    auto local_weather_context = make_site_system_context<LocalWeatherResolveSystem>(
+        *campaign_,
+        *active_site_run_,
+        command_queue_,
+        fixed_step_seconds_,
+        move_direction);
+    LocalWeatherResolveSystem::run(local_weather_context);
+
+    auto worker_condition_context = make_site_system_context<WorkerConditionSystem>(
+        *campaign_,
+        *active_site_run_,
+        command_queue_,
+        fixed_step_seconds_,
+        move_direction);
+    WorkerConditionSystem::run(worker_condition_context);
+
+    auto camp_durability_context = make_site_system_context<CampDurabilitySystem>(
+        *campaign_,
+        *active_site_run_,
+        command_queue_,
+        fixed_step_seconds_,
+        move_direction);
+    CampDurabilitySystem::run(camp_durability_context);
+
+    auto device_maintenance_context = make_site_system_context<DeviceMaintenanceSystem>(
+        *campaign_,
+        *active_site_run_,
+        command_queue_,
+        fixed_step_seconds_,
+        move_direction);
+    DeviceMaintenanceSystem::run(device_maintenance_context);
+
+    auto device_support_context = make_site_system_context<DeviceSupportSystem>(
+        *campaign_,
+        *active_site_run_,
+        command_queue_,
+        fixed_step_seconds_,
+        move_direction);
+    DeviceSupportSystem::run(device_support_context);
+
+    auto ecology_context = make_site_system_context<EcologySystem>(
+        *campaign_,
+        *active_site_run_,
+        command_queue_,
+        fixed_step_seconds_,
+        move_direction);
+    EcologySystem::run(ecology_context);
+
+    auto inventory_context = make_site_system_context<InventorySystem>(
+        *campaign_,
+        *active_site_run_,
+        command_queue_,
+        fixed_step_seconds_,
+        move_direction);
+    InventorySystem::run(inventory_context);
+
+    auto task_board_context = make_site_system_context<TaskBoardSystem>(
+        *campaign_,
+        *active_site_run_,
+        command_queue_,
+        fixed_step_seconds_,
+        move_direction);
+    TaskBoardSystem::run(task_board_context);
+
+    auto economy_context = make_site_system_context<EconomyPhoneSystem>(
+        *campaign_,
+        *active_site_run_,
+        command_queue_,
+        fixed_step_seconds_,
+        move_direction);
+    EconomyPhoneSystem::run(economy_context);
+
+    auto failure_context = make_site_system_context<FailureRecoverySystem>(
+        *campaign_,
+        *active_site_run_,
+        command_queue_,
+        fixed_step_seconds_,
+        move_direction);
+    FailureRecoverySystem::run(failure_context);
+
+    auto completion_context = make_site_system_context<SiteCompletionSystem>(
+        *campaign_,
+        *active_site_run_,
+        command_queue_,
+        fixed_step_seconds_,
+        move_direction);
+    SiteCompletionSystem::run(completion_context);
 }
 }  // namespace gs1

@@ -16,21 +16,26 @@ constexpr float k_mild_weather_dust = 5.0f;
 constexpr double k_phase_step_minutes = 0.5;
 constexpr float k_weather_epsilon = 0.0001f;
 
-void apply_site_weather(SiteRunState& site_run, float heat, float wind, float dust)
+void apply_site_weather(
+    SiteSystemContext<WeatherEventSystem>& context,
+    float heat,
+    float wind,
+    float dust)
 {
+    auto& weather = context.world.own_weather();
     const bool changed =
-        std::fabs(site_run.weather.weather_heat - heat) > k_weather_epsilon ||
-        std::fabs(site_run.weather.weather_wind - wind) > k_weather_epsilon ||
-        std::fabs(site_run.weather.weather_dust - dust) > k_weather_epsilon;
+        std::fabs(weather.weather_heat - heat) > k_weather_epsilon ||
+        std::fabs(weather.weather_wind - wind) > k_weather_epsilon ||
+        std::fabs(weather.weather_dust - dust) > k_weather_epsilon;
     if (!changed)
     {
         return;
     }
 
-    site_run.weather.weather_heat = heat;
-    site_run.weather.weather_wind = wind;
-    site_run.weather.weather_dust = dust;
-    site_run.pending_projection_update_flags |= SITE_PROJECTION_UPDATE_WEATHER;
+    weather.weather_heat = heat;
+    weather.weather_wind = wind;
+    weather.weather_dust = dust;
+    context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
 }
 
 float resolve_phase_pressure(EventPhase phase)
@@ -57,7 +62,7 @@ bool WeatherEventSystem::subscribes_to(GameCommandType type) noexcept
 }
 
 Gs1Status WeatherEventSystem::process_command(
-    SiteSystemContext& context,
+    SiteSystemContext<WeatherEventSystem>& context,
     const GameCommand& command)
 {
     if (command.type != GameCommandType::SiteRunStarted)
@@ -65,24 +70,25 @@ Gs1Status WeatherEventSystem::process_command(
         return GS1_STATUS_OK;
     }
 
-    auto& site_run = context.site_run;
-    if (site_run.site_id.value != 1U || site_run.event.event_phase != EventPhase::None)
+    auto& weather = context.world.own_weather();
+    auto& event = context.world.own_event();
+    if (context.world.site_id_value() != 1U || event.event_phase != EventPhase::None)
     {
         return GS1_STATUS_OK;
     }
 
-    site_run.weather.forecast_profile_state.forecast_profile_id = 1U;
-    site_run.weather.site_weather_bias = 0.0f;
-    site_run.event.active_event_template_id = EventTemplateId{1U};
-    site_run.event.event_phase = EventPhase::Warning;
-    site_run.event.phase_minutes_remaining = 5.0;
-    site_run.event.event_heat_pressure = k_mild_weather_heat * resolve_phase_pressure(EventPhase::Warning);
-    site_run.event.event_wind_pressure = k_mild_weather_wind * resolve_phase_pressure(EventPhase::Warning);
-    site_run.event.event_dust_pressure = k_mild_weather_dust * resolve_phase_pressure(EventPhase::Warning);
-    site_run.event.aftermath_relief_resolved = 0.0f;
+    weather.forecast_profile_state.forecast_profile_id = 1U;
+    weather.site_weather_bias = 0.0f;
+    event.active_event_template_id = EventTemplateId{1U};
+    event.event_phase = EventPhase::Warning;
+    event.phase_minutes_remaining = 5.0;
+    event.event_heat_pressure = k_mild_weather_heat * resolve_phase_pressure(EventPhase::Warning);
+    event.event_wind_pressure = k_mild_weather_wind * resolve_phase_pressure(EventPhase::Warning);
+    event.event_dust_pressure = k_mild_weather_dust * resolve_phase_pressure(EventPhase::Warning);
+    event.aftermath_relief_resolved = 0.0f;
 
-    site_run.pending_projection_update_flags |= SITE_PROJECTION_UPDATE_WEATHER;
-    apply_site_weather(site_run, k_mild_weather_heat, k_mild_weather_wind, k_mild_weather_dust);
+    context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
+    apply_site_weather(context, k_mild_weather_heat, k_mild_weather_wind, k_mild_weather_dust);
 
     return GS1_STATUS_OK;
 }
@@ -107,50 +113,50 @@ EventPhase advance_phase(EventPhase current) noexcept
 }
 }  // namespace
 
-void WeatherEventSystem::run(SiteSystemContext& context)
+void WeatherEventSystem::run(SiteSystemContext<WeatherEventSystem>& context)
 {
-    auto& site_run = context.site_run;
-    if (site_run.event.event_phase == EventPhase::None ||
-        !site_run.event.active_event_template_id.has_value())
+    auto& event = context.world.own_event();
+    if (event.event_phase == EventPhase::None ||
+        !event.active_event_template_id.has_value())
     {
         return;
     }
 
-    const auto previous_phase = site_run.event.event_phase;
-    const auto previous_template_id = site_run.event.active_event_template_id;
+    const auto previous_phase = event.event_phase;
+    const auto previous_template_id = event.active_event_template_id;
 
-    site_run.event.phase_minutes_remaining -= k_phase_step_minutes;
-    if (site_run.event.phase_minutes_remaining <= 0.0)
+    event.phase_minutes_remaining -= k_phase_step_minutes;
+    if (event.phase_minutes_remaining <= 0.0)
     {
-        if (site_run.event.event_phase == EventPhase::Aftermath)
+        if (event.event_phase == EventPhase::Aftermath)
         {
-            site_run.event.event_phase = EventPhase::None;
-            site_run.event.phase_minutes_remaining = 0.0;
-            site_run.event.active_event_template_id.reset();
-            site_run.event.event_heat_pressure = 0.0f;
-            site_run.event.event_wind_pressure = 0.0f;
-            site_run.event.event_dust_pressure = 0.0f;
-            site_run.event.aftermath_relief_resolved = 1.0f;
-            site_run.pending_projection_update_flags |= SITE_PROJECTION_UPDATE_WEATHER;
-            apply_site_weather(site_run, 0.0f, 0.0f, 0.0f);
+            event.event_phase = EventPhase::None;
+            event.phase_minutes_remaining = 0.0;
+            event.active_event_template_id.reset();
+            event.event_heat_pressure = 0.0f;
+            event.event_wind_pressure = 0.0f;
+            event.event_dust_pressure = 0.0f;
+            event.aftermath_relief_resolved = 1.0f;
+            context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
+            apply_site_weather(context, 0.0f, 0.0f, 0.0f);
             return;
         }
 
-        site_run.event.event_phase = advance_phase(site_run.event.event_phase);
-        site_run.event.phase_minutes_remaining = 5.0;
+        event.event_phase = advance_phase(event.event_phase);
+        event.phase_minutes_remaining = 5.0;
     }
 
-    const float pressure_scale = resolve_phase_pressure(site_run.event.event_phase);
-    site_run.event.event_heat_pressure = k_mild_weather_heat * pressure_scale;
-    site_run.event.event_wind_pressure = k_mild_weather_wind * pressure_scale;
-    site_run.event.event_dust_pressure = k_mild_weather_dust * pressure_scale;
-    if (site_run.event.event_phase != previous_phase ||
-        site_run.event.active_event_template_id != previous_template_id)
+    const float pressure_scale = resolve_phase_pressure(event.event_phase);
+    event.event_heat_pressure = k_mild_weather_heat * pressure_scale;
+    event.event_wind_pressure = k_mild_weather_wind * pressure_scale;
+    event.event_dust_pressure = k_mild_weather_dust * pressure_scale;
+    if (event.event_phase != previous_phase ||
+        event.active_event_template_id != previous_template_id)
     {
-        site_run.pending_projection_update_flags |= SITE_PROJECTION_UPDATE_WEATHER;
+        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
     }
     apply_site_weather(
-        site_run,
+        context,
         k_mild_weather_heat * pressure_scale,
         k_mild_weather_wind * pressure_scale,
         k_mild_weather_dust * pressure_scale);

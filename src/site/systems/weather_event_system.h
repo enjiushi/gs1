@@ -8,10 +8,23 @@ namespace gs1
 class WeatherEventSystem final
 {
 public:
+    [[nodiscard]] static constexpr SiteSystemAccess access() noexcept
+    {
+        return SiteSystemAccess {
+            "WeatherEventSystem",
+            site_component_mask_of(
+                SiteComponent::RunMeta,
+                SiteComponent::Weather,
+                SiteComponent::Event),
+            site_component_mask_of(
+                SiteComponent::Weather,
+                SiteComponent::Event)};
+    }
+
     [[nodiscard]] static bool subscribes_to(GameCommandType type) noexcept;
     [[nodiscard]] static Gs1Status process_command(
-        SiteSystemContext& context,
+        SiteSystemContext<WeatherEventSystem>& context,
         const GameCommand& command);
-    static void run(SiteSystemContext& context);
+    static void run(SiteSystemContext<WeatherEventSystem>& context);
 };
 }  // namespace gs1

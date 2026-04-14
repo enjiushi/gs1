@@ -29,28 +29,29 @@ bool money_delta_fits(std::int64_t amount) noexcept
         amount <= std::numeric_limits<std::int32_t>::max();
 }
 
-void mark_phone_and_hud_dirty(SiteSystemContext& context) noexcept
+void mark_phone_and_hud_dirty(SiteSystemContext<EconomyPhoneSystem>& context) noexcept
 {
-    context.site_run.pending_projection_update_flags |=
-        SITE_PROJECTION_UPDATE_PHONE | SITE_PROJECTION_UPDATE_HUD;
+    context.world.mark_projection_dirty(
+        SITE_PROJECTION_UPDATE_PHONE | SITE_PROJECTION_UPDATE_HUD);
 }
 
-bool adjust_money(SiteSystemContext& context, std::int32_t delta) noexcept
+bool adjust_money(SiteSystemContext<EconomyPhoneSystem>& context, std::int32_t delta) noexcept
 {
-    const auto current = static_cast<std::int64_t>(context.site_run.economy.money);
+    auto& economy = context.world.own_economy();
+    const auto current = static_cast<std::int64_t>(economy.money);
     const auto updated = current + delta;
     if (updated < 0 || updated > std::numeric_limits<std::int32_t>::max())
     {
         return false;
     }
 
-    context.site_run.economy.money = static_cast<std::int32_t>(updated);
+    economy.money = static_cast<std::int32_t>(updated);
     return true;
 }
 
-PhoneListingState* find_listing(SiteRunState& site_run, std::uint32_t listing_id) noexcept
+PhoneListingState* find_listing(EconomyState& economy, std::uint32_t listing_id) noexcept
 {
-    for (auto& listing : site_run.economy.available_phone_listings)
+    for (auto& listing : economy.available_phone_listings)
     {
         if (listing.listing_id == listing_id)
         {
@@ -60,9 +61,9 @@ PhoneListingState* find_listing(SiteRunState& site_run, std::uint32_t listing_id
     return nullptr;
 }
 
-PhoneListingState* find_unlockable_listing(SiteRunState& site_run, std::uint32_t unlockable_id) noexcept
+PhoneListingState* find_unlockable_listing(EconomyState& economy, std::uint32_t unlockable_id) noexcept
 {
-    for (auto& listing : site_run.economy.available_phone_listings)
+    for (auto& listing : economy.available_phone_listings)
     {
         if (listing.kind == PhoneListingKind::PurchaseUnlockable &&
             listing.item_id.value == unlockable_id)
@@ -86,7 +87,7 @@ void remove_unlockable(std::vector<std::uint32_t>& container, std::uint32_t unlo
 }
 
 Gs1Status process_buy_listing(
-    SiteSystemContext& context,
+    SiteSystemContext<EconomyPhoneSystem>& context,
     PhoneListingState& listing,
     std::uint32_t quantity)
 {
@@ -123,7 +124,7 @@ Gs1Status process_buy_listing(
 }
 
 Gs1Status process_sell_listing(
-    SiteSystemContext& context,
+    SiteSystemContext<EconomyPhoneSystem>& context,
     PhoneListingState& listing,
     std::uint32_t quantity)
 {
@@ -160,10 +161,10 @@ Gs1Status process_sell_listing(
 }
 
 Gs1Status process_contractor_hire(
-    SiteSystemContext& context,
+    SiteSystemContext<EconomyPhoneSystem>& context,
     const ContractorHireRequestedCommand& payload)
 {
-    auto* listing = find_listing(context.site_run, payload.listing_or_offer_id);
+    auto* listing = find_listing(context.world.own_economy(), payload.listing_or_offer_id);
     if (listing == nullptr)
     {
         return GS1_STATUS_NOT_FOUND;
@@ -202,16 +203,17 @@ Gs1Status process_contractor_hire(
 }
 
 Gs1Status process_unlockable_purchase(
-    SiteSystemContext& context,
+    SiteSystemContext<EconomyPhoneSystem>& context,
     std::uint32_t unlockable_id,
     std::int32_t price)
 {
+    auto& economy = context.world.own_economy();
     if (price < 0 || !money_delta_fits(-static_cast<std::int64_t>(price)))
     {
         return GS1_STATUS_INVALID_STATE;
     }
 
-    if (!contains_unlockable(context.site_run.economy.direct_purchase_unlockable_ids, unlockable_id))
+    if (!contains_unlockable(economy.direct_purchase_unlockable_ids, unlockable_id))
     {
         return GS1_STATUS_INVALID_STATE;
     }
@@ -221,19 +223,19 @@ Gs1Status process_unlockable_purchase(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    remove_unlockable(context.site_run.economy.direct_purchase_unlockable_ids, unlockable_id);
-    if (!contains_unlockable(context.site_run.economy.revealed_site_unlockable_ids, unlockable_id))
+    remove_unlockable(economy.direct_purchase_unlockable_ids, unlockable_id);
+    if (!contains_unlockable(economy.revealed_site_unlockable_ids, unlockable_id))
     {
-        context.site_run.economy.revealed_site_unlockable_ids.push_back(unlockable_id);
+        economy.revealed_site_unlockable_ids.push_back(unlockable_id);
     }
 
     mark_phone_and_hud_dirty(context);
     return GS1_STATUS_OK;
 }
 
-void seed_site_economy(SiteSystemContext& context, std::uint32_t site_id)
+void seed_site_economy(SiteSystemContext<EconomyPhoneSystem>& context, std::uint32_t site_id)
 {
-    auto& economy = context.site_run.economy;
+    auto& economy = context.world.own_economy();
     economy.available_phone_listings.clear();
     economy.revealed_site_unlockable_ids.clear();
     economy.direct_purchase_unlockable_ids.clear();
@@ -298,7 +300,7 @@ bool EconomyPhoneSystem::subscribes_to(GameCommandType type) noexcept
 }
 
 Gs1Status EconomyPhoneSystem::process_command(
-    SiteSystemContext& context,
+    SiteSystemContext<EconomyPhoneSystem>& context,
     const GameCommand& command)
 {
     switch (command.type)
@@ -313,7 +315,7 @@ Gs1Status EconomyPhoneSystem::process_command(
     case GameCommandType::PhoneListingPurchaseRequested:
     {
         const auto& payload = command.payload_as<PhoneListingPurchaseRequestedCommand>();
-        auto* listing = find_listing(context.site_run, payload.listing_id);
+        auto* listing = find_listing(context.world.own_economy(), payload.listing_id);
         if (listing == nullptr)
         {
             return GS1_STATUS_NOT_FOUND;
@@ -334,7 +336,7 @@ Gs1Status EconomyPhoneSystem::process_command(
     case GameCommandType::PhoneListingSaleRequested:
     {
         const auto& payload = command.payload_as<PhoneListingSaleRequestedCommand>();
-        auto* listing = find_listing(context.site_run, payload.listing_id_or_item_id);
+        auto* listing = find_listing(context.world.own_economy(), payload.listing_id_or_item_id);
         if (listing == nullptr)
         {
             return GS1_STATUS_NOT_FOUND;
@@ -350,7 +352,7 @@ Gs1Status EconomyPhoneSystem::process_command(
     case GameCommandType::SiteUnlockablePurchaseRequested:
     {
         const auto& payload = command.payload_as<SiteUnlockablePurchaseRequestedCommand>();
-        const auto* listing = find_unlockable_listing(context.site_run, payload.unlockable_id);
+        const auto* listing = find_unlockable_listing(context.world.own_economy(), payload.unlockable_id);
         if (listing == nullptr)
         {
             return GS1_STATUS_NOT_FOUND;
@@ -364,7 +366,7 @@ Gs1Status EconomyPhoneSystem::process_command(
     }
 }
 
-void EconomyPhoneSystem::run(SiteSystemContext&)
+void EconomyPhoneSystem::run(SiteSystemContext<EconomyPhoneSystem>&)
 {
 }
 }  // namespace gs1

@@ -46,65 +46,35 @@ TileCoord tile_coord_from_index(const TileGridState& tile_grid, std::size_t inde
         static_cast<std::int32_t>(index / tile_grid.width)};
 }
 
-void mark_tile_projection_dirty(SiteRunState& site_run, TileCoord coord)
-{
-    if (!tile_coord_in_bounds(site_run.tile_grid, coord))
-    {
-        return;
-    }
-
-    const auto tile_count = site_run.tile_grid.tile_count();
-    if (tile_count == 0U)
-    {
-        return;
-    }
-
-    if (site_run.pending_tile_projection_update_mask.size() != tile_count)
-    {
-        site_run.pending_tile_projection_update_mask.assign(tile_count, 0U);
-        site_run.pending_tile_projection_updates.clear();
-    }
-
-    const auto index = site_run.tile_grid.to_index(coord);
-    if (index >= site_run.pending_tile_projection_update_mask.size())
-    {
-        return;
-    }
-
-    if (site_run.pending_tile_projection_update_mask[index] == 0U)
-    {
-        site_run.pending_tile_projection_update_mask[index] = 1U;
-        site_run.pending_tile_projection_updates.push_back(coord);
-    }
-
-    site_run.pending_projection_update_flags |= SITE_PROJECTION_UPDATE_TILES;
-}
-
-void emit_tile_ecology_changed(SiteSystemContext& context, TileCoord coord, std::uint32_t changed_mask)
+void emit_tile_ecology_changed(
+    SiteSystemContext<EcologySystem>& context,
+    TileCoord coord,
+    std::uint32_t changed_mask)
 {
     if (changed_mask == TILE_ECOLOGY_CHANGED_NONE)
     {
         return;
     }
 
-    if (!tile_coord_in_bounds(context.site_run.tile_grid, coord))
+    const auto& tile_grid = context.world.read_tile_grid();
+    if (!tile_coord_in_bounds(tile_grid, coord))
     {
         return;
     }
 
-    const auto index = context.site_run.tile_grid.to_index(coord);
+    const auto index = tile_grid.to_index(coord);
     GameCommand command {};
     command.type = GameCommandType::TileEcologyChanged;
     command.set_payload(TileEcologyChangedCommand {
         coord.x,
         coord.y,
         changed_mask,
-        context.site_run.tile_grid.plant_type_ids[index].value,
-        context.site_run.tile_grid.ground_cover_type_ids[index],
-        context.site_run.tile_grid.tile_plant_density[index],
-        context.site_run.tile_grid.tile_sand_burial[index]});
+        tile_grid.plant_type_ids[index].value,
+        tile_grid.ground_cover_type_ids[index],
+        tile_grid.tile_plant_density[index],
+        tile_grid.tile_sand_burial[index]});
     context.command_queue.push_back(command);
-    mark_tile_projection_dirty(context.site_run, coord);
+    context.world.mark_tile_projection_dirty(coord);
 }
 
 std::uint32_t apply_ground_cover(
@@ -251,21 +221,23 @@ std::uint32_t apply_burial_cleared(
     return TILE_ECOLOGY_CHANGED_SAND_BURIAL;
 }
 
-void update_restoration_progress(SiteSystemContext& context, std::uint32_t new_count)
+void update_restoration_progress(
+    SiteSystemContext<EcologySystem>& context,
+    std::uint32_t new_count)
 {
-    auto& site_run = context.site_run;
-    const auto previous_count = site_run.counters.fully_grown_tile_count;
+    auto& counters = context.world.own_counters();
+    const auto previous_count = counters.fully_grown_tile_count;
     if (previous_count == new_count)
     {
         return;
     }
 
-    site_run.counters.fully_grown_tile_count = new_count;
+    counters.fully_grown_tile_count = new_count;
     float normalized_progress = 0.0f;
-    if (site_run.counters.site_completion_tile_threshold > 0U)
+    if (counters.site_completion_tile_threshold > 0U)
     {
         normalized_progress = static_cast<float>(new_count) /
-            static_cast<float>(site_run.counters.site_completion_tile_threshold);
+            static_cast<float>(counters.site_completion_tile_threshold);
         normalized_progress = std::clamp(normalized_progress, 0.0f, 1.0f);
     }
 
@@ -273,10 +245,10 @@ void update_restoration_progress(SiteSystemContext& context, std::uint32_t new_c
     progress_command.type = GameCommandType::RestorationProgressChanged;
     progress_command.set_payload(RestorationProgressChangedCommand {
         new_count,
-        site_run.counters.site_completion_tile_threshold,
+        counters.site_completion_tile_threshold,
         normalized_progress});
     context.command_queue.push_back(progress_command);
-    site_run.pending_projection_update_flags |= SITE_PROJECTION_UPDATE_HUD;
+    context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_HUD);
 }
 }  // namespace
 
@@ -295,9 +267,10 @@ bool EcologySystem::subscribes_to(GameCommandType type) noexcept
 }
 
 Gs1Status EcologySystem::process_command(
-    SiteSystemContext& context,
+    SiteSystemContext<EcologySystem>& context,
     const GameCommand& command)
 {
+    auto& tile_grid = context.world.own_tile_grid();
     switch (command.type)
     {
     case GameCommandType::SiteGroundCoverPlaced:
@@ -307,7 +280,7 @@ Gs1Status EcologySystem::process_command(
         emit_tile_ecology_changed(
             context,
             coord,
-            apply_ground_cover(context.site_run.tile_grid, coord, payload));
+            apply_ground_cover(tile_grid, coord, payload));
         break;
     }
 
@@ -318,7 +291,7 @@ Gs1Status EcologySystem::process_command(
         emit_tile_ecology_changed(
             context,
             coord,
-            apply_planting(context.site_run.tile_grid, coord, payload));
+            apply_planting(tile_grid, coord, payload));
         break;
     }
 
@@ -329,7 +302,7 @@ Gs1Status EcologySystem::process_command(
         emit_tile_ecology_changed(
             context,
             coord,
-            apply_watering(context.site_run.tile_grid, coord, payload));
+            apply_watering(tile_grid, coord, payload));
         break;
     }
 
@@ -340,7 +313,7 @@ Gs1Status EcologySystem::process_command(
         emit_tile_ecology_changed(
             context,
             coord,
-            apply_burial_cleared(context.site_run.tile_grid, coord, payload));
+            apply_burial_cleared(tile_grid, coord, payload));
         break;
     }
 
@@ -351,10 +324,9 @@ Gs1Status EcologySystem::process_command(
     return GS1_STATUS_OK;
 }
 
-void EcologySystem::run(SiteSystemContext& context)
+void EcologySystem::run(SiteSystemContext<EcologySystem>& context)
 {
-    auto& site_run = context.site_run;
-    auto& tile_grid = site_run.tile_grid;
+    auto& tile_grid = context.world.own_tile_grid();
     const auto tile_count = tile_grid.tile_count();
     if (tile_count == 0 || !has_valid_tile_data(tile_grid))
     {

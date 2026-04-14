@@ -84,7 +84,7 @@ void assign_slot(InventorySlot& slot, ItemId item_id, std::uint32_t quantity) no
 }
 
 void emit_item_use_effect_if_supported(
-    SiteSystemContext& context,
+    SiteSystemContext<InventorySystem>& context,
     const InventorySlot& slot,
     std::uint32_t quantity)
 {
@@ -112,10 +112,10 @@ void emit_item_use_effect_if_supported(
     context.command_queue.push_back(command);
 }
 
-void seed_inventory_for_site_one(SiteSystemContext& context) noexcept
+void seed_inventory_for_site_one(SiteSystemContext<InventorySystem>& context) noexcept
 {
-    auto& inventory = context.site_run.inventory;
-    if (context.site_run.site_id.value != 1U)
+    auto& inventory = context.world.own_inventory();
+    if (context.world.site_id_value() != 1U)
     {
         return;
     }
@@ -138,16 +138,17 @@ void seed_inventory_for_site_one(SiteSystemContext& context) noexcept
         assign_slot(inventory.camp_storage_slots[0], ItemId{4}, 5U);
     }
 
-    context.site_run.pending_projection_update_flags |= SITE_PROJECTION_UPDATE_INVENTORY;
+    context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_INVENTORY);
 }
 
 Gs1Status handle_inventory_item_use(
-    SiteSystemContext& context,
+    SiteSystemContext<InventorySystem>& context,
     const InventoryItemUseRequestedCommand& payload) noexcept
 {
-    ensure_inventory_slots(context.site_run.inventory);
+    auto& inventory = context.world.own_inventory();
+    ensure_inventory_slots(inventory);
     auto* slot = find_slot(
-        context.site_run.inventory,
+        inventory,
         payload.container_kind,
         static_cast<std::size_t>(payload.slot_index));
     if (slot == nullptr || !slot->occupied)
@@ -173,12 +174,12 @@ Gs1Status handle_inventory_item_use(
         clear_slot(*slot);
     }
 
-    context.site_run.pending_projection_update_flags |= SITE_PROJECTION_UPDATE_INVENTORY;
+    context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_INVENTORY);
     return GS1_STATUS_OK;
 }
 
 Gs1Status handle_inventory_transfer(
-    SiteSystemContext& context,
+    SiteSystemContext<InventorySystem>& context,
     const InventoryTransferRequestedCommand& payload) noexcept
 {
     if (payload.source_slot_index == payload.destination_slot_index &&
@@ -187,13 +188,14 @@ Gs1Status handle_inventory_transfer(
         return GS1_STATUS_OK;
     }
 
-    ensure_inventory_slots(context.site_run.inventory);
+    auto& inventory = context.world.own_inventory();
+    ensure_inventory_slots(inventory);
     auto* source_slot = find_slot(
-        context.site_run.inventory,
+        inventory,
         payload.source_container_kind,
         static_cast<std::size_t>(payload.source_slot_index));
     auto* destination_slot = find_slot(
-        context.site_run.inventory,
+        inventory,
         payload.destination_container_kind,
         static_cast<std::size_t>(payload.destination_slot_index));
     if (source_slot == nullptr || destination_slot == nullptr || !source_slot->occupied)
@@ -228,7 +230,7 @@ Gs1Status handle_inventory_transfer(
         clear_slot(*source_slot);
     }
 
-    context.site_run.pending_projection_update_flags |= SITE_PROJECTION_UPDATE_INVENTORY;
+    context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_INVENTORY);
     return GS1_STATUS_OK;
 }
 
@@ -248,7 +250,7 @@ bool InventorySystem::subscribes_to(GameCommandType type) noexcept
 }
 
 Gs1Status InventorySystem::process_command(
-    SiteSystemContext& context,
+    SiteSystemContext<InventorySystem>& context,
     const GameCommand& command)
 {
     switch (command.type)
@@ -269,8 +271,8 @@ Gs1Status InventorySystem::process_command(
     }
 }
 
-void InventorySystem::run(SiteSystemContext& context)
+void InventorySystem::run(SiteSystemContext<InventorySystem>& context)
 {
-    ensure_inventory_slots(context.site_run.inventory);
+    ensure_inventory_slots(context.world.own_inventory());
 }
 }  // namespace gs1

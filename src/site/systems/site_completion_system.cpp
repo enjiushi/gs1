@@ -23,13 +23,13 @@ bool has_pending_site_transition_command(
 }
 }  // namespace
 
-void SiteCompletionSystem::run(SiteSystemContext& context)
+void SiteCompletionSystem::run(SiteSystemContext<SiteCompletionSystem>& context)
 {
-    const auto& site_run = context.site_run;
-    if (site_run.run_status != SiteRunStatus::Active ||
-        site_run.counters.site_completion_tile_threshold == 0U ||
-        site_run.counters.fully_grown_tile_count < site_run.counters.site_completion_tile_threshold ||
-        has_pending_site_transition_command(context.command_queue, site_run.site_id.value))
+    const auto& counters = context.world.read_counters();
+    if (context.world.run_status() != SiteRunStatus::Active ||
+        counters.site_completion_tile_threshold == 0U ||
+        counters.fully_grown_tile_count < counters.site_completion_tile_threshold ||
+        has_pending_site_transition_command(context.command_queue, context.world.site_id_value()))
     {
         return;
     }
@@ -37,7 +37,7 @@ void SiteCompletionSystem::run(SiteSystemContext& context)
     GameCommand command {};
     command.type = GameCommandType::SiteAttemptEnded;
     command.set_payload(SiteAttemptEndedCommand {
-        site_run.site_id.value,
+        context.world.site_id_value(),
         GS1_SITE_ATTEMPT_RESULT_COMPLETED});
     context.command_queue.push_back(command);
 }

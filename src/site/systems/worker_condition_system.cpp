@@ -111,22 +111,22 @@ std::uint32_t compute_change_mask(
     return mask;
 }
 
-void ensure_memory_for_run(SiteSystemContext& context) noexcept
+void ensure_memory_for_run(SiteSystemContext<WorkerConditionSystem>& context) noexcept
 {
     auto& memory = g_worker_memory;
     if (!memory.site_run_id.has_value() ||
-        memory.site_run_id->value != context.site_run.site_run_id.value)
+        memory.site_run_id->value != context.world.site_run_id().value)
     {
-        memory.site_run_id = context.site_run.site_run_id;
+        memory.site_run_id = context.world.site_run_id();
         memory.last_reported_snapshot.reset();
     }
 }
 
-void emit_worker_meters_changed_if_needed(SiteSystemContext& context) noexcept
+void emit_worker_meters_changed_if_needed(SiteSystemContext<WorkerConditionSystem>& context) noexcept
 {
     ensure_memory_for_run(context);
     auto& memory = g_worker_memory;
-    const auto snapshot = make_snapshot(context.site_run.worker);
+    const auto snapshot = make_snapshot(context.world.read_worker_needs());
     const auto previous_snapshot = memory.last_reported_snapshot.value_or(snapshot);
     const auto mask = compute_change_mask(previous_snapshot, snapshot);
     const auto is_initial = !memory.last_reported_snapshot.has_value();
@@ -146,8 +146,8 @@ void emit_worker_meters_changed_if_needed(SiteSystemContext& context) noexcept
             snapshot.morale,
             snapshot.work_efficiency});
         context.command_queue.push_back(command);
-        context.site_run.pending_projection_update_flags |=
-            SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD;
+        context.world.mark_projection_dirty(
+            SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
         memory.last_reported_snapshot = snapshot;
     }
 }
@@ -221,7 +221,7 @@ bool WorkerConditionSystem::subscribes_to(GameCommandType type) noexcept
 }
 
 Gs1Status WorkerConditionSystem::process_command(
-    SiteSystemContext& context,
+    SiteSystemContext<WorkerConditionSystem>& context,
     const GameCommand& command)
 {
     if (command.type != GameCommandType::WorkerMeterDeltaRequested)
@@ -230,16 +230,16 @@ Gs1Status WorkerConditionSystem::process_command(
     }
 
     apply_worker_meter_delta(
-        context.site_run.worker,
+        context.world.own_worker_needs(),
         command.payload_as<WorkerMeterDeltaRequestedCommand>());
     emit_worker_meters_changed_if_needed(context);
     return GS1_STATUS_OK;
 }
 
-void WorkerConditionSystem::run(SiteSystemContext& context)
+void WorkerConditionSystem::run(SiteSystemContext<WorkerConditionSystem>& context)
 {
     const auto step_seconds = static_cast<float>(context.fixed_step_seconds);
-    apply_passive_decay(context.site_run.worker, step_seconds);
+    apply_passive_decay(context.world.own_worker_needs(), step_seconds);
     emit_worker_meters_changed_if_needed(context);
 }
 }  // namespace gs1

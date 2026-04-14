@@ -45,7 +45,7 @@ bool LocalWeatherResolveSystem::subscribes_to(GameCommandType type) noexcept
 }
 
 Gs1Status LocalWeatherResolveSystem::process_command(
-    SiteSystemContext& context,
+    SiteSystemContext<LocalWeatherResolveSystem>& context,
     const GameCommand& command)
 {
     (void)context;
@@ -53,10 +53,9 @@ Gs1Status LocalWeatherResolveSystem::process_command(
     return GS1_STATUS_OK;
 }
 
-void LocalWeatherResolveSystem::run(SiteSystemContext& context)
+void LocalWeatherResolveSystem::run(SiteSystemContext<LocalWeatherResolveSystem>& context)
 {
-    auto& site_run = context.site_run;
-    auto& tile_grid = site_run.tile_grid;
+    auto& tile_grid = context.world.own_tile_grid();
     if (!has_valid_tile_grid(tile_grid))
     {
         return;
@@ -68,9 +67,10 @@ void LocalWeatherResolveSystem::run(SiteSystemContext& context)
         return;
     }
 
-    const float base_heat = site_run.weather.weather_heat;
-    const float base_wind = site_run.weather.weather_wind;
-    const float base_dust = site_run.weather.weather_dust;
+    const auto& weather = context.world.read_weather();
+    const float base_heat = weather.weather_heat;
+    const float base_wind = weather.weather_wind;
+    const float base_dust = weather.weather_dust;
 
     for (std::size_t index = 0; index < tile_count; ++index)
     {

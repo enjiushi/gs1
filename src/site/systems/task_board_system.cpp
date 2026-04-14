@@ -19,16 +19,16 @@ std::uint32_t normalized_task_target(std::uint32_t requested_target) noexcept
     return requested_target == 0U ? 1U : requested_target;
 }
 
-TaskInstanceState make_site1_task(const SiteRunState& site_run) noexcept
+TaskInstanceState make_site1_task(const SiteCounters& counters) noexcept
 {
     TaskInstanceState task {};
     task.task_instance_id = k_site1_task_instance_id;
     task.task_template_id = k_site1_task_template_id;
     task.publisher_faction_id = k_site1_publisher_id;
     task.task_tier_id = k_site1_task_tier_id;
-    task.target_amount = normalized_task_target(site_run.counters.site_completion_tile_threshold);
+    task.target_amount = normalized_task_target(counters.site_completion_tile_threshold);
     task.current_progress_amount =
-        std::min(task.target_amount, site_run.counters.fully_grown_tile_count);
+        std::min(task.target_amount, counters.fully_grown_tile_count);
     task.runtime_list_kind = TaskRuntimeListKind::Visible;
     return task;
 }
@@ -67,10 +67,10 @@ bool remove_task_id(std::vector<TaskInstanceId>& list, TaskInstanceId id) noexce
     return true;
 }
 
-void mark_task_projection_dirty(SiteRunState& site_run) noexcept
+void mark_task_projection_dirty(SiteSystemContext<TaskBoardSystem>& context) noexcept
 {
-    site_run.pending_projection_update_flags |=
-        SITE_PROJECTION_UPDATE_TASKS | SITE_PROJECTION_UPDATE_HUD;
+    context.world.mark_projection_dirty(
+        SITE_PROJECTION_UPDATE_TASKS | SITE_PROJECTION_UPDATE_HUD);
 }
 
 bool complete_task(TaskBoardState& board, TaskInstanceState& task) noexcept
@@ -86,9 +86,11 @@ bool complete_task(TaskBoardState& board, TaskInstanceState& task) noexcept
     return true;
 }
 
-void handle_site_run_started(SiteSystemContext& context, const SiteRunStartedCommand& payload)
+void handle_site_run_started(
+    SiteSystemContext<TaskBoardSystem>& context,
+    const SiteRunStartedCommand& payload)
 {
-    auto& board = context.site_run.task_board;
+    auto& board = context.world.own_task_board();
     reset_task_board(board);
 
     if (payload.site_id != 1U)
@@ -96,17 +98,17 @@ void handle_site_run_started(SiteSystemContext& context, const SiteRunStartedCom
         return;
     }
 
-    board.visible_tasks.push_back(make_site1_task(context.site_run));
+    board.visible_tasks.push_back(make_site1_task(context.world.read_counters()));
     board.task_pool_size = static_cast<std::uint32_t>(board.visible_tasks.size());
     board.minutes_until_next_refresh = 0.0;
-    mark_task_projection_dirty(context.site_run);
+    mark_task_projection_dirty(context);
 }
 
 void handle_task_accept_requested(
-    SiteSystemContext& context,
+    SiteSystemContext<TaskBoardSystem>& context,
     const TaskAcceptRequestedCommand& payload)
 {
-    auto& board = context.site_run.task_board;
+    auto& board = context.world.own_task_board();
     if (board.accepted_task_ids.size() >= board.accepted_task_cap)
     {
         return;
@@ -121,14 +123,14 @@ void handle_task_accept_requested(
 
     task->runtime_list_kind = TaskRuntimeListKind::Accepted;
     board.accepted_task_ids.push_back(task->task_instance_id);
-    mark_task_projection_dirty(context.site_run);
+    mark_task_projection_dirty(context);
 }
 
 void handle_restoration_progress(
-    SiteSystemContext& context,
+    SiteSystemContext<TaskBoardSystem>& context,
     const RestorationProgressChangedCommand& payload)
 {
-    auto& board = context.site_run.task_board;
+    auto& board = context.world.own_task_board();
     if (board.visible_tasks.empty())
     {
         return;
@@ -157,7 +159,7 @@ void handle_restoration_progress(
 
     if (mutated)
     {
-        mark_task_projection_dirty(context.site_run);
+        mark_task_projection_dirty(context);
     }
 }
 }  // namespace
@@ -176,7 +178,7 @@ bool TaskBoardSystem::subscribes_to(GameCommandType type) noexcept
 }
 
 Gs1Status TaskBoardSystem::process_command(
-    SiteSystemContext& context,
+    SiteSystemContext<TaskBoardSystem>& context,
     const GameCommand& command)
 {
     switch (command.type)
@@ -197,7 +199,7 @@ Gs1Status TaskBoardSystem::process_command(
     return GS1_STATUS_OK;
 }
 
-void TaskBoardSystem::run(SiteSystemContext& context)
+void TaskBoardSystem::run(SiteSystemContext<TaskBoardSystem>& context)
 {
     (void)context;
 }

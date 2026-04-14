@@ -8,10 +8,20 @@ namespace gs1
 class TaskBoardSystem final
 {
 public:
+    [[nodiscard]] static constexpr SiteSystemAccess access() noexcept
+    {
+        return SiteSystemAccess {
+            "TaskBoardSystem",
+            site_component_mask_of(
+                SiteComponent::TaskBoard,
+                SiteComponent::Counters),
+            site_component_mask_of(SiteComponent::TaskBoard)};
+    }
+
     [[nodiscard]] static bool subscribes_to(GameCommandType type) noexcept;
     [[nodiscard]] static Gs1Status process_command(
-        SiteSystemContext& context,
+        SiteSystemContext<TaskBoardSystem>& context,
         const GameCommand& command);
-    static void run(SiteSystemContext& context);
+    static void run(SiteSystemContext<TaskBoardSystem>& context);
 };
 }  // namespace gs1

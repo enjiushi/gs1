@@ -37,17 +37,18 @@ using gs1::SiteSystemContext;
 using gs1::SiteMoveDirectionInput;
 using gs1::StartSiteAttemptCommand;
 
-SiteSystemContext make_site_context(
+template <typename SiteSystemTag>
+SiteSystemContext<SiteSystemTag> make_site_context(
     CampaignState& campaign,
     SiteRunState& site_run,
     GameCommandQueue& command_queue)
 {
-    return SiteSystemContext {
+    return gs1::make_site_system_context<SiteSystemTag>(
         campaign,
         site_run,
         command_queue,
         0.25,
-        SiteMoveDirectionInput {}};
+        SiteMoveDirectionInput {});
 }
 }  // namespace
 
@@ -113,10 +114,10 @@ int main()
     site_run.counters.fully_grown_tile_count = 0U;
 
     GameCommandQueue command_queue {};
-    auto site_context = make_site_context(campaign, site_run, command_queue);
-    site_context.move_direction = SiteMoveDirectionInput {1.0f, 0.0f, 0.0f, true};
+    auto site_flow_context = make_site_context<SiteFlowSystem>(campaign, site_run, command_queue);
+    site_flow_context.move_direction = SiteMoveDirectionInput {1.0f, 0.0f, 0.0f, true};
 
-    SiteFlowSystem::run(site_context);
+    SiteFlowSystem::run(site_flow_context);
     assert(site_run.worker.tile_position_x > 2.0f);
     assert(site_run.worker.tile_position_y == 2.0f);
     assert(site_run.worker.facing_degrees == 90.0f);
@@ -127,7 +128,8 @@ int main()
     assert(campaign.campaign_days_remaining == 30U);
 
     site_run.counters.fully_grown_tile_count = 3U;
-    SiteCompletionSystem::run(site_context);
+    auto completion_context = make_site_context<SiteCompletionSystem>(campaign, site_run, command_queue);
+    SiteCompletionSystem::run(completion_context);
     assert(site_run.run_status == SiteRunStatus::Active);
     assert(command_queue.size() == 1U);
     assert(command_queue.front().type == GameCommandType::SiteAttemptEnded);
@@ -137,7 +139,8 @@ int main()
     command_queue.clear();
     site_run.counters.fully_grown_tile_count = 0U;
     site_run.worker.player_health = 0.0f;
-    FailureRecoverySystem::run(site_context);
+    auto failure_context = make_site_context<FailureRecoverySystem>(campaign, site_run, command_queue);
+    FailureRecoverySystem::run(failure_context);
     assert(site_run.run_status == SiteRunStatus::Active);
     assert(command_queue.size() == 1U);
     assert(command_queue.front().type == GameCommandType::SiteAttemptEnded);

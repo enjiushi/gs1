@@ -21,7 +21,6 @@ bool has_valid_device_data(const TileGridState& tile_grid) noexcept
     return tile_count > 0 &&
         tile_grid.structure_type_ids.size() >= tile_count &&
         tile_grid.device_integrity.size() >= tile_count &&
-        tile_grid.device_efficiency.size() >= tile_count &&
         tile_grid.tile_sand_burial.size() >= tile_count;
 }
 
@@ -34,7 +33,7 @@ bool DeviceMaintenanceSystem::subscribes_to(GameCommandType type) noexcept
 }
 
 Gs1Status DeviceMaintenanceSystem::process_command(
-    SiteSystemContext& context,
+    SiteSystemContext<DeviceMaintenanceSystem>& context,
     const GameCommand& command)
 {
     (void)context;
@@ -42,10 +41,9 @@ Gs1Status DeviceMaintenanceSystem::process_command(
     return GS1_STATUS_OK;
 }
 
-void DeviceMaintenanceSystem::run(SiteSystemContext& context)
+void DeviceMaintenanceSystem::run(SiteSystemContext<DeviceMaintenanceSystem>& context)
 {
-    auto& site_run = context.site_run;
-    auto& tile_grid = site_run.tile_grid;
+    auto& tile_grid = context.world.own_tile_grid();
 
     const auto tile_count = tile_grid.tile_count();
     if (tile_count == 0U || !has_valid_device_data(tile_grid))
@@ -60,9 +58,9 @@ void DeviceMaintenanceSystem::run(SiteSystemContext& context)
     }
 
     const float weather_wear_base =
-        std::fabs(site_run.weather.weather_heat) +
-        std::fabs(site_run.weather.weather_wind) +
-        std::fabs(site_run.weather.weather_dust);
+        std::fabs(context.world.read_weather().weather_heat) +
+        std::fabs(context.world.read_weather().weather_wind) +
+        std::fabs(context.world.read_weather().weather_dust);
     const float weather_wear = weather_wear_base * k_weather_wear_per_unit * step_seconds;
 
     for (std::size_t index = 0; index < tile_count; ++index)
@@ -85,24 +83,12 @@ void DeviceMaintenanceSystem::run(SiteSystemContext& context)
         const float next_integrity = std::clamp(previous_integrity - total_wear, 0.0f, 1.0f);
         const bool integrity_changed = std::fabs(next_integrity - previous_integrity) > k_integrity_epsilon;
 
-        const float previous_efficiency = tile_grid.device_efficiency[index];
-        const float next_efficiency = next_integrity;
-        const bool efficiency_changed = std::fabs(next_efficiency - previous_efficiency) > k_integrity_epsilon;
-
-        if (!integrity_changed && !efficiency_changed)
+        if (!integrity_changed)
         {
             continue;
         }
 
-        if (integrity_changed)
-        {
-            tile_grid.device_integrity[index] = next_integrity;
-        }
-
-        if (efficiency_changed)
-        {
-            tile_grid.device_efficiency[index] = next_efficiency;
-        }
+        tile_grid.device_integrity[index] = next_integrity;
     }
 }
 }  // namespace gs1

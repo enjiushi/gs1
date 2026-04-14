@@ -38,7 +38,7 @@ bool DeviceSupportSystem::subscribes_to(GameCommandType type) noexcept
 }
 
 Gs1Status DeviceSupportSystem::process_command(
-    SiteSystemContext& context,
+    SiteSystemContext<DeviceSupportSystem>& context,
     const GameCommand& command)
 {
     (void)context;
@@ -46,10 +46,9 @@ Gs1Status DeviceSupportSystem::process_command(
     return GS1_STATUS_OK;
 }
 
-void DeviceSupportSystem::run(SiteSystemContext& context)
+void DeviceSupportSystem::run(SiteSystemContext<DeviceSupportSystem>& context)
 {
-    auto& site_run = context.site_run;
-    auto& tile_grid = site_run.tile_grid;
+    auto& tile_grid = context.world.own_tile_grid();
     if (!has_valid_device_tile_data(tile_grid))
     {
         return;

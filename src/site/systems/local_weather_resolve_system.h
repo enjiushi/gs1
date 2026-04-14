@@ -8,10 +8,22 @@ namespace gs1
 class LocalWeatherResolveSystem final
 {
 public:
+    [[nodiscard]] static constexpr SiteSystemAccess access() noexcept
+    {
+        return SiteSystemAccess {
+            "LocalWeatherResolveSystem",
+            site_component_mask_of(
+                SiteComponent::TileLayout,
+                SiteComponent::TileEcology,
+                SiteComponent::TileWeather,
+                SiteComponent::Weather),
+            site_component_mask_of(SiteComponent::TileWeather)};
+    }
+
     [[nodiscard]] static bool subscribes_to(GameCommandType type) noexcept;
     [[nodiscard]] static Gs1Status process_command(
-        SiteSystemContext& context,
+        SiteSystemContext<LocalWeatherResolveSystem>& context,
         const GameCommand& command);
-    static void run(SiteSystemContext& context);
+    static void run(SiteSystemContext<LocalWeatherResolveSystem>& context);
 };
 }  // namespace gs1

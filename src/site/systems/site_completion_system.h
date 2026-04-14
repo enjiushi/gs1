@@ -7,6 +7,16 @@ namespace gs1
 class SiteCompletionSystem final
 {
 public:
-    static void run(SiteSystemContext& context);
+    [[nodiscard]] static constexpr SiteSystemAccess access() noexcept
+    {
+        return SiteSystemAccess {
+            "SiteCompletionSystem",
+            site_component_mask_of(
+                SiteComponent::RunMeta,
+                SiteComponent::Counters),
+            0U};
+    }
+
+    static void run(SiteSystemContext<SiteCompletionSystem>& context);
 };
 }  // namespace gs1

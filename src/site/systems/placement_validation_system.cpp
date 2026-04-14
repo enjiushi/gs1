@@ -69,12 +69,12 @@ bool is_tile_reserved(
 }
 
 PlacementReservationRejectionReason validate_request(
-    const SiteRunState& site_run,
+    SiteRunId site_run_id,
+    const TileGridState& tile_grid,
     TileCoord target_tile,
     PlacementOccupancyLayer occupancy_layer,
     std::uint32_t excluding_action_id) noexcept
 {
-    const auto& tile_grid = site_run.tile_grid;
     if (!tile_coord_in_bounds(tile_grid, target_tile))
     {
         return PlacementReservationRejectionReason::OutOfBounds;
@@ -125,7 +125,7 @@ PlacementReservationRejectionReason validate_request(
         return PlacementReservationRejectionReason::TerrainBlocked;
     }
 
-    if (is_tile_reserved(site_run.site_run_id, target_tile, excluding_action_id))
+    if (is_tile_reserved(site_run_id, target_tile, excluding_action_id))
     {
         return PlacementReservationRejectionReason::Reserved;
     }
@@ -133,18 +133,19 @@ PlacementReservationRejectionReason validate_request(
     return PlacementReservationRejectionReason::None;
 }
 
-void handle_site_run_started(SiteSystemContext& context) noexcept
+void handle_site_run_started(SiteSystemContext<PlacementValidationSystem>& context) noexcept
 {
-    prune_reservations_for_run(context.site_run.site_run_id);
+    prune_reservations_for_run(context.world.site_run_id());
 }
 
 void handle_reservation_requested(
-    SiteSystemContext& context,
+    SiteSystemContext<PlacementValidationSystem>& context,
     const PlacementReservationRequestedCommand& payload)
 {
     const TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
     const auto rejection_reason = validate_request(
-        context.site_run,
+        context.world.site_run_id(),
+        context.world.read_tile_grid(),
         target_tile,
         payload.occupancy_layer,
         payload.action_id);
@@ -164,7 +165,7 @@ void handle_reservation_requested(
 
     const std::uint32_t reservation_token = g_next_reservation_token++;
     g_reservations.push_back(PlacementReservationRecord {
-        context.site_run.site_run_id,
+        context.world.site_run_id(),
         payload.action_id,
         reservation_token,
         target_tile,
@@ -212,7 +213,7 @@ bool PlacementValidationSystem::subscribes_to(GameCommandType type) noexcept
 }
 
 Gs1Status PlacementValidationSystem::process_command(
-    SiteSystemContext& context,
+    SiteSystemContext<PlacementValidationSystem>& context,
     const GameCommand& command)
 {
     switch (command.type)
@@ -238,7 +239,7 @@ Gs1Status PlacementValidationSystem::process_command(
     return GS1_STATUS_OK;
 }
 
-void PlacementValidationSystem::run(SiteSystemContext& context)
+void PlacementValidationSystem::run(SiteSystemContext<PlacementValidationSystem>& context)
 {
     (void)context;
 }

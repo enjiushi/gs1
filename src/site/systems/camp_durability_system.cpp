@@ -60,29 +60,29 @@ float compute_event_phase_wear(EventPhase phase) noexcept
     return k_event_phase_wear_per_second * resolve_event_phase_scale(phase);
 }
 
-void refresh_memory_with_current_state(SiteSystemContext& context)
+void refresh_memory_with_current_state(SiteSystemContext<CampDurabilitySystem>& context)
 {
     auto& memory = g_camp_durability_memory;
-    memory.site_run_id = context.site_run.site_run_id;
-    memory.last_reported_durability = context.site_run.camp.camp_durability;
-    memory.last_protection_resolved = context.site_run.camp.camp_protection_resolved;
-    memory.last_delivery_operational = context.site_run.camp.delivery_point_operational;
-    memory.last_shared_storage_access_enabled =
-        context.site_run.camp.shared_camp_storage_access_enabled;
+    const auto& camp = context.world.read_camp();
+    memory.site_run_id = context.world.site_run_id();
+    memory.last_reported_durability = camp.camp_durability;
+    memory.last_protection_resolved = camp.camp_protection_resolved;
+    memory.last_delivery_operational = camp.delivery_point_operational;
+    memory.last_shared_storage_access_enabled = camp.shared_camp_storage_access_enabled;
 }
 
-void ensure_memory_for_run(SiteSystemContext& context)
+void ensure_memory_for_run(SiteSystemContext<CampDurabilitySystem>& context)
 {
     auto& memory = g_camp_durability_memory;
     if (!memory.site_run_id.has_value() ||
-        memory.site_run_id->value != context.site_run.site_run_id.value)
+        memory.site_run_id->value != context.world.site_run_id().value)
     {
         refresh_memory_with_current_state(context);
     }
 }
 
 void apply_projection_if_needed(
-    SiteSystemContext& context,
+    SiteSystemContext<CampDurabilitySystem>& context,
     float durability,
     bool protection_resolved,
     bool delivery_operational,
@@ -101,7 +101,7 @@ void apply_projection_if_needed(
         return;
     }
 
-    context.site_run.pending_projection_update_flags |= SITE_PROJECTION_UPDATE_CAMP;
+    context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_CAMP);
     memory.last_reported_durability = durability;
     memory.last_protection_resolved = protection_resolved;
     memory.last_delivery_operational = delivery_operational;
@@ -115,7 +115,7 @@ bool CampDurabilitySystem::subscribes_to(GameCommandType type) noexcept
 }
 
 Gs1Status CampDurabilitySystem::process_command(
-    SiteSystemContext& context,
+    SiteSystemContext<CampDurabilitySystem>& context,
     const GameCommand& command)
 {
     if (command.type != GameCommandType::SiteRunStarted)
@@ -123,7 +123,7 @@ Gs1Status CampDurabilitySystem::process_command(
         return GS1_STATUS_OK;
     }
 
-    auto& camp = context.site_run.camp;
+    auto& camp = context.world.own_camp();
     camp.camp_durability = k_camp_durability_max;
     camp.camp_protection_resolved = true;
     camp.delivery_point_operational = true;
@@ -132,7 +132,7 @@ Gs1Status CampDurabilitySystem::process_command(
     return GS1_STATUS_OK;
 }
 
-void CampDurabilitySystem::run(SiteSystemContext& context)
+void CampDurabilitySystem::run(SiteSystemContext<CampDurabilitySystem>& context)
 {
     ensure_memory_for_run(context);
     if (context.fixed_step_seconds <= 0.0)
@@ -140,12 +140,12 @@ void CampDurabilitySystem::run(SiteSystemContext& context)
         return;
     }
 
-    auto& camp = context.site_run.camp;
+    auto& camp = context.world.own_camp();
     const auto step_seconds = static_cast<float>(context.fixed_step_seconds);
     const float wear_rate_per_second =
         k_base_wear_per_second +
-        compute_weather_intensity(context.site_run.weather) * k_weather_wear_scale +
-        compute_event_phase_wear(context.site_run.event.event_phase);
+        compute_weather_intensity(context.world.read_weather()) * k_weather_wear_scale +
+        compute_event_phase_wear(context.world.read_event().event_phase);
     const float wear_amount = wear_rate_per_second * step_seconds;
     const float previous = camp.camp_durability;
     camp.camp_durability =
