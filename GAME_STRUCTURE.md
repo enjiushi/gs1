@@ -5,6 +5,7 @@
 This framework defines a world-simulation-first ECS architecture where:
 
 - the ECS world is the single source of truth
+- the common ECS storage model is archetype-style
 - systems communicate via commands, plus translated feedback events when execution re-enters gameplay
 - the engine is only a rendering and execution adapter
 - the game remains portable across engines
@@ -257,6 +258,90 @@ These:
 
 ---
 
+### 4.4 Archetype-Style ECS Storage Model
+
+The default ECS implementation model is archetype-style storage.
+
+Rules:
+
+- entities that share the same component layout should live in the same archetype storage
+- component storage inside an archetype should remain dense and iteration-friendly
+- systems may rely on archetype-local contiguous iteration when processing large homogeneous sets
+- resources remain valid alongside archetype entity storage; not all world data needs to become entities
+- specialized storage rules are allowed when a domain has stronger invariants than ordinary gameplay entities, as long as that domain still obeys the same ECS ownership and system model
+
+Clarification:
+
+- this document treats archetype ECS as the common framework, not as a special-case optimization
+- a game may still build domain-specific helpers on top of that framework when the domain requires fixed ordering or direct index math
+- systems should iterate the archetypes or entity sets that actually carry the components they need, instead of scanning unrelated archetypes to discover sparse data
+- sparse identity-bearing gameplay objects such as devices should live as their own ECS entities and may carry a tile-coordinate component when they need to reference fixed tile data
+
+### 4.5 Fixed Dense Tile Domain Inside ECS
+
+Tile data may live inside the common ECS world as a specialized fixed dense domain.
+
+This is still ECS.
+
+It differs from ordinary dynamic entities because tile cells have stronger invariants:
+
+- tile count for one site is fixed after world creation
+- tile order is stable after creation
+- tile storage is dense and row-major
+- `tile_index = y * width + x` remains valid for the whole site lifetime
+- tile systems may intentionally iterate in row-major index order rather than generic unordered query order
+
+Design intent:
+
+- the tile domain should keep the benefits of ECS ownership, shared world access rules, and archetype-based storage
+- the tile domain should also preserve direct spatial indexing, neighbor lookup, and full-grid pass efficiency
+- tiles should not be treated like free-form spawn/despawn gameplay entities once the site world is initialized
+
+Recommended split:
+
+- fixed dense tile entities own map-cell data such as terrain, traversability, soil, local weather fields, occupancy, and other per-cell simulation data
+- dynamic ECS entities own actor/object identity such as characters, dropped items, projectiles, action executors, or any world object whose lifecycle is not one fixed map cell
+- singleton or wide-scope state such as clocks, weather/event globals, task boards, economy state, UI state, and campaign/session state may remain plain owner-managed runtime state when that data does not benefit from ECS identity, archetype composition, or spatial queries
+
+Clarification:
+
+- this framework does not require every gameplay singleton or manager-style state block to become an ECS resource
+- ECS is primarily for authoritative world entities and per-cell simulation data
+- once tile or actor gameplay data is migrated into ECS, that payload should remain authoritative there rather than being mirrored in legacy vector-backed simulation stores
+- helper arrays or vectors may still exist for dirty-index tracking, projection batching, or adapter-local staging, but they are not authoritative gameplay state
+
+Current implementation snapshot:
+
+- ECS-applied authoritative data in the current codebase: fixed dense tile components for terrain/traversability/plantability/structure reservation, tile ecology values, tile local weather values, sparse device entities carrying `DeviceTag`, `TileCoordComponent`, `DeviceStructureId`, `DeviceIntegrity`, `DeviceEfficiency`, and `DeviceStoredWater`, plus the worker ECS entity for position/facing and vitals
+- non-ECS authoritative data in the current codebase: site clock, site run metadata and status, camp state, inventory state, contractor state, weather state, event state, task-board state, modifier state, economy state, action state, and site counters
+- non-ECS helper/runtime data in the current codebase: projection-dirty flags, pending tile projection lists, and projection update masks
+- future identity-bearing gameplay objects such as additional characters, dropped items, projectiles, and action executors remain valid ECS categories in the architecture, but they are not yet separate ECS entity sets in the current implementation
+
+Current ownership snapshot:
+
+- `SiteFlowSystem` owns `SiteClockState` plus worker position/facing ECS components
+- `WorkerConditionSystem` owns worker vitals ECS components
+- `LocalWeatherResolveSystem` owns tile local weather ECS components
+- `EcologySystem` owns the currently mutable tile ecology ECS fields: plant slot, ground-cover slot, plant density, sand burial, and restoration progress counter updates
+- `DeviceMaintenanceSystem` owns `DeviceIntegrity` on sparse device entities and reads tile burial through each device entity's tile coordinate
+- `DeviceSupportSystem` owns `DeviceEfficiency` and `DeviceStoredWater` on sparse device entities and reads tile heat through each device entity's tile coordinate
+- `WeatherEventSystem` owns weather and event singleton state
+- `CampDurabilitySystem` owns camp durability and camp service flags
+- `InventorySystem` owns inventory state
+- `TaskBoardSystem` owns task-board state
+- `ModifierSystem` owns modifier state
+- `EconomyPhoneSystem` owns economy and phone-listing state
+- `ActionExecutionSystem` owns action state
+- `CampaignFlowSystem` owns site-attempt result status transitions after `SiteAttemptEnded`
+- bootstrap-only read-mostly data such as tile topology/static components, unmutated ecology baseline fields, sparse device identity/placement fields, and setup metadata are initialized by site creation and are not currently owned by a runtime simulation system
+- projection dirty flags and adapter-facing dirty lists are helper state rather than authoritative gameplay state, so multiple systems may set their own dirty bits without violating gameplay ownership
+
+Implementation rule:
+
+- if a tile-heavy system depends on direct index math or stable row-major traversal for correctness or performance, that requirement should be treated as part of the tile-domain contract rather than as an accidental implementation detail
+
+---
+
 ## 5. System Design
 
 Each system:
@@ -298,6 +383,8 @@ Rules:
 
 - a system may write only the ECS data it owns
 - non-owned ECS data is read-only to that system
+- systems should access ECS through owner-scoped read/read-write views of the exact components they are authorized to touch
+- a system should not pull a whole aggregate snapshot through a helper API when it owns only one component inside that aggregate
 - if a system needs another ownership domain to change, it must emit a command for the owning system or module to resolve
 - command flow is the mechanism for requesting changes in another ownership domain, not only for cosmetic signaling
 - if a system needs to react to another system's published gameplay meaning, it should do so by subscribing to the relevant command type rather than by directly calling that system

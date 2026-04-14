@@ -30,6 +30,7 @@ This file is a quick orientation guide for agents working in this repository.
 
 ## Code Style
 
+- All structs should try to be trivial. Prefer simple data-only layouts and avoid adding behavior or lifecycle management to structs unless there is a clear need.
 - Prefer POD-like structs for data containers: keep them trivial and standard-layout when practical, with no virtual functions, custom constructors/destructors, or owning containers unless the design clearly needs them. This keeps layout predictable and gives the compiler the best chance to optimize copies, binary payloads, and cache-friendly data paths.
 
 ## System Ownership Rule
@@ -38,6 +39,11 @@ This file is a quick orientation guide for agents working in this repository.
 - A system may directly mutate only the state it owns.
 - Do not add direct system-to-system calls for gameplay coordination.
 - Do not directly mutate another system's owned state even if both states are reachable from the same runtime object or context struct.
+- ECS systems should iterate the archetypes or entity sets that actually carry the components they care about.
+- Do not scan a broad dense archetype such as all tiles just to discover a sparse component such as devices or other optional occupants.
+- If sparse gameplay data needs tile linkage, give that data its own ECS entity with a tile-coordinate component instead of hanging the sparse payload off every tile entity.
+- Prefer owner-scoped ECS access helpers that make read-only versus read/write component access explicit.
+- When mutating ECS data, update only the owned components that changed; avoid whole-aggregate read/modify/write paths when only one field or component is owned by that system.
 - If one system needs another ownership domain to change, express that request through internal `GameCommand` flow and let subscribed owning systems resolve it.
 - Treat `GameCommand` definitions as publish/observe contracts, not private RPCs between two named systems.
 - Define a command payload around gameplay meaning published by the producer; do not shape it around one specific consumer's implementation details.

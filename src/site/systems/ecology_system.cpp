@@ -2,6 +2,7 @@
 
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
+#include "site/site_world_access.h"
 
 #include <algorithm>
 #include <cmath>
@@ -15,35 +16,9 @@ constexpr float k_density_epsilon = 0.0001f;
 constexpr float k_growth_rate_per_second = 0.2f;
 constexpr float k_water_density_per_unit = 0.2f;
 
-bool tile_coord_in_bounds(const TileGridState& tile_grid, TileCoord coord) noexcept
+bool has_tile_occupant(PlantId plant_id, std::uint32_t ground_cover_type_id) noexcept
 {
-    return coord.x >= 0 &&
-        coord.y >= 0 &&
-        static_cast<std::uint32_t>(coord.x) < tile_grid.width &&
-        static_cast<std::uint32_t>(coord.y) < tile_grid.height;
-}
-
-bool has_valid_tile_data(const TileGridState& tile_grid) noexcept
-{
-    const auto tile_count = tile_grid.tile_count();
-    return tile_count > 0 &&
-        tile_grid.plant_type_ids.size() >= tile_count &&
-        tile_grid.ground_cover_type_ids.size() >= tile_count &&
-        tile_grid.tile_plant_density.size() >= tile_count &&
-        tile_grid.tile_sand_burial.size() >= tile_count;
-}
-
-bool has_tile_occupant(const TileGridState& tile_grid, std::size_t index) noexcept
-{
-    return tile_grid.plant_type_ids[index].value != 0U ||
-        tile_grid.ground_cover_type_ids[index] != 0U;
-}
-
-TileCoord tile_coord_from_index(const TileGridState& tile_grid, std::size_t index) noexcept
-{
-    return TileCoord {
-        static_cast<std::int32_t>(index % tile_grid.width),
-        static_cast<std::int32_t>(index / tile_grid.width)};
+    return plant_id.value != 0U || ground_cover_type_id != 0U;
 }
 
 void emit_tile_ecology_changed(
@@ -56,122 +31,158 @@ void emit_tile_ecology_changed(
         return;
     }
 
-    const auto& tile_grid = context.world.read_tile_grid();
-    if (!tile_coord_in_bounds(tile_grid, coord))
+    if (!site_world_access::tile_coord_in_bounds(context.site_run, coord))
     {
         return;
     }
 
-    const auto index = tile_grid.to_index(coord);
-    GameCommand command {};
-    command.type = GameCommandType::TileEcologyChanged;
-    command.set_payload(TileEcologyChangedCommand {
+    TileEcologyChangedCommand payload {
         coord.x,
         coord.y,
         changed_mask,
-        tile_grid.plant_type_ids[index].value,
-        tile_grid.ground_cover_type_ids[index],
-        tile_grid.tile_plant_density[index],
-        tile_grid.tile_sand_burial[index]});
+        0U,
+        0U,
+        0.0f,
+        0.0f};
+    const bool has_tile = site_world_access::ecology::read_tile(
+        context.site_run,
+        coord,
+        [&](const site_ecs::TileSandBurial& sand_burial,
+            const site_ecs::TilePlantSlot& plant,
+            const site_ecs::TileGroundCoverSlot& ground_cover,
+            const site_ecs::TilePlantDensity& density) {
+            payload.plant_type_id = plant.plant_id.value;
+            payload.ground_cover_type_id = ground_cover.ground_cover_type_id;
+            payload.plant_density = density.value;
+            payload.sand_burial = sand_burial.value;
+        });
+    if (!has_tile)
+    {
+        return;
+    }
+
+    GameCommand command {};
+    command.type = GameCommandType::TileEcologyChanged;
+    command.set_payload(payload);
     context.command_queue.push_back(command);
     context.world.mark_tile_projection_dirty(coord);
 }
 
 std::uint32_t apply_ground_cover(
-    TileGridState& tile_grid,
+    SiteRunState& site_run,
     TileCoord coord,
     const SiteGroundCoverPlacedCommand& payload)
 {
-    if (!tile_coord_in_bounds(tile_grid, coord) || !has_valid_tile_data(tile_grid))
+    if (!site_world_access::tile_coord_in_bounds(site_run, coord))
     {
         return TILE_ECOLOGY_CHANGED_NONE;
     }
 
-    const auto index = tile_grid.to_index(coord);
     std::uint32_t changed_mask = TILE_ECOLOGY_CHANGED_NONE;
-    bool occupancy_changed = false;
+    site_world_access::ecology::with_tile_mut(
+        site_run,
+        coord,
+        [&](site_ecs::TileSandBurial&,
+            site_ecs::TilePlantSlot& plant,
+            site_ecs::TileGroundCoverSlot& ground_cover,
+            site_ecs::TilePlantDensity& density) {
+            bool modified = false;
+            bool occupancy_changed = false;
 
-    if (tile_grid.ground_cover_type_ids[index] != payload.ground_cover_type_id)
-    {
-        tile_grid.ground_cover_type_ids[index] = payload.ground_cover_type_id;
-        occupancy_changed = true;
-    }
+            if (ground_cover.ground_cover_type_id != payload.ground_cover_type_id)
+            {
+                ground_cover.ground_cover_type_id = payload.ground_cover_type_id;
+                occupancy_changed = true;
+                modified = true;
+            }
 
-    if (tile_grid.plant_type_ids[index].value != 0U)
-    {
-        tile_grid.plant_type_ids[index] = PlantId{};
-        occupancy_changed = true;
-    }
+            if (plant.plant_id.value != 0U)
+            {
+                plant.plant_id = PlantId {};
+                occupancy_changed = true;
+                modified = true;
+            }
 
-    const float target_density = std::clamp(payload.initial_density, 0.0f, 1.0f);
-    if (std::fabs(tile_grid.tile_plant_density[index] - target_density) > k_density_epsilon)
-    {
-        tile_grid.tile_plant_density[index] = target_density;
-        changed_mask |= TILE_ECOLOGY_CHANGED_DENSITY;
-    }
+            const float target_density = std::clamp(payload.initial_density, 0.0f, 1.0f);
+            if (std::fabs(density.value - target_density) > k_density_epsilon)
+            {
+                density.value = target_density;
+                changed_mask |= TILE_ECOLOGY_CHANGED_DENSITY;
+                modified = true;
+            }
 
-    if (occupancy_changed)
-    {
-        changed_mask |= TILE_ECOLOGY_CHANGED_OCCUPANCY;
-    }
+            if (occupancy_changed)
+            {
+                changed_mask |= TILE_ECOLOGY_CHANGED_OCCUPANCY;
+            }
+
+            return modified;
+        });
 
     return changed_mask;
 }
 
 std::uint32_t apply_planting(
-    TileGridState& tile_grid,
+    SiteRunState& site_run,
     TileCoord coord,
     const SiteTilePlantingCompletedCommand& payload)
 {
-    if (!tile_coord_in_bounds(tile_grid, coord) || !has_valid_tile_data(tile_grid))
+    if (!site_world_access::tile_coord_in_bounds(site_run, coord))
     {
         return TILE_ECOLOGY_CHANGED_NONE;
     }
 
-    const auto index = tile_grid.to_index(coord);
     std::uint32_t changed_mask = TILE_ECOLOGY_CHANGED_NONE;
-    bool occupancy_changed = false;
+    site_world_access::ecology::with_tile_mut(
+        site_run,
+        coord,
+        [&](site_ecs::TileSandBurial&,
+            site_ecs::TilePlantSlot& plant,
+            site_ecs::TileGroundCoverSlot& ground_cover,
+            site_ecs::TilePlantDensity& density) {
+            bool modified = false;
+            bool occupancy_changed = false;
 
-    const PlantId requested_plant {payload.plant_type_id};
-    if (tile_grid.plant_type_ids[index].value != requested_plant.value)
-    {
-        tile_grid.plant_type_ids[index] = requested_plant;
-        occupancy_changed = true;
-    }
+            const PlantId requested_plant {payload.plant_type_id};
+            if (plant.plant_id.value != requested_plant.value)
+            {
+                plant.plant_id = requested_plant;
+                occupancy_changed = true;
+                modified = true;
+            }
 
-    if (tile_grid.ground_cover_type_ids[index] != 0U)
-    {
-        tile_grid.ground_cover_type_ids[index] = 0U;
-        occupancy_changed = true;
-    }
+            if (ground_cover.ground_cover_type_id != 0U)
+            {
+                ground_cover.ground_cover_type_id = 0U;
+                occupancy_changed = true;
+                modified = true;
+            }
 
-    const float target_density = std::clamp(payload.initial_density, 0.0f, 1.0f);
-    if (std::fabs(tile_grid.tile_plant_density[index] - target_density) > k_density_epsilon)
-    {
-        tile_grid.tile_plant_density[index] = target_density;
-        changed_mask |= TILE_ECOLOGY_CHANGED_DENSITY;
-    }
+            const float target_density = std::clamp(payload.initial_density, 0.0f, 1.0f);
+            if (std::fabs(density.value - target_density) > k_density_epsilon)
+            {
+                density.value = target_density;
+                changed_mask |= TILE_ECOLOGY_CHANGED_DENSITY;
+                modified = true;
+            }
 
-    if (occupancy_changed)
-    {
-        changed_mask |= TILE_ECOLOGY_CHANGED_OCCUPANCY;
-    }
+            if (occupancy_changed)
+            {
+                changed_mask |= TILE_ECOLOGY_CHANGED_OCCUPANCY;
+            }
+
+            return modified;
+        });
 
     return changed_mask;
 }
 
 std::uint32_t apply_watering(
-    TileGridState& tile_grid,
+    SiteRunState& site_run,
     TileCoord coord,
     const SiteTileWateredCommand& payload)
 {
-    if (!tile_coord_in_bounds(tile_grid, coord) || !has_valid_tile_data(tile_grid))
-    {
-        return TILE_ECOLOGY_CHANGED_NONE;
-    }
-
-    const auto index = tile_grid.to_index(coord);
-    if (!has_tile_occupant(tile_grid, index))
+    if (!site_world_access::tile_coord_in_bounds(site_run, coord))
     {
         return TILE_ECOLOGY_CHANGED_NONE;
     }
@@ -182,43 +193,69 @@ std::uint32_t apply_watering(
         return TILE_ECOLOGY_CHANGED_NONE;
     }
 
-    const float current_density = tile_grid.tile_plant_density[index];
-    if (current_density >= 1.0f - k_density_epsilon)
-    {
-        return TILE_ECOLOGY_CHANGED_NONE;
-    }
+    std::uint32_t changed_mask = TILE_ECOLOGY_CHANGED_NONE;
+    site_world_access::ecology::with_tile_mut(
+        site_run,
+        coord,
+        [&](site_ecs::TileSandBurial&,
+            site_ecs::TilePlantSlot& plant,
+            site_ecs::TileGroundCoverSlot& ground_cover,
+            site_ecs::TilePlantDensity& density) {
+            if (!has_tile_occupant(plant.plant_id, ground_cover.ground_cover_type_id))
+            {
+                return false;
+            }
 
-    const float next_density = std::min(1.0f, current_density + amount * k_water_density_per_unit);
-    if (std::fabs(next_density - current_density) <= k_density_epsilon)
-    {
-        return TILE_ECOLOGY_CHANGED_NONE;
-    }
+            const float current_density = density.value;
+            if (current_density >= 1.0f - k_density_epsilon)
+            {
+                return false;
+            }
 
-    tile_grid.tile_plant_density[index] = next_density;
-    return TILE_ECOLOGY_CHANGED_DENSITY;
+            const float next_density =
+                std::min(1.0f, current_density + amount * k_water_density_per_unit);
+            if (std::fabs(next_density - current_density) <= k_density_epsilon)
+            {
+                return false;
+            }
+
+            density.value = next_density;
+            changed_mask = TILE_ECOLOGY_CHANGED_DENSITY;
+            return true;
+        });
+    return changed_mask;
 }
 
 std::uint32_t apply_burial_cleared(
-    TileGridState& tile_grid,
+    SiteRunState& site_run,
     TileCoord coord,
     const SiteTileBurialClearedCommand& payload)
 {
-    if (!tile_coord_in_bounds(tile_grid, coord) || !has_valid_tile_data(tile_grid))
+    if (!site_world_access::tile_coord_in_bounds(site_run, coord))
     {
         return TILE_ECOLOGY_CHANGED_NONE;
     }
 
-    const auto index = tile_grid.to_index(coord);
-    const float previous_burial = tile_grid.tile_sand_burial[index];
     const float reduction = std::max(0.0f, payload.cleared_amount);
-    const float next_burial = std::max(0.0f, previous_burial - reduction);
-    if (std::fabs(previous_burial - next_burial) <= k_density_epsilon)
-    {
-        return TILE_ECOLOGY_CHANGED_NONE;
-    }
+    std::uint32_t changed_mask = TILE_ECOLOGY_CHANGED_NONE;
+    site_world_access::ecology::with_tile_mut(
+        site_run,
+        coord,
+        [&](site_ecs::TileSandBurial& sand_burial,
+            site_ecs::TilePlantSlot&,
+            site_ecs::TileGroundCoverSlot&,
+            site_ecs::TilePlantDensity&) {
+            const float next_burial = std::max(0.0f, sand_burial.value - reduction);
+            if (std::fabs(sand_burial.value - next_burial) <= k_density_epsilon)
+            {
+                return false;
+            }
 
-    tile_grid.tile_sand_burial[index] = next_burial;
-    return TILE_ECOLOGY_CHANGED_SAND_BURIAL;
+            sand_burial.value = next_burial;
+            changed_mask = TILE_ECOLOGY_CHANGED_SAND_BURIAL;
+            return true;
+        });
+    return changed_mask;
 }
 
 void update_restoration_progress(
@@ -270,7 +307,6 @@ Gs1Status EcologySystem::process_command(
     SiteSystemContext<EcologySystem>& context,
     const GameCommand& command)
 {
-    auto& tile_grid = context.world.own_tile_grid();
     switch (command.type)
     {
     case GameCommandType::SiteGroundCoverPlaced:
@@ -280,7 +316,7 @@ Gs1Status EcologySystem::process_command(
         emit_tile_ecology_changed(
             context,
             coord,
-            apply_ground_cover(tile_grid, coord, payload));
+            apply_ground_cover(context.site_run, coord, payload));
         break;
     }
 
@@ -291,7 +327,7 @@ Gs1Status EcologySystem::process_command(
         emit_tile_ecology_changed(
             context,
             coord,
-            apply_planting(tile_grid, coord, payload));
+            apply_planting(context.site_run, coord, payload));
         break;
     }
 
@@ -302,7 +338,7 @@ Gs1Status EcologySystem::process_command(
         emit_tile_ecology_changed(
             context,
             coord,
-            apply_watering(tile_grid, coord, payload));
+            apply_watering(context.site_run, coord, payload));
         break;
     }
 
@@ -313,7 +349,7 @@ Gs1Status EcologySystem::process_command(
         emit_tile_ecology_changed(
             context,
             coord,
-            apply_burial_cleared(tile_grid, coord, payload));
+            apply_burial_cleared(context.site_run, coord, payload));
         break;
     }
 
@@ -326,9 +362,8 @@ Gs1Status EcologySystem::process_command(
 
 void EcologySystem::run(SiteSystemContext<EcologySystem>& context)
 {
-    auto& tile_grid = context.world.own_tile_grid();
-    const auto tile_count = tile_grid.tile_count();
-    if (tile_count == 0 || !has_valid_tile_data(tile_grid))
+    auto& site_run = context.site_run;
+    if (!site_world_access::has_world(site_run))
     {
         return;
     }
@@ -341,32 +376,34 @@ void EcologySystem::run(SiteSystemContext<EcologySystem>& context)
     }
 
     std::uint32_t fully_grown_count = 0U;
-    for (std::size_t index = 0; index < tile_count; ++index)
-    {
-        if (!has_tile_occupant(tile_grid, index))
-        {
-            continue;
-        }
-
-        float& density = tile_grid.tile_plant_density[index];
-        if (density < 1.0f - k_density_epsilon)
-        {
-            const float next_density = std::min(1.0f, density + growth_delta);
-            if (std::fabs(next_density - density) > k_density_epsilon)
+    site_world_access::ecology::for_each_occupied_tile_mut(
+        site_run,
+        [&](TileCoord coord,
+            site_ecs::TilePlantSlot&,
+            site_ecs::TileGroundCoverSlot&,
+            site_ecs::TilePlantDensity& density) {
+            bool modified = false;
+            if (density.value < 1.0f - k_density_epsilon)
             {
-                density = next_density;
-                emit_tile_ecology_changed(
-                    context,
-                    tile_coord_from_index(tile_grid, index),
-                    TILE_ECOLOGY_CHANGED_DENSITY);
+                const float next_density = std::min(1.0f, density.value + growth_delta);
+                if (std::fabs(next_density - density.value) > k_density_epsilon)
+                {
+                    density.value = next_density;
+                    modified = true;
+                    emit_tile_ecology_changed(
+                        context,
+                        coord,
+                        TILE_ECOLOGY_CHANGED_DENSITY);
+                }
             }
-        }
 
-        if (density >= 1.0f - k_density_epsilon)
-        {
-            ++fully_grown_count;
-        }
-    }
+            if (density.value >= 1.0f - k_density_epsilon)
+            {
+                ++fully_grown_count;
+            }
+
+            return modified;
+        });
 
     update_restoration_progress(context, fully_grown_count);
 }

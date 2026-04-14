@@ -1,6 +1,7 @@
 #include "site/systems/placement_validation_system.h"
 
 #include "site/site_run_state.h"
+#include "site/site_world_access.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -30,14 +31,6 @@ void enqueue_command(GameCommandQueue& queue, GameCommandType type, const Payloa
     command.type = type;
     command.set_payload(payload);
     queue.push_back(command);
-}
-
-bool tile_coord_in_bounds(const TileGridState& tile_grid, TileCoord coord) noexcept
-{
-    return coord.x >= 0 &&
-        coord.y >= 0 &&
-        static_cast<std::uint32_t>(coord.x) < tile_grid.width &&
-        static_cast<std::uint32_t>(coord.y) < tile_grid.height;
 }
 
 void prune_reservations_for_run(SiteRunId site_run_id) noexcept
@@ -70,59 +63,70 @@ bool is_tile_reserved(
 
 PlacementReservationRejectionReason validate_request(
     SiteRunId site_run_id,
-    const TileGridState& tile_grid,
+    const SiteRunState& site_run,
     TileCoord target_tile,
     PlacementOccupancyLayer occupancy_layer,
     std::uint32_t excluding_action_id) noexcept
 {
-    if (!tile_coord_in_bounds(tile_grid, target_tile))
+    if (!site_world_access::tile_coord_in_bounds(site_run, target_tile))
     {
         return PlacementReservationRejectionReason::OutOfBounds;
     }
 
-    const auto index = tile_grid.to_index(target_tile);
-    if (occupancy_layer == PlacementOccupancyLayer::GroundCover)
+    PlacementReservationRejectionReason rejection_reason = PlacementReservationRejectionReason::None;
+    const bool has_tile = site_world_access::placement_validation::read_tile(
+        site_run,
+        target_tile,
+        [&](const site_ecs::TileTraversable& traversable,
+            const site_ecs::TilePlantable& plantable,
+            const site_ecs::TileReservedByStructure& reserved_by_structure,
+            const site_ecs::TilePlantSlot& plant,
+            const site_ecs::TileGroundCoverSlot& ground_cover,
+            StructureId structure_id) {
+            if (occupancy_layer == PlacementOccupancyLayer::GroundCover)
+            {
+                if (!plantable.value)
+                {
+                    rejection_reason = PlacementReservationRejectionReason::TerrainBlocked;
+                    return;
+                }
+
+                if (reserved_by_structure.value ||
+                    structure_id.value != 0U ||
+                    plant.plant_id.value != 0U ||
+                    ground_cover.ground_cover_type_id != 0U)
+                {
+                    rejection_reason = PlacementReservationRejectionReason::Occupied;
+                    return;
+                }
+            }
+            else if (occupancy_layer == PlacementOccupancyLayer::Structure)
+            {
+                if (!traversable.value)
+                {
+                    rejection_reason = PlacementReservationRejectionReason::TerrainBlocked;
+                    return;
+                }
+
+                if (structure_id.value != 0U)
+                {
+                    rejection_reason = PlacementReservationRejectionReason::Occupied;
+                    return;
+                }
+            }
+            else
+            {
+                rejection_reason = PlacementReservationRejectionReason::TerrainBlocked;
+            }
+        });
+    if (!has_tile)
     {
-        if (index >= tile_grid.tile_plantable.size() || tile_grid.tile_plantable[index] == 0U)
-        {
-            return PlacementReservationRejectionReason::TerrainBlocked;
-        }
-        if (index < tile_grid.tile_reserved_by_structure.size() &&
-            tile_grid.tile_reserved_by_structure[index] != 0U)
-        {
-            return PlacementReservationRejectionReason::Occupied;
-        }
-        if (index < tile_grid.structure_type_ids.size() &&
-            tile_grid.structure_type_ids[index].value != 0U)
-        {
-            return PlacementReservationRejectionReason::Occupied;
-        }
-        if (index < tile_grid.plant_type_ids.size() &&
-            tile_grid.plant_type_ids[index].value != 0U)
-        {
-            return PlacementReservationRejectionReason::Occupied;
-        }
-        if (index < tile_grid.ground_cover_type_ids.size() &&
-            tile_grid.ground_cover_type_ids[index] != 0U)
-        {
-            return PlacementReservationRejectionReason::Occupied;
-        }
+        return PlacementReservationRejectionReason::OutOfBounds;
     }
-    else if (occupancy_layer == PlacementOccupancyLayer::Structure)
+
+    if (rejection_reason != PlacementReservationRejectionReason::None)
     {
-        if (index >= tile_grid.tile_traversable.size() || tile_grid.tile_traversable[index] == 0U)
-        {
-            return PlacementReservationRejectionReason::TerrainBlocked;
-        }
-        if (index < tile_grid.structure_type_ids.size() &&
-            tile_grid.structure_type_ids[index].value != 0U)
-        {
-            return PlacementReservationRejectionReason::Occupied;
-        }
-    }
-    else
-    {
-        return PlacementReservationRejectionReason::TerrainBlocked;
+        return rejection_reason;
     }
 
     if (is_tile_reserved(site_run_id, target_tile, excluding_action_id))
@@ -145,7 +149,7 @@ void handle_reservation_requested(
     const TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
     const auto rejection_reason = validate_request(
         context.world.site_run_id(),
-        context.world.read_tile_grid(),
+        context.site_run,
         target_tile,
         payload.occupancy_layer,
         payload.action_id);
