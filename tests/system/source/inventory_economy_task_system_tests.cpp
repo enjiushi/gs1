@@ -1,4 +1,5 @@
 #include "commands/game_command.h"
+#include "content/defs/item_defs.h"
 #include "site/systems/economy_phone_system.h"
 #include "site/systems/inventory_system.h"
 #include "site/systems/task_board_system.h"
@@ -187,6 +188,82 @@ void inventory_transfer_moves_and_merges_stacks(gs1::testing::SystemTestExecutio
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[4].item_quantity == 2U);
 }
 
+void inventory_item_consume_removes_quantity_across_matching_stacks(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 805U);
+    GameCommandQueue queue {};
+    auto site_context = make_site_context<InventorySystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::SiteRunStarted,
+                SiteRunStartedCommand {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    site_run.inventory.worker_pack_slots[3].occupied = true;
+    site_run.inventory.worker_pack_slots[3].item_id = gs1::ItemId {gs1::k_item_water_container};
+    site_run.inventory.worker_pack_slots[3].item_quantity = 2U;
+    site_run.inventory.worker_pack_slots[3].item_condition = 1.0f;
+    site_run.inventory.worker_pack_slots[3].item_freshness = 1.0f;
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::InventoryItemConsumeRequested,
+                gs1::InventoryItemConsumeRequestedCommand {
+                    gs1::k_item_water_container,
+                    3U,
+                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
+                    0U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, !site_run.inventory.worker_pack_slots[0].occupied);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[3].occupied);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[3].item_quantity == 1U);
+}
+
+void inventory_delivery_request_arrives_in_camp_storage(gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 805U);
+    GameCommandQueue queue {};
+    auto site_context = make_site_context<InventorySystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::InventoryDeliveryRequested,
+                gs1::InventoryDeliveryRequestedCommand {
+                    gs1::k_item_wind_reed_seed_bundle,
+                    3U,
+                    1U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.pending_delivery_queue.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, !site_run.inventory.camp_storage_slots[0].occupied);
+
+    for (int step = 0; step < 4; ++step)
+    {
+        InventorySystem::run(site_context);
+    }
+    GS1_SYSTEM_TEST_CHECK(context, !site_run.inventory.camp_storage_slots[0].occupied);
+
+    for (int step = 0; step < 2 && !site_run.inventory.pending_delivery_queue.empty(); ++step)
+    {
+        InventorySystem::run(site_context);
+    }
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.pending_delivery_queue.empty());
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.camp_storage_slots[0].occupied);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        site_run.inventory.camp_storage_slots[0].item_id.value == gs1::k_item_wind_reed_seed_bundle);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.camp_storage_slots[0].item_quantity == 3U);
+}
+
 void economy_site_run_started_seeds_site_one_and_resets_other_sites(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -209,7 +286,7 @@ void economy_site_run_started_seeds_site_one_and_resets_other_sites(
         context,
         EconomyPhoneSystem::process_command(site_one_context, started_one) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, site_one_run.economy.money == 45);
-    GS1_SYSTEM_TEST_CHECK(context, site_one_run.economy.available_phone_listings.size() == 4U);
+    GS1_SYSTEM_TEST_CHECK(context, site_one_run.economy.available_phone_listings.size() == 10U);
     GS1_SYSTEM_TEST_CHECK(context, site_one_run.economy.direct_purchase_unlockable_ids.size() == 1U);
 
     GS1_SYSTEM_TEST_REQUIRE(
@@ -243,17 +320,24 @@ void economy_purchase_sell_hire_and_unlockable_paths_update_money(
                 GameCommandType::PhoneListingPurchaseRequested,
                 gs1::PhoneListingPurchaseRequestedCommand {1U, 2U, 0U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 35);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.available_phone_listings[0].quantity == 3U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.available_phone_listings[0].quantity == 4U);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameCommandType::InventoryDeliveryRequested);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        queue.front().payload_as<gs1::InventoryDeliveryRequestedCommand>().item_id ==
+            gs1::k_item_water_container);
 
+    queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         EconomyPhoneSystem::process_command(
             site_context,
             make_command(
                 GameCommandType::PhoneListingSaleRequested,
-                gs1::PhoneListingSaleRequestedCommand {2U, 2U, 0U})) == GS1_STATUS_OK);
+                gs1::PhoneListingSaleRequestedCommand {8U, 2U, 0U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 39);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.available_phone_listings[1].quantity == 8U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.available_phone_listings[7].quantity == 8U);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -261,9 +345,9 @@ void economy_purchase_sell_hire_and_unlockable_paths_update_money(
             site_context,
             make_command(
                 GameCommandType::ContractorHireRequested,
-                gs1::ContractorHireRequestedCommand {3U, 1U})) == GS1_STATUS_OK);
+                gs1::ContractorHireRequestedCommand {9U, 1U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 31);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.available_phone_listings[2].quantity == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.available_phone_listings[8].quantity == 2U);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -299,7 +383,7 @@ void economy_purchase_listing_unlockable_path_spends_money_and_removes_direct_un
             site_context,
             make_command(
                 GameCommandType::PhoneListingPurchaseRequested,
-                gs1::PhoneListingPurchaseRequestedCommand {4U, 1U, 0U})) == GS1_STATUS_OK);
+                gs1::PhoneListingPurchaseRequestedCommand {10U, 1U, 0U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 25);
     GS1_SYSTEM_TEST_CHECK(context, site_run.economy.direct_purchase_unlockable_ids.empty());
     GS1_SYSTEM_TEST_CHECK(context, site_run.economy.revealed_site_unlockable_ids.size() == 1U);
@@ -343,7 +427,7 @@ void economy_invalid_listing_or_money_returns_failures(gs1::testing::SystemTestE
             site_context,
             make_command(
                 GameCommandType::ContractorHireRequested,
-                gs1::ContractorHireRequestedCommand {3U, 1U})) == GS1_STATUS_INVALID_STATE);
+                gs1::ContractorHireRequestedCommand {9U, 1U})) == GS1_STATUS_INVALID_STATE);
 }
 
 void task_board_site_run_started_seeds_site_one_board(gs1::testing::SystemTestExecutionContext& context)
@@ -500,6 +584,14 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "inventory",
     "transfer_moves_and_merges_stacks",
     inventory_transfer_moves_and_merges_stacks);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "inventory",
+    "item_consume_removes_quantity_across_matching_stacks",
+    inventory_item_consume_removes_quantity_across_matching_stacks);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "inventory",
+    "delivery_request_arrives_in_camp_storage",
+    inventory_delivery_request_arrives_in_camp_storage);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "economy_phone",
     "site_run_started_seeds_site_one_and_resets_other_sites",

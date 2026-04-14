@@ -1,5 +1,6 @@
 #include "site/systems/action_execution_system.h"
 
+#include "content/defs/item_defs.h"
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
 #include "site/site_world_access.h"
@@ -271,6 +272,49 @@ bool has_active_action(const ActionState& action_state) noexcept
         action_state.action_kind != ActionKind::None;
 }
 
+std::uint32_t available_worker_pack_item_quantity(
+    const InventoryState& inventory,
+    ItemId item_id) noexcept
+{
+    std::uint32_t total_quantity = 0U;
+    for (const auto& slot : inventory.worker_pack_slots)
+    {
+        if (!slot.occupied || slot.item_id != item_id)
+        {
+            continue;
+        }
+
+        total_quantity += slot.item_quantity;
+    }
+
+    return total_quantity;
+}
+
+const ItemDef* action_item_def(
+    ActionKind action_kind,
+    std::uint32_t item_id) noexcept
+{
+    if (action_kind != ActionKind::Plant || item_id == 0U)
+    {
+        return nullptr;
+    }
+
+    const auto* item_def = find_item_def(ItemId {item_id});
+    if (item_def == nullptr ||
+        !item_has_capability(*item_def, ITEM_CAPABILITY_PLANT) ||
+        item_def->linked_plant_id.value == 0U)
+    {
+        return nullptr;
+    }
+
+    return item_def;
+}
+
+bool action_requires_item(ActionKind action_kind, std::uint32_t item_id) noexcept
+{
+    return action_kind == ActionKind::Plant && item_id != 0U;
+}
+
 bool is_action_waiting_for_placement(const ActionState& action_state) noexcept
 {
     return has_active_action(action_state) && action_state.awaiting_placement_reservation;
@@ -326,16 +370,46 @@ void emit_action_fact_commands(GameCommandQueue& queue, const ActionState& actio
     switch (action_state.action_kind)
     {
     case ActionKind::Plant:
-        enqueue_command(
-            queue,
-            GameCommandType::SiteGroundCoverPlaced,
-            SiteGroundCoverPlacedCommand {
-                action_id,
-                target_tile.x,
-                target_tile.y,
-                action_state.primary_subject_id == 0U ? 1U : action_state.primary_subject_id,
-                std::min(1.0f, 0.25f * static_cast<float>(action_state.quantity == 0U ? 1U : action_state.quantity)),
-                flags});
+        if (const auto* item_def = action_item_def(
+                action_state.action_kind,
+                action_state.item_id))
+        {
+            enqueue_command(
+                queue,
+                GameCommandType::InventoryItemConsumeRequested,
+                InventoryItemConsumeRequestedCommand {
+                    item_def->item_id.value,
+                    action_state.quantity == 0U ? 1U : action_state.quantity,
+                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
+                    0U});
+            enqueue_command(
+                queue,
+                GameCommandType::SiteTilePlantingCompleted,
+                SiteTilePlantingCompletedCommand {
+                    action_id,
+                    target_tile.x,
+                    target_tile.y,
+                    item_def->linked_plant_id.value,
+                    std::min(
+                        1.0f,
+                        0.25f * static_cast<float>(action_state.quantity == 0U ? 1U : action_state.quantity)),
+                    flags});
+        }
+        else
+        {
+            enqueue_command(
+                queue,
+                GameCommandType::SiteGroundCoverPlaced,
+                SiteGroundCoverPlacedCommand {
+                    action_id,
+                    target_tile.x,
+                    target_tile.y,
+                    action_state.primary_subject_id == 0U ? 1U : action_state.primary_subject_id,
+                    std::min(
+                        1.0f,
+                        0.25f * static_cast<float>(action_state.quantity == 0U ? 1U : action_state.quantity)),
+                    flags});
+        }
         break;
 
     case ActionKind::Water:
@@ -442,6 +516,40 @@ Gs1Status ActionExecutionSystem::process_command(
                 payload.primary_subject_id,
                 payload.secondary_subject_id);
             return GS1_STATUS_OK;
+        }
+
+        if (action_requires_item(action_kind, payload.item_id))
+        {
+            const auto* item_def = action_item_def(action_kind, payload.item_id);
+            if (item_def == nullptr)
+            {
+                emit_site_action_failed(
+                    context.command_queue,
+                    0U,
+                    action_kind,
+                    SiteActionFailureReason::InvalidState,
+                    payload.flags,
+                    target_tile,
+                    payload.primary_subject_id,
+                    payload.secondary_subject_id);
+                return GS1_STATUS_OK;
+            }
+
+            const auto required_quantity = payload.quantity == 0U ? 1U : payload.quantity;
+            if (available_worker_pack_item_quantity(context.world.read_inventory(), item_def->item_id) <
+                required_quantity)
+            {
+                emit_site_action_failed(
+                    context.command_queue,
+                    0U,
+                    action_kind,
+                    SiteActionFailureReason::InsufficientResources,
+                    payload.flags,
+                    target_tile,
+                    payload.primary_subject_id,
+                    payload.secondary_subject_id);
+                return GS1_STATUS_OK;
+            }
         }
 
         const double duration_minutes =

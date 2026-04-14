@@ -20,6 +20,7 @@ public:
         std::filesystem::path repo_root,
         GetStringCallback state_callback,
         PostBodyCallback ui_action_callback,
+        PostBodyCallback site_action_callback,
         PostBodyCallback site_control_callback);
     SmokeLiveHttpServer(const SmokeLiveHttpServer&) = delete;
     SmokeLiveHttpServer& operator=(const SmokeLiveHttpServer&) = delete;
@@ -52,6 +53,7 @@ private:
     std::filesystem::path repo_root_ {};
     GetStringCallback state_callback_ {};
     PostBodyCallback ui_action_callback_ {};
+    PostBodyCallback site_action_callback_ {};
     PostBodyCallback site_control_callback_ {};
     std::atomic<bool> running_ {false};
     std::uintptr_t listen_socket_ {static_cast<std::uintptr_t>(~0ULL)};

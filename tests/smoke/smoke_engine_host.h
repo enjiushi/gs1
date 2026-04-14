@@ -45,6 +45,7 @@ public:
     void queue_feedback_event(const Gs1FeedbackEvent& event);
     void update(double delta_seconds);
     void queue_ui_action(const Gs1UiAction& action);
+    void queue_site_action_request(const Gs1HostEventSiteActionRequestData& action);
     void queue_site_move_direction(float world_move_x, float world_move_y, float world_move_z);
     [[nodiscard]] std::vector<std::string> consume_pending_live_state_patches();
     [[nodiscard]] LiveStateSnapshot capture_live_state_snapshot() const;

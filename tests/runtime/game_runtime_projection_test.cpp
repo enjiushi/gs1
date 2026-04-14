@@ -1,4 +1,5 @@
 #include "runtime/game_runtime.h"
+#include "content/defs/item_defs.h"
 #include "site/site_world_access.h"
 
 #include <algorithm>
@@ -84,27 +85,69 @@ std::vector<Gs1EngineCommand> drain_engine_commands(GameRuntime& runtime)
 Gs1HostEvent make_site_action_request_event(
     Gs1SiteActionKind action_kind,
     TileCoord target_tile,
-    std::uint32_t primary_subject_id)
+    std::uint32_t primary_subject_id,
+    std::uint32_t item_id = 0U)
 {
     Gs1HostEvent event {};
     event.type = GS1_HOST_EVENT_SITE_ACTION_REQUEST;
     event.payload.site_action_request.action_kind = action_kind;
-    event.payload.site_action_request.flags = GS1_SITE_ACTION_REQUEST_FLAG_HAS_PRIMARY_SUBJECT;
+    event.payload.site_action_request.flags = item_id != 0U
+        ? GS1_SITE_ACTION_REQUEST_FLAG_HAS_ITEM
+        : GS1_SITE_ACTION_REQUEST_FLAG_HAS_PRIMARY_SUBJECT;
     event.payload.site_action_request.quantity = 1U;
     event.payload.site_action_request.target_tile_x = target_tile.x;
     event.payload.site_action_request.target_tile_y = target_tile.y;
     event.payload.site_action_request.primary_subject_id = primary_subject_id;
+    event.payload.site_action_request.item_id = item_id;
     return event;
 }
 
-void run_phase1(GameRuntime& runtime, double real_delta_seconds)
+std::uint64_t pack_inventory_use_arg(
+    Gs1InventoryContainerKind container_kind,
+    std::uint32_t slot_index,
+    std::uint32_t quantity)
+{
+    return static_cast<std::uint64_t>(container_kind) |
+        (static_cast<std::uint64_t>(slot_index & 0xffU) << 8U) |
+        (static_cast<std::uint64_t>(quantity & 0xffffU) << 16U);
+}
+
+std::uint64_t pack_inventory_transfer_arg(
+    Gs1InventoryContainerKind source_container_kind,
+    std::uint32_t source_slot_index,
+    Gs1InventoryContainerKind destination_container_kind,
+    std::uint32_t destination_slot_index,
+    std::uint32_t quantity)
+{
+    return static_cast<std::uint64_t>(source_container_kind) |
+        (static_cast<std::uint64_t>(source_slot_index & 0xffU) << 8U) |
+        (static_cast<std::uint64_t>(destination_container_kind) << 16U) |
+        (static_cast<std::uint64_t>(destination_slot_index & 0xffU) << 24U) |
+        (static_cast<std::uint64_t>(quantity & 0xffffU) << 32U);
+}
+
+Gs1HostEvent make_ui_action_event(const Gs1UiAction& action)
+{
+    Gs1HostEvent event {};
+    event.type = GS1_HOST_EVENT_UI_ACTION;
+    event.payload.ui_action.action = action;
+    return event;
+}
+
+void run_phase1(GameRuntime& runtime, double real_delta_seconds, Gs1Phase1Result& out_result)
 {
     Gs1Phase1Request request {};
     request.struct_size = sizeof(Gs1Phase1Request);
     request.real_delta_seconds = real_delta_seconds;
 
+    out_result = {};
+    assert(runtime.run_phase1(request, out_result) == GS1_STATUS_OK);
+}
+
+void run_phase1(GameRuntime& runtime, double real_delta_seconds)
+{
     Gs1Phase1Result result {};
-    assert(runtime.run_phase1(request, result) == GS1_STATUS_OK);
+    run_phase1(runtime, real_delta_seconds, result);
 }
 
 void set_tile_sand_burial(gs1::SiteRunState& site_run, TileCoord coord, float sand_burial)
@@ -159,12 +202,14 @@ int main()
     assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).has_value());
 
     auto& bootstrap_site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
-    assert(bootstrap_site_run.inventory.worker_pack_slots.size() == 8U);
+    assert(gs1::site_world_access::width(bootstrap_site_run) == 32U);
+    assert(gs1::site_world_access::height(bootstrap_site_run) == 32U);
+    assert(bootstrap_site_run.inventory.worker_pack_slots.size() == 6U);
     assert(bootstrap_site_run.inventory.worker_pack_slots[0].occupied);
     assert(bootstrap_site_run.inventory.worker_pack_slots[0].item_id.value == 1U);
     assert(bootstrap_site_run.task_board.visible_tasks.size() == 1U);
     assert(bootstrap_site_run.economy.money == 45);
-    assert(bootstrap_site_run.economy.available_phone_listings.size() == 4U);
+    assert(bootstrap_site_run.economy.available_phone_listings.size() == 10U);
 
     const auto bootstrap_commands = drain_engine_commands(runtime);
     assert(!collect_commands_of_type(bootstrap_commands, GS1_ENGINE_COMMAND_SITE_INVENTORY_SLOT_UPSERT).empty());
@@ -196,8 +241,12 @@ int main()
     buy_listing.set_payload(PhoneListingPurchaseRequestedCommand {1U, 1U, 0U});
     assert(runtime.handle_command(buy_listing) == GS1_STATUS_OK);
     assert(bootstrap_site_run.economy.money == 40);
-    assert(bootstrap_site_run.economy.available_phone_listings[0].quantity == 4U);
+    assert(bootstrap_site_run.economy.available_phone_listings[0].quantity == 5U);
 
+    Gs1Phase1Result delivery_result {};
+    run_phase1(runtime, 3.0, delivery_result);
+    assert(bootstrap_site_run.inventory.camp_storage_slots[4].occupied);
+    assert(bootstrap_site_run.inventory.camp_storage_slots[4].item_id.value == gs1::k_item_water_container);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
     drain_engine_commands(runtime);
 
@@ -244,6 +293,67 @@ int main()
     assert(!fallback_tiles.empty());
     assert(fallback_tiles.size() == gs1::site_world_access::tile_count(site_run));
 
+    Gs1RuntimeCreateDesc ui_desc {};
+    ui_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
+    ui_desc.api_version = gs1::k_api_version;
+    ui_desc.fixed_step_seconds = 1.0 / 60.0;
+
+    GameRuntime ui_runtime {ui_desc};
+    assert(ui_runtime.handle_command(make_start_campaign_command()) == GS1_STATUS_OK);
+    const auto ui_site_id =
+        gs1::GameRuntimeProjectionTestAccess::campaign(ui_runtime)->sites.front().site_id.value;
+    assert(ui_runtime.handle_command(make_start_site_attempt_command(ui_site_id)) == GS1_STATUS_OK);
+    auto& ui_site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(ui_runtime).value();
+    drain_engine_commands(ui_runtime);
+
+    auto ui_worker = gs1::site_world_access::worker_conditions(ui_site_run);
+    ui_worker.hydration = 70.0f;
+    gs1::site_world_access::set_worker_conditions(ui_site_run, ui_worker);
+
+    Gs1UiAction transfer_action {};
+    transfer_action.type = GS1_UI_ACTION_TRANSFER_INVENTORY_ITEM;
+    transfer_action.arg0 = pack_inventory_transfer_arg(
+        GS1_INVENTORY_CONTAINER_CAMP_STORAGE,
+        0U,
+        GS1_INVENTORY_CONTAINER_WORKER_PACK,
+        3U,
+        2U);
+    auto transfer_event = make_ui_action_event(transfer_action);
+
+    Gs1Phase1Result transfer_result {};
+    assert(ui_runtime.submit_host_events(&transfer_event, 1U) == GS1_STATUS_OK);
+    run_phase1(ui_runtime, 0.0, transfer_result);
+    assert(transfer_result.processed_host_event_count == 1U);
+    assert(ui_site_run.inventory.camp_storage_slots[0].occupied);
+    assert(ui_site_run.inventory.camp_storage_slots[0].item_id.value == gs1::k_item_wind_reed_seed_bundle);
+    assert(ui_site_run.inventory.camp_storage_slots[0].item_quantity == 6U);
+    assert(ui_site_run.inventory.worker_pack_slots[3].occupied);
+    assert(ui_site_run.inventory.worker_pack_slots[3].item_id.value == gs1::k_item_wind_reed_seed_bundle);
+    assert(ui_site_run.inventory.worker_pack_slots[3].item_quantity == 2U);
+    const auto transfer_commands = drain_engine_commands(ui_runtime);
+    assert(!collect_commands_of_type(transfer_commands, GS1_ENGINE_COMMAND_SITE_INVENTORY_SLOT_UPSERT).empty());
+
+    Gs1UiAction use_action {};
+    use_action.type = GS1_UI_ACTION_USE_INVENTORY_ITEM;
+    use_action.target_id = gs1::k_item_water_container;
+    use_action.arg0 = pack_inventory_use_arg(
+        GS1_INVENTORY_CONTAINER_WORKER_PACK,
+        0U,
+        1U);
+    auto use_event = make_ui_action_event(use_action);
+
+    Gs1Phase1Result use_result {};
+    assert(ui_runtime.submit_host_events(&use_event, 1U) == GS1_STATUS_OK);
+    run_phase1(ui_runtime, 0.0, use_result);
+    assert(use_result.processed_host_event_count == 1U);
+    assert(ui_site_run.inventory.worker_pack_slots[0].occupied);
+    assert(ui_site_run.inventory.worker_pack_slots[0].item_quantity == 1U);
+    assert(gs1::site_world_access::worker_conditions(ui_site_run).hydration == 82.0f);
+    const auto use_commands = drain_engine_commands(ui_runtime);
+    assert(!collect_commands_of_type(use_commands, GS1_ENGINE_COMMAND_SITE_INVENTORY_SLOT_UPSERT).empty());
+    assert(!collect_commands_of_type(use_commands, GS1_ENGINE_COMMAND_SITE_WORKER_UPDATE).empty());
+    assert(!collect_commands_of_type(use_commands, GS1_ENGINE_COMMAND_HUD_STATE).empty());
+
     Gs1RuntimeCreateDesc action_desc {};
     action_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
     action_desc.api_version = gs1::k_api_version;
@@ -256,17 +366,27 @@ int main()
     assert(action_runtime.handle_command(make_start_site_attempt_command(action_site_id)) == GS1_STATUS_OK);
     assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(action_runtime).has_value());
     drain_engine_commands(action_runtime);
+    auto& action_site_run =
+        gs1::GameRuntimeProjectionTestAccess::active_site_run(action_runtime).value();
+    action_site_run.inventory.worker_pack_slots[3].occupied = true;
+    action_site_run.inventory.worker_pack_slots[3].item_id = gs1::ItemId {gs1::k_item_wind_reed_seed_bundle};
+    action_site_run.inventory.worker_pack_slots[3].item_quantity = 2U;
+    action_site_run.inventory.worker_pack_slots[3].item_condition = 1.0f;
+    action_site_run.inventory.worker_pack_slots[3].item_freshness = 1.0f;
 
     const TileCoord action_target {5, 4};
-    auto action_event = make_site_action_request_event(GS1_SITE_ACTION_PLANT, action_target, 1U);
+    auto action_event = make_site_action_request_event(
+        GS1_SITE_ACTION_PLANT,
+        action_target,
+        0U,
+        gs1::k_item_wind_reed_seed_bundle);
     assert(action_runtime.submit_host_events(&action_event, 1U) == GS1_STATUS_OK);
     run_phase1(action_runtime, 60.0);
 
-    auto& action_site_run =
-        gs1::GameRuntimeProjectionTestAccess::active_site_run(action_runtime).value();
     const auto action_ecology = gs1::site_world_access::tile_ecology(action_site_run, action_target);
-    assert(action_ecology.ground_cover_type_id == 1U);
+    assert(action_ecology.plant_id.value == gs1::k_plant_wind_reed);
     assert(action_ecology.plant_density >= 0.25f);
+    assert(action_site_run.inventory.worker_pack_slots[3].item_quantity == 1U);
 
     run_phase1(action_runtime, 0.0);
     const auto action_commands = drain_engine_commands(action_runtime);
@@ -279,7 +399,7 @@ int main()
             const auto& payload = command->payload_as<Gs1EngineCommandSiteTileData>();
             return payload.x == static_cast<std::uint32_t>(action_target.x) &&
                 payload.y == static_cast<std::uint32_t>(action_target.y) &&
-                payload.ground_cover_type_id == 1U &&
+                payload.plant_type_id == gs1::k_plant_wind_reed &&
                 payload.plant_density >= 0.25f;
         });
     assert(projected_action_tile != action_tile_commands.end());

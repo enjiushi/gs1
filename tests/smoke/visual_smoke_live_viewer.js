@@ -16,7 +16,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const menuActions = document.getElementById("menu-actions");
     const selectionEyebrow = document.getElementById("selection-eyebrow");
     const selectionText = document.getElementById("selection-text");
+    const selectionInventory = document.getElementById("selection-inventory");
     const contextActions = document.getElementById("context-actions");
+    const inventoryTooltip = document.getElementById("inventory-tooltip");
+    const inventoryTooltipTitle = document.getElementById("inventory-tooltip-title");
+    const inventoryTooltipMeta = document.getElementById("inventory-tooltip-meta");
 
     let latestState = null;
     let stateStream = null;
@@ -26,6 +30,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let lastSentSiteControlSignature = "0";
     let currentSceneKind = "";
     let siteSceneCache = null;
+    let armedPlantSlotKey = "";
+    let selectedInventorySlotKey = "";
     let animationTimeSeconds = 0;
     let rendererWidth = 0;
     let rendererHeight = 0;
@@ -52,6 +58,28 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         offsetZ: 5.2,
         lookHeight: 0.4,
         rotateRadiansPerPixel: 0.002
+    };
+    const inventoryContainerCodes = {
+        WORKER_PACK: 0,
+        CAMP_STORAGE: 1
+    };
+    const itemCatalog = {
+        1: { name: "Water", shortName: "H2O", stackSize: 5, canUse: true, canPlant: false },
+        2: { name: "Food", shortName: "Ration", stackSize: 5, canUse: true, canPlant: false },
+        3: { name: "Medicine", shortName: "Med", stackSize: 3, canUse: true, canPlant: false },
+        4: { name: "Wind Reed Seeds", shortName: "Wind Reed", stackSize: 10, canUse: false, canPlant: true },
+        5: { name: "Saltbush Seeds", shortName: "Saltbush", stackSize: 10, canUse: false, canPlant: true },
+        6: { name: "Shade Cactus Seeds", shortName: "Shade Cactus", stackSize: 10, canUse: false, canPlant: true },
+        7: { name: "Sunfruit Vine Seeds", shortName: "Sunfruit Vine", stackSize: 10, canUse: false, canPlant: true }
+    };
+    const itemVisuals = {
+        1: { glyph: "H2", light: "#5d8eb3", dark: "#33546f" },
+        2: { glyph: "FD", light: "#b48a4f", dark: "#6f4a28" },
+        3: { glyph: "MD", light: "#9a676c", dark: "#62363b" },
+        4: { glyph: "WR", light: "#79a35f", dark: "#46693a" },
+        5: { glyph: "SB", light: "#8aa05c", dark: "#53683a" },
+        6: { glyph: "SC", light: "#6a8c67", dark: "#3c5841" },
+        7: { glyph: "SV", light: "#8f7c4c", dark: "#5c4526" }
     };
 
     const renderer = new THREE_NS.WebGLRenderer({ antialias: true });
@@ -166,6 +194,511 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return state.siteState || null;
     }
 
+    function getItemMeta(itemId) {
+        return itemCatalog[itemId] || null;
+    }
+
+    function getItemLabel(itemId) {
+        const itemMeta = getItemMeta(itemId);
+        return itemMeta ? itemMeta.name : ("Item " + itemId);
+    }
+
+    function getItemShortLabel(itemId) {
+        const itemMeta = getItemMeta(itemId);
+        return itemMeta ? itemMeta.shortName : ("Item " + itemId);
+    }
+
+    function getItemVisual(itemId) {
+        return itemVisuals[itemId] || { glyph: "??", light: "#8f7a64", dark: "#5a4837" };
+    }
+
+    function getInventorySlotsByKind(state, containerKind) {
+        const siteState = getSiteState(state);
+        if (!siteState || !siteState.inventorySlots) {
+            return [];
+        }
+
+        return siteState.inventorySlots.filter((slot) => slot.containerKind === containerKind);
+    }
+
+    function getBuyListings(state) {
+        const siteState = getSiteState(state);
+        if (!siteState || !siteState.phoneListings) {
+            return [];
+        }
+
+        return siteState.phoneListings.filter((listing) => listing.listingKind === "BUY_ITEM" && listing.quantity !== 0);
+    }
+
+    function slotKey(containerKind, slotIndex) {
+        return containerKind + ":" + slotIndex;
+    }
+
+    function encodeInventoryUseArg(containerKind, slotIndex, quantity) {
+        const containerCode = inventoryContainerCodes[containerKind] || 0;
+        return containerCode + ((slotIndex & 0xff) << 8) + ((quantity & 0xffff) << 16);
+    }
+
+    function encodeInventoryTransferArg(
+        sourceContainerKind,
+        sourceSlotIndex,
+        destinationContainerKind,
+        destinationSlotIndex,
+        quantity
+    ) {
+        const sourceContainerCode = inventoryContainerCodes[sourceContainerKind] || 0;
+        const destinationContainerCode = inventoryContainerCodes[destinationContainerKind] || 0;
+        return sourceContainerCode +
+            ((sourceSlotIndex & 0xff) << 8) +
+            ((destinationContainerCode & 0xff) << 16) +
+            ((destinationSlotIndex & 0xff) << 24) +
+            ((quantity & 0xffff) * 0x100000000);
+    }
+
+    function clearArmedPlantSlotIfInvalid(state) {
+        if (!armedPlantSlotKey || !state || state.appState !== "SITE_ACTIVE") {
+            return;
+        }
+
+        const workerPackSlots = getInventorySlotsByKind(state, "WORKER_PACK");
+        const armedSlot = workerPackSlots.find((slot) => slotKey(slot.containerKind, slot.slotIndex) === armedPlantSlotKey);
+        if (!armedSlot || armedSlot.quantity <= 0) {
+            armedPlantSlotKey = "";
+            return;
+        }
+
+        const itemMeta = getItemMeta(armedSlot.itemId);
+        if (!itemMeta || !itemMeta.canPlant) {
+            armedPlantSlotKey = "";
+        }
+    }
+
+    function clearSelectedInventorySlotIfInvalid(state) {
+        if (!selectedInventorySlotKey || !state || state.appState !== "SITE_ACTIVE") {
+            selectedInventorySlotKey = "";
+            return;
+        }
+
+        const allSlots = getInventorySlotsByKind(state, "WORKER_PACK").concat(getInventorySlotsByKind(state, "CAMP_STORAGE"));
+        const selectedSlot = allSlots.find((slot) => slotKey(slot.containerKind, slot.slotIndex) === selectedInventorySlotKey);
+        if (!selectedSlot || selectedSlot.quantity <= 0 || selectedSlot.flags === 0) {
+            selectedInventorySlotKey = "";
+        }
+    }
+
+    function findSelectedInventorySlot(state) {
+        if (!selectedInventorySlotKey || !state) {
+            return null;
+        }
+        const allSlots = getInventorySlotsByKind(state, "WORKER_PACK").concat(getInventorySlotsByKind(state, "CAMP_STORAGE"));
+        return allSlots.find((slot) => slotKey(slot.containerKind, slot.slotIndex) === selectedInventorySlotKey) || null;
+    }
+
+    function findTransferTargetSlot(state, sourceSlot, destinationKind) {
+        const destinationSlots = getInventorySlotsByKind(state, destinationKind);
+        const itemMeta = getItemMeta(sourceSlot.itemId);
+        const stackSize = itemMeta ? itemMeta.stackSize : Math.max(sourceSlot.quantity, 1);
+
+        for (const destinationSlot of destinationSlots) {
+            if (destinationSlot.flags === 0 && destinationSlot.itemId === 0) {
+                return {
+                    slotIndex: destinationSlot.slotIndex,
+                    quantity: Math.min(sourceSlot.quantity, stackSize)
+                };
+            }
+            if (destinationSlot.flags === 0) {
+                return {
+                    slotIndex: destinationSlot.slotIndex,
+                    quantity: Math.min(sourceSlot.quantity, stackSize)
+                };
+            }
+            if (destinationSlot.itemId !== sourceSlot.itemId) {
+                continue;
+            }
+
+            const freeCapacity = stackSize - destinationSlot.quantity;
+            if (freeCapacity <= 0) {
+                continue;
+            }
+
+            return {
+                slotIndex: destinationSlot.slotIndex,
+                quantity: Math.min(sourceSlot.quantity, freeCapacity)
+            };
+        }
+
+        return null;
+    }
+
+    function postInventoryUse(slot) {
+        return postJson("/ui-action", {
+            type: "USE_INVENTORY_ITEM",
+            targetId: slot.itemId,
+            arg0: encodeInventoryUseArg(slot.containerKind, slot.slotIndex, 1),
+            arg1: 0
+        });
+    }
+
+    function postInventoryTransfer(sourceSlot, destinationKind, destinationSlotIndex, quantity) {
+        return postJson("/ui-action", {
+            type: "TRANSFER_INVENTORY_ITEM",
+            targetId: 0,
+            arg0: encodeInventoryTransferArg(
+                sourceSlot.containerKind,
+                sourceSlot.slotIndex,
+                destinationKind,
+                destinationSlotIndex,
+                quantity
+            ),
+            arg1: 0
+        });
+    }
+
+    function postSiteAction(payload) {
+        return postJson("/site-action", payload);
+    }
+
+    function hideInventoryTooltip() {
+        inventoryTooltip.hidden = true;
+    }
+
+    function moveInventoryTooltip(clientX, clientY) {
+        const tooltipWidth = 220;
+        const tooltipHeight = 90;
+        const left = Math.min(clientX + 18, Math.max(12, window.innerWidth - tooltipWidth - 16));
+        const top = Math.min(clientY + 18, Math.max(12, window.innerHeight - tooltipHeight - 16));
+        inventoryTooltip.style.left = left + "px";
+        inventoryTooltip.style.top = top + "px";
+    }
+
+    function showInventoryTooltip(slot, options, clientX, clientY) {
+        const occupied = isOccupiedSlot(slot);
+        if (!occupied) {
+            hideInventoryTooltip();
+            return;
+        }
+
+        const itemMeta = getItemMeta(slot.itemId);
+        const locationName = slot.containerKind === "WORKER_PACK" ? "Worker Pack" : "Camp Storage";
+        const actionHint = slot.containerKind === "WORKER_PACK"
+                ? (itemMeta && itemMeta.canPlant ? "Click to select and arm/store" : "Click to select and use/store")
+                : "Click to select and carry";
+
+        inventoryTooltipTitle.textContent = getItemLabel(slot.itemId);
+        inventoryTooltipMeta.textContent =
+            locationName + "  Slot " + (slot.slotIndex + 1) +
+            "  x" + slot.quantity + "\n" +
+            actionHint;
+        inventoryTooltip.hidden = false;
+        moveInventoryTooltip(clientX, clientY);
+    }
+
+    function clearSelectionInventory() {
+        selectionInventory.hidden = true;
+        selectionInventory.innerHTML = "";
+        hideInventoryTooltip();
+    }
+
+    function makeInventorySection(title, metaText, gridClassName, columnCount) {
+        const section = document.createElement("section");
+        section.className = "inventory-section";
+
+        const header = document.createElement("div");
+        header.className = "inventory-section-header";
+
+        const titleElement = document.createElement("div");
+        titleElement.className = "inventory-section-title";
+        titleElement.textContent = title;
+        header.appendChild(titleElement);
+
+        const metaElement = document.createElement("div");
+        metaElement.className = "inventory-section-meta";
+        metaElement.textContent = metaText;
+        header.appendChild(metaElement);
+        section.appendChild(header);
+
+        const grid = document.createElement("div");
+        grid.className = "inventory-grid" + (gridClassName ? " " + gridClassName : "");
+        grid.style.setProperty("--inventory-columns", String(columnCount));
+        section.appendChild(grid);
+
+        return { section, grid };
+    }
+
+    function appendSlotAction(container, label, onClick, variant, disabled) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "slot-action-button" + (variant ? " " + variant : "");
+        button.textContent = label;
+        button.disabled = !!disabled;
+        button.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (!button.disabled) {
+                onClick();
+            }
+        });
+        container.appendChild(button);
+    }
+
+    function isOccupiedSlot(slot) {
+        return !!slot && slot.flags !== 0 && slot.itemId !== 0 && slot.quantity > 0;
+    }
+
+    function createInventorySlotCard(label, slot, options) {
+        const itemMeta = slot ? getItemMeta(slot.itemId) : null;
+        const occupied = isOccupiedSlot(slot);
+        const card = document.createElement("div");
+        const slotClasses = ["inventory-slot"];
+        if (!occupied) {
+            slotClasses.push("empty");
+        }
+        if (occupied && itemMeta && itemMeta.canPlant) {
+            slotClasses.push("plantable");
+        }
+        if (occupied && itemMeta && itemMeta.canUse) {
+            slotClasses.push("usable");
+        }
+        if (occupied && options.armedSlotKey && slotKey(slot.containerKind, slot.slotIndex) === options.armedSlotKey) {
+            slotClasses.push("armed");
+        }
+        if (occupied && options.selectedSlotKey && slotKey(slot.containerKind, slot.slotIndex) === options.selectedSlotKey) {
+            slotClasses.push("selected");
+        }
+        card.className = slotClasses.join(" ");
+        card.title = occupied ? getItemLabel(slot.itemId) : label;
+
+        const icon = document.createElement("div");
+        icon.className = "inventory-slot-icon";
+        if (occupied) {
+            const visual = getItemVisual(slot.itemId);
+            icon.style.setProperty("--slot-accent-light", visual.light);
+            icon.style.setProperty("--slot-accent-dark", visual.dark);
+            const glyph = document.createElement("div");
+            glyph.className = "inventory-slot-icon-glyph";
+            glyph.textContent = visual.glyph;
+            icon.appendChild(glyph);
+        } else {
+            const glyph = document.createElement("div");
+            glyph.className = "inventory-slot-icon-glyph";
+            glyph.textContent = "--";
+            icon.appendChild(glyph);
+        }
+        card.appendChild(icon);
+
+        const corner = document.createElement("div");
+        corner.className = "inventory-slot-corner";
+        card.appendChild(corner);
+
+        if (occupied) {
+            const count = document.createElement("div");
+            count.className = "inventory-slot-count";
+            count.textContent = String(slot.quantity);
+            card.appendChild(count);
+        }
+
+        if (occupied) {
+            card.addEventListener("mouseenter", function (event) {
+                showInventoryTooltip(slot, options, event.clientX, event.clientY);
+            });
+            card.addEventListener("mousemove", function (event) {
+                showInventoryTooltip(slot, options, event.clientX, event.clientY);
+            });
+            card.addEventListener("mouseleave", function () {
+                hideInventoryTooltip();
+            });
+        }
+
+        if (occupied) {
+            card.addEventListener("click", function () {
+                const clickedKey = slotKey(slot.containerKind, slot.slotIndex);
+                selectedInventorySlotKey = selectedInventorySlotKey === clickedKey ? "" : clickedKey;
+                if (latestState) {
+                    renderSiteOverlay(latestState);
+                }
+            });
+        }
+
+        return card;
+    }
+
+    function appendInventoryGridSection(container, title, metaText, slots, options) {
+        const sectionParts = makeInventorySection(title, metaText, options.gridClassName || "", options.columns);
+        const slotByIndex = new Map();
+        slots.forEach((slot) => {
+            slotByIndex.set(slot.slotIndex, slot);
+        });
+
+        for (let slotIndex = 0; slotIndex < options.slotCount; slotIndex += 1) {
+            const slot = slotByIndex.get(slotIndex) || {
+                containerKind: options.containerKind,
+                slotIndex: slotIndex,
+                itemId: 0,
+                quantity: 0,
+                flags: 0,
+                condition: 0,
+                freshness: 0
+            };
+            sectionParts.grid.appendChild(createInventorySlotCard(options.slotLabelPrefix + " " + (slotIndex + 1), slot, options));
+        }
+
+        container.appendChild(sectionParts.section);
+    }
+
+    function renderSiteInventoryPanel(state, workerPackSlots, campStorageSlots, armedSlot) {
+        selectionInventory.hidden = false;
+        selectionInventory.innerHTML = "";
+
+        const stack = document.createElement("div");
+        stack.className = "site-panel-stack";
+        selectionInventory.appendChild(stack);
+
+        const topGrid = document.createElement("div");
+        topGrid.className = "site-panel-grid";
+        stack.appendChild(topGrid);
+
+        appendInventoryGridSection(topGrid, "Worker Pack", "Live carried inventory", workerPackSlots, {
+            state: state,
+            containerKind: "WORKER_PACK",
+            slotCount: 6,
+            columns: 3,
+            slotLabelPrefix: "Pack",
+            armedSlotKey: armedSlot ? armedPlantSlotKey : "",
+            selectedSlotKey: selectedInventorySlotKey
+        });
+
+        appendInventoryGridSection(topGrid, "Camp Storage", "Live camp stock", campStorageSlots, {
+            state: state,
+            containerKind: "CAMP_STORAGE",
+            slotCount: 24,
+            columns: 6,
+            slotLabelPrefix: "Camp",
+            armedSlotKey: "",
+            selectedSlotKey: selectedInventorySlotKey
+        });
+
+        const footnote = document.createElement("div");
+        footnote.className = "inventory-footnote";
+        footnote.textContent = armedSlot
+            ? ("Planting armed: " + getItemLabel(armedSlot.itemId) + ". Click a site tile to place one bundle.")
+            : "Worker pack and camp storage are live and interactive.";
+        stack.appendChild(footnote);
+    }
+
+    function appendSelectedInventoryActions(state, selectedSlot) {
+        if (!selectedSlot) {
+            const helper = document.createElement("div");
+            helper.className = "helper-note";
+            helper.textContent = "Hover any item for details. Click a worker-pack or camp-storage slot to surface actions here.";
+            contextActions.appendChild(helper);
+            return;
+        }
+
+        const itemMeta = getItemMeta(selectedSlot.itemId);
+        const slotSummary = document.createElement("div");
+        slotSummary.className = "helper-note";
+        slotSummary.textContent =
+            getItemLabel(selectedSlot.itemId) +
+            "  x" + selectedSlot.quantity +
+            "  " +
+            (selectedSlot.containerKind === "WORKER_PACK" ? "Worker Pack" : "Camp Storage") +
+            " slot " + (selectedSlot.slotIndex + 1);
+        contextActions.appendChild(slotSummary);
+
+        if (selectedSlot.containerKind === "WORKER_PACK" && itemMeta && itemMeta.canUse) {
+            contextActions.appendChild(
+                makeButton(
+                    "Use " + getItemLabel(selectedSlot.itemId),
+                    function () {
+                        postInventoryUse(selectedSlot).catch(() => {
+                            statusChip.textContent = "Failed to use inventory item.";
+                        });
+                    },
+                    false,
+                    false
+                )
+            );
+        }
+
+        if (selectedSlot.containerKind === "WORKER_PACK" && itemMeta && itemMeta.canPlant) {
+            const selectedKey = slotKey(selectedSlot.containerKind, selectedSlot.slotIndex);
+            const armed = selectedKey === armedPlantSlotKey;
+            contextActions.appendChild(
+                makeButton(
+                    armed ? "Disarm Seed" : "Arm Seed",
+                    function () {
+                        armedPlantSlotKey = armed ? "" : selectedKey;
+                        if (latestState) {
+                            renderSiteOverlay(latestState);
+                        }
+                    },
+                    armed,
+                    false
+                )
+            );
+        }
+
+        if (selectedSlot.containerKind === "WORKER_PACK") {
+            const campTarget = findTransferTargetSlot(state, selectedSlot, "CAMP_STORAGE");
+            contextActions.appendChild(
+                makeButton(
+                    "Store To Camp",
+                    function () {
+                        if (!campTarget) {
+                            return;
+                        }
+                        postInventoryTransfer(
+                            selectedSlot,
+                            "CAMP_STORAGE",
+                            campTarget.slotIndex,
+                            campTarget.quantity).catch(() => {
+                            statusChip.textContent = "Failed to store inventory item.";
+                        });
+                    },
+                    true,
+                    !campTarget
+                )
+            );
+        }
+
+        if (selectedSlot.containerKind === "CAMP_STORAGE") {
+            const workerTarget = findTransferTargetSlot(state, selectedSlot, "WORKER_PACK");
+            contextActions.appendChild(
+                makeButton(
+                    "Carry To Pack",
+                    function () {
+                        if (!workerTarget) {
+                            return;
+                        }
+                        postInventoryTransfer(
+                            selectedSlot,
+                            "WORKER_PACK",
+                            workerTarget.slotIndex,
+                            workerTarget.quantity).catch(() => {
+                            statusChip.textContent = "Failed to carry inventory item.";
+                        });
+                    },
+                    true,
+                    !workerTarget
+                )
+            );
+        }
+
+        contextActions.appendChild(
+            makeButton(
+                "Clear Selection",
+                function () {
+                    selectedInventorySlotKey = "";
+                    if (latestState) {
+                        renderSiteOverlay(latestState);
+                    }
+                },
+                true,
+                false
+            )
+        );
+    }
+
     function updateMoveAxis() {
         const x = (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0) - (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0);
         const y = (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
@@ -273,13 +806,66 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const siteState = getSiteState(state);
         const hud = state.hud;
         const weather = siteState ? siteState.weather : null;
+        const workerPackSlots = getInventorySlotsByKind(state, "WORKER_PACK");
+        const campStorageSlots = getInventorySlotsByKind(state, "CAMP_STORAGE");
+        const buyListings = getBuyListings(state);
 
         menuPanel.hidden = true;
         selectionEyebrow.textContent = "Site Active";
-        selectionText.textContent = siteBootstrap
-            ? "Site " + siteBootstrap.siteId + " is live. Use WASD to move and drag with the middle mouse button to orbit around the worker."
-            : "Site bootstrap is loading.";
         contextActions.innerHTML = "";
+        clearArmedPlantSlotIfInvalid(state);
+        clearSelectedInventorySlotIfInvalid(state);
+
+        const armedSlot = workerPackSlots.find((slot) => slotKey(slot.containerKind, slot.slotIndex) === armedPlantSlotKey) || null;
+        const selectedSlot = findSelectedInventorySlot(state);
+        const armedText = armedSlot
+            ? ("Armed seed: " + getItemLabel(armedSlot.itemId) + " in worker slot " + (armedSlot.slotIndex + 1) + ". Click a tile to plant.")
+            : "Use the live worker-pack and camp-storage slots below. Hover for details, click to select, and arm a seed from the action bar before planting.";
+        selectionText.innerHTML = siteBootstrap
+            ? (
+                "Site " + siteBootstrap.siteId +
+                " is live. Use WASD to move and middle-drag to orbit the camera." +
+                "<br><br>" + armedText
+            )
+            : "Site bootstrap is loading.";
+        renderSiteInventoryPanel(state, workerPackSlots, campStorageSlots, armedSlot);
+        appendSelectedInventoryActions(state, selectedSlot);
+
+        if (armedSlot) {
+            contextActions.appendChild(
+                makeButton(
+                    "Disarm Seed",
+                    function () {
+                        armedPlantSlotKey = "";
+                        if (latestState) {
+                            renderSiteOverlay(latestState);
+                        }
+                    },
+                    true,
+                    false
+                )
+            );
+        }
+
+        buyListings.forEach((listing) => {
+            contextActions.appendChild(
+                makeButton(
+                    "Buy " + getItemLabel(listing.itemOrUnlockableId) + " $" + listing.price,
+                    function () {
+                        postJson("/ui-action", {
+                            type: "BUY_PHONE_LISTING",
+                            targetId: listing.listingId,
+                            arg0: 1,
+                            arg1: 0
+                        }).catch(() => {
+                            statusChip.textContent = "Failed to buy listing.";
+                        });
+                    },
+                    false,
+                    false
+                )
+            );
+        });
 
         const hydration = hud ? Math.round(hud.playerHydration) : 0;
         const energy = hud ? Math.round(hud.playerEnergy) : 0;
@@ -289,23 +875,29 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             "Site Live\nHydration " + hydration +
             "\nEnergy " + energy +
             "\nCompletion " + completion + "%" +
-            "\nEvent " + eventPhase;
+            "\nEvent " + eventPhase +
+            "\nArmed " + (armedSlot ? getItemLabel(armedSlot.itemId) : "none");
     }
 
     function updateOverlay(state) {
         stageFrame.classList.toggle("main-menu-mode", state.appState === "MAIN_MENU");
         stageFrame.classList.toggle("regional-map-mode", state.appState === "REGIONAL_MAP");
+        stageFrame.classList.toggle("site-active-mode", state.appState === "SITE_ACTIVE");
         hudEyebrow.textContent = "App State";
         hudTitle.textContent = state.appState || "NONE";
 
         switch (state.appState) {
         case "MAIN_MENU":
             hudSubtitle.textContent = "Austere, painterly, and severe: the campaign opens under hostile conditions.";
+            selectedInventorySlotKey = "";
+            clearSelectionInventory();
             renderMenuOverlay(state);
             statusChip.textContent = "Prototype Build\nVisual Smoke";
             break;
         case "REGIONAL_MAP":
             hudSubtitle.textContent = "Review the campaign survey board and choose the next deployment route.";
+            selectedInventorySlotKey = "";
+            clearSelectionInventory();
             renderRegionalMapOverlay(state);
             statusChip.textContent =
                 "Campaign Survey\nFrame " + state.frameNumber +
@@ -317,6 +909,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             break;
         default:
             hudSubtitle.textContent = "The current adapter only styles the core early flow for now.";
+            selectedInventorySlotKey = "";
+            clearSelectionInventory();
             renderFallbackOverlay(state);
             statusChip.textContent =
                 "Connected\nFrame " + state.frameNumber +
@@ -1116,6 +1710,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         currentSceneKind = "SITE_ACTIVE";
         scene.background = new THREE_NS.Color(0xe7d3b0);
         const cameraOrbitState = buildSiteCameraOrbitState(siteBootstrap, width, height, previousCache);
+        const tilePickables = [];
 
         const desertWidth = Math.max(width + 8, 20);
         const desertHeight = Math.max(height + 8, 20);
@@ -1141,23 +1736,47 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             const hasPlant = tile.plantTypeId !== 0 || plantDensity > 0.05;
             const noise = ((tile.x * 17 + tile.y * 29) % 7) * 0.008;
             const tileHeight = 0.08 + burial * 0.14 + plantDensity * 0.18 + noise;
-            const tileColor = hasPlant
-                ? 0x97a66d
-                : burial > 0.45
-                    ? 0xdfc090
-                    : 0xc9a776;
+            const tileColor = tile.plantTypeId !== 0
+                ? (tile.plantTypeId === 1 ? 0x8ea56a
+                    : tile.plantTypeId === 2 ? 0x7f9b62
+                    : tile.plantTypeId === 3 ? 0x8a8f58
+                    : 0x9d8f5a)
+                : hasPlant
+                    ? 0x97a66d
+                    : burial > 0.45
+                        ? 0xdfc090
+                        : 0xc9a776;
 
             const tileMesh = new THREE_NS.Mesh(
                 new THREE_NS.BoxGeometry(0.94, tileHeight, 0.94),
                 new THREE_NS.MeshStandardMaterial({ color: tileColor, roughness: 0.9, metalness: 0.02 })
             );
             tileMesh.position.set(tile.x - offsetX, tileHeight * 0.5, tile.y - offsetZ);
+            tileMesh.userData = {
+                tileX: tile.x,
+                tileY: tile.y
+            };
             worldGroup.add(tileMesh);
+            tilePickables.push(tileMesh);
 
             if (hasPlant) {
+                const plantHeight = tile.plantTypeId === 4
+                    ? 0.22 + plantDensity * 0.35
+                    : 0.25 + plantDensity * 0.45;
+                const plantGeometry = tile.plantTypeId === 3
+                    ? new THREE_NS.CylinderGeometry(0.08, 0.12, plantHeight, 7)
+                    : new THREE_NS.CylinderGeometry(0.04, 0.08, plantHeight, tile.plantTypeId === 4 ? 5 : 6);
+                const plantMaterial = new THREE_NS.MeshStandardMaterial({
+                    color: tile.plantTypeId === 1 ? 0x657c4f
+                        : tile.plantTypeId === 2 ? 0x6b8452
+                        : tile.plantTypeId === 3 ? 0x7b9150
+                        : 0x8c7b4d,
+                    roughness: 0.82,
+                    metalness: 0.01
+                });
                 const reed = new THREE_NS.Mesh(
-                    new THREE_NS.CylinderGeometry(0.04, 0.08, 0.25 + plantDensity * 0.45, 6),
-                    new THREE_NS.MeshStandardMaterial({ color: 0x657c4f, roughness: 0.82, metalness: 0.01 })
+                    plantGeometry,
+                    plantMaterial
                 );
                 reed.position.set(tile.x - offsetX, tileHeight + 0.16 + plantDensity * 0.12, tile.y - offsetZ);
                 worldGroup.add(reed);
@@ -1195,6 +1814,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             offsetZ: offsetZ,
             width: width,
             height: height,
+            tilePickables: tilePickables,
             workerGroup: workerGroup,
             workerRig: workerVisual.rig,
             workerInitialized: false,
@@ -1436,11 +2056,62 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             }
         }
 
-        if (normalizedState.appState !== "MAIN_MENU") {
+        if (normalizedState.appState !== "MAIN_MENU" && normalizedState.appState !== "SITE_ACTIVE") {
             statusChip.textContent =
                 "Connected\nFrame " + normalizedState.frameNumber +
                 "\nSelected Site: " + (normalizedState.selectedSiteId == null ? "none" : normalizedState.selectedSiteId);
         }
+    }
+
+    function handleSiteTileClick(event) {
+        if (!latestState || latestState.appState !== "SITE_ACTIVE" || !siteSceneCache || !siteSceneCache.tilePickables) {
+            return false;
+        }
+
+        const rect = renderer.domElement.getBoundingClientRect();
+        pointer.x = ((event.clientX - rect.left) / Math.max(rect.width, 1)) * 2 - 1;
+        pointer.y = -(((event.clientY - rect.top) / Math.max(rect.height, 1)) * 2 - 1);
+        raycaster.setFromCamera(pointer, camera);
+
+        const hits = raycaster.intersectObjects(siteSceneCache.tilePickables, false);
+        if (hits.length === 0) {
+            return false;
+        }
+
+        if (!armedPlantSlotKey) {
+            statusChip.textContent = "Arm a seed bundle from the worker pack before clicking a tile.";
+            return true;
+        }
+
+        const workerPackSlots = getInventorySlotsByKind(latestState, "WORKER_PACK");
+        const armedSlot = workerPackSlots.find((slot) => slotKey(slot.containerKind, slot.slotIndex) === armedPlantSlotKey);
+        if (!armedSlot || armedSlot.quantity <= 0) {
+            armedPlantSlotKey = "";
+            statusChip.textContent = "The armed seed slot is no longer available.";
+            return true;
+        }
+
+        const itemMeta = getItemMeta(armedSlot.itemId);
+        if (!itemMeta || !itemMeta.canPlant) {
+            armedPlantSlotKey = "";
+            statusChip.textContent = "That slot no longer contains a plantable item.";
+            return true;
+        }
+
+        const tileData = hits[0].object.userData || {};
+        postSiteAction({
+            actionKind: "PLANT",
+            flags: 4,
+            quantity: 1,
+            targetTileX: tileData.tileX || 0,
+            targetTileY: tileData.tileY || 0,
+            primarySubjectId: 0,
+            secondarySubjectId: 0,
+            itemId: armedSlot.itemId
+        }).catch(() => {
+            statusChip.textContent = "Failed to send site action.";
+        });
+        return true;
     }
 
     function connectStateStream() {
@@ -1707,6 +2378,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     });
 
     renderer.domElement.addEventListener("click", function (event) {
+        if (handleSiteTileClick(event)) {
+            return;
+        }
+
         if (!latestState || latestState.appState !== "REGIONAL_MAP") {
             return;
         }

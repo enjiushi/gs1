@@ -4,7 +4,7 @@ runner = economy_phone_regression
 description = Purchases the unlockable through the phone listing purchase path and verifies money plus unlockable state.
 ---
 scenario = purchase_unlockable_listing
-listing_id = 4
+listing_id = 10
 quantity = 1
 expect_money = 25
 expect_direct_unlockable_count = 0

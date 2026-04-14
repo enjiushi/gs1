@@ -351,6 +351,14 @@ void SmokeEngineHost::queue_ui_action(const Gs1UiAction& action)
     pending_pre_phase1_host_events_.push_back(make_ui_action_event(action));
 }
 
+void SmokeEngineHost::queue_site_action_request(const Gs1HostEventSiteActionRequestData& action)
+{
+    Gs1HostEvent event {};
+    event.type = GS1_HOST_EVENT_SITE_ACTION_REQUEST;
+    event.payload.site_action_request = action;
+    pending_pre_phase1_host_events_.push_back(event);
+}
+
 void SmokeEngineHost::queue_site_move_direction(float world_move_x, float world_move_y, float world_move_z)
 {
     const auto duplicate = std::find_if(

@@ -1,3 +1,4 @@
+#include "content/defs/item_defs.h"
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
 #include "site/systems/economy_phone_system.h"
@@ -12,10 +13,17 @@ namespace gs1
 namespace
 {
 constexpr std::int32_t k_site1_initial_money = 45;
-constexpr std::uint32_t k_site1_buy_listing_id = 1U;
-constexpr std::uint32_t k_site1_sale_listing_id = 2U;
-constexpr std::uint32_t k_site1_contractor_listing_id = 3U;
-constexpr std::uint32_t k_site1_unlockable_listing_id = 4U;
+constexpr std::uint16_t k_default_delivery_minutes = 30U;
+constexpr std::uint32_t k_site1_water_listing_id = 1U;
+constexpr std::uint32_t k_site1_food_listing_id = 2U;
+constexpr std::uint32_t k_site1_medicine_listing_id = 3U;
+constexpr std::uint32_t k_site1_wind_reed_listing_id = 4U;
+constexpr std::uint32_t k_site1_saltbush_listing_id = 5U;
+constexpr std::uint32_t k_site1_shade_cactus_listing_id = 6U;
+constexpr std::uint32_t k_site1_sunfruit_vine_listing_id = 7U;
+constexpr std::uint32_t k_site1_sale_listing_id = 8U;
+constexpr std::uint32_t k_site1_contractor_listing_id = 9U;
+constexpr std::uint32_t k_site1_unlockable_listing_id = 10U;
 constexpr std::uint32_t k_site1_unlockable_id = 101U;
 
 std::uint32_t normalize_quantity(std::uint16_t value) noexcept
@@ -33,6 +41,24 @@ void mark_phone_and_hud_dirty(SiteSystemContext<EconomyPhoneSystem>& context) no
 {
     context.world.mark_projection_dirty(
         SITE_PROJECTION_UPDATE_PHONE | SITE_PROJECTION_UPDATE_HUD);
+}
+
+PhoneListingState make_item_listing(
+    PhoneListingKind kind,
+    std::uint32_t listing_id,
+    ItemId item_id,
+    std::uint32_t quantity) noexcept
+{
+    const auto* item_def = find_item_def(item_id);
+    return PhoneListingState {
+        kind,
+        item_id,
+        listing_id,
+        item_def == nullptr
+            ? 0
+            : (kind == PhoneListingKind::SellItem ? item_def->sell_price : item_def->buy_price),
+        quantity,
+        true};
 }
 
 bool adjust_money(SiteSystemContext<EconomyPhoneSystem>& context, std::int32_t delta) noexcept
@@ -117,6 +143,17 @@ Gs1Status process_buy_listing(
     if (limited)
     {
         listing.quantity = available - quantity;
+    }
+
+    if (listing.item_id.value != 0U)
+    {
+        GameCommand delivery_command {};
+        delivery_command.type = GameCommandType::InventoryDeliveryRequested;
+        delivery_command.set_payload(InventoryDeliveryRequestedCommand {
+            listing.item_id.value,
+            static_cast<std::uint16_t>(quantity),
+            k_default_delivery_minutes});
+        context.command_queue.push_back(delivery_command);
     }
 
     mark_phone_and_hud_dirty(context);
@@ -248,20 +285,46 @@ void seed_site_economy(SiteSystemContext<EconomyPhoneSystem>& context, std::uint
     }
 
     economy.money = k_site1_initial_money;
-    economy.available_phone_listings.push_back(PhoneListingState {
+    economy.available_phone_listings.push_back(make_item_listing(
         PhoneListingKind::BuyItem,
-        ItemId {1U},
-        k_site1_buy_listing_id,
-        5,
-        5U,
-        true});
-    economy.available_phone_listings.push_back(PhoneListingState {
+        k_site1_water_listing_id,
+        ItemId {k_item_water_container},
+        6U));
+    economy.available_phone_listings.push_back(make_item_listing(
+        PhoneListingKind::BuyItem,
+        k_site1_food_listing_id,
+        ItemId {k_item_food_pack},
+        5U));
+    economy.available_phone_listings.push_back(make_item_listing(
+        PhoneListingKind::BuyItem,
+        k_site1_medicine_listing_id,
+        ItemId {k_item_medicine_pack},
+        4U));
+    economy.available_phone_listings.push_back(make_item_listing(
+        PhoneListingKind::BuyItem,
+        k_site1_wind_reed_listing_id,
+        ItemId {k_item_wind_reed_seed_bundle},
+        10U));
+    economy.available_phone_listings.push_back(make_item_listing(
+        PhoneListingKind::BuyItem,
+        k_site1_saltbush_listing_id,
+        ItemId {k_item_saltbush_seed_bundle},
+        8U));
+    economy.available_phone_listings.push_back(make_item_listing(
+        PhoneListingKind::BuyItem,
+        k_site1_shade_cactus_listing_id,
+        ItemId {k_item_shade_cactus_seed_bundle},
+        8U));
+    economy.available_phone_listings.push_back(make_item_listing(
+        PhoneListingKind::BuyItem,
+        k_site1_sunfruit_vine_listing_id,
+        ItemId {k_item_sunfruit_vine_seed_bundle},
+        6U));
+    economy.available_phone_listings.push_back(make_item_listing(
         PhoneListingKind::SellItem,
-        ItemId {2U},
         k_site1_sale_listing_id,
-        2,
-        10U,
-        true});
+        ItemId {k_item_food_pack},
+        10U));
     economy.available_phone_listings.push_back(PhoneListingState {
         PhoneListingKind::HireContractor,
         ItemId {0U},

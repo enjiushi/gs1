@@ -99,7 +99,7 @@ inline SiteRunState make_test_site_run(
     site_run.run_status = SiteRunStatus::Active;
     site_run.clock.day_phase = DayPhase::Dawn;
     site_run.camp.camp_anchor_tile = camp_anchor_tile;
-    site_run.inventory.worker_pack_slot_count = 8U;
+    site_run.inventory.worker_pack_slot_count = 6U;
     site_run.inventory.camp_storage_slot_count = 24U;
     site_run.inventory.worker_pack_slots.resize(site_run.inventory.worker_pack_slot_count);
     site_run.inventory.camp_storage_slots.resize(site_run.inventory.camp_storage_slot_count);

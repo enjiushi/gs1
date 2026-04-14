@@ -58,7 +58,9 @@ enum class GameCommandType : std::uint8_t
     TaskRewardClaimRequested,
     PhoneListingPurchaseRequested,
     PhoneListingSaleRequested,
+    InventoryDeliveryRequested,
     InventoryItemUseRequested,
+    InventoryItemConsumeRequested,
     InventoryTransferRequested,
     ContractorHireRequested,
     SiteUnlockablePurchaseRequested,
@@ -365,12 +367,27 @@ struct PhoneListingSaleRequestedCommand final
     std::uint16_t flags;
 };
 
+struct InventoryDeliveryRequestedCommand final
+{
+    std::uint32_t item_id;
+    std::uint16_t quantity;
+    std::uint16_t minutes_until_arrival;
+};
+
 struct InventoryItemUseRequestedCommand final
 {
     std::uint32_t item_id;
     std::uint16_t quantity;
     Gs1InventoryContainerKind container_kind;
     std::uint8_t slot_index;
+};
+
+struct InventoryItemConsumeRequestedCommand final
+{
+    std::uint32_t item_id;
+    std::uint16_t quantity;
+    Gs1InventoryContainerKind container_kind;
+    std::uint8_t flags;
 };
 
 struct InventoryTransferRequestedCommand final
@@ -426,7 +443,9 @@ GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(TaskAcceptRequestedCommand, 4U);
 GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(TaskRewardClaimRequestedCommand, 8U);
 GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(PhoneListingPurchaseRequestedCommand, 8U);
 GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(PhoneListingSaleRequestedCommand, 8U);
+GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(InventoryDeliveryRequestedCommand, 8U);
 GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(InventoryItemUseRequestedCommand, 8U);
+GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(InventoryItemConsumeRequestedCommand, 8U);
 GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(InventoryTransferRequestedCommand, 10U);
 GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(ContractorHireRequestedCommand, 8U);
 GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(SiteUnlockablePurchaseRequestedCommand, 4U);

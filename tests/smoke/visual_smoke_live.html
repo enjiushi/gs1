@@ -609,12 +609,270 @@ body {
 }
 
 .selection-chip {
-  max-width: 420px;
+  max-width: 920px;
+  width: min(920px, 100%);
 }
 
 .action-bar {
   justify-content: flex-end;
   margin-top: 0;
+}
+
+.selection-inventory {
+  margin-top: 14px;
+}
+
+.site-panel-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.site-panel-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.5fr);
+  gap: 12px;
+}
+
+.inventory-section {
+  padding: 12px;
+  border: 1px solid rgba(109, 85, 57, 0.14);
+  background:
+    linear-gradient(180deg, rgba(255, 249, 239, 0.78), rgba(236, 220, 195, 0.72));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    0 10px 22px rgba(55, 35, 14, 0.08);
+}
+
+.inventory-section-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.inventory-section-title {
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(96, 66, 33, 0.78);
+}
+
+.inventory-section-meta {
+  font-size: 11px;
+  color: rgba(96, 66, 33, 0.62);
+}
+
+.inventory-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--inventory-columns, 8), minmax(0, 1fr));
+  gap: 8px;
+}
+
+.inventory-grid.loadout-grid {
+  max-height: 360px;
+  padding-right: 4px;
+  overflow-y: auto;
+}
+
+.inventory-slot {
+  position: relative;
+  min-height: 58px;
+  min-width: 58px;
+  padding: 0;
+  border: 1px solid rgba(116, 87, 54, 0.18);
+  background:
+    linear-gradient(180deg, rgba(254, 249, 241, 0.94), rgba(232, 219, 201, 0.88));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    0 6px 12px rgba(55, 35, 14, 0.05);
+}
+
+.inventory-slot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.26), transparent 42%),
+    linear-gradient(180deg, transparent, rgba(62, 40, 16, 0.04));
+  pointer-events: none;
+}
+
+.inventory-slot.empty {
+  min-height: 52px;
+  background:
+    linear-gradient(180deg, rgba(242, 234, 219, 0.4), rgba(225, 214, 197, 0.34));
+  border-style: dashed;
+  cursor: default;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.inventory-slot.armed {
+  border-color: rgba(78, 124, 86, 0.5);
+  box-shadow:
+    inset 0 0 0 1px rgba(78, 124, 86, 0.22),
+    0 10px 18px rgba(43, 71, 48, 0.12);
+}
+
+.inventory-slot.selected {
+  border-color: rgba(139, 98, 41, 0.58);
+  box-shadow:
+    inset 0 0 0 1px rgba(139, 98, 41, 0.2),
+    0 12px 18px rgba(76, 49, 18, 0.12);
+}
+
+.inventory-slot.loadout-slot {
+  min-height: 54px;
+  min-width: 54px;
+}
+
+.inventory-slot-icon {
+  position: relative;
+  z-index: 1;
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: #fff7ec;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 5px 10px rgba(43, 28, 11, 0.16);
+  background: linear-gradient(180deg, var(--slot-accent-light, #8f7a64), var(--slot-accent-dark, #5a4837));
+}
+
+.inventory-slot.loadout-slot .inventory-slot-icon {
+  width: 24px;
+  height: 24px;
+  font-size: 9px;
+}
+
+.inventory-slot.empty .inventory-slot-icon {
+  background: linear-gradient(180deg, rgba(188, 173, 152, 0.46), rgba(146, 130, 111, 0.4));
+  color: rgba(255, 247, 236, 0.44);
+  box-shadow: none;
+}
+
+.inventory-slot-icon-glyph {
+  transform: translateY(-0.5px);
+}
+
+.inventory-slot-count {
+  position: absolute;
+  left: 4px;
+  bottom: 3px;
+  z-index: 2;
+  min-width: 14px;
+  padding: 1px 4px 0;
+  background: rgba(43, 30, 16, 0.88);
+  color: rgba(251, 244, 229, 0.96);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+  box-shadow: 0 3px 8px rgba(21, 12, 5, 0.18);
+}
+
+.inventory-slot-corner {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(80, 63, 39, 0.18);
+}
+
+.inventory-slot.plantable .inventory-slot-corner {
+  background: rgba(74, 117, 74, 0.74);
+}
+
+.inventory-slot.usable .inventory-slot-corner {
+  background: rgba(74, 101, 137, 0.74);
+}
+
+.inventory-slot.empty .inventory-slot-count,
+.inventory-slot.empty .inventory-slot-corner {
+  display: none;
+}
+
+.slot-action-button {
+  border: 1px solid rgba(122, 94, 59, 0.22);
+  background: rgba(92, 69, 39, 0.92);
+  color: rgba(251, 241, 223, 0.92);
+  padding: 5px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.slot-action-button.secondary {
+  background: rgba(89, 108, 84, 0.92);
+  border-color: rgba(77, 101, 72, 0.28);
+}
+
+.slot-action-button.active {
+  background: rgba(74, 117, 74, 0.96);
+  border-color: rgba(66, 107, 66, 0.38);
+}
+
+.slot-action-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.inventory-footnote {
+  font-size: 11px;
+  color: rgba(90, 68, 40, 0.68);
+  line-height: 1.45;
+}
+
+.inventory-tooltip {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 60;
+  max-width: 220px;
+  padding: 10px 12px;
+  border: 1px solid rgba(196, 167, 126, 0.26);
+  background:
+    linear-gradient(180deg, rgba(44, 33, 24, 0.96), rgba(27, 20, 14, 0.98));
+  color: rgba(245, 236, 220, 0.94);
+  pointer-events: none;
+  box-shadow:
+    0 16px 34px rgba(8, 6, 4, 0.28),
+    inset 0 1px 0 rgba(255, 245, 228, 0.06);
+}
+
+.inventory-tooltip[hidden] {
+  display: none;
+}
+
+.inventory-tooltip-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.inventory-tooltip-meta {
+  margin-top: 4px;
+  font-size: 11px;
+  color: rgba(228, 211, 185, 0.72);
+  line-height: 1.45;
+  white-space: pre-line;
 }
 
 .helper-note {
@@ -753,6 +1011,18 @@ body {
     justify-content: flex-start;
   }
 
+  .site-panel-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .selection-chip {
+    max-width: none;
+  }
+
+  .inventory-grid.loadout-grid {
+    max-height: 300px;
+  }
+
   .menu-header {
     grid-template-columns: 1fr;
   }
@@ -857,12 +1127,17 @@ body {
         <div class="selection-chip" id="selection-chip">
           <div class="eyebrow" id="selection-eyebrow">Current View</div>
           <div class="subtitle" id="selection-text">No selection yet.</div>
+          <div class="selection-inventory" id="selection-inventory" hidden></div>
         </div>
 
         <div class="action-bar" id="context-actions"></div>
       </div>
     </div>
   </div>
+</div>
+<div class="inventory-tooltip" id="inventory-tooltip" hidden>
+  <div class="inventory-tooltip-title" id="inventory-tooltip-title">Item</div>
+  <div class="inventory-tooltip-meta" id="inventory-tooltip-meta">Details</div>
 </div>
 
 <script type="module" src="/viewer.js"></script>

@@ -192,6 +192,32 @@ std::optional<Gs1UiActionType> parse_ui_action_type(const std::string& value)
     return std::nullopt;
 }
 
+std::optional<Gs1SiteActionKind> parse_site_action_kind(const std::string& value)
+{
+    if (value == "PLANT")
+    {
+        return GS1_SITE_ACTION_PLANT;
+    }
+    if (value == "BUILD")
+    {
+        return GS1_SITE_ACTION_BUILD;
+    }
+    if (value == "REPAIR")
+    {
+        return GS1_SITE_ACTION_REPAIR;
+    }
+    if (value == "WATER")
+    {
+        return GS1_SITE_ACTION_WATER;
+    }
+    if (value == "CLEAR_BURIAL")
+    {
+        return GS1_SITE_ACTION_CLEAR_BURIAL;
+    }
+
+    return std::nullopt;
+}
+
 void run_live_mode(
     const Gs1RuntimeApi& api,
     Gs1RuntimeHandle* runtime,
@@ -232,6 +258,36 @@ void run_live_mode(
 
             std::scoped_lock lock {session.mutex};
             session.host.queue_ui_action(action);
+        },
+        [&session](const std::string& body) {
+            const auto action_kind_name = extract_string_field(body, "actionKind");
+            if (!action_kind_name.has_value())
+            {
+                return;
+            }
+
+            const auto action_kind = parse_site_action_kind(action_kind_name.value());
+            if (!action_kind.has_value())
+            {
+                return;
+            }
+
+            Gs1HostEventSiteActionRequestData action {};
+            action.action_kind = action_kind.value();
+            action.flags = static_cast<std::uint8_t>(
+                extract_number_field<std::uint32_t>(body, "flags").value_or(0U));
+            action.quantity = static_cast<std::uint16_t>(
+                extract_number_field<std::uint32_t>(body, "quantity").value_or(1U));
+            action.target_tile_x = extract_number_field<std::int32_t>(body, "targetTileX").value_or(0);
+            action.target_tile_y = extract_number_field<std::int32_t>(body, "targetTileY").value_or(0);
+            action.primary_subject_id =
+                extract_number_field<std::uint32_t>(body, "primarySubjectId").value_or(0U);
+            action.secondary_subject_id =
+                extract_number_field<std::uint32_t>(body, "secondarySubjectId").value_or(0U);
+            action.item_id = extract_number_field<std::uint32_t>(body, "itemId").value_or(0U);
+
+            std::scoped_lock lock {session.mutex};
+            session.host.queue_site_action_request(action);
         },
         [&session](const std::string& body) {
             std::scoped_lock lock {session.mutex};

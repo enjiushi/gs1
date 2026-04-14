@@ -4,7 +4,7 @@ runner = economy_phone_regression
 description = Attempts to hire contractors after forcing money to zero and verifies the request is rejected.
 ---
 scenario = hire_contractor
-listing_id = 3
+listing_id = 9
 work_units = 1
 override_money = 0
 expect_status = invalid_state

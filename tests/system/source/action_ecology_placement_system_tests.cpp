@@ -1,4 +1,5 @@
 #include "commands/game_command.h"
+#include "content/defs/item_defs.h"
 #include "site/site_world_access.h"
 #include "site/systems/action_execution_system.h"
 #include "site/systems/ecology_system.h"
@@ -16,6 +17,7 @@ using gs1::EcologySystem;
 using gs1::GameCommand;
 using gs1::GameCommandQueue;
 using gs1::GameCommandType;
+using gs1::InventoryItemConsumeRequestedCommand;
 using gs1::PlacementOccupancyLayer;
 using gs1::PlacementReservationAcceptedCommand;
 using gs1::PlacementReservationRejectedCommand;
@@ -47,7 +49,8 @@ GameCommand make_start_action_command(
     Gs1SiteActionKind action_kind,
     TileCoord target_tile,
     std::uint16_t quantity = 1U,
-    std::uint32_t primary_subject_id = 1U)
+    std::uint32_t primary_subject_id = 1U,
+    std::uint32_t item_id = 0U)
 {
     return make_command(
         GameCommandType::StartSiteAction,
@@ -59,7 +62,7 @@ GameCommand make_start_action_command(
             target_tile.y,
             primary_subject_id,
             0U,
-            0U});
+            item_id});
 }
 
 void action_execution_rejects_invalid_or_out_of_bounds_requests(
@@ -333,6 +336,73 @@ void action_execution_plant_completion_emits_ground_cover_after_reservation(
     GS1_SYSTEM_TEST_CHECK(
         context,
         approx_equal(queue[1].payload_as<SiteGroundCoverPlacedCommand>().initial_density, 0.5f));
+    GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.current_action_id.has_value());
+}
+
+void action_execution_item_based_plant_completion_consumes_seed_and_emits_planting(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 508U);
+    GameCommandQueue queue {};
+    auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue, 180.0);
+
+    site_run.inventory.worker_pack_slots[3].occupied = true;
+    site_run.inventory.worker_pack_slots[3].item_id = gs1::ItemId {gs1::k_item_wind_reed_seed_bundle};
+    site_run.inventory.worker_pack_slots[3].item_quantity = 2U;
+    site_run.inventory.worker_pack_slots[3].item_condition = 1.0f;
+    site_run.inventory.worker_pack_slots[3].item_freshness = 1.0f;
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_command(
+            site_context,
+            make_start_action_command(
+                GS1_SITE_ACTION_PLANT,
+                TileCoord {4, 3},
+                2U,
+                0U,
+                gs1::k_item_wind_reed_seed_bundle)) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(context, site_run.site_action.current_action_id.has_value());
+    const auto action_id = site_run.site_action.current_action_id->value;
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.awaiting_placement_reservation);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameCommandType::PlacementReservationRequested);
+
+    queue.clear();
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::PlacementReservationAccepted,
+                PlacementReservationAcceptedCommand {action_id, 4, 3, 88U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.awaiting_placement_reservation);
+
+    queue.clear();
+    ActionExecutionSystem::run(site_context);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 4U);
+    GS1_SYSTEM_TEST_CHECK(context, queue[0].type == GameCommandType::SiteActionCompleted);
+    GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameCommandType::InventoryItemConsumeRequested);
+    GS1_SYSTEM_TEST_CHECK(context, queue[2].type == GameCommandType::SiteTilePlantingCompleted);
+    GS1_SYSTEM_TEST_CHECK(context, queue[3].type == GameCommandType::PlacementReservationReleased);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        queue[1].payload_as<InventoryItemConsumeRequestedCommand>().item_id ==
+            gs1::k_item_wind_reed_seed_bundle);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        queue[1].payload_as<InventoryItemConsumeRequestedCommand>().quantity == 2U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        queue[1].payload_as<InventoryItemConsumeRequestedCommand>().container_kind ==
+            GS1_INVENTORY_CONTAINER_WORKER_PACK);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        queue[2].payload_as<SiteTilePlantingCompletedCommand>().plant_type_id == gs1::k_plant_wind_reed);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(queue[2].payload_as<SiteTilePlantingCompletedCommand>().initial_density, 0.5f));
     GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.current_action_id.has_value());
 }
 
@@ -696,6 +766,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "action_execution",
     "plant_completion_emits_ground_cover_after_reservation",
     action_execution_plant_completion_emits_ground_cover_after_reservation);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "action_execution",
+    "item_based_plant_completion_consumes_seed_and_emits_planting",
+    action_execution_item_based_plant_completion_consumes_seed_and_emits_planting);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "placement_validation",
     "accepts_releases_and_rejects_reserved_tiles",

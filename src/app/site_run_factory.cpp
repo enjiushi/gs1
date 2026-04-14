@@ -3,10 +3,17 @@
 #include "content/prototype_content.h"
 #include "site/site_world.h"
 
+#include <cstdint>
 #include <memory>
 
 namespace gs1
 {
+namespace
+{
+constexpr std::uint32_t k_site_width = 32U;
+constexpr std::uint32_t k_site_height = 32U;
+}
+
 SiteRunState SiteRunFactory::create_site_run(
     const CampaignState& campaign,
     const SiteMetaState& site_meta)
@@ -20,7 +27,7 @@ SiteRunState SiteRunFactory::create_site_run(
     run.site_attempt_seed = campaign.campaign_seed + site_meta.site_id.value + site_meta.attempt_count;
     run.run_status = SiteRunStatus::Active;
     run.clock.day_phase = DayPhase::Dawn;
-    run.inventory.worker_pack_slot_count = 8U;
+    run.inventory.worker_pack_slot_count = 6U;
     run.inventory.camp_storage_slot_count = 24U;
     run.inventory.worker_pack_slots.resize(run.inventory.worker_pack_slot_count);
     run.inventory.camp_storage_slots.resize(run.inventory.camp_storage_slot_count);
@@ -39,8 +46,8 @@ SiteRunState SiteRunFactory::create_site_run(
     run.site_world = std::make_shared<SiteWorld>();
     run.site_world->initialize(
         SiteWorld::CreateDesc {
-            12U,
-            12U,
+            k_site_width,
+            k_site_height,
             worker_tile_coord,
             worker_tile_x,
             worker_tile_y,

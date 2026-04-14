@@ -54,6 +54,70 @@ bool is_valid_feedback_event_type(Gs1FeedbackEventType type) noexcept
     return feedback_event_type_index(type) < k_feedback_event_type_count;
 }
 
+std::uint64_t pack_inventory_use_arg(
+    Gs1InventoryContainerKind container_kind,
+    std::uint32_t slot_index,
+    std::uint32_t quantity) noexcept
+{
+    return static_cast<std::uint64_t>(container_kind) |
+        (static_cast<std::uint64_t>(slot_index & 0xffU) << 8U) |
+        (static_cast<std::uint64_t>(quantity & 0xffffU) << 16U);
+}
+
+Gs1InventoryContainerKind unpack_inventory_container(std::uint64_t packed) noexcept
+{
+    return static_cast<Gs1InventoryContainerKind>(packed & 0xffU);
+}
+
+std::uint32_t unpack_inventory_slot_index(std::uint64_t packed) noexcept
+{
+    return static_cast<std::uint32_t>((packed >> 8U) & 0xffU);
+}
+
+std::uint32_t unpack_inventory_quantity(std::uint64_t packed) noexcept
+{
+    return static_cast<std::uint32_t>((packed >> 16U) & 0xffffU);
+}
+
+std::uint64_t pack_inventory_transfer_arg(
+    Gs1InventoryContainerKind source_container_kind,
+    std::uint32_t source_slot_index,
+    Gs1InventoryContainerKind destination_container_kind,
+    std::uint32_t destination_slot_index,
+    std::uint32_t quantity) noexcept
+{
+    return static_cast<std::uint64_t>(source_container_kind) |
+        (static_cast<std::uint64_t>(source_slot_index & 0xffU) << 8U) |
+        (static_cast<std::uint64_t>(destination_container_kind) << 16U) |
+        (static_cast<std::uint64_t>(destination_slot_index & 0xffU) << 24U) |
+        (static_cast<std::uint64_t>(quantity & 0xffffU) << 32U);
+}
+
+Gs1InventoryContainerKind unpack_transfer_source_container(std::uint64_t packed) noexcept
+{
+    return static_cast<Gs1InventoryContainerKind>(packed & 0xffU);
+}
+
+std::uint32_t unpack_transfer_source_slot(std::uint64_t packed) noexcept
+{
+    return static_cast<std::uint32_t>((packed >> 8U) & 0xffU);
+}
+
+Gs1InventoryContainerKind unpack_transfer_destination_container(std::uint64_t packed) noexcept
+{
+    return static_cast<Gs1InventoryContainerKind>((packed >> 16U) & 0xffU);
+}
+
+std::uint32_t unpack_transfer_destination_slot(std::uint64_t packed) noexcept
+{
+    return static_cast<std::uint32_t>((packed >> 24U) & 0xffU);
+}
+
+std::uint32_t unpack_transfer_quantity(std::uint64_t packed) noexcept
+{
+    return static_cast<std::uint32_t>((packed >> 32U) & 0xffffU);
+}
+
 Gs1EngineCommand make_engine_command(
     Gs1EngineCommandType type)
 {
@@ -748,7 +812,9 @@ void GameRuntime::sync_after_processed_command(const GameCommand& command)
     case GameCommandType::TaskRewardClaimRequested:
     case GameCommandType::PhoneListingPurchaseRequested:
     case GameCommandType::PhoneListingSaleRequested:
+    case GameCommandType::InventoryDeliveryRequested:
     case GameCommandType::InventoryItemUseRequested:
+    case GameCommandType::InventoryItemConsumeRequested:
     case GameCommandType::InventoryTransferRequested:
     case GameCommandType::ContractorHireRequested:
     case GameCommandType::SiteUnlockablePurchaseRequested:
@@ -1691,7 +1757,34 @@ Gs1Status GameRuntime::translate_ui_action_to_command(const Gs1UiAction& action,
         return GS1_STATUS_OK;
 
     case GS1_UI_ACTION_USE_INVENTORY_ITEM:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        out_command.type = GameCommandType::InventoryItemUseRequested;
+        out_command.set_payload(InventoryItemUseRequestedCommand {
+            action.target_id,
+            static_cast<std::uint16_t>(unpack_inventory_quantity(action.arg0) == 0U
+                    ? 1U
+                    : unpack_inventory_quantity(action.arg0)),
+            unpack_inventory_container(action.arg0),
+            static_cast<std::uint8_t>(unpack_inventory_slot_index(action.arg0))});
+        return GS1_STATUS_OK;
+
     case GS1_UI_ACTION_TRANSFER_INVENTORY_ITEM:
+        out_command.type = GameCommandType::InventoryTransferRequested;
+        out_command.set_payload(InventoryTransferRequestedCommand {
+            static_cast<std::uint16_t>(unpack_transfer_source_slot(action.arg0)),
+            static_cast<std::uint16_t>(unpack_transfer_destination_slot(action.arg0)),
+            static_cast<std::uint16_t>(unpack_transfer_quantity(action.arg0) == 0U
+                    ? 1U
+                    : unpack_transfer_quantity(action.arg0)),
+            unpack_transfer_source_container(action.arg0),
+            unpack_transfer_destination_container(action.arg0),
+            0U,
+            0U});
+        return GS1_STATUS_OK;
+
     case GS1_UI_ACTION_NONE:
     default:
         return GS1_STATUS_INVALID_ARGUMENT;
