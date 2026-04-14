@@ -161,6 +161,33 @@ if(GS1_BUILD_TESTS)
         src/site/site_world.cpp
         src/runtime/game_runtime.cpp)
 
+    add_executable(gs1_runtime_command_chain_test
+        tests/runtime/game_runtime_command_chain_test.cpp
+        src/app/campaign_factory.cpp
+        src/app/site_run_factory.cpp
+        src/campaign/systems/campaign_flow_system.cpp
+        src/campaign/systems/loadout_planner_system.cpp
+        src/commands/command_dispatcher.cpp
+        src/content/prototype_content.cpp
+        src/site/systems/action_execution_system.cpp
+        src/site/systems/camp_durability_system.cpp
+        src/site/systems/device_maintenance_system.cpp
+        src/site/systems/device_support_system.cpp
+        src/site/systems/ecology_system.cpp
+        src/site/systems/economy_phone_system.cpp
+        src/site/systems/failure_recovery_system.cpp
+        src/site/systems/inventory_system.cpp
+        src/site/systems/local_weather_resolve_system.cpp
+        src/site/systems/modifier_system.cpp
+        src/site/systems/placement_validation_system.cpp
+        src/site/systems/site_completion_system.cpp
+        src/site/systems/site_flow_system.cpp
+        src/site/systems/task_board_system.cpp
+        src/site/systems/weather_event_system.cpp
+        src/site/systems/worker_condition_system.cpp
+        src/site/site_world.cpp
+        src/runtime/game_runtime.cpp)
+
     add_executable(gs1_site_system_command_flow_test
         tests/runtime/site_system_command_flow_test.cpp
         src/app/campaign_factory.cpp
@@ -194,6 +221,9 @@ if(GS1_BUILD_TESTS)
     target_include_directories(gs1_runtime_projection_test PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_include_directories(gs1_runtime_command_chain_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_include_directories(gs1_site_system_command_flow_test PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -202,6 +232,7 @@ if(GS1_BUILD_TESTS)
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/smoke)
     target_link_libraries(gs1_runtime_projection_test PRIVATE flecs)
+    target_link_libraries(gs1_runtime_command_chain_test PRIVATE flecs)
     target_link_libraries(gs1_site_system_command_flow_test PRIVATE flecs)
     target_link_libraries(gs1_visual_smoke_host PRIVATE ws2_32 winmm)
 
@@ -214,10 +245,12 @@ if(GS1_BUILD_TESTS)
     if(MSVC)
         target_compile_options(gs1_system_test_host PRIVATE /W4 /permissive-)
         target_compile_options(gs1_runtime_projection_test PRIVATE /W4 /permissive-)
+        target_compile_options(gs1_runtime_command_chain_test PRIVATE /W4 /permissive-)
         target_compile_options(gs1_site_system_command_flow_test PRIVATE /W4 /permissive-)
     else()
         target_compile_options(gs1_system_test_host PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(gs1_runtime_projection_test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(gs1_runtime_command_chain_test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(gs1_site_system_command_flow_test PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 
@@ -231,6 +264,10 @@ if(GS1_BUILD_TESTS)
     add_test(
         NAME gs1_runtime_projection_test
         COMMAND gs1_runtime_projection_test)
+
+    add_test(
+        NAME gs1_runtime_command_chain_test
+        COMMAND gs1_runtime_command_chain_test)
 
     add_test(
         NAME gs1_site_system_command_flow_test
@@ -255,6 +292,8 @@ if(GS1_BUILD_TESTS)
     set_tests_properties(gs1_smoke_host PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(gs1_runtime_projection_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(gs1_runtime_command_chain_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(gs1_site_system_command_flow_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

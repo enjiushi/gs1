@@ -1,0 +1,12 @@
+system = placement_validation
+name = structure_tile_blocked_rejected
+runner = placement_validation_regression
+description = Requests a structure reservation on a non-traversable tile and verifies a terrain-blocked rejection.
+---
+scenario = request
+x = 4
+y = 4
+layer = structure
+tile_traversable = false
+expect_result = rejected
+expect_reason = terrain_blocked

@@ -1,0 +1,16 @@
+system = inventory
+name = transfer_merge_stack
+runner = inventory_regression
+description = Transfers one seeded hydration item into a prefilled destination stack and verifies the merge result.
+---
+scenario = transfer
+site_id = 1
+source_slot = 0
+destination_slot = 3
+quantity = 1
+prefill_destination_with_same_item = true
+prefill_destination_quantity = 1
+expect_status = ok
+expect_source_quantity = 1
+expect_destination_quantity = 2
+expect_destination_occupied = true

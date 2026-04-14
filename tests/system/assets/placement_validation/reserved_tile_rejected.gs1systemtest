@@ -1,0 +1,14 @@
+system = placement_validation
+name = reserved_tile_rejected
+runner = placement_validation_regression
+description = Reserves a tile once, then requests it again and verifies the second request is rejected as reserved.
+---
+scenario = request
+x = 3
+y = 3
+layer = ground_cover
+pre_reserve_same_tile = true
+pre_action_id = 80
+action_id = 81
+expect_result = rejected
+expect_reason = reserved

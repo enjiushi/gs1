@@ -1,0 +1,15 @@
+system = ecology
+name = run_growth_updates_progress
+runner = ecology_regression
+description = Runs ecology growth on an occupied tile and verifies density, fully-grown count, and progress command emission.
+---
+scenario = run_growth
+x = 5
+y = 5
+tile_plant_id = 3
+tile_density = 0.9
+step_seconds = 1.0
+site_completion_tile_threshold = 1
+expect_density = 1.0
+expect_fully_grown_count = 1
+expect_progress_command_count = 1

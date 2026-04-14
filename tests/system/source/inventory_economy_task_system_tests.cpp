@@ -1,0 +1,534 @@
+#include "commands/game_command.h"
+#include "site/systems/economy_phone_system.h"
+#include "site/systems/inventory_system.h"
+#include "site/systems/task_board_system.h"
+#include "testing/system_test_registry.h"
+#include "system_test_fixtures.h"
+
+namespace
+{
+using gs1::EconomyPhoneSystem;
+using gs1::GameCommand;
+using gs1::GameCommandQueue;
+using gs1::GameCommandType;
+using gs1::InventorySystem;
+using gs1::PhoneListingKind;
+using gs1::SiteRunStartedCommand;
+using gs1::TaskBoardSystem;
+using gs1::TaskRuntimeListKind;
+using namespace gs1::testing::fixtures;
+
+template <typename Payload>
+GameCommand make_command(gs1::GameCommandType type, const Payload& payload)
+{
+    GameCommand command {};
+    command.type = type;
+    command.set_payload(payload);
+    return command;
+}
+
+void inventory_site_one_seed_is_applied_once(gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 801U);
+    GameCommandQueue queue {};
+    auto site_context = make_site_context<InventorySystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::SiteRunStarted,
+                SiteRunStartedCommand {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].occupied);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].item_id.value == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].item_quantity == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[1].item_id.value == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.camp_storage_slots[0].item_id.value == 4U);
+
+    site_run.inventory.worker_pack_slots[0].item_quantity = 99U;
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::SiteRunStarted,
+                SiteRunStartedCommand {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].item_quantity == 99U);
+}
+
+void inventory_non_site_seed_and_run_resize_slots(gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(2U, 802U);
+    GameCommandQueue queue {};
+    auto site_context = make_site_context<InventorySystem>(campaign, site_run, queue);
+
+    site_run.inventory.worker_pack_slots.resize(1U);
+    site_run.inventory.camp_storage_slots.resize(2U);
+    InventorySystem::run(site_context);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        site_run.inventory.worker_pack_slots.size() == site_run.inventory.worker_pack_slot_count);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        site_run.inventory.camp_storage_slots.size() == site_run.inventory.camp_storage_slot_count);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::SiteRunStarted,
+                SiteRunStartedCommand {2U, 1U, 102U, 1U, 43ULL})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, !site_run.inventory.worker_pack_slots[0].occupied);
+}
+
+void inventory_item_use_validates_and_emits_meter_delta(gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 803U);
+    GameCommandQueue queue {};
+    auto site_context = make_site_context<InventorySystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::SiteRunStarted,
+                SiteRunStartedCommand {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    queue.clear();
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        InventorySystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::InventoryItemUseRequested,
+                gs1::InventoryItemUseRequestedCommand {
+                    999U,
+                    1U,
+                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
+                    0U})) == GS1_STATUS_INVALID_ARGUMENT);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::InventoryItemUseRequested,
+                gs1::InventoryItemUseRequestedCommand {
+                    1U,
+                    1U,
+                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
+                    0U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].item_quantity == 1U);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameCommandType::WorkerMeterDeltaRequested);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            queue.front().payload_as<gs1::WorkerMeterDeltaRequestedCommand>().hydration_delta,
+            12.0f));
+}
+
+void inventory_transfer_moves_and_merges_stacks(gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 804U);
+    GameCommandQueue queue {};
+    auto site_context = make_site_context<InventorySystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::SiteRunStarted,
+                SiteRunStartedCommand {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::InventoryTransferRequested,
+                gs1::InventoryTransferRequestedCommand {
+                    0U,
+                    3U,
+                    1U,
+                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
+                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
+                    0U,
+                    0U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].item_quantity == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[3].item_id.value == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[3].item_quantity == 1U);
+
+    site_run.inventory.worker_pack_slots[4] = site_run.inventory.worker_pack_slots[3];
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::InventoryTransferRequested,
+                gs1::InventoryTransferRequestedCommand {
+                    3U,
+                    4U,
+                    1U,
+                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
+                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
+                    0U,
+                    0U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, !site_run.inventory.worker_pack_slots[3].occupied);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[4].item_quantity == 2U);
+}
+
+void economy_site_run_started_seeds_site_one_and_resets_other_sites(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_one_run = make_test_site_run(1U, 901U);
+    auto other_site_run = make_test_site_run(2U, 902U);
+    GameCommandQueue site_one_queue {};
+    GameCommandQueue other_queue {};
+
+    auto site_one_context = make_site_context<EconomyPhoneSystem>(campaign, site_one_run, site_one_queue);
+    auto other_context = make_site_context<EconomyPhoneSystem>(campaign, other_site_run, other_queue);
+    const auto started_one = make_command(
+        GameCommandType::SiteRunStarted,
+        SiteRunStartedCommand {1U, 1U, 101U, 1U, 42ULL});
+    const auto started_two = make_command(
+        GameCommandType::SiteRunStarted,
+        SiteRunStartedCommand {2U, 1U, 102U, 1U, 42ULL});
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        EconomyPhoneSystem::process_command(site_one_context, started_one) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, site_one_run.economy.money == 45);
+    GS1_SYSTEM_TEST_CHECK(context, site_one_run.economy.available_phone_listings.size() == 4U);
+    GS1_SYSTEM_TEST_CHECK(context, site_one_run.economy.direct_purchase_unlockable_ids.size() == 1U);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        EconomyPhoneSystem::process_command(other_context, started_two) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, other_site_run.economy.money == 0);
+    GS1_SYSTEM_TEST_CHECK(context, other_site_run.economy.available_phone_listings.empty());
+}
+
+void economy_purchase_sell_hire_and_unlockable_paths_update_money(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 903U);
+    GameCommandQueue queue {};
+    auto site_context = make_site_context<EconomyPhoneSystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        EconomyPhoneSystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::SiteRunStarted,
+                SiteRunStartedCommand {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        EconomyPhoneSystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::PhoneListingPurchaseRequested,
+                gs1::PhoneListingPurchaseRequestedCommand {1U, 2U, 0U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 35);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.available_phone_listings[0].quantity == 3U);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        EconomyPhoneSystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::PhoneListingSaleRequested,
+                gs1::PhoneListingSaleRequestedCommand {2U, 2U, 0U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 39);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.available_phone_listings[1].quantity == 8U);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        EconomyPhoneSystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::ContractorHireRequested,
+                gs1::ContractorHireRequestedCommand {3U, 1U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 31);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.available_phone_listings[2].quantity == 2U);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        EconomyPhoneSystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::SiteUnlockablePurchaseRequested,
+                gs1::SiteUnlockablePurchaseRequestedCommand {101U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 11);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.direct_purchase_unlockable_ids.empty());
+    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.revealed_site_unlockable_ids.size() == 1U);
+}
+
+void economy_purchase_listing_unlockable_path_spends_money_and_removes_direct_unlockable(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 905U);
+    GameCommandQueue queue {};
+    auto site_context = make_site_context<EconomyPhoneSystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        EconomyPhoneSystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::SiteRunStarted,
+                SiteRunStartedCommand {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        EconomyPhoneSystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::PhoneListingPurchaseRequested,
+                gs1::PhoneListingPurchaseRequestedCommand {4U, 1U, 0U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 25);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.direct_purchase_unlockable_ids.empty());
+    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.revealed_site_unlockable_ids.size() == 1U);
+}
+
+void economy_invalid_listing_or_money_returns_failures(gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 904U);
+    GameCommandQueue queue {};
+    auto site_context = make_site_context<EconomyPhoneSystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        EconomyPhoneSystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::SiteRunStarted,
+                SiteRunStartedCommand {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        EconomyPhoneSystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::PhoneListingPurchaseRequested,
+                gs1::PhoneListingPurchaseRequestedCommand {999U, 1U, 0U})) == GS1_STATUS_NOT_FOUND);
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        EconomyPhoneSystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::PhoneListingPurchaseRequested,
+                gs1::PhoneListingPurchaseRequestedCommand {1U, 50U, 0U})) == GS1_STATUS_INVALID_STATE);
+
+    site_run.economy.money = 0;
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        EconomyPhoneSystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::ContractorHireRequested,
+                gs1::ContractorHireRequestedCommand {3U, 1U})) == GS1_STATUS_INVALID_STATE);
+}
+
+void task_board_site_run_started_seeds_site_one_board(gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 1001U);
+    GameCommandQueue queue {};
+    auto site_context = make_site_context<TaskBoardSystem>(campaign, site_run, queue);
+
+    site_run.counters.site_completion_tile_threshold = 5U;
+    site_run.counters.fully_grown_tile_count = 2U;
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::SiteRunStarted,
+                SiteRunStartedCommand {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_REQUIRE(context, site_run.task_board.visible_tasks.size() == 1U);
+    const auto& task = site_run.task_board.visible_tasks.front();
+    GS1_SYSTEM_TEST_CHECK(context, task.target_amount == 5U);
+    GS1_SYSTEM_TEST_CHECK(context, task.current_progress_amount == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, task.runtime_list_kind == TaskRuntimeListKind::Visible);
+}
+
+void task_board_non_site_run_started_clears_existing_board_state(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(2U, 1004U);
+    GameCommandQueue queue {};
+    auto site_context = make_site_context<TaskBoardSystem>(campaign, site_run, queue);
+
+    gs1::TaskInstanceState task {};
+    task.task_instance_id = gs1::TaskInstanceId {99U};
+    task.runtime_list_kind = TaskRuntimeListKind::Accepted;
+    site_run.task_board.visible_tasks.push_back(task);
+    site_run.task_board.accepted_task_ids.push_back(task.task_instance_id);
+    site_run.task_board.completed_task_ids.push_back(gs1::TaskInstanceId {100U});
+    site_run.task_board.active_chain_state = gs1::TaskChainState {};
+    site_run.task_board.task_pool_size = 5U;
+    site_run.task_board.minutes_until_next_refresh = 12.0;
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::SiteRunStarted,
+                SiteRunStartedCommand {2U, 1U, 102U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.visible_tasks.empty());
+    GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.accepted_task_ids.empty());
+    GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.completed_task_ids.empty());
+    GS1_SYSTEM_TEST_CHECK(context, !site_run.task_board.active_chain_state.has_value());
+    GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.task_pool_size == 0U);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.task_board.minutes_until_next_refresh, 0.0));
+}
+
+void task_board_accept_respects_cap_and_list_kind(gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 1002U);
+    GameCommandQueue queue {};
+    auto site_context = make_site_context<TaskBoardSystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::SiteRunStarted,
+                SiteRunStartedCommand {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    const auto task_id = site_run.task_board.visible_tasks.front().task_instance_id.value;
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::TaskAcceptRequested,
+                gs1::TaskAcceptRequestedCommand {task_id})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.accepted_task_ids.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        site_run.task_board.visible_tasks.front().runtime_list_kind == TaskRuntimeListKind::Accepted);
+
+    site_run.task_board.accepted_task_cap = 0U;
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::TaskAcceptRequested,
+                gs1::TaskAcceptRequestedCommand {task_id})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.accepted_task_ids.size() == 1U);
+}
+
+void task_board_restoration_progress_completes_task(gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 1003U);
+    GameCommandQueue queue {};
+    auto site_context = make_site_context<TaskBoardSystem>(campaign, site_run, queue);
+
+    site_run.counters.site_completion_tile_threshold = 2U;
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::SiteRunStarted,
+                SiteRunStartedCommand {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    const auto task_id = site_run.task_board.visible_tasks.front().task_instance_id.value;
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::TaskAcceptRequested,
+                gs1::TaskAcceptRequestedCommand {task_id})) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::RestorationProgressChanged,
+                gs1::RestorationProgressChangedCommand {2U, 2U, 1.0f})) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        site_run.task_board.visible_tasks.front().runtime_list_kind == TaskRuntimeListKind::Completed);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.completed_task_ids.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.accepted_task_ids.empty());
+}
+}  // namespace
+
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "inventory",
+    "site_one_seed_is_applied_once",
+    inventory_site_one_seed_is_applied_once);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "inventory",
+    "non_site_seed_and_run_resize_slots",
+    inventory_non_site_seed_and_run_resize_slots);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "inventory",
+    "item_use_validates_and_emits_meter_delta",
+    inventory_item_use_validates_and_emits_meter_delta);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "inventory",
+    "transfer_moves_and_merges_stacks",
+    inventory_transfer_moves_and_merges_stacks);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "economy_phone",
+    "site_run_started_seeds_site_one_and_resets_other_sites",
+    economy_site_run_started_seeds_site_one_and_resets_other_sites);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "economy_phone",
+    "purchase_sell_hire_and_unlockable_paths_update_money",
+    economy_purchase_sell_hire_and_unlockable_paths_update_money);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "economy_phone",
+    "purchase_listing_unlockable_path_spends_money_and_removes_direct_unlockable",
+    economy_purchase_listing_unlockable_path_spends_money_and_removes_direct_unlockable);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "economy_phone",
+    "invalid_listing_or_money_returns_failures",
+    economy_invalid_listing_or_money_returns_failures);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "task_board",
+    "site_run_started_seeds_site_one_board",
+    task_board_site_run_started_seeds_site_one_board);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "task_board",
+    "non_site_run_started_clears_existing_board_state",
+    task_board_non_site_run_started_clears_existing_board_state);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "task_board",
+    "accept_respects_cap_and_list_kind",
+    task_board_accept_respects_cap_and_list_kind);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "task_board",
+    "restoration_progress_completes_task",
+    task_board_restoration_progress_completes_task);

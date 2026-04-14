@@ -1,0 +1,12 @@
+system = ecology
+name = clear_burial_clamps_to_zero
+runner = ecology_regression
+description = Clears more burial than exists and verifies sand burial clamps to zero.
+---
+scenario = clear_burial
+x = 1
+y = 4
+tile_sand_burial = 0.2
+cleared_amount = 0.5
+expect_sand_burial = 0.0
+expect_tile_ecology_changed_count = 1

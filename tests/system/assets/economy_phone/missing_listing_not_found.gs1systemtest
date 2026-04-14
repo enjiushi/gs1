@@ -1,0 +1,10 @@
+system = economy_phone
+name = missing_listing_not_found
+runner = economy_phone_regression
+description = Attempts to buy a missing listing and verifies the system returns not found without changing money.
+---
+scenario = purchase_listing
+listing_id = 999
+quantity = 1
+expect_status = not_found
+expect_money = 45

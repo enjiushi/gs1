@@ -1,0 +1,11 @@
+system = placement_validation
+name = out_of_bounds_rejected
+runner = placement_validation_regression
+description = Requests a placement reservation outside the site bounds and verifies an out-of-bounds rejection.
+---
+scenario = request
+x = 99
+y = 99
+layer = ground_cover
+expect_result = rejected
+expect_reason = out_of_bounds

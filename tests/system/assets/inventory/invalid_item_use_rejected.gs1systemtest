@@ -1,0 +1,13 @@
+system = inventory
+name = invalid_item_use_rejected
+runner = inventory_regression
+description = Attempts to use a seeded slot with the wrong item id and verifies the request is rejected without consuming the stack.
+---
+scenario = use_item
+site_id = 1
+slot = 0
+item_id = 999
+quantity = 1
+expect_status = invalid_argument
+expect_remaining_quantity = 2
+expect_meter_command = false

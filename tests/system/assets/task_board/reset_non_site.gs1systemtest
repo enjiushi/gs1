@@ -1,0 +1,11 @@
+system = task_board
+name = reset_non_site
+runner = task_board_regression
+description = Starts a non-site-one board after prepopulating state and verifies the board is reset to empty.
+---
+scenario = reset_non_site
+site_id = 2
+prepopulate_board = true
+expect_visible = 0
+expect_accepted = 0
+expect_completed = 0

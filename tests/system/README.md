@@ -3,6 +3,7 @@
 See the full manual here:
 
 - [SYSTEM_TEST_MANUAL.md](E:/gs1/SYSTEM_TEST_MANUAL.md)
+- [SYSTEM_TEST_COVERAGE.md](E:/gs1/SYSTEM_TEST_COVERAGE.md)
 
 This folder contains:
 

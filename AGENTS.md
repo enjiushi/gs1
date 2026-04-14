@@ -33,6 +33,12 @@ This file is a quick orientation guide for agents working in this repository.
 - All structs should try to be trivial. Prefer simple data-only layouts and avoid adding behavior or lifecycle management to structs unless there is a clear need.
 - Prefer POD-like structs for data containers: keep them trivial and standard-layout when practical, with no virtual functions, custom constructors/destructors, or owning containers unless the design clearly needs them. This keeps layout predictable and gives the compiler the best chance to optimize copies, binary payloads, and cache-friendly data paths.
 
+## Regression Test Rule
+
+- When a bug is found in or traced to a specific gameplay system, add or update a system test that reproduces that bug and locks the expected behavior before considering the fix complete.
+- Prefer the narrowest system-level test that covers the regression. If the bug depends on ECS state, seed the ECS data directly in the test setup rather than routing around the system boundary.
+- If the current implementation intentionally cannot express the full design behavior yet, keep the regression test focused on the bug we fixed and document any still-missing broader behavior in the system test coverage docs.
+
 ## System Ownership Rule
 
 - Treat every gameplay system as a self-contained owner of a specific state slice.
