@@ -5,6 +5,8 @@
 #include "campaign/systems/loadout_planner_system.h"
 #include "commands/game_command.h"
 #include "site/site_run_state.h"
+#include "site/site_world.h"
+#include "site/site_world_access.h"
 #include "site/systems/failure_recovery_system.h"
 #include "site/systems/site_completion_system.h"
 #include "site/systems/site_flow_system.h"
@@ -36,6 +38,8 @@ using gs1::SiteRunStatus;
 using gs1::SiteSystemContext;
 using gs1::SiteMoveDirectionInput;
 using gs1::StartSiteAttemptCommand;
+using gs1::SiteWorld;
+using gs1::TileCoord;
 
 SiteSystemContext make_site_context(
     CampaignState& campaign,
@@ -48,6 +52,34 @@ SiteSystemContext make_site_context(
         command_queue,
         0.25,
         SiteMoveDirectionInput {}};
+}
+
+void initialize_site_world(
+    SiteRunState& site_run,
+    std::uint32_t width,
+    std::uint32_t height,
+    TileCoord worker_tile_coord,
+    float worker_tile_x,
+    float worker_tile_y,
+    float worker_health)
+{
+    site_run.site_world = std::make_shared<SiteWorld>();
+    site_run.site_world->initialize(
+        SiteWorld::CreateDesc {
+            width,
+            height,
+            worker_tile_coord,
+            worker_tile_x,
+            worker_tile_y,
+            0.0f,
+            worker_health,
+            100.0f,
+            100.0f,
+            100.0f,
+            100.0f,
+            100.0f,
+            1.0f,
+            false});
 }
 }  // namespace
 
@@ -102,13 +134,7 @@ int main()
     SiteRunState site_run {};
     site_run.site_id = SiteId {7U};
     site_run.run_status = SiteRunStatus::Active;
-    site_run.tile_grid.width = 8U;
-    site_run.tile_grid.height = 8U;
-    site_run.tile_grid.tile_traversable.assign(site_run.tile_grid.tile_count(), 1U);
-    site_run.worker.tile_coord = {2, 2};
-    site_run.worker.tile_position_x = 2.0f;
-    site_run.worker.tile_position_y = 2.0f;
-    site_run.worker.player_health = 100.0f;
+    initialize_site_world(site_run, 8U, 8U, {2, 2}, 2.0f, 2.0f, 100.0f);
     site_run.counters.site_completion_tile_threshold = 3U;
     site_run.counters.fully_grown_tile_count = 0U;
 
@@ -117,9 +143,10 @@ int main()
     site_context.move_direction = SiteMoveDirectionInput {1.0f, 0.0f, 0.0f, true};
 
     SiteFlowSystem::run(site_context);
-    assert(site_run.worker.tile_position_x > 2.0f);
-    assert(site_run.worker.tile_position_y == 2.0f);
-    assert(site_run.worker.facing_degrees == 90.0f);
+    const auto worker_position = gs1::site_world_access::worker_position(site_run);
+    assert(worker_position.tile_x > 2.0f);
+    assert(worker_position.tile_y == 2.0f);
+    assert(worker_position.facing_degrees == 90.0f);
     assert(site_run.run_status == SiteRunStatus::Active);
     assert(command_queue.empty());
     assert(site_run.clock.day_phase == DayPhase::Dawn);
@@ -136,7 +163,9 @@ int main()
 
     command_queue.clear();
     site_run.counters.fully_grown_tile_count = 0U;
-    site_run.worker.player_health = 0.0f;
+    auto worker_conditions = gs1::site_world_access::worker_conditions(site_run);
+    worker_conditions.health = 0.0f;
+    gs1::site_world_access::set_worker_conditions(site_run, worker_conditions);
     FailureRecoverySystem::run(site_context);
     assert(site_run.run_status == SiteRunStatus::Active);
     assert(command_queue.size() == 1U);

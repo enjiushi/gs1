@@ -7,7 +7,6 @@
 #include "site/inventory_state.h"
 #include "site/modifier_state.h"
 #include "site/task_board_state.h"
-#include "site/tile_grid_state.h"
 #include "site/weather_state.h"
 #include "support/id_types.h"
 
@@ -46,23 +45,6 @@ struct SiteClockState final
     double accumulator_real_seconds {0.0};
 };
 
-struct WorkerState final
-{
-    TileCoord tile_coord {};
-    float tile_position_x {0.0f};
-    float tile_position_y {0.0f};
-    float facing_degrees {0.0f};
-    float player_health {100.0f};
-    float player_hydration {100.0f};
-    float player_nourishment {100.0f};
-    float player_energy_cap {100.0f};
-    float player_energy {100.0f};
-    float player_morale {100.0f};
-    float player_work_efficiency {1.0f};
-    bool is_sheltered {false};
-    std::optional<RuntimeActionId> current_action_id {};
-};
-
 struct CampState final
 {
     TileCoord camp_anchor_tile {};
@@ -88,8 +70,6 @@ struct SiteRunState final
     SiteRunStatus run_status {SiteRunStatus::Active};
     std::shared_ptr<SiteWorld> site_world {};
     SiteClockState clock {};
-    TileGridState tile_grid {};
-    WorkerState worker {};
     CampState camp {};
     InventoryState inventory {};
     ContractorState contractor {};

@@ -2,6 +2,7 @@
 
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
+#include "site/site_world_access.h"
 
 #include <algorithm>
 #include <cmath>
@@ -56,16 +57,30 @@ constexpr std::uint32_t kWorkerMetersChangedInitialMask =
 
 WorkerConditionMemory g_worker_memory {};
 
-WorkerMeterSnapshot make_snapshot(const WorkerState& worker) noexcept
+WorkerMeterSnapshot make_snapshot(const site_ecs::WorkerVitals& worker) noexcept
 {
     return WorkerMeterSnapshot {
-        worker.player_health,
-        worker.player_hydration,
-        worker.player_nourishment,
-        worker.player_energy_cap,
-        worker.player_energy,
-        worker.player_morale,
-        worker.player_work_efficiency};
+        worker.health,
+        worker.hydration,
+        worker.nourishment,
+        worker.energy_cap,
+        worker.energy,
+        worker.morale,
+        worker.work_efficiency};
+}
+
+bool worker_vitals_changed(
+    const site_ecs::WorkerVitals& previous,
+    const site_ecs::WorkerVitals& current) noexcept
+{
+    return previous.health != current.health ||
+        previous.hydration != current.hydration ||
+        previous.nourishment != current.nourishment ||
+        previous.energy_cap != current.energy_cap ||
+        previous.energy != current.energy ||
+        previous.morale != current.morale ||
+        previous.work_efficiency != current.work_efficiency ||
+        previous.is_sheltered != current.is_sheltered;
 }
 
 std::uint32_t compute_change_mask(
@@ -126,7 +141,17 @@ void emit_worker_meters_changed_if_needed(SiteSystemContext& context) noexcept
 {
     ensure_memory_for_run(context);
     auto& memory = g_worker_memory;
-    const auto snapshot = make_snapshot(context.site_run.worker);
+    WorkerMeterSnapshot snapshot {};
+    const bool has_worker = site_world_access::worker_condition::read_worker(
+        context.site_run,
+        [&](const site_ecs::WorkerVitals& worker) {
+            snapshot = make_snapshot(worker);
+        });
+    if (!has_worker)
+    {
+        return;
+    }
+
     const auto previous_snapshot = memory.last_reported_snapshot.value_or(snapshot);
     const auto mask = compute_change_mask(previous_snapshot, snapshot);
     const auto is_initial = !memory.last_reported_snapshot.has_value();
@@ -152,64 +177,64 @@ void emit_worker_meters_changed_if_needed(SiteSystemContext& context) noexcept
     }
 }
 
-void apply_passive_decay(WorkerState& worker, float step_seconds) noexcept
+void apply_passive_decay(site_ecs::WorkerVitals& worker, float step_seconds) noexcept
 {
-    worker.player_hydration = std::clamp(
-        worker.player_hydration - kHydrationDrainPerSecond * step_seconds,
+    worker.hydration = std::clamp(
+        worker.hydration - kHydrationDrainPerSecond * step_seconds,
         kMeterMin,
         kHydrationMax);
-    worker.player_nourishment = std::clamp(
-        worker.player_nourishment - kNourishmentDrainPerSecond * step_seconds,
+    worker.nourishment = std::clamp(
+        worker.nourishment - kNourishmentDrainPerSecond * step_seconds,
         kMeterMin,
         kNourishmentMax);
-    worker.player_energy = std::clamp(
-        worker.player_energy - kEnergyDrainPerSecond * step_seconds,
+    worker.energy = std::clamp(
+        worker.energy - kEnergyDrainPerSecond * step_seconds,
         kMeterMin,
-        worker.player_energy_cap);
-    worker.player_morale = std::clamp(
-        worker.player_morale - kMoraleDrainPerSecond * step_seconds,
+        worker.energy_cap);
+    worker.morale = std::clamp(
+        worker.morale - kMoraleDrainPerSecond * step_seconds,
         kMeterMin,
         kMoraleMax);
 
-    if (worker.player_hydration <= 0.0f || worker.player_nourishment <= 0.0f)
+    if (worker.hydration <= 0.0f || worker.nourishment <= 0.0f)
     {
-        worker.player_health = std::clamp(
-            worker.player_health - kStarvationHealthDrainPerSecond * step_seconds,
+        worker.health = std::clamp(
+            worker.health - kStarvationHealthDrainPerSecond * step_seconds,
             kMeterMin,
             kHealthMax);
     }
 }
 
 void apply_worker_meter_delta(
-    WorkerState& worker,
+    site_ecs::WorkerVitals& worker,
     const WorkerMeterDeltaRequestedCommand& payload) noexcept
 {
-    worker.player_health = std::clamp(
-        worker.player_health + payload.health_delta,
+    worker.health = std::clamp(
+        worker.health + payload.health_delta,
         kMeterMin,
         kHealthMax);
-    worker.player_hydration = std::clamp(
-        worker.player_hydration + payload.hydration_delta,
+    worker.hydration = std::clamp(
+        worker.hydration + payload.hydration_delta,
         kMeterMin,
         kHydrationMax);
-    worker.player_nourishment = std::clamp(
-        worker.player_nourishment + payload.nourishment_delta,
+    worker.nourishment = std::clamp(
+        worker.nourishment + payload.nourishment_delta,
         kMeterMin,
         kNourishmentMax);
-    worker.player_energy_cap = std::clamp(
-        worker.player_energy_cap + payload.energy_cap_delta,
+    worker.energy_cap = std::clamp(
+        worker.energy_cap + payload.energy_cap_delta,
         kMeterMin,
         kEnergyCapMax);
-    worker.player_energy = std::clamp(
-        worker.player_energy + payload.energy_delta,
+    worker.energy = std::clamp(
+        worker.energy + payload.energy_delta,
         kMeterMin,
-        worker.player_energy_cap);
-    worker.player_morale = std::clamp(
-        worker.player_morale + payload.morale_delta,
+        worker.energy_cap);
+    worker.morale = std::clamp(
+        worker.morale + payload.morale_delta,
         kMeterMin,
         kMoraleMax);
-    worker.player_work_efficiency = std::clamp(
-        worker.player_work_efficiency + payload.work_efficiency_delta,
+    worker.work_efficiency = std::clamp(
+        worker.work_efficiency + payload.work_efficiency_delta,
         kWorkEfficiencyMin,
         kWorkEfficiencyMax);
 }
@@ -229,17 +254,33 @@ Gs1Status WorkerConditionSystem::process_command(
         return GS1_STATUS_OK;
     }
 
-    apply_worker_meter_delta(
-        context.site_run.worker,
-        command.payload_as<WorkerMeterDeltaRequestedCommand>());
-    emit_worker_meters_changed_if_needed(context);
+    const bool modified = site_world_access::worker_condition::with_worker_mut(
+        context.site_run,
+        [&](site_ecs::WorkerVitals& worker) {
+            const auto previous = worker;
+            apply_worker_meter_delta(worker, command.payload_as<WorkerMeterDeltaRequestedCommand>());
+            return worker_vitals_changed(previous, worker);
+        });
+    if (modified)
+    {
+        emit_worker_meters_changed_if_needed(context);
+    }
     return GS1_STATUS_OK;
 }
 
 void WorkerConditionSystem::run(SiteSystemContext& context)
 {
     const auto step_seconds = static_cast<float>(context.fixed_step_seconds);
-    apply_passive_decay(context.site_run.worker, step_seconds);
-    emit_worker_meters_changed_if_needed(context);
+    const bool modified = site_world_access::worker_condition::with_worker_mut(
+        context.site_run,
+        [&](site_ecs::WorkerVitals& worker) {
+            const auto previous = worker;
+            apply_passive_decay(worker, step_seconds);
+            return worker_vitals_changed(previous, worker);
+        });
+    if (modified)
+    {
+        emit_worker_meters_changed_if_needed(context);
+    }
 }
 }  // namespace gs1

@@ -3,10 +3,19 @@
 #include "support/id_types.h"
 
 #include <cstdint>
+#include <type_traits>
 
 namespace gs1::site_ecs
 {
 struct TileTag final
+{
+};
+
+struct TileOccupantTag final
+{
+};
+
+struct DeviceTag final
 {
 };
 
@@ -16,158 +25,165 @@ struct WorkerTag final
 
 struct TileIndex final
 {
-    std::uint32_t value {0};
+    std::uint32_t value;
 };
 
 struct TileCoordComponent final
 {
-    TileCoord value {};
+    TileCoord value;
 };
 
 struct TileTerrain final
 {
-    std::uint32_t type_id {0};
+    std::uint32_t type_id;
 };
 
 struct TileTraversable final
 {
-    bool value {false};
+    bool value;
 };
 
 struct TilePlantable final
 {
-    bool value {false};
+    bool value;
 };
 
 struct TileReservedByStructure final
 {
-    bool value {false};
+    bool value;
 };
 
 struct TileSoilFertility final
 {
-    float value {0.0f};
+    float value;
 };
 
 struct TileMoisture final
 {
-    float value {0.0f};
+    float value;
 };
 
 struct TileSoilSalinity final
 {
-    float value {0.0f};
+    float value;
 };
 
 struct TileSandBurial final
 {
-    float value {0.0f};
+    float value;
 };
 
 struct TileHeat final
 {
-    float value {0.0f};
+    float value;
 };
 
 struct TileWind final
 {
-    float value {0.0f};
+    float value;
 };
 
 struct TileDust final
 {
-    float value {0.0f};
+    float value;
 };
 
 struct TilePlantSlot final
 {
-    PlantId plant_id {};
+    PlantId plant_id;
 };
 
 struct TileGroundCoverSlot final
 {
-    std::uint32_t ground_cover_type_id {0};
+    std::uint32_t ground_cover_type_id;
 };
 
 struct TilePlantDensity final
 {
-    float value {0.0f};
+    float value;
 };
 
 struct TileGrowthPressure final
 {
-    float value {0.0f};
+    float value;
 };
 
-struct TileStructureSlot final
+struct DeviceStructureId final
 {
-    StructureId structure_id {};
+    StructureId structure_id;
 };
 
-struct TileDeviceIntegrity final
+struct DeviceIntegrity final
 {
-    float value {1.0f};
+    float value;
 };
 
-struct TileDeviceEfficiency final
+struct DeviceEfficiency final
 {
-    float value {1.0f};
+    float value;
 };
 
-struct TileDeviceStoredWater final
+struct DeviceStoredWater final
 {
-    float value {0.0f};
-};
-
-struct SiteIdentityResource final
-{
-    SiteId site_id {};
-    SiteRunId site_run_id {};
-    std::uint32_t site_archetype_id {0};
-};
-
-struct TileDomainResource final
-{
-    std::uint32_t width {0};
-    std::uint32_t height {0};
-};
-
-struct CampResource final
-{
-    TileCoord anchor_tile {};
-    float durability {100.0f};
-    bool protection_resolved {true};
-    bool delivery_point_operational {true};
-    bool shared_storage_access_enabled {true};
+    float value;
 };
 
 struct WorkerTilePosition final
 {
-    TileCoord tile_coord {};
-    float tile_x {0.0f};
-    float tile_y {0.0f};
+    TileCoord tile_coord;
+    float tile_x;
+    float tile_y;
 };
 
 struct WorkerFacing final
 {
-    float degrees {0.0f};
+    float degrees;
 };
 
 struct WorkerVitals final
 {
-    float health {100.0f};
-    float hydration {100.0f};
-    float nourishment {100.0f};
-    float energy_cap {100.0f};
-    float energy {100.0f};
-    float morale {100.0f};
-    float work_efficiency {1.0f};
-    bool is_sheltered {false};
+    float health;
+    float hydration;
+    float nourishment;
+    float energy_cap;
+    float energy;
+    float morale;
+    float work_efficiency;
+    bool is_sheltered;
 };
 
-struct WorkerActionReference final
-{
-    std::uint32_t runtime_action_id {0};
-    bool has_runtime_action_id {false};
-};
+#define GS1_REQUIRE_TRIVIAL(Type) \
+    static_assert(std::is_trivial_v<Type>, #Type " must remain trivial."); \
+    static_assert(std::is_trivially_copyable_v<Type>, #Type " must remain trivially copyable.")
+
+GS1_REQUIRE_TRIVIAL(TileTag);
+GS1_REQUIRE_TRIVIAL(TileOccupantTag);
+GS1_REQUIRE_TRIVIAL(DeviceTag);
+GS1_REQUIRE_TRIVIAL(WorkerTag);
+GS1_REQUIRE_TRIVIAL(TileIndex);
+GS1_REQUIRE_TRIVIAL(TileCoordComponent);
+GS1_REQUIRE_TRIVIAL(TileTerrain);
+GS1_REQUIRE_TRIVIAL(TileTraversable);
+GS1_REQUIRE_TRIVIAL(TilePlantable);
+GS1_REQUIRE_TRIVIAL(TileReservedByStructure);
+GS1_REQUIRE_TRIVIAL(TileSoilFertility);
+GS1_REQUIRE_TRIVIAL(TileMoisture);
+GS1_REQUIRE_TRIVIAL(TileSoilSalinity);
+GS1_REQUIRE_TRIVIAL(TileSandBurial);
+GS1_REQUIRE_TRIVIAL(TileHeat);
+GS1_REQUIRE_TRIVIAL(TileWind);
+GS1_REQUIRE_TRIVIAL(TileDust);
+GS1_REQUIRE_TRIVIAL(TilePlantSlot);
+GS1_REQUIRE_TRIVIAL(TileGroundCoverSlot);
+GS1_REQUIRE_TRIVIAL(TilePlantDensity);
+GS1_REQUIRE_TRIVIAL(TileGrowthPressure);
+GS1_REQUIRE_TRIVIAL(DeviceStructureId);
+GS1_REQUIRE_TRIVIAL(DeviceIntegrity);
+GS1_REQUIRE_TRIVIAL(DeviceEfficiency);
+GS1_REQUIRE_TRIVIAL(DeviceStoredWater);
+GS1_REQUIRE_TRIVIAL(WorkerTilePosition);
+GS1_REQUIRE_TRIVIAL(WorkerFacing);
+GS1_REQUIRE_TRIVIAL(WorkerVitals);
+
+#undef GS1_REQUIRE_TRIVIAL
 }  // namespace gs1::site_ecs

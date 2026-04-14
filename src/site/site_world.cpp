@@ -19,11 +19,21 @@ namespace
 {
 using namespace site_ecs;
 
-TileCoord coord_from_index(const TileGridState& tile_grid, std::size_t index) noexcept
+std::size_t tile_count_from_dimensions(std::uint32_t width, std::uint32_t height) noexcept
 {
+    return static_cast<std::size_t>(width) * static_cast<std::size_t>(height);
+}
+
+TileCoord coord_from_index(std::uint32_t width, std::size_t index) noexcept
+{
+    if (width == 0U)
+    {
+        return {};
+    }
+
     return TileCoord {
-        static_cast<std::int32_t>(index % tile_grid.width),
-        static_cast<std::int32_t>(index / tile_grid.width)};
+        static_cast<std::int32_t>(index % width),
+        static_cast<std::int32_t>(index / width)};
 }
 
 template <typename Component>
@@ -35,6 +45,8 @@ void register_component(flecs::world& world)
 void register_site_world_types(flecs::world& world)
 {
     register_component<TileTag>(world);
+    register_component<TileOccupantTag>(world);
+    register_component<DeviceTag>(world);
     register_component<WorkerTag>(world);
     register_component<TileIndex>(world);
     register_component<TileCoordComponent>(world);
@@ -53,17 +65,218 @@ void register_site_world_types(flecs::world& world)
     register_component<TileGroundCoverSlot>(world);
     register_component<TilePlantDensity>(world);
     register_component<TileGrowthPressure>(world);
-    register_component<TileStructureSlot>(world);
-    register_component<TileDeviceIntegrity>(world);
-    register_component<TileDeviceEfficiency>(world);
-    register_component<TileDeviceStoredWater>(world);
-    register_component<SiteIdentityResource>(world);
-    register_component<TileDomainResource>(world);
-    register_component<CampResource>(world);
+    register_component<DeviceStructureId>(world);
+    register_component<DeviceIntegrity>(world);
+    register_component<DeviceEfficiency>(world);
+    register_component<DeviceStoredWater>(world);
     register_component<WorkerTilePosition>(world);
     register_component<WorkerFacing>(world);
     register_component<WorkerVitals>(world);
-    register_component<WorkerActionReference>(world);
+}
+
+bool has_tile_occupant(PlantId plant_id, std::uint32_t ground_cover_type_id) noexcept
+{
+    return plant_id.value != 0U || ground_cover_type_id != 0U;
+}
+
+void sync_tile_occupant_tag(
+    flecs::entity entity,
+    PlantId plant_id,
+    std::uint32_t ground_cover_type_id)
+{
+    if (has_tile_occupant(plant_id, ground_cover_type_id))
+    {
+        entity.add<TileOccupantTag>();
+    }
+    else
+    {
+        entity.remove<TileOccupantTag>();
+    }
+}
+
+SiteWorld::TileStaticData tile_static_from_entity(flecs::entity entity)
+{
+    const auto terrain = entity.get<TileTerrain>();
+    const auto traversable = entity.get<TileTraversable>();
+    const auto plantable = entity.get<TilePlantable>();
+    const auto reserved = entity.get<TileReservedByStructure>();
+
+    return SiteWorld::TileStaticData {
+        terrain.type_id,
+        traversable.value,
+        plantable.value,
+        reserved.value};
+}
+
+SiteWorld::TileEcologyData tile_ecology_from_entity(flecs::entity entity)
+{
+    const auto fertility = entity.get<TileSoilFertility>();
+    const auto moisture = entity.get<TileMoisture>();
+    const auto salinity = entity.get<TileSoilSalinity>();
+    const auto burial = entity.get<TileSandBurial>();
+    const auto plant = entity.get<TilePlantSlot>();
+    const auto ground_cover = entity.get<TileGroundCoverSlot>();
+    const auto density = entity.get<TilePlantDensity>();
+    const auto growth = entity.get<TileGrowthPressure>();
+
+    return SiteWorld::TileEcologyData {
+        fertility.value,
+        moisture.value,
+        salinity.value,
+        burial.value,
+        plant.plant_id,
+        ground_cover.ground_cover_type_id,
+        density.value,
+        growth.value};
+}
+
+SiteWorld::TileLocalWeatherData tile_local_weather_from_entity(flecs::entity entity)
+{
+    const auto heat = entity.get<TileHeat>();
+    const auto wind = entity.get<TileWind>();
+    const auto dust = entity.get<TileDust>();
+
+    return SiteWorld::TileLocalWeatherData {
+        heat.value,
+        wind.value,
+        dust.value};
+}
+
+SiteWorld::TileDeviceData tile_device_from_entity(flecs::entity entity)
+{
+    const auto structure = entity.get<DeviceStructureId>();
+    const auto integrity = entity.get<DeviceIntegrity>();
+    const auto efficiency = entity.get<DeviceEfficiency>();
+    const auto stored_water = entity.get<DeviceStoredWater>();
+
+    return SiteWorld::TileDeviceData {
+        structure.structure_id,
+        integrity.value,
+        efficiency.value,
+        stored_water.value};
+}
+
+SiteWorld::TileData tile_data_from_entity(flecs::entity entity)
+{
+    return SiteWorld::TileData {
+        tile_static_from_entity(entity),
+        tile_ecology_from_entity(entity),
+        tile_local_weather_from_entity(entity),
+        SiteWorld::TileDeviceData {StructureId {}, 1.0f, 1.0f, 0.0f}};
+}
+
+SiteWorld::TileData default_tile_data() noexcept
+{
+    return SiteWorld::TileData {
+        SiteWorld::TileStaticData {0U, true, true, false},
+        SiteWorld::TileEcologyData {0.5f, 0.5f, 0.0f, 0.0f, PlantId {}, 0U, 0.0f, 0.0f},
+        SiteWorld::TileLocalWeatherData {0.0f, 0.0f, 0.0f},
+        SiteWorld::TileDeviceData {StructureId {}, 1.0f, 1.0f, 0.0f}};
+}
+
+SiteWorld::TileDeviceData default_device_data() noexcept
+{
+    return SiteWorld::TileDeviceData {StructureId {}, 1.0f, 1.0f, 0.0f};
+}
+
+void apply_tile_static_to_entity(flecs::entity entity, const SiteWorld::TileStaticData& data)
+{
+    entity
+        .set<TileTerrain>({data.terrain_type_id})
+        .set<TileTraversable>({data.traversable})
+        .set<TilePlantable>({data.plantable})
+        .set<TileReservedByStructure>({data.reserved_by_structure});
+}
+
+void apply_tile_ecology_to_entity(flecs::entity entity, const SiteWorld::TileEcologyData& data)
+{
+    entity
+        .set<TileSoilFertility>({data.soil_fertility})
+        .set<TileMoisture>({data.moisture})
+        .set<TileSoilSalinity>({data.soil_salinity})
+        .set<TileSandBurial>({data.sand_burial})
+        .set<TilePlantSlot>({data.plant_id})
+        .set<TileGroundCoverSlot>({data.ground_cover_type_id})
+        .set<TilePlantDensity>({data.plant_density})
+        .set<TileGrowthPressure>({data.growth_pressure});
+
+    sync_tile_occupant_tag(entity, data.plant_id, data.ground_cover_type_id);
+}
+
+void apply_tile_local_weather_to_entity(
+    flecs::entity entity,
+    const SiteWorld::TileLocalWeatherData& data)
+{
+    entity
+        .set<TileHeat>({data.heat})
+        .set<TileWind>({data.wind})
+        .set<TileDust>({data.dust});
+}
+
+void apply_device_to_entity(flecs::entity entity, const SiteWorld::TileDeviceData& data)
+{
+    entity
+        .set<DeviceStructureId>({data.structure_id})
+        .set<DeviceIntegrity>({data.device_integrity})
+        .set<DeviceEfficiency>({data.device_efficiency})
+        .set<DeviceStoredWater>({data.device_stored_water});
+}
+
+SiteWorld::WorkerPositionData worker_position_from_entity(flecs::entity entity)
+{
+    const auto position = entity.get<WorkerTilePosition>();
+    const auto facing = entity.get<WorkerFacing>();
+
+    return SiteWorld::WorkerPositionData {
+        position.tile_coord,
+        position.tile_x,
+        position.tile_y,
+        facing.degrees};
+}
+
+SiteWorld::WorkerConditionData worker_conditions_from_entity(flecs::entity entity)
+{
+    const auto vitals = entity.get<WorkerVitals>();
+
+    return SiteWorld::WorkerConditionData {
+        vitals.health,
+        vitals.hydration,
+        vitals.nourishment,
+        vitals.energy_cap,
+        vitals.energy,
+        vitals.morale,
+        vitals.work_efficiency,
+        vitals.is_sheltered};
+}
+
+SiteWorld::WorkerData worker_data_from_entity(flecs::entity entity)
+{
+    return SiteWorld::WorkerData {
+        worker_position_from_entity(entity),
+        worker_conditions_from_entity(entity)};
+}
+
+void apply_worker_position_to_entity(flecs::entity entity, const SiteWorld::WorkerPositionData& data)
+{
+    entity
+        .set<WorkerTilePosition>({
+            data.tile_coord,
+            data.tile_x,
+            data.tile_y})
+        .set<WorkerFacing>({data.facing_degrees});
+}
+
+void apply_worker_conditions_to_entity(flecs::entity entity, const SiteWorld::WorkerConditionData& data)
+{
+    entity.set<WorkerVitals>({
+        data.health,
+        data.hydration,
+        data.nourishment,
+        data.energy_cap,
+        data.energy,
+        data.morale,
+        data.work_efficiency,
+        data.is_sheltered});
 }
 }  // namespace
 
@@ -72,7 +285,8 @@ struct SiteWorld::Impl final
     flecs::world world {};
     std::uint32_t width {0};
     std::uint32_t height {0};
-    std::vector<flecs::entity_t> tile_entities {};
+    flecs::entity_t tile_entity_base {0};
+    std::vector<flecs::entity_t> device_entities_by_tile_index {};
     flecs::entity_t worker_entity {0};
     bool initialized {false};
 };
@@ -87,62 +301,78 @@ SiteWorld::~SiteWorld() = default;
 SiteWorld::SiteWorld(SiteWorld&&) noexcept = default;
 SiteWorld& SiteWorld::operator=(SiteWorld&&) noexcept = default;
 
-void SiteWorld::initialize(const CreateDesc& desc, const TileGridState& tile_grid)
+void SiteWorld::initialize(const CreateDesc& desc)
 {
     impl_ = std::make_unique<Impl>();
     register_site_world_types(impl_->world);
 
-    impl_->width = tile_grid.width;
-    impl_->height = tile_grid.height;
-    const auto tile_count = tile_grid.tile_count();
-    impl_->tile_entities.reserve(tile_count);
+    impl_->width = desc.width;
+    impl_->height = desc.height;
+    const auto count = tile_count_from_dimensions(desc.width, desc.height);
+    const auto initial_tile = default_tile_data();
+    impl_->device_entities_by_tile_index.assign(count, 0U);
 
-    impl_->world.set<SiteIdentityResource>({
-        desc.site_id,
-        desc.site_run_id,
-        desc.site_archetype_id});
-    impl_->world.set<TileDomainResource>({
-        tile_grid.width,
-        tile_grid.height});
-    impl_->world.set<CampResource>({
-        desc.camp_anchor_tile,
-        desc.camp_durability,
-        desc.camp_protection_resolved,
-        desc.delivery_point_operational,
-        desc.shared_camp_storage_access_enabled});
-
-    for (std::size_t index = 0; index < tile_count; ++index)
+    for (std::size_t index = 0; index < count; ++index)
     {
-        const auto coord = coord_from_index(tile_grid, index);
-        auto tile_entity = impl_->world.entity();
+        const auto coord = coord_from_index(desc.width, index);
+        flecs::entity tile_entity = index == 0
+            ? impl_->world.entity()
+            : [&]() {
+                ecs_entity_desc_t entity_desc {};
+                entity_desc.id =
+                    impl_->tile_entity_base + static_cast<flecs::entity_t>(index);
+                return impl_->world.entity(ecs_entity_init(impl_->world.c_ptr(), &entity_desc));
+            }();
+
+        if (index == 0)
+        {
+            impl_->tile_entity_base = tile_entity.id();
+        }
+
         tile_entity
             .add<TileTag>()
             .set<TileIndex>({static_cast<std::uint32_t>(index)})
             .set<TileCoordComponent>({coord})
-            .set<TileTerrain>({tile_grid.terrain_type_ids[index]})
-            .set<TileTraversable>({tile_grid.tile_traversable[index] != 0U})
-            .set<TilePlantable>({tile_grid.tile_plantable[index] != 0U})
-            .set<TileReservedByStructure>({tile_grid.tile_reserved_by_structure[index] != 0U})
-            .set<TileSoilFertility>({tile_grid.tile_soil_fertility[index]})
-            .set<TileMoisture>({tile_grid.tile_moisture[index]})
-            .set<TileSoilSalinity>({tile_grid.tile_soil_salinity[index]})
-            .set<TileSandBurial>({tile_grid.tile_sand_burial[index]})
-            .set<TileHeat>({tile_grid.tile_heat[index]})
-            .set<TileWind>({tile_grid.tile_wind[index]})
-            .set<TileDust>({tile_grid.tile_dust[index]})
-            .set<TilePlantSlot>({tile_grid.plant_type_ids[index]})
-            .set<TileGroundCoverSlot>({tile_grid.ground_cover_type_ids[index]})
-            .set<TilePlantDensity>({tile_grid.tile_plant_density[index]})
-            .set<TileGrowthPressure>({tile_grid.growth_pressure[index]})
-            .set<TileStructureSlot>({tile_grid.structure_type_ids[index]})
-            .set<TileDeviceIntegrity>({tile_grid.device_integrity[index]})
-            .set<TileDeviceEfficiency>({tile_grid.device_efficiency[index]})
-            .set<TileDeviceStoredWater>({tile_grid.device_stored_water[index]});
+            .set<TileTerrain>({initial_tile.static_data.terrain_type_id})
+            .set<TileTraversable>({initial_tile.static_data.traversable})
+            .set<TilePlantable>({initial_tile.static_data.plantable})
+            .set<TileReservedByStructure>({initial_tile.static_data.reserved_by_structure})
+            .set<TileSoilFertility>({initial_tile.ecology.soil_fertility})
+            .set<TileMoisture>({initial_tile.ecology.moisture})
+            .set<TileSoilSalinity>({initial_tile.ecology.soil_salinity})
+            .set<TileSandBurial>({initial_tile.ecology.sand_burial})
+            .set<TileHeat>({initial_tile.local_weather.heat})
+            .set<TileWind>({initial_tile.local_weather.wind})
+            .set<TileDust>({initial_tile.local_weather.dust})
+            .set<TilePlantSlot>({initial_tile.ecology.plant_id})
+            .set<TileGroundCoverSlot>({initial_tile.ecology.ground_cover_type_id})
+            .set<TilePlantDensity>({initial_tile.ecology.plant_density})
+            .set<TileGrowthPressure>({initial_tile.ecology.growth_pressure});
 
-        impl_->tile_entities.push_back(tile_entity.id());
+        sync_tile_occupant_tag(
+            tile_entity,
+            initial_tile.ecology.plant_id,
+            initial_tile.ecology.ground_cover_type_id);
+
+        if (initial_tile.device.structure_id.value != 0U)
+        {
+            auto device_entity = impl_->world.entity();
+            device_entity
+                .add<DeviceTag>()
+                .set<TileCoordComponent>({coord});
+            apply_device_to_entity(device_entity, initial_tile.device);
+            impl_->device_entities_by_tile_index[index] = device_entity.id();
+        }
     }
 
-    auto worker_entity = impl_->world.entity("Worker");
+    ecs_entity_desc_t worker_desc {};
+    worker_desc.id = count > 0
+        ? impl_->tile_entity_base + static_cast<flecs::entity_t>(count)
+        : impl_->world.entity().id();
+    worker_desc.name = "Worker";
+    worker_desc.sep = "::";
+    worker_desc.root_sep = "::";
+    auto worker_entity = impl_->world.entity(ecs_entity_init(impl_->world.c_ptr(), &worker_desc));
     worker_entity
         .add<WorkerTag>()
         .set<WorkerTilePosition>({
@@ -158,10 +388,7 @@ void SiteWorld::initialize(const CreateDesc& desc, const TileGridState& tile_gri
             desc.worker_energy,
             desc.worker_morale,
             desc.worker_work_efficiency,
-            desc.worker_is_sheltered})
-        .set<WorkerActionReference>({
-            desc.worker_current_action_id,
-            desc.worker_has_current_action_id});
+            desc.worker_is_sheltered});
 
     impl_->worker_entity = worker_entity.id();
     impl_->initialized = true;
@@ -184,7 +411,9 @@ std::uint32_t SiteWorld::height() const noexcept
 
 std::size_t SiteWorld::tile_count() const noexcept
 {
-    return impl_ != nullptr ? impl_->tile_entities.size() : 0U;
+    return impl_ != nullptr
+        ? tile_count_from_dimensions(impl_->width, impl_->height)
+        : 0U;
 }
 
 bool SiteWorld::contains(TileCoord coord) const noexcept
@@ -204,6 +433,11 @@ std::uint32_t SiteWorld::tile_index(TileCoord coord) const noexcept
         static_cast<std::uint32_t>(coord.x));
 }
 
+TileCoord SiteWorld::tile_coord(std::size_t index) const noexcept
+{
+    return impl_ != nullptr ? coord_from_index(impl_->width, index) : TileCoord {};
+}
+
 std::uint64_t SiteWorld::tile_entity_id(TileCoord coord) const noexcept
 {
     if (!contains(coord))
@@ -211,13 +445,320 @@ std::uint64_t SiteWorld::tile_entity_id(TileCoord coord) const noexcept
         return 0U;
     }
 
+    return impl_->tile_entity_base + static_cast<flecs::entity_t>(tile_index(coord));
+}
+
+std::uint64_t SiteWorld::device_entity_id(TileCoord coord) const noexcept
+{
+    if (!contains(coord) || impl_ == nullptr)
+    {
+        return 0U;
+    }
+
     const auto index = tile_index(coord);
-    return index < impl_->tile_entities.size() ? impl_->tile_entities[index] : 0U;
+    return index < impl_->device_entities_by_tile_index.size()
+        ? impl_->device_entities_by_tile_index[index]
+        : 0U;
 }
 
 std::uint64_t SiteWorld::worker_entity_id() const noexcept
 {
     return impl_ != nullptr ? impl_->worker_entity : 0U;
+}
+
+flecs::world& SiteWorld::ecs_world() noexcept
+{
+    return impl_->world;
+}
+
+const flecs::world& SiteWorld::ecs_world() const noexcept
+{
+    return impl_->world;
+}
+
+SiteWorld::TileStaticData SiteWorld::tile_static_data(TileCoord coord) const noexcept
+{
+    if (!contains(coord))
+    {
+        return {};
+    }
+
+    return tile_static_data_at_index(tile_index(coord));
+}
+
+SiteWorld::TileStaticData SiteWorld::tile_static_data_at_index(std::size_t index) const noexcept
+{
+    if (impl_ == nullptr || index >= tile_count())
+    {
+        return {};
+    }
+
+    return tile_static_from_entity(
+        impl_->world.entity(impl_->tile_entity_base + static_cast<flecs::entity_t>(index)));
+}
+
+SiteWorld::TileEcologyData SiteWorld::tile_ecology(TileCoord coord) const noexcept
+{
+    if (!contains(coord))
+    {
+        return {};
+    }
+
+    return tile_ecology_at_index(tile_index(coord));
+}
+
+SiteWorld::TileEcologyData SiteWorld::tile_ecology_at_index(std::size_t index) const noexcept
+{
+    if (impl_ == nullptr || index >= tile_count())
+    {
+        return {};
+    }
+
+    return tile_ecology_from_entity(
+        impl_->world.entity(impl_->tile_entity_base + static_cast<flecs::entity_t>(index)));
+}
+
+void SiteWorld::set_tile_ecology(TileCoord coord, const TileEcologyData& data)
+{
+    if (!contains(coord))
+    {
+        return;
+    }
+
+    set_tile_ecology_at_index(tile_index(coord), data);
+}
+
+void SiteWorld::set_tile_ecology_at_index(std::size_t index, const TileEcologyData& data)
+{
+    if (impl_ == nullptr || index >= tile_count())
+    {
+        return;
+    }
+
+    apply_tile_ecology_to_entity(
+        impl_->world.entity(impl_->tile_entity_base + static_cast<flecs::entity_t>(index)),
+        data);
+}
+
+SiteWorld::TileLocalWeatherData SiteWorld::tile_local_weather(TileCoord coord) const noexcept
+{
+    if (!contains(coord))
+    {
+        return {};
+    }
+
+    return tile_local_weather_at_index(tile_index(coord));
+}
+
+SiteWorld::TileLocalWeatherData SiteWorld::tile_local_weather_at_index(std::size_t index) const noexcept
+{
+    if (impl_ == nullptr || index >= tile_count())
+    {
+        return {};
+    }
+
+    return tile_local_weather_from_entity(
+        impl_->world.entity(impl_->tile_entity_base + static_cast<flecs::entity_t>(index)));
+}
+
+void SiteWorld::set_tile_local_weather(TileCoord coord, const TileLocalWeatherData& data)
+{
+    if (!contains(coord))
+    {
+        return;
+    }
+
+    set_tile_local_weather_at_index(tile_index(coord), data);
+}
+
+void SiteWorld::set_tile_local_weather_at_index(std::size_t index, const TileLocalWeatherData& data)
+{
+    if (impl_ == nullptr || index >= tile_count())
+    {
+        return;
+    }
+
+    apply_tile_local_weather_to_entity(
+        impl_->world.entity(impl_->tile_entity_base + static_cast<flecs::entity_t>(index)),
+        data);
+}
+
+SiteWorld::TileDeviceData SiteWorld::tile_device(TileCoord coord) const noexcept
+{
+    if (!contains(coord))
+    {
+        return {};
+    }
+
+    return tile_device_at_index(tile_index(coord));
+}
+
+SiteWorld::TileDeviceData SiteWorld::tile_device_at_index(std::size_t index) const noexcept
+{
+    if (impl_ == nullptr || index >= tile_count())
+    {
+        return {};
+    }
+
+    const auto entity_id = impl_->device_entities_by_tile_index[index];
+    if (entity_id == 0U)
+    {
+        return default_device_data();
+    }
+
+    return tile_device_from_entity(impl_->world.entity(entity_id));
+}
+
+void SiteWorld::set_tile_device(TileCoord coord, const TileDeviceData& data)
+{
+    if (!contains(coord))
+    {
+        return;
+    }
+
+    set_tile_device_at_index(tile_index(coord), data);
+}
+
+void SiteWorld::set_tile_device_at_index(std::size_t index, const TileDeviceData& data)
+{
+    if (impl_ == nullptr || index >= tile_count())
+    {
+        return;
+    }
+
+    auto& entity_id = impl_->device_entities_by_tile_index[index];
+    if (data.structure_id.value == 0U)
+    {
+        if (entity_id != 0U)
+        {
+            impl_->world.entity(entity_id).destruct();
+            entity_id = 0U;
+        }
+        return;
+    }
+
+    const auto coord = tile_coord(index);
+    auto entity = entity_id == 0U
+        ? impl_->world.entity()
+        : impl_->world.entity(entity_id);
+    if (entity_id == 0U)
+    {
+        entity_id = entity.id();
+        entity.add<DeviceTag>();
+    }
+
+    entity.set<TileCoordComponent>({coord});
+    apply_device_to_entity(entity, data);
+}
+
+SiteWorld::TileData SiteWorld::tile_at(TileCoord coord) const noexcept
+{
+    if (!contains(coord))
+    {
+        return {};
+    }
+
+    return tile_at_index(tile_index(coord));
+}
+
+SiteWorld::TileData SiteWorld::tile_at_index(std::size_t index) const noexcept
+{
+    if (impl_ == nullptr || index >= tile_count())
+    {
+        return {};
+    }
+
+    auto tile = tile_data_from_entity(
+        impl_->world.entity(impl_->tile_entity_base + static_cast<flecs::entity_t>(index)));
+    tile.device = tile_device_at_index(index);
+    return tile;
+}
+
+void SiteWorld::set_tile(TileCoord coord, const TileData& data)
+{
+    if (!contains(coord))
+    {
+        return;
+    }
+
+    set_tile_at_index(tile_index(coord), data);
+}
+
+void SiteWorld::set_tile_at_index(std::size_t index, const TileData& data)
+{
+    if (impl_ == nullptr || index >= tile_count())
+    {
+        return;
+    }
+
+    const auto entity = impl_->world.entity(
+        impl_->tile_entity_base + static_cast<flecs::entity_t>(index));
+    apply_tile_static_to_entity(entity, data.static_data);
+    apply_tile_ecology_to_entity(entity, data.ecology);
+    apply_tile_local_weather_to_entity(entity, data.local_weather);
+    set_tile_device_at_index(index, data.device);
+}
+
+SiteWorld::WorkerPositionData SiteWorld::worker_position() const
+{
+    if (impl_ == nullptr || impl_->worker_entity == 0U)
+    {
+        return {};
+    }
+
+    return worker_position_from_entity(impl_->world.entity(impl_->worker_entity));
+}
+
+void SiteWorld::set_worker_position(const WorkerPositionData& data)
+{
+    if (impl_ == nullptr || impl_->worker_entity == 0U)
+    {
+        return;
+    }
+
+    apply_worker_position_to_entity(impl_->world.entity(impl_->worker_entity), data);
+}
+
+SiteWorld::WorkerConditionData SiteWorld::worker_conditions() const
+{
+    if (impl_ == nullptr || impl_->worker_entity == 0U)
+    {
+        return {};
+    }
+
+    return worker_conditions_from_entity(impl_->world.entity(impl_->worker_entity));
+}
+
+void SiteWorld::set_worker_conditions(const WorkerConditionData& data)
+{
+    if (impl_ == nullptr || impl_->worker_entity == 0U)
+    {
+        return;
+    }
+
+    apply_worker_conditions_to_entity(impl_->world.entity(impl_->worker_entity), data);
+}
+
+SiteWorld::WorkerData SiteWorld::worker() const
+{
+    if (impl_ == nullptr || impl_->worker_entity == 0U)
+    {
+        return {};
+    }
+
+    return worker_data_from_entity(impl_->world.entity(impl_->worker_entity));
+}
+
+void SiteWorld::set_worker(const WorkerData& data)
+{
+    if (impl_ == nullptr || impl_->worker_entity == 0U)
+    {
+        return;
+    }
+
+    const auto entity = impl_->world.entity(impl_->worker_entity);
+    apply_worker_position_to_entity(entity, data.position);
+    apply_worker_conditions_to_entity(entity, data.conditions);
 }
 }  // namespace gs1
 

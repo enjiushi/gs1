@@ -2,6 +2,7 @@
 
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
+#include "site/site_world_access.h"
 #include "support/id_types.h"
 
 #include <algorithm>
@@ -109,16 +110,6 @@ double compute_duration_minutes(ActionKind kind, std::uint16_t quantity) noexcep
     const std::uint16_t safe_quantity = quantity == 0U ? 1U : quantity;
     const double duration = base_duration_minutes(kind) * static_cast<double>(safe_quantity);
     return std::max(k_minimum_action_duration_minutes, duration);
-}
-
-bool tile_coord_in_bounds(const TileGridState& tile_grid, TileCoord coord) noexcept
-{
-    return tile_grid.width > 0U &&
-        tile_grid.height > 0U &&
-        coord.x >= 0 &&
-        coord.y >= 0 &&
-        static_cast<std::uint32_t>(coord.x) < tile_grid.width &&
-        static_cast<std::uint32_t>(coord.y) < tile_grid.height;
 }
 
 RuntimeActionId allocate_runtime_action_id() noexcept
@@ -439,7 +430,7 @@ Gs1Status ActionExecutionSystem::process_command(
         }
 
         const TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
-        if (!tile_coord_in_bounds(context.site_run.tile_grid, target_tile))
+        if (!site_world_access::tile_coord_in_bounds(context.site_run, target_tile))
         {
             emit_site_action_failed(
                 context.command_queue,

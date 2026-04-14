@@ -4,6 +4,7 @@
 #include "campaign/systems/campaign_system_context.h"
 #include "campaign/systems/loadout_planner_system.h"
 #include "commands/command_dispatcher.h"
+#include "site/site_world_access.h"
 #include "site/systems/action_execution_system.h"
 #include "site/systems/camp_durability_system.h"
 #include "site/systems/device_maintenance_system.h"
@@ -59,14 +60,6 @@ Gs1EngineCommand make_engine_command(
     Gs1EngineCommand command {};
     command.type = type;
     return command;
-}
-
-bool tile_coord_in_bounds(const TileGridState& tile_grid, TileCoord coord) noexcept
-{
-    return coord.x >= 0 &&
-        coord.y >= 0 &&
-        static_cast<std::uint32_t>(coord.x) < tile_grid.width &&
-        static_cast<std::uint32_t>(coord.y) < tile_grid.height;
 }
 
 Gs1TaskPresentationListKind to_task_presentation_list_kind(TaskRuntimeListKind kind) noexcept
@@ -961,8 +954,8 @@ void GameRuntime::queue_site_snapshot_begin_command(Gs1ProjectionMode mode)
     begin_payload.mode = mode;
     begin_payload.site_id = active_site_run_->site_id.value;
     begin_payload.site_archetype_id = active_site_run_->site_archetype_id;
-    begin_payload.width = static_cast<std::uint16_t>(active_site_run_->tile_grid.width);
-    begin_payload.height = static_cast<std::uint16_t>(active_site_run_->tile_grid.height);
+    begin_payload.width = static_cast<std::uint16_t>(site_world_access::width(active_site_run_.value()));
+    begin_payload.height = static_cast<std::uint16_t>(site_world_access::height(active_site_run_.value()));
     engine_commands_.push_back(begin);
 }
 
@@ -978,25 +971,28 @@ void GameRuntime::queue_site_tile_upsert_command(std::uint32_t x, std::uint32_t 
         return;
     }
 
-    if (x >= active_site_run_->tile_grid.width || y >= active_site_run_->tile_grid.height)
+    auto& site_run = active_site_run_.value();
+    const TileCoord coord {
+        static_cast<std::int32_t>(x),
+        static_cast<std::int32_t>(y)};
+
+    if (!site_world_access::tile_coord_in_bounds(site_run, coord))
     {
         return;
     }
 
-    const auto index =
-        static_cast<std::size_t>(y) * static_cast<std::size_t>(active_site_run_->tile_grid.width) +
-        static_cast<std::size_t>(x);
+    const auto tile = site_run.site_world->tile_at(coord);
 
     auto tile_command = make_engine_command(GS1_ENGINE_COMMAND_SITE_TILE_UPSERT);
     auto& payload = tile_command.emplace_payload<Gs1EngineCommandSiteTileData>();
     payload.x = x;
     payload.y = y;
-    payload.terrain_type_id = active_site_run_->tile_grid.terrain_type_ids[index];
-    payload.plant_type_id = active_site_run_->tile_grid.plant_type_ids[index].value;
-    payload.structure_type_id = active_site_run_->tile_grid.structure_type_ids[index].value;
-    payload.ground_cover_type_id = active_site_run_->tile_grid.ground_cover_type_ids[index];
-    payload.plant_density = active_site_run_->tile_grid.tile_plant_density[index];
-    payload.sand_burial = active_site_run_->tile_grid.tile_sand_burial[index];
+    payload.terrain_type_id = tile.static_data.terrain_type_id;
+    payload.plant_type_id = tile.ecology.plant_id.value;
+    payload.structure_type_id = tile.device.structure_id.value;
+    payload.ground_cover_type_id = tile.ecology.ground_cover_type_id;
+    payload.plant_density = tile.ecology.plant_density;
+    payload.sand_burial = tile.ecology.sand_burial;
     engine_commands_.push_back(tile_command);
 }
 
@@ -1007,9 +1003,11 @@ void GameRuntime::queue_all_site_tile_upsert_commands()
         return;
     }
 
-    for (std::uint32_t y = 0; y < active_site_run_->tile_grid.height; ++y)
+    const auto width = site_world_access::width(active_site_run_.value());
+    const auto height = site_world_access::height(active_site_run_.value());
+    for (std::uint32_t y = 0; y < height; ++y)
     {
-        for (std::uint32_t x = 0; x < active_site_run_->tile_grid.width; ++x)
+        for (std::uint32_t x = 0; x < width; ++x)
         {
             queue_site_tile_upsert_command(x, y);
         }
@@ -1056,16 +1054,19 @@ void GameRuntime::queue_site_worker_update_command()
         return;
     }
 
+    const auto worker_position = site_world_access::worker_position(active_site_run_.value());
+    const auto worker_conditions = site_world_access::worker_conditions(active_site_run_.value());
+
     auto worker_command = make_engine_command(GS1_ENGINE_COMMAND_SITE_WORKER_UPDATE);
     auto& worker_payload = worker_command.emplace_payload<Gs1EngineCommandWorkerData>();
-    worker_payload.tile_x = active_site_run_->worker.tile_position_x;
-    worker_payload.tile_y = active_site_run_->worker.tile_position_y;
-    worker_payload.facing_degrees = active_site_run_->worker.facing_degrees;
-    worker_payload.health_normalized = active_site_run_->worker.player_health / 100.0f;
-    worker_payload.hydration_normalized = active_site_run_->worker.player_hydration / 100.0f;
+    worker_payload.tile_x = worker_position.tile_x;
+    worker_payload.tile_y = worker_position.tile_y;
+    worker_payload.facing_degrees = worker_position.facing_degrees;
+    worker_payload.health_normalized = worker_conditions.health / 100.0f;
+    worker_payload.hydration_normalized = worker_conditions.hydration / 100.0f;
     worker_payload.energy_normalized =
-        active_site_run_->worker.player_energy_cap > 0.0f
-            ? (active_site_run_->worker.player_energy / active_site_run_->worker.player_energy_cap)
+        worker_conditions.energy_cap > 0.0f
+            ? (worker_conditions.energy / worker_conditions.energy_cap)
             : 0.0f;
     worker_payload.current_action_kind =
         static_cast<Gs1SiteActionKind>(active_site_run_->site_action.action_kind);
@@ -1328,11 +1329,13 @@ void GameRuntime::queue_hud_state_command()
         return;
     }
 
+    const auto worker_conditions = site_world_access::worker_conditions(active_site_run_.value());
+
     auto hud_command = make_engine_command(GS1_ENGINE_COMMAND_HUD_STATE);
     auto& payload = hud_command.emplace_payload<Gs1EngineCommandHudStateData>();
-    payload.player_health = active_site_run_->worker.player_health;
-    payload.player_hydration = active_site_run_->worker.player_hydration;
-    payload.player_energy = active_site_run_->worker.player_energy;
+    payload.player_health = worker_conditions.health;
+    payload.player_hydration = worker_conditions.hydration;
+    payload.player_energy = worker_conditions.energy;
     payload.current_money = active_site_run_->economy.money;
     payload.active_task_count =
         static_cast<std::uint16_t>(active_site_run_->task_board.accepted_task_ids.size());
@@ -1382,19 +1385,19 @@ void GameRuntime::mark_site_tile_projection_dirty(TileCoord coord) noexcept
     }
 
     auto& site_run = active_site_run_.value();
-    if (!tile_coord_in_bounds(site_run.tile_grid, coord))
+    if (!site_world_access::tile_coord_in_bounds(site_run, coord))
     {
         return;
     }
 
-    const auto tile_count = site_run.tile_grid.tile_count();
+    const auto tile_count = site_world_access::tile_count(site_run);
     if (site_run.pending_tile_projection_update_mask.size() != tile_count)
     {
         site_run.pending_tile_projection_update_mask.assign(tile_count, 0U);
         site_run.pending_tile_projection_updates.clear();
     }
 
-    const auto index = site_run.tile_grid.to_index(coord);
+    const auto index = site_world_access::tile_index(site_run, coord);
     if (site_run.pending_tile_projection_update_mask[index] == 0U)
     {
         site_run.pending_tile_projection_update_mask[index] = 1U;
@@ -1414,12 +1417,12 @@ void GameRuntime::clear_pending_site_tile_projection_updates() noexcept
     auto& site_run = active_site_run_.value();
     for (const auto& coord : site_run.pending_tile_projection_updates)
     {
-        if (!tile_coord_in_bounds(site_run.tile_grid, coord))
+        if (!site_world_access::tile_coord_in_bounds(site_run, coord))
         {
             continue;
         }
 
-        const auto index = site_run.tile_grid.to_index(coord);
+        const auto index = site_world_access::tile_index(site_run, coord);
         if (index < site_run.pending_tile_projection_update_mask.size())
         {
             site_run.pending_tile_projection_update_mask[index] = 0U;

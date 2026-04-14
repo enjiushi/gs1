@@ -1,4 +1,5 @@
 #include "runtime/game_runtime.h"
+#include "site/site_world_access.h"
 
 #include <algorithm>
 #include <cassert>
@@ -106,14 +107,20 @@ void run_phase1(GameRuntime& runtime, double real_delta_seconds)
     assert(runtime.run_phase1(request, result) == GS1_STATUS_OK);
 }
 
+void set_tile_sand_burial(gs1::SiteRunState& site_run, TileCoord coord, float sand_burial)
+{
+    auto ecology = gs1::site_world_access::tile_ecology(site_run, coord);
+    ecology.sand_burial = sand_burial;
+    gs1::site_world_access::set_tile_ecology(site_run, coord, ecology);
+}
+
 std::vector<Gs1EngineCommand> flush_tile_delta_for(
     GameRuntime& runtime,
     TileCoord coord,
     float sand_burial)
 {
     auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
-    const auto index = site_run.tile_grid.to_index(coord);
-    site_run.tile_grid.tile_sand_burial[index] = sand_burial;
+    set_tile_sand_burial(site_run, coord, sand_burial);
     gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, coord);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
     return drain_engine_commands(runtime);
@@ -170,7 +177,9 @@ int main()
     assert(runtime.handle_command(accept_task) == GS1_STATUS_OK);
     assert(bootstrap_site_run.task_board.accepted_task_ids.size() == 1U);
 
-    bootstrap_site_run.worker.player_hydration = 80.0f;
+    auto worker = gs1::site_world_access::worker_conditions(bootstrap_site_run);
+    worker.hydration = 80.0f;
+    gs1::site_world_access::set_worker_conditions(bootstrap_site_run, worker);
     GameCommand use_item {};
     use_item.type = GameCommandType::InventoryItemUseRequested;
     use_item.set_payload(InventoryItemUseRequestedCommand {
@@ -180,7 +189,7 @@ int main()
         0U});
     assert(runtime.handle_command(use_item) == GS1_STATUS_OK);
     assert(bootstrap_site_run.inventory.worker_pack_slots[0].item_quantity == 1U);
-    assert(bootstrap_site_run.worker.player_hydration > 80.0f);
+    assert(gs1::site_world_access::worker_conditions(bootstrap_site_run).hydration > 80.0f);
 
     GameCommand buy_listing {};
     buy_listing.type = GameCommandType::PhoneListingPurchaseRequested;
@@ -207,11 +216,10 @@ int main()
 
     auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
     const auto repeated_coord = TileCoord {5, 4};
-    const auto repeated_index = site_run.tile_grid.to_index(repeated_coord);
-    site_run.tile_grid.tile_sand_burial[repeated_index] = 0.5f;
+    set_tile_sand_burial(site_run, repeated_coord, 0.5f);
     gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, repeated_coord);
     gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, repeated_coord);
-    site_run.tile_grid.tile_sand_burial[site_run.tile_grid.to_index(TileCoord {1, 1})] = 0.75f;
+    set_tile_sand_burial(site_run, TileCoord {1, 1}, 0.75f);
     gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, TileCoord {1, 1});
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
 
@@ -228,13 +236,13 @@ int main()
         assert(second_tile.sand_burial == 0.5f);
     }
 
-    site_run.tile_grid.tile_sand_burial[site_run.tile_grid.to_index(TileCoord {0, 0})] = 0.9f;
+    set_tile_sand_burial(site_run, TileCoord {0, 0}, 0.9f);
     gs1::GameRuntimeProjectionTestAccess::mark_all_tiles_dirty(runtime);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
     const auto fallback_commands = drain_engine_commands(runtime);
     const auto fallback_tiles = collect_commands_of_type(fallback_commands, GS1_ENGINE_COMMAND_SITE_TILE_UPSERT);
     assert(!fallback_tiles.empty());
-    assert(fallback_tiles.size() == site_run.tile_grid.tile_count());
+    assert(fallback_tiles.size() == gs1::site_world_access::tile_count(site_run));
 
     Gs1RuntimeCreateDesc action_desc {};
     action_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
@@ -256,9 +264,9 @@ int main()
 
     auto& action_site_run =
         gs1::GameRuntimeProjectionTestAccess::active_site_run(action_runtime).value();
-    const auto action_tile_index = action_site_run.tile_grid.to_index(action_target);
-    assert(action_site_run.tile_grid.ground_cover_type_ids[action_tile_index] == 1U);
-    assert(action_site_run.tile_grid.tile_plant_density[action_tile_index] >= 0.25f);
+    const auto action_ecology = gs1::site_world_access::tile_ecology(action_site_run, action_target);
+    assert(action_ecology.ground_cover_type_id == 1U);
+    assert(action_ecology.plant_density >= 0.25f);
 
     run_phase1(action_runtime, 0.0);
     const auto action_commands = drain_engine_commands(action_runtime);

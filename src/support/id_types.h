@@ -1,13 +1,14 @@
 #pragma once
 
 #include <cstdint>
+#include <type_traits>
 
 namespace gs1
 {
 template<typename Tag>
 struct Id final
 {
-    std::uint32_t value {0};
+    std::uint32_t value;
 
     constexpr bool operator==(const Id&) const = default;
     constexpr bool operator<(const Id& other) const noexcept
@@ -54,7 +55,12 @@ using RuntimeActionId = Id<RuntimeActionIdTag>;
 
 struct TileCoord final
 {
-    std::int32_t x {0};
-    std::int32_t y {0};
+    std::int32_t x;
+    std::int32_t y;
 };
+
+static_assert(std::is_trivial_v<SiteId>);
+static_assert(std::is_trivially_copyable_v<SiteId>);
+static_assert(std::is_trivial_v<TileCoord>);
+static_assert(std::is_trivially_copyable_v<TileCoord>);
 }  // namespace gs1
