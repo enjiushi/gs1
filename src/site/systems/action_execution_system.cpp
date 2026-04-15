@@ -16,7 +16,6 @@ namespace gs1
 {
 namespace
 {
-constexpr double k_seconds_per_minute = 60.0;
 constexpr double k_minimum_action_duration_minutes = 0.25;
 
 ActionKind to_action_kind(Gs1SiteActionKind kind) noexcept
@@ -354,6 +353,13 @@ bool is_action_waiting_for_worker_approach(const ActionState& action_state) noex
 bool is_action_in_progress(const ActionState& action_state) noexcept
 {
     return has_active_action(action_state) && action_has_started(action_state);
+}
+
+double current_action_total_duration_minutes(const ActionState& action_state) noexcept
+{
+    return compute_duration_minutes(
+        action_state.action_kind,
+        static_cast<std::uint16_t>(action_state.quantity == 0U ? 1U : action_state.quantity));
 }
 
 bool tile_is_traversable(
@@ -852,9 +858,15 @@ void ActionExecutionSystem::run(SiteSystemContext<ActionExecutionSystem>& contex
         return;
     }
 
-    const double delta_minutes = context.fixed_step_seconds / k_seconds_per_minute;
+    const double elapsed_minutes =
+        std::max(
+            0.0,
+            context.world.read_time().world_time_minutes -
+                action_state.started_at_world_minute.value_or(context.world.read_time().world_time_minutes));
+    const double remaining_minutes =
+        std::max(0.0, current_action_total_duration_minutes(action_state) - elapsed_minutes);
     action_state.remaining_action_minutes =
-        std::max(0.0, action_state.remaining_action_minutes - delta_minutes);
+        remaining_minutes;
 
     if (action_state.remaining_action_minutes > 0.0)
     {

@@ -460,6 +460,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (expands) {
             nextHoverPath[level] = itemId;
         }
+        if (nextHoverPath.length === tileContextMenuState.hoverPath.length &&
+            nextHoverPath.every(function (hoveredId, index) {
+                return hoveredId === tileContextMenuState.hoverPath[index];
+            })) {
+            return;
+        }
         tileContextMenuState.hoverPath = nextHoverPath;
         renderTileContextMenu();
     }

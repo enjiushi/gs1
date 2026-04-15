@@ -425,9 +425,17 @@ int main()
         0U,
         gs1::k_item_wind_reed_seed_bundle);
     assert(action_runtime.submit_host_events(&action_event, 1U) == GS1_STATUS_OK);
-    run_phase1(action_runtime, 60.0);
+    gs1::SiteWorld::TileEcologyData action_ecology {};
+    for (int step = 0; step < 10; ++step)
+    {
+        run_phase1(action_runtime, 60.0);
+        action_ecology = gs1::site_world_access::tile_ecology(action_site_run, action_target);
+        if (action_ecology.plant_id.value == gs1::k_plant_wind_reed)
+        {
+            break;
+        }
+    }
 
-    const auto action_ecology = gs1::site_world_access::tile_ecology(action_site_run, action_target);
     assert(action_ecology.plant_id.value == gs1::k_plant_wind_reed);
     assert(action_ecology.plant_density >= 0.2f);
     assert(action_site_run.inventory.worker_pack_slots[3].item_quantity == 1U);
