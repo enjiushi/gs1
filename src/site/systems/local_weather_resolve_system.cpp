@@ -1,10 +1,10 @@
 #include "site/systems/local_weather_resolve_system.h"
 
 #include "site/site_run_state.h"
-#include "site/site_world_access.h"
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 namespace
 {
 constexpr float k_local_weather_epsilon = 0.0001f;
@@ -34,8 +34,7 @@ Gs1Status LocalWeatherResolveSystem::process_command(
 
 void LocalWeatherResolveSystem::run(SiteSystemContext<LocalWeatherResolveSystem>& context)
 {
-    auto& site_run = context.site_run;
-    if (!site_world_access::has_world(site_run))
+    if (!context.world.has_world())
     {
         return;
     }
@@ -45,47 +44,37 @@ void LocalWeatherResolveSystem::run(SiteSystemContext<LocalWeatherResolveSystem>
     const float base_wind = weather.weather_wind;
     const float base_dust = weather.weather_dust;
 
-    site_world_access::local_weather::for_each_tile_mut(
-        site_run,
-        [&](TileCoord,
-            const site_ecs::TilePlantSlot& plant,
-            const site_ecs::TileGroundCoverSlot& ground_cover,
-            const site_ecs::TilePlantDensity& density,
-            site_ecs::TileHeat& heat,
-            site_ecs::TileWind& wind,
-            site_ecs::TileDust& dust) {
-            const float occupant_density = std::clamp(density.value, 0.0f, 1.0f);
-            const bool has_cover =
-                plant.plant_id.value != 0U || ground_cover.ground_cover_type_id != 0U;
-            const float cover_factor = has_cover ? 1.0f : 0.0f;
+    const auto tile_count = context.world.tile_count();
+    for (std::size_t index = 0; index < tile_count; ++index)
+    {
+        auto tile = context.world.read_tile_at_index(index);
+        const float occupant_density = std::clamp(tile.ecology.plant_density, 0.0f, 1.0f);
+        const bool has_cover =
+            tile.ecology.plant_id.value != 0U || tile.ecology.ground_cover_type_id != 0U;
+        const float cover_factor = has_cover ? 1.0f : 0.0f;
 
-            const float resolved_heat = base_heat + (occupant_density * k_cover_heat_modifier);
-            const float resolved_wind = base_wind + (cover_factor * k_cover_wind_modifier);
-            const float resolved_dust =
-                base_dust +
-                (occupant_density * k_cover_dust_modifier) +
-                ((1.0f - cover_factor) * k_exposed_dust_bias);
+        const float resolved_heat = base_heat + (occupant_density * k_cover_heat_modifier);
+        const float resolved_wind = base_wind + (cover_factor * k_cover_wind_modifier);
+        const float resolved_dust =
+            base_dust +
+            (occupant_density * k_cover_dust_modifier) +
+            ((1.0f - cover_factor) * k_exposed_dust_bias);
 
-            const bool heat_changed = std::fabs(heat.value - resolved_heat) > k_local_weather_epsilon;
-            const bool wind_changed = std::fabs(wind.value - resolved_wind) > k_local_weather_epsilon;
-            const bool dust_changed = std::fabs(dust.value - resolved_dust) > k_local_weather_epsilon;
+        const bool heat_changed =
+            std::fabs(tile.local_weather.heat - resolved_heat) > k_local_weather_epsilon;
+        const bool wind_changed =
+            std::fabs(tile.local_weather.wind - resolved_wind) > k_local_weather_epsilon;
+        const bool dust_changed =
+            std::fabs(tile.local_weather.dust - resolved_dust) > k_local_weather_epsilon;
+        if (!heat_changed && !wind_changed && !dust_changed)
+        {
+            continue;
+        }
 
-            if (heat_changed)
-            {
-                heat.value = resolved_heat;
-            }
-
-            if (wind_changed)
-            {
-                wind.value = resolved_wind;
-            }
-
-            if (dust_changed)
-            {
-                dust.value = resolved_dust;
-            }
-
-            return heat_changed || wind_changed || dust_changed;
-        });
+        tile.local_weather.heat = resolved_heat;
+        tile.local_weather.wind = resolved_wind;
+        tile.local_weather.dust = resolved_dust;
+        context.world.write_tile_at_index(index, tile);
+    }
 }
 }  // namespace gs1

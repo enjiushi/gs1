@@ -168,6 +168,51 @@ template <std::size_t SystemCount>
     return {};
 }
 
+template <typename SystemTag>
+[[nodiscard]] consteval bool site_system_reads_component(SiteComponent component) noexcept
+{
+    return (SystemTag::access().read_components & site_component_bit(component)) != 0U;
+}
+
+template <typename SystemTag>
+[[nodiscard]] consteval bool site_system_owns_component(SiteComponent component) noexcept
+{
+    return (SystemTag::access().own_components & site_component_bit(component)) != 0U;
+}
+
+template <typename SystemTag>
+[[nodiscard]] consteval bool site_system_reads_any_tile_component() noexcept
+{
+    return site_system_reads_component<SystemTag>(SiteComponent::TileLayout) ||
+        site_system_reads_component<SystemTag>(SiteComponent::TileEcology) ||
+        site_system_reads_component<SystemTag>(SiteComponent::TileWeather) ||
+        site_system_reads_component<SystemTag>(SiteComponent::DeviceCondition) ||
+        site_system_reads_component<SystemTag>(SiteComponent::DeviceRuntime);
+}
+
+template <typename SystemTag>
+[[nodiscard]] consteval bool site_system_owns_any_tile_component() noexcept
+{
+    return site_system_owns_component<SystemTag>(SiteComponent::TileEcology) ||
+        site_system_owns_component<SystemTag>(SiteComponent::TileWeather) ||
+        site_system_owns_component<SystemTag>(SiteComponent::DeviceCondition) ||
+        site_system_owns_component<SystemTag>(SiteComponent::DeviceRuntime);
+}
+
+template <typename SystemTag>
+[[nodiscard]] consteval bool site_system_reads_any_worker_component() noexcept
+{
+    return site_system_reads_component<SystemTag>(SiteComponent::WorkerMotion) ||
+        site_system_reads_component<SystemTag>(SiteComponent::WorkerNeeds);
+}
+
+template <typename SystemTag>
+[[nodiscard]] consteval bool site_system_owns_any_worker_component() noexcept
+{
+    return site_system_owns_component<SystemTag>(SiteComponent::WorkerMotion) ||
+        site_system_owns_component<SystemTag>(SiteComponent::WorkerNeeds);
+}
+
 struct SiteMoveDirectionInput final
 {
     float world_move_x {0.0f};
@@ -195,6 +240,119 @@ public:
 
     [[nodiscard]] const SiteClockState& read_time() const noexcept { return site_run_.clock; }
     [[nodiscard]] SiteClockState& own_time() noexcept { return site_run_.clock; }
+
+    [[nodiscard]] bool has_world() const noexcept
+    {
+        return site_world_access::has_world(site_run_);
+    }
+
+    [[nodiscard]] std::uint32_t tile_width() const noexcept
+    {
+        static_assert(
+            site_system_reads_any_tile_component<SystemTag>(),
+            "System must declare a tile-grid component as readable.");
+        const auto* world = site_world_ptr();
+        return world != nullptr ? world->width() : 0U;
+    }
+
+    [[nodiscard]] std::uint32_t tile_height() const noexcept
+    {
+        static_assert(
+            site_system_reads_any_tile_component<SystemTag>(),
+            "System must declare a tile-grid component as readable.");
+        const auto* world = site_world_ptr();
+        return world != nullptr ? world->height() : 0U;
+    }
+
+    [[nodiscard]] std::size_t tile_count() const noexcept
+    {
+        static_assert(
+            site_system_reads_any_tile_component<SystemTag>(),
+            "System must declare a tile-grid component as readable.");
+        const auto* world = site_world_ptr();
+        return world != nullptr ? world->tile_count() : 0U;
+    }
+
+    [[nodiscard]] bool tile_coord_in_bounds(TileCoord coord) const noexcept
+    {
+        static_assert(
+            site_system_reads_any_tile_component<SystemTag>(),
+            "System must declare a tile-grid component as readable.");
+        const auto* world = site_world_ptr();
+        return world != nullptr && world->contains(coord);
+    }
+
+    [[nodiscard]] TileCoord tile_coord(std::size_t index) const noexcept
+    {
+        static_assert(
+            site_system_reads_any_tile_component<SystemTag>(),
+            "System must declare a tile-grid component as readable.");
+        const auto* world = site_world_ptr();
+        return world != nullptr ? world->tile_coord(index) : TileCoord {};
+    }
+
+    [[nodiscard]] SiteWorld::TileData read_tile(TileCoord coord) const noexcept
+    {
+        static_assert(
+            site_system_reads_any_tile_component<SystemTag>(),
+            "System must declare a tile-grid component as readable.");
+        const auto* world = site_world_ptr();
+        return world != nullptr ? world->tile_at(coord) : SiteWorld::TileData {};
+    }
+
+    [[nodiscard]] SiteWorld::TileData read_tile_at_index(std::size_t index) const noexcept
+    {
+        static_assert(
+            site_system_reads_any_tile_component<SystemTag>(),
+            "System must declare a tile-grid component as readable.");
+        const auto* world = site_world_ptr();
+        return world != nullptr ? world->tile_at_index(index) : SiteWorld::TileData {};
+    }
+
+    void write_tile(TileCoord coord, const SiteWorld::TileData& data)
+    {
+        static_assert(
+            site_system_owns_any_tile_component<SystemTag>(),
+            "System must declare a tile-grid component as owned.");
+        auto* world = site_world_ptr();
+        if (world != nullptr)
+        {
+            world->set_tile(coord, data);
+        }
+    }
+
+    void write_tile_at_index(std::size_t index, const SiteWorld::TileData& data)
+    {
+        static_assert(
+            site_system_owns_any_tile_component<SystemTag>(),
+            "System must declare a tile-grid component as owned.");
+        auto* world = site_world_ptr();
+        if (world != nullptr)
+        {
+            world->set_tile_at_index(index, data);
+        }
+    }
+
+    [[nodiscard]] SiteWorld::WorkerData read_worker() const
+    {
+        static_assert(
+            site_system_reads_any_worker_component<SystemTag>(),
+            "System must declare a worker component as readable.");
+        const auto* world = site_world_ptr();
+        return world != nullptr ? world->worker() : SiteWorld::WorkerData {};
+    }
+
+    void write_worker(const SiteWorld::WorkerData& data)
+    {
+        static_assert(
+            site_system_owns_any_worker_component<SystemTag>(),
+            "System must declare a worker component as owned.");
+        auto* world = site_world_ptr();
+        if (world != nullptr)
+        {
+            world->set_worker(data);
+        }
+    }
 
     [[nodiscard]] const CampState& read_camp() const noexcept { return site_run_.camp; }
     [[nodiscard]] CampState& own_camp() noexcept { return site_run_.camp; }
@@ -310,6 +468,16 @@ public:
     }
 
 private:
+    [[nodiscard]] const SiteWorld* site_world_ptr() const noexcept
+    {
+        return has_world() ? site_run_.site_world.get() : nullptr;
+    }
+
+    [[nodiscard]] SiteWorld* site_world_ptr() noexcept
+    {
+        return has_world() ? site_run_.site_world.get() : nullptr;
+    }
+
     SiteRunState& site_run_;
 };
 

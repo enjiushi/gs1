@@ -2,7 +2,6 @@
 
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
-#include "site/site_world_access.h"
 
 #include <algorithm>
 #include <cmath>
@@ -57,7 +56,7 @@ constexpr std::uint32_t kWorkerMetersChangedInitialMask =
 
 WorkerConditionMemory g_worker_memory {};
 
-WorkerMeterSnapshot make_snapshot(const site_ecs::WorkerVitals& worker) noexcept
+WorkerMeterSnapshot make_snapshot(const SiteWorld::WorkerConditionData& worker) noexcept
 {
     return WorkerMeterSnapshot {
         worker.health,
@@ -69,9 +68,9 @@ WorkerMeterSnapshot make_snapshot(const site_ecs::WorkerVitals& worker) noexcept
         worker.work_efficiency};
 }
 
-bool worker_vitals_changed(
-    const site_ecs::WorkerVitals& previous,
-    const site_ecs::WorkerVitals& current) noexcept
+bool worker_conditions_changed(
+    const SiteWorld::WorkerConditionData& previous,
+    const SiteWorld::WorkerConditionData& current) noexcept
 {
     return previous.health != current.health ||
         previous.hydration != current.hydration ||
@@ -140,18 +139,13 @@ void ensure_memory_for_run(SiteSystemContext<WorkerConditionSystem>& context) no
 void emit_worker_meters_changed_if_needed(SiteSystemContext<WorkerConditionSystem>& context) noexcept
 {
     ensure_memory_for_run(context);
-    auto& memory = g_worker_memory;
-    WorkerMeterSnapshot snapshot {};
-    const bool has_worker = site_world_access::worker_condition::read_worker(
-        context.site_run,
-        [&](const site_ecs::WorkerVitals& worker) {
-            snapshot = make_snapshot(worker);
-        });
-    if (!has_worker)
+    if (!context.world.has_world())
     {
         return;
     }
 
+    auto& memory = g_worker_memory;
+    const auto snapshot = make_snapshot(context.world.read_worker().conditions);
     const auto previous_snapshot = memory.last_reported_snapshot.value_or(snapshot);
     const auto mask = compute_change_mask(previous_snapshot, snapshot);
     const auto is_initial = !memory.last_reported_snapshot.has_value();
@@ -177,7 +171,7 @@ void emit_worker_meters_changed_if_needed(SiteSystemContext<WorkerConditionSyste
     }
 }
 
-void apply_passive_decay(site_ecs::WorkerVitals& worker, float step_seconds) noexcept
+void apply_passive_decay(SiteWorld::WorkerConditionData& worker, float step_seconds) noexcept
 {
     worker.hydration = std::clamp(
         worker.hydration - kHydrationDrainPerSecond * step_seconds,
@@ -206,7 +200,7 @@ void apply_passive_decay(site_ecs::WorkerVitals& worker, float step_seconds) noe
 }
 
 void apply_worker_meter_delta(
-    site_ecs::WorkerVitals& worker,
+    SiteWorld::WorkerConditionData& worker,
     const WorkerMeterDeltaRequestedCommand& payload) noexcept
 {
     worker.health = std::clamp(
@@ -254,15 +248,20 @@ Gs1Status WorkerConditionSystem::process_command(
         return GS1_STATUS_OK;
     }
 
-    const bool modified = site_world_access::worker_condition::with_worker_mut(
-        context.site_run,
-        [&](site_ecs::WorkerVitals& worker) {
-            const auto previous = worker;
-            apply_worker_meter_delta(worker, command.payload_as<WorkerMeterDeltaRequestedCommand>());
-            return worker_vitals_changed(previous, worker);
-        });
+    if (!context.world.has_world())
+    {
+        return GS1_STATUS_OK;
+    }
+
+    auto worker = context.world.read_worker();
+    const auto previous = worker.conditions;
+    apply_worker_meter_delta(
+        worker.conditions,
+        command.payload_as<WorkerMeterDeltaRequestedCommand>());
+    const bool modified = worker_conditions_changed(previous, worker.conditions);
     if (modified)
     {
+        context.world.write_worker(worker);
         emit_worker_meters_changed_if_needed(context);
     }
     return GS1_STATUS_OK;
@@ -270,16 +269,19 @@ Gs1Status WorkerConditionSystem::process_command(
 
 void WorkerConditionSystem::run(SiteSystemContext<WorkerConditionSystem>& context)
 {
+    if (!context.world.has_world())
+    {
+        return;
+    }
+
     const auto step_seconds = static_cast<float>(context.fixed_step_seconds);
-    const bool modified = site_world_access::worker_condition::with_worker_mut(
-        context.site_run,
-        [&](site_ecs::WorkerVitals& worker) {
-            const auto previous = worker;
-            apply_passive_decay(worker, step_seconds);
-            return worker_vitals_changed(previous, worker);
-        });
+    auto worker = context.world.read_worker();
+    const auto previous = worker.conditions;
+    apply_passive_decay(worker.conditions, step_seconds);
+    const bool modified = worker_conditions_changed(previous, worker.conditions);
     if (modified)
     {
+        context.world.write_worker(worker);
         emit_worker_meters_changed_if_needed(context);
     }
 }

@@ -2,7 +2,6 @@
 
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
-#include "site/site_world_access.h"
 
 #include <algorithm>
 #include <cmath>
@@ -44,9 +43,8 @@ void SiteFlowSystem::run(SiteSystemContext<SiteFlowSystem>& context)
         static_cast<std::uint32_t>(clock.world_time_minutes / k_minutes_per_day);
     clock.day_phase = resolve_day_phase(clock.world_time_minutes);
 
-    auto& site_run = context.site_run;
-    const std::uint32_t width = site_world_access::width(site_run);
-    const std::uint32_t height = site_world_access::height(site_run);
+    const std::uint32_t width = context.world.tile_width();
+    const std::uint32_t height = context.world.tile_height();
     if (!context.move_direction.present || width == 0U || height == 0U)
     {
         return;
@@ -66,46 +64,40 @@ void SiteFlowSystem::run(SiteSystemContext<SiteFlowSystem>& context)
     const float movement_step =
         k_worker_move_speed_tiles_per_second * static_cast<float>(context.fixed_step_seconds);
 
-    const bool moved = site_world_access::movement::with_worker_mut(
-        site_run,
-        [&](site_ecs::WorkerTilePosition& worker, site_ecs::WorkerFacing& facing) {
-            const float max_x = static_cast<float>(width - 1U);
-            const float max_y = static_cast<float>(height - 1U);
-            const float target_x =
-                std::clamp(worker.tile_x + direction_x * movement_step, 0.0f, max_x);
-            const float target_y =
-                std::clamp(worker.tile_y + direction_y * movement_step, 0.0f, max_y);
+    auto worker = context.world.read_worker();
+    const float max_x = static_cast<float>(width - 1U);
+    const float max_y = static_cast<float>(height - 1U);
+    const float target_x =
+        std::clamp(worker.position.tile_x + direction_x * movement_step, 0.0f, max_x);
+    const float target_y =
+        std::clamp(worker.position.tile_y + direction_y * movement_step, 0.0f, max_y);
 
-            const TileCoord target_tile {
-                static_cast<std::int32_t>(std::lround(target_x)),
-                static_cast<std::int32_t>(std::lround(target_y))};
-            if (!site_world_access::tile_coord_in_bounds(site_run, target_tile))
-            {
-                return false;
-            }
-
-            if (!site_world_access::movement::tile_traversable(site_run, target_tile))
-            {
-                return false;
-            }
-
-            const bool position_changed =
-                std::fabs(target_x - worker.tile_x) > 0.0001f ||
-                std::fabs(target_y - worker.tile_y) > 0.0001f;
-            if (!position_changed)
-            {
-                return false;
-            }
-
-            worker.tile_x = target_x;
-            worker.tile_y = target_y;
-            worker.tile_coord = target_tile;
-            facing.degrees = std::atan2(direction_x, direction_y) * k_radians_to_degrees;
-            return true;
-        });
-    if (moved)
+    const TileCoord target_tile {
+        static_cast<std::int32_t>(std::lround(target_x)),
+        static_cast<std::int32_t>(std::lround(target_y))};
+    if (!context.world.tile_coord_in_bounds(target_tile))
     {
-        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WORKER);
+        return;
     }
+
+    if (!context.world.read_tile(target_tile).static_data.traversable)
+    {
+        return;
+    }
+
+    const bool position_changed =
+        std::fabs(target_x - worker.position.tile_x) > 0.0001f ||
+        std::fabs(target_y - worker.position.tile_y) > 0.0001f;
+    if (!position_changed)
+    {
+        return;
+    }
+
+    worker.position.tile_x = target_x;
+    worker.position.tile_y = target_y;
+    worker.position.tile_coord = target_tile;
+    worker.position.facing_degrees = std::atan2(direction_x, direction_y) * k_radians_to_degrees;
+    context.world.write_worker(worker);
+    context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WORKER);
 }
 }  // namespace gs1

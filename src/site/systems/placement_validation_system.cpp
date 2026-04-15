@@ -1,7 +1,6 @@
 #include "site/systems/placement_validation_system.h"
 
 #include "site/site_run_state.h"
-#include "site/site_world_access.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -63,70 +62,47 @@ bool is_tile_reserved(
 
 PlacementReservationRejectionReason validate_request(
     SiteRunId site_run_id,
-    const SiteRunState& site_run,
+    const SiteWorldAccess<PlacementValidationSystem>& world,
     TileCoord target_tile,
     PlacementOccupancyLayer occupancy_layer,
     std::uint32_t excluding_action_id) noexcept
 {
-    if (!site_world_access::tile_coord_in_bounds(site_run, target_tile))
+    if (!world.tile_coord_in_bounds(target_tile))
     {
         return PlacementReservationRejectionReason::OutOfBounds;
     }
 
-    PlacementReservationRejectionReason rejection_reason = PlacementReservationRejectionReason::None;
-    const bool has_tile = site_world_access::placement_validation::read_tile(
-        site_run,
-        target_tile,
-        [&](const site_ecs::TileTraversable& traversable,
-            const site_ecs::TilePlantable& plantable,
-            const site_ecs::TileReservedByStructure& reserved_by_structure,
-            const site_ecs::TilePlantSlot& plant,
-            const site_ecs::TileGroundCoverSlot& ground_cover,
-            StructureId structure_id) {
-            if (occupancy_layer == PlacementOccupancyLayer::GroundCover)
-            {
-                if (!plantable.value)
-                {
-                    rejection_reason = PlacementReservationRejectionReason::TerrainBlocked;
-                    return;
-                }
-
-                if (reserved_by_structure.value ||
-                    structure_id.value != 0U ||
-                    plant.plant_id.value != 0U ||
-                    ground_cover.ground_cover_type_id != 0U)
-                {
-                    rejection_reason = PlacementReservationRejectionReason::Occupied;
-                    return;
-                }
-            }
-            else if (occupancy_layer == PlacementOccupancyLayer::Structure)
-            {
-                if (!traversable.value)
-                {
-                    rejection_reason = PlacementReservationRejectionReason::TerrainBlocked;
-                    return;
-                }
-
-                if (structure_id.value != 0U)
-                {
-                    rejection_reason = PlacementReservationRejectionReason::Occupied;
-                    return;
-                }
-            }
-            else
-            {
-                rejection_reason = PlacementReservationRejectionReason::TerrainBlocked;
-            }
-        });
-    if (!has_tile)
+    const auto tile = world.read_tile(target_tile);
+    if (occupancy_layer == PlacementOccupancyLayer::GroundCover)
     {
-        return PlacementReservationRejectionReason::OutOfBounds;
+        if (!tile.static_data.plantable)
+        {
+            return PlacementReservationRejectionReason::TerrainBlocked;
+        }
+
+        if (tile.static_data.reserved_by_structure ||
+            tile.device.structure_id.value != 0U ||
+            tile.ecology.plant_id.value != 0U ||
+            tile.ecology.ground_cover_type_id != 0U)
+        {
+            return PlacementReservationRejectionReason::Occupied;
+        }
     }
-
-    if (rejection_reason != PlacementReservationRejectionReason::None)
+    else if (occupancy_layer == PlacementOccupancyLayer::Structure)
     {
-        return rejection_reason;
+        if (!tile.static_data.traversable)
+        {
+            return PlacementReservationRejectionReason::TerrainBlocked;
+        }
+
+        if (tile.device.structure_id.value != 0U)
+        {
+            return PlacementReservationRejectionReason::Occupied;
+        }
+    }
+    else
+    {
+        return PlacementReservationRejectionReason::TerrainBlocked;
     }
 
     if (is_tile_reserved(site_run_id, target_tile, excluding_action_id))
@@ -149,7 +125,7 @@ void handle_reservation_requested(
     const TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
     const auto rejection_reason = validate_request(
         context.world.site_run_id(),
-        context.site_run,
+        context.world,
         target_tile,
         payload.occupancy_layer,
         payload.action_id);

@@ -1,10 +1,10 @@
 #include "site/systems/device_support_system.h"
 
 #include "site/site_run_state.h"
-#include "site/site_world_access.h"
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 
 namespace
@@ -34,8 +34,7 @@ Gs1Status DeviceSupportSystem::process_command(
 
 void DeviceSupportSystem::run(SiteSystemContext<DeviceSupportSystem>& context)
 {
-    auto& site_run = context.site_run;
-    if (!site_world_access::has_world(site_run))
+    if (!context.world.has_world())
     {
         return;
     }
@@ -46,48 +45,41 @@ void DeviceSupportSystem::run(SiteSystemContext<DeviceSupportSystem>& context)
         return;
     }
 
-    site_world_access::device_support::for_each_device_mut(
-        site_run,
-        [&](TileCoord,
-            const site_ecs::DeviceStructureId& structure,
-            const site_ecs::DeviceIntegrity& integrity,
-            const site_ecs::TileHeat& heat,
-            site_ecs::DeviceEfficiency& efficiency,
-            site_ecs::DeviceStoredWater& stored_water) {
-            const bool has_structure = structure.structure_id.value != 0U;
-            const float clamped_integrity = std::clamp(integrity.value, 0.0f, 1.0f);
-            const float target_efficiency = has_structure ? clamped_integrity : 0.0f;
-            const float previous_efficiency = efficiency.value;
-            const bool efficiency_changed =
-                std::fabs(previous_efficiency - target_efficiency) > k_device_efficiency_epsilon;
-            if (efficiency_changed)
-            {
-                efficiency.value = target_efficiency;
-            }
+    const auto tile_count = context.world.tile_count();
+    for (std::size_t index = 0; index < tile_count; ++index)
+    {
+        auto tile = context.world.read_tile_at_index(index);
+        if (tile.device.structure_id.value == 0U)
+        {
+            continue;
+        }
 
-            const float previous_water = stored_water.value;
-            float next_water = previous_water;
-            if (has_structure)
-            {
-                const float clamped_heat = std::max(heat.value, 0.0f);
-                const float evaporation_rate =
-                    (k_device_water_evaporation_base +
-                        clamped_heat * k_device_heat_evaporation_multiplier) *
-                    step_seconds;
-                next_water = std::max(0.0f, previous_water - evaporation_rate);
-            }
-            else
-            {
-                next_water = 0.0f;
-            }
+        const float clamped_integrity = std::clamp(tile.device.device_integrity, 0.0f, 1.0f);
+        const float target_efficiency = clamped_integrity;
+        const float previous_efficiency = tile.device.device_efficiency;
+        const bool efficiency_changed =
+            std::fabs(previous_efficiency - target_efficiency) > k_device_efficiency_epsilon;
+        if (efficiency_changed)
+        {
+            tile.device.device_efficiency = target_efficiency;
+        }
 
-            const bool water_changed = std::fabs(previous_water - next_water) > k_device_water_epsilon;
-            if (water_changed)
-            {
-                stored_water.value = next_water;
-            }
+        const float previous_water = tile.device.device_stored_water;
+        const float clamped_heat = std::max(tile.local_weather.heat, 0.0f);
+        const float evaporation_rate =
+            (k_device_water_evaporation_base + clamped_heat * k_device_heat_evaporation_multiplier) *
+            step_seconds;
+        const float next_water = std::max(0.0f, previous_water - evaporation_rate);
+        const bool water_changed = std::fabs(previous_water - next_water) > k_device_water_epsilon;
+        if (water_changed)
+        {
+            tile.device.device_stored_water = next_water;
+        }
 
-            return efficiency_changed || water_changed;
-        });
+        if (efficiency_changed || water_changed)
+        {
+            context.world.write_tile_at_index(index, tile);
+        }
+    }
 }
 }  // namespace gs1

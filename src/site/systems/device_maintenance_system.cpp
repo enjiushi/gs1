@@ -1,10 +1,10 @@
 #include "site/systems/device_maintenance_system.h"
 
 #include "site/site_run_state.h"
-#include "site/site_world_access.h"
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 namespace gs1
 {
 namespace
@@ -32,9 +32,7 @@ Gs1Status DeviceMaintenanceSystem::process_command(
 
 void DeviceMaintenanceSystem::run(SiteSystemContext<DeviceMaintenanceSystem>& context)
 {
-    auto& site_run = context.site_run;
-
-    if (!site_world_access::has_world(site_run))
+    if (!context.world.has_world())
     {
         return;
     }
@@ -51,33 +49,32 @@ void DeviceMaintenanceSystem::run(SiteSystemContext<DeviceMaintenanceSystem>& co
         std::fabs(context.world.read_weather().weather_dust);
     const float weather_wear = weather_wear_base * k_weather_wear_per_unit * step_seconds;
 
-    site_world_access::device_maintenance::for_each_device_mut(
-        site_run,
-        [&](TileCoord,
-            const site_ecs::DeviceStructureId& structure,
-            const site_ecs::TileSandBurial& burial,
-            site_ecs::DeviceIntegrity& integrity) {
-            if (structure.structure_id.value == 0U)
-            {
-                return false;
-            }
+    const auto tile_count = context.world.tile_count();
+    for (std::size_t index = 0; index < tile_count; ++index)
+    {
+        auto tile = context.world.read_tile_at_index(index);
+        if (tile.device.structure_id.value == 0U)
+        {
+            continue;
+        }
 
-            const float burial_amount = std::clamp(burial.value, 0.0f, 1.0f);
-            const float burial_wear = burial_amount * k_burial_wear_per_unit * step_seconds;
-            const float total_wear = weather_wear + burial_wear;
-            if (total_wear <= 0.0f)
-            {
-                return false;
-            }
+        const float burial_amount = std::clamp(tile.ecology.sand_burial, 0.0f, 1.0f);
+        const float burial_wear = burial_amount * k_burial_wear_per_unit * step_seconds;
+        const float total_wear = weather_wear + burial_wear;
+        if (total_wear <= 0.0f)
+        {
+            continue;
+        }
 
-            const float next_integrity = std::clamp(integrity.value - total_wear, 0.0f, 1.0f);
-            if (std::fabs(next_integrity - integrity.value) <= k_integrity_epsilon)
-            {
-                return false;
-            }
+        const float next_integrity =
+            std::clamp(tile.device.device_integrity - total_wear, 0.0f, 1.0f);
+        if (std::fabs(next_integrity - tile.device.device_integrity) <= k_integrity_epsilon)
+        {
+            continue;
+        }
 
-            integrity.value = next_integrity;
-            return true;
-        });
+        tile.device.device_integrity = next_integrity;
+        context.world.write_tile_at_index(index, tile);
+    }
 }
 }  // namespace gs1

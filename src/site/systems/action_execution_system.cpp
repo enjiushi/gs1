@@ -3,7 +3,6 @@
 #include "content/defs/item_defs.h"
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
-#include "site/site_world_access.h"
 #include "support/id_types.h"
 
 #include <algorithm>
@@ -504,7 +503,7 @@ Gs1Status ActionExecutionSystem::process_command(
         }
 
         const TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
-        if (!site_world_access::tile_coord_in_bounds(context.site_run, target_tile))
+        if (!context.world.tile_coord_in_bounds(target_tile))
         {
             emit_site_action_failed(
                 context.command_queue,

@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.24)
 
+if(POLICY CMP0141)
+    cmake_policy(SET CMP0141 NEW)
+endif()
+
 # Build definition for the gameplay DLL plus the smoke host executable.
 project(gs1_game
     VERSION 0.1.0
@@ -25,6 +29,17 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
+
+if(MSVC)
+    # Visual Studio builds share a compile PDB per target by default.
+    # /FS prevents parallel cl.exe instances from racing on vc143.pdb.
+    add_compile_options(/FS)
+    # Use embedded debug information for compile steps so parallel compiles
+    # do not all contend on a single vc143.pdb file.
+    set(
+        CMAKE_MSVC_DEBUG_INFORMATION_FORMAT
+        "$<$<CONFIG:Debug,RelWithDebInfo>:Embedded>")
+endif()
 
 add_library(flecs STATIC
     third_party/flecs/flecs.c)
