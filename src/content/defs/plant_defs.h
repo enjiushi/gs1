@@ -29,6 +29,7 @@ struct PlantDef final
     bool growable;
     std::uint8_t aura_size;
     std::uint16_t reserved0;
+    float plant_action_duration_minutes;
     float constant_wither_rate;
     float salt_tolerance;
     float heat_tolerance;
@@ -51,6 +52,7 @@ inline constexpr PlantDef k_generic_living_plant_def {
     true,
     0U,
     0U,
+    1.0f,
     0.0f,
     40.0f,
     40.0f,
@@ -72,6 +74,7 @@ inline constexpr PlantDef k_generic_ground_cover_def {
     false,
     0U,
     0U,
+    1.0f,
     0.0f,
     100.0f,
     100.0f,
@@ -94,6 +97,7 @@ inline constexpr std::array<PlantDef, 4> k_prototype_plant_defs {
         true,
         1U,
         0U,
+        0.75f,
         0.0f,
         45.0f,
         38.0f,
@@ -114,6 +118,7 @@ inline constexpr std::array<PlantDef, 4> k_prototype_plant_defs {
         true,
         1U,
         0U,
+        1.0f,
         0.0f,
         82.0f,
         52.0f,
@@ -134,6 +139,7 @@ inline constexpr std::array<PlantDef, 4> k_prototype_plant_defs {
         true,
         1U,
         0U,
+        1.5f,
         0.0f,
         48.0f,
         82.0f,
@@ -154,6 +160,7 @@ inline constexpr std::array<PlantDef, 4> k_prototype_plant_defs {
         true,
         1U,
         0U,
+        1.25f,
         0.0f,
         18.0f,
         28.0f,

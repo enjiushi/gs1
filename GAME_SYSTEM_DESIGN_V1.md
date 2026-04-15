@@ -787,6 +787,7 @@ Required fields:
 currentActionId?
 actionKind?
 targetTile?
+totalActionMinutes
 remainingActionMinutes
 reservedInputItemStacks[]
 startedAtWorldMinute?
@@ -797,6 +798,7 @@ Rules:
 - only one player action may be active at once in v1
 - reserved input items are not permanently consumed until successful action completion unless the action definition explicitly spends on start
 - interruption clears the active action and releases unspent reserved inputs
+- item-based planting resolves `totalActionMinutes` from the linked `PlantDef.plantActionDurationMinutes`; other prototype site actions may still use action-definition defaults
 
 ### 6.16 `WeatherState`
 
@@ -1479,6 +1481,7 @@ Engine-command examples:
 - `SITE_INVENTORY_SLOT_UPSERT`
 - `SITE_TASK_UPSERT`
 - `SITE_PHONE_LISTING_UPSERT`
+- `SITE_ACTION_UPDATE`
 - `HUD_STATE`
 - `NOTIFICATION_PUSH`
 - `SITE_RESULT_READY`
@@ -1488,6 +1491,7 @@ Current implementation note:
 
 - the public header now defines a richer engine-command schema centered on app-state projection, regional-map projection, semantic UI setup projection, site projection, HUD/UI projection, site results, and one-shot cues
 - the current runtime now emits a practical prototype subset of that richer contract: log text, set app state, UI setup batches for menu/panel surfaces, regional-map snapshot commands, site bootstrap snapshots on site entry/resync, authoritative site partial-update batches after bootstrap, HUD state, and site result ready
+- the current runtime also emits `SITE_ACTION_UPDATE` when a site action execution actually starts and again when it clears, so adapters can drive bottom-middle progress bars locally without polling gameplay every frame
 - inventory/task/phone/notification/one-shot cue commands are defined in the schema now but are not fully emitted yet by gameplay runtime code
 
 ### 13.2 Engine Command Contract Shape
@@ -1523,6 +1527,7 @@ Site command contract:
 - `SITE_TILE_UPSERT` projects one tile cell or changed tile cell
 - `SITE_WORKER_UPDATE`, `SITE_CAMP_UPDATE`, and `SITE_WEATHER_UPDATE` project authoritative site-state slices
 - `SITE_INVENTORY_SLOT_UPSERT`, `SITE_TASK_UPSERT`, and `SITE_PHONE_LISTING_UPSERT` project host-side UI collections when those systems are active
+- `SITE_ACTION_UPDATE` projects transient action-execution UI state such as action id, action kind, target tile, authored total duration, and an optional bootstrap progress hint
 - `END_SITE_SNAPSHOT` closes the batch
 
 Projection rules:
@@ -1532,6 +1537,7 @@ Projection rules:
 - when a site tile changes after bootstrap, the runtime should emit only the authoritative changed tile cells for that batch unless it is intentionally performing a tile-surface resync
 - the host should treat begin/end snapshot commands as transactional fences for the matching presentation surface
 - the host must not infer gameplay state that was never sent; if a surface is host-relevant, the DLL should emit a command for it
+- adapters should treat `SITE_ACTION_UPDATE` as lifecycle data, not per-frame progress authority: the DLL sends action start plus duration and later sends the clear/completion transition, while fill percentage can advance entirely inside the adapter
 - the gameplay DLL should emit projection commands only when the authoritative gameplay state for that surface actually changed
 - if a specific typed projection command already describes the changed presentation slice, prefer that over emitting an extra generic dirty notification
 - delta-mode site updates should carry authoritative changed state, not arithmetic change amounts; for example worker movement should send the worker's new transform state, not a movement delta to be accumulated by the host

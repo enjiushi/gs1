@@ -211,6 +211,7 @@ const Gs1EngineCommand* find_inventory_slot_command(
 
     return nullptr;
 }
+
 }  // namespace
 
 int main()
@@ -397,6 +398,79 @@ int main()
     assert(find_inventory_slot_command(use_commands, GS1_INVENTORY_CONTAINER_WORKER_PACK, 0U) != nullptr);
     assert(!collect_commands_of_type(use_commands, GS1_ENGINE_COMMAND_SITE_WORKER_UPDATE).empty());
     assert(!collect_commands_of_type(use_commands, GS1_ENGINE_COMMAND_HUD_STATE).empty());
+
+    Gs1RuntimeCreateDesc water_action_desc {};
+    water_action_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
+    water_action_desc.api_version = gs1::k_api_version;
+    water_action_desc.fixed_step_seconds = 60.0;
+
+    GameRuntime water_action_runtime {water_action_desc};
+    assert(water_action_runtime.handle_command(make_start_campaign_command()) == GS1_STATUS_OK);
+    const auto water_action_site_id =
+        gs1::GameRuntimeProjectionTestAccess::campaign(water_action_runtime)->sites.front().site_id.value;
+    assert(water_action_runtime.handle_command(make_start_site_attempt_command(water_action_site_id)) == GS1_STATUS_OK);
+    drain_engine_commands(water_action_runtime);
+
+    const TileCoord water_target {2, 2};
+    auto& water_site_run =
+        gs1::GameRuntimeProjectionTestAccess::active_site_run(water_action_runtime).value();
+    water_site_run.site_action.current_action_id = gs1::RuntimeActionId {77U};
+    water_site_run.site_action.action_kind = gs1::ActionKind::Water;
+    water_site_run.site_action.target_tile = water_target;
+    water_site_run.site_action.primary_subject_id = 17U;
+    water_site_run.site_action.total_action_minutes = 0.75;
+    water_site_run.site_action.remaining_action_minutes = 0.75;
+    water_site_run.site_action.started_at_world_minute = water_site_run.clock.world_time_minutes;
+
+    GameCommand water_started {};
+    water_started.type = GameCommandType::SiteActionStarted;
+    water_started.set_payload(gs1::SiteActionStartedCommand {
+        77U,
+        GS1_SITE_ACTION_WATER,
+        0U,
+        0U,
+        water_target.x,
+        water_target.y,
+        17U,
+        0.75f});
+    assert(water_action_runtime.handle_command(water_started) == GS1_STATUS_OK);
+    const auto water_start_commands = drain_engine_commands(water_action_runtime);
+    const auto water_action_updates =
+        collect_commands_of_type(water_start_commands, GS1_ENGINE_COMMAND_SITE_ACTION_UPDATE);
+    assert(water_action_updates.size() == 1U);
+    const auto& water_action_payload =
+        water_action_updates.front()->payload_as<Gs1EngineCommandSiteActionData>();
+    assert((water_action_payload.flags & GS1_SITE_ACTION_PRESENTATION_FLAG_ACTIVE) != 0U);
+    assert(water_action_payload.action_kind == GS1_SITE_ACTION_WATER);
+    assert(water_action_payload.target_tile_x == water_target.x);
+    assert(water_action_payload.target_tile_y == water_target.y);
+    assert(water_action_payload.duration_minutes == 0.75f);
+    assert(water_action_payload.progress_normalized == 0.0f);
+
+    water_site_run.site_action = {};
+    GameCommand water_completed {};
+    water_completed.type = GameCommandType::SiteActionCompleted;
+    water_completed.set_payload(gs1::SiteActionCompletedCommand {
+        77U,
+        GS1_SITE_ACTION_WATER,
+        0U,
+        0U,
+        water_target.x,
+        water_target.y,
+        17U,
+        0U});
+    assert(water_action_runtime.handle_command(water_completed) == GS1_STATUS_OK);
+    const auto water_complete_commands = drain_engine_commands(water_action_runtime);
+    const auto water_clear_updates =
+        collect_commands_of_type(water_complete_commands, GS1_ENGINE_COMMAND_SITE_ACTION_UPDATE);
+    assert(water_clear_updates.size() == 1U);
+    {
+        const auto& payload = water_clear_updates.front()->payload_as<Gs1EngineCommandSiteActionData>();
+        assert((payload.flags & GS1_SITE_ACTION_PRESENTATION_FLAG_CLEAR) != 0U);
+        assert(payload.action_kind == GS1_SITE_ACTION_NONE);
+        assert(payload.action_id == 0U);
+        assert(payload.duration_minutes == 0.0f);
+    }
 
     Gs1RuntimeCreateDesc action_desc {};
     action_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);

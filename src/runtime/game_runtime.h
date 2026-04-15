@@ -15,7 +15,7 @@
 
 namespace gs1
 {
-inline constexpr std::uint32_t k_api_version = 2;
+inline constexpr std::uint32_t k_api_version = 3;
 inline constexpr double k_default_fixed_step_seconds = 0.25;
 inline constexpr std::size_t k_feedback_event_type_count = 4U;
 
@@ -127,6 +127,7 @@ private:
     void queue_all_site_phone_listing_upsert_commands();
     void queue_site_bootstrap_commands();
     void queue_site_delta_commands(std::uint64_t dirty_flags);
+    void queue_site_action_update_command();
     void queue_hud_state_command();
     void queue_site_result_ready_command(
         std::uint32_t site_id,

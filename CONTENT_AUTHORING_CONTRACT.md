@@ -355,11 +355,29 @@ Rules:
 - event templates are authored content; the actual event instance is generated at runtime from eligible templates
 - event templates are not the same thing as `Per-Site Modifier`s
 
-## 7. Authored Prototype Support Package Contract
+## 7. Plant Authoring Contract
+
+The prototype now needs one plant-authored action-timing field so planting can project a stable adapter-side progress bar without hardcoding every seed's timing in runtime code.
+
+### 7.1 `PlantDef`
+
+Required fields in addition to the existing plant ecology fields:
+
+| Field | Type | Notes |
+|---|---|---|
+| `plantActionDurationMinutes` | positive number | Per-seed planting duration used when a `Plant` site action starts from an inventory seed item linked to this plant. |
+
+Rules:
+
+- `plantActionDurationMinutes` must be positive
+- item-based planting must resolve its action duration from the linked plant row, not from a hardcoded per-item switch
+- adapter progress bars should treat this authored value as total action duration and animate locally after the start command arrives
+
+## 8. Authored Prototype Support Package Contract
 
 The prototype uses authored regional support packages rather than ecology-derived formulas. That authoring should be explicit rather than hidden in site notes.
 
-### 7.1 `SiteSupportPackageDef`
+### 8.1 `SiteSupportPackageDef`
 
 Required fields:
 
@@ -383,7 +401,7 @@ Rules:
 - `nearbyAuraModifierIds[]` should contain only modifiers valid for always-on deployment support
 - this contract is authored per source site, not recomputed from plant composition during the prototype
 
-## 8. Validation Rules
+## 9. Validation Rules
 
 Content tools should reject invalid authored content before runtime. At minimum, validation must enforce these rules:
 
@@ -406,11 +424,12 @@ Content tools should reject invalid authored content before runtime. At minimum,
 - every draft profile can always reach at least one safe fallback family
 - every event template uses valid non-negative durations and pressure values
 - every event template has at least one meaningful hazardous pressure channel in build or peak
+- every plant definition uses a positive `plantActionDurationMinutes`
 - every support package references a real source site and real exported content rows
 
 Validation should happen in content tools, spreadsheet import, or build-time data compilation. Runtime should not be the first place where broken content is discovered.
 
-## 9. Runtime Boundary Clarification
+## 10. Runtime Boundary Clarification
 
 This document intentionally does not define runtime task instance structs in full detail. It defines the authored content that runtime systems must consume.
 
@@ -427,7 +446,7 @@ The important handoff rule is:
 - runtime structs define live instantiated state
 - save boundaries, when added later, serialize runtime state rather than authored definitions
 
-## 10. Immediate System-Design Impact
+## 11. Immediate System-Design Impact
 
 With this contract in place, the next system-design pass can safely define:
 
@@ -435,6 +454,7 @@ With this contract in place, the next system-design pass can safely define:
 - import/build validation
 - generator service boundaries for task, event, and reward selection
 - runtime task and event instance structs
+- planting-duration lookup from authored plant rows into runtime action state
 - authored prototype-support package loading
 
 The only remaining major formal contract still intentionally deferred for the prototype path is save-data boundaries.

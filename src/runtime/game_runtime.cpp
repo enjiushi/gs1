@@ -118,6 +118,27 @@ std::uint32_t unpack_transfer_quantity(std::uint64_t packed) noexcept
     return static_cast<std::uint32_t>((packed >> 32U) & 0xffffU);
 }
 
+bool action_has_started(const ActionState& action_state) noexcept
+{
+    return action_state.current_action_id.has_value() &&
+        action_state.action_kind != ActionKind::None &&
+        action_state.started_at_world_minute.has_value() &&
+        action_state.total_action_minutes > 0.0;
+}
+
+float action_progress_normalized(const ActionState& action_state) noexcept
+{
+    if (!action_has_started(action_state))
+    {
+        return 0.0f;
+    }
+
+    const double elapsed_minutes =
+        std::max(0.0, action_state.total_action_minutes - action_state.remaining_action_minutes);
+    const double normalized = elapsed_minutes / std::max(action_state.total_action_minutes, 0.0001);
+    return static_cast<float>(std::clamp(normalized, 0.0, 1.0));
+}
+
 Gs1EngineCommand make_engine_command(
     Gs1EngineCommandType type)
 {
@@ -762,6 +783,7 @@ void GameRuntime::sync_after_processed_command(const GameCommand& command)
 
     case GameCommandType::SiteRunStarted:
         queue_site_bootstrap_commands();
+        queue_site_action_update_command();
         queue_hud_state_command();
         queue_log_command("Started site attempt.");
         break;
@@ -794,12 +816,15 @@ void GameRuntime::sync_after_processed_command(const GameCommand& command)
         break;
     }
 
-    case GameCommandType::DeploymentSiteSelectionChanged:
-    case GameCommandType::StartSiteAction:
-    case GameCommandType::CancelSiteAction:
     case GameCommandType::SiteActionStarted:
     case GameCommandType::SiteActionCompleted:
     case GameCommandType::SiteActionFailed:
+        queue_site_action_update_command();
+        break;
+
+    case GameCommandType::DeploymentSiteSelectionChanged:
+    case GameCommandType::StartSiteAction:
+    case GameCommandType::CancelSiteAction:
     case GameCommandType::SiteGroundCoverPlaced:
     case GameCommandType::SiteTilePlantingCompleted:
     case GameCommandType::SiteTileWatered:
@@ -1542,6 +1567,42 @@ void GameRuntime::queue_site_delta_commands(std::uint64_t dirty_flags)
     }
 
     queue_site_snapshot_end_command();
+}
+
+void GameRuntime::queue_site_action_update_command()
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
+
+    const auto& action_state = active_site_run_->site_action;
+    auto command = make_engine_command(GS1_ENGINE_COMMAND_SITE_ACTION_UPDATE);
+    auto& payload = command.emplace_payload<Gs1EngineCommandSiteActionData>();
+
+    if (action_has_started(action_state))
+    {
+        const TileCoord target_tile = action_state.target_tile.value_or(TileCoord {});
+        payload.action_id = action_state.current_action_id->value;
+        payload.target_tile_x = target_tile.x;
+        payload.target_tile_y = target_tile.y;
+        payload.action_kind = static_cast<Gs1SiteActionKind>(action_state.action_kind);
+        payload.flags = GS1_SITE_ACTION_PRESENTATION_FLAG_ACTIVE;
+        payload.progress_normalized = action_progress_normalized(action_state);
+        payload.duration_minutes = static_cast<float>(action_state.total_action_minutes);
+    }
+    else
+    {
+        payload.action_id = 0U;
+        payload.target_tile_x = 0;
+        payload.target_tile_y = 0;
+        payload.action_kind = GS1_SITE_ACTION_NONE;
+        payload.flags = GS1_SITE_ACTION_PRESENTATION_FLAG_CLEAR;
+        payload.progress_normalized = 0.0f;
+        payload.duration_minutes = 0.0f;
+    }
+
+    engine_commands_.push_back(command);
 }
 
 void GameRuntime::queue_hud_state_command()

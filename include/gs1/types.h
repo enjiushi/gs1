@@ -129,6 +129,13 @@ enum Gs1SiteActionCancelFlags : std::uint32_t
     GS1_SITE_ACTION_CANCEL_FLAG_CURRENT_ACTION = 1u << 0
 };
 
+enum Gs1SiteActionPresentationFlags : std::uint8_t
+{
+    GS1_SITE_ACTION_PRESENTATION_FLAG_NONE = 0,
+    GS1_SITE_ACTION_PRESENTATION_FLAG_ACTIVE = 1u << 0,
+    GS1_SITE_ACTION_PRESENTATION_FLAG_CLEAR = 1u << 1
+};
+
 enum Gs1FeedbackEventType : std::uint8_t
 {
     GS1_FEEDBACK_EVENT_NONE = 0,
@@ -523,7 +530,7 @@ struct Gs1EngineCommandSiteActionData
     std::uint8_t flags;
     std::uint16_t reserved0;
     float progress_normalized;
-    float minutes_remaining;
+    float duration_minutes;
 };
 
 struct Gs1EngineCommandHudStateData

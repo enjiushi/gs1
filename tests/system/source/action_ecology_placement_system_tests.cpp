@@ -157,6 +157,11 @@ void action_execution_water_starts_immediately_and_emits_cost(
     GS1_SYSTEM_TEST_CHECK(
         context,
         approx_equal(
+            queue[0].payload_as<SiteActionStartedCommand>().duration_minutes,
+            1.5f));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
             queue[1].payload_as<gs1::WorkerMeterDeltaRequestedCommand>().hydration_delta,
             -0.7f));
     GS1_SYSTEM_TEST_CHECK(
@@ -313,24 +318,26 @@ void action_execution_run_completes_actions_and_emits_fact_commands(
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(1U, 506U);
     GameCommandQueue queue {};
-    auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue);
+    auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue, 60.0);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         ActionExecutionSystem::process_command(
             site_context,
             make_start_action_command(GS1_SITE_ACTION_WATER, TileCoord {2, 2}, 3U)) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.started_at_world_minute.has_value());
 
     queue.clear();
-    site_run.clock.world_time_minutes += 3.0;
     ActionExecutionSystem::run(site_context);
-    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 3U);
-    GS1_SYSTEM_TEST_CHECK(context, queue[0].type == GameCommandType::SiteActionCompleted);
-    GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameCommandType::SiteTileWatered);
-    GS1_SYSTEM_TEST_CHECK(context, queue[2].type == GameCommandType::PlacementReservationReleased);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        queue[1].payload_as<SiteTileWateredCommand>().water_amount == 3.0f);
+    GS1_SYSTEM_TEST_CHECK(context, count_commands(queue, GameCommandType::SiteActionCompleted) == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, count_commands(queue, GameCommandType::SiteTileWatered) == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, count_commands(queue, GameCommandType::PlacementReservationReleased) == 1U);
+    const auto* watered =
+        first_command_payload<SiteTileWateredCommand>(
+            queue,
+            GameCommandType::SiteTileWatered);
+    GS1_SYSTEM_TEST_REQUIRE(context, watered != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, watered->water_amount == 3.0f);
     GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.current_action_id.has_value());
 
     queue.clear();
@@ -339,14 +346,18 @@ void action_execution_run_completes_actions_and_emits_fact_commands(
         ActionExecutionSystem::process_command(
             site_context,
             make_start_action_command(GS1_SITE_ACTION_CLEAR_BURIAL, TileCoord {1, 1}, 2U)) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.started_at_world_minute.has_value());
     queue.clear();
-    site_run.clock.world_time_minutes += 3.0;
     ActionExecutionSystem::run(site_context);
-    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 3U);
-    GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameCommandType::SiteTileBurialCleared);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        approx_equal(queue[1].payload_as<SiteTileBurialClearedCommand>().cleared_amount, 0.7f));
+    GS1_SYSTEM_TEST_CHECK(context, count_commands(queue, GameCommandType::SiteActionCompleted) == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, count_commands(queue, GameCommandType::SiteTileBurialCleared) == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, count_commands(queue, GameCommandType::PlacementReservationReleased) == 1U);
+    const auto* burial_cleared =
+        first_command_payload<SiteTileBurialClearedCommand>(
+            queue,
+            GameCommandType::SiteTileBurialCleared);
+    GS1_SYSTEM_TEST_REQUIRE(context, burial_cleared != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(burial_cleared->cleared_amount, 0.7f));
 }
 
 void action_execution_plant_completion_emits_ground_cover_after_reservation(
@@ -355,7 +366,7 @@ void action_execution_plant_completion_emits_ground_cover_after_reservation(
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(1U, 507U);
     GameCommandQueue queue {};
-    auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue);
+    auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue, 60.0);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -377,18 +388,17 @@ void action_execution_plant_completion_emits_ground_cover_after_reservation(
     GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.awaiting_placement_reservation);
 
     queue.clear();
-    site_run.clock.world_time_minutes += 3.0;
     ActionExecutionSystem::run(site_context);
-    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 3U);
-    GS1_SYSTEM_TEST_CHECK(context, queue[0].type == GameCommandType::SiteActionCompleted);
-    GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameCommandType::SiteGroundCoverPlaced);
-    GS1_SYSTEM_TEST_CHECK(context, queue[2].type == GameCommandType::PlacementReservationReleased);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        queue[1].payload_as<SiteGroundCoverPlacedCommand>().ground_cover_type_id == 9U);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        approx_equal(queue[1].payload_as<SiteGroundCoverPlacedCommand>().initial_density, 0.5f));
+    GS1_SYSTEM_TEST_CHECK(context, count_commands(queue, GameCommandType::SiteActionCompleted) == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, count_commands(queue, GameCommandType::SiteGroundCoverPlaced) == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, count_commands(queue, GameCommandType::PlacementReservationReleased) == 1U);
+    const auto* ground_cover =
+        first_command_payload<SiteGroundCoverPlacedCommand>(
+            queue,
+            GameCommandType::SiteGroundCoverPlaced);
+    GS1_SYSTEM_TEST_REQUIRE(context, ground_cover != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, ground_cover->ground_cover_type_id == 9U);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(ground_cover->initial_density, 0.5f));
     GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.current_action_id.has_value());
 }
 
@@ -398,7 +408,7 @@ void action_execution_item_based_plant_completion_consumes_seed_and_emits_planti
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(1U, 508U);
     GameCommandQueue queue {};
-    auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue);
+    auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue, 60.0);
 
     site_run.inventory.worker_pack_slots[3].occupied = true;
     site_run.inventory.worker_pack_slots[3].item_id = gs1::ItemId {gs1::k_item_wind_reed_seed_bundle};
@@ -433,34 +443,30 @@ void action_execution_item_based_plant_completion_consumes_seed_and_emits_planti
     GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.awaiting_placement_reservation);
 
     queue.clear();
-    site_run.clock.world_time_minutes += 3.0;
     ActionExecutionSystem::run(site_context);
-    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 4U);
-    GS1_SYSTEM_TEST_CHECK(context, queue[0].type == GameCommandType::SiteActionCompleted);
-    GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameCommandType::InventoryItemConsumeRequested);
-    GS1_SYSTEM_TEST_CHECK(context, queue[2].type == GameCommandType::SiteTilePlantingCompleted);
-    GS1_SYSTEM_TEST_CHECK(context, queue[3].type == GameCommandType::PlacementReservationReleased);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        queue[1].payload_as<InventoryItemConsumeRequestedCommand>().item_id ==
-            gs1::k_item_wind_reed_seed_bundle);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        queue[1].payload_as<InventoryItemConsumeRequestedCommand>().quantity == 2U);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        queue[1].payload_as<InventoryItemConsumeRequestedCommand>().container_kind ==
-            GS1_INVENTORY_CONTAINER_WORKER_PACK);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        queue[2].payload_as<SiteTilePlantingCompletedCommand>().plant_type_id == gs1::k_plant_wind_reed);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        approx_equal(queue[2].payload_as<SiteTilePlantingCompletedCommand>().initial_density, 0.4f));
+    GS1_SYSTEM_TEST_CHECK(context, count_commands(queue, GameCommandType::SiteActionCompleted) == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, count_commands(queue, GameCommandType::InventoryItemConsumeRequested) == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, count_commands(queue, GameCommandType::SiteTilePlantingCompleted) == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, count_commands(queue, GameCommandType::PlacementReservationReleased) == 1U);
+    const auto* consume =
+        first_command_payload<InventoryItemConsumeRequestedCommand>(
+            queue,
+            GameCommandType::InventoryItemConsumeRequested);
+    GS1_SYSTEM_TEST_REQUIRE(context, consume != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, consume->item_id == gs1::k_item_wind_reed_seed_bundle);
+    GS1_SYSTEM_TEST_CHECK(context, consume->quantity == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, consume->container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK);
+    const auto* planting =
+        first_command_payload<SiteTilePlantingCompletedCommand>(
+            queue,
+            GameCommandType::SiteTilePlantingCompleted);
+    GS1_SYSTEM_TEST_REQUIRE(context, planting != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, planting->plant_type_id == gs1::k_plant_wind_reed);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(planting->initial_density, 0.4f));
     GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.current_action_id.has_value());
 }
 
-void action_execution_plant_progress_tracks_world_time(
+void action_execution_plant_progress_tracks_fixed_step_duration(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
@@ -496,10 +502,20 @@ void action_execution_plant_progress_tracks_world_time(
             make_command(
                 GameCommandType::PlacementReservationAccepted,
                 PlacementReservationAcceptedCommand {action_id, 2, 2, 90U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, queue[0].type == GameCommandType::SiteActionStarted);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            queue[0].payload_as<SiteActionStartedCommand>().duration_minutes,
+            0.75f));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(site_run.site_action.total_action_minutes, 0.75));
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.started_at_world_minute.has_value());
 
     queue.clear();
-    for (int step = 0; step < 4; ++step)
+    for (int step = 0; step < 2; ++step)
     {
         SiteFlowSystem::run(flow_context);
         ActionExecutionSystem::run(action_context);
@@ -508,10 +524,80 @@ void action_execution_plant_progress_tracks_world_time(
     }
 
     queue.clear();
-    SiteFlowSystem::run(flow_context);
-    ActionExecutionSystem::run(action_context);
+    bool completed = false;
+    for (int step = 0; step < 2 && !completed; ++step)
+    {
+        SiteFlowSystem::run(flow_context);
+        ActionExecutionSystem::run(action_context);
+        completed = count_commands(queue, GameCommandType::SiteActionCompleted) == 1U;
+        if (!completed)
+        {
+            queue.clear();
+        }
+    }
+    GS1_SYSTEM_TEST_CHECK(context, completed);
     GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.current_action_id.has_value());
-    GS1_SYSTEM_TEST_CHECK(context, count_commands(queue, GameCommandType::SiteActionCompleted) == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, count_commands(queue, GameCommandType::SiteTilePlantingCompleted) == 1U);
+}
+
+void action_execution_plant_duration_respects_small_fixed_steps(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 511U);
+    GameCommandQueue queue {};
+    auto action_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue, 1.0 / 60.0);
+    auto flow_context = make_site_context<SiteFlowSystem>(campaign, site_run, queue, 1.0 / 60.0);
+
+    site_run.inventory.worker_pack_slots[3].occupied = true;
+    site_run.inventory.worker_pack_slots[3].item_id = gs1::ItemId {gs1::k_item_wind_reed_seed_bundle};
+    site_run.inventory.worker_pack_slots[3].item_quantity = 1U;
+    site_run.inventory.worker_pack_slots[3].item_condition = 1.0f;
+    site_run.inventory.worker_pack_slots[3].item_freshness = 1.0f;
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_command(
+            action_context,
+            make_start_action_command(
+                GS1_SITE_ACTION_PLANT,
+                TileCoord {2, 2},
+                1U,
+                0U,
+                gs1::k_item_wind_reed_seed_bundle)) == GS1_STATUS_OK);
+    const auto action_id = site_run.site_action.current_action_id->value;
+
+    queue.clear();
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_command(
+            action_context,
+            make_command(
+                GameCommandType::PlacementReservationAccepted,
+                PlacementReservationAcceptedCommand {action_id, 2, 2, 91U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 2U);
+    queue.clear();
+
+    for (int step = 0; step < 4; ++step)
+    {
+        SiteFlowSystem::run(flow_context);
+        ActionExecutionSystem::run(action_context);
+    }
+
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.current_action_id.has_value());
+    GS1_SYSTEM_TEST_CHECK(context, count_commands(queue, GameCommandType::SiteActionCompleted) == 0U);
+    GS1_SYSTEM_TEST_CHECK(context, count_commands(queue, GameCommandType::SiteTilePlantingCompleted) == 0U);
+
+    bool completed = false;
+    for (int step = 0; step < 80 && !completed; ++step)
+    {
+        SiteFlowSystem::run(flow_context);
+        ActionExecutionSystem::run(action_context);
+        completed = count_commands(queue, GameCommandType::SiteActionCompleted) == 1U;
+    }
+
+    GS1_SYSTEM_TEST_CHECK(context, completed);
+    GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.current_action_id.has_value());
     GS1_SYSTEM_TEST_CHECK(context, count_commands(queue, GameCommandType::SiteTilePlantingCompleted) == 1U);
 }
 
@@ -886,8 +972,12 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     action_execution_item_based_plant_completion_consumes_seed_and_emits_planting);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "action_execution",
-    "plant_progress_tracks_world_time",
-    action_execution_plant_progress_tracks_world_time);
+    "plant_progress_tracks_fixed_step_duration",
+    action_execution_plant_progress_tracks_fixed_step_duration);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "action_execution",
+    "plant_duration_respects_small_fixed_steps",
+    action_execution_plant_duration_respects_small_fixed_steps);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "placement_validation",
     "accepts_releases_and_rejects_reserved_tiles",

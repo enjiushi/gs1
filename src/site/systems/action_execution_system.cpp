@@ -1,6 +1,8 @@
 #include "site/systems/action_execution_system.h"
 
 #include "content/defs/item_defs.h"
+#include "content/defs/plant_defs.h"
+#include "site/defs/site_action_defs.h"
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
 #include "support/id_types.h"
@@ -17,6 +19,7 @@ namespace gs1
 namespace
 {
 constexpr double k_minimum_action_duration_minutes = 0.25;
+constexpr double k_action_minutes_per_real_second = 0.8;
 
 ActionKind to_action_kind(Gs1SiteActionKind kind) noexcept
 {
@@ -58,60 +61,52 @@ Gs1SiteActionKind to_gs1_action_kind(ActionKind kind) noexcept
 
 double base_duration_minutes(ActionKind kind) noexcept
 {
-    switch (kind)
-    {
-    case ActionKind::Plant:
-        return 1.0;
-    case ActionKind::Build:
-        return 2.5;
-    case ActionKind::Repair:
-        return 1.5;
-    case ActionKind::Water:
-        return 0.75;
-    case ActionKind::ClearBurial:
-        return 1.0;
-    case ActionKind::None:
-    default:
-        return 1.0;
-    }
+    const auto* action_def = find_site_action_def(kind);
+    return action_def == nullptr
+        ? 1.0
+        : std::max(
+            static_cast<double>(action_def->duration_minutes_per_unit),
+            k_minimum_action_duration_minutes);
 }
 
 float action_energy_cost(ActionKind kind, std::uint16_t quantity) noexcept
 {
     const float scale = static_cast<float>(quantity == 0U ? 1U : quantity);
-    switch (kind)
-    {
-    case ActionKind::Plant:
-        return 2.0f * scale;
-    case ActionKind::Water:
-        return 1.0f * scale;
-    case ActionKind::ClearBurial:
-        return 1.5f * scale;
-    default:
-        return 0.0f;
-    }
+    const auto* action_def = find_site_action_def(kind);
+    return action_def == nullptr ? 0.0f : action_def->energy_cost_per_unit * scale;
 }
 
 float action_hydration_cost(ActionKind kind, std::uint16_t quantity) noexcept
 {
     const float scale = static_cast<float>(quantity == 0U ? 1U : quantity);
-    switch (kind)
-    {
-    case ActionKind::Plant:
-        return 0.75f * scale;
-    case ActionKind::Water:
-        return 0.35f * scale;
-    case ActionKind::ClearBurial:
-        return 0.5f * scale;
-    default:
-        return 0.0f;
-    }
+    const auto* action_def = find_site_action_def(kind);
+    return action_def == nullptr ? 0.0f : action_def->hydration_cost_per_unit * scale;
 }
 
-double compute_duration_minutes(ActionKind kind, std::uint16_t quantity) noexcept
+double action_unit_duration_minutes(ActionKind kind, std::uint32_t item_id) noexcept
+{
+    if (kind == ActionKind::Plant && item_id != 0U)
+    {
+        const auto* item_def = find_item_def(ItemId {item_id});
+        if (item_def != nullptr && item_def->linked_plant_id.value != 0U)
+        {
+            const auto* plant_def = find_plant_def(item_def->linked_plant_id);
+            if (plant_def != nullptr)
+            {
+                return std::max(
+                    static_cast<double>(plant_def->plant_action_duration_minutes),
+                    k_minimum_action_duration_minutes);
+            }
+        }
+    }
+
+    return base_duration_minutes(kind);
+}
+
+double compute_duration_minutes(ActionKind kind, std::uint16_t quantity, std::uint32_t item_id) noexcept
 {
     const std::uint16_t safe_quantity = quantity == 0U ? 1U : quantity;
-    const double duration = base_duration_minutes(kind) * static_cast<double>(safe_quantity);
+    const double duration = action_unit_duration_minutes(kind, item_id) * static_cast<double>(safe_quantity);
     return std::max(k_minimum_action_duration_minutes, duration);
 }
 
@@ -143,6 +138,7 @@ void clear_action_state(ActionState& action_state) noexcept
     action_state.quantity = 0U;
     action_state.request_flags = 0U;
     action_state.awaiting_placement_reservation = false;
+    action_state.total_action_minutes = 0.0;
     action_state.remaining_action_minutes = 0.0;
     action_state.reserved_input_item_stacks.clear();
     action_state.started_at_world_minute.reset();
@@ -177,25 +173,20 @@ TileCoord action_approach_tile(const ActionState& action_state) noexcept
 
 bool should_request_placement_reservation(ActionKind action_kind) noexcept
 {
-    return action_kind == ActionKind::Plant;
+    const auto* action_def = find_site_action_def(action_kind);
+    return action_def != nullptr && action_def->requests_placement_reservation;
 }
 
 bool action_requires_worker_approach(ActionKind action_kind) noexcept
 {
-    return action_kind == ActionKind::Plant;
+    const auto* action_def = find_site_action_def(action_kind);
+    return action_def != nullptr && action_def->requires_worker_approach;
 }
 
 PlacementOccupancyLayer placement_occupancy_layer(ActionKind action_kind) noexcept
 {
-    switch (action_kind)
-    {
-    case ActionKind::Plant:
-        return PlacementOccupancyLayer::GroundCover;
-    case ActionKind::Build:
-        return PlacementOccupancyLayer::Structure;
-    default:
-        return PlacementOccupancyLayer::None;
-    }
+    const auto* action_def = find_site_action_def(action_kind);
+    return action_def == nullptr ? PlacementOccupancyLayer::None : action_def->placement_occupancy_layer;
 }
 
 void emit_site_action_started(
@@ -357,9 +348,12 @@ bool is_action_in_progress(const ActionState& action_state) noexcept
 
 double current_action_total_duration_minutes(const ActionState& action_state) noexcept
 {
-    return compute_duration_minutes(
-        action_state.action_kind,
-        static_cast<std::uint16_t>(action_state.quantity == 0U ? 1U : action_state.quantity));
+    return std::max(action_state.total_action_minutes, k_minimum_action_duration_minutes);
+}
+
+double action_elapsed_minutes_for_step(double fixed_step_seconds) noexcept
+{
+    return std::max(0.0, fixed_step_seconds) * k_action_minutes_per_real_second;
 }
 
 bool tile_is_traversable(
@@ -687,7 +681,10 @@ Gs1Status ActionExecutionSystem::process_command(
         }
 
         const double duration_minutes =
-            compute_duration_minutes(action_kind, payload.quantity == 0U ? 1U : payload.quantity);
+            compute_duration_minutes(
+                action_kind,
+                payload.quantity == 0U ? 1U : payload.quantity,
+                payload.item_id);
         const RuntimeActionId action_id = allocate_runtime_action_id();
 
         action_state.current_action_id = action_id;
@@ -699,6 +696,7 @@ Gs1Status ActionExecutionSystem::process_command(
         action_state.item_id = payload.item_id;
         action_state.quantity = payload.quantity == 0U ? 1U : payload.quantity;
         action_state.request_flags = payload.flags;
+        action_state.total_action_minutes = duration_minutes;
         action_state.remaining_action_minutes = duration_minutes;
         action_state.started_at_world_minute.reset();
         action_state.awaiting_placement_reservation =
@@ -858,15 +856,11 @@ void ActionExecutionSystem::run(SiteSystemContext<ActionExecutionSystem>& contex
         return;
     }
 
-    const double elapsed_minutes =
+    action_state.remaining_action_minutes =
         std::max(
             0.0,
-            context.world.read_time().world_time_minutes -
-                action_state.started_at_world_minute.value_or(context.world.read_time().world_time_minutes));
-    const double remaining_minutes =
-        std::max(0.0, current_action_total_duration_minutes(action_state) - elapsed_minutes);
-    action_state.remaining_action_minutes =
-        remaining_minutes;
+            action_state.remaining_action_minutes -
+                action_elapsed_minutes_for_step(context.fixed_step_seconds));
 
     if (action_state.remaining_action_minutes > 0.0)
     {

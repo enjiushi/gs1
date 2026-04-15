@@ -754,6 +754,34 @@ void append_hud_json(std::string& json, const std::optional<SmokeEngineHost::Hud
     json += '}';
 }
 
+void append_site_action_json(
+    std::string& json,
+    const std::optional<SmokeEngineHost::SiteActionProjection>& site_action)
+{
+    if (!site_action.has_value())
+    {
+        json += "null";
+        return;
+    }
+
+    const auto& action = site_action.value();
+    json += "{\"actionId\":";
+    json += std::to_string(action.action_id);
+    json += ",\"targetTileX\":";
+    json += std::to_string(action.target_tile_x);
+    json += ",\"targetTileY\":";
+    json += std::to_string(action.target_tile_y);
+    json += ",\"actionKind\":";
+    json += std::to_string(action.action_kind);
+    json += ",\"flags\":";
+    json += std::to_string(action.flags);
+    json += ",\"progressNormalized\":";
+    json += std::to_string(action.progress_normalized);
+    json += ",\"durationMinutes\":";
+    json += std::to_string(action.duration_minutes);
+    json += '}';
+}
+
 void append_site_result_json(std::string& json, const std::optional<SmokeEngineHost::SiteResultProjection>& site_result)
 {
     if (!site_result.has_value())
@@ -811,6 +839,8 @@ std::string SmokeEngineHost::build_live_state_json(const LiveStateSnapshot& live
     append_site_state_json(json, live_state.active_site_snapshot);
     json += ",\"hud\":";
     append_hud_json(json, live_state.hud_state);
+    json += ",\"siteAction\":";
+    append_site_action_json(json, live_state.site_action);
     json += ",\"siteResult\":";
     append_site_result_json(json, live_state.site_result);
     json += "}";
@@ -904,6 +934,12 @@ std::string SmokeEngineHost::build_live_state_patch_json(
     {
         append_field("hud", [&](std::string& destination) {
             append_hud_json(destination, snapshot.hud_state);
+        });
+    }
+    if ((field_mask & LiveStatePatchField_SiteAction) != 0U)
+    {
+        append_field("siteAction", [&](std::string& destination) {
+            append_site_action_json(destination, snapshot.site_action);
         });
     }
     if ((field_mask & LiveStatePatchField_SiteResult) != 0U)

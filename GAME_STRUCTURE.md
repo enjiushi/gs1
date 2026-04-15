@@ -715,6 +715,7 @@ Rules:
 - adapter behavior should be deterministic with respect to the received engine commands
 - for long-lived presentation surfaces, the adapter should build its projected world from authoritative bootstrap state and then apply later authoritative partial state updates onto that projected world rather than rebuilding the entire surface every frame
 - the adapter should keep stable mapping keys from gameplay-facing identity such as ids or site-local coordinates to engine-native objects and update those mappings when objects are created or removed
+- transient presentation such as an action progress bar may animate entirely inside the adapter after a gameplay start command arrives; gameplay should send lifecycle commands such as action-start-plus-duration and later action-clear/completion, not per-frame fill percentages
 - engine-side feedback must re-enter the world through translated world feedback events, not through direct gameplay mutation
 - engine-side feedback is observational input only; the adapter may report what happened in execution, but only world systems may decide the gameplay consequence
 

@@ -410,6 +410,7 @@ SmokeEngineHost::LiveStateSnapshot SmokeEngineHost::capture_live_state_snapshot(
     snapshot.regional_map_links = snapshot_regional_map_links();
     snapshot.active_site_snapshot = active_site_snapshot_;
     snapshot.hud_state = hud_state_;
+    snapshot.site_action = site_action_;
     snapshot.site_result = site_result_;
     return snapshot;
 }
@@ -627,6 +628,7 @@ void SmokeEngineHost::flush_engine_commands(const char* stage_label)
             {
                 active_site_snapshot_.reset();
                 hud_state_.reset();
+                site_action_.reset();
                 site_result_.reset();
             }
             else if (current_app_state_ == GS1_APP_STATE_SITE_ACTIVE ||
@@ -640,6 +642,7 @@ void SmokeEngineHost::flush_engine_commands(const char* stage_label)
                 LiveStatePatchField_SiteBootstrap |
                 LiveStatePatchField_SiteState |
                 LiveStatePatchField_Hud |
+                LiveStatePatchField_SiteAction |
                 LiveStatePatchField_SiteResult;
             break;
         }
@@ -752,6 +755,10 @@ void SmokeEngineHost::flush_engine_commands(const char* stage_label)
         case GS1_ENGINE_COMMAND_HUD_STATE:
             apply_hud_state(command);
             live_state_patch_mask = LiveStatePatchField_Hud;
+            break;
+        case GS1_ENGINE_COMMAND_SITE_ACTION_UPDATE:
+            apply_site_action_update(command);
+            live_state_patch_mask = LiveStatePatchField_SiteAction;
             break;
         case GS1_ENGINE_COMMAND_SITE_RESULT_READY:
             apply_site_result_ready(command);
@@ -1298,6 +1305,27 @@ void SmokeEngineHost::apply_hud_state(const Gs1EngineCommand& command)
     hud_state_ = projection;
 }
 
+void SmokeEngineHost::apply_site_action_update(const Gs1EngineCommand& command)
+{
+    const auto& payload = command.payload_as<Gs1EngineCommandSiteActionData>();
+    SiteActionProjection projection {};
+    projection.action_id = payload.action_id;
+    projection.target_tile_x = payload.target_tile_x;
+    projection.target_tile_y = payload.target_tile_y;
+    projection.action_kind = payload.action_kind;
+    projection.flags = payload.flags;
+    projection.progress_normalized = payload.progress_normalized;
+    projection.duration_minutes = payload.duration_minutes;
+
+    if ((payload.flags & GS1_SITE_ACTION_PRESENTATION_FLAG_CLEAR) != 0U)
+    {
+        site_action_.reset();
+        return;
+    }
+
+    site_action_ = projection;
+}
+
 void SmokeEngineHost::apply_site_result_ready(const Gs1EngineCommand& command)
 {
     const auto& payload = command.payload_as<Gs1EngineCommandSiteResultData>();
@@ -1536,7 +1564,7 @@ std::string SmokeEngineHost::describe_command(const Gs1EngineCommand& command)
         description += " kind=" + std::to_string(payload.action_kind);
         description += " target=(" + std::to_string(payload.target_tile_x);
         description += "," + std::to_string(payload.target_tile_y) + ")";
-        description += " progress=" + std::to_string(payload.progress_normalized);
+        description += " duration=" + std::to_string(payload.duration_minutes);
         break;
     }
 

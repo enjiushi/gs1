@@ -18,6 +18,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const selectionText = document.getElementById("selection-text");
     const selectionInventory = document.getElementById("selection-inventory");
     const contextActions = document.getElementById("context-actions");
+    const actionProgress = document.getElementById("action-progress");
+    const actionProgressLabel = document.getElementById("action-progress-label");
+    const actionProgressTime = document.getElementById("action-progress-time");
+    const actionProgressTitle = document.getElementById("action-progress-title");
+    const actionProgressFill = document.getElementById("action-progress-fill");
+    const actionProgressPercent = document.getElementById("action-progress-percent");
+    const actionProgressTarget = document.getElementById("action-progress-target");
     const inventoryTooltip = document.getElementById("inventory-tooltip");
     const inventoryTooltipTitle = document.getElementById("inventory-tooltip-title");
     const inventoryTooltipMeta = document.getElementById("inventory-tooltip-meta");
@@ -33,6 +40,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let siteSceneCache = null;
     let selectedInventorySlotKey = "";
     let tileContextMenuState = null;
+    let localActionProgressState = null;
     let animationTimeSeconds = 0;
     let rendererWidth = 0;
     let rendererHeight = 0;
@@ -69,6 +77,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         rotateRadiansPerPixel: 0.002
     };
     const runtimeFixedStepSeconds = 1.0 / 60.0;
+    const siteActionMinutesPerRealSecond = 0.8;
     const inventoryContainerCodes = {
         WORKER_PACK: 0,
         CAMP_STORAGE: 1
@@ -404,6 +413,69 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return "Clear Burial";
         }
         return "Idle";
+    }
+
+    function formatActionSeconds(totalSeconds) {
+        if (totalSeconds >= 60) {
+            return (totalSeconds / 60).toFixed(1) + "m";
+        }
+        return totalSeconds.toFixed(1) + "s";
+    }
+
+    function syncLocalActionProgress(state) {
+        const siteAction = state ? state.siteAction : null;
+        const nowMs = performance.now();
+
+        if (!siteAction || (siteAction.flags & 1) === 0 || siteAction.actionKind === 0) {
+            localActionProgressState = null;
+            return;
+        }
+
+        const durationMinutes = Math.max(siteAction.durationMinutes || 0, 0);
+        const durationMs = Math.max((durationMinutes / siteActionMinutesPerRealSecond) * 1000, 1);
+        const clampedProgress = Math.max(0, Math.min(siteAction.progressNormalized || 0, 1));
+
+        if (localActionProgressState &&
+            localActionProgressState.actionId === siteAction.actionId &&
+            localActionProgressState.durationMs === durationMs) {
+            localActionProgressState.lastSyncProgress = clampedProgress;
+            return;
+        }
+
+        localActionProgressState = {
+            actionId: siteAction.actionId,
+            actionKind: siteAction.actionKind,
+            targetTileX: siteAction.targetTileX,
+            targetTileY: siteAction.targetTileY,
+            durationMs: durationMs,
+            startedAtMs: nowMs - clampedProgress * durationMs,
+            lastSyncProgress: clampedProgress
+        };
+    }
+
+    function renderActionProgressBar(state) {
+        if (!actionProgress) {
+            return;
+        }
+
+        if (!state || state.appState !== "SITE_ACTIVE" || !localActionProgressState) {
+            actionProgress.hidden = true;
+            return;
+        }
+
+        const nowMs = performance.now();
+        const elapsedMs = Math.max(0, nowMs - localActionProgressState.startedAtMs);
+        const progress = Math.max(0, Math.min(elapsedMs / localActionProgressState.durationMs, 1));
+        const remainingSeconds = Math.max(0, (localActionProgressState.durationMs - elapsedMs) / 1000);
+
+        actionProgress.hidden = false;
+        actionProgressLabel.textContent = "Current Action";
+        actionProgressTitle.textContent = getSiteActionLabel(localActionProgressState.actionKind);
+        actionProgressTime.textContent = formatActionSeconds(remainingSeconds);
+        actionProgressFill.style.width = (progress * 100).toFixed(1) + "%";
+        actionProgressPercent.textContent = Math.round(progress * 100) + "%";
+        actionProgressTarget.textContent =
+            "Tile " + localActionProgressState.targetTileX + ", " + localActionProgressState.targetTileY;
     }
 
     function renderSiteStatusChip(state) {
@@ -2517,6 +2589,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
 
         fitRenderer();
+        renderActionProgressBar(latestState);
         renderer.render(scene, camera);
     }
 
@@ -2526,6 +2599,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
         if (!state.regionalMap) {
             state.regionalMap = { sites: [], links: [] };
+        }
+        if (typeof state.siteAction === "undefined") {
+            state.siteAction = null;
         }
         return state;
     }
@@ -2553,12 +2629,17 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const lightweightParts = {
             worker: false,
             weather: false,
-            hud: false
+            hud: false,
+            siteAction: false
         };
 
         for (const field of patchFields) {
             if (field === "hud") {
                 lightweightParts.hud = true;
+                continue;
+            }
+            if (field === "siteAction") {
+                lightweightParts.siteAction = true;
                 continue;
             }
 
@@ -2580,7 +2661,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             }
         }
 
-        if (!lightweightParts.worker && !lightweightParts.weather && !lightweightParts.hud) {
+        if (!lightweightParts.worker && !lightweightParts.weather && !lightweightParts.hud && !lightweightParts.siteAction) {
             return null;
         }
 
@@ -2590,6 +2671,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     function handleIncomingState(state, forceRender, patch) {
         const normalizedState = normalizeState(state);
         const previousState = latestState;
+        syncLocalActionProgress(normalizedState);
         const lightweightPatchParts =
             !forceRender && normalizedState.appState === "SITE_ACTIVE"
                 ? getSiteLightweightPatchParts(patch)
@@ -2609,10 +2691,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     ? normalizedState.siteState.worker.currentActionKind || 0
                     : 0;
             if (lightweightPatchParts.hud ||
+                lightweightPatchParts.siteAction ||
                 lightweightPatchParts.weather ||
                 previousActionKind !== nextActionKind) {
                 renderSiteStatusChip(normalizedState);
             }
+            renderActionProgressBar(normalizedState);
             return;
         }
 
@@ -2638,6 +2722,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 "Connected\nFrame " + normalizedState.frameNumber +
                 "\nSelected Site: " + (normalizedState.selectedSiteId == null ? "none" : normalizedState.selectedSiteId);
         }
+        renderActionProgressBar(normalizedState);
     }
 
     function connectStateStream() {

@@ -36,6 +36,7 @@ struct ActionState final
     std::uint16_t quantity {0};
     std::uint8_t request_flags {0};
     bool awaiting_placement_reservation {false};
+    double total_action_minutes {0.0};
     double remaining_action_minutes {0.0};
     std::vector<ReservedItemStack> reserved_input_item_stacks {};
     std::optional<double> started_at_world_minute {};

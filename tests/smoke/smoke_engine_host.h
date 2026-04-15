@@ -32,12 +32,13 @@ public:
         LiveStatePatchField_SiteState = 1U << 6,
         LiveStatePatchField_Hud = 1U << 7,
         LiveStatePatchField_SiteResult = 1U << 8,
-        LiveStatePatchField_SiteStateWorker = 1U << 9,
-        LiveStatePatchField_SiteStateCamp = 1U << 10,
-        LiveStatePatchField_SiteStateWeather = 1U << 11,
-        LiveStatePatchField_SiteStateInventory = 1U << 12,
-        LiveStatePatchField_SiteStateTasks = 1U << 13,
-        LiveStatePatchField_SiteStatePhone = 1U << 14
+        LiveStatePatchField_SiteAction = 1U << 9,
+        LiveStatePatchField_SiteStateWorker = 1U << 10,
+        LiveStatePatchField_SiteStateCamp = 1U << 11,
+        LiveStatePatchField_SiteStateWeather = 1U << 12,
+        LiveStatePatchField_SiteStateInventory = 1U << 13,
+        LiveStatePatchField_SiteStateTasks = 1U << 14,
+        LiveStatePatchField_SiteStatePhone = 1U << 15
     };
 
     struct LiveStateSnapshot;
@@ -227,6 +228,17 @@ public:
         float site_completion_normalized {0.0f};
     };
 
+    struct SiteActionProjection final
+    {
+        std::uint32_t action_id {0};
+        std::int32_t target_tile_x {0};
+        std::int32_t target_tile_y {0};
+        std::uint32_t action_kind {0};
+        std::uint32_t flags {0};
+        float progress_normalized {0.0f};
+        float duration_minutes {0.0f};
+    };
+
     struct SiteResultProjection final
     {
         std::uint32_t site_id {0};
@@ -248,6 +260,7 @@ public:
         std::vector<RegionalMapLinkProjection> regional_map_links {};
         std::optional<SiteSnapshotProjection> active_site_snapshot {};
         std::optional<HudProjection> hud_state {};
+        std::optional<SiteActionProjection> site_action {};
         std::optional<SiteResultProjection> site_result {};
     };
 
@@ -285,6 +298,7 @@ private:
     void apply_site_phone_listing_upsert(const Gs1EngineCommand& command);
     void apply_site_snapshot_end();
     void apply_hud_state(const Gs1EngineCommand& command);
+    void apply_site_action_update(const Gs1EngineCommand& command);
     void apply_site_result_ready(const Gs1EngineCommand& command);
     void queue_live_state_patch(std::uint32_t field_mask);
     static void write_json_string(std::string& destination, std::string_view value);
@@ -321,6 +335,7 @@ private:
     std::uint32_t pending_site_snapshot_patch_mask_ {0U};
     std::optional<SiteSnapshotProjection> active_site_snapshot_ {};
     std::optional<HudProjection> hud_state_ {};
+    std::optional<SiteActionProjection> site_action_ {};
     std::optional<SiteResultProjection> site_result_ {};
     std::uint32_t phase1_fixed_steps_executed_ {0};
     std::uint32_t phase1_processed_host_event_count_ {0};
