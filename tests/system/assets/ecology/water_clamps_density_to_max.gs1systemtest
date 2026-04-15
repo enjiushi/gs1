@@ -1,13 +1,14 @@
 system = ecology
-name = water_clamps_density_to_max
+name = water_clamps_moisture_to_max
 runner = ecology_regression
-description = Waters an occupied tile near full density and verifies density clamps at one.
+description = Waters an occupied tile near full moisture and verifies moisture clamps at one.
 ---
 scenario = water
 x = 2
 y = 3
 tile_ground_cover_type_id = 7
 tile_density = 0.9
+tile_moisture = 0.9
 water_amount = 1.0
-expect_density = 1.0
+expect_moisture = 1.0
 expect_tile_ecology_changed_count = 1

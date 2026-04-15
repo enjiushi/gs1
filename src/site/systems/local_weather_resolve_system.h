@@ -16,7 +16,8 @@ public:
                 SiteComponent::TileLayout,
                 SiteComponent::TileEcology,
                 SiteComponent::TileWeather,
-                SiteComponent::Weather),
+                SiteComponent::Weather,
+                SiteComponent::Modifier),
             site_component_mask_of(SiteComponent::TileWeather)};
     }
 

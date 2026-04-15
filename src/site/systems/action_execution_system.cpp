@@ -6,7 +6,11 @@
 #include "support/id_types.h"
 
 #include <algorithm>
+#include <array>
+#include <cmath>
 #include <cstdint>
+#include <limits>
+#include <optional>
 
 namespace gs1
 {
@@ -132,6 +136,7 @@ void clear_action_state(ActionState& action_state) noexcept
     action_state.current_action_id.reset();
     action_state.action_kind = ActionKind::None;
     action_state.target_tile.reset();
+    action_state.approach_tile.reset();
     action_state.primary_subject_id = 0U;
     action_state.secondary_subject_id = 0U;
     action_state.item_id = 0U;
@@ -162,7 +167,21 @@ TileCoord action_target_tile(const ActionState& action_state) noexcept
     return TileCoord {};
 }
 
+TileCoord action_approach_tile(const ActionState& action_state) noexcept
+{
+    if (action_state.approach_tile.has_value())
+    {
+        return *action_state.approach_tile;
+    }
+    return action_target_tile(action_state);
+}
+
 bool should_request_placement_reservation(ActionKind action_kind) noexcept
+{
+    return action_kind == ActionKind::Plant;
+}
+
+bool action_requires_worker_approach(ActionKind action_kind) noexcept
 {
     return action_kind == ActionKind::Plant;
 }
@@ -319,9 +338,121 @@ bool is_action_waiting_for_placement(const ActionState& action_state) noexcept
     return has_active_action(action_state) && action_state.awaiting_placement_reservation;
 }
 
+bool action_has_started(const ActionState& action_state) noexcept
+{
+    return action_state.started_at_world_minute.has_value();
+}
+
+bool is_action_waiting_for_worker_approach(const ActionState& action_state) noexcept
+{
+    return has_active_action(action_state) &&
+        !action_state.awaiting_placement_reservation &&
+        action_requires_worker_approach(action_state.action_kind) &&
+        !action_has_started(action_state);
+}
+
 bool is_action_in_progress(const ActionState& action_state) noexcept
 {
-    return has_active_action(action_state) && !action_state.awaiting_placement_reservation;
+    return has_active_action(action_state) && action_has_started(action_state);
+}
+
+bool tile_is_traversable(
+    const SiteWorldAccess<ActionExecutionSystem>& world,
+    TileCoord coord) noexcept
+{
+    return world.tile_coord_in_bounds(coord) && world.read_tile(coord).static_data.traversable;
+}
+
+std::optional<TileCoord> resolve_action_approach_tile(
+    const SiteWorldAccess<ActionExecutionSystem>& world,
+    const SiteWorld::WorkerData& worker,
+    TileCoord target_tile)
+{
+    if (tile_is_traversable(world, target_tile))
+    {
+        return target_tile;
+    }
+
+    constexpr std::array<TileCoord, 8> k_neighbor_offsets {{
+        TileCoord {0, -1},
+        TileCoord {1, 0},
+        TileCoord {0, 1},
+        TileCoord {-1, 0},
+        TileCoord {1, -1},
+        TileCoord {1, 1},
+        TileCoord {-1, 1},
+        TileCoord {-1, -1},
+    }};
+
+    float best_distance_squared = std::numeric_limits<float>::max();
+    std::optional<TileCoord> best_tile {};
+    for (const auto offset : k_neighbor_offsets)
+    {
+        const TileCoord candidate {
+            target_tile.x + offset.x,
+            target_tile.y + offset.y};
+        if (!tile_is_traversable(world, candidate))
+        {
+            continue;
+        }
+
+        const float dx =
+            worker.position.tile_x - static_cast<float>(candidate.x);
+        const float dy =
+            worker.position.tile_y - static_cast<float>(candidate.y);
+        const float distance_squared = dx * dx + dy * dy;
+        if (distance_squared < best_distance_squared)
+        {
+            best_distance_squared = distance_squared;
+            best_tile = candidate;
+        }
+    }
+
+    return best_tile;
+}
+
+bool worker_is_at_action_approach_tile(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    const ActionState& action_state) noexcept
+{
+    if (!action_state.approach_tile.has_value())
+    {
+        return true;
+    }
+
+    const auto worker = context.world.read_worker();
+    const float dx =
+        worker.position.tile_x - static_cast<float>(action_state.approach_tile->x);
+    const float dy =
+        worker.position.tile_y - static_cast<float>(action_state.approach_tile->y);
+    return (dx * dx + dy * dy) <= 0.0025f;
+}
+
+void begin_action_execution(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    ActionState& action_state)
+{
+    if (!action_state.current_action_id.has_value() || action_has_started(action_state))
+    {
+        return;
+    }
+
+    action_state.started_at_world_minute = context.world.read_time().world_time_minutes;
+    emit_site_action_started(
+        context.command_queue,
+        action_state.current_action_id.value(),
+        action_state.action_kind,
+        action_state.request_flags,
+        action_target_tile(action_state),
+        action_state.primary_subject_id,
+        static_cast<float>(action_state.remaining_action_minutes));
+    emit_worker_meter_cost_request(
+        context.command_queue,
+        action_state.current_action_id->value,
+        action_state.action_kind,
+        action_state.quantity);
+    context.world.mark_projection_dirty(
+        SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
 }
 
 void emit_placement_reservation_requested(
@@ -365,6 +496,8 @@ void emit_action_fact_commands(GameCommandQueue& queue, const ActionState& actio
     const TileCoord target_tile = action_target_tile(action_state);
     const auto action_id = action_id_value(action_state);
     const auto flags = static_cast<std::uint32_t>(action_state.request_flags);
+    const std::uint16_t safe_quantity = static_cast<std::uint16_t>(
+        action_state.quantity == 0U ? 1U : action_state.quantity);
 
     switch (action_state.action_kind)
     {
@@ -378,7 +511,7 @@ void emit_action_fact_commands(GameCommandQueue& queue, const ActionState& actio
                 GameCommandType::InventoryItemConsumeRequested,
                 InventoryItemConsumeRequestedCommand {
                     item_def->item_id.value,
-                    action_state.quantity == 0U ? 1U : action_state.quantity,
+                    safe_quantity,
                     GS1_INVENTORY_CONTAINER_WORKER_PACK,
                     0U});
             enqueue_command(
@@ -389,9 +522,7 @@ void emit_action_fact_commands(GameCommandQueue& queue, const ActionState& actio
                     target_tile.x,
                     target_tile.y,
                     item_def->linked_plant_id.value,
-                    std::min(
-                        1.0f,
-                        0.25f * static_cast<float>(action_state.quantity == 0U ? 1U : action_state.quantity)),
+                    std::min(1.0f, 0.2f * static_cast<float>(safe_quantity)),
                     flags});
         }
         else
@@ -404,9 +535,7 @@ void emit_action_fact_commands(GameCommandQueue& queue, const ActionState& actio
                     target_tile.x,
                     target_tile.y,
                     action_state.primary_subject_id == 0U ? 1U : action_state.primary_subject_id,
-                    std::min(
-                        1.0f,
-                        0.25f * static_cast<float>(action_state.quantity == 0U ? 1U : action_state.quantity)),
+                    std::min(1.0f, 0.25f * static_cast<float>(safe_quantity)),
                     flags});
         }
         break;
@@ -558,6 +687,7 @@ Gs1Status ActionExecutionSystem::process_command(
         action_state.current_action_id = action_id;
         action_state.action_kind = action_kind;
         action_state.target_tile = target_tile;
+        action_state.approach_tile.reset();
         action_state.primary_subject_id = payload.primary_subject_id;
         action_state.secondary_subject_id = payload.secondary_subject_id;
         action_state.item_id = payload.item_id;
@@ -568,6 +698,29 @@ Gs1Status ActionExecutionSystem::process_command(
         action_state.awaiting_placement_reservation =
             should_request_placement_reservation(action_kind);
         action_state.reserved_input_item_stacks.clear();
+
+        if (action_requires_worker_approach(action_kind))
+        {
+            const auto worker = context.world.read_worker();
+            const auto approach_tile =
+                resolve_action_approach_tile(context.world, worker, target_tile);
+            if (!approach_tile.has_value())
+            {
+                clear_action_state(action_state);
+                emit_site_action_failed(
+                    context.command_queue,
+                    0U,
+                    action_kind,
+                    SiteActionFailureReason::InvalidTarget,
+                    payload.flags,
+                    target_tile,
+                    payload.primary_subject_id,
+                    payload.secondary_subject_id);
+                return GS1_STATUS_OK;
+            }
+
+            action_state.approach_tile = approach_tile;
+        }
 
         if (action_state.awaiting_placement_reservation)
         {
@@ -580,20 +733,7 @@ Gs1Status ActionExecutionSystem::process_command(
         }
         else
         {
-            action_state.started_at_world_minute = context.world.read_time().world_time_minutes;
-            emit_site_action_started(
-                context.command_queue,
-                action_id,
-                action_kind,
-                payload.flags,
-                target_tile,
-                payload.primary_subject_id,
-                static_cast<float>(duration_minutes));
-            emit_worker_meter_cost_request(
-                context.command_queue,
-                action_id.value,
-                action_kind,
-                action_state.quantity);
+            begin_action_execution(context, action_state);
         }
 
         context.world.mark_projection_dirty(
@@ -653,23 +793,15 @@ Gs1Status ActionExecutionSystem::process_command(
 
         action_state.awaiting_placement_reservation = false;
         action_state.placement_reservation_token = payload.reservation_token;
-        action_state.started_at_world_minute = context.world.read_time().world_time_minutes;
-
-        emit_site_action_started(
-            context.command_queue,
-            action_state.current_action_id.value(),
-            action_state.action_kind,
-            action_state.request_flags,
-            action_target_tile(action_state),
-            action_state.primary_subject_id,
-            static_cast<float>(action_state.remaining_action_minutes));
-        emit_worker_meter_cost_request(
-            context.command_queue,
-            action_state.current_action_id->value,
-            action_state.action_kind,
-            action_state.quantity);
-        context.world.mark_projection_dirty(
-            SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
+        if (!action_requires_worker_approach(action_state.action_kind) ||
+            worker_is_at_action_approach_tile(context, action_state))
+        {
+            begin_action_execution(context, action_state);
+        }
+        else
+        {
+            context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WORKER);
+        }
         return GS1_STATUS_OK;
     }
 
@@ -709,6 +841,12 @@ Gs1Status ActionExecutionSystem::process_command(
 void ActionExecutionSystem::run(SiteSystemContext<ActionExecutionSystem>& context)
 {
     auto& action_state = context.world.own_action();
+    if (is_action_waiting_for_worker_approach(action_state) &&
+        worker_is_at_action_approach_tile(context, action_state))
+    {
+        begin_action_execution(context, action_state);
+    }
+
     if (!is_action_in_progress(action_state))
     {
         return;

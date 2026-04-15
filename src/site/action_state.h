@@ -28,6 +28,7 @@ struct ActionState final
     std::optional<RuntimeActionId> current_action_id {};
     ActionKind action_kind {ActionKind::None};
     std::optional<TileCoord> target_tile {};
+    std::optional<TileCoord> approach_tile {};
     std::uint32_t primary_subject_id {0};
     std::uint32_t secondary_subject_id {0};
     std::uint32_t item_id {0};

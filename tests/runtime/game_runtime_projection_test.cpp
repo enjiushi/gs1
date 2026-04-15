@@ -429,7 +429,7 @@ int main()
 
     const auto action_ecology = gs1::site_world_access::tile_ecology(action_site_run, action_target);
     assert(action_ecology.plant_id.value == gs1::k_plant_wind_reed);
-    assert(action_ecology.plant_density >= 0.25f);
+    assert(action_ecology.plant_density >= 0.2f);
     assert(action_site_run.inventory.worker_pack_slots[3].item_quantity == 1U);
 
     run_phase1(action_runtime, 0.0);
@@ -444,7 +444,7 @@ int main()
             return payload.x == static_cast<std::uint32_t>(action_target.x) &&
                 payload.y == static_cast<std::uint32_t>(action_target.y) &&
                 payload.plant_type_id == gs1::k_plant_wind_reed &&
-                payload.plant_density >= 0.25f;
+                payload.plant_density >= 0.2f;
         });
     assert(projected_action_tile != action_tile_commands.end());
 

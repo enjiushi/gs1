@@ -630,6 +630,7 @@ void ecology_regression_runner(
         tile.ecology.ground_cover_type_id =
             parse_u32(context, values, "tile_ground_cover_type_id", tile.ecology.ground_cover_type_id);
         tile.ecology.plant_density = parse_float(context, values, "tile_density", tile.ecology.plant_density);
+        tile.ecology.moisture = parse_float(context, values, "tile_moisture", tile.ecology.moisture);
         tile.ecology.sand_burial = parse_float(context, values, "tile_sand_burial", tile.ecology.sand_burial);
         site_run.site_world->set_tile(coord, tile);
     }
@@ -649,7 +650,22 @@ void ecology_regression_runner(
                         parse_float(context, values, "water_amount", 1.0f),
                         0U})) == GS1_STATUS_OK);
         const auto tile = site_run.site_world->tile_at(coord);
-        GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.plant_density, parse_float(context, values, "expect_density")));
+        if (values.contains("expect_moisture"))
+        {
+            GS1_SYSTEM_TEST_CHECK(
+                context,
+                approx_equal(
+                    tile.ecology.moisture,
+                    parse_float(context, values, "expect_moisture")));
+        }
+        else
+        {
+            GS1_SYSTEM_TEST_CHECK(
+                context,
+                approx_equal(
+                    tile.ecology.plant_density,
+                    parse_float(context, values, "expect_density")));
+        }
         GS1_SYSTEM_TEST_CHECK(
             context,
             count_commands(queue, GameCommandType::TileEcologyChanged) ==

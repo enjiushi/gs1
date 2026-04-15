@@ -15,6 +15,8 @@ public:
             site_component_mask_of(
                 SiteComponent::TileLayout,
                 SiteComponent::TileEcology,
+                SiteComponent::TileWeather,
+                SiteComponent::Modifier,
                 SiteComponent::Counters),
             site_component_mask_of(
                 SiteComponent::TileEcology,

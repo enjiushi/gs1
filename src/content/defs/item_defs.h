@@ -1,6 +1,6 @@
 #pragma once
 
-#include "support/id_types.h"
+#include "content/defs/plant_defs.h"
 
 #include <array>
 #include <cstdint>
@@ -51,11 +51,6 @@ inline constexpr std::uint32_t k_item_wind_reed_seed_bundle = 4U;
 inline constexpr std::uint32_t k_item_saltbush_seed_bundle = 5U;
 inline constexpr std::uint32_t k_item_shade_cactus_seed_bundle = 6U;
 inline constexpr std::uint32_t k_item_sunfruit_vine_seed_bundle = 7U;
-
-inline constexpr std::uint32_t k_plant_wind_reed = 1U;
-inline constexpr std::uint32_t k_plant_saltbush = 2U;
-inline constexpr std::uint32_t k_plant_shade_cactus = 3U;
-inline constexpr std::uint32_t k_plant_sunfruit_vine = 4U;
 
 inline constexpr std::array<ItemDef, 7> k_prototype_item_defs {
     ItemDef {

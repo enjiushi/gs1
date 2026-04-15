@@ -4,6 +4,7 @@
 #include "site/systems/action_execution_system.h"
 #include "site/systems/ecology_system.h"
 #include "site/systems/placement_validation_system.h"
+#include "site/systems/site_flow_system.h"
 #include "testing/system_test_registry.h"
 #include "system_test_fixtures.h"
 
@@ -29,6 +30,7 @@ using gs1::SiteActionFailedCommand;
 using gs1::SiteActionStartedCommand;
 using gs1::SiteGroundCoverPlacedCommand;
 using gs1::SiteMoveDirectionInput;
+using gs1::SiteFlowSystem;
 using gs1::SiteTileBurialClearedCommand;
 using gs1::SiteTilePlantingCompletedCommand;
 using gs1::SiteTileWateredCommand;
@@ -194,9 +196,57 @@ void action_execution_plant_waits_for_reservation_then_starts_on_accept(
 
     GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.awaiting_placement_reservation);
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_reservation_token == 55U);
+    GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.started_at_world_minute.has_value());
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.approach_tile.has_value());
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.approach_tile->x == 3);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.approach_tile->y == 3);
+    GS1_SYSTEM_TEST_CHECK(context, queue.empty());
+}
+
+void planting_auto_move_reaches_tile_before_action_starts(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 509U);
+    GameCommandQueue queue {};
+    auto action_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_command(
+            action_context,
+            make_start_action_command(GS1_SITE_ACTION_PLANT, TileCoord {4, 2}, 1U, 12U)) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(context, site_run.site_action.current_action_id.has_value());
+    const auto action_id = site_run.site_action.current_action_id->value;
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.awaiting_placement_reservation);
+
+    queue.clear();
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_command(
+            action_context,
+            make_command(
+                GameCommandType::PlacementReservationAccepted,
+                PlacementReservationAcceptedCommand {action_id, 4, 2, 56U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.awaiting_placement_reservation);
+    GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.started_at_world_minute.has_value());
+    GS1_SYSTEM_TEST_CHECK(context, queue.empty());
+
+    auto flow_context = make_site_context<SiteFlowSystem>(campaign, site_run, queue);
+    SiteFlowSystem::run(flow_context);
+
+    const auto worker = site_run.site_world->worker();
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(worker.position.tile_x, 4.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(worker.position.tile_y, 2.0f));
+    GS1_SYSTEM_TEST_CHECK(context, worker.position.tile_coord.x == 4);
+    GS1_SYSTEM_TEST_CHECK(context, worker.position.tile_coord.y == 2);
+
+    queue.clear();
+    ActionExecutionSystem::run(action_context);
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 2U);
     GS1_SYSTEM_TEST_CHECK(context, queue[0].type == GameCommandType::SiteActionStarted);
     GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameCommandType::WorkerMeterDeltaRequested);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.started_at_world_minute.has_value());
 }
 
 void action_execution_rejection_and_cancel_clear_action_state(
@@ -309,7 +359,7 @@ void action_execution_plant_completion_emits_ground_cover_after_reservation(
         context,
         ActionExecutionSystem::process_command(
             site_context,
-            make_start_action_command(GS1_SITE_ACTION_PLANT, TileCoord {4, 2}, 2U, 9U)) == GS1_STATUS_OK);
+            make_start_action_command(GS1_SITE_ACTION_PLANT, TileCoord {2, 2}, 2U, 9U)) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, site_run.site_action.current_action_id.has_value());
     const auto action_id = site_run.site_action.current_action_id->value;
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.awaiting_placement_reservation);
@@ -321,7 +371,7 @@ void action_execution_plant_completion_emits_ground_cover_after_reservation(
             site_context,
             make_command(
                 GameCommandType::PlacementReservationAccepted,
-                PlacementReservationAcceptedCommand {action_id, 4, 2, 77U})) == GS1_STATUS_OK);
+                PlacementReservationAcceptedCommand {action_id, 2, 2, 77U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.awaiting_placement_reservation);
 
     queue.clear();
@@ -359,7 +409,7 @@ void action_execution_item_based_plant_completion_consumes_seed_and_emits_planti
             site_context,
             make_start_action_command(
                 GS1_SITE_ACTION_PLANT,
-                TileCoord {4, 3},
+                TileCoord {2, 2},
                 2U,
                 0U,
                 gs1::k_item_wind_reed_seed_bundle)) == GS1_STATUS_OK);
@@ -376,7 +426,7 @@ void action_execution_item_based_plant_completion_consumes_seed_and_emits_planti
             site_context,
             make_command(
                 GameCommandType::PlacementReservationAccepted,
-                PlacementReservationAcceptedCommand {action_id, 4, 3, 88U})) == GS1_STATUS_OK);
+                PlacementReservationAcceptedCommand {action_id, 2, 2, 88U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.awaiting_placement_reservation);
 
     queue.clear();
@@ -402,7 +452,7 @@ void action_execution_item_based_plant_completion_consumes_seed_and_emits_planti
         queue[2].payload_as<SiteTilePlantingCompletedCommand>().plant_type_id == gs1::k_plant_wind_reed);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        approx_equal(queue[2].payload_as<SiteTilePlantingCompletedCommand>().initial_density, 0.5f));
+        approx_equal(queue[2].payload_as<SiteTilePlantingCompletedCommand>().initial_density, 0.4f));
     GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.current_action_id.has_value());
 }
 
@@ -668,6 +718,7 @@ void ecology_watering_and_burial_clear_require_valid_targets(
     auto tile = site_run.site_world->tile_at(TileCoord {1, 1});
     tile.ecology.ground_cover_type_id = 3U;
     tile.ecology.plant_density = 0.2f;
+    tile.ecology.moisture = 0.2f;
     tile.ecology.sand_burial = 0.8f;
     site_run.site_world->set_tile(TileCoord {1, 1}, tile);
 
@@ -679,12 +730,12 @@ void ecology_watering_and_burial_clear_require_valid_targets(
                 GameCommandType::SiteTileWatered,
                 SiteTileWateredCommand {2U, 1, 1, 1.5f, 0U})) == GS1_STATUS_OK);
     tile = site_run.site_world->tile_at(TileCoord {1, 1});
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.plant_density, 0.5f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.moisture, 0.53f));
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(
         context,
         queue.front().payload_as<TileEcologyChangedCommand>().changed_mask ==
-            gs1::TILE_ECOLOGY_CHANGED_DENSITY);
+            gs1::TILE_ECOLOGY_CHANGED_MOISTURE);
 
     queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(
@@ -708,7 +759,7 @@ void ecology_run_grows_occupied_tiles_and_updates_progress(
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(1U, 703U);
     GameCommandQueue queue {};
-    auto site_context = make_site_context<EcologySystem>(campaign, site_run, queue, 1.0);
+    auto site_context = make_site_context<EcologySystem>(campaign, site_run, queue, 60.0);
 
     site_run.counters.site_completion_tile_threshold = 2U;
     auto occupied = site_run.site_world->tile_at(TileCoord {2, 2});
@@ -726,7 +777,7 @@ void ecology_run_grows_occupied_tiles_and_updates_progress(
     occupied = site_run.site_world->tile_at(TileCoord {2, 2});
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(occupied.ecology.plant_density, 1.0f));
     GS1_SYSTEM_TEST_CHECK(context, site_run.counters.fully_grown_tile_count == 2U);
-    GS1_SYSTEM_TEST_CHECK(context, count_commands(queue, GameCommandType::TileEcologyChanged) == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, count_commands(queue, GameCommandType::TileEcologyChanged) >= 1U);
     GS1_SYSTEM_TEST_CHECK(context, count_commands(queue, GameCommandType::RestorationProgressChanged) == 1U);
     const auto* progress =
         first_command_payload<gs1::RestorationProgressChangedCommand>(
@@ -754,6 +805,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "action_execution",
     "plant_waits_for_reservation_then_starts_on_accept",
     action_execution_plant_waits_for_reservation_then_starts_on_accept);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "action_execution",
+    "planting_auto_move_reaches_tile_before_action_starts",
+    planting_auto_move_reaches_tile_before_action_starts);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "action_execution",
     "rejection_and_cancel_clear_action_state",

@@ -252,6 +252,18 @@ bool ui_action_matches(const Gs1UiAction& requested, const Gs1UiAction& availabl
 
     return true;
 }
+
+bool should_log_engine_command_to_sink(
+    SmokeEngineHost::LogMode log_mode,
+    Gs1EngineCommandType type) noexcept
+{
+    if (log_mode == SmokeEngineHost::LogMode::Verbose)
+    {
+        return true;
+    }
+
+    return type == GS1_ENGINE_COMMAND_LOG_TEXT;
+}
 }  // namespace
 
 SmokeEngineHost::SmokeEngineHost(
@@ -285,10 +297,7 @@ void SmokeEngineHost::update(double delta_seconds)
     Gs1Phase1Result phase1_result {};
     const auto phase1_status = api_->run_phase1(runtime_, &phase1_request, &phase1_result);
     assert(phase1_status == GS1_STATUS_OK);
-    const bool log_phase1_summary =
-        log_mode_ == LogMode::Verbose ||
-        phase1_result.processed_host_event_count > 0U ||
-        phase1_result.engine_commands_queued > 0U;
+    const bool log_phase1_summary = log_mode_ == LogMode::Verbose;
     if (log_phase1_summary)
     {
         smoke_log::infof("[ENGINE][FRAME %llu] phase1 status=%u host_events=%u fixed_steps=%u queued=%u\n",
@@ -313,10 +322,13 @@ void SmokeEngineHost::update(double delta_seconds)
             pending_feedback_events_.data(),
             static_cast<std::uint32_t>(pending_feedback_events_.size()));
         assert(status == GS1_STATUS_OK);
-        smoke_log::infof("[ENGINE][FRAME %llu] submit_feedback_events status=%u count=%u\n",
-            static_cast<unsigned long long>(frame_number_),
-            static_cast<unsigned>(status),
-            static_cast<unsigned>(pending_feedback_events_.size()));
+        if (log_mode_ == LogMode::Verbose)
+        {
+            smoke_log::infof("[ENGINE][FRAME %llu] submit_feedback_events status=%u count=%u\n",
+                static_cast<unsigned long long>(frame_number_),
+                static_cast<unsigned>(status),
+                static_cast<unsigned>(pending_feedback_events_.size()));
+        }
         pending_feedback_events_.clear();
     }
 
@@ -326,11 +338,7 @@ void SmokeEngineHost::update(double delta_seconds)
     Gs1Phase2Result phase2_result {};
     const auto phase2_status = api_->run_phase2(runtime_, &phase2_request, &phase2_result);
     assert(phase2_status == GS1_STATUS_OK);
-    const bool log_phase2_summary =
-        log_mode_ == LogMode::Verbose ||
-        phase2_result.processed_host_event_count > 0U ||
-        phase2_result.processed_feedback_event_count > 0U ||
-        phase2_result.engine_commands_queued > 0U;
+    const bool log_phase2_summary = log_mode_ == LogMode::Verbose;
     if (log_phase2_summary)
     {
         smoke_log::infof("[ENGINE][FRAME %llu] phase2 status=%u host_events=%u feedback_events=%u queued=%u\n",
@@ -460,11 +468,14 @@ void SmokeEngineHost::submit_host_events(
         events.data(),
         static_cast<std::uint32_t>(events.size()));
     assert(status == GS1_STATUS_OK);
-    smoke_log::infof("[ENGINE][FRAME %llu] submit_host_events stage=%s status=%u count=%u\n",
-        static_cast<unsigned long long>(frame_number_),
-        stage_label,
-        static_cast<unsigned>(status),
-        static_cast<unsigned>(events.size()));
+    if (log_mode_ == LogMode::Verbose)
+    {
+        smoke_log::infof("[ENGINE][FRAME %llu] submit_host_events stage=%s status=%u count=%u\n",
+            static_cast<unsigned long long>(frame_number_),
+            stage_label,
+            static_cast<unsigned>(status),
+            static_cast<unsigned>(events.size()));
+    }
     events.clear();
 }
 
@@ -757,17 +768,27 @@ void SmokeEngineHost::flush_engine_commands(const char* stage_label)
         if (command.type == GS1_ENGINE_COMMAND_LOG_TEXT)
         {
             log_entry = std::string("[GAMEPLAY] ") + description;
-            smoke_log::infof("[GAMEPLAY][FRAME %llu] %s\n",
-                static_cast<unsigned long long>(frame_number_),
-                description.c_str());
         }
         else
         {
             log_entry = std::string("[ENGINE][CMD] ") + stage_label + ": " + description;
-            smoke_log::infof("[ENGINE][CMD][FRAME %llu] %s: %s\n",
-                static_cast<unsigned long long>(frame_number_),
-                stage_label,
-                description.c_str());
+        }
+
+        if (should_log_engine_command_to_sink(log_mode_, command.type))
+        {
+            if (command.type == GS1_ENGINE_COMMAND_LOG_TEXT)
+            {
+                smoke_log::infof("[GAMEPLAY][FRAME %llu] %s\n",
+                    static_cast<unsigned long long>(frame_number_),
+                    description.c_str());
+            }
+            else
+            {
+                smoke_log::infof("[ENGINE][CMD][FRAME %llu] %s: %s\n",
+                    static_cast<unsigned long long>(frame_number_),
+                    stage_label,
+                    description.c_str());
+            }
         }
 
         command_logs_.push_back(log_entry);

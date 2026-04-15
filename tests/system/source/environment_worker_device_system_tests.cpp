@@ -167,7 +167,7 @@ void local_weather_resolve_updates_tiles_and_process_command_is_noop(
     GS1_SYSTEM_TEST_CHECK(context, covered_weather.heat < exposed_weather.heat);
     GS1_SYSTEM_TEST_CHECK(context, covered_weather.wind < exposed_weather.wind);
     GS1_SYSTEM_TEST_CHECK(context, covered_weather.dust < exposed_weather.dust);
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(exposed_weather.dust, 3.1f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(exposed_weather.dust, 4.25f));
 }
 
 void worker_condition_requested_delta_emits_initial_full_mask_and_clamps(

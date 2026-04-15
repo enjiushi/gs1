@@ -21,6 +21,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const inventoryTooltip = document.getElementById("inventory-tooltip");
     const inventoryTooltipTitle = document.getElementById("inventory-tooltip-title");
     const inventoryTooltipMeta = document.getElementById("inventory-tooltip-meta");
+    const tileContextMenu = document.getElementById("tile-context-menu");
 
     let latestState = null;
     let stateStream = null;
@@ -30,8 +31,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let lastSentSiteControlSignature = "0";
     let currentSceneKind = "";
     let siteSceneCache = null;
-    let armedPlantSlotKey = "";
     let selectedInventorySlotKey = "";
+    let tileContextMenuState = null;
     let animationTimeSeconds = 0;
     let rendererWidth = 0;
     let rendererHeight = 0;
@@ -39,8 +40,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let cameraOrbitDragButton = -1;
     let cameraOrbitDragLastClientX = 0;
     let cameraOrbitPointerLockActive = false;
-    const rightMouseButton = 2;
-    const rightMouseButtonsMask = 2;
+    let pendingSiteOrbitGesture = null;
+    const orbitMouseButton = 2;
+    const orbitMouseButtonsMask = 2;
+    const orbitDragThresholdPixels = 6;
 
     const moveAxes = {
         x: 0,
@@ -65,6 +68,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         wheelZoomStepDistance: 1.5,
         rotateRadiansPerPixel: 0.002
     };
+    const runtimeFixedStepSeconds = 1.0 / 60.0;
     const inventoryContainerCodes = {
         WORKER_PACK: 0,
         CAMP_STORAGE: 1
@@ -139,6 +143,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function clearWorld() {
         stopCameraOrbitDrag();
+        closeTileContextMenu();
         while (worldGroup.children.length > 0) {
             const child = worldGroup.children[0];
             worldGroup.remove(child);
@@ -268,22 +273,39 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             ((quantity & 0xffff) * 0x100000000);
     }
 
-    function clearArmedPlantSlotIfInvalid(state) {
-        if (!armedPlantSlotKey || !state || state.appState !== "SITE_ACTIVE") {
-            return;
-        }
-
+    function getCarriedSeedOptions(state) {
+        const seedTotals = new Map();
         const workerPackSlots = getInventorySlotsByKind(state, "WORKER_PACK");
-        const armedSlot = workerPackSlots.find((slot) => slotKey(slot.containerKind, slot.slotIndex) === armedPlantSlotKey);
-        if (!armedSlot || armedSlot.quantity <= 0) {
-            armedPlantSlotKey = "";
-            return;
-        }
+        workerPackSlots.forEach((slot) => {
+            if (!isOccupiedSlot(slot)) {
+                return;
+            }
 
-        const itemMeta = getItemMeta(armedSlot.itemId);
-        if (!itemMeta || !itemMeta.canPlant) {
-            armedPlantSlotKey = "";
-        }
+            const itemMeta = getItemMeta(slot.itemId);
+            if (!itemMeta || !itemMeta.canPlant) {
+                return;
+            }
+
+            const previousQuantity = seedTotals.get(slot.itemId) || 0;
+            seedTotals.set(slot.itemId, previousQuantity + slot.quantity);
+        });
+
+        return Array.from(seedTotals.entries())
+            .sort((lhs, rhs) => lhs[0] - rhs[0])
+            .map(([itemId, quantity]) => {
+                const itemMeta = getItemMeta(itemId);
+                const visual = getItemVisual(itemId);
+                return {
+                    id: "seed:" + itemId,
+                    itemId: itemId,
+                    label: itemMeta ? itemMeta.name : ("Item " + itemId),
+                    shortLabel: itemMeta ? itemMeta.shortName : ("Item " + itemId),
+                    quantity: quantity,
+                    iconGlyph: visual.glyph,
+                    iconLight: visual.light,
+                    iconDark: visual.dark
+                };
+            });
     }
 
     function clearSelectedInventorySlotIfInvalid(state) {
@@ -369,6 +391,274 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function postSiteAction(payload) {
         return postJson("/site-action", payload);
+    }
+
+    function getSiteActionLabel(actionKind) {
+        if (actionKind === 1) {
+            return "Plant";
+        }
+        if (actionKind === 4) {
+            return "Water";
+        }
+        if (actionKind === 5) {
+            return "Clear Burial";
+        }
+        return "Idle";
+    }
+
+    function renderSiteStatusChip(state) {
+        const siteState = getSiteState(state);
+        const hud = state ? state.hud : null;
+        const weather = siteState ? siteState.weather : null;
+        const carriedSeeds = getCarriedSeedOptions(state);
+        const workerActionKind =
+            siteState && siteState.worker ? siteState.worker.currentActionKind : 0;
+        const hydration = hud ? Math.round(hud.playerHydration) : 0;
+        const energy = hud ? Math.round(hud.playerEnergy) : 0;
+        const completion = hud ? Math.round((hud.siteCompletionNormalized || 0) * 100) : 0;
+        const eventPhase = weather ? weather.eventPhase : "NONE";
+
+        statusChip.textContent =
+            "Site Live\nHydration " + hydration +
+            "\nEnergy " + energy +
+            "\nCompletion " + completion + "%" +
+            "\nEvent " + eventPhase +
+            "\nSeeds " + carriedSeeds.reduce((total, seed) => total + seed.quantity, 0) +
+            "\nAction " + getSiteActionLabel(workerActionKind);
+    }
+
+    function pickSiteTileAtClientPosition(clientX, clientY) {
+        if (!latestState || latestState.appState !== "SITE_ACTIVE" || !siteSceneCache || !siteSceneCache.tilePickables) {
+            return null;
+        }
+
+        const rect = renderer.domElement.getBoundingClientRect();
+        pointer.x = ((clientX - rect.left) / Math.max(rect.width, 1)) * 2 - 1;
+        pointer.y = -(((clientY - rect.top) / Math.max(rect.height, 1)) * 2 - 1);
+        raycaster.setFromCamera(pointer, camera);
+
+        const hits = raycaster.intersectObjects(siteSceneCache.tilePickables, false);
+        if (hits.length === 0) {
+            return null;
+        }
+
+        return hits[0].object.userData || null;
+    }
+
+    function closeTileContextMenu() {
+        tileContextMenuState = null;
+        tileContextMenu.hidden = true;
+        tileContextMenu.innerHTML = "";
+    }
+
+    function setTileContextMenuHover(level, itemId, expands) {
+        if (!tileContextMenuState) {
+            return;
+        }
+
+        const nextHoverPath = tileContextMenuState.hoverPath.slice(0, level);
+        if (expands) {
+            nextHoverPath[level] = itemId;
+        }
+        tileContextMenuState.hoverPath = nextHoverPath;
+        renderTileContextMenu();
+    }
+
+    function collectTileContextPanels(rootItems, hoverPath) {
+        const panels = [];
+        let items = rootItems;
+        let level = 0;
+
+        while (items && items.length > 0) {
+            panels.push({ level: level, items: items });
+            const hoveredId = hoverPath[level];
+            const hoveredItem = items.find((item) => item.id === hoveredId);
+            if (!hoveredItem || !hoveredItem.children || hoveredItem.children.length === 0) {
+                break;
+            }
+
+            items = hoveredItem.children;
+            level += 1;
+        }
+
+        return panels;
+    }
+
+    function buildTileContextMenuItems(state, tileX, tileY) {
+        const carriedSeeds = getCarriedSeedOptions(state);
+        if (carriedSeeds.length === 0) {
+            return [
+                {
+                    id: "none",
+                    label: "No Action",
+                    meta: "Carry seeds in the worker pack to plant here.",
+                    iconGlyph: "--",
+                    iconLight: "#a38e76",
+                    iconDark: "#796652",
+                    disabled: true
+                }
+            ];
+        }
+
+        return [
+            {
+                id: "plant",
+                label: "Plant",
+                meta: "Choose one carried seed type.",
+                iconGlyph: "PL",
+                iconLight: "#7a9d67",
+                iconDark: "#4a6b3b",
+                children: carriedSeeds.map((seed) => {
+                    return {
+                        id: seed.id,
+                        label: seed.label,
+                        meta: "x" + seed.quantity + " carried",
+                        iconGlyph: seed.iconGlyph,
+                        iconLight: seed.iconLight,
+                        iconDark: seed.iconDark,
+                        onSelect: function () {
+                            statusChip.textContent =
+                                "Walking to tile (" + tileX + "," + tileY + ") to plant " + seed.shortLabel + ".";
+                            postSiteAction({
+                                actionKind: "PLANT",
+                                flags: 4,
+                                quantity: 1,
+                                targetTileX: tileX,
+                                targetTileY: tileY,
+                                primarySubjectId: 0,
+                                secondarySubjectId: 0,
+                                itemId: seed.itemId
+                            }).catch(() => {
+                                statusChip.textContent = "Failed to send site action.";
+                            });
+                            closeTileContextMenu();
+                        }
+                    };
+                })
+            }
+        ];
+    }
+
+    function renderTileContextMenu() {
+        if (!tileContextMenuState || !latestState || latestState.appState !== "SITE_ACTIVE") {
+            closeTileContextMenu();
+            return;
+        }
+
+        const rootItems = buildTileContextMenuItems(
+            latestState,
+            tileContextMenuState.tileX,
+            tileContextMenuState.tileY);
+        const panels = collectTileContextPanels(rootItems, tileContextMenuState.hoverPath);
+        const panelWidth = 220;
+        const panelGap = 10;
+        const panelRise = 16;
+        const viewportWidth = Math.max(window.innerWidth, 320);
+        const viewportHeight = Math.max(window.innerHeight, 240);
+
+        tileContextMenu.hidden = false;
+        tileContextMenu.innerHTML = "";
+
+        panels.forEach((panel) => {
+            const panelElement = document.createElement("div");
+            panelElement.className = "tile-context-panel";
+
+            const panelLeft = Math.min(
+                Math.max(10, tileContextMenuState.anchorX + panel.level * (panelWidth + panelGap)),
+                Math.max(10, viewportWidth - panelWidth - 12));
+            const estimatedHeight = panel.items.length * 58 + 18;
+            const panelTop = Math.min(
+                Math.max(10, tileContextMenuState.anchorY - panel.level * panelRise),
+                Math.max(10, viewportHeight - estimatedHeight - 12));
+            panelElement.style.left = panelLeft + "px";
+            panelElement.style.top = panelTop + "px";
+
+            panel.items.forEach((item) => {
+                const button = document.createElement("button");
+                button.type = "button";
+                button.className = "tile-context-item";
+                if (item.disabled) {
+                    button.classList.add("disabled");
+                }
+                if (tileContextMenuState.hoverPath[panel.level] === item.id) {
+                    button.classList.add("hovered");
+                }
+                button.disabled = !!item.disabled;
+                button.addEventListener("mouseenter", function () {
+                    setTileContextMenuHover(
+                        panel.level,
+                        item.id,
+                        Array.isArray(item.children) && item.children.length > 0);
+                });
+                button.addEventListener("mousedown", function (event) {
+                    event.stopPropagation();
+                });
+                button.addEventListener("click", function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (item.disabled) {
+                        return;
+                    }
+                    if (typeof item.onSelect === "function") {
+                        item.onSelect();
+                        return;
+                    }
+                    setTileContextMenuHover(
+                        panel.level,
+                        item.id,
+                        Array.isArray(item.children) && item.children.length > 0);
+                });
+
+                const icon = document.createElement("div");
+                icon.className = "tile-context-item-icon";
+                icon.textContent = item.iconGlyph || "--";
+                if (item.iconLight) {
+                    icon.style.setProperty("--menu-icon-light", item.iconLight);
+                }
+                if (item.iconDark) {
+                    icon.style.setProperty("--menu-icon-dark", item.iconDark);
+                }
+                button.appendChild(icon);
+
+                const main = document.createElement("div");
+                main.className = "tile-context-item-main";
+                const label = document.createElement("div");
+                label.className = "tile-context-item-label";
+                label.textContent = item.label;
+                main.appendChild(label);
+                if (item.meta) {
+                    const meta = document.createElement("div");
+                    meta.className = "tile-context-item-meta";
+                    meta.textContent = item.meta;
+                    main.appendChild(meta);
+                }
+                button.appendChild(main);
+
+                const tail = document.createElement("div");
+                tail.className = "tile-context-item-tail";
+                tail.textContent = item.children && item.children.length > 0 ? ">" : "";
+                button.appendChild(tail);
+
+                panelElement.appendChild(button);
+            });
+
+            tileContextMenu.appendChild(panelElement);
+        });
+    }
+
+    function openTileContextMenu(tileData, clientX, clientY) {
+        if (!latestState || latestState.appState !== "SITE_ACTIVE") {
+            return;
+        }
+
+        tileContextMenuState = {
+            tileX: tileData && typeof tileData.tileX === "number" ? tileData.tileX : 0,
+            tileY: tileData && typeof tileData.tileY === "number" ? tileData.tileY : 0,
+            anchorX: clientX,
+            anchorY: clientY,
+            hoverPath: []
+        };
+        renderTileContextMenu();
     }
 
     function hideInventoryTooltip() {
@@ -558,7 +848,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         container.appendChild(sectionParts.section);
     }
 
-    function renderSiteInventoryPanel(state, workerPackSlots, campStorageSlots, armedSlot) {
+    function renderSiteInventoryPanel(state, workerPackSlots, campStorageSlots) {
         selectionInventory.hidden = false;
         selectionInventory.innerHTML = "";
 
@@ -576,7 +866,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             slotCount: 6,
             columns: 3,
             slotLabelPrefix: "Pack",
-            armedSlotKey: armedSlot ? armedPlantSlotKey : "",
             selectedSlotKey: selectedInventorySlotKey
         });
 
@@ -586,15 +875,16 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             slotCount: 24,
             columns: 6,
             slotLabelPrefix: "Camp",
-            armedSlotKey: "",
             selectedSlotKey: selectedInventorySlotKey
         });
 
         const footnote = document.createElement("div");
         footnote.className = "inventory-footnote";
-        footnote.textContent = armedSlot
-            ? ("Planting armed: " + getInventoryItemLabel(armedSlot) + ". Click a site tile to place one bundle.")
-            : "Worker pack and camp storage are live and interactive.";
+        const carriedSeeds = getCarriedSeedOptions(state);
+        footnote.textContent = carriedSeeds.length > 0
+            ? ("Carry seeds in the worker pack, then right-click a tile to open the planting menu. " +
+                carriedSeeds.map((seed) => seed.shortLabel + " x" + seed.quantity).join("  |  "))
+            : "Worker pack and camp storage are live and interactive. Move seeds into the worker pack to plant.";
         stack.appendChild(footnote);
     }
 
@@ -628,24 +918,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                         });
                     },
                     false,
-                    false
-                )
-            );
-        }
-
-        if (selectedSlot.containerKind === "WORKER_PACK" && itemMeta && itemMeta.canPlant) {
-            const selectedKey = slotKey(selectedSlot.containerKind, selectedSlot.slotIndex);
-            const armed = selectedKey === armedPlantSlotKey;
-            contextActions.appendChild(
-                makeButton(
-                    armed ? "Disarm Seed" : "Arm Seed",
-                    function () {
-                        armedPlantSlotKey = armed ? "" : selectedKey;
-                        if (latestState) {
-                            renderSiteOverlay(latestState);
-                        }
-                    },
-                    armed,
                     false
                 )
             );
@@ -817,49 +1089,32 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     function renderSiteOverlay(state) {
         const siteBootstrap = getSiteBootstrap(state);
         const siteState = getSiteState(state);
-        const hud = state.hud;
-        const weather = siteState ? siteState.weather : null;
         const workerPackSlots = getInventorySlotsByKind(state, "WORKER_PACK");
         const campStorageSlots = getInventorySlotsByKind(state, "CAMP_STORAGE");
         const buyListings = getBuyListings(state);
+        const carriedSeeds = getCarriedSeedOptions(state);
+        const workerActionKind =
+            siteState && siteState.worker ? siteState.worker.currentActionKind : 0;
 
         menuPanel.hidden = true;
         selectionEyebrow.textContent = "Site Active";
         contextActions.innerHTML = "";
-        clearArmedPlantSlotIfInvalid(state);
         clearSelectedInventorySlotIfInvalid(state);
 
-        const armedSlot = workerPackSlots.find((slot) => slotKey(slot.containerKind, slot.slotIndex) === armedPlantSlotKey) || null;
         const selectedSlot = findSelectedInventorySlot(state);
-        const armedText = armedSlot
-            ? ("Armed seed: " + getInventoryItemLabel(armedSlot) + " in worker slot " + (armedSlot.slotIndex + 1) + ". Click a tile to plant.")
-            : "Use the live worker-pack and camp-storage slots below. Hover for details, click to select, and arm a seed from the action bar before planting.";
+        const plantingText = carriedSeeds.length > 0
+            ? ("Right-click any site tile to open the planting menu. Carried seeds: " +
+                carriedSeeds.map((seed) => seed.shortLabel + " x" + seed.quantity).join("  |  "))
+            : "Carry seeds into the worker pack to unlock planting from the tile menu.";
         selectionText.innerHTML = siteBootstrap
             ? (
                 "Site " + siteBootstrap.siteId +
-                " is live. Use WASD to move and right-drag to orbit the camera." +
-                " If Edge still catches the drag, disable Mouse gestures in Edge settings." +
-                "<br><br>" + armedText
+                " is live. Use WASD to move, drag with right mouse to orbit the camera, and short right-click a tile to choose a site action." +
+                "<br><br>" + plantingText
             )
             : "Site bootstrap is loading.";
-        renderSiteInventoryPanel(state, workerPackSlots, campStorageSlots, armedSlot);
+        renderSiteInventoryPanel(state, workerPackSlots, campStorageSlots);
         appendSelectedInventoryActions(state, selectedSlot);
-
-        if (armedSlot) {
-            contextActions.appendChild(
-                makeButton(
-                    "Disarm Seed",
-                    function () {
-                        armedPlantSlotKey = "";
-                        if (latestState) {
-                            renderSiteOverlay(latestState);
-                        }
-                    },
-                    true,
-                    false
-                )
-            );
-        }
 
         buyListings.forEach((listing) => {
             contextActions.appendChild(
@@ -880,17 +1135,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 )
             );
         });
-
-        const hydration = hud ? Math.round(hud.playerHydration) : 0;
-        const energy = hud ? Math.round(hud.playerEnergy) : 0;
-        const completion = hud ? Math.round((hud.siteCompletionNormalized || 0) * 100) : 0;
-        const eventPhase = weather ? weather.eventPhase : "NONE";
-        statusChip.textContent =
-            "Site Live\nHydration " + hydration +
-            "\nEnergy " + energy +
-            "\nCompletion " + completion + "%" +
-            "\nEvent " + eventPhase +
-            "\nArmed " + (armedSlot ? getInventoryItemLabel(armedSlot) : "none");
+        renderSiteStatusChip(state);
     }
 
     function updateOverlay(state) {
@@ -918,7 +1163,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 "\nSelected Site: " + (state.selectedSiteId == null ? "none" : state.selectedSiteId);
             break;
         case "SITE_ACTIVE":
-            hudSubtitle.textContent = "Field movement is now live. Orbit the follow camera with middle drag while navigation keeps following the current view.";
+            hudSubtitle.textContent = "Field movement is now live. Drag with right mouse to orbit the follow camera, or short right-click a tile to open its action menu.";
             renderSiteOverlay(state);
             break;
         default:
@@ -1506,7 +1751,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         };
     }
 
-    function updateHumanoidWorkerAnimation(cache, deltaSeconds, elapsed, movementSpeed, distanceToTarget) {
+    function updateHumanoidWorkerAnimation(cache, deltaSeconds, elapsed, movementSpeed, distanceToTarget, currentActionKind) {
         const rig = cache.workerRig;
         if (!rig) {
             return;
@@ -1558,6 +1803,35 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             lerp(0.56, 0.70, locomotionAmount),
             1.0
         );
+
+        const plantingBlend = currentActionKind === 1 ? clamp01(1.0 - locomotionAmount * 1.8) : 0.0;
+        if (plantingBlend > 0.0) {
+            cache.workerActionPhase += deltaSeconds * 4.8;
+            const plantingPhase = Math.sin(cache.workerActionPhase);
+            rig.root.position.y += (0.018 + Math.abs(plantingPhase) * 0.02) * plantingBlend;
+            rig.torso.rotation.x = lerp(rig.torso.rotation.x, 0.34 + plantingPhase * 0.04, plantingBlend);
+            rig.pelvis.rotation.z = lerp(rig.pelvis.rotation.z, -0.03, plantingBlend);
+            rig.leftShoulder.rotation.set(
+                lerp(rig.leftShoulder.rotation.x, -1.0 + plantingPhase * 0.12, plantingBlend),
+                0.14 * plantingBlend,
+                lerp(rig.leftShoulder.rotation.z, -0.22, plantingBlend)
+            );
+            rig.rightShoulder.rotation.set(
+                lerp(rig.rightShoulder.rotation.x, -0.72 - plantingPhase * 0.18, plantingBlend),
+                -0.16 * plantingBlend,
+                lerp(rig.rightShoulder.rotation.z, 0.22, plantingBlend)
+            );
+            rig.leftElbow.rotation.x = lerp(rig.leftElbow.rotation.x, 0.72 + Math.max(0, -plantingPhase) * 0.18, plantingBlend);
+            rig.rightElbow.rotation.x = lerp(rig.rightElbow.rotation.x, 1.02 + Math.max(0, plantingPhase) * 0.22, plantingBlend);
+            rig.leftWrist.rotation.x = lerp(rig.leftWrist.rotation.x, -0.18 + plantingPhase * 0.08, plantingBlend);
+            rig.rightWrist.rotation.x = lerp(rig.rightWrist.rotation.x, -0.34 - plantingPhase * 0.12, plantingBlend);
+            rig.head.rotation.x = lerp(rig.head.rotation.x, 0.12, plantingBlend);
+            rig.shadow.scale.set(
+                lerp(rig.shadow.scale.x, 0.94, plantingBlend),
+                lerp(rig.shadow.scale.y, 0.62, plantingBlend),
+                1.0
+            );
+        }
     }
 
     function buildSiteBootstrapSignature(siteBootstrap) {
@@ -1676,6 +1950,68 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         );
     }
 
+    function updateSiteWorkerTargetFromState(siteState, frameNumber) {
+        if (!siteSceneCache) {
+            return;
+        }
+
+        let cameraTargetX = 0;
+        let cameraTargetZ = 0;
+        if (siteState && siteState.worker) {
+            cameraTargetX = siteState.worker.tileX - siteSceneCache.offsetX;
+            cameraTargetZ = siteState.worker.tileY - siteSceneCache.offsetZ;
+            const nowMs = performance.now();
+            if (siteSceneCache.workerTargetInitialized) {
+                const targetDistance = Math.hypot(
+                    cameraTargetX - siteSceneCache.lastWorkerTargetX,
+                    cameraTargetZ - siteSceneCache.lastWorkerTargetZ
+                );
+                const patchFrameDelta =
+                    siteSceneCache.lastWorkerTargetFrameNumber > 0
+                        ? Math.max(frameNumber - siteSceneCache.lastWorkerTargetFrameNumber, 1)
+                        : 1;
+                siteSceneCache.lastWorkerPatchDistance = targetDistance;
+                siteSceneCache.lastWorkerPatchDeltaFrames = patchFrameDelta;
+                siteSceneCache.lastWorkerPatchIntervalMs =
+                    siteSceneCache.lastWorkerPatchTimeMs > 0
+                        ? Math.max(nowMs - siteSceneCache.lastWorkerPatchTimeMs, 0.0)
+                        : 0.0;
+                if (targetDistance > 0.0001) {
+                    const effectiveFrameDelta =
+                        siteSceneCache.workerAuthoritativeSpeed > 0.0001
+                            ? patchFrameDelta
+                            : 1;
+                    siteSceneCache.workerAuthoritativeSpeed =
+                        targetDistance / (effectiveFrameDelta * runtimeFixedStepSeconds);
+                } else {
+                    siteSceneCache.workerAuthoritativeSpeed = 0.0;
+                }
+            } else {
+                siteSceneCache.lastWorkerPatchDistance = 0.0;
+                siteSceneCache.lastWorkerPatchDeltaFrames = 0;
+                siteSceneCache.lastWorkerPatchIntervalMs = 0.0;
+            }
+            siteSceneCache.workerTargetInitialized = true;
+            siteSceneCache.lastWorkerPatchTimeMs = nowMs;
+            siteSceneCache.lastWorkerTargetFrameNumber = frameNumber;
+            siteSceneCache.lastWorkerTargetX = cameraTargetX;
+            siteSceneCache.lastWorkerTargetZ = cameraTargetZ;
+            siteSceneCache.workerTargetX = cameraTargetX;
+            siteSceneCache.workerTargetZ = cameraTargetZ;
+            siteSceneCache.workerTargetYaw = (siteState.worker.facingDegrees || 0) * Math.PI / 180.0;
+
+            if (!siteSceneCache.workerInitialized) {
+                siteSceneCache.workerGroup.position.set(cameraTargetX, 0.0, cameraTargetZ);
+                siteSceneCache.workerGroup.rotation.y = siteSceneCache.workerTargetYaw;
+                siteSceneCache.workerInitialized = true;
+                siteSceneCache.workerVisualSpeed = 0.0;
+            }
+        }
+
+        siteSceneCache.cameraTargetX = cameraTargetX;
+        siteSceneCache.cameraTargetZ = cameraTargetZ;
+    }
+
     function applySiteCameraTransform(cache, focusX, focusZ, blendFactor) {
         if (!cache) {
             return;
@@ -1712,6 +2048,49 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         cameraOrbitDragLastClientX = 0;
     }
 
+    function releasePointerCaptureIfHeld(pointerId) {
+        if (pointerId == null) {
+            return;
+        }
+        if (renderer.domElement.hasPointerCapture(pointerId)) {
+            renderer.domElement.releasePointerCapture(pointerId);
+        }
+    }
+
+    function clearPendingSiteOrbitGesture(pointerId) {
+        if (!pendingSiteOrbitGesture) {
+            return;
+        }
+        if (pointerId != null && pointerId !== pendingSiteOrbitGesture.pointerId) {
+            return;
+        }
+
+        releasePointerCaptureIfHeld(pendingSiteOrbitGesture.pointerId);
+        pendingSiteOrbitGesture = null;
+    }
+
+    function beginPendingSiteOrbitGesture(event) {
+        clearPendingSiteOrbitGesture();
+        pendingSiteOrbitGesture = {
+            pointerId: event.pointerId,
+            startClientX: event.clientX,
+            startClientY: event.clientY,
+            dragging: false
+        };
+        renderer.domElement.setPointerCapture(event.pointerId);
+    }
+
+    function beginSiteCameraOrbitDrag(pointerId, clientX) {
+        cameraOrbitDragPointerId = pointerId;
+        cameraOrbitDragButton = orbitMouseButton;
+        cameraOrbitDragLastClientX = clientX;
+        closeTileContextMenu();
+    }
+
+    function shouldSuppressSiteContextMenu() {
+        return isSiteActiveView();
+    }
+
     function isSiteActiveView() {
         return !!latestState && latestState.appState === "SITE_ACTIVE";
     }
@@ -1721,8 +2100,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return -1;
         }
 
-        if (event.button === rightMouseButton) {
-            return rightMouseButton;
+        if (event.button === orbitMouseButton) {
+            return orbitMouseButton;
         }
 
         return -1;
@@ -1737,8 +2116,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return true;
         }
 
-        if (cameraOrbitDragButton === rightMouseButton) {
-            return (event.buttons & rightMouseButtonsMask) !== 0;
+        if (cameraOrbitDragButton === orbitMouseButton) {
+            return (event.buttons & orbitMouseButtonsMask) !== 0;
         }
 
         return false;
@@ -1783,7 +2162,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
     }
 
-    function rebuildStaticSiteScene(siteBootstrap, offsetX, offsetZ, width, height, previousCache) {
+    function rebuildStaticSiteScene(siteBootstrap, offsetX, offsetZ, width, height, previousCache, bootstrapSignature) {
         clearWorld();
         currentSceneKind = "SITE_ACTIVE";
         scene.background = new THREE_NS.Color(0xe7d3b0);
@@ -1887,7 +2266,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         siteSceneCache = {
             siteId: siteBootstrap.siteId,
-            bootstrapSignature: buildSiteBootstrapSignature(siteBootstrap),
+            bootstrapSignature: bootstrapSignature,
+            sourceBootstrap: siteBootstrap,
             offsetX: offsetX,
             offsetZ: offsetZ,
             width: width,
@@ -1897,10 +2277,20 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             workerRig: workerVisual.rig,
             workerInitialized: false,
             workerAnimPhase: 0,
+            workerActionPhase: 0,
             workerVisualSpeed: 0,
+            workerAuthoritativeSpeed: 0,
             workerTargetX: 0,
             workerTargetZ: 0,
             workerTargetYaw: 0,
+            workerTargetInitialized: false,
+            lastWorkerPatchTimeMs: 0,
+            lastWorkerPatchDeltaFrames: 0,
+            lastWorkerPatchIntervalMs: 0,
+            lastWorkerPatchDistance: 0,
+            lastWorkerTargetFrameNumber: 0,
+            lastWorkerTargetX: 0,
+            lastWorkerTargetZ: 0,
             cameraTargetX: 0,
             cameraTargetZ: 0,
             cameraOrbitGroundDistance: cameraOrbitState.groundDistance,
@@ -1954,8 +2344,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const height = Math.max(siteBootstrap.height, 1);
         const offsetX = (width - 1) * 0.5;
         const offsetZ = (height - 1) * 0.5;
-        const bootstrapSignature = buildSiteBootstrapSignature(siteBootstrap);
         const previousSiteSceneCache = siteSceneCache;
+        const bootstrapReferenceChanged =
+            !siteSceneCache ||
+            siteSceneCache.sourceBootstrap !== siteBootstrap;
+        const bootstrapSignature = bootstrapReferenceChanged
+            ? buildSiteBootstrapSignature(siteBootstrap)
+            : siteSceneCache.bootstrapSignature;
 
         const needsStaticRebuild =
             currentSceneKind !== "SITE_ACTIVE" ||
@@ -1963,37 +2358,31 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             siteSceneCache.siteId !== siteBootstrap.siteId ||
             siteSceneCache.width !== width ||
             siteSceneCache.height !== height ||
-            siteSceneCache.bootstrapSignature !== bootstrapSignature;
+            (bootstrapReferenceChanged && siteSceneCache.bootstrapSignature !== bootstrapSignature);
 
         if (needsStaticRebuild) {
-            rebuildStaticSiteScene(siteBootstrap, offsetX, offsetZ, width, height, previousSiteSceneCache);
+            rebuildStaticSiteScene(
+                siteBootstrap,
+                offsetX,
+                offsetZ,
+                width,
+                height,
+                previousSiteSceneCache,
+                bootstrapSignature);
         }
 
         if (!siteSceneCache) {
             return;
         }
 
-        let cameraTargetX = 0;
-        let cameraTargetZ = 0;
-        if (siteState && siteState.worker) {
-            cameraTargetX = siteState.worker.tileX - siteSceneCache.offsetX;
-            cameraTargetZ = siteState.worker.tileY - siteSceneCache.offsetZ;
-            siteSceneCache.workerTargetX = cameraTargetX;
-            siteSceneCache.workerTargetZ = cameraTargetZ;
-            siteSceneCache.workerTargetYaw = (siteState.worker.facingDegrees || 0) * Math.PI / 180.0;
-
-            if (!siteSceneCache.workerInitialized) {
-                siteSceneCache.workerGroup.position.set(cameraTargetX, 0.0, cameraTargetZ);
-                siteSceneCache.workerGroup.rotation.y = siteSceneCache.workerTargetYaw;
-                siteSceneCache.workerInitialized = true;
-            }
-        }
-
-        siteSceneCache.cameraTargetX = cameraTargetX;
-        siteSceneCache.cameraTargetZ = cameraTargetZ;
+        updateSiteWorkerTargetFromState(siteState, state.frameNumber || 0);
 
         if (needsStaticRebuild) {
-            applySiteCameraTransform(siteSceneCache, cameraTargetX, cameraTargetZ, 1.0);
+            applySiteCameraTransform(
+                siteSceneCache,
+                siteSceneCache.cameraTargetX,
+                siteSceneCache.cameraTargetZ,
+                1.0);
         }
     }
 
@@ -2020,6 +2409,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         latestState = state;
         updateOverlay(state);
         rebuildWorld(state);
+        if (state.appState === "SITE_ACTIVE" && tileContextMenuState) {
+            renderTileContextMenu();
+        } else if (tileContextMenuState) {
+            closeTileContextMenu();
+        }
     }
 
     function buildPresentationSignature(state) {
@@ -2057,17 +2451,29 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         if (siteSceneCache && siteSceneCache.workerGroup) {
             const workerGroup = siteSceneCache.workerGroup;
-            const workerBlend = blendFactorFromRate(18.0, deltaSeconds);
             const rotationBlend = blendFactorFromRate(16.0, deltaSeconds);
-            const cameraBlend = cameraOrbitDragPointerId == null ? blendFactorFromRate(10.0, deltaSeconds) : 1.0;
+            const isWorkerMoving =
+                siteSceneCache.workerAuthoritativeSpeed > 0.2 ||
+                moveAxes.x !== 0 ||
+                moveAxes.y !== 0;
+            const cameraFollowRate = isWorkerMoving ? 30.0 : 10.0;
+            const cameraBlend =
+                cameraOrbitDragPointerId == null ? blendFactorFromRate(cameraFollowRate, deltaSeconds) : 1.0;
             const previousWorkerX = workerGroup.position.x;
             const previousWorkerZ = workerGroup.position.z;
-            const distanceToTargetBeforeMove = Math.hypot(
-                siteSceneCache.workerTargetX - previousWorkerX,
-                siteSceneCache.workerTargetZ - previousWorkerZ
-            );
-            workerGroup.position.x += (siteSceneCache.workerTargetX - workerGroup.position.x) * workerBlend;
-            workerGroup.position.z += (siteSceneCache.workerTargetZ - workerGroup.position.z) * workerBlend;
+            const targetDeltaX = siteSceneCache.workerTargetX - workerGroup.position.x;
+            const targetDeltaZ = siteSceneCache.workerTargetZ - workerGroup.position.z;
+            const distanceToTargetBeforeMove = Math.hypot(targetDeltaX, targetDeltaZ);
+            if (distanceToTargetBeforeMove > 0.0001 && deltaSeconds > 0.0) {
+                const stepDistance = Math.min(
+                    distanceToTargetBeforeMove,
+                    siteSceneCache.workerAuthoritativeSpeed * deltaSeconds
+                );
+                if (stepDistance > 0.0) {
+                    workerGroup.position.x += (targetDeltaX / distanceToTargetBeforeMove) * stepDistance;
+                    workerGroup.position.z += (targetDeltaZ / distanceToTargetBeforeMove) * stepDistance;
+                }
+            }
 
             const yawDelta = normalizeAngleRadians(siteSceneCache.workerTargetYaw - workerGroup.rotation.y);
             workerGroup.rotation.y += yawDelta * rotationBlend;
@@ -2081,21 +2487,27 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 siteSceneCache.workerTargetZ - workerGroup.position.z
             );
             const visualSpeed = deltaSeconds > 0.0 ? visualMoveDistance / deltaSeconds : 0.0;
-            const targetPullSpeed = deltaSeconds > 0.0
-                ? Math.min(distanceToTargetBeforeMove / deltaSeconds, 3.8)
-                : 0.0;
-            const desiredWorkerSpeed = Math.max(visualSpeed, distanceToTarget > 0.006 ? targetPullSpeed : 0.0);
+            const desiredWorkerSpeed = Math.max(siteSceneCache.workerAuthoritativeSpeed, visualSpeed);
             const speedBlend = blendFactorFromRate(12.0, deltaSeconds);
             siteSceneCache.workerVisualSpeed += (desiredWorkerSpeed - siteSceneCache.workerVisualSpeed) * speedBlend;
+            const currentActionKind =
+                latestState && latestState.siteState && latestState.siteState.worker
+                    ? latestState.siteState.worker.currentActionKind || 0
+                    : 0;
             updateHumanoidWorkerAnimation(
                 siteSceneCache,
                 deltaSeconds,
                 elapsed,
                 siteSceneCache.workerVisualSpeed,
-                distanceToTarget
+                distanceToTarget,
+                currentActionKind
             );
 
-            applySiteCameraTransform(siteSceneCache, workerGroup.position.x, workerGroup.position.z, cameraBlend);
+            applySiteCameraTransform(
+                siteSceneCache,
+                workerGroup.position.x,
+                workerGroup.position.z,
+                cameraBlend);
         }
 
         fitRenderer();
@@ -2122,8 +2534,82 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return normalizeState(mergedState);
     }
 
-    function handleIncomingState(state, forceRender) {
+    function getSiteLightweightPatchParts(patch) {
+        if (!patch) {
+            return null;
+        }
+
+        const patchFields = Object.keys(patch).filter((key) => key !== "frameNumber");
+        if (patchFields.length === 0) {
+            return null;
+        }
+
+        const lightweightParts = {
+            worker: false,
+            weather: false,
+            hud: false
+        };
+
+        for (const field of patchFields) {
+            if (field === "hud") {
+                lightweightParts.hud = true;
+                continue;
+            }
+
+            if (field !== "siteStatePatch" || !patch.siteStatePatch) {
+                return null;
+            }
+
+            const siteStateFields = Object.keys(patch.siteStatePatch);
+            for (const siteField of siteStateFields) {
+                if (siteField === "worker") {
+                    lightweightParts.worker = true;
+                    continue;
+                }
+                if (siteField === "weather") {
+                    lightweightParts.weather = true;
+                    continue;
+                }
+                return null;
+            }
+        }
+
+        if (!lightweightParts.worker && !lightweightParts.weather && !lightweightParts.hud) {
+            return null;
+        }
+
+        return lightweightParts;
+    }
+
+    function handleIncomingState(state, forceRender, patch) {
         const normalizedState = normalizeState(state);
+        const previousState = latestState;
+        const lightweightPatchParts =
+            !forceRender && normalizedState.appState === "SITE_ACTIVE"
+                ? getSiteLightweightPatchParts(patch)
+                : null;
+        if (lightweightPatchParts) {
+            latestState = normalizedState;
+            if (lightweightPatchParts.worker) {
+                updateSiteWorkerTargetFromState(getSiteState(normalizedState), normalizedState.frameNumber || 0);
+            }
+
+            const previousActionKind =
+                previousState && previousState.siteState && previousState.siteState.worker
+                    ? previousState.siteState.worker.currentActionKind || 0
+                    : 0;
+            const nextActionKind =
+                normalizedState.siteState && normalizedState.siteState.worker
+                    ? normalizedState.siteState.worker.currentActionKind || 0
+                    : 0;
+            if (lightweightPatchParts.hud ||
+                lightweightPatchParts.weather ||
+                previousActionKind !== nextActionKind) {
+                renderSiteStatusChip(normalizedState);
+            }
+            return;
+        }
+
         if (forceRender || normalizedState.appState === "SITE_ACTIVE") {
             if (normalizedState.appState === "SITE_ACTIVE") {
                 latestPresentationSignature = "";
@@ -2148,57 +2634,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
     }
 
-    function handleSiteTileClick(event) {
-        if (!latestState || latestState.appState !== "SITE_ACTIVE" || !siteSceneCache || !siteSceneCache.tilePickables) {
-            return false;
-        }
-
-        const rect = renderer.domElement.getBoundingClientRect();
-        pointer.x = ((event.clientX - rect.left) / Math.max(rect.width, 1)) * 2 - 1;
-        pointer.y = -(((event.clientY - rect.top) / Math.max(rect.height, 1)) * 2 - 1);
-        raycaster.setFromCamera(pointer, camera);
-
-        const hits = raycaster.intersectObjects(siteSceneCache.tilePickables, false);
-        if (hits.length === 0) {
-            return false;
-        }
-
-        if (!armedPlantSlotKey) {
-            statusChip.textContent = "Arm a seed bundle from the worker pack before clicking a tile.";
-            return true;
-        }
-
-        const workerPackSlots = getInventorySlotsByKind(latestState, "WORKER_PACK");
-        const armedSlot = workerPackSlots.find((slot) => slotKey(slot.containerKind, slot.slotIndex) === armedPlantSlotKey);
-        if (!armedSlot || armedSlot.quantity <= 0) {
-            armedPlantSlotKey = "";
-            statusChip.textContent = "The armed seed slot is no longer available.";
-            return true;
-        }
-
-        const itemMeta = getItemMeta(armedSlot.itemId);
-        if (!itemMeta || !itemMeta.canPlant) {
-            armedPlantSlotKey = "";
-            statusChip.textContent = "That slot no longer contains a plantable item.";
-            return true;
-        }
-
-        const tileData = hits[0].object.userData || {};
-        postSiteAction({
-            actionKind: "PLANT",
-            flags: 4,
-            quantity: 1,
-            targetTileX: tileData.tileX || 0,
-            targetTileY: tileData.tileY || 0,
-            primarySubjectId: 0,
-            secondarySubjectId: 0,
-            itemId: armedSlot.itemId
-        }).catch(() => {
-            statusChip.textContent = "Failed to send site action.";
-        });
-        return true;
-    }
-
     function connectStateStream() {
         if (stateStream) {
             stateStream.close();
@@ -2212,7 +2647,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         stateStream.addEventListener("state-patch", function (event) {
             const patch = JSON.parse(event.data);
             const state = mergeStatePatch(patch);
-            handleIncomingState(state, false);
+            handleIncomingState(state, false, patch);
         });
         stateStream.onerror = function () {
             statusChip.textContent = "Waiting for host...";
@@ -2312,6 +2747,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     window.addEventListener("keydown", function (event) {
+        if (event.code === "Escape" && tileContextMenuState) {
+            closeTileContextMenu();
+        }
         keys.add(event.code);
         updateMoveAxis();
         sendSiteControlState();
@@ -2322,6 +2760,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         updateMoveAxis();
         sendSiteControlState();
     });
+
+    window.addEventListener("contextmenu", function (event) {
+        if (!shouldSuppressSiteContextMenu()) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+    }, true);
 
     renderer.domElement.addEventListener("contextmenu", function (event) {
         if (!isSiteActiveView()) {
@@ -2393,16 +2840,23 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return;
         }
 
-        cameraOrbitDragPointerId = event.pointerId;
-        cameraOrbitDragButton = orbitDragButton;
-        cameraOrbitDragLastClientX = event.clientX;
-        renderer.domElement.setPointerCapture(event.pointerId);
-        tryRequestCameraPointerLock();
+        beginPendingSiteOrbitGesture(event);
         event.preventDefault();
         event.stopPropagation();
     });
 
     renderer.domElement.addEventListener("pointermove", function (event) {
+        if (pendingSiteOrbitGesture && event.pointerId === pendingSiteOrbitGesture.pointerId) {
+            const dragDistance = Math.hypot(
+                event.clientX - pendingSiteOrbitGesture.startClientX,
+                event.clientY - pendingSiteOrbitGesture.startClientY
+            );
+            if (!pendingSiteOrbitGesture.dragging && dragDistance >= orbitDragThresholdPixels && siteSceneCache) {
+                pendingSiteOrbitGesture.dragging = true;
+                beginSiteCameraOrbitDrag(event.pointerId, event.clientX);
+            }
+        }
+
         if (cameraOrbitDragPointerId == null || event.pointerId !== cameraOrbitDragPointerId || !siteSceneCache) {
             return;
         }
@@ -2418,26 +2872,46 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     });
 
     renderer.domElement.addEventListener("pointerup", function (event) {
-        if (cameraOrbitDragPointerId == null || event.pointerId !== cameraOrbitDragPointerId) {
+        if (!pendingSiteOrbitGesture || event.pointerId !== pendingSiteOrbitGesture.pointerId) {
             return;
         }
+
+        const wasDragging = pendingSiteOrbitGesture.dragging;
+        const releaseClientX = event.clientX;
+        const releaseClientY = event.clientY;
         releaseCameraPointerLock();
         stopCameraOrbitDrag(event.pointerId);
+        clearPendingSiteOrbitGesture(event.pointerId);
+        if (!wasDragging && isSiteActiveView()) {
+            const tileData = pickSiteTileAtClientPosition(releaseClientX, releaseClientY);
+            if (!tileData) {
+                closeTileContextMenu();
+            } else {
+                openTileContextMenu(tileData, releaseClientX, releaseClientY);
+            }
+        }
+        event.preventDefault();
+        event.stopPropagation();
     });
 
     renderer.domElement.addEventListener("pointercancel", function (event) {
-        if (cameraOrbitDragPointerId == null || event.pointerId !== cameraOrbitDragPointerId) {
+        if (!pendingSiteOrbitGesture || event.pointerId !== pendingSiteOrbitGesture.pointerId) {
             return;
         }
         releaseCameraPointerLock();
         stopCameraOrbitDrag(event.pointerId);
+        clearPendingSiteOrbitGesture(event.pointerId);
     });
 
     renderer.domElement.addEventListener("lostpointercapture", function (event) {
+        if (pendingSiteOrbitGesture && event.pointerId === pendingSiteOrbitGesture.pointerId) {
+            pendingSiteOrbitGesture = null;
+        }
         if (event.pointerId !== cameraOrbitDragPointerId) {
             return;
         }
         cameraOrbitDragPointerId = null;
+        cameraOrbitDragButton = -1;
         cameraOrbitDragLastClientX = 0;
     });
 
@@ -2458,25 +2932,33 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }, true);
 
     document.addEventListener("mouseup", function (event) {
-        if (!isSiteCameraOrbitActive() || event.button !== cameraOrbitDragButton) {
+        if (!isSiteCameraOrbitActive() && (!pendingSiteOrbitGesture || event.button !== orbitMouseButton)) {
             return;
         }
 
         releaseCameraPointerLock();
         stopCameraOrbitDrag();
+        clearPendingSiteOrbitGesture();
         event.preventDefault();
     }, true);
 
     window.addEventListener("blur", function () {
         releaseCameraPointerLock();
         stopCameraOrbitDrag();
+        clearPendingSiteOrbitGesture();
     });
 
-    renderer.domElement.addEventListener("click", function (event) {
-        if (handleSiteTileClick(event)) {
+    document.addEventListener("pointerdown", function (event) {
+        if (!tileContextMenuState) {
             return;
         }
+        if (tileContextMenu.contains(event.target)) {
+            return;
+        }
+        closeTileContextMenu();
+    }, true);
 
+    renderer.domElement.addEventListener("click", function (event) {
         if (!latestState || latestState.appState !== "REGIONAL_MAP") {
             return;
         }

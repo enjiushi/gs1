@@ -14,7 +14,8 @@ public:
             site_component_mask_of(
                 SiteComponent::Time,
                 SiteComponent::TileLayout,
-                SiteComponent::WorkerMotion),
+                SiteComponent::WorkerMotion,
+                SiteComponent::Action),
             site_component_mask_of(
                 SiteComponent::Time,
                 SiteComponent::WorkerMotion)};

@@ -1,4 +1,5 @@
 #include "runtime/game_runtime.h"
+#include "content/defs/plant_defs.h"
 #include "site/site_world_access.h"
 #include "site/site_world_components.h"
 
@@ -223,7 +224,7 @@ void set_worker_hydration(SiteRunState& site_run, float hydration)
     entity.modified<gs1::site_ecs::WorkerVitals>();
 }
 
-void seed_ground_cover_tile(SiteRunState& site_run, TileCoord coord, std::uint32_t cover_id, float density)
+void seed_plant_tile(SiteRunState& site_run, TileCoord coord, std::uint32_t plant_id, float density)
 {
     assert(site_run.site_world != nullptr);
     auto entity = site_run.site_world->ecs_world().entity(site_run.site_world->tile_entity_id(coord));
@@ -235,8 +236,8 @@ void seed_ground_cover_tile(SiteRunState& site_run, TileCoord coord, std::uint32
     auto& plant_density = entity.get_mut<gs1::site_ecs::TilePlantDensity>();
 
     burial.value = 0.0f;
-    plant.plant_id = gs1::PlantId {};
-    ground_cover.ground_cover_type_id = cover_id;
+    plant.plant_id = gs1::PlantId {plant_id};
+    ground_cover.ground_cover_type_id = 0U;
     plant_density.value = density;
     entity.add<gs1::site_ecs::TileOccupantTag>();
     entity.modified<gs1::site_ecs::TileSandBurial>();
@@ -318,7 +319,7 @@ void ecology_growth_completes_task_and_site_attempt()
     Gs1RuntimeCreateDesc create_desc {};
     create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
     create_desc.api_version = gs1::k_api_version;
-    create_desc.fixed_step_seconds = 1.0;
+    create_desc.fixed_step_seconds = 60.0;
 
     GameRuntime runtime {create_desc};
     bootstrap_site_one(runtime);
@@ -349,11 +350,11 @@ void ecology_growth_completes_task_and_site_attempt()
         TileCoord {4, 1}};
     for (const auto coord : seeded_tiles)
     {
-        seed_ground_cover_tile(site_run, coord, 1U, 0.9f);
+        seed_plant_tile(site_run, coord, gs1::k_plant_wind_reed, 0.9f);
     }
 
     Gs1Phase1Result result {};
-    run_phase1(runtime, 1.0, result);
+    run_phase1(runtime, 60.0, result);
     assert(result.fixed_steps_executed == 1U);
 
     assert(site_run.counters.fully_grown_tile_count == 10U);
@@ -372,14 +373,16 @@ void ecology_growth_completes_task_and_site_attempt()
 
     const auto tile_state = gs1::site_world_access::tile_ecology(site_run, seeded_tiles.front());
     assert(approx_equal(tile_state.plant_density, 1.0f));
-    assert(tile_state.ground_cover_type_id == 1U);
+    assert(tile_state.plant_id.value == gs1::k_plant_wind_reed);
+    assert(tile_state.ground_cover_type_id == 0U);
 
     const auto phase1_commands = drain_engine_commands(runtime);
     const auto* grown_tile_command = find_tile_command(phase1_commands, seeded_tiles.front());
     assert(grown_tile_command != nullptr);
     {
         const auto& payload = grown_tile_command->payload_as<Gs1EngineCommandSiteTileData>();
-        assert(payload.ground_cover_type_id == 1U);
+        assert(payload.plant_type_id == gs1::k_plant_wind_reed);
+        assert(payload.ground_cover_type_id == 0U);
         assert(approx_equal(payload.plant_density, 1.0f));
     }
 
