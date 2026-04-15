@@ -120,6 +120,7 @@ private:
         Gs1InventoryContainerKind container_kind,
         std::uint32_t slot_index);
     void queue_all_site_inventory_slot_upsert_commands();
+    void queue_pending_site_inventory_slot_upsert_commands();
     void queue_site_task_upsert_command(std::size_t task_index);
     void queue_all_site_task_upsert_commands();
     void queue_site_phone_listing_upsert_command(std::size_t listing_index);
@@ -134,6 +135,7 @@ private:
     void mark_site_projection_update_dirty(std::uint64_t dirty_flags) noexcept;
     void mark_site_tile_projection_dirty(TileCoord coord) noexcept;
     void clear_pending_site_tile_projection_updates() noexcept;
+    void clear_pending_site_inventory_projection_updates() noexcept;
     void flush_site_presentation_if_dirty();
     [[nodiscard]] Gs1Status translate_ui_action_to_command(const Gs1UiAction& action, GameCommand& out_command) const;
     [[nodiscard]] Gs1Status translate_site_action_request_to_command(

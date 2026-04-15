@@ -203,6 +203,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return itemMeta ? itemMeta.name : ("Item " + itemId);
     }
 
+    function getInventoryItemLabel(slot) {
+        if (slot && slot.itemName) {
+            return slot.itemName;
+        }
+        return getItemLabel(slot ? slot.itemId : 0);
+    }
+
     function getItemShortLabel(itemId) {
         const itemMeta = getItemMeta(itemId);
         return itemMeta ? itemMeta.shortName : ("Item " + itemId);
@@ -384,7 +391,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 ? (itemMeta && itemMeta.canPlant ? "Click to select and arm/store" : "Click to select and use/store")
                 : "Click to select and carry";
 
-        inventoryTooltipTitle.textContent = getItemLabel(slot.itemId);
+        inventoryTooltipTitle.textContent = getInventoryItemLabel(slot);
         inventoryTooltipMeta.textContent =
             locationName + "  Slot " + (slot.slotIndex + 1) +
             "  x" + slot.quantity + "\n" +
@@ -466,7 +473,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             slotClasses.push("selected");
         }
         card.className = slotClasses.join(" ");
-        card.title = occupied ? getItemLabel(slot.itemId) : label;
+        card.title = occupied ? getInventoryItemLabel(slot) : label;
 
         const icon = document.createElement("div");
         icon.className = "inventory-slot-icon";
@@ -580,7 +587,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const footnote = document.createElement("div");
         footnote.className = "inventory-footnote";
         footnote.textContent = armedSlot
-            ? ("Planting armed: " + getItemLabel(armedSlot.itemId) + ". Click a site tile to place one bundle.")
+            ? ("Planting armed: " + getInventoryItemLabel(armedSlot) + ". Click a site tile to place one bundle.")
             : "Worker pack and camp storage are live and interactive.";
         stack.appendChild(footnote);
     }
@@ -598,7 +605,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const slotSummary = document.createElement("div");
         slotSummary.className = "helper-note";
         slotSummary.textContent =
-            getItemLabel(selectedSlot.itemId) +
+            getInventoryItemLabel(selectedSlot) +
             "  x" + selectedSlot.quantity +
             "  " +
             (selectedSlot.containerKind === "WORKER_PACK" ? "Worker Pack" : "Camp Storage") +
@@ -608,7 +615,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (selectedSlot.containerKind === "WORKER_PACK" && itemMeta && itemMeta.canUse) {
             contextActions.appendChild(
                 makeButton(
-                    "Use " + getItemLabel(selectedSlot.itemId),
+                    "Use " + getInventoryItemLabel(selectedSlot),
                     function () {
                         postInventoryUse(selectedSlot).catch(() => {
                             statusChip.textContent = "Failed to use inventory item.";
@@ -819,7 +826,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const armedSlot = workerPackSlots.find((slot) => slotKey(slot.containerKind, slot.slotIndex) === armedPlantSlotKey) || null;
         const selectedSlot = findSelectedInventorySlot(state);
         const armedText = armedSlot
-            ? ("Armed seed: " + getItemLabel(armedSlot.itemId) + " in worker slot " + (armedSlot.slotIndex + 1) + ". Click a tile to plant.")
+            ? ("Armed seed: " + getInventoryItemLabel(armedSlot) + " in worker slot " + (armedSlot.slotIndex + 1) + ". Click a tile to plant.")
             : "Use the live worker-pack and camp-storage slots below. Hover for details, click to select, and arm a seed from the action bar before planting.";
         selectionText.innerHTML = siteBootstrap
             ? (
@@ -876,7 +883,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             "\nEnergy " + energy +
             "\nCompletion " + completion + "%" +
             "\nEvent " + eventPhase +
-            "\nArmed " + (armedSlot ? getItemLabel(armedSlot.itemId) : "none");
+            "\nArmed " + (armedSlot ? getInventoryItemLabel(armedSlot) : "none");
     }
 
     function updateOverlay(state) {
@@ -2034,7 +2041,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function mergeStatePatch(patch) {
-        return normalizeState(Object.assign({}, latestState || {}, patch));
+        const baseState = normalizeState(Object.assign({}, latestState || {}));
+        const mergedState = Object.assign({}, baseState, patch);
+        if (patch.siteStatePatch) {
+            mergedState.siteState = Object.assign({}, baseState.siteState || {}, patch.siteStatePatch);
+            delete mergedState.siteStatePatch;
+        }
+        return normalizeState(mergedState);
     }
 
     function handleIncomingState(state, forceRender) {

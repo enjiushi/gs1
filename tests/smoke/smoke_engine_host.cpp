@@ -1004,13 +1004,14 @@ void SmokeEngineHost::apply_regional_map_link_remove(const Gs1EngineCommand& com
 void SmokeEngineHost::apply_site_snapshot_begin(const Gs1EngineCommand& command)
 {
     const auto& payload = command.payload_as<Gs1EngineCommandSiteSnapshotData>();
-    pending_site_snapshot_patch_mask_ = LiveStatePatchField_SiteState;
     if (payload.mode == GS1_PROJECTION_MODE_DELTA && active_site_snapshot_.has_value())
     {
+        pending_site_snapshot_patch_mask_ = LiveStatePatchField_None;
         pending_site_snapshot_ = active_site_snapshot_.value();
     }
     else
     {
+        pending_site_snapshot_patch_mask_ = LiveStatePatchField_SiteState;
         pending_site_snapshot_ = SiteSnapshotProjection {};
     }
 
@@ -1084,6 +1085,7 @@ void SmokeEngineHost::apply_site_worker_update(const Gs1EngineCommand& command)
     projection.flags = payload.flags;
     projection.current_action_kind = payload.current_action_kind;
     pending_site_snapshot_->worker = projection;
+    pending_site_snapshot_patch_mask_ |= LiveStatePatchField_SiteStateWorker;
 }
 
 void SmokeEngineHost::apply_site_camp_update(const Gs1EngineCommand& command)
@@ -1100,6 +1102,9 @@ void SmokeEngineHost::apply_site_camp_update(const Gs1EngineCommand& command)
     projection.durability_normalized = payload.durability_normalized;
     projection.flags = payload.flags;
     pending_site_snapshot_->camp = projection;
+    pending_site_snapshot_patch_mask_ |=
+        LiveStatePatchField_SiteBootstrap |
+        LiveStatePatchField_SiteStateCamp;
 }
 
 void SmokeEngineHost::apply_site_weather_update(const Gs1EngineCommand& command)
@@ -1118,6 +1123,7 @@ void SmokeEngineHost::apply_site_weather_update(const Gs1EngineCommand& command)
     projection.event_phase = payload.event_phase;
     projection.phase_minutes_remaining = payload.phase_minutes_remaining;
     pending_site_snapshot_->weather = projection;
+    pending_site_snapshot_patch_mask_ |= LiveStatePatchField_SiteStateWeather;
 }
 
 void SmokeEngineHost::apply_site_inventory_slot_upsert(const Gs1EngineCommand& command)
@@ -1150,6 +1156,8 @@ void SmokeEngineHost::apply_site_inventory_slot_upsert(const Gs1EngineCommand& c
     {
         slots.push_back(projection);
     }
+
+    pending_site_snapshot_patch_mask_ |= LiveStatePatchField_SiteStateInventory;
 }
 
 void SmokeEngineHost::apply_site_task_upsert(const Gs1EngineCommand& command)
@@ -1181,6 +1189,8 @@ void SmokeEngineHost::apply_site_task_upsert(const Gs1EngineCommand& command)
     {
         tasks.push_back(projection);
     }
+
+    pending_site_snapshot_patch_mask_ |= LiveStatePatchField_SiteStateTasks;
 }
 
 void SmokeEngineHost::apply_site_phone_listing_upsert(const Gs1EngineCommand& command)
@@ -1212,6 +1222,8 @@ void SmokeEngineHost::apply_site_phone_listing_upsert(const Gs1EngineCommand& co
     {
         listings.push_back(projection);
     }
+
+    pending_site_snapshot_patch_mask_ |= LiveStatePatchField_SiteStatePhone;
 }
 
 void SmokeEngineHost::apply_site_snapshot_end()

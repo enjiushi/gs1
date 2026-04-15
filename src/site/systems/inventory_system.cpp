@@ -59,16 +59,21 @@ InventorySlot* find_slot(
     return &(*slots)[slot_index];
 }
 
-void ensure_inventory_slots(InventoryState& inventory) noexcept
+bool ensure_inventory_slots(InventoryState& inventory) noexcept
 {
+    bool resized = false;
     if (inventory.worker_pack_slots.size() != inventory.worker_pack_slot_count)
     {
         inventory.worker_pack_slots.resize(inventory.worker_pack_slot_count);
+        resized = true;
     }
     if (inventory.camp_storage_slots.size() != inventory.camp_storage_slot_count)
     {
         inventory.camp_storage_slots.resize(inventory.camp_storage_slot_count);
+        resized = true;
     }
+
+    return resized;
 }
 
 void clear_slot(InventorySlot& slot) noexcept
@@ -180,18 +185,47 @@ std::uint32_t available_item_quantity(
     return total_quantity;
 }
 
+void track_touched_slot(std::vector<std::size_t>* touched_slots, std::size_t slot_index) noexcept
+{
+    if (touched_slots == nullptr)
+    {
+        return;
+    }
+
+    const auto existing = std::find(touched_slots->begin(), touched_slots->end(), slot_index);
+    if (existing == touched_slots->end())
+    {
+        touched_slots->push_back(slot_index);
+    }
+}
+
+void mark_touched_inventory_slots(
+    SiteSystemContext<InventorySystem>& context,
+    Gs1InventoryContainerKind container_kind,
+    const std::vector<std::size_t>& touched_slots) noexcept
+{
+    for (const auto slot_index : touched_slots)
+    {
+        context.world.mark_inventory_slot_projection_dirty(
+            container_kind,
+            static_cast<std::uint32_t>(slot_index));
+    }
+}
+
 std::uint32_t add_item_to_slots(
     std::vector<InventorySlot>& slots,
     ItemId item_id,
     std::uint32_t quantity,
     float item_condition = 1.0f,
-    float item_freshness = 1.0f) noexcept
+    float item_freshness = 1.0f,
+    std::vector<std::size_t>* touched_slots = nullptr) noexcept
 {
     std::uint32_t remaining_quantity = quantity;
     const auto stack_limit = item_stack_size(item_id);
 
-    for (auto& slot : slots)
+    for (std::size_t slot_index = 0; slot_index < slots.size(); ++slot_index)
     {
+        auto& slot = slots[slot_index];
         if (!slot.occupied || slot.item_id != item_id || slot.item_quantity >= stack_limit)
         {
             continue;
@@ -200,6 +234,7 @@ std::uint32_t add_item_to_slots(
         const auto free_capacity = stack_limit - slot.item_quantity;
         const auto transfer_quantity = std::min(remaining_quantity, free_capacity);
         slot.item_quantity += transfer_quantity;
+        track_touched_slot(touched_slots, slot_index);
         remaining_quantity -= transfer_quantity;
         if (remaining_quantity == 0U)
         {
@@ -207,8 +242,9 @@ std::uint32_t add_item_to_slots(
         }
     }
 
-    for (auto& slot : slots)
+    for (std::size_t slot_index = 0; slot_index < slots.size(); ++slot_index)
     {
+        auto& slot = slots[slot_index];
         if (slot.occupied)
         {
             continue;
@@ -216,6 +252,7 @@ std::uint32_t add_item_to_slots(
 
         const auto transfer_quantity = std::min(remaining_quantity, stack_limit);
         assign_slot(slot, item_id, transfer_quantity, item_condition, item_freshness);
+        track_touched_slot(touched_slots, slot_index);
         remaining_quantity -= transfer_quantity;
         if (remaining_quantity == 0U)
         {
@@ -232,7 +269,8 @@ std::uint32_t add_item_to_container(
     ItemId item_id,
     std::uint32_t quantity,
     float item_condition = 1.0f,
-    float item_freshness = 1.0f) noexcept
+    float item_freshness = 1.0f,
+    std::vector<std::size_t>* touched_slots = nullptr) noexcept
 {
     auto* slots = container_slots(inventory, container_kind);
     if (slots == nullptr)
@@ -240,18 +278,20 @@ std::uint32_t add_item_to_container(
         return quantity;
     }
 
-    return add_item_to_slots(*slots, item_id, quantity, item_condition, item_freshness);
+    return add_item_to_slots(*slots, item_id, quantity, item_condition, item_freshness, touched_slots);
 }
 
 std::uint32_t consume_item_from_slots(
     std::vector<InventorySlot>& slots,
     ItemId item_id,
-    std::uint32_t quantity) noexcept
+    std::uint32_t quantity,
+    std::vector<std::size_t>* touched_slots = nullptr) noexcept
 {
     std::uint32_t remaining_quantity = quantity;
 
-    for (auto& slot : slots)
+    for (std::size_t slot_index = 0; slot_index < slots.size(); ++slot_index)
     {
+        auto& slot = slots[slot_index];
         if (!slot.occupied || slot.item_id != item_id)
         {
             continue;
@@ -259,6 +299,7 @@ std::uint32_t consume_item_from_slots(
 
         const auto removed_quantity = std::min(remaining_quantity, slot.item_quantity);
         slot.item_quantity -= removed_quantity;
+        track_touched_slot(touched_slots, slot_index);
         remaining_quantity -= removed_quantity;
         if (slot.item_quantity == 0U)
         {
@@ -342,8 +383,6 @@ void seed_inventory_for_site_one(SiteSystemContext<InventorySystem>& context) no
         GS1_INVENTORY_CONTAINER_CAMP_STORAGE,
         ItemId {k_item_sunfruit_vine_seed_bundle},
         3U);
-
-    context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_INVENTORY);
 }
 
 Gs1Status handle_inventory_item_use(
@@ -351,7 +390,7 @@ Gs1Status handle_inventory_item_use(
     const InventoryItemUseRequestedCommand& payload) noexcept
 {
     auto& inventory = context.world.own_inventory();
-    ensure_inventory_slots(inventory);
+    const bool inventory_resized = ensure_inventory_slots(inventory);
     auto* slot = find_slot(
         inventory,
         payload.container_kind,
@@ -390,7 +429,13 @@ Gs1Status handle_inventory_item_use(
         clear_slot(*slot);
     }
 
-    context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_INVENTORY);
+    if (inventory_resized)
+    {
+        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_INVENTORY);
+    }
+    context.world.mark_inventory_slot_projection_dirty(
+        payload.container_kind,
+        static_cast<std::uint32_t>(payload.slot_index));
     return GS1_STATUS_OK;
 }
 
@@ -399,7 +444,7 @@ Gs1Status handle_inventory_item_consume(
     const InventoryItemConsumeRequestedCommand& payload) noexcept
 {
     auto& inventory = context.world.own_inventory();
-    ensure_inventory_slots(inventory);
+    const bool inventory_resized = ensure_inventory_slots(inventory);
 
     const ItemId item_id {payload.item_id};
     const auto quantity = normalize_quantity(payload.quantity);
@@ -419,13 +464,18 @@ Gs1Status handle_inventory_item_consume(
         return GS1_STATUS_INVALID_ARGUMENT;
     }
 
-    const auto remaining_quantity = consume_item_from_slots(*slots, item_id, quantity);
+    std::vector<std::size_t> touched_slots {};
+    const auto remaining_quantity = consume_item_from_slots(*slots, item_id, quantity, &touched_slots);
     if (remaining_quantity != 0U)
     {
         return GS1_STATUS_INVALID_STATE;
     }
 
-    context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_INVENTORY);
+    if (inventory_resized)
+    {
+        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_INVENTORY);
+    }
+    mark_touched_inventory_slots(context, payload.container_kind, touched_slots);
     return GS1_STATUS_OK;
 }
 
@@ -440,7 +490,7 @@ Gs1Status handle_inventory_transfer(
     }
 
     auto& inventory = context.world.own_inventory();
-    ensure_inventory_slots(inventory);
+    const bool inventory_resized = ensure_inventory_slots(inventory);
     auto* source_slot = find_slot(
         inventory,
         payload.source_container_kind,
@@ -498,7 +548,16 @@ Gs1Status handle_inventory_transfer(
         clear_slot(*source_slot);
     }
 
-    context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_INVENTORY);
+    if (inventory_resized)
+    {
+        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_INVENTORY);
+    }
+    context.world.mark_inventory_slot_projection_dirty(
+        payload.source_container_kind,
+        static_cast<std::uint32_t>(payload.source_slot_index));
+    context.world.mark_inventory_slot_projection_dirty(
+        payload.destination_container_kind,
+        static_cast<std::uint32_t>(payload.destination_slot_index));
     return GS1_STATUS_OK;
 }
 
@@ -507,7 +566,11 @@ Gs1Status handle_inventory_delivery_requested(
     const InventoryDeliveryRequestedCommand& payload) noexcept
 {
     auto& inventory = context.world.own_inventory();
-    ensure_inventory_slots(inventory);
+    const bool inventory_resized = ensure_inventory_slots(inventory);
+    if (inventory_resized)
+    {
+        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_INVENTORY);
+    }
 
     const ItemId item_id {payload.item_id};
     if (find_item_def(item_id) == nullptr)
@@ -533,12 +596,18 @@ Gs1Status handle_inventory_delivery_requested(
 void progress_pending_deliveries(SiteSystemContext<InventorySystem>& context) noexcept
 {
     auto& inventory = context.world.own_inventory();
+    const bool inventory_resized = ensure_inventory_slots(inventory);
+    if (inventory_resized)
+    {
+        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_INVENTORY);
+    }
     if (inventory.pending_delivery_queue.empty())
     {
         return;
     }
 
     bool inventory_changed = false;
+    std::vector<std::size_t> touched_camp_slots {};
 
     for (auto& delivery : inventory.pending_delivery_queue)
     {
@@ -562,7 +631,8 @@ void progress_pending_deliveries(SiteSystemContext<InventorySystem>& context) no
                 stack.item_id,
                 stack.item_quantity,
                 stack.item_condition,
-                stack.item_freshness);
+                stack.item_freshness,
+                &touched_camp_slots);
             if (remaining_quantity != stack.item_quantity)
             {
                 inventory_changed = true;
@@ -590,7 +660,7 @@ void progress_pending_deliveries(SiteSystemContext<InventorySystem>& context) no
 
     if (inventory_changed)
     {
-        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_INVENTORY);
+        mark_touched_inventory_slots(context, GS1_INVENTORY_CONTAINER_CAMP_STORAGE, touched_camp_slots);
     }
 }
 
@@ -648,7 +718,10 @@ Gs1Status InventorySystem::process_command(
 
 void InventorySystem::run(SiteSystemContext<InventorySystem>& context)
 {
-    ensure_inventory_slots(context.world.own_inventory());
+    if (ensure_inventory_slots(context.world.own_inventory()))
+    {
+        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_INVENTORY);
+    }
     progress_pending_deliveries(context);
 }
 }  // namespace gs1

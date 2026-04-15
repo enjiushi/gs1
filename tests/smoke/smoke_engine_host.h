@@ -31,7 +31,13 @@ public:
         LiveStatePatchField_SiteBootstrap = 1U << 5,
         LiveStatePatchField_SiteState = 1U << 6,
         LiveStatePatchField_Hud = 1U << 7,
-        LiveStatePatchField_SiteResult = 1U << 8
+        LiveStatePatchField_SiteResult = 1U << 8,
+        LiveStatePatchField_SiteStateWorker = 1U << 9,
+        LiveStatePatchField_SiteStateCamp = 1U << 10,
+        LiveStatePatchField_SiteStateWeather = 1U << 11,
+        LiveStatePatchField_SiteStateInventory = 1U << 12,
+        LiveStatePatchField_SiteStateTasks = 1U << 13,
+        LiveStatePatchField_SiteStatePhone = 1U << 14
     };
 
     struct LiveStateSnapshot;

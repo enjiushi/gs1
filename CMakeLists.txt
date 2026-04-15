@@ -213,11 +213,14 @@ if(GS1_BUILD_TESTS)
         src/site/systems/worker_condition_system.cpp
         src/site/site_world.cpp)
 
-    # The smoke host includes only the public gameplay SDK headers.
+    # The smoke hosts consume the public SDK plus internal content definitions
+    # used to enrich live snapshot JSON for manual adapter verification.
     target_include_directories(gs1_smoke_host PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/include)
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_include_directories(gs1_visual_smoke_host PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/include)
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_include_directories(gs1_runtime_projection_test PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src)

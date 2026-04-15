@@ -183,6 +183,34 @@ std::vector<const Gs1EngineCommand*> collect_commands_of_type(
     }
     return matches;
 }
+
+std::vector<const Gs1EngineCommand*> collect_inventory_slot_commands(
+    const std::vector<Gs1EngineCommand>& commands)
+{
+    return collect_commands_of_type(commands, GS1_ENGINE_COMMAND_SITE_INVENTORY_SLOT_UPSERT);
+}
+
+const Gs1EngineCommand* find_inventory_slot_command(
+    const std::vector<Gs1EngineCommand>& commands,
+    Gs1InventoryContainerKind container_kind,
+    std::uint16_t slot_index)
+{
+    for (const auto& command : commands)
+    {
+        if (command.type != GS1_ENGINE_COMMAND_SITE_INVENTORY_SLOT_UPSERT)
+        {
+            continue;
+        }
+
+        const auto& payload = command.payload_as<Gs1EngineCommandInventorySlotData>();
+        if (payload.container_kind == container_kind && payload.slot_index == slot_index)
+        {
+            return &command;
+        }
+    }
+
+    return nullptr;
+}
 }  // namespace
 
 int main()
@@ -242,13 +270,24 @@ int main()
     assert(runtime.handle_command(buy_listing) == GS1_STATUS_OK);
     assert(bootstrap_site_run.economy.money == 40);
     assert(bootstrap_site_run.economy.available_phone_listings[0].quantity == 5U);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+    drain_engine_commands(runtime);
 
     Gs1Phase1Result delivery_result {};
     run_phase1(runtime, 3.0, delivery_result);
     assert(bootstrap_site_run.inventory.camp_storage_slots[4].occupied);
     assert(bootstrap_site_run.inventory.camp_storage_slots[4].item_id.value == gs1::k_item_water_container);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    drain_engine_commands(runtime);
+    const auto delivery_commands = drain_engine_commands(runtime);
+    const auto delivery_inventory_commands = collect_inventory_slot_commands(delivery_commands);
+    assert(delivery_inventory_commands.size() == 1U);
+    {
+        const auto& payload = delivery_inventory_commands.front()->payload_as<Gs1EngineCommandInventorySlotData>();
+        assert(payload.container_kind == GS1_INVENTORY_CONTAINER_CAMP_STORAGE);
+        assert(payload.slot_index == 4U);
+        assert(payload.item_id == gs1::k_item_water_container);
+        assert(payload.quantity == 1U);
+    }
 
     const auto first_commands = flush_tile_delta_for(runtime, TileCoord {3, 2}, 0.25f);
     const auto first_tiles = collect_commands_of_type(first_commands, GS1_ENGINE_COMMAND_SITE_TILE_UPSERT);
@@ -331,7 +370,10 @@ int main()
     assert(ui_site_run.inventory.worker_pack_slots[3].item_id.value == gs1::k_item_wind_reed_seed_bundle);
     assert(ui_site_run.inventory.worker_pack_slots[3].item_quantity == 2U);
     const auto transfer_commands = drain_engine_commands(ui_runtime);
-    assert(!collect_commands_of_type(transfer_commands, GS1_ENGINE_COMMAND_SITE_INVENTORY_SLOT_UPSERT).empty());
+    const auto transfer_inventory_commands = collect_inventory_slot_commands(transfer_commands);
+    assert(transfer_inventory_commands.size() == 2U);
+    assert(find_inventory_slot_command(transfer_commands, GS1_INVENTORY_CONTAINER_CAMP_STORAGE, 0U) != nullptr);
+    assert(find_inventory_slot_command(transfer_commands, GS1_INVENTORY_CONTAINER_WORKER_PACK, 3U) != nullptr);
 
     Gs1UiAction use_action {};
     use_action.type = GS1_UI_ACTION_USE_INVENTORY_ITEM;
@@ -350,7 +392,9 @@ int main()
     assert(ui_site_run.inventory.worker_pack_slots[0].item_quantity == 1U);
     assert(gs1::site_world_access::worker_conditions(ui_site_run).hydration == 82.0f);
     const auto use_commands = drain_engine_commands(ui_runtime);
-    assert(!collect_commands_of_type(use_commands, GS1_ENGINE_COMMAND_SITE_INVENTORY_SLOT_UPSERT).empty());
+    const auto use_inventory_commands = collect_inventory_slot_commands(use_commands);
+    assert(use_inventory_commands.size() == 1U);
+    assert(find_inventory_slot_command(use_commands, GS1_INVENTORY_CONTAINER_WORKER_PACK, 0U) != nullptr);
     assert(!collect_commands_of_type(use_commands, GS1_ENGINE_COMMAND_SITE_WORKER_UPDATE).empty());
     assert(!collect_commands_of_type(use_commands, GS1_ENGINE_COMMAND_HUD_STATE).empty());
 

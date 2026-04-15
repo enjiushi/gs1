@@ -1351,6 +1351,39 @@ void GameRuntime::queue_all_site_inventory_slot_upsert_commands()
     }
 }
 
+void GameRuntime::queue_pending_site_inventory_slot_upsert_commands()
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
+
+    auto& site_run = active_site_run_.value();
+    if (site_run.pending_full_inventory_projection_update ||
+        (site_run.pending_worker_pack_inventory_projection_updates.empty() &&
+            site_run.pending_camp_storage_inventory_projection_updates.empty()))
+    {
+        queue_all_site_inventory_slot_upsert_commands();
+        return;
+    }
+
+    std::sort(
+        site_run.pending_worker_pack_inventory_projection_updates.begin(),
+        site_run.pending_worker_pack_inventory_projection_updates.end());
+    for (const auto slot_index : site_run.pending_worker_pack_inventory_projection_updates)
+    {
+        queue_site_inventory_slot_upsert_command(GS1_INVENTORY_CONTAINER_WORKER_PACK, slot_index);
+    }
+
+    std::sort(
+        site_run.pending_camp_storage_inventory_projection_updates.begin(),
+        site_run.pending_camp_storage_inventory_projection_updates.end());
+    for (const auto slot_index : site_run.pending_camp_storage_inventory_projection_updates)
+    {
+        queue_site_inventory_slot_upsert_command(GS1_INVENTORY_CONTAINER_CAMP_STORAGE, slot_index);
+    }
+}
+
 void GameRuntime::queue_site_task_upsert_command(std::size_t task_index)
 {
     if (!active_site_run_.has_value())
@@ -1448,6 +1481,7 @@ void GameRuntime::queue_site_bootstrap_commands()
 
     active_site_run_->pending_projection_update_flags = 0U;
     clear_pending_site_tile_projection_updates();
+    clear_pending_site_inventory_projection_updates();
 }
 
 void GameRuntime::queue_site_delta_commands(std::uint64_t dirty_flags)
@@ -1494,7 +1528,7 @@ void GameRuntime::queue_site_delta_commands(std::uint64_t dirty_flags)
 
     if ((site_dirty_flags & SITE_PROJECTION_UPDATE_INVENTORY) != 0U)
     {
-        queue_all_site_inventory_slot_upsert_commands();
+        queue_pending_site_inventory_slot_upsert_commands();
     }
 
     if ((site_dirty_flags & SITE_PROJECTION_UPDATE_TASKS) != 0U)
@@ -1561,6 +1595,10 @@ void GameRuntime::mark_site_projection_update_dirty(std::uint64_t dirty_flags) n
     {
         active_site_run_->pending_full_tile_projection_update = true;
     }
+    if ((dirty_flags & SITE_PROJECTION_UPDATE_INVENTORY) != 0U)
+    {
+        active_site_run_->pending_full_inventory_projection_update = true;
+    }
 
     active_site_run_->pending_projection_update_flags |= dirty_flags;
 }
@@ -1621,6 +1659,36 @@ void GameRuntime::clear_pending_site_tile_projection_updates() noexcept
     site_run.pending_full_tile_projection_update = false;
 }
 
+void GameRuntime::clear_pending_site_inventory_projection_updates() noexcept
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
+
+    auto& site_run = active_site_run_.value();
+
+    for (const auto slot_index : site_run.pending_worker_pack_inventory_projection_updates)
+    {
+        if (slot_index < site_run.pending_worker_pack_inventory_projection_update_mask.size())
+        {
+            site_run.pending_worker_pack_inventory_projection_update_mask[slot_index] = 0U;
+        }
+    }
+    site_run.pending_worker_pack_inventory_projection_updates.clear();
+
+    for (const auto slot_index : site_run.pending_camp_storage_inventory_projection_updates)
+    {
+        if (slot_index < site_run.pending_camp_storage_inventory_projection_update_mask.size())
+        {
+            site_run.pending_camp_storage_inventory_projection_update_mask[slot_index] = 0U;
+        }
+    }
+    site_run.pending_camp_storage_inventory_projection_updates.clear();
+
+    site_run.pending_full_inventory_projection_update = false;
+}
+
 void GameRuntime::flush_site_presentation_if_dirty()
 {
     if (!active_site_run_.has_value())
@@ -1643,6 +1711,7 @@ void GameRuntime::flush_site_presentation_if_dirty()
 
     active_site_run_->pending_projection_update_flags = 0U;
     clear_pending_site_tile_projection_updates();
+    clear_pending_site_inventory_projection_updates();
 }
 
 Gs1Status GameRuntime::translate_ui_action_to_command(const Gs1UiAction& action, GameCommand& out_command) const

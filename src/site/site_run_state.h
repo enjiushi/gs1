@@ -85,5 +85,10 @@ struct SiteRunState final
     bool pending_full_tile_projection_update {false};
     std::vector<TileCoord> pending_tile_projection_updates {};
     std::vector<std::uint8_t> pending_tile_projection_update_mask {};
+    bool pending_full_inventory_projection_update {false};
+    std::vector<std::uint32_t> pending_worker_pack_inventory_projection_updates {};
+    std::vector<std::uint8_t> pending_worker_pack_inventory_projection_update_mask {};
+    std::vector<std::uint32_t> pending_camp_storage_inventory_projection_updates {};
+    std::vector<std::uint8_t> pending_camp_storage_inventory_projection_update_mask {};
 };
 }  // namespace gs1

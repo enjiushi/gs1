@@ -232,6 +232,10 @@ public:
         {
             site_run_.pending_full_tile_projection_update = true;
         }
+        if ((dirty_flags & SITE_PROJECTION_UPDATE_INVENTORY) != 0U)
+        {
+            site_run_.pending_full_inventory_projection_update = true;
+        }
 
         site_run_.pending_projection_update_flags |= dirty_flags;
     }
@@ -259,6 +263,50 @@ public:
         }
 
         site_run_.pending_projection_update_flags |= SITE_PROJECTION_UPDATE_TILES;
+    }
+
+    void mark_inventory_slot_projection_dirty(
+        Gs1InventoryContainerKind container_kind,
+        std::uint32_t slot_index) noexcept
+    {
+        std::vector<std::uint32_t>* pending_updates = nullptr;
+        std::vector<std::uint8_t>* pending_update_mask = nullptr;
+        std::uint32_t slot_count = 0U;
+
+        switch (container_kind)
+        {
+        case GS1_INVENTORY_CONTAINER_WORKER_PACK:
+            pending_updates = &site_run_.pending_worker_pack_inventory_projection_updates;
+            pending_update_mask = &site_run_.pending_worker_pack_inventory_projection_update_mask;
+            slot_count = site_run_.inventory.worker_pack_slot_count;
+            break;
+        case GS1_INVENTORY_CONTAINER_CAMP_STORAGE:
+            pending_updates = &site_run_.pending_camp_storage_inventory_projection_updates;
+            pending_update_mask = &site_run_.pending_camp_storage_inventory_projection_update_mask;
+            slot_count = site_run_.inventory.camp_storage_slot_count;
+            break;
+        default:
+            return;
+        }
+
+        if (slot_index >= slot_count || pending_updates == nullptr || pending_update_mask == nullptr)
+        {
+            return;
+        }
+
+        if (pending_update_mask->size() != slot_count)
+        {
+            pending_update_mask->assign(slot_count, 0U);
+            pending_updates->clear();
+        }
+
+        if ((*pending_update_mask)[slot_index] == 0U)
+        {
+            (*pending_update_mask)[slot_index] = 1U;
+            pending_updates->push_back(slot_index);
+        }
+
+        site_run_.pending_projection_update_flags |= SITE_PROJECTION_UPDATE_INVENTORY;
     }
 
 private:

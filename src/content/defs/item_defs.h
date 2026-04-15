@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstdint>
+#include <string_view>
 
 namespace gs1
 {
@@ -29,6 +30,7 @@ enum class ItemSourceRule : std::uint8_t
 struct ItemDef final
 {
     ItemId item_id {};
+    std::string_view display_name {};
     std::uint16_t stack_size {1};
     ItemSourceRule source_rule {ItemSourceRule::None};
     std::uint8_t reserved0 {0};
@@ -58,6 +60,7 @@ inline constexpr std::uint32_t k_plant_sunfruit_vine = 4U;
 inline constexpr std::array<ItemDef, 7> k_prototype_item_defs {
     ItemDef {
         ItemId {k_item_water_container},
+        "Water",
         5U,
         ItemSourceRule::BuyOnly,
         0U,
@@ -71,6 +74,7 @@ inline constexpr std::array<ItemDef, 7> k_prototype_item_defs {
         0.0f},
     ItemDef {
         ItemId {k_item_food_pack},
+        "Food",
         5U,
         ItemSourceRule::BuyOnly,
         0U,
@@ -84,6 +88,7 @@ inline constexpr std::array<ItemDef, 7> k_prototype_item_defs {
         8.0f},
     ItemDef {
         ItemId {k_item_medicine_pack},
+        "Medicine",
         3U,
         ItemSourceRule::BuyOnly,
         0U,
@@ -97,6 +102,7 @@ inline constexpr std::array<ItemDef, 7> k_prototype_item_defs {
         0.0f},
     ItemDef {
         ItemId {k_item_wind_reed_seed_bundle},
+        "Wind Reed Seeds",
         10U,
         ItemSourceRule::BuyOnly,
         0U,
@@ -110,6 +116,7 @@ inline constexpr std::array<ItemDef, 7> k_prototype_item_defs {
         0.0f},
     ItemDef {
         ItemId {k_item_saltbush_seed_bundle},
+        "Saltbush Seeds",
         10U,
         ItemSourceRule::BuyOnly,
         0U,
@@ -123,6 +130,7 @@ inline constexpr std::array<ItemDef, 7> k_prototype_item_defs {
         0.0f},
     ItemDef {
         ItemId {k_item_shade_cactus_seed_bundle},
+        "Shade Cactus Seeds",
         10U,
         ItemSourceRule::BuyOnly,
         0U,
@@ -136,6 +144,7 @@ inline constexpr std::array<ItemDef, 7> k_prototype_item_defs {
         0.0f},
     ItemDef {
         ItemId {k_item_sunfruit_vine_seed_bundle},
+        "Sunfruit Vine Seeds",
         10U,
         ItemSourceRule::BuyOnly,
         0U,
