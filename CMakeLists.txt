@@ -228,6 +228,39 @@ if(GS1_BUILD_TESTS)
         src/site/systems/worker_condition_system.cpp
         src/site/site_world.cpp)
 
+    add_executable(gs1_local_weather_perf_probe
+        tests/runtime/local_weather_perf_probe.cpp
+        src/content/prototype_content.cpp
+        src/site/systems/local_weather_resolve_system.cpp
+        src/site/site_world.cpp)
+
+    add_executable(gs1_runtime_performance_test
+        tests/runtime/game_runtime_performance_test.cpp
+        src/app/campaign_factory.cpp
+        src/app/site_run_factory.cpp
+        src/campaign/systems/campaign_flow_system.cpp
+        src/campaign/systems/loadout_planner_system.cpp
+        src/commands/command_dispatcher.cpp
+        src/content/prototype_content.cpp
+        src/site/systems/action_execution_system.cpp
+        src/site/systems/camp_durability_system.cpp
+        src/site/systems/device_maintenance_system.cpp
+        src/site/systems/device_support_system.cpp
+        src/site/systems/ecology_system.cpp
+        src/site/systems/economy_phone_system.cpp
+        src/site/systems/failure_recovery_system.cpp
+        src/site/systems/inventory_system.cpp
+        src/site/systems/local_weather_resolve_system.cpp
+        src/site/systems/modifier_system.cpp
+        src/site/systems/placement_validation_system.cpp
+        src/site/systems/site_completion_system.cpp
+        src/site/systems/site_flow_system.cpp
+        src/site/systems/task_board_system.cpp
+        src/site/systems/weather_event_system.cpp
+        src/site/systems/worker_condition_system.cpp
+        src/site/site_world.cpp
+        src/runtime/game_runtime.cpp)
+
     # The smoke hosts consume the public SDK plus internal content definitions
     # used to enrich live snapshot JSON for manual adapter verification.
     target_include_directories(gs1_smoke_host PRIVATE
@@ -245,6 +278,12 @@ if(GS1_BUILD_TESTS)
     target_include_directories(gs1_site_system_command_flow_test PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_include_directories(gs1_local_weather_perf_probe PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_include_directories(gs1_runtime_performance_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_include_directories(gs1_system_test_host PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -252,7 +291,11 @@ if(GS1_BUILD_TESTS)
     target_link_libraries(gs1_runtime_projection_test PRIVATE flecs)
     target_link_libraries(gs1_runtime_command_chain_test PRIVATE flecs)
     target_link_libraries(gs1_site_system_command_flow_test PRIVATE flecs)
+    target_link_libraries(gs1_local_weather_perf_probe PRIVATE flecs)
+    target_link_libraries(gs1_runtime_performance_test PRIVATE flecs)
     target_link_libraries(gs1_visual_smoke_host PRIVATE ws2_32 winmm)
+    target_compile_definitions(gs1_local_weather_perf_probe PRIVATE GS1_ENABLE_LOCAL_WEATHER_RESOLUTION=1)
+    target_compile_definitions(gs1_runtime_performance_test PRIVATE GS1_ENABLE_LOCAL_WEATHER_RESOLUTION=1)
 
     # Ensure the DLL is built before the smoke host is run.
     # This is a build-order dependency, not a link-time dependency.
@@ -265,11 +308,15 @@ if(GS1_BUILD_TESTS)
         target_compile_options(gs1_runtime_projection_test PRIVATE /W4 /permissive-)
         target_compile_options(gs1_runtime_command_chain_test PRIVATE /W4 /permissive-)
         target_compile_options(gs1_site_system_command_flow_test PRIVATE /W4 /permissive-)
+        target_compile_options(gs1_local_weather_perf_probe PRIVATE /W4 /permissive-)
+        target_compile_options(gs1_runtime_performance_test PRIVATE /W4 /permissive-)
     else()
         target_compile_options(gs1_system_test_host PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(gs1_runtime_projection_test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(gs1_runtime_command_chain_test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(gs1_site_system_command_flow_test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(gs1_local_weather_perf_probe PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(gs1_runtime_performance_test PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 
     # Run the smoke host with the built DLL path and the default smoke script.

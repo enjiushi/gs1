@@ -41,4 +41,16 @@ GS1_API Gs1Status gs1_run_phase2(
 GS1_API Gs1Status gs1_pop_engine_command(
     Gs1RuntimeHandle* runtime,
     Gs1EngineCommand* out_command) GS1_NOEXCEPT;
+
+GS1_API Gs1Status gs1_get_runtime_profiling_snapshot(
+    Gs1RuntimeHandle* runtime,
+    Gs1RuntimeProfilingSnapshot* out_snapshot) GS1_NOEXCEPT;
+
+GS1_API Gs1Status gs1_reset_runtime_profiling(
+    Gs1RuntimeHandle* runtime) GS1_NOEXCEPT;
+
+GS1_API Gs1Status gs1_set_runtime_profile_system_enabled(
+    Gs1RuntimeHandle* runtime,
+    Gs1RuntimeProfileSystemId system_id,
+    std::uint8_t enabled) GS1_NOEXCEPT;
 }

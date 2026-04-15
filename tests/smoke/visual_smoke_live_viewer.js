@@ -39,6 +39,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let currentSceneKind = "";
     let siteSceneCache = null;
     let selectedInventorySlotKey = "";
+    let inventoryPanelOpen = true;
     let tileContextMenuState = null;
     let localActionProgressState = null;
     let animationTimeSeconds = 0;
@@ -212,6 +213,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function getSiteState(state) {
         return state.siteState || null;
+    }
+
+    function getHudState(state) {
+        return state ? state.hud || null : null;
     }
 
     function getItemMeta(itemId) {
@@ -480,7 +485,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function renderSiteStatusChip(state) {
         const siteState = getSiteState(state);
-        const hud = state ? state.hud : null;
+        const hud = getHudState(state);
         const weather = siteState ? siteState.weather : null;
         const carriedSeeds = getCarriedSeedOptions(state);
         const workerActionKind =
@@ -780,6 +785,81 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         hideInventoryTooltip();
     }
 
+    function clampMeterPercent(value) {
+        return Math.round(clamp01((typeof value === "number" ? value : 0) / 100) * 100);
+    }
+
+    function appendInventorySummaryCard(container, label, valueText, fillPercent, fillClassName) {
+        const card = document.createElement("div");
+        card.className = "inventory-summary-card";
+
+        const labelElement = document.createElement("div");
+        labelElement.className = "inventory-summary-label";
+        labelElement.textContent = label;
+        card.appendChild(labelElement);
+
+        const valueElement = document.createElement("div");
+        valueElement.className = "inventory-summary-value" + (fillClassName === "money" ? " money" : "");
+        valueElement.textContent = valueText;
+        card.appendChild(valueElement);
+
+        if (fillClassName !== "money") {
+            const meterTrack = document.createElement("div");
+            meterTrack.className = "inventory-meter-track";
+            const meterFill = document.createElement("div");
+            meterFill.className = "inventory-meter-fill " + fillClassName;
+            meterFill.style.width = Math.max(0, Math.min(fillPercent, 100)) + "%";
+            meterTrack.appendChild(meterFill);
+            card.appendChild(meterTrack);
+        }
+
+        container.appendChild(card);
+    }
+
+    function appendInventorySummarySection(container, state) {
+        const hud = getHudState(state);
+        const siteState = getSiteState(state);
+        const worker = siteState ? siteState.worker : null;
+        const health = hud && typeof hud.playerHealth === "number"
+            ? hud.playerHealth
+            : (worker && typeof worker.healthNormalized === "number" ? worker.healthNormalized * 100 : 0);
+        const hydration = hud && typeof hud.playerHydration === "number"
+            ? hud.playerHydration
+            : (worker && typeof worker.hydrationNormalized === "number" ? worker.hydrationNormalized * 100 : 0);
+        const energy = hud && typeof hud.playerEnergy === "number"
+            ? hud.playerEnergy
+            : (worker && typeof worker.energyNormalized === "number" ? worker.energyNormalized * 100 : 0);
+        const currentMoney = hud && typeof hud.currentMoney === "number" ? hud.currentMoney : 0;
+
+        const section = document.createElement("section");
+        section.className = "inventory-section";
+
+        const header = document.createElement("div");
+        header.className = "inventory-section-header";
+
+        const titleElement = document.createElement("div");
+        titleElement.className = "inventory-section-title";
+        titleElement.textContent = "Field Status";
+        header.appendChild(titleElement);
+
+        const metaElement = document.createElement("div");
+        metaElement.className = "inventory-section-meta";
+        metaElement.textContent = "HUD-driven values  |  Toggle B";
+        header.appendChild(metaElement);
+        section.appendChild(header);
+
+        const summaryGrid = document.createElement("div");
+        summaryGrid.className = "inventory-summary-grid";
+        section.appendChild(summaryGrid);
+
+        appendInventorySummaryCard(summaryGrid, "Health", clampMeterPercent(health) + "%", clampMeterPercent(health), "health");
+        appendInventorySummaryCard(summaryGrid, "Hydration", clampMeterPercent(hydration) + "%", clampMeterPercent(hydration), "hydration");
+        appendInventorySummaryCard(summaryGrid, "Energy", clampMeterPercent(energy) + "%", clampMeterPercent(energy), "energy");
+        appendInventorySummaryCard(summaryGrid, "Money", "$" + String(currentMoney), 0, "money");
+
+        container.appendChild(section);
+    }
+
     function makeInventorySection(title, metaText, gridClassName, columnCount) {
         const section = document.createElement("section");
         section.className = "inventory-section";
@@ -930,9 +1010,20 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         selectionInventory.hidden = false;
         selectionInventory.innerHTML = "";
 
+        if (!inventoryPanelOpen) {
+            const hiddenNote = document.createElement("div");
+            hiddenNote.className = "inventory-panel-hidden-note";
+            hiddenNote.textContent = "Inventory panel hidden. Press B to reopen.";
+            selectionInventory.appendChild(hiddenNote);
+            hideInventoryTooltip();
+            return;
+        }
+
         const stack = document.createElement("div");
         stack.className = "site-panel-stack";
         selectionInventory.appendChild(stack);
+
+        appendInventorySummarySection(stack, state);
 
         const topGrid = document.createElement("div");
         topGrid.className = "site-panel-grid";
@@ -1187,7 +1278,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         selectionText.innerHTML = siteBootstrap
             ? (
                 "Site " + siteBootstrap.siteId +
-                " is live. Use WASD to move, drag with right mouse to orbit the camera, and short right-click a tile to choose a site action." +
+                " is live. Use WASD to move, press B to open or close the inventory panel, drag with right mouse to orbit the camera, and short right-click a tile to choose a site action." +
                 "<br><br>" + plantingText
             )
             : "Site bootstrap is loading.";
@@ -1226,6 +1317,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         switch (state.appState) {
         case "MAIN_MENU":
             hudSubtitle.textContent = "Austere, painterly, and severe: the campaign opens under hostile conditions.";
+            inventoryPanelOpen = true;
             selectedInventorySlotKey = "";
             clearSelectionInventory();
             renderMenuOverlay(state);
@@ -1233,6 +1325,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             break;
         case "REGIONAL_MAP":
             hudSubtitle.textContent = "Review the campaign survey board and choose the next deployment route.";
+            inventoryPanelOpen = true;
             selectedInventorySlotKey = "";
             clearSelectionInventory();
             renderRegionalMapOverlay(state);
@@ -1241,11 +1334,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 "\nSelected Site: " + (state.selectedSiteId == null ? "none" : state.selectedSiteId);
             break;
         case "SITE_ACTIVE":
-            hudSubtitle.textContent = "Field movement is now live. Drag with right mouse to orbit the follow camera, or short right-click a tile to open its action menu.";
+            hudSubtitle.textContent = "Field movement is now live. Press B to toggle the inventory panel, drag with right mouse to orbit the follow camera, or short right-click a tile to open its action menu.";
             renderSiteOverlay(state);
             break;
         default:
             hudSubtitle.textContent = "The current adapter only styles the core early flow for now.";
+            inventoryPanelOpen = true;
             selectedInventorySlotKey = "";
             clearSelectionInventory();
             renderFallbackOverlay(state);
@@ -2240,6 +2334,239 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
     }
 
+    function deterministicNoise01(x, y, salt) {
+        const value = Math.sin(x * 127.1 + y * 311.7 + salt * 74.7) * 43758.5453123;
+        return value - Math.floor(value);
+    }
+
+    function createPlantMaterial(color, roughness, emissive, emissiveIntensity) {
+        return new THREE_NS.MeshStandardMaterial({
+            color: color,
+            roughness: roughness == null ? 0.84 : roughness,
+            metalness: 0.01,
+            emissive: emissive == null ? 0x000000 : emissive,
+            emissiveIntensity: emissiveIntensity == null ? 0.0 : emissiveIntensity
+        });
+    }
+
+    function createLeafMesh(color, width, thickness, length) {
+        const leaf = new THREE_NS.Mesh(
+            new THREE_NS.SphereGeometry(1, 10, 10),
+            createPlantMaterial(color, 0.78, color, 0.04)
+        );
+        leaf.scale.set(width, thickness, length);
+        return leaf;
+    }
+
+    function addWindReedPlant(plantGroup, tile, plantDensity) {
+        const stemColor = 0x6b8b4c;
+        const leafColor = 0x93b868;
+        const bunchCount = 5 + Math.round(plantDensity * 3);
+        const baseHeight = 0.34 + plantDensity * 0.38;
+
+        for (let index = 0; index < bunchCount; index += 1) {
+            const angle = (index / bunchCount) * Math.PI * 2 + deterministicNoise01(tile.x, tile.y, index + 1) * 0.42;
+            const offsetRadius = 0.03 + deterministicNoise01(tile.y, tile.x, index + 11) * 0.06;
+            const stemHeight = baseHeight * (0.72 + deterministicNoise01(tile.x, tile.y, index + 21) * 0.38);
+            const stemRadius = 0.012 + deterministicNoise01(tile.y, tile.x, index + 31) * 0.008;
+            const stem = new THREE_NS.Mesh(
+                new THREE_NS.CylinderGeometry(stemRadius * 0.55, stemRadius, stemHeight, 5),
+                createPlantMaterial(stemColor)
+            );
+            stem.position.set(
+                Math.cos(angle) * offsetRadius,
+                stemHeight * 0.5,
+                Math.sin(angle) * offsetRadius
+            );
+            stem.rotation.z = Math.cos(angle) * 0.2;
+            stem.rotation.x = -Math.sin(angle) * 0.18;
+            plantGroup.add(stem);
+
+            const blade = createLeafMesh(leafColor, 0.02, 0.009, 0.14 + plantDensity * 0.1);
+            blade.position.set(
+                stem.position.x * 0.6,
+                stemHeight * (0.56 + deterministicNoise01(tile.x, tile.y, index + 41) * 0.12),
+                stem.position.z * 0.6
+            );
+            blade.rotation.y = angle;
+            blade.rotation.z = 0.48 + deterministicNoise01(tile.y, tile.x, index + 51) * 0.44;
+            plantGroup.add(blade);
+        }
+    }
+
+    function addSaltbushPlant(plantGroup, tile, plantDensity) {
+        const twigColor = 0x6b5c3b;
+        const leafColors = [0x88a45d, 0x95b568, 0x78914d];
+        const branchCount = 4 + Math.round(plantDensity * 2);
+        const bushRadius = 0.2 + plantDensity * 0.14;
+
+        for (let index = 0; index < branchCount; index += 1) {
+            const angle = (index / branchCount) * Math.PI * 2 + deterministicNoise01(tile.x, tile.y, index + 61) * 0.6;
+            const branchHeight = 0.12 + plantDensity * 0.12 + deterministicNoise01(tile.y, tile.x, index + 71) * 0.08;
+            const branch = new THREE_NS.Mesh(
+                new THREE_NS.CylinderGeometry(0.015, 0.022, branchHeight, 5),
+                createPlantMaterial(twigColor, 0.9)
+            );
+            branch.position.set(0, branchHeight * 0.38, 0);
+            branch.rotation.z = Math.cos(angle) * 0.65;
+            branch.rotation.x = -Math.sin(angle) * 0.65;
+            plantGroup.add(branch);
+        }
+
+        const clumpCount = 7 + Math.round(plantDensity * 4);
+        for (let index = 0; index < clumpCount; index += 1) {
+            const angle = deterministicNoise01(tile.x, tile.y, index + 81) * Math.PI * 2;
+            const radius = bushRadius * (0.28 + deterministicNoise01(tile.y, tile.x, index + 91) * 0.72);
+            const clump = new THREE_NS.Mesh(
+                new THREE_NS.SphereGeometry(0.09 + deterministicNoise01(tile.x, tile.y, index + 101) * 0.03, 10, 10),
+                createPlantMaterial(leafColors[index % leafColors.length], 0.8, 0x42522a, 0.04)
+            );
+            clump.scale.set(
+                0.95 + deterministicNoise01(tile.x, tile.y, index + 111) * 0.3,
+                0.7 + deterministicNoise01(tile.y, tile.x, index + 121) * 0.25,
+                0.95 + deterministicNoise01(tile.x, tile.y, index + 131) * 0.3
+            );
+            clump.position.set(
+                Math.cos(angle) * radius,
+                0.12 + plantDensity * 0.08 + deterministicNoise01(tile.y, tile.x, index + 141) * 0.12,
+                Math.sin(angle) * radius
+            );
+            plantGroup.add(clump);
+        }
+    }
+
+    function addShadeCactusPlant(plantGroup, tile, plantDensity) {
+        const bodyMaterial = createPlantMaterial(0x6b8c52, 0.82, 0x30411e, 0.06);
+        const height = 0.48 + plantDensity * 0.42;
+        const trunk = new THREE_NS.Mesh(
+            new THREE_NS.CylinderGeometry(0.09, 0.12, height, 8),
+            bodyMaterial
+        );
+        trunk.position.y = height * 0.5;
+        plantGroup.add(trunk);
+
+        const armPairs = [
+            { side: -1, heightFactor: 0.5, length: 0.26 + plantDensity * 0.1, tilt: -0.95 },
+            { side: 1, heightFactor: 0.66, length: 0.22 + plantDensity * 0.08, tilt: 0.92 }
+        ];
+        armPairs.forEach((armSpec) => {
+            const arm = new THREE_NS.Mesh(
+                new THREE_NS.CylinderGeometry(0.045, 0.055, armSpec.length, 7),
+                bodyMaterial
+            );
+            arm.position.set(armSpec.side * 0.11, height * armSpec.heightFactor, 0);
+            arm.rotation.z = armSpec.tilt;
+            plantGroup.add(arm);
+
+            const armTip = new THREE_NS.Mesh(
+                new THREE_NS.SphereGeometry(0.052, 8, 8),
+                bodyMaterial
+            );
+            armTip.position.set(
+                arm.position.x + armSpec.side * (armSpec.length * 0.34),
+                arm.position.y + armSpec.length * 0.28,
+                0
+            );
+            armTip.scale.set(1.0, 1.1, 1.0);
+            plantGroup.add(armTip);
+        });
+
+        const bloom = new THREE_NS.Mesh(
+            new THREE_NS.SphereGeometry(0.038, 10, 10),
+            createPlantMaterial(0xcfa56a, 0.7, 0x8c5c26, 0.08)
+        );
+        bloom.position.set(0, height + 0.02, 0);
+        bloom.scale.set(1.0, 0.8, 1.0);
+        plantGroup.add(bloom);
+    }
+
+    function addSunfruitVinePlant(plantGroup, tile, plantDensity) {
+        const stemMaterial = createPlantMaterial(0x6e7a37, 0.86);
+        const leafColors = [0x8db05e, 0x7a984b, 0x97bc64];
+        const fruitColor = 0xd5a34f;
+        const span = 0.18 + plantDensity * 0.14;
+        const vineCurve = new THREE_NS.CatmullRomCurve3([
+            new THREE_NS.Vector3(-span, 0.03, -0.08),
+            new THREE_NS.Vector3(-0.06, 0.12 + plantDensity * 0.05, 0.04),
+            new THREE_NS.Vector3(0.07, 0.08 + plantDensity * 0.06, -0.03),
+            new THREE_NS.Vector3(span, 0.14 + plantDensity * 0.08, 0.08)
+        ]);
+        const vine = new THREE_NS.Mesh(
+            new THREE_NS.TubeGeometry(vineCurve, 16, 0.018, 6, false),
+            stemMaterial
+        );
+        plantGroup.add(vine);
+
+        for (let index = 0; index < 4; index += 1) {
+            const t = 0.18 + index * 0.2;
+            const point = vineCurve.getPoint(t);
+            const tangent = vineCurve.getTangent(t);
+            const leaf = createLeafMesh(
+                leafColors[index % leafColors.length],
+                0.08 + plantDensity * 0.03,
+                0.014,
+                0.12 + plantDensity * 0.04
+            );
+            leaf.position.copy(point);
+            leaf.position.y += 0.02 + (index % 2) * 0.015;
+            leaf.rotation.y = Math.atan2(tangent.x, tangent.z) + (index % 2 === 0 ? 0.6 : -0.65);
+            leaf.rotation.z = index % 2 === 0 ? -0.52 : 0.52;
+            plantGroup.add(leaf);
+        }
+
+        const fruitCount = 1 + Math.round(plantDensity * 2);
+        for (let index = 0; index < fruitCount; index += 1) {
+            const t = 0.42 + index * 0.18;
+            const point = vineCurve.getPoint(Math.min(t, 0.92));
+            const fruit = new THREE_NS.Mesh(
+                new THREE_NS.SphereGeometry(0.034 + plantDensity * 0.01, 10, 10),
+                createPlantMaterial(fruitColor, 0.62, 0x7c4d16, 0.12)
+            );
+            fruit.position.copy(point);
+            fruit.position.y -= 0.015;
+            fruit.position.x += (index % 2 === 0 ? -1 : 1) * 0.028;
+            plantGroup.add(fruit);
+        }
+    }
+
+    function addGenericPlant(plantGroup, tile, plantDensity) {
+        const stem = new THREE_NS.Mesh(
+            new THREE_NS.CylinderGeometry(0.03, 0.04, 0.26 + plantDensity * 0.18, 6),
+            createPlantMaterial(0x72884d)
+        );
+        stem.position.y = 0.16 + plantDensity * 0.09;
+        plantGroup.add(stem);
+
+        for (let index = 0; index < 3; index += 1) {
+            const angle = (index / 3) * Math.PI * 2 + deterministicNoise01(tile.x, tile.y, index + 151) * 0.5;
+            const leaf = createLeafMesh(0x96b867, 0.05, 0.012, 0.11 + plantDensity * 0.04);
+            leaf.position.set(Math.cos(angle) * 0.04, 0.14 + index * 0.04, Math.sin(angle) * 0.04);
+            leaf.rotation.y = angle;
+            leaf.rotation.z = 0.5;
+            plantGroup.add(leaf);
+        }
+    }
+
+    function createPlantVisual(tile, tileHeight, plantDensity) {
+        const plantGroup = new THREE_NS.Group();
+        plantGroup.position.y = tileHeight + 0.02;
+        plantGroup.rotation.y = deterministicNoise01(tile.x, tile.y, tile.plantTypeId + 161) * Math.PI * 2;
+
+        if (tile.plantTypeId === 1) {
+            addWindReedPlant(plantGroup, tile, plantDensity);
+        } else if (tile.plantTypeId === 2) {
+            addSaltbushPlant(plantGroup, tile, plantDensity);
+        } else if (tile.plantTypeId === 3) {
+            addShadeCactusPlant(plantGroup, tile, plantDensity);
+        } else if (tile.plantTypeId === 4) {
+            addSunfruitVinePlant(plantGroup, tile, plantDensity);
+        } else {
+            addGenericPlant(plantGroup, tile, plantDensity);
+        }
+
+        return plantGroup;
+    }
+
     function rebuildStaticSiteScene(siteBootstrap, offsetX, offsetZ, width, height, previousCache, bootstrapSignature) {
         clearWorld();
         currentSceneKind = "SITE_ACTIVE";
@@ -2295,26 +2622,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             tilePickables.push(tileMesh);
 
             if (hasPlant) {
-                const plantHeight = tile.plantTypeId === 4
-                    ? 0.22 + plantDensity * 0.35
-                    : 0.25 + plantDensity * 0.45;
-                const plantGeometry = tile.plantTypeId === 3
-                    ? new THREE_NS.CylinderGeometry(0.08, 0.12, plantHeight, 7)
-                    : new THREE_NS.CylinderGeometry(0.04, 0.08, plantHeight, tile.plantTypeId === 4 ? 5 : 6);
-                const plantMaterial = new THREE_NS.MeshStandardMaterial({
-                    color: tile.plantTypeId === 1 ? 0x657c4f
-                        : tile.plantTypeId === 2 ? 0x6b8452
-                        : tile.plantTypeId === 3 ? 0x7b9150
-                        : 0x8c7b4d,
-                    roughness: 0.82,
-                    metalness: 0.01
-                });
-                const reed = new THREE_NS.Mesh(
-                    plantGeometry,
-                    plantMaterial
-                );
-                reed.position.set(tile.x - offsetX, tileHeight + 0.16 + plantDensity * 0.12, tile.y - offsetZ);
-                worldGroup.add(reed);
+                const plantVisual = createPlantVisual(tile, tileHeight, plantDensity);
+                plantVisual.position.x = tile.x - offsetX;
+                plantVisual.position.z = tile.y - offsetZ;
+                worldGroup.add(plantVisual);
             }
         });
 
@@ -2696,6 +3007,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 previousActionKind !== nextActionKind) {
                 renderSiteStatusChip(normalizedState);
             }
+            if (lightweightPatchParts.hud) {
+                renderSiteInventoryPanel(
+                    normalizedState,
+                    getInventorySlotsByKind(normalizedState, "WORKER_PACK"),
+                    getInventorySlotsByKind(normalizedState, "CAMP_STORAGE"));
+            }
             renderActionProgressBar(normalizedState);
             return;
         }
@@ -2838,6 +3155,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     window.addEventListener("keydown", function (event) {
+        if (event.code === "KeyB" && !event.repeat && latestState && latestState.appState === "SITE_ACTIVE") {
+            inventoryPanelOpen = !inventoryPanelOpen;
+            renderSiteInventoryPanel(
+                latestState,
+                getInventorySlotsByKind(latestState, "WORKER_PACK"),
+                getInventorySlotsByKind(latestState, "CAMP_STORAGE"));
+            event.preventDefault();
+            return;
+        }
         if (event.code === "Escape" && tileContextMenuState) {
             closeTileContextMenu();
         }

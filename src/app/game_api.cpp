@@ -133,6 +133,43 @@ Gs1Status gs1_pop_engine_command(
     return runtime->runtime.pop_engine_command(*out_command);
 }
 
+Gs1Status gs1_get_runtime_profiling_snapshot(
+    Gs1RuntimeHandle* runtime,
+    Gs1RuntimeProfilingSnapshot* out_snapshot) GS1_NOEXCEPT
+{
+    if (runtime == nullptr || out_snapshot == nullptr)
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    return runtime->runtime.get_profiling_snapshot(*out_snapshot);
+}
+
+Gs1Status gs1_reset_runtime_profiling(
+    Gs1RuntimeHandle* runtime) GS1_NOEXCEPT
+{
+    if (runtime == nullptr)
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    runtime->runtime.reset_profiling();
+    return GS1_STATUS_OK;
+}
+
+Gs1Status gs1_set_runtime_profile_system_enabled(
+    Gs1RuntimeHandle* runtime,
+    Gs1RuntimeProfileSystemId system_id,
+    std::uint8_t enabled) GS1_NOEXCEPT
+{
+    if (runtime == nullptr)
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    return runtime->runtime.set_profiled_system_enabled(system_id, enabled != 0U);
+}
+
 std::uint32_t gs1_get_system_test_api_version() GS1_NOEXCEPT
 {
     return gs1::testing::k_system_test_api_version;

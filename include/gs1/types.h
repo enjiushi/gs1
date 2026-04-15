@@ -258,11 +258,62 @@ enum Gs1EngineCommandType : std::uint8_t
     GS1_ENGINE_COMMAND_PLAY_ONE_SHOT_CUE = 43
 };
 
+enum Gs1RuntimeProfileSystemId : std::uint8_t
+{
+    GS1_RUNTIME_PROFILE_SYSTEM_CAMPAIGN_FLOW = 0,
+    GS1_RUNTIME_PROFILE_SYSTEM_LOADOUT_PLANNER = 1,
+    GS1_RUNTIME_PROFILE_SYSTEM_SITE_FLOW = 2,
+    GS1_RUNTIME_PROFILE_SYSTEM_MODIFIER = 3,
+    GS1_RUNTIME_PROFILE_SYSTEM_WEATHER_EVENT = 4,
+    GS1_RUNTIME_PROFILE_SYSTEM_ACTION_EXECUTION = 5,
+    GS1_RUNTIME_PROFILE_SYSTEM_LOCAL_WEATHER_RESOLVE = 6,
+    GS1_RUNTIME_PROFILE_SYSTEM_WORKER_CONDITION = 7,
+    GS1_RUNTIME_PROFILE_SYSTEM_CAMP_DURABILITY = 8,
+    GS1_RUNTIME_PROFILE_SYSTEM_DEVICE_MAINTENANCE = 9,
+    GS1_RUNTIME_PROFILE_SYSTEM_DEVICE_SUPPORT = 10,
+    GS1_RUNTIME_PROFILE_SYSTEM_ECOLOGY = 11,
+    GS1_RUNTIME_PROFILE_SYSTEM_INVENTORY = 12,
+    GS1_RUNTIME_PROFILE_SYSTEM_TASK_BOARD = 13,
+    GS1_RUNTIME_PROFILE_SYSTEM_ECONOMY_PHONE = 14,
+    GS1_RUNTIME_PROFILE_SYSTEM_PLACEMENT_VALIDATION = 15,
+    GS1_RUNTIME_PROFILE_SYSTEM_FAILURE_RECOVERY = 16,
+    GS1_RUNTIME_PROFILE_SYSTEM_SITE_COMPLETION = 17,
+    GS1_RUNTIME_PROFILE_SYSTEM_COUNT = 18
+};
+
 struct Gs1RuntimeCreateDesc
 {
     std::uint32_t struct_size;
     std::uint32_t api_version;
     double fixed_step_seconds;
+};
+
+struct Gs1RuntimeTimingStats
+{
+    std::uint64_t sample_count;
+    double last_elapsed_ms;
+    double total_elapsed_ms;
+    double max_elapsed_ms;
+};
+
+struct Gs1RuntimeProfileSystemStats
+{
+    Gs1RuntimeProfileSystemId system_id;
+    std::uint8_t enabled;
+    std::uint16_t reserved0;
+    std::uint32_t reserved1;
+    Gs1RuntimeTimingStats run_timing;
+    Gs1RuntimeTimingStats command_timing;
+};
+
+struct Gs1RuntimeProfilingSnapshot
+{
+    std::uint32_t struct_size;
+    std::uint32_t system_count;
+    Gs1RuntimeTimingStats phase1_timing;
+    Gs1RuntimeTimingStats phase2_timing;
+    Gs1RuntimeTimingStats fixed_step_timing;
+    Gs1RuntimeProfileSystemStats systems[GS1_RUNTIME_PROFILE_SYSTEM_COUNT];
 };
 
 struct Gs1UiAction
@@ -618,6 +669,9 @@ private:
 };
 
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1RuntimeCreateDesc, 16U);
+GS1_ASSERT_TRIVIAL_SCHEMA(Gs1RuntimeTimingStats);
+GS1_ASSERT_TRIVIAL_SCHEMA(Gs1RuntimeProfileSystemStats);
+GS1_ASSERT_TRIVIAL_SCHEMA(Gs1RuntimeProfilingSnapshot);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1UiAction, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventUiActionData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteMoveDirectionData, 12U);

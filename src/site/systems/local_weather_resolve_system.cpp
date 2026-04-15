@@ -119,8 +119,11 @@ void LocalWeatherResolveSystem::run(SiteSystemContext<LocalWeatherResolveSystem>
         return;
     }
 
-    // Temporary regression isolation: disable local weather resolution.
+    // Temporary regression isolation: keep local weather resolution disabled in
+    // normal gameplay builds until the hot path is reworked.
+#if !defined(GS1_ENABLE_LOCAL_WEATHER_RESOLUTION)
     return;
+#endif
 
     const auto& weather = context.world.read_weather();
     const auto& modifiers = context.world.read_modifier().resolved_channel_totals;
