@@ -39,6 +39,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let cameraOrbitDragButton = -1;
     let cameraOrbitDragLastClientX = 0;
     let cameraOrbitPointerLockActive = false;
+    const rightMouseButton = 2;
+    const rightMouseButtonsMask = 2;
 
     const moveAxes = {
         x: 0,
@@ -835,7 +837,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         selectionText.innerHTML = siteBootstrap
             ? (
                 "Site " + siteBootstrap.siteId +
-                " is live. Use WASD to move and middle-drag to orbit the camera." +
+                " is live. Use WASD to move and right-drag to orbit the camera." +
+                " If Edge still catches the drag, disable Mouse gestures in Edge settings." +
                 "<br><br>" + armedText
             )
             : "Site bootstrap is loading.";
@@ -1718,8 +1721,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return -1;
         }
 
-        if (event.button === 1) {
-            return 1;
+        if (event.button === rightMouseButton) {
+            return rightMouseButton;
         }
 
         return -1;
@@ -1734,8 +1737,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return true;
         }
 
-        if (cameraOrbitDragButton === 1) {
-            return (event.buttons & 4) !== 0;
+        if (cameraOrbitDragButton === rightMouseButton) {
+            return (event.buttons & rightMouseButtonsMask) !== 0;
         }
 
         return false;
