@@ -56,7 +56,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const siteCameraDefaults = {
         offsetX: 4.6,
         offsetZ: 5.2,
-        lookHeight: 0.4,
+        lookHeight: 0.78,
+        viewAngleRadians: Math.PI / 4,
+        nearestGroundDistance: 9.0,
+        farthestGroundDistance: 18.0,
+        wheelZoomStepDistance: 1.5,
         rotateRadiansPerPixel: 0.002
     };
     const inventoryContainerCodes = {
@@ -1573,23 +1577,43 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         );
     }
 
-    function getSiteCameraHeight(width, height) {
-        return Math.max(width, height) * 0.72 + 3.0;
+    function getSiteCameraOffsetYForGroundDistance(groundDistance) {
+        return siteCameraDefaults.lookHeight +
+            groundDistance * Math.tan(siteCameraDefaults.viewAngleRadians);
     }
 
     function buildSiteCameraOrbitState(siteBootstrap, width, height, previousCache) {
+        let orbitDirectionX = siteCameraDefaults.offsetX;
+        let orbitDirectionZ = siteCameraDefaults.offsetZ;
+        let orbitDistance = siteCameraDefaults.nearestGroundDistance;
+
         if (previousCache && previousCache.siteId === siteBootstrap.siteId) {
-            return {
-                offsetX: previousCache.cameraOrbitOffsetX,
-                offsetY: getSiteCameraHeight(width, height),
-                offsetZ: previousCache.cameraOrbitOffsetZ
-            };
+            orbitDirectionX = previousCache.cameraOrbitOffsetX;
+            orbitDirectionZ = previousCache.cameraOrbitOffsetZ;
+            if (typeof previousCache.cameraOrbitGroundDistance === "number") {
+                orbitDistance = previousCache.cameraOrbitGroundDistance;
+            }
         }
 
+        const orbitDirectionLength = Math.hypot(orbitDirectionX, orbitDirectionZ);
+        if (orbitDirectionLength <= 0.000001) {
+            orbitDirectionX = 0.0;
+            orbitDirectionZ = 1.0;
+        } else {
+            orbitDirectionX /= orbitDirectionLength;
+            orbitDirectionZ /= orbitDirectionLength;
+        }
+
+        orbitDistance = Math.max(
+            siteCameraDefaults.nearestGroundDistance,
+            Math.min(siteCameraDefaults.farthestGroundDistance, orbitDistance)
+        );
+
         return {
-            offsetX: siteCameraDefaults.offsetX,
-            offsetY: getSiteCameraHeight(width, height),
-            offsetZ: siteCameraDefaults.offsetZ
+            offsetX: orbitDirectionX * orbitDistance,
+            offsetY: getSiteCameraOffsetYForGroundDistance(orbitDistance),
+            offsetZ: orbitDirectionZ * orbitDistance,
+            groundDistance: orbitDistance
         };
     }
 
@@ -1604,6 +1628,49 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const previousOffsetZ = cache.cameraOrbitOffsetZ;
         cache.cameraOrbitOffsetX = previousOffsetX * cosAngle - previousOffsetZ * sinAngle;
         cache.cameraOrbitOffsetZ = previousOffsetX * sinAngle + previousOffsetZ * cosAngle;
+    }
+
+    function setSiteCameraOrbitDistance(cache, groundDistance) {
+        if (!cache) {
+            return;
+        }
+
+        const clampedDistance = Math.max(
+            siteCameraDefaults.nearestGroundDistance,
+            Math.min(siteCameraDefaults.farthestGroundDistance, groundDistance)
+        );
+        let orbitDirectionX = cache.cameraOrbitOffsetX;
+        let orbitDirectionZ = cache.cameraOrbitOffsetZ;
+        const orbitDirectionLength = Math.hypot(orbitDirectionX, orbitDirectionZ);
+        if (orbitDirectionLength <= 0.000001) {
+            orbitDirectionX = 0.0;
+            orbitDirectionZ = 1.0;
+        } else {
+            orbitDirectionX /= orbitDirectionLength;
+            orbitDirectionZ /= orbitDirectionLength;
+        }
+
+        cache.cameraOrbitGroundDistance = clampedDistance;
+        cache.cameraOrbitOffsetX = orbitDirectionX * clampedDistance;
+        cache.cameraOrbitOffsetY = getSiteCameraOffsetYForGroundDistance(clampedDistance);
+        cache.cameraOrbitOffsetZ = orbitDirectionZ * clampedDistance;
+    }
+
+    function updateSiteCameraZoomFromWheel(deltaY) {
+        if (!siteSceneCache || Math.abs(deltaY) <= 0.000001) {
+            return;
+        }
+
+        const zoomDirection = Math.sign(deltaY);
+        if (zoomDirection === 0) {
+            return;
+        }
+
+        setSiteCameraOrbitDistance(
+            siteSceneCache,
+            siteSceneCache.cameraOrbitGroundDistance +
+                zoomDirection * siteCameraDefaults.wheelZoomStepDistance
+        );
     }
 
     function applySiteCameraTransform(cache, focusX, focusZ, blendFactor) {
@@ -1621,6 +1688,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             camera.position.y += (desiredCameraY - camera.position.y) * blendFactor;
             camera.position.z += (desiredCameraZ - camera.position.z) * blendFactor;
         }
+
         camera.lookAt(focusX, siteCameraDefaults.lookHeight, focusZ);
     }
 
@@ -1832,6 +1900,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             workerTargetYaw: 0,
             cameraTargetX: 0,
             cameraTargetZ: 0,
+            cameraOrbitGroundDistance: cameraOrbitState.groundDistance,
             cameraOrbitOffsetX: cameraOrbitState.offsetX,
             cameraOrbitOffsetY: cameraOrbitState.offsetY,
             cameraOrbitOffsetZ: cameraOrbitState.offsetZ
@@ -2304,6 +2373,16 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         event.preventDefault();
         event.stopPropagation();
     }, true);
+
+    renderer.domElement.addEventListener("wheel", function (event) {
+        if (!isSiteActiveView() || !siteSceneCache) {
+            return;
+        }
+
+        updateSiteCameraZoomFromWheel(event.deltaY || 0);
+        event.preventDefault();
+        event.stopPropagation();
+    }, { passive: false });
 
     renderer.domElement.addEventListener("pointerdown", function (event) {
         const orbitDragButton = getSiteOrbitDragButtonFromEvent(event);

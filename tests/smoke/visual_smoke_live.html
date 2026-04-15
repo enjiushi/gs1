@@ -611,6 +611,7 @@ body {
 .selection-chip {
   max-width: 920px;
   width: min(920px, 100%);
+  min-width: 0;
 }
 
 .action-bar {
@@ -630,11 +631,12 @@ body {
 
 .site-panel-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.5fr);
+  grid-template-columns: repeat(auto-fit, minmax(min(390px, 100%), 1fr));
   gap: 12px;
 }
 
 .inventory-section {
+  min-width: 0;
   padding: 12px;
   border: 1px solid rgba(109, 85, 57, 0.14);
   background:
@@ -735,8 +737,8 @@ body {
 .inventory-slot-icon {
   position: relative;
   z-index: 1;
-  width: 28px;
-  height: 28px;
+  width: min(28px, calc(100% - 12px));
+  height: min(28px, calc(100% - 12px));
   border-radius: 10px;
   display: grid;
   place-items: center;
@@ -752,8 +754,8 @@ body {
 }
 
 .inventory-slot.loadout-slot .inventory-slot-icon {
-  width: 24px;
-  height: 24px;
+  width: min(24px, calc(100% - 10px));
+  height: min(24px, calc(100% - 10px));
   font-size: 9px;
 }
 
