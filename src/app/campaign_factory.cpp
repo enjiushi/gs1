@@ -1,5 +1,6 @@
 #include "app/campaign_factory.h"
 
+#include "campaign/systems/loadout_planner_system.h"
 #include "content/prototype_content.h"
 
 namespace gs1
@@ -18,6 +19,7 @@ CampaignState CampaignFactory::create_prototype_campaign(
     campaign.campaign_days_remaining = campaign_days;
     campaign.app_state = GS1_APP_STATE_REGIONAL_MAP;
     campaign.faction_progress.push_back(FactionProgressState{FactionId{1U}});
+    LoadoutPlannerSystem::initialize_campaign_state(campaign);
 
     campaign.sites.reserve(content.sites.size());
     for (const auto& site_content : content.sites)

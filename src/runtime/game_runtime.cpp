@@ -4,6 +4,7 @@
 #include "campaign/systems/campaign_system_context.h"
 #include "campaign/systems/loadout_planner_system.h"
 #include "commands/command_dispatcher.h"
+#include "content/defs/item_defs.h"
 #include "site/inventory_storage.h"
 #include "site/site_world_access.h"
 #include "site/systems/action_execution_system.h"
@@ -37,6 +38,20 @@ namespace gs1
 {
 namespace
 {
+[[nodiscard]] std::uint32_t visible_loadout_slot_count(const LoadoutPlannerState& planner) noexcept
+{
+    std::uint32_t count = 0U;
+    for (const auto& slot : planner.selected_loadout_slots)
+    {
+        if (slot.occupied && slot.item_id.value != 0U && slot.quantity > 0U)
+        {
+            count += 1U;
+        }
+    }
+
+    return count;
+}
+
 std::size_t command_type_index(GameCommandType type) noexcept
 {
     return static_cast<std::size_t>(type);
@@ -1221,11 +1236,12 @@ void GameRuntime::queue_regional_map_selection_ui_commands()
     }
 
     const auto site_id = campaign_->regional_map_state.selected_site_id->value;
+    const auto loadout_label_count = visible_loadout_slot_count(campaign_->loadout_planner_state);
 
     queue_ui_setup_begin_command(
         GS1_UI_SETUP_REGIONAL_MAP_SELECTION,
         GS1_UI_SETUP_PRESENTATION_OVERLAY,
-        2U,
+        static_cast<std::uint32_t>(3U + loadout_label_count),
         site_id);
 
     Gs1UiAction no_action {};
@@ -1238,13 +1254,50 @@ void GameRuntime::queue_regional_map_selection_ui_commands()
         no_action,
         label_text);
 
+    std::uint32_t next_element_id = 2U;
+    for (const auto& slot : campaign_->loadout_planner_state.selected_loadout_slots)
+    {
+        if (!slot.occupied || slot.item_id.value == 0U || slot.quantity == 0U)
+        {
+            continue;
+        }
+
+        char loadout_text[64] {};
+        if (const auto* item_def = find_item_def(slot.item_id); item_def != nullptr)
+        {
+            std::snprintf(
+                loadout_text,
+                sizeof(loadout_text),
+                "%.*s x%u",
+                static_cast<int>(item_def->display_name.size()),
+                item_def->display_name.data(),
+                static_cast<unsigned>(slot.quantity));
+        }
+        else
+        {
+            std::snprintf(
+                loadout_text,
+                sizeof(loadout_text),
+                "Item %u x%u",
+                static_cast<unsigned>(slot.item_id.value),
+                static_cast<unsigned>(slot.quantity));
+        }
+
+        queue_ui_element_command(
+            next_element_id++,
+            GS1_UI_ELEMENT_LABEL,
+            GS1_UI_ELEMENT_FLAG_NONE,
+            no_action,
+            loadout_text);
+    }
+
     Gs1UiAction deploy_action {};
     deploy_action.type = GS1_UI_ACTION_START_SITE_ATTEMPT;
     deploy_action.target_id = site_id;
     char button_text[64] {};
     std::snprintf(button_text, sizeof(button_text), "Start Site %u", static_cast<unsigned>(site_id));
     queue_ui_element_command(
-        2U,
+        next_element_id++,
         GS1_UI_ELEMENT_BUTTON,
         GS1_UI_ELEMENT_FLAG_PRIMARY,
         deploy_action,
@@ -1253,7 +1306,7 @@ void GameRuntime::queue_regional_map_selection_ui_commands()
     Gs1UiAction clear_selection_action {};
     clear_selection_action.type = GS1_UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION;
     queue_ui_element_command(
-        3U,
+        next_element_id,
         GS1_UI_ELEMENT_BUTTON,
         GS1_UI_ELEMENT_FLAG_BACKGROUND_CLICK,
         clear_selection_action,

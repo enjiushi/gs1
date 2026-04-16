@@ -17,7 +17,16 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const selectionEyebrow = document.getElementById("selection-eyebrow");
     const selectionText = document.getElementById("selection-text");
     const selectionInventory = document.getElementById("selection-inventory");
+    const storagePanel = document.getElementById("storage-panel");
+    const storagePanelTitle = document.getElementById("storage-panel-title");
+    const storagePanelSubtitle = document.getElementById("storage-panel-subtitle");
+    const storagePanelBody = document.getElementById("storage-panel-body");
+    const storagePanelClose = document.getElementById("storage-panel-close");
     const contextActions = document.getElementById("context-actions");
+    const phoneLayer = document.getElementById("phone-layer");
+    const phoneStatusTime = document.getElementById("phone-status-time");
+    const phoneAppSubtitle = document.getElementById("phone-app-subtitle");
+    const phoneScreenBody = document.getElementById("phone-screen-body");
     const actionProgress = document.getElementById("action-progress");
     const actionProgressLabel = document.getElementById("action-progress-label");
     const actionProgressTime = document.getElementById("action-progress-time");
@@ -41,6 +50,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let selectedInventorySlotKey = "";
     let openedInventoryContainerKey = "";
     let inventoryPanelOpen = true;
+    let phonePanelOpen = false;
+    let lastOverlayAppState = "";
     let tileContextMenuState = null;
     let localActionProgressState = null;
     let animationTimeSeconds = 0;
@@ -86,6 +97,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         CAMP_STORAGE: 1,
         DEVICE_STORAGE: 2
     };
+    let inventoryCache = createEmptyInventoryCache();
     const itemCatalog = {
         1: { name: "Water", shortName: "H2O", stackSize: 5, canUse: true, canPlant: false, canDeploy: false },
         2: { name: "Food", shortName: "Ration", stackSize: 5, canUse: true, canPlant: false, canDeploy: false },
@@ -243,6 +255,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return button;
     }
 
+    function makePhoneActionButton(label, onClick, secondary, disabled) {
+        const button = makeButton(label, onClick, secondary, disabled);
+        button.classList.add("phone-action-button");
+        return button;
+    }
+
     function getSetup(state, setupId) {
         return (state.uiSetups || []).find((setup) => setup.setupId === setupId) || null;
     }
@@ -277,6 +295,86 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return state.siteState || null;
     }
 
+    function createEmptyInventoryCache() {
+        return {
+            frameNumber: 0,
+            slots: [],
+            slotMap: new Map(),
+            containers: [],
+            containerMap: new Map()
+        };
+    }
+
+    function rebuildInventoryCache(state) {
+        const nextCache = createEmptyInventoryCache();
+        if (!state || state.appState !== "SITE_ACTIVE") {
+            inventoryCache = nextCache;
+            return;
+        }
+
+        const siteState = getSiteState(state);
+        const sourceSlots = siteState && Array.isArray(siteState.inventorySlots)
+            ? siteState.inventorySlots
+            : [];
+        nextCache.frameNumber = typeof state.frameNumber === "number" ? state.frameNumber : 0;
+
+        sourceSlots.forEach((sourceSlot) => {
+            const normalizedSlot = {
+                containerKind: sourceSlot.containerKind || "WORKER_PACK",
+                slotIndex: typeof sourceSlot.slotIndex === "number" ? sourceSlot.slotIndex : 0,
+                itemId: typeof sourceSlot.itemId === "number" ? sourceSlot.itemId : 0,
+                itemName: sourceSlot.itemName || null,
+                containerOwnerId: typeof sourceSlot.containerOwnerId === "number" ? sourceSlot.containerOwnerId : 0,
+                quantity: typeof sourceSlot.quantity === "number" ? sourceSlot.quantity : 0,
+                condition: typeof sourceSlot.condition === "number" ? sourceSlot.condition : 0,
+                freshness: typeof sourceSlot.freshness === "number" ? sourceSlot.freshness : 0,
+                containerTileX: typeof sourceSlot.containerTileX === "number" ? sourceSlot.containerTileX : 0,
+                containerTileY: typeof sourceSlot.containerTileY === "number" ? sourceSlot.containerTileY : 0,
+                flags: typeof sourceSlot.flags === "number" ? sourceSlot.flags : 0
+            };
+
+            const cachedSlotKey = slotKey(
+                normalizedSlot.containerKind,
+                normalizedSlot.slotIndex,
+                normalizedSlot.containerOwnerId
+            );
+            nextCache.slots.push(normalizedSlot);
+            nextCache.slotMap.set(cachedSlotKey, normalizedSlot);
+
+            const cachedContainerKey = containerKey(
+                normalizedSlot.containerKind,
+                normalizedSlot.containerOwnerId
+            );
+            if (!nextCache.containerMap.has(cachedContainerKey)) {
+                nextCache.containerMap.set(cachedContainerKey, {
+                    key: cachedContainerKey,
+                    containerKind: normalizedSlot.containerKind,
+                    containerOwnerId: normalizedSlot.containerOwnerId,
+                    containerTileX: normalizedSlot.containerTileX,
+                    containerTileY: normalizedSlot.containerTileY,
+                    slots: []
+                });
+            }
+
+            nextCache.containerMap.get(cachedContainerKey).slots.push(normalizedSlot);
+        });
+
+        nextCache.containers = Array.from(nextCache.containerMap.values()).sort((left, right) => {
+            if (left.containerKind !== right.containerKind) {
+                return left.containerKind.localeCompare(right.containerKind);
+            }
+            if ((left.containerOwnerId || 0) !== (right.containerOwnerId || 0)) {
+                return (left.containerOwnerId || 0) - (right.containerOwnerId || 0);
+            }
+            return 0;
+        });
+        nextCache.containers.forEach((containerInfo) => {
+            containerInfo.slots.sort((left, right) => left.slotIndex - right.slotIndex);
+        });
+
+        inventoryCache = nextCache;
+    }
+
     function getHudState(state) {
         return state ? state.hud || null : null;
     }
@@ -306,6 +404,23 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return itemVisuals[itemId] || { glyph: "??", light: "#8f7a64", dark: "#5a4837" };
     }
 
+    function findItemIdByLabel(labelText) {
+        const target = String(labelText || "").trim();
+        if (!target) {
+            return 0;
+        }
+
+        const itemIds = Object.keys(itemCatalog);
+        for (let index = 0; index < itemIds.length; index += 1) {
+            const itemId = Number(itemIds[index]);
+            if (getItemLabel(itemId) === target) {
+                return itemId;
+            }
+        }
+
+        return 0;
+    }
+
     function getStructureMeta(structureId) {
         return structureCatalog[structureId] || null;
     }
@@ -329,12 +444,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function getAllInventorySlots(state) {
-        const siteState = getSiteState(state);
-        if (!siteState || !siteState.inventorySlots) {
-            return [];
-        }
-
-        return siteState.inventorySlots.slice();
+        return inventoryCache.slots.slice();
     }
 
     function getInventorySlotsByKind(state, containerKind) {
@@ -357,6 +467,27 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
 
         return siteState.phoneListings.filter((listing) => listing.listingKind === "SELL_ITEM" && listing.quantity !== 0);
+    }
+
+    function getSpecialPhoneListings(state) {
+        const siteState = getSiteState(state);
+        if (!siteState || !siteState.phoneListings) {
+            return [];
+        }
+
+        return siteState.phoneListings.filter((listing) =>
+            listing.listingKind !== "BUY_ITEM" &&
+            listing.listingKind !== "SELL_ITEM" &&
+            listing.quantity !== 0);
+    }
+
+    function getSiteTasks(state) {
+        const siteState = getSiteState(state);
+        if (!siteState || !siteState.tasks) {
+            return [];
+        }
+
+        return siteState.tasks.slice();
     }
 
     function containerKey(containerKind, containerOwnerId) {
@@ -393,31 +524,22 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function getInventoryContainers(state) {
-        const containers = new Map();
-        getAllInventorySlots(state).forEach((slot) => {
-            const key = containerKey(slot.containerKind, slot.containerOwnerId || 0);
-            if (!containers.has(key)) {
-                containers.set(key, {
-                    key: key,
-                    containerKind: slot.containerKind,
-                    containerOwnerId: slot.containerOwnerId || 0,
-                    containerTileX: typeof slot.containerTileX === "number" ? slot.containerTileX : 0,
-                    containerTileY: typeof slot.containerTileY === "number" ? slot.containerTileY : 0,
-                    slots: []
-                });
-            }
-            containers.get(key).slots.push(slot);
-        });
+        return inventoryCache.containers.map((containerInfo) => ({
+            key: containerInfo.key,
+            containerKind: containerInfo.containerKind,
+            containerOwnerId: containerInfo.containerOwnerId,
+            containerTileX: containerInfo.containerTileX,
+            containerTileY: containerInfo.containerTileY,
+            slots: containerInfo.slots.slice()
+        }));
+    }
 
-        return Array.from(containers.values()).sort((left, right) => {
-            if (left.containerKind !== right.containerKind) {
-                return left.containerKind.localeCompare(right.containerKind);
-            }
-            if ((left.containerOwnerId || 0) !== (right.containerOwnerId || 0)) {
-                return (left.containerOwnerId || 0) - (right.containerOwnerId || 0);
-            }
-            return 0;
-        });
+    function findInventoryContainerByKey(containerLookupKey) {
+        if (!containerLookupKey) {
+            return null;
+        }
+
+        return inventoryCache.containerMap.get(containerLookupKey) || null;
     }
 
     function getDeviceStorageContainers(state) {
@@ -425,10 +547,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function getOpenableStorageContainersForTile(state, tileX, tileY) {
-        return getInventoryContainers(state).filter((container) =>
+        const containersAtTile = getInventoryContainers(state).filter((container) =>
             container.containerKind !== "WORKER_PACK" &&
             container.containerTileX === tileX &&
             container.containerTileY === tileY);
+        const campStorageContainers = containersAtTile.filter((container) => container.containerKind === "CAMP_STORAGE");
+        return campStorageContainers.length > 0 ? campStorageContainers : containersAtTile;
     }
 
     function findOpenedInventoryContainer(state) {
@@ -436,7 +560,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return null;
         }
 
-        return getInventoryContainers(state).find((container) => container.key === openedInventoryContainerKey) || null;
+        return findInventoryContainerByKey(openedInventoryContainerKey);
     }
 
     function clearOpenedInventoryContainerIfInvalid(state) {
@@ -452,7 +576,17 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function openInventoryContainer(containerInfo) {
         openedInventoryContainerKey = containerInfo ? containerInfo.key : "";
-        inventoryPanelOpen = true;
+        if (latestState) {
+            renderSiteOverlay(latestState);
+        }
+    }
+
+    function closeOpenedInventoryContainer() {
+        const closedContainerKey = openedInventoryContainerKey;
+        openedInventoryContainerKey = "";
+        if (closedContainerKey && selectedInventorySlotKey.startsWith(closedContainerKey + ":")) {
+            selectedInventorySlotKey = "";
+        }
         if (latestState) {
             renderSiteOverlay(latestState);
         }
@@ -1342,6 +1476,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (occupied && itemMeta && itemMeta.canUse) {
             slotClasses.push("usable");
         }
+        if (options.slotClassName) {
+            slotClasses.push(options.slotClassName);
+        }
         if (occupied && options.armedSlotKey && slotKey(slot.containerKind, slot.slotIndex, slot.containerOwnerId) === options.armedSlotKey) {
             slotClasses.push("armed");
         }
@@ -1380,7 +1517,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             card.appendChild(count);
         }
 
-        if (occupied) {
+        if (occupied && options.interactive !== false) {
             card.addEventListener("mouseenter", function (event) {
                 showInventoryTooltip(slot, options, event.clientX, event.clientY);
             });
@@ -1392,7 +1529,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             });
         }
 
-        if (occupied) {
+        if (occupied && options.interactive !== false) {
             card.addEventListener("click", function () {
                 const clickedKey = slotKey(slot.containerKind, slot.slotIndex, slot.containerOwnerId);
                 selectedInventorySlotKey = selectedInventorySlotKey === clickedKey ? "" : clickedKey;
@@ -1431,7 +1568,82 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         container.appendChild(sectionParts.section);
     }
 
-    function renderSiteInventoryPanel(state, workerPackSlots, openedContainerInfo) {
+    function parseRegionalLoadoutSlots(labels) {
+        return labels
+            .map((entry) => {
+                if (!entry || typeof entry.text !== "string") {
+                    return null;
+                }
+
+                const match = /^(.*)\sx(\d+)$/.exec(entry.text.trim());
+                if (!match) {
+                    return null;
+                }
+
+                const itemName = match[1].trim();
+                const quantity = Number(match[2]) || 0;
+                const itemId = findItemIdByLabel(itemName);
+                return {
+                    containerKind: "LOADOUT",
+                    containerOwnerId: 0,
+                    containerTileX: 0,
+                    containerTileY: 0,
+                    slotIndex: 0,
+                    itemId: itemId,
+                    itemName: itemName,
+                    quantity: quantity,
+                    flags: quantity > 0 ? 1 : 0,
+                    condition: 1,
+                    freshness: 1
+                };
+            })
+            .filter((slot) => !!slot)
+            .map((slot, index) => ({
+                ...slot,
+                slotIndex: index
+            }));
+    }
+
+    function renderRegionalMapLoadoutPanel(state, selectionSetup, primaryLabelText) {
+        const labels = getLabelElements(selectionSetup);
+        const loadoutSlots = parseRegionalLoadoutSlots(labels);
+
+        selectionInventory.innerHTML = "";
+        if (state.selectedSiteId == null || loadoutSlots.length === 0) {
+            selectionInventory.hidden = true;
+            return;
+        }
+
+        selectionInventory.hidden = false;
+        const stack = document.createElement("div");
+        stack.className = "site-panel-stack";
+        selectionInventory.appendChild(stack);
+
+        appendInventoryGridSection(
+            stack,
+            "Deployment Loadout",
+            primaryLabelText ? (primaryLabelText + "  |  Starter support ready") : "Starter support ready",
+            loadoutSlots,
+            {
+                state: state,
+                containerKind: "LOADOUT",
+                slotCount: loadoutSlots.length,
+                columns: Math.min(4, Math.max(loadoutSlots.length, 1)),
+                gridClassName: "loadout-grid",
+                slotClassName: "loadout-slot",
+                slotLabelPrefix: "Loadout",
+                selectedSlotKey: "",
+                interactive: false
+            });
+
+        const footnote = document.createElement("div");
+        footnote.className = "inventory-footnote";
+        footnote.textContent =
+            "Baseline support is packed before deployment. Water and recovery supplies start carried; seeds and raw materials begin in camp storage.";
+        stack.appendChild(footnote);
+    }
+
+    function renderSiteInventoryPanel(state, workerPackSlots) {
         selectionInventory.hidden = false;
         selectionInventory.innerHTML = "";
 
@@ -1463,42 +1675,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             selectedSlotKey: selectedInventorySlotKey
         });
 
-        if (openedContainerInfo) {
-            const tile = getTileSnapshot(state, openedContainerInfo.containerTileX, openedContainerInfo.containerTileY);
-            const structureMeta = getStructureMeta(tile ? tile.structureTypeId : 0);
-            const openedSlotCount = openedContainerInfo.containerKind === "CAMP_STORAGE"
-                ? 24
-                : (structureMeta ? structureMeta.slotCount : Math.max(openedContainerInfo.slots.length, 1));
-            appendInventoryGridSection(
-                topGrid,
-                getContainerDisplayName(state, openedContainerInfo),
-                openedContainerInfo.containerKind === "CAMP_STORAGE"
-                    ? "Starter camp stockpile"
-                    : (structureMeta ? ("Device storage - " + structureMeta.slotCount + " slots") : "Device storage"),
-                openedContainerInfo.slots,
-                {
-                    state: state,
-                    containerKind: openedContainerInfo.containerKind,
-                    containerOwnerId: openedContainerInfo.containerOwnerId,
-                    containerTileX: openedContainerInfo.containerTileX,
-                    containerTileY: openedContainerInfo.containerTileY,
-                    slotCount: openedSlotCount,
-                    columns: openedSlotCount <= 6 ? 3 : 4,
-                    slotLabelPrefix: openedContainerInfo.containerKind === "CAMP_STORAGE" ? "Camp" : "Device",
-                    selectedSlotKey: selectedInventorySlotKey
-                });
-        }
-
         const footnote = document.createElement("div");
         footnote.className = "inventory-footnote";
         const carriedSeeds = getCarriedSeedOptions(state);
         const carriedDeployables = getCarriedDeployableOptions(state);
         const footnoteParts = [];
-        if (openedContainerInfo) {
-            footnoteParts.push("Opened: " + getContainerDisplayName(state, openedContainerInfo));
-        } else {
-            footnoteParts.push("Press B for the worker pack, or right-click a storage/crafting device to open that container.");
-        }
+        footnoteParts.push("Press B to toggle the worker pack. Right-click a storage or crafting device to open its separate storage panel.");
         if (carriedSeeds.length > 0) {
             footnoteParts.push(
                 "Seeds: " +
@@ -1513,11 +1695,58 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         stack.appendChild(footnote);
     }
 
+    function renderStoragePanel(state, openedContainerInfo) {
+        const currentOpenedContainer =
+            state && state.appState === "SITE_ACTIVE"
+                ? findOpenedInventoryContainer(state)
+                : null;
+        if (!state || state.appState !== "SITE_ACTIVE" || !currentOpenedContainer) {
+            storagePanel.hidden = true;
+            storagePanelBody.innerHTML = "";
+            return;
+        }
+
+        storagePanel.hidden = false;
+        storagePanelTitle.textContent = getContainerDisplayName(state, currentOpenedContainer);
+
+        const tile = getTileSnapshot(state, currentOpenedContainer.containerTileX, currentOpenedContainer.containerTileY);
+        const structureMeta = getStructureMeta(tile ? tile.structureTypeId : 0);
+        const slotCount = currentOpenedContainer.containerKind === "CAMP_STORAGE"
+            ? 24
+            : (structureMeta ? structureMeta.slotCount : Math.max(currentOpenedContainer.slots.length, 1));
+        storagePanelSubtitle.textContent = currentOpenedContainer.containerKind === "CAMP_STORAGE"
+            ? "Starter camp stockpile"
+            : (structureMeta ? ("Device storage - " + structureMeta.slotCount + " slots") : "Device storage");
+
+        storagePanelBody.innerHTML = "";
+        const stack = document.createElement("div");
+        stack.className = "site-panel-stack";
+        storagePanelBody.appendChild(stack);
+
+        appendInventoryGridSection(
+            stack,
+            storagePanelTitle.textContent,
+            storagePanelSubtitle.textContent,
+            currentOpenedContainer.slots,
+            {
+                state: state,
+                containerKind: currentOpenedContainer.containerKind,
+                containerOwnerId: currentOpenedContainer.containerOwnerId,
+                containerTileX: currentOpenedContainer.containerTileX,
+                containerTileY: currentOpenedContainer.containerTileY,
+                slotCount: slotCount,
+                columns: slotCount <= 6 ? 3 : 4,
+                slotLabelPrefix: currentOpenedContainer.containerKind === "CAMP_STORAGE" ? "Camp" : "Device",
+                selectedSlotKey: selectedInventorySlotKey
+            });
+    }
+
     function appendSelectedInventoryActions(state, selectedSlot) {
         if (!selectedSlot) {
             const helper = document.createElement("div");
             helper.className = "helper-note";
-            helper.textContent = "Hover any item for details. Click any worker, camp, or device slot to surface actions here.";
+            helper.textContent =
+                "Hover any item for details. Click any worker, camp, or device slot to surface actions here. Press F to open the phone.";
             contextActions.appendChild(helper);
             return;
         }
@@ -1600,6 +1829,340 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         );
     }
 
+    function clearPhonePanel() {
+        phoneScreenBody.innerHTML = "";
+        phoneLayer.classList.remove("open");
+        phoneLayer.classList.add("hidden-view");
+        phoneLayer.setAttribute("aria-hidden", "true");
+        stageFrame.classList.remove("phone-open");
+    }
+
+    function syncPhonePanelVisibility(isSiteActive) {
+        if (!isSiteActive) {
+            clearPhonePanel();
+            return;
+        }
+
+        phoneLayer.classList.remove("hidden-view");
+        phoneLayer.classList.toggle("open", phonePanelOpen);
+        phoneLayer.setAttribute("aria-hidden", phonePanelOpen ? "false" : "true");
+        stageFrame.classList.toggle("phone-open", phonePanelOpen);
+    }
+
+    function formatPhoneClockLabel() {
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, "0");
+        const minutes = String(now.getMinutes()).padStart(2, "0");
+        return hours + ":" + minutes;
+    }
+
+    function countTasksByListKind(tasks, listKind) {
+        return tasks.filter((task) => task.listKind === listKind).length;
+    }
+
+    function appendPhoneSummaryCard(container, label, value) {
+        const card = document.createElement("div");
+        card.className = "phone-summary-card";
+
+        const labelElement = document.createElement("div");
+        labelElement.className = "phone-summary-label";
+        labelElement.textContent = label;
+        card.appendChild(labelElement);
+
+        const valueElement = document.createElement("div");
+        valueElement.className = "phone-summary-value";
+        valueElement.textContent = value;
+        card.appendChild(valueElement);
+
+        container.appendChild(card);
+    }
+
+    function makePhoneSection(title, metaText) {
+        const section = document.createElement("section");
+        section.className = "phone-section";
+
+        const header = document.createElement("div");
+        header.className = "phone-section-header";
+
+        const titleElement = document.createElement("div");
+        titleElement.className = "phone-section-title";
+        titleElement.textContent = title;
+        header.appendChild(titleElement);
+
+        const metaElement = document.createElement("div");
+        metaElement.className = "phone-section-meta";
+        metaElement.textContent = metaText;
+        header.appendChild(metaElement);
+
+        section.appendChild(header);
+        return section;
+    }
+
+    function getPhoneListingBadgeLabel(listing) {
+        switch (listing.listingKind) {
+        case "SELL_ITEM":
+            return "Sell";
+        case "HIRE_CONTRACTOR":
+            return "Hire";
+        case "PURCHASE_UNLOCKABLE":
+            return "Unlock";
+        case "BUY_ITEM":
+        default:
+            return "Buy";
+        }
+    }
+
+    function getPhoneListingTitle(listing) {
+        switch (listing.listingKind) {
+        case "SELL_ITEM":
+        case "BUY_ITEM":
+            return getItemLabel(listing.itemOrUnlockableId);
+        case "HIRE_CONTRACTOR":
+            return "Hire Contractor";
+        case "PURCHASE_UNLOCKABLE":
+            return "Unlockable " + listing.itemOrUnlockableId;
+        default:
+            return "Listing " + listing.listingId;
+        }
+    }
+
+    function getPhoneListingMetaText(listing, affordable) {
+        const parts = ["$" + listing.price];
+        if (listing.listingKind === "SELL_ITEM") {
+            parts.push("available x" + listing.quantity);
+        } else if (listing.listingKind === "HIRE_CONTRACTOR") {
+            parts.push("open slots x" + listing.quantity);
+        } else {
+            parts.push("stock x" + listing.quantity);
+        }
+        if (listing.relatedSiteId) {
+            parts.push("site " + listing.relatedSiteId);
+        }
+        if (!affordable && listing.listingKind !== "SELL_ITEM") {
+            parts.push("insufficient funds");
+        }
+        return parts.join("  |  ");
+    }
+
+    function getPhoneListingActionLabel(listing) {
+        switch (listing.listingKind) {
+        case "SELL_ITEM":
+            return "Sell For $" + listing.price;
+        case "HIRE_CONTRACTOR":
+            return "Hire For $" + listing.price;
+        case "PURCHASE_UNLOCKABLE":
+            return "Unlock For $" + listing.price;
+        case "BUY_ITEM":
+        default:
+            return "Buy For $" + listing.price;
+        }
+    }
+
+    function canUsePhoneListing(state, listing) {
+        if (listing.listingKind === "SELL_ITEM") {
+            return listing.quantity > 0;
+        }
+
+        const hud = getHudState(state);
+        const currentMoney = hud && typeof hud.currentMoney === "number" ? hud.currentMoney : 0;
+        return listing.quantity > 0 && currentMoney >= listing.price;
+    }
+
+    function postPhoneListingAction(listing) {
+        return postJson("/ui-action", {
+            type: listing.listingKind === "SELL_ITEM" ? "SELL_PHONE_LISTING" : "BUY_PHONE_LISTING",
+            targetId: listing.listingId,
+            arg0: 1,
+            arg1: 0
+        });
+    }
+
+    function appendPhoneListingSection(container, title, metaText, listings, state) {
+        if (listings.length === 0) {
+            return;
+        }
+
+        const section = makePhoneSection(title, metaText);
+        const stack = document.createElement("div");
+        stack.className = "phone-list-stack";
+        section.appendChild(stack);
+
+        listings.forEach((listing) => {
+            const affordable = canUsePhoneListing(state, listing);
+            const card = document.createElement("article");
+            card.className = "phone-list-card" + (affordable ? "" : " disabled");
+
+            const header = document.createElement("div");
+            header.className = "phone-list-header";
+
+            const titleElement = document.createElement("div");
+            titleElement.className = "phone-list-title";
+            titleElement.textContent = getPhoneListingTitle(listing);
+            header.appendChild(titleElement);
+
+            const badge = document.createElement("div");
+            badge.className = "phone-list-badge";
+            badge.textContent = getPhoneListingBadgeLabel(listing);
+            header.appendChild(badge);
+            card.appendChild(header);
+
+            const metaElement = document.createElement("div");
+            metaElement.className = "phone-list-meta";
+            metaElement.textContent = getPhoneListingMetaText(listing, affordable);
+            card.appendChild(metaElement);
+
+            card.appendChild(
+                makePhoneActionButton(
+                    getPhoneListingActionLabel(listing),
+                    function () {
+                        postPhoneListingAction(listing).catch(() => {
+                            statusChip.textContent = listing.listingKind === "SELL_ITEM"
+                                ? "Failed to sell listing."
+                                : "Failed to use phone listing.";
+                        });
+                    },
+                    listing.listingKind === "SELL_ITEM",
+                    !affordable
+                )
+            );
+
+            stack.appendChild(card);
+        });
+
+        container.appendChild(section);
+    }
+
+    function getPhoneTaskStateLabel(task) {
+        switch (task.listKind) {
+        case "ACCEPTED":
+            return "Active";
+        case "COMPLETED":
+            return "Done";
+        case "VISIBLE":
+        default:
+            return "Open";
+        }
+    }
+
+    function getPhoneTaskStateClassName(task) {
+        let className = "phone-task-state";
+        if (task.listKind === "ACCEPTED") {
+            className += " accepted";
+        } else if (task.listKind === "COMPLETED") {
+            className += " completed";
+        }
+        return className;
+    }
+
+    function appendPhoneTaskSection(container, tasks) {
+        const visibleTaskCount = countTasksByListKind(tasks, "VISIBLE");
+        const acceptedTaskCount = countTasksByListKind(tasks, "ACCEPTED");
+        const section = makePhoneSection("Contracts", "Open " + visibleTaskCount + "  |  Active " + acceptedTaskCount);
+
+        if (tasks.length === 0) {
+            const emptyState = document.createElement("div");
+            emptyState.className = "phone-empty-state";
+            emptyState.textContent = "No field contracts are synced to the phone yet.";
+            section.appendChild(emptyState);
+            container.appendChild(section);
+            return;
+        }
+
+        const stack = document.createElement("div");
+        stack.className = "phone-list-stack";
+        section.appendChild(stack);
+
+        tasks.forEach((task) => {
+            const targetProgress = Math.max(task.targetProgress || 0, 1);
+            const currentProgress = Math.max(0, Math.min(task.currentProgress || 0, targetProgress));
+            const completion = Math.round((currentProgress / targetProgress) * 100);
+            const card = document.createElement("article");
+            card.className = "phone-task-card";
+
+            const header = document.createElement("div");
+            header.className = "phone-task-header";
+
+            const titleElement = document.createElement("div");
+            titleElement.className = "phone-task-title";
+            titleElement.textContent = "Contract " + task.taskInstanceId;
+            header.appendChild(titleElement);
+
+            const stateElement = document.createElement("div");
+            stateElement.className = getPhoneTaskStateClassName(task);
+            stateElement.textContent = getPhoneTaskStateLabel(task);
+            header.appendChild(stateElement);
+            card.appendChild(header);
+
+            const metaElement = document.createElement("div");
+            metaElement.className = "phone-task-meta";
+            metaElement.textContent =
+                "Template " + task.taskTemplateId +
+                "  |  Progress " + currentProgress + "/" + targetProgress +
+                "  |  " + completion + "%";
+            card.appendChild(metaElement);
+
+            const track = document.createElement("div");
+            track.className = "phone-task-track";
+            const fill = document.createElement("div");
+            fill.className = "phone-task-fill";
+            fill.style.width = completion + "%";
+            track.appendChild(fill);
+            card.appendChild(track);
+
+            stack.appendChild(card);
+        });
+
+        container.appendChild(section);
+    }
+
+    function renderPhonePanel(state) {
+        const isSiteActive = !!state && state.appState === "SITE_ACTIVE";
+        syncPhonePanelVisibility(isSiteActive);
+        phoneScreenBody.innerHTML = "";
+
+        if (!isSiteActive || !phonePanelOpen) {
+            return;
+        }
+
+        phoneStatusTime.textContent = formatPhoneClockLabel();
+
+        const hud = getHudState(state);
+        const tasks = getSiteTasks(state);
+        const buyListings = getBuyListings(state);
+        const sellListings = getSellListings(state);
+        const specialListings = getSpecialPhoneListings(state);
+        const currentMoney = hud && typeof hud.currentMoney === "number" ? hud.currentMoney : 0;
+        const activeTaskCount = hud && typeof hud.activeTaskCount === "number"
+            ? hud.activeTaskCount
+            : countTasksByListKind(tasks, "ACCEPTED");
+        const visibleTaskCount = countTasksByListKind(tasks, "VISIBLE");
+
+        phoneAppSubtitle.textContent =
+            activeTaskCount > 0
+                ? activeTaskCount + " active contract" + (activeTaskCount === 1 ? "" : "s") + ". Press F to pocket the handset."
+                : "Pocket market access, contracts, and remote services. Press F to pocket it again.";
+
+        const summaryGrid = document.createElement("div");
+        summaryGrid.className = "phone-summary-grid";
+        appendPhoneSummaryCard(summaryGrid, "Money", "$" + String(currentMoney));
+        appendPhoneSummaryCard(summaryGrid, "Buy", String(buyListings.length));
+        appendPhoneSummaryCard(summaryGrid, "Sell", String(sellListings.length));
+        appendPhoneSummaryCard(summaryGrid, "Tasks", String(activeTaskCount + visibleTaskCount));
+        phoneScreenBody.appendChild(summaryGrid);
+
+        appendPhoneTaskSection(phoneScreenBody, tasks);
+        appendPhoneListingSection(phoneScreenBody, "Marketplace", "Remote orders routed to camp stock", buyListings, state);
+        appendPhoneListingSection(phoneScreenBody, "Sellback", "Current inventory surfaced for quick sale", sellListings, state);
+        appendPhoneListingSection(phoneScreenBody, "Services", "Remote services and unlockables", specialListings, state);
+
+        if (buyListings.length === 0 && sellListings.length === 0 && specialListings.length === 0) {
+            const emptyState = document.createElement("div");
+            emptyState.className = "phone-empty-state";
+            emptyState.textContent = "No remote listings are available on the phone right now.";
+            phoneScreenBody.appendChild(emptyState);
+        }
+    }
+
     function updateMoveAxis() {
         const x = (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0) - (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0);
         const y = (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
@@ -1648,6 +2211,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         selectionEyebrow.textContent = "Situation";
         selectionText.textContent = "Supplies are thin, cover is fragile, and every deployment begins exposed to dust and heat. Begin the campaign and secure the first living foothold.";
+        renderStoragePanel(null, null);
         contextActions.innerHTML = "";
     }
 
@@ -1655,17 +2219,21 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const selectionSetup = getSetup(state, "REGIONAL_MAP_SELECTION");
         const labels = getLabelElements(selectionSetup);
         const actions = getVisibleActionElements(selectionSetup);
+        const primaryLabel = labels.length > 0 ? labels[0].text : "";
 
         menuPanel.hidden = true;
         selectionEyebrow.textContent = "Field Survey";
 
-        if (labels.length > 0) {
-            selectionText.textContent = labels.map((entry) => entry.text).join(" | ");
+        if (primaryLabel) {
+            selectionText.textContent = primaryLabel;
         } else if (state.selectedSiteId != null) {
             selectionText.textContent = "Deployment route prepared for Site " + state.selectedSiteId + ". Review the dossier and commit when ready.";
         } else {
             selectionText.textContent = "Review the campaign survey and choose the next exposed site to stabilize.";
         }
+
+        renderRegionalMapLoadoutPanel(state, selectionSetup, primaryLabel);
+        renderStoragePanel(null, null);
 
         contextActions.innerHTML = "";
         actions.forEach((element) => {
@@ -1699,19 +2267,17 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             siteBootstrap
                 ? "Site " + siteBootstrap.siteId + " placeholder view."
                 : "Waiting for the next presentation state.";
+        selectionInventory.hidden = true;
+        selectionInventory.innerHTML = "";
+        renderStoragePanel(null, null);
         contextActions.innerHTML = "";
     }
 
     function renderSiteOverlay(state) {
         const siteBootstrap = getSiteBootstrap(state);
-        const siteState = getSiteState(state);
         const workerPackSlots = getInventorySlotsByKind(state, "WORKER_PACK");
-        const buyListings = getBuyListings(state);
-        const sellListings = getSellListings(state);
         const carriedSeeds = getCarriedSeedOptions(state);
         const carriedDeployables = getCarriedDeployableOptions(state);
-        const workerActionKind =
-            siteState && siteState.worker ? siteState.worker.currentActionKind : 0;
 
         menuPanel.hidden = true;
         selectionEyebrow.textContent = "Site Active";
@@ -1735,55 +2301,16 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         selectionText.innerHTML = siteBootstrap
             ? (
                 "Site " + siteBootstrap.siteId +
-                " is live. Use WASD to move, press B to open or close the worker pack, drag with right mouse to orbit the camera, and short right-click a tile to choose a site action." +
+                " is live. Use WASD to move, press B to open or close the worker pack, press F to open or close the phone, drag with right mouse to orbit the camera, and short right-click a tile to choose a site action." +
                 "<br><br>" + plantingText +
                 "<br><br>" + deployText +
-                "<br><br>" + storageText
+                "<br><br>" + storageText +
+                "<br><br>Inventory and storage panels resolve slots from the adapter's cached site snapshot and refresh as inventory slot updates arrive."
             )
             : "Site bootstrap is loading.";
-        renderSiteInventoryPanel(state, workerPackSlots, openedContainerInfo);
+        renderSiteInventoryPanel(state, workerPackSlots);
+        renderStoragePanel(state, openedContainerInfo);
         appendSelectedInventoryActions(state, selectedSlot);
-
-        buyListings.forEach((listing) => {
-            contextActions.appendChild(
-                makeButton(
-                    "Buy " + getItemLabel(listing.itemOrUnlockableId) + " $" + listing.price,
-                    function () {
-                        postJson("/ui-action", {
-                            type: "BUY_PHONE_LISTING",
-                            targetId: listing.listingId,
-                            arg0: 1,
-                            arg1: 0
-                        }).catch(() => {
-                            statusChip.textContent = "Failed to buy listing.";
-                        });
-                    },
-                    false,
-                    false
-                )
-            );
-        });
-
-        sellListings.forEach((listing) => {
-            contextActions.appendChild(
-                makeButton(
-                    "Sell " + getItemLabel(listing.itemOrUnlockableId) +
-                    " $" + listing.price + " - x" + listing.quantity,
-                    function () {
-                        postJson("/ui-action", {
-                            type: "SELL_PHONE_LISTING",
-                            targetId: listing.listingId,
-                            arg0: 1,
-                            arg1: 0
-                        }).catch(() => {
-                            statusChip.textContent = "Failed to sell listing.";
-                        });
-                    },
-                    true,
-                    false
-                )
-            );
-        });
         renderSiteStatusChip(state);
     }
 
@@ -1793,11 +2320,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         stageFrame.classList.toggle("site-active-mode", state.appState === "SITE_ACTIVE");
         hudEyebrow.textContent = "App State";
         hudTitle.textContent = state.appState || "NONE";
+        const appStateChanged = lastOverlayAppState !== state.appState;
 
         switch (state.appState) {
         case "MAIN_MENU":
             hudSubtitle.textContent = "Austere, painterly, and severe: the campaign opens under hostile conditions.";
             inventoryPanelOpen = true;
+            phonePanelOpen = false;
             selectedInventorySlotKey = "";
             openedInventoryContainerKey = "";
             clearSelectionInventory();
@@ -1807,6 +2336,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         case "REGIONAL_MAP":
             hudSubtitle.textContent = "Review the campaign survey board and choose the next deployment route.";
             inventoryPanelOpen = true;
+            phonePanelOpen = false;
             selectedInventorySlotKey = "";
             openedInventoryContainerKey = "";
             clearSelectionInventory();
@@ -1816,12 +2346,20 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 "\nSelected Site: " + (state.selectedSiteId == null ? "none" : state.selectedSiteId);
             break;
         case "SITE_ACTIVE":
-            hudSubtitle.textContent = "Field movement is now live. Press B to toggle the inventory panel, drag with right mouse to orbit the follow camera, or short right-click a tile to open its action menu.";
+            if (appStateChanged) {
+                inventoryPanelOpen = false;
+                phonePanelOpen = false;
+                selectedInventorySlotKey = "";
+                openedInventoryContainerKey = "";
+            }
+            hudSubtitle.textContent =
+                "Field movement is now live. Press B to toggle the inventory panel, press F to pocket or raise the phone, drag with right mouse to orbit the follow camera, or short right-click a tile to open its action menu.";
             renderSiteOverlay(state);
             break;
         default:
             hudSubtitle.textContent = "The current adapter only styles the core early flow for now.";
             inventoryPanelOpen = true;
+            phonePanelOpen = false;
             selectedInventorySlotKey = "";
             openedInventoryContainerKey = "";
             clearSelectionInventory();
@@ -1831,6 +2369,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 "\nSelected Site: " + (state.selectedSiteId == null ? "none" : state.selectedSiteId);
             break;
         }
+
+        renderPhonePanel(state);
+        lastOverlayAppState = state.appState;
     }
 
     function renderMainMenuScene() {
@@ -3529,6 +4070,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function handleIncomingState(state, forceRender, patch) {
         const normalizedState = normalizeState(state);
+        rebuildInventoryCache(normalizedState);
         const previousState = latestState;
         syncLocalActionProgress(normalizedState);
         const lightweightPatchParts =
@@ -3558,8 +4100,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             if (lightweightPatchParts.hud) {
                 renderSiteInventoryPanel(
                     normalizedState,
-                    getInventorySlotsByKind(normalizedState, "WORKER_PACK"),
-                    findOpenedInventoryContainer(normalizedState));
+                    getInventorySlotsByKind(normalizedState, "WORKER_PACK"));
+                renderStoragePanel(normalizedState, findOpenedInventoryContainer(normalizedState));
+                if (phonePanelOpen) {
+                    renderPhonePanel(normalizedState);
+                }
             }
             renderActionProgressBar(normalizedState);
             return;
@@ -3703,11 +4248,14 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     window.addEventListener("keydown", function (event) {
+        if (event.code === "KeyF" && !event.repeat && latestState && latestState.appState === "SITE_ACTIVE") {
+            phonePanelOpen = !phonePanelOpen;
+            renderPhonePanel(latestState);
+            event.preventDefault();
+            return;
+        }
         if (event.code === "KeyB" && !event.repeat && latestState && latestState.appState === "SITE_ACTIVE") {
             inventoryPanelOpen = !inventoryPanelOpen;
-            if (inventoryPanelOpen) {
-                openedInventoryContainerKey = "";
-            }
             renderSiteOverlay(latestState);
             event.preventDefault();
             return;
@@ -3960,6 +4508,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     window.addEventListener("resize", fitRenderer);
 
     fitRenderer();
+    storagePanelClose.addEventListener("click", function () {
+        closeOpenedInventoryContainer();
+    });
     animate();
     connectStateStream();
     window.setInterval(sendSiteControlState, 16);

@@ -9,6 +9,7 @@ namespace gs1
 class LoadoutPlannerSystem final
 {
 public:
+    static void initialize_campaign_state(CampaignState& campaign);
     [[nodiscard]] static bool subscribes_to(GameCommandType type) noexcept;
     [[nodiscard]] static Gs1Status process_command(
         CampaignSystemContext& context,

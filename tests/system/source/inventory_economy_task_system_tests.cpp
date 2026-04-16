@@ -72,7 +72,13 @@ void inventory_site_one_seed_is_applied_once(gs1::testing::SystemTestExecutionCo
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].item_id.value == 1U);
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].item_quantity == 2U);
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[1].item_id.value == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[2].item_id.value == 3U);
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.camp_storage_slots[0].item_id.value == 4U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.camp_storage_slots[0].item_quantity == 8U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.camp_storage_slots[1].item_id.value == 8U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.camp_storage_slots[1].item_quantity == 6U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.camp_storage_slots[2].item_id.value == 9U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.camp_storage_slots[2].item_quantity == 4U);
 
     {
         auto container = gs1::inventory_storage::worker_pack_container(site_run);
@@ -117,7 +123,10 @@ void inventory_non_site_seed_and_run_resize_slots(gs1::testing::SystemTestExecut
             make_command(
                 GameCommandType::SiteRunStarted,
                 SiteRunStartedCommand {2U, 1U, 102U, 1U, 43ULL})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, !site_run.inventory.worker_pack_slots[0].occupied);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].occupied);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].item_id.value == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.camp_storage_slots[0].occupied);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.camp_storage_slots[0].item_id.value == 4U);
 }
 
 void inventory_item_use_validates_and_emits_meter_delta(gs1::testing::SystemTestExecutionContext& context)

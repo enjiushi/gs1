@@ -4,6 +4,7 @@
 #include "campaign/systems/regional_support_system.h"
 #include "campaign/systems/technology_system.h"
 #include "commands/game_command.h"
+#include "content/defs/item_defs.h"
 #include "site/site_world_access.h"
 #include "site/systems/failure_recovery_system.h"
 #include "site/systems/site_completion_system.h"
@@ -46,6 +47,21 @@ GameCommand make_command(gs1::GameCommandType type, const Payload& payload)
     return command;
 }
 
+const gs1::LoadoutSlot* find_loadout_slot(
+    const std::vector<gs1::LoadoutSlot>& slots,
+    std::uint32_t item_id) noexcept
+{
+    for (const auto& slot : slots)
+    {
+        if (slot.occupied && slot.item_id.value == item_id)
+        {
+            return &slot;
+        }
+    }
+
+    return nullptr;
+}
+
 void campaign_flow_start_new_campaign_initializes_state(gs1::testing::SystemTestExecutionContext& context)
 {
     std::optional<gs1::CampaignState> campaign {};
@@ -76,6 +92,30 @@ void campaign_flow_start_new_campaign_initializes_state(gs1::testing::SystemTest
     GS1_SYSTEM_TEST_CHECK(context, campaign->regional_map_state.revealed_site_ids.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, campaign->regional_map_state.available_site_ids.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, campaign->regional_map_state.available_site_ids.front().value == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, campaign->loadout_planner_state.baseline_deployment_items.size() == 6U);
+    GS1_SYSTEM_TEST_CHECK(context, campaign->loadout_planner_state.selected_loadout_slots.size() == 6U);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        find_loadout_slot(
+            campaign->loadout_planner_state.selected_loadout_slots,
+            gs1::k_item_wind_reed_seed_bundle) != nullptr);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        find_loadout_slot(
+            campaign->loadout_planner_state.selected_loadout_slots,
+            gs1::k_item_wind_reed_seed_bundle)
+            ->quantity == 8U);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        find_loadout_slot(
+            campaign->loadout_planner_state.selected_loadout_slots,
+            gs1::k_item_wood_bundle) != nullptr);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        find_loadout_slot(
+            campaign->loadout_planner_state.selected_loadout_slots,
+            gs1::k_item_wood_bundle)
+            ->quantity == 6U);
     GS1_SYSTEM_TEST_CHECK(context, queue.empty());
 }
 
@@ -309,6 +349,7 @@ void loadout_planner_tracks_selected_target_site(gs1::testing::SystemTestExecuti
         LoadoutPlannerSystem::process_command(campaign_context, select_command) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, campaign.loadout_planner_state.selected_target_site_id.has_value());
     GS1_SYSTEM_TEST_CHECK(context, campaign.loadout_planner_state.selected_target_site_id->value == 3U);
+    GS1_SYSTEM_TEST_CHECK(context, campaign.loadout_planner_state.selected_loadout_slots.size() == 6U);
 
     auto clear_command = make_command(
         GameCommandType::DeploymentSiteSelectionChanged,
@@ -317,6 +358,7 @@ void loadout_planner_tracks_selected_target_site(gs1::testing::SystemTestExecuti
         context,
         LoadoutPlannerSystem::process_command(campaign_context, clear_command) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, !campaign.loadout_planner_state.selected_target_site_id.has_value());
+    GS1_SYSTEM_TEST_CHECK(context, campaign.loadout_planner_state.selected_loadout_slots.size() == 6U);
 }
 
 void site_flow_moves_worker_and_marks_projection_dirty(gs1::testing::SystemTestExecutionContext& context)

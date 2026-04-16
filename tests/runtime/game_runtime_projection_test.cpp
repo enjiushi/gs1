@@ -14,6 +14,7 @@ using gs1::GameCommandType;
 using gs1::GameRuntime;
 using gs1::InventoryItemUseRequestedCommand;
 using gs1::PhoneListingPurchaseRequestedCommand;
+using gs1::SelectDeploymentSiteCommand;
 using gs1::SiteId;
 using gs1::StartNewCampaignCommand;
 using gs1::StartSiteAttemptCommand;
@@ -68,6 +69,14 @@ GameCommand make_start_site_attempt_command(std::uint32_t site_id)
     GameCommand command {};
     command.type = GameCommandType::StartSiteAttempt;
     command.set_payload(StartSiteAttemptCommand {site_id});
+    return command;
+}
+
+GameCommand make_select_site_command(std::uint32_t site_id)
+{
+    GameCommand command {};
+    command.type = GameCommandType::SelectDeploymentSite;
+    command.set_payload(SelectDeploymentSiteCommand {site_id});
     return command;
 }
 
@@ -212,6 +221,27 @@ const Gs1EngineCommand* find_inventory_slot_command(
     return nullptr;
 }
 
+bool contains_ui_element_text(
+    const std::vector<Gs1EngineCommand>& commands,
+    const char* expected_text)
+{
+    for (const auto& command : commands)
+    {
+        if (command.type != GS1_ENGINE_COMMAND_UI_ELEMENT_UPSERT)
+        {
+            continue;
+        }
+
+        const auto& payload = command.payload_as<Gs1EngineCommandUiElementData>();
+        if (std::strcmp(payload.text, expected_text) == 0)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 }  // namespace
 
 int main()
@@ -226,7 +256,15 @@ int main()
     assert(runtime.handle_command(make_start_campaign_command()) == GS1_STATUS_OK);
     assert(gs1::GameRuntimeProjectionTestAccess::campaign(runtime).has_value());
 
-    const auto first_site_id = gs1::GameRuntimeProjectionTestAccess::campaign(runtime)->sites.front().site_id.value;
+    const auto campaign_site_id = gs1::GameRuntimeProjectionTestAccess::campaign(runtime)->sites.front().site_id.value;
+    drain_engine_commands(runtime);
+    assert(runtime.handle_command(make_select_site_command(campaign_site_id)) == GS1_STATUS_OK);
+    const auto loadout_ui_commands = drain_engine_commands(runtime);
+    assert(contains_ui_element_text(loadout_ui_commands, "Water x2"));
+    assert(contains_ui_element_text(loadout_ui_commands, "Wind Reed Seeds x8"));
+    assert(contains_ui_element_text(loadout_ui_commands, "Wood x6"));
+
+    const auto first_site_id = campaign_site_id;
     assert(runtime.handle_command(make_start_site_attempt_command(first_site_id)) == GS1_STATUS_OK);
     assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).has_value());
 

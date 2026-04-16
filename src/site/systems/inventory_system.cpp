@@ -1,5 +1,6 @@
 #include "site/systems/inventory_system.h"
 
+#include "campaign/campaign_state.h"
 #include "content/defs/craft_recipe_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/structure_defs.h"
@@ -229,66 +230,48 @@ bool delivery_has_pending_items(const PendingDelivery& delivery) noexcept
     return false;
 }
 
-void seed_inventory_for_site_one(SiteSystemContext<InventorySystem>& context) noexcept
+[[nodiscard]] bool item_prefers_worker_pack(ItemId item_id) noexcept
+{
+    const auto* item_def = find_item_def(item_id);
+    return item_def != nullptr && item_is_directly_usable(*item_def);
+}
+
+void seed_inventory_from_loadout(SiteSystemContext<InventorySystem>& context) noexcept
 {
     auto& inventory = context.world.own_inventory();
-    if (context.world.site_id_value() != 1U)
-    {
-        return;
-    }
-
     ensure_inventory_storage_initialized(context);
     if (inventory_has_any_item(inventory))
     {
         return;
     }
 
-    (void)inventory_storage::add_item_to_container(
-        context.site_run,
-        inventory_storage::worker_pack_container(context.site_run),
-        ItemId {k_item_water_container},
-        2U);
-    (void)inventory_storage::add_item_to_container(
-        context.site_run,
-        inventory_storage::worker_pack_container(context.site_run),
-        ItemId {k_item_food_pack},
-        1U);
-    (void)inventory_storage::add_item_to_container(
-        context.site_run,
-        inventory_storage::worker_pack_container(context.site_run),
-        ItemId {k_item_medicine_pack},
-        1U);
+    const auto& planner = context.campaign.loadout_planner_state;
+    const auto& loadout_slots =
+        planner.selected_loadout_slots.empty()
+            ? planner.baseline_deployment_items
+            : planner.selected_loadout_slots;
+    if (loadout_slots.empty())
+    {
+        return;
+    }
 
-    (void)inventory_storage::add_item_to_container(
-        context.site_run,
-        inventory_storage::camp_storage_container(context.site_run),
-        ItemId {k_item_wind_reed_seed_bundle},
-        8U);
-    (void)inventory_storage::add_item_to_container(
-        context.site_run,
-        inventory_storage::camp_storage_container(context.site_run),
-        ItemId {k_item_saltbush_seed_bundle},
-        6U);
-    (void)inventory_storage::add_item_to_container(
-        context.site_run,
-        inventory_storage::camp_storage_container(context.site_run),
-        ItemId {k_item_shade_cactus_seed_bundle},
-        4U);
-    (void)inventory_storage::add_item_to_container(
-        context.site_run,
-        inventory_storage::camp_storage_container(context.site_run),
-        ItemId {k_item_sunfruit_vine_seed_bundle},
-        3U);
-    (void)inventory_storage::add_item_to_container(
-        context.site_run,
-        inventory_storage::camp_storage_container(context.site_run),
-        ItemId {k_item_wood_bundle},
-        6U);
-    (void)inventory_storage::add_item_to_container(
-        context.site_run,
-        inventory_storage::camp_storage_container(context.site_run),
-        ItemId {k_item_iron_bundle},
-        4U);
+    for (const auto& slot : loadout_slots)
+    {
+        if (!slot.occupied || slot.item_id.value == 0U || slot.quantity == 0U)
+        {
+            continue;
+        }
+
+        const auto container =
+            item_prefers_worker_pack(slot.item_id)
+                ? inventory_storage::worker_pack_container(context.site_run)
+                : inventory_storage::camp_storage_container(context.site_run);
+        (void)inventory_storage::add_item_to_container(
+            context.site_run,
+            container,
+            slot.item_id,
+            slot.quantity);
+    }
 
     context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_INVENTORY);
 }
@@ -647,7 +630,7 @@ Gs1Status InventorySystem::process_command(
     switch (command.type)
     {
     case GameCommandType::SiteRunStarted:
-        seed_inventory_for_site_one(context);
+        seed_inventory_from_loadout(context);
         return GS1_STATUS_OK;
 
     case GameCommandType::SiteDevicePlaced:
