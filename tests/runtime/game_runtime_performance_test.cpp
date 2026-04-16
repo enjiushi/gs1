@@ -27,6 +27,30 @@ using gs1::TileCoord;
 constexpr double kFixedStepSeconds = 1.0 / 60.0;
 constexpr int kDefaultWarmupFrames = 120;
 constexpr int kDefaultMeasuredFrames = 600;
+
+[[noreturn]] void fail_test(const char* message)
+{
+    std::cerr << "Test failure: " << message << "\n";
+    std::abort();
+}
+
+void require(bool condition, const char* message)
+{
+    if (!condition)
+    {
+        fail_test(message);
+    }
+}
+
+void require_ok(Gs1Status status, const char* message)
+{
+    if (status != GS1_STATUS_OK)
+    {
+        std::cerr << "Test failure: " << message
+                  << " status=" << static_cast<int>(status) << "\n";
+        std::abort();
+    }
+}
 }  // namespace
 
 namespace gs1
@@ -124,19 +148,37 @@ void drain_engine_commands(GameRuntime& runtime)
 
 void bootstrap_site_one(GameRuntime& runtime)
 {
-    assert(runtime.handle_command(make_start_campaign_command()) == GS1_STATUS_OK);
+    require_ok(runtime.handle_command(make_start_campaign_command()), "starting prototype campaign");
     auto& campaign = gs1::GameRuntimeProjectionTestAccess::campaign(runtime);
-    assert(campaign.has_value());
-    assert(!campaign->sites.empty());
+    require(campaign.has_value(), "campaign state was not created");
+    require(!campaign->sites.empty(), "prototype campaign has no sites");
 
     const auto site_id = campaign->sites.front().site_id.value;
-    assert(runtime.handle_command(make_start_site_attempt_command(site_id)) == GS1_STATUS_OK);
-    assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).has_value());
+    require_ok(runtime.handle_command(make_start_site_attempt_command(site_id)), "starting first site attempt");
+    require(
+        gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).has_value(),
+        "active site run was not created");
+}
+
+void run_boot_phase(GameRuntime& runtime)
+{
+    Gs1Phase1Request phase1_request {};
+    phase1_request.struct_size = sizeof(Gs1Phase1Request);
+    phase1_request.real_delta_seconds = 0.0;
+
+    Gs1Phase2Request phase2_request {};
+    phase2_request.struct_size = sizeof(Gs1Phase2Request);
+
+    Gs1Phase1Result phase1_result {};
+    Gs1Phase2Result phase2_result {};
+    require_ok(runtime.run_phase1(phase1_request, phase1_result), "running boot phase1");
+    require_ok(runtime.run_phase2(phase2_request, phase2_result), "running boot phase2");
+    drain_engine_commands(runtime);
 }
 
 void seed_dense_cover(SiteRunState& site_run)
 {
-    assert(site_run.site_world != nullptr);
+    require(site_run.site_world != nullptr, "site run has no site world");
     const auto tile_count = site_run.site_world->tile_count();
     for (std::size_t index = 0; index < tile_count; ++index)
     {
@@ -185,14 +227,17 @@ ScenarioResult run_scenario(const ScenarioConfig& config)
     create_desc.fixed_step_seconds = kFixedStepSeconds;
 
     GameRuntime runtime {create_desc};
+    run_boot_phase(runtime);
     bootstrap_site_one(runtime);
-    auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
+    auto& active_site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime);
+    require(active_site_run.has_value(), "active site run missing after bootstrap");
+    auto& site_run = active_site_run.value();
     seed_dense_cover(site_run);
     drain_engine_commands(runtime);
 
     for (const auto system_id : config.disabled_systems)
     {
-        assert(runtime.set_profiled_system_enabled(system_id, false) == GS1_STATUS_OK);
+        require_ok(runtime.set_profiled_system_enabled(system_id, false), "disabling profiled system");
     }
 
     Gs1Phase1Request phase1_request {};
@@ -208,8 +253,8 @@ ScenarioResult run_scenario(const ScenarioConfig& config)
     {
         Gs1Phase1Result phase1_result {};
         Gs1Phase2Result phase2_result {};
-        assert(runtime.run_phase1(phase1_request, phase1_result) == GS1_STATUS_OK);
-        assert(runtime.run_phase2(phase2_request, phase2_result) == GS1_STATUS_OK);
+        require_ok(runtime.run_phase1(phase1_request, phase1_result), "running warmup phase1");
+        require_ok(runtime.run_phase2(phase2_request, phase2_result), "running warmup phase2");
         drain_engine_commands(runtime);
     }
 
@@ -227,8 +272,8 @@ ScenarioResult run_scenario(const ScenarioConfig& config)
         Gs1Phase2Result phase2_result {};
 
         const auto started_at = std::chrono::steady_clock::now();
-        assert(runtime.run_phase1(phase1_request, phase1_result) == GS1_STATUS_OK);
-        assert(runtime.run_phase2(phase2_request, phase2_result) == GS1_STATUS_OK);
+        require_ok(runtime.run_phase1(phase1_request, phase1_result), "running measured phase1");
+        require_ok(runtime.run_phase2(phase2_request, phase2_result), "running measured phase2");
         const double frame_wall_ms = std::chrono::duration<double, std::milli>(
             std::chrono::steady_clock::now() - started_at)
                                          .count();
@@ -243,7 +288,7 @@ ScenarioResult run_scenario(const ScenarioConfig& config)
         config.measured_frames > 0
             ? (result.total_wall_ms / static_cast<double>(config.measured_frames))
             : 0.0;
-    assert(runtime.get_profiling_snapshot(result.profiling) == GS1_STATUS_OK);
+    require_ok(runtime.get_profiling_snapshot(result.profiling), "capturing profiling snapshot");
     return result;
 }
 
