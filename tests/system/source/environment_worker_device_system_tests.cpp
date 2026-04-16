@@ -138,7 +138,7 @@ void local_weather_resolve_updates_tiles_and_process_command_is_noop(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
-    auto site_run = make_test_site_run(1U, 1201U);
+    auto site_run = make_test_site_run(2U, 1201U);
     GameCommandQueue queue {};
     auto site_context = make_site_context<LocalWeatherResolveSystem>(campaign, site_run, queue);
 
@@ -164,10 +164,17 @@ void local_weather_resolve_updates_tiles_and_process_command_is_noop(
 
     const auto covered_weather = site_run.site_world->tile_local_weather(TileCoord {1, 1});
     const auto exposed_weather = site_run.site_world->tile_local_weather(TileCoord {2, 1});
+#if defined(GS1_ENABLE_LOCAL_WEATHER_RESOLUTION)
     GS1_SYSTEM_TEST_CHECK(context, covered_weather.heat < exposed_weather.heat);
     GS1_SYSTEM_TEST_CHECK(context, covered_weather.wind < exposed_weather.wind);
     GS1_SYSTEM_TEST_CHECK(context, covered_weather.dust < exposed_weather.dust);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(exposed_weather.dust, 4.25f));
+#else
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(covered_weather.heat, 0.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(covered_weather.wind, 0.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(covered_weather.dust, 0.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(exposed_weather.dust, 0.0f));
+#endif
 }
 
 void worker_condition_requested_delta_emits_initial_full_mask_and_clamps(

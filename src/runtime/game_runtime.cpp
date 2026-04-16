@@ -4,9 +4,11 @@
 #include "campaign/systems/campaign_system_context.h"
 #include "campaign/systems/loadout_planner_system.h"
 #include "commands/command_dispatcher.h"
+#include "site/inventory_storage.h"
 #include "site/site_world_access.h"
 #include "site/systems/action_execution_system.h"
 #include "site/systems/camp_durability_system.h"
+#include "site/systems/craft_system.h"
 #include "site/systems/device_maintenance_system.h"
 #include "site/systems/device_support_system.h"
 #include "site/systems/ecology_system.h"
@@ -139,6 +141,16 @@ std::uint32_t unpack_transfer_destination_slot(std::uint64_t packed) noexcept
 std::uint32_t unpack_transfer_quantity(std::uint64_t packed) noexcept
 {
     return static_cast<std::uint32_t>((packed >> 32U) & 0xffffU);
+}
+
+std::uint32_t unpack_transfer_source_owner(std::uint64_t packed) noexcept
+{
+    return static_cast<std::uint32_t>(packed & 0xffffffffULL);
+}
+
+std::uint32_t unpack_transfer_destination_owner(std::uint64_t packed) noexcept
+{
+    return static_cast<std::uint32_t>((packed >> 32U) & 0xffffffffULL);
 }
 
 bool action_has_started(const ActionState& action_state) noexcept
@@ -316,6 +328,7 @@ void GameRuntime::initialize_subscription_tables()
         PlacementValidationSystem::access(),
         LocalWeatherResolveSystem::access(),
         InventorySystem::access(),
+        CraftSystem::access(),
         EconomyPhoneSystem::access(),
         CampDurabilitySystem::access(),
         DeviceSupportSystem::access(),
@@ -392,9 +405,19 @@ void GameRuntime::initialize_subscription_tables()
             subscribers.push_back(CommandSubscriberId::LocalWeatherResolve);
         }
 
+        if (DeviceMaintenanceSystem::subscribes_to(type))
+        {
+            subscribers.push_back(CommandSubscriberId::DeviceMaintenance);
+        }
+
         if (InventorySystem::subscribes_to(type))
         {
             subscribers.push_back(CommandSubscriberId::Inventory);
+        }
+
+        if (CraftSystem::subscribes_to(type))
+        {
+            subscribers.push_back(CommandSubscriberId::Craft);
         }
 
         if (EconomyPhoneSystem::subscribes_to(type))
@@ -410,11 +433,6 @@ void GameRuntime::initialize_subscription_tables()
         if (DeviceSupportSystem::subscribes_to(type))
         {
             subscribers.push_back(CommandSubscriberId::DeviceSupport);
-        }
-
-        if (DeviceMaintenanceSystem::subscribes_to(type))
-        {
-            subscribers.push_back(CommandSubscriberId::DeviceMaintenance);
         }
 
         if (ModifierSystem::subscribes_to(type))
@@ -795,6 +813,26 @@ Gs1Status GameRuntime::dispatch_subscribed_command(const GameCommand& command)
                 [&]() -> Gs1Status {
                     return dispatch_site_system_command<InventorySystem>(
                         InventorySystem::process_command,
+                        command,
+                        campaign_,
+                        active_site_run_,
+                        command_queue_,
+                        fixed_step_seconds_);
+                });
+            if (status != GS1_STATUS_OK)
+            {
+                return status;
+            }
+            break;
+        }
+
+        case CommandSubscriberId::Craft:
+        {
+            const auto status = dispatch_profiled_command(
+                GS1_RUNTIME_PROFILE_SYSTEM_CRAFT,
+                [&]() -> Gs1Status {
+                    return dispatch_site_system_command<CraftSystem>(
+                        CraftSystem::process_command,
                         command,
                         campaign_,
                         active_site_run_,
@@ -1516,30 +1554,68 @@ void GameRuntime::queue_site_weather_update_command()
 
 void GameRuntime::queue_site_inventory_slot_upsert_command(
     Gs1InventoryContainerKind container_kind,
-    std::uint32_t slot_index)
+    std::uint32_t slot_index,
+    std::uint32_t container_owner_id,
+    TileCoord container_tile)
 {
     if (!active_site_run_.has_value())
     {
         return;
     }
 
-    const auto& slots =
-        container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK
-            ? active_site_run_->inventory.worker_pack_slots
-            : active_site_run_->inventory.camp_storage_slots;
-    if (slot_index >= slots.size())
+    InventorySlot slot {};
+    if (container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK)
+    {
+        if (slot_index >= active_site_run_->inventory.worker_pack_slots.size())
+        {
+            return;
+        }
+
+        slot = active_site_run_->inventory.worker_pack_slots[slot_index];
+    }
+    else if (container_kind == GS1_INVENTORY_CONTAINER_CAMP_STORAGE)
+    {
+        if (slot_index >= active_site_run_->inventory.camp_storage_slots.size())
+        {
+            return;
+        }
+
+        slot = active_site_run_->inventory.camp_storage_slots[slot_index];
+        container_tile = inventory_storage::container_tile_coord(
+            active_site_run_.value(),
+            inventory_storage::camp_storage_container(active_site_run_.value()));
+    }
+    else if (container_kind == GS1_INVENTORY_CONTAINER_DEVICE_STORAGE)
+    {
+        auto container = inventory_storage::container_for_kind(
+            active_site_run_.value(),
+            container_kind,
+            container_owner_id);
+        if (!container.is_valid())
+        {
+            return;
+        }
+
+        container_tile = inventory_storage::container_tile_coord(active_site_run_.value(), container);
+        const auto slot_entity = inventory_storage::slot_entity(active_site_run_.value(), container, slot_index);
+        const auto item_entity = inventory_storage::item_entity_for_slot(active_site_run_.value(), slot_entity);
+        inventory_storage::fill_projection_slot_from_entities(slot, item_entity);
+    }
+    else
     {
         return;
     }
 
-    const auto& slot = slots[slot_index];
     auto command = make_engine_command(GS1_ENGINE_COMMAND_SITE_INVENTORY_SLOT_UPSERT);
     auto& payload = command.emplace_payload<Gs1EngineCommandInventorySlotData>();
     payload.item_id = slot.item_id.value;
     payload.condition = slot.item_condition;
     payload.freshness = slot.item_freshness;
+    payload.container_owner_id = container_owner_id;
     payload.quantity = static_cast<std::uint16_t>(std::min<std::uint32_t>(slot.item_quantity, 65535U));
     payload.slot_index = static_cast<std::uint16_t>(slot_index);
+    payload.container_tile_x = static_cast<std::int16_t>(container_tile.x);
+    payload.container_tile_y = static_cast<std::int16_t>(container_tile.y);
     payload.container_kind = container_kind;
     payload.flags = slot.occupied ? 1U : 0U;
     engine_commands_.push_back(command);
@@ -1560,6 +1636,35 @@ void GameRuntime::queue_all_site_inventory_slot_upsert_commands()
     for (std::uint32_t index = 0; index < active_site_run_->inventory.camp_storage_slots.size(); ++index)
     {
         queue_site_inventory_slot_upsert_command(GS1_INVENTORY_CONTAINER_CAMP_STORAGE, index);
+    }
+
+    using namespace site_ecs;
+    const auto containers = inventory_storage::collect_all_storage_containers(active_site_run_.value(), true);
+    for (const auto& container : containers)
+    {
+        if (!container.is_valid() || !container.has<StorageContainerKindComponent>())
+        {
+            continue;
+        }
+
+        if (container.get<StorageContainerKindComponent>().kind != StorageContainerKind::DeviceStorage)
+        {
+            continue;
+        }
+
+        const auto owner_id =
+            inventory_storage::owner_device_entity_id_for_container(active_site_run_.value(), container);
+        const auto container_tile =
+            inventory_storage::container_tile_coord(active_site_run_.value(), container);
+        const auto slot_count = inventory_storage::slot_count_in_container(active_site_run_.value(), container);
+        for (std::uint32_t slot_index = 0U; slot_index < slot_count; ++slot_index)
+        {
+            queue_site_inventory_slot_upsert_command(
+                GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
+                slot_index,
+                owner_id,
+                container_tile);
+        }
     }
 }
 
@@ -2099,7 +2204,9 @@ Gs1Status GameRuntime::translate_ui_action_to_command(const Gs1UiAction& action,
             unpack_transfer_source_container(action.arg0),
             unpack_transfer_destination_container(action.arg0),
             0U,
-            0U});
+            0U,
+            unpack_transfer_source_owner(action.arg1),
+            unpack_transfer_destination_owner(action.arg1)});
         return GS1_STATUS_OK;
 
     case GS1_UI_ACTION_NONE:
@@ -2430,6 +2537,17 @@ void GameRuntime::run_fixed_step()
             fixed_step_seconds_,
             move_direction);
         InventorySystem::run(inventory_context);
+    });
+
+    run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_CRAFT, [&]()
+    {
+        auto craft_context = make_site_system_context<CraftSystem>(
+            *campaign_,
+            *active_site_run_,
+            command_queue_,
+            fixed_step_seconds_,
+            move_direction);
+        CraftSystem::run(craft_context);
     });
 
     run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_TASK_BOARD, [&]()

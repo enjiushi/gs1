@@ -70,6 +70,7 @@ constexpr NamedSystem kNamedSystems[] {
     {"device_support", "DeviceSupportSystem", GS1_RUNTIME_PROFILE_SYSTEM_DEVICE_SUPPORT},
     {"ecology", "EcologySystem", GS1_RUNTIME_PROFILE_SYSTEM_ECOLOGY},
     {"inventory", "InventorySystem", GS1_RUNTIME_PROFILE_SYSTEM_INVENTORY},
+    {"craft", "CraftSystem", GS1_RUNTIME_PROFILE_SYSTEM_CRAFT},
     {"task_board", "TaskBoardSystem", GS1_RUNTIME_PROFILE_SYSTEM_TASK_BOARD},
     {"economy_phone", "EconomyPhoneSystem", GS1_RUNTIME_PROFILE_SYSTEM_ECONOMY_PHONE},
     {"placement_validation", "PlacementValidationSystem", GS1_RUNTIME_PROFILE_SYSTEM_PLACEMENT_VALIDATION},

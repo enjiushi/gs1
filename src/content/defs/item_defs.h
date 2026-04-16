@@ -1,6 +1,7 @@
 #pragma once
 
 #include "content/defs/plant_defs.h"
+#include "content/defs/structure_defs.h"
 
 #include <array>
 #include <cstdint>
@@ -15,7 +16,8 @@ enum ItemCapabilityFlags : std::uint32_t
     ITEM_CAPABILITY_EAT = 1u << 1,
     ITEM_CAPABILITY_USE_MEDICINE = 1u << 2,
     ITEM_CAPABILITY_PLANT = 1u << 3,
-    ITEM_CAPABILITY_SELL = 1u << 4
+    ITEM_CAPABILITY_SELL = 1u << 4,
+    ITEM_CAPABILITY_DEPLOY = 1u << 5
 };
 
 enum class ItemSourceRule : std::uint8_t
@@ -33,11 +35,12 @@ struct ItemDef final
     std::string_view display_name {};
     std::uint16_t stack_size {1};
     ItemSourceRule source_rule {ItemSourceRule::None};
-    std::uint8_t reserved0 {0};
+    bool consumable {false};
     std::int32_t buy_price {0};
     std::int32_t sell_price {0};
     std::uint32_t capability_flags {ITEM_CAPABILITY_NONE};
     PlantId linked_plant_id {};
+    StructureId linked_structure_id {};
     float health_delta {0.0f};
     float hydration_delta {0.0f};
     float nourishment_delta {0.0f};
@@ -51,18 +54,25 @@ inline constexpr std::uint32_t k_item_wind_reed_seed_bundle = 4U;
 inline constexpr std::uint32_t k_item_saltbush_seed_bundle = 5U;
 inline constexpr std::uint32_t k_item_shade_cactus_seed_bundle = 6U;
 inline constexpr std::uint32_t k_item_sunfruit_vine_seed_bundle = 7U;
+inline constexpr std::uint32_t k_item_wood_bundle = 8U;
+inline constexpr std::uint32_t k_item_iron_bundle = 9U;
+inline constexpr std::uint32_t k_item_wind_reed_fiber = 10U;
+inline constexpr std::uint32_t k_item_camp_stove_kit = 11U;
+inline constexpr std::uint32_t k_item_workbench_kit = 12U;
+inline constexpr std::uint32_t k_item_storage_crate_kit = 13U;
 
-inline constexpr std::array<ItemDef, 7> k_prototype_item_defs {
+inline constexpr std::array<ItemDef, 13> k_prototype_item_defs {{
     ItemDef {
         ItemId {k_item_water_container},
         "Water",
         5U,
-        ItemSourceRule::BuyOnly,
-        0U,
+        ItemSourceRule::BuyOrCraft,
+        true,
         5,
         3,
         ITEM_CAPABILITY_DRINK | ITEM_CAPABILITY_SELL,
         PlantId {},
+        StructureId {},
         0.0f,
         12.0f,
         0.0f,
@@ -71,12 +81,13 @@ inline constexpr std::array<ItemDef, 7> k_prototype_item_defs {
         ItemId {k_item_food_pack},
         "Food",
         5U,
-        ItemSourceRule::BuyOnly,
-        0U,
+        ItemSourceRule::BuyOrCraft,
+        true,
         4,
         2,
         ITEM_CAPABILITY_EAT | ITEM_CAPABILITY_SELL,
         PlantId {},
+        StructureId {},
         0.0f,
         0.0f,
         10.0f,
@@ -86,11 +97,12 @@ inline constexpr std::array<ItemDef, 7> k_prototype_item_defs {
         "Medicine",
         3U,
         ItemSourceRule::BuyOnly,
-        0U,
+        true,
         8,
         5,
         ITEM_CAPABILITY_USE_MEDICINE | ITEM_CAPABILITY_SELL,
         PlantId {},
+        StructureId {},
         18.0f,
         0.0f,
         0.0f,
@@ -100,11 +112,12 @@ inline constexpr std::array<ItemDef, 7> k_prototype_item_defs {
         "Wind Reed Seeds",
         10U,
         ItemSourceRule::BuyOnly,
-        0U,
+        false,
         6,
         3,
         ITEM_CAPABILITY_PLANT | ITEM_CAPABILITY_SELL,
         PlantId {k_plant_wind_reed},
+        StructureId {},
         0.0f,
         0.0f,
         0.0f,
@@ -114,11 +127,12 @@ inline constexpr std::array<ItemDef, 7> k_prototype_item_defs {
         "Saltbush Seeds",
         10U,
         ItemSourceRule::BuyOnly,
-        0U,
+        false,
         7,
         4,
         ITEM_CAPABILITY_PLANT | ITEM_CAPABILITY_SELL,
         PlantId {k_plant_saltbush},
+        StructureId {},
         0.0f,
         0.0f,
         0.0f,
@@ -128,11 +142,12 @@ inline constexpr std::array<ItemDef, 7> k_prototype_item_defs {
         "Shade Cactus Seeds",
         10U,
         ItemSourceRule::BuyOnly,
-        0U,
+        false,
         8,
         4,
         ITEM_CAPABILITY_PLANT | ITEM_CAPABILITY_SELL,
         PlantId {k_plant_shade_cactus},
+        StructureId {},
         0.0f,
         0.0f,
         0.0f,
@@ -142,16 +157,107 @@ inline constexpr std::array<ItemDef, 7> k_prototype_item_defs {
         "Sunfruit Vine Seeds",
         10U,
         ItemSourceRule::BuyOnly,
-        0U,
+        false,
         10,
         5,
         ITEM_CAPABILITY_PLANT | ITEM_CAPABILITY_SELL,
         PlantId {k_plant_sunfruit_vine},
+        StructureId {},
         0.0f,
         0.0f,
         0.0f,
-        0.0f}
-};
+        0.0f},
+    ItemDef {
+        ItemId {k_item_wood_bundle},
+        "Wood",
+        20U,
+        ItemSourceRule::BuyOnly,
+        false,
+        2,
+        1,
+        ITEM_CAPABILITY_SELL,
+        PlantId {},
+        StructureId {},
+        0.0f,
+        0.0f,
+        0.0f,
+        0.0f},
+    ItemDef {
+        ItemId {k_item_iron_bundle},
+        "Iron",
+        20U,
+        ItemSourceRule::BuyOnly,
+        false,
+        3,
+        1,
+        ITEM_CAPABILITY_SELL,
+        PlantId {},
+        StructureId {},
+        0.0f,
+        0.0f,
+        0.0f,
+        0.0f},
+    ItemDef {
+        ItemId {k_item_wind_reed_fiber},
+        "Wind Reed Fiber",
+        20U,
+        ItemSourceRule::HarvestOnly,
+        false,
+        1,
+        1,
+        ITEM_CAPABILITY_SELL,
+        PlantId {},
+        StructureId {},
+        0.0f,
+        0.0f,
+        0.0f,
+        0.0f},
+    ItemDef {
+        ItemId {k_item_camp_stove_kit},
+        "Camp Stove Kit",
+        1U,
+        ItemSourceRule::CraftOnly,
+        false,
+        0,
+        6,
+        ITEM_CAPABILITY_DEPLOY | ITEM_CAPABILITY_SELL,
+        PlantId {},
+        StructureId {k_structure_camp_stove},
+        0.0f,
+        0.0f,
+        0.0f,
+        0.0f},
+    ItemDef {
+        ItemId {k_item_workbench_kit},
+        "Workbench Kit",
+        1U,
+        ItemSourceRule::CraftOnly,
+        false,
+        0,
+        8,
+        ITEM_CAPABILITY_DEPLOY | ITEM_CAPABILITY_SELL,
+        PlantId {},
+        StructureId {k_structure_workbench},
+        0.0f,
+        0.0f,
+        0.0f,
+        0.0f},
+    ItemDef {
+        ItemId {k_item_storage_crate_kit},
+        "Storage Crate Kit",
+        1U,
+        ItemSourceRule::CraftOnly,
+        false,
+        0,
+        5,
+        ITEM_CAPABILITY_DEPLOY | ITEM_CAPABILITY_SELL,
+        PlantId {},
+        StructureId {k_structure_storage_crate},
+        0.0f,
+        0.0f,
+        0.0f,
+        0.0f},
+}};
 
 [[nodiscard]] inline constexpr bool item_has_capability(
     const ItemDef& item_def,

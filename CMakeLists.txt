@@ -68,6 +68,7 @@ add_library(gs1_game SHARED
     src/site/systems/economy_phone_system.cpp
     src/site/systems/failure_recovery_system.cpp
     src/site/systems/inventory_system.cpp
+    src/site/systems/craft_system.cpp
     src/site/systems/local_weather_resolve_system.cpp
     src/site/systems/modifier_system.cpp
     src/site/systems/placement_validation_system.cpp
@@ -165,6 +166,7 @@ if(GS1_BUILD_TESTS)
         src/site/systems/economy_phone_system.cpp
         src/site/systems/failure_recovery_system.cpp
         src/site/systems/inventory_system.cpp
+        src/site/systems/craft_system.cpp
         src/site/systems/local_weather_resolve_system.cpp
         src/site/systems/modifier_system.cpp
         src/site/systems/placement_validation_system.cpp
@@ -192,6 +194,7 @@ if(GS1_BUILD_TESTS)
         src/site/systems/economy_phone_system.cpp
         src/site/systems/failure_recovery_system.cpp
         src/site/systems/inventory_system.cpp
+        src/site/systems/craft_system.cpp
         src/site/systems/local_weather_resolve_system.cpp
         src/site/systems/modifier_system.cpp
         src/site/systems/placement_validation_system.cpp
@@ -218,6 +221,7 @@ if(GS1_BUILD_TESTS)
         src/site/systems/economy_phone_system.cpp
         src/site/systems/failure_recovery_system.cpp
         src/site/systems/inventory_system.cpp
+        src/site/systems/craft_system.cpp
         src/site/systems/local_weather_resolve_system.cpp
         src/site/systems/modifier_system.cpp
         src/site/systems/placement_validation_system.cpp
@@ -250,6 +254,7 @@ if(GS1_BUILD_TESTS)
         src/site/systems/economy_phone_system.cpp
         src/site/systems/failure_recovery_system.cpp
         src/site/systems/inventory_system.cpp
+        src/site/systems/craft_system.cpp
         src/site/systems/local_weather_resolve_system.cpp
         src/site/systems/modifier_system.cpp
         src/site/systems/placement_validation_system.cpp

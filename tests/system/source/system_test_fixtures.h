@@ -5,6 +5,8 @@
 #include "campaign/campaign_state.h"
 #include "campaign/systems/campaign_system_context.h"
 #include "commands/game_command.h"
+#include "content/defs/structure_defs.h"
+#include "site/inventory_storage.h"
 #include "site/site_run_state.h"
 #include "site/site_world.h"
 #include "site/site_world_components.h"
@@ -24,6 +26,16 @@ namespace gs1::testing::fixtures
 inline constexpr std::uint64_t k_default_campaign_seed = 42ULL;
 inline constexpr std::uint32_t k_default_campaign_days = 30U;
 inline constexpr double k_default_fixed_step_seconds = 1.0;
+
+inline TileCoord default_starter_workbench_tile(TileCoord camp_anchor_tile) noexcept
+{
+    return TileCoord {camp_anchor_tile.x + 1, camp_anchor_tile.y};
+}
+
+inline TileCoord default_starter_camp_storage_tile(TileCoord camp_anchor_tile) noexcept
+{
+    return TileCoord {camp_anchor_tile.x - 1, camp_anchor_tile.y};
+}
 
 inline bool approx_equal(float lhs, float rhs, float epsilon = 0.001f) noexcept
 {
@@ -99,6 +111,7 @@ inline SiteRunState make_test_site_run(
     site_run.run_status = SiteRunStatus::Active;
     site_run.clock.day_phase = DayPhase::Dawn;
     site_run.camp.camp_anchor_tile = camp_anchor_tile;
+    site_run.camp.camp_storage_tile = default_starter_camp_storage_tile(camp_anchor_tile);
     site_run.inventory.worker_pack_slot_count = 6U;
     site_run.inventory.camp_storage_slot_count = 24U;
     site_run.inventory.worker_pack_slots.resize(site_run.inventory.worker_pack_slot_count);
@@ -123,7 +136,22 @@ inline SiteRunState make_test_site_run(
             100.0f,
             1.0f,
             false});
+    if (site_run.site_world->contains(site_run.camp.camp_storage_tile))
+    {
+        auto tile = site_run.site_world->tile_at(site_run.camp.camp_storage_tile);
+        tile.device.structure_id = gs1::StructureId {gs1::k_structure_storage_crate};
+        tile.device.device_integrity = 1.0f;
+        site_run.site_world->set_tile(site_run.camp.camp_storage_tile, tile);
+    }
+    if (site_id == 1U && site_run.site_world->contains(default_starter_workbench_tile(camp_anchor_tile)))
+    {
+        auto tile = site_run.site_world->tile_at(default_starter_workbench_tile(camp_anchor_tile));
+        tile.device.structure_id = gs1::StructureId {gs1::k_structure_workbench};
+        tile.device.device_integrity = 1.0f;
+        site_run.site_world->set_tile(default_starter_workbench_tile(camp_anchor_tile), tile);
+    }
     site_run.pending_tile_projection_update_mask.assign(site_run.site_world->tile_count(), 0U);
+    inventory_storage::initialize_site_inventory_storage(site_run);
     return site_run;
 }
 

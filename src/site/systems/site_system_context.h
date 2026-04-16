@@ -33,6 +33,7 @@ enum class SiteComponent : std::uint8_t
     TaskBoard,
     Modifier,
     Economy,
+    Craft,
     Action,
     Counters,
     Count
@@ -89,6 +90,8 @@ template <typename... Components>
         return "Modifier";
     case SiteComponent::Economy:
         return "Economy";
+    case SiteComponent::Craft:
+        return "Craft";
     case SiteComponent::Action:
         return "Action";
     case SiteComponent::Counters:
@@ -377,6 +380,9 @@ public:
 
     [[nodiscard]] const EconomyState& read_economy() const noexcept { return site_run_.economy; }
     [[nodiscard]] EconomyState& own_economy() noexcept { return site_run_.economy; }
+
+    [[nodiscard]] const CraftState& read_craft() const noexcept { return site_run_.craft; }
+    [[nodiscard]] CraftState& own_craft() noexcept { return site_run_.craft; }
 
     [[nodiscard]] const ActionState& read_action() const noexcept { return site_run_.site_action; }
     [[nodiscard]] ActionState& own_action() noexcept { return site_run_.site_action; }

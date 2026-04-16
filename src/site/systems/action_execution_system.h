@@ -17,6 +17,7 @@ public:
                 SiteComponent::TileLayout,
                 SiteComponent::WorkerMotion,
                 SiteComponent::Inventory,
+                SiteComponent::Craft,
                 SiteComponent::Action),
             site_component_mask_of(SiteComponent::Action)};
     }

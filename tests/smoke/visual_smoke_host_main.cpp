@@ -214,6 +214,10 @@ std::optional<Gs1SiteActionKind> parse_site_action_kind(const std::string& value
     {
         return GS1_SITE_ACTION_CLEAR_BURIAL;
     }
+    if (value == "CRAFT")
+    {
+        return GS1_SITE_ACTION_CRAFT;
+    }
 
     return std::nullopt;
 }

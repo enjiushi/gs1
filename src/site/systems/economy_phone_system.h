@@ -12,7 +12,10 @@ public:
     {
         return SiteSystemAccess {
             "EconomyPhoneSystem",
-            site_component_mask_of(SiteComponent::Economy),
+            site_component_mask_of(
+                SiteComponent::Inventory,
+                SiteComponent::Craft,
+                SiteComponent::Economy),
             site_component_mask_of(SiteComponent::Economy)};
     }
 

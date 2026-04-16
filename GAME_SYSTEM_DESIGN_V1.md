@@ -101,6 +101,18 @@ Rationale:
 - this keeps command schemas stable enough that multiple systems can evolve in parallel without repeatedly touching the same command-definition file
 - this lets multiple systems evolve behind stable subscriptions while sharing one message contract instead of encoding pairwise system dependencies
 
+### 1.5 V1 Crafting And Storage Clarification
+
+The current prototype implementation makes these item/storage rules explicit:
+
+- authored materials such as wood, iron, plant fiber, water, and seed bundles are all ordinary `ItemDef` rows
+- `ItemDef` may be both consumable and a crafting ingredient; crafting-material behavior does not require a separate authored attribute
+- deployable kits are also ordinary items and point at an authored `StructureDef`
+- starter camp storage is a fixed shared camp container, while deployed devices keep per-device storage containers with authored slot counts
+- crafting stations cache nearby item-instance ids from local storage plus the worker pack when the worker is inside the craft radius
+- crafting actions are timed site actions; on completion they resolve recipe consumption across matching stacks and place output into the acting device's own storage
+- phone selling resolves against a global item-instance cache that includes worker, camp, and device storage
+
 ## 2. Top-Level Code Structure
 
 This is the required source layout for v1. Folder names may adapt to the target language, but the ownership split should stay equivalent.

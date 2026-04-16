@@ -14,7 +14,8 @@ enum class ActionKind : std::uint32_t
     Build = 2,
     Repair = 3,
     Water = 4,
-    ClearBurial = 5
+    ClearBurial = 5,
+    Craft = 6
 };
 
 struct ReservedItemStack final

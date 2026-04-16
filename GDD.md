@@ -1273,7 +1273,8 @@ The game should support these carried-storage and camp-storage locations:
 | Location | Capacity | Purpose |
 |---|---|---|
 | Carried Inventory | `6` slots | What the player carries into the field |
-| Camp Containers | `24` total slots initially | Main local stockpile for site `Item`s, represented by one or more built or bought `Container`s |
+| Camp Storage | `24` slots initially | Starter camp stockpile available when a site begins |
+| Device Storage | per-device authored slot count | Individual local storage attached to deployed crafting or storage devices |
 | Pending Delivery Queue | unbounded list of packages | Ordered supplies waiting to arrive at camp |
 
 Rules:
@@ -1281,9 +1282,11 @@ Rules:
 - a slot holds one stack of one exact `Item`
 - one slot cannot exceed that `Item`'s listed stack size
 - stack splitting and merging should be supported
+- each stack should have its own runtime item-instance identity even when several stacks share the same authored `ItemId`
+- merging should preserve authored stack limits; if a merge overflows, the excess stays in another stack
 - empty slots are explicit
 - future tech can expand `workerPackSlotCount` or `campStorageSlotCount`, but the game should start at `6` and `24`
-- `campStorageSlotCount` should represent the total capacity provided by current camp `Container`s
+- `campStorageSlotCount` refers only to the starter camp storage, while deployed devices keep their own authored storage counts
 - the player should only be able to carry a limited working set away from camp, even if the camp has much more storage available
 - carrying a lot of one exact `Item` should therefore compete directly with carrying water, seed bundles, repair supplies, device kits, or harvested goods
 
@@ -1295,9 +1298,10 @@ Example inventory pressure:
 
 Container rules:
 
-- `Container`s should be buyable or buildable camp objects in the current design
-- interacting with any `Container` should access the shared `campStorage` rather than only that one object's personal slots
-- losing, burying, or exposing camp `Container`s can put stored `Item`s at risk during harsh events
+- the site begins with one starter `campStorage` container plus a starter workbench so the first fabrication recipes are reachable
+- deployed crafting devices and storage crates should keep their own local slot sets instead of aliasing one global camp container
+- crafting-device storage is both an output destination and a valid nearby ingredient source for later recipes
+- losing, burying, or exposing a deployed storage or crafting device can put the items in that specific device at risk during harsh events
 
 #### Item Flow Rules
 
@@ -1306,13 +1310,14 @@ Use these item-flow rules:
 - phone purchases create a package in `pendingDeliveryQueue`
 - each purchased package should arrive at camp after `30` in-game minutes if the camp delivery point is operational
 - delivered items enter `campStorage`, not `workerPack`
-- the player can transfer items between `campStorage` and `workerPack` only while interacting with a `Container` or another explicitly valid storage access point
+- the player can transfer items between `workerPack`, `campStorage`, and nearby device storage through the shared inventory interaction panel
 - plant placement, repair work, and burial clearing consume from `workerPack` when they require carried items
-- structure construction can consume from `workerPack`
+- deployable structure kits consume from `workerPack`
 - harvesting places goods into `workerPack` first
-- selling through the `Field Phone` should require items to be present in `campStorage`, not only in `workerPack`
-- camp-side crafting devices should be allowed to consume required materials directly from shared `campStorage`
-- there should be no distance-cost rule between `Container`s and camp crafting devices, because both are restricted to the player base area
+- selling through the `Field Phone` should be allowed from a global live cache that covers `workerPack`, `campStorage`, and all deployed device storage
+- each crafting device should cache nearby item-instance ids from all storage in roughly a `10x10` local area, plus the player `workerPack` when the player is nearby
+- crafting should consume recipe ingredients across matching stacks one after another and remove emptied stacks
+- crafted output should be placed into the acting device's own storage, and the craft should fail cleanly at completion if that device cannot fit the output after ingredient consumption
 - `Water Container`s can be transferred from `workerPack` or `campStorage` into a `Water Tank` through a valid water transfer interaction, increasing that tank's `deviceStoredWater`
 - connected `Drip Irrigator`s consume `deviceStoredWater` from linked `Water Tank`s rather than directly consuming water from `workerPack` or `campStorage`
 

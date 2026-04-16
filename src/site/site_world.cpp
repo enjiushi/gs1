@@ -48,8 +48,22 @@ void register_site_world_types(flecs::world& world)
     register_component<TileOccupantTag>(world);
     register_component<DeviceTag>(world);
     register_component<WorkerTag>(world);
+    register_component<StorageContainerTag>(world);
+    register_component<StorageSlotTag>(world);
+    register_component<StorageItemTag>(world);
     register_component<TileIndex>(world);
     register_component<TileCoordComponent>(world);
+    register_component<StorageContainerKindComponent>(world);
+    register_component<StorageSlotIndex>(world);
+    register_component<StorageItemStack>(world);
+    world.component<StorageOwnedByDevice>().add(flecs::Exclusive);
+    world.component<StorageAtTile>()
+        .add(flecs::Exclusive)
+        .add(flecs::Symmetric);
+    world.component<StorageSlotOf>().add(flecs::Exclusive);
+    world.component<StorageItemInSlot>()
+        .add(flecs::Exclusive)
+        .add(flecs::Symmetric);
     register_component<TileTerrain>(world);
     register_component<TileTraversable>(world);
     register_component<TilePlantable>(world);

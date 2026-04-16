@@ -1,8 +1,12 @@
 #include "site/systems/action_execution_system.h"
 
+#include "content/defs/craft_recipe_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/plant_defs.h"
+#include "content/defs/structure_defs.h"
+#include "site/craft_logic.h"
 #include "site/defs/site_action_defs.h"
+#include "site/inventory_storage.h"
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
 #include "support/id_types.h"
@@ -35,6 +39,8 @@ ActionKind to_action_kind(Gs1SiteActionKind kind) noexcept
         return ActionKind::Water;
     case GS1_SITE_ACTION_CLEAR_BURIAL:
         return ActionKind::ClearBurial;
+    case GS1_SITE_ACTION_CRAFT:
+        return ActionKind::Craft;
     default:
         return ActionKind::None;
     }
@@ -54,6 +60,8 @@ Gs1SiteActionKind to_gs1_action_kind(ActionKind kind) noexcept
         return GS1_SITE_ACTION_WATER;
     case ActionKind::ClearBurial:
         return GS1_SITE_ACTION_CLEAR_BURIAL;
+    case ActionKind::Craft:
+        return GS1_SITE_ACTION_CRAFT;
     default:
         return GS1_SITE_ACTION_NONE;
     }
@@ -302,25 +310,122 @@ const ItemDef* action_item_def(
     ActionKind action_kind,
     std::uint32_t item_id) noexcept
 {
-    if (action_kind != ActionKind::Plant || item_id == 0U)
+    if (item_id == 0U)
     {
         return nullptr;
     }
 
     const auto* item_def = find_item_def(ItemId {item_id});
-    if (item_def == nullptr ||
-        !item_has_capability(*item_def, ITEM_CAPABILITY_PLANT) ||
-        item_def->linked_plant_id.value == 0U)
+    if (item_def == nullptr)
     {
         return nullptr;
     }
 
-    return item_def;
+    switch (action_kind)
+    {
+    case ActionKind::Plant:
+        return item_has_capability(*item_def, ITEM_CAPABILITY_PLANT) &&
+                item_def->linked_plant_id.value != 0U
+            ? item_def
+            : nullptr;
+
+    case ActionKind::Build:
+        return item_has_capability(*item_def, ITEM_CAPABILITY_DEPLOY) &&
+                item_def->linked_structure_id.value != 0U
+            ? item_def
+            : nullptr;
+
+    default:
+        return nullptr;
+    }
 }
 
 bool action_requires_item(ActionKind action_kind, std::uint32_t item_id) noexcept
 {
+    if (action_kind == ActionKind::Build)
+    {
+        return true;
+    }
+
     return action_kind == ActionKind::Plant && item_id != 0U;
+}
+
+const CraftRecipeDef* resolve_craft_recipe_for_action(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    TileCoord target_tile,
+    std::uint32_t output_item_id,
+    std::uint64_t* out_device_entity_id = nullptr) noexcept
+{
+    if (output_item_id == 0U || !context.world.tile_coord_in_bounds(target_tile))
+    {
+        return nullptr;
+    }
+
+    const auto tile = context.world.read_tile(target_tile);
+    if (!structure_is_crafting_station(tile.device.structure_id) || context.site_run.site_world == nullptr)
+    {
+        return nullptr;
+    }
+
+    if (out_device_entity_id != nullptr)
+    {
+        *out_device_entity_id = context.site_run.site_world->device_entity_id(target_tile);
+    }
+
+    return find_craft_recipe_def(tile.device.structure_id, ItemId {output_item_id});
+}
+
+bool craft_ingredients_available_for_action(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    TileCoord target_tile,
+    std::uint64_t device_entity_id,
+    const CraftRecipeDef& recipe_def)
+{
+    const auto cached_items = craft_logic::nearby_item_instance_ids_for_device(
+        context.site_run,
+        context.world.read_craft(),
+        device_entity_id,
+        target_tile);
+    return craft_logic::can_satisfy_recipe_ingredients(
+        context.site_run,
+        cached_items,
+        recipe_def);
+}
+
+bool craft_output_fits_for_action(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    TileCoord target_tile,
+    std::uint64_t device_entity_id,
+    const CraftRecipeDef& recipe_def)
+{
+    const auto* structure_def = find_structure_def(recipe_def.station_structure_id);
+    if (structure_def == nullptr || !structure_def->grants_storage || structure_def->storage_slot_count == 0U)
+    {
+        return false;
+    }
+
+    const auto source_containers =
+        craft_logic::collect_nearby_source_containers(context.site_run, target_tile);
+    const auto output_container =
+        inventory_storage::find_device_storage_container(context.site_run, device_entity_id);
+    if (!output_container.is_valid())
+    {
+        auto remaining = static_cast<std::uint32_t>(recipe_def.output_quantity);
+        const auto max_stack = item_stack_size(recipe_def.output_item_id);
+        for (std::uint16_t slot_index = 0U;
+             slot_index < structure_def->storage_slot_count && remaining > 0U;
+             ++slot_index)
+        {
+            remaining = remaining > max_stack ? remaining - max_stack : 0U;
+        }
+        return remaining == 0U;
+    }
+
+    return craft_logic::can_store_output_after_recipe_consumption(
+        context.site_run,
+        output_container,
+        source_containers,
+        recipe_def);
 }
 
 bool is_action_waiting_for_placement(const ActionState& action_state) noexcept
@@ -565,11 +670,102 @@ void emit_action_fact_commands(GameCommandQueue& queue, const ActionState& actio
         break;
 
     case ActionKind::Build:
+        if (const auto* item_def = action_item_def(
+                action_state.action_kind,
+                action_state.item_id))
+        {
+            enqueue_command(
+                queue,
+                GameCommandType::InventoryItemConsumeRequested,
+                InventoryItemConsumeRequestedCommand {
+                    item_def->item_id.value,
+                    safe_quantity,
+                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
+                    0U});
+            enqueue_command(
+                queue,
+                GameCommandType::SiteDevicePlaced,
+                SiteDevicePlacedCommand {
+                    action_id,
+                    target_tile.x,
+                    target_tile.y,
+                    item_def->linked_structure_id.value,
+                    flags});
+        }
+        break;
+
+    case ActionKind::Craft:
+        if (action_state.secondary_subject_id != 0U)
+        {
+            enqueue_command(
+                queue,
+                GameCommandType::InventoryCraftCommitRequested,
+                InventoryCraftCommitRequestedCommand {
+                    action_state.secondary_subject_id,
+                    target_tile.x,
+                    target_tile.y,
+                    flags});
+        }
+        break;
+
     case ActionKind::Repair:
     case ActionKind::None:
     default:
         break;
     }
+}
+
+SiteActionFailureReason validate_craft_completion(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    const ActionState& action_state)
+{
+    if (!action_state.target_tile.has_value() || action_state.secondary_subject_id == 0U)
+    {
+        return SiteActionFailureReason::InvalidState;
+    }
+
+    const auto* recipe_def = find_craft_recipe_def(RecipeId {action_state.secondary_subject_id});
+    if (recipe_def == nullptr)
+    {
+        return SiteActionFailureReason::InvalidState;
+    }
+
+    if (!context.world.tile_coord_in_bounds(*action_state.target_tile) || context.site_run.site_world == nullptr)
+    {
+        return SiteActionFailureReason::InvalidTarget;
+    }
+
+    const auto tile = context.world.read_tile(*action_state.target_tile);
+    if (tile.device.structure_id != recipe_def->station_structure_id)
+    {
+        return SiteActionFailureReason::InvalidTarget;
+    }
+
+    const auto device_entity_id = context.site_run.site_world->device_entity_id(*action_state.target_tile);
+    if (device_entity_id == 0U)
+    {
+        return SiteActionFailureReason::InvalidTarget;
+    }
+
+    if (!craft_ingredients_available_for_action(
+            context,
+            *action_state.target_tile,
+            device_entity_id,
+            *recipe_def))
+    {
+        return SiteActionFailureReason::InsufficientResources;
+    }
+
+    if (!craft_output_fits_for_action(
+            context,
+            *action_state.target_tile,
+            device_entity_id,
+            *recipe_def))
+    {
+        return SiteActionFailureReason::InvalidState;
+    }
+
+    return SiteActionFailureReason::None;
 }
 
 }  // namespace
@@ -599,6 +795,7 @@ Gs1Status ActionExecutionSystem::process_command(
     case GameCommandType::StartSiteAction:
     {
         const auto& payload = command.payload_as<StartSiteActionCommand>();
+        const TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
 
         if (has_active_action(action_state))
         {
@@ -608,16 +805,14 @@ Gs1Status ActionExecutionSystem::process_command(
                 to_action_kind(payload.action_kind),
                 SiteActionFailureReason::Busy,
                 payload.flags,
-                {payload.target_tile_x, payload.target_tile_y},
+                target_tile,
                 payload.primary_subject_id,
                 payload.secondary_subject_id);
             return GS1_STATUS_OK;
         }
 
         const ActionKind action_kind = to_action_kind(payload.action_kind);
-        if (action_kind == ActionKind::None ||
-            action_kind == ActionKind::Build ||
-            action_kind == ActionKind::Repair)
+        if (action_kind == ActionKind::None || action_kind == ActionKind::Repair)
         {
             emit_site_action_failed(
                 context.command_queue,
@@ -631,7 +826,6 @@ Gs1Status ActionExecutionSystem::process_command(
             return GS1_STATUS_OK;
         }
 
-        const TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
         if (!context.world.tile_coord_in_bounds(target_tile))
         {
             emit_site_action_failed(
@@ -680,11 +874,56 @@ Gs1Status ActionExecutionSystem::process_command(
             }
         }
 
-        const double duration_minutes =
-            compute_duration_minutes(
-                action_kind,
-                payload.quantity == 0U ? 1U : payload.quantity,
-                payload.item_id);
+        const CraftRecipeDef* craft_recipe = nullptr;
+        std::uint64_t craft_device_entity_id = 0U;
+        if (action_kind == ActionKind::Craft)
+        {
+            craft_recipe = resolve_craft_recipe_for_action(
+                context,
+                target_tile,
+                payload.item_id,
+                &craft_device_entity_id);
+            if (craft_recipe == nullptr || craft_device_entity_id == 0U)
+            {
+                emit_site_action_failed(
+                    context.command_queue,
+                    0U,
+                    action_kind,
+                    SiteActionFailureReason::InvalidTarget,
+                    payload.flags,
+                    target_tile,
+                    payload.primary_subject_id,
+                    payload.secondary_subject_id);
+                return GS1_STATUS_OK;
+            }
+
+            if (!craft_ingredients_available_for_action(
+                    context,
+                    target_tile,
+                    craft_device_entity_id,
+                    *craft_recipe))
+            {
+                emit_site_action_failed(
+                    context.command_queue,
+                    0U,
+                    action_kind,
+                    SiteActionFailureReason::InsufficientResources,
+                    payload.flags,
+                    target_tile,
+                    payload.primary_subject_id,
+                    payload.secondary_subject_id);
+                return GS1_STATUS_OK;
+            }
+        }
+
+        const double duration_minutes = action_kind == ActionKind::Craft && craft_recipe != nullptr
+            ? std::max(
+                  static_cast<double>(craft_recipe->craft_minutes),
+                  k_minimum_action_duration_minutes)
+            : compute_duration_minutes(
+                  action_kind,
+                  payload.quantity == 0U ? 1U : payload.quantity,
+                  payload.item_id);
         const RuntimeActionId action_id = allocate_runtime_action_id();
 
         action_state.current_action_id = action_id;
@@ -692,9 +931,15 @@ Gs1Status ActionExecutionSystem::process_command(
         action_state.target_tile = target_tile;
         action_state.approach_tile.reset();
         action_state.primary_subject_id = payload.primary_subject_id;
-        action_state.secondary_subject_id = payload.secondary_subject_id;
+        action_state.secondary_subject_id =
+            action_kind == ActionKind::Craft && craft_recipe != nullptr
+            ? craft_recipe->recipe_id.value
+            : payload.secondary_subject_id;
         action_state.item_id = payload.item_id;
-        action_state.quantity = payload.quantity == 0U ? 1U : payload.quantity;
+        action_state.quantity =
+            action_kind == ActionKind::Craft
+            ? 1U
+            : (payload.quantity == 0U ? 1U : payload.quantity);
         action_state.request_flags = payload.flags;
         action_state.total_action_minutes = duration_minutes;
         action_state.remaining_action_minutes = duration_minutes;
@@ -865,6 +1110,28 @@ void ActionExecutionSystem::run(SiteSystemContext<ActionExecutionSystem>& contex
     if (action_state.remaining_action_minutes > 0.0)
     {
         return;
+    }
+
+    if (action_state.action_kind == ActionKind::Craft)
+    {
+        const auto failure_reason = validate_craft_completion(context, action_state);
+        if (failure_reason != SiteActionFailureReason::None)
+        {
+            emit_site_action_failed(
+                context.command_queue,
+                action_id_value(action_state),
+                action_state.action_kind,
+                failure_reason,
+                action_state.request_flags,
+                action_target_tile(action_state),
+                action_state.primary_subject_id,
+                action_state.secondary_subject_id);
+            emit_placement_reservation_released(context.command_queue, action_state);
+            clear_action_state(action_state);
+            context.world.mark_projection_dirty(
+                SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
+            return;
+        }
     }
 
     emit_site_action_completed(context.command_queue, action_state);

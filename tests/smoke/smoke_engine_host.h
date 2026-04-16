@@ -173,8 +173,11 @@ public:
         std::uint32_t item_id {0};
         float condition {0.0f};
         float freshness {0.0f};
+        std::uint32_t container_owner_id {0};
         std::uint32_t quantity {0};
         std::uint32_t slot_index {0};
+        std::int32_t container_tile_x {0};
+        std::int32_t container_tile_y {0};
         Gs1InventoryContainerKind container_kind {GS1_INVENTORY_CONTAINER_WORKER_PACK};
         std::uint32_t flags {0};
     };

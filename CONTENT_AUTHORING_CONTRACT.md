@@ -70,6 +70,34 @@ The next system-design pass should assume these authored definition tables exist
 
 Not every future version must keep these exact filenames or one-table-per-type storage, but the authored contract should preserve these meanings.
 
+## 3.1 Item, Structure, And Crafting Authoring Clarification
+
+The current prototype also depends on these authoring-side gameplay rows:
+
+- `ItemDef`
+- `StructureDef`
+- `CraftRecipeDef`
+
+Required item authoring rules:
+
+- authored crafting materials such as wood, iron, harvested fiber, water, and seeds are ordinary `ItemDef` rows
+- an item may be both `consumable` and usable as a craft ingredient
+- deployable kits are ordinary items with a linked authored `StructureDef`
+- authored item source rules should distinguish at least `BuyOnly`, `CraftOnly`, `BuyOrCraft`, and `HarvestOnly`
+- authored stack size is the hard cap for one runtime item stack
+
+Required structure authoring rules:
+
+- a structure that grants local storage must author its slot count directly on `StructureDef`
+- a structure that acts as a crafting station must author its crafting-station kind directly on `StructureDef`
+- a deployed storage crate is a structure with storage but no crafting recipes
+
+Required crafting authoring rules:
+
+- each `CraftRecipeDef` must name one station structure id, one output item id, one output quantity, one craft duration, and an explicit list of ingredient item ids plus counts
+- recipes are selected by station plus output item; the output item must therefore be unique per station in the current prototype contract
+- crafting input items are removed across matching stacks one after another, so authored recipes should assume stack-spanning consumption is valid
+
 ## 4. Task Authoring Contract
 
 ### 4.1 `TaskTierDef`

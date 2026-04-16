@@ -164,6 +164,8 @@ const char* inventory_container_name(Gs1InventoryContainerKind kind)
 {
     switch (kind)
     {
+    case GS1_INVENTORY_CONTAINER_DEVICE_STORAGE:
+        return "DEVICE_STORAGE";
     case GS1_INVENTORY_CONTAINER_CAMP_STORAGE:
         return "CAMP_STORAGE";
     case GS1_INVENTORY_CONTAINER_WORKER_PACK:
@@ -576,12 +578,18 @@ void append_inventory_slots_json(std::string& json, const SmokeEngineHost::SiteS
         {
             append_json_string(json, display_name);
         }
+        json += ",\"containerOwnerId\":";
+        json += std::to_string(slot.container_owner_id);
         json += ",\"quantity\":";
         json += std::to_string(slot.quantity);
         json += ",\"condition\":";
         json += std::to_string(slot.condition);
         json += ",\"freshness\":";
         json += std::to_string(slot.freshness);
+        json += ",\"containerTileX\":";
+        json += std::to_string(slot.container_tile_x);
+        json += ",\"containerTileY\":";
+        json += std::to_string(slot.container_tile_y);
         json += ",\"flags\":";
         json += std::to_string(slot.flags);
         json += '}';

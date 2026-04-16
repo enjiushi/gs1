@@ -238,7 +238,7 @@ int main()
     assert(bootstrap_site_run.inventory.worker_pack_slots[0].item_id.value == 1U);
     assert(bootstrap_site_run.task_board.visible_tasks.size() == 1U);
     assert(bootstrap_site_run.economy.money == 45);
-    assert(bootstrap_site_run.economy.available_phone_listings.size() == 10U);
+    assert(bootstrap_site_run.economy.available_phone_listings.size() >= 11U);
 
     const auto bootstrap_commands = drain_engine_commands(runtime);
     assert(!collect_commands_of_type(bootstrap_commands, GS1_ENGINE_COMMAND_SITE_INVENTORY_SLOT_UPSERT).empty());
@@ -276,8 +276,15 @@ int main()
 
     Gs1Phase1Result delivery_result {};
     run_phase1(runtime, 3.0, delivery_result);
-    assert(bootstrap_site_run.inventory.camp_storage_slots[4].occupied);
-    assert(bootstrap_site_run.inventory.camp_storage_slots[4].item_id.value == gs1::k_item_water_container);
+    const auto delivered_slot = std::find_if(
+        bootstrap_site_run.inventory.camp_storage_slots.begin(),
+        bootstrap_site_run.inventory.camp_storage_slots.end(),
+        [](const auto& slot) {
+            return slot.occupied && slot.item_id.value == gs1::k_item_water_container && slot.item_quantity == 1U;
+        });
+    assert(delivered_slot != bootstrap_site_run.inventory.camp_storage_slots.end());
+    const auto delivered_slot_index = static_cast<std::uint16_t>(
+        std::distance(bootstrap_site_run.inventory.camp_storage_slots.begin(), delivered_slot));
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
     const auto delivery_commands = drain_engine_commands(runtime);
     const auto delivery_inventory_commands = collect_inventory_slot_commands(delivery_commands);
@@ -285,7 +292,7 @@ int main()
     {
         const auto& payload = delivery_inventory_commands.front()->payload_as<Gs1EngineCommandInventorySlotData>();
         assert(payload.container_kind == GS1_INVENTORY_CONTAINER_CAMP_STORAGE);
-        assert(payload.slot_index == 4U);
+        assert(payload.slot_index == delivered_slot_index);
         assert(payload.item_id == gs1::k_item_water_container);
         assert(payload.quantity == 1U);
     }

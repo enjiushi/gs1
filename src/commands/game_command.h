@@ -50,6 +50,7 @@ enum class GameCommandType : std::uint8_t
     SiteTilePlantingCompleted,
     SiteTileWatered,
     SiteTileBurialCleared,
+    SiteDevicePlaced,
     WorkerMeterDeltaRequested,
     WorkerMetersChanged,
     TileEcologyChanged,
@@ -61,7 +62,9 @@ enum class GameCommandType : std::uint8_t
     InventoryDeliveryRequested,
     InventoryItemUseRequested,
     InventoryItemConsumeRequested,
+    InventoryGlobalItemConsumeRequested,
     InventoryTransferRequested,
+    InventoryCraftCommitRequested,
     ContractorHireRequested,
     SiteUnlockablePurchaseRequested,
     Count
@@ -299,6 +302,15 @@ struct SiteTileBurialClearedCommand final
     std::uint32_t flags;
 };
 
+struct SiteDevicePlacedCommand final
+{
+    std::uint32_t action_id;
+    std::int32_t target_tile_x;
+    std::int32_t target_tile_y;
+    std::uint32_t structure_id;
+    std::uint32_t flags;
+};
+
 struct WorkerMeterDeltaRequestedCommand final
 {
     std::uint32_t source_id;
@@ -390,6 +402,13 @@ struct InventoryItemConsumeRequestedCommand final
     std::uint8_t flags;
 };
 
+struct InventoryGlobalItemConsumeRequestedCommand final
+{
+    std::uint32_t item_id;
+    std::uint16_t quantity;
+    std::uint16_t flags;
+};
+
 struct InventoryTransferRequestedCommand final
 {
     std::uint16_t source_slot_index;
@@ -399,6 +418,16 @@ struct InventoryTransferRequestedCommand final
     Gs1InventoryContainerKind destination_container_kind;
     std::uint8_t flags;
     std::uint8_t reserved0;
+    std::uint32_t source_container_owner_id;
+    std::uint32_t destination_container_owner_id;
+};
+
+struct InventoryCraftCommitRequestedCommand final
+{
+    std::uint32_t recipe_id;
+    std::int32_t target_tile_x;
+    std::int32_t target_tile_y;
+    std::uint32_t flags;
 };
 
 struct ContractorHireRequestedCommand final
@@ -435,6 +464,7 @@ GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(SiteGroundCoverPlacedCommand, 24U);
 GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(SiteTilePlantingCompletedCommand, 24U);
 GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(SiteTileWateredCommand, 20U);
 GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(SiteTileBurialClearedCommand, 20U);
+GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(SiteDevicePlacedCommand, 20U);
 GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(WorkerMeterDeltaRequestedCommand, 36U);
 GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(WorkerMetersChangedCommand, 32U);
 GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(TileEcologyChangedCommand, 28U);
@@ -446,7 +476,9 @@ GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(PhoneListingSaleRequestedCommand, 8U);
 GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(InventoryDeliveryRequestedCommand, 8U);
 GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(InventoryItemUseRequestedCommand, 8U);
 GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(InventoryItemConsumeRequestedCommand, 8U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(InventoryTransferRequestedCommand, 10U);
+GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(InventoryGlobalItemConsumeRequestedCommand, 8U);
+GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(InventoryTransferRequestedCommand, 20U);
+GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(InventoryCraftCommitRequestedCommand, 16U);
 GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(ContractorHireRequestedCommand, 8U);
 GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(SiteUnlockablePurchaseRequestedCommand, 4U);
 

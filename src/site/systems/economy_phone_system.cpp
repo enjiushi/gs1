@@ -1,4 +1,6 @@
 #include "content/defs/item_defs.h"
+#include "site/craft_logic.h"
+#include "site/inventory_storage.h"
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
 #include "site/systems/economy_phone_system.h"
@@ -21,10 +23,12 @@ constexpr std::uint32_t k_site1_wind_reed_listing_id = 4U;
 constexpr std::uint32_t k_site1_saltbush_listing_id = 5U;
 constexpr std::uint32_t k_site1_shade_cactus_listing_id = 6U;
 constexpr std::uint32_t k_site1_sunfruit_vine_listing_id = 7U;
-constexpr std::uint32_t k_site1_sale_listing_id = 8U;
-constexpr std::uint32_t k_site1_contractor_listing_id = 9U;
-constexpr std::uint32_t k_site1_unlockable_listing_id = 10U;
+constexpr std::uint32_t k_site1_wood_listing_id = 8U;
+constexpr std::uint32_t k_site1_iron_listing_id = 9U;
+constexpr std::uint32_t k_site1_contractor_listing_id = 10U;
+constexpr std::uint32_t k_site1_unlockable_listing_id = 11U;
 constexpr std::uint32_t k_site1_unlockable_id = 101U;
+constexpr std::uint32_t k_sell_listing_id_base = 1000U;
 
 std::uint32_t normalize_quantity(std::uint16_t value) noexcept
 {
@@ -35,6 +39,11 @@ bool money_delta_fits(std::int64_t amount) noexcept
 {
     return amount >= std::numeric_limits<std::int32_t>::min() &&
         amount <= std::numeric_limits<std::int32_t>::max();
+}
+
+void mark_phone_dirty(SiteSystemContext<EconomyPhoneSystem>& context) noexcept
+{
+    context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_PHONE);
 }
 
 void mark_phone_and_hud_dirty(SiteSystemContext<EconomyPhoneSystem>& context) noexcept
@@ -59,6 +68,11 @@ PhoneListingState make_item_listing(
             : (kind == PhoneListingKind::SellItem ? item_def->sell_price : item_def->buy_price),
         quantity,
         true};
+}
+
+std::uint32_t make_sell_listing_id(ItemId item_id) noexcept
+{
+    return k_sell_listing_id_base + item_id.value;
 }
 
 bool adjust_money(SiteSystemContext<EconomyPhoneSystem>& context, std::int32_t delta) noexcept
@@ -87,6 +101,19 @@ PhoneListingState* find_listing(EconomyState& economy, std::uint32_t listing_id)
     return nullptr;
 }
 
+PhoneListingState* find_sell_listing_for_item(EconomyState& economy, std::uint32_t item_id) noexcept
+{
+    for (auto& listing : economy.available_phone_listings)
+    {
+        if (listing.kind == PhoneListingKind::SellItem && listing.item_id.value == item_id)
+        {
+            return &listing;
+        }
+    }
+
+    return nullptr;
+}
+
 PhoneListingState* find_unlockable_listing(EconomyState& economy, std::uint32_t unlockable_id) noexcept
 {
     for (auto& listing : economy.available_phone_listings)
@@ -110,6 +137,121 @@ bool contains_unlockable(
 void remove_unlockable(std::vector<std::uint32_t>& container, std::uint32_t unlockable_id) noexcept
 {
     container.erase(std::remove(container.begin(), container.end(), unlockable_id), container.end());
+}
+
+std::vector<std::uint32_t> phone_item_instance_ids(
+    SiteSystemContext<EconomyPhoneSystem>& context)
+{
+    const auto& craft = context.world.read_craft();
+    const auto& inventory = context.world.read_inventory();
+    if (craft.phone_cache.source_membership_revision == inventory.item_membership_revision)
+    {
+        return craft.phone_cache.item_instance_ids;
+    }
+
+    return inventory_storage::collect_item_instance_ids_in_containers(
+        context.site_run,
+        inventory_storage::collect_all_storage_containers(context.site_run, true));
+}
+
+std::uint32_t available_global_item_quantity(
+    SiteSystemContext<EconomyPhoneSystem>& context,
+    ItemId item_id)
+{
+    return craft_logic::available_cached_item_quantity(
+        context.site_run,
+        phone_item_instance_ids(context),
+        item_id);
+}
+
+bool same_listing_vector(
+    const std::vector<PhoneListingState>& lhs,
+    const std::vector<PhoneListingState>& rhs) noexcept
+{
+    if (lhs.size() != rhs.size())
+    {
+        return false;
+    }
+
+    for (std::size_t index = 0; index < lhs.size(); ++index)
+    {
+        const auto& left = lhs[index];
+        const auto& right = rhs[index];
+        if (left.kind != right.kind ||
+            left.item_id != right.item_id ||
+            left.listing_id != right.listing_id ||
+            left.price != right.price ||
+            left.quantity != right.quantity ||
+            left.occupied != right.occupied)
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void refresh_dynamic_sell_listings(
+    SiteSystemContext<EconomyPhoneSystem>& context,
+    bool force_dirty = false)
+{
+    auto& economy = context.world.own_economy();
+    const auto& inventory = context.world.read_inventory();
+    const bool revisions_unchanged =
+        !force_dirty &&
+        economy.phone_listing_source_membership_revision == inventory.item_membership_revision &&
+        economy.phone_listing_source_quantity_revision == inventory.item_quantity_revision;
+    if (revisions_unchanged)
+    {
+        return;
+    }
+
+    std::vector<PhoneListingState> sell_listings {};
+    const auto item_ids = phone_item_instance_ids(context);
+    for (const auto& item_def : k_prototype_item_defs)
+    {
+        if (!item_has_capability(item_def, ITEM_CAPABILITY_SELL))
+        {
+            continue;
+        }
+
+        const auto available_quantity =
+            craft_logic::available_cached_item_quantity(context.site_run, item_ids, item_def.item_id);
+        if (available_quantity == 0U)
+        {
+            continue;
+        }
+
+        sell_listings.push_back(make_item_listing(
+            PhoneListingKind::SellItem,
+            make_sell_listing_id(item_def.item_id),
+            item_def.item_id,
+            available_quantity));
+    }
+
+    std::sort(sell_listings.begin(), sell_listings.end(), [](const auto& lhs, const auto& rhs) {
+        return lhs.item_id.value < rhs.item_id.value;
+    });
+
+    std::vector<PhoneListingState> refreshed {};
+    refreshed.reserve(economy.available_phone_listings.size() + sell_listings.size());
+    for (const auto& listing : economy.available_phone_listings)
+    {
+        if (listing.kind != PhoneListingKind::SellItem)
+        {
+            refreshed.push_back(listing);
+        }
+    }
+    refreshed.insert(refreshed.end(), sell_listings.begin(), sell_listings.end());
+
+    const bool changed = !same_listing_vector(refreshed, economy.available_phone_listings);
+    economy.available_phone_listings = std::move(refreshed);
+    economy.phone_listing_source_membership_revision = inventory.item_membership_revision;
+    economy.phone_listing_source_quantity_revision = inventory.item_quantity_revision;
+    if (changed || force_dirty)
+    {
+        mark_phone_dirty(context);
+    }
 }
 
 Gs1Status process_buy_listing(
@@ -170,9 +312,8 @@ Gs1Status process_sell_listing(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    const bool limited = listing.quantity != 0U;
-    const std::uint32_t available = listing.quantity;
-    if (limited && available < quantity)
+    const auto available = available_global_item_quantity(context, listing.item_id);
+    if (available < quantity)
     {
         return GS1_STATUS_INVALID_STATE;
     }
@@ -188,10 +329,15 @@ Gs1Status process_sell_listing(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    if (limited)
-    {
-        listing.quantity = available - quantity;
-    }
+    listing.quantity = available - quantity;
+
+    GameCommand consume_command {};
+    consume_command.type = GameCommandType::InventoryGlobalItemConsumeRequested;
+    consume_command.set_payload(InventoryGlobalItemConsumeRequestedCommand {
+        listing.item_id.value,
+        static_cast<std::uint16_t>(quantity),
+        0U});
+    context.command_queue.push_back(consume_command);
 
     mark_phone_and_hud_dirty(context);
     return GS1_STATUS_OK;
@@ -273,6 +419,8 @@ Gs1Status process_unlockable_purchase(
 void seed_site_economy(SiteSystemContext<EconomyPhoneSystem>& context, std::uint32_t site_id)
 {
     auto& economy = context.world.own_economy();
+    economy.phone_listing_source_membership_revision = 0U;
+    economy.phone_listing_source_quantity_revision = 0U;
     economy.available_phone_listings.clear();
     economy.revealed_site_unlockable_ids.clear();
     economy.direct_purchase_unlockable_ids.clear();
@@ -321,9 +469,14 @@ void seed_site_economy(SiteSystemContext<EconomyPhoneSystem>& context, std::uint
         ItemId {k_item_sunfruit_vine_seed_bundle},
         6U));
     economy.available_phone_listings.push_back(make_item_listing(
-        PhoneListingKind::SellItem,
-        k_site1_sale_listing_id,
-        ItemId {k_item_food_pack},
+        PhoneListingKind::BuyItem,
+        k_site1_wood_listing_id,
+        ItemId {k_item_wood_bundle},
+        12U));
+    economy.available_phone_listings.push_back(make_item_listing(
+        PhoneListingKind::BuyItem,
+        k_site1_iron_listing_id,
+        ItemId {k_item_iron_bundle},
         10U));
     economy.available_phone_listings.push_back(PhoneListingState {
         PhoneListingKind::HireContractor,
@@ -343,6 +496,7 @@ void seed_site_economy(SiteSystemContext<EconomyPhoneSystem>& context, std::uint
     economy.revealed_site_unlockable_ids.push_back(k_site1_unlockable_id);
     economy.direct_purchase_unlockable_ids.push_back(k_site1_unlockable_id);
 
+    refresh_dynamic_sell_listings(context, true);
     mark_phone_and_hud_dirty(context);
 }
 }  // namespace
@@ -402,7 +556,13 @@ Gs1Status EconomyPhoneSystem::process_command(
         auto* listing = find_listing(context.world.own_economy(), payload.listing_id_or_item_id);
         if (listing == nullptr)
         {
-            return GS1_STATUS_NOT_FOUND;
+            listing = find_sell_listing_for_item(
+                context.world.own_economy(),
+                payload.listing_id_or_item_id);
+            if (listing == nullptr)
+            {
+                return GS1_STATUS_NOT_FOUND;
+            }
         }
 
         const std::uint32_t quantity = normalize_quantity(payload.quantity);
@@ -429,7 +589,8 @@ Gs1Status EconomyPhoneSystem::process_command(
     }
 }
 
-void EconomyPhoneSystem::run(SiteSystemContext<EconomyPhoneSystem>&)
+void EconomyPhoneSystem::run(SiteSystemContext<EconomyPhoneSystem>& context)
 {
+    refresh_dynamic_sell_listings(context);
 }
 }  // namespace gs1

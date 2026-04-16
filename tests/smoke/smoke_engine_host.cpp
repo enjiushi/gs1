@@ -1166,14 +1166,18 @@ void SmokeEngineHost::apply_site_inventory_slot_upsert(const Gs1EngineCommand& c
     projection.item_id = payload.item_id;
     projection.condition = payload.condition;
     projection.freshness = payload.freshness;
+    projection.container_owner_id = payload.container_owner_id;
     projection.quantity = payload.quantity;
     projection.slot_index = payload.slot_index;
+    projection.container_tile_x = payload.container_tile_x;
+    projection.container_tile_y = payload.container_tile_y;
     projection.container_kind = payload.container_kind;
     projection.flags = payload.flags;
 
     auto& slots = pending_site_snapshot_->inventory_slots;
     const auto existing = std::find_if(slots.begin(), slots.end(), [&](const SiteInventorySlotProjection& slot) {
         return slot.container_kind == projection.container_kind &&
+            slot.container_owner_id == projection.container_owner_id &&
             slot.slot_index == projection.slot_index;
     });
     if (existing != slots.end())
@@ -1274,6 +1278,10 @@ void SmokeEngineHost::apply_site_snapshot_end()
         if (lhs.container_kind != rhs.container_kind)
         {
             return lhs.container_kind < rhs.container_kind;
+        }
+        if (lhs.container_owner_id != rhs.container_owner_id)
+        {
+            return lhs.container_owner_id < rhs.container_owner_id;
         }
         return lhs.slot_index < rhs.slot_index;
     });

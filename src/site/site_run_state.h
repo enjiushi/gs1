@@ -2,6 +2,7 @@
 
 #include "site/action_state.h"
 #include "site/contractor_state.h"
+#include "site/craft_state.h"
 #include "site/economy_state.h"
 #include "site/event_state.h"
 #include "site/inventory_state.h"
@@ -48,6 +49,7 @@ struct SiteClockState final
 struct CampState final
 {
     TileCoord camp_anchor_tile {};
+    TileCoord camp_storage_tile {};
     float camp_durability {100.0f};
     bool camp_protection_resolved {true};
     bool delivery_point_operational {true};
@@ -78,6 +80,7 @@ struct SiteRunState final
     TaskBoardState task_board {};
     ModifierState modifier {};
     EconomyState economy {};
+    CraftState craft {};
     ActionState site_action {};
     SiteCounters counters {};
     std::uint32_t result_newly_revealed_site_count {0};

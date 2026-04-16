@@ -65,6 +65,7 @@ These areas are the main missing formal sections if we want a safe full-game arc
 | Terrain and ecology runtime | `Ready` | Terrain, plant, weather, device, and meter relationships are clear enough for module and struct design. |
 | Inventory and item runtime | `Ready` | Shared item model, item meters, storage flow, and hazard interaction are already explicit. |
 | Device runtime | `Ready` | Device roster is small and the behavior contract is defined well enough for data tables and instance state. |
+| Crafting and device storage runtime | `Ready` | Crafting now assumes authored item materials, per-device storage, nearby-item caching, timed craft actions, and global sell visibility. |
 | Faction reputation and tech | `Ready` | Branch identity, node model, progression meters, and content-update model are already strong enough for persistent-state design. |
 | Contract board runtime | `Ready` | Prototype task data shape, completion, reward-generation, and chain rules are now defined strongly enough for system design. |
 | Economy runtime | `Ready` | Economic flow, buy/sell directions, and relative value hierarchy are clear enough for system design; exact prices stay as later tuning tables. |

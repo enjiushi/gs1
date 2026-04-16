@@ -112,7 +112,8 @@ enum Gs1SiteActionKind : std::uint8_t
     GS1_SITE_ACTION_BUILD = 2,
     GS1_SITE_ACTION_REPAIR = 3,
     GS1_SITE_ACTION_WATER = 4,
-    GS1_SITE_ACTION_CLEAR_BURIAL = 5
+    GS1_SITE_ACTION_CLEAR_BURIAL = 5,
+    GS1_SITE_ACTION_CRAFT = 6
 };
 
 enum Gs1SiteActionRequestFlags : std::uint8_t
@@ -183,7 +184,8 @@ enum Gs1TaskPresentationListKind : std::uint8_t
 enum Gs1InventoryContainerKind : std::uint8_t
 {
     GS1_INVENTORY_CONTAINER_WORKER_PACK = 0,
-    GS1_INVENTORY_CONTAINER_CAMP_STORAGE = 1
+    GS1_INVENTORY_CONTAINER_CAMP_STORAGE = 1,
+    GS1_INVENTORY_CONTAINER_DEVICE_STORAGE = 2
 };
 
 enum Gs1PhoneListingPresentationKind : std::uint8_t
@@ -273,12 +275,13 @@ enum Gs1RuntimeProfileSystemId : std::uint8_t
     GS1_RUNTIME_PROFILE_SYSTEM_DEVICE_SUPPORT = 10,
     GS1_RUNTIME_PROFILE_SYSTEM_ECOLOGY = 11,
     GS1_RUNTIME_PROFILE_SYSTEM_INVENTORY = 12,
-    GS1_RUNTIME_PROFILE_SYSTEM_TASK_BOARD = 13,
-    GS1_RUNTIME_PROFILE_SYSTEM_ECONOMY_PHONE = 14,
-    GS1_RUNTIME_PROFILE_SYSTEM_PLACEMENT_VALIDATION = 15,
-    GS1_RUNTIME_PROFILE_SYSTEM_FAILURE_RECOVERY = 16,
-    GS1_RUNTIME_PROFILE_SYSTEM_SITE_COMPLETION = 17,
-    GS1_RUNTIME_PROFILE_SYSTEM_COUNT = 18
+    GS1_RUNTIME_PROFILE_SYSTEM_CRAFT = 13,
+    GS1_RUNTIME_PROFILE_SYSTEM_TASK_BOARD = 14,
+    GS1_RUNTIME_PROFILE_SYSTEM_ECONOMY_PHONE = 15,
+    GS1_RUNTIME_PROFILE_SYSTEM_PLACEMENT_VALIDATION = 16,
+    GS1_RUNTIME_PROFILE_SYSTEM_FAILURE_RECOVERY = 17,
+    GS1_RUNTIME_PROFILE_SYSTEM_SITE_COMPLETION = 18,
+    GS1_RUNTIME_PROFILE_SYSTEM_COUNT = 19
 };
 
 struct Gs1RuntimeCreateDesc
@@ -544,8 +547,11 @@ struct Gs1EngineCommandInventorySlotData
     std::uint32_t item_id;
     float condition;
     float freshness;
+    std::uint32_t container_owner_id;
     std::uint16_t quantity;
     std::uint16_t slot_index;
+    std::int16_t container_tile_x;
+    std::int16_t container_tile_y;
     Gs1InventoryContainerKind container_kind;
     std::uint8_t flags;
 };
@@ -703,7 +709,7 @@ GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandSiteTileData, 32U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandWorkerData, 28U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandCampData, 16U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandWeatherData, 24U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandInventorySlotData, 20U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandInventorySlotData, 28U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandTaskData, 20U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandPhoneListingData, 20U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandSiteActionData, 24U);

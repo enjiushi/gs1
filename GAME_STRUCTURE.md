@@ -328,6 +328,7 @@ Current ownership snapshot:
 - `WeatherEventSystem` owns weather and event singleton state
 - `CampDurabilitySystem` owns camp durability and camp service flags
 - `InventorySystem` owns inventory state
+- `CraftSystem` owns crafting-cache state for nearby device inputs and the global phone item cache
 - `TaskBoardSystem` owns task-board state
 - `ModifierSystem` owns modifier state
 - `EconomyPhoneSystem` owns economy and phone-listing state
@@ -358,6 +359,18 @@ Example systems:
 - `ProjectileSystem`
 - `CombatSystem`
 - `AISystem`
+
+## 5.1 V1 Item-Storage-Crafting Clarification
+
+For the current prototype implementation:
+
+- every stackable item is an authored `ItemDef`; crafting materials are not a separate top-level resource family
+- an item stack has a unique runtime item-instance id even when several stacks share the same authored `ItemId`
+- storage uses Flecs relationships in the chain `Item -> Slot -> Container`, with container-to-tile and container-to-device links for local queries
+- the site begins with one starter camp-storage container and one starter workbench so fabrication can bootstrap immediately
+- deployed crafting devices and storage crates keep their own storage slots instead of aliasing the starter camp storage
+- nearby crafting queries read all storage containers in the device's local area plus the worker pack when the worker is nearby
+- selling uses a global live cache that includes worker inventory, camp storage, and deployed device storage rather than one camp-only sell source
 
 Rule:
 

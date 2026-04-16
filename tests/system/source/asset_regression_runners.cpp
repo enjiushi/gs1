@@ -340,6 +340,8 @@ void inventory_regression_runner(
                     GS1_INVENTORY_CONTAINER_WORKER_PACK,
                     GS1_INVENTORY_CONTAINER_WORKER_PACK,
                     0U,
+                    0U,
+                    0U,
                     0U}));
         GS1_SYSTEM_TEST_CHECK(context, status == parse_status(values, "expect_status", GS1_STATUS_OK));
         GS1_SYSTEM_TEST_CHECK(

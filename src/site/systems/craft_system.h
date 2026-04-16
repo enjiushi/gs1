@@ -5,24 +5,25 @@
 
 namespace gs1
 {
-class InventorySystem final
+class CraftSystem final
 {
 public:
     [[nodiscard]] static constexpr SiteSystemAccess access() noexcept
     {
         return SiteSystemAccess {
-            "InventorySystem",
+            "CraftSystem",
             site_component_mask_of(
-                SiteComponent::RunMeta,
                 SiteComponent::TileLayout,
-                SiteComponent::Inventory),
-            site_component_mask_of(SiteComponent::Inventory)};
+                SiteComponent::WorkerMotion,
+                SiteComponent::Inventory,
+                SiteComponent::Craft),
+            site_component_mask_of(SiteComponent::Craft)};
     }
 
     [[nodiscard]] static bool subscribes_to(GameCommandType type) noexcept;
     [[nodiscard]] static Gs1Status process_command(
-        SiteSystemContext<InventorySystem>& context,
+        SiteSystemContext<CraftSystem>& context,
         const GameCommand& command);
-    static void run(SiteSystemContext<InventorySystem>& context);
+    static void run(SiteSystemContext<CraftSystem>& context);
 };
 }  // namespace gs1

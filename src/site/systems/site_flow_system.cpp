@@ -45,7 +45,6 @@ bool action_waits_for_worker_approach(const ActionState& action_state) noexcept
 {
     return has_active_action(action_state) &&
         !action_state.awaiting_placement_reservation &&
-        action_state.action_kind == ActionKind::Plant &&
         !action_state.started_at_world_minute.has_value() &&
         action_state.approach_tile.has_value();
 }

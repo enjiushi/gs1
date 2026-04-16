@@ -605,7 +605,8 @@ body {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  align-items: flex-end;
+  align-items: flex-start;
+  min-height: 0;
 }
 
 .action-progress {
@@ -686,15 +687,39 @@ body {
   max-width: 920px;
   width: min(920px, 100%);
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: min(58vh, calc(100vh - 172px));
+  overflow: hidden;
 }
 
 .action-bar {
   justify-content: flex-end;
   margin-top: 0;
+  align-self: flex-start;
 }
 
 .selection-inventory {
   margin-top: 14px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.selection-inventory::-webkit-scrollbar {
+  width: 10px;
+}
+
+.selection-inventory::-webkit-scrollbar-thumb {
+  background: rgba(96, 66, 33, 0.22);
+  border-radius: 999px;
+  border: 2px solid rgba(0, 0, 0, 0);
+  background-clip: padding-box;
+}
+
+.selection-inventory::-webkit-scrollbar-track {
+  background: rgba(96, 66, 33, 0.08);
+  border-radius: 999px;
 }
 
 .site-panel-stack {

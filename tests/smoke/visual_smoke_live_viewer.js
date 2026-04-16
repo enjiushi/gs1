@@ -39,6 +39,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let currentSceneKind = "";
     let siteSceneCache = null;
     let selectedInventorySlotKey = "";
+    let openedInventoryContainerKey = "";
     let inventoryPanelOpen = true;
     let tileContextMenuState = null;
     let localActionProgressState = null;
@@ -79,18 +80,26 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     };
     const runtimeFixedStepSeconds = 1.0 / 60.0;
     const siteActionMinutesPerRealSecond = 0.8;
+    const craftCacheRadiusTiles = 5;
     const inventoryContainerCodes = {
         WORKER_PACK: 0,
-        CAMP_STORAGE: 1
+        CAMP_STORAGE: 1,
+        DEVICE_STORAGE: 2
     };
     const itemCatalog = {
-        1: { name: "Water", shortName: "H2O", stackSize: 5, canUse: true, canPlant: false },
-        2: { name: "Food", shortName: "Ration", stackSize: 5, canUse: true, canPlant: false },
-        3: { name: "Medicine", shortName: "Med", stackSize: 3, canUse: true, canPlant: false },
-        4: { name: "Wind Reed Seeds", shortName: "Wind Reed", stackSize: 10, canUse: false, canPlant: true },
-        5: { name: "Saltbush Seeds", shortName: "Saltbush", stackSize: 10, canUse: false, canPlant: true },
-        6: { name: "Shade Cactus Seeds", shortName: "Shade Cactus", stackSize: 10, canUse: false, canPlant: true },
-        7: { name: "Sunfruit Vine Seeds", shortName: "Sunfruit Vine", stackSize: 10, canUse: false, canPlant: true }
+        1: { name: "Water", shortName: "H2O", stackSize: 5, canUse: true, canPlant: false, canDeploy: false },
+        2: { name: "Food", shortName: "Ration", stackSize: 5, canUse: true, canPlant: false, canDeploy: false },
+        3: { name: "Medicine", shortName: "Med", stackSize: 3, canUse: true, canPlant: false, canDeploy: false },
+        4: { name: "Wind Reed Seeds", shortName: "Wind Reed", stackSize: 10, canUse: false, canPlant: true, canDeploy: false },
+        5: { name: "Saltbush Seeds", shortName: "Saltbush", stackSize: 10, canUse: false, canPlant: true, canDeploy: false },
+        6: { name: "Shade Cactus Seeds", shortName: "Shade Cactus", stackSize: 10, canUse: false, canPlant: true, canDeploy: false },
+        7: { name: "Sunfruit Vine Seeds", shortName: "Sunfruit Vine", stackSize: 10, canUse: false, canPlant: true, canDeploy: false },
+        8: { name: "Wood", shortName: "Wood", stackSize: 20, canUse: false, canPlant: false, canDeploy: false },
+        9: { name: "Iron", shortName: "Iron", stackSize: 20, canUse: false, canPlant: false, canDeploy: false },
+        10: { name: "Wind Reed Fiber", shortName: "Fiber", stackSize: 20, canUse: false, canPlant: false, canDeploy: false },
+        11: { name: "Camp Stove Kit", shortName: "Stove Kit", stackSize: 1, canUse: false, canPlant: false, canDeploy: true, deployStructureId: 201 },
+        12: { name: "Workbench Kit", shortName: "Bench Kit", stackSize: 1, canUse: false, canPlant: false, canDeploy: true, deployStructureId: 202 },
+        13: { name: "Storage Crate Kit", shortName: "Crate Kit", stackSize: 1, canUse: false, canPlant: false, canDeploy: true, deployStructureId: 203 }
     };
     const itemVisuals = {
         1: { glyph: "H2", light: "#5d8eb3", dark: "#33546f" },
@@ -99,7 +108,60 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         4: { glyph: "WR", light: "#79a35f", dark: "#46693a" },
         5: { glyph: "SB", light: "#8aa05c", dark: "#53683a" },
         6: { glyph: "SC", light: "#6a8c67", dark: "#3c5841" },
-        7: { glyph: "SV", light: "#8f7c4c", dark: "#5c4526" }
+        7: { glyph: "SV", light: "#8f7c4c", dark: "#5c4526" },
+        8: { glyph: "WD", light: "#ac7d4b", dark: "#6e4a28" },
+        9: { glyph: "IR", light: "#9ca7b4", dark: "#596572" },
+        10: { glyph: "FB", light: "#a2bb7b", dark: "#607541" },
+        11: { glyph: "ST", light: "#c7835a", dark: "#7b4327" },
+        12: { glyph: "WB", light: "#b2966c", dark: "#6b5437" },
+        13: { glyph: "CR", light: "#af8c63", dark: "#694d2c" }
+    };
+    const structureCatalog = {
+        201: { name: "Camp Stove", shortName: "Stove", slotCount: 6 },
+        202: { name: "Workbench", shortName: "Workbench", slotCount: 8 },
+        203: { name: "Storage Crate", shortName: "Crate", slotCount: 10 }
+    };
+    const craftRecipeCatalog = {
+        201: [
+            {
+                outputItemId: 2,
+                outputQuantity: 1,
+                craftMinutes: 1.0,
+                ingredients: [
+                    { itemId: 1, quantity: 1 },
+                    { itemId: 10, quantity: 2 }
+                ]
+            }
+        ],
+        202: [
+            {
+                outputItemId: 11,
+                outputQuantity: 1,
+                craftMinutes: 1.5,
+                ingredients: [
+                    { itemId: 8, quantity: 4 },
+                    { itemId: 9, quantity: 2 }
+                ]
+            },
+            {
+                outputItemId: 12,
+                outputQuantity: 1,
+                craftMinutes: 2.0,
+                ingredients: [
+                    { itemId: 8, quantity: 5 },
+                    { itemId: 9, quantity: 3 }
+                ]
+            },
+            {
+                outputItemId: 13,
+                outputQuantity: 1,
+                craftMinutes: 1.0,
+                ingredients: [
+                    { itemId: 8, quantity: 3 },
+                    { itemId: 9, quantity: 2 }
+                ]
+            }
+        ]
     };
 
     const renderer = new THREE_NS.WebGLRenderer({ antialias: true });
@@ -244,13 +306,39 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return itemVisuals[itemId] || { glyph: "??", light: "#8f7a64", dark: "#5a4837" };
     }
 
-    function getInventorySlotsByKind(state, containerKind) {
+    function getStructureMeta(structureId) {
+        return structureCatalog[structureId] || null;
+    }
+
+    function getStructureLabel(structureId) {
+        const structureMeta = getStructureMeta(structureId);
+        return structureMeta ? structureMeta.name : ("Structure " + structureId);
+    }
+
+    function getCraftRecipesForStructure(structureId) {
+        return craftRecipeCatalog[structureId] || [];
+    }
+
+    function getTileSnapshot(state, tileX, tileY) {
+        const siteBootstrap = getSiteBootstrap(state);
+        if (!siteBootstrap || !siteBootstrap.tiles) {
+            return null;
+        }
+
+        return siteBootstrap.tiles.find((tile) => tile.x === tileX && tile.y === tileY) || null;
+    }
+
+    function getAllInventorySlots(state) {
         const siteState = getSiteState(state);
         if (!siteState || !siteState.inventorySlots) {
             return [];
         }
 
-        return siteState.inventorySlots.filter((slot) => slot.containerKind === containerKind);
+        return siteState.inventorySlots.slice();
+    }
+
+    function getInventorySlotsByKind(state, containerKind) {
+        return getAllInventorySlots(state).filter((slot) => slot.containerKind === containerKind);
     }
 
     function getBuyListings(state) {
@@ -262,8 +350,25 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return siteState.phoneListings.filter((listing) => listing.listingKind === "BUY_ITEM" && listing.quantity !== 0);
     }
 
-    function slotKey(containerKind, slotIndex) {
-        return containerKind + ":" + slotIndex;
+    function getSellListings(state) {
+        const siteState = getSiteState(state);
+        if (!siteState || !siteState.phoneListings) {
+            return [];
+        }
+
+        return siteState.phoneListings.filter((listing) => listing.listingKind === "SELL_ITEM" && listing.quantity !== 0);
+    }
+
+    function containerKey(containerKind, containerOwnerId) {
+        return containerKind + ":" + String(containerOwnerId || 0);
+    }
+
+    function slotKey(containerKind, slotIndex, containerOwnerId) {
+        return containerKey(containerKind, containerOwnerId) + ":" + slotIndex;
+    }
+
+    function encodeInventoryTransferOwnersArg(sourceOwnerId, destinationOwnerId) {
+        return (sourceOwnerId >>> 0) + ((destinationOwnerId >>> 0) * 0x100000000);
     }
 
     function encodeInventoryUseArg(containerKind, slotIndex, quantity) {
@@ -285,6 +390,89 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             ((destinationContainerCode & 0xff) << 16) +
             ((destinationSlotIndex & 0xff) << 24) +
             ((quantity & 0xffff) * 0x100000000);
+    }
+
+    function getInventoryContainers(state) {
+        const containers = new Map();
+        getAllInventorySlots(state).forEach((slot) => {
+            const key = containerKey(slot.containerKind, slot.containerOwnerId || 0);
+            if (!containers.has(key)) {
+                containers.set(key, {
+                    key: key,
+                    containerKind: slot.containerKind,
+                    containerOwnerId: slot.containerOwnerId || 0,
+                    containerTileX: typeof slot.containerTileX === "number" ? slot.containerTileX : 0,
+                    containerTileY: typeof slot.containerTileY === "number" ? slot.containerTileY : 0,
+                    slots: []
+                });
+            }
+            containers.get(key).slots.push(slot);
+        });
+
+        return Array.from(containers.values()).sort((left, right) => {
+            if (left.containerKind !== right.containerKind) {
+                return left.containerKind.localeCompare(right.containerKind);
+            }
+            if ((left.containerOwnerId || 0) !== (right.containerOwnerId || 0)) {
+                return (left.containerOwnerId || 0) - (right.containerOwnerId || 0);
+            }
+            return 0;
+        });
+    }
+
+    function getDeviceStorageContainers(state) {
+        return getInventoryContainers(state).filter((container) => container.containerKind === "DEVICE_STORAGE");
+    }
+
+    function getOpenableStorageContainersForTile(state, tileX, tileY) {
+        return getInventoryContainers(state).filter((container) =>
+            container.containerKind !== "WORKER_PACK" &&
+            container.containerTileX === tileX &&
+            container.containerTileY === tileY);
+    }
+
+    function findOpenedInventoryContainer(state) {
+        if (!openedInventoryContainerKey) {
+            return null;
+        }
+
+        return getInventoryContainers(state).find((container) => container.key === openedInventoryContainerKey) || null;
+    }
+
+    function clearOpenedInventoryContainerIfInvalid(state) {
+        if (!openedInventoryContainerKey || !state || state.appState !== "SITE_ACTIVE") {
+            openedInventoryContainerKey = "";
+            return;
+        }
+
+        if (!findOpenedInventoryContainer(state)) {
+            openedInventoryContainerKey = "";
+        }
+    }
+
+    function openInventoryContainer(containerInfo) {
+        openedInventoryContainerKey = containerInfo ? containerInfo.key : "";
+        inventoryPanelOpen = true;
+        if (latestState) {
+            renderSiteOverlay(latestState);
+        }
+    }
+
+    function getContainerDisplayName(state, containerInfo) {
+        if (!containerInfo) {
+            return "Storage";
+        }
+        if (containerInfo.containerKind === "WORKER_PACK") {
+            return "Worker Pack";
+        }
+        if (containerInfo.containerKind === "CAMP_STORAGE") {
+            return "Camp Storage (" + containerInfo.containerTileX + ", " + containerInfo.containerTileY + ")";
+        }
+
+        const tile = getTileSnapshot(state, containerInfo.containerTileX, containerInfo.containerTileY);
+        const structureId = tile ? tile.structureTypeId : 0;
+        const structureLabel = getStructureLabel(structureId);
+        return structureLabel + " (" + containerInfo.containerTileX + ", " + containerInfo.containerTileY + ")";
     }
 
     function getCarriedSeedOptions(state) {
@@ -322,14 +510,86 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             });
     }
 
+    function getCarriedDeployableOptions(state) {
+        const deployTotals = new Map();
+        getInventorySlotsByKind(state, "WORKER_PACK").forEach((slot) => {
+            if (!isOccupiedSlot(slot)) {
+                return;
+            }
+
+            const itemMeta = getItemMeta(slot.itemId);
+            if (!itemMeta || !itemMeta.canDeploy || !itemMeta.deployStructureId) {
+                return;
+            }
+
+            const previous = deployTotals.get(slot.itemId) || 0;
+            deployTotals.set(slot.itemId, previous + slot.quantity);
+        });
+
+        return Array.from(deployTotals.entries())
+            .sort((lhs, rhs) => lhs[0] - rhs[0])
+            .map(([itemId, quantity]) => {
+                const itemMeta = getItemMeta(itemId);
+                const visual = getItemVisual(itemId);
+                return {
+                    id: "deploy:" + itemId,
+                    itemId: itemId,
+                    label: itemMeta ? itemMeta.name : ("Item " + itemId),
+                    shortLabel: itemMeta ? itemMeta.shortName : ("Item " + itemId),
+                    quantity: quantity,
+                    iconGlyph: visual.glyph,
+                    iconLight: visual.light,
+                    iconDark: visual.dark
+                };
+            });
+    }
+
+    function isWithinCraftRange(tileX, tileY, otherTileX, otherTileY) {
+        return Math.abs((otherTileX || 0) - tileX) <= craftCacheRadiusTiles &&
+            Math.abs((otherTileY || 0) - tileY) <= craftCacheRadiusTiles;
+    }
+
+    function getNearbyCraftSourceSlots(state, tileX, tileY) {
+        const siteState = getSiteState(state);
+        const worker = siteState ? siteState.worker : null;
+        return getAllInventorySlots(state).filter((slot) => {
+            if (!isOccupiedSlot(slot)) {
+                return false;
+            }
+            if (slot.containerKind === "WORKER_PACK") {
+                if (!worker) {
+                    return false;
+                }
+                return isWithinCraftRange(tileX, tileY, Math.round(worker.tileX || 0), Math.round(worker.tileY || 0));
+            }
+            return isWithinCraftRange(tileX, tileY, slot.containerTileX || 0, slot.containerTileY || 0);
+        });
+    }
+
+    function summarizeItemTotals(slots) {
+        const totals = new Map();
+        slots.forEach((slot) => {
+            if (!isOccupiedSlot(slot)) {
+                return;
+            }
+            totals.set(slot.itemId, (totals.get(slot.itemId) || 0) + slot.quantity);
+        });
+        return totals;
+    }
+
+    function canCraftRecipeFromNearby(state, tileX, tileY, recipe) {
+        const nearbyTotals = summarizeItemTotals(getNearbyCraftSourceSlots(state, tileX, tileY));
+        return recipe.ingredients.every((ingredient) => (nearbyTotals.get(ingredient.itemId) || 0) >= ingredient.quantity);
+    }
+
     function clearSelectedInventorySlotIfInvalid(state) {
         if (!selectedInventorySlotKey || !state || state.appState !== "SITE_ACTIVE") {
             selectedInventorySlotKey = "";
             return;
         }
 
-        const allSlots = getInventorySlotsByKind(state, "WORKER_PACK").concat(getInventorySlotsByKind(state, "CAMP_STORAGE"));
-        const selectedSlot = allSlots.find((slot) => slotKey(slot.containerKind, slot.slotIndex) === selectedInventorySlotKey);
+        const selectedSlot = getAllInventorySlots(state).find((slot) =>
+            slotKey(slot.containerKind, slot.slotIndex, slot.containerOwnerId) === selectedInventorySlotKey);
         if (!selectedSlot || selectedSlot.quantity <= 0 || selectedSlot.flags === 0) {
             selectedInventorySlotKey = "";
         }
@@ -339,24 +599,28 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (!selectedInventorySlotKey || !state) {
             return null;
         }
-        const allSlots = getInventorySlotsByKind(state, "WORKER_PACK").concat(getInventorySlotsByKind(state, "CAMP_STORAGE"));
-        return allSlots.find((slot) => slotKey(slot.containerKind, slot.slotIndex) === selectedInventorySlotKey) || null;
+        return getAllInventorySlots(state).find((slot) =>
+            slotKey(slot.containerKind, slot.slotIndex, slot.containerOwnerId) === selectedInventorySlotKey) || null;
     }
 
-    function findTransferTargetSlot(state, sourceSlot, destinationKind) {
-        const destinationSlots = getInventorySlotsByKind(state, destinationKind);
+    function findTransferTargetSlot(state, sourceSlot, destinationContainerInfo) {
+        const destinationSlots = destinationContainerInfo ? destinationContainerInfo.slots : [];
         const itemMeta = getItemMeta(sourceSlot.itemId);
         const stackSize = itemMeta ? itemMeta.stackSize : Math.max(sourceSlot.quantity, 1);
 
         for (const destinationSlot of destinationSlots) {
             if (destinationSlot.flags === 0 && destinationSlot.itemId === 0) {
                 return {
+                    containerKind: destinationContainerInfo.containerKind,
+                    containerOwnerId: destinationContainerInfo.containerOwnerId || 0,
                     slotIndex: destinationSlot.slotIndex,
                     quantity: Math.min(sourceSlot.quantity, stackSize)
                 };
             }
             if (destinationSlot.flags === 0) {
                 return {
+                    containerKind: destinationContainerInfo.containerKind,
+                    containerOwnerId: destinationContainerInfo.containerOwnerId || 0,
                     slotIndex: destinationSlot.slotIndex,
                     quantity: Math.min(sourceSlot.quantity, stackSize)
                 };
@@ -371,6 +635,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             }
 
             return {
+                containerKind: destinationContainerInfo.containerKind,
+                containerOwnerId: destinationContainerInfo.containerOwnerId || 0,
                 slotIndex: destinationSlot.slotIndex,
                 quantity: Math.min(sourceSlot.quantity, freeCapacity)
             };
@@ -388,7 +654,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         });
     }
 
-    function postInventoryTransfer(sourceSlot, destinationKind, destinationSlotIndex, quantity) {
+    function postInventoryTransfer(sourceSlot, destinationKind, destinationSlotIndex, quantity, destinationOwnerId) {
         return postJson("/ui-action", {
             type: "TRANSFER_INVENTORY_ITEM",
             targetId: 0,
@@ -399,7 +665,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 destinationSlotIndex,
                 quantity
             ),
-            arg1: 0
+            arg1: encodeInventoryTransferOwnersArg(
+                sourceSlot.containerOwnerId || 0,
+                destinationOwnerId || 0
+            )
         });
     }
 
@@ -411,11 +680,17 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (actionKind === 1) {
             return "Plant";
         }
+        if (actionKind === 2) {
+            return "Build";
+        }
         if (actionKind === 4) {
             return "Water";
         }
         if (actionKind === 5) {
             return "Clear Burial";
+        }
+        if (actionKind === 6) {
+            return "Craft";
         }
         return "Idle";
     }
@@ -568,23 +843,109 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function buildTileContextMenuItems(state, tileX, tileY) {
+        const tile = getTileSnapshot(state, tileX, tileY);
+        const structureId = tile ? (tile.structureTypeId || 0) : 0;
+        const recipes = getCraftRecipesForStructure(structureId);
+        const storageContainers = getOpenableStorageContainersForTile(state, tileX, tileY);
         const carriedSeeds = getCarriedSeedOptions(state);
-        if (carriedSeeds.length === 0) {
-            return [
-                {
-                    id: "none",
-                    label: "No Action",
-                    meta: "Carry seeds in the worker pack to plant here.",
-                    iconGlyph: "--",
-                    iconLight: "#a38e76",
-                    iconDark: "#796652",
-                    disabled: true
+        const carriedDeployables = getCarriedDeployableOptions(state);
+        const rootItems = [];
+        const tileHasStructure = structureId !== 0;
+
+        if (storageContainers.length === 1) {
+            const containerInfo = storageContainers[0];
+            rootItems.push({
+                id: "open-storage:" + containerInfo.key,
+                label: "Open Storage",
+                meta: getContainerDisplayName(state, containerInfo),
+                iconGlyph: "BX",
+                iconLight: "#8f7a64",
+                iconDark: "#5a4837",
+                onSelect: function () {
+                    openInventoryContainer(containerInfo);
+                    closeTileContextMenu();
                 }
-            ];
+            });
+        } else if (storageContainers.length > 1) {
+            rootItems.push({
+                id: "open-storage",
+                label: "Open Storage",
+                meta: "Choose one attached container.",
+                iconGlyph: "BX",
+                iconLight: "#8f7a64",
+                iconDark: "#5a4837",
+                children: storageContainers.map((containerInfo) => ({
+                    id: "open-storage:" + containerInfo.key,
+                    label: getContainerDisplayName(state, containerInfo),
+                    meta: "Open this container",
+                    iconGlyph: "BX",
+                    iconLight: "#8f7a64",
+                    iconDark: "#5a4837",
+                    onSelect: function () {
+                        openInventoryContainer(containerInfo);
+                        closeTileContextMenu();
+                    }
+                }))
+            });
         }
 
-        return [
-            {
+        if (recipes.length > 0) {
+            const orderedRecipes = recipes.slice().sort((left, right) => {
+                const leftCraftable = canCraftRecipeFromNearby(state, tileX, tileY, left) ? 0 : 1;
+                const rightCraftable = canCraftRecipeFromNearby(state, tileX, tileY, right) ? 0 : 1;
+                if (leftCraftable !== rightCraftable) {
+                    return leftCraftable - rightCraftable;
+                }
+                return left.outputItemId - right.outputItemId;
+            });
+
+            rootItems.push({
+                id: "craft",
+                label: "Craft",
+                meta: "Choose one recipe.",
+                iconGlyph: "CF",
+                iconLight: "#7a9d67",
+                iconDark: "#4a6b3b",
+                children: orderedRecipes.map((recipe) => {
+                    const itemMeta = getItemMeta(recipe.outputItemId);
+                    const visual = getItemVisual(recipe.outputItemId);
+                    const craftable = canCraftRecipeFromNearby(state, tileX, tileY, recipe);
+                    return {
+                        id: "craft:" + recipe.outputItemId,
+                        label: itemMeta ? itemMeta.name : ("Item " + recipe.outputItemId),
+                        meta: (craftable ? "Ready" : "Missing materials") +
+                            " - " +
+                            recipe.ingredients.map((ingredient) =>
+                                getItemShortLabel(ingredient.itemId) + " x" + ingredient.quantity).join(" + "),
+                        iconGlyph: visual.glyph,
+                        iconLight: visual.light,
+                        iconDark: visual.dark,
+                        disabled: !craftable,
+                        onSelect: function () {
+                            statusChip.textContent =
+                                "Moving to (" + tileX + "," + tileY + ") to craft " +
+                                (itemMeta ? itemMeta.shortName : ("Item " + recipe.outputItemId)) + ".";
+                            postSiteAction({
+                                actionKind: "CRAFT",
+                                flags: 4,
+                                quantity: 1,
+                                targetTileX: tileX,
+                                targetTileY: tileY,
+                                primarySubjectId: 0,
+                                secondarySubjectId: 0,
+                                itemId: recipe.outputItemId
+                            }).catch(() => {
+                                statusChip.textContent = "Failed to send craft action.";
+                            });
+                            closeTileContextMenu();
+                        }
+                    };
+                })
+            });
+        }
+
+        if (!tileHasStructure && carriedSeeds.length > 0) {
+            rootItems.push({
                 id: "plant",
                 label: "Plant",
                 meta: "Choose one carried seed type.",
@@ -618,8 +979,64 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                         }
                     };
                 })
-            }
-        ];
+            });
+        }
+
+        if (!tileHasStructure && carriedDeployables.length > 0) {
+            rootItems.push({
+                id: "deploy",
+                label: "Deploy",
+                meta: "Place a carried device kit here.",
+                iconGlyph: "DP",
+                iconLight: "#b48857",
+                iconDark: "#6a4b2e",
+                children: carriedDeployables.map((item) => {
+                    return {
+                        id: item.id,
+                        label: item.label,
+                        meta: "x" + item.quantity + " carried",
+                        iconGlyph: item.iconGlyph,
+                        iconLight: item.iconLight,
+                        iconDark: item.iconDark,
+                        onSelect: function () {
+                            statusChip.textContent =
+                                "Moving to (" + tileX + "," + tileY + ") to deploy " + item.shortLabel + ".";
+                            postSiteAction({
+                                actionKind: "BUILD",
+                                flags: 4,
+                                quantity: 1,
+                                targetTileX: tileX,
+                                targetTileY: tileY,
+                                primarySubjectId: 0,
+                                secondarySubjectId: 0,
+                                itemId: item.itemId
+                            }).catch(() => {
+                                statusChip.textContent = "Failed to send build action.";
+                            });
+                            closeTileContextMenu();
+                        }
+                    };
+                })
+            });
+        }
+
+        if (rootItems.length === 0) {
+            return [
+                {
+                    id: "none",
+                    label: "No Action",
+                    meta: tileHasStructure
+                        ? "This structure has no direct action right now."
+                        : "Carry seeds or deployable kits, or use a crafting/storage device.",
+                    iconGlyph: "--",
+                    iconLight: "#a38e76",
+                    iconDark: "#796652",
+                    disabled: true
+                }
+            ];
+        }
+
+        return rootItems;
     }
 
     function renderTileContextMenu() {
@@ -765,10 +1182,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
 
         const itemMeta = getItemMeta(slot.itemId);
-        const locationName = slot.containerKind === "WORKER_PACK" ? "Worker Pack" : "Camp Storage";
+        const locationName = getContainerDisplayName(latestState, {
+            containerKind: slot.containerKind,
+            containerOwnerId: slot.containerOwnerId || 0,
+            containerTileX: slot.containerTileX || 0,
+            containerTileY: slot.containerTileY || 0
+        });
         const actionHint = slot.containerKind === "WORKER_PACK"
-                ? (itemMeta && itemMeta.canPlant ? "Click to select and arm/store" : "Click to select and use/store")
-                : "Click to select and carry";
+            ? (itemMeta && itemMeta.canPlant ? "Click to select and arm/store" : "Click to select and use/store")
+            : "Click to select and move";
 
         inventoryTooltipTitle.textContent = getInventoryItemLabel(slot);
         inventoryTooltipMeta.textContent =
@@ -920,10 +1342,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (occupied && itemMeta && itemMeta.canUse) {
             slotClasses.push("usable");
         }
-        if (occupied && options.armedSlotKey && slotKey(slot.containerKind, slot.slotIndex) === options.armedSlotKey) {
+        if (occupied && options.armedSlotKey && slotKey(slot.containerKind, slot.slotIndex, slot.containerOwnerId) === options.armedSlotKey) {
             slotClasses.push("armed");
         }
-        if (occupied && options.selectedSlotKey && slotKey(slot.containerKind, slot.slotIndex) === options.selectedSlotKey) {
+        if (occupied && options.selectedSlotKey && slotKey(slot.containerKind, slot.slotIndex, slot.containerOwnerId) === options.selectedSlotKey) {
             slotClasses.push("selected");
         }
         card.className = slotClasses.join(" ");
@@ -972,7 +1394,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         if (occupied) {
             card.addEventListener("click", function () {
-                const clickedKey = slotKey(slot.containerKind, slot.slotIndex);
+                const clickedKey = slotKey(slot.containerKind, slot.slotIndex, slot.containerOwnerId);
                 selectedInventorySlotKey = selectedInventorySlotKey === clickedKey ? "" : clickedKey;
                 if (latestState) {
                     renderSiteOverlay(latestState);
@@ -993,6 +1415,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         for (let slotIndex = 0; slotIndex < options.slotCount; slotIndex += 1) {
             const slot = slotByIndex.get(slotIndex) || {
                 containerKind: options.containerKind,
+                containerOwnerId: options.containerOwnerId || 0,
+                containerTileX: options.containerTileX || 0,
+                containerTileY: options.containerTileY || 0,
                 slotIndex: slotIndex,
                 itemId: 0,
                 quantity: 0,
@@ -1006,7 +1431,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         container.appendChild(sectionParts.section);
     }
 
-    function renderSiteInventoryPanel(state, workerPackSlots, campStorageSlots) {
+    function renderSiteInventoryPanel(state, workerPackSlots, openedContainerInfo) {
         selectionInventory.hidden = false;
         selectionInventory.innerHTML = "";
 
@@ -1038,22 +1463,53 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             selectedSlotKey: selectedInventorySlotKey
         });
 
-        appendInventoryGridSection(topGrid, "Camp Storage", "Live camp stock", campStorageSlots, {
-            state: state,
-            containerKind: "CAMP_STORAGE",
-            slotCount: 24,
-            columns: 6,
-            slotLabelPrefix: "Camp",
-            selectedSlotKey: selectedInventorySlotKey
-        });
+        if (openedContainerInfo) {
+            const tile = getTileSnapshot(state, openedContainerInfo.containerTileX, openedContainerInfo.containerTileY);
+            const structureMeta = getStructureMeta(tile ? tile.structureTypeId : 0);
+            const openedSlotCount = openedContainerInfo.containerKind === "CAMP_STORAGE"
+                ? 24
+                : (structureMeta ? structureMeta.slotCount : Math.max(openedContainerInfo.slots.length, 1));
+            appendInventoryGridSection(
+                topGrid,
+                getContainerDisplayName(state, openedContainerInfo),
+                openedContainerInfo.containerKind === "CAMP_STORAGE"
+                    ? "Starter camp stockpile"
+                    : (structureMeta ? ("Device storage - " + structureMeta.slotCount + " slots") : "Device storage"),
+                openedContainerInfo.slots,
+                {
+                    state: state,
+                    containerKind: openedContainerInfo.containerKind,
+                    containerOwnerId: openedContainerInfo.containerOwnerId,
+                    containerTileX: openedContainerInfo.containerTileX,
+                    containerTileY: openedContainerInfo.containerTileY,
+                    slotCount: openedSlotCount,
+                    columns: openedSlotCount <= 6 ? 3 : 4,
+                    slotLabelPrefix: openedContainerInfo.containerKind === "CAMP_STORAGE" ? "Camp" : "Device",
+                    selectedSlotKey: selectedInventorySlotKey
+                });
+        }
 
         const footnote = document.createElement("div");
         footnote.className = "inventory-footnote";
         const carriedSeeds = getCarriedSeedOptions(state);
-        footnote.textContent = carriedSeeds.length > 0
-            ? ("Carry seeds in the worker pack, then right-click a tile to open the planting menu. " +
-                carriedSeeds.map((seed) => seed.shortLabel + " x" + seed.quantity).join("  |  "))
-            : "Worker pack and camp storage are live and interactive. Move seeds into the worker pack to plant.";
+        const carriedDeployables = getCarriedDeployableOptions(state);
+        const footnoteParts = [];
+        if (openedContainerInfo) {
+            footnoteParts.push("Opened: " + getContainerDisplayName(state, openedContainerInfo));
+        } else {
+            footnoteParts.push("Press B for the worker pack, or right-click a storage/crafting device to open that container.");
+        }
+        if (carriedSeeds.length > 0) {
+            footnoteParts.push(
+                "Seeds: " +
+                carriedSeeds.map((seed) => seed.shortLabel + " x" + seed.quantity).join("  | "));
+        }
+        if (carriedDeployables.length > 0) {
+            footnoteParts.push(
+                "Deployables: " +
+                carriedDeployables.map((item) => item.shortLabel + " x" + item.quantity).join("  | "));
+        }
+        footnote.textContent = footnoteParts.join("     ");
         stack.appendChild(footnote);
     }
 
@@ -1061,7 +1517,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (!selectedSlot) {
             const helper = document.createElement("div");
             helper.className = "helper-note";
-            helper.textContent = "Hover any item for details. Click a worker-pack or camp-storage slot to surface actions here.";
+            helper.textContent = "Hover any item for details. Click any worker, camp, or device slot to surface actions here.";
             contextActions.appendChild(helper);
             return;
         }
@@ -1073,7 +1529,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             getInventoryItemLabel(selectedSlot) +
             "  x" + selectedSlot.quantity +
             "  " +
-            (selectedSlot.containerKind === "WORKER_PACK" ? "Worker Pack" : "Camp Storage") +
+            getContainerDisplayName(state, {
+                containerKind: selectedSlot.containerKind,
+                containerOwnerId: selectedSlot.containerOwnerId || 0,
+                containerTileX: selectedSlot.containerTileX || 0,
+                containerTileY: selectedSlot.containerTileY || 0
+            }) +
             " slot " + (selectedSlot.slotIndex + 1);
         contextActions.appendChild(slotSummary);
 
@@ -1092,51 +1553,37 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             );
         }
 
-        if (selectedSlot.containerKind === "WORKER_PACK") {
-            const campTarget = findTransferTargetSlot(state, selectedSlot, "CAMP_STORAGE");
-            contextActions.appendChild(
-                makeButton(
-                    "Store To Camp",
-                    function () {
-                        if (!campTarget) {
-                            return;
-                        }
-                        postInventoryTransfer(
-                            selectedSlot,
-                            "CAMP_STORAGE",
-                            campTarget.slotIndex,
-                            campTarget.quantity).catch(() => {
-                            statusChip.textContent = "Failed to store inventory item.";
-                        });
-                    },
-                    true,
-                    !campTarget
-                )
-            );
-        }
-
-        if (selectedSlot.containerKind === "CAMP_STORAGE") {
-            const workerTarget = findTransferTargetSlot(state, selectedSlot, "WORKER_PACK");
-            contextActions.appendChild(
-                makeButton(
-                    "Carry To Pack",
-                    function () {
-                        if (!workerTarget) {
-                            return;
-                        }
-                        postInventoryTransfer(
-                            selectedSlot,
-                            "WORKER_PACK",
-                            workerTarget.slotIndex,
-                            workerTarget.quantity).catch(() => {
-                            statusChip.textContent = "Failed to carry inventory item.";
-                        });
-                    },
-                    true,
-                    !workerTarget
-                )
-            );
-        }
+        const sourceContainerKey = containerKey(selectedSlot.containerKind, selectedSlot.containerOwnerId || 0);
+        getInventoryContainers(state)
+            .filter((containerInfo) => containerInfo.key !== sourceContainerKey)
+            .forEach((containerInfo) => {
+                const target = findTransferTargetSlot(state, selectedSlot, containerInfo);
+                const targetLabel = containerInfo.containerKind === "WORKER_PACK"
+                    ? "Carry To Pack"
+                    : (containerInfo.containerKind === "CAMP_STORAGE"
+                        ? "Store To Camp"
+                        : ("Move To " + getContainerDisplayName(state, containerInfo)));
+                contextActions.appendChild(
+                    makeButton(
+                        targetLabel,
+                        function () {
+                            if (!target) {
+                                return;
+                            }
+                            postInventoryTransfer(
+                                selectedSlot,
+                                target.containerKind,
+                                target.slotIndex,
+                                target.quantity,
+                                target.containerOwnerId).catch(() => {
+                                statusChip.textContent = "Failed to move inventory item.";
+                            });
+                        },
+                        true,
+                        !target
+                    )
+                );
+            });
 
         contextActions.appendChild(
             makeButton(
@@ -1259,9 +1706,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const siteBootstrap = getSiteBootstrap(state);
         const siteState = getSiteState(state);
         const workerPackSlots = getInventorySlotsByKind(state, "WORKER_PACK");
-        const campStorageSlots = getInventorySlotsByKind(state, "CAMP_STORAGE");
         const buyListings = getBuyListings(state);
+        const sellListings = getSellListings(state);
         const carriedSeeds = getCarriedSeedOptions(state);
+        const carriedDeployables = getCarriedDeployableOptions(state);
         const workerActionKind =
             siteState && siteState.worker ? siteState.worker.currentActionKind : 0;
 
@@ -1269,20 +1717,31 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         selectionEyebrow.textContent = "Site Active";
         contextActions.innerHTML = "";
         clearSelectedInventorySlotIfInvalid(state);
+        clearOpenedInventoryContainerIfInvalid(state);
 
         const selectedSlot = findSelectedInventorySlot(state);
+        const openedContainerInfo = findOpenedInventoryContainer(state);
         const plantingText = carriedSeeds.length > 0
-            ? ("Right-click any site tile to open the planting menu. Carried seeds: " +
+            ? ("Right-click open ground to plant. Carried seeds: " +
                 carriedSeeds.map((seed) => seed.shortLabel + " x" + seed.quantity).join("  |  "))
             : "Carry seeds into the worker pack to unlock planting from the tile menu.";
+        const deployText = carriedDeployables.length > 0
+            ? ("Deployable kits: " +
+                carriedDeployables.map((item) => item.shortLabel + " x" + item.quantity).join("  | "))
+            : "Craft or collect deployable kits, then right-click open ground to place them.";
+        const storageText = openedContainerInfo
+            ? ("Opened container: " + getContainerDisplayName(state, openedContainerInfo) + ".")
+            : "Right-click the camp storage crate, workbench, stove, or another storage device to open that specific container.";
         selectionText.innerHTML = siteBootstrap
             ? (
                 "Site " + siteBootstrap.siteId +
-                " is live. Use WASD to move, press B to open or close the inventory panel, drag with right mouse to orbit the camera, and short right-click a tile to choose a site action." +
-                "<br><br>" + plantingText
+                " is live. Use WASD to move, press B to open or close the worker pack, drag with right mouse to orbit the camera, and short right-click a tile to choose a site action." +
+                "<br><br>" + plantingText +
+                "<br><br>" + deployText +
+                "<br><br>" + storageText
             )
             : "Site bootstrap is loading.";
-        renderSiteInventoryPanel(state, workerPackSlots, campStorageSlots);
+        renderSiteInventoryPanel(state, workerPackSlots, openedContainerInfo);
         appendSelectedInventoryActions(state, selectedSlot);
 
         buyListings.forEach((listing) => {
@@ -1304,6 +1763,27 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 )
             );
         });
+
+        sellListings.forEach((listing) => {
+            contextActions.appendChild(
+                makeButton(
+                    "Sell " + getItemLabel(listing.itemOrUnlockableId) +
+                    " $" + listing.price + " - x" + listing.quantity,
+                    function () {
+                        postJson("/ui-action", {
+                            type: "SELL_PHONE_LISTING",
+                            targetId: listing.listingId,
+                            arg0: 1,
+                            arg1: 0
+                        }).catch(() => {
+                            statusChip.textContent = "Failed to sell listing.";
+                        });
+                    },
+                    true,
+                    false
+                )
+            );
+        });
         renderSiteStatusChip(state);
     }
 
@@ -1319,6 +1799,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             hudSubtitle.textContent = "Austere, painterly, and severe: the campaign opens under hostile conditions.";
             inventoryPanelOpen = true;
             selectedInventorySlotKey = "";
+            openedInventoryContainerKey = "";
             clearSelectionInventory();
             renderMenuOverlay(state);
             statusChip.textContent = "Prototype Build\nVisual Smoke";
@@ -1327,6 +1808,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             hudSubtitle.textContent = "Review the campaign survey board and choose the next deployment route.";
             inventoryPanelOpen = true;
             selectedInventorySlotKey = "";
+            openedInventoryContainerKey = "";
             clearSelectionInventory();
             renderRegionalMapOverlay(state);
             statusChip.textContent =
@@ -1341,6 +1823,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             hudSubtitle.textContent = "The current adapter only styles the core early flow for now.";
             inventoryPanelOpen = true;
             selectedInventorySlotKey = "";
+            openedInventoryContainerKey = "";
             clearSelectionInventory();
             renderFallbackOverlay(state);
             statusChip.textContent =
@@ -1976,7 +2459,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             1.0
         );
 
-        const plantingBlend = currentActionKind === 1 ? clamp01(1.0 - locomotionAmount * 1.8) : 0.0;
+        const plantingBlend =
+            (currentActionKind === 1 || currentActionKind === 2 || currentActionKind === 6)
+                ? clamp01(1.0 - locomotionAmount * 1.8)
+                : 0.0;
         if (plantingBlend > 0.0) {
             cache.workerActionPhase += deltaSeconds * 4.8;
             const plantingPhase = Math.sin(cache.workerActionPhase);
@@ -2567,6 +3053,61 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return plantGroup;
     }
 
+    function createStructureVisual(tile, tileHeight) {
+        const structureGroup = new THREE_NS.Group();
+        structureGroup.position.y = tileHeight;
+
+        if (tile.structureTypeId === 201) {
+            const stoveBase = new THREE_NS.Mesh(
+                new THREE_NS.BoxGeometry(0.52, 0.34, 0.42),
+                new THREE_NS.MeshStandardMaterial({ color: 0x7f5740, roughness: 0.88, metalness: 0.1 })
+            );
+            stoveBase.position.y = 0.18;
+            structureGroup.add(stoveBase);
+
+            const cookTop = new THREE_NS.Mesh(
+                new THREE_NS.CylinderGeometry(0.11, 0.11, 0.06, 16),
+                new THREE_NS.MeshStandardMaterial({ color: 0x4a3a34, roughness: 0.65, metalness: 0.22 })
+            );
+            cookTop.position.set(0, 0.38, 0);
+            structureGroup.add(cookTop);
+        } else if (tile.structureTypeId === 202) {
+            const benchTop = new THREE_NS.Mesh(
+                new THREE_NS.BoxGeometry(0.72, 0.08, 0.46),
+                new THREE_NS.MeshStandardMaterial({ color: 0x9e784d, roughness: 0.92, metalness: 0.02 })
+            );
+            benchTop.position.y = 0.48;
+            structureGroup.add(benchTop);
+
+            [-0.28, 0.28].forEach((x) => {
+                [-0.16, 0.16].forEach((z) => {
+                    const leg = new THREE_NS.Mesh(
+                        new THREE_NS.BoxGeometry(0.06, 0.5, 0.06),
+                        new THREE_NS.MeshStandardMaterial({ color: 0x6a4a2c, roughness: 0.92, metalness: 0.01 })
+                    );
+                    leg.position.set(x, 0.22, z);
+                    structureGroup.add(leg);
+                });
+            });
+        } else if (tile.structureTypeId === 203) {
+            const crate = new THREE_NS.Mesh(
+                new THREE_NS.BoxGeometry(0.58, 0.46, 0.58),
+                new THREE_NS.MeshStandardMaterial({ color: 0x8a633d, roughness: 0.92, metalness: 0.02 })
+            );
+            crate.position.y = 0.24;
+            structureGroup.add(crate);
+        } else {
+            const fallback = new THREE_NS.Mesh(
+                new THREE_NS.BoxGeometry(0.5, 0.3, 0.5),
+                new THREE_NS.MeshStandardMaterial({ color: 0x8f7a64, roughness: 0.9, metalness: 0.02 })
+            );
+            fallback.position.y = 0.16;
+            structureGroup.add(fallback);
+        }
+
+        return structureGroup;
+    }
+
     function rebuildStaticSiteScene(siteBootstrap, offsetX, offsetZ, width, height, previousCache, bootstrapSignature) {
         clearWorld();
         currentSceneKind = "SITE_ACTIVE";
@@ -2626,6 +3167,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 plantVisual.position.x = tile.x - offsetX;
                 plantVisual.position.z = tile.y - offsetZ;
                 worldGroup.add(plantVisual);
+            }
+
+            if (tile.structureTypeId !== 0) {
+                const structureVisual = createStructureVisual(tile, tileHeight);
+                structureVisual.position.x = tile.x - offsetX;
+                structureVisual.position.z = tile.y - offsetZ;
+                worldGroup.add(structureVisual);
             }
         });
 
@@ -3011,7 +3559,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 renderSiteInventoryPanel(
                     normalizedState,
                     getInventorySlotsByKind(normalizedState, "WORKER_PACK"),
-                    getInventorySlotsByKind(normalizedState, "CAMP_STORAGE"));
+                    findOpenedInventoryContainer(normalizedState));
             }
             renderActionProgressBar(normalizedState);
             return;
@@ -3157,10 +3705,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     window.addEventListener("keydown", function (event) {
         if (event.code === "KeyB" && !event.repeat && latestState && latestState.appState === "SITE_ACTIVE") {
             inventoryPanelOpen = !inventoryPanelOpen;
-            renderSiteInventoryPanel(
-                latestState,
-                getInventorySlotsByKind(latestState, "WORKER_PACK"),
-                getInventorySlotsByKind(latestState, "CAMP_STORAGE"));
+            if (inventoryPanelOpen) {
+                openedInventoryContainerKey = "";
+            }
+            renderSiteOverlay(latestState);
             event.preventDefault();
             return;
         }

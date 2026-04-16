@@ -15,7 +15,7 @@
 
 namespace gs1
 {
-inline constexpr std::uint32_t k_api_version = 3;
+inline constexpr std::uint32_t k_api_version = 4;
 inline constexpr double k_default_fixed_step_seconds = 0.25;
 inline constexpr std::size_t k_feedback_event_type_count = 4U;
 
@@ -73,11 +73,12 @@ private:
         PlacementValidation = 7,
         LocalWeatherResolve = 8,
         Inventory = 9,
-        EconomyPhone = 10,
-        CampDurability = 11,
-        DeviceSupport = 12,
-        DeviceMaintenance = 13,
-        Modifier = 14
+        Craft = 10,
+        EconomyPhone = 11,
+        CampDurability = 12,
+        DeviceSupport = 13,
+        DeviceMaintenance = 14,
+        Modifier = 15
     };
 
     enum class FeedbackEventSubscriberId : std::uint8_t
@@ -139,7 +140,9 @@ private:
     void queue_site_weather_update_command();
     void queue_site_inventory_slot_upsert_command(
         Gs1InventoryContainerKind container_kind,
-        std::uint32_t slot_index);
+        std::uint32_t slot_index,
+        std::uint32_t container_owner_id = 0U,
+        TileCoord container_tile = TileCoord {});
     void queue_all_site_inventory_slot_upsert_commands();
     void queue_pending_site_inventory_slot_upsert_commands();
     void queue_site_task_upsert_command(std::size_t task_index);
