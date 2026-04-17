@@ -64,6 +64,8 @@ enum class GameMessageType : std::uint8_t
     InventoryItemConsumeRequested,
     InventoryGlobalItemConsumeRequested,
     InventoryTransferRequested,
+    InventoryStorageViewRequest,
+    InventoryCraftContextRequested,
     InventoryCraftCommitRequested,
     ContractorHireRequested,
     SiteUnlockablePurchaseRequested,
@@ -389,9 +391,9 @@ struct InventoryDeliveryRequestedMessage final
 struct InventoryItemUseRequestedMessage final
 {
     std::uint32_t item_id;
+    std::uint32_t storage_id;
     std::uint16_t quantity;
-    Gs1InventoryContainerKind container_kind;
-    std::uint8_t slot_index;
+    std::uint16_t slot_index;
 };
 
 struct InventoryItemConsumeRequestedMessage final
@@ -413,15 +415,27 @@ inline constexpr std::uint8_t k_inventory_transfer_flag_resolve_destination_in_d
 
 struct InventoryTransferRequestedMessage final
 {
+    std::uint32_t source_storage_id;
+    std::uint32_t destination_storage_id;
     std::uint16_t source_slot_index;
     std::uint16_t destination_slot_index;
     std::uint16_t quantity;
-    Gs1InventoryContainerKind source_container_kind;
-    Gs1InventoryContainerKind destination_container_kind;
     std::uint8_t flags;
     std::uint8_t reserved0;
-    std::uint32_t source_container_owner_id;
-    std::uint32_t destination_container_owner_id;
+};
+
+struct InventoryStorageViewRequestMessage final
+{
+    std::uint32_t storage_id;
+    Gs1InventoryViewEventKind event_kind;
+    std::uint8_t reserved0[3];
+};
+
+struct CraftContextRequestedMessage final
+{
+    std::int32_t tile_x;
+    std::int32_t tile_y;
+    std::uint32_t flags;
 };
 
 struct InventoryCraftCommitRequestedMessage final
@@ -476,10 +490,12 @@ GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TaskRewardClaimRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingPurchaseRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingSaleRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryDeliveryRequestedMessage, 8U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryItemUseRequestedMessage, 8U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryItemUseRequestedMessage, 12U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryItemConsumeRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryGlobalItemConsumeRequestedMessage, 8U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryTransferRequestedMessage, 20U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryTransferRequestedMessage, 16U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryStorageViewRequestMessage, 8U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(CraftContextRequestedMessage, 12U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryCraftCommitRequestedMessage, 16U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(ContractorHireRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteUnlockablePurchaseRequestedMessage, 4U);

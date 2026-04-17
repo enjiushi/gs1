@@ -21,9 +21,23 @@ struct PhoneInventoryCacheState final
     std::vector<std::uint32_t> item_instance_ids {};
 };
 
+struct CraftContextOptionState final
+{
+    std::uint32_t recipe_id {0U};
+    std::uint32_t output_item_id {0U};
+};
+
+struct CraftContextPresentationState final
+{
+    bool occupied {false};
+    TileCoord tile_coord {};
+    std::vector<CraftContextOptionState> options {};
+};
+
 struct CraftState final
 {
     std::vector<CraftDeviceCacheState> device_caches {};
     PhoneInventoryCacheState phone_cache {};
+    CraftContextPresentationState context_presentation {};
 };
 }  // namespace gs1

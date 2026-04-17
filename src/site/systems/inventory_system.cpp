@@ -29,23 +29,35 @@ std::uint32_t normalize_quantity(std::uint32_t quantity) noexcept
 
 bool has_supported_inventory_transfer_route(const InventoryTransferRequestedMessage& payload) noexcept
 {
-    const bool source_is_worker_pack =
-        payload.source_container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK;
-    const bool destination_is_worker_pack =
-        payload.destination_container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK;
-    const bool source_is_device_storage =
-        payload.source_container_kind == GS1_INVENTORY_CONTAINER_DEVICE_STORAGE;
-    const bool destination_is_device_storage =
-        payload.destination_container_kind == GS1_INVENTORY_CONTAINER_DEVICE_STORAGE;
-
-    return (source_is_worker_pack && destination_is_worker_pack) ||
-        (source_is_worker_pack && destination_is_device_storage) ||
-        (source_is_device_storage && destination_is_worker_pack);
+    return payload.source_storage_id != 0U && payload.destination_storage_id != 0U;
 }
 
 bool transfer_resolves_destination_in_dll(const InventoryTransferRequestedMessage& payload) noexcept
 {
     return (payload.flags & k_inventory_transfer_flag_resolve_destination_in_dll) != 0U;
+}
+
+const StorageContainerState* storage_state_for_transfer(
+    const SiteRunState& site_run,
+    std::uint32_t storage_id) noexcept
+{
+    return inventory_storage::storage_container_state_for_storage_id(site_run, storage_id);
+}
+
+std::vector<InventorySlot> capture_storage_projection_slots(
+    SiteRunState& site_run,
+    std::uint32_t storage_id)
+{
+    std::vector<InventorySlot> slots {};
+    const auto container = inventory_storage::container_for_storage_id(site_run, storage_id);
+    if (!container.is_valid())
+    {
+        return slots;
+    }
+
+    slots.resize(inventory_storage::slot_count_in_container(site_run, container));
+    inventory_storage::sync_projection_slots_for_container(site_run, container, slots);
+    return slots;
 }
 
 bool inventory_has_any_item(const InventoryState& inventory) noexcept
@@ -65,8 +77,8 @@ bool storage_has_any_item(SiteRunState& site_run) noexcept
         const auto slot_count = inventory_storage::slot_count_in_container(site_run, container);
         for (std::uint32_t slot_index = 0U; slot_index < slot_count; ++slot_index)
         {
-            const auto slot = inventory_storage::slot_entity(site_run, container, slot_index);
-            const auto item = inventory_storage::item_entity_for_slot(site_run, slot);
+            const auto item =
+                inventory_storage::item_entity_for_slot(site_run, container, slot_index);
             const auto* stack = inventory_storage::stack_data(site_run, item);
             if (stack != nullptr && stack->quantity > 0U)
             {
@@ -132,7 +144,7 @@ bool ensure_device_storage_containers(SiteSystemContext<InventorySystem>& contex
 
     if (created_any)
     {
-        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_INVENTORY);
+        context.world.mark_inventory_storage_descriptors_projection_dirty();
     }
 
     return created_any;
@@ -173,26 +185,72 @@ flecs::entity resolve_starter_storage_container(SiteSystemContext<InventorySyste
 
 void mark_changed_slot_views(
     SiteSystemContext<InventorySystem>& context,
-    const std::vector<InventorySlot>& before_worker) noexcept
+    const std::vector<InventorySlot>& before_worker,
+    std::uint32_t before_opened_storage_id,
+    const std::vector<InventorySlot>& before_opened_storage) noexcept
 {
     const auto& inventory = context.world.read_inventory();
     if (before_worker.size() != inventory.worker_pack_slots.size())
     {
-        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_INVENTORY);
+        context.world.mark_inventory_storage_descriptors_projection_dirty();
+    }
+    else
+    {
+        for (std::size_t index = 0; index < before_worker.size(); ++index)
+        {
+            const auto& lhs = before_worker[index];
+            const auto& rhs = inventory.worker_pack_slots[index];
+            if (lhs.item_instance_id != rhs.item_instance_id ||
+                lhs.item_id != rhs.item_id ||
+                lhs.item_quantity != rhs.item_quantity ||
+                lhs.item_condition != rhs.item_condition ||
+                lhs.item_freshness != rhs.item_freshness ||
+                lhs.occupied != rhs.occupied)
+            {
+                context.world.mark_inventory_slot_projection_dirty(
+                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
+                    static_cast<std::uint32_t>(index));
+            }
+        }
+    }
+
+    const auto after_opened_storage_id = inventory.opened_device_storage_id;
+    if (before_opened_storage_id != after_opened_storage_id)
+    {
+        context.world.mark_inventory_view_state_projection_dirty();
+        if (after_opened_storage_id != 0U)
+        {
+            context.world.mark_opened_inventory_storage_full_projection_dirty();
+        }
         return;
     }
 
-    for (std::size_t index = 0; index < before_worker.size(); ++index)
+    if (after_opened_storage_id == 0U)
     {
-        const auto& lhs = before_worker[index];
-        const auto& rhs = inventory.worker_pack_slots[index];
+        return;
+    }
+
+    const auto after_opened_storage =
+        capture_storage_projection_slots(context.site_run, after_opened_storage_id);
+    if (before_opened_storage.size() != after_opened_storage.size())
+    {
+        context.world.mark_opened_inventory_storage_full_projection_dirty();
+        return;
+    }
+
+    for (std::size_t index = 0; index < before_opened_storage.size(); ++index)
+    {
+        const auto& lhs = before_opened_storage[index];
+        const auto& rhs = after_opened_storage[index];
         if (lhs.item_instance_id != rhs.item_instance_id ||
             lhs.item_id != rhs.item_id ||
             lhs.item_quantity != rhs.item_quantity ||
+            lhs.item_condition != rhs.item_condition ||
+            lhs.item_freshness != rhs.item_freshness ||
             lhs.occupied != rhs.occupied)
         {
-            context.world.mark_inventory_slot_projection_dirty(
-                GS1_INVENTORY_CONTAINER_WORKER_PACK,
+            context.world.mark_inventory_slot_projection_dirty_by_storage(
+                after_opened_storage_id,
                 static_cast<std::uint32_t>(index));
         }
     }
@@ -205,6 +263,9 @@ Gs1Status mutate_inventory_storage(
 {
     const bool storage_changed = ensure_inventory_storage_initialized(context);
     const auto before_worker = context.world.read_inventory().worker_pack_slots;
+    const auto before_opened_storage_id = context.world.read_inventory().opened_device_storage_id;
+    const auto before_opened_storage =
+        capture_storage_projection_slots(context.site_run, before_opened_storage_id);
     const auto status = func();
     if (status != GS1_STATUS_OK)
     {
@@ -213,9 +274,13 @@ Gs1Status mutate_inventory_storage(
 
     if (storage_changed)
     {
-        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_INVENTORY);
+        context.world.mark_inventory_storage_descriptors_projection_dirty();
     }
-    mark_changed_slot_views(context, before_worker);
+    mark_changed_slot_views(
+        context,
+        before_worker,
+        before_opened_storage_id,
+        before_opened_storage);
     return GS1_STATUS_OK;
 }
 
@@ -330,8 +395,6 @@ void seed_inventory_from_loadout(SiteSystemContext<InventorySystem>& context) no
             slot.item_id,
             slot.quantity);
     }
-
-    context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_INVENTORY);
 }
 
 Gs1Status handle_inventory_item_use(
@@ -340,12 +403,11 @@ Gs1Status handle_inventory_item_use(
 {
     return mutate_inventory_storage(context, [&]() -> Gs1Status {
         const auto container =
-            inventory_storage::container_for_kind(context.site_run, payload.container_kind);
-        const auto slot = inventory_storage::slot_entity(
+            inventory_storage::container_for_storage_id(context.site_run, payload.storage_id);
+        const auto item_entity = inventory_storage::item_entity_for_slot(
             context.site_run,
             container,
             static_cast<std::uint32_t>(payload.slot_index));
-        const auto item_entity = inventory_storage::item_entity_for_slot(context.site_run, slot);
         const auto* stack = inventory_storage::stack_data(context.site_run, item_entity);
         if (stack == nullptr || stack->quantity == 0U)
         {
@@ -384,11 +446,6 @@ Gs1Status handle_inventory_item_use(
         {
             return GS1_STATUS_INVALID_STATE;
         }
-
-        if (payload.container_kind == GS1_INVENTORY_CONTAINER_DEVICE_STORAGE)
-        {
-            context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_INVENTORY);
-        }
         context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_HUD);
         return GS1_STATUS_OK;
     });
@@ -419,10 +476,6 @@ Gs1Status handle_inventory_item_consume(
             inventory_storage::container_for_kind(context.site_run, payload.container_kind),
             item_id,
             quantity);
-        if (payload.container_kind == GS1_INVENTORY_CONTAINER_DEVICE_STORAGE)
-        {
-            context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_INVENTORY);
-        }
         return remaining == 0U ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
     });
 }
@@ -454,7 +507,6 @@ Gs1Status handle_inventory_global_item_consume(
             containers,
             item_id,
             quantity);
-        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_INVENTORY);
         return remaining == 0U ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
     });
 }
@@ -545,7 +597,6 @@ Gs1Status handle_inventory_craft_commit(
             output_container,
             recipe_def->output_item_id,
             recipe_def->output_quantity);
-        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_INVENTORY);
         return remaining_output == 0U ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
     });
 }
@@ -555,9 +606,7 @@ Gs1Status handle_inventory_transfer(
     const InventoryTransferRequestedMessage& payload) noexcept
 {
     const bool auto_resolve_destination = transfer_resolves_destination_in_dll(payload);
-    const bool same_container =
-        payload.source_container_kind == payload.destination_container_kind &&
-        payload.source_container_owner_id == payload.destination_container_owner_id;
+    const bool same_container = payload.source_storage_id == payload.destination_storage_id;
 
     if (!auto_resolve_destination &&
         payload.source_slot_index == payload.destination_slot_index &&
@@ -572,6 +621,29 @@ Gs1Status handle_inventory_transfer(
     }
 
     return mutate_inventory_storage(context, [&]() -> Gs1Status {
+        const auto* source_storage = storage_state_for_transfer(context.site_run, payload.source_storage_id);
+        const auto* destination_storage =
+            storage_state_for_transfer(context.site_run, payload.destination_storage_id);
+        if (source_storage == nullptr || destination_storage == nullptr)
+        {
+            return GS1_STATUS_INVALID_STATE;
+        }
+
+        const bool source_is_worker_pack =
+            source_storage->container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK;
+        const bool destination_is_worker_pack =
+            destination_storage->container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK;
+        const bool source_is_device_storage =
+            source_storage->container_kind == GS1_INVENTORY_CONTAINER_DEVICE_STORAGE;
+        const bool destination_is_device_storage =
+            destination_storage->container_kind == GS1_INVENTORY_CONTAINER_DEVICE_STORAGE;
+        if (!((source_is_worker_pack && destination_is_worker_pack) ||
+                (source_is_worker_pack && destination_is_device_storage) ||
+                (source_is_device_storage && destination_is_worker_pack)))
+        {
+            return GS1_STATUS_INVALID_STATE;
+        }
+
         if (auto_resolve_destination)
         {
             if (same_container)
@@ -579,24 +651,19 @@ Gs1Status handle_inventory_transfer(
                 return GS1_STATUS_INVALID_STATE;
             }
 
-            const auto source_container = inventory_storage::container_for_kind(
-                context.site_run,
-                payload.source_container_kind,
-                payload.source_container_owner_id);
-            const auto destination_container = inventory_storage::container_for_kind(
-                context.site_run,
-                payload.destination_container_kind,
-                payload.destination_container_owner_id);
+            const auto source_container =
+                inventory_storage::container_for_storage_id(context.site_run, payload.source_storage_id);
+            const auto destination_container =
+                inventory_storage::container_for_storage_id(context.site_run, payload.destination_storage_id);
             if (!source_container.is_valid() || !destination_container.is_valid())
             {
                 return GS1_STATUS_INVALID_STATE;
             }
 
-            const auto source_slot = inventory_storage::slot_entity(
+            const auto source_item = inventory_storage::item_entity_for_slot(
                 context.site_run,
                 source_container,
                 payload.source_slot_index);
-            const auto source_item = inventory_storage::item_entity_for_slot(context.site_run, source_slot);
             const auto* source_stack = inventory_storage::stack_data(context.site_run, source_item);
             if (source_stack == nullptr || source_stack->quantity == 0U)
             {
@@ -627,32 +694,61 @@ Gs1Status handle_inventory_transfer(
             {
                 return GS1_STATUS_INVALID_STATE;
             }
-
-            if (payload.source_container_kind == GS1_INVENTORY_CONTAINER_DEVICE_STORAGE ||
-                payload.destination_container_kind == GS1_INVENTORY_CONTAINER_DEVICE_STORAGE)
-            {
-                context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_INVENTORY);
-            }
             return GS1_STATUS_OK;
         }
 
         const bool transferred = inventory_storage::transfer_between_slots(
             context.site_run,
-            payload.source_container_kind,
+            source_storage->container_kind,
             payload.source_slot_index,
-            payload.destination_container_kind,
+            destination_storage->container_kind,
             payload.destination_slot_index,
             normalize_quantity(payload.quantity),
-            payload.source_container_owner_id,
-            payload.destination_container_owner_id);
-        if (transferred &&
-            (payload.source_container_kind == GS1_INVENTORY_CONTAINER_DEVICE_STORAGE ||
-                payload.destination_container_kind == GS1_INVENTORY_CONTAINER_DEVICE_STORAGE))
-        {
-            context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_INVENTORY);
-        }
+            source_storage->owner_device_entity_id,
+            destination_storage->owner_device_entity_id);
         return transferred ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
     });
+}
+
+Gs1Status handle_inventory_storage_view_request(
+    SiteSystemContext<InventorySystem>& context,
+    const InventoryStorageViewRequestMessage& payload) noexcept
+{
+    ensure_inventory_storage_initialized(context);
+
+    if (payload.event_kind == GS1_INVENTORY_VIEW_EVENT_CLOSE)
+    {
+        auto& inventory = context.world.own_inventory();
+        if (inventory.opened_device_storage_id == payload.storage_id)
+        {
+            inventory.opened_device_storage_id = 0U;
+            context.world.mark_inventory_view_state_projection_dirty();
+        }
+        return GS1_STATUS_OK;
+    }
+
+    if (payload.event_kind != GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT)
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    if (payload.storage_id == context.world.read_inventory().worker_pack_storage_id)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    const auto* storage_state =
+        inventory_storage::storage_container_state_for_storage_id(context.site_run, payload.storage_id);
+    if (storage_state == nullptr ||
+        storage_state->container_kind != GS1_INVENTORY_CONTAINER_DEVICE_STORAGE)
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    context.world.own_inventory().opened_device_storage_id = payload.storage_id;
+    context.world.mark_inventory_view_state_projection_dirty();
+    context.world.mark_opened_inventory_storage_full_projection_dirty();
+    return GS1_STATUS_OK;
 }
 
 Gs1Status handle_inventory_delivery_requested(
@@ -695,8 +791,10 @@ void progress_pending_deliveries(SiteSystemContext<InventorySystem>& context) no
     }
 
     const auto before_worker = inventory.worker_pack_slots;
+    const auto before_opened_storage_id = inventory.opened_device_storage_id;
+    const auto before_opened_storage =
+        capture_storage_projection_slots(context.site_run, before_opened_storage_id);
     const auto starter_storage = resolve_starter_storage_container(context);
-    bool inventory_changed = false;
 
     for (auto& delivery : inventory.pending_delivery_queue)
     {
@@ -721,10 +819,6 @@ void progress_pending_deliveries(SiteSystemContext<InventorySystem>& context) no
                 stack.item_quantity,
                 stack.item_condition,
                 stack.item_freshness);
-            if (remaining_quantity != stack.item_quantity)
-            {
-                inventory_changed = true;
-            }
             if (remaining_quantity == 0U)
             {
                 stack = InventorySlot {};
@@ -745,11 +839,11 @@ void progress_pending_deliveries(SiteSystemContext<InventorySystem>& context) no
             }),
         inventory.pending_delivery_queue.end());
 
-    if (inventory_changed)
-    {
-        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_INVENTORY);
-    }
-    mark_changed_slot_views(context, before_worker);
+    mark_changed_slot_views(
+        context,
+        before_worker,
+        before_opened_storage_id,
+        before_opened_storage);
 }
 
 }  // namespace
@@ -765,6 +859,7 @@ bool InventorySystem::subscribes_to(GameMessageType type) noexcept
     case GameMessageType::InventoryItemConsumeRequested:
     case GameMessageType::InventoryGlobalItemConsumeRequested:
     case GameMessageType::InventoryTransferRequested:
+    case GameMessageType::InventoryStorageViewRequest:
     case GameMessageType::InventoryCraftCommitRequested:
         return true;
     default:
@@ -812,6 +907,11 @@ Gs1Status InventorySystem::process_message(
             context,
             message.payload_as<InventoryTransferRequestedMessage>());
 
+    case GameMessageType::InventoryStorageViewRequest:
+        return handle_inventory_storage_view_request(
+            context,
+            message.payload_as<InventoryStorageViewRequestMessage>());
+
     case GameMessageType::InventoryCraftCommitRequested:
         return handle_inventory_craft_commit(
             context,
@@ -826,7 +926,7 @@ void InventorySystem::run(SiteSystemContext<InventorySystem>& context)
 {
     if (ensure_inventory_storage_initialized(context))
     {
-        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_INVENTORY);
+        context.world.mark_inventory_storage_descriptors_projection_dirty();
     }
     progress_pending_deliveries(context);
 }

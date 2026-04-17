@@ -38,7 +38,8 @@ public:
         LiveStatePatchField_SiteStateWeather = 1U << 12,
         LiveStatePatchField_SiteStateInventory = 1U << 13,
         LiveStatePatchField_SiteStateTasks = 1U << 14,
-        LiveStatePatchField_SiteStatePhone = 1U << 15
+        LiveStatePatchField_SiteStatePhone = 1U << 15,
+        LiveStatePatchField_SiteStateCraftContext = 1U << 16
     };
 
     struct LiveStateSnapshot;
@@ -53,6 +54,8 @@ public:
     void update(double delta_seconds);
     void queue_ui_action(const Gs1UiAction& action);
     void queue_site_action_request(const Gs1HostEventSiteActionRequestData& action);
+    void queue_site_storage_view(const Gs1HostEventSiteStorageViewData& request);
+    void queue_site_context_request(const Gs1HostEventSiteContextRequestData& request);
     void queue_site_move_direction(float world_move_x, float world_move_y, float world_move_z);
     [[nodiscard]] std::vector<std::string> consume_pending_live_state_patches();
     [[nodiscard]] LiveStateSnapshot capture_live_state_snapshot() const;
@@ -168,9 +171,22 @@ public:
         float phase_minutes_remaining {0.0f};
     };
 
+    struct SiteInventoryStorageProjection final
+    {
+        std::uint32_t storage_id {0};
+        std::uint32_t owner_entity_id {0};
+        std::uint32_t slot_count {0};
+        std::int32_t tile_x {0};
+        std::int32_t tile_y {0};
+        Gs1InventoryContainerKind container_kind {GS1_INVENTORY_CONTAINER_WORKER_PACK};
+        std::uint32_t flags {0};
+    };
+
     struct SiteInventorySlotProjection final
     {
         std::uint32_t item_id {0};
+        std::uint32_t item_instance_id {0};
+        std::uint32_t storage_id {0};
         float condition {0.0f};
         float freshness {0.0f};
         std::uint32_t container_owner_id {0};
@@ -180,6 +196,28 @@ public:
         std::int32_t container_tile_y {0};
         Gs1InventoryContainerKind container_kind {GS1_INVENTORY_CONTAINER_WORKER_PACK};
         std::uint32_t flags {0};
+    };
+
+    struct SiteInventoryViewProjection final
+    {
+        std::uint32_t storage_id {0};
+        std::uint32_t slot_count {0};
+        std::vector<SiteInventorySlotProjection> slots {};
+    };
+
+    struct SiteCraftContextOptionProjection final
+    {
+        std::uint32_t recipe_id {0};
+        std::uint32_t output_item_id {0};
+        std::uint32_t flags {0};
+    };
+
+    struct SiteCraftContextProjection final
+    {
+        std::int32_t tile_x {0};
+        std::int32_t tile_y {0};
+        std::uint32_t flags {0};
+        std::vector<SiteCraftContextOptionProjection> options {};
     };
 
     struct SiteTaskProjection final
@@ -211,9 +249,12 @@ public:
         std::uint32_t width {0};
         std::uint32_t height {0};
         std::vector<SiteTileProjection> tiles {};
-        std::vector<SiteInventorySlotProjection> inventory_slots {};
+        std::vector<SiteInventoryStorageProjection> inventory_storages {};
+        std::vector<SiteInventorySlotProjection> worker_pack_slots {};
         std::vector<SiteTaskProjection> tasks {};
         std::vector<SitePhoneListingProjection> phone_listings {};
+        std::optional<SiteInventoryViewProjection> opened_storage {};
+        std::optional<SiteCraftContextProjection> craft_context {};
         std::optional<SiteWorkerProjection> worker {};
         std::optional<SiteCampProjection> camp {};
         std::optional<SiteWeatherProjection> weather {};
@@ -296,7 +337,12 @@ private:
     void apply_site_worker_update(const Gs1EngineMessage& message);
     void apply_site_camp_update(const Gs1EngineMessage& message);
     void apply_site_weather_update(const Gs1EngineMessage& message);
+    void apply_site_inventory_storage_upsert(const Gs1EngineMessage& message);
     void apply_site_inventory_slot_upsert(const Gs1EngineMessage& message);
+    void apply_site_inventory_view_state(const Gs1EngineMessage& message);
+    void apply_site_craft_context_begin(const Gs1EngineMessage& message);
+    void apply_site_craft_context_option_upsert(const Gs1EngineMessage& message);
+    void apply_site_craft_context_end();
     void apply_site_task_upsert(const Gs1EngineMessage& message);
     void apply_site_phone_listing_upsert(const Gs1EngineMessage& message);
     void apply_site_snapshot_end();

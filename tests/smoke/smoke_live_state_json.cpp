@@ -549,12 +549,47 @@ void append_site_weather_json(std::string& json, const SmokeEngineHost::SiteSnap
     json += '}';
 }
 
-void append_inventory_slots_json(std::string& json, const SmokeEngineHost::SiteSnapshotProjection& site_snapshot)
+void append_inventory_storages_json(std::string& json, const SmokeEngineHost::SiteSnapshotProjection& site_snapshot)
 {
-    json += "\"inventorySlots\":[";
-    for (std::size_t index = 0; index < site_snapshot.inventory_slots.size(); ++index)
+    json += "\"inventoryStorages\":[";
+    for (std::size_t index = 0; index < site_snapshot.inventory_storages.size(); ++index)
     {
-        const auto& slot = site_snapshot.inventory_slots[index];
+        const auto& storage = site_snapshot.inventory_storages[index];
+        if (index > 0U)
+        {
+            json.push_back(',');
+        }
+
+        json += "{\"storageId\":";
+        json += std::to_string(storage.storage_id);
+        json += ",\"ownerEntityId\":";
+        json += std::to_string(storage.owner_entity_id);
+        json += ",\"slotCount\":";
+        json += std::to_string(storage.slot_count);
+        json += ",\"tileX\":";
+        json += std::to_string(storage.tile_x);
+        json += ",\"tileY\":";
+        json += std::to_string(storage.tile_y);
+        json += ",\"containerKind\":";
+        append_json_string(json, inventory_container_name(storage.container_kind));
+        json += ",\"flags\":";
+        json += std::to_string(storage.flags);
+        json += '}';
+    }
+    json += "]";
+}
+
+void append_inventory_slots_json(
+    std::string& json,
+    std::string_view field_name,
+    const std::vector<SmokeEngineHost::SiteInventorySlotProjection>& slots)
+{
+    json += "\"";
+    json += field_name;
+    json += "\":[";
+    for (std::size_t index = 0; index < slots.size(); ++index)
+    {
+        const auto& slot = slots[index];
         if (index > 0U)
         {
             json.push_back(',');
@@ -562,8 +597,12 @@ void append_inventory_slots_json(std::string& json, const SmokeEngineHost::SiteS
 
         json += "{\"containerKind\":";
         append_json_string(json, inventory_container_name(slot.container_kind));
+        json += ",\"storageId\":";
+        json += std::to_string(slot.storage_id);
         json += ",\"slotIndex\":";
         json += std::to_string(slot.slot_index);
+        json += ",\"itemInstanceId\":";
+        json += std::to_string(slot.item_instance_id);
         json += ",\"itemId\":";
         json += std::to_string(slot.item_id);
         json += ",\"itemName\":";
@@ -593,6 +632,61 @@ void append_inventory_slots_json(std::string& json, const SmokeEngineHost::SiteS
         json += '}';
     }
     json += "]";
+}
+
+void append_opened_storage_json(std::string& json, const SmokeEngineHost::SiteSnapshotProjection& site_snapshot)
+{
+    json += "\"openedStorage\":";
+    if (!site_snapshot.opened_storage.has_value())
+    {
+        json += "null";
+        return;
+    }
+
+    const auto& opened = site_snapshot.opened_storage.value();
+    json += "{\"storageId\":";
+    json += std::to_string(opened.storage_id);
+    json += ",\"slotCount\":";
+    json += std::to_string(opened.slot_count);
+    json += ",";
+    append_inventory_slots_json(json, "slots", opened.slots);
+    json += "}";
+}
+
+void append_craft_context_json(std::string& json, const SmokeEngineHost::SiteSnapshotProjection& site_snapshot)
+{
+    json += "\"craftContext\":";
+    if (!site_snapshot.craft_context.has_value())
+    {
+        json += "null";
+        return;
+    }
+
+    const auto& craft_context = site_snapshot.craft_context.value();
+    json += "{\"tileX\":";
+    json += std::to_string(craft_context.tile_x);
+    json += ",\"tileY\":";
+    json += std::to_string(craft_context.tile_y);
+    json += ",\"flags\":";
+    json += std::to_string(craft_context.flags);
+    json += ",\"options\":[";
+    for (std::size_t index = 0; index < craft_context.options.size(); ++index)
+    {
+        const auto& option = craft_context.options[index];
+        if (index > 0U)
+        {
+            json.push_back(',');
+        }
+
+        json += "{\"recipeId\":";
+        json += std::to_string(option.recipe_id);
+        json += ",\"outputItemId\":";
+        json += std::to_string(option.output_item_id);
+        json += ",\"flags\":";
+        json += std::to_string(option.flags);
+        json += "}";
+    }
+    json += "]}";
 }
 
 void append_site_tasks_json(std::string& json, const SmokeEngineHost::SiteSnapshotProjection& site_snapshot)
@@ -673,7 +767,13 @@ void append_site_state_json(std::string& json, const std::optional<SmokeEngineHo
     json += ",";
     append_site_weather_json(json, site_snapshot);
     json += ",";
-    append_inventory_slots_json(json, site_snapshot);
+    append_inventory_storages_json(json, site_snapshot);
+    json += ",";
+    append_inventory_slots_json(json, "workerPackSlots", site_snapshot.worker_pack_slots);
+    json += ",";
+    append_opened_storage_json(json, site_snapshot);
+    json += ",";
+    append_craft_context_json(json, site_snapshot);
     json += ",";
     append_site_tasks_json(json, site_snapshot);
     json += ",";
@@ -718,7 +818,13 @@ void append_site_state_patch_json(
     }
     if ((field_mask & SmokeEngineHost::LiveStatePatchField_SiteStateInventory) != 0U)
     {
-        append_field([&]() { append_inventory_slots_json(json, site_snapshot); });
+        append_field([&]() { append_inventory_storages_json(json, site_snapshot); });
+        append_field([&]() { append_inventory_slots_json(json, "workerPackSlots", site_snapshot.worker_pack_slots); });
+        append_field([&]() { append_opened_storage_json(json, site_snapshot); });
+    }
+    if ((field_mask & SmokeEngineHost::LiveStatePatchField_SiteStateCraftContext) != 0U)
+    {
+        append_field([&]() { append_craft_context_json(json, site_snapshot); });
     }
     if ((field_mask & SmokeEngineHost::LiveStatePatchField_SiteStateTasks) != 0U)
     {
@@ -862,6 +968,7 @@ std::string SmokeEngineHost::build_live_state_patch_json(
         LiveStatePatchField_SiteStateCamp |
         LiveStatePatchField_SiteStateWeather |
         LiveStatePatchField_SiteStateInventory |
+        LiveStatePatchField_SiteStateCraftContext |
         LiveStatePatchField_SiteStateTasks |
         LiveStatePatchField_SiteStatePhone;
 

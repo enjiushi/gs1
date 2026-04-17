@@ -222,6 +222,20 @@ std::optional<Gs1SiteActionKind> parse_site_action_kind(const std::string& value
     return std::nullopt;
 }
 
+std::optional<Gs1InventoryViewEventKind> parse_inventory_view_event_kind(const std::string& value)
+{
+    if (value == "OPEN_SNAPSHOT")
+    {
+        return GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT;
+    }
+    if (value == "CLOSE")
+    {
+        return GS1_INVENTORY_VIEW_EVENT_CLOSE;
+    }
+
+    return std::nullopt;
+}
+
 void run_live_mode(
     const Gs1RuntimeApi& api,
     Gs1RuntimeHandle* runtime,
@@ -292,6 +306,35 @@ void run_live_mode(
 
             std::scoped_lock lock {session.mutex};
             session.host.queue_site_action_request(action);
+        },
+        [&session](const std::string& body) {
+            const auto event_kind_name = extract_string_field(body, "eventKind");
+            if (!event_kind_name.has_value())
+            {
+                return;
+            }
+
+            const auto event_kind = parse_inventory_view_event_kind(event_kind_name.value());
+            if (!event_kind.has_value())
+            {
+                return;
+            }
+
+            Gs1HostEventSiteStorageViewData request {};
+            request.storage_id = extract_number_field<std::uint32_t>(body, "storageId").value_or(0U);
+            request.event_kind = event_kind.value();
+
+            std::scoped_lock lock {session.mutex};
+            session.host.queue_site_storage_view(request);
+        },
+        [&session](const std::string& body) {
+            Gs1HostEventSiteContextRequestData request {};
+            request.tile_x = extract_number_field<std::int32_t>(body, "tileX").value_or(0);
+            request.tile_y = extract_number_field<std::int32_t>(body, "tileY").value_or(0);
+            request.flags = extract_number_field<std::uint32_t>(body, "flags").value_or(0U);
+
+            std::scoped_lock lock {session.mutex};
+            session.host.queue_site_context_request(request);
         },
         [&session](const std::string& body) {
             std::scoped_lock lock {session.mutex};

@@ -312,18 +312,52 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
 
         const siteState = getSiteState(state);
-        const sourceSlots = siteState && Array.isArray(siteState.inventorySlots)
-            ? siteState.inventorySlots
+        const sourceStorages = siteState && Array.isArray(siteState.inventoryStorages)
+            ? siteState.inventoryStorages
             : [];
+        const workerPackSlots = siteState && Array.isArray(siteState.workerPackSlots)
+            ? siteState.workerPackSlots
+            : [];
+        const openedStorageSlots =
+            siteState && siteState.openedStorage && Array.isArray(siteState.openedStorage.slots)
+                ? siteState.openedStorage.slots
+                : [];
+        const sourceSlots = workerPackSlots.concat(openedStorageSlots);
         nextCache.frameNumber = typeof state.frameNumber === "number" ? state.frameNumber : 0;
+
+        sourceStorages.forEach((storage) => {
+            const storageId = typeof storage.storageId === "number" ? storage.storageId : 0;
+            const cachedContainerKey = containerKey(
+                storage.containerKind || "WORKER_PACK",
+                storageId
+            );
+            nextCache.containerMap.set(cachedContainerKey, {
+                key: cachedContainerKey,
+                containerKind: storage.containerKind || "WORKER_PACK",
+                containerOwnerId: storageId,
+                storageId: storageId,
+                ownerEntityId: typeof storage.ownerEntityId === "number" ? storage.ownerEntityId : 0,
+                containerTileX: typeof storage.tileX === "number" ? storage.tileX : 0,
+                containerTileY: typeof storage.tileY === "number" ? storage.tileY : 0,
+                slotCount: typeof storage.slotCount === "number" ? storage.slotCount : 0,
+                isOpenedView:
+                    !!(siteState &&
+                        siteState.openedStorage &&
+                        typeof siteState.openedStorage.storageId === "number" &&
+                        siteState.openedStorage.storageId === storageId),
+                slots: []
+            });
+        });
 
         sourceSlots.forEach((sourceSlot) => {
             const normalizedSlot = {
                 containerKind: sourceSlot.containerKind || "WORKER_PACK",
                 slotIndex: typeof sourceSlot.slotIndex === "number" ? sourceSlot.slotIndex : 0,
+                itemInstanceId: typeof sourceSlot.itemInstanceId === "number" ? sourceSlot.itemInstanceId : 0,
                 itemId: typeof sourceSlot.itemId === "number" ? sourceSlot.itemId : 0,
                 itemName: sourceSlot.itemName || null,
-                containerOwnerId: typeof sourceSlot.containerOwnerId === "number" ? sourceSlot.containerOwnerId : 0,
+                storageId: typeof sourceSlot.storageId === "number" ? sourceSlot.storageId : 0,
+                containerOwnerId: typeof sourceSlot.storageId === "number" ? sourceSlot.storageId : 0,
                 quantity: typeof sourceSlot.quantity === "number" ? sourceSlot.quantity : 0,
                 condition: typeof sourceSlot.condition === "number" ? sourceSlot.condition : 0,
                 freshness: typeof sourceSlot.freshness === "number" ? sourceSlot.freshness : 0,
@@ -335,22 +369,34 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             const cachedSlotKey = slotKey(
                 normalizedSlot.containerKind,
                 normalizedSlot.slotIndex,
-                normalizedSlot.containerOwnerId
+                normalizedSlot.storageId
             );
             nextCache.slots.push(normalizedSlot);
             nextCache.slotMap.set(cachedSlotKey, normalizedSlot);
 
             const cachedContainerKey = containerKey(
                 normalizedSlot.containerKind,
-                normalizedSlot.containerOwnerId
+                normalizedSlot.storageId
             );
             if (!nextCache.containerMap.has(cachedContainerKey)) {
                 nextCache.containerMap.set(cachedContainerKey, {
                     key: cachedContainerKey,
                     containerKind: normalizedSlot.containerKind,
-                    containerOwnerId: normalizedSlot.containerOwnerId,
+                    containerOwnerId: normalizedSlot.storageId,
+                    storageId: normalizedSlot.storageId,
+                    ownerEntityId: typeof sourceSlot.containerOwnerId === "number" ? sourceSlot.containerOwnerId : 0,
                     containerTileX: normalizedSlot.containerTileX,
                     containerTileY: normalizedSlot.containerTileY,
+                    slotCount:
+                        normalizedSlot.containerKind === "WORKER_PACK"
+                            ? workerPackSlots.length
+                            : (siteState && siteState.openedStorage && siteState.openedStorage.storageId === normalizedSlot.storageId
+                                ? (siteState.openedStorage.slotCount || 0)
+                                : 0),
+                    isOpenedView:
+                        !!(siteState &&
+                            siteState.openedStorage &&
+                            siteState.openedStorage.storageId === normalizedSlot.storageId),
                     slots: []
                 });
             }
@@ -362,8 +408,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             if (left.containerKind !== right.containerKind) {
                 return left.containerKind.localeCompare(right.containerKind);
             }
-            if ((left.containerOwnerId || 0) !== (right.containerOwnerId || 0)) {
-                return (left.containerOwnerId || 0) - (right.containerOwnerId || 0);
+            if ((left.storageId || 0) !== (right.storageId || 0)) {
+                return (left.storageId || 0) - (right.storageId || 0);
             }
             return 0;
         });
@@ -489,6 +535,18 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return siteState.tasks.slice();
     }
 
+    function getCraftContextForTile(state, tileX, tileY) {
+        const siteState = getSiteState(state);
+        const craftContext = siteState ? siteState.craftContext : null;
+        if (!craftContext) {
+            return null;
+        }
+        if ((craftContext.tileX || 0) !== tileX || (craftContext.tileY || 0) !== tileY) {
+            return null;
+        }
+        return craftContext;
+    }
+
     function containerKey(containerKind, containerOwnerId) {
         return containerKind + ":" + String(containerOwnerId || 0);
     }
@@ -525,8 +583,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             key: containerInfo.key,
             containerKind: containerInfo.containerKind,
             containerOwnerId: containerInfo.containerOwnerId,
+            storageId: containerInfo.storageId,
+            ownerEntityId: containerInfo.ownerEntityId,
             containerTileX: containerInfo.containerTileX,
             containerTileY: containerInfo.containerTileY,
+            slotCount: containerInfo.slotCount,
+            isOpenedView: !!containerInfo.isOpenedView,
             slots: containerInfo.slots.slice()
         }));
     }
@@ -571,16 +633,33 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function openInventoryContainer(containerInfo) {
         openedInventoryContainerKey = containerInfo ? containerInfo.key : "";
+        if (containerInfo && typeof containerInfo.storageId === "number") {
+            postJson("/site-storage-view", {
+                storageId: containerInfo.storageId,
+                eventKind: "OPEN_SNAPSHOT"
+            }).catch(() => {
+                statusChip.textContent = "Failed to open storage.";
+            });
+        }
         if (latestState) {
             renderSiteOverlay(latestState);
         }
     }
 
     function closeOpenedInventoryContainer() {
+        const openedContainer = latestState ? findOpenedInventoryContainer(latestState) : null;
         const closedContainerKey = openedInventoryContainerKey;
         openedInventoryContainerKey = "";
         if (closedContainerKey && selectedInventorySlotKey.startsWith(closedContainerKey + ":")) {
             selectedInventorySlotKey = "";
+        }
+        if (openedContainer && typeof openedContainer.storageId === "number") {
+            postJson("/site-storage-view", {
+                storageId: openedContainer.storageId,
+                eventKind: "CLOSE"
+            }).catch(() => {
+                statusChip.textContent = "Failed to close storage.";
+            });
         }
         if (latestState) {
             renderSiteOverlay(latestState);
@@ -781,16 +860,16 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     function postInventoryUse(slot) {
         return postJson("/ui-action", {
             type: "USE_INVENTORY_ITEM",
-            targetId: slot.itemId,
+            targetId: slot.itemInstanceId || slot.itemId,
             arg0: encodeInventoryUseArg(slot.containerKind, slot.slotIndex, 1),
-            arg1: 0
+            arg1: slot.storageId || 0
         });
     }
 
     function postInventoryTransfer(sourceSlot, destinationKind, destinationOwnerId) {
         return postJson("/ui-action", {
             type: "TRANSFER_INVENTORY_ITEM",
-            targetId: sourceSlot.itemId,
+            targetId: sourceSlot.itemInstanceId || sourceSlot.itemId,
             arg0: encodeInventoryTransferArg(
                 sourceSlot.containerKind,
                 sourceSlot.slotIndex,
@@ -798,7 +877,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 0
             ),
             arg1: encodeInventoryTransferOwnersArg(
-                sourceSlot.containerOwnerId || 0,
+                sourceSlot.storageId || 0,
                 destinationOwnerId || 0
             )
         });
@@ -806,6 +885,14 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function postSiteAction(payload) {
         return postJson("/site-action", payload);
+    }
+
+    function postSiteContextRequest(tileX, tileY) {
+        return postJson("/site-context", {
+            tileX: tileX,
+            tileY: tileY,
+            flags: 0
+        });
     }
 
     function getSiteActionLabel(actionKind) {
@@ -978,6 +1065,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const tile = getTileSnapshot(state, tileX, tileY);
         const structureId = tile ? (tile.structureTypeId || 0) : 0;
         const recipes = getCraftRecipesForStructure(structureId);
+        const craftContext = getCraftContextForTile(state, tileX, tileY);
         const storageContainers = getOpenableStorageContainersForTile(state, tileX, tileY);
         const carriedSeeds = getCarriedSeedOptions(state);
         const carriedDeployables = getCarriedDeployableOptions(state);
@@ -1022,15 +1110,17 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
 
         if (recipes.length > 0) {
-            const orderedRecipes = recipes.slice().sort((left, right) => {
-                const leftCraftable = canCraftRecipeFromNearby(state, tileX, tileY, left) ? 0 : 1;
-                const rightCraftable = canCraftRecipeFromNearby(state, tileX, tileY, right) ? 0 : 1;
-                if (leftCraftable !== rightCraftable) {
-                    return leftCraftable - rightCraftable;
-                }
-                return left.outputItemId - right.outputItemId;
-            });
-
+            if (!craftContext) {
+                rootItems.push({
+                    id: "craft-loading",
+                    label: "Craft",
+                    meta: "Checking nearby supplies...",
+                    iconGlyph: "CF",
+                    iconLight: "#7a9d67",
+                    iconDark: "#4a6b3b",
+                    disabled: true
+                });
+            } else if (Array.isArray(craftContext.options) && craftContext.options.length > 0) {
             rootItems.push({
                 id: "craft",
                 label: "Craft",
@@ -1038,25 +1128,20 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 iconGlyph: "CF",
                 iconLight: "#7a9d67",
                 iconDark: "#4a6b3b",
-                children: orderedRecipes.map((recipe) => {
-                    const itemMeta = getItemMeta(recipe.outputItemId);
-                    const visual = getItemVisual(recipe.outputItemId);
-                    const craftable = canCraftRecipeFromNearby(state, tileX, tileY, recipe);
+                    children: craftContext.options.map((option) => {
+                    const itemMeta = getItemMeta(option.outputItemId);
+                    const visual = getItemVisual(option.outputItemId);
                     return {
-                        id: "craft:" + recipe.outputItemId,
-                        label: itemMeta ? itemMeta.name : ("Item " + recipe.outputItemId),
-                        meta: (craftable ? "Ready" : "Missing materials") +
-                            " - " +
-                            recipe.ingredients.map((ingredient) =>
-                                getItemShortLabel(ingredient.itemId) + " x" + ingredient.quantity).join(" + "),
+                        id: "craft:" + option.outputItemId,
+                        label: itemMeta ? itemMeta.name : ("Item " + option.outputItemId),
+                        meta: "Ready",
                         iconGlyph: visual.glyph,
                         iconLight: visual.light,
                         iconDark: visual.dark,
-                        disabled: !craftable,
                         onSelect: function () {
                             statusChip.textContent =
                                 "Moving to (" + tileX + "," + tileY + ") to craft " +
-                                (itemMeta ? itemMeta.shortName : ("Item " + recipe.outputItemId)) + ".";
+                                (itemMeta ? itemMeta.shortName : ("Item " + option.outputItemId)) + ".";
                             postSiteAction({
                                 actionKind: "CRAFT",
                                 flags: 4,
@@ -1065,7 +1150,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                                 targetTileY: tileY,
                                 primarySubjectId: 0,
                                 secondarySubjectId: 0,
-                                itemId: recipe.outputItemId
+                                itemId: option.outputItemId
                             }).catch(() => {
                                 statusChip.textContent = "Failed to send craft action.";
                             });
@@ -1074,6 +1159,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     };
                 })
             });
+            }
         }
 
         if (!tileHasStructure && carriedSeeds.length > 0) {
@@ -1290,6 +1376,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             anchorY: clientY,
             hoverPath: []
         };
+        const tile = getTileSnapshot(latestState, tileContextMenuState.tileX, tileContextMenuState.tileY);
+        const structureId = tile ? (tile.structureTypeId || 0) : 0;
+        if (getCraftRecipesForStructure(structureId).length > 0) {
+            postSiteContextRequest(tileContextMenuState.tileX, tileContextMenuState.tileY).catch(() => {
+                statusChip.textContent = "Failed to query tile context.";
+            });
+        }
         renderTileContextMenu();
     }
 
@@ -1732,12 +1825,16 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         const tile = getTileSnapshot(state, currentOpenedContainer.containerTileX, currentOpenedContainer.containerTileY);
         const structureMeta = getStructureMeta(tile ? tile.structureTypeId : 0);
-        const slotCount = structureMeta
-            ? structureMeta.slotCount
-            : Math.max(currentOpenedContainer.slots.length, 1);
-        storagePanelSubtitle.textContent = structureMeta
-            ? ("Device storage - " + structureMeta.slotCount + " slots")
-            : "Device storage";
+        const slotCount = Math.max(
+            currentOpenedContainer.slotCount || 0,
+            structureMeta ? structureMeta.slotCount : 0,
+            currentOpenedContainer.slots.length,
+            1);
+        storagePanelSubtitle.textContent = currentOpenedContainer.isOpenedView
+            ? (structureMeta
+                ? ("Device storage - " + slotCount + " slots")
+                : "Device storage")
+            : "Loading storage snapshot...";
 
         storagePanelBody.innerHTML = "";
         const stack = document.createElement("div");

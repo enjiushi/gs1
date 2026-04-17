@@ -138,13 +138,21 @@ private:
     void queue_site_worker_update_message();
     void queue_site_camp_update_message();
     void queue_site_weather_update_message();
+    void queue_site_inventory_storage_upsert_message(std::uint32_t storage_id);
+    void queue_all_site_inventory_storage_upsert_messages();
     void queue_site_inventory_slot_upsert_message(
         Gs1InventoryContainerKind container_kind,
         std::uint32_t slot_index,
+        std::uint32_t storage_id = 0U,
         std::uint32_t container_owner_id = 0U,
         TileCoord container_tile = TileCoord {});
+    void queue_site_inventory_view_state_message(
+        std::uint32_t storage_id,
+        Gs1InventoryViewEventKind event_kind,
+        std::uint32_t slot_count = 0U);
     void queue_all_site_inventory_slot_upsert_messages();
     void queue_pending_site_inventory_slot_upsert_messages();
+    void queue_site_craft_context_messages();
     void queue_site_task_upsert_message(std::size_t task_index);
     void queue_all_site_task_upsert_messages();
     void queue_site_phone_listing_upsert_message(std::size_t listing_index);
@@ -168,6 +176,12 @@ private:
         GameMessage& out_message) const;
     [[nodiscard]] Gs1Status translate_site_action_cancel_to_message(
         const Gs1HostEventSiteActionCancelData& action,
+        GameMessage& out_message) const;
+    [[nodiscard]] Gs1Status translate_site_storage_view_to_message(
+        const Gs1HostEventSiteStorageViewData& request,
+        GameMessage& out_message) const;
+    [[nodiscard]] Gs1Status translate_site_context_request_to_message(
+        const Gs1HostEventSiteContextRequestData& request,
         GameMessage& out_message) const;
     [[nodiscard]] Gs1Status dispatch_host_events(
         HostEventDispatchStage stage,

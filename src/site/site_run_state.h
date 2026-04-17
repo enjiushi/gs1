@@ -21,6 +21,12 @@ namespace gs1
 {
 class SiteWorld;
 
+struct PendingInventorySlotProjectionUpdate final
+{
+    std::uint32_t storage_id {0};
+    std::uint32_t slot_index {0};
+};
+
 enum class SiteRunStatus : std::uint32_t
 {
     Active = 0,
@@ -93,5 +99,10 @@ struct SiteRunState final
     bool pending_full_inventory_projection_update {false};
     std::vector<std::uint32_t> pending_worker_pack_inventory_projection_updates {};
     std::vector<std::uint8_t> pending_worker_pack_inventory_projection_update_mask {};
+    bool pending_inventory_storage_descriptor_projection_update {false};
+    bool pending_inventory_view_state_projection_update {false};
+    bool pending_opened_inventory_storage_full_projection_update {false};
+    std::vector<std::uint32_t> pending_opened_inventory_storage_projection_updates {};
+    std::vector<std::uint8_t> pending_opened_inventory_storage_projection_update_mask {};
 };
 }  // namespace gs1

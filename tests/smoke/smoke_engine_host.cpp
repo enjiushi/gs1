@@ -47,8 +47,12 @@ const char* message_type_name(Gs1EngineMessageType type)
         return "SITE_CAMP_UPDATE";
     case GS1_ENGINE_MESSAGE_SITE_WEATHER_UPDATE:
         return "SITE_WEATHER_UPDATE";
+    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_STORAGE_UPSERT:
+        return "SITE_INVENTORY_STORAGE_UPSERT";
     case GS1_ENGINE_MESSAGE_SITE_INVENTORY_SLOT_UPSERT:
         return "SITE_INVENTORY_SLOT_UPSERT";
+    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_VIEW_STATE:
+        return "SITE_INVENTORY_VIEW_STATE";
     case GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT:
         return "SITE_TASK_UPSERT";
     case GS1_ENGINE_MESSAGE_SITE_TASK_REMOVE:
@@ -61,6 +65,12 @@ const char* message_type_name(Gs1EngineMessageType type)
         return "END_SITE_SNAPSHOT";
     case GS1_ENGINE_MESSAGE_SITE_ACTION_UPDATE:
         return "SITE_ACTION_UPDATE";
+    case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_BEGIN:
+        return "SITE_CRAFT_CONTEXT_BEGIN";
+    case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_OPTION_UPSERT:
+        return "SITE_CRAFT_CONTEXT_OPTION_UPSERT";
+    case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_END:
+        return "SITE_CRAFT_CONTEXT_END";
     case GS1_ENGINE_MESSAGE_HUD_STATE:
         return "HUD_STATE";
     case GS1_ENGINE_MESSAGE_NOTIFICATION_PUSH:
@@ -364,6 +374,22 @@ void SmokeEngineHost::queue_site_action_request(const Gs1HostEventSiteActionRequ
     Gs1HostEvent event {};
     event.type = GS1_HOST_EVENT_SITE_ACTION_REQUEST;
     event.payload.site_action_request = action;
+    pending_pre_phase1_host_events_.push_back(event);
+}
+
+void SmokeEngineHost::queue_site_storage_view(const Gs1HostEventSiteStorageViewData& request)
+{
+    Gs1HostEvent event {};
+    event.type = GS1_HOST_EVENT_SITE_STORAGE_VIEW;
+    event.payload.site_storage_view = request;
+    pending_pre_phase1_host_events_.push_back(event);
+}
+
+void SmokeEngineHost::queue_site_context_request(const Gs1HostEventSiteContextRequestData& request)
+{
+    Gs1HostEvent event {};
+    event.type = GS1_HOST_EVENT_SITE_CONTEXT_REQUEST;
+    event.payload.site_context_request = request;
     pending_pre_phase1_host_events_.push_back(event);
 }
 
@@ -737,8 +763,23 @@ void SmokeEngineHost::flush_engine_messages(const char* stage_label)
         case GS1_ENGINE_MESSAGE_SITE_WEATHER_UPDATE:
             apply_site_weather_update(message);
             break;
+        case GS1_ENGINE_MESSAGE_SITE_INVENTORY_STORAGE_UPSERT:
+            apply_site_inventory_storage_upsert(message);
+            break;
         case GS1_ENGINE_MESSAGE_SITE_INVENTORY_SLOT_UPSERT:
             apply_site_inventory_slot_upsert(message);
+            break;
+        case GS1_ENGINE_MESSAGE_SITE_INVENTORY_VIEW_STATE:
+            apply_site_inventory_view_state(message);
+            break;
+        case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_BEGIN:
+            apply_site_craft_context_begin(message);
+            break;
+        case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_OPTION_UPSERT:
+            apply_site_craft_context_option_upsert(message);
+            break;
+        case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_END:
+            apply_site_craft_context_end();
             break;
         case GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT:
             apply_site_task_upsert(message);
@@ -1052,9 +1093,12 @@ void SmokeEngineHost::apply_site_snapshot_begin(const Gs1EngineMessage& message)
     {
         pending_site_snapshot_patch_mask_ |= LiveStatePatchField_SiteBootstrap;
         pending_site_snapshot_->tiles.clear();
-        pending_site_snapshot_->inventory_slots.clear();
+        pending_site_snapshot_->inventory_storages.clear();
+        pending_site_snapshot_->worker_pack_slots.clear();
         pending_site_snapshot_->tasks.clear();
         pending_site_snapshot_->phone_listings.clear();
+        pending_site_snapshot_->opened_storage.reset();
+        pending_site_snapshot_->craft_context.reset();
         pending_site_snapshot_->worker.reset();
         pending_site_snapshot_->camp.reset();
         pending_site_snapshot_->weather.reset();
@@ -1154,6 +1198,39 @@ void SmokeEngineHost::apply_site_weather_update(const Gs1EngineMessage& message)
     pending_site_snapshot_patch_mask_ |= LiveStatePatchField_SiteStateWeather;
 }
 
+void SmokeEngineHost::apply_site_inventory_storage_upsert(const Gs1EngineMessage& message)
+{
+    if (!pending_site_snapshot_.has_value())
+    {
+        return;
+    }
+
+    const auto& payload = message.payload_as<Gs1EngineMessageInventoryStorageData>();
+    SiteInventoryStorageProjection projection {};
+    projection.storage_id = payload.storage_id;
+    projection.owner_entity_id = payload.owner_entity_id;
+    projection.slot_count = payload.slot_count;
+    projection.tile_x = payload.tile_x;
+    projection.tile_y = payload.tile_y;
+    projection.container_kind = payload.container_kind;
+    projection.flags = payload.flags;
+
+    auto& storages = pending_site_snapshot_->inventory_storages;
+    const auto existing = std::find_if(storages.begin(), storages.end(), [&](const SiteInventoryStorageProjection& storage) {
+        return storage.storage_id == projection.storage_id;
+    });
+    if (existing != storages.end())
+    {
+        *existing = projection;
+    }
+    else
+    {
+        storages.push_back(projection);
+    }
+
+    pending_site_snapshot_patch_mask_ |= LiveStatePatchField_SiteStateInventory;
+}
+
 void SmokeEngineHost::apply_site_inventory_slot_upsert(const Gs1EngineMessage& message)
 {
     if (!pending_site_snapshot_.has_value())
@@ -1164,6 +1241,8 @@ void SmokeEngineHost::apply_site_inventory_slot_upsert(const Gs1EngineMessage& m
     const auto& payload = message.payload_as<Gs1EngineMessageInventorySlotData>();
     SiteInventorySlotProjection projection {};
     projection.item_id = payload.item_id;
+    projection.item_instance_id = payload.item_instance_id;
+    projection.storage_id = payload.storage_id;
     projection.condition = payload.condition;
     projection.freshness = payload.freshness;
     projection.container_owner_id = payload.container_owner_id;
@@ -1174,22 +1253,112 @@ void SmokeEngineHost::apply_site_inventory_slot_upsert(const Gs1EngineMessage& m
     projection.container_kind = payload.container_kind;
     projection.flags = payload.flags;
 
-    auto& slots = pending_site_snapshot_->inventory_slots;
-    const auto existing = std::find_if(slots.begin(), slots.end(), [&](const SiteInventorySlotProjection& slot) {
-        return slot.container_kind == projection.container_kind &&
-            slot.container_owner_id == projection.container_owner_id &&
+    std::vector<SiteInventorySlotProjection>* slots = nullptr;
+    if (projection.container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK)
+    {
+        slots = &pending_site_snapshot_->worker_pack_slots;
+    }
+    else if (pending_site_snapshot_->opened_storage.has_value() &&
+        pending_site_snapshot_->opened_storage->storage_id == projection.storage_id)
+    {
+        slots = &pending_site_snapshot_->opened_storage->slots;
+    }
+
+    if (slots == nullptr)
+    {
+        return;
+    }
+
+    const auto existing = std::find_if(slots->begin(), slots->end(), [&](const SiteInventorySlotProjection& slot) {
+        return slot.storage_id == projection.storage_id &&
             slot.slot_index == projection.slot_index;
     });
-    if (existing != slots.end())
+    if (existing != slots->end())
     {
         *existing = projection;
     }
     else
     {
-        slots.push_back(projection);
+        slots->push_back(projection);
     }
 
     pending_site_snapshot_patch_mask_ |= LiveStatePatchField_SiteStateInventory;
+}
+
+void SmokeEngineHost::apply_site_inventory_view_state(const Gs1EngineMessage& message)
+{
+    if (!pending_site_snapshot_.has_value())
+    {
+        return;
+    }
+
+    const auto& payload = message.payload_as<Gs1EngineMessageInventoryViewData>();
+    if (payload.event_kind == GS1_INVENTORY_VIEW_EVENT_CLOSE)
+    {
+        if (pending_site_snapshot_->opened_storage.has_value() &&
+            pending_site_snapshot_->opened_storage->storage_id == payload.storage_id)
+        {
+            pending_site_snapshot_->opened_storage.reset();
+        }
+    }
+    else if (payload.event_kind == GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT)
+    {
+        pending_site_snapshot_->opened_storage = SiteInventoryViewProjection {};
+        pending_site_snapshot_->opened_storage->storage_id = payload.storage_id;
+        pending_site_snapshot_->opened_storage->slot_count = payload.slot_count;
+        pending_site_snapshot_->opened_storage->slots.clear();
+    }
+
+    pending_site_snapshot_patch_mask_ |= LiveStatePatchField_SiteStateInventory;
+}
+
+void SmokeEngineHost::apply_site_craft_context_begin(const Gs1EngineMessage& message)
+{
+    if (!pending_site_snapshot_.has_value())
+    {
+        return;
+    }
+
+    const auto& payload = message.payload_as<Gs1EngineMessageCraftContextData>();
+    pending_site_snapshot_->craft_context = SiteCraftContextProjection {};
+    pending_site_snapshot_->craft_context->tile_x = payload.tile_x;
+    pending_site_snapshot_->craft_context->tile_y = payload.tile_y;
+    pending_site_snapshot_->craft_context->flags = payload.flags;
+    pending_site_snapshot_->craft_context->options.clear();
+    pending_site_snapshot_patch_mask_ |= LiveStatePatchField_SiteStateCraftContext;
+}
+
+void SmokeEngineHost::apply_site_craft_context_option_upsert(const Gs1EngineMessage& message)
+{
+    if (!pending_site_snapshot_.has_value() || !pending_site_snapshot_->craft_context.has_value())
+    {
+        return;
+    }
+
+    const auto& payload = message.payload_as<Gs1EngineMessageCraftContextOptionData>();
+    pending_site_snapshot_->craft_context->options.push_back(SiteCraftContextOptionProjection {
+        payload.recipe_id,
+        payload.output_item_id,
+        payload.flags});
+    pending_site_snapshot_patch_mask_ |= LiveStatePatchField_SiteStateCraftContext;
+}
+
+void SmokeEngineHost::apply_site_craft_context_end()
+{
+    if (!pending_site_snapshot_.has_value() || !pending_site_snapshot_->craft_context.has_value())
+    {
+        return;
+    }
+
+    auto& options = pending_site_snapshot_->craft_context->options;
+    std::sort(options.begin(), options.end(), [](const SiteCraftContextOptionProjection& lhs, const SiteCraftContextOptionProjection& rhs) {
+        if (lhs.output_item_id != rhs.output_item_id)
+        {
+            return lhs.output_item_id < rhs.output_item_id;
+        }
+        return lhs.recipe_id < rhs.recipe_id;
+    });
+    pending_site_snapshot_patch_mask_ |= LiveStatePatchField_SiteStateCraftContext;
 }
 
 void SmokeEngineHost::apply_site_task_upsert(const Gs1EngineMessage& message)
@@ -1273,18 +1442,29 @@ void SmokeEngineHost::apply_site_snapshot_end()
         }
         return lhs.x < rhs.x;
     });
-    auto& inventory_slots = pending_site_snapshot_->inventory_slots;
-    std::sort(inventory_slots.begin(), inventory_slots.end(), [](const SiteInventorySlotProjection& lhs, const SiteInventorySlotProjection& rhs) {
+    auto& inventory_storages = pending_site_snapshot_->inventory_storages;
+    std::sort(inventory_storages.begin(), inventory_storages.end(), [](const SiteInventoryStorageProjection& lhs, const SiteInventoryStorageProjection& rhs) {
         if (lhs.container_kind != rhs.container_kind)
         {
             return lhs.container_kind < rhs.container_kind;
         }
-        if (lhs.container_owner_id != rhs.container_owner_id)
+        return lhs.storage_id < rhs.storage_id;
+    });
+    auto& worker_pack_slots = pending_site_snapshot_->worker_pack_slots;
+    std::sort(worker_pack_slots.begin(), worker_pack_slots.end(), [](const SiteInventorySlotProjection& lhs, const SiteInventorySlotProjection& rhs) {
+        if (lhs.container_kind != rhs.container_kind)
         {
-            return lhs.container_owner_id < rhs.container_owner_id;
+            return lhs.container_kind < rhs.container_kind;
         }
         return lhs.slot_index < rhs.slot_index;
     });
+    if (pending_site_snapshot_->opened_storage.has_value())
+    {
+        auto& opened_slots = pending_site_snapshot_->opened_storage->slots;
+        std::sort(opened_slots.begin(), opened_slots.end(), [](const SiteInventorySlotProjection& lhs, const SiteInventorySlotProjection& rhs) {
+            return lhs.slot_index < rhs.slot_index;
+        });
+    }
     auto& tasks = pending_site_snapshot_->tasks;
     std::sort(tasks.begin(), tasks.end(), [](const SiteTaskProjection& lhs, const SiteTaskProjection& rhs) {
         return lhs.task_instance_id < rhs.task_instance_id;

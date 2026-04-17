@@ -119,6 +119,11 @@ std::uint32_t unpack_inventory_quantity(std::uint64_t packed) noexcept
     return static_cast<std::uint32_t>((packed >> 16U) & 0xffffU);
 }
 
+std::uint32_t unpack_inventory_storage_id(std::uint64_t packed) noexcept
+{
+    return static_cast<std::uint32_t>(packed & 0xffffffffULL);
+}
+
 std::uint64_t pack_inventory_transfer_arg(
     Gs1InventoryContainerKind source_container_kind,
     std::uint32_t source_slot_index,
@@ -1074,6 +1079,8 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
     case GameMessageType::InventoryItemUseRequested:
     case GameMessageType::InventoryItemConsumeRequested:
     case GameMessageType::InventoryTransferRequested:
+    case GameMessageType::InventoryStorageViewRequest:
+    case GameMessageType::InventoryCraftContextRequested:
     case GameMessageType::ContractorHireRequested:
     case GameMessageType::SiteUnlockablePurchaseRequested:
     default:
@@ -1601,6 +1608,7 @@ void GameRuntime::queue_site_weather_update_message()
 void GameRuntime::queue_site_inventory_slot_upsert_message(
     Gs1InventoryContainerKind container_kind,
     std::uint32_t slot_index,
+    std::uint32_t storage_id,
     std::uint32_t container_owner_id,
     TileCoord container_tile)
 {
@@ -1609,30 +1617,37 @@ void GameRuntime::queue_site_inventory_slot_upsert_message(
         return;
     }
 
+    auto& site_run = active_site_run_.value();
     InventorySlot slot {};
     if (container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK)
     {
-        if (slot_index >= active_site_run_->inventory.worker_pack_slots.size())
+        if (slot_index >= site_run.inventory.worker_pack_slots.size())
         {
             return;
         }
 
-        slot = active_site_run_->inventory.worker_pack_slots[slot_index];
+        slot = site_run.inventory.worker_pack_slots[slot_index];
+        storage_id = site_run.inventory.worker_pack_storage_id;
     }
     else if (container_kind == GS1_INVENTORY_CONTAINER_DEVICE_STORAGE)
     {
-        auto container = inventory_storage::container_for_kind(
-            active_site_run_.value(),
-            container_kind,
-            container_owner_id);
+        auto container =
+            storage_id != 0U
+                ? inventory_storage::container_for_storage_id(site_run, storage_id)
+                : inventory_storage::container_for_kind(site_run, container_kind, container_owner_id);
         if (!container.is_valid())
         {
             return;
         }
 
-        container_tile = inventory_storage::container_tile_coord(active_site_run_.value(), container);
-        const auto slot_entity = inventory_storage::slot_entity(active_site_run_.value(), container, slot_index);
-        const auto item_entity = inventory_storage::item_entity_for_slot(active_site_run_.value(), slot_entity);
+        if (storage_id == 0U)
+        {
+            storage_id = inventory_storage::storage_id_for_container(site_run, container);
+        }
+        container_owner_id = inventory_storage::owner_device_entity_id_for_container(site_run, container);
+        container_tile = inventory_storage::container_tile_coord(site_run, container);
+        const auto item_entity =
+            inventory_storage::item_entity_for_slot(site_run, container, slot_index);
         inventory_storage::fill_projection_slot_from_entities(slot, item_entity);
     }
     else
@@ -1643,8 +1658,10 @@ void GameRuntime::queue_site_inventory_slot_upsert_message(
     auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_INVENTORY_SLOT_UPSERT);
     auto& payload = message.emplace_payload<Gs1EngineMessageInventorySlotData>();
     payload.item_id = slot.item_id.value;
+    payload.item_instance_id = slot.item_instance_id;
     payload.condition = slot.item_condition;
     payload.freshness = slot.item_freshness;
+    payload.storage_id = storage_id;
     payload.container_owner_id = container_owner_id;
     payload.quantity = static_cast<std::uint16_t>(std::min<std::uint32_t>(slot.item_quantity, 65535U));
     payload.slot_index = static_cast<std::uint16_t>(slot_index);
@@ -1652,6 +1669,61 @@ void GameRuntime::queue_site_inventory_slot_upsert_message(
     payload.container_tile_y = static_cast<std::int16_t>(container_tile.y);
     payload.container_kind = container_kind;
     payload.flags = slot.occupied ? 1U : 0U;
+    engine_messages_.push_back(message);
+}
+
+void GameRuntime::queue_site_inventory_storage_upsert_message(std::uint32_t storage_id)
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
+
+    const auto* storage_state =
+        inventory_storage::storage_container_state_for_storage_id(active_site_run_.value(), storage_id);
+    if (storage_state == nullptr)
+    {
+        return;
+    }
+
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_INVENTORY_STORAGE_UPSERT);
+    auto& payload = message.emplace_payload<Gs1EngineMessageInventoryStorageData>();
+    payload.storage_id = storage_state->storage_id;
+    payload.owner_entity_id = storage_state->owner_device_entity_id;
+    payload.slot_count = static_cast<std::uint16_t>(std::min<std::size_t>(
+        storage_state->slot_item_instance_ids.size(),
+        65535U));
+    payload.tile_x = static_cast<std::int16_t>(storage_state->tile_coord.x);
+    payload.tile_y = static_cast<std::int16_t>(storage_state->tile_coord.y);
+    payload.container_kind = storage_state->container_kind;
+    payload.flags = 0U;
+    engine_messages_.push_back(message);
+}
+
+void GameRuntime::queue_all_site_inventory_storage_upsert_messages()
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
+
+    for (const auto& storage : active_site_run_->inventory.storage_containers)
+    {
+        queue_site_inventory_storage_upsert_message(storage.storage_id);
+    }
+}
+
+void GameRuntime::queue_site_inventory_view_state_message(
+    std::uint32_t storage_id,
+    Gs1InventoryViewEventKind event_kind,
+    std::uint32_t slot_count)
+{
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_INVENTORY_VIEW_STATE);
+    auto& payload = message.emplace_payload<Gs1EngineMessageInventoryViewData>();
+    payload.storage_id = storage_id;
+    payload.slot_count = static_cast<std::uint16_t>(std::min<std::uint32_t>(slot_count, 65535U));
+    payload.event_kind = event_kind;
+    payload.flags = 0U;
     engine_messages_.push_back(message);
 }
 
@@ -1664,36 +1736,10 @@ void GameRuntime::queue_all_site_inventory_slot_upsert_messages()
 
     for (std::uint32_t index = 0; index < active_site_run_->inventory.worker_pack_slots.size(); ++index)
     {
-        queue_site_inventory_slot_upsert_message(GS1_INVENTORY_CONTAINER_WORKER_PACK, index);
-    }
-
-    using namespace site_ecs;
-    const auto containers = inventory_storage::collect_all_storage_containers(active_site_run_.value(), true);
-    for (const auto& container : containers)
-    {
-        if (!container.is_valid() || !container.has<StorageContainerKindComponent>())
-        {
-            continue;
-        }
-
-        if (container.get<StorageContainerKindComponent>().kind != StorageContainerKind::DeviceStorage)
-        {
-            continue;
-        }
-
-        const auto owner_id =
-            inventory_storage::owner_device_entity_id_for_container(active_site_run_.value(), container);
-        const auto container_tile =
-            inventory_storage::container_tile_coord(active_site_run_.value(), container);
-        const auto slot_count = inventory_storage::slot_count_in_container(active_site_run_.value(), container);
-        for (std::uint32_t slot_index = 0U; slot_index < slot_count; ++slot_index)
-        {
-            queue_site_inventory_slot_upsert_message(
-                GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
-                slot_index,
-                owner_id,
-                container_tile);
-        }
+        queue_site_inventory_slot_upsert_message(
+            GS1_INVENTORY_CONTAINER_WORKER_PACK,
+            index,
+            active_site_run_->inventory.worker_pack_storage_id);
     }
 }
 
@@ -1705,20 +1751,126 @@ void GameRuntime::queue_pending_site_inventory_slot_upsert_messages()
     }
 
     auto& site_run = active_site_run_.value();
+    if (site_run.pending_inventory_storage_descriptor_projection_update ||
+        site_run.pending_full_inventory_projection_update)
+    {
+        queue_all_site_inventory_storage_upsert_messages();
+    }
+
     if (site_run.pending_full_inventory_projection_update ||
         site_run.pending_worker_pack_inventory_projection_updates.empty())
     {
         queue_all_site_inventory_slot_upsert_messages();
+    }
+    else
+    {
+        std::sort(
+            site_run.pending_worker_pack_inventory_projection_updates.begin(),
+            site_run.pending_worker_pack_inventory_projection_updates.end());
+        for (const auto slot_index : site_run.pending_worker_pack_inventory_projection_updates)
+        {
+            queue_site_inventory_slot_upsert_message(
+                GS1_INVENTORY_CONTAINER_WORKER_PACK,
+                slot_index,
+                site_run.inventory.worker_pack_storage_id);
+        }
+    }
+
+    if (site_run.pending_inventory_view_state_projection_update)
+    {
+        const auto previous_storage_id = site_run.inventory.last_projected_opened_device_storage_id;
+        const auto current_storage_id = site_run.inventory.opened_device_storage_id;
+        if (previous_storage_id != 0U && previous_storage_id != current_storage_id)
+        {
+            queue_site_inventory_view_state_message(previous_storage_id, GS1_INVENTORY_VIEW_EVENT_CLOSE);
+        }
+        if (current_storage_id != 0U)
+        {
+            const auto* storage_state =
+                inventory_storage::storage_container_state_for_storage_id(site_run, current_storage_id);
+            queue_site_inventory_view_state_message(
+                current_storage_id,
+                GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT,
+                storage_state == nullptr
+                    ? 0U
+                    : static_cast<std::uint32_t>(storage_state->slot_item_instance_ids.size()));
+        }
+        site_run.inventory.last_projected_opened_device_storage_id = current_storage_id;
+    }
+
+    if (site_run.inventory.opened_device_storage_id == 0U)
+    {
+        return;
+    }
+
+    const auto* opened_storage =
+        inventory_storage::storage_container_state_for_storage_id(
+            site_run,
+            site_run.inventory.opened_device_storage_id);
+    if (opened_storage == nullptr)
+    {
+        return;
+    }
+
+    if (site_run.pending_opened_inventory_storage_full_projection_update)
+    {
+        for (std::uint32_t slot_index = 0U; slot_index < opened_storage->slot_item_instance_ids.size(); ++slot_index)
+        {
+            queue_site_inventory_slot_upsert_message(
+                GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
+                slot_index,
+                opened_storage->storage_id,
+                opened_storage->owner_device_entity_id,
+                opened_storage->tile_coord);
+        }
         return;
     }
 
     std::sort(
-        site_run.pending_worker_pack_inventory_projection_updates.begin(),
-        site_run.pending_worker_pack_inventory_projection_updates.end());
-    for (const auto slot_index : site_run.pending_worker_pack_inventory_projection_updates)
+        site_run.pending_opened_inventory_storage_projection_updates.begin(),
+        site_run.pending_opened_inventory_storage_projection_updates.end());
+    for (const auto slot_index : site_run.pending_opened_inventory_storage_projection_updates)
     {
-        queue_site_inventory_slot_upsert_message(GS1_INVENTORY_CONTAINER_WORKER_PACK, slot_index);
+        queue_site_inventory_slot_upsert_message(
+            GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
+            slot_index,
+            opened_storage->storage_id,
+            opened_storage->owner_device_entity_id,
+            opened_storage->tile_coord);
     }
+}
+
+void GameRuntime::queue_site_craft_context_messages()
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
+
+    const auto& presentation = active_site_run_->craft.context_presentation;
+    auto begin = make_engine_message(GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_BEGIN);
+    auto& begin_payload = begin.emplace_payload<Gs1EngineMessageCraftContextData>();
+    begin_payload.tile_x = presentation.tile_coord.x;
+    begin_payload.tile_y = presentation.tile_coord.y;
+    begin_payload.option_count = static_cast<std::uint16_t>(std::min<std::size_t>(
+        presentation.options.size(),
+        65535U));
+    begin_payload.flags = presentation.occupied ? 1U : 0U;
+    engine_messages_.push_back(begin);
+
+    for (const auto& option : presentation.options)
+    {
+        auto option_message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_OPTION_UPSERT);
+        auto& option_payload =
+            option_message.emplace_payload<Gs1EngineMessageCraftContextOptionData>();
+        option_payload.recipe_id = option.recipe_id;
+        option_payload.output_item_id = option.output_item_id;
+        option_payload.flags = 1U;
+        option_payload.reserved0 = 0U;
+        engine_messages_.push_back(option_message);
+    }
+
+    engine_messages_.push_back(make_engine_message(GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_END));
 }
 
 void GameRuntime::queue_site_task_upsert_message(std::size_t task_index)
@@ -1811,6 +1963,7 @@ void GameRuntime::queue_site_bootstrap_messages()
     queue_site_worker_update_message();
     queue_site_camp_update_message();
     queue_site_weather_update_message();
+    queue_all_site_inventory_storage_upsert_messages();
     queue_all_site_inventory_slot_upsert_messages();
     queue_all_site_task_upsert_messages();
     queue_all_site_phone_listing_upsert_messages();
@@ -1834,6 +1987,7 @@ void GameRuntime::queue_site_delta_messages(std::uint64_t dirty_flags)
             SITE_PROJECTION_UPDATE_CAMP |
             SITE_PROJECTION_UPDATE_WEATHER |
             SITE_PROJECTION_UPDATE_INVENTORY |
+            SITE_PROJECTION_UPDATE_CRAFT_CONTEXT |
             SITE_PROJECTION_UPDATE_TASKS |
             SITE_PROJECTION_UPDATE_PHONE);
     if (site_dirty_flags == 0U)
@@ -1866,6 +2020,11 @@ void GameRuntime::queue_site_delta_messages(std::uint64_t dirty_flags)
     if ((site_dirty_flags & SITE_PROJECTION_UPDATE_INVENTORY) != 0U)
     {
         queue_pending_site_inventory_slot_upsert_messages();
+    }
+
+    if ((site_dirty_flags & SITE_PROJECTION_UPDATE_CRAFT_CONTEXT) != 0U)
+    {
+        queue_site_craft_context_messages();
     }
 
     if ((site_dirty_flags & SITE_PROJECTION_UPDATE_TASKS) != 0U)
@@ -1971,6 +2130,11 @@ void GameRuntime::mark_site_projection_update_dirty(std::uint64_t dirty_flags) n
     if ((dirty_flags & SITE_PROJECTION_UPDATE_INVENTORY) != 0U)
     {
         active_site_run_->pending_full_inventory_projection_update = true;
+        active_site_run_->pending_inventory_storage_descriptor_projection_update = true;
+        if (active_site_run_->inventory.opened_device_storage_id != 0U)
+        {
+            active_site_run_->pending_opened_inventory_storage_full_projection_update = true;
+        }
     }
 
     active_site_run_->pending_projection_update_flags |= dirty_flags;
@@ -2050,7 +2214,19 @@ void GameRuntime::clear_pending_site_inventory_projection_updates() noexcept
     }
     site_run.pending_worker_pack_inventory_projection_updates.clear();
 
+    for (const auto slot_index : site_run.pending_opened_inventory_storage_projection_updates)
+    {
+        if (slot_index < site_run.pending_opened_inventory_storage_projection_update_mask.size())
+        {
+            site_run.pending_opened_inventory_storage_projection_update_mask[slot_index] = 0U;
+        }
+    }
+    site_run.pending_opened_inventory_storage_projection_updates.clear();
+
     site_run.pending_full_inventory_projection_update = false;
+    site_run.pending_inventory_storage_descriptor_projection_update = false;
+    site_run.pending_inventory_view_state_projection_update = false;
+    site_run.pending_opened_inventory_storage_full_projection_update = false;
 }
 
 void GameRuntime::flush_site_presentation_if_dirty()
@@ -2197,25 +2373,23 @@ Gs1Status GameRuntime::translate_ui_action_to_message(const Gs1UiAction& action,
         out_message.type = GameMessageType::InventoryItemUseRequested;
         out_message.set_payload(InventoryItemUseRequestedMessage {
             action.target_id,
+            unpack_inventory_storage_id(action.arg1),
             static_cast<std::uint16_t>(unpack_inventory_quantity(action.arg0) == 0U
                     ? 1U
                     : unpack_inventory_quantity(action.arg0)),
-            unpack_inventory_container(action.arg0),
-            static_cast<std::uint8_t>(unpack_inventory_slot_index(action.arg0))});
+            static_cast<std::uint16_t>(unpack_inventory_slot_index(action.arg0))});
         return GS1_STATUS_OK;
 
     case GS1_UI_ACTION_TRANSFER_INVENTORY_ITEM:
         out_message.type = GameMessageType::InventoryTransferRequested;
         out_message.set_payload(InventoryTransferRequestedMessage {
+            unpack_transfer_source_owner(action.arg1),
+            unpack_transfer_destination_owner(action.arg1),
             static_cast<std::uint16_t>(unpack_transfer_source_slot(action.arg0)),
             0U,
             static_cast<std::uint16_t>(unpack_transfer_quantity(action.arg0)),
-            unpack_transfer_source_container(action.arg0),
-            unpack_transfer_destination_container(action.arg0),
             k_inventory_transfer_flag_resolve_destination_in_dll,
-            0U,
-            unpack_transfer_source_owner(action.arg1),
-            unpack_transfer_destination_owner(action.arg1)});
+            0U});
         return GS1_STATUS_OK;
 
     case GS1_UI_ACTION_NONE:
@@ -2260,6 +2434,36 @@ Gs1Status GameRuntime::translate_site_action_cancel_to_message(
     out_message.set_payload(CancelSiteActionMessage {
         action.action_id,
         action.flags});
+    return GS1_STATUS_OK;
+}
+
+Gs1Status GameRuntime::translate_site_storage_view_to_message(
+    const Gs1HostEventSiteStorageViewData& request,
+    GameMessage& out_message) const
+{
+    if (request.event_kind != GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT &&
+        request.event_kind != GS1_INVENTORY_VIEW_EVENT_CLOSE)
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    out_message.type = GameMessageType::InventoryStorageViewRequest;
+    out_message.set_payload(InventoryStorageViewRequestMessage {
+        request.storage_id,
+        request.event_kind,
+        {0U, 0U, 0U}});
+    return GS1_STATUS_OK;
+}
+
+Gs1Status GameRuntime::translate_site_context_request_to_message(
+    const Gs1HostEventSiteContextRequestData& request,
+    GameMessage& out_message) const
+{
+    out_message.type = GameMessageType::InventoryCraftContextRequested;
+    out_message.set_payload(CraftContextRequestedMessage {
+        request.tile_x,
+        request.tile_y,
+        request.flags});
     return GS1_STATUS_OK;
 }
 
@@ -2346,6 +2550,44 @@ Gs1Status GameRuntime::dispatch_host_events(
             GameMessage message {};
             const auto status =
                 translate_site_action_cancel_to_message(event.payload.site_action_cancel, message);
+            if (status != GS1_STATUS_OK)
+            {
+                return status;
+            }
+
+            message_queue_.push_back(message);
+            const auto dispatch_status = dispatch_queued_messages();
+            if (dispatch_status != GS1_STATUS_OK)
+            {
+                return dispatch_status;
+            }
+            break;
+        }
+
+        case GS1_HOST_EVENT_SITE_STORAGE_VIEW:
+        {
+            GameMessage message {};
+            const auto status =
+                translate_site_storage_view_to_message(event.payload.site_storage_view, message);
+            if (status != GS1_STATUS_OK)
+            {
+                return status;
+            }
+
+            message_queue_.push_back(message);
+            const auto dispatch_status = dispatch_queued_messages();
+            if (dispatch_status != GS1_STATUS_OK)
+            {
+                return dispatch_status;
+            }
+            break;
+        }
+
+        case GS1_HOST_EVENT_SITE_CONTEXT_REQUEST:
+        {
+            GameMessage message {};
+            const auto status =
+                translate_site_context_request_to_message(event.payload.site_context_request, message);
             if (status != GS1_STATUS_OK)
             {
                 return status;

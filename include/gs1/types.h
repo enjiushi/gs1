@@ -54,7 +54,9 @@ enum Gs1HostEventType : std::uint8_t
     GS1_HOST_EVENT_UI_ACTION = 1,
     GS1_HOST_EVENT_SITE_MOVE_DIRECTION = 2,
     GS1_HOST_EVENT_SITE_ACTION_REQUEST = 3,
-    GS1_HOST_EVENT_SITE_ACTION_CANCEL = 4
+    GS1_HOST_EVENT_SITE_ACTION_CANCEL = 4,
+    GS1_HOST_EVENT_SITE_STORAGE_VIEW = 5,
+    GS1_HOST_EVENT_SITE_CONTEXT_REQUEST = 6
 };
 
 enum Gs1UiSetupId : std::uint8_t
@@ -187,6 +189,13 @@ enum Gs1InventoryContainerKind : std::uint8_t
     GS1_INVENTORY_CONTAINER_DEVICE_STORAGE = 1
 };
 
+enum Gs1InventoryViewEventKind : std::uint8_t
+{
+    GS1_INVENTORY_VIEW_EVENT_NONE = 0,
+    GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT = 1,
+    GS1_INVENTORY_VIEW_EVENT_CLOSE = 2
+};
+
 enum Gs1PhoneListingPresentationKind : std::uint8_t
 {
     GS1_PHONE_LISTING_PRESENTATION_BUY_ITEM = 0,
@@ -252,6 +261,11 @@ enum Gs1EngineMessageType : std::uint8_t
     GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_REMOVE = 29,
     GS1_ENGINE_MESSAGE_END_SITE_SNAPSHOT = 30,
     GS1_ENGINE_MESSAGE_SITE_ACTION_UPDATE = 31,
+    GS1_ENGINE_MESSAGE_SITE_INVENTORY_STORAGE_UPSERT = 32,
+    GS1_ENGINE_MESSAGE_SITE_INVENTORY_VIEW_STATE = 33,
+    GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_BEGIN = 34,
+    GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_OPTION_UPSERT = 35,
+    GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_END = 36,
 
     GS1_ENGINE_MESSAGE_HUD_STATE = 40,
     GS1_ENGINE_MESSAGE_NOTIFICATION_PUSH = 41,
@@ -358,6 +372,24 @@ struct Gs1HostEventSiteActionCancelData
     std::uint64_t reserved1;
 };
 
+struct Gs1HostEventSiteStorageViewData
+{
+    std::uint32_t storage_id;
+    Gs1InventoryViewEventKind event_kind;
+    std::uint8_t reserved0[3];
+    std::uint64_t reserved1;
+    std::uint64_t reserved2;
+};
+
+struct Gs1HostEventSiteContextRequestData
+{
+    std::int32_t tile_x;
+    std::int32_t tile_y;
+    std::uint32_t flags;
+    std::uint32_t reserved0;
+    std::uint64_t reserved1;
+};
+
 struct Gs1HostEventEmptyData
 {
     std::uint64_t reserved0;
@@ -370,6 +402,8 @@ union Gs1HostEventPayload
     Gs1HostEventSiteMoveDirectionData site_move_direction;
     Gs1HostEventSiteActionRequestData site_action_request;
     Gs1HostEventSiteActionCancelData site_action_cancel;
+    Gs1HostEventSiteStorageViewData site_storage_view;
+    Gs1HostEventSiteContextRequestData site_context_request;
     Gs1HostEventEmptyData empty;
 };
 
@@ -541,11 +575,24 @@ struct Gs1EngineMessageWeatherData
     float phase_minutes_remaining;
 };
 
+struct Gs1EngineMessageInventoryStorageData
+{
+    std::uint32_t storage_id;
+    std::uint32_t owner_entity_id;
+    std::uint16_t slot_count;
+    std::int16_t tile_x;
+    std::int16_t tile_y;
+    Gs1InventoryContainerKind container_kind;
+    std::uint8_t flags;
+};
+
 struct Gs1EngineMessageInventorySlotData
 {
     std::uint32_t item_id;
+    std::uint32_t item_instance_id;
     float condition;
     float freshness;
+    std::uint32_t storage_id;
     std::uint32_t container_owner_id;
     std::uint16_t quantity;
     std::uint16_t slot_index;
@@ -553,6 +600,30 @@ struct Gs1EngineMessageInventorySlotData
     std::int16_t container_tile_y;
     Gs1InventoryContainerKind container_kind;
     std::uint8_t flags;
+};
+
+struct Gs1EngineMessageInventoryViewData
+{
+    std::uint32_t storage_id;
+    std::uint16_t slot_count;
+    Gs1InventoryViewEventKind event_kind;
+    std::uint8_t flags;
+};
+
+struct Gs1EngineMessageCraftContextData
+{
+    std::int32_t tile_x;
+    std::int32_t tile_y;
+    std::uint16_t option_count;
+    std::uint16_t flags;
+};
+
+struct Gs1EngineMessageCraftContextOptionData
+{
+    std::uint32_t recipe_id;
+    std::uint32_t output_item_id;
+    std::uint16_t flags;
+    std::uint16_t reserved0;
 };
 
 struct Gs1EngineMessageTaskData
@@ -682,6 +753,8 @@ GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventUiActionData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteMoveDirectionData, 12U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteActionRequestData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteActionCancelData, 24U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteStorageViewData, 24U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteContextRequestData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventEmptyData, 16U);
 static_assert(std::is_standard_layout_v<Gs1HostEventPayload>, "Gs1HostEventPayload must remain standard layout.");
 static_assert(std::is_trivial_v<Gs1HostEventPayload>, "Gs1HostEventPayload must remain trivial.");
@@ -708,7 +781,11 @@ GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteTileData, 32U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageWorkerData, 28U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageCampData, 16U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageWeatherData, 24U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageInventorySlotData, 28U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageInventoryStorageData, 16U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageInventorySlotData, 36U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageInventoryViewData, 8U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageCraftContextData, 12U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageCraftContextOptionData, 12U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageTaskData, 20U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePhoneListingData, 20U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteActionData, 24U);
@@ -732,7 +809,11 @@ static_assert(sizeof(Gs1EngineMessageSiteTileData) <= GS1_MESSAGE_PAYLOAD_BYTE_C
 static_assert(sizeof(Gs1EngineMessageWorkerData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageCampData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageWeatherData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageInventoryStorageData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageInventorySlotData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageInventoryViewData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageCraftContextData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageCraftContextOptionData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageTaskData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessagePhoneListingData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageSiteActionData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);

@@ -151,6 +151,17 @@ Gs1HostEvent make_ui_action_event(const Gs1UiAction& action)
     return event;
 }
 
+Gs1HostEvent make_storage_view_event(
+    std::uint32_t storage_id,
+    Gs1InventoryViewEventKind event_kind)
+{
+    Gs1HostEvent event {};
+    event.type = GS1_HOST_EVENT_SITE_STORAGE_VIEW;
+    event.payload.site_storage_view.storage_id = storage_id;
+    event.payload.site_storage_view.event_kind = event_kind;
+    return event;
+}
+
 void run_phase1(GameRuntime& runtime, double real_delta_seconds, Gs1Phase1Result& out_result)
 {
     Gs1Phase1Request request {};
@@ -210,7 +221,7 @@ std::vector<const Gs1EngineMessage*> collect_inventory_slot_messages(
 const Gs1EngineMessage* find_inventory_slot_message(
     const std::vector<Gs1EngineMessage>& messages,
     Gs1InventoryContainerKind container_kind,
-    std::uint32_t container_owner_id,
+    std::uint32_t storage_id,
     std::uint16_t slot_index)
 {
     for (const auto& message : messages)
@@ -222,7 +233,7 @@ const Gs1EngineMessage* find_inventory_slot_message(
 
         const auto& payload = message.payload_as<Gs1EngineMessageInventorySlotData>();
         if (payload.container_kind == container_kind &&
-            payload.container_owner_id == container_owner_id &&
+            payload.storage_id == storage_id &&
             payload.slot_index == slot_index)
         {
             return &message;
@@ -237,6 +248,13 @@ std::uint32_t starter_storage_owner_id(const gs1::SiteRunState& site_run)
     return static_cast<std::uint32_t>(site_run.site_world->device_entity_id(site_run.camp.starter_storage_tile));
 }
 
+std::uint32_t starter_storage_id(gs1::SiteRunState& site_run)
+{
+    return gs1::inventory_storage::storage_id_for_container(
+        site_run,
+        gs1::inventory_storage::starter_storage_container(site_run));
+}
+
 std::uint16_t find_starter_storage_slot_index(
     gs1::SiteRunState& site_run,
     gs1::ItemId item_id,
@@ -246,8 +264,7 @@ std::uint16_t find_starter_storage_slot_index(
     const auto slot_count = gs1::inventory_storage::slot_count_in_container(site_run, container);
     for (std::uint32_t slot_index = 0U; slot_index < slot_count; ++slot_index)
     {
-        const auto slot = gs1::inventory_storage::slot_entity(site_run, container, slot_index);
-        const auto item = gs1::inventory_storage::item_entity_for_slot(site_run, slot);
+        const auto item = gs1::inventory_storage::item_entity_for_slot(site_run, container, slot_index);
         const auto* stack = gs1::inventory_storage::stack_data(site_run, item);
         if (stack != nullptr && stack->item_id == item_id && stack->quantity == quantity)
         {
@@ -345,8 +362,8 @@ int main()
     use_item.type = GameMessageType::InventoryItemUseRequested;
     use_item.set_payload(InventoryItemUseRequestedMessage {
         1U,
+        bootstrap_site_run.inventory.worker_pack_storage_id,
         1U,
-        GS1_INVENTORY_CONTAINER_WORKER_PACK,
         0U});
     assert(runtime.handle_message(use_item) == GS1_STATUS_OK);
     assert(bootstrap_site_run.inventory.worker_pack_slots[0].item_quantity == 1U);
@@ -371,18 +388,7 @@ int main()
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
     const auto delivery_messages = drain_engine_messages(runtime);
     const auto delivery_inventory_messages = collect_inventory_slot_messages(delivery_messages);
-    assert(!delivery_inventory_messages.empty());
-    const auto* delivered_message = find_inventory_slot_message(
-        delivery_messages,
-        GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
-        starter_storage_owner_id(bootstrap_site_run),
-        delivered_slot_index);
-    assert(delivered_message != nullptr);
-    {
-        const auto& payload = delivered_message->payload_as<Gs1EngineMessageInventorySlotData>();
-        assert(payload.item_id == gs1::k_item_water_container);
-        assert(payload.quantity == 1U);
-    }
+    assert(delivery_inventory_messages.empty());
 
     const auto first_messages = flush_tile_delta_for(runtime, TileCoord {3, 2}, 0.25f);
     const auto first_tiles = collect_messages_of_type(first_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
@@ -440,6 +446,21 @@ int main()
     auto& ui_site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(ui_runtime).value();
     drain_engine_messages(ui_runtime);
 
+    auto open_storage_event = make_storage_view_event(
+        starter_storage_id(ui_site_run),
+        GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT);
+    Gs1Phase1Result open_storage_result {};
+    assert(ui_runtime.submit_host_events(&open_storage_event, 1U) == GS1_STATUS_OK);
+    run_phase1(ui_runtime, 0.0, open_storage_result);
+    assert(open_storage_result.processed_host_event_count == 1U);
+    const auto open_storage_messages = drain_engine_messages(ui_runtime);
+    assert(!collect_messages_of_type(open_storage_messages, GS1_ENGINE_MESSAGE_SITE_INVENTORY_VIEW_STATE).empty());
+    assert(find_inventory_slot_message(
+               open_storage_messages,
+               GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
+               starter_storage_id(ui_site_run),
+               0U) != nullptr);
+
     auto ui_worker = gs1::site_world_access::worker_conditions(ui_site_run);
     ui_worker.hydration = 70.0f;
     gs1::site_world_access::set_worker_conditions(ui_site_run, ui_worker);
@@ -452,8 +473,8 @@ int main()
         GS1_INVENTORY_CONTAINER_WORKER_PACK,
         0U);
     transfer_action.arg1 = pack_inventory_transfer_owner_arg(
-        starter_storage_owner_id(ui_site_run),
-        0U);
+        starter_storage_id(ui_site_run),
+        ui_site_run.inventory.worker_pack_storage_id);
     auto transfer_event = make_ui_action_event(transfer_action);
 
     Gs1Phase1Result transfer_result {};
@@ -473,21 +494,22 @@ int main()
     assert(find_inventory_slot_message(
                transfer_messages,
                GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
-               starter_storage_owner_id(ui_site_run),
+               starter_storage_id(ui_site_run),
                0U) != nullptr);
     assert(find_inventory_slot_message(
                transfer_messages,
                GS1_INVENTORY_CONTAINER_WORKER_PACK,
-               0U,
+               ui_site_run.inventory.worker_pack_storage_id,
                3U) != nullptr);
 
     Gs1UiAction use_action {};
     use_action.type = GS1_UI_ACTION_USE_INVENTORY_ITEM;
-    use_action.target_id = gs1::k_item_water_container;
+    use_action.target_id = ui_site_run.inventory.worker_pack_slots[0].item_instance_id;
     use_action.arg0 = pack_inventory_use_arg(
         GS1_INVENTORY_CONTAINER_WORKER_PACK,
         0U,
         1U);
+    use_action.arg1 = ui_site_run.inventory.worker_pack_storage_id;
     auto use_event = make_ui_action_event(use_action);
 
     Gs1Phase1Result use_result {};
@@ -503,7 +525,7 @@ int main()
     assert(find_inventory_slot_message(
                use_messages,
                GS1_INVENTORY_CONTAINER_WORKER_PACK,
-               0U,
+               ui_site_run.inventory.worker_pack_storage_id,
                0U) != nullptr);
     assert(!collect_messages_of_type(use_messages, GS1_ENGINE_MESSAGE_SITE_WORKER_UPDATE).empty());
     assert(!collect_messages_of_type(use_messages, GS1_ENGINE_MESSAGE_HUD_STATE).empty());

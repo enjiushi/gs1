@@ -303,9 +303,9 @@ void inventory_regression_runner(
                 GameMessageType::InventoryItemUseRequested,
                 gs1::InventoryItemUseRequestedMessage {
                     parse_u32(context, values, "item_id"),
+                    site_run.inventory.worker_pack_storage_id,
                     static_cast<std::uint16_t>(parse_u32(context, values, "quantity", 1U)),
-                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
-                    static_cast<std::uint8_t>(parse_u32(context, values, "slot", 0U))}));
+                    static_cast<std::uint16_t>(parse_u32(context, values, "slot", 0U))}));
         GS1_SYSTEM_TEST_CHECK(context, status == parse_status(values, "expect_status", GS1_STATUS_OK));
         GS1_SYSTEM_TEST_CHECK(
             context,
@@ -334,13 +334,11 @@ void inventory_regression_runner(
             make_message(
                 GameMessageType::InventoryTransferRequested,
                 gs1::InventoryTransferRequestedMessage {
+                    site_run.inventory.worker_pack_storage_id,
+                    site_run.inventory.worker_pack_storage_id,
                     static_cast<std::uint16_t>(source_slot),
                     static_cast<std::uint16_t>(destination_slot),
                     static_cast<std::uint16_t>(parse_u32(context, values, "quantity", 1U)),
-                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
-                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
-                    0U,
-                    0U,
                     0U,
                     0U}));
         GS1_SYSTEM_TEST_CHECK(context, status == parse_status(values, "expect_status", GS1_STATUS_OK));

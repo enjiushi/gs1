@@ -27,10 +27,6 @@ struct StorageContainerTag final
 {
 };
 
-struct StorageSlotTag final
-{
-};
-
 struct StorageItemTag final
 {
 };
@@ -69,19 +65,18 @@ struct StorageItemStack final
     float freshness;
 };
 
+struct StorageItemLocation final
+{
+    std::uint64_t container_entity_id;
+    std::uint16_t slot_index;
+    std::uint16_t reserved0;
+};
+
 struct StorageOwnedByDevice final
 {
 };
 
 struct StorageAtTile final
-{
-};
-
-struct StorageSlotOf final
-{
-};
-
-struct StorageItemInSlot final
 {
 };
 
@@ -213,17 +208,15 @@ GS1_REQUIRE_TRIVIAL(TileOccupantTag);
 GS1_REQUIRE_TRIVIAL(DeviceTag);
 GS1_REQUIRE_TRIVIAL(WorkerTag);
 GS1_REQUIRE_TRIVIAL(StorageContainerTag);
-GS1_REQUIRE_TRIVIAL(StorageSlotTag);
 GS1_REQUIRE_TRIVIAL(StorageItemTag);
 GS1_REQUIRE_TRIVIAL(TileIndex);
 GS1_REQUIRE_TRIVIAL(TileCoordComponent);
 GS1_REQUIRE_TRIVIAL(StorageContainerKindComponent);
 GS1_REQUIRE_TRIVIAL(StorageSlotIndex);
 GS1_REQUIRE_TRIVIAL(StorageItemStack);
+GS1_REQUIRE_TRIVIAL(StorageItemLocation);
 GS1_REQUIRE_TRIVIAL(StorageOwnedByDevice);
 GS1_REQUIRE_TRIVIAL(StorageAtTile);
-GS1_REQUIRE_TRIVIAL(StorageSlotOf);
-GS1_REQUIRE_TRIVIAL(StorageItemInSlot);
 GS1_REQUIRE_TRIVIAL(TileTerrain);
 GS1_REQUIRE_TRIVIAL(TileTraversable);
 GS1_REQUIRE_TRIVIAL(TilePlantable);

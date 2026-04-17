@@ -87,16 +87,16 @@ GameMessage make_accept_task_message(std::uint32_t task_instance_id)
 GameMessage make_inventory_use_message(
     std::uint32_t item_id,
     std::uint32_t quantity,
-    Gs1InventoryContainerKind container_kind,
+    std::uint32_t storage_id,
     std::uint32_t slot_index)
 {
     GameMessage message {};
     message.type = GameMessageType::InventoryItemUseRequested;
     message.set_payload(InventoryItemUseRequestedMessage {
         item_id,
+        storage_id,
         static_cast<std::uint16_t>(quantity),
-        container_kind,
-        static_cast<std::uint8_t>(slot_index)});
+        static_cast<std::uint16_t>(slot_index)});
     return message;
 }
 
@@ -138,7 +138,7 @@ std::vector<const Gs1EngineMessage*> collect_messages_of_type(
 
 const Gs1EngineMessage* find_inventory_slot_message(
     const std::vector<Gs1EngineMessage>& messages,
-    Gs1InventoryContainerKind container_kind,
+    std::uint32_t storage_id,
     std::uint16_t slot_index)
 {
     for (const auto& message : messages)
@@ -149,7 +149,7 @@ const Gs1EngineMessage* find_inventory_slot_message(
         }
 
         const auto& payload = message.payload_as<Gs1EngineMessageInventorySlotData>();
-        if (payload.container_kind == container_kind && payload.slot_index == slot_index)
+        if (payload.storage_id == storage_id && payload.slot_index == slot_index)
         {
             return &message;
         }
@@ -269,7 +269,7 @@ void inventory_item_use_updates_worker_and_projection()
     assert(runtime.handle_message(make_inventory_use_message(
                1U,
                1U,
-               GS1_INVENTORY_CONTAINER_WORKER_PACK,
+               site_run.inventory.worker_pack_storage_id,
                0U)) == GS1_STATUS_OK);
 
     assert(site_run.inventory.worker_pack_slots[0].occupied);
@@ -291,7 +291,7 @@ void inventory_item_use_updates_worker_and_projection()
     assert(hud_messages.size() == 1U);
 
     const auto* slot_message =
-        find_inventory_slot_message(messages, GS1_INVENTORY_CONTAINER_WORKER_PACK, 0U);
+        find_inventory_slot_message(messages, site_run.inventory.worker_pack_storage_id, 0U);
     assert(slot_message != nullptr);
     {
         const auto& payload = slot_message->payload_as<Gs1EngineMessageInventorySlotData>();

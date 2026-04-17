@@ -171,8 +171,8 @@ inline bool can_store_output_after_recipe_consumption(
     simulated_slots.resize(slot_count);
     for (std::uint32_t slot_index = 0U; slot_index < slot_count; ++slot_index)
     {
-        const auto slot_entity = inventory_storage::slot_entity(site_run, output_container, slot_index);
-        const auto item_entity = inventory_storage::item_entity_for_slot(site_run, slot_entity);
+        const auto item_entity =
+            inventory_storage::item_entity_for_slot(site_run, output_container, slot_index);
         inventory_storage::fill_projection_slot_from_entities(simulated_slots[slot_index], item_entity);
     }
 

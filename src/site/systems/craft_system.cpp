@@ -8,12 +8,92 @@
 
 namespace gs1
 {
+namespace
+{
+Gs1Status handle_craft_context_requested(
+    SiteSystemContext<CraftSystem>& context,
+    const CraftContextRequestedMessage& payload) noexcept
+{
+    auto& presentation = context.world.own_craft().context_presentation;
+    presentation = CraftContextPresentationState {};
+
+    if (!context.world.has_world() || context.site_run.site_world == nullptr)
+    {
+        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_CRAFT_CONTEXT);
+        return GS1_STATUS_OK;
+    }
+
+    const TileCoord target_tile {payload.tile_x, payload.tile_y};
+    if (!context.world.tile_coord_in_bounds(target_tile))
+    {
+        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_CRAFT_CONTEXT);
+        return GS1_STATUS_OK;
+    }
+
+    const auto tile = context.world.read_tile(target_tile);
+    const auto recipes = craft_logic::recipes_for_station(tile.device.structure_id);
+    presentation.occupied = true;
+    presentation.tile_coord = target_tile;
+    if (recipes.empty())
+    {
+        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_CRAFT_CONTEXT);
+        return GS1_STATUS_OK;
+    }
+
+    const auto device_entity_id = context.site_run.site_world->device_entity_id(target_tile);
+    const auto output_container =
+        inventory_storage::find_device_storage_container(context.site_run, device_entity_id);
+    if (device_entity_id == 0U || !output_container.is_valid())
+    {
+        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_CRAFT_CONTEXT);
+        return GS1_STATUS_OK;
+    }
+
+    const auto nearby_items =
+        craft_logic::nearby_item_instance_ids_for_device(context.site_run, context.world.read_craft(), device_entity_id, target_tile);
+    const auto source_containers =
+        craft_logic::collect_nearby_source_containers(context.site_run, target_tile);
+    for (const auto* recipe_def : recipes)
+    {
+        if (recipe_def == nullptr)
+        {
+            continue;
+        }
+
+        if (!craft_logic::can_satisfy_recipe_ingredients(
+                context.site_run,
+                nearby_items,
+                *recipe_def))
+        {
+            continue;
+        }
+
+        if (!craft_logic::can_store_output_after_recipe_consumption(
+                context.site_run,
+                output_container,
+                source_containers,
+                *recipe_def))
+        {
+            continue;
+        }
+
+        presentation.options.push_back(CraftContextOptionState {
+            recipe_def->recipe_id.value,
+            recipe_def->output_item_id.value});
+    }
+
+    context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_CRAFT_CONTEXT);
+    return GS1_STATUS_OK;
+}
+}  // namespace
+
 bool CraftSystem::subscribes_to(GameMessageType type) noexcept
 {
     switch (type)
     {
     case GameMessageType::SiteRunStarted:
     case GameMessageType::SiteDevicePlaced:
+    case GameMessageType::InventoryCraftContextRequested:
         return true;
     default:
         return false;
@@ -33,6 +113,11 @@ Gs1Status CraftSystem::process_message(
     case GameMessageType::SiteDevicePlaced:
         context.world.own_craft().device_caches.clear();
         return GS1_STATUS_OK;
+
+    case GameMessageType::InventoryCraftContextRequested:
+        return handle_craft_context_requested(
+            context,
+            message.payload_as<CraftContextRequestedMessage>());
 
     default:
         return GS1_STATUS_OK;

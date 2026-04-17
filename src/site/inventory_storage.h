@@ -10,7 +10,7 @@
 #include <flecs.h>
 
 #include <algorithm>
-#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 
@@ -42,6 +42,66 @@ inline flecs::entity entity_from_id(const SiteRunState& site_run, std::uint64_t 
     return world == nullptr || entity_id == 0U ? flecs::entity {} : const_cast<flecs::world*>(world)->entity(entity_id);
 }
 
+inline StorageContainerState* find_storage_container_state_by_entity_id(
+    InventoryState& inventory,
+    std::uint64_t container_entity_id) noexcept
+{
+    for (auto& storage : inventory.storage_containers)
+    {
+        if (storage.container_entity_id == container_entity_id)
+        {
+            return &storage;
+        }
+    }
+
+    return nullptr;
+}
+
+inline const StorageContainerState* find_storage_container_state_by_entity_id(
+    const InventoryState& inventory,
+    std::uint64_t container_entity_id) noexcept
+{
+    for (const auto& storage : inventory.storage_containers)
+    {
+        if (storage.container_entity_id == container_entity_id)
+        {
+            return &storage;
+        }
+    }
+
+    return nullptr;
+}
+
+inline StorageContainerState* find_storage_container_state_by_storage_id(
+    InventoryState& inventory,
+    std::uint32_t storage_id) noexcept
+{
+    for (auto& storage : inventory.storage_containers)
+    {
+        if (storage.storage_id == storage_id)
+        {
+            return &storage;
+        }
+    }
+
+    return nullptr;
+}
+
+inline const StorageContainerState* find_storage_container_state_by_storage_id(
+    const InventoryState& inventory,
+    std::uint32_t storage_id) noexcept
+{
+    for (const auto& storage : inventory.storage_containers)
+    {
+        if (storage.storage_id == storage_id)
+        {
+            return &storage;
+        }
+    }
+
+    return nullptr;
+}
+
 inline void bump_item_membership_revision(InventoryState& inventory) noexcept
 {
     inventory.item_membership_revision += 1U;
@@ -68,59 +128,27 @@ inline flecs::entity find_container_entity(
     StorageContainerKind kind,
     std::uint64_t owner_device_entity_id = 0U) noexcept
 {
-    auto* world = ecs_world_ptr(site_run);
-    if (world == nullptr)
+    for (const auto& storage : site_run.inventory.storage_containers)
     {
-        return {};
+        const bool kind_matches =
+            (kind == StorageContainerKind::WorkerPack &&
+                storage.container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK) ||
+            (kind == StorageContainerKind::DeviceStorage &&
+                storage.container_kind == GS1_INVENTORY_CONTAINER_DEVICE_STORAGE);
+        if (!kind_matches)
+        {
+            continue;
+        }
+
+        if (owner_device_entity_id != 0U && storage.owner_device_entity_id != owner_device_entity_id)
+        {
+            continue;
+        }
+
+        return entity_from_id(site_run, storage.container_entity_id);
     }
 
-    flecs::entity result {};
-    world->each([&](flecs::entity entity, const StorageContainerKindComponent& container_kind) {
-        if (result.is_valid() || container_kind.kind != kind)
-        {
-            return;
-        }
-
-        if (owner_device_entity_id != 0U)
-        {
-            if (!entity.has<StorageOwnedByDevice>(world->entity(owner_device_entity_id)))
-            {
-                return;
-            }
-        }
-
-        result = entity;
-    });
-    return result;
-}
-
-inline flecs::entity ensure_slot_entity(
-    flecs::world& world,
-    flecs::entity container,
-    std::uint16_t slot_index)
-{
-    flecs::entity result {};
-    world.each([&](flecs::entity entity, const StorageSlotIndex& index) {
-        if (result.is_valid())
-        {
-            return;
-        }
-
-        if (index.value == slot_index && entity.has<StorageSlotOf>(container))
-        {
-            result = entity;
-        }
-    });
-
-    if (result.is_valid())
-    {
-        return result;
-    }
-
-    return world.entity()
-        .add<StorageSlotTag>()
-        .set<StorageSlotIndex>({slot_index})
-        .add<StorageSlotOf>(container);
+    return {};
 }
 
 inline flecs::entity ensure_storage_container(
@@ -159,56 +187,28 @@ inline flecs::entity ensure_storage_container(
         }
     }
 
-    for (std::uint16_t slot_index = 0U; slot_index < slot_count; ++slot_index)
+    auto* storage_state =
+        find_storage_container_state_by_entity_id(site_run.inventory, container.id());
+    if (storage_state == nullptr)
     {
-        (void)ensure_slot_entity(*world, container, slot_index);
+        site_run.inventory.storage_containers.push_back(StorageContainerState {});
+        storage_state = &site_run.inventory.storage_containers.back();
+        storage_state->storage_id = site_run.inventory.next_storage_id++;
+        storage_state->container_entity_id = container.id();
+    }
+
+    storage_state->owner_device_entity_id = static_cast<std::uint32_t>(owner_device_entity_id);
+    storage_state->container_kind =
+        kind == StorageContainerKind::WorkerPack
+            ? GS1_INVENTORY_CONTAINER_WORKER_PACK
+            : GS1_INVENTORY_CONTAINER_DEVICE_STORAGE;
+    storage_state->tile_coord = tile_coord;
+    if (storage_state->slot_item_instance_ids.size() != slot_count)
+    {
+        storage_state->slot_item_instance_ids.resize(slot_count, 0ULL);
     }
 
     return container;
-}
-
-inline flecs::entity slot_entity(
-    SiteRunState& site_run,
-    flecs::entity container,
-    std::uint32_t slot_index) noexcept
-{
-    auto* world = ecs_world_ptr(site_run);
-    if (world == nullptr || !container.is_valid())
-    {
-        return {};
-    }
-
-    flecs::entity result {};
-    world->each([&](flecs::entity entity, const StorageSlotIndex& index) {
-        if (!result.is_valid() &&
-            index.value == slot_index &&
-            entity.has<StorageSlotOf>(container))
-        {
-            result = entity;
-        }
-    });
-    return result;
-}
-
-inline flecs::entity item_entity_for_slot(
-    SiteRunState& site_run,
-    flecs::entity slot) noexcept
-{
-    (void)site_run;
-    if (!slot.is_valid())
-    {
-        return {};
-    }
-
-    auto item = slot.target<StorageItemInSlot>();
-    return item.is_valid() ? item : flecs::entity {};
-}
-
-inline flecs::entity item_entity_for_slot(
-    const SiteRunState& site_run,
-    flecs::entity slot) noexcept
-{
-    return item_entity_for_slot(const_cast<SiteRunState&>(site_run), slot);
 }
 
 inline flecs::entity worker_pack_container(SiteRunState& site_run) noexcept
@@ -249,6 +249,59 @@ inline flecs::entity container_for_kind(
     default:
         return {};
     }
+}
+
+inline flecs::entity container_for_storage_id(
+    SiteRunState& site_run,
+    std::uint32_t storage_id) noexcept
+{
+    const auto* storage_state =
+        find_storage_container_state_by_storage_id(site_run.inventory, storage_id);
+    return storage_state == nullptr
+        ? flecs::entity {}
+        : entity_from_id(site_run, storage_state->container_entity_id);
+}
+
+inline std::uint32_t storage_id_for_container(
+    const SiteRunState& site_run,
+    flecs::entity container) noexcept
+{
+    if (!container.is_valid())
+    {
+        return 0U;
+    }
+
+    const auto* storage_state =
+        find_storage_container_state_by_entity_id(site_run.inventory, container.id());
+    return storage_state == nullptr ? 0U : storage_state->storage_id;
+}
+
+inline std::uint32_t worker_pack_storage_id(const SiteRunState& site_run) noexcept
+{
+    return site_run.inventory.worker_pack_storage_id;
+}
+
+inline flecs::entity item_entity_for_slot(
+    SiteRunState& site_run,
+    flecs::entity container,
+    std::uint32_t slot_index) noexcept
+{
+    const auto* storage_state =
+        find_storage_container_state_by_entity_id(site_run.inventory, container.id());
+    if (storage_state == nullptr || slot_index >= storage_state->slot_item_instance_ids.size())
+    {
+        return {};
+    }
+
+    return entity_from_id(site_run, storage_state->slot_item_instance_ids[slot_index]);
+}
+
+inline flecs::entity item_entity_for_slot(
+    const SiteRunState& site_run,
+    flecs::entity container,
+    std::uint32_t slot_index) noexcept
+{
+    return item_entity_for_slot(const_cast<SiteRunState&>(site_run), container, slot_index);
 }
 
 inline const StorageItemStack* stack_data(const SiteRunState& site_run, flecs::entity item) noexcept
@@ -299,16 +352,24 @@ inline void sync_projection_slots_for_container(
     flecs::entity container,
     std::vector<InventorySlot>& destination)
 {
-    if (!container.is_valid())
+    const auto* storage_state =
+        find_storage_container_state_by_entity_id(site_run.inventory, container.id());
+    if (storage_state == nullptr)
     {
         std::fill(destination.begin(), destination.end(), InventorySlot {});
         return;
     }
 
-    for (std::size_t slot_index = 0; slot_index < destination.size(); ++slot_index)
+    if (destination.size() != storage_state->slot_item_instance_ids.size())
     {
-        auto slot = slot_entity(site_run, container, static_cast<std::uint32_t>(slot_index));
-        fill_projection_slot_from_entities(destination[slot_index], item_entity_for_slot(site_run, slot));
+        destination.resize(storage_state->slot_item_instance_ids.size());
+    }
+
+    for (std::size_t slot_index = 0; slot_index < storage_state->slot_item_instance_ids.size(); ++slot_index)
+    {
+        fill_projection_slot_from_entities(
+            destination[slot_index],
+            item_entity_for_slot(site_run, container, static_cast<std::uint32_t>(slot_index)));
     }
 }
 
@@ -333,12 +394,14 @@ inline void initialize_site_inventory_storage(SiteRunState& site_run)
         site_run.inventory.worker_pack_slot_count);
 
     site_run.inventory.worker_pack_container_entity_id = worker_container.id();
+    site_run.inventory.worker_pack_storage_id = storage_id_for_container(site_run, worker_container);
     sync_projection_views(site_run);
 }
 
 inline flecs::entity create_item_entity(
     flecs::world& world,
-    flecs::entity slot,
+    flecs::entity container,
+    std::uint32_t slot_index,
     ItemId item_id,
     std::uint32_t quantity,
     float condition,
@@ -347,7 +410,7 @@ inline flecs::entity create_item_entity(
     return world.entity()
         .add<StorageItemTag>()
         .set<StorageItemStack>({item_id, quantity, condition, freshness})
-        .add<StorageItemInSlot>(slot);
+        .set<StorageItemLocation>({container.id(), static_cast<std::uint16_t>(slot_index), 0U});
 }
 
 inline void import_projection_slots_into_container_if_needed(
@@ -356,15 +419,17 @@ inline void import_projection_slots_into_container_if_needed(
     const std::vector<InventorySlot>& source_slots)
 {
     auto* world = ecs_world_ptr(site_run);
-    if (world == nullptr || !container.is_valid())
+    auto* storage_state =
+        find_storage_container_state_by_entity_id(site_run.inventory, container.id());
+    if (world == nullptr || storage_state == nullptr)
     {
         return;
     }
 
     for (std::size_t slot_index = 0; slot_index < source_slots.size(); ++slot_index)
     {
-        const auto slot = slot_entity(site_run, container, static_cast<std::uint32_t>(slot_index));
-        if (!slot.is_valid() || item_entity_for_slot(site_run, slot).is_valid())
+        if (slot_index >= storage_state->slot_item_instance_ids.size() ||
+            storage_state->slot_item_instance_ids[slot_index] != 0U)
         {
             continue;
         }
@@ -375,13 +440,15 @@ inline void import_projection_slots_into_container_if_needed(
             continue;
         }
 
-        (void)create_item_entity(
+        const auto item = create_item_entity(
             *world,
-            slot,
+            container,
+            static_cast<std::uint32_t>(slot_index),
             source.item_id,
             source.item_quantity,
             source.item_condition,
             source.item_freshness);
+        storage_state->slot_item_instance_ids[slot_index] = item.id();
         bump_item_membership_revision(site_run.inventory);
     }
 }
@@ -411,7 +478,9 @@ inline std::uint32_t add_item_to_container(
     float freshness = 1.0f)
 {
     auto* world = ecs_world_ptr(site_run);
-    if (world == nullptr || !container.is_valid() || quantity == 0U)
+    auto* storage_state =
+        find_storage_container_state_by_entity_id(site_run.inventory, container.id());
+    if (world == nullptr || storage_state == nullptr || quantity == 0U)
     {
         return quantity;
     }
@@ -419,15 +488,11 @@ inline std::uint32_t add_item_to_container(
     std::uint32_t remaining = quantity;
     const auto max_stack = stack_limit(item_id);
 
-    for (std::uint32_t slot_index = 0U; slot_index < 65535U && remaining > 0U; ++slot_index)
+    for (std::uint32_t slot_index = 0U;
+         slot_index < storage_state->slot_item_instance_ids.size() && remaining > 0U;
+         ++slot_index)
     {
-        auto slot = slot_entity(site_run, container, slot_index);
-        if (!slot.is_valid())
-        {
-            break;
-        }
-
-        auto item = item_entity_for_slot(site_run, slot);
+        const auto item = item_entity_for_slot(site_run, container, slot_index);
         if (!item.is_valid() || !item.has<StorageItemStack>())
         {
             continue;
@@ -447,21 +512,25 @@ inline std::uint32_t add_item_to_container(
         bump_item_quantity_revision(site_run.inventory);
     }
 
-    for (std::uint32_t slot_index = 0U; slot_index < 65535U && remaining > 0U; ++slot_index)
+    for (std::uint32_t slot_index = 0U;
+         slot_index < storage_state->slot_item_instance_ids.size() && remaining > 0U;
+         ++slot_index)
     {
-        auto slot = slot_entity(site_run, container, slot_index);
-        if (!slot.is_valid())
-        {
-            break;
-        }
-
-        if (item_entity_for_slot(site_run, slot).is_valid())
+        if (storage_state->slot_item_instance_ids[slot_index] != 0U)
         {
             continue;
         }
 
         const auto transfer = std::min<std::uint32_t>(remaining, max_stack);
-        (void)create_item_entity(*world, slot, item_id, transfer, condition, freshness);
+        const auto item = create_item_entity(
+            *world,
+            container,
+            slot_index,
+            item_id,
+            transfer,
+            condition,
+            freshness);
+        storage_state->slot_item_instance_ids[slot_index] = item.id();
         remaining -= transfer;
         bump_item_membership_revision(site_run.inventory);
     }
@@ -475,21 +544,17 @@ inline std::uint32_t available_item_quantity_in_container(
     flecs::entity container,
     ItemId item_id) noexcept
 {
-    if (!container.is_valid())
+    const auto* storage_state =
+        find_storage_container_state_by_entity_id(site_run.inventory, container.id());
+    if (storage_state == nullptr)
     {
         return 0U;
     }
 
     std::uint32_t total = 0U;
-    for (std::uint32_t slot_index = 0U; slot_index < 65535U; ++slot_index)
+    for (std::uint32_t slot_index = 0U; slot_index < storage_state->slot_item_instance_ids.size(); ++slot_index)
     {
-        const auto slot = slot_entity(site_run, container, slot_index);
-        if (!slot.is_valid())
-        {
-            break;
-        }
-
-        const auto item = item_entity_for_slot(site_run, slot);
+        const auto item = item_entity_for_slot(site_run, container, slot_index);
         const auto* stack = stack_data(site_run, item);
         if (stack != nullptr && stack->item_id == item_id)
         {
@@ -530,21 +595,19 @@ inline std::uint32_t consume_item_type_from_container(
     ItemId item_id,
     std::uint32_t quantity)
 {
-    if (!container.is_valid() || quantity == 0U)
+    auto* storage_state =
+        find_storage_container_state_by_entity_id(site_run.inventory, container.id());
+    if (storage_state == nullptr || quantity == 0U)
     {
         return quantity;
     }
 
     std::uint32_t remaining = quantity;
-    for (std::uint32_t slot_index = 0U; slot_index < 65535U && remaining > 0U; ++slot_index)
+    for (std::uint32_t slot_index = 0U;
+         slot_index < storage_state->slot_item_instance_ids.size() && remaining > 0U;
+         ++slot_index)
     {
-        const auto slot = slot_entity(site_run, container, slot_index);
-        if (!slot.is_valid())
-        {
-            break;
-        }
-
-        auto item = item_entity_for_slot(site_run, slot);
+        auto item = item_entity_for_slot(site_run, container, slot_index);
         if (!item.is_valid() || !item.has<StorageItemStack>())
         {
             continue;
@@ -561,6 +624,7 @@ inline std::uint32_t consume_item_type_from_container(
         remaining -= removed;
         if (stack.quantity == 0U)
         {
+            storage_state->slot_item_instance_ids[slot_index] = 0U;
             item.destruct();
             bump_item_membership_revision(site_run.inventory);
         }
@@ -580,7 +644,7 @@ inline bool consume_quantity_from_item_entity(
     flecs::entity item_entity,
     std::uint32_t quantity)
 {
-    if (!item_entity.is_valid() || !item_entity.has<StorageItemStack>())
+    if (!item_entity.is_valid() || !item_entity.has<StorageItemStack>() || !item_entity.has<StorageItemLocation>())
     {
         return false;
     }
@@ -591,9 +655,18 @@ inline bool consume_quantity_from_item_entity(
         return false;
     }
 
+    const auto location = item_entity.get<StorageItemLocation>();
+    auto* storage_state =
+        find_storage_container_state_by_entity_id(site_run.inventory, location.container_entity_id);
+    if (storage_state == nullptr || location.slot_index >= storage_state->slot_item_instance_ids.size())
+    {
+        return false;
+    }
+
     stack.quantity -= quantity;
     if (stack.quantity == 0U)
     {
+        storage_state->slot_item_instance_ids[location.slot_index] = 0U;
         item_entity.destruct();
         bump_item_membership_revision(site_run.inventory);
     }
@@ -632,22 +705,20 @@ inline bool can_fit_item_in_container(
     ItemId item_id,
     std::uint32_t quantity) noexcept
 {
-    if (!container.is_valid())
+    const auto* storage_state =
+        find_storage_container_state_by_entity_id(site_run.inventory, container.id());
+    if (storage_state == nullptr)
     {
         return false;
     }
 
     std::uint32_t remaining = quantity;
     const auto max_stack = stack_limit(item_id);
-    for (std::uint32_t slot_index = 0U; slot_index < 65535U && remaining > 0U; ++slot_index)
+    for (std::uint32_t slot_index = 0U;
+         slot_index < storage_state->slot_item_instance_ids.size() && remaining > 0U;
+         ++slot_index)
     {
-        const auto slot = slot_entity(site_run, container, slot_index);
-        if (!slot.is_valid())
-        {
-            break;
-        }
-
-        const auto item = item_entity_for_slot(site_run, slot);
+        const auto item = item_entity_for_slot(site_run, container, slot_index);
         const auto* stack = stack_data(site_run, item);
         if (stack == nullptr)
         {
@@ -680,15 +751,20 @@ inline bool transfer_between_slots(
     auto source_container = container_for_kind(site_run, source_kind, source_owner_entity_id);
     auto destination_container =
         container_for_kind(site_run, destination_kind, destination_owner_entity_id);
-    auto source_slot = slot_entity(site_run, source_container, source_slot_index);
-    auto destination_slot = slot_entity(site_run, destination_container, destination_slot_index);
-    if (!source_slot.is_valid() || !destination_slot.is_valid())
+    auto* source_state =
+        find_storage_container_state_by_entity_id(site_run.inventory, source_container.id());
+    auto* destination_state =
+        find_storage_container_state_by_entity_id(site_run.inventory, destination_container.id());
+    if (source_state == nullptr ||
+        destination_state == nullptr ||
+        source_slot_index >= source_state->slot_item_instance_ids.size() ||
+        destination_slot_index >= destination_state->slot_item_instance_ids.size())
     {
         return false;
     }
 
-    auto source_item = item_entity_for_slot(site_run, source_slot);
-    auto destination_item = item_entity_for_slot(site_run, destination_slot);
+    auto source_item = item_entity_for_slot(site_run, source_container, source_slot_index);
+    auto destination_item = item_entity_for_slot(site_run, destination_container, destination_slot_index);
     if (!source_item.is_valid() || !source_item.has<StorageItemStack>())
     {
         return false;
@@ -703,18 +779,25 @@ inline bool transfer_between_slots(
     {
         if (transfer_quantity == source_stack.quantity)
         {
-            source_item.remove<StorageItemInSlot>(source_slot);
-            source_item.add<StorageItemInSlot>(destination_slot);
+            source_state->slot_item_instance_ids[source_slot_index] = 0U;
+            destination_state->slot_item_instance_ids[destination_slot_index] = source_item.id();
+            source_item.set<StorageItemLocation>({
+                destination_container.id(),
+                static_cast<std::uint16_t>(destination_slot_index),
+                0U});
+            bump_item_membership_revision(site_run.inventory);
         }
         else
         {
-            create_item_entity(
+            const auto created = create_item_entity(
                 site_run.site_world->ecs_world(),
-                destination_slot,
+                destination_container,
+                destination_slot_index,
                 source_stack.item_id,
                 transfer_quantity,
                 source_stack.condition,
                 source_stack.freshness);
+            destination_state->slot_item_instance_ids[destination_slot_index] = created.id();
             source_stack.quantity -= transfer_quantity;
             source_item.modified<StorageItemStack>();
             bump_item_membership_revision(site_run.inventory);
@@ -752,6 +835,7 @@ inline bool transfer_between_slots(
 
     if (source_stack.quantity == 0U)
     {
+        source_state->slot_item_instance_ids[source_slot_index] = 0U;
         source_item.destruct();
         bump_item_membership_revision(site_run.inventory);
     }
@@ -769,32 +853,20 @@ inline std::uint32_t owner_device_entity_id_for_container(
     const SiteRunState& site_run,
     flecs::entity container) noexcept
 {
-    (void)site_run;
-    if (!container.is_valid())
-    {
-        return 0U;
-    }
-
-    const auto owner = container.target<StorageOwnedByDevice>();
-    return owner.is_valid()
-        ? static_cast<std::uint32_t>(owner.id())
-        : 0U;
+    const auto* storage_state =
+        find_storage_container_state_by_entity_id(site_run.inventory, container.id());
+    return storage_state == nullptr ? 0U : storage_state->owner_device_entity_id;
 }
 
 inline std::uint32_t slot_count_in_container(
     SiteRunState& site_run,
     flecs::entity container) noexcept
 {
-    std::uint32_t slot_count = 0U;
-    for (;;)
-    {
-        if (!slot_entity(site_run, container, slot_count).is_valid())
-        {
-            break;
-        }
-        slot_count += 1U;
-    }
-    return slot_count;
+    const auto* storage_state =
+        find_storage_container_state_by_entity_id(site_run.inventory, container.id());
+    return storage_state == nullptr
+        ? 0U
+        : static_cast<std::uint32_t>(storage_state->slot_item_instance_ids.size());
 }
 
 inline std::vector<std::uint32_t> collect_item_instance_ids_in_containers(
@@ -818,23 +890,18 @@ inline std::vector<std::uint32_t> collect_item_instance_ids_in_container(
     flecs::entity container)
 {
     std::vector<std::uint32_t> item_ids {};
-    if (!container.is_valid())
+    const auto* storage_state =
+        find_storage_container_state_by_entity_id(site_run.inventory, container.id());
+    if (storage_state == nullptr)
     {
         return item_ids;
     }
 
-    for (std::uint32_t slot_index = 0U; slot_index < 65535U; ++slot_index)
+    for (const auto item_id : storage_state->slot_item_instance_ids)
     {
-        const auto slot = slot_entity(site_run, container, slot_index);
-        if (!slot.is_valid())
+        if (item_id != 0U)
         {
-            break;
-        }
-
-        const auto item = item_entity_for_slot(site_run, slot);
-        if (item.is_valid())
-        {
-            item_ids.push_back(static_cast<std::uint32_t>(item.id()));
+            item_ids.push_back(static_cast<std::uint32_t>(item_id));
         }
     }
 
@@ -846,19 +913,16 @@ inline std::vector<flecs::entity> collect_all_storage_containers(
     bool include_device_storage = true)
 {
     std::vector<flecs::entity> containers {};
-    auto* world = ecs_world_ptr(site_run);
-    if (world == nullptr)
+    for (const auto& storage : site_run.inventory.storage_containers)
     {
-        return containers;
-    }
-
-    world->each([&](flecs::entity entity, const StorageContainerKindComponent& kind) {
-        if (!include_device_storage && kind.kind == StorageContainerKind::DeviceStorage)
+        if (!include_device_storage &&
+            storage.container_kind == GS1_INVENTORY_CONTAINER_DEVICE_STORAGE)
         {
-            return;
+            continue;
         }
-        containers.push_back(entity);
-    });
+
+        containers.push_back(entity_from_id(site_run, storage.container_entity_id));
+    }
 
     std::sort(containers.begin(), containers.end(), [](const auto& lhs, const auto& rhs) {
         return lhs.id() < rhs.id();
@@ -868,16 +932,9 @@ inline std::vector<flecs::entity> collect_all_storage_containers(
 
 inline TileCoord container_tile_coord(SiteRunState& site_run, flecs::entity container) noexcept
 {
-    (void)site_run;
-    const auto tile = container.target<StorageAtTile>();
-    if (!tile.is_valid())
-    {
-        return {};
-    }
-
-    return tile.has<TileCoordComponent>()
-        ? tile.get<TileCoordComponent>().value
-        : TileCoord {};
+    const auto* storage_state =
+        find_storage_container_state_by_entity_id(site_run.inventory, container.id());
+    return storage_state == nullptr ? TileCoord {} : storage_state->tile_coord;
 }
 
 inline flecs::entity ensure_device_storage_container(
@@ -903,5 +960,12 @@ inline flecs::entity find_device_storage_container(
         site_run,
         StorageContainerKind::DeviceStorage,
         device_entity_id);
+}
+
+inline const StorageContainerState* storage_container_state_for_storage_id(
+    const SiteRunState& site_run,
+    std::uint32_t storage_id) noexcept
+{
+    return find_storage_container_state_by_storage_id(site_run.inventory, storage_id);
 }
 }  // namespace gs1::inventory_storage

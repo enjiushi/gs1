@@ -46,8 +46,7 @@ const gs1::site_ecs::StorageItemStack* starter_storage_slot_stack(
     std::uint32_t slot_index)
 {
     const auto container = starter_storage_container(site_run);
-    const auto slot = gs1::inventory_storage::slot_entity(site_run, container, slot_index);
-    const auto item = gs1::inventory_storage::item_entity_for_slot(site_run, slot);
+    const auto item = gs1::inventory_storage::item_entity_for_slot(site_run, container, slot_index);
     return gs1::inventory_storage::stack_data(site_run, item);
 }
 
@@ -56,8 +55,7 @@ const gs1::site_ecs::StorageItemStack* container_slot_stack(
     flecs::entity container,
     std::uint32_t slot_index)
 {
-    const auto slot = gs1::inventory_storage::slot_entity(site_run, container, slot_index);
-    const auto item = gs1::inventory_storage::item_entity_for_slot(site_run, slot);
+    const auto item = gs1::inventory_storage::item_entity_for_slot(site_run, container, slot_index);
     return gs1::inventory_storage::stack_data(site_run, item);
 }
 
@@ -129,8 +127,7 @@ void inventory_site_one_seed_is_applied_once(gs1::testing::SystemTestExecutionCo
 
     {
         auto container = gs1::inventory_storage::worker_pack_container(site_run);
-        auto slot = gs1::inventory_storage::slot_entity(site_run, container, 0U);
-        auto item = gs1::inventory_storage::item_entity_for_slot(site_run, slot);
+        auto item = gs1::inventory_storage::item_entity_for_slot(site_run, container, 0U);
         auto& stack = item.get_mut<gs1::site_ecs::StorageItemStack>();
         stack.quantity = 99U;
         item.modified<gs1::site_ecs::StorageItemStack>();
@@ -200,8 +197,8 @@ void inventory_item_use_validates_and_emits_meter_delta(gs1::testing::SystemTest
                 GameMessageType::InventoryItemUseRequested,
                 gs1::InventoryItemUseRequestedMessage {
                     999U,
+                    site_run.inventory.worker_pack_storage_id,
                     1U,
-                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
                     0U})) == GS1_STATUS_INVALID_ARGUMENT);
 
     GS1_SYSTEM_TEST_REQUIRE(
@@ -212,8 +209,8 @@ void inventory_item_use_validates_and_emits_meter_delta(gs1::testing::SystemTest
                 GameMessageType::InventoryItemUseRequested,
                 gs1::InventoryItemUseRequestedMessage {
                     1U,
+                    site_run.inventory.worker_pack_storage_id,
                     1U,
-                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
                     0U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].item_quantity == 1U);
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
@@ -247,13 +244,11 @@ void inventory_transfer_moves_and_merges_stacks(gs1::testing::SystemTestExecutio
             make_message(
                 GameMessageType::InventoryTransferRequested,
                 gs1::InventoryTransferRequestedMessage {
+                    site_run.inventory.worker_pack_storage_id,
+                    site_run.inventory.worker_pack_storage_id,
                     0U,
                     3U,
                     1U,
-                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
-                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
-                    0U,
-                    0U,
                     0U,
                     0U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].item_quantity == 1U);
@@ -268,13 +263,11 @@ void inventory_transfer_moves_and_merges_stacks(gs1::testing::SystemTestExecutio
             make_message(
                 GameMessageType::InventoryTransferRequested,
                 gs1::InventoryTransferRequestedMessage {
+                    site_run.inventory.worker_pack_storage_id,
+                    site_run.inventory.worker_pack_storage_id,
                     3U,
                     4U,
                     1U,
-                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
-                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
-                    0U,
-                    0U,
                     0U,
                     0U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, !site_run.inventory.worker_pack_slots[3].occupied);
@@ -306,6 +299,8 @@ void inventory_device_storage_items_must_route_through_worker_pack(
         gs1::inventory_storage::find_device_storage_container(site_run, workbench_owner_id);
     const auto starter_storage = starter_storage_container(site_run);
     const auto worker_pack = gs1::inventory_storage::worker_pack_container(site_run);
+    const auto workbench_storage_id = gs1::inventory_storage::storage_id_for_container(site_run, workbench_storage);
+    const auto starter_storage_id = gs1::inventory_storage::storage_id_for_container(site_run, starter_storage);
     GS1_SYSTEM_TEST_REQUIRE(context, workbench_storage.is_valid());
     GS1_SYSTEM_TEST_REQUIRE(context, starter_storage.is_valid());
     GS1_SYSTEM_TEST_REQUIRE(context, worker_pack.is_valid());
@@ -327,14 +322,12 @@ void inventory_device_storage_items_must_route_through_worker_pack(
             make_message(
                 GameMessageType::InventoryTransferRequested,
                 gs1::InventoryTransferRequestedMessage {
+                    site_run.inventory.worker_pack_storage_id,
+                    site_run.inventory.worker_pack_storage_id,
                     0U,
                     0U,
                     0U,
-                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
-                    GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
                     gs1::k_inventory_transfer_flag_resolve_destination_in_dll,
-                    0U,
-                    0U,
                     0U})) == GS1_STATUS_INVALID_STATE);
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].occupied);
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].item_quantity == 2U);
@@ -365,14 +358,12 @@ void inventory_device_storage_items_must_route_through_worker_pack(
             make_message(
                 GameMessageType::InventoryTransferRequested,
                 gs1::InventoryTransferRequestedMessage {
+                    workbench_storage_id,
+                    site_run.inventory.worker_pack_storage_id,
                     0U,
                     0U,
                     0U,
-                    GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
-                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
                     gs1::k_inventory_transfer_flag_resolve_destination_in_dll,
-                    0U,
-                    workbench_owner_id,
                     0U})) == GS1_STATUS_INVALID_STATE);
     GS1_SYSTEM_TEST_CHECK(
         context,
@@ -396,14 +387,12 @@ void inventory_device_storage_items_must_route_through_worker_pack(
             make_message(
                 GameMessageType::InventoryTransferRequested,
                 gs1::InventoryTransferRequestedMessage {
+                    workbench_storage_id,
+                    site_run.inventory.worker_pack_storage_id,
                     0U,
                     0U,
                     0U,
-                    GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
-                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
                     gs1::k_inventory_transfer_flag_resolve_destination_in_dll,
-                    0U,
-                    workbench_owner_id,
                     0U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, container_slot_stack(site_run, workbench_storage, 0U) == nullptr);
     GS1_SYSTEM_TEST_CHECK(
@@ -418,14 +407,12 @@ void inventory_device_storage_items_must_route_through_worker_pack(
             make_message(
                 GameMessageType::InventoryTransferRequested,
                 gs1::InventoryTransferRequestedMessage {
+                    site_run.inventory.worker_pack_storage_id,
+                    site_run.inventory.worker_pack_storage_id,
                     3U,
                     0U,
                     0U,
-                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
-                    GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
                     gs1::k_inventory_transfer_flag_resolve_destination_in_dll,
-                    0U,
-                    0U,
                     0U})) == GS1_STATUS_INVALID_STATE);
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[3].occupied);
     GS1_SYSTEM_TEST_CHECK(
@@ -442,15 +429,13 @@ void inventory_device_storage_items_must_route_through_worker_pack(
             make_message(
                 GameMessageType::InventoryTransferRequested,
                 gs1::InventoryTransferRequestedMessage {
+                    site_run.inventory.worker_pack_storage_id,
+                    starter_storage_id,
                     3U,
                     0U,
                     0U,
-                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
-                    GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
                     gs1::k_inventory_transfer_flag_resolve_destination_in_dll,
-                    0U,
-                    0U,
-                    starter_owner_id})) == GS1_STATUS_OK);
+                    0U})) == GS1_STATUS_OK);
 
     GS1_SYSTEM_TEST_CHECK(
         context,

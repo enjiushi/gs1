@@ -14,6 +14,7 @@ enum SiteProjectionUpdateFlags : std::uint64_t
     SITE_PROJECTION_UPDATE_HUD = 1ull << 4,
     SITE_PROJECTION_UPDATE_INVENTORY = 1ull << 5,
     SITE_PROJECTION_UPDATE_TASKS = 1ull << 6,
-    SITE_PROJECTION_UPDATE_PHONE = 1ull << 7
+    SITE_PROJECTION_UPDATE_PHONE = 1ull << 7,
+    SITE_PROJECTION_UPDATE_CRAFT_CONTEXT = 1ull << 8
 };
 }  // namespace gs1
