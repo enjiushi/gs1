@@ -52,6 +52,18 @@ This file is a quick orientation guide for agents working in this repository.
 - If a task starts from a git worktree, align that worktree branch with the current local `main` branch before making task-specific changes.
 - Resolve or report any alignment conflicts before proceeding with implementation in that worktree.
 
+## Merge Coordination Rule
+
+- Use `.agent-progress/merge-log.md` as the shared merge coordination file for merges from a source worktree into a target worktree, including merges into `main`, unless the source is `main` and the target is another worktree.
+- Merges from `main` into another worktree do not use this rule and do not need to read or write `.agent-progress/merge-log.md`.
+- If `.agent-progress/merge-log.md` does not exist when an in-scope merge is about to start, create it in `.agent-progress/` before doing anything else related to that merge.
+- Every in-scope merge entry in `.agent-progress/merge-log.md` must include a unique 64-bit unsigned integer merge ID, the source worktree name, the target worktree name, and a state of either `processing` or `done`.
+- Generate a merge ID only when appending a new in-scope merge entry. The first appended merge entry uses ID `0`, and each later merge entry uses the latest recorded merge ID plus `1`.
+- Before appending a new in-scope merge entry, inspect `.agent-progress/merge-log.md`. If any merge entry is currently marked `processing`, wait 10 seconds and check again. Repeat until no merge entry is still `processing`.
+- If a request says an in-scope merge may start only after merge ID `X`, wait until `.agent-progress/merge-log.md` contains a `done` merge entry whose ID is greater than `X`. Recheck every 10 seconds. Once that condition is satisfied, also perform the no-`processing` check before appending the new merge entry.
+- When an in-scope merge can start, append the new merge entry with state `processing` before running the merge itself.
+- When an in-scope merge finishes, update that merge entry from `processing` to `done`.
+
 ## System Ownership Rule
 
 - Treat every gameplay system as a self-contained owner of a specific state slice.
