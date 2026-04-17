@@ -47,6 +47,11 @@ This file is a quick orientation guide for agents working in this repository.
 - Update the file as work progresses so another agent can immediately see what is planned, what is in flight, and what is finished.
 - Keep `.agent-progress/` out of commits and remove the temporary session file once every listed item is `done` and no further session work remains.
 
+## Worktree Alignment Rule
+
+- If a task starts from a git worktree, align that worktree branch with the current local `main` branch before making task-specific changes.
+- Resolve or report any alignment conflicts before proceeding with implementation in that worktree.
+
 ## System Ownership Rule
 
 - Treat every gameplay system as a self-contained owner of a specific state slice.
