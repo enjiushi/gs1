@@ -197,7 +197,7 @@ inline flecs::entity ensure_storage_container(
         storage_state->container_entity_id = container.id();
     }
 
-    storage_state->owner_device_entity_id = static_cast<std::uint32_t>(owner_device_entity_id);
+    storage_state->owner_device_entity_id = owner_device_entity_id;
     storage_state->container_kind =
         kind == StorageContainerKind::WorkerPack
             ? GS1_INVENTORY_CONTAINER_WORKER_PACK
@@ -236,7 +236,7 @@ inline flecs::entity starter_storage_container(SiteRunState& site_run) noexcept
 inline flecs::entity container_for_kind(
     SiteRunState& site_run,
     Gs1InventoryContainerKind kind,
-    std::uint32_t owner_entity_id = 0U) noexcept
+    std::uint64_t owner_entity_id = 0U) noexcept
 {
     switch (kind)
     {
@@ -568,7 +568,7 @@ inline std::uint32_t available_item_quantity_in_container_kind(
     SiteRunState& site_run,
     Gs1InventoryContainerKind kind,
     ItemId item_id,
-    std::uint32_t owner_entity_id = 0U) noexcept
+    std::uint64_t owner_entity_id = 0U) noexcept
 {
     return available_item_quantity_in_container(
         site_run,
@@ -745,8 +745,8 @@ inline bool transfer_between_slots(
     Gs1InventoryContainerKind destination_kind,
     std::uint32_t destination_slot_index,
     std::uint32_t quantity,
-    std::uint32_t source_owner_entity_id = 0U,
-    std::uint32_t destination_owner_entity_id = 0U)
+    std::uint64_t source_owner_entity_id = 0U,
+    std::uint64_t destination_owner_entity_id = 0U)
 {
     auto source_container = container_for_kind(site_run, source_kind, source_owner_entity_id);
     auto destination_container =
@@ -849,7 +849,7 @@ inline bool transfer_between_slots(
     return true;
 }
 
-inline std::uint32_t owner_device_entity_id_for_container(
+inline std::uint64_t owner_device_entity_id_for_container(
     const SiteRunState& site_run,
     flecs::entity container) noexcept
 {

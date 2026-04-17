@@ -1609,7 +1609,7 @@ void GameRuntime::queue_site_inventory_slot_upsert_message(
     Gs1InventoryContainerKind container_kind,
     std::uint32_t slot_index,
     std::uint32_t storage_id,
-    std::uint32_t container_owner_id,
+    std::uint64_t container_owner_id,
     TileCoord container_tile)
 {
     if (!active_site_run_.has_value())
@@ -1662,7 +1662,7 @@ void GameRuntime::queue_site_inventory_slot_upsert_message(
     payload.condition = slot.item_condition;
     payload.freshness = slot.item_freshness;
     payload.storage_id = storage_id;
-    payload.container_owner_id = container_owner_id;
+    payload.container_owner_id = static_cast<std::uint32_t>(container_owner_id);
     payload.quantity = static_cast<std::uint16_t>(std::min<std::uint32_t>(slot.item_quantity, 65535U));
     payload.slot_index = static_cast<std::uint16_t>(slot_index);
     payload.container_tile_x = static_cast<std::int16_t>(container_tile.x);
@@ -1689,7 +1689,7 @@ void GameRuntime::queue_site_inventory_storage_upsert_message(std::uint32_t stor
     auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_INVENTORY_STORAGE_UPSERT);
     auto& payload = message.emplace_payload<Gs1EngineMessageInventoryStorageData>();
     payload.storage_id = storage_state->storage_id;
-    payload.owner_entity_id = storage_state->owner_device_entity_id;
+    payload.owner_entity_id = static_cast<std::uint32_t>(storage_state->owner_device_entity_id);
     payload.slot_count = static_cast<std::uint16_t>(std::min<std::size_t>(
         storage_state->slot_item_instance_ids.size(),
         65535U));

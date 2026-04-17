@@ -144,7 +144,7 @@ private:
         Gs1InventoryContainerKind container_kind,
         std::uint32_t slot_index,
         std::uint32_t storage_id = 0U,
-        std::uint32_t container_owner_id = 0U,
+        std::uint64_t container_owner_id = 0U,
         TileCoord container_tile = TileCoord {});
     void queue_site_inventory_view_state_message(
         std::uint32_t storage_id,

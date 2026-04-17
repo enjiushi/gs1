@@ -4,6 +4,7 @@
 #include "site/craft_logic.h"
 #include "site/inventory_storage.h"
 #include "site/systems/action_execution_system.h"
+#include "site/systems/device_maintenance_system.h"
 #include "site/systems/craft_system.h"
 #include "site/systems/inventory_system.h"
 #include "testing/system_test_registry.h"
@@ -13,6 +14,7 @@ namespace
 {
 using gs1::ActionExecutionSystem;
 using gs1::CraftSystem;
+using gs1::DeviceMaintenanceSystem;
 using gs1::GameMessage;
 using gs1::GameMessageQueue;
 using gs1::GameMessageType;
@@ -206,6 +208,104 @@ void craft_cache_tracks_worker_pack_membership_by_distance(
             far_cache->nearby_item_instance_ids,
             gs1::ItemId {gs1::k_item_water_container}) == 0U);
 }
+
+void dynamically_placed_storage_device_reuses_single_inventory_container(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 1504U);
+    GameMessageQueue queue {};
+    auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
+    auto maintenance_context = make_site_context<DeviceMaintenanceSystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_message(
+            inventory_context,
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    const TileCoord target_tile {site_run.camp.camp_anchor_tile.x, site_run.camp.camp_anchor_tile.y - 1};
+    GS1_SYSTEM_TEST_REQUIRE(context, site_run.site_world->contains(target_tile));
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_world->tile_device(target_tile).structure_id.value == 0U);
+
+    const auto worker_pack = gs1::inventory_storage::worker_pack_container(site_run);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        gs1::inventory_storage::add_item_to_container(
+            site_run,
+            worker_pack,
+            gs1::ItemId {gs1::k_item_storage_crate_kit},
+            1U) == 0U);
+
+    std::uint64_t consumed_item_entity_id = 0U;
+    const auto slot_count = gs1::inventory_storage::slot_count_in_container(site_run, worker_pack);
+    for (std::uint32_t slot_index = 0U; slot_index < slot_count; ++slot_index)
+    {
+        const auto item = gs1::inventory_storage::item_entity_for_slot(site_run, worker_pack, slot_index);
+        const auto* stack = gs1::inventory_storage::stack_data(site_run, item);
+        if (stack != nullptr && stack->item_id.value == gs1::k_item_storage_crate_kit)
+        {
+            consumed_item_entity_id = item.id();
+            break;
+        }
+    }
+    GS1_SYSTEM_TEST_REQUIRE(context, consumed_item_entity_id != 0U);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_message(
+            inventory_context,
+            make_message(
+                GameMessageType::InventoryItemConsumeRequested,
+                InventoryItemConsumeRequestedMessage {
+                    gs1::k_item_storage_crate_kit,
+                    1U,
+                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
+                    0U})) == GS1_STATUS_OK);
+
+    const auto placed_message = make_message(
+        GameMessageType::SiteDevicePlaced,
+        SiteDevicePlacedMessage {
+            1U,
+            target_tile.x,
+            target_tile.y,
+            gs1::k_structure_storage_crate,
+            0U});
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        DeviceMaintenanceSystem::process_message(maintenance_context, placed_message) == GS1_STATUS_OK);
+    const auto placed_device_entity_id = site_run.site_world->device_entity_id(target_tile);
+    GS1_SYSTEM_TEST_REQUIRE(context, placed_device_entity_id != 0U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        static_cast<std::uint32_t>(placed_device_entity_id) ==
+            static_cast<std::uint32_t>(consumed_item_entity_id));
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_message(inventory_context, placed_message) == GS1_STATUS_OK);
+
+    InventorySystem::run(inventory_context);
+    InventorySystem::run(inventory_context);
+
+    std::size_t matching_storage_count = 0U;
+    for (const auto& storage : site_run.inventory.storage_containers)
+    {
+        if (storage.container_kind != GS1_INVENTORY_CONTAINER_DEVICE_STORAGE)
+        {
+            continue;
+        }
+        if (storage.tile_coord.x == target_tile.x && storage.tile_coord.y == target_tile.y)
+        {
+            matching_storage_count += 1U;
+        }
+    }
+
+    GS1_SYSTEM_TEST_CHECK(context, matching_storage_count == 1U);
+}
 }  // namespace
 
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
@@ -220,3 +320,7 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "craft",
     "cache_tracks_worker_pack_membership_by_distance",
     craft_cache_tracks_worker_pack_membership_by_distance);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "inventory",
+    "dynamically_placed_storage_device_reuses_single_inventory_container",
+    dynamically_placed_storage_device_reuses_single_inventory_container);

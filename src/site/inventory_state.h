@@ -12,7 +12,8 @@ struct StorageContainerState final
 {
     std::uint32_t storage_id {0};
     std::uint64_t container_entity_id {0};
-    std::uint32_t owner_device_entity_id {0};
+    // Recycled Flecs device entities can carry generation bits above 32 bits.
+    std::uint64_t owner_device_entity_id {0};
     Gs1InventoryContainerKind container_kind {GS1_INVENTORY_CONTAINER_WORKER_PACK};
     TileCoord tile_coord {};
     std::vector<std::uint64_t> slot_item_instance_ids {};
