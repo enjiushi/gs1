@@ -39,6 +39,14 @@ This file is a quick orientation guide for agents working in this repository.
 - Prefer the narrowest system-level test that covers the regression. If the bug depends on ECS state, seed the ECS data directly in the test setup rather than routing around the system boundary.
 - If the current implementation intentionally cannot express the full design behavior yet, keep the regression test focused on the bug we fixed and document any still-missing broader behavior in the system test coverage docs.
 
+## Session Handoff Rule
+
+- At the start of any task or implementation session, create a temporary Markdown file in the repository root named after the current session.
+- Use that file as a live task tracker for the session and list every intended work item before doing it.
+- Every listed item must include a status and only the statuses `pending`, `processing`, or `done` may be used.
+- Update the file as work progresses so another agent can immediately see what is planned, what is in flight, and what is finished.
+- Remove the temporary session file once every listed item is `done` and no further session work remains.
+
 ## System Ownership Rule
 
 - Treat every gameplay system as a self-contained owner of a specific state slice.
