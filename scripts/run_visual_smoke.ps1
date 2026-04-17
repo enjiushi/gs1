@@ -17,7 +17,57 @@ $visualExePath = Join-Path $buildPath "$Configuration\gs1_visual_smoke_host.exe"
 $dllPath = Join-Path $buildPath "$Configuration\gs1_game.dll"
 $resolvedLogPath = Resolve-RepoPath -Path $LogPath -RepoRoot $repoRoot
 
-if ($BuildFirst) {
+function Get-NewestWriteTimeUtc {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Paths
+    )
+
+    $newest = [DateTime]::MinValue
+    foreach ($path in $Paths) {
+        if (!(Test-Path $path)) {
+            continue
+        }
+
+        $item = Get-Item $path
+        if ($item.PSIsContainer) {
+            $candidateItems = Get-ChildItem -LiteralPath $item.FullName -Recurse -File
+        } else {
+            $candidateItems = @($item)
+        }
+
+        foreach ($candidate in $candidateItems) {
+            if ($candidate.LastWriteTimeUtc -gt $newest) {
+                $newest = $candidate.LastWriteTimeUtc
+            }
+        }
+    }
+
+    return $newest
+}
+
+$shouldBuild = $BuildFirst.IsPresent
+if (-not $shouldBuild) {
+    if (!(Test-Path $visualExePath) -or !(Test-Path $dllPath)) {
+        $shouldBuild = $true
+        Write-Host "Visual smoke artifacts are missing. Building before launch."
+    } else {
+        $newestSourceWriteTime = Get-NewestWriteTimeUtc -Paths @(
+            (Join-Path $repoRoot "CMakeLists.txt"),
+            (Join-Path $repoRoot "include"),
+            (Join-Path $repoRoot "src"),
+            (Join-Path $repoRoot "tests\smoke"),
+            (Join-Path $repoRoot "scripts")
+        )
+        $newestArtifactWriteTime = Get-NewestWriteTimeUtc -Paths @($visualExePath, $dllPath)
+        if ($newestSourceWriteTime -gt $newestArtifactWriteTime) {
+            $shouldBuild = $true
+            Write-Host "Visual smoke sources are newer than the built host or DLL. Building before launch."
+        }
+    }
+}
+
+if ($shouldBuild) {
     & (Join-Path $PSScriptRoot "build_gameplay_dll.ps1") -Configuration $Configuration -BuildDir $BuildDir -CMakePath $CMakePath
     if ($LASTEXITCODE -ne 0) {
         throw "Gameplay DLL build script failed."
@@ -42,15 +92,15 @@ if ($logDirectory -and !(Test-Path $logDirectory)) {
     New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
 }
 
-if (Test-Path $resolvedLogPath) {
-    Remove-Item -LiteralPath $resolvedLogPath -Force
-}
-
 # Always start from a fresh runtime so the adapter boots back into MAIN_MENU.
 $existingHosts = Get-Process -Name "gs1_visual_smoke_host" -ErrorAction SilentlyContinue
 if ($null -ne $existingHosts) {
     $existingHosts | Stop-Process -Force
     Start-Sleep -Milliseconds 400
+}
+
+if (Test-Path $resolvedLogPath) {
+    Remove-Item -LiteralPath $resolvedLogPath -Force
 }
 
 $arguments = @($dllPath)

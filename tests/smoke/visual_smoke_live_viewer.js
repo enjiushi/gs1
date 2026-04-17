@@ -54,6 +54,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let lastOverlayAppState = "";
     let tileContextMenuState = null;
     let localActionProgressState = null;
+    let viewerCompatibilityWarning = "";
     let animationTimeSeconds = 0;
     let rendererWidth = 0;
     let rendererHeight = 0;
@@ -475,8 +476,34 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return structureMeta ? structureMeta.name : ("Structure " + structureId);
     }
 
+    function structureProvidesStorage(structureId) {
+        const structureMeta = getStructureMeta(structureId);
+        return !!(structureMeta && (structureMeta.slotCount || 0) > 0);
+    }
+
     function getCraftRecipesForStructure(structureId) {
         return craftRecipeCatalog[structureId] || [];
+    }
+
+    function getVisualSmokeCompatibilityWarning(state) {
+        if (!state || state.appState !== "SITE_ACTIVE") {
+            return "";
+        }
+
+        const siteState = getSiteState(state);
+        if (!siteState) {
+            return "";
+        }
+
+        if (Array.isArray(siteState.inventoryStorages) && Array.isArray(siteState.workerPackSlots)) {
+            return "";
+        }
+
+        if (Array.isArray(siteState.inventorySlots)) {
+            return "Visual Smoke Build Mismatch\nOpen Storage unavailable\nRebuild gs1_visual_smoke_host\nRebuild gs1_game.dll";
+        }
+
+        return "Visual Smoke Host Error\nInventory projection missing\nRebuild gs1_visual_smoke_host\nReload this page";
     }
 
     function getTileSnapshot(state, tileX, tileY) {
@@ -978,6 +1005,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function renderSiteStatusChip(state) {
+        if (viewerCompatibilityWarning) {
+            statusChip.textContent = viewerCompatibilityWarning;
+            return;
+        }
+
         const siteState = getSiteState(state);
         const hud = getHudState(state);
         const weather = siteState ? siteState.weather : null;
@@ -1106,6 +1138,16 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                         closeTileContextMenu();
                     }
                 }))
+            });
+        } else if (tileHasStructure && structureProvidesStorage(structureId) && viewerCompatibilityWarning) {
+            rootItems.push({
+                id: "open-storage-unavailable",
+                label: "Open Storage",
+                meta: "Rebuild the visual smoke host and gameplay DLL.",
+                iconGlyph: "BX",
+                iconLight: "#8f7a64",
+                iconDark: "#5a4837",
+                disabled: true
             });
         }
 
@@ -4156,6 +4198,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function handleIncomingState(state, forceRender, patch) {
         const normalizedState = normalizeState(state);
+        viewerCompatibilityWarning = getVisualSmokeCompatibilityWarning(normalizedState);
         rebuildInventoryCache(normalizedState);
         const previousState = latestState;
         syncLocalActionProgress(normalizedState);

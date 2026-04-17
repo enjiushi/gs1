@@ -218,6 +218,30 @@ std::vector<const Gs1EngineMessage*> collect_inventory_slot_messages(
     return collect_messages_of_type(messages, GS1_ENGINE_MESSAGE_SITE_INVENTORY_SLOT_UPSERT);
 }
 
+const Gs1EngineMessage* find_inventory_storage_message(
+    const std::vector<Gs1EngineMessage>& messages,
+    Gs1InventoryContainerKind container_kind,
+    TileCoord tile)
+{
+    for (const auto& message : messages)
+    {
+        if (message.type != GS1_ENGINE_MESSAGE_SITE_INVENTORY_STORAGE_UPSERT)
+        {
+            continue;
+        }
+
+        const auto& payload = message.payload_as<Gs1EngineMessageInventoryStorageData>();
+        if (payload.container_kind == container_kind &&
+            payload.tile_x == tile.x &&
+            payload.tile_y == tile.y)
+        {
+            return &message;
+        }
+    }
+
+    return nullptr;
+}
+
 const Gs1EngineMessage* find_inventory_slot_message(
     const std::vector<Gs1EngineMessage>& messages,
     Gs1InventoryContainerKind container_kind,
@@ -253,6 +277,20 @@ std::uint32_t starter_storage_id(gs1::SiteRunState& site_run)
     return gs1::inventory_storage::storage_id_for_container(
         site_run,
         gs1::inventory_storage::starter_storage_container(site_run));
+}
+
+TileCoord starter_workbench_tile(const gs1::SiteRunState& site_run)
+{
+    return TileCoord {site_run.camp.camp_anchor_tile.x + 1, site_run.camp.camp_anchor_tile.y};
+}
+
+std::uint32_t starter_workbench_id(gs1::SiteRunState& site_run)
+{
+    const auto tile = starter_workbench_tile(site_run);
+    const auto device_entity_id = site_run.site_world->device_entity_id(tile);
+    return gs1::inventory_storage::storage_id_for_container(
+        site_run,
+        gs1::inventory_storage::find_device_storage_container(site_run, device_entity_id));
 }
 
 std::uint16_t find_starter_storage_slot_index(
@@ -345,9 +383,38 @@ int main()
     assert(bootstrap_site_run.economy.available_phone_listings.size() >= 11U);
 
     const auto bootstrap_messages = drain_engine_messages(runtime);
+    const auto storage_messages =
+        collect_messages_of_type(bootstrap_messages, GS1_ENGINE_MESSAGE_SITE_INVENTORY_STORAGE_UPSERT);
     assert(!collect_messages_of_type(bootstrap_messages, GS1_ENGINE_MESSAGE_SITE_INVENTORY_SLOT_UPSERT).empty());
+    assert(storage_messages.size() == 3U);
     assert(!collect_messages_of_type(bootstrap_messages, GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT).empty());
     assert(!collect_messages_of_type(bootstrap_messages, GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_UPSERT).empty());
+    {
+        const auto* starter_storage_message = find_inventory_storage_message(
+            bootstrap_messages,
+            GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
+            bootstrap_site_run.camp.starter_storage_tile);
+        assert(starter_storage_message != nullptr);
+        const auto& starter_payload =
+            starter_storage_message->payload_as<Gs1EngineMessageInventoryStorageData>();
+        assert(starter_payload.storage_id == starter_storage_id(bootstrap_site_run));
+        assert(starter_payload.owner_entity_id == starter_storage_owner_id(bootstrap_site_run));
+        assert(starter_payload.slot_count == 10U);
+    }
+    {
+        const auto workbench_tile = starter_workbench_tile(bootstrap_site_run);
+        const auto* workbench_storage_message = find_inventory_storage_message(
+            bootstrap_messages,
+            GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
+            workbench_tile);
+        assert(workbench_storage_message != nullptr);
+        const auto& workbench_payload =
+            workbench_storage_message->payload_as<Gs1EngineMessageInventoryStorageData>();
+        assert(workbench_payload.storage_id == starter_workbench_id(bootstrap_site_run));
+        assert(workbench_payload.owner_entity_id ==
+               static_cast<std::uint32_t>(bootstrap_site_run.site_world->device_entity_id(workbench_tile)));
+        assert(workbench_payload.slot_count == 8U);
+    }
 
     GameMessage accept_task {};
     accept_task.type = GameMessageType::TaskAcceptRequested;
