@@ -41,11 +41,11 @@ This file is a quick orientation guide for agents working in this repository.
 
 ## Session Handoff Rule
 
-- At the start of any task or implementation session, create a temporary Markdown file in the repository root named after the current session.
+- At the start of any task or implementation session, create a temporary Markdown file at `.agent-progress/<session-name>.md`.
 - Use that file as a live task tracker for the session and list every intended work item before doing it.
 - Every listed item must include a status and only the statuses `pending`, `processing`, or `done` may be used.
 - Update the file as work progresses so another agent can immediately see what is planned, what is in flight, and what is finished.
-- Remove the temporary session file once every listed item is `done` and no further session work remains.
+- Keep `.agent-progress/` out of commits and remove the temporary session file once every listed item is `done` and no further session work remains.
 
 ## System Ownership Rule
 
