@@ -60,8 +60,9 @@ inline constexpr std::uint32_t k_item_wind_reed_fiber = 10U;
 inline constexpr std::uint32_t k_item_camp_stove_kit = 11U;
 inline constexpr std::uint32_t k_item_workbench_kit = 12U;
 inline constexpr std::uint32_t k_item_storage_crate_kit = 13U;
+inline constexpr std::uint32_t k_item_hammer = 14U;
 
-inline constexpr std::array<ItemDef, 13> k_prototype_item_defs {{
+inline constexpr std::array<ItemDef, 14> k_prototype_item_defs {{
     ItemDef {
         ItemId {k_item_water_container},
         "Water",
@@ -253,6 +254,21 @@ inline constexpr std::array<ItemDef, 13> k_prototype_item_defs {{
         ITEM_CAPABILITY_DEPLOY | ITEM_CAPABILITY_SELL,
         PlantId {},
         StructureId {k_structure_storage_crate},
+        0.0f,
+        0.0f,
+        0.0f,
+        0.0f},
+    ItemDef {
+        ItemId {k_item_hammer},
+        "Hammer",
+        1U,
+        ItemSourceRule::CraftOnly,
+        false,
+        0,
+        4,
+        ITEM_CAPABILITY_SELL,
+        PlantId {},
+        StructureId {},
         0.0f,
         0.0f,
         0.0f,

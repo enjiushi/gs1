@@ -99,9 +99,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     };
     let inventoryCache = createEmptyInventoryCache();
     const itemCatalog = {
-        1: { name: "Water", shortName: "H2O", stackSize: 5, canUse: true, canPlant: false, canDeploy: false },
-        2: { name: "Food", shortName: "Ration", stackSize: 5, canUse: true, canPlant: false, canDeploy: false },
-        3: { name: "Medicine", shortName: "Med", stackSize: 3, canUse: true, canPlant: false, canDeploy: false },
+        1: { name: "Water", shortName: "H2O", stackSize: 5, canUse: true, canPlant: false, canDeploy: false, useLabel: "Drink" },
+        2: { name: "Food", shortName: "Ration", stackSize: 5, canUse: true, canPlant: false, canDeploy: false, useLabel: "Eat" },
+        3: { name: "Medicine", shortName: "Med", stackSize: 3, canUse: true, canPlant: false, canDeploy: false, useLabel: "Use" },
         4: { name: "Wind Reed Seeds", shortName: "Wind Reed", stackSize: 10, canUse: false, canPlant: true, canDeploy: false },
         5: { name: "Saltbush Seeds", shortName: "Saltbush", stackSize: 10, canUse: false, canPlant: true, canDeploy: false },
         6: { name: "Shade Cactus Seeds", shortName: "Shade Cactus", stackSize: 10, canUse: false, canPlant: true, canDeploy: false },
@@ -111,7 +111,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         10: { name: "Wind Reed Fiber", shortName: "Fiber", stackSize: 20, canUse: false, canPlant: false, canDeploy: false },
         11: { name: "Camp Stove Kit", shortName: "Stove Kit", stackSize: 1, canUse: false, canPlant: false, canDeploy: true, deployStructureId: 201 },
         12: { name: "Workbench Kit", shortName: "Bench Kit", stackSize: 1, canUse: false, canPlant: false, canDeploy: true, deployStructureId: 202 },
-        13: { name: "Storage Crate Kit", shortName: "Crate Kit", stackSize: 1, canUse: false, canPlant: false, canDeploy: true, deployStructureId: 203 }
+        13: { name: "Storage Crate Kit", shortName: "Crate Kit", stackSize: 1, canUse: false, canPlant: false, canDeploy: true, deployStructureId: 203 },
+        14: { name: "Hammer", shortName: "Hammer", stackSize: 1, canUse: false, canPlant: false, canDeploy: false }
     };
     const itemVisuals = {
         1: { glyph: "H2", light: "#5d8eb3", dark: "#33546f" },
@@ -126,7 +127,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         10: { glyph: "FB", light: "#a2bb7b", dark: "#607541" },
         11: { glyph: "ST", light: "#c7835a", dark: "#7b4327" },
         12: { glyph: "WB", light: "#b2966c", dark: "#6b5437" },
-        13: { glyph: "CR", light: "#af8c63", dark: "#694d2c" }
+        13: { glyph: "CR", light: "#af8c63", dark: "#694d2c" },
+        14: { glyph: "HM", light: "#9ea9b7", dark: "#5c6775" }
     };
     const structureCatalog = {
         201: { name: "Camp Stove", shortName: "Stove", slotCount: 6 },
@@ -171,6 +173,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 ingredients: [
                     { itemId: 8, quantity: 3 },
                     { itemId: 9, quantity: 2 }
+                ]
+            },
+            {
+                outputItemId: 14,
+                outputQuantity: 1,
+                craftMinutes: 1.0,
+                ingredients: [
+                    { itemId: 8, quantity: 2 },
+                    { itemId: 9, quantity: 1 }
                 ]
             }
         ]
@@ -521,6 +532,18 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function getInventorySlotsByKind(state, containerKind) {
         return getAllInventorySlots(state).filter((slot) => slot.containerKind === containerKind);
+    }
+
+    function getCarriedItemQuantity(state, itemId) {
+        let total = 0;
+        getInventorySlotsByKind(state, "WORKER_PACK").forEach((slot) => {
+            if (!isOccupiedSlot(slot) || slot.itemId !== itemId) {
+                return;
+            }
+
+            total += slot.quantity;
+        });
+        return total;
     }
 
     function getBuyListings(state) {
@@ -929,6 +952,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (actionKind === 2) {
             return "Build";
         }
+        if (actionKind === 3) {
+            return "Repair";
+        }
         if (actionKind === 4) {
             return "Water";
         }
@@ -937,6 +963,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
         if (actionKind === 6) {
             return "Craft";
+        }
+        if (actionKind === 7) {
+            return "Drink";
+        }
+        if (actionKind === 8) {
+            return "Eat";
         }
         return "Idle";
     }
@@ -1001,7 +1033,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         actionProgressFill.style.width = (progress * 100).toFixed(1) + "%";
         actionProgressPercent.textContent = Math.round(progress * 100) + "%";
         actionProgressTarget.textContent =
-            "Tile " + localActionProgressState.targetTileX + ", " + localActionProgressState.targetTileY;
+            localActionProgressState.actionKind === 7 || localActionProgressState.actionKind === 8
+                ? "Self"
+                : ("Tile " + localActionProgressState.targetTileX + ", " + localActionProgressState.targetTileY);
     }
 
     function renderSiteStatusChip(state) {
@@ -1101,6 +1135,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const storageContainers = getOpenableStorageContainersForTile(state, tileX, tileY);
         const carriedSeeds = getCarriedSeedOptions(state);
         const carriedDeployables = getCarriedDeployableOptions(state);
+        const carriedHammerCount = getCarriedItemQuantity(state, 14);
         const rootItems = [];
         const tileHasStructure = structureId !== 0;
 
@@ -1202,6 +1237,37 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 })
             });
             }
+        }
+
+        if (tileHasStructure) {
+            rootItems.push({
+                id: "repair",
+                label: "Repair",
+                meta: carriedHammerCount > 0
+                    ? ("Hammer x" + carriedHammerCount + " carried")
+                    : "Requires a carried hammer.",
+                iconGlyph: "HM",
+                iconLight: "#9ea9b7",
+                iconDark: "#5c6775",
+                disabled: carriedHammerCount === 0,
+                onSelect: function () {
+                    statusChip.textContent =
+                        "Moving to (" + tileX + "," + tileY + ") to repair " + getStructureLabel(structureId) + ".";
+                    postSiteAction({
+                        actionKind: "REPAIR",
+                        flags: 4,
+                        quantity: 1,
+                        targetTileX: tileX,
+                        targetTileY: tileY,
+                        primarySubjectId: 0,
+                        secondarySubjectId: 0,
+                        itemId: 14
+                    }).catch(() => {
+                        statusChip.textContent = "Failed to send repair action.";
+                    });
+                    closeTileContextMenu();
+                }
+            });
         }
 
         if (!tileHasStructure && carriedSeeds.length > 0) {
@@ -1943,7 +2009,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (selectedSlot.containerKind === "WORKER_PACK" && itemMeta && itemMeta.canUse) {
             contextActions.appendChild(
                 makeButton(
-                    "Use " + getInventoryItemLabel(selectedSlot),
+                    (itemMeta.useLabel || "Use") + " " + getInventoryItemLabel(selectedSlot),
                     function () {
                         postInventoryUse(selectedSlot).catch(() => {
                             statusChip.textContent = "Failed to use inventory item.";
@@ -3169,6 +3235,41 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             rig.shadow.scale.set(
                 lerp(rig.shadow.scale.x, 0.94, plantingBlend),
                 lerp(rig.shadow.scale.y, 0.62, plantingBlend),
+                1.0
+            );
+        }
+
+        const consumeBlend =
+            (currentActionKind === 7 || currentActionKind === 8)
+                ? clamp01(1.0 - locomotionAmount * 1.8)
+                : 0.0;
+        if (consumeBlend > 0.0) {
+            cache.workerActionPhase += deltaSeconds * (currentActionKind === 7 ? 5.2 : 4.2);
+            const consumePhase = Math.sin(cache.workerActionPhase);
+            const sipPulse = 0.5 + 0.5 * Math.sin(cache.workerActionPhase * 2.0);
+            rig.root.position.y += (0.01 + sipPulse * 0.01) * consumeBlend;
+            rig.torso.rotation.x = lerp(rig.torso.rotation.x, 0.12 + consumePhase * 0.03, consumeBlend);
+            rig.torso.rotation.z = lerp(rig.torso.rotation.z, currentActionKind === 7 ? 0.05 : -0.04, consumeBlend);
+            rig.pelvis.rotation.z = lerp(rig.pelvis.rotation.z, currentActionKind === 7 ? -0.02 : 0.02, consumeBlend);
+            rig.leftShoulder.rotation.set(
+                lerp(rig.leftShoulder.rotation.x, currentActionKind === 7 ? -0.38 : -0.72, consumeBlend),
+                lerp(rig.leftShoulder.rotation.y, currentActionKind === 7 ? 0.08 : 0.16, consumeBlend),
+                lerp(rig.leftShoulder.rotation.z, -0.18, consumeBlend)
+            );
+            rig.rightShoulder.rotation.set(
+                lerp(rig.rightShoulder.rotation.x, currentActionKind === 7 ? -1.26 + consumePhase * 0.08 : -1.08 + consumePhase * 0.06, consumeBlend),
+                lerp(rig.rightShoulder.rotation.y, currentActionKind === 7 ? -0.24 : -0.08, consumeBlend),
+                lerp(rig.rightShoulder.rotation.z, 0.24, consumeBlend)
+            );
+            rig.leftElbow.rotation.x = lerp(rig.leftElbow.rotation.x, currentActionKind === 7 ? 0.62 : 0.96, consumeBlend);
+            rig.rightElbow.rotation.x = lerp(rig.rightElbow.rotation.x, currentActionKind === 7 ? 1.48 + sipPulse * 0.08 : 1.34 + sipPulse * 0.06, consumeBlend);
+            rig.leftWrist.rotation.x = lerp(rig.leftWrist.rotation.x, currentActionKind === 7 ? -0.14 : -0.28, consumeBlend);
+            rig.rightWrist.rotation.x = lerp(rig.rightWrist.rotation.x, currentActionKind === 7 ? -0.92 : -0.58, consumeBlend);
+            rig.head.rotation.x = lerp(rig.head.rotation.x, currentActionKind === 7 ? 0.26 : 0.18, consumeBlend);
+            rig.head.rotation.z = lerp(rig.head.rotation.z, currentActionKind === 7 ? -0.06 : 0.04, consumeBlend);
+            rig.shadow.scale.set(
+                lerp(rig.shadow.scale.x, 0.97, consumeBlend),
+                lerp(rig.shadow.scale.y, 0.60, consumeBlend),
                 1.0
             );
         }

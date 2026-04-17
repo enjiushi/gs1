@@ -1,5 +1,6 @@
 #include "site/systems/site_flow_system.h"
 
+#include "site/defs/site_action_defs.h"
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
 
@@ -49,6 +50,12 @@ bool action_waits_for_worker_approach(const ActionState& action_state) noexcept
         action_state.approach_tile.has_value();
 }
 
+bool action_blocks_worker_movement(const ActionState& action_state) noexcept
+{
+    return has_active_action(action_state) &&
+        action_impacts_worker_movement(action_state.action_kind);
+}
+
 bool has_pending_device_storage_open(const InventoryState& inventory) noexcept
 {
     return inventory.pending_device_storage_open.active &&
@@ -93,7 +100,7 @@ void SiteFlowSystem::run(SiteSystemContext<SiteFlowSystem>& context)
     {
         move_goal_tile = action_state.approach_tile;
     }
-    else if (has_active_action(action_state))
+    else if (action_blocks_worker_movement(action_state))
     {
         if (action_state.target_tile.has_value())
         {

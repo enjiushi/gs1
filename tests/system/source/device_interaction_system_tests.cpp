@@ -13,6 +13,7 @@ using gs1::ActionExecutionSystem;
 using gs1::GameMessage;
 using gs1::GameMessageQueue;
 using gs1::GameMessageType;
+using gs1::InventoryItemUseRequestedMessage;
 using gs1::InventoryStorageViewRequestMessage;
 using gs1::InventorySystem;
 using gs1::SiteRunStartedMessage;
@@ -78,6 +79,137 @@ void inventory_storage_open_waits_for_worker_to_reach_device_range(
     GS1_SYSTEM_TEST_CHECK(
         context,
         site_run.site_world->worker().position.tile_coord.y == expected_approach_tile.y);
+}
+
+void medicine_item_use_keeps_pending_storage_open_chain(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 1603U, 101U, 10U, 10U, TileCoord {2, 2}, TileCoord {7, 7});
+    GameMessageQueue queue {};
+    auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
+    auto flow_context = make_site_context<SiteFlowSystem>(campaign, site_run, queue);
+    InventorySystem::run(inventory_context);
+
+    site_run.inventory.worker_pack_slots[4].occupied = true;
+    site_run.inventory.worker_pack_slots[4].item_id = gs1::ItemId {gs1::k_item_medicine_pack};
+    site_run.inventory.worker_pack_slots[4].item_quantity = 1U;
+    site_run.inventory.worker_pack_slots[4].item_condition = 1.0f;
+    site_run.inventory.worker_pack_slots[4].item_freshness = 1.0f;
+
+    const auto storage_container = gs1::inventory_storage::starter_storage_container(site_run);
+    const auto storage_id = gs1::inventory_storage::storage_id_for_container(site_run, storage_container);
+    GS1_SYSTEM_TEST_REQUIRE(context, storage_id != 0U);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_message(
+            inventory_context,
+            make_message(
+                GameMessageType::InventoryStorageViewRequest,
+                InventoryStorageViewRequestMessage {
+                    storage_id,
+                    GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT,
+                    {0U, 0U, 0U}})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(context, site_run.inventory.pending_device_storage_open.active);
+
+    queue.clear();
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_message(
+            inventory_context,
+            make_message(
+                GameMessageType::InventoryItemUseRequested,
+                InventoryItemUseRequestedMessage {
+                    gs1::k_item_medicine_pack,
+                    site_run.inventory.worker_pack_storage_id,
+                    1U,
+                    4U})) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.pending_device_storage_open.active);
+    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::StartSiteAction) == 0U);
+
+    for (int step = 0; step < 12; ++step)
+    {
+        SiteFlowSystem::run(flow_context);
+        InventorySystem::run(inventory_context);
+        if (site_run.inventory.opened_device_storage_id == storage_id)
+        {
+            break;
+        }
+    }
+
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.opened_device_storage_id == storage_id);
+}
+
+void drink_action_breaks_pending_storage_open_chain(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 1604U, 101U, 10U, 10U, TileCoord {2, 2}, TileCoord {7, 7});
+    GameMessageQueue queue {};
+    auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
+    auto action_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue);
+    auto flow_context = make_site_context<SiteFlowSystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_message(
+            inventory_context,
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    const auto storage_container = gs1::inventory_storage::starter_storage_container(site_run);
+    const auto storage_id = gs1::inventory_storage::storage_id_for_container(site_run, storage_container);
+    GS1_SYSTEM_TEST_REQUIRE(context, storage_id != 0U);
+
+    queue.clear();
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_message(
+            inventory_context,
+            make_message(
+                GameMessageType::InventoryStorageViewRequest,
+                InventoryStorageViewRequestMessage {
+                    storage_id,
+                    GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT,
+                    {0U, 0U, 0U}})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(context, site_run.inventory.pending_device_storage_open.active);
+
+    queue.clear();
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_message(
+            inventory_context,
+            make_message(
+                GameMessageType::InventoryItemUseRequested,
+                InventoryItemUseRequestedMessage {
+                    gs1::k_item_water_container,
+                    site_run.inventory.worker_pack_storage_id,
+                    1U,
+                    0U})) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::StartSiteAction) == 1U);
+    const auto start_action_message = *first_message(queue, GameMessageType::StartSiteAction);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(action_context, start_action_message) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_message(inventory_context, start_action_message) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_CHECK(context, !site_run.inventory.pending_device_storage_open.active);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.opened_device_storage_id == 0U);
+
+    for (int step = 0; step < 12; ++step)
+    {
+        SiteFlowSystem::run(flow_context);
+        InventorySystem::run(inventory_context);
+    }
+
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.opened_device_storage_id == 0U);
 }
 
 void craft_action_waits_for_worker_to_reach_device_range_before_starting(
@@ -149,6 +281,14 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "device_interaction",
     "storage_open_waits_for_worker_to_reach_device_range",
     inventory_storage_open_waits_for_worker_to_reach_device_range);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "device_interaction",
+    "medicine_item_use_keeps_pending_storage_open_chain",
+    medicine_item_use_keeps_pending_storage_open_chain);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "device_interaction",
+    "drink_action_breaks_pending_storage_open_chain",
+    drink_action_breaks_pending_storage_open_chain);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "device_interaction",
     "craft_action_waits_for_worker_to_reach_device_range_before_starting",

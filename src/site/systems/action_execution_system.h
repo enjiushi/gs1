@@ -15,6 +15,7 @@ public:
             site_component_mask_of(
                 SiteComponent::Time,
                 SiteComponent::TileLayout,
+                SiteComponent::DeviceCondition,
                 SiteComponent::WorkerMotion,
                 SiteComponent::Inventory,
                 SiteComponent::Craft,

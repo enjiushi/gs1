@@ -18,16 +18,18 @@ struct SiteActionDef final
     PlacementOccupancyLayer placement_occupancy_layer;
     bool requests_placement_reservation;
     bool requires_worker_approach;
+    bool impacts_worker_movement;
     std::uint8_t reserved0;
 };
 
-inline constexpr std::array<SiteActionDef, 6> k_prototype_site_action_defs {{
+inline constexpr std::array<SiteActionDef, 8> k_prototype_site_action_defs {{
     SiteActionDef {
         ActionKind::Plant,
         1.0f,
         2.0f,
         0.75f,
         PlacementOccupancyLayer::GroundCover,
+        true,
         true,
         true,
         0U},
@@ -39,6 +41,7 @@ inline constexpr std::array<SiteActionDef, 6> k_prototype_site_action_defs {{
         PlacementOccupancyLayer::Structure,
         true,
         true,
+        true,
         0U},
     SiteActionDef {
         ActionKind::Repair,
@@ -47,7 +50,8 @@ inline constexpr std::array<SiteActionDef, 6> k_prototype_site_action_defs {{
         0.0f,
         PlacementOccupancyLayer::None,
         false,
-        false,
+        true,
+        true,
         0U},
     SiteActionDef {
         ActionKind::Water,
@@ -57,6 +61,7 @@ inline constexpr std::array<SiteActionDef, 6> k_prototype_site_action_defs {{
         PlacementOccupancyLayer::None,
         false,
         false,
+        true,
         0U},
     SiteActionDef {
         ActionKind::ClearBurial,
@@ -66,6 +71,7 @@ inline constexpr std::array<SiteActionDef, 6> k_prototype_site_action_defs {{
         PlacementOccupancyLayer::None,
         false,
         false,
+        true,
         0U},
     SiteActionDef {
         ActionKind::Craft,
@@ -75,8 +81,55 @@ inline constexpr std::array<SiteActionDef, 6> k_prototype_site_action_defs {{
         PlacementOccupancyLayer::None,
         false,
         true,
+        true,
+        0U},
+    SiteActionDef {
+        ActionKind::Drink,
+        0.5f,
+        0.0f,
+        0.0f,
+        PlacementOccupancyLayer::None,
+        false,
+        false,
+        true,
+        0U},
+    SiteActionDef {
+        ActionKind::Eat,
+        0.75f,
+        0.0f,
+        0.0f,
+        PlacementOccupancyLayer::None,
+        false,
+        false,
+        true,
         0U},
 }};
+
+[[nodiscard]] inline constexpr ActionKind action_kind_from_gs1(
+    Gs1SiteActionKind action_kind) noexcept
+{
+    switch (action_kind)
+    {
+    case GS1_SITE_ACTION_PLANT:
+        return ActionKind::Plant;
+    case GS1_SITE_ACTION_BUILD:
+        return ActionKind::Build;
+    case GS1_SITE_ACTION_REPAIR:
+        return ActionKind::Repair;
+    case GS1_SITE_ACTION_WATER:
+        return ActionKind::Water;
+    case GS1_SITE_ACTION_CLEAR_BURIAL:
+        return ActionKind::ClearBurial;
+    case GS1_SITE_ACTION_CRAFT:
+        return ActionKind::Craft;
+    case GS1_SITE_ACTION_DRINK:
+        return ActionKind::Drink;
+    case GS1_SITE_ACTION_EAT:
+        return ActionKind::Eat;
+    default:
+        return ActionKind::None;
+    }
+}
 
 [[nodiscard]] inline constexpr const SiteActionDef* find_site_action_def(ActionKind action_kind) noexcept
 {
@@ -89,6 +142,18 @@ inline constexpr std::array<SiteActionDef, 6> k_prototype_site_action_defs {{
     }
 
     return nullptr;
+}
+
+[[nodiscard]] inline constexpr bool action_impacts_worker_movement(ActionKind action_kind) noexcept
+{
+    const auto* action_def = find_site_action_def(action_kind);
+    return action_def != nullptr && action_def->impacts_worker_movement;
+}
+
+[[nodiscard]] inline constexpr bool gs1_action_impacts_worker_movement(
+    Gs1SiteActionKind action_kind) noexcept
+{
+    return action_impacts_worker_movement(action_kind_from_gs1(action_kind));
 }
 
 static_assert(std::is_standard_layout_v<SiteActionDef>, "SiteActionDef must remain standard layout.");

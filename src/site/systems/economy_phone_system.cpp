@@ -158,10 +158,37 @@ std::uint32_t available_global_item_quantity(
     SiteSystemContext<EconomyPhoneSystem>& context,
     ItemId item_id)
 {
-    return craft_logic::available_cached_item_quantity(
+    const auto available_quantity = craft_logic::available_cached_item_quantity(
         context.site_run,
         phone_item_instance_ids(context),
         item_id);
+    std::uint32_t reserved_quantity = 0U;
+    for (const auto& reserved_stack : context.world.read_action().reserved_input_item_stacks)
+    {
+        if (reserved_stack.item_id == item_id)
+        {
+            reserved_quantity += reserved_stack.quantity;
+        }
+    }
+
+    return available_quantity > reserved_quantity ? available_quantity - reserved_quantity : 0U;
+}
+
+std::uint64_t action_reservation_signature(const ActionState& action_state) noexcept
+{
+    std::uint64_t signature =
+        action_state.current_action_id.has_value()
+            ? static_cast<std::uint64_t>(action_state.current_action_id->value)
+            : 0ULL;
+    signature ^= static_cast<std::uint64_t>(action_state.reserved_input_item_stacks.size()) << 32U;
+    for (const auto& reserved_stack : action_state.reserved_input_item_stacks)
+    {
+        signature ^= static_cast<std::uint64_t>(reserved_stack.item_id.value) << 8U;
+        signature ^= static_cast<std::uint64_t>(reserved_stack.quantity) << 24U;
+        signature ^= static_cast<std::uint64_t>(reserved_stack.container_kind) << 56U;
+    }
+
+    return signature;
 }
 
 bool same_listing_vector(
@@ -197,17 +224,18 @@ void refresh_dynamic_sell_listings(
 {
     auto& economy = context.world.own_economy();
     const auto& inventory = context.world.read_inventory();
+    const auto reservation_signature = action_reservation_signature(context.world.read_action());
     const bool revisions_unchanged =
         !force_dirty &&
         economy.phone_listing_source_membership_revision == inventory.item_membership_revision &&
-        economy.phone_listing_source_quantity_revision == inventory.item_quantity_revision;
+        economy.phone_listing_source_quantity_revision == inventory.item_quantity_revision &&
+        economy.phone_listing_source_action_reservation_signature == reservation_signature;
     if (revisions_unchanged)
     {
         return;
     }
 
     std::vector<PhoneListingState> sell_listings {};
-    const auto item_ids = phone_item_instance_ids(context);
     for (const auto& item_def : k_prototype_item_defs)
     {
         if (!item_has_capability(item_def, ITEM_CAPABILITY_SELL))
@@ -215,8 +243,7 @@ void refresh_dynamic_sell_listings(
             continue;
         }
 
-        const auto available_quantity =
-            craft_logic::available_cached_item_quantity(context.site_run, item_ids, item_def.item_id);
+        const auto available_quantity = available_global_item_quantity(context, item_def.item_id);
         if (available_quantity == 0U)
         {
             continue;
@@ -248,6 +275,7 @@ void refresh_dynamic_sell_listings(
     economy.available_phone_listings = std::move(refreshed);
     economy.phone_listing_source_membership_revision = inventory.item_membership_revision;
     economy.phone_listing_source_quantity_revision = inventory.item_quantity_revision;
+    economy.phone_listing_source_action_reservation_signature = reservation_signature;
     if (changed || force_dirty)
     {
         mark_phone_dirty(context);
@@ -421,6 +449,7 @@ void seed_site_economy(SiteSystemContext<EconomyPhoneSystem>& context, std::uint
     auto& economy = context.world.own_economy();
     economy.phone_listing_source_membership_revision = 0U;
     economy.phone_listing_source_quantity_revision = 0U;
+    economy.phone_listing_source_action_reservation_signature = 0U;
     economy.available_phone_listings.clear();
     economy.revealed_site_unlockable_ids.clear();
     economy.direct_purchase_unlockable_ids.clear();

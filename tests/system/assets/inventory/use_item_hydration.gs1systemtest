@@ -1,7 +1,7 @@
 system = inventory
-name = use_item_hydration
+name = use_item_drink_starts_action
 runner = inventory_regression
-description = Uses the seeded hydration item from the worker pack and checks the remaining quantity plus meter message emission.
+description = Uses the seeded water item from the worker pack and checks that it starts a deferred consume action without immediate removal or meter changes.
 ---
 scenario = use_item
 site_id = 1
@@ -9,5 +9,5 @@ slot = 0
 item_id = 1
 quantity = 1
 expect_status_ok = true
-expect_remaining_quantity = 1
-expect_meter_message = true
+expect_remaining_quantity = 2
+expect_meter_message = false

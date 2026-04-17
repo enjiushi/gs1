@@ -51,6 +51,8 @@ enum class GameMessageType : std::uint8_t
     SiteTileWatered,
     SiteTileBurialCleared,
     SiteDevicePlaced,
+    SiteDeviceBroken,
+    SiteDeviceRepaired,
     WorkerMeterDeltaRequested,
     WorkerMetersChanged,
     TileEcologyChanged,
@@ -313,6 +315,22 @@ struct SiteDevicePlacedMessage final
     std::uint32_t flags;
 };
 
+struct SiteDeviceBrokenMessage final
+{
+    std::uint64_t device_entity_id;
+    std::int32_t target_tile_x;
+    std::int32_t target_tile_y;
+    std::uint32_t structure_id;
+};
+
+struct SiteDeviceRepairedMessage final
+{
+    std::uint32_t action_id;
+    std::int32_t target_tile_x;
+    std::int32_t target_tile_y;
+    std::uint32_t flags;
+};
+
 struct WorkerMeterDeltaRequestedMessage final
 {
     std::uint32_t source_id;
@@ -404,6 +422,8 @@ struct InventoryItemConsumeRequestedMessage final
     std::uint8_t flags;
 };
 
+inline constexpr std::uint8_t k_inventory_item_consume_flag_ignore_action_reservations = 1U << 0U;
+
 struct InventoryGlobalItemConsumeRequestedMessage final
 {
     std::uint32_t item_id;
@@ -481,6 +501,8 @@ GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteTilePlantingCompletedMessage, 24U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteTileWateredMessage, 20U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteTileBurialClearedMessage, 20U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteDevicePlacedMessage, 20U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteDeviceBrokenMessage, 24U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteDeviceRepairedMessage, 16U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(WorkerMeterDeltaRequestedMessage, 36U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(WorkerMetersChangedMessage, 32U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TileEcologyChangedMessage, 28U);

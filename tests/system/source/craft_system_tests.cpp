@@ -23,8 +23,11 @@ using gs1::InventoryItemConsumeRequestedMessage;
 using gs1::InventorySystem;
 using gs1::PlacementReservationAcceptedMessage;
 using gs1::SiteActionCompletedMessage;
+using gs1::SiteActionFailedMessage;
 using gs1::SiteActionStartedMessage;
+using gs1::SiteDeviceBrokenMessage;
 using gs1::SiteDevicePlacedMessage;
+using gs1::SiteDeviceRepairedMessage;
 using gs1::SiteRunStartedMessage;
 using gs1::TileCoord;
 using namespace gs1::testing::fixtures;
@@ -159,6 +162,58 @@ void inventory_craft_commit_consumes_nearby_ingredients_and_outputs_to_device_st
             site_run,
             gs1::inventory_storage::starter_storage_container(site_run),
             gs1::ItemId {gs1::k_item_iron_bundle}) == 2U);
+}
+
+void inventory_craft_commit_crafts_hammer_from_wood_and_iron(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 1507U);
+    GameMessageQueue queue {};
+    auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_message(
+            inventory_context,
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    const auto workbench_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_message(
+            inventory_context,
+            make_message(
+                GameMessageType::InventoryCraftCommitRequested,
+                InventoryCraftCommitRequestedMessage {
+                    gs1::k_recipe_craft_hammer,
+                    workbench_tile.x,
+                    workbench_tile.y,
+                    0U})) == GS1_STATUS_OK);
+
+    const auto workbench_entity_id = site_run.site_world->device_entity_id(workbench_tile);
+    const auto workbench_storage =
+        gs1::inventory_storage::find_device_storage_container(site_run, workbench_entity_id);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        gs1::inventory_storage::available_item_quantity_in_container(
+            site_run,
+            workbench_storage,
+            gs1::ItemId {gs1::k_item_hammer}) == 1U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        gs1::inventory_storage::available_item_quantity_in_container(
+            site_run,
+            gs1::inventory_storage::starter_storage_container(site_run),
+            gs1::ItemId {gs1::k_item_wood_bundle}) == 4U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        gs1::inventory_storage::available_item_quantity_in_container(
+            site_run,
+            gs1::inventory_storage::starter_storage_container(site_run),
+            gs1::ItemId {gs1::k_item_iron_bundle}) == 3U);
 }
 
 void craft_cache_tracks_worker_pack_membership_by_distance(
@@ -306,6 +361,144 @@ void dynamically_placed_storage_device_reuses_single_inventory_container(
 
     GS1_SYSTEM_TEST_CHECK(context, matching_storage_count == 1U);
 }
+
+void repair_action_requires_hammer_and_restores_device_integrity(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 1505U);
+    GameMessageQueue queue {};
+    auto action_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue, 60.0);
+    auto maintenance_context = make_site_context<DeviceMaintenanceSystem>(campaign, site_run, queue);
+
+    const auto repair_tile = site_run.camp.camp_anchor_tile;
+    auto tile = site_run.site_world->tile_at(repair_tile);
+    tile.device.structure_id = gs1::StructureId {gs1::k_structure_storage_crate};
+    tile.device.device_integrity = 0.4f;
+    site_run.site_world->set_tile(repair_tile, tile);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            action_context,
+            make_message(
+                GameMessageType::StartSiteAction,
+                gs1::StartSiteActionMessage {
+                    GS1_SITE_ACTION_REPAIR,
+                    4U,
+                    1U,
+                    repair_tile.x,
+                    repair_tile.y,
+                    0U,
+                    0U,
+                    gs1::k_item_hammer})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::SiteActionFailed) == 1U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        first_message_payload<SiteActionFailedMessage>(
+            queue,
+            GameMessageType::SiteActionFailed)->reason == gs1::SiteActionFailureReason::InsufficientResources);
+
+    queue.clear();
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        gs1::inventory_storage::add_item_to_container(
+            site_run,
+            gs1::inventory_storage::worker_pack_container(site_run),
+            gs1::ItemId {gs1::k_item_hammer},
+            1U) == 0U);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            action_context,
+            make_message(
+                GameMessageType::StartSiteAction,
+                gs1::StartSiteActionMessage {
+                    GS1_SITE_ACTION_REPAIR,
+                    4U,
+                    1U,
+                    repair_tile.x,
+                    repair_tile.y,
+                    0U,
+                    0U,
+                    gs1::k_item_hammer})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::SiteActionStarted) == 1U);
+
+    queue.clear();
+    ActionExecutionSystem::run(action_context);
+    GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::SiteActionCompleted) == 1U);
+    GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::SiteDeviceRepaired) == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::InventoryItemConsumeRequested) == 0U);
+
+    const auto* repaired_message =
+        first_message(queue, GameMessageType::SiteDeviceRepaired);
+    GS1_SYSTEM_TEST_REQUIRE(context, repaired_message != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        DeviceMaintenanceSystem::process_message(maintenance_context, *repaired_message) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(site_run.site_world->tile_device(repair_tile).device_integrity, 1.0f));
+}
+
+void storage_device_breakage_destroys_owned_storage_and_items(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 1506U);
+    GameMessageQueue queue {};
+    auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
+    auto maintenance_context = make_site_context<DeviceMaintenanceSystem>(campaign, site_run, queue, 1.0);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_message(
+            inventory_context,
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    const auto storage_tile = site_run.camp.starter_storage_tile;
+    const auto broken_device_entity_id = site_run.site_world->device_entity_id(storage_tile);
+    const auto storage_container =
+        gs1::inventory_storage::find_device_storage_container(site_run, broken_device_entity_id);
+    GS1_SYSTEM_TEST_REQUIRE(context, storage_container.is_valid());
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        gs1::inventory_storage::add_item_to_container(
+            site_run,
+            storage_container,
+            gs1::ItemId {gs1::k_item_hammer},
+            1U) == 0U);
+    const auto storage_id =
+        gs1::inventory_storage::storage_id_for_container(site_run, storage_container);
+    site_run.inventory.opened_device_storage_id = storage_id;
+
+    auto tile = site_run.site_world->tile_at(storage_tile);
+    tile.ecology.sand_burial = 1.0f;
+    tile.device.device_integrity = 0.01f;
+    site_run.site_world->set_tile(storage_tile, tile);
+
+    queue.clear();
+    DeviceMaintenanceSystem::run(maintenance_context);
+    GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::SiteDeviceBroken) == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_world->tile_device(storage_tile).structure_id.value == 0U);
+
+    const auto* broken_message =
+        first_message(queue, GameMessageType::SiteDeviceBroken);
+    GS1_SYSTEM_TEST_REQUIRE(context, broken_message != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_message(inventory_context, *broken_message) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        !gs1::inventory_storage::find_device_storage_container(site_run, broken_device_entity_id).is_valid());
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.opened_device_storage_id == 0U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        gs1::inventory_storage::storage_container_state_for_storage_id(site_run, storage_id) == nullptr);
+}
 }  // namespace
 
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
@@ -317,6 +510,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "craft_commit_consumes_nearby_ingredients_and_outputs_to_device_storage",
     inventory_craft_commit_consumes_nearby_ingredients_and_outputs_to_device_storage);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "inventory",
+    "craft_commit_crafts_hammer_from_wood_and_iron",
+    inventory_craft_commit_crafts_hammer_from_wood_and_iron);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "craft",
     "cache_tracks_worker_pack_membership_by_distance",
     craft_cache_tracks_worker_pack_membership_by_distance);
@@ -324,3 +521,11 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "inventory",
     "dynamically_placed_storage_device_reuses_single_inventory_container",
     dynamically_placed_storage_device_reuses_single_inventory_container);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "action_execution",
+    "repair_requires_hammer_and_restores_device_integrity",
+    repair_action_requires_hammer_and_restores_device_integrity);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "inventory",
+    "storage_device_breakage_destroys_owned_storage_and_items",
+    storage_device_breakage_destroys_owned_storage_and_items);

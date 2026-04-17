@@ -30,6 +30,7 @@ struct EconomyState final
     std::int32_t money {0};
     std::uint64_t phone_listing_source_membership_revision {0U};
     std::uint64_t phone_listing_source_quantity_revision {0U};
+    std::uint64_t phone_listing_source_action_reservation_signature {0U};
     std::vector<std::uint32_t> revealed_site_unlockable_ids {};
     std::vector<std::uint32_t> direct_purchase_unlockable_ids {};
     std::vector<PhoneListingState> available_phone_listings {};

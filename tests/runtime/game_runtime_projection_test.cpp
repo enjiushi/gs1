@@ -432,19 +432,25 @@ int main()
     assert(runtime.handle_message(accept_task) == GS1_STATUS_OK);
     assert(bootstrap_site_run.task_board.accepted_task_ids.size() == 1U);
 
+    bootstrap_site_run.inventory.worker_pack_slots[4].occupied = true;
+    bootstrap_site_run.inventory.worker_pack_slots[4].item_id = gs1::ItemId {gs1::k_item_medicine_pack};
+    bootstrap_site_run.inventory.worker_pack_slots[4].item_quantity = 1U;
+    bootstrap_site_run.inventory.worker_pack_slots[4].item_condition = 1.0f;
+    bootstrap_site_run.inventory.worker_pack_slots[4].item_freshness = 1.0f;
+
     auto worker = gs1::site_world_access::worker_conditions(bootstrap_site_run);
-    worker.hydration = 80.0f;
+    worker.health = 70.0f;
     gs1::site_world_access::set_worker_conditions(bootstrap_site_run, worker);
     GameMessage use_item {};
     use_item.type = GameMessageType::InventoryItemUseRequested;
     use_item.set_payload(InventoryItemUseRequestedMessage {
-        1U,
+        gs1::k_item_medicine_pack,
         bootstrap_site_run.inventory.worker_pack_storage_id,
         1U,
-        0U});
+        4U});
     assert(runtime.handle_message(use_item) == GS1_STATUS_OK);
-    assert(bootstrap_site_run.inventory.worker_pack_slots[0].item_quantity == 1U);
-    assert(gs1::site_world_access::worker_conditions(bootstrap_site_run).hydration > 80.0f);
+    assert(!bootstrap_site_run.inventory.worker_pack_slots[4].occupied);
+    assert(gs1::site_world_access::worker_conditions(bootstrap_site_run).health > 70.0f);
 
     GameMessage buy_listing {};
     buy_listing.type = GameMessageType::PhoneListingPurchaseRequested;
@@ -594,16 +600,12 @@ int main()
     run_phase1(ui_runtime, 0.0, use_result);
     assert(use_result.processed_host_event_count == 1U);
     assert(ui_site_run.inventory.worker_pack_slots[0].occupied);
-    assert(ui_site_run.inventory.worker_pack_slots[0].item_quantity == 1U);
-    assert(gs1::site_world_access::worker_conditions(ui_site_run).hydration == 82.0f);
+    assert(ui_site_run.inventory.worker_pack_slots[0].item_quantity == 2U);
+    assert(gs1::site_world_access::worker_conditions(ui_site_run).hydration == 70.0f);
     const auto use_messages = drain_engine_messages(ui_runtime);
     const auto use_inventory_messages = collect_inventory_slot_messages(use_messages);
-    assert(use_inventory_messages.size() == 1U);
-    assert(find_inventory_slot_message(
-               use_messages,
-               GS1_INVENTORY_CONTAINER_WORKER_PACK,
-               ui_site_run.inventory.worker_pack_storage_id,
-               0U) != nullptr);
+    assert(use_inventory_messages.empty());
+    assert(!collect_messages_of_type(use_messages, GS1_ENGINE_MESSAGE_SITE_ACTION_UPDATE).empty());
     assert(!collect_messages_of_type(use_messages, GS1_ENGINE_MESSAGE_SITE_WORKER_UPDATE).empty());
     assert(!collect_messages_of_type(use_messages, GS1_ENGINE_MESSAGE_HUD_STATE).empty());
 
