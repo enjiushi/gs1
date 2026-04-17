@@ -36,6 +36,13 @@ struct PendingDelivery final
     double minutes_until_arrival {0.0};
 };
 
+struct PendingDeviceStorageOpen final
+{
+    std::uint32_t storage_id {0};
+    TileCoord approach_tile {};
+    bool active {false};
+};
+
 struct InventoryState final
 {
     std::uint32_t next_storage_id {1};
@@ -46,6 +53,7 @@ struct InventoryState final
     std::uint64_t worker_pack_container_entity_id {0};
     std::uint64_t item_membership_revision {1U};
     std::uint64_t item_quantity_revision {1U};
+    PendingDeviceStorageOpen pending_device_storage_open {};
     std::vector<StorageContainerState> storage_containers {};
     std::vector<InventorySlot> worker_pack_slots {};
     std::vector<PendingDelivery> pending_delivery_queue {};

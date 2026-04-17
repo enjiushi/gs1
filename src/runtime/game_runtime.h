@@ -190,6 +190,7 @@ private:
     [[nodiscard]] Gs1Status dispatch_queued_messages();
     [[nodiscard]] Gs1Status dispatch_subscribed_message(const GameMessage& message);
     [[nodiscard]] Gs1Status dispatch_subscribed_feedback_event(const Gs1FeedbackEvent& event);
+    [[nodiscard]] Gs1Status cancel_pending_device_storage_open_request();
     void sync_after_processed_message(const GameMessage& message);
     void run_fixed_step();
     void copy_timing_snapshot(

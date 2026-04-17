@@ -15,6 +15,7 @@ public:
             site_component_mask_of(
                 SiteComponent::RunMeta,
                 SiteComponent::TileLayout,
+                SiteComponent::WorkerMotion,
                 SiteComponent::Inventory),
             site_component_mask_of(SiteComponent::Inventory)};
     }

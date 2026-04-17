@@ -2467,6 +2467,25 @@ Gs1Status GameRuntime::translate_site_context_request_to_message(
     return GS1_STATUS_OK;
 }
 
+Gs1Status GameRuntime::cancel_pending_device_storage_open_request()
+{
+    if (!active_site_run_.has_value() ||
+        !active_site_run_->inventory.pending_device_storage_open.active ||
+        active_site_run_->inventory.pending_device_storage_open.storage_id == 0U)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    GameMessage message {};
+    message.type = GameMessageType::InventoryStorageViewRequest;
+    message.set_payload(InventoryStorageViewRequestMessage {
+        active_site_run_->inventory.pending_device_storage_open.storage_id,
+        GS1_INVENTORY_VIEW_EVENT_CLOSE,
+        {0U, 0U, 0U}});
+    message_queue_.push_back(message);
+    return dispatch_queued_messages();
+}
+
 Gs1Status GameRuntime::dispatch_host_events(
     HostEventDispatchStage stage,
     std::uint32_t& out_processed_count)
@@ -2513,12 +2532,23 @@ Gs1Status GameRuntime::dispatch_host_events(
                 return GS1_STATUS_INVALID_STATE;
             }
 
+            const auto& payload = event.payload.site_move_direction;
+            const float move_length_squared =
+                payload.world_move_x * payload.world_move_x +
+                payload.world_move_y * payload.world_move_y +
+                payload.world_move_z * payload.world_move_z;
+            if (move_length_squared > 0.0001f)
+            {
+                const auto cancel_status = cancel_pending_device_storage_open_request();
+                if (cancel_status != GS1_STATUS_OK)
+                {
+                    return cancel_status;
+                }
+            }
             if (!active_site_run_.has_value() || app_state_ != GS1_APP_STATE_SITE_ACTIVE)
             {
                 break;
             }
-
-            const auto& payload = event.payload.site_move_direction;
             phase1_site_move_direction_.world_move_x = payload.world_move_x;
             phase1_site_move_direction_.world_move_y = payload.world_move_y;
             phase1_site_move_direction_.world_move_z = payload.world_move_z;

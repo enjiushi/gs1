@@ -4,6 +4,7 @@
 #include "content/defs/craft_recipe_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/structure_defs.h"
+#include "site/device_interaction_logic.h"
 #include "site/craft_logic.h"
 #include "site/inventory_state.h"
 #include "site/inventory_storage.h"
@@ -91,6 +92,79 @@ bool storage_has_any_item(SiteRunState& site_run) noexcept
 }
 
 bool ensure_device_storage_containers(SiteSystemContext<InventorySystem>& context) noexcept;
+
+void clear_pending_device_storage_open(InventoryState& inventory) noexcept
+{
+    inventory.pending_device_storage_open = {};
+}
+
+bool has_pending_device_storage_open(const InventoryState& inventory) noexcept
+{
+    return inventory.pending_device_storage_open.active &&
+        inventory.pending_device_storage_open.storage_id != 0U;
+}
+
+bool clear_pending_device_storage_open_for_storage(
+    InventoryState& inventory,
+    std::uint32_t storage_id) noexcept
+{
+    if (!has_pending_device_storage_open(inventory) ||
+        inventory.pending_device_storage_open.storage_id != storage_id)
+    {
+        return false;
+    }
+
+    clear_pending_device_storage_open(inventory);
+    return true;
+}
+
+bool open_device_storage_now(
+    SiteSystemContext<InventorySystem>& context,
+    std::uint32_t storage_id) noexcept
+{
+    auto& inventory = context.world.own_inventory();
+    clear_pending_device_storage_open(inventory);
+    inventory.opened_device_storage_id = storage_id;
+    context.world.mark_inventory_view_state_projection_dirty();
+    context.world.mark_opened_inventory_storage_full_projection_dirty();
+    return true;
+}
+
+void progress_pending_device_storage_open(SiteSystemContext<InventorySystem>& context) noexcept
+{
+    auto& inventory = context.world.own_inventory();
+    if (!has_pending_device_storage_open(inventory))
+    {
+        return;
+    }
+
+    const auto storage_id = inventory.pending_device_storage_open.storage_id;
+    const auto* storage_state =
+        inventory_storage::storage_container_state_for_storage_id(context.site_run, storage_id);
+    if (storage_state == nullptr ||
+        storage_state->container_kind != GS1_INVENTORY_CONTAINER_DEVICE_STORAGE)
+    {
+        clear_pending_device_storage_open(inventory);
+        return;
+    }
+
+    if (!device_interaction_logic::tile_is_traversable(
+            context.site_run,
+            inventory.pending_device_storage_open.approach_tile))
+    {
+        clear_pending_device_storage_open(inventory);
+        return;
+    }
+
+    if (!device_interaction_logic::worker_is_at_tile(
+            context.world.read_worker(),
+            inventory.pending_device_storage_open.approach_tile))
+    {
+        return;
+    }
+
+    (void)open_device_storage_now(context, storage_id);
+}
 
 bool ensure_inventory_storage_initialized(SiteSystemContext<InventorySystem>& context) noexcept
 {
@@ -401,6 +475,7 @@ Gs1Status handle_inventory_item_use(
     SiteSystemContext<InventorySystem>& context,
     const InventoryItemUseRequestedMessage& payload) noexcept
 {
+    clear_pending_device_storage_open(context.world.own_inventory());
     return mutate_inventory_storage(context, [&]() -> Gs1Status {
         const auto container =
             inventory_storage::container_for_storage_id(context.site_run, payload.storage_id);
@@ -719,10 +794,16 @@ Gs1Status handle_inventory_storage_view_request(
     if (payload.event_kind == GS1_INVENTORY_VIEW_EVENT_CLOSE)
     {
         auto& inventory = context.world.own_inventory();
+        const bool cleared_pending =
+            clear_pending_device_storage_open_for_storage(inventory, payload.storage_id);
         if (inventory.opened_device_storage_id == payload.storage_id)
         {
             inventory.opened_device_storage_id = 0U;
             context.world.mark_inventory_view_state_projection_dirty();
+        }
+        else if (cleared_pending)
+        {
+            return GS1_STATUS_OK;
         }
         return GS1_STATUS_OK;
     }
@@ -745,9 +826,27 @@ Gs1Status handle_inventory_storage_view_request(
         return GS1_STATUS_INVALID_ARGUMENT;
     }
 
-    context.world.own_inventory().opened_device_storage_id = payload.storage_id;
-    context.world.mark_inventory_view_state_projection_dirty();
-    context.world.mark_opened_inventory_storage_full_projection_dirty();
+    const auto worker = context.world.read_worker();
+    const auto approach_tile =
+        device_interaction_logic::resolve_interaction_range_approach_tile(
+            context.site_run,
+            worker,
+            storage_state->tile_coord);
+    if (!approach_tile.has_value())
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    if (device_interaction_logic::worker_is_at_tile(worker, *approach_tile))
+    {
+        (void)open_device_storage_now(context, payload.storage_id);
+        return GS1_STATUS_OK;
+    }
+
+    auto& inventory = context.world.own_inventory();
+    inventory.pending_device_storage_open.storage_id = payload.storage_id;
+    inventory.pending_device_storage_open.approach_tile = *approach_tile;
+    inventory.pending_device_storage_open.active = true;
     return GS1_STATUS_OK;
 }
 
@@ -852,6 +951,8 @@ bool InventorySystem::subscribes_to(GameMessageType type) noexcept
 {
     switch (type)
     {
+    case GameMessageType::StartSiteAction:
+    case GameMessageType::CancelSiteAction:
     case GameMessageType::SiteRunStarted:
     case GameMessageType::SiteDevicePlaced:
     case GameMessageType::InventoryDeliveryRequested:
@@ -873,6 +974,11 @@ Gs1Status InventorySystem::process_message(
 {
     switch (message.type)
     {
+    case GameMessageType::StartSiteAction:
+    case GameMessageType::CancelSiteAction:
+        clear_pending_device_storage_open(context.world.own_inventory());
+        return GS1_STATUS_OK;
+
     case GameMessageType::SiteRunStarted:
         seed_inventory_from_loadout(context);
         return GS1_STATUS_OK;
@@ -928,6 +1034,7 @@ void InventorySystem::run(SiteSystemContext<InventorySystem>& context)
     {
         context.world.mark_inventory_storage_descriptors_projection_dirty();
     }
+    progress_pending_device_storage_open(context);
     progress_pending_deliveries(context);
 }
 }  // namespace gs1

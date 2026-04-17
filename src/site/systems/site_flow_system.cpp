@@ -49,6 +49,12 @@ bool action_waits_for_worker_approach(const ActionState& action_state) noexcept
         action_state.approach_tile.has_value();
 }
 
+bool has_pending_device_storage_open(const InventoryState& inventory) noexcept
+{
+    return inventory.pending_device_storage_open.active &&
+        inventory.pending_device_storage_open.storage_id != 0U;
+}
+
 float facing_degrees_for_direction(float direction_x, float direction_y) noexcept
 {
     if (std::fabs(direction_x) <= k_worker_position_epsilon &&
@@ -78,6 +84,7 @@ void SiteFlowSystem::run(SiteSystemContext<SiteFlowSystem>& context)
 
     auto worker = context.world.read_worker();
     const auto& action_state = context.world.read_action();
+    const auto& inventory = context.world.read_inventory();
     const float movement_step =
         k_worker_move_speed_tiles_per_second * static_cast<float>(context.fixed_step_seconds);
 
@@ -103,6 +110,10 @@ void SiteFlowSystem::run(SiteSystemContext<SiteFlowSystem>& context)
             }
         }
         return;
+    }
+    else if (has_pending_device_storage_open(inventory))
+    {
+        move_goal_tile = inventory.pending_device_storage_open.approach_tile;
     }
 
     float direction_x = 0.0f;

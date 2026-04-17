@@ -162,6 +162,16 @@ Gs1HostEvent make_storage_view_event(
     return event;
 }
 
+Gs1HostEvent make_move_direction_event(float world_move_x, float world_move_y, float world_move_z)
+{
+    Gs1HostEvent event {};
+    event.type = GS1_HOST_EVENT_SITE_MOVE_DIRECTION;
+    event.payload.site_move_direction.world_move_x = world_move_x;
+    event.payload.site_move_direction.world_move_y = world_move_y;
+    event.payload.site_move_direction.world_move_z = world_move_z;
+    return event;
+}
+
 void run_phase1(GameRuntime& runtime, double real_delta_seconds, Gs1Phase1Result& out_result)
 {
     Gs1Phase1Request request {};
@@ -727,6 +737,56 @@ int main()
                 payload.plant_density >= 0.2f;
         });
     assert(projected_action_tile != action_tile_messages.end());
+
+    Gs1RuntimeCreateDesc storage_walk_desc {};
+    storage_walk_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
+    storage_walk_desc.api_version = gs1::k_api_version;
+    storage_walk_desc.fixed_step_seconds = 0.1;
+
+    GameRuntime storage_walk_runtime {storage_walk_desc};
+    assert(storage_walk_runtime.handle_message(make_start_campaign_message()) == GS1_STATUS_OK);
+    const auto storage_walk_site_id =
+        gs1::GameRuntimeProjectionTestAccess::campaign(storage_walk_runtime)->sites.front().site_id.value;
+    assert(storage_walk_runtime.handle_message(make_start_site_attempt_message(storage_walk_site_id)) == GS1_STATUS_OK);
+    auto& storage_walk_site_run =
+        gs1::GameRuntimeProjectionTestAccess::active_site_run(storage_walk_runtime).value();
+    drain_engine_messages(storage_walk_runtime);
+
+    auto worker_position = gs1::site_world_access::worker_position(storage_walk_site_run);
+    worker_position.tile_coord = TileCoord {7, 7};
+    worker_position.tile_x = 7.0f;
+    worker_position.tile_y = 7.0f;
+    gs1::site_world_access::set_worker_position(storage_walk_site_run, worker_position);
+
+    auto distant_open_event = make_storage_view_event(
+        starter_storage_id(storage_walk_site_run),
+        GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT);
+    Gs1Phase1Result distant_open_result {};
+    assert(storage_walk_runtime.submit_host_events(&distant_open_event, 1U) == GS1_STATUS_OK);
+    run_phase1(storage_walk_runtime, 0.1, distant_open_result);
+    assert(distant_open_result.fixed_steps_executed == 1U);
+    assert(distant_open_result.processed_host_event_count == 1U);
+    assert(storage_walk_site_run.inventory.opened_device_storage_id == 0U);
+    assert(storage_walk_site_run.inventory.pending_device_storage_open.active);
+    drain_engine_messages(storage_walk_runtime);
+
+    auto move_cancel_event = make_move_direction_event(1.0f, 0.0f, 0.0f);
+    Gs1Phase1Result move_cancel_result {};
+    assert(storage_walk_runtime.submit_host_events(&move_cancel_event, 1U) == GS1_STATUS_OK);
+    run_phase1(storage_walk_runtime, 0.1, move_cancel_result);
+    assert(move_cancel_result.fixed_steps_executed == 1U);
+    assert(move_cancel_result.processed_host_event_count == 1U);
+    assert(!storage_walk_site_run.inventory.pending_device_storage_open.active);
+    assert(storage_walk_site_run.inventory.opened_device_storage_id == 0U);
+    drain_engine_messages(storage_walk_runtime);
+
+    for (int step = 0; step < 12; ++step)
+    {
+        run_phase1(storage_walk_runtime, 0.1);
+    }
+
+    assert(!storage_walk_site_run.inventory.pending_device_storage_open.active);
+    assert(storage_walk_site_run.inventory.opened_device_storage_id == 0U);
 
     return 0;
 }

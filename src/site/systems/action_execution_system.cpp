@@ -4,6 +4,7 @@
 #include "content/defs/item_defs.h"
 #include "content/defs/plant_defs.h"
 #include "content/defs/structure_defs.h"
+#include "site/device_interaction_logic.h"
 #include "site/craft_logic.h"
 #include "site/defs/site_action_defs.h"
 #include "site/inventory_storage.h"
@@ -12,10 +13,8 @@
 #include "support/id_types.h"
 
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <cstdint>
-#include <limits>
 #include <optional>
 
 namespace gs1
@@ -461,59 +460,36 @@ double action_elapsed_minutes_for_step(double fixed_step_seconds) noexcept
     return std::max(0.0, fixed_step_seconds) * k_action_minutes_per_real_second;
 }
 
-bool tile_is_traversable(
-    const SiteWorldAccess<ActionExecutionSystem>& world,
-    TileCoord coord) noexcept
+std::optional<TileCoord> resolve_action_approach_tile(
+    const SiteRunState& site_run,
+    const SiteWorld::WorkerData& worker,
+    TileCoord target_tile,
+    bool interaction_range_allowed)
 {
-    return world.tile_coord_in_bounds(coord) && world.read_tile(coord).static_data.traversable;
+    if (interaction_range_allowed)
+    {
+        return device_interaction_logic::resolve_interaction_range_approach_tile(
+            site_run,
+            worker,
+            target_tile);
+    }
+
+    return device_interaction_logic::resolve_direct_approach_tile(
+        site_run,
+        worker,
+        target_tile);
 }
 
-std::optional<TileCoord> resolve_action_approach_tile(
-    const SiteWorldAccess<ActionExecutionSystem>& world,
-    const SiteWorld::WorkerData& worker,
-    TileCoord target_tile)
+bool action_target_supports_interaction_range(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    TileCoord target_tile) noexcept
 {
-    if (tile_is_traversable(world, target_tile))
+    if (!context.world.tile_coord_in_bounds(target_tile))
     {
-        return target_tile;
+        return false;
     }
 
-    constexpr std::array<TileCoord, 8> k_neighbor_offsets {{
-        TileCoord {0, -1},
-        TileCoord {1, 0},
-        TileCoord {0, 1},
-        TileCoord {-1, 0},
-        TileCoord {1, -1},
-        TileCoord {1, 1},
-        TileCoord {-1, 1},
-        TileCoord {-1, -1},
-    }};
-
-    float best_distance_squared = std::numeric_limits<float>::max();
-    std::optional<TileCoord> best_tile {};
-    for (const auto offset : k_neighbor_offsets)
-    {
-        const TileCoord candidate {
-            target_tile.x + offset.x,
-            target_tile.y + offset.y};
-        if (!tile_is_traversable(world, candidate))
-        {
-            continue;
-        }
-
-        const float dx =
-            worker.position.tile_x - static_cast<float>(candidate.x);
-        const float dy =
-            worker.position.tile_y - static_cast<float>(candidate.y);
-        const float distance_squared = dx * dx + dy * dy;
-        if (distance_squared < best_distance_squared)
-        {
-            best_distance_squared = distance_squared;
-            best_tile = candidate;
-        }
-    }
-
-    return best_tile;
+    return context.world.read_tile(target_tile).device.structure_id.value != 0U;
 }
 
 bool worker_is_at_action_approach_tile(
@@ -525,12 +501,9 @@ bool worker_is_at_action_approach_tile(
         return true;
     }
 
-    const auto worker = context.world.read_worker();
-    const float dx =
-        worker.position.tile_x - static_cast<float>(action_state.approach_tile->x);
-    const float dy =
-        worker.position.tile_y - static_cast<float>(action_state.approach_tile->y);
-    return (dx * dx + dy * dy) <= 0.0025f;
+    return device_interaction_logic::worker_is_at_tile(
+        context.world.read_worker(),
+        *action_state.approach_tile);
 }
 
 void begin_action_execution(
@@ -952,7 +925,11 @@ Gs1Status ActionExecutionSystem::process_message(
         {
             const auto worker = context.world.read_worker();
             const auto approach_tile =
-                resolve_action_approach_tile(context.world, worker, target_tile);
+                resolve_action_approach_tile(
+                    context.site_run,
+                    worker,
+                    target_tile,
+                    action_target_supports_interaction_range(context, target_tile));
             if (!approach_tile.has_value())
             {
                 clear_action_state(action_state);
@@ -980,7 +957,8 @@ Gs1Status ActionExecutionSystem::process_message(
                 target_tile,
                 payload.primary_subject_id);
         }
-        else
+        else if (!action_requires_worker_approach(action_kind) ||
+            worker_is_at_action_approach_tile(context, action_state))
         {
             begin_action_execution(context, action_state);
         }
