@@ -15,7 +15,7 @@ namespace
 constexpr std::uint32_t k_site_width = 32U;
 constexpr std::uint32_t k_site_height = 32U;
 
-TileCoord starter_camp_storage_tile(TileCoord camp_anchor_tile) noexcept
+TileCoord starter_storage_tile(TileCoord camp_anchor_tile) noexcept
 {
     return TileCoord {camp_anchor_tile.x - 1, camp_anchor_tile.y};
 }
@@ -40,21 +40,19 @@ SiteRunState SiteRunFactory::create_site_run(
     run.run_status = SiteRunStatus::Active;
     run.clock.day_phase = DayPhase::Dawn;
     run.inventory.worker_pack_slot_count = 6U;
-    run.inventory.camp_storage_slot_count = 24U;
     run.inventory.worker_pack_slots.resize(run.inventory.worker_pack_slot_count);
-    run.inventory.camp_storage_slots.resize(run.inventory.camp_storage_slot_count);
     run.task_board.accepted_task_cap = 3U;
 
     if (site_content != nullptr)
     {
         run.site_archetype_id = site_content->site_archetype_id;
         run.camp.camp_anchor_tile = site_content->camp_anchor_tile;
-        run.camp.camp_storage_tile = starter_camp_storage_tile(site_content->camp_anchor_tile);
+        run.camp.starter_storage_tile = starter_storage_tile(site_content->camp_anchor_tile);
         run.counters.site_completion_tile_threshold = site_content->site_completion_tile_threshold;
     }
     else
     {
-        run.camp.camp_storage_tile = starter_camp_storage_tile(run.camp.camp_anchor_tile);
+        run.camp.starter_storage_tile = starter_storage_tile(run.camp.camp_anchor_tile);
     }
 
     const auto worker_tile_coord = run.camp.camp_anchor_tile;
@@ -77,12 +75,12 @@ SiteRunState SiteRunFactory::create_site_run(
             100.0f,
             1.0f,
             false});
-    if (run.site_world->contains(run.camp.camp_storage_tile))
+    if (run.site_world->contains(run.camp.starter_storage_tile))
     {
-        auto tile = run.site_world->tile_at(run.camp.camp_storage_tile);
+        auto tile = run.site_world->tile_at(run.camp.starter_storage_tile);
         tile.device.structure_id = StructureId {k_structure_storage_crate};
         tile.device.device_integrity = 1.0f;
-        run.site_world->set_tile(run.camp.camp_storage_tile, tile);
+        run.site_world->set_tile(run.camp.starter_storage_tile, tile);
     }
     if (run.site_id.value == 1U)
     {

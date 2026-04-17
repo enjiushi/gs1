@@ -80,7 +80,7 @@ These terms are stable and should be used consistently in future design and impl
 | `Support Quota` | The pre-deployment support score used to claim exported loadout items from nearby stabilized sites. In the current prototype direction it is fixed, baseline support does not spend it, and later `Village Committee` tech may raise it. |
 | `Inventory` | The player's slot-based carried storage for `Item`s during a `Site` session. Capacity is limited and can be expanded by the `Persistent Tech Tree`. |
 | `Item` | Any carriable object that can occupy `Inventory` or `Container` slots. In the current design, every item should use one shared data-driven gameplay model, with behavior decided by tags, capabilities, and linked content rather than by a fixed top-level item type. |
-| `Container` | A camp storage object that can be built or bought on-site and used to store `Item`s outside the player's carried `Inventory`. |
+| `Container` | Any storage-capable on-site device, such as the starter storage crate, a built storage crate, or a crafting station with slots, used to store `Item`s outside the player's carried `Inventory`. |
 | `Site Output Modifier` | A persistent bonus trait attached to a stabilized site's regional support output, such as increased wind protection, fertility support, specific loadout-item yield, or support range. In the current prototype direction, a completed site should usually provide at most `1` such modifier: one chosen support direction with one rolled amount. These traits strengthen that site's exported `Nearby-Site Aura` or `Loadout Item Output`. |
 | `Nearby-Site Aura` | A passive `Per-Site Modifier` package projected from adjacent stabilized sites into the current site session before deployment. It should be weaker and steadier than a claimed `Run Modifier`, usually focuses on one support channel or one linked pair of meters, and should never grant full hazard immunity. |
 | `Camp Support` | The light support infrastructure on a `Site`, including shelter, `Container`s, service devices, and hired labor access. |
@@ -335,7 +335,7 @@ Core UI rules:
 - site-play HUD should stay compact and always visible, covering current `Hydration`, `Energy`, money, time of day, `Heat`, `Wind`, `Dust`, current event state when relevant, and simple site-completion progress
 - accepted tasks should have a compact always-available tracker during normal site play so the player does not need to reopen the phone for every progress check
 - item description should not become a separate permanent screen; use one contextual inspect panel for tiles, plants, structures, items, and selected regional-map sites
-- carried `Inventory` and camp storage should use one shared management panel rather than separate inventory and storage screen families
+- carried `Inventory` and device storage should use one shared interaction family rather than separate inventory and storage screen families
 - planting, device placement, repair, watering, burial clearing, and similar explicit field-work choices should use one shared field-actions panel rather than multiple permanent build, plant, and utility panels
 - crafting should stay contextual to the `Field Workshop` and should not become a globally available full-screen system in the current stage
 - full-screen planning UI and pause/system UI should pause time
@@ -453,7 +453,7 @@ Discrete or integer runtime values:
 - `tilePlantable`
 - `tileReservedByStructure`
 - `workerPackSlotCount`
-- `campStorageSlotCount`
+- `starterStorageTile`
 - `money`
 - `reputation`
 - item counts such as water containers, food packs, repair kits, device kits, seeds, and harvested goods
@@ -983,7 +983,7 @@ When `eventState` enters `Aftermath`, the event should stop dealing peak pressur
 
 - extra `tileSandBurial`
 - reduced `deviceEfficiency` from burial or damage
-- possible camp storage disruption if the camp was exposed
+- possible starter-storage or placed-device storage disruption if the camp was exposed
 - lower short-term worker morale until the site feels under control again
 - possible `Aftermath Relief Offer`s from high-reputation factions, giving the player a recovery choice rather than automatic rescue
 
@@ -1268,13 +1268,13 @@ Recommended simplified item catalog:
 
 #### Layer 3: Inventory And Containers
 
-The game should support these carried-storage and camp-storage locations:
+The game should support these carried-storage and device-storage locations:
 
 | Location | Capacity | Purpose |
 |---|---|---|
 | Carried Inventory | `6` slots | What the player carries into the field |
-| Camp Storage | `24` slots initially | Starter camp stockpile available when a site begins |
-| Device Storage | per-device authored slot count | Individual local storage attached to deployed crafting or storage devices |
+| Starter Storage Crate | authored storage-crate slot count, currently `10` | Baseline on-site storage available when a site begins, implemented as the starter device-storage container |
+| Other Device Storage | per-device authored slot count | Individual local storage attached to deployed crafting or storage devices |
 | Pending Delivery Queue | unbounded list of packages | Ordered supplies waiting to arrive at camp |
 
 Rules:
@@ -1285,8 +1285,7 @@ Rules:
 - each stack should have its own runtime item-instance identity even when several stacks share the same authored `ItemId`
 - merging should preserve authored stack limits; if a merge overflows, the excess stays in another stack
 - empty slots are explicit
-- future tech can expand `workerPackSlotCount` or `campStorageSlotCount`, but the game should start at `6` and `24`
-- `campStorageSlotCount` refers only to the starter camp storage, while deployed devices keep their own authored storage counts
+- future tech can expand `workerPackSlotCount`, while device-storage capacity should come from authored structure slot counts; the game should start at `6` worker-pack slots plus a starter storage crate device
 - the player should only be able to carry a limited working set away from camp, even if the camp has much more storage available
 - carrying a lot of one exact `Item` should therefore compete directly with carrying water, seed bundles, repair supplies, device kits, or harvested goods
 
@@ -1298,7 +1297,7 @@ Example inventory pressure:
 
 Container rules:
 
-- the site begins with one starter `campStorage` container plus a starter workbench so the first fabrication recipes are reachable
+- the site begins with one starter storage crate device plus a starter workbench so the first fabrication recipes are reachable
 - deployed crafting devices and storage crates should keep their own local slot sets instead of aliasing one global camp container
 - crafting-device storage is both an output destination and a valid nearby ingredient source for later recipes
 - losing, burying, or exposing a deployed storage or crafting device can put the items in that specific device at risk during harsh events
@@ -1309,17 +1308,17 @@ Use these item-flow rules:
 
 - phone purchases create a package in `pendingDeliveryQueue`
 - each purchased package should arrive at camp after `30` in-game minutes if the camp delivery point is operational
-- delivered items enter `campStorage`, not `workerPack`
-- the player can transfer items between `workerPack`, `campStorage`, and nearby device storage through the shared inventory interaction panel
+- delivered items enter the starter storage crate device, not `workerPack`
+- the player can transfer items between `workerPack` and any nearby device storage through the shared inventory interaction panel
 - plant placement, repair work, and burial clearing consume from `workerPack` when they require carried items
 - deployable structure kits consume from `workerPack`
 - harvesting places goods into `workerPack` first
-- selling through the `Field Phone` should be allowed from a global live cache that covers `workerPack`, `campStorage`, and all deployed device storage
+- selling through the `Field Phone` should be allowed from a global live cache that covers `workerPack` and all device storage
 - each crafting device should cache nearby item-instance ids from all storage in roughly a `10x10` local area, plus the player `workerPack` when the player is nearby
 - crafting should consume recipe ingredients across matching stacks one after another and remove emptied stacks
 - crafted output should be placed into the acting device's own storage, and the craft should fail cleanly at completion if that device cannot fit the output after ingredient consumption
-- `Water Container`s can be transferred from `workerPack` or `campStorage` into a `Water Tank` through a valid water transfer interaction, increasing that tank's `deviceStoredWater`
-- connected `Drip Irrigator`s consume `deviceStoredWater` from linked `Water Tank`s rather than directly consuming water from `workerPack` or `campStorage`
+- `Water Container`s can be transferred from `workerPack` or any device storage into a `Water Tank` through a valid water transfer interaction, increasing that tank's `deviceStoredWater`
+- connected `Drip Irrigator`s consume `deviceStoredWater` from linked `Water Tank`s rather than directly consuming water from `workerPack` or device storage
 
 This keeps the carried `Inventory` important without forcing a full hauling sim.
 
@@ -1423,7 +1422,7 @@ Rules:
 - a disabled device keeps occupying its footprint until repaired or removed
 - `deviceIntegrity` tracks structural health, while `deviceEfficiency` tracks current functional output after burial, storm damage, or solar support
 - if a structure allows plant sharing, the structure still occupies the tile for buildability and repair logic, but the allowed living plant may remain on that tile and continue resolving its own density and support effects
-- a camp-side device with `craftingSupport` should be able to read required materials from shared `campStorage` without first moving them into `workerPack`
+- a camp-side device with `craftingSupport` should be able to read required materials from nearby device storage without first moving them into `workerPack`
 - `Water Tank` should use `deviceStoredWater` as a real runtime reserve that can be filled and drained during the site
 - `Drip Irrigator` should only provide irrigation support while at least one linked `Water Tank` still has `deviceStoredWater > 0`
 - in the current design, a tank link should be a simple logical connection rather than a pipe-building system
@@ -1438,7 +1437,7 @@ Rules:
 | `Drip Irrigator` | Irrigation | `1x1` | `AnyHeight` | `money 180`, `parts 4` | Adds steady direct `tileMoisture` gain to nearby plant tiles while consuming water from one or more linked `Water Tank`s | Provides no irrigation if linked tanks are empty; efficiency also collapses when buried or damaged |
 | `Wind Fence` | Protection utility | `1x1` | `None` | `money 100`, `parts 2` | Lowers local `tileWind` and `tileDust`, especially useful for exposed edges and storm-facing lanes | Provides little recovery value and degrades under repeated sand pressure |
 | `Solar Array` | Solar utility / Heat relief | `1x1` | `LowOnly` | `money 220`, `parts 5` | Improves nearby `deviceEfficiency`, provides light local heat relief, supports stable utility output without fuel logistics, and can create small sellable surplus electricity when site demand is already covered | Storm damage and burial can sharply reduce output until repaired or cleared |
-| `Field Workshop` | Workshop / Crafting | `1x1` | `None` | `money 200`, `parts 4` | Enables camp crafting actions using materials from shared `campStorage` | Crafting access depends on the workshop staying intact and reachable |
+| `Field Workshop` | Workshop / Crafting | `1x1` | `None` | `money 200`, `parts 4` | Enables camp crafting actions using materials from nearby device storage | Crafting access depends on the workshop staying intact and reachable |
 
 #### Structure Family Roles
 
@@ -4398,7 +4397,7 @@ Important rule:
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `itemQuantity` | Buying, crafting, harvesting, transfers between `workerPack`, `campStorage`, and `pendingDeliveryQueue`, planting, building, repair, consume actions, selling, hazard-side partial loss | Inventory occupancy, action availability, sale payout, `deviceStoredWater` when water is transferred | Core stack-count meter. It should always be clamped between `0` and `stackSize`, and the stack should be removed when it reaches `0`. |
+| `itemQuantity` | Buying, crafting, harvesting, transfers between `workerPack`, device storage, and `pendingDeliveryQueue`, planting, building, repair, consume actions, selling, hazard-side partial loss | Inventory occupancy, action availability, sale payout, `deviceStoredWater` when water is transferred | Core stack-count meter. It should always be clamped between `0` and `stackSize`, and the stack should be removed when it reaches `0`. |
 | `itemCondition` | Severe hazard damage on exposed stored items, authored item-damage events | Action availability, sale payout | Meaningful mainly for items whose tags imply physical integrity matters, such as `mechanical`, `repairSupply`, `buildSupply`, `fragile`, or `deployableKit`. |
 | `itemFreshness` | Severe hazard spoilage on exposed stored items, authored spoilage events | Action availability, worker recovery value, sale payout | Meaningful mainly for items with the `spoilable` tag, such as water, food, medicine, or crafted consumables. |
 

@@ -216,14 +216,22 @@ inline flecs::entity worker_pack_container(SiteRunState& site_run) noexcept
     return entity_from_id(site_run, site_run.inventory.worker_pack_container_entity_id);
 }
 
-inline flecs::entity camp_storage_container(SiteRunState& site_run) noexcept
-{
-    return entity_from_id(site_run, site_run.inventory.camp_storage_container_entity_id);
-}
-
 inline flecs::entity find_device_storage_container(
     SiteRunState& site_run,
     std::uint64_t device_entity_id) noexcept;
+
+inline flecs::entity starter_storage_container(SiteRunState& site_run) noexcept
+{
+    if (site_run.site_world == nullptr || !site_run.site_world->contains(site_run.camp.starter_storage_tile))
+    {
+        return {};
+    }
+
+    const auto device_entity_id = site_run.site_world->device_entity_id(site_run.camp.starter_storage_tile);
+    return device_entity_id == 0U
+        ? flecs::entity {}
+        : find_device_storage_container(site_run, device_entity_id);
+}
 
 inline flecs::entity container_for_kind(
     SiteRunState& site_run,
@@ -234,8 +242,6 @@ inline flecs::entity container_for_kind(
     {
     case GS1_INVENTORY_CONTAINER_WORKER_PACK:
         return worker_pack_container(site_run);
-    case GS1_INVENTORY_CONTAINER_CAMP_STORAGE:
-        return camp_storage_container(site_run);
     case GS1_INVENTORY_CONTAINER_DEVICE_STORAGE:
         return owner_entity_id == 0U
             ? flecs::entity {}
@@ -312,10 +318,6 @@ inline void sync_projection_views(SiteRunState& site_run)
         site_run,
         worker_pack_container(site_run),
         site_run.inventory.worker_pack_slots);
-    sync_projection_slots_for_container(
-        site_run,
-        camp_storage_container(site_run),
-        site_run.inventory.camp_storage_slots);
 }
 
 inline void initialize_site_inventory_storage(SiteRunState& site_run)
@@ -324,24 +326,13 @@ inline void initialize_site_inventory_storage(SiteRunState& site_run)
     {
         site_run.inventory.worker_pack_slots.resize(site_run.inventory.worker_pack_slot_count);
     }
-    if (site_run.inventory.camp_storage_slots.size() != site_run.inventory.camp_storage_slot_count)
-    {
-        site_run.inventory.camp_storage_slots.resize(site_run.inventory.camp_storage_slot_count);
-    }
 
     const auto worker_container = ensure_storage_container(
         site_run,
         StorageContainerKind::WorkerPack,
         site_run.inventory.worker_pack_slot_count);
-    const auto camp_container = ensure_storage_container(
-        site_run,
-        StorageContainerKind::CampStorage,
-        site_run.inventory.camp_storage_slot_count,
-        site_run.camp.camp_storage_tile,
-        true);
 
     site_run.inventory.worker_pack_container_entity_id = worker_container.id();
-    site_run.inventory.camp_storage_container_entity_id = camp_container.id();
     sync_projection_views(site_run);
 }
 
@@ -398,23 +389,17 @@ inline void import_projection_slots_into_container_if_needed(
 inline void import_projection_views_into_storage_if_needed(SiteRunState& site_run)
 {
     const auto worker_projection = site_run.inventory.worker_pack_slots;
-    const auto camp_projection = site_run.inventory.camp_storage_slots;
     initialize_site_inventory_storage(site_run);
     import_projection_slots_into_container_if_needed(
         site_run,
         worker_pack_container(site_run),
         worker_projection);
-    import_projection_slots_into_container_if_needed(
-        site_run,
-        camp_storage_container(site_run),
-        camp_projection);
     sync_projection_views(site_run);
 }
 
 inline bool storage_initialized(const SiteRunState& site_run) noexcept
 {
-    return site_run.inventory.worker_pack_container_entity_id != 0U &&
-        site_run.inventory.camp_storage_container_entity_id != 0U;
+    return site_run.inventory.worker_pack_container_entity_id != 0U;
 }
 
 inline std::uint32_t add_item_to_container(

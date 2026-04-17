@@ -32,7 +32,7 @@ inline TileCoord default_starter_workbench_tile(TileCoord camp_anchor_tile) noex
     return TileCoord {camp_anchor_tile.x + 1, camp_anchor_tile.y};
 }
 
-inline TileCoord default_starter_camp_storage_tile(TileCoord camp_anchor_tile) noexcept
+inline TileCoord default_starter_storage_tile(TileCoord camp_anchor_tile) noexcept
 {
     return TileCoord {camp_anchor_tile.x - 1, camp_anchor_tile.y};
 }
@@ -111,11 +111,9 @@ inline SiteRunState make_test_site_run(
     site_run.run_status = SiteRunStatus::Active;
     site_run.clock.day_phase = DayPhase::Dawn;
     site_run.camp.camp_anchor_tile = camp_anchor_tile;
-    site_run.camp.camp_storage_tile = default_starter_camp_storage_tile(camp_anchor_tile);
+    site_run.camp.starter_storage_tile = default_starter_storage_tile(camp_anchor_tile);
     site_run.inventory.worker_pack_slot_count = 6U;
-    site_run.inventory.camp_storage_slot_count = 24U;
     site_run.inventory.worker_pack_slots.resize(site_run.inventory.worker_pack_slot_count);
-    site_run.inventory.camp_storage_slots.resize(site_run.inventory.camp_storage_slot_count);
     site_run.task_board.accepted_task_cap = 3U;
     site_run.counters.site_completion_tile_threshold = 3U;
 
@@ -136,12 +134,12 @@ inline SiteRunState make_test_site_run(
             100.0f,
             1.0f,
             false});
-    if (site_run.site_world->contains(site_run.camp.camp_storage_tile))
+    if (site_run.site_world->contains(site_run.camp.starter_storage_tile))
     {
-        auto tile = site_run.site_world->tile_at(site_run.camp.camp_storage_tile);
+        auto tile = site_run.site_world->tile_at(site_run.camp.starter_storage_tile);
         tile.device.structure_id = gs1::StructureId {gs1::k_structure_storage_crate};
         tile.device.device_integrity = 1.0f;
-        site_run.site_world->set_tile(site_run.camp.camp_storage_tile, tile);
+        site_run.site_world->set_tile(site_run.camp.starter_storage_tile, tile);
     }
     if (site_id == 1U && site_run.site_world->contains(default_starter_workbench_tile(camp_anchor_tile)))
     {
@@ -206,6 +204,11 @@ inline flecs::entity worker_entity(SiteRunState& site_run)
 
     const auto entity_id = site_run.site_world->worker_entity_id();
     return entity_id == 0U ? flecs::entity {} : site_run.site_world->ecs_world().entity(entity_id);
+}
+
+inline flecs::entity starter_storage_container(SiteRunState& site_run)
+{
+    return gs1::inventory_storage::starter_storage_container(site_run);
 }
 
 template <typename Component, typename Func>

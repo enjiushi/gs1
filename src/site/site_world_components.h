@@ -48,8 +48,7 @@ struct TileCoordComponent final
 enum class StorageContainerKind : std::uint8_t
 {
     WorkerPack = 0,
-    CampStorage = 1,
-    DeviceStorage = 2
+    DeviceStorage = 1
 };
 
 struct StorageContainerKindComponent final

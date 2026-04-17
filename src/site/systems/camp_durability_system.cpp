@@ -68,7 +68,7 @@ void refresh_memory_with_current_state(SiteSystemContext<CampDurabilitySystem>& 
     memory.last_reported_durability = camp.camp_durability;
     memory.last_protection_resolved = camp.camp_protection_resolved;
     memory.last_delivery_operational = camp.delivery_point_operational;
-    memory.last_shared_storage_access_enabled = camp.shared_camp_storage_access_enabled;
+    memory.last_shared_storage_access_enabled = camp.shared_storage_access_enabled;
 }
 
 void ensure_memory_for_run(SiteSystemContext<CampDurabilitySystem>& context)
@@ -127,7 +127,7 @@ Gs1Status CampDurabilitySystem::process_command(
     camp.camp_durability = k_camp_durability_max;
     camp.camp_protection_resolved = true;
     camp.delivery_point_operational = true;
-    camp.shared_camp_storage_access_enabled = true;
+    camp.shared_storage_access_enabled = true;
     refresh_memory_with_current_state(context);
     return GS1_STATUS_OK;
 }
@@ -158,7 +158,7 @@ void CampDurabilitySystem::run(SiteSystemContext<CampDurabilitySystem>& context)
 
     camp.camp_protection_resolved = protection_resolved;
     camp.delivery_point_operational = delivery_operational;
-    camp.shared_camp_storage_access_enabled = shared_storage_access_enabled;
+    camp.shared_storage_access_enabled = shared_storage_access_enabled;
 
     apply_projection_if_needed(
         context,

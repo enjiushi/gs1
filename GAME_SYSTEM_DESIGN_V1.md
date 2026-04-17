@@ -108,10 +108,10 @@ The current prototype implementation makes these item/storage rules explicit:
 - authored materials such as wood, iron, plant fiber, water, and seed bundles are all ordinary `ItemDef` rows
 - `ItemDef` may be both consumable and a crafting ingredient; crafting-material behavior does not require a separate authored attribute
 - deployable kits are also ordinary items and point at an authored `StructureDef`
-- starter camp storage is a fixed shared camp container, while deployed devices keep per-device storage containers with authored slot counts
+- the site begins with a starter storage crate device, and all on-site storage resolves through per-device storage containers with authored slot counts
 - crafting stations cache nearby item-instance ids from local storage plus the worker pack when the worker is inside the craft radius
 - crafting actions are timed site actions; on completion they resolve recipe consumption across matching stacks and place output into the acting device's own storage
-- phone selling resolves against a global item-instance cache that includes worker, camp, and device storage
+- phone selling resolves against a global item-instance cache that includes worker-pack items plus all device storage
 
 ## 2. Top-Level Code Structure
 
@@ -300,7 +300,7 @@ Owns:
 - one active site attempt and all mutable in-site state
 - tile simulation
 - worker condition
-- inventory and camp storage
+- inventory and device storage
 - weather and events
 - task board
 - money flow during the site
@@ -724,7 +724,7 @@ campAnchorTile
 campDurability
 campProtectionResolved
 deliveryPointOperational
-sharedCampStorageAccessEnabled
+sharedStorageAccessEnabled
 ```
 
 Rules:
@@ -738,9 +738,7 @@ Required fields:
 
 ```text
 workerPackSlotCount
-campStorageSlotCount
 workerPackSlots[]
-campStorageSlots[]
 pendingDeliveryQueue[]
 ```
 
@@ -766,7 +764,7 @@ Rules:
 - one slot holds one stack of one exact item
 - empty slot means `itemId = null`
 - `itemQuantity` is removed when it reaches `0`
-- selling requires items to be in `campStorageSlots[]`
+- selling reads item-instance state from the worker pack plus all device storage containers
 
 ### 6.14 `ContractorState`
 
@@ -926,7 +924,7 @@ availablePhoneListings
 `availablePhoneListings` contains:
 
 - buyable item listings
-- sellable item summaries from camp storage
+- sellable item summaries from worker-pack and device-stored item-instance caches
 - contractor hiring offerings
 - revealed unlockable purchase offerings
 
@@ -1124,8 +1122,8 @@ Rule:
 | `runStatus`, `resultNewlyRevealedSiteCount` | `CampaignFlowSystem` | resolved when `SiteAttemptEnded` is processed |
 | `SiteClockState` | `SiteFlowSystem` | fixed-step time owner |
 | `CampState.campAnchorTile` | site bootstrap (`SiteRunFactory`) | initialized from site content |
-| `CampState.campDurability`, `CampState.campProtectionResolved`, `CampState.deliveryPointOperational`, `CampState.sharedCampStorageAccessEnabled` | `CampDurabilitySystem` | durability/service-state owner |
-| `InventoryState.workerPackSlotCount`, `InventoryState.campStorageSlotCount` | site bootstrap (`SiteRunFactory`) | initialized on site creation |
+| `CampState.campDurability`, `CampState.campProtectionResolved`, `CampState.deliveryPointOperational`, `CampState.sharedStorageAccessEnabled` | `CampDurabilitySystem` | durability/service-state owner |
+| `InventoryState.workerPackSlotCount` | site bootstrap (`SiteRunFactory`) | initialized on site creation |
 | inventory slots and item use/transfer state | `InventorySystem` | current runtime inventory owner |
 | `ContractorState` | no active mutating owner in current code | state exists but no gameplay system currently mutates it |
 | `WeatherState`, `EventState` | `WeatherEventSystem` | weather/event singleton owner |
@@ -1258,11 +1256,11 @@ Responsibilities:
 
 Responsibilities:
 
-- move items between worker pack and camp storage
+- move items between worker pack and device storage
 - process delivery arrival
 - handle stack merge/split
 - consume carried items for actions
-- apply camp-stored item damage or spoilage during severe hazards
+- apply device-stored item damage or spoilage during severe hazards
 
 ### 10.11 `EconomyPhoneSystem`
 

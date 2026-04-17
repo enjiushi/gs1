@@ -184,8 +184,7 @@ enum Gs1TaskPresentationListKind : std::uint8_t
 enum Gs1InventoryContainerKind : std::uint8_t
 {
     GS1_INVENTORY_CONTAINER_WORKER_PACK = 0,
-    GS1_INVENTORY_CONTAINER_CAMP_STORAGE = 1,
-    GS1_INVENTORY_CONTAINER_DEVICE_STORAGE = 2
+    GS1_INVENTORY_CONTAINER_DEVICE_STORAGE = 1
 };
 
 enum Gs1PhoneListingPresentationKind : std::uint8_t

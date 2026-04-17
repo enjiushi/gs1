@@ -94,8 +94,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const craftCacheRadiusTiles = 5;
     const inventoryContainerCodes = {
         WORKER_PACK: 0,
-        CAMP_STORAGE: 1,
-        DEVICE_STORAGE: 2
+        DEVICE_STORAGE: 1
     };
     let inventoryCache = createEmptyInventoryCache();
     const itemCatalog = {
@@ -547,12 +546,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function getOpenableStorageContainersForTile(state, tileX, tileY) {
-        const containersAtTile = getInventoryContainers(state).filter((container) =>
+        return getInventoryContainers(state).filter((container) =>
             container.containerKind !== "WORKER_PACK" &&
             container.containerTileX === tileX &&
             container.containerTileY === tileY);
-        const campStorageContainers = containersAtTile.filter((container) => container.containerKind === "CAMP_STORAGE");
-        return campStorageContainers.length > 0 ? campStorageContainers : containersAtTile;
     }
 
     function findOpenedInventoryContainer(state) {
@@ -598,9 +595,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
         if (containerInfo.containerKind === "WORKER_PACK") {
             return "Worker Pack";
-        }
-        if (containerInfo.containerKind === "CAMP_STORAGE") {
-            return "Camp Storage (" + containerInfo.containerTileX + ", " + containerInfo.containerTileY + ")";
         }
 
         const tile = getTileSnapshot(state, containerInfo.containerTileX, containerInfo.containerTileY);
@@ -1639,7 +1633,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const footnote = document.createElement("div");
         footnote.className = "inventory-footnote";
         footnote.textContent =
-            "Baseline support is packed before deployment. Water and recovery supplies start carried; seeds and raw materials begin in camp storage.";
+            "Baseline support is packed before deployment. Water and recovery supplies start carried; seeds and raw materials begin in the starter storage crate.";
         stack.appendChild(footnote);
     }
 
@@ -1711,12 +1705,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         const tile = getTileSnapshot(state, currentOpenedContainer.containerTileX, currentOpenedContainer.containerTileY);
         const structureMeta = getStructureMeta(tile ? tile.structureTypeId : 0);
-        const slotCount = currentOpenedContainer.containerKind === "CAMP_STORAGE"
-            ? 24
-            : (structureMeta ? structureMeta.slotCount : Math.max(currentOpenedContainer.slots.length, 1));
-        storagePanelSubtitle.textContent = currentOpenedContainer.containerKind === "CAMP_STORAGE"
-            ? "Starter camp stockpile"
-            : (structureMeta ? ("Device storage - " + structureMeta.slotCount + " slots") : "Device storage");
+        const slotCount = structureMeta
+            ? structureMeta.slotCount
+            : Math.max(currentOpenedContainer.slots.length, 1);
+        storagePanelSubtitle.textContent = structureMeta
+            ? ("Device storage - " + structureMeta.slotCount + " slots")
+            : "Device storage";
 
         storagePanelBody.innerHTML = "";
         const stack = document.createElement("div");
@@ -1736,7 +1730,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 containerTileY: currentOpenedContainer.containerTileY,
                 slotCount: slotCount,
                 columns: slotCount <= 6 ? 3 : 4,
-                slotLabelPrefix: currentOpenedContainer.containerKind === "CAMP_STORAGE" ? "Camp" : "Device",
+                slotLabelPrefix: "Device",
                 selectedSlotKey: selectedInventorySlotKey
             });
     }
@@ -1789,9 +1783,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 const target = findTransferTargetSlot(state, selectedSlot, containerInfo);
                 const targetLabel = containerInfo.containerKind === "WORKER_PACK"
                     ? "Carry To Pack"
-                    : (containerInfo.containerKind === "CAMP_STORAGE"
-                        ? "Store To Camp"
-                        : ("Move To " + getContainerDisplayName(state, containerInfo)));
+                    : ("Move To " + getContainerDisplayName(state, containerInfo));
                 contextActions.appendChild(
                     makeButton(
                         targetLabel,
@@ -2297,7 +2289,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             : "Craft or collect deployable kits, then right-click open ground to place them.";
         const storageText = openedContainerInfo
             ? ("Opened container: " + getContainerDisplayName(state, openedContainerInfo) + ".")
-            : "Right-click the camp storage crate, workbench, stove, or another storage device to open that specific container.";
+            : "Right-click the starter storage crate, workbench, stove, or another storage device to open that specific container.";
         selectionText.innerHTML = siteBootstrap
             ? (
                 "Site " + siteBootstrap.siteId +

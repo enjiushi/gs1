@@ -49,11 +49,11 @@ struct SiteClockState final
 struct CampState final
 {
     TileCoord camp_anchor_tile {};
-    TileCoord camp_storage_tile {};
+    TileCoord starter_storage_tile {};
     float camp_durability {100.0f};
     bool camp_protection_resolved {true};
     bool delivery_point_operational {true};
-    bool shared_camp_storage_access_enabled {true};
+    bool shared_storage_access_enabled {true};
 };
 
 struct SiteCounters final
@@ -91,7 +91,5 @@ struct SiteRunState final
     bool pending_full_inventory_projection_update {false};
     std::vector<std::uint32_t> pending_worker_pack_inventory_projection_updates {};
     std::vector<std::uint8_t> pending_worker_pack_inventory_projection_update_mask {};
-    std::vector<std::uint32_t> pending_camp_storage_inventory_projection_updates {};
-    std::vector<std::uint8_t> pending_camp_storage_inventory_projection_update_mask {};
 };
 }  // namespace gs1

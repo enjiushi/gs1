@@ -444,10 +444,8 @@ public:
             pending_update_mask = &site_run_.pending_worker_pack_inventory_projection_update_mask;
             slot_count = site_run_.inventory.worker_pack_slot_count;
             break;
-        case GS1_INVENTORY_CONTAINER_CAMP_STORAGE:
-            pending_updates = &site_run_.pending_camp_storage_inventory_projection_updates;
-            pending_update_mask = &site_run_.pending_camp_storage_inventory_projection_update_mask;
-            slot_count = site_run_.inventory.camp_storage_slot_count;
+        case GS1_INVENTORY_CONTAINER_DEVICE_STORAGE:
+            mark_projection_dirty(SITE_PROJECTION_UPDATE_INVENTORY);
             break;
         default:
             return;

@@ -1578,7 +1578,7 @@ void GameRuntime::queue_site_camp_update_command()
     camp_payload.durability_normalized = active_site_run_->camp.camp_durability / 100.0f;
     camp_payload.flags =
         (active_site_run_->camp.delivery_point_operational ? 1U : 0U) |
-        (active_site_run_->camp.shared_camp_storage_access_enabled ? 2U : 0U);
+        (active_site_run_->camp.shared_storage_access_enabled ? 2U : 0U);
     engine_commands_.push_back(camp_command);
 }
 
@@ -1625,18 +1625,6 @@ void GameRuntime::queue_site_inventory_slot_upsert_command(
         }
 
         slot = active_site_run_->inventory.worker_pack_slots[slot_index];
-    }
-    else if (container_kind == GS1_INVENTORY_CONTAINER_CAMP_STORAGE)
-    {
-        if (slot_index >= active_site_run_->inventory.camp_storage_slots.size())
-        {
-            return;
-        }
-
-        slot = active_site_run_->inventory.camp_storage_slots[slot_index];
-        container_tile = inventory_storage::container_tile_coord(
-            active_site_run_.value(),
-            inventory_storage::camp_storage_container(active_site_run_.value()));
     }
     else if (container_kind == GS1_INVENTORY_CONTAINER_DEVICE_STORAGE)
     {
@@ -1686,11 +1674,6 @@ void GameRuntime::queue_all_site_inventory_slot_upsert_commands()
         queue_site_inventory_slot_upsert_command(GS1_INVENTORY_CONTAINER_WORKER_PACK, index);
     }
 
-    for (std::uint32_t index = 0; index < active_site_run_->inventory.camp_storage_slots.size(); ++index)
-    {
-        queue_site_inventory_slot_upsert_command(GS1_INVENTORY_CONTAINER_CAMP_STORAGE, index);
-    }
-
     using namespace site_ecs;
     const auto containers = inventory_storage::collect_all_storage_containers(active_site_run_.value(), true);
     for (const auto& container : containers)
@@ -1730,8 +1713,7 @@ void GameRuntime::queue_pending_site_inventory_slot_upsert_commands()
 
     auto& site_run = active_site_run_.value();
     if (site_run.pending_full_inventory_projection_update ||
-        (site_run.pending_worker_pack_inventory_projection_updates.empty() &&
-            site_run.pending_camp_storage_inventory_projection_updates.empty()))
+        site_run.pending_worker_pack_inventory_projection_updates.empty())
     {
         queue_all_site_inventory_slot_upsert_commands();
         return;
@@ -1743,14 +1725,6 @@ void GameRuntime::queue_pending_site_inventory_slot_upsert_commands()
     for (const auto slot_index : site_run.pending_worker_pack_inventory_projection_updates)
     {
         queue_site_inventory_slot_upsert_command(GS1_INVENTORY_CONTAINER_WORKER_PACK, slot_index);
-    }
-
-    std::sort(
-        site_run.pending_camp_storage_inventory_projection_updates.begin(),
-        site_run.pending_camp_storage_inventory_projection_updates.end());
-    for (const auto slot_index : site_run.pending_camp_storage_inventory_projection_updates)
-    {
-        queue_site_inventory_slot_upsert_command(GS1_INVENTORY_CONTAINER_CAMP_STORAGE, slot_index);
     }
 }
 
@@ -2082,15 +2056,6 @@ void GameRuntime::clear_pending_site_inventory_projection_updates() noexcept
         }
     }
     site_run.pending_worker_pack_inventory_projection_updates.clear();
-
-    for (const auto slot_index : site_run.pending_camp_storage_inventory_projection_updates)
-    {
-        if (slot_index < site_run.pending_camp_storage_inventory_projection_update_mask.size())
-        {
-            site_run.pending_camp_storage_inventory_projection_update_mask[slot_index] = 0U;
-        }
-    }
-    site_run.pending_camp_storage_inventory_projection_updates.clear();
 
     site_run.pending_full_inventory_projection_update = false;
 }

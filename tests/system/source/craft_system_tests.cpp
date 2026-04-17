@@ -149,13 +149,13 @@ void inventory_craft_commit_consumes_nearby_ingredients_and_outputs_to_device_st
         context,
         gs1::inventory_storage::available_item_quantity_in_container(
             site_run,
-            gs1::inventory_storage::camp_storage_container(site_run),
+            gs1::inventory_storage::starter_storage_container(site_run),
             gs1::ItemId {gs1::k_item_wood_bundle}) == 3U);
     GS1_SYSTEM_TEST_CHECK(
         context,
         gs1::inventory_storage::available_item_quantity_in_container(
             site_run,
-            gs1::inventory_storage::camp_storage_container(site_run),
+            gs1::inventory_storage::starter_storage_container(site_run),
             gs1::ItemId {gs1::k_item_iron_bundle}) == 2U);
 }
 

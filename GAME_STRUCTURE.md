@@ -367,10 +367,10 @@ For the current prototype implementation:
 - every stackable item is an authored `ItemDef`; crafting materials are not a separate top-level resource family
 - an item stack has a unique runtime item-instance id even when several stacks share the same authored `ItemId`
 - storage uses Flecs relationships in the chain `Item -> Slot -> Container`, with container-to-tile and container-to-device links for local queries
-- the site begins with one starter camp-storage container and one starter workbench so fabrication can bootstrap immediately
-- deployed crafting devices and storage crates keep their own storage slots instead of aliasing the starter camp storage
+- the site begins with one starter storage crate device and one starter workbench so fabrication can bootstrap immediately
+- every on-site storage source, including the starter crate, resolves through device-backed storage slots
 - nearby crafting queries read all storage containers in the device's local area plus the worker pack when the worker is nearby
-- selling uses a global live cache that includes worker inventory, camp storage, and deployed device storage rather than one camp-only sell source
+- selling uses a global live cache that includes worker inventory and all device storage rather than one starter-storage-only sell source
 
 Rule:
 

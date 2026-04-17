@@ -166,8 +166,6 @@ const char* inventory_container_name(Gs1InventoryContainerKind kind)
     {
     case GS1_INVENTORY_CONTAINER_DEVICE_STORAGE:
         return "DEVICE_STORAGE";
-    case GS1_INVENTORY_CONTAINER_CAMP_STORAGE:
-        return "CAMP_STORAGE";
     case GS1_INVENTORY_CONTAINER_WORKER_PACK:
     default:
         return "WORKER_PACK";

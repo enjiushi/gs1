@@ -59,7 +59,7 @@ Current seeded site state after entry:
 - Active task count: `0`
 - Site completion: `0%`
 - Weather: seeded Site 1 warning event, roughly heat `15`, wind `10`, dust `5`, event phase `WARNING`
-- Starter inventory: worker pack and camp storage include seeded occupied slots
+- Starter inventory: worker pack and starter storage crate include seeded occupied slots
 - Phone listings: one seeded buy listing, one sell listing, one contractor listing, and one unlockable listing
 - Tiles: all default terrain on entry, but they can now change through runtime action flow
 
@@ -248,7 +248,7 @@ Purpose: freeze the shared message meanings before splitting work across multipl
 | `DeviceSupportSystem` | Structure occupancy, device efficiency, device stored water, device support outputs | Build/repair facts, weather pressure, modifier totals | `DeviceSupportOutputChanged`, `DeviceIrrigationApplied`, `DeviceStoredWaterChanged` |
 | `DeviceMaintenanceSystem` | Device integrity and damage/repair state | Weather pressure, burial, repair facts | `DeviceIntegrityChanged`, `DeviceDisabled`, `DeviceRecovered` |
 | `CampDurabilitySystem` | Camp durability and camp service flags | Weather pressure, repair facts, site state | `CampStateChanged`, `CampDisabled`, `CampDestroyed` |
-| `InventorySystem` | Worker pack slots, camp storage slots, pending deliveries, item reservations | Economy purchases, action needs, task rewards, hazard facts | `InventorySlotChanged`, `InventoryItemsReserved`, `InventoryReservationFailed`, `InventoryDeliveryArrived` |
+| `InventorySystem` | Worker pack slots, device-backed storage slots, pending deliveries, item reservations | Economy purchases, action needs, task rewards, hazard facts | `InventorySlotChanged`, `InventoryItemsReserved`, `InventoryReservationFailed`, `InventoryDeliveryArrived` |
 | `EconomyPhoneSystem` | Money, phone listings, site unlockable availability | Task reward grants, inventory sale requests, site run start | `MoneyChanged`, `PhoneListingChanged`, `PhoneListingPurchased`, `PhoneListingRejected`, item/contractor grant requests |
 | `TaskBoardSystem` | Visible, accepted, completed, and chain task runtime state | Action result facts, inventory facts, restoration progress, weather milestones | `TaskAccepted`, `TaskProgressChanged`, `TaskCompleted`, `TaskRewardClaimed`, reward grant requests |
 | `ModifierSystem` | Active run modifiers, nearby-site aura modifiers, resolved modifier channel totals | Site run start, task rewards, aftermath relief, technology state | `ModifierTotalsChanged`, `ModifierExpired` |
@@ -275,7 +275,7 @@ Implemented public host/API additions:
 | `GS1_UI_ACTION_BUY_PHONE_LISTING` | Listing id and quantity | `PhoneListingPurchaseRequested` | Can use existing `Gs1UiAction.target_id/arg0`. |
 | `GS1_UI_ACTION_SELL_PHONE_LISTING` | Listing id or item id and quantity | `PhoneListingSaleRequested` | Can use existing `Gs1UiAction.target_id/arg0`. |
 | `GS1_UI_ACTION_USE_INVENTORY_ITEM` | Container, slot, quantity | `InventoryItemUseRequested` | Inventory owns item removal and emits worker/effect commands. |
-| `GS1_UI_ACTION_TRANSFER_INVENTORY_ITEM` | Source container/slot, destination container/slot, quantity | `InventoryTransferRequested` | Needed once worker pack and camp storage are visible. |
+| `GS1_UI_ACTION_TRANSFER_INVENTORY_ITEM` | Source container/slot, destination container/slot, quantity | `InventoryTransferRequested` | Needed once worker pack and device storage are visible. |
 | `GS1_UI_ACTION_HIRE_CONTRACTOR` | Listing id or contractor offer id | `ContractorHireRequested` | Economy owns payment, contractor state owns work capacity. |
 | `GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE` | Unlockable id | `SiteUnlockablePurchaseRequested` | Economy owns money and available unlockables. |
 

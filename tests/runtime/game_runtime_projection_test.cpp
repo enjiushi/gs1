@@ -1,10 +1,12 @@
 #include "runtime/game_runtime.h"
 #include "content/defs/item_defs.h"
+#include "site/inventory_storage.h"
 #include "site/site_world_access.h"
 
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
+#include <limits>
 #include <vector>
 
 namespace
@@ -135,6 +137,14 @@ std::uint64_t pack_inventory_transfer_arg(
         (static_cast<std::uint64_t>(quantity & 0xffffU) << 32U);
 }
 
+std::uint64_t pack_inventory_transfer_owner_arg(
+    std::uint32_t source_owner_id,
+    std::uint32_t destination_owner_id)
+{
+    return static_cast<std::uint64_t>(source_owner_id) |
+        (static_cast<std::uint64_t>(destination_owner_id) << 32U);
+}
+
 Gs1HostEvent make_ui_action_event(const Gs1UiAction& action)
 {
     Gs1HostEvent event {};
@@ -202,6 +212,7 @@ std::vector<const Gs1EngineCommand*> collect_inventory_slot_commands(
 const Gs1EngineCommand* find_inventory_slot_command(
     const std::vector<Gs1EngineCommand>& commands,
     Gs1InventoryContainerKind container_kind,
+    std::uint32_t container_owner_id,
     std::uint16_t slot_index)
 {
     for (const auto& command : commands)
@@ -212,13 +223,41 @@ const Gs1EngineCommand* find_inventory_slot_command(
         }
 
         const auto& payload = command.payload_as<Gs1EngineCommandInventorySlotData>();
-        if (payload.container_kind == container_kind && payload.slot_index == slot_index)
+        if (payload.container_kind == container_kind &&
+            payload.container_owner_id == container_owner_id &&
+            payload.slot_index == slot_index)
         {
             return &command;
         }
     }
 
     return nullptr;
+}
+
+std::uint32_t starter_storage_owner_id(const gs1::SiteRunState& site_run)
+{
+    return static_cast<std::uint32_t>(site_run.site_world->device_entity_id(site_run.camp.starter_storage_tile));
+}
+
+std::uint16_t find_starter_storage_slot_index(
+    gs1::SiteRunState& site_run,
+    gs1::ItemId item_id,
+    std::uint32_t quantity)
+{
+    const auto container = gs1::inventory_storage::starter_storage_container(site_run);
+    const auto slot_count = gs1::inventory_storage::slot_count_in_container(site_run, container);
+    for (std::uint32_t slot_index = 0U; slot_index < slot_count; ++slot_index)
+    {
+        const auto slot = gs1::inventory_storage::slot_entity(site_run, container, slot_index);
+        const auto item = gs1::inventory_storage::item_entity_for_slot(site_run, slot);
+        const auto* stack = gs1::inventory_storage::stack_data(site_run, item);
+        if (stack != nullptr && stack->item_id == item_id && stack->quantity == quantity)
+        {
+            return static_cast<std::uint16_t>(slot_index);
+        }
+    }
+
+    return std::numeric_limits<std::uint16_t>::max();
 }
 
 bool contains_ui_element_text(
@@ -274,6 +313,18 @@ int main()
     assert(bootstrap_site_run.inventory.worker_pack_slots.size() == 6U);
     assert(bootstrap_site_run.inventory.worker_pack_slots[0].occupied);
     assert(bootstrap_site_run.inventory.worker_pack_slots[0].item_id.value == 1U);
+    assert(gs1::inventory_storage::available_item_quantity_in_container(
+               bootstrap_site_run,
+               gs1::inventory_storage::starter_storage_container(bootstrap_site_run),
+               gs1::ItemId {gs1::k_item_wind_reed_seed_bundle}) == 8U);
+    assert(gs1::inventory_storage::available_item_quantity_in_container(
+               bootstrap_site_run,
+               gs1::inventory_storage::starter_storage_container(bootstrap_site_run),
+               gs1::ItemId {gs1::k_item_wood_bundle}) == 6U);
+    assert(gs1::inventory_storage::available_item_quantity_in_container(
+               bootstrap_site_run,
+               gs1::inventory_storage::starter_storage_container(bootstrap_site_run),
+               gs1::ItemId {gs1::k_item_iron_bundle}) == 4U);
     assert(bootstrap_site_run.task_board.visible_tasks.size() == 1U);
     assert(bootstrap_site_run.economy.money == 45);
     assert(bootstrap_site_run.economy.available_phone_listings.size() >= 11U);
@@ -314,23 +365,23 @@ int main()
 
     Gs1Phase1Result delivery_result {};
     run_phase1(runtime, 3.0, delivery_result);
-    const auto delivered_slot = std::find_if(
-        bootstrap_site_run.inventory.camp_storage_slots.begin(),
-        bootstrap_site_run.inventory.camp_storage_slots.end(),
-        [](const auto& slot) {
-            return slot.occupied && slot.item_id.value == gs1::k_item_water_container && slot.item_quantity == 1U;
-        });
-    assert(delivered_slot != bootstrap_site_run.inventory.camp_storage_slots.end());
-    const auto delivered_slot_index = static_cast<std::uint16_t>(
-        std::distance(bootstrap_site_run.inventory.camp_storage_slots.begin(), delivered_slot));
+    const auto delivered_slot_index = find_starter_storage_slot_index(
+        bootstrap_site_run,
+        gs1::ItemId {gs1::k_item_water_container},
+        1U);
+    assert(delivered_slot_index != std::numeric_limits<std::uint16_t>::max());
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
     const auto delivery_commands = drain_engine_commands(runtime);
     const auto delivery_inventory_commands = collect_inventory_slot_commands(delivery_commands);
-    assert(delivery_inventory_commands.size() == 1U);
+    assert(!delivery_inventory_commands.empty());
+    const auto* delivered_command = find_inventory_slot_command(
+        delivery_commands,
+        GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
+        starter_storage_owner_id(bootstrap_site_run),
+        delivered_slot_index);
+    assert(delivered_command != nullptr);
     {
-        const auto& payload = delivery_inventory_commands.front()->payload_as<Gs1EngineCommandInventorySlotData>();
-        assert(payload.container_kind == GS1_INVENTORY_CONTAINER_CAMP_STORAGE);
-        assert(payload.slot_index == delivered_slot_index);
+        const auto& payload = delivered_command->payload_as<Gs1EngineCommandInventorySlotData>();
         assert(payload.item_id == gs1::k_item_water_container);
         assert(payload.quantity == 1U);
     }
@@ -398,28 +449,40 @@ int main()
     Gs1UiAction transfer_action {};
     transfer_action.type = GS1_UI_ACTION_TRANSFER_INVENTORY_ITEM;
     transfer_action.arg0 = pack_inventory_transfer_arg(
-        GS1_INVENTORY_CONTAINER_CAMP_STORAGE,
+        GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
         0U,
         GS1_INVENTORY_CONTAINER_WORKER_PACK,
         3U,
         2U);
+    transfer_action.arg1 = pack_inventory_transfer_owner_arg(
+        starter_storage_owner_id(ui_site_run),
+        0U);
     auto transfer_event = make_ui_action_event(transfer_action);
 
     Gs1Phase1Result transfer_result {};
     assert(ui_runtime.submit_host_events(&transfer_event, 1U) == GS1_STATUS_OK);
     run_phase1(ui_runtime, 0.0, transfer_result);
     assert(transfer_result.processed_host_event_count == 1U);
-    assert(ui_site_run.inventory.camp_storage_slots[0].occupied);
-    assert(ui_site_run.inventory.camp_storage_slots[0].item_id.value == gs1::k_item_wind_reed_seed_bundle);
-    assert(ui_site_run.inventory.camp_storage_slots[0].item_quantity == 6U);
+    assert(gs1::inventory_storage::available_item_quantity_in_container(
+               ui_site_run,
+               gs1::inventory_storage::starter_storage_container(ui_site_run),
+               gs1::ItemId {gs1::k_item_wind_reed_seed_bundle}) == 6U);
     assert(ui_site_run.inventory.worker_pack_slots[3].occupied);
     assert(ui_site_run.inventory.worker_pack_slots[3].item_id.value == gs1::k_item_wind_reed_seed_bundle);
     assert(ui_site_run.inventory.worker_pack_slots[3].item_quantity == 2U);
     const auto transfer_commands = drain_engine_commands(ui_runtime);
     const auto transfer_inventory_commands = collect_inventory_slot_commands(transfer_commands);
-    assert(transfer_inventory_commands.size() == 2U);
-    assert(find_inventory_slot_command(transfer_commands, GS1_INVENTORY_CONTAINER_CAMP_STORAGE, 0U) != nullptr);
-    assert(find_inventory_slot_command(transfer_commands, GS1_INVENTORY_CONTAINER_WORKER_PACK, 3U) != nullptr);
+    assert(!transfer_inventory_commands.empty());
+    assert(find_inventory_slot_command(
+               transfer_commands,
+               GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
+               starter_storage_owner_id(ui_site_run),
+               0U) != nullptr);
+    assert(find_inventory_slot_command(
+               transfer_commands,
+               GS1_INVENTORY_CONTAINER_WORKER_PACK,
+               0U,
+               3U) != nullptr);
 
     Gs1UiAction use_action {};
     use_action.type = GS1_UI_ACTION_USE_INVENTORY_ITEM;
@@ -440,7 +503,11 @@ int main()
     const auto use_commands = drain_engine_commands(ui_runtime);
     const auto use_inventory_commands = collect_inventory_slot_commands(use_commands);
     assert(use_inventory_commands.size() == 1U);
-    assert(find_inventory_slot_command(use_commands, GS1_INVENTORY_CONTAINER_WORKER_PACK, 0U) != nullptr);
+    assert(find_inventory_slot_command(
+               use_commands,
+               GS1_INVENTORY_CONTAINER_WORKER_PACK,
+               0U,
+               0U) != nullptr);
     assert(!collect_commands_of_type(use_commands, GS1_ENGINE_COMMAND_SITE_WORKER_UPDATE).empty());
     assert(!collect_commands_of_type(use_commands, GS1_ENGINE_COMMAND_HUD_STATE).empty());
 

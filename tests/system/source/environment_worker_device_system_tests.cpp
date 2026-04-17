@@ -304,7 +304,7 @@ void camp_durability_resets_and_crosses_service_thresholds(gs1::testing::SystemT
     site_run.camp.camp_durability = 25.0f;
     site_run.camp.camp_protection_resolved = false;
     site_run.camp.delivery_point_operational = false;
-    site_run.camp.shared_camp_storage_access_enabled = false;
+    site_run.camp.shared_storage_access_enabled = false;
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -316,7 +316,7 @@ void camp_durability_resets_and_crosses_service_thresholds(gs1::testing::SystemT
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.camp.camp_durability, 100.0f));
     GS1_SYSTEM_TEST_CHECK(context, site_run.camp.camp_protection_resolved);
     GS1_SYSTEM_TEST_CHECK(context, site_run.camp.delivery_point_operational);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.camp.shared_camp_storage_access_enabled);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.camp.shared_storage_access_enabled);
 
     site_run.weather.weather_heat = 100.0f;
     site_run.weather.weather_wind = 100.0f;
@@ -327,7 +327,7 @@ void camp_durability_resets_and_crosses_service_thresholds(gs1::testing::SystemT
     GS1_SYSTEM_TEST_CHECK(context, site_run.camp.camp_durability < 30.0f);
     GS1_SYSTEM_TEST_CHECK(context, !site_run.camp.camp_protection_resolved);
     GS1_SYSTEM_TEST_CHECK(context, !site_run.camp.delivery_point_operational);
-    GS1_SYSTEM_TEST_CHECK(context, !site_run.camp.shared_camp_storage_access_enabled);
+    GS1_SYSTEM_TEST_CHECK(context, !site_run.camp.shared_storage_access_enabled);
     GS1_SYSTEM_TEST_CHECK(
         context,
         (site_run.pending_projection_update_flags & gs1::SITE_PROJECTION_UPDATE_CAMP) != 0U);
