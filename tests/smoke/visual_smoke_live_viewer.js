@@ -1595,6 +1595,46 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return !!slot && slot.flags !== 0 && slot.itemId !== 0 && slot.quantity > 0;
     }
 
+    function handleInventorySlotPrimaryPress(slot, event) {
+        if (event.button !== 0) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        const primaryTransferClick = slotUsesPrimaryTransferClick(latestState, slot);
+        const transferTargetContainer = findPrimaryTransferTargetContainer(latestState, slot);
+
+        if (transferTargetContainer) {
+            selectedInventorySlotKey = "";
+            postInventoryTransfer(
+                slot,
+                transferTargetContainer.containerKind,
+                transferTargetContainer.containerOwnerId).catch(() => {
+                statusChip.textContent = "Failed to move inventory item.";
+            });
+            if (latestState) {
+                renderSiteOverlay(latestState);
+            }
+            return;
+        }
+
+        if (primaryTransferClick) {
+            return;
+        }
+
+        if (!slotSupportsSelection(slot)) {
+            return;
+        }
+
+        const clickedKey = slotKey(slot.containerKind, slot.slotIndex, slot.containerOwnerId);
+        selectedInventorySlotKey = selectedInventorySlotKey === clickedKey ? "" : clickedKey;
+        if (latestState) {
+            renderSiteOverlay(latestState);
+        }
+    }
+
     function createInventorySlotCard(label, slot, options) {
         const itemMeta = slot ? getItemMeta(slot.itemId) : null;
         const occupied = isOccupiedSlot(slot);
@@ -1663,35 +1703,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
 
         if (occupied && options.interactive !== false) {
-            card.addEventListener("click", function () {
-                const transferTargetContainer = findPrimaryTransferTargetContainer(latestState, slot);
-                if (transferTargetContainer) {
-                    selectedInventorySlotKey = "";
-                    postInventoryTransfer(
-                        slot,
-                        transferTargetContainer.containerKind,
-                        transferTargetContainer.containerOwnerId).catch(() => {
-                        statusChip.textContent = "Failed to move inventory item.";
-                    });
-                    if (latestState) {
-                        renderSiteOverlay(latestState);
-                    }
-                    return;
-                }
-
-                if (slotUsesPrimaryTransferClick(latestState, slot)) {
-                    return;
-                }
-
-                if (!slotSupportsSelection(slot)) {
-                    return;
-                }
-
-                const clickedKey = slotKey(slot.containerKind, slot.slotIndex, slot.containerOwnerId);
-                selectedInventorySlotKey = selectedInventorySlotKey === clickedKey ? "" : clickedKey;
-                if (latestState) {
-                    renderSiteOverlay(latestState);
-                }
+            card.addEventListener("mousedown", function (event) {
+                handleInventorySlotPrimaryPress(slot, event);
             });
         }
 
