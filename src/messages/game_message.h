@@ -422,6 +422,8 @@ struct InventoryItemConsumeRequestedMessage final
     std::uint8_t flags;
 };
 
+inline constexpr std::uint8_t k_inventory_item_consume_flag_ignore_action_reservations = 1U << 0U;
+
 struct InventoryGlobalItemConsumeRequestedMessage final
 {
     std::uint32_t item_id;

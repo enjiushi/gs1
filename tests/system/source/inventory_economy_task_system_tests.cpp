@@ -1,13 +1,16 @@
 #include "messages/game_message.h"
 #include "content/defs/item_defs.h"
+#include "site/systems/action_execution_system.h"
 #include "site/systems/economy_phone_system.h"
 #include "site/systems/inventory_system.h"
 #include "site/systems/task_board_system.h"
+#include "site/systems/worker_condition_system.h"
 #include "testing/system_test_registry.h"
 #include "system_test_fixtures.h"
 
 namespace
 {
+using gs1::ActionExecutionSystem;
 using gs1::EconomyPhoneSystem;
 using gs1::GameMessage;
 using gs1::GameMessageQueue;
@@ -17,6 +20,7 @@ using gs1::PhoneListingKind;
 using gs1::SiteRunStartedMessage;
 using gs1::TaskBoardSystem;
 using gs1::TaskRuntimeListKind;
+using gs1::WorkerConditionSystem;
 using namespace gs1::testing::fixtures;
 
 template <typename Payload>
@@ -201,6 +205,12 @@ void inventory_item_use_validates_and_emits_meter_delta(gs1::testing::SystemTest
                     1U,
                     0U})) == GS1_STATUS_INVALID_ARGUMENT);
 
+    site_run.inventory.worker_pack_slots[4].occupied = true;
+    site_run.inventory.worker_pack_slots[4].item_id = gs1::ItemId {gs1::k_item_medicine_pack};
+    site_run.inventory.worker_pack_slots[4].item_quantity = 1U;
+    site_run.inventory.worker_pack_slots[4].item_condition = 1.0f;
+    site_run.inventory.worker_pack_slots[4].item_freshness = 1.0f;
+
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         InventorySystem::process_message(
@@ -208,18 +218,18 @@ void inventory_item_use_validates_and_emits_meter_delta(gs1::testing::SystemTest
             make_message(
                 GameMessageType::InventoryItemUseRequested,
                 gs1::InventoryItemUseRequestedMessage {
-                    1U,
+                    gs1::k_item_medicine_pack,
                     site_run.inventory.worker_pack_storage_id,
                     1U,
-                    0U})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].item_quantity == 1U);
+                    4U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, !site_run.inventory.worker_pack_slots[4].occupied);
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::WorkerMeterDeltaRequested);
     GS1_SYSTEM_TEST_CHECK(
         context,
         approx_equal(
-            queue.front().payload_as<gs1::WorkerMeterDeltaRequestedMessage>().hydration_delta,
-            12.0f));
+            queue.front().payload_as<gs1::WorkerMeterDeltaRequestedMessage>().health_delta,
+            18.0f));
 }
 
 void inventory_transfer_moves_and_merges_stacks(gs1::testing::SystemTestExecutionContext& context)
@@ -484,6 +494,82 @@ void inventory_item_consume_removes_quantity_across_matching_stacks(
     GS1_SYSTEM_TEST_CHECK(context, !site_run.inventory.worker_pack_slots[0].occupied);
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[3].occupied);
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[3].item_quantity == 1U);
+}
+
+void inventory_item_use_drink_defers_item_and_meter_changes_until_action_completion(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 806U);
+    GameMessageQueue queue {};
+    auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue, 60.0);
+    auto action_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue, 60.0);
+    auto worker_context = make_site_context<WorkerConditionSystem>(campaign, site_run, queue, 60.0);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_message(
+            inventory_context,
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    auto worker_conditions = site_run.site_world->worker_conditions();
+    worker_conditions.hydration = 40.0f;
+    site_run.site_world->set_worker_conditions(worker_conditions);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_message(
+            inventory_context,
+            make_message(
+                GameMessageType::InventoryItemUseRequested,
+                gs1::InventoryItemUseRequestedMessage {
+                    gs1::k_item_water_container,
+                    site_run.inventory.worker_pack_storage_id,
+                    1U,
+                    0U})) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::StartSiteAction);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].item_quantity == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.site_world->worker_conditions().hydration, 40.0f));
+
+    const auto start_action_message = queue.front();
+    queue.clear();
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(action_context, start_action_message) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(context, site_run.site_action.current_action_id.has_value());
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.action_kind == gs1::ActionKind::Drink);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.started_at_world_minute.has_value());
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::SiteActionStarted);
+
+    queue.clear();
+    ActionExecutionSystem::run(action_context);
+    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::SiteActionCompleted) == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::InventoryItemConsumeRequested) == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::WorkerMeterDeltaRequested) == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].item_quantity == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.site_world->worker_conditions().hydration, 40.0f));
+
+    const auto* consume_message =
+        first_message(queue, GameMessageType::InventoryItemConsumeRequested);
+    const auto* meter_message =
+        first_message(queue, GameMessageType::WorkerMeterDeltaRequested);
+    GS1_SYSTEM_TEST_REQUIRE(context, consume_message != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(context, meter_message != nullptr);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_message(inventory_context, *consume_message) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        WorkerConditionSystem::process_message(worker_context, *meter_message) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].occupied);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].item_quantity == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.site_world->worker_conditions().hydration, 52.0f));
 }
 
 void inventory_delivery_request_arrives_in_starter_device_storage(gs1::testing::SystemTestExecutionContext& context)
@@ -862,6 +948,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "inventory",
     "item_consume_removes_quantity_across_matching_stacks",
     inventory_item_consume_removes_quantity_across_matching_stacks);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "inventory",
+    "item_use_drink_defers_item_and_meter_changes_until_action_completion",
+    inventory_item_use_drink_defers_item_and_meter_changes_until_action_completion);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "inventory",
     "delivery_request_arrives_in_starter_device_storage",
