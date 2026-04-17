@@ -218,6 +218,14 @@ std::optional<Gs1SiteActionKind> parse_site_action_kind(const std::string& value
     {
         return GS1_SITE_ACTION_CRAFT;
     }
+    if (value == "DRINK")
+    {
+        return GS1_SITE_ACTION_DRINK;
+    }
+    if (value == "EAT")
+    {
+        return GS1_SITE_ACTION_EAT;
+    }
 
     return std::nullopt;
 }

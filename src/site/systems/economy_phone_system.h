@@ -15,6 +15,7 @@ public:
             site_component_mask_of(
                 SiteComponent::Inventory,
                 SiteComponent::Craft,
+                SiteComponent::Action,
                 SiteComponent::Economy),
             site_component_mask_of(SiteComponent::Economy)};
     }

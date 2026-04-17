@@ -21,7 +21,7 @@ struct SiteActionDef final
     std::uint8_t reserved0;
 };
 
-inline constexpr std::array<SiteActionDef, 6> k_prototype_site_action_defs {{
+inline constexpr std::array<SiteActionDef, 8> k_prototype_site_action_defs {{
     SiteActionDef {
         ActionKind::Plant,
         1.0f,
@@ -75,6 +75,24 @@ inline constexpr std::array<SiteActionDef, 6> k_prototype_site_action_defs {{
         PlacementOccupancyLayer::None,
         false,
         true,
+        0U},
+    SiteActionDef {
+        ActionKind::Drink,
+        0.5f,
+        0.0f,
+        0.0f,
+        PlacementOccupancyLayer::None,
+        false,
+        false,
+        0U},
+    SiteActionDef {
+        ActionKind::Eat,
+        0.75f,
+        0.0f,
+        0.0f,
+        PlacementOccupancyLayer::None,
+        false,
+        false,
         0U},
 }};
 

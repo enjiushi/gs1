@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gs1/types.h"
 #include "support/id_types.h"
 
 #include <optional>
@@ -15,13 +16,17 @@ enum class ActionKind : std::uint32_t
     Repair = 3,
     Water = 4,
     ClearBurial = 5,
-    Craft = 6
+    Craft = 6,
+    Drink = 7,
+    Eat = 8
 };
 
 struct ReservedItemStack final
 {
     ItemId item_id {};
     std::uint32_t quantity {0};
+    Gs1InventoryContainerKind container_kind {GS1_INVENTORY_CONTAINER_WORKER_PACK};
+    std::uint8_t reserved0[3] {};
 };
 
 struct ActionState final

@@ -1,4 +1,5 @@
 #include "runtime/game_runtime.h"
+#include "content/defs/item_defs.h"
 #include "content/defs/plant_defs.h"
 #include "site/site_world_access.h"
 #include "site/site_world_components.h"
@@ -263,20 +264,27 @@ void inventory_item_use_updates_worker_and_projection()
 
     drain_engine_messages(runtime);
 
-    set_worker_hydration(site_run, 80.0f);
-    assert(approx_equal(gs1::site_world_access::worker_conditions(site_run).hydration, 80.0f));
+    site_run.inventory.worker_pack_slots[4].occupied = true;
+    site_run.inventory.worker_pack_slots[4].item_id = gs1::ItemId {gs1::k_item_medicine_pack};
+    site_run.inventory.worker_pack_slots[4].item_quantity = 1U;
+    site_run.inventory.worker_pack_slots[4].item_condition = 1.0f;
+    site_run.inventory.worker_pack_slots[4].item_freshness = 1.0f;
+
+    auto worker_conditions = gs1::site_world_access::worker_conditions(site_run);
+    worker_conditions.health = 70.0f;
+    gs1::site_world_access::set_worker_conditions(site_run, worker_conditions);
+    assert(approx_equal(gs1::site_world_access::worker_conditions(site_run).health, 70.0f));
 
     assert(runtime.handle_message(make_inventory_use_message(
-               1U,
+               gs1::k_item_medicine_pack,
                1U,
                site_run.inventory.worker_pack_storage_id,
-               0U)) == GS1_STATUS_OK);
+               4U)) == GS1_STATUS_OK);
 
-    assert(site_run.inventory.worker_pack_slots[0].occupied);
-    assert(site_run.inventory.worker_pack_slots[0].item_quantity == 1U);
+    assert(!site_run.inventory.worker_pack_slots[4].occupied);
 
-    const auto worker_conditions = gs1::site_world_access::worker_conditions(site_run);
-    assert(approx_equal(worker_conditions.hydration, 92.0f));
+    worker_conditions = gs1::site_world_access::worker_conditions(site_run);
+    assert(approx_equal(worker_conditions.health, 88.0f));
 
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
     const auto messages = drain_engine_messages(runtime);
@@ -291,24 +299,24 @@ void inventory_item_use_updates_worker_and_projection()
     assert(hud_messages.size() == 1U);
 
     const auto* slot_message =
-        find_inventory_slot_message(messages, site_run.inventory.worker_pack_storage_id, 0U);
+        find_inventory_slot_message(messages, site_run.inventory.worker_pack_storage_id, 4U);
     assert(slot_message != nullptr);
     {
         const auto& payload = slot_message->payload_as<Gs1EngineMessageInventorySlotData>();
-        assert(payload.item_id == 1U);
-        assert(payload.quantity == 1U);
-        assert(payload.flags == 1U);
+        assert(payload.item_id == 0U);
+        assert(payload.quantity == 0U);
+        assert(payload.flags == 0U);
     }
 
     {
         const auto& payload = worker_messages.front()->payload_as<Gs1EngineMessageWorkerData>();
-        assert(approx_equal(payload.hydration_normalized, 0.92f));
-        assert(approx_equal(payload.health_normalized, 1.0f));
+        assert(approx_equal(payload.health_normalized, 0.88f));
+        assert(approx_equal(payload.hydration_normalized, 1.0f));
     }
 
     {
         const auto& payload = hud_messages.front()->payload_as<Gs1EngineMessageHudStateData>();
-        assert(approx_equal(payload.player_hydration, 92.0f));
+        assert(approx_equal(payload.player_health, 88.0f));
         assert(payload.current_money == 45);
         assert(payload.active_task_count == 0U);
     }

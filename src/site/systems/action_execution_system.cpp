@@ -41,6 +41,10 @@ ActionKind to_action_kind(Gs1SiteActionKind kind) noexcept
         return ActionKind::ClearBurial;
     case GS1_SITE_ACTION_CRAFT:
         return ActionKind::Craft;
+    case GS1_SITE_ACTION_DRINK:
+        return ActionKind::Drink;
+    case GS1_SITE_ACTION_EAT:
+        return ActionKind::Eat;
     default:
         return ActionKind::None;
     }
@@ -62,6 +66,10 @@ Gs1SiteActionKind to_gs1_action_kind(ActionKind kind) noexcept
         return GS1_SITE_ACTION_CLEAR_BURIAL;
     case ActionKind::Craft:
         return GS1_SITE_ACTION_CRAFT;
+    case ActionKind::Drink:
+        return GS1_SITE_ACTION_DRINK;
+    case ActionKind::Eat:
+        return GS1_SITE_ACTION_EAT;
     default:
         return GS1_SITE_ACTION_NONE;
     }
@@ -243,6 +251,13 @@ void emit_worker_meter_cost_request(
     ActionKind action_kind,
     std::uint16_t quantity)
 {
+    const float hydration_cost = action_hydration_cost(action_kind, quantity);
+    const float energy_cost = action_energy_cost(action_kind, quantity);
+    if (hydration_cost == 0.0f && energy_cost == 0.0f)
+    {
+        return;
+    }
+
     enqueue_message(
         queue,
         GameMessageType::WorkerMeterDeltaRequested,
@@ -250,10 +265,10 @@ void emit_worker_meter_cost_request(
             action_id,
             WORKER_METER_CHANGED_HYDRATION | WORKER_METER_CHANGED_ENERGY,
             0.0f,
-            -action_hydration_cost(action_kind, quantity),
+            -hydration_cost,
             0.0f,
             0.0f,
-            -action_energy_cost(action_kind, quantity),
+            -energy_cost,
             0.0f,
             0.0f});
 }
@@ -335,6 +350,12 @@ const ItemDef* action_item_def(
             ? item_def
             : nullptr;
 
+    case ActionKind::Drink:
+        return item_has_capability(*item_def, ITEM_CAPABILITY_DRINK) ? item_def : nullptr;
+
+    case ActionKind::Eat:
+        return item_has_capability(*item_def, ITEM_CAPABILITY_EAT) ? item_def : nullptr;
+
     default:
         return nullptr;
     }
@@ -347,7 +368,107 @@ bool action_requires_item(ActionKind action_kind, std::uint32_t item_id) noexcep
         return true;
     }
 
-    return action_kind == ActionKind::Plant && item_id != 0U;
+    if (action_kind == ActionKind::Plant ||
+        action_kind == ActionKind::Drink ||
+        action_kind == ActionKind::Eat)
+    {
+        return item_id != 0U;
+    }
+
+    return false;
+}
+
+Gs1InventoryContainerKind reserved_item_container_kind(const ActionState& action_state) noexcept
+{
+    if (!action_state.reserved_input_item_stacks.empty())
+    {
+        return action_state.reserved_input_item_stacks.front().container_kind;
+    }
+
+    return GS1_INVENTORY_CONTAINER_WORKER_PACK;
+}
+
+void populate_reserved_input_items(ActionState& action_state)
+{
+    action_state.reserved_input_item_stacks.clear();
+    if (!action_requires_item(action_state.action_kind, action_state.item_id))
+    {
+        return;
+    }
+
+    const auto* item_def = action_item_def(action_state.action_kind, action_state.item_id);
+    if (item_def == nullptr)
+    {
+        return;
+    }
+
+    action_state.reserved_input_item_stacks.push_back(ReservedItemStack {
+        item_def->item_id,
+        static_cast<std::uint32_t>(action_state.quantity == 0U ? 1U : action_state.quantity),
+        GS1_INVENTORY_CONTAINER_WORKER_PACK,
+        {0U, 0U, 0U}});
+}
+
+SiteActionFailureReason validate_reserved_item_completion(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    const ActionState& action_state)
+{
+    for (const auto& reserved_stack : action_state.reserved_input_item_stacks)
+    {
+        const auto available_quantity =
+            reserved_stack.container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK
+            ? available_worker_pack_item_quantity(context.world.read_inventory(), reserved_stack.item_id)
+            : inventory_storage::available_item_quantity_in_container_kind(
+                  context.site_run,
+                  reserved_stack.container_kind,
+                  reserved_stack.item_id);
+        if (available_quantity < reserved_stack.quantity)
+        {
+            return SiteActionFailureReason::InsufficientResources;
+        }
+    }
+
+    return SiteActionFailureReason::None;
+}
+
+void emit_item_meter_delta_request(
+    GameMessageQueue& queue,
+    const ItemDef& item_def,
+    std::uint16_t quantity)
+{
+    WorkerMeterDeltaRequestedMessage meter_delta {};
+    meter_delta.source_id = item_def.item_id.value;
+
+    if (item_def.health_delta != 0.0f)
+    {
+        meter_delta.flags |= WORKER_METER_CHANGED_HEALTH;
+        meter_delta.health_delta = item_def.health_delta * static_cast<float>(quantity);
+    }
+    if (item_def.hydration_delta != 0.0f)
+    {
+        meter_delta.flags |= WORKER_METER_CHANGED_HYDRATION;
+        meter_delta.hydration_delta = item_def.hydration_delta * static_cast<float>(quantity);
+    }
+    if (item_def.nourishment_delta != 0.0f)
+    {
+        meter_delta.flags |= WORKER_METER_CHANGED_NOURISHMENT;
+        meter_delta.nourishment_delta = item_def.nourishment_delta * static_cast<float>(quantity);
+    }
+    if (item_def.energy_delta != 0.0f)
+    {
+        meter_delta.flags |= WORKER_METER_CHANGED_ENERGY;
+        meter_delta.energy_delta = item_def.energy_delta * static_cast<float>(quantity);
+    }
+
+    if (meter_delta.flags == WORKER_METER_CHANGED_NONE)
+    {
+        return;
+    }
+
+    enqueue_message(
+        queue,
+        GameMessageType::WorkerMeterDeltaRequested,
+        meter_delta);
 }
 
 const CraftRecipeDef* resolve_craft_recipe_for_action(
@@ -618,7 +739,7 @@ void emit_action_fact_messages(GameMessageQueue& queue, const ActionState& actio
                     item_def->item_id.value,
                     safe_quantity,
                     GS1_INVENTORY_CONTAINER_WORKER_PACK,
-                    0U});
+                    k_inventory_item_consume_flag_ignore_action_reservations});
             enqueue_message(
                 queue,
                 GameMessageType::SiteTilePlantingCompleted,
@@ -681,7 +802,7 @@ void emit_action_fact_messages(GameMessageQueue& queue, const ActionState& actio
                     item_def->item_id.value,
                     safe_quantity,
                     GS1_INVENTORY_CONTAINER_WORKER_PACK,
-                    0U});
+                    k_inventory_item_consume_flag_ignore_action_reservations});
             enqueue_message(
                 queue,
                 GameMessageType::SiteDevicePlaced,
@@ -691,6 +812,24 @@ void emit_action_fact_messages(GameMessageQueue& queue, const ActionState& actio
                     target_tile.y,
                     item_def->linked_structure_id.value,
                     flags});
+        }
+        break;
+
+    case ActionKind::Drink:
+    case ActionKind::Eat:
+        if (const auto* item_def = action_item_def(
+                action_state.action_kind,
+                action_state.item_id))
+        {
+            enqueue_message(
+                queue,
+                GameMessageType::InventoryItemConsumeRequested,
+                InventoryItemConsumeRequestedMessage {
+                    item_def->item_id.value,
+                    safe_quantity,
+                    reserved_item_container_kind(action_state),
+                    k_inventory_item_consume_flag_ignore_action_reservations});
+            emit_item_meter_delta_request(queue, *item_def, safe_quantity);
         }
         break;
 
@@ -946,7 +1085,7 @@ Gs1Status ActionExecutionSystem::process_message(
         action_state.started_at_world_minute.reset();
         action_state.awaiting_placement_reservation =
             should_request_placement_reservation(action_kind);
-        action_state.reserved_input_item_stacks.clear();
+        populate_reserved_input_items(action_state);
 
         if (action_requires_worker_approach(action_kind))
         {
@@ -1132,6 +1271,25 @@ void ActionExecutionSystem::run(SiteSystemContext<ActionExecutionSystem>& contex
                 SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
             return;
         }
+    }
+
+    const auto item_failure_reason = validate_reserved_item_completion(context, action_state);
+    if (item_failure_reason != SiteActionFailureReason::None)
+    {
+        emit_site_action_failed(
+            context.message_queue,
+            action_id_value(action_state),
+            action_state.action_kind,
+            item_failure_reason,
+            action_state.request_flags,
+            action_target_tile(action_state),
+            action_state.primary_subject_id,
+            action_state.secondary_subject_id);
+        emit_placement_reservation_released(context.message_queue, action_state);
+        clear_action_state(action_state);
+        context.world.mark_projection_dirty(
+            SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
+        return;
     }
 
     emit_site_action_completed(context.message_queue, action_state);
