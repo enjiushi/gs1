@@ -29,6 +29,7 @@ enum class SiteComponent : std::uint8_t
     Inventory,
     Contractor,
     Weather,
+    LocalWeatherRuntime,
     Event,
     TaskBoard,
     Modifier,
@@ -82,6 +83,8 @@ template <typename... Components>
         return "Contractor";
     case SiteComponent::Weather:
         return "Weather";
+    case SiteComponent::LocalWeatherRuntime:
+        return "LocalWeatherRuntime";
     case SiteComponent::Event:
         return "Event";
     case SiteComponent::TaskBoard:
@@ -294,6 +297,78 @@ public:
         return world != nullptr ? world->tile_coord(index) : TileCoord {};
     }
 
+    [[nodiscard]] std::uint32_t tile_index(TileCoord coord) const noexcept
+    {
+        static_assert(
+            site_system_reads_any_tile_component<SystemTag>(),
+            "System must declare a tile-grid component as readable.");
+        const auto* world = site_world_ptr();
+        return world != nullptr && world->contains(coord) ? world->tile_index(coord) : 0U;
+    }
+
+    [[nodiscard]] SiteWorld::TileEcologyData read_tile_ecology(TileCoord coord) const noexcept
+    {
+        static_assert(
+            site_system_reads_component<SystemTag>(SiteComponent::TileEcology),
+            "System must declare TileEcology as readable.");
+        const auto* world = site_world_ptr();
+        return world != nullptr ? world->tile_ecology(coord) : SiteWorld::TileEcologyData {};
+    }
+
+    [[nodiscard]] SiteWorld::TileEcologyData read_tile_ecology_at_index(std::size_t index) const noexcept
+    {
+        static_assert(
+            site_system_reads_component<SystemTag>(SiteComponent::TileEcology),
+            "System must declare TileEcology as readable.");
+        const auto* world = site_world_ptr();
+        return world != nullptr ? world->tile_ecology_at_index(index) : SiteWorld::TileEcologyData {};
+    }
+
+    [[nodiscard]] SiteWorld::TileLocalWeatherData read_tile_local_weather(TileCoord coord) const noexcept
+    {
+        static_assert(
+            site_system_reads_component<SystemTag>(SiteComponent::TileWeather),
+            "System must declare TileWeather as readable.");
+        const auto* world = site_world_ptr();
+        return world != nullptr ? world->tile_local_weather(coord) : SiteWorld::TileLocalWeatherData {};
+    }
+
+    [[nodiscard]] SiteWorld::TileLocalWeatherData read_tile_local_weather_at_index(
+        std::size_t index) const noexcept
+    {
+        static_assert(
+            site_system_reads_component<SystemTag>(SiteComponent::TileWeather),
+            "System must declare TileWeather as readable.");
+        const auto* world = site_world_ptr();
+        return world != nullptr
+            ? world->tile_local_weather_at_index(index)
+            : SiteWorld::TileLocalWeatherData {};
+    }
+
+    void write_tile_local_weather(TileCoord coord, const SiteWorld::TileLocalWeatherData& data)
+    {
+        static_assert(
+            site_system_owns_component<SystemTag>(SiteComponent::TileWeather),
+            "System must declare TileWeather as owned.");
+        auto* world = site_world_ptr();
+        if (world != nullptr)
+        {
+            world->set_tile_local_weather(coord, data);
+        }
+    }
+
+    void write_tile_local_weather_at_index(std::size_t index, const SiteWorld::TileLocalWeatherData& data)
+    {
+        static_assert(
+            site_system_owns_component<SystemTag>(SiteComponent::TileWeather),
+            "System must declare TileWeather as owned.");
+        auto* world = site_world_ptr();
+        if (world != nullptr)
+        {
+            world->set_tile_local_weather_at_index(index, data);
+        }
+    }
+
     [[nodiscard]] SiteWorld::TileData read_tile(TileCoord coord) const noexcept
     {
         static_assert(
@@ -368,6 +443,16 @@ public:
 
     [[nodiscard]] const WeatherState& read_weather() const noexcept { return site_run_.weather; }
     [[nodiscard]] WeatherState& own_weather() noexcept { return site_run_.weather; }
+
+    [[nodiscard]] const LocalWeatherResolveState& read_local_weather_runtime() const noexcept
+    {
+        return site_run_.local_weather_resolve;
+    }
+
+    [[nodiscard]] LocalWeatherResolveState& own_local_weather_runtime() noexcept
+    {
+        return site_run_.local_weather_resolve;
+    }
 
     [[nodiscard]] const EventState& read_event() const noexcept { return site_run_.event; }
     [[nodiscard]] EventState& own_event() noexcept { return site_run_.event; }

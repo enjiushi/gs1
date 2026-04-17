@@ -299,8 +299,6 @@ if(GS1_BUILD_TESTS)
     target_link_libraries(gs1_local_weather_perf_probe PRIVATE flecs)
     target_link_libraries(gs1_runtime_performance_test PRIVATE flecs)
     target_link_libraries(gs1_visual_smoke_host PRIVATE ws2_32 winmm)
-    target_compile_definitions(gs1_local_weather_perf_probe PRIVATE GS1_ENABLE_LOCAL_WEATHER_RESOLUTION=1)
-    target_compile_definitions(gs1_runtime_performance_test PRIVATE GS1_ENABLE_LOCAL_WEATHER_RESOLUTION=1)
 
     # Ensure the DLL is built before the smoke host is run.
     # This is a build-order dependency, not a link-time dependency.

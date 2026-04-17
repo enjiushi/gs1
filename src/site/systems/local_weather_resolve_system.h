@@ -17,8 +17,11 @@ public:
                 SiteComponent::TileEcology,
                 SiteComponent::TileWeather,
                 SiteComponent::Weather,
-                SiteComponent::Modifier),
-            site_component_mask_of(SiteComponent::TileWeather)};
+                SiteComponent::Modifier,
+                SiteComponent::LocalWeatherRuntime),
+            site_component_mask_of(
+                SiteComponent::TileWeather,
+                SiteComponent::LocalWeatherRuntime)};
     }
 
     [[nodiscard]] static bool subscribes_to(GameCommandType type) noexcept;

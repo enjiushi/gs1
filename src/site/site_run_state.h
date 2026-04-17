@@ -6,6 +6,7 @@
 #include "site/economy_state.h"
 #include "site/event_state.h"
 #include "site/inventory_state.h"
+#include "site/local_weather_resolve_state.h"
 #include "site/modifier_state.h"
 #include "site/task_board_state.h"
 #include "site/weather_state.h"
@@ -83,6 +84,7 @@ struct SiteRunState final
     CraftState craft {};
     ActionState site_action {};
     SiteCounters counters {};
+    LocalWeatherResolveState local_weather_resolve {};
     std::uint32_t result_newly_revealed_site_count {0};
     std::uint64_t pending_projection_update_flags {0};
     bool pending_full_tile_projection_update {false};

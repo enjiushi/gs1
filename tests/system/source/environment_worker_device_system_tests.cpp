@@ -134,11 +134,11 @@ void weather_event_does_not_reseed_when_event_is_already_active(
     GS1_SYSTEM_TEST_CHECK(context, site_run.event.event_phase == EventPhase::Peak);
 }
 
-void local_weather_resolve_updates_tiles_and_process_command_is_noop(
+void local_weather_resolve_spreads_full_refresh_over_multiple_runs(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
-    auto site_run = make_test_site_run(2U, 1201U);
+    auto site_run = make_test_site_run(2U, 1201U, 101U, 8U, 8U);
     GameCommandQueue queue {};
     auto site_context = make_site_context<LocalWeatherResolveSystem>(campaign, site_run, queue);
 
@@ -146,12 +146,8 @@ void local_weather_resolve_updates_tiles_and_process_command_is_noop(
     site_run.weather.weather_wind = 5.0f;
     site_run.weather.weather_dust = 3.0f;
 
-    auto covered = site_run.site_world->tile_at(TileCoord {1, 1});
-    covered.ecology.ground_cover_type_id = 4U;
-    covered.ecology.plant_density = 0.5f;
-    site_run.site_world->set_tile(TileCoord {1, 1}, covered);
-
     GS1_SYSTEM_TEST_CHECK(context, !LocalWeatherResolveSystem::subscribes_to(GameCommandType::SiteRunStarted));
+    GS1_SYSTEM_TEST_CHECK(context, LocalWeatherResolveSystem::subscribes_to(GameCommandType::TileEcologyChanged));
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         LocalWeatherResolveSystem::process_command(
@@ -162,19 +158,74 @@ void local_weather_resolve_updates_tiles_and_process_command_is_noop(
 
     LocalWeatherResolveSystem::run(site_context);
 
-    const auto covered_weather = site_run.site_world->tile_local_weather(TileCoord {1, 1});
-    const auto exposed_weather = site_run.site_world->tile_local_weather(TileCoord {2, 1});
-#if defined(GS1_ENABLE_LOCAL_WEATHER_RESOLUTION)
-    GS1_SYSTEM_TEST_CHECK(context, covered_weather.heat < exposed_weather.heat);
-    GS1_SYSTEM_TEST_CHECK(context, covered_weather.wind < exposed_weather.wind);
-    GS1_SYSTEM_TEST_CHECK(context, covered_weather.dust < exposed_weather.dust);
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(exposed_weather.dust, 4.25f));
-#else
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(covered_weather.heat, 0.0f));
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(covered_weather.wind, 0.0f));
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(covered_weather.dust, 0.0f));
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(exposed_weather.dust, 0.0f));
-#endif
+    const auto first_pass_weather = site_run.site_world->tile_local_weather(TileCoord {0, 0});
+    const auto deferred_weather = site_run.site_world->tile_local_weather(TileCoord {0, 4});
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(first_pass_weather.heat, 10.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(first_pass_weather.wind, 5.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(first_pass_weather.dust, 4.25f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(deferred_weather.heat, 0.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(deferred_weather.wind, 0.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(deferred_weather.dust, 0.0f));
+
+    LocalWeatherResolveSystem::run(site_context);
+    const auto second_pass_weather = site_run.site_world->tile_local_weather(TileCoord {0, 4});
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(second_pass_weather.heat, 10.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(second_pass_weather.wind, 5.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(second_pass_weather.dust, 4.25f));
+}
+
+void local_weather_resolve_refreshes_dirty_neighborhood_from_tile_ecology_changed(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(2U, 1202U);
+    GameCommandQueue queue {};
+    auto site_context = make_site_context<LocalWeatherResolveSystem>(campaign, site_run, queue);
+
+    site_run.weather.weather_heat = 10.0f;
+    site_run.weather.weather_wind = 5.0f;
+    site_run.weather.weather_dust = 3.0f;
+
+    for (int iteration = 0; iteration < 8; ++iteration)
+    {
+        LocalWeatherResolveSystem::run(site_context);
+    }
+
+    auto planted_tile = site_run.site_world->tile_at(TileCoord {3, 3});
+    planted_tile.ecology.plant_id = gs1::PlantId {1U};
+    planted_tile.ecology.plant_density = 0.5f;
+    site_run.site_world->set_tile(TileCoord {3, 3}, planted_tile);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        LocalWeatherResolveSystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::TileEcologyChanged,
+                gs1::TileEcologyChangedCommand {
+                    3,
+                    3,
+                    gs1::TILE_ECOLOGY_CHANGED_OCCUPANCY |
+                        gs1::TILE_ECOLOGY_CHANGED_DENSITY,
+                    1U,
+                    0U,
+                    0.5f,
+                    0.0f})) == GS1_STATUS_OK);
+
+    LocalWeatherResolveSystem::run(site_context);
+
+    const auto planted_weather = site_run.site_world->tile_local_weather(TileCoord {3, 3});
+    const auto neighbor_weather = site_run.site_world->tile_local_weather(TileCoord {4, 3});
+    const auto far_weather = site_run.site_world->tile_local_weather(TileCoord {7, 7});
+    GS1_SYSTEM_TEST_CHECK(context, planted_weather.heat < 10.0f);
+    GS1_SYSTEM_TEST_CHECK(context, planted_weather.wind < 5.0f);
+    GS1_SYSTEM_TEST_CHECK(context, planted_weather.dust < 4.25f);
+    GS1_SYSTEM_TEST_CHECK(context, neighbor_weather.heat < 10.0f);
+    GS1_SYSTEM_TEST_CHECK(context, neighbor_weather.wind < 5.0f);
+    GS1_SYSTEM_TEST_CHECK(context, neighbor_weather.dust < 4.25f);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(far_weather.heat, 10.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(far_weather.wind, 5.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(far_weather.dust, 4.25f));
 }
 
 void worker_condition_requested_delta_emits_initial_full_mask_and_clamps(
@@ -380,8 +431,12 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     weather_event_does_not_reseed_when_event_is_already_active);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "local_weather_resolve",
-    "updates_tiles_and_process_command_is_noop",
-    local_weather_resolve_updates_tiles_and_process_command_is_noop);
+    "spreads_full_refresh_over_multiple_runs",
+    local_weather_resolve_spreads_full_refresh_over_multiple_runs);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "local_weather_resolve",
+    "refreshes_dirty_neighborhood_from_tile_ecology_changed",
+    local_weather_resolve_refreshes_dirty_neighborhood_from_tile_ecology_changed);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "worker_condition",
     "requested_delta_emits_initial_full_mask_and_clamps",

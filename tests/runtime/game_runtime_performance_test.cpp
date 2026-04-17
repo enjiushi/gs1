@@ -448,7 +448,7 @@ int main(int argc, char** argv)
 
     std::cout << "GS1 runtime performance test\n";
     std::cout << "  fixed_step_seconds=" << std::fixed << std::setprecision(6) << kFixedStepSeconds << "\n";
-    std::cout << "  note=local weather resolution is enabled in this perf target only\n";
+    std::cout << "  note=local weather resolution is enabled in normal builds\n";
 
     for (const auto& scenario : scenarios)
     {
