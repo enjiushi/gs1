@@ -510,7 +510,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         sourceContainerKind,
         sourceSlotIndex,
         destinationContainerKind,
-        destinationSlotIndex,
         quantity
     ) {
         const sourceContainerCode = inventoryContainerCodes[sourceContainerKind] || 0;
@@ -518,8 +517,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return sourceContainerCode +
             ((sourceSlotIndex & 0xff) << 8) +
             ((destinationContainerCode & 0xff) << 16) +
-            ((destinationSlotIndex & 0xff) << 24) +
-            ((quantity & 0xffff) * 0x100000000);
+            ((quantity & 0xffff) * 0x1000000);
     }
 
     function getInventoryContainers(state) {
@@ -731,46 +729,53 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             slotKey(slot.containerKind, slot.slotIndex, slot.containerOwnerId) === selectedInventorySlotKey) || null;
     }
 
-    function findTransferTargetSlot(state, sourceSlot, destinationContainerInfo) {
-        const destinationSlots = destinationContainerInfo ? destinationContainerInfo.slots : [];
-        const itemMeta = getItemMeta(sourceSlot.itemId);
-        const stackSize = itemMeta ? itemMeta.stackSize : Math.max(sourceSlot.quantity, 1);
+    function findWorkerPackInventoryContainer(state) {
+        return getInventoryContainers(state).find((container) => container.containerKind === "WORKER_PACK") || null;
+    }
 
-        for (const destinationSlot of destinationSlots) {
-            if (destinationSlot.flags === 0 && destinationSlot.itemId === 0) {
-                return {
-                    containerKind: destinationContainerInfo.containerKind,
-                    containerOwnerId: destinationContainerInfo.containerOwnerId || 0,
-                    slotIndex: destinationSlot.slotIndex,
-                    quantity: Math.min(sourceSlot.quantity, stackSize)
-                };
-            }
-            if (destinationSlot.flags === 0) {
-                return {
-                    containerKind: destinationContainerInfo.containerKind,
-                    containerOwnerId: destinationContainerInfo.containerOwnerId || 0,
-                    slotIndex: destinationSlot.slotIndex,
-                    quantity: Math.min(sourceSlot.quantity, stackSize)
-                };
-            }
-            if (destinationSlot.itemId !== sourceSlot.itemId) {
-                continue;
-            }
+    function slotUsesPrimaryTransferClick(state, sourceSlot) {
+        if (!state || state.appState !== "SITE_ACTIVE" || !isOccupiedSlot(sourceSlot)) {
+            return false;
+        }
 
-            const freeCapacity = stackSize - destinationSlot.quantity;
-            if (freeCapacity <= 0) {
-                continue;
-            }
+        if (sourceSlot.containerKind === "WORKER_PACK") {
+            const openedContainer = findOpenedInventoryContainer(state);
+            return !!(openedContainer && openedContainer.containerKind === "DEVICE_STORAGE");
+        }
 
-            return {
-                containerKind: destinationContainerInfo.containerKind,
-                containerOwnerId: destinationContainerInfo.containerOwnerId || 0,
-                slotIndex: destinationSlot.slotIndex,
-                quantity: Math.min(sourceSlot.quantity, freeCapacity)
-            };
+        if (sourceSlot.containerKind === "DEVICE_STORAGE") {
+            const openedContainer = findOpenedInventoryContainer(state);
+            return !!openedContainer &&
+                openedContainer.containerKind === sourceSlot.containerKind &&
+                (openedContainer.containerOwnerId || 0) === (sourceSlot.containerOwnerId || 0);
+        }
+
+        return false;
+    }
+
+    function findPrimaryTransferTargetContainer(state, sourceSlot) {
+        if (!slotUsesPrimaryTransferClick(state, sourceSlot)) {
+            return null;
+        }
+
+        if (sourceSlot.containerKind === "WORKER_PACK") {
+            return findOpenedInventoryContainer(state);
+        }
+
+        if (sourceSlot.containerKind === "DEVICE_STORAGE") {
+            return findWorkerPackInventoryContainer(state);
         }
 
         return null;
+    }
+
+    function slotSupportsSelection(slot) {
+        if (!isOccupiedSlot(slot) || slot.containerKind !== "WORKER_PACK") {
+            return false;
+        }
+
+        const itemMeta = getItemMeta(slot.itemId);
+        return !!(itemMeta && itemMeta.canUse);
     }
 
     function postInventoryUse(slot) {
@@ -782,16 +787,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         });
     }
 
-    function postInventoryTransfer(sourceSlot, destinationKind, destinationSlotIndex, quantity, destinationOwnerId) {
+    function postInventoryTransfer(sourceSlot, destinationKind, destinationOwnerId) {
         return postJson("/ui-action", {
             type: "TRANSFER_INVENTORY_ITEM",
-            targetId: 0,
+            targetId: sourceSlot.itemId,
             arg0: encodeInventoryTransferArg(
                 sourceSlot.containerKind,
                 sourceSlot.slotIndex,
                 destinationKind,
-                destinationSlotIndex,
-                quantity
+                0
             ),
             arg1: encodeInventoryTransferOwnersArg(
                 sourceSlot.containerOwnerId || 0,
@@ -1525,6 +1529,29 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         if (occupied && options.interactive !== false) {
             card.addEventListener("click", function () {
+                const transferTargetContainer = findPrimaryTransferTargetContainer(latestState, slot);
+                if (transferTargetContainer) {
+                    selectedInventorySlotKey = "";
+                    postInventoryTransfer(
+                        slot,
+                        transferTargetContainer.containerKind,
+                        transferTargetContainer.containerOwnerId).catch(() => {
+                        statusChip.textContent = "Failed to move inventory item.";
+                    });
+                    if (latestState) {
+                        renderSiteOverlay(latestState);
+                    }
+                    return;
+                }
+
+                if (slotUsesPrimaryTransferClick(latestState, slot)) {
+                    return;
+                }
+
+                if (!slotSupportsSelection(slot)) {
+                    return;
+                }
+
                 const clickedKey = slotKey(slot.containerKind, slot.slotIndex, slot.containerOwnerId);
                 selectedInventorySlotKey = selectedInventorySlotKey === clickedKey ? "" : clickedKey;
                 if (latestState) {
@@ -1674,7 +1701,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const carriedSeeds = getCarriedSeedOptions(state);
         const carriedDeployables = getCarriedDeployableOptions(state);
         const footnoteParts = [];
-        footnoteParts.push("Press B to toggle the worker pack. Right-click a storage or crafting device to open its separate storage panel.");
+        footnoteParts.push("Press B to toggle the worker pack. Right-click a storage or crafting device to open its separate storage panel, then left-click items to move them between that storage and the pack.");
         if (carriedSeeds.length > 0) {
             footnoteParts.push(
                 "Seeds: " +
@@ -1740,7 +1767,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             const helper = document.createElement("div");
             helper.className = "helper-note";
             helper.textContent =
-                "Hover any item for details. Click any worker, camp, or device slot to surface actions here. Press F to open the phone.";
+                "Hover any item for details. Click pack items to move them into the opened storage, or click opened storage items to carry them into the pack. Usable carried items still surface actions here when no storage is open.";
             contextActions.appendChild(helper);
             return;
         }
@@ -1775,36 +1802,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 )
             );
         }
-
-        const sourceContainerKey = containerKey(selectedSlot.containerKind, selectedSlot.containerOwnerId || 0);
-        getInventoryContainers(state)
-            .filter((containerInfo) => containerInfo.key !== sourceContainerKey)
-            .forEach((containerInfo) => {
-                const target = findTransferTargetSlot(state, selectedSlot, containerInfo);
-                const targetLabel = containerInfo.containerKind === "WORKER_PACK"
-                    ? "Carry To Pack"
-                    : ("Move To " + getContainerDisplayName(state, containerInfo));
-                contextActions.appendChild(
-                    makeButton(
-                        targetLabel,
-                        function () {
-                            if (!target) {
-                                return;
-                            }
-                            postInventoryTransfer(
-                                selectedSlot,
-                                target.containerKind,
-                                target.slotIndex,
-                                target.quantity,
-                                target.containerOwnerId).catch(() => {
-                                statusChip.textContent = "Failed to move inventory item.";
-                            });
-                        },
-                        true,
-                        !target
-                    )
-                );
-            });
 
         contextActions.appendChild(
             makeButton(
@@ -2288,8 +2285,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 carriedDeployables.map((item) => item.shortLabel + " x" + item.quantity).join("  | "))
             : "Craft or collect deployable kits, then right-click open ground to place them.";
         const storageText = openedContainerInfo
-            ? ("Opened container: " + getContainerDisplayName(state, openedContainerInfo) + ".")
-            : "Right-click the starter storage crate, workbench, stove, or another storage device to open that specific container.";
+            ? ("Opened container: " + getContainerDisplayName(state, openedContainerInfo) + ". Left-click pack items to send them there, or left-click storage items to carry them back into the pack.")
+            : "Right-click a storage crate, workbench, stove, or another storage device to open that specific container. Items move between storage and the worker pack one click at a time.";
         selectionText.innerHTML = siteBootstrap
             ? (
                 "Site " + siteBootstrap.siteId +

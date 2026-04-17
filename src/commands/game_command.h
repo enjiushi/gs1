@@ -409,6 +409,8 @@ struct InventoryGlobalItemConsumeRequestedCommand final
     std::uint16_t flags;
 };
 
+inline constexpr std::uint8_t k_inventory_transfer_flag_resolve_destination_in_dll = 1U << 0U;
+
 struct InventoryTransferRequestedCommand final
 {
     std::uint16_t source_slot_index;

@@ -51,6 +51,31 @@ const gs1::site_ecs::StorageItemStack* starter_storage_slot_stack(
     return gs1::inventory_storage::stack_data(site_run, item);
 }
 
+const gs1::site_ecs::StorageItemStack* container_slot_stack(
+    gs1::SiteRunState& site_run,
+    flecs::entity container,
+    std::uint32_t slot_index)
+{
+    const auto slot = gs1::inventory_storage::slot_entity(site_run, container, slot_index);
+    const auto item = gs1::inventory_storage::item_entity_for_slot(site_run, slot);
+    return gs1::inventory_storage::stack_data(site_run, item);
+}
+
+std::uint32_t find_first_empty_worker_pack_slot(const gs1::SiteRunState& site_run)
+{
+    for (std::uint32_t slot_index = 0U;
+         slot_index < site_run.inventory.worker_pack_slots.size();
+         ++slot_index)
+    {
+        if (!site_run.inventory.worker_pack_slots[slot_index].occupied)
+        {
+            return slot_index;
+        }
+    }
+
+    return static_cast<std::uint32_t>(site_run.inventory.worker_pack_slots.size());
+}
+
 void seed_site_one_inventory(gs1::CampaignState& campaign, gs1::SiteRunState& site_run)
 {
     GameCommandQueue inventory_queue {};
@@ -254,6 +279,188 @@ void inventory_transfer_moves_and_merges_stacks(gs1::testing::SystemTestExecutio
                     0U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, !site_run.inventory.worker_pack_slots[3].occupied);
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[4].item_quantity == 2U);
+}
+
+void inventory_device_storage_items_must_route_through_worker_pack(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 806U);
+    GameCommandQueue queue {};
+    auto site_context = make_site_context<InventorySystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::SiteRunStarted,
+                SiteRunStartedCommand {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    const auto workbench_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);
+    const auto workbench_owner_id =
+        static_cast<std::uint32_t>(site_run.site_world->device_entity_id(workbench_tile));
+    const auto starter_owner_id =
+        static_cast<std::uint32_t>(site_run.site_world->device_entity_id(site_run.camp.starter_storage_tile));
+    const auto workbench_storage =
+        gs1::inventory_storage::find_device_storage_container(site_run, workbench_owner_id);
+    const auto starter_storage = starter_storage_container(site_run);
+    const auto worker_pack = gs1::inventory_storage::worker_pack_container(site_run);
+    GS1_SYSTEM_TEST_REQUIRE(context, workbench_storage.is_valid());
+    GS1_SYSTEM_TEST_REQUIRE(context, starter_storage.is_valid());
+    GS1_SYSTEM_TEST_REQUIRE(context, worker_pack.is_valid());
+
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        workbench_storage,
+        gs1::ItemId {gs1::k_item_storage_crate_kit},
+        1U);
+
+    const auto starter_storage_kit_before = gs1::inventory_storage::available_item_quantity_in_container(
+        site_run,
+        starter_storage,
+        gs1::ItemId {gs1::k_item_storage_crate_kit});
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        InventorySystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::InventoryTransferRequested,
+                gs1::InventoryTransferRequestedCommand {
+                    0U,
+                    0U,
+                    0U,
+                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
+                    GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
+                    gs1::k_inventory_transfer_flag_resolve_destination_in_dll,
+                    0U,
+                    0U,
+                    0U})) == GS1_STATUS_INVALID_STATE);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].occupied);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].item_quantity == 2U);
+
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        worker_pack,
+        gs1::ItemId {gs1::k_item_wind_reed_seed_bundle},
+        1U);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        worker_pack,
+        gs1::ItemId {gs1::k_item_wood_bundle},
+        1U);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        worker_pack,
+        gs1::ItemId {gs1::k_item_iron_bundle},
+        1U);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        find_first_empty_worker_pack_slot(site_run) == site_run.inventory.worker_pack_slots.size());
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        InventorySystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::InventoryTransferRequested,
+                gs1::InventoryTransferRequestedCommand {
+                    0U,
+                    0U,
+                    0U,
+                    GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
+                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
+                    gs1::k_inventory_transfer_flag_resolve_destination_in_dll,
+                    0U,
+                    workbench_owner_id,
+                    0U})) == GS1_STATUS_INVALID_STATE);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        gs1::inventory_storage::available_item_quantity_in_container(
+            site_run,
+            workbench_storage,
+            gs1::ItemId {gs1::k_item_storage_crate_kit}) == 1U);
+
+    const auto freed_quantity = gs1::inventory_storage::consume_item_type_from_container(
+        site_run,
+        worker_pack,
+        gs1::ItemId {gs1::k_item_wind_reed_seed_bundle},
+        1U);
+    GS1_SYSTEM_TEST_REQUIRE(context, freed_quantity == 0U);
+    GS1_SYSTEM_TEST_REQUIRE(context, find_first_empty_worker_pack_slot(site_run) == 3U);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::InventoryTransferRequested,
+                gs1::InventoryTransferRequestedCommand {
+                    0U,
+                    0U,
+                    0U,
+                    GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
+                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
+                    gs1::k_inventory_transfer_flag_resolve_destination_in_dll,
+                    0U,
+                    workbench_owner_id,
+                    0U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(context, container_slot_stack(site_run, workbench_storage, 0U) == nullptr);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        site_run.inventory.worker_pack_slots[3].item_id.value == gs1::k_item_storage_crate_kit);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[3].item_quantity == 1U);
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        InventorySystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::InventoryTransferRequested,
+                gs1::InventoryTransferRequestedCommand {
+                    3U,
+                    0U,
+                    0U,
+                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
+                    GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
+                    gs1::k_inventory_transfer_flag_resolve_destination_in_dll,
+                    0U,
+                    0U,
+                    0U})) == GS1_STATUS_INVALID_STATE);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[3].occupied);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        gs1::inventory_storage::available_item_quantity_in_container(
+            site_run,
+            starter_storage,
+            gs1::ItemId {gs1::k_item_storage_crate_kit}) == starter_storage_kit_before);
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        InventorySystem::process_command(
+            site_context,
+            make_command(
+                GameCommandType::InventoryTransferRequested,
+                gs1::InventoryTransferRequestedCommand {
+                    3U,
+                    0U,
+                    0U,
+                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
+                    GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
+                    gs1::k_inventory_transfer_flag_resolve_destination_in_dll,
+                    0U,
+                    0U,
+                    starter_owner_id})) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        !site_run.inventory.worker_pack_slots[3].occupied);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        gs1::inventory_storage::available_item_quantity_in_container(
+            site_run,
+            starter_storage,
+            gs1::ItemId {gs1::k_item_storage_crate_kit}) == starter_storage_kit_before + 1U);
 }
 
 void inventory_item_consume_removes_quantity_across_matching_stacks(
@@ -662,6 +869,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "inventory",
     "transfer_moves_and_merges_stacks",
     inventory_transfer_moves_and_merges_stacks);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "inventory",
+    "device_storage_items_must_route_through_worker_pack",
+    inventory_device_storage_items_must_route_through_worker_pack);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "inventory",
     "item_consume_removes_quantity_across_matching_stacks",

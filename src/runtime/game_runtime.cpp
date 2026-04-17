@@ -123,14 +123,12 @@ std::uint64_t pack_inventory_transfer_arg(
     Gs1InventoryContainerKind source_container_kind,
     std::uint32_t source_slot_index,
     Gs1InventoryContainerKind destination_container_kind,
-    std::uint32_t destination_slot_index,
     std::uint32_t quantity) noexcept
 {
     return static_cast<std::uint64_t>(source_container_kind) |
         (static_cast<std::uint64_t>(source_slot_index & 0xffU) << 8U) |
         (static_cast<std::uint64_t>(destination_container_kind) << 16U) |
-        (static_cast<std::uint64_t>(destination_slot_index & 0xffU) << 24U) |
-        (static_cast<std::uint64_t>(quantity & 0xffffU) << 32U);
+        (static_cast<std::uint64_t>(quantity & 0xffffU) << 24U);
 }
 
 Gs1InventoryContainerKind unpack_transfer_source_container(std::uint64_t packed) noexcept
@@ -148,14 +146,9 @@ Gs1InventoryContainerKind unpack_transfer_destination_container(std::uint64_t pa
     return static_cast<Gs1InventoryContainerKind>((packed >> 16U) & 0xffU);
 }
 
-std::uint32_t unpack_transfer_destination_slot(std::uint64_t packed) noexcept
-{
-    return static_cast<std::uint32_t>((packed >> 24U) & 0xffU);
-}
-
 std::uint32_t unpack_transfer_quantity(std::uint64_t packed) noexcept
 {
-    return static_cast<std::uint32_t>((packed >> 32U) & 0xffffU);
+    return static_cast<std::uint32_t>((packed >> 24U) & 0xffffU);
 }
 
 std::uint32_t unpack_transfer_source_owner(std::uint64_t packed) noexcept
@@ -2215,13 +2208,11 @@ Gs1Status GameRuntime::translate_ui_action_to_command(const Gs1UiAction& action,
         out_command.type = GameCommandType::InventoryTransferRequested;
         out_command.set_payload(InventoryTransferRequestedCommand {
             static_cast<std::uint16_t>(unpack_transfer_source_slot(action.arg0)),
-            static_cast<std::uint16_t>(unpack_transfer_destination_slot(action.arg0)),
-            static_cast<std::uint16_t>(unpack_transfer_quantity(action.arg0) == 0U
-                    ? 1U
-                    : unpack_transfer_quantity(action.arg0)),
+            0U,
+            static_cast<std::uint16_t>(unpack_transfer_quantity(action.arg0)),
             unpack_transfer_source_container(action.arg0),
             unpack_transfer_destination_container(action.arg0),
-            0U,
+            k_inventory_transfer_flag_resolve_destination_in_dll,
             0U,
             unpack_transfer_source_owner(action.arg1),
             unpack_transfer_destination_owner(action.arg1)});

@@ -127,14 +127,12 @@ std::uint64_t pack_inventory_transfer_arg(
     Gs1InventoryContainerKind source_container_kind,
     std::uint32_t source_slot_index,
     Gs1InventoryContainerKind destination_container_kind,
-    std::uint32_t destination_slot_index,
     std::uint32_t quantity)
 {
     return static_cast<std::uint64_t>(source_container_kind) |
         (static_cast<std::uint64_t>(source_slot_index & 0xffU) << 8U) |
         (static_cast<std::uint64_t>(destination_container_kind) << 16U) |
-        (static_cast<std::uint64_t>(destination_slot_index & 0xffU) << 24U) |
-        (static_cast<std::uint64_t>(quantity & 0xffffU) << 32U);
+        (static_cast<std::uint64_t>(quantity & 0xffffU) << 24U);
 }
 
 std::uint64_t pack_inventory_transfer_owner_arg(
@@ -452,8 +450,7 @@ int main()
         GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
         0U,
         GS1_INVENTORY_CONTAINER_WORKER_PACK,
-        3U,
-        2U);
+        0U);
     transfer_action.arg1 = pack_inventory_transfer_owner_arg(
         starter_storage_owner_id(ui_site_run),
         0U);
@@ -466,10 +463,10 @@ int main()
     assert(gs1::inventory_storage::available_item_quantity_in_container(
                ui_site_run,
                gs1::inventory_storage::starter_storage_container(ui_site_run),
-               gs1::ItemId {gs1::k_item_wind_reed_seed_bundle}) == 6U);
+               gs1::ItemId {gs1::k_item_wind_reed_seed_bundle}) == 0U);
     assert(ui_site_run.inventory.worker_pack_slots[3].occupied);
     assert(ui_site_run.inventory.worker_pack_slots[3].item_id.value == gs1::k_item_wind_reed_seed_bundle);
-    assert(ui_site_run.inventory.worker_pack_slots[3].item_quantity == 2U);
+    assert(ui_site_run.inventory.worker_pack_slots[3].item_quantity == 8U);
     const auto transfer_commands = drain_engine_commands(ui_runtime);
     const auto transfer_inventory_commands = collect_inventory_slot_commands(transfer_commands);
     assert(!transfer_inventory_commands.empty());
