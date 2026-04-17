@@ -1,4 +1,4 @@
-#include "commands/game_command.h"
+#include "messages/game_message.h"
 #include "site/site_projection_update_flags.h"
 #include "site/site_world_access.h"
 #include "site/systems/camp_durability_system.h"
@@ -17,24 +17,24 @@ using gs1::CampDurabilitySystem;
 using gs1::DeviceMaintenanceSystem;
 using gs1::DeviceSupportSystem;
 using gs1::EventPhase;
-using gs1::GameCommand;
-using gs1::GameCommandQueue;
-using gs1::GameCommandType;
+using gs1::GameMessage;
+using gs1::GameMessageQueue;
+using gs1::GameMessageType;
 using gs1::LocalWeatherResolveSystem;
 using gs1::ModifierSystem;
-using gs1::SiteRunStartedCommand;
+using gs1::SiteRunStartedMessage;
 using gs1::TileCoord;
 using gs1::WeatherEventSystem;
 using gs1::WorkerConditionSystem;
 using namespace gs1::testing::fixtures;
 
 template <typename Payload>
-GameCommand make_command(gs1::GameCommandType type, const Payload& payload)
+GameMessage make_message(gs1::GameMessageType type, const Payload& payload)
 {
-    GameCommand command {};
-    command.type = type;
-    command.set_payload(payload);
-    return command;
+    GameMessage message {};
+    message.type = type;
+    message.set_payload(payload);
+    return message;
 }
 
 void weather_event_seeds_site_one_and_ignores_other_sites(gs1::testing::SystemTestExecutionContext& context)
@@ -42,21 +42,21 @@ void weather_event_seeds_site_one_and_ignores_other_sites(gs1::testing::SystemTe
     auto campaign = make_campaign();
     auto site_one_run = make_test_site_run(1U, 1101U);
     auto site_two_run = make_test_site_run(2U, 1102U);
-    GameCommandQueue queue_one {};
-    GameCommandQueue queue_two {};
+    GameMessageQueue queue_one {};
+    GameMessageQueue queue_two {};
 
     auto site_one_context = make_site_context<WeatherEventSystem>(campaign, site_one_run, queue_one);
     auto site_two_context = make_site_context<WeatherEventSystem>(campaign, site_two_run, queue_two);
-    const auto started_one = make_command(
-        GameCommandType::SiteRunStarted,
-        SiteRunStartedCommand {1U, 1U, 101U, 1U, 42ULL});
-    const auto started_two = make_command(
-        GameCommandType::SiteRunStarted,
-        SiteRunStartedCommand {2U, 1U, 102U, 1U, 42ULL});
+    const auto started_one = make_message(
+        GameMessageType::SiteRunStarted,
+        SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
+    const auto started_two = make_message(
+        GameMessageType::SiteRunStarted,
+        SiteRunStartedMessage {2U, 1U, 102U, 1U, 42ULL});
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        WeatherEventSystem::process_command(site_one_context, started_one) == GS1_STATUS_OK);
+        WeatherEventSystem::process_message(site_one_context, started_one) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, site_one_run.weather.forecast_profile_state.forecast_profile_id == 1U);
     GS1_SYSTEM_TEST_CHECK(context, site_one_run.event.active_event_template_id.has_value());
     GS1_SYSTEM_TEST_CHECK(context, site_one_run.event.event_phase == EventPhase::Warning);
@@ -67,7 +67,7 @@ void weather_event_seeds_site_one_and_ignores_other_sites(gs1::testing::SystemTe
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        WeatherEventSystem::process_command(site_two_context, started_two) == GS1_STATUS_OK);
+        WeatherEventSystem::process_message(site_two_context, started_two) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, !site_two_run.event.active_event_template_id.has_value());
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_two_run.weather.weather_heat, 0.0f));
 }
@@ -76,16 +76,16 @@ void weather_event_run_advances_through_full_lifecycle(gs1::testing::SystemTestE
 {
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(1U, 1103U);
-    GameCommandQueue queue {};
+    GameMessageQueue queue {};
     auto site_context = make_site_context<WeatherEventSystem>(campaign, site_run, queue);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        WeatherEventSystem::process_command(
+        WeatherEventSystem::process_message(
             site_context,
-            make_command(
-                GameCommandType::SiteRunStarted,
-                SiteRunStartedCommand {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     for (int index = 0; index < 10; ++index)
     {
@@ -108,7 +108,7 @@ void weather_event_does_not_reseed_when_event_is_already_active(
 {
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(1U, 1104U);
-    GameCommandQueue queue {};
+    GameMessageQueue queue {};
     auto site_context = make_site_context<WeatherEventSystem>(campaign, site_run, queue);
 
     site_run.weather.forecast_profile_state.forecast_profile_id = 7U;
@@ -120,11 +120,11 @@ void weather_event_does_not_reseed_when_event_is_already_active(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        WeatherEventSystem::process_command(
+        WeatherEventSystem::process_message(
             site_context,
-            make_command(
-                GameCommandType::SiteRunStarted,
-                SiteRunStartedCommand {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     GS1_SYSTEM_TEST_CHECK(context, site_run.weather.forecast_profile_state.forecast_profile_id == 7U);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.weather.site_weather_bias, 2.5f));
@@ -139,22 +139,22 @@ void local_weather_resolve_spreads_full_refresh_over_multiple_runs(
 {
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(2U, 1201U, 101U, 8U, 8U);
-    GameCommandQueue queue {};
+    GameMessageQueue queue {};
     auto site_context = make_site_context<LocalWeatherResolveSystem>(campaign, site_run, queue);
 
     site_run.weather.weather_heat = 10.0f;
     site_run.weather.weather_wind = 5.0f;
     site_run.weather.weather_dust = 3.0f;
 
-    GS1_SYSTEM_TEST_CHECK(context, !LocalWeatherResolveSystem::subscribes_to(GameCommandType::SiteRunStarted));
-    GS1_SYSTEM_TEST_CHECK(context, LocalWeatherResolveSystem::subscribes_to(GameCommandType::TileEcologyChanged));
+    GS1_SYSTEM_TEST_CHECK(context, !LocalWeatherResolveSystem::subscribes_to(GameMessageType::SiteRunStarted));
+    GS1_SYSTEM_TEST_CHECK(context, LocalWeatherResolveSystem::subscribes_to(GameMessageType::TileEcologyChanged));
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        LocalWeatherResolveSystem::process_command(
+        LocalWeatherResolveSystem::process_message(
             site_context,
-            make_command(
-                GameCommandType::SiteRunStarted,
-                SiteRunStartedCommand {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     LocalWeatherResolveSystem::run(site_context);
 
@@ -179,7 +179,7 @@ void local_weather_resolve_refreshes_dirty_neighborhood_from_tile_ecology_change
 {
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(2U, 1202U);
-    GameCommandQueue queue {};
+    GameMessageQueue queue {};
     auto site_context = make_site_context<LocalWeatherResolveSystem>(campaign, site_run, queue);
 
     site_run.weather.weather_heat = 10.0f;
@@ -198,11 +198,11 @@ void local_weather_resolve_refreshes_dirty_neighborhood_from_tile_ecology_change
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        LocalWeatherResolveSystem::process_command(
+        LocalWeatherResolveSystem::process_message(
             site_context,
-            make_command(
-                GameCommandType::TileEcologyChanged,
-                gs1::TileEcologyChangedCommand {
+            make_message(
+                GameMessageType::TileEcologyChanged,
+                gs1::TileEcologyChangedMessage {
                     3,
                     3,
                     gs1::TILE_ECOLOGY_CHANGED_OCCUPANCY |
@@ -233,16 +233,16 @@ void worker_condition_requested_delta_emits_initial_full_mask_and_clamps(
 {
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(1U, 1301U);
-    GameCommandQueue queue {};
+    GameMessageQueue queue {};
     auto site_context = make_site_context<WorkerConditionSystem>(campaign, site_run, queue);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        WorkerConditionSystem::process_command(
+        WorkerConditionSystem::process_message(
             site_context,
-            make_command(
-                GameCommandType::WorkerMeterDeltaRequested,
-                gs1::WorkerMeterDeltaRequestedCommand {
+            make_message(
+                GameMessageType::WorkerMeterDeltaRequested,
+                gs1::WorkerMeterDeltaRequestedMessage {
                     1U,
                     gs1::WORKER_METER_CHANGED_HEALTH |
                         gs1::WORKER_METER_CHANGED_ENERGY_CAP |
@@ -260,10 +260,10 @@ void worker_condition_requested_delta_emits_initial_full_mask_and_clamps(
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(worker.energy_cap, 200.0f));
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(worker.energy, 200.0f));
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
-    GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameCommandType::WorkerMetersChanged);
+    GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::WorkerMetersChanged);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        queue.front().payload_as<gs1::WorkerMetersChangedCommand>().changed_mask ==
+        queue.front().payload_as<gs1::WorkerMetersChangedMessage>().changed_mask ==
             (gs1::WORKER_METER_CHANGED_HEALTH |
                 gs1::WORKER_METER_CHANGED_HYDRATION |
                 gs1::WORKER_METER_CHANGED_NOURISHMENT |
@@ -278,7 +278,7 @@ void worker_condition_run_drains_resources_and_health_when_starving(
 {
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(1U, 1302U);
-    GameCommandQueue queue {};
+    GameMessageQueue queue {};
     auto site_context = make_site_context<WorkerConditionSystem>(campaign, site_run, queue, 100.0);
 
     auto worker = gs1::site_world_access::worker_conditions(site_run);
@@ -303,7 +303,7 @@ void device_support_updates_efficiency_and_water_from_heat(
 {
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(1U, 1401U);
-    GameCommandQueue queue {};
+    GameMessageQueue queue {};
     auto site_context = make_site_context<DeviceSupportSystem>(campaign, site_run, queue, 10.0);
 
     auto tile = site_run.site_world->tile_at(TileCoord {2, 2});
@@ -326,7 +326,7 @@ void device_maintenance_applies_weather_and_burial_wear(gs1::testing::SystemTest
 {
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(1U, 1402U);
-    GameCommandQueue queue {};
+    GameMessageQueue queue {};
     auto site_context = make_site_context<DeviceMaintenanceSystem>(campaign, site_run, queue, 10.0);
 
     site_run.weather.weather_heat = 20.0f;
@@ -349,7 +349,7 @@ void camp_durability_resets_and_crosses_service_thresholds(gs1::testing::SystemT
 {
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(1U, 1501U);
-    GameCommandQueue queue {};
+    GameMessageQueue queue {};
     auto site_context = make_site_context<CampDurabilitySystem>(campaign, site_run, queue, 300.0);
 
     site_run.camp.camp_durability = 25.0f;
@@ -359,11 +359,11 @@ void camp_durability_resets_and_crosses_service_thresholds(gs1::testing::SystemT
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        CampDurabilitySystem::process_command(
+        CampDurabilitySystem::process_message(
             site_context,
-            make_command(
-                GameCommandType::SiteRunStarted,
-                SiteRunStartedCommand {1U, 1501U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1501U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.camp.camp_durability, 100.0f));
     GS1_SYSTEM_TEST_CHECK(context, site_run.camp.camp_protection_resolved);
     GS1_SYSTEM_TEST_CHECK(context, site_run.camp.delivery_point_operational);
@@ -392,16 +392,16 @@ void modifier_imports_campaign_aura_and_reacts_to_camp_changes(
         gs1::ModifierId {1U},
         gs1::ModifierId {2U}};
     auto site_run = make_test_site_run(1U, 1601U);
-    GameCommandQueue queue {};
+    GameMessageQueue queue {};
     auto site_context = make_site_context<ModifierSystem>(campaign, site_run, queue);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        ModifierSystem::process_command(
+        ModifierSystem::process_message(
             site_context,
-            make_command(
-                GameCommandType::SiteRunStarted,
-                SiteRunStartedCommand {1U, 1601U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1601U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, site_run.modifier.active_nearby_aura_modifier_ids.size() == 2U);
     const auto initial_morale = site_run.modifier.resolved_channel_totals.morale;
 

@@ -27,7 +27,7 @@ std::uint32_t normalize_quantity(std::uint32_t quantity) noexcept
     return quantity == 0U ? 1U : quantity;
 }
 
-bool has_supported_inventory_transfer_route(const InventoryTransferRequestedCommand& payload) noexcept
+bool has_supported_inventory_transfer_route(const InventoryTransferRequestedMessage& payload) noexcept
 {
     const bool source_is_worker_pack =
         payload.source_container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK;
@@ -43,7 +43,7 @@ bool has_supported_inventory_transfer_route(const InventoryTransferRequestedComm
         (source_is_device_storage && destination_is_worker_pack);
 }
 
-bool transfer_resolves_destination_in_dll(const InventoryTransferRequestedCommand& payload) noexcept
+bool transfer_resolves_destination_in_dll(const InventoryTransferRequestedMessage& payload) noexcept
 {
     return (payload.flags & k_inventory_transfer_flag_resolve_destination_in_dll) != 0U;
 }
@@ -231,7 +231,7 @@ void emit_item_use_effect(
     const ItemDef& item_def,
     std::uint32_t quantity) noexcept
 {
-    WorkerMeterDeltaRequestedCommand meter_delta {};
+    WorkerMeterDeltaRequestedMessage meter_delta {};
     meter_delta.source_id = item_def.item_id.value;
 
     if (item_def.health_delta != 0.0f)
@@ -260,10 +260,10 @@ void emit_item_use_effect(
         return;
     }
 
-    GameCommand command {};
-    command.type = GameCommandType::WorkerMeterDeltaRequested;
-    command.set_payload(meter_delta);
-    context.command_queue.push_back(command);
+    GameMessage message {};
+    message.type = GameMessageType::WorkerMeterDeltaRequested;
+    message.set_payload(meter_delta);
+    context.message_queue.push_back(message);
 }
 
 std::uint32_t allocate_delivery_id() noexcept
@@ -336,7 +336,7 @@ void seed_inventory_from_loadout(SiteSystemContext<InventorySystem>& context) no
 
 Gs1Status handle_inventory_item_use(
     SiteSystemContext<InventorySystem>& context,
-    const InventoryItemUseRequestedCommand& payload) noexcept
+    const InventoryItemUseRequestedMessage& payload) noexcept
 {
     return mutate_inventory_storage(context, [&]() -> Gs1Status {
         const auto container =
@@ -396,7 +396,7 @@ Gs1Status handle_inventory_item_use(
 
 Gs1Status handle_inventory_item_consume(
     SiteSystemContext<InventorySystem>& context,
-    const InventoryItemConsumeRequestedCommand& payload) noexcept
+    const InventoryItemConsumeRequestedMessage& payload) noexcept
 {
     return mutate_inventory_storage(context, [&]() -> Gs1Status {
         const ItemId item_id {payload.item_id};
@@ -429,7 +429,7 @@ Gs1Status handle_inventory_item_consume(
 
 Gs1Status handle_inventory_global_item_consume(
     SiteSystemContext<InventorySystem>& context,
-    const InventoryGlobalItemConsumeRequestedCommand& payload) noexcept
+    const InventoryGlobalItemConsumeRequestedMessage& payload) noexcept
 {
     return mutate_inventory_storage(context, [&]() -> Gs1Status {
         const ItemId item_id {payload.item_id};
@@ -461,7 +461,7 @@ Gs1Status handle_inventory_global_item_consume(
 
 Gs1Status handle_inventory_craft_commit(
     SiteSystemContext<InventorySystem>& context,
-    const InventoryCraftCommitRequestedCommand& payload) noexcept
+    const InventoryCraftCommitRequestedMessage& payload) noexcept
 {
     return mutate_inventory_storage(context, [&]() -> Gs1Status {
         const auto* recipe_def = find_craft_recipe_def(RecipeId {payload.recipe_id});
@@ -552,7 +552,7 @@ Gs1Status handle_inventory_craft_commit(
 
 Gs1Status handle_inventory_transfer(
     SiteSystemContext<InventorySystem>& context,
-    const InventoryTransferRequestedCommand& payload) noexcept
+    const InventoryTransferRequestedMessage& payload) noexcept
 {
     const bool auto_resolve_destination = transfer_resolves_destination_in_dll(payload);
     const bool same_container =
@@ -657,7 +657,7 @@ Gs1Status handle_inventory_transfer(
 
 Gs1Status handle_inventory_delivery_requested(
     SiteSystemContext<InventorySystem>& context,
-    const InventoryDeliveryRequestedCommand& payload) noexcept
+    const InventoryDeliveryRequestedMessage& payload) noexcept
 {
     ensure_inventory_storage_initialized(context);
 
@@ -754,68 +754,68 @@ void progress_pending_deliveries(SiteSystemContext<InventorySystem>& context) no
 
 }  // namespace
 
-bool InventorySystem::subscribes_to(GameCommandType type) noexcept
+bool InventorySystem::subscribes_to(GameMessageType type) noexcept
 {
     switch (type)
     {
-    case GameCommandType::SiteRunStarted:
-    case GameCommandType::SiteDevicePlaced:
-    case GameCommandType::InventoryDeliveryRequested:
-    case GameCommandType::InventoryItemUseRequested:
-    case GameCommandType::InventoryItemConsumeRequested:
-    case GameCommandType::InventoryGlobalItemConsumeRequested:
-    case GameCommandType::InventoryTransferRequested:
-    case GameCommandType::InventoryCraftCommitRequested:
+    case GameMessageType::SiteRunStarted:
+    case GameMessageType::SiteDevicePlaced:
+    case GameMessageType::InventoryDeliveryRequested:
+    case GameMessageType::InventoryItemUseRequested:
+    case GameMessageType::InventoryItemConsumeRequested:
+    case GameMessageType::InventoryGlobalItemConsumeRequested:
+    case GameMessageType::InventoryTransferRequested:
+    case GameMessageType::InventoryCraftCommitRequested:
         return true;
     default:
         return false;
     }
 }
 
-Gs1Status InventorySystem::process_command(
+Gs1Status InventorySystem::process_message(
     SiteSystemContext<InventorySystem>& context,
-    const GameCommand& command)
+    const GameMessage& message)
 {
-    switch (command.type)
+    switch (message.type)
     {
-    case GameCommandType::SiteRunStarted:
+    case GameMessageType::SiteRunStarted:
         seed_inventory_from_loadout(context);
         return GS1_STATUS_OK;
 
-    case GameCommandType::SiteDevicePlaced:
+    case GameMessageType::SiteDevicePlaced:
         (void)ensure_inventory_storage_initialized(context);
         (void)ensure_device_storage_containers(context);
         return GS1_STATUS_OK;
 
-    case GameCommandType::InventoryDeliveryRequested:
+    case GameMessageType::InventoryDeliveryRequested:
         return handle_inventory_delivery_requested(
             context,
-            command.payload_as<InventoryDeliveryRequestedCommand>());
+            message.payload_as<InventoryDeliveryRequestedMessage>());
 
-    case GameCommandType::InventoryItemUseRequested:
+    case GameMessageType::InventoryItemUseRequested:
         return handle_inventory_item_use(
             context,
-            command.payload_as<InventoryItemUseRequestedCommand>());
+            message.payload_as<InventoryItemUseRequestedMessage>());
 
-    case GameCommandType::InventoryItemConsumeRequested:
+    case GameMessageType::InventoryItemConsumeRequested:
         return handle_inventory_item_consume(
             context,
-            command.payload_as<InventoryItemConsumeRequestedCommand>());
+            message.payload_as<InventoryItemConsumeRequestedMessage>());
 
-    case GameCommandType::InventoryGlobalItemConsumeRequested:
+    case GameMessageType::InventoryGlobalItemConsumeRequested:
         return handle_inventory_global_item_consume(
             context,
-            command.payload_as<InventoryGlobalItemConsumeRequestedCommand>());
+            message.payload_as<InventoryGlobalItemConsumeRequestedMessage>());
 
-    case GameCommandType::InventoryTransferRequested:
+    case GameMessageType::InventoryTransferRequested:
         return handle_inventory_transfer(
             context,
-            command.payload_as<InventoryTransferRequestedCommand>());
+            message.payload_as<InventoryTransferRequestedMessage>());
 
-    case GameCommandType::InventoryCraftCommitRequested:
+    case GameMessageType::InventoryCraftCommitRequested:
         return handle_inventory_craft_commit(
             context,
-            command.payload_as<InventoryCraftCommitRequestedCommand>());
+            message.payload_as<InventoryCraftCommitRequestedMessage>());
 
     default:
         return GS1_STATUS_OK;

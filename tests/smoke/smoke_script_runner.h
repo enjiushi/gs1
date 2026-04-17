@@ -20,7 +20,7 @@ private:
         std::size_t line_number,
         const std::string& line);
 
-    [[nodiscard]] bool parse_command(
+    [[nodiscard]] bool parse_message(
         const std::string& script_path,
         std::size_t line_number,
         const std::string& trimmed_line,

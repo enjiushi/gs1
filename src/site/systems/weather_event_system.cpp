@@ -56,16 +56,16 @@ float resolve_phase_pressure(EventPhase phase)
 }
 }  // namespace
 
-bool WeatherEventSystem::subscribes_to(GameCommandType type) noexcept
+bool WeatherEventSystem::subscribes_to(GameMessageType type) noexcept
 {
-    return type == GameCommandType::SiteRunStarted;
+    return type == GameMessageType::SiteRunStarted;
 }
 
-Gs1Status WeatherEventSystem::process_command(
+Gs1Status WeatherEventSystem::process_message(
     SiteSystemContext<WeatherEventSystem>& context,
-    const GameCommand& command)
+    const GameMessage& message)
 {
-    if (command.type != GameCommandType::SiteRunStarted)
+    if (message.type != GameMessageType::SiteRunStarted)
     {
         return GS1_STATUS_OK;
     }

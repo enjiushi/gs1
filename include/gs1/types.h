@@ -8,8 +8,8 @@
 
 struct Gs1RuntimeHandle;
 
-inline constexpr std::size_t GS1_COMMAND_CACHE_LINE_SIZE = 64U;
-inline constexpr std::size_t GS1_COMMAND_PAYLOAD_BYTE_COUNT = GS1_COMMAND_CACHE_LINE_SIZE - sizeof(std::uint8_t);
+inline constexpr std::size_t GS1_MESSAGE_CACHE_LINE_SIZE = 64U;
+inline constexpr std::size_t GS1_MESSAGE_PAYLOAD_BYTE_COUNT = GS1_MESSAGE_CACHE_LINE_SIZE - sizeof(std::uint8_t);
 
 #define GS1_ASSERT_TRIVIAL_SCHEMA(Type) \
     static_assert(std::is_standard_layout_v<Type>, #Type " must remain standard layout."); \
@@ -221,42 +221,42 @@ enum Gs1SiteAttemptResult : std::uint8_t
     GS1_SITE_ATTEMPT_RESULT_FAILED = 2
 };
 
-enum Gs1EngineCommandType : std::uint8_t
+enum Gs1EngineMessageType : std::uint8_t
 {
-    GS1_ENGINE_COMMAND_NONE = 0,
-    GS1_ENGINE_COMMAND_LOG_TEXT = 1,
-    GS1_ENGINE_COMMAND_SET_APP_STATE = 2,
-    GS1_ENGINE_COMMAND_PRESENTATION_DIRTY = 3,
+    GS1_ENGINE_MESSAGE_NONE = 0,
+    GS1_ENGINE_MESSAGE_LOG_TEXT = 1,
+    GS1_ENGINE_MESSAGE_SET_APP_STATE = 2,
+    GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY = 3,
 
-    GS1_ENGINE_COMMAND_BEGIN_REGIONAL_MAP_SNAPSHOT = 10,
-    GS1_ENGINE_COMMAND_REGIONAL_MAP_SITE_UPSERT = 11,
-    GS1_ENGINE_COMMAND_REGIONAL_MAP_SITE_REMOVE = 12,
-    GS1_ENGINE_COMMAND_REGIONAL_MAP_LINK_UPSERT = 13,
-    GS1_ENGINE_COMMAND_REGIONAL_MAP_LINK_REMOVE = 14,
-    GS1_ENGINE_COMMAND_END_REGIONAL_MAP_SNAPSHOT = 15,
+    GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_MAP_SNAPSHOT = 10,
+    GS1_ENGINE_MESSAGE_REGIONAL_MAP_SITE_UPSERT = 11,
+    GS1_ENGINE_MESSAGE_REGIONAL_MAP_SITE_REMOVE = 12,
+    GS1_ENGINE_MESSAGE_REGIONAL_MAP_LINK_UPSERT = 13,
+    GS1_ENGINE_MESSAGE_REGIONAL_MAP_LINK_REMOVE = 14,
+    GS1_ENGINE_MESSAGE_END_REGIONAL_MAP_SNAPSHOT = 15,
 
-    GS1_ENGINE_COMMAND_BEGIN_UI_SETUP = 16,
-    GS1_ENGINE_COMMAND_UI_ELEMENT_UPSERT = 17,
-    GS1_ENGINE_COMMAND_END_UI_SETUP = 18,
-    GS1_ENGINE_COMMAND_CLOSE_UI_SETUP = 19,
+    GS1_ENGINE_MESSAGE_BEGIN_UI_SETUP = 16,
+    GS1_ENGINE_MESSAGE_UI_ELEMENT_UPSERT = 17,
+    GS1_ENGINE_MESSAGE_END_UI_SETUP = 18,
+    GS1_ENGINE_MESSAGE_CLOSE_UI_SETUP = 19,
 
-    GS1_ENGINE_COMMAND_BEGIN_SITE_SNAPSHOT = 20,
-    GS1_ENGINE_COMMAND_SITE_TILE_UPSERT = 21,
-    GS1_ENGINE_COMMAND_SITE_WORKER_UPDATE = 22,
-    GS1_ENGINE_COMMAND_SITE_CAMP_UPDATE = 23,
-    GS1_ENGINE_COMMAND_SITE_WEATHER_UPDATE = 24,
-    GS1_ENGINE_COMMAND_SITE_INVENTORY_SLOT_UPSERT = 25,
-    GS1_ENGINE_COMMAND_SITE_TASK_UPSERT = 26,
-    GS1_ENGINE_COMMAND_SITE_TASK_REMOVE = 27,
-    GS1_ENGINE_COMMAND_SITE_PHONE_LISTING_UPSERT = 28,
-    GS1_ENGINE_COMMAND_SITE_PHONE_LISTING_REMOVE = 29,
-    GS1_ENGINE_COMMAND_END_SITE_SNAPSHOT = 30,
-    GS1_ENGINE_COMMAND_SITE_ACTION_UPDATE = 31,
+    GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT = 20,
+    GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT = 21,
+    GS1_ENGINE_MESSAGE_SITE_WORKER_UPDATE = 22,
+    GS1_ENGINE_MESSAGE_SITE_CAMP_UPDATE = 23,
+    GS1_ENGINE_MESSAGE_SITE_WEATHER_UPDATE = 24,
+    GS1_ENGINE_MESSAGE_SITE_INVENTORY_SLOT_UPSERT = 25,
+    GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT = 26,
+    GS1_ENGINE_MESSAGE_SITE_TASK_REMOVE = 27,
+    GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_UPSERT = 28,
+    GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_REMOVE = 29,
+    GS1_ENGINE_MESSAGE_END_SITE_SNAPSHOT = 30,
+    GS1_ENGINE_MESSAGE_SITE_ACTION_UPDATE = 31,
 
-    GS1_ENGINE_COMMAND_HUD_STATE = 40,
-    GS1_ENGINE_COMMAND_NOTIFICATION_PUSH = 41,
-    GS1_ENGINE_COMMAND_SITE_RESULT_READY = 42,
-    GS1_ENGINE_COMMAND_PLAY_ONE_SHOT_CUE = 43
+    GS1_ENGINE_MESSAGE_HUD_STATE = 40,
+    GS1_ENGINE_MESSAGE_NOTIFICATION_PUSH = 41,
+    GS1_ENGINE_MESSAGE_SITE_RESULT_READY = 42,
+    GS1_ENGINE_MESSAGE_PLAY_ONE_SHOT_CUE = 43
 };
 
 enum Gs1RuntimeProfileSystemId : std::uint8_t
@@ -305,7 +305,7 @@ struct Gs1RuntimeProfileSystemStats
     std::uint16_t reserved0;
     std::uint32_t reserved1;
     Gs1RuntimeTimingStats run_timing;
-    Gs1RuntimeTimingStats command_timing;
+    Gs1RuntimeTimingStats message_timing;
 };
 
 struct Gs1RuntimeProfilingSnapshot
@@ -403,7 +403,7 @@ struct Gs1Phase1Result
 {
     std::uint32_t struct_size;
     std::uint32_t fixed_steps_executed;
-    std::uint32_t engine_commands_queued;
+    std::uint32_t engine_messages_queued;
     std::uint32_t processed_host_event_count;
 };
 
@@ -417,29 +417,29 @@ struct Gs1Phase2Result
     std::uint32_t struct_size;
     std::uint32_t processed_host_event_count;
     std::uint32_t processed_feedback_event_count;
-    std::uint32_t engine_commands_queued;
+    std::uint32_t engine_messages_queued;
     std::uint32_t reserved;
 };
 
-struct Gs1EngineCommandLogTextData
+struct Gs1EngineMessageLogTextData
 {
     Gs1LogLevel level;
     char text[62];
 };
 
-struct Gs1EngineCommandSetAppStateData
+struct Gs1EngineMessageSetAppStateData
 {
     Gs1AppState app_state;
 };
 
-struct Gs1EngineCommandPresentationDirtyData
+struct Gs1EngineMessagePresentationDirtyData
 {
     std::uint32_t dirty_flags;
     std::uint32_t reserved0;
     std::uint64_t revision;
 };
 
-struct Gs1EngineCommandRegionalMapSnapshotData
+struct Gs1EngineMessageRegionalMapSnapshotData
 {
     Gs1ProjectionMode mode;
     std::uint32_t site_count;
@@ -447,7 +447,7 @@ struct Gs1EngineCommandRegionalMapSnapshotData
     std::uint32_t selected_site_id;
 };
 
-struct Gs1EngineCommandRegionalMapSiteData
+struct Gs1EngineMessageRegionalMapSiteData
 {
     std::uint32_t site_id;
     std::uint32_t site_archetype_id;
@@ -459,14 +459,14 @@ struct Gs1EngineCommandRegionalMapSiteData
     std::uint8_t flags;
 };
 
-struct Gs1EngineCommandRegionalMapLinkData
+struct Gs1EngineMessageRegionalMapLinkData
 {
     std::uint32_t from_site_id;
     std::uint32_t to_site_id;
     std::uint8_t flags;
 };
 
-struct Gs1EngineCommandUiSetupData
+struct Gs1EngineMessageUiSetupData
 {
     std::uint32_t context_id;
     std::uint16_t element_count;
@@ -475,13 +475,13 @@ struct Gs1EngineCommandUiSetupData
     Gs1UiSetupPresentationType presentation_type;
 };
 
-struct Gs1EngineCommandCloseUiSetupData
+struct Gs1EngineMessageCloseUiSetupData
 {
     Gs1UiSetupId setup_id;
     Gs1UiSetupPresentationType presentation_type;
 };
 
-struct Gs1EngineCommandUiElementData
+struct Gs1EngineMessageUiElementData
 {
     Gs1UiAction action;
     std::uint32_t element_id;
@@ -490,7 +490,7 @@ struct Gs1EngineCommandUiElementData
     char text[26];
 };
 
-struct Gs1EngineCommandSiteSnapshotData
+struct Gs1EngineMessageSiteSnapshotData
 {
     std::uint32_t site_id;
     std::uint32_t site_archetype_id;
@@ -499,7 +499,7 @@ struct Gs1EngineCommandSiteSnapshotData
     Gs1ProjectionMode mode;
 };
 
-struct Gs1EngineCommandSiteTileData
+struct Gs1EngineMessageSiteTileData
 {
     std::uint32_t x;
     std::uint32_t y;
@@ -511,7 +511,7 @@ struct Gs1EngineCommandSiteTileData
     float sand_burial;
 };
 
-struct Gs1EngineCommandWorkerData
+struct Gs1EngineMessageWorkerData
 {
     float tile_x;
     float tile_y;
@@ -523,7 +523,7 @@ struct Gs1EngineCommandWorkerData
     Gs1SiteActionKind current_action_kind;
 };
 
-struct Gs1EngineCommandCampData
+struct Gs1EngineMessageCampData
 {
     std::int32_t tile_x;
     std::int32_t tile_y;
@@ -531,7 +531,7 @@ struct Gs1EngineCommandCampData
     std::uint8_t flags;
 };
 
-struct Gs1EngineCommandWeatherData
+struct Gs1EngineMessageWeatherData
 {
     float heat;
     float wind;
@@ -541,7 +541,7 @@ struct Gs1EngineCommandWeatherData
     float phase_minutes_remaining;
 };
 
-struct Gs1EngineCommandInventorySlotData
+struct Gs1EngineMessageInventorySlotData
 {
     std::uint32_t item_id;
     float condition;
@@ -555,7 +555,7 @@ struct Gs1EngineCommandInventorySlotData
     std::uint8_t flags;
 };
 
-struct Gs1EngineCommandTaskData
+struct Gs1EngineMessageTaskData
 {
     std::uint32_t task_instance_id;
     std::uint32_t task_template_id;
@@ -566,7 +566,7 @@ struct Gs1EngineCommandTaskData
     std::uint8_t flags;
 };
 
-struct Gs1EngineCommandPhoneListingData
+struct Gs1EngineMessagePhoneListingData
 {
     std::uint32_t listing_id;
     std::uint32_t item_or_unlockable_id;
@@ -577,7 +577,7 @@ struct Gs1EngineCommandPhoneListingData
     std::uint8_t flags;
 };
 
-struct Gs1EngineCommandSiteActionData
+struct Gs1EngineMessageSiteActionData
 {
     std::uint32_t action_id;
     std::int32_t target_tile_x;
@@ -589,7 +589,7 @@ struct Gs1EngineCommandSiteActionData
     float duration_minutes;
 };
 
-struct Gs1EngineCommandHudStateData
+struct Gs1EngineMessageHudStateData
 {
     float player_health;
     float player_hydration;
@@ -601,7 +601,7 @@ struct Gs1EngineCommandHudStateData
     Gs1SiteActionKind current_action_kind;
 };
 
-struct Gs1EngineCommandNotificationData
+struct Gs1EngineMessageNotificationData
 {
     std::uint32_t notification_code;
     std::uint32_t subject_id;
@@ -611,14 +611,14 @@ struct Gs1EngineCommandNotificationData
     char text[39];
 };
 
-struct Gs1EngineCommandSiteResultData
+struct Gs1EngineMessageSiteResultData
 {
     std::uint32_t site_id;
     Gs1SiteAttemptResult result;
     std::uint16_t newly_revealed_site_count;
 };
 
-struct Gs1EngineCommandOneShotCueData
+struct Gs1EngineMessageOneShotCueData
 {
     std::uint32_t subject_id;
     float world_x;
@@ -628,10 +628,10 @@ struct Gs1EngineCommandOneShotCueData
     Gs1OneShotCueKind cue_kind;
 };
 
-struct alignas(GS1_COMMAND_CACHE_LINE_SIZE) Gs1EngineCommand
+struct alignas(GS1_MESSAGE_CACHE_LINE_SIZE) Gs1EngineMessage
 {
-    unsigned char payload[GS1_COMMAND_PAYLOAD_BYTE_COUNT];
-    Gs1EngineCommandType type;
+    unsigned char payload[GS1_MESSAGE_PAYLOAD_BYTE_COUNT];
+    Gs1EngineMessageType type;
 
     template <typename PayloadData>
     [[nodiscard]] PayloadData& emplace_payload() noexcept
@@ -668,8 +668,8 @@ private:
     static constexpr void validate_payload_type() noexcept
     {
         GS1_ASSERT_TRIVIAL_SCHEMA(PayloadData);
-        static_assert(sizeof(PayloadData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT, "Engine command payload data exceeds command payload storage.");
-        static_assert(alignof(PayloadData) <= alignof(Gs1EngineCommand), "Engine command payload data requires stronger alignment than Gs1EngineCommand.");
+        static_assert(sizeof(PayloadData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT, "Engine message payload data exceeds message payload storage.");
+        static_assert(alignof(PayloadData) <= alignof(Gs1EngineMessage), "Engine message payload data requires stronger alignment than Gs1EngineMessage.");
     }
 };
 
@@ -694,56 +694,56 @@ GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1Phase1Request, 16U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1Phase1Result, 16U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1Phase2Request, 4U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1Phase2Result, 20U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandLogTextData, 63U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandSetAppStateData, 1U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandPresentationDirtyData, 16U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandRegionalMapSnapshotData, 16U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandRegionalMapSiteData, 24U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandRegionalMapLinkData, 12U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandUiSetupData, 12U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandCloseUiSetupData, 2U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandUiElementData, 56U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandSiteSnapshotData, 16U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandSiteTileData, 32U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandWorkerData, 28U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandCampData, 16U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandWeatherData, 24U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandInventorySlotData, 28U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandTaskData, 20U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandPhoneListingData, 20U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandSiteActionData, 24U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandHudStateData, 28U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandNotificationData, 56U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandSiteResultData, 8U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommandOneShotCueData, 24U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineCommand, 64U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageLogTextData, 63U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSetAppStateData, 1U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePresentationDirtyData, 16U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageRegionalMapSnapshotData, 16U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageRegionalMapSiteData, 24U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageRegionalMapLinkData, 12U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageUiSetupData, 12U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageCloseUiSetupData, 2U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageUiElementData, 56U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteSnapshotData, 16U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteTileData, 32U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageWorkerData, 28U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageCampData, 16U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageWeatherData, 24U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageInventorySlotData, 28U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageTaskData, 20U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePhoneListingData, 20U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteActionData, 24U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageHudStateData, 28U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageNotificationData, 56U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteResultData, 8U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageOneShotCueData, 24U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessage, 64U);
 
-static_assert(sizeof(Gs1EngineCommandLogTextData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineCommandSetAppStateData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineCommandPresentationDirtyData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineCommandRegionalMapSnapshotData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineCommandRegionalMapSiteData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineCommandRegionalMapLinkData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineCommandUiSetupData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineCommandCloseUiSetupData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineCommandUiElementData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineCommandSiteSnapshotData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineCommandSiteTileData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineCommandWorkerData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineCommandCampData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineCommandWeatherData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineCommandInventorySlotData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineCommandTaskData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineCommandPhoneListingData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineCommandSiteActionData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineCommandHudStateData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineCommandNotificationData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineCommandSiteResultData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineCommandOneShotCueData) <= GS1_COMMAND_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineCommand) == GS1_COMMAND_CACHE_LINE_SIZE, "Gs1EngineCommand must fit exactly one cache line.");
-static_assert(alignof(Gs1EngineCommand) == GS1_COMMAND_CACHE_LINE_SIZE, "Gs1EngineCommand must be cache-line aligned.");
-static_assert(offsetof(Gs1EngineCommand, payload) == 0U, "Gs1EngineCommand payload must start at byte zero.");
-static_assert(offsetof(Gs1EngineCommand, type) == GS1_COMMAND_PAYLOAD_BYTE_COUNT, "Gs1EngineCommand type must sit at the tail byte.");
+static_assert(sizeof(Gs1EngineMessageLogTextData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageSetAppStateData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessagePresentationDirtyData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageRegionalMapSnapshotData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageRegionalMapSiteData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageRegionalMapLinkData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageUiSetupData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageCloseUiSetupData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageUiElementData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageSiteSnapshotData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageSiteTileData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageWorkerData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageCampData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageWeatherData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageInventorySlotData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageTaskData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessagePhoneListingData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageSiteActionData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageHudStateData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageNotificationData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageSiteResultData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageOneShotCueData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessage) == GS1_MESSAGE_CACHE_LINE_SIZE, "Gs1EngineMessage must fit exactly one cache line.");
+static_assert(alignof(Gs1EngineMessage) == GS1_MESSAGE_CACHE_LINE_SIZE, "Gs1EngineMessage must be cache-line aligned.");
+static_assert(offsetof(Gs1EngineMessage, payload) == 0U, "Gs1EngineMessage payload must start at byte zero.");
+static_assert(offsetof(Gs1EngineMessage, type) == GS1_MESSAGE_PAYLOAD_BYTE_COUNT, "Gs1EngineMessage type must sit at the tail byte.");
 
 #undef GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT
 #undef GS1_ASSERT_TRIVIAL_SCHEMA

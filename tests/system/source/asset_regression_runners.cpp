@@ -1,4 +1,4 @@
-#include "commands/game_command.h"
+#include "messages/game_message.h"
 #include "site/systems/ecology_system.h"
 #include "site/systems/economy_phone_system.h"
 #include "site/systems/inventory_system.h"
@@ -18,14 +18,14 @@ namespace
 {
 using gs1::EcologySystem;
 using gs1::EconomyPhoneSystem;
-using gs1::GameCommand;
-using gs1::GameCommandQueue;
-using gs1::GameCommandType;
+using gs1::GameMessage;
+using gs1::GameMessageQueue;
+using gs1::GameMessageType;
 using gs1::InventorySystem;
 using gs1::PlacementOccupancyLayer;
 using gs1::PlacementReservationRejectionReason;
 using gs1::PlacementValidationSystem;
-using gs1::SiteRunStartedCommand;
+using gs1::SiteRunStartedMessage;
 using gs1::TaskBoardSystem;
 using gs1::TaskRuntimeListKind;
 using gs1::TileCoord;
@@ -267,12 +267,12 @@ PlacementReservationRejectionReason parse_rejection_reason(
 }
 
 template <typename Payload>
-GameCommand make_command(gs1::GameCommandType type, const Payload& payload)
+GameMessage make_message(gs1::GameMessageType type, const Payload& payload)
 {
-    GameCommand command {};
-    command.type = type;
-    command.set_payload(payload);
-    return command;
+    GameMessage message {};
+    message.type = type;
+    message.set_payload(payload);
+    return message;
 }
 
 void inventory_regression_runner(
@@ -284,24 +284,24 @@ void inventory_regression_runner(
     auto campaign = make_campaign();
     const std::uint32_t site_id = parse_u32(context, values, "site_id", 1U);
     auto site_run = make_test_site_run(site_id, 2001U);
-    GameCommandQueue queue {};
+    GameMessageQueue queue {};
     auto site_context = make_site_context<InventorySystem>(campaign, site_run, queue);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_command(
+        InventorySystem::process_message(
             site_context,
-            make_command(
-                GameCommandType::SiteRunStarted,
-                SiteRunStartedCommand {site_id, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {site_id, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     if (scenario == "use_item")
     {
-        const auto status = InventorySystem::process_command(
+        const auto status = InventorySystem::process_message(
             site_context,
-            make_command(
-                GameCommandType::InventoryItemUseRequested,
-                gs1::InventoryItemUseRequestedCommand {
+            make_message(
+                GameMessageType::InventoryItemUseRequested,
+                gs1::InventoryItemUseRequestedMessage {
                     parse_u32(context, values, "item_id"),
                     static_cast<std::uint16_t>(parse_u32(context, values, "quantity", 1U)),
                     GS1_INVENTORY_CONTAINER_WORKER_PACK,
@@ -313,8 +313,8 @@ void inventory_regression_runner(
                 parse_u32(context, values, "expect_remaining_quantity"));
         GS1_SYSTEM_TEST_CHECK(
             context,
-            count_commands(queue, GameCommandType::WorkerMeterDeltaRequested) ==
-                (parse_bool(values, "expect_meter_command", true) ? 1U : 0U));
+            count_messages(queue, GameMessageType::WorkerMeterDeltaRequested) ==
+                (parse_bool(values, "expect_meter_message", true) ? 1U : 0U));
         return;
     }
 
@@ -329,11 +329,11 @@ void inventory_regression_runner(
                 parse_u32(context, values, "prefill_destination_quantity", 1U);
         }
 
-        const auto status = InventorySystem::process_command(
+        const auto status = InventorySystem::process_message(
             site_context,
-            make_command(
-                GameCommandType::InventoryTransferRequested,
-                gs1::InventoryTransferRequestedCommand {
+            make_message(
+                GameMessageType::InventoryTransferRequested,
+                gs1::InventoryTransferRequestedMessage {
                     static_cast<std::uint16_t>(source_slot),
                     static_cast<std::uint16_t>(destination_slot),
                     static_cast<std::uint16_t>(parse_u32(context, values, "quantity", 1U)),
@@ -370,24 +370,24 @@ void economy_phone_regression_runner(
     const std::string scenario = parse_string(values, "scenario");
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(1U, 2002U);
-    GameCommandQueue queue {};
+    GameMessageQueue queue {};
     auto site_context = make_site_context<EconomyPhoneSystem>(campaign, site_run, queue);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        EconomyPhoneSystem::process_command(
+        EconomyPhoneSystem::process_message(
             site_context,
-            make_command(
-                GameCommandType::SiteRunStarted,
-                SiteRunStartedCommand {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     if (scenario == "purchase_unlockable_listing")
     {
-        const auto status = EconomyPhoneSystem::process_command(
+        const auto status = EconomyPhoneSystem::process_message(
             site_context,
-            make_command(
-                GameCommandType::PhoneListingPurchaseRequested,
-                gs1::PhoneListingPurchaseRequestedCommand {
+            make_message(
+                GameMessageType::PhoneListingPurchaseRequested,
+                gs1::PhoneListingPurchaseRequestedMessage {
                     parse_u32(context, values, "listing_id"),
                     static_cast<std::uint16_t>(parse_u32(context, values, "quantity", 1U)),
                     0U}));
@@ -402,11 +402,11 @@ void economy_phone_regression_runner(
 
     if (scenario == "purchase_listing")
     {
-        const auto status = EconomyPhoneSystem::process_command(
+        const auto status = EconomyPhoneSystem::process_message(
             site_context,
-            make_command(
-                GameCommandType::PhoneListingPurchaseRequested,
-                gs1::PhoneListingPurchaseRequestedCommand {
+            make_message(
+                GameMessageType::PhoneListingPurchaseRequested,
+                gs1::PhoneListingPurchaseRequestedMessage {
                     parse_u32(context, values, "listing_id"),
                     static_cast<std::uint16_t>(parse_u32(context, values, "quantity", 1U)),
                     0U}));
@@ -424,11 +424,11 @@ void economy_phone_regression_runner(
             site_run.economy.money = static_cast<std::int32_t>(parse_u32(context, values, "override_money"));
         }
 
-        const auto status = EconomyPhoneSystem::process_command(
+        const auto status = EconomyPhoneSystem::process_message(
             site_context,
-            make_command(
-                GameCommandType::ContractorHireRequested,
-                gs1::ContractorHireRequestedCommand {
+            make_message(
+                GameMessageType::ContractorHireRequested,
+                gs1::ContractorHireRequestedMessage {
                     parse_u32(context, values, "listing_id"),
                     parse_u32(context, values, "work_units", 1U)}));
         GS1_SYSTEM_TEST_CHECK(context, status == parse_status(values, "expect_status", GS1_STATUS_OK));
@@ -450,7 +450,7 @@ void task_board_regression_runner(
     auto campaign = make_campaign();
     const std::uint32_t site_id = parse_u32(context, values, "site_id", 2U);
     auto site_run = make_test_site_run(site_id, 2003U);
-    GameCommandQueue queue {};
+    GameMessageQueue queue {};
     auto site_context = make_site_context<TaskBoardSystem>(campaign, site_run, queue);
 
     if (parse_bool(values, "prepopulate_board", false))
@@ -468,11 +468,11 @@ void task_board_regression_runner(
     {
         GS1_SYSTEM_TEST_REQUIRE(
             context,
-            TaskBoardSystem::process_command(
+            TaskBoardSystem::process_message(
                 site_context,
-                make_command(
-                    GameCommandType::SiteRunStarted,
-                    SiteRunStartedCommand {site_id, 1U, 102U, 1U, 42ULL})) == GS1_STATUS_OK);
+                make_message(
+                    GameMessageType::SiteRunStarted,
+                    SiteRunStartedMessage {site_id, 1U, 102U, 1U, 42ULL})) == GS1_STATUS_OK);
         GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.visible_tasks.size() == parse_u32(context, values, "expect_visible"));
         GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.accepted_task_ids.size() == parse_u32(context, values, "expect_accepted"));
         GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.completed_task_ids.size() == parse_u32(context, values, "expect_completed"));
@@ -485,27 +485,27 @@ void task_board_regression_runner(
             parse_u32(context, values, "site_completion_tile_threshold", 2U);
         GS1_SYSTEM_TEST_REQUIRE(
             context,
-            TaskBoardSystem::process_command(
+            TaskBoardSystem::process_message(
                 site_context,
-                make_command(
-                    GameCommandType::SiteRunStarted,
-                    SiteRunStartedCommand {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+                make_message(
+                    GameMessageType::SiteRunStarted,
+                    SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
         GS1_SYSTEM_TEST_REQUIRE(context, !site_run.task_board.visible_tasks.empty());
         const auto task_id = site_run.task_board.visible_tasks.front().task_instance_id.value;
         GS1_SYSTEM_TEST_REQUIRE(
             context,
-            TaskBoardSystem::process_command(
+            TaskBoardSystem::process_message(
                 site_context,
-                make_command(
-                    GameCommandType::TaskAcceptRequested,
-                    gs1::TaskAcceptRequestedCommand {task_id})) == GS1_STATUS_OK);
+                make_message(
+                    GameMessageType::TaskAcceptRequested,
+                    gs1::TaskAcceptRequestedMessage {task_id})) == GS1_STATUS_OK);
         GS1_SYSTEM_TEST_REQUIRE(
             context,
-            TaskBoardSystem::process_command(
+            TaskBoardSystem::process_message(
                 site_context,
-                make_command(
-                    GameCommandType::RestorationProgressChanged,
-                    gs1::RestorationProgressChangedCommand {
+                make_message(
+                    GameMessageType::RestorationProgressChanged,
+                    gs1::RestorationProgressChangedMessage {
                         parse_u32(context, values, "fully_grown_tile_count", 2U),
                         parse_u32(context, values, "site_completion_tile_threshold", 2U),
                         1.0f})) == GS1_STATUS_OK);
@@ -533,7 +533,7 @@ void placement_validation_regression_runner(
     const std::string scenario = parse_string(values, "scenario");
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(parse_u32(context, values, "site_id", 1U), 2004U);
-    GameCommandQueue queue {};
+    GameMessageQueue queue {};
     auto site_context = make_site_context<PlacementValidationSystem>(campaign, site_run, queue);
 
     if (scenario == "request")
@@ -560,11 +560,11 @@ void placement_validation_regression_runner(
         {
             GS1_SYSTEM_TEST_REQUIRE(
                 context,
-                PlacementValidationSystem::process_command(
+                PlacementValidationSystem::process_message(
                     site_context,
-                    make_command(
-                        GameCommandType::PlacementReservationRequested,
-                        gs1::PlacementReservationRequestedCommand {
+                    make_message(
+                        GameMessageType::PlacementReservationRequested,
+                        gs1::PlacementReservationRequestedMessage {
                             parse_u32(context, values, "pre_action_id", 90U),
                             coord.x,
                             coord.y,
@@ -576,11 +576,11 @@ void placement_validation_regression_runner(
 
         GS1_SYSTEM_TEST_REQUIRE(
             context,
-            PlacementValidationSystem::process_command(
+            PlacementValidationSystem::process_message(
                 site_context,
-                make_command(
-                    GameCommandType::PlacementReservationRequested,
-                    gs1::PlacementReservationRequestedCommand {
+                make_message(
+                    GameMessageType::PlacementReservationRequested,
+                    gs1::PlacementReservationRequestedMessage {
                         parse_u32(context, values, "action_id", 91U),
                         coord.x,
                         coord.y,
@@ -591,14 +591,14 @@ void placement_validation_regression_runner(
         const std::string expect_result = parse_string(values, "expect_result", "accepted");
         if (expect_result == "accepted")
         {
-            GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameCommandType::PlacementReservationAccepted);
+            GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::PlacementReservationAccepted);
         }
         else
         {
-            GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameCommandType::PlacementReservationRejected);
+            GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::PlacementReservationRejected);
             GS1_SYSTEM_TEST_CHECK(
                 context,
-                queue.front().payload_as<gs1::PlacementReservationRejectedCommand>().reason_code ==
+                queue.front().payload_as<gs1::PlacementReservationRejectedMessage>().reason_code ==
                     parse_rejection_reason(values, "expect_reason"));
         }
         return;
@@ -615,7 +615,7 @@ void ecology_regression_runner(
     const std::string scenario = parse_string(values, "scenario");
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(parse_u32(context, values, "site_id", 1U), 2005U);
-    GameCommandQueue queue {};
+    GameMessageQueue queue {};
     auto site_context = make_site_context<EcologySystem>(
         campaign,
         site_run,
@@ -641,11 +641,11 @@ void ecology_regression_runner(
     {
         GS1_SYSTEM_TEST_REQUIRE(
             context,
-            EcologySystem::process_command(
+            EcologySystem::process_message(
                 site_context,
-                make_command(
-                    GameCommandType::SiteTileWatered,
-                    gs1::SiteTileWateredCommand {
+                make_message(
+                    GameMessageType::SiteTileWatered,
+                    gs1::SiteTileWateredMessage {
                         parse_u32(context, values, "source_id", 1U),
                         coord.x,
                         coord.y,
@@ -670,7 +670,7 @@ void ecology_regression_runner(
         }
         GS1_SYSTEM_TEST_CHECK(
             context,
-            count_commands(queue, GameCommandType::TileEcologyChanged) ==
+            count_messages(queue, GameMessageType::TileEcologyChanged) ==
                 parse_u32(context, values, "expect_tile_ecology_changed_count", 1U));
         return;
     }
@@ -679,11 +679,11 @@ void ecology_regression_runner(
     {
         GS1_SYSTEM_TEST_REQUIRE(
             context,
-            EcologySystem::process_command(
+            EcologySystem::process_message(
                 site_context,
-                make_command(
-                    GameCommandType::SiteTileBurialCleared,
-                    gs1::SiteTileBurialClearedCommand {
+                make_message(
+                    GameMessageType::SiteTileBurialCleared,
+                    gs1::SiteTileBurialClearedMessage {
                         parse_u32(context, values, "source_id", 1U),
                         coord.x,
                         coord.y,
@@ -693,7 +693,7 @@ void ecology_regression_runner(
         GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.sand_burial, parse_float(context, values, "expect_sand_burial")));
         GS1_SYSTEM_TEST_CHECK(
             context,
-            count_commands(queue, GameCommandType::TileEcologyChanged) ==
+            count_messages(queue, GameMessageType::TileEcologyChanged) ==
                 parse_u32(context, values, "expect_tile_ecology_changed_count", 1U));
         return;
     }
@@ -711,8 +711,8 @@ void ecology_regression_runner(
                 parse_u32(context, values, "expect_fully_grown_count"));
         GS1_SYSTEM_TEST_CHECK(
             context,
-            count_commands(queue, GameCommandType::RestorationProgressChanged) ==
-                parse_u32(context, values, "expect_progress_command_count", 1U));
+            count_messages(queue, GameMessageType::RestorationProgressChanged) ==
+                parse_u32(context, values, "expect_progress_message_count", 1U));
         return;
     }
 

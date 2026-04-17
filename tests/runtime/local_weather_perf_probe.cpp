@@ -1,5 +1,5 @@
 #include "campaign/campaign_state.h"
-#include "commands/game_command.h"
+#include "messages/game_message.h"
 #include "site/site_run_state.h"
 #include "site/site_world.h"
 #include "site/systems/local_weather_resolve_system.h"
@@ -73,7 +73,7 @@ void seed_dense_cover(gs1::SiteRunState& site_run)
 double measure_initial_pass_ms()
 {
     gs1::CampaignState campaign {};
-    gs1::GameCommandQueue command_queue {};
+    gs1::GameMessageQueue message_queue {};
     double total_ms = 0.0;
 
     for (int iteration = 0; iteration < kInitialPassIterations; ++iteration)
@@ -83,10 +83,10 @@ double measure_initial_pass_ms()
         auto context = gs1::make_site_system_context<gs1::LocalWeatherResolveSystem>(
             campaign,
             site_run,
-            command_queue,
+            message_queue,
             kFixedStepSeconds,
             {});
-        command_queue.clear();
+        message_queue.clear();
 
         const auto started = std::chrono::steady_clock::now();
         gs1::LocalWeatherResolveSystem::run(context);
@@ -101,13 +101,13 @@ double measure_initial_pass_ms()
 double measure_steady_state_pass_ms()
 {
     gs1::CampaignState campaign {};
-    gs1::GameCommandQueue command_queue {};
+    gs1::GameMessageQueue message_queue {};
     auto site_run = make_site_run();
     seed_dense_cover(site_run);
     auto context = gs1::make_site_system_context<gs1::LocalWeatherResolveSystem>(
         campaign,
         site_run,
-        command_queue,
+        message_queue,
         kFixedStepSeconds,
         {});
 

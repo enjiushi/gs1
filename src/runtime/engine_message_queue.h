@@ -6,5 +6,5 @@
 
 namespace gs1
 {
-using EngineCommandQueue = std::deque<Gs1EngineCommand>;
+using EngineMessageQueue = std::deque<Gs1EngineMessage>;
 }  // namespace gs1

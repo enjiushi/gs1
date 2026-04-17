@@ -171,7 +171,7 @@ void resolve_modifier_totals(SiteSystemContext<ModifierSystem>& context)
 
 void handle_site_run_started(
     SiteSystemContext<ModifierSystem>& context,
-    const SiteRunStartedCommand& /*payload*/) noexcept
+    const SiteRunStartedMessage& /*payload*/) noexcept
 {
     auto& modifier_state = context.world.own_modifier();
     modifier_state.active_run_modifier_ids.clear();
@@ -188,18 +188,18 @@ void handle_site_run_started(
 }
 }  // namespace
 
-bool ModifierSystem::subscribes_to(GameCommandType type) noexcept
+bool ModifierSystem::subscribes_to(GameMessageType type) noexcept
 {
-    return type == GameCommandType::SiteRunStarted;
+    return type == GameMessageType::SiteRunStarted;
 }
 
-Gs1Status ModifierSystem::process_command(
+Gs1Status ModifierSystem::process_message(
     SiteSystemContext<ModifierSystem>& context,
-    const GameCommand& command)
+    const GameMessage& message)
 {
-    if (command.type == GameCommandType::SiteRunStarted)
+    if (message.type == GameMessageType::SiteRunStarted)
     {
-        handle_site_run_started(context, command.payload_as<SiteRunStartedCommand>());
+        handle_site_run_started(context, message.payload_as<SiteRunStartedMessage>());
     }
 
     return GS1_STATUS_OK;

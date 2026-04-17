@@ -17,11 +17,11 @@ wait_selected_site 1 60
 # Validate observable results.
 assert_app_state REGIONAL_MAP
 assert_selected_site 1
-assert_saw_command SET_APP_STATE
-assert_saw_command BEGIN_UI_SETUP
-assert_saw_command UI_ELEMENT_UPSERT
-assert_saw_command BEGIN_REGIONAL_MAP_SNAPSHOT
-assert_saw_command REGIONAL_MAP_SITE_UPSERT
+assert_saw_message SET_APP_STATE
+assert_saw_message BEGIN_UI_SETUP
+assert_saw_message UI_ELEMENT_UPSERT
+assert_saw_message BEGIN_REGIONAL_MAP_SNAPSHOT
+assert_saw_message REGIONAL_MAP_SITE_UPSERT
 assert_log_contains Entered main menu.
 assert_log_contains Started new GS1 campaign.
 assert_log_contains Selected deployment site.

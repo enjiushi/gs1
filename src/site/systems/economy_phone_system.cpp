@@ -289,13 +289,13 @@ Gs1Status process_buy_listing(
 
     if (listing.item_id.value != 0U)
     {
-        GameCommand delivery_command {};
-        delivery_command.type = GameCommandType::InventoryDeliveryRequested;
-        delivery_command.set_payload(InventoryDeliveryRequestedCommand {
+        GameMessage delivery_message {};
+        delivery_message.type = GameMessageType::InventoryDeliveryRequested;
+        delivery_message.set_payload(InventoryDeliveryRequestedMessage {
             listing.item_id.value,
             static_cast<std::uint16_t>(quantity),
             k_default_delivery_minutes});
-        context.command_queue.push_back(delivery_command);
+        context.message_queue.push_back(delivery_message);
     }
 
     mark_phone_and_hud_dirty(context);
@@ -331,13 +331,13 @@ Gs1Status process_sell_listing(
 
     listing.quantity = available - quantity;
 
-    GameCommand consume_command {};
-    consume_command.type = GameCommandType::InventoryGlobalItemConsumeRequested;
-    consume_command.set_payload(InventoryGlobalItemConsumeRequestedCommand {
+    GameMessage consume_message {};
+    consume_message.type = GameMessageType::InventoryGlobalItemConsumeRequested;
+    consume_message.set_payload(InventoryGlobalItemConsumeRequestedMessage {
         listing.item_id.value,
         static_cast<std::uint16_t>(quantity),
         0U});
-    context.command_queue.push_back(consume_command);
+    context.message_queue.push_back(consume_message);
 
     mark_phone_and_hud_dirty(context);
     return GS1_STATUS_OK;
@@ -345,7 +345,7 @@ Gs1Status process_sell_listing(
 
 Gs1Status process_contractor_hire(
     SiteSystemContext<EconomyPhoneSystem>& context,
-    const ContractorHireRequestedCommand& payload)
+    const ContractorHireRequestedMessage& payload)
 {
     auto* listing = find_listing(context.world.own_economy(), payload.listing_or_offer_id);
     if (listing == nullptr)
@@ -501,37 +501,37 @@ void seed_site_economy(SiteSystemContext<EconomyPhoneSystem>& context, std::uint
 }
 }  // namespace
 
-bool EconomyPhoneSystem::subscribes_to(GameCommandType type) noexcept
+bool EconomyPhoneSystem::subscribes_to(GameMessageType type) noexcept
 {
     switch (type)
     {
-    case GameCommandType::SiteRunStarted:
-    case GameCommandType::PhoneListingPurchaseRequested:
-    case GameCommandType::PhoneListingSaleRequested:
-    case GameCommandType::ContractorHireRequested:
-    case GameCommandType::SiteUnlockablePurchaseRequested:
+    case GameMessageType::SiteRunStarted:
+    case GameMessageType::PhoneListingPurchaseRequested:
+    case GameMessageType::PhoneListingSaleRequested:
+    case GameMessageType::ContractorHireRequested:
+    case GameMessageType::SiteUnlockablePurchaseRequested:
         return true;
     default:
         return false;
     }
 }
 
-Gs1Status EconomyPhoneSystem::process_command(
+Gs1Status EconomyPhoneSystem::process_message(
     SiteSystemContext<EconomyPhoneSystem>& context,
-    const GameCommand& command)
+    const GameMessage& message)
 {
-    switch (command.type)
+    switch (message.type)
     {
-    case GameCommandType::SiteRunStarted:
+    case GameMessageType::SiteRunStarted:
     {
-        const auto& payload = command.payload_as<SiteRunStartedCommand>();
+        const auto& payload = message.payload_as<SiteRunStartedMessage>();
         seed_site_economy(context, payload.site_id);
         return GS1_STATUS_OK;
     }
 
-    case GameCommandType::PhoneListingPurchaseRequested:
+    case GameMessageType::PhoneListingPurchaseRequested:
     {
-        const auto& payload = command.payload_as<PhoneListingPurchaseRequestedCommand>();
+        const auto& payload = message.payload_as<PhoneListingPurchaseRequestedMessage>();
         auto* listing = find_listing(context.world.own_economy(), payload.listing_id);
         if (listing == nullptr)
         {
@@ -550,9 +550,9 @@ Gs1Status EconomyPhoneSystem::process_command(
         }
     }
 
-    case GameCommandType::PhoneListingSaleRequested:
+    case GameMessageType::PhoneListingSaleRequested:
     {
-        const auto& payload = command.payload_as<PhoneListingSaleRequestedCommand>();
+        const auto& payload = message.payload_as<PhoneListingSaleRequestedMessage>();
         auto* listing = find_listing(context.world.own_economy(), payload.listing_id_or_item_id);
         if (listing == nullptr)
         {
@@ -569,12 +569,12 @@ Gs1Status EconomyPhoneSystem::process_command(
         return process_sell_listing(context, *listing, quantity);
     }
 
-    case GameCommandType::ContractorHireRequested:
-        return process_contractor_hire(context, command.payload_as<ContractorHireRequestedCommand>());
+    case GameMessageType::ContractorHireRequested:
+        return process_contractor_hire(context, message.payload_as<ContractorHireRequestedMessage>());
 
-    case GameCommandType::SiteUnlockablePurchaseRequested:
+    case GameMessageType::SiteUnlockablePurchaseRequested:
     {
-        const auto& payload = command.payload_as<SiteUnlockablePurchaseRequestedCommand>();
+        const auto& payload = message.payload_as<SiteUnlockablePurchaseRequestedMessage>();
         const auto* listing = find_unlockable_listing(context.world.own_economy(), payload.unlockable_id);
         if (listing == nullptr)
         {

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "commands/game_command.h"
+#include "messages/game_message.h"
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
 #include "site/site_world_access.h"
@@ -576,7 +576,7 @@ struct SiteSystemContext final
     const CampaignState& campaign;
     SiteRunState& site_run;
     SiteWorldAccess<SystemTag> world;
-    GameCommandQueue& command_queue;
+    GameMessageQueue& message_queue;
     double fixed_step_seconds {0.0};
     SiteMoveDirectionInput move_direction {};
 };
@@ -585,7 +585,7 @@ template <typename SystemTag>
 [[nodiscard]] inline SiteSystemContext<SystemTag> make_site_system_context(
     const CampaignState& campaign,
     SiteRunState& site_run,
-    GameCommandQueue& command_queue,
+    GameMessageQueue& message_queue,
     double fixed_step_seconds,
     SiteMoveDirectionInput move_direction)
 {
@@ -593,7 +593,7 @@ template <typename SystemTag>
         campaign,
         site_run,
         SiteWorldAccess<SystemTag> {site_run},
-        command_queue,
+        message_queue,
         fixed_step_seconds,
         move_direction};
 }

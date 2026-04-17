@@ -49,21 +49,21 @@ void LoadoutPlannerSystem::initialize_campaign_state(CampaignState& campaign)
     rebuild_selected_loadout(campaign);
 }
 
-bool LoadoutPlannerSystem::subscribes_to(GameCommandType type) noexcept
+bool LoadoutPlannerSystem::subscribes_to(GameMessageType type) noexcept
 {
-    return type == GameCommandType::DeploymentSiteSelectionChanged;
+    return type == GameMessageType::DeploymentSiteSelectionChanged;
 }
 
-Gs1Status LoadoutPlannerSystem::process_command(
+Gs1Status LoadoutPlannerSystem::process_message(
     CampaignSystemContext& context,
-    const GameCommand& command)
+    const GameMessage& message)
 {
-    if (!subscribes_to(command.type))
+    if (!subscribes_to(message.type))
     {
         return GS1_STATUS_OK;
     }
 
-    const auto& payload = command.payload_as<DeploymentSiteSelectionChangedCommand>();
+    const auto& payload = message.payload_as<DeploymentSiteSelectionChangedMessage>();
     if (payload.selected_site_id == 0U)
     {
         context.campaign.loadout_planner_state.selected_target_site_id.reset();

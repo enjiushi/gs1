@@ -125,12 +125,12 @@ RuntimeActionId allocate_runtime_action_id() noexcept
 }
 
 template <typename Payload>
-void enqueue_command(GameCommandQueue& queue, GameCommandType type, const Payload& payload)
+void enqueue_message(GameMessageQueue& queue, GameMessageType type, const Payload& payload)
 {
-    GameCommand command {};
-    command.type = type;
-    command.set_payload(payload);
-    queue.push_back(command);
+    GameMessage message {};
+    message.type = type;
+    message.set_payload(payload);
+    queue.push_back(message);
 }
 
 void clear_action_state(ActionState& action_state) noexcept
@@ -198,7 +198,7 @@ PlacementOccupancyLayer placement_occupancy_layer(ActionKind action_kind) noexce
 }
 
 void emit_site_action_started(
-    GameCommandQueue& queue,
+    GameMessageQueue& queue,
     RuntimeActionId action_id,
     ActionKind action_kind,
     std::uint8_t flags,
@@ -206,10 +206,10 @@ void emit_site_action_started(
     std::uint32_t primary_subject_id,
     float duration_minutes)
 {
-    enqueue_command(
+    enqueue_message(
         queue,
-        GameCommandType::SiteActionStarted,
-        SiteActionStartedCommand {
+        GameMessageType::SiteActionStarted,
+        SiteActionStartedMessage {
             action_id.value,
             to_gs1_action_kind(action_kind),
             flags,
@@ -220,13 +220,13 @@ void emit_site_action_started(
             duration_minutes});
 }
 
-void emit_site_action_completed(GameCommandQueue& queue, const ActionState& action_state)
+void emit_site_action_completed(GameMessageQueue& queue, const ActionState& action_state)
 {
     const TileCoord target_tile = action_target_tile(action_state);
-    enqueue_command(
+    enqueue_message(
         queue,
-        GameCommandType::SiteActionCompleted,
-        SiteActionCompletedCommand {
+        GameMessageType::SiteActionCompleted,
+        SiteActionCompletedMessage {
             action_id_value(action_state),
             to_gs1_action_kind(action_state.action_kind),
             0U,
@@ -238,15 +238,15 @@ void emit_site_action_completed(GameCommandQueue& queue, const ActionState& acti
 }
 
 void emit_worker_meter_cost_request(
-    GameCommandQueue& queue,
+    GameMessageQueue& queue,
     std::uint32_t action_id,
     ActionKind action_kind,
     std::uint16_t quantity)
 {
-    enqueue_command(
+    enqueue_message(
         queue,
-        GameCommandType::WorkerMeterDeltaRequested,
-        WorkerMeterDeltaRequestedCommand {
+        GameMessageType::WorkerMeterDeltaRequested,
+        WorkerMeterDeltaRequestedMessage {
             action_id,
             WORKER_METER_CHANGED_HYDRATION | WORKER_METER_CHANGED_ENERGY,
             0.0f,
@@ -259,7 +259,7 @@ void emit_worker_meter_cost_request(
 }
 
 void emit_site_action_failed(
-    GameCommandQueue& queue,
+    GameMessageQueue& queue,
     std::uint32_t action_id,
     ActionKind action_kind,
     SiteActionFailureReason reason,
@@ -268,10 +268,10 @@ void emit_site_action_failed(
     std::uint32_t primary_subject_id,
     std::uint32_t secondary_subject_id)
 {
-    enqueue_command(
+    enqueue_message(
         queue,
-        GameCommandType::SiteActionFailed,
-        SiteActionFailedCommand {
+        GameMessageType::SiteActionFailed,
+        SiteActionFailedMessage {
             action_id,
             to_gs1_action_kind(action_kind),
             reason,
@@ -544,7 +544,7 @@ void begin_action_execution(
 
     action_state.started_at_world_minute = context.world.read_time().world_time_minutes;
     emit_site_action_started(
-        context.command_queue,
+        context.message_queue,
         action_state.current_action_id.value(),
         action_state.action_kind,
         action_state.request_flags,
@@ -552,7 +552,7 @@ void begin_action_execution(
         action_state.primary_subject_id,
         static_cast<float>(action_state.remaining_action_minutes));
     emit_worker_meter_cost_request(
-        context.command_queue,
+        context.message_queue,
         action_state.current_action_id->value,
         action_state.action_kind,
         action_state.quantity);
@@ -561,16 +561,16 @@ void begin_action_execution(
 }
 
 void emit_placement_reservation_requested(
-    GameCommandQueue& queue,
+    GameMessageQueue& queue,
     std::uint32_t action_id,
     ActionKind action_kind,
     TileCoord target_tile,
     std::uint32_t subject_id)
 {
-    enqueue_command(
+    enqueue_message(
         queue,
-        GameCommandType::PlacementReservationRequested,
-        PlacementReservationRequestedCommand {
+        GameMessageType::PlacementReservationRequested,
+        PlacementReservationRequestedMessage {
             action_id,
             target_tile.x,
             target_tile.y,
@@ -580,7 +580,7 @@ void emit_placement_reservation_requested(
 }
 
 void emit_placement_reservation_released(
-    GameCommandQueue& queue,
+    GameMessageQueue& queue,
     const ActionState& action_state)
 {
     if (!action_state.current_action_id.has_value())
@@ -588,15 +588,15 @@ void emit_placement_reservation_released(
         return;
     }
 
-    enqueue_command(
+    enqueue_message(
         queue,
-        GameCommandType::PlacementReservationReleased,
-        PlacementReservationReleasedCommand {
+        GameMessageType::PlacementReservationReleased,
+        PlacementReservationReleasedMessage {
             action_state.current_action_id->value,
             action_state.placement_reservation_token});
 }
 
-void emit_action_fact_commands(GameCommandQueue& queue, const ActionState& action_state)
+void emit_action_fact_messages(GameMessageQueue& queue, const ActionState& action_state)
 {
     const TileCoord target_tile = action_target_tile(action_state);
     const auto action_id = action_id_value(action_state);
@@ -611,18 +611,18 @@ void emit_action_fact_commands(GameCommandQueue& queue, const ActionState& actio
                 action_state.action_kind,
                 action_state.item_id))
         {
-            enqueue_command(
+            enqueue_message(
                 queue,
-                GameCommandType::InventoryItemConsumeRequested,
-                InventoryItemConsumeRequestedCommand {
+                GameMessageType::InventoryItemConsumeRequested,
+                InventoryItemConsumeRequestedMessage {
                     item_def->item_id.value,
                     safe_quantity,
                     GS1_INVENTORY_CONTAINER_WORKER_PACK,
                     0U});
-            enqueue_command(
+            enqueue_message(
                 queue,
-                GameCommandType::SiteTilePlantingCompleted,
-                SiteTilePlantingCompletedCommand {
+                GameMessageType::SiteTilePlantingCompleted,
+                SiteTilePlantingCompletedMessage {
                     action_id,
                     target_tile.x,
                     target_tile.y,
@@ -632,10 +632,10 @@ void emit_action_fact_commands(GameCommandQueue& queue, const ActionState& actio
         }
         else
         {
-            enqueue_command(
+            enqueue_message(
                 queue,
-                GameCommandType::SiteGroundCoverPlaced,
-                SiteGroundCoverPlacedCommand {
+                GameMessageType::SiteGroundCoverPlaced,
+                SiteGroundCoverPlacedMessage {
                     action_id,
                     target_tile.x,
                     target_tile.y,
@@ -646,10 +646,10 @@ void emit_action_fact_commands(GameCommandQueue& queue, const ActionState& actio
         break;
 
     case ActionKind::Water:
-        enqueue_command(
+        enqueue_message(
             queue,
-            GameCommandType::SiteTileWatered,
-            SiteTileWateredCommand {
+            GameMessageType::SiteTileWatered,
+            SiteTileWateredMessage {
                 action_id,
                 target_tile.x,
                 target_tile.y,
@@ -658,10 +658,10 @@ void emit_action_fact_commands(GameCommandQueue& queue, const ActionState& actio
         break;
 
     case ActionKind::ClearBurial:
-        enqueue_command(
+        enqueue_message(
             queue,
-            GameCommandType::SiteTileBurialCleared,
-            SiteTileBurialClearedCommand {
+            GameMessageType::SiteTileBurialCleared,
+            SiteTileBurialClearedMessage {
                 action_id,
                 target_tile.x,
                 target_tile.y,
@@ -674,18 +674,18 @@ void emit_action_fact_commands(GameCommandQueue& queue, const ActionState& actio
                 action_state.action_kind,
                 action_state.item_id))
         {
-            enqueue_command(
+            enqueue_message(
                 queue,
-                GameCommandType::InventoryItemConsumeRequested,
-                InventoryItemConsumeRequestedCommand {
+                GameMessageType::InventoryItemConsumeRequested,
+                InventoryItemConsumeRequestedMessage {
                     item_def->item_id.value,
                     safe_quantity,
                     GS1_INVENTORY_CONTAINER_WORKER_PACK,
                     0U});
-            enqueue_command(
+            enqueue_message(
                 queue,
-                GameCommandType::SiteDevicePlaced,
-                SiteDevicePlacedCommand {
+                GameMessageType::SiteDevicePlaced,
+                SiteDevicePlacedMessage {
                     action_id,
                     target_tile.x,
                     target_tile.y,
@@ -697,10 +697,10 @@ void emit_action_fact_commands(GameCommandQueue& queue, const ActionState& actio
     case ActionKind::Craft:
         if (action_state.secondary_subject_id != 0U)
         {
-            enqueue_command(
+            enqueue_message(
                 queue,
-                GameCommandType::InventoryCraftCommitRequested,
-                InventoryCraftCommitRequestedCommand {
+                GameMessageType::InventoryCraftCommitRequested,
+                InventoryCraftCommitRequestedMessage {
                     action_state.secondary_subject_id,
                     target_tile.x,
                     target_tile.y,
@@ -770,37 +770,37 @@ SiteActionFailureReason validate_craft_completion(
 
 }  // namespace
 
-bool ActionExecutionSystem::subscribes_to(GameCommandType type) noexcept
+bool ActionExecutionSystem::subscribes_to(GameMessageType type) noexcept
 {
     switch (type)
     {
-    case GameCommandType::StartSiteAction:
-    case GameCommandType::CancelSiteAction:
-    case GameCommandType::PlacementReservationAccepted:
-    case GameCommandType::PlacementReservationRejected:
+    case GameMessageType::StartSiteAction:
+    case GameMessageType::CancelSiteAction:
+    case GameMessageType::PlacementReservationAccepted:
+    case GameMessageType::PlacementReservationRejected:
         return true;
     default:
         return false;
     }
 }
 
-Gs1Status ActionExecutionSystem::process_command(
+Gs1Status ActionExecutionSystem::process_message(
     SiteSystemContext<ActionExecutionSystem>& context,
-    const GameCommand& command)
+    const GameMessage& message)
 {
     auto& action_state = context.world.own_action();
-    const auto& payload_type = command.type;
+    const auto& payload_type = message.type;
     switch (payload_type)
     {
-    case GameCommandType::StartSiteAction:
+    case GameMessageType::StartSiteAction:
     {
-        const auto& payload = command.payload_as<StartSiteActionCommand>();
+        const auto& payload = message.payload_as<StartSiteActionMessage>();
         const TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
 
         if (has_active_action(action_state))
         {
             emit_site_action_failed(
-                context.command_queue,
+                context.message_queue,
                 0U,
                 to_action_kind(payload.action_kind),
                 SiteActionFailureReason::Busy,
@@ -815,7 +815,7 @@ Gs1Status ActionExecutionSystem::process_command(
         if (action_kind == ActionKind::None || action_kind == ActionKind::Repair)
         {
             emit_site_action_failed(
-                context.command_queue,
+                context.message_queue,
                 0U,
                 action_kind,
                 SiteActionFailureReason::InvalidState,
@@ -829,7 +829,7 @@ Gs1Status ActionExecutionSystem::process_command(
         if (!context.world.tile_coord_in_bounds(target_tile))
         {
             emit_site_action_failed(
-                context.command_queue,
+                context.message_queue,
                 0U,
                 action_kind,
                 SiteActionFailureReason::InvalidTarget,
@@ -846,7 +846,7 @@ Gs1Status ActionExecutionSystem::process_command(
             if (item_def == nullptr)
             {
                 emit_site_action_failed(
-                    context.command_queue,
+                    context.message_queue,
                     0U,
                     action_kind,
                     SiteActionFailureReason::InvalidState,
@@ -862,7 +862,7 @@ Gs1Status ActionExecutionSystem::process_command(
                 required_quantity)
             {
                 emit_site_action_failed(
-                    context.command_queue,
+                    context.message_queue,
                     0U,
                     action_kind,
                     SiteActionFailureReason::InsufficientResources,
@@ -886,7 +886,7 @@ Gs1Status ActionExecutionSystem::process_command(
             if (craft_recipe == nullptr || craft_device_entity_id == 0U)
             {
                 emit_site_action_failed(
-                    context.command_queue,
+                    context.message_queue,
                     0U,
                     action_kind,
                     SiteActionFailureReason::InvalidTarget,
@@ -904,7 +904,7 @@ Gs1Status ActionExecutionSystem::process_command(
                     *craft_recipe))
             {
                 emit_site_action_failed(
-                    context.command_queue,
+                    context.message_queue,
                     0U,
                     action_kind,
                     SiteActionFailureReason::InsufficientResources,
@@ -957,7 +957,7 @@ Gs1Status ActionExecutionSystem::process_command(
             {
                 clear_action_state(action_state);
                 emit_site_action_failed(
-                    context.command_queue,
+                    context.message_queue,
                     0U,
                     action_kind,
                     SiteActionFailureReason::InvalidTarget,
@@ -974,7 +974,7 @@ Gs1Status ActionExecutionSystem::process_command(
         if (action_state.awaiting_placement_reservation)
         {
             emit_placement_reservation_requested(
-                context.command_queue,
+                context.message_queue,
                 action_id.value,
                 action_kind,
                 target_tile,
@@ -990,9 +990,9 @@ Gs1Status ActionExecutionSystem::process_command(
         return GS1_STATUS_OK;
     }
 
-    case GameCommandType::CancelSiteAction:
+    case GameMessageType::CancelSiteAction:
     {
-        const auto& payload = command.payload_as<CancelSiteActionCommand>();
+        const auto& payload = message.payload_as<CancelSiteActionMessage>();
 
         if (!has_active_action(action_state))
         {
@@ -1010,9 +1010,9 @@ Gs1Status ActionExecutionSystem::process_command(
             return GS1_STATUS_OK;
         }
 
-        emit_placement_reservation_released(context.command_queue, action_state);
+        emit_placement_reservation_released(context.message_queue, action_state);
         emit_site_action_failed(
-            context.command_queue,
+            context.message_queue,
             action_id_value(action_state),
             action_state.action_kind,
             SiteActionFailureReason::Cancelled,
@@ -1027,14 +1027,14 @@ Gs1Status ActionExecutionSystem::process_command(
         return GS1_STATUS_OK;
     }
 
-    case GameCommandType::PlacementReservationAccepted:
+    case GameMessageType::PlacementReservationAccepted:
     {
         if (!is_action_waiting_for_placement(action_state))
         {
             return GS1_STATUS_OK;
         }
 
-        const auto& payload = command.payload_as<PlacementReservationAcceptedCommand>();
+        const auto& payload = message.payload_as<PlacementReservationAcceptedMessage>();
         if (payload.action_id != action_id_value(action_state))
         {
             return GS1_STATUS_OK;
@@ -1054,21 +1054,21 @@ Gs1Status ActionExecutionSystem::process_command(
         return GS1_STATUS_OK;
     }
 
-    case GameCommandType::PlacementReservationRejected:
+    case GameMessageType::PlacementReservationRejected:
     {
         if (!is_action_waiting_for_placement(action_state))
         {
             return GS1_STATUS_OK;
         }
 
-        const auto& payload = command.payload_as<PlacementReservationRejectedCommand>();
+        const auto& payload = message.payload_as<PlacementReservationRejectedMessage>();
         if (payload.action_id != action_id_value(action_state))
         {
             return GS1_STATUS_OK;
         }
 
         emit_site_action_failed(
-            context.command_queue,
+            context.message_queue,
             action_id_value(action_state),
             action_state.action_kind,
             SiteActionFailureReason::InvalidTarget,
@@ -1118,7 +1118,7 @@ void ActionExecutionSystem::run(SiteSystemContext<ActionExecutionSystem>& contex
         if (failure_reason != SiteActionFailureReason::None)
         {
             emit_site_action_failed(
-                context.command_queue,
+                context.message_queue,
                 action_id_value(action_state),
                 action_state.action_kind,
                 failure_reason,
@@ -1126,7 +1126,7 @@ void ActionExecutionSystem::run(SiteSystemContext<ActionExecutionSystem>& contex
                 action_target_tile(action_state),
                 action_state.primary_subject_id,
                 action_state.secondary_subject_id);
-            emit_placement_reservation_released(context.command_queue, action_state);
+            emit_placement_reservation_released(context.message_queue, action_state);
             clear_action_state(action_state);
             context.world.mark_projection_dirty(
                 SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
@@ -1134,9 +1134,9 @@ void ActionExecutionSystem::run(SiteSystemContext<ActionExecutionSystem>& contex
         }
     }
 
-    emit_site_action_completed(context.command_queue, action_state);
-    emit_action_fact_commands(context.command_queue, action_state);
-    emit_placement_reservation_released(context.command_queue, action_state);
+    emit_site_action_completed(context.message_queue, action_state);
+    emit_action_fact_messages(context.message_queue, action_state);
+    emit_placement_reservation_released(context.message_queue, action_state);
     clear_action_state(action_state);
     context.world.mark_projection_dirty(
         SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);

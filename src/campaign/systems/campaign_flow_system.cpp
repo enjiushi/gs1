@@ -62,44 +62,44 @@ SiteMetaState* find_site_mut(CampaignState& campaign, std::uint32_t site_id) noe
 }
 }  // namespace
 
-bool CampaignFlowSystem::subscribes_to(GameCommandType type) noexcept
+bool CampaignFlowSystem::subscribes_to(GameMessageType type) noexcept
 {
     switch (type)
     {
-    case GameCommandType::OpenMainMenu:
-    case GameCommandType::StartNewCampaign:
-    case GameCommandType::SelectDeploymentSite:
-    case GameCommandType::ClearDeploymentSiteSelection:
-    case GameCommandType::StartSiteAttempt:
-    case GameCommandType::ReturnToRegionalMap:
-    case GameCommandType::SiteAttemptEnded:
+    case GameMessageType::OpenMainMenu:
+    case GameMessageType::StartNewCampaign:
+    case GameMessageType::SelectDeploymentSite:
+    case GameMessageType::ClearDeploymentSiteSelection:
+    case GameMessageType::StartSiteAttempt:
+    case GameMessageType::ReturnToRegionalMap:
+    case GameMessageType::SiteAttemptEnded:
         return true;
 
-    case GameCommandType::DeploymentSiteSelectionChanged:
-    case GameCommandType::PresentLog:
+    case GameMessageType::DeploymentSiteSelectionChanged:
+    case GameMessageType::PresentLog:
     default:
         return false;
     }
 }
 
-Gs1Status CampaignFlowSystem::process_command(
-    CampaignFlowCommandContext& context,
-    const GameCommand& command)
+Gs1Status CampaignFlowSystem::process_message(
+    CampaignFlowMessageContext& context,
+    const GameMessage& message)
 {
-    if (!subscribes_to(command.type))
+    if (!subscribes_to(message.type))
     {
         return GS1_STATUS_OK;
     }
 
-    switch (command.type)
+    switch (message.type)
     {
-    case GameCommandType::OpenMainMenu:
+    case GameMessageType::OpenMainMenu:
         context.app_state = GS1_APP_STATE_MAIN_MENU;
         return GS1_STATUS_OK;
 
-    case GameCommandType::StartNewCampaign:
+    case GameMessageType::StartNewCampaign:
     {
-        const auto& payload = command.payload_as<StartNewCampaignCommand>();
+        const auto& payload = message.payload_as<StartNewCampaignMessage>();
         context.campaign = CampaignFactory::create_prototype_campaign(payload.campaign_seed, payload.campaign_days);
         context.active_site_run.reset();
         context.app_state = GS1_APP_STATE_REGIONAL_MAP;
@@ -108,14 +108,14 @@ Gs1Status CampaignFlowSystem::process_command(
         return GS1_STATUS_OK;
     }
 
-    case GameCommandType::SelectDeploymentSite:
+    case GameMessageType::SelectDeploymentSite:
     {
         if (!context.campaign.has_value())
         {
             return GS1_STATUS_INVALID_STATE;
         }
 
-        const auto& payload = command.payload_as<SelectDeploymentSiteCommand>();
+        const auto& payload = message.payload_as<SelectDeploymentSiteMessage>();
         auto* site = find_site_mut(*context.campaign, payload.site_id);
         if (site == nullptr)
         {
@@ -135,14 +135,14 @@ Gs1Status CampaignFlowSystem::process_command(
 
         selection = SiteId {payload.site_id};
 
-        GameCommand selection_changed {};
-        selection_changed.type = GameCommandType::DeploymentSiteSelectionChanged;
-        selection_changed.set_payload(DeploymentSiteSelectionChangedCommand {payload.site_id});
-        context.command_queue.push_back(selection_changed);
+        GameMessage selection_changed {};
+        selection_changed.type = GameMessageType::DeploymentSiteSelectionChanged;
+        selection_changed.set_payload(DeploymentSiteSelectionChangedMessage {payload.site_id});
+        context.message_queue.push_back(selection_changed);
         return GS1_STATUS_OK;
     }
 
-    case GameCommandType::ClearDeploymentSiteSelection:
+    case GameMessageType::ClearDeploymentSiteSelection:
     {
         if (!context.campaign.has_value())
         {
@@ -157,21 +157,21 @@ Gs1Status CampaignFlowSystem::process_command(
 
         selection.reset();
 
-        GameCommand selection_changed {};
-        selection_changed.type = GameCommandType::DeploymentSiteSelectionChanged;
-        selection_changed.set_payload(DeploymentSiteSelectionChangedCommand {0U});
-        context.command_queue.push_back(selection_changed);
+        GameMessage selection_changed {};
+        selection_changed.type = GameMessageType::DeploymentSiteSelectionChanged;
+        selection_changed.set_payload(DeploymentSiteSelectionChangedMessage {0U});
+        context.message_queue.push_back(selection_changed);
         return GS1_STATUS_OK;
     }
 
-    case GameCommandType::StartSiteAttempt:
+    case GameMessageType::StartSiteAttempt:
     {
         if (!context.campaign.has_value())
         {
             return GS1_STATUS_INVALID_STATE;
         }
 
-        const auto& payload = command.payload_as<StartSiteAttemptCommand>();
+        const auto& payload = message.payload_as<StartSiteAttemptMessage>();
         auto* site = find_site_mut(*context.campaign, payload.site_id);
         if (site == nullptr)
         {
@@ -189,19 +189,19 @@ Gs1Status CampaignFlowSystem::process_command(
         context.app_state = GS1_APP_STATE_SITE_ACTIVE;
         context.campaign->app_state = context.app_state;
 
-        GameCommand site_run_started {};
-        site_run_started.type = GameCommandType::SiteRunStarted;
-        site_run_started.set_payload(SiteRunStartedCommand {
+        GameMessage site_run_started {};
+        site_run_started.type = GameMessageType::SiteRunStarted;
+        site_run_started.set_payload(SiteRunStartedMessage {
             context.active_site_run->site_id.value,
             context.active_site_run->site_run_id.value,
             context.active_site_run->site_archetype_id,
             context.active_site_run->attempt_index,
             context.active_site_run->site_attempt_seed});
-        context.command_queue.push_back(site_run_started);
+        context.message_queue.push_back(site_run_started);
         return GS1_STATUS_OK;
     }
 
-    case GameCommandType::ReturnToRegionalMap:
+    case GameMessageType::ReturnToRegionalMap:
     {
         if (!context.campaign.has_value())
         {
@@ -216,14 +216,14 @@ Gs1Status CampaignFlowSystem::process_command(
         return GS1_STATUS_OK;
     }
 
-    case GameCommandType::SiteAttemptEnded:
+    case GameMessageType::SiteAttemptEnded:
     {
         if (!context.campaign.has_value() || !context.active_site_run.has_value())
         {
             return GS1_STATUS_INVALID_STATE;
         }
 
-        const auto& payload = command.payload_as<SiteAttemptEndedCommand>();
+        const auto& payload = message.payload_as<SiteAttemptEndedMessage>();
         auto* site = find_site_mut(*context.campaign, payload.site_id);
         if (site == nullptr)
         {
@@ -258,8 +258,8 @@ Gs1Status CampaignFlowSystem::process_command(
         return GS1_STATUS_OK;
     }
 
-    case GameCommandType::DeploymentSiteSelectionChanged:
-    case GameCommandType::PresentLog:
+    case GameMessageType::DeploymentSiteSelectionChanged:
+    case GameMessageType::PresentLog:
     default:
         return GS1_STATUS_OK;
     }

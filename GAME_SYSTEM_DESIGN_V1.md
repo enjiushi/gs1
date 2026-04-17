@@ -19,14 +19,14 @@ For the first game version:
 - use one monolithic game codebase
 - do not extract reusable feature modules
 - do not extract a separate reusable core-schema package
-- keep all gameplay structs, commands, systems, and content definitions inside one game namespace
+- keep all gameplay structs, messages, systems, and content definitions inside one game namespace
 - still preserve clean ownership and layering inside that single game codebase
 
 This means the generic layering described in [GAME_STRUCTURE.md](GAME_STRUCTURE.md) is kept only as a conceptual discipline:
 
 - engine integration remains separate from gameplay logic
 - gameplay still owns simulation authority
-- cross-ownership changes still use commands
+- cross-ownership changes still use messages
 - but all of it now lives inside one game project instead of split reusable modules
 
 DLL boundary rule for v1:
@@ -36,7 +36,7 @@ DLL boundary rule for v1:
 - the DLL exposes only engine-agnostic public headers and exported entry points
 - build output must package the DLL together with its public headers and import library for host-side integration
 - host-to-game DLL ingress should use semantic host events, translated feedback events, and phase entrypoints
-- game-to-host DLL egress should use engine commands only
+- game-to-host DLL egress should use engine messages only
 
 ### 1.2 Non-Goals For V1
 
@@ -60,8 +60,8 @@ To avoid implementation drift, the following choices are now fixed:
 - allow specialized tile-domain helpers and indexed access such as `tile_index = y * width + x`, while keeping tile data inside the common ECS framework
 - use dynamic ECS entities for actors, items, plants, structures, and action executors when those objects need identity or independent lifecycle
 - keep singleton or manager-style state such as weather/event flow, task-board state, economy state, UI state, and campaign/session bookkeeping as plain owner-managed state when ECS composition does not add value
-- use explicit command queues for cross-owner mutation
-- use no internal gameplay-event queue; internal cross-system gameplay communication uses `GameCommand`
+- use explicit message queues for cross-owner mutation
+- use no internal gameplay-event queue; internal cross-system gameplay communication uses `GameMessage`
 - use authored prototype regional-map adjacency as a plain adjacency list per site
 - use deterministic random seeds per campaign and per site attempt
 - do not implement disk save/load in v1; all persistence is in-process only
@@ -80,25 +80,25 @@ Rules:
 - if sparse gameplay data needs tile linkage, model it as its own ECS entity with a tile-coordinate component instead of hanging the sparse payload off every tile entity
 - owner-scoped ECS access should expose the exact read-only and read/write components the system is authorized to touch
 - if a system owns only one component inside a larger aggregate, it should mutate that component directly rather than round-tripping the whole aggregate through a snapshot helper
-- if a system needs another ownership domain to change, it must express that request through a `GameCommand`
-- cross-system coordination inside gameplay should happen through command flow and owned-state observation, not through direct peer-to-peer write paths
-- a `GameCommand` payload should describe gameplay meaning published by its producer, not a private request addressed to one specific consumer system
-- the producing system must not assume which systems listen to a command, or how many listeners there are
-- multiple systems may listen to the same command and each listener may resolve only its own owned state
-- once a command layout is established, prefer changing listener behavior over reshaping the command for one system's convenience
-- the command queue must dispatch each command only to systems that explicitly subscribe to that command type
-- there is no internal gameplay-event queue; internal cross-system gameplay communication must use `GameCommand`
-- translated feedback-event queues must use the same enum-indexed subscriber-list dispatch pattern as commands
-- systems should coordinate only through subscribed command processing, translated feedback-event processing, and owned/public state, not through direct peer calls
-- if a system is not subscribed to a command or translated feedback-event type, it must not process that message
+- if a system needs another ownership domain to change, it must express that request through a `GameMessage`
+- cross-system coordination inside gameplay should happen through message flow and owned-state observation, not through direct peer-to-peer write paths
+- a `GameMessage` payload should describe gameplay meaning published by its producer, not a private request addressed to one specific consumer system
+- the producing system must not assume which systems listen to a message, or how many listeners there are
+- multiple systems may listen to the same message and each listener may resolve only its own owned state
+- once a message layout is established, prefer changing listener behavior over reshaping the message for one system's convenience
+- the message queue must dispatch each message only to systems that explicitly subscribe to that message type
+- there is no internal gameplay-event queue; internal cross-system gameplay communication must use `GameMessage`
+- translated feedback-event queues must use the same enum-indexed subscriber-list dispatch pattern as messages
+- systems should coordinate only through subscribed message processing, translated feedback-event processing, and owned/public state, not through direct peer calls
+- if a system is not subscribed to a message or translated feedback-event type, it must not process that message
 - queue subscription should be the hard boundary that prevents cross-system coupling by force rather than by convention alone
 
 Rationale:
 
-- this keeps each system testable in isolation with deterministic command inputs and owned-state outputs
+- this keeps each system testable in isolation with deterministic message inputs and owned-state outputs
 - this lets different agent sessions or developers modify separate systems asynchronously with fewer hidden write conflicts
 - this keeps ownership boundaries reviewable as the codebase grows
-- this keeps command schemas stable enough that multiple systems can evolve in parallel without repeatedly touching the same command-definition file
+- this keeps message schemas stable enough that multiple systems can evolve in parallel without repeatedly touching the same message-definition file
 - this lets multiple systems evolve behind stable subscriptions while sharing one message contract instead of encoding pairwise system dependencies
 
 ### 1.5 V1 Crafting And Storage Clarification
@@ -137,8 +137,8 @@ src/
     GameRuntime
     RuntimeClock
     FixedStepRunner
-    CommandQueue
-    EngineCommandQueue
+    MessageQueue
+    EngineMessageQueue
     EngineFeedbackBuffer
     RandomService
     IdAllocator
@@ -207,9 +207,9 @@ src/
       ModifierSystem
       SiteCompletionSystem
       FailureRecoverySystem
-  commands/
-    GameCommand
-    CommandIds
+  messages/
+    GameMessage
+    MessageIds
     handlers/
   events/
     EngineFeedbackEvent
@@ -316,7 +316,7 @@ Owns:
 Must not own:
 
 - authoritative gameplay state
-- gameplay mutation except through app commands
+- gameplay mutation except through app messages
 
 ### 3.7 Host-Side Engine Integration
 
@@ -325,7 +325,7 @@ This does not live inside the gameplay DLL source tree.
 The engine-side host owns:
 
 - engine-specific input translation into the DLL input contract
-- engine command playback from the DLL engine-command contract
+- engine message playback from the DLL engine-message contract
 - engine feedback translation into the DLL feedback/input contract
 - view-model binding or presentation mapping when the host chooses to use the DLL's query surface
 
@@ -963,34 +963,34 @@ Recommendation:
 
 This keeps one common ECS framework while preserving the dense fixed-grid properties that tile-heavy simulation depends on.
 
-## 8. Command Model For V1
+## 8. Message Model For V1
 
-All commands now live in one game namespace:
+All messages now live in one game namespace:
 
-- `game.commands`
+- `game.messages`
 
-There is no reusable command package for v1.
+There is no reusable message package for v1.
 
-### 8.1 Command Families
+### 8.1 Message Families
 
-Required command families:
+Required message families:
 
-- app commands
-- site action commands
-- inventory commands
-- economy commands
-- task board commands
-- technology commands
-- campaign flow commands
-- engine presentation commands
+- app messages
+- site action messages
+- inventory messages
+- economy messages
+- task board messages
+- technology messages
+- campaign flow messages
+- engine presentation messages
 
-Command handling rule:
+Message handling rule:
 
-- each command id must map to exactly one owning handler
-- handlers may enqueue follow-up commands but must not call peer handlers directly
-- commands are plain data objects and must not carry engine references or function callbacks
+- each message id must map to exactly one owning handler
+- handlers may enqueue follow-up messages but must not call peer handlers directly
+- messages are plain data objects and must not carry engine references or function callbacks
 
-### 8.2 Required App Commands
+### 8.2 Required App Messages
 
 - `StartNewCampaign`
 - `OpenRegionalMap`
@@ -999,7 +999,7 @@ Command handling rule:
 - `ExitSiteToResult`
 - `ReturnToRegionalMap`
 
-### 8.3 Required Site Action Commands
+### 8.3 Required Site Action Messages
 
 - `BeginPlantAction`
 - `BeginBuildAction`
@@ -1009,7 +1009,7 @@ Command handling rule:
 - `CancelCurrentAction`
 - `CompleteAction`
 
-### 8.4 Required Inventory Commands
+### 8.4 Required Inventory Messages
 
 - `TransferItemWorkerToCamp`
 - `TransferItemCampToWorker`
@@ -1019,7 +1019,7 @@ Command handling rule:
 - `EatFood`
 - `TransferWaterToDevice`
 
-### 8.5 Required Economy Commands
+### 8.5 Required Economy Messages
 
 - `BuyItemPackage`
 - `SellCampStoredItem`
@@ -1028,7 +1028,7 @@ Command handling rule:
 - `PurchaseDirectFallbackUnlockable`
 - `ClaimDeliveryAtCamp`
 
-### 8.6 Required Task Board Commands
+### 8.6 Required Task Board Messages
 
 - `AcceptTask`
 - `RefreshTaskBoard`
@@ -1036,36 +1036,36 @@ Command handling rule:
 - `ClaimTaskReward`
 - `SpawnChainFollowUp`
 
-### 8.7 Required Technology Commands
+### 8.7 Required Technology Messages
 
 - `ClaimTechnologyNode`
 
-### 8.8 Required Campaign Commands
+### 8.8 Required Campaign Messages
 
 - `ApplyCompletedSiteSupport`
 - `MarkSiteCompleted`
 - `MarkSiteFailed`
 - `RevealAdjacentSites`
 
-### 8.9 Required Engine Presentation Command Families
+### 8.9 Required Engine Presentation Message Families
 
-- app-state presentation commands
-- regional-map snapshot commands
-- regional-map delta commands
-- site snapshot commands
-- site delta commands
-- HUD projection commands
-- phone and task-board projection commands
-- notification and one-shot cue commands
-- site-result presentation commands
+- app-state presentation messages
+- regional-map snapshot messages
+- regional-map delta messages
+- site snapshot messages
+- site delta messages
+- HUD projection messages
+- phone and task-board projection messages
+- notification and one-shot cue messages
+- site-result presentation messages
 
 Rules:
 
-- presentation commands contain only world meaning
+- presentation messages contain only world meaning
 - gameplay systems never call adapter functions directly
-- if the public DLL query surface stays minimal, engine commands must be sufficient for the host to reconstruct long-lived presentation state without reaching back into gameplay internals
-- long-lived presentation state should use snapshot begin/end plus upsert/remove commands instead of relying on opaque dirty-only notifications
-- transient presentation such as sound/VFX hints should use dedicated one-shot cue commands rather than be mixed into persistent projection state
+- if the public DLL query surface stays minimal, engine messages must be sufficient for the host to reconstruct long-lived presentation state without reaching back into gameplay internals
+- long-lived presentation state should use snapshot begin/end plus upsert/remove messages instead of relying on opaque dirty-only notifications
+- transient presentation such as sound/VFX hints should use dedicated one-shot cue messages rather than be mixed into persistent projection state
 
 ## 9. System Ownership And Update Order
 
@@ -1095,7 +1095,7 @@ Current code step order inside `GameRuntime` fixed-step execution:
 Rule:
 
 - the list above is the current implemented fixed-step order and should be kept in sync with `GameRuntime`
-- subscribed command processing still occurs through the runtime command queue, but the numbered list above is the direct per-step system run order
+- subscribed message processing still occurs through the runtime message queue, but the numbered list above is the direct per-step system run order
 
 ### 9.2 Current ECS Component Ownership
 
@@ -1104,7 +1104,7 @@ Rule:
 | `TileTag`, `TileIndex`, `TileCoordComponent` | site bootstrap (`SiteRunFactory` + `SiteWorld`) | initialized during site-world creation; runtime read-only |
 | `TileTerrain`, `TileTraversable`, `TilePlantable`, `TileReservedByStructure` | site bootstrap (`SiteRunFactory` + `SiteWorld`) | initialized during site-world creation; runtime read-only in current code |
 | `TileSoilFertility`, `TileMoisture`, `TileSoilSalinity`, `TileGrowthPressure` | site bootstrap (`SiteRunFactory` + `SiteWorld`) | baseline-only in current code; no runtime mutator yet |
-| `TileSandBurial`, `TilePlantSlot`, `TileGroundCoverSlot`, `TilePlantDensity` | `EcologySystem` | all runtime writes go through `EcologySystem` command handling and pulse updates |
+| `TileSandBurial`, `TilePlantSlot`, `TileGroundCoverSlot`, `TilePlantDensity` | `EcologySystem` | all runtime writes go through `EcologySystem` message handling and pulse updates |
 | `TileOccupantTag` | `EcologySystem` | derived tag maintained alongside plant/ground-cover occupancy writes |
 | `TileHeat`, `TileWind`, `TileDust` | `LocalWeatherResolveSystem` | recomputed from weather/event and local cover state |
 | `DeviceTag`, `TileCoordComponent` on device entities, `DeviceStructureId` | site bootstrap / placement path | sparse device identity and placement fields; runtime read-only in current code |
@@ -1139,7 +1139,7 @@ Rule:
 
 ### 9.4 System Summary
 
-| System | Owns Direct Writes | Reads | Emits Commands |
+| System | Owns Direct Writes | Reads | Emits Messages |
 |---|---|---|---|
 | `SiteFlowSystem` | `SiteClockState`, `WorkerTilePosition`, `WorkerFacing` | all site state | none in current code |
 | `ActionExecutionSystem` | `ActionState` | worker entity, inventory state, fixed dense tile domain | inventory consume, plant/build/repair completion |
@@ -1150,7 +1150,7 @@ Rule:
 | `CampDurabilitySystem` | mutable `CampState` service fields | weather, event phase | none in current code |
 | `DeviceMaintenanceSystem` | `DeviceIntegrity` | site weather singleton state, device `DeviceStructureId`, tile `TileSandBurial` looked up through device `TileCoordComponent` | none |
 | `DeviceSupportSystem` | `DeviceEfficiency`, `DeviceStoredWater` | device `DeviceStructureId`, `DeviceIntegrity`, tile `TileHeat` looked up through device `TileCoordComponent` | none |
-| `EcologySystem` | mutable tile ecology ECS fields, `TileOccupantTag`, `SiteCounters.fullyGrownTileCount` | ecology command payloads and owned tile occupancy state | restoration progress, tile ecology changed |
+| `EcologySystem` | mutable tile ecology ECS fields, `TileOccupantTag`, `SiteCounters.fullyGrownTileCount` | ecology message payloads and owned tile occupancy state | restoration progress, tile ecology changed |
 | `InventorySystem` | runtime inventory contents | action/economy context | worker meter delta |
 | `TaskBoardSystem` | mutable `TaskBoardState` runtime lists/progress | site counters | none in current code |
 | `EconomyPhoneSystem` | `EconomyState` | phone listing requests | none in current code |
@@ -1160,7 +1160,7 @@ Rule:
 Rule:
 
 - In this v1 boundary, tile data and identity-bearing world objects use ECS, while singleton/manager-style state such as weather/event flow, task board, economy, and UI-facing state may stay as plain owner-managed runtime state.
-- if a system does not own a state block, it reads that block and emits a command instead of mutating it directly
+- if a system does not own a state block, it reads that block and emits a message instead of mutating it directly
 
 ## 10. Detailed System Responsibilities
 
@@ -1173,7 +1173,7 @@ Responsibilities:
 - tick task refresh timer
 - tick ecology pulse timer
 - tick delivery timers
-- create refresh commands when the board timer expires
+- create refresh messages when the board timer expires
 
 ### 10.2 `ActionExecutionSystem`
 
@@ -1181,13 +1181,13 @@ Responsibilities:
 
 - hold one active manual action for the worker
 - check action completion against elapsed action time
-- on completion, emit domain commands that mutate inventory, tiles, or devices
+- on completion, emit domain messages that mutate inventory, tiles, or devices
 - apply interruption rules during severe hazards or cancellation
 
 V1 rule:
 
 - only one player manual action can be active at a time
-- action-completion commands must resolve in command flush phase A so a completed watering, repair, burial clear, or build can affect the same simulation step before hazard damage is applied
+- action-completion messages must resolve in message flush phase A so a completed watering, repair, burial clear, or build can affect the same simulation step before hazard damage is applied
 
 ### 10.3 `WeatherEventSystem`
 
@@ -1212,7 +1212,7 @@ Responsibilities:
 - apply hydration, nourishment, energy, morale, and health changes
 - apply recovery when sheltered
 - clamp all worker meters
-- emit site-failure command when health reaches zero
+- emit site-failure message when health reaches zero
 
 ### 10.6 `CampDurabilitySystem`
 
@@ -1344,7 +1344,7 @@ These are query helpers over validated content plus current progression state. T
 
 ## 12. UI Architecture
 
-UI code is read-only over gameplay state and mutates gameplay only through commands.
+UI code is read-only over gameplay state and mutates gameplay only through messages.
 
 ### 12.1 DLL-Defined UI Setup Contract
 
@@ -1359,7 +1359,7 @@ Rules:
 - when the player activates a host-rendered UI element, the adapter sends the matching DLL-defined UI action back through the host-event contract
 - UI action events may be submitted in the pre-`phase1` host-event window or in the between-phase host-event window depending on when the host resolved the interaction
 
-Current v1 command shape:
+Current v1 message shape:
 
 - `BEGIN_UI_SETUP`
 - `UI_ELEMENT_UPSERT`
@@ -1424,7 +1424,7 @@ The regional map must expose:
 
 Regional-map note:
 
-- site nodes are still projected through the dedicated regional-map engine-command contract, not through generic UI setup elements
+- site nodes are still projected through the dedicated regional-map engine-message contract, not through generic UI setup elements
 - host-side interaction with projected site nodes should still come back into the DLL as DLL-defined UI action tokens such as `SELECT_DEPLOYMENT_SITE`
 
 ## 13. Engine Adapter Contract For V1
@@ -1436,7 +1436,7 @@ The host-side engine integration layer must provide:
 - `queueHostEventsBeforePhase1()`
 - `queueHostEventsBetweenPhases()`
 - `sampleSourceInputAndResolveHostEvents()`
-- `flushEngineCommands()`
+- `flushEngineMessages()`
 - `collectFeedbackEvents()`
 
 ### 13.1 Reduced Exported DLL Surface
@@ -1448,15 +1448,15 @@ The gameplay DLL should expose only the minimum engine-agnostic runtime boundary
 - translated feedback-event submission for engine execution observations
 - `phase1` runtime entry
 - `phase2` runtime entry
-- engine-command pop/read
+- engine-message pop/read
 
 Current boundary rule:
 
 - host-to-game data is submitted as host/feedback events plus the per-frame real delta carried by `phase1`
-- game-to-host data is emitted as engine commands
+- game-to-host data is emitted as engine messages
 - the host must not pass raw button, cursor, or camera-state data across the DLL boundary when it can instead submit semantic host events
 - translated feedback events must already be in world language before entering the DLL
-- host events may be submitted in two windows each frame: once before `phase1` and once after the phase-1 engine-command flush but before `phase2`
+- host events may be submitted in two windows each frame: once before `phase1` and once after the phase-1 engine-message flush but before `phase2`
 - pre-`phase1` host events are for interactions or continuous control meaning the host already resolved before gameplay tick, including host-rendered UI actions and per-frame site move-direction events that should affect phase-1 gameplay
 - between-phase host events remain valid for interactions or adapter work that completes after the phase-1 flush
 - per-frame real delta time is supplied to `phase1`; `phase2` is the same frame continuation and does not take a second frame delta
@@ -1473,7 +1473,7 @@ Translated feedback-event examples:
 - translated trace hit
 - translated animation notify
 
-Engine-command examples:
+Engine-message examples:
 
 - `SET_APP_STATE`
 - `BEGIN_REGIONAL_MAP_SNAPSHOT`
@@ -1499,24 +1499,24 @@ Engine-command examples:
 
 Current implementation note:
 
-- the public header now defines a richer engine-command schema centered on app-state projection, regional-map projection, semantic UI setup projection, site projection, HUD/UI projection, site results, and one-shot cues
-- the current runtime now emits a practical prototype subset of that richer contract: log text, set app state, UI setup batches for menu/panel surfaces, regional-map snapshot commands, site bootstrap snapshots on site entry/resync, authoritative site partial-update batches after bootstrap, HUD state, and site result ready
+- the public header now defines a richer engine-message schema centered on app-state projection, regional-map projection, semantic UI setup projection, site projection, HUD/UI projection, site results, and one-shot cues
+- the current runtime now emits a practical prototype subset of that richer contract: log text, set app state, UI setup batches for menu/panel surfaces, regional-map snapshot messages, site bootstrap snapshots on site entry/resync, authoritative site partial-update batches after bootstrap, HUD state, and site result ready
 - the current runtime also emits `SITE_ACTION_UPDATE` when a site action execution actually starts and again when it clears, so adapters can drive bottom-middle progress bars locally without polling gameplay every frame
-- inventory/task/phone/notification/one-shot cue commands are defined in the schema now but are not fully emitted yet by gameplay runtime code
+- inventory/task/phone/notification/one-shot cue messages are defined in the schema now but are not fully emitted yet by gameplay runtime code
 
-### 13.2 Engine Command Contract Shape
+### 13.2 Engine Message Contract Shape
 
-To keep DLL exposure low, the engine-command contract should be the main host-facing projection channel.
+To keep DLL exposure low, the engine-message contract should be the main host-facing projection channel.
 
 The required shape is:
 
-- snapshot begin/end commands for long-lived surfaces such as regional map and active site
-- snapshot begin/end plus element upsert commands for semantic UI surfaces owned by gameplay
-- upsert/remove commands for list-like state such as sites, links, tasks, phone listings, and inventory slots
-- direct state-update commands for singleton surfaces such as app state, worker state, camp state, weather state, HUD state, and site result state
-- one-shot cue commands for transient presentation hints
+- snapshot begin/end messages for long-lived surfaces such as regional map and active site
+- snapshot begin/end plus element upsert messages for semantic UI surfaces owned by gameplay
+- upsert/remove messages for list-like state such as sites, links, tasks, phone listings, and inventory slots
+- direct state-update messages for singleton surfaces such as app state, worker state, camp state, weather state, HUD state, and site result state
+- one-shot cue messages for transient presentation hints
 
-Regional-map command contract:
+Regional-map message contract:
 
 - `BEGIN_REGIONAL_MAP_SNAPSHOT` starts a full authoritative map projection update
 - `REGIONAL_MAP_SITE_UPSERT` updates one site node projection
@@ -1530,7 +1530,7 @@ Semantic UI setup contract:
 - `END_UI_SETUP` closes the batch
 - UI setup data intentionally omits host-owned layout, size, animation, and style details
 
-Site command contract:
+Site message contract:
 
 - `BEGIN_SITE_SNAPSHOT` with `SNAPSHOT` mode starts a full authoritative site bootstrap/resync batch
 - `BEGIN_SITE_SNAPSHOT` with `DELTA` mode starts an authoritative partial site-update batch against an already projected site world
@@ -1542,14 +1542,14 @@ Site command contract:
 
 Projection rules:
 
-- snapshot commands describe authoritative visual rebuild/bootstrap state
+- snapshot messages describe authoritative visual rebuild/bootstrap state
 - delta-mode site batches describe authoritative partial state updates after the host already has a valid site projection baseline
 - when a site tile changes after bootstrap, the runtime should emit only the authoritative changed tile cells for that batch unless it is intentionally performing a tile-surface resync
-- the host should treat begin/end snapshot commands as transactional fences for the matching presentation surface
-- the host must not infer gameplay state that was never sent; if a surface is host-relevant, the DLL should emit a command for it
+- the host should treat begin/end snapshot messages as transactional fences for the matching presentation surface
+- the host must not infer gameplay state that was never sent; if a surface is host-relevant, the DLL should emit a message for it
 - adapters should treat `SITE_ACTION_UPDATE` as lifecycle data, not per-frame progress authority: the DLL sends action start plus duration and later sends the clear/completion transition, while fill percentage can advance entirely inside the adapter
-- the gameplay DLL should emit projection commands only when the authoritative gameplay state for that surface actually changed
-- if a specific typed projection command already describes the changed presentation slice, prefer that over emitting an extra generic dirty notification
+- the gameplay DLL should emit projection messages only when the authoritative gameplay state for that surface actually changed
+- if a specific typed projection message already describes the changed presentation slice, prefer that over emitting an extra generic dirty notification
 - delta-mode site updates should carry authoritative changed state, not arithmetic change amounts; for example worker movement should send the worker's new transform state, not a movement delta to be accumulated by the host
 - adapters should build the long-lived site world from the bootstrap batch, maintain stable object mappings, and apply later site-state slices onto those existing projected objects
 
@@ -1560,16 +1560,16 @@ For a simulated or real engine host, one frame update should look like:
 1. gather engine input and translate it into semantic host events; continuous control such as movement should be resolved here using adapter-owned camera state if needed
 2. optionally submit any host events already resolved before gameplay tick
 3. call `phase1(delta_seconds)`
-4. flush phase-1 engine commands through the engine adapter
+4. flush phase-1 engine messages through the engine adapter
 5. optionally submit newly resolved host events plus translated feedback events
 6. call `phase2()`
-7. flush phase-2 engine commands through the engine adapter
+7. flush phase-2 engine messages through the engine adapter
 
 Timing rule:
 
 - every engine frame has a real delta time
 - the gameplay DLL needs that delta for `phase1` so fixed-step simulation can advance correctly
-- `phase2` does not take another delta because it belongs to the same frame and only resolves between-phase ingress plus follow-up commands
+- `phase2` does not take another delta because it belongs to the same frame and only resolves between-phase ingress plus follow-up messages
 - the same host-event API may be used in both ingress windows; submission timing decides whether the runtime handles those events in `phase1` or `phase2`
 
 It must not:
@@ -1654,7 +1654,7 @@ For the first playable coding stage, the implementation shape is now locked stro
 - one authoritative site run state
 - one archetype-style ECS world for site gameplay
 - one fixed dense row-major tile ECS domain
-- self-contained systems with command-driven cross-owner mutation
+- self-contained systems with message-driven cross-owner mutation
 - validated content database
 - explicit system ownership
 - explicit folder structure

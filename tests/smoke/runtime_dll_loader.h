@@ -15,7 +15,7 @@ struct Gs1RuntimeApi final
     decltype(&gs1_submit_feedback_events) submit_feedback_events {nullptr};
     decltype(&gs1_run_phase1) run_phase1 {nullptr};
     decltype(&gs1_run_phase2) run_phase2 {nullptr};
-    decltype(&gs1_pop_engine_command) pop_engine_command {nullptr};
+    decltype(&gs1_pop_engine_message) pop_engine_message {nullptr};
     decltype(&gs1_get_system_test_api_version) get_system_test_api_version {nullptr};
     decltype(&gs1_get_system_test_case_count) get_system_test_case_count {nullptr};
     decltype(&gs1_get_system_test_case_info) get_system_test_case_info {nullptr};

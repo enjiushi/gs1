@@ -93,7 +93,7 @@ bool RuntimeDllLoader::load(const wchar_t* dll_path)
         load_symbol(api_.submit_feedback_events, "gs1_submit_feedback_events") &&
         load_symbol(api_.run_phase1, "gs1_run_phase1") &&
         load_symbol(api_.run_phase2, "gs1_run_phase2") &&
-        load_symbol(api_.pop_engine_command, "gs1_pop_engine_command") &&
+        load_symbol(api_.pop_engine_message, "gs1_pop_engine_message") &&
         load_symbol(api_.get_system_test_api_version, "gs1_get_system_test_api_version") &&
         load_symbol(api_.get_system_test_case_count, "gs1_get_system_test_case_count") &&
         load_symbol(api_.get_system_test_case_info, "gs1_get_system_test_case_info") &&

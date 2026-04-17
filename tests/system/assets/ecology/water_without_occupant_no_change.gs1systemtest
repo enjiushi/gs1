@@ -1,7 +1,7 @@
 system = ecology
 name = water_without_occupant_no_change
 runner = ecology_regression
-description = Waters an empty tile and verifies density stays unchanged with no ecology-changed command.
+description = Waters an empty tile and verifies density stays unchanged with no ecology-changed message.
 ---
 scenario = water
 x = 2

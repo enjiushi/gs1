@@ -153,9 +153,9 @@ void emit_worker_meters_changed_if_needed(SiteSystemContext<WorkerConditionSyste
 
     if (is_initial || actual_mask != WORKER_METER_CHANGED_NONE)
     {
-        GameCommand command {};
-        command.type = GameCommandType::WorkerMetersChanged;
-        command.set_payload(WorkerMetersChangedCommand {
+        GameMessage message {};
+        message.type = GameMessageType::WorkerMetersChanged;
+        message.set_payload(WorkerMetersChangedMessage {
             actual_mask,
             snapshot.health,
             snapshot.hydration,
@@ -164,7 +164,7 @@ void emit_worker_meters_changed_if_needed(SiteSystemContext<WorkerConditionSyste
             snapshot.energy,
             snapshot.morale,
             snapshot.work_efficiency});
-        context.command_queue.push_back(command);
+        context.message_queue.push_back(message);
         context.world.mark_projection_dirty(
             SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
         memory.last_reported_snapshot = snapshot;
@@ -201,7 +201,7 @@ void apply_passive_decay(SiteWorld::WorkerConditionData& worker, float step_seco
 
 void apply_worker_meter_delta(
     SiteWorld::WorkerConditionData& worker,
-    const WorkerMeterDeltaRequestedCommand& payload) noexcept
+    const WorkerMeterDeltaRequestedMessage& payload) noexcept
 {
     worker.health = std::clamp(
         worker.health + payload.health_delta,
@@ -234,16 +234,16 @@ void apply_worker_meter_delta(
 }
 }  // namespace
 
-bool WorkerConditionSystem::subscribes_to(GameCommandType type) noexcept
+bool WorkerConditionSystem::subscribes_to(GameMessageType type) noexcept
 {
-    return type == GameCommandType::WorkerMeterDeltaRequested;
+    return type == GameMessageType::WorkerMeterDeltaRequested;
 }
 
-Gs1Status WorkerConditionSystem::process_command(
+Gs1Status WorkerConditionSystem::process_message(
     SiteSystemContext<WorkerConditionSystem>& context,
-    const GameCommand& command)
+    const GameMessage& message)
 {
-    if (command.type != GameCommandType::WorkerMeterDeltaRequested)
+    if (message.type != GameMessageType::WorkerMeterDeltaRequested)
     {
         return GS1_STATUS_OK;
     }
@@ -257,7 +257,7 @@ Gs1Status WorkerConditionSystem::process_command(
     const auto previous = worker.conditions;
     apply_worker_meter_delta(
         worker.conditions,
-        command.payload_as<WorkerMeterDeltaRequestedCommand>());
+        message.payload_as<WorkerMeterDeltaRequestedMessage>());
     const bool modified = worker_conditions_changed(previous, worker.conditions);
     if (modified)
     {

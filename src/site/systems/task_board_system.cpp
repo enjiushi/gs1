@@ -88,7 +88,7 @@ bool complete_task(TaskBoardState& board, TaskInstanceState& task) noexcept
 
 void handle_site_run_started(
     SiteSystemContext<TaskBoardSystem>& context,
-    const SiteRunStartedCommand& payload)
+    const SiteRunStartedMessage& payload)
 {
     auto& board = context.world.own_task_board();
     reset_task_board(board);
@@ -106,7 +106,7 @@ void handle_site_run_started(
 
 void handle_task_accept_requested(
     SiteSystemContext<TaskBoardSystem>& context,
-    const TaskAcceptRequestedCommand& payload)
+    const TaskAcceptRequestedMessage& payload)
 {
     auto& board = context.world.own_task_board();
     if (board.accepted_task_ids.size() >= board.accepted_task_cap)
@@ -128,7 +128,7 @@ void handle_task_accept_requested(
 
 void handle_restoration_progress(
     SiteSystemContext<TaskBoardSystem>& context,
-    const RestorationProgressChangedCommand& payload)
+    const RestorationProgressChangedMessage& payload)
 {
     auto& board = context.world.own_task_board();
     if (board.visible_tasks.empty())
@@ -164,33 +164,33 @@ void handle_restoration_progress(
 }
 }  // namespace
 
-bool TaskBoardSystem::subscribes_to(GameCommandType type) noexcept
+bool TaskBoardSystem::subscribes_to(GameMessageType type) noexcept
 {
     switch (type)
     {
-    case GameCommandType::SiteRunStarted:
-    case GameCommandType::TaskAcceptRequested:
-    case GameCommandType::RestorationProgressChanged:
+    case GameMessageType::SiteRunStarted:
+    case GameMessageType::TaskAcceptRequested:
+    case GameMessageType::RestorationProgressChanged:
         return true;
     default:
         return false;
     }
 }
 
-Gs1Status TaskBoardSystem::process_command(
+Gs1Status TaskBoardSystem::process_message(
     SiteSystemContext<TaskBoardSystem>& context,
-    const GameCommand& command)
+    const GameMessage& message)
 {
-    switch (command.type)
+    switch (message.type)
     {
-    case GameCommandType::SiteRunStarted:
-        handle_site_run_started(context, command.payload_as<SiteRunStartedCommand>());
+    case GameMessageType::SiteRunStarted:
+        handle_site_run_started(context, message.payload_as<SiteRunStartedMessage>());
         break;
-    case GameCommandType::TaskAcceptRequested:
-        handle_task_accept_requested(context, command.payload_as<TaskAcceptRequestedCommand>());
+    case GameMessageType::TaskAcceptRequested:
+        handle_task_accept_requested(context, message.payload_as<TaskAcceptRequestedMessage>());
         break;
-    case GameCommandType::RestorationProgressChanged:
-        handle_restoration_progress(context, command.payload_as<RestorationProgressChangedCommand>());
+    case GameMessageType::RestorationProgressChanged:
+        handle_restoration_progress(context, message.payload_as<RestorationProgressChangedMessage>());
         break;
     default:
         break;

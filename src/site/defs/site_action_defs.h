@@ -1,6 +1,6 @@
 #pragma once
 
-#include "commands/game_command.h"
+#include "messages/game_message.h"
 #include "site/action_state.h"
 
 #include <array>

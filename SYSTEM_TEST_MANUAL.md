@@ -5,7 +5,7 @@ This document describes the GS1 per-system test framework, how to run it, and ho
 For the current per-system coverage map and placeholder/future test plan, see
 [SYSTEM_TEST_COVERAGE.md](E:/gs1/SYSTEM_TEST_COVERAGE.md).
 
-For runtime-level command/projection regression coverage that spans multiple
+For runtime-level message/projection regression coverage that spans multiple
 systems, also see the standalone executables under `tests/runtime/`.
 
 ## Goals
@@ -65,13 +65,13 @@ The system-test framework has four layers:
 The per-system framework is the main tool for focused system ownership tests.
 Alongside it, `tests/runtime/` contains a smaller set of direct-link runtime
 regression executables for scenarios where the important behavior is the full
-command chain or engine-command output ordering.
+message chain or engine-message output ordering.
 
 Use the runtime layer when you need to verify things like:
 
-- multiple systems coordinating only through subscribed `GameCommand` flow
+- multiple systems coordinating only through subscribed `GameMessage` flow
 - projection flushing timing relative to fixed-step updates
-- engine-facing command payloads such as worker, HUD, tile, and site-result
+- engine-facing message payloads such as worker, HUD, tile, and site-result
   outputs
 
 The runtime layer complements the DLL-loaded system-test host; it does not
@@ -84,8 +84,8 @@ This project already uses a DLL-loading host pattern for smoke tests. The system
 This design also avoids mixing test coordination into gameplay systems:
 
 - Systems still own their own state.
-- Cross-system behavior should still flow through `GameCommand`.
-- Tests can observe behavior through public state, command flow, or runtime outputs without breaking ownership rules.
+- Cross-system behavior should still flow through `GameMessage`.
+- Tests can observe behavior through public state, message flow, or runtime outputs without breaking ownership rules.
 
 ## Supported Test Authoring Styles
 
@@ -232,8 +232,8 @@ If the build was configured with `GS1_SYSTEM_TEST_SYSTEMS`, the CTest entry will
 
 ```powershell
 ctest -C Debug -R gs1_runtime_projection_test --output-on-failure
-ctest -C Debug -R gs1_runtime_command_chain_test --output-on-failure
-ctest -C Debug -R gs1_site_system_command_flow_test --output-on-failure
+ctest -C Debug -R gs1_runtime_message_chain_test --output-on-failure
+ctest -C Debug -R gs1_site_system_message_flow_test --output-on-failure
 ```
 
 ## How To Add A Source Test Case
@@ -300,7 +300,7 @@ scripts/run_system_tests.ps1 -BuildFirst -System inventory
 - Put the `system` string on the registration macro in lowercase for consistency.
 - Name tests for gameplay behavior, not implementation detail.
 - Prefer setting up only the owned state slice the tested system needs.
-- For cross-system interactions, drive the scenario through `GameCommand` flow rather than direct peer mutation.
+- For cross-system interactions, drive the scenario through `GameMessage` flow rather than direct peer mutation.
 - Use the shared helpers in [tests/system/source/system_test_fixtures.h](E:/gs1/tests/system/source/system_test_fixtures.h) when you need a prototype campaign, a minimal site run, queue inspection, or direct ECS component mutation for tile/device/worker tests.
 
 ## How To Add An Asset Test Case
@@ -433,7 +433,7 @@ When changing one system:
 3. Repeat until the system behavior is correct.
 4. Run the broader test set before merging.
 
-Typical commands:
+Typical messages:
 
 ```powershell
 scripts/run_system_tests.ps1 -BuildFirst -System inventory
@@ -460,7 +460,7 @@ At the end, the host prints a summary with counts for passed, failed, and error 
 - Prefer behavior names such as `accept_task_adds_task_to_accepted_list` over internal names.
 - Keep setup small and explicit.
 - Respect system ownership boundaries.
-- Drive cross-owner effects through commands, not direct peer mutation.
+- Drive cross-owner effects through messages, not direct peer mutation.
 - Use asset tests when many cases share the same execution logic.
 - Use source tests when the logic is code-heavy or needs internal helper setup.
 

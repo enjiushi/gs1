@@ -14,7 +14,7 @@ enum class SmokeScriptOpcode
     WaitSelectedSite,
     AssertAppState,
     AssertSelectedSite,
-    AssertSawCommand,
+    AssertSawMessage,
     AssertLogContains
 };
 
@@ -27,7 +27,7 @@ struct SmokeScriptDirective
     Gs1UiAction ui_action {};
     Gs1AppState app_state {GS1_APP_STATE_BOOT};
     std::uint32_t site_id {0};
-    Gs1EngineCommandType engine_command_type {GS1_ENGINE_COMMAND_NONE};
+    Gs1EngineMessageType engine_message_type {GS1_ENGINE_MESSAGE_NONE};
     std::string text {};
     std::uint32_t remaining_frames {0};
 };

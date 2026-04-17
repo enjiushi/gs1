@@ -38,9 +38,9 @@ GS1_API Gs1Status gs1_run_phase2(
     const Gs1Phase2Request* request,
     Gs1Phase2Result* out_result) GS1_NOEXCEPT;
 
-GS1_API Gs1Status gs1_pop_engine_command(
+GS1_API Gs1Status gs1_pop_engine_message(
     Gs1RuntimeHandle* runtime,
-    Gs1EngineCommand* out_command) GS1_NOEXCEPT;
+    Gs1EngineMessage* out_message) GS1_NOEXCEPT;
 
 GS1_API Gs1Status gs1_get_runtime_profiling_snapshot(
     Gs1RuntimeHandle* runtime,

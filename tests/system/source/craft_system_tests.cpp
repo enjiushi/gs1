@@ -1,4 +1,4 @@
-#include "commands/game_command.h"
+#include "messages/game_message.h"
 #include "content/defs/craft_recipe_defs.h"
 #include "content/defs/item_defs.h"
 #include "site/craft_logic.h"
@@ -13,27 +13,27 @@ namespace
 {
 using gs1::ActionExecutionSystem;
 using gs1::CraftSystem;
-using gs1::GameCommand;
-using gs1::GameCommandQueue;
-using gs1::GameCommandType;
-using gs1::InventoryCraftCommitRequestedCommand;
-using gs1::InventoryItemConsumeRequestedCommand;
+using gs1::GameMessage;
+using gs1::GameMessageQueue;
+using gs1::GameMessageType;
+using gs1::InventoryCraftCommitRequestedMessage;
+using gs1::InventoryItemConsumeRequestedMessage;
 using gs1::InventorySystem;
-using gs1::PlacementReservationAcceptedCommand;
-using gs1::SiteActionCompletedCommand;
-using gs1::SiteActionStartedCommand;
-using gs1::SiteDevicePlacedCommand;
-using gs1::SiteRunStartedCommand;
+using gs1::PlacementReservationAcceptedMessage;
+using gs1::SiteActionCompletedMessage;
+using gs1::SiteActionStartedMessage;
+using gs1::SiteDevicePlacedMessage;
+using gs1::SiteRunStartedMessage;
 using gs1::TileCoord;
 using namespace gs1::testing::fixtures;
 
 template <typename Payload>
-GameCommand make_command(gs1::GameCommandType type, const Payload& payload)
+GameMessage make_message(gs1::GameMessageType type, const Payload& payload)
 {
-    GameCommand command {};
-    command.type = type;
-    command.set_payload(payload);
-    return command;
+    GameMessage message {};
+    message.type = type;
+    message.set_payload(payload);
+    return message;
 }
 
 void action_execution_build_completion_consumes_deployable_and_emits_device_placement(
@@ -41,17 +41,17 @@ void action_execution_build_completion_consumes_deployable_and_emits_device_plac
 {
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(1U, 1501U);
-    GameCommandQueue queue {};
+    GameMessageQueue queue {};
     auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
     auto action_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue, 60.0);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_command(
+        InventorySystem::process_message(
             inventory_context,
-            make_command(
-                GameCommandType::SiteRunStarted,
-                SiteRunStartedCommand {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
     (void)gs1::inventory_storage::add_item_to_container(
         site_run,
         gs1::inventory_storage::worker_pack_container(site_run),
@@ -61,11 +61,11 @@ void action_execution_build_completion_consumes_deployable_and_emits_device_plac
     queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        ActionExecutionSystem::process_command(
+        ActionExecutionSystem::process_message(
             action_context,
-            make_command(
-                GameCommandType::StartSiteAction,
-                gs1::StartSiteActionCommand {
+            make_message(
+                GameMessageType::StartSiteAction,
+                gs1::StartSiteActionMessage {
                     GS1_SITE_ACTION_BUILD,
                     0U,
                     1U,
@@ -74,37 +74,37 @@ void action_execution_build_completion_consumes_deployable_and_emits_device_plac
                     0U,
                     0U,
                     gs1::k_item_storage_crate_kit})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_REQUIRE(context, count_commands(queue, GameCommandType::PlacementReservationRequested) == 1U);
+    GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::PlacementReservationRequested) == 1U);
 
     queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        ActionExecutionSystem::process_command(
+        ActionExecutionSystem::process_message(
             action_context,
-            make_command(
-                GameCommandType::PlacementReservationAccepted,
-                PlacementReservationAcceptedCommand {
+            make_message(
+                GameMessageType::PlacementReservationAccepted,
+                PlacementReservationAcceptedMessage {
                     site_run.site_action.current_action_id->value,
                     site_run.camp.camp_anchor_tile.x,
                     site_run.camp.camp_anchor_tile.y,
                     55U})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_REQUIRE(context, count_commands(queue, GameCommandType::SiteActionStarted) == 1U);
+    GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::SiteActionStarted) == 1U);
 
     queue.clear();
     ActionExecutionSystem::run(action_context);
-    GS1_SYSTEM_TEST_REQUIRE(context, count_commands(queue, GameCommandType::SiteActionCompleted) == 1U);
-    GS1_SYSTEM_TEST_REQUIRE(context, count_commands(queue, GameCommandType::InventoryItemConsumeRequested) == 1U);
-    GS1_SYSTEM_TEST_REQUIRE(context, count_commands(queue, GameCommandType::SiteDevicePlaced) == 1U);
+    GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::SiteActionCompleted) == 1U);
+    GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::InventoryItemConsumeRequested) == 1U);
+    GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::SiteDevicePlaced) == 1U);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        first_command_payload<InventoryItemConsumeRequestedCommand>(
+        first_message_payload<InventoryItemConsumeRequestedMessage>(
             queue,
-            GameCommandType::InventoryItemConsumeRequested)->item_id == gs1::k_item_storage_crate_kit);
+            GameMessageType::InventoryItemConsumeRequested)->item_id == gs1::k_item_storage_crate_kit);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        first_command_payload<SiteDevicePlacedCommand>(
+        first_message_payload<SiteDevicePlacedMessage>(
             queue,
-            GameCommandType::SiteDevicePlaced)->structure_id == gs1::k_structure_storage_crate);
+            GameMessageType::SiteDevicePlaced)->structure_id == gs1::k_structure_storage_crate);
 }
 
 void inventory_craft_commit_consumes_nearby_ingredients_and_outputs_to_device_storage(
@@ -112,25 +112,25 @@ void inventory_craft_commit_consumes_nearby_ingredients_and_outputs_to_device_st
 {
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(1U, 1502U);
-    GameCommandQueue queue {};
+    GameMessageQueue queue {};
     auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_command(
+        InventorySystem::process_message(
             inventory_context,
-            make_command(
-                GameCommandType::SiteRunStarted,
-                SiteRunStartedCommand {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     const auto workbench_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_command(
+        InventorySystem::process_message(
             inventory_context,
-            make_command(
-                GameCommandType::InventoryCraftCommitRequested,
-                InventoryCraftCommitRequestedCommand {
+            make_message(
+                GameMessageType::InventoryCraftCommitRequested,
+                InventoryCraftCommitRequestedMessage {
                     gs1::k_recipe_craft_storage_crate,
                     workbench_tile.x,
                     workbench_tile.y,
@@ -164,17 +164,17 @@ void craft_cache_tracks_worker_pack_membership_by_distance(
 {
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(1U, 1503U, 101U, 16U, 16U);
-    GameCommandQueue queue {};
+    GameMessageQueue queue {};
     auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
     auto craft_context = make_site_context<CraftSystem>(campaign, site_run, queue);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_command(
+        InventorySystem::process_message(
             inventory_context,
-            make_command(
-                GameCommandType::SiteRunStarted,
-                SiteRunStartedCommand {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     CraftSystem::run(craft_context);
     const auto workbench_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);

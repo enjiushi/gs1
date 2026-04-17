@@ -294,7 +294,7 @@ void append_ui_action_json(std::string& json, const Gs1UiAction& action)
     json += '}';
 }
 
-void append_command_entries_json(std::string& json, const std::vector<std::string>& entries)
+void append_message_entries_json(std::string& json, const std::vector<std::string>& entries)
 {
     json += '[';
     for (std::size_t index = 0; index < entries.size(); ++index)
@@ -831,10 +831,10 @@ std::string SmokeEngineHost::build_live_state_json(const LiveStateSnapshot& live
     append_optional_u32_json(json, live_state.selected_site_id);
     json += ",\"scriptFailed\":";
     append_bool_json(json, live_state.script_failed);
-    json += ",\"commandEntries\":";
-    append_command_entries_json(json, live_state.current_frame_command_entries);
+    json += ",\"messageEntries\":";
+    append_message_entries_json(json, live_state.current_frame_message_entries);
     json += ",\"logTail\":";
-    append_command_entries_json(json, live_state.command_log_tail);
+    append_message_entries_json(json, live_state.message_log_tail);
     json += ",\"uiSetups\":";
     append_ui_setups_json(json, live_state.active_ui_setups);
     json += ",\"regionalMap\":";

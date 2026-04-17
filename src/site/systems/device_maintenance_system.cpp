@@ -15,21 +15,21 @@ constexpr float k_burial_wear_per_unit = 0.05f;
 
 }  // namespace
 
-bool DeviceMaintenanceSystem::subscribes_to(GameCommandType type) noexcept
+bool DeviceMaintenanceSystem::subscribes_to(GameMessageType type) noexcept
 {
-    return type == GameCommandType::SiteDevicePlaced;
+    return type == GameMessageType::SiteDevicePlaced;
 }
 
-Gs1Status DeviceMaintenanceSystem::process_command(
+Gs1Status DeviceMaintenanceSystem::process_message(
     SiteSystemContext<DeviceMaintenanceSystem>& context,
-    const GameCommand& command)
+    const GameMessage& message)
 {
-    if (command.type != GameCommandType::SiteDevicePlaced)
+    if (message.type != GameMessageType::SiteDevicePlaced)
     {
         return GS1_STATUS_OK;
     }
 
-    const auto& payload = command.payload_as<SiteDevicePlacedCommand>();
+    const auto& payload = message.payload_as<SiteDevicePlacedMessage>();
     const TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
     if (!context.world.tile_coord_in_bounds(target_tile))
     {

@@ -12,20 +12,20 @@
 
 namespace gs1
 {
-inline constexpr std::size_t k_command_cache_line_size = 64U;
-inline constexpr std::size_t k_command_payload_byte_count = k_command_cache_line_size - sizeof(std::uint8_t);
+inline constexpr std::size_t k_message_cache_line_size = 64U;
+inline constexpr std::size_t k_message_payload_byte_count = k_message_cache_line_size - sizeof(std::uint8_t);
 
-#define GS1_ASSERT_TRIVIAL_COMMAND_TYPE(Type) \
+#define GS1_ASSERT_TRIVIAL_MESSAGE_TYPE(Type) \
     static_assert(std::is_standard_layout_v<Type>, #Type " must remain standard layout."); \
     static_assert(std::is_trivial_v<Type>, #Type " must remain trivial."); \
     static_assert(std::is_trivially_copyable_v<Type>, #Type " must remain trivially copyable.")
 
-#define GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(Type, ExpectedSize) \
-    GS1_ASSERT_TRIVIAL_COMMAND_TYPE(Type); \
-    static_assert(sizeof(Type) == (ExpectedSize), #Type " size changed; revisit command payload packing."); \
-    static_assert(sizeof(Type) <= k_command_payload_byte_count, #Type " exceeds the game command payload budget.")
+#define GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(Type, ExpectedSize) \
+    GS1_ASSERT_TRIVIAL_MESSAGE_TYPE(Type); \
+    static_assert(sizeof(Type) == (ExpectedSize), #Type " size changed; revisit message payload packing."); \
+    static_assert(sizeof(Type) <= k_message_payload_byte_count, #Type " exceeds the game message payload budget.")
 
-enum class GameCommandType : std::uint8_t
+enum class GameMessageType : std::uint8_t
 {
     OpenMainMenu,
     StartNewCampaign,
@@ -70,8 +70,8 @@ enum class GameCommandType : std::uint8_t
     Count
 };
 
-inline constexpr std::size_t k_game_command_type_count =
-    static_cast<std::size_t>(GameCommandType::Count);
+inline constexpr std::size_t k_game_message_type_count =
+    static_cast<std::size_t>(GameMessageType::Count);
 
 enum class SiteActionFailureReason : std::uint8_t
 {
@@ -124,51 +124,51 @@ enum TileEcologyChangedFlags : std::uint32_t
     TILE_ECOLOGY_CHANGED_GROWTH_PRESSURE = 1u << 6
 };
 
-struct StartNewCampaignCommand final
+struct StartNewCampaignMessage final
 {
     std::uint64_t campaign_seed;
     std::uint32_t campaign_days;
 };
 
-struct OpenMainMenuCommand final
+struct OpenMainMenuMessage final
 {
 };
 
-struct SelectDeploymentSiteCommand final
+struct SelectDeploymentSiteMessage final
 {
     std::uint32_t site_id;
 };
 
-struct ClearDeploymentSiteSelectionCommand final
+struct ClearDeploymentSiteSelectionMessage final
 {
 };
 
-struct DeploymentSiteSelectionChangedCommand final
+struct DeploymentSiteSelectionChangedMessage final
 {
     std::uint32_t selected_site_id;
 };
 
-struct StartSiteAttemptCommand final
+struct StartSiteAttemptMessage final
 {
     std::uint32_t site_id;
 };
 
-struct ReturnToRegionalMapCommand final
+struct ReturnToRegionalMapMessage final
 {
 };
 
-struct SiteAttemptEndedCommand final
+struct SiteAttemptEndedMessage final
 {
     std::uint32_t site_id;
     Gs1SiteAttemptResult result;
 };
 
-struct PresentLogCommand final
+struct PresentLogMessage final
 {
     char text[63];
 };
 
-struct SiteRunStartedCommand final
+struct SiteRunStartedMessage final
 {
     std::uint32_t site_id;
     std::uint32_t site_run_id;
@@ -177,7 +177,7 @@ struct SiteRunStartedCommand final
     std::uint64_t attempt_seed;
 };
 
-struct StartSiteActionCommand final
+struct StartSiteActionMessage final
 {
     Gs1SiteActionKind action_kind;
     std::uint8_t flags;
@@ -189,13 +189,13 @@ struct StartSiteActionCommand final
     std::uint32_t item_id;
 };
 
-struct CancelSiteActionCommand final
+struct CancelSiteActionMessage final
 {
     std::uint32_t action_id;
     std::uint32_t flags;
 };
 
-struct SiteActionStartedCommand final
+struct SiteActionStartedMessage final
 {
     std::uint32_t action_id;
     Gs1SiteActionKind action_kind;
@@ -207,7 +207,7 @@ struct SiteActionStartedCommand final
     float duration_minutes;
 };
 
-struct SiteActionCompletedCommand final
+struct SiteActionCompletedMessage final
 {
     std::uint32_t action_id;
     Gs1SiteActionKind action_kind;
@@ -219,7 +219,7 @@ struct SiteActionCompletedCommand final
     std::uint32_t secondary_subject_id;
 };
 
-struct SiteActionFailedCommand final
+struct SiteActionFailedMessage final
 {
     std::uint32_t action_id;
     Gs1SiteActionKind action_kind;
@@ -231,7 +231,7 @@ struct SiteActionFailedCommand final
     std::uint32_t secondary_subject_id;
 };
 
-struct PlacementReservationRequestedCommand final
+struct PlacementReservationRequestedMessage final
 {
     std::uint32_t action_id;
     std::int32_t target_tile_x;
@@ -241,7 +241,7 @@ struct PlacementReservationRequestedCommand final
     std::uint32_t subject_id;
 };
 
-struct PlacementReservationAcceptedCommand final
+struct PlacementReservationAcceptedMessage final
 {
     std::uint32_t action_id;
     std::int32_t target_tile_x;
@@ -249,7 +249,7 @@ struct PlacementReservationAcceptedCommand final
     std::uint32_t reservation_token;
 };
 
-struct PlacementReservationRejectedCommand final
+struct PlacementReservationRejectedMessage final
 {
     std::uint32_t action_id;
     std::int32_t target_tile_x;
@@ -258,13 +258,13 @@ struct PlacementReservationRejectedCommand final
     std::uint8_t reserved0[3];
 };
 
-struct PlacementReservationReleasedCommand final
+struct PlacementReservationReleasedMessage final
 {
     std::uint32_t action_id;
     std::uint32_t reservation_token;
 };
 
-struct SiteGroundCoverPlacedCommand final
+struct SiteGroundCoverPlacedMessage final
 {
     std::uint32_t action_id;
     std::int32_t target_tile_x;
@@ -274,7 +274,7 @@ struct SiteGroundCoverPlacedCommand final
     std::uint32_t flags;
 };
 
-struct SiteTilePlantingCompletedCommand final
+struct SiteTilePlantingCompletedMessage final
 {
     std::uint32_t action_id;
     std::int32_t target_tile_x;
@@ -284,7 +284,7 @@ struct SiteTilePlantingCompletedCommand final
     std::uint32_t flags;
 };
 
-struct SiteTileWateredCommand final
+struct SiteTileWateredMessage final
 {
     std::uint32_t source_id;
     std::int32_t target_tile_x;
@@ -293,7 +293,7 @@ struct SiteTileWateredCommand final
     std::uint32_t flags;
 };
 
-struct SiteTileBurialClearedCommand final
+struct SiteTileBurialClearedMessage final
 {
     std::uint32_t source_id;
     std::int32_t target_tile_x;
@@ -302,7 +302,7 @@ struct SiteTileBurialClearedCommand final
     std::uint32_t flags;
 };
 
-struct SiteDevicePlacedCommand final
+struct SiteDevicePlacedMessage final
 {
     std::uint32_t action_id;
     std::int32_t target_tile_x;
@@ -311,7 +311,7 @@ struct SiteDevicePlacedCommand final
     std::uint32_t flags;
 };
 
-struct WorkerMeterDeltaRequestedCommand final
+struct WorkerMeterDeltaRequestedMessage final
 {
     std::uint32_t source_id;
     std::uint32_t flags;
@@ -324,7 +324,7 @@ struct WorkerMeterDeltaRequestedCommand final
     float work_efficiency_delta;
 };
 
-struct WorkerMetersChangedCommand final
+struct WorkerMetersChangedMessage final
 {
     std::uint32_t changed_mask;
     float player_health;
@@ -336,7 +336,7 @@ struct WorkerMetersChangedCommand final
     float player_work_efficiency;
 };
 
-struct TileEcologyChangedCommand final
+struct TileEcologyChangedMessage final
 {
     std::int32_t target_tile_x;
     std::int32_t target_tile_y;
@@ -347,46 +347,46 @@ struct TileEcologyChangedCommand final
     float sand_burial;
 };
 
-struct RestorationProgressChangedCommand final
+struct RestorationProgressChangedMessage final
 {
     std::uint32_t fully_grown_tile_count;
     std::uint32_t site_completion_tile_threshold;
     float normalized_progress;
 };
 
-struct TaskAcceptRequestedCommand final
+struct TaskAcceptRequestedMessage final
 {
     std::uint32_t task_instance_id;
 };
 
-struct TaskRewardClaimRequestedCommand final
+struct TaskRewardClaimRequestedMessage final
 {
     std::uint32_t task_instance_id;
     std::uint32_t reward_candidate_id;
 };
 
-struct PhoneListingPurchaseRequestedCommand final
+struct PhoneListingPurchaseRequestedMessage final
 {
     std::uint32_t listing_id;
     std::uint16_t quantity;
     std::uint16_t flags;
 };
 
-struct PhoneListingSaleRequestedCommand final
+struct PhoneListingSaleRequestedMessage final
 {
     std::uint32_t listing_id_or_item_id;
     std::uint16_t quantity;
     std::uint16_t flags;
 };
 
-struct InventoryDeliveryRequestedCommand final
+struct InventoryDeliveryRequestedMessage final
 {
     std::uint32_t item_id;
     std::uint16_t quantity;
     std::uint16_t minutes_until_arrival;
 };
 
-struct InventoryItemUseRequestedCommand final
+struct InventoryItemUseRequestedMessage final
 {
     std::uint32_t item_id;
     std::uint16_t quantity;
@@ -394,7 +394,7 @@ struct InventoryItemUseRequestedCommand final
     std::uint8_t slot_index;
 };
 
-struct InventoryItemConsumeRequestedCommand final
+struct InventoryItemConsumeRequestedMessage final
 {
     std::uint32_t item_id;
     std::uint16_t quantity;
@@ -402,7 +402,7 @@ struct InventoryItemConsumeRequestedCommand final
     std::uint8_t flags;
 };
 
-struct InventoryGlobalItemConsumeRequestedCommand final
+struct InventoryGlobalItemConsumeRequestedMessage final
 {
     std::uint32_t item_id;
     std::uint16_t quantity;
@@ -411,7 +411,7 @@ struct InventoryGlobalItemConsumeRequestedCommand final
 
 inline constexpr std::uint8_t k_inventory_transfer_flag_resolve_destination_in_dll = 1U << 0U;
 
-struct InventoryTransferRequestedCommand final
+struct InventoryTransferRequestedMessage final
 {
     std::uint16_t source_slot_index;
     std::uint16_t destination_slot_index;
@@ -424,7 +424,7 @@ struct InventoryTransferRequestedCommand final
     std::uint32_t destination_container_owner_id;
 };
 
-struct InventoryCraftCommitRequestedCommand final
+struct InventoryCraftCommitRequestedMessage final
 {
     std::uint32_t recipe_id;
     std::int32_t target_tile_x;
@@ -432,62 +432,62 @@ struct InventoryCraftCommitRequestedCommand final
     std::uint32_t flags;
 };
 
-struct ContractorHireRequestedCommand final
+struct ContractorHireRequestedMessage final
 {
     std::uint32_t listing_or_offer_id;
     std::uint32_t requested_work_units;
 };
 
-struct SiteUnlockablePurchaseRequestedCommand final
+struct SiteUnlockablePurchaseRequestedMessage final
 {
     std::uint32_t unlockable_id;
 };
 
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(OpenMainMenuCommand, 1U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(StartNewCampaignCommand, 16U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(SelectDeploymentSiteCommand, 4U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(ClearDeploymentSiteSelectionCommand, 1U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(DeploymentSiteSelectionChangedCommand, 4U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(StartSiteAttemptCommand, 4U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(ReturnToRegionalMapCommand, 1U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(SiteAttemptEndedCommand, 8U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(PresentLogCommand, 63U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(SiteRunStartedCommand, 24U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(StartSiteActionCommand, 24U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(CancelSiteActionCommand, 8U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(SiteActionStartedCommand, 24U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(SiteActionCompletedCommand, 24U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(SiteActionFailedCommand, 24U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(PlacementReservationRequestedCommand, 20U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(PlacementReservationAcceptedCommand, 16U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(PlacementReservationRejectedCommand, 16U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(PlacementReservationReleasedCommand, 8U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(SiteGroundCoverPlacedCommand, 24U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(SiteTilePlantingCompletedCommand, 24U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(SiteTileWateredCommand, 20U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(SiteTileBurialClearedCommand, 20U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(SiteDevicePlacedCommand, 20U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(WorkerMeterDeltaRequestedCommand, 36U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(WorkerMetersChangedCommand, 32U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(TileEcologyChangedCommand, 28U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(RestorationProgressChangedCommand, 12U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(TaskAcceptRequestedCommand, 4U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(TaskRewardClaimRequestedCommand, 8U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(PhoneListingPurchaseRequestedCommand, 8U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(PhoneListingSaleRequestedCommand, 8U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(InventoryDeliveryRequestedCommand, 8U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(InventoryItemUseRequestedCommand, 8U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(InventoryItemConsumeRequestedCommand, 8U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(InventoryGlobalItemConsumeRequestedCommand, 8U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(InventoryTransferRequestedCommand, 20U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(InventoryCraftCommitRequestedCommand, 16U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(ContractorHireRequestedCommand, 8U);
-GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT(SiteUnlockablePurchaseRequestedCommand, 4U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(OpenMainMenuMessage, 1U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(StartNewCampaignMessage, 16U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SelectDeploymentSiteMessage, 4U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(ClearDeploymentSiteSelectionMessage, 1U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(DeploymentSiteSelectionChangedMessage, 4U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(StartSiteAttemptMessage, 4U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(ReturnToRegionalMapMessage, 1U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteAttemptEndedMessage, 8U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PresentLogMessage, 63U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteRunStartedMessage, 24U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(StartSiteActionMessage, 24U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(CancelSiteActionMessage, 8U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteActionStartedMessage, 24U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteActionCompletedMessage, 24U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteActionFailedMessage, 24U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PlacementReservationRequestedMessage, 20U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PlacementReservationAcceptedMessage, 16U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PlacementReservationRejectedMessage, 16U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PlacementReservationReleasedMessage, 8U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteGroundCoverPlacedMessage, 24U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteTilePlantingCompletedMessage, 24U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteTileWateredMessage, 20U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteTileBurialClearedMessage, 20U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteDevicePlacedMessage, 20U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(WorkerMeterDeltaRequestedMessage, 36U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(WorkerMetersChangedMessage, 32U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TileEcologyChangedMessage, 28U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(RestorationProgressChangedMessage, 12U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TaskAcceptRequestedMessage, 4U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TaskRewardClaimRequestedMessage, 8U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingPurchaseRequestedMessage, 8U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingSaleRequestedMessage, 8U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryDeliveryRequestedMessage, 8U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryItemUseRequestedMessage, 8U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryItemConsumeRequestedMessage, 8U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryGlobalItemConsumeRequestedMessage, 8U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryTransferRequestedMessage, 20U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryCraftCommitRequestedMessage, 16U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(ContractorHireRequestedMessage, 8U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteUnlockablePurchaseRequestedMessage, 4U);
 
-struct alignas(k_command_cache_line_size) GameCommand final
+struct alignas(k_message_cache_line_size) GameMessage final
 {
-    unsigned char payload[k_command_payload_byte_count];
-    GameCommandType type;
+    unsigned char payload[k_message_payload_byte_count];
+    GameMessageType type;
 
     template <typename PayloadData>
     [[nodiscard]] PayloadData& emplace_payload() noexcept
@@ -529,20 +529,20 @@ private:
     template <typename PayloadData>
     static constexpr void validate_payload_type() noexcept
     {
-        GS1_ASSERT_TRIVIAL_COMMAND_TYPE(PayloadData);
-        static_assert(sizeof(PayloadData) <= k_command_payload_byte_count, "Game command payload data exceeds command payload storage.");
-        static_assert(alignof(PayloadData) <= alignof(GameCommand), "Game command payload data requires stronger alignment than GameCommand.");
+        GS1_ASSERT_TRIVIAL_MESSAGE_TYPE(PayloadData);
+        static_assert(sizeof(PayloadData) <= k_message_payload_byte_count, "Game message payload data exceeds message payload storage.");
+        static_assert(alignof(PayloadData) <= alignof(GameMessage), "Game message payload data requires stronger alignment than GameMessage.");
     }
 };
 
-GS1_ASSERT_TRIVIAL_COMMAND_TYPE(GameCommand);
-static_assert(sizeof(GameCommand) == k_command_cache_line_size, "GameCommand must fit exactly one cache line.");
-static_assert(alignof(GameCommand) == k_command_cache_line_size, "GameCommand must be cache-line aligned.");
-static_assert(offsetof(GameCommand, payload) == 0U, "GameCommand payload must start at byte zero.");
-static_assert(offsetof(GameCommand, type) == k_command_payload_byte_count, "GameCommand type must sit at the tail byte.");
+GS1_ASSERT_TRIVIAL_MESSAGE_TYPE(GameMessage);
+static_assert(sizeof(GameMessage) == k_message_cache_line_size, "GameMessage must fit exactly one cache line.");
+static_assert(alignof(GameMessage) == k_message_cache_line_size, "GameMessage must be cache-line aligned.");
+static_assert(offsetof(GameMessage, payload) == 0U, "GameMessage payload must start at byte zero.");
+static_assert(offsetof(GameMessage, type) == k_message_payload_byte_count, "GameMessage type must sit at the tail byte.");
 
-using GameCommandQueue = std::deque<GameCommand>;
+using GameMessageQueue = std::deque<GameMessage>;
 
-#undef GS1_ASSERT_COMMAND_PAYLOAD_LAYOUT
-#undef GS1_ASSERT_TRIVIAL_COMMAND_TYPE
+#undef GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT
+#undef GS1_ASSERT_TRIVIAL_MESSAGE_TYPE
 }  // namespace gs1

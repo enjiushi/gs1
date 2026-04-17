@@ -1,7 +1,7 @@
 system = inventory
 name = use_item_hydration
 runner = inventory_regression
-description = Uses the seeded hydration item from the worker pack and checks the remaining quantity plus meter command emission.
+description = Uses the seeded hydration item from the worker pack and checks the remaining quantity plus meter message emission.
 ---
 scenario = use_item
 site_id = 1
@@ -10,4 +10,4 @@ item_id = 1
 quantity = 1
 expect_status_ok = true
 expect_remaining_quantity = 1
-expect_meter_command = true
+expect_meter_message = true

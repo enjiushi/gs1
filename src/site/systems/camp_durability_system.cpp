@@ -109,16 +109,16 @@ void apply_projection_if_needed(
 }
 }  // namespace
 
-bool CampDurabilitySystem::subscribes_to(GameCommandType type) noexcept
+bool CampDurabilitySystem::subscribes_to(GameMessageType type) noexcept
 {
-    return type == GameCommandType::SiteRunStarted;
+    return type == GameMessageType::SiteRunStarted;
 }
 
-Gs1Status CampDurabilitySystem::process_command(
+Gs1Status CampDurabilitySystem::process_message(
     SiteSystemContext<CampDurabilitySystem>& context,
-    const GameCommand& command)
+    const GameMessage& message)
 {
-    if (command.type != GameCommandType::SiteRunStarted)
+    if (message.type != GameMessageType::SiteRunStarted)
     {
         return GS1_STATUS_OK;
     }

@@ -8,29 +8,29 @@
 
 namespace gs1
 {
-bool CraftSystem::subscribes_to(GameCommandType type) noexcept
+bool CraftSystem::subscribes_to(GameMessageType type) noexcept
 {
     switch (type)
     {
-    case GameCommandType::SiteRunStarted:
-    case GameCommandType::SiteDevicePlaced:
+    case GameMessageType::SiteRunStarted:
+    case GameMessageType::SiteDevicePlaced:
         return true;
     default:
         return false;
     }
 }
 
-Gs1Status CraftSystem::process_command(
+Gs1Status CraftSystem::process_message(
     SiteSystemContext<CraftSystem>& context,
-    const GameCommand& command)
+    const GameMessage& message)
 {
-    switch (command.type)
+    switch (message.type)
     {
-    case GameCommandType::SiteRunStarted:
+    case GameMessageType::SiteRunStarted:
         context.world.own_craft() = CraftState {};
         return GS1_STATUS_OK;
 
-    case GameCommandType::SiteDevicePlaced:
+    case GameMessageType::SiteDevicePlaced:
         context.world.own_craft().device_caches.clear();
         return GS1_STATUS_OK;
 

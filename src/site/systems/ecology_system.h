@@ -23,10 +23,10 @@ public:
                 SiteComponent::Counters)};
     }
 
-    [[nodiscard]] static bool subscribes_to(GameCommandType type) noexcept;
-    [[nodiscard]] static Gs1Status process_command(
+    [[nodiscard]] static bool subscribes_to(GameMessageType type) noexcept;
+    [[nodiscard]] static Gs1Status process_message(
         SiteSystemContext<EcologySystem>& context,
-        const GameCommand& command);
+        const GameMessage& message);
     static void run(SiteSystemContext<EcologySystem>& context);
 };
 }  // namespace gs1

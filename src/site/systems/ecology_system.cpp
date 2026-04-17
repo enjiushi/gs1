@@ -258,9 +258,9 @@ void emit_tile_ecology_changed(
     }
 
     const auto tile = context.world.read_tile(coord);
-    GameCommand command {};
-    command.type = GameCommandType::TileEcologyChanged;
-    command.set_payload(TileEcologyChangedCommand {
+    GameMessage message {};
+    message.type = GameMessageType::TileEcologyChanged;
+    message.set_payload(TileEcologyChangedMessage {
         coord.x,
         coord.y,
         changed_mask,
@@ -268,7 +268,7 @@ void emit_tile_ecology_changed(
         tile.ecology.ground_cover_type_id,
         tile.ecology.plant_density,
         tile.ecology.sand_burial});
-    context.command_queue.push_back(command);
+    context.message_queue.push_back(message);
 
     if (ecology_change_affects_visible_projection(changed_mask))
     {
@@ -279,7 +279,7 @@ void emit_tile_ecology_changed(
 std::uint32_t apply_ground_cover(
     SiteWorldAccess<EcologySystem>& world,
     TileCoord coord,
-    const SiteGroundCoverPlacedCommand& payload)
+    const SiteGroundCoverPlacedMessage& payload)
 {
     if (!world.tile_coord_in_bounds(coord))
     {
@@ -336,7 +336,7 @@ std::uint32_t apply_ground_cover(
 std::uint32_t apply_planting(
     SiteWorldAccess<EcologySystem>& world,
     TileCoord coord,
-    const SiteTilePlantingCompletedCommand& payload)
+    const SiteTilePlantingCompletedMessage& payload)
 {
     if (!world.tile_coord_in_bounds(coord))
     {
@@ -394,7 +394,7 @@ std::uint32_t apply_planting(
 std::uint32_t apply_watering(
     SiteWorldAccess<EcologySystem>& world,
     TileCoord coord,
-    const SiteTileWateredCommand& payload)
+    const SiteTileWateredMessage& payload)
 {
     if (!world.tile_coord_in_bounds(coord))
     {
@@ -430,7 +430,7 @@ std::uint32_t apply_watering(
 std::uint32_t apply_burial_cleared(
     SiteWorldAccess<EcologySystem>& world,
     TileCoord coord,
-    const SiteTileBurialClearedCommand& payload)
+    const SiteTileBurialClearedMessage& payload)
 {
     if (!world.tile_coord_in_bounds(coord))
     {
@@ -470,40 +470,40 @@ void update_restoration_progress(
         normalized_progress = std::clamp(normalized_progress, 0.0f, 1.0f);
     }
 
-    GameCommand progress_command {};
-    progress_command.type = GameCommandType::RestorationProgressChanged;
-    progress_command.set_payload(RestorationProgressChangedCommand {
+    GameMessage progress_message {};
+    progress_message.type = GameMessageType::RestorationProgressChanged;
+    progress_message.set_payload(RestorationProgressChangedMessage {
         new_count,
         counters.site_completion_tile_threshold,
         normalized_progress});
-    context.command_queue.push_back(progress_command);
+    context.message_queue.push_back(progress_message);
     context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_HUD);
 }
 }  // namespace
 
-bool EcologySystem::subscribes_to(GameCommandType type) noexcept
+bool EcologySystem::subscribes_to(GameMessageType type) noexcept
 {
     switch (type)
     {
-    case GameCommandType::SiteGroundCoverPlaced:
-    case GameCommandType::SiteTilePlantingCompleted:
-    case GameCommandType::SiteTileWatered:
-    case GameCommandType::SiteTileBurialCleared:
+    case GameMessageType::SiteGroundCoverPlaced:
+    case GameMessageType::SiteTilePlantingCompleted:
+    case GameMessageType::SiteTileWatered:
+    case GameMessageType::SiteTileBurialCleared:
         return true;
     default:
         return false;
     }
 }
 
-Gs1Status EcologySystem::process_command(
+Gs1Status EcologySystem::process_message(
     SiteSystemContext<EcologySystem>& context,
-    const GameCommand& command)
+    const GameMessage& message)
 {
-    switch (command.type)
+    switch (message.type)
     {
-    case GameCommandType::SiteGroundCoverPlaced:
+    case GameMessageType::SiteGroundCoverPlaced:
     {
-        const auto& payload = command.payload_as<SiteGroundCoverPlacedCommand>();
+        const auto& payload = message.payload_as<SiteGroundCoverPlacedMessage>();
         const TileCoord coord {payload.target_tile_x, payload.target_tile_y};
         emit_tile_ecology_changed(
             context,
@@ -512,9 +512,9 @@ Gs1Status EcologySystem::process_command(
         break;
     }
 
-    case GameCommandType::SiteTilePlantingCompleted:
+    case GameMessageType::SiteTilePlantingCompleted:
     {
-        const auto& payload = command.payload_as<SiteTilePlantingCompletedCommand>();
+        const auto& payload = message.payload_as<SiteTilePlantingCompletedMessage>();
         const TileCoord coord {payload.target_tile_x, payload.target_tile_y};
         emit_tile_ecology_changed(
             context,
@@ -523,9 +523,9 @@ Gs1Status EcologySystem::process_command(
         break;
     }
 
-    case GameCommandType::SiteTileWatered:
+    case GameMessageType::SiteTileWatered:
     {
-        const auto& payload = command.payload_as<SiteTileWateredCommand>();
+        const auto& payload = message.payload_as<SiteTileWateredMessage>();
         const TileCoord coord {payload.target_tile_x, payload.target_tile_y};
         emit_tile_ecology_changed(
             context,
@@ -534,9 +534,9 @@ Gs1Status EcologySystem::process_command(
         break;
     }
 
-    case GameCommandType::SiteTileBurialCleared:
+    case GameMessageType::SiteTileBurialCleared:
     {
-        const auto& payload = command.payload_as<SiteTileBurialClearedCommand>();
+        const auto& payload = message.payload_as<SiteTileBurialClearedMessage>();
         const TileCoord coord {payload.target_tile_x, payload.target_tile_y};
         emit_tile_ecology_changed(
             context,

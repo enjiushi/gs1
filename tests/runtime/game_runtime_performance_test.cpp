@@ -16,12 +16,12 @@
 namespace
 {
 using gs1::CampaignState;
-using gs1::GameCommand;
-using gs1::GameCommandType;
+using gs1::GameMessage;
+using gs1::GameMessageType;
 using gs1::GameRuntime;
 using gs1::SiteRunState;
-using gs1::StartNewCampaignCommand;
-using gs1::StartSiteAttemptCommand;
+using gs1::StartNewCampaignMessage;
+using gs1::StartSiteAttemptMessage;
 using gs1::TileCoord;
 
 constexpr double kFixedStepSeconds = 1.0 / 60.0;
@@ -122,39 +122,39 @@ struct ScenarioResult final
     Gs1RuntimeProfilingSnapshot profiling {};
 };
 
-GameCommand make_start_campaign_command()
+GameMessage make_start_campaign_message()
 {
-    GameCommand command {};
-    command.type = GameCommandType::StartNewCampaign;
-    command.set_payload(StartNewCampaignCommand {42ULL, 30U});
-    return command;
+    GameMessage message {};
+    message.type = GameMessageType::StartNewCampaign;
+    message.set_payload(StartNewCampaignMessage {42ULL, 30U});
+    return message;
 }
 
-GameCommand make_start_site_attempt_command(std::uint32_t site_id)
+GameMessage make_start_site_attempt_message(std::uint32_t site_id)
 {
-    GameCommand command {};
-    command.type = GameCommandType::StartSiteAttempt;
-    command.set_payload(StartSiteAttemptCommand {site_id});
-    return command;
+    GameMessage message {};
+    message.type = GameMessageType::StartSiteAttempt;
+    message.set_payload(StartSiteAttemptMessage {site_id});
+    return message;
 }
 
-void drain_engine_commands(GameRuntime& runtime)
+void drain_engine_messages(GameRuntime& runtime)
 {
-    Gs1EngineCommand command {};
-    while (runtime.pop_engine_command(command) == GS1_STATUS_OK)
+    Gs1EngineMessage message {};
+    while (runtime.pop_engine_message(message) == GS1_STATUS_OK)
     {
     }
 }
 
 void bootstrap_site_one(GameRuntime& runtime)
 {
-    require_ok(runtime.handle_command(make_start_campaign_command()), "starting prototype campaign");
+    require_ok(runtime.handle_message(make_start_campaign_message()), "starting prototype campaign");
     auto& campaign = gs1::GameRuntimeProjectionTestAccess::campaign(runtime);
     require(campaign.has_value(), "campaign state was not created");
     require(!campaign->sites.empty(), "prototype campaign has no sites");
 
     const auto site_id = campaign->sites.front().site_id.value;
-    require_ok(runtime.handle_command(make_start_site_attempt_command(site_id)), "starting first site attempt");
+    require_ok(runtime.handle_message(make_start_site_attempt_message(site_id)), "starting first site attempt");
     require(
         gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).has_value(),
         "active site run was not created");
@@ -173,7 +173,7 @@ void run_boot_phase(GameRuntime& runtime)
     Gs1Phase2Result phase2_result {};
     require_ok(runtime.run_phase1(phase1_request, phase1_result), "running boot phase1");
     require_ok(runtime.run_phase2(phase2_request, phase2_result), "running boot phase2");
-    drain_engine_commands(runtime);
+    drain_engine_messages(runtime);
 }
 
 void seed_dense_cover(SiteRunState& site_run)
@@ -233,7 +233,7 @@ ScenarioResult run_scenario(const ScenarioConfig& config)
     require(active_site_run.has_value(), "active site run missing after bootstrap");
     auto& site_run = active_site_run.value();
     seed_dense_cover(site_run);
-    drain_engine_commands(runtime);
+    drain_engine_messages(runtime);
 
     for (const auto system_id : config.disabled_systems)
     {
@@ -255,7 +255,7 @@ ScenarioResult run_scenario(const ScenarioConfig& config)
         Gs1Phase2Result phase2_result {};
         require_ok(runtime.run_phase1(phase1_request, phase1_result), "running warmup phase1");
         require_ok(runtime.run_phase2(phase2_request, phase2_result), "running warmup phase2");
-        drain_engine_commands(runtime);
+        drain_engine_messages(runtime);
     }
 
     runtime.reset_profiling();
@@ -281,7 +281,7 @@ ScenarioResult run_scenario(const ScenarioConfig& config)
         result.total_wall_ms += frame_wall_ms;
         result.max_wall_ms = std::max(result.max_wall_ms, frame_wall_ms);
         result.fixed_steps_executed += phase1_result.fixed_steps_executed;
-        drain_engine_commands(runtime);
+        drain_engine_messages(runtime);
     }
 
     result.avg_wall_ms =
@@ -332,21 +332,21 @@ void print_scenario_result(const ScenarioResult& result)
         sorted_systems.begin(),
         sorted_systems.end(),
         [](const Gs1RuntimeProfileSystemStats* lhs, const Gs1RuntimeProfileSystemStats* rhs) {
-            const double lhs_total = lhs->run_timing.total_elapsed_ms + lhs->command_timing.total_elapsed_ms;
-            const double rhs_total = rhs->run_timing.total_elapsed_ms + rhs->command_timing.total_elapsed_ms;
+            const double lhs_total = lhs->run_timing.total_elapsed_ms + lhs->message_timing.total_elapsed_ms;
+            const double rhs_total = rhs->run_timing.total_elapsed_ms + rhs->message_timing.total_elapsed_ms;
             return lhs_total > rhs_total;
         });
 
     std::cout << "  per_system_ms:\n";
     for (const auto* system : sorted_systems)
     {
-        const double total_ms = system->run_timing.total_elapsed_ms + system->command_timing.total_elapsed_ms;
+        const double total_ms = system->run_timing.total_elapsed_ms + system->message_timing.total_elapsed_ms;
         const double avg_run_ms = system->run_timing.sample_count > 0
             ? (system->run_timing.total_elapsed_ms / static_cast<double>(system->run_timing.sample_count))
             : 0.0;
-        const double avg_command_ms = system->command_timing.sample_count > 0
-            ? (system->command_timing.total_elapsed_ms /
-                static_cast<double>(system->command_timing.sample_count))
+        const double avg_message_ms = system->message_timing.sample_count > 0
+            ? (system->message_timing.total_elapsed_ms /
+                static_cast<double>(system->message_timing.sample_count))
             : 0.0;
 
         std::cout << "    " << system_name(system->system_id)
@@ -354,10 +354,10 @@ void print_scenario_result(const ScenarioResult& result)
                   << " total=" << total_ms
                   << " run_avg=" << avg_run_ms
                   << " run_max=" << system->run_timing.max_elapsed_ms
-                  << " command_avg=" << avg_command_ms
-                  << " command_max=" << system->command_timing.max_elapsed_ms
+                  << " message_avg=" << avg_message_ms
+                  << " message_max=" << system->message_timing.max_elapsed_ms
                   << " run_calls=" << system->run_timing.sample_count
-                  << " command_calls=" << system->command_timing.sample_count
+                  << " message_calls=" << system->message_timing.sample_count
                   << "\n";
     }
 }

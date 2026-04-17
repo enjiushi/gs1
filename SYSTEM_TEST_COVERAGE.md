@@ -6,8 +6,8 @@ cases under `tests/system/assets/`.
 
 Cross-system runtime regression scenarios also live under `tests/runtime/`.
 Those tests are not replacements for per-system coverage; they verify the
-runtime command/projection seams where several independently owned systems are
-expected to coordinate through queued `GameCommand` flow.
+runtime message/projection seams where several independently owned systems are
+expected to coordinate through queued `GameMessage` flow.
 
 It complements [SYSTEM_TEST_MANUAL.md](E:/gs1/SYSTEM_TEST_MANUAL.md):
 
@@ -32,7 +32,7 @@ The ECS-oriented helper pattern is:
 - Seed tile, device, or worker state through `SiteWorld` mutators or direct
   component mutation helpers.
 - Run the target system.
-- Assert on owned state, emitted `GameCommand` flow, and projection-dirty flags.
+- Assert on owned state, emitted `GameMessage` flow, and projection-dirty flags.
 
 ## Coverage Policy
 
@@ -54,14 +54,14 @@ Asset-authored regression coverage is especially useful when:
 - we want a compact matrix of valid and invalid cases
 - we want bug reproductions to stay cheap to add after future fixes
 
-Runtime command-chain coverage is especially useful when:
+Runtime message-chain coverage is especially useful when:
 
-- several systems must cooperate through subscribed command dispatch
-- the order of fixed-step updates, projection flushing, and queued-command
+- several systems must cooperate through subscribed message dispatch
+- the order of fixed-step updates, projection flushing, and queued-message
   dispatch matters
-- we want to verify the engine-facing command stream in addition to owned state
+- we want to verify the engine-facing message stream in addition to owned state
 
-## Runtime Command-Chain Coverage
+## Runtime Message-Chain Coverage
 
 The runtime regression layer currently verifies:
 
@@ -71,7 +71,7 @@ The runtime regression layer currently verifies:
 - `EcologySystem::run -> RestorationProgressChanged -> TaskBoardSystem ->
   SiteAttemptEnded -> CampaignFlowSystem` completes a site-one restoration
   chain, transitions the app to `SITE_RESULT`, reveals the adjacent site, and
-  emits site-result engine commands.
+  emits site-result engine messages.
 
 ## Campaign Systems
 
@@ -108,7 +108,7 @@ Implemented behavior coverage should verify:
 - The system subscribes only to `DeploymentSiteSelectionChanged`.
 - A non-zero selected site updates `selected_target_site_id`.
 - A zero selected site clears `selected_target_site_id`.
-- Unrelated commands are ignored.
+- Unrelated messages are ignored.
 
 ### `technology`
 
@@ -156,7 +156,7 @@ Implemented behavior coverage should verify:
 - The system emits `SiteAttemptEnded(COMPLETED)` once the fully-grown tile count
   meets the site threshold.
 - It does not emit when the run is not active, when the threshold is zero, when
-  progress is below threshold, or when a pending site transition command already
+  progress is below threshold, or when a pending site transition message already
   exists.
 
 ### `failure_recovery`
@@ -165,7 +165,7 @@ Implemented behavior coverage should verify:
 
 - The system emits `SiteAttemptEnded(FAILED)` when worker health reaches zero.
 - It does not emit when the run is inactive, when worker health is still above
-  zero, when no worker entity exists, or when a pending transition command is
+  zero, when no worker entity exists, or when a pending transition message is
   already queued.
 
 ### `action_execution`
@@ -181,14 +181,14 @@ Implemented behavior coverage should verify:
 - Plant actions request a placement reservation first instead of starting
   immediately.
 - `PlacementReservationAccepted` transitions a waiting plant action into active
-  execution and emits the expected start/cost commands.
+  execution and emits the expected start/cost messages.
 - `PlacementReservationRejected` fails the waiting action and clears action
   state.
 - Cancelling the current action emits `SiteActionFailed(Cancelled)`, releases any
   reservation, and clears action state.
 - Running the system advances action timers.
 - Completing an action emits `SiteActionCompleted` plus the correct follow-up
-  gameplay fact command:
+  gameplay fact message:
   `SiteGroundCoverPlaced`, `SiteTileWatered`, or `SiteTileBurialCleared`.
 
 ### `placement_validation`
@@ -282,7 +282,7 @@ Implemented behavior coverage should verify:
 
 Implemented behavior coverage should verify:
 
-- The system currently subscribes to no commands and `process_command()` is a
+- The system currently subscribes to no messages and `process_message()` is a
   no-op.
 - `run()` writes per-tile local heat, wind, and dust from site weather plus
   occupant-density/cover adjustments.
@@ -298,14 +298,14 @@ Implemented behavior coverage should verify:
 - Requested meter deltas are applied with clamping.
 - Passive `run()` drains hydration, nourishment, energy, and morale over time.
 - Zero hydration or nourishment starts health decay.
-- When nothing changes, no command is emitted.
+- When nothing changes, no message is emitted.
 - Projection dirty flags are raised when a worker update is emitted.
 
 ### `device_support`
 
 Implemented behavior coverage should verify:
 
-- The system currently subscribes to no commands and `process_command()` is a
+- The system currently subscribes to no messages and `process_message()` is a
   no-op.
 - Devices derive efficiency from integrity.
 - Higher tile heat increases water evaporation over time.
@@ -317,7 +317,7 @@ Implemented behavior coverage should verify:
 
 Implemented behavior coverage should verify:
 
-- The system currently subscribes to no commands and `process_command()` is a
+- The system currently subscribes to no messages and `process_message()` is a
   no-op.
 - Weather intensity and sand burial reduce device integrity over time.
 - Integrity clamps at zero and one.

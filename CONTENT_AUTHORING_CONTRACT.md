@@ -399,7 +399,7 @@ Rules:
 
 - `plantActionDurationMinutes` must be positive
 - item-based planting must resolve its action duration from the linked plant row, not from a hardcoded per-item switch
-- adapter progress bars should treat this authored value as total action duration and animate locally after the start command arrives
+- adapter progress bars should treat this authored value as total action duration and animate locally after the start message arrives
 
 ## 8. Authored Prototype Support Package Contract
 

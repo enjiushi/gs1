@@ -18,11 +18,11 @@ wait_app_state SITE_ACTIVE 60
 
 # Validate the site bootstrap projection path.
 assert_app_state SITE_ACTIVE
-assert_saw_command BEGIN_SITE_SNAPSHOT
-assert_saw_command SITE_TILE_UPSERT
-assert_saw_command SITE_WORKER_UPDATE
-assert_saw_command SITE_CAMP_UPDATE
-assert_saw_command SITE_WEATHER_UPDATE
-assert_saw_command HUD_STATE
+assert_saw_message BEGIN_SITE_SNAPSHOT
+assert_saw_message SITE_TILE_UPSERT
+assert_saw_message SITE_WORKER_UPDATE
+assert_saw_message SITE_CAMP_UPDATE
+assert_saw_message SITE_WEATHER_UPDATE
+assert_saw_message HUD_STATE
 assert_log_contains BEGIN_SITE_SNAPSHOT mode=SNAPSHOT
 assert_log_contains Started site attempt.

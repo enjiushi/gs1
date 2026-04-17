@@ -295,16 +295,16 @@ void process_full_refresh_chunk(
 
 namespace gs1
 {
-bool LocalWeatherResolveSystem::subscribes_to(GameCommandType type) noexcept
+bool LocalWeatherResolveSystem::subscribes_to(GameMessageType type) noexcept
 {
-    return type == GameCommandType::TileEcologyChanged;
+    return type == GameMessageType::TileEcologyChanged;
 }
 
-Gs1Status LocalWeatherResolveSystem::process_command(
+Gs1Status LocalWeatherResolveSystem::process_message(
     SiteSystemContext<LocalWeatherResolveSystem>& context,
-    const GameCommand& command)
+    const GameMessage& message)
 {
-    if (!context.world.has_world() || command.type != GameCommandType::TileEcologyChanged)
+    if (!context.world.has_world() || message.type != GameMessageType::TileEcologyChanged)
     {
         return GS1_STATUS_OK;
     }
@@ -312,7 +312,7 @@ Gs1Status LocalWeatherResolveSystem::process_command(
     auto& runtime = context.world.own_local_weather_runtime();
     ensure_local_weather_runtime_buffers(runtime, context.world.tile_count());
 
-    const auto& payload = command.payload_as<TileEcologyChangedCommand>();
+    const auto& payload = message.payload_as<TileEcologyChangedMessage>();
     if (!ecology_change_affects_local_weather(payload.changed_mask))
     {
         return GS1_STATUS_OK;

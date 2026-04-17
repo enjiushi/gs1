@@ -10,4 +10,4 @@ item_id = 999
 quantity = 1
 expect_status = invalid_argument
 expect_remaining_quantity = 2
-expect_meter_command = false
+expect_meter_message = false

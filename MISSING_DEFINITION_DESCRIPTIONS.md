@@ -16,7 +16,7 @@ Purpose: show which formal definitions are still missing after the authoring-con
 - `Deferred for now` means the topic is real, but intentionally outside the current prototype implementation scope.
 - `Expected output` means the concrete document or contract that the next pass should produce.
 - `GDD.md` should stay conceptual; exact field lists, structs, and schemas belong in the later system-design documents.
-- `GAME_STRUCTURE.md` already defines the global architecture pipeline, ECS-world authority, command/event communication, world-level engine commands, and engine-adapter boundary.
+- `GAME_STRUCTURE.md` already defines the global architecture pipeline, ECS-world authority, message/event communication, world-level engine messages, and engine-adapter boundary.
 - The earlier separate `Persistence Ownership By System` gap is no longer tracked here. `GAME_STRUCTURE.md` already fixes the generic ownership model, and the concrete game-module ownership can be assigned directly during normal system-design work.
 - Resolved prototype design questions should be removed from this document rather than kept as fake missing items.
 

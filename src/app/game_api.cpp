@@ -121,16 +121,16 @@ Gs1Status gs1_run_phase2(
     return runtime->runtime.run_phase2(*request, *out_result);
 }
 
-Gs1Status gs1_pop_engine_command(
+Gs1Status gs1_pop_engine_message(
     Gs1RuntimeHandle* runtime,
-    Gs1EngineCommand* out_command) GS1_NOEXCEPT
+    Gs1EngineMessage* out_message) GS1_NOEXCEPT
 {
-    if (runtime == nullptr || out_command == nullptr)
+    if (runtime == nullptr || out_message == nullptr)
     {
         return GS1_STATUS_INVALID_ARGUMENT;
     }
 
-    return runtime->runtime.pop_engine_command(*out_command);
+    return runtime->runtime.pop_engine_message(*out_message);
 }
 
 Gs1Status gs1_get_runtime_profiling_snapshot(

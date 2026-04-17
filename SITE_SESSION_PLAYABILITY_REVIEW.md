@@ -82,8 +82,8 @@ Implemented:
 - Regional map snapshot.
 - Site selection overlay.
 - Start site attempt.
-- Site result overlay commands exist for completion/failure.
-- Return to regional map command exists.
+- Site result overlay messages exist for completion/failure.
+- Return to regional map message exists.
 
 Important limitation:
 
@@ -139,7 +139,7 @@ Implemented:
 - Traversability check.
 - Dirty projection for worker movement.
 - Fixed-step calls to the full current site stack: flow, modifiers, weather/event, actions, local weather, worker condition, camp durability, device maintenance, device support, ecology, inventory, task board, economy/phone, failure recovery, and completion.
-- Completion/failure command checks.
+- Completion/failure message checks.
 
 Important limitation:
 
@@ -175,16 +175,16 @@ Still thin or incomplete:
 - `DeviceSupportSystem` and `CampDurabilitySystem`: mostly passive upkeep rather than strong strategic support loops.
 - `ContractorState`: still has no dedicated system header/implementation.
 
-Current command-dispatch status:
+Current message-dispatch status:
 
-- The internal command subscriber table now registers the site systems that own current command-handled behavior.
+- The internal message subscriber table now registers the site systems that own current message-handled behavior.
 - The translated feedback-event subscriber table still exists, but no gameplay system currently depends on translated feedback events for the prototype site loop.
 
 ### Engine Projection
 
 Implemented:
 
-- Regional map snapshot/upsert/link commands.
+- Regional map snapshot/upsert/link messages.
 - Site snapshot begin/end.
 - Site tile upsert.
 - Site worker update.
@@ -200,7 +200,7 @@ Implemented:
 
 Important limitation:
 
-- `GS1_ENGINE_COMMAND_SITE_ACTION_UPDATE` exists in the contract, but the runtime does not emit it yet.
+- `GS1_ENGINE_MESSAGE_SITE_ACTION_UPDATE` exists in the contract, but the runtime does not emit it yet.
 - The smoke host records inventory/task/phone projections, but the current visual smoke viewer still does not present them as interactive in-site surfaces.
 - Detailed local-weather, soil, device, and modifier meters are still not projected to a dedicated UI surface.
 
@@ -220,26 +220,26 @@ Missing:
 
 ## Site System Contract Pass
 
-Purpose: freeze the shared message meanings before splitting work across multiple systems. The goal is not to implement every command immediately. The goal is to avoid each system inventing a private coupling path while parallel work is underway.
+Purpose: freeze the shared message meanings before splitting work across multiple systems. The goal is not to implement every message immediately. The goal is to avoid each system inventing a private coupling path while parallel work is underway.
 
 ### Contract Rules
 
-- Internal gameplay coordination should use `GameCommand`; do not add an internal gameplay-event queue.
+- Internal gameplay coordination should use `GameMessage`; do not add an internal gameplay-event queue.
 - Host events are adapter/player ingress only.
 - Translated feedback events are engine execution observations only.
-- Engine commands are presentation output only.
-- Command payloads should stay POD-like, trivial, fixed-size, and inside the current 63-byte `GameCommand` payload budget.
-- Command names should describe gameplay meaning, not a private RPC to one named consumer.
-- Zero, one, or many systems may subscribe to the same command.
-- Each listener may mutate only its owned state and should emit follow-up commands for other ownership domains.
-- Site bootstrap should publish a `SiteRunStarted` command after `CampaignFlowSystem` has created `active_site_run_`, so site systems can seed their own state without subscribing to the pre-creation `StartSiteAttempt` intent.
+- Engine messages are presentation output only.
+- Message payloads should stay POD-like, trivial, fixed-size, and inside the current 63-byte `GameMessage` payload budget.
+- Message names should describe gameplay meaning, not a private RPC to one named consumer.
+- Zero, one, or many systems may subscribe to the same message.
+- Each listener may mutate only its owned state and should emit follow-up messages for other ownership domains.
+- Site bootstrap should publish a `SiteRunStarted` message after `CampaignFlowSystem` has created `active_site_run_`, so site systems can seed their own state without subscribing to the pre-creation `StartSiteAttempt` intent.
 
 ### Ownership Baseline
 
-| System | Owns and may write | Should observe/read | Likely commands published |
+| System | Owns and may write | Should observe/read | Likely messages published |
 |---|---|---|---|
 | `SiteFlowSystem` | `SiteClockState`, worker tile position, worker facing | Tile traversability, movement input | `WorkerMoved` when the worker changes tile |
-| `ActionExecutionSystem` | `ActionState` | Worker meters, inventory availability, placement validity, tile state | `SiteActionStarted`, `SiteActionCompleted`, `SiteActionFailed`, action result fact commands, worker/inventory cost requests |
+| `ActionExecutionSystem` | `ActionState` | Worker meters, inventory availability, placement validity, tile state | `SiteActionStarted`, `SiteActionCompleted`, `SiteActionFailed`, action result fact messages, worker/inventory cost requests |
 | `PlacementValidationSystem` | Placement reservations if we keep persistent reservations | Terrain flags, occupancy, content rules | `PlacementReservationAccepted`, `PlacementReservationRejected`, `PlacementReservationReleased` |
 | `WorkerConditionSystem` | Worker health, hydration, nourishment, energy cap, energy, morale, work efficiency, shelter state | Local weather, camp shelter, action facts, modifier totals | `WorkerMetersChanged`, `WorkerShelterChanged`, `WorkerIncapacitated` |
 | `WeatherEventSystem` | `WeatherState`, `EventState` | Site clock, forecast content, modifier totals | `WeatherEventScheduled`, `WeatherEventPhaseChanged`, `WeatherPressureChanged` |
@@ -261,7 +261,7 @@ Existing host events:
 
 | Host event | Current meaning | Current destination |
 |---|---|---|
-| `GS1_HOST_EVENT_UI_ACTION` | Discrete host-rendered UI selection | Translated to current app/campaign `GameCommand`s |
+| `GS1_HOST_EVENT_UI_ACTION` | Discrete host-rendered UI selection | Translated to current app/campaign `GameMessage`s |
 | `GS1_HOST_EVENT_SITE_MOVE_DIRECTION` | Continuous world-space movement vector for this phase | Runtime transient input consumed by `SiteFlowSystem` |
 
 Implemented public host/API additions:
@@ -274,7 +274,7 @@ Implemented public host/API additions:
 | `GS1_UI_ACTION_CLAIM_TASK_REWARD` | Task instance id plus selected reward candidate id | `TaskRewardClaimRequested` | Can use existing `Gs1UiAction.target_id/arg0`. |
 | `GS1_UI_ACTION_BUY_PHONE_LISTING` | Listing id and quantity | `PhoneListingPurchaseRequested` | Can use existing `Gs1UiAction.target_id/arg0`. |
 | `GS1_UI_ACTION_SELL_PHONE_LISTING` | Listing id or item id and quantity | `PhoneListingSaleRequested` | Can use existing `Gs1UiAction.target_id/arg0`. |
-| `GS1_UI_ACTION_USE_INVENTORY_ITEM` | Container, slot, quantity | `InventoryItemUseRequested` | Inventory owns item removal and emits worker/effect commands. |
+| `GS1_UI_ACTION_USE_INVENTORY_ITEM` | Container, slot, quantity | `InventoryItemUseRequested` | Inventory owns item removal and emits worker/effect messages. |
 | `GS1_UI_ACTION_TRANSFER_INVENTORY_ITEM` | Source container/slot, destination container/slot, quantity | `InventoryTransferRequested` | Needed once worker pack and device storage are visible. |
 | `GS1_UI_ACTION_HIRE_CONTRACTOR` | Listing id or contractor offer id | `ContractorHireRequested` | Economy owns payment, contractor state owns work capacity. |
 | `GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE` | Unlockable id | `SiteUnlockablePurchaseRequested` | Economy owns money and available unlockables. |
@@ -289,11 +289,11 @@ Existing feedback event types:
 | `GS1_FEEDBACK_EVENT_TRACE_HIT` | Adapter-translated trace observation | Avoid for normal tile actions if the host can resolve tile coordinates before submitting `GS1_HOST_EVENT_SITE_ACTION_REQUEST`. |
 | `GS1_FEEDBACK_EVENT_ANIMATION_NOTIFY` | Adapter-translated animation observation | Use only for future execution sync or presentation-sensitive timing, not for authoritative action completion. |
 
-No new translated feedback event is required for the first playable site loop. Action timers, resource checks, tile mutation, task progress, and completion should all be authoritative gameplay commands/state, not engine callbacks.
+No new translated feedback event is required for the first playable site loop. Action timers, resource checks, tile mutation, task progress, and completion should all be authoritative gameplay messages/state, not engine callbacks.
 
-### Existing Internal Commands To Preserve
+### Existing Internal Messages To Preserve
 
-| Command | Current publisher | Current subscriber |
+| Message | Current publisher | Current subscriber |
 |---|---|---|
 | `OpenMainMenu` | Runtime boot | `CampaignFlowSystem` |
 | `StartNewCampaign` | UI action | `CampaignFlowSystem` |
@@ -305,11 +305,11 @@ No new translated feedback event is required for the first playable site loop. A
 | `SiteAttemptEnded` | `FailureRecoverySystem`, `SiteCompletionSystem` | `CampaignFlowSystem` |
 | `PresentLog` | Any system needing a simple log line | Runtime presentation sync |
 
-### Current Internal Commands By Gameplay Meaning
+### Current Internal Messages By Gameplay Meaning
 
 Lifecycle and site result:
 
-| Command | Payload meaning | Producer | Likely subscribers |
+| Message | Payload meaning | Producer | Likely subscribers |
 |---|---|---|---|
 | `SiteRunStarted` | Site id, site run id, archetype id, attempt index, attempt seed | `CampaignFlowSystem` after creating `active_site_run_` | Weather, ecology, task board, inventory, economy, modifiers, camp, devices |
 | `SiteRunEnding` | Site id, result, reason code | Failure/completion or future abort flow | Systems that need to release reservations or stop timers |
@@ -317,7 +317,7 @@ Lifecycle and site result:
 
 Player action lifecycle:
 
-| Command | Payload meaning | Producer | Likely subscribers |
+| Message | Payload meaning | Producer | Likely subscribers |
 |---|---|---|---|
 | `StartSiteAction` | Action kind, target tile, primary subject id, secondary subject id, optional item id, quantity, flags | Host event translation | `ActionExecutionSystem`, optional placement validation |
 | `CancelSiteAction` | Action id or current-action sentinel | Host event translation | `ActionExecutionSystem`, inventory reservation release |
@@ -327,7 +327,7 @@ Player action lifecycle:
 
 Action result facts:
 
-| Command | Payload meaning | Producer | Likely subscribers |
+| Message | Payload meaning | Producer | Likely subscribers |
 |---|---|---|---|
 | `SiteGroundCoverPlaced` | Action id, tile, ground-cover type id, initial density | `ActionExecutionSystem` | `EcologySystem`, `TaskBoardSystem`, projection dirtying |
 | `SiteTilePlantingCompleted` | Action id, tile, plant id, initial density | `ActionExecutionSystem` | `EcologySystem`, `TaskBoardSystem`, projection dirtying |
@@ -338,7 +338,7 @@ Action result facts:
 
 Placement:
 
-| Command | Payload meaning | Producer | Likely subscribers |
+| Message | Payload meaning | Producer | Likely subscribers |
 |---|---|---|---|
 | `PlacementReservationRequested` | Action id, tile, occupancy layer, subject id | `ActionExecutionSystem` | `PlacementValidationSystem` |
 | `PlacementReservationAccepted` | Action id, tile, reservation token | `PlacementValidationSystem` | `ActionExecutionSystem` |
@@ -347,7 +347,7 @@ Placement:
 
 Worker condition:
 
-| Command | Payload meaning | Producer | Likely subscribers |
+| Message | Payload meaning | Producer | Likely subscribers |
 |---|---|---|---|
 | `WorkerMeterDeltaRequested` | Source kind/id plus health, hydration, nourishment, energy, morale deltas | Actions, inventory use, hazards, modifiers | `WorkerConditionSystem` |
 | `WorkerMetersChanged` | Current meters plus changed-mask | `WorkerConditionSystem` | Failure recovery, task board, HUD/projection |
@@ -357,7 +357,7 @@ Worker condition:
 
 Weather, local weather, and harsh events:
 
-| Command | Payload meaning | Producer | Likely subscribers |
+| Message | Payload meaning | Producer | Likely subscribers |
 |---|---|---|---|
 | `WeatherEventScheduled` | Event template id and scheduled start minute | `WeatherEventSystem` | Forecast/notification projection, task board |
 | `WeatherEventPhaseChanged` | Event template id, phase, phase minutes remaining, pressure channels | `WeatherEventSystem` | Worker condition, ecology, camp, devices, task board, projection |
@@ -367,7 +367,7 @@ Weather, local weather, and harsh events:
 
 Ecology and restoration:
 
-| Command | Payload meaning | Producer | Likely subscribers |
+| Message | Payload meaning | Producer | Likely subscribers |
 |---|---|---|---|
 | `TileEcologyChanged` | Tile, changed-mask, plant id, ground-cover id, density, burial | `EcologySystem` | Task board, projection dirtying |
 | `TileRestorationMilestoneReached` | Tile, milestone kind, plant id, density | `EcologySystem` | Task board, notifications |
@@ -376,7 +376,7 @@ Ecology and restoration:
 
 Inventory:
 
-| Command | Payload meaning | Producer | Likely subscribers |
+| Message | Payload meaning | Producer | Likely subscribers |
 |---|---|---|---|
 | `InventoryItemGrantRequested` | Item id, quantity, target container, reason code | Task rewards, phone purchases, ecology output, support packages | `InventorySystem` |
 | `InventoryItemRemoveRequested` | Item id, quantity, container mask, reason code | Selling, action costs, spoilage/hazard flow | `InventorySystem` |
@@ -393,7 +393,7 @@ Inventory:
 
 Economy, phone, unlockables, and contractors:
 
-| Command | Payload meaning | Producer | Likely subscribers |
+| Message | Payload meaning | Producer | Likely subscribers |
 |---|---|---|---|
 | `MoneyDeltaRequested` | Amount delta and reason code | Task rewards, penalties, debug/test hooks | `EconomyPhoneSystem` |
 | `MoneyChanged` | Current money and delta | `EconomyPhoneSystem` | HUD/projection, task board |
@@ -412,7 +412,7 @@ Economy, phone, unlockables, and contractors:
 
 Task board and rewards:
 
-| Command | Payload meaning | Producer | Likely subscribers |
+| Message | Payload meaning | Producer | Likely subscribers |
 |---|---|---|---|
 | `TaskAcceptRequested` | Task instance id | UI action | `TaskBoardSystem` |
 | `TaskAccepted` | Task instance id and template id | `TaskBoardSystem` | Projection, notifications |
@@ -426,7 +426,7 @@ Task board and rewards:
 
 Devices, camp, and modifiers:
 
-| Command | Payload meaning | Producer | Likely subscribers |
+| Message | Payload meaning | Producer | Likely subscribers |
 |---|---|---|---|
 | `DeviceSupportOutputChanged` | Tile/source id and support channel summary | Device support | Local weather, ecology, projection |
 | `DeviceIrrigationApplied` | Source structure id/tile, target tile, water amount | Device support | Ecology, task board |
@@ -465,24 +465,24 @@ Defer inventory reservations, phone economy, contractors, and task reward drafts
 
 ### Engine Projection Contract
 
-Existing engine command types already cover most first playable projections:
+Existing engine message types already cover most first playable projections:
 
-- `GS1_ENGINE_COMMAND_SITE_TILE_UPSERT`
-- `GS1_ENGINE_COMMAND_SITE_WORKER_UPDATE`
-- `GS1_ENGINE_COMMAND_SITE_CAMP_UPDATE`
-- `GS1_ENGINE_COMMAND_SITE_WEATHER_UPDATE`
-- `GS1_ENGINE_COMMAND_SITE_INVENTORY_SLOT_UPSERT`
-- `GS1_ENGINE_COMMAND_SITE_TASK_UPSERT`
-- `GS1_ENGINE_COMMAND_SITE_TASK_REMOVE`
-- `GS1_ENGINE_COMMAND_SITE_PHONE_LISTING_UPSERT`
-- `GS1_ENGINE_COMMAND_SITE_PHONE_LISTING_REMOVE`
-- `GS1_ENGINE_COMMAND_HUD_STATE`
-- `GS1_ENGINE_COMMAND_NOTIFICATION_PUSH`
-- `GS1_ENGINE_COMMAND_PLAY_ONE_SHOT_CUE`
+- `GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT`
+- `GS1_ENGINE_MESSAGE_SITE_WORKER_UPDATE`
+- `GS1_ENGINE_MESSAGE_SITE_CAMP_UPDATE`
+- `GS1_ENGINE_MESSAGE_SITE_WEATHER_UPDATE`
+- `GS1_ENGINE_MESSAGE_SITE_INVENTORY_SLOT_UPSERT`
+- `GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT`
+- `GS1_ENGINE_MESSAGE_SITE_TASK_REMOVE`
+- `GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_UPSERT`
+- `GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_REMOVE`
+- `GS1_ENGINE_MESSAGE_HUD_STATE`
+- `GS1_ENGINE_MESSAGE_NOTIFICATION_PUSH`
+- `GS1_ENGINE_MESSAGE_PLAY_ONE_SHOT_CUE`
 
 Projection gaps still open:
 
-- Add a `GS1_ENGINE_COMMAND_SITE_ACTION_UPDATE` or extend an existing projection if action progress needs visible progress, because worker/HUD payloads currently carry `current_action_kind` but not action id, target tile, or progress.
+- Add a `GS1_ENGINE_MESSAGE_SITE_ACTION_UPDATE` or extend an existing projection if action progress needs visible progress, because worker/HUD payloads currently carry `current_action_kind` but not action id, target tile, or progress.
 - Keep V0 tile projection using existing `plant_type_id`, `ground_cover_type_id`, `plant_density`, and `sand_burial`.
 - Defer projecting detailed moisture, fertility, salinity, heat, wind, dust, growth pressure, and device meters until the UI has a concrete surface for those values.
 
@@ -555,7 +555,7 @@ Goal: turn the current passive device/camp slices into meaningful strategy.
 
 Next work:
 
-- Let device support materially affect ecology or worker pressure through explicit commands/state observation.
+- Let device support materially affect ecology or worker pressure through explicit messages/state observation.
 - Make camp shelter/protection meaningfully change local survival pressure.
 - Add stronger recovery and stabilization loops around damaged support infrastructure.
 
@@ -607,11 +607,11 @@ Current status against those criteria:
 - Do not build the full task board before there are real action/ecology events for tasks to track.
 - Do not expand regional/campaign complexity before Site 1 has a satisfying action-pressure-progress loop.
 - Keep prototype content static until the shape is fun; a loader/generator can come later.
-- Keep new command payloads POD-like and small, matching the existing command style.
+- Keep new message payloads POD-like and small, matching the existing message style.
 - Every gameplay state mutation should mark the right projection dirty, or the visual smoke UI will hide working gameplay.
 
 ## Decision Recommendation
 
 Make Site 1 playable before broadening anything else.
 
-The current foundation is good: app state, map flow, site entry, movement, projection, and live smoke UI are in place. The next valuable work is the first complete gameplay loop inside `SITE_ACTIVE`: action command, tile mutation, meter cost, growth/progress, and completion.
+The current foundation is good: app state, map flow, site entry, movement, projection, and live smoke UI are in place. The next valuable work is the first complete gameplay loop inside `SITE_ACTIVE`: action message, tile mutation, meter cost, growth/progress, and completion.

@@ -4,7 +4,7 @@
 #include "app/site_run_factory.h"
 #include "campaign/campaign_state.h"
 #include "campaign/systems/campaign_system_context.h"
-#include "commands/game_command.h"
+#include "messages/game_message.h"
 #include "content/defs/structure_defs.h"
 #include "site/inventory_storage.h"
 #include "site/site_run_state.h"
@@ -157,14 +157,14 @@ template <typename SystemTag>
 inline SiteSystemContext<SystemTag> make_site_context(
     CampaignState& campaign,
     SiteRunState& site_run,
-    GameCommandQueue& command_queue,
+    GameMessageQueue& message_queue,
     double fixed_step_seconds = k_default_fixed_step_seconds,
     SiteMoveDirectionInput move_direction = {})
 {
     return make_site_system_context<SystemTag>(
         campaign,
         site_run,
-        command_queue,
+        message_queue,
         fixed_step_seconds,
         move_direction);
 }
@@ -256,14 +256,14 @@ inline bool with_worker_component_mut(SiteRunState& site_run, Func&& func)
     return true;
 }
 
-inline std::size_t count_commands(
-    const GameCommandQueue& command_queue,
-    GameCommandType type) noexcept
+inline std::size_t count_messages(
+    const GameMessageQueue& message_queue,
+    GameMessageType type) noexcept
 {
     std::size_t count = 0U;
-    for (const auto& command : command_queue)
+    for (const auto& message : message_queue)
     {
-        if (command.type == type)
+        if (message.type == type)
         {
             count += 1U;
         }
@@ -272,15 +272,15 @@ inline std::size_t count_commands(
     return count;
 }
 
-inline const GameCommand* first_command(
-    const GameCommandQueue& command_queue,
-    GameCommandType type) noexcept
+inline const GameMessage* first_message(
+    const GameMessageQueue& message_queue,
+    GameMessageType type) noexcept
 {
-    for (const auto& command : command_queue)
+    for (const auto& message : message_queue)
     {
-        if (command.type == type)
+        if (message.type == type)
         {
-            return &command;
+            return &message;
         }
     }
 
@@ -288,11 +288,11 @@ inline const GameCommand* first_command(
 }
 
 template <typename Payload>
-inline const Payload* first_command_payload(
-    const GameCommandQueue& command_queue,
-    GameCommandType type) noexcept
+inline const Payload* first_message_payload(
+    const GameMessageQueue& message_queue,
+    GameMessageType type) noexcept
 {
-    const auto* command = first_command(command_queue, type);
-    return command == nullptr ? nullptr : &command->payload_as<Payload>();
+    const auto* message = first_message(message_queue, type);
+    return message == nullptr ? nullptr : &message->payload_as<Payload>();
 }
 }  // namespace gs1::testing::fixtures

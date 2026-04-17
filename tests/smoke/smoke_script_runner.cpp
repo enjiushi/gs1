@@ -126,71 +126,71 @@ std::optional<Gs1AppState> parse_app_state(const std::string& value)
     return std::nullopt;
 }
 
-std::optional<Gs1EngineCommandType> parse_engine_command_type(const std::string& value)
+std::optional<Gs1EngineMessageType> parse_engine_message_type(const std::string& value)
 {
     if (value == "SET_APP_STATE")
     {
-        return GS1_ENGINE_COMMAND_SET_APP_STATE;
+        return GS1_ENGINE_MESSAGE_SET_APP_STATE;
     }
     if (value == "BEGIN_REGIONAL_MAP_SNAPSHOT")
     {
-        return GS1_ENGINE_COMMAND_BEGIN_REGIONAL_MAP_SNAPSHOT;
+        return GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_MAP_SNAPSHOT;
     }
     if (value == "BEGIN_UI_SETUP")
     {
-        return GS1_ENGINE_COMMAND_BEGIN_UI_SETUP;
+        return GS1_ENGINE_MESSAGE_BEGIN_UI_SETUP;
     }
     if (value == "CLOSE_UI_SETUP")
     {
-        return GS1_ENGINE_COMMAND_CLOSE_UI_SETUP;
+        return GS1_ENGINE_MESSAGE_CLOSE_UI_SETUP;
     }
     if (value == "UI_ELEMENT_UPSERT")
     {
-        return GS1_ENGINE_COMMAND_UI_ELEMENT_UPSERT;
+        return GS1_ENGINE_MESSAGE_UI_ELEMENT_UPSERT;
     }
     if (value == "REGIONAL_MAP_SITE_UPSERT")
     {
-        return GS1_ENGINE_COMMAND_REGIONAL_MAP_SITE_UPSERT;
+        return GS1_ENGINE_MESSAGE_REGIONAL_MAP_SITE_UPSERT;
     }
     if (value == "REGIONAL_MAP_LINK_UPSERT")
     {
-        return GS1_ENGINE_COMMAND_REGIONAL_MAP_LINK_UPSERT;
+        return GS1_ENGINE_MESSAGE_REGIONAL_MAP_LINK_UPSERT;
     }
     if (value == "BEGIN_SITE_SNAPSHOT")
     {
-        return GS1_ENGINE_COMMAND_BEGIN_SITE_SNAPSHOT;
+        return GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT;
     }
     if (value == "SITE_TILE_UPSERT")
     {
-        return GS1_ENGINE_COMMAND_SITE_TILE_UPSERT;
+        return GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT;
     }
     if (value == "SITE_WORKER_UPDATE")
     {
-        return GS1_ENGINE_COMMAND_SITE_WORKER_UPDATE;
+        return GS1_ENGINE_MESSAGE_SITE_WORKER_UPDATE;
     }
     if (value == "SITE_CAMP_UPDATE")
     {
-        return GS1_ENGINE_COMMAND_SITE_CAMP_UPDATE;
+        return GS1_ENGINE_MESSAGE_SITE_CAMP_UPDATE;
     }
     if (value == "SITE_WEATHER_UPDATE")
     {
-        return GS1_ENGINE_COMMAND_SITE_WEATHER_UPDATE;
+        return GS1_ENGINE_MESSAGE_SITE_WEATHER_UPDATE;
     }
     if (value == "SITE_ACTION_UPDATE")
     {
-        return GS1_ENGINE_COMMAND_SITE_ACTION_UPDATE;
+        return GS1_ENGINE_MESSAGE_SITE_ACTION_UPDATE;
     }
     if (value == "HUD_STATE")
     {
-        return GS1_ENGINE_COMMAND_HUD_STATE;
+        return GS1_ENGINE_MESSAGE_HUD_STATE;
     }
     if (value == "SITE_RESULT_READY")
     {
-        return GS1_ENGINE_COMMAND_SITE_RESULT_READY;
+        return GS1_ENGINE_MESSAGE_SITE_RESULT_READY;
     }
     if (value == "LOG_TEXT")
     {
-        return GS1_ENGINE_COMMAND_LOG_TEXT;
+        return GS1_ENGINE_MESSAGE_LOG_TEXT;
     }
 
     return std::nullopt;
@@ -256,10 +256,10 @@ bool SmokeScriptRunner::parse_line(
     std::istringstream stream {trimmed};
     std::string opcode;
     stream >> opcode;
-    return parse_command(script_path, line_number, trimmed, opcode, stream);
+    return parse_message(script_path, line_number, trimmed, opcode, stream);
 }
 
-bool SmokeScriptRunner::parse_command(
+bool SmokeScriptRunner::parse_message(
     const std::string& script_path,
     std::size_t line_number,
     const std::string& trimmed_line,
@@ -406,22 +406,22 @@ bool SmokeScriptRunner::parse_command(
         return true;
     }
 
-    if (opcode == "assert_saw_command")
+    if (opcode == "assert_saw_message")
     {
-        std::string command_name;
-        if (!(arguments >> command_name))
+        std::string message_name;
+        if (!(arguments >> message_name))
         {
-            return fail(script_path, line_number, "assert_saw_command requires <command_name>");
+            return fail(script_path, line_number, "assert_saw_message requires <message_name>");
         }
 
-        const auto command_type = parse_engine_command_type(command_name);
-        if (!command_type.has_value())
+        const auto message_type = parse_engine_message_type(message_name);
+        if (!message_type.has_value())
         {
-            return fail(script_path, line_number, "unknown engine command: " + command_name);
+            return fail(script_path, line_number, "unknown engine message: " + message_name);
         }
 
-        directive.opcode = SmokeScriptOpcode::AssertSawCommand;
-        directive.engine_command_type = command_type.value();
+        directive.opcode = SmokeScriptOpcode::AssertSawMessage;
+        directive.engine_message_type = message_type.value();
         queued_directives_.push_back(std::move(directive));
         return true;
     }

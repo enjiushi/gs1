@@ -17,18 +17,18 @@ constexpr float k_device_heat_evaporation_multiplier = 0.0075f;
 
 namespace gs1
 {
-bool DeviceSupportSystem::subscribes_to(GameCommandType type) noexcept
+bool DeviceSupportSystem::subscribes_to(GameMessageType type) noexcept
 {
     (void)type;
     return false;
 }
 
-Gs1Status DeviceSupportSystem::process_command(
+Gs1Status DeviceSupportSystem::process_message(
     SiteSystemContext<DeviceSupportSystem>& context,
-    const GameCommand& command)
+    const GameMessage& message)
 {
     (void)context;
-    (void)command;
+    (void)message;
     return GS1_STATUS_OK;
 }
 

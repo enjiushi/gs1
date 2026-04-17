@@ -11,14 +11,14 @@ Purpose: summarize what the current design documents already define well enough 
 Boundary rule:
 
 - `GDD.md` should stay at gameplay-contract, content-direction, and meter-relationship level.
-- `GAME_STRUCTURE.md` defines the global code framework, ECS world model, command/event pipeline, world-level engine commands, and engine-adapter boundary.
+- `GAME_STRUCTURE.md` defines the global code framework, ECS world model, message/event pipeline, world-level engine messages, and engine-adapter boundary.
 - Exact structs, field lists, save schemas, and module ownership belong in the later system-design documents.
 
 ## Overall Verdict
 
 - Prototype path: ready to move into system design.
 - Full-campaign path: not fully ready yet.
-- Current strength: the core site loop is already coherent across survival, hazards, planting, devices, tasks, faction reputation, and small tech growth; the global ECS/command architecture is explicitly defined; and the missing authoring-side content contract is now formalized.
+- Current strength: the core site loop is already coherent across survival, hazards, planting, devices, tasks, faction reputation, and small tech growth; the global ECS/message architecture is explicitly defined; and the missing authoring-side content contract is now formalized.
 - Current risk: save/load boundaries remain an intentional later TODO, so full long-session architecture should still avoid pretending persistence is already solved.
 
 ## What Is Already Stable Enough
@@ -26,8 +26,8 @@ Boundary rule:
 These areas are defined strongly enough to start module design and runtime-structure planning now:
 
 - Global world-first ECS architecture
-- Command/event-driven cross-system communication
-- World-level engine-command boundary and engine-adapter boundary
+- Message/event-driven cross-system communication
+- World-level engine-message boundary and engine-adapter boundary
 - Shared schema layering direction from global to feature to game-specific data
 - Core gameplay loop and site loop
 - Fixed-step simulation contract and high-level update order
@@ -60,7 +60,7 @@ These areas are the main missing formal sections if we want a safe full-game arc
 
 | Area | Status | Why |
 |---|---|---|
-| Global framework and engine boundary | `Ready` | `GAME_STRUCTURE.md` now defines the ECS-world-first architecture, command/event flow, world-level engine commands, engine-adapter responsibilities, the semantic host-event intake contract, and the bootstrap-plus-partial-update adapter projection rule for long-lived presentation surfaces. |
+| Global framework and engine boundary | `Ready` | `GAME_STRUCTURE.md` now defines the ECS-world-first architecture, message/event flow, world-level engine messages, engine-adapter responsibilities, the semantic host-event intake contract, and the bootstrap-plus-partial-update adapter projection rule for long-lived presentation surfaces. |
 | Site runtime simulation | `Ready` | Update order, meters, causal loop, and tile/runtime state categories are already defined. |
 | Terrain and ecology runtime | `Ready` | Terrain, plant, weather, device, and meter relationships are clear enough for module and struct design. |
 | Inventory and item runtime | `Ready` | Shared item model, item meters, storage flow, and hazard interaction are already explicit. |
@@ -85,7 +85,7 @@ The next stage can already define these artifacts:
 - plant, device, item, recipe, task, and tech definition schemas
 - modifier-bundle representation
 - simulation service boundaries inside the world layer
-- game-specific command/event contracts within the global command pipeline
+- game-specific message/event contracts within the global message pipeline
 
 The next stage should not wait for exact balance numbers. It should instead define the structural contract for how those numbers are stored and applied.
 
@@ -115,7 +115,7 @@ The names can change later. The important point is that these ownership lines ar
 
 When the next system-design pass assigns concrete game-state ownership, use this module split as the reference layout. One module may contain multiple closely related systems, but authority should still map back to one owning module rather than being duplicated across several systems.
 
-These gameplay modules should live inside the world-first ECS architecture defined in [GAME_STRUCTURE.md](GAME_STRUCTURE.md). Cross-module interaction should follow command/event flow and shared state access rules rather than direct system-to-system calls.
+These gameplay modules should live inside the world-first ECS architecture defined in [GAME_STRUCTURE.md](GAME_STRUCTURE.md). Cross-module interaction should follow message/event flow and shared state access rules rather than direct system-to-system calls.
 
 ## Recommended Core Data Definitions
 

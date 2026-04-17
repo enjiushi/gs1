@@ -4,7 +4,7 @@
 
 namespace gs1
 {
-enum class CommandId : std::uint32_t
+enum class MessageId : std::uint32_t
 {
     Invalid = 0,
     StartNewCampaign = 1,

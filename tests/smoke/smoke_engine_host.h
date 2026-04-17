@@ -69,7 +69,7 @@ public:
     [[nodiscard]] bool script_failed() const noexcept { return script_failed_; }
     bool set_inflight_script_directive(SmokeScriptDirective directive);
 
-    [[nodiscard]] const std::vector<std::string>& command_logs() const noexcept { return command_logs_; }
+    [[nodiscard]] const std::vector<std::string>& message_logs() const noexcept { return message_logs_; }
     [[nodiscard]] std::uint32_t phase1_fixed_steps_executed() const noexcept { return phase1_fixed_steps_executed_; }
     [[nodiscard]] std::uint32_t phase2_processed_host_event_count() const noexcept
     {
@@ -79,7 +79,7 @@ public:
     [[nodiscard]] std::optional<Gs1AppState> current_app_state() const noexcept { return current_app_state_; }
     [[nodiscard]] std::optional<std::uint32_t> selected_site_id() const noexcept { return selected_site_id_; }
 
-    [[nodiscard]] bool saw_command(Gs1EngineCommandType type) const noexcept;
+    [[nodiscard]] bool saw_message(Gs1EngineMessageType type) const noexcept;
 
 public:
     struct ActiveUiElement final
@@ -256,8 +256,8 @@ public:
         std::optional<Gs1AppState> current_app_state {};
         std::optional<std::uint32_t> selected_site_id {};
         bool script_failed {false};
-        std::vector<std::string> current_frame_command_entries {};
-        std::vector<std::string> command_log_tail {};
+        std::vector<std::string> current_frame_message_entries {};
+        std::vector<std::string> message_log_tail {};
         std::vector<ActiveUiSetup> active_ui_setups {};
         std::vector<RegionalMapSiteProjection> regional_map_sites {};
         std::vector<RegionalMapLinkProjection> regional_map_links {};
@@ -277,32 +277,32 @@ private:
     void resolve_inflight_script_directive();
     void clear_inflight_script_directive();
     void fail_inflight_script_directive(const std::string& message);
-    void flush_engine_commands(const char* stage_label);
+    void flush_engine_messages(const char* stage_label);
     [[nodiscard]] bool try_queue_ui_action_from_directive(std::vector<Gs1HostEvent>& destination);
     [[nodiscard]] bool resolve_available_ui_action(
         const Gs1UiAction& requested_action,
         Gs1UiAction& out_action) const;
-    void apply_ui_setup_begin(const Gs1EngineCommand& command);
-    void apply_ui_setup_close(const Gs1EngineCommand& command);
-    void apply_ui_element_upsert(const Gs1EngineCommand& command);
+    void apply_ui_setup_begin(const Gs1EngineMessage& message);
+    void apply_ui_setup_close(const Gs1EngineMessage& message);
+    void apply_ui_element_upsert(const Gs1EngineMessage& message);
     void apply_ui_setup_end();
-    void apply_regional_map_snapshot_begin(const Gs1EngineCommand& command);
-    void apply_regional_map_site_upsert(const Gs1EngineCommand& command);
-    void apply_regional_map_site_remove(const Gs1EngineCommand& command);
-    void apply_regional_map_link_upsert(const Gs1EngineCommand& command);
-    void apply_regional_map_link_remove(const Gs1EngineCommand& command);
-    void apply_site_snapshot_begin(const Gs1EngineCommand& command);
-    void apply_site_tile_upsert(const Gs1EngineCommand& command);
-    void apply_site_worker_update(const Gs1EngineCommand& command);
-    void apply_site_camp_update(const Gs1EngineCommand& command);
-    void apply_site_weather_update(const Gs1EngineCommand& command);
-    void apply_site_inventory_slot_upsert(const Gs1EngineCommand& command);
-    void apply_site_task_upsert(const Gs1EngineCommand& command);
-    void apply_site_phone_listing_upsert(const Gs1EngineCommand& command);
+    void apply_regional_map_snapshot_begin(const Gs1EngineMessage& message);
+    void apply_regional_map_site_upsert(const Gs1EngineMessage& message);
+    void apply_regional_map_site_remove(const Gs1EngineMessage& message);
+    void apply_regional_map_link_upsert(const Gs1EngineMessage& message);
+    void apply_regional_map_link_remove(const Gs1EngineMessage& message);
+    void apply_site_snapshot_begin(const Gs1EngineMessage& message);
+    void apply_site_tile_upsert(const Gs1EngineMessage& message);
+    void apply_site_worker_update(const Gs1EngineMessage& message);
+    void apply_site_camp_update(const Gs1EngineMessage& message);
+    void apply_site_weather_update(const Gs1EngineMessage& message);
+    void apply_site_inventory_slot_upsert(const Gs1EngineMessage& message);
+    void apply_site_task_upsert(const Gs1EngineMessage& message);
+    void apply_site_phone_listing_upsert(const Gs1EngineMessage& message);
     void apply_site_snapshot_end();
-    void apply_hud_state(const Gs1EngineCommand& command);
-    void apply_site_action_update(const Gs1EngineCommand& command);
-    void apply_site_result_ready(const Gs1EngineCommand& command);
+    void apply_hud_state(const Gs1EngineMessage& message);
+    void apply_site_action_update(const Gs1EngineMessage& message);
+    void apply_site_result_ready(const Gs1EngineMessage& message);
     void queue_live_state_patch(std::uint32_t field_mask);
     static void write_json_string(std::string& destination, std::string_view value);
     [[nodiscard]] std::vector<ActiveUiSetup> snapshot_active_ui_setups() const;
@@ -311,7 +311,7 @@ private:
     [[nodiscard]] static std::uint64_t make_regional_map_link_key(
         std::uint32_t from_site_id,
         std::uint32_t to_site_id) noexcept;
-    [[nodiscard]] static std::string describe_command(const Gs1EngineCommand& command);
+    [[nodiscard]] static std::string describe_message(const Gs1EngineMessage& message);
     static Gs1HostEvent make_ui_action_event(const Gs1UiAction& action) noexcept;
     static Gs1HostEvent make_site_move_direction_event(
         float world_move_x,
@@ -325,10 +325,10 @@ private:
     std::vector<Gs1HostEvent> pending_pre_phase1_host_events_ {};
     std::vector<Gs1HostEvent> pending_between_phase_host_events_ {};
     std::vector<Gs1FeedbackEvent> pending_feedback_events_ {};
-    std::vector<std::string> command_logs_ {};
-    std::vector<std::string> current_frame_command_entries_ {};
+    std::vector<std::string> message_logs_ {};
+    std::vector<std::string> current_frame_message_entries_ {};
     std::vector<std::string> pending_live_state_patches_ {};
-    std::vector<Gs1EngineCommandType> seen_commands_ {};
+    std::vector<Gs1EngineMessageType> seen_messages_ {};
     std::map<Gs1UiSetupId, ActiveUiSetup> active_ui_setups_ {};
     std::optional<PendingUiSetup> pending_ui_setup_ {};
     std::map<std::uint32_t, RegionalMapSiteProjection> regional_map_sites_ {};

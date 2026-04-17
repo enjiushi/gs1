@@ -24,12 +24,12 @@ std::vector<PlacementReservationRecord> g_reservations {};
 std::uint32_t g_next_reservation_token = 1U;
 
 template <typename Payload>
-void enqueue_command(GameCommandQueue& queue, GameCommandType type, const Payload& payload)
+void enqueue_message(GameMessageQueue& queue, GameMessageType type, const Payload& payload)
 {
-    GameCommand command {};
-    command.type = type;
-    command.set_payload(payload);
-    queue.push_back(command);
+    GameMessage message {};
+    message.type = type;
+    message.set_payload(payload);
+    queue.push_back(message);
 }
 
 void prune_reservations_for_run(SiteRunId site_run_id) noexcept
@@ -120,7 +120,7 @@ void handle_site_run_started(SiteSystemContext<PlacementValidationSystem>& conte
 
 void handle_reservation_requested(
     SiteSystemContext<PlacementValidationSystem>& context,
-    const PlacementReservationRequestedCommand& payload)
+    const PlacementReservationRequestedMessage& payload)
 {
     const TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
     const auto rejection_reason = validate_request(
@@ -131,10 +131,10 @@ void handle_reservation_requested(
         payload.action_id);
     if (rejection_reason != PlacementReservationRejectionReason::None)
     {
-        enqueue_command(
-            context.command_queue,
-            GameCommandType::PlacementReservationRejected,
-            PlacementReservationRejectedCommand {
+        enqueue_message(
+            context.message_queue,
+            GameMessageType::PlacementReservationRejected,
+            PlacementReservationRejectedMessage {
                 payload.action_id,
                 payload.target_tile_x,
                 payload.target_tile_y,
@@ -152,17 +152,17 @@ void handle_reservation_requested(
         payload.occupancy_layer,
         payload.subject_id});
 
-    enqueue_command(
-        context.command_queue,
-        GameCommandType::PlacementReservationAccepted,
-        PlacementReservationAcceptedCommand {
+    enqueue_message(
+        context.message_queue,
+        GameMessageType::PlacementReservationAccepted,
+        PlacementReservationAcceptedMessage {
             payload.action_id,
             payload.target_tile_x,
             payload.target_tile_y,
             reservation_token});
 }
 
-void handle_reservation_released(const PlacementReservationReleasedCommand& payload) noexcept
+void handle_reservation_released(const PlacementReservationReleasedMessage& payload) noexcept
 {
     g_reservations.erase(
         std::remove_if(
@@ -179,37 +179,37 @@ void handle_reservation_released(const PlacementReservationReleasedCommand& payl
 }
 }  // namespace
 
-bool PlacementValidationSystem::subscribes_to(GameCommandType type) noexcept
+bool PlacementValidationSystem::subscribes_to(GameMessageType type) noexcept
 {
     switch (type)
     {
-    case GameCommandType::SiteRunStarted:
-    case GameCommandType::PlacementReservationRequested:
-    case GameCommandType::PlacementReservationReleased:
+    case GameMessageType::SiteRunStarted:
+    case GameMessageType::PlacementReservationRequested:
+    case GameMessageType::PlacementReservationReleased:
         return true;
     default:
         return false;
     }
 }
 
-Gs1Status PlacementValidationSystem::process_command(
+Gs1Status PlacementValidationSystem::process_message(
     SiteSystemContext<PlacementValidationSystem>& context,
-    const GameCommand& command)
+    const GameMessage& message)
 {
-    switch (command.type)
+    switch (message.type)
     {
-    case GameCommandType::SiteRunStarted:
+    case GameMessageType::SiteRunStarted:
         handle_site_run_started(context);
         break;
 
-    case GameCommandType::PlacementReservationRequested:
+    case GameMessageType::PlacementReservationRequested:
         handle_reservation_requested(
             context,
-            command.payload_as<PlacementReservationRequestedCommand>());
+            message.payload_as<PlacementReservationRequestedMessage>());
         break;
 
-    case GameCommandType::PlacementReservationReleased:
-        handle_reservation_released(command.payload_as<PlacementReservationReleasedCommand>());
+    case GameMessageType::PlacementReservationReleased:
+        handle_reservation_released(message.payload_as<PlacementReservationReleasedMessage>());
         break;
 
     default:

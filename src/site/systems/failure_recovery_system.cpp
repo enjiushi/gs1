@@ -6,14 +6,14 @@ namespace gs1
 {
 namespace
 {
-bool has_pending_site_transition_command(
-    const GameCommandQueue& command_queue,
+bool has_pending_site_transition_message(
+    const GameMessageQueue& message_queue,
     std::uint32_t site_id)
 {
-    for (const auto& command : command_queue)
+    for (const auto& message : message_queue)
     {
-        if (command.type == GameCommandType::SiteAttemptEnded &&
-            command.payload_as<SiteAttemptEndedCommand>().site_id == site_id)
+        if (message.type == GameMessageType::SiteAttemptEnded &&
+            message.payload_as<SiteAttemptEndedMessage>().site_id == site_id)
         {
             return true;
         }
@@ -35,16 +35,16 @@ void FailureRecoverySystem::run(SiteSystemContext<FailureRecoverySystem>& contex
     const auto& site_run = context.site_run;
     if (site_run.run_status != SiteRunStatus::Active ||
         worker_health > 0.0f ||
-        has_pending_site_transition_command(context.command_queue, site_run.site_id.value))
+        has_pending_site_transition_message(context.message_queue, site_run.site_id.value))
     {
         return;
     }
 
-    GameCommand command {};
-    command.type = GameCommandType::SiteAttemptEnded;
-    command.set_payload(SiteAttemptEndedCommand {
+    GameMessage message {};
+    message.type = GameMessageType::SiteAttemptEnded;
+    message.set_payload(SiteAttemptEndedMessage {
         context.world.site_id_value(),
         GS1_SITE_ATTEMPT_RESULT_FAILED});
-    context.command_queue.push_back(command);
+    context.message_queue.push_back(message);
 }
 }  // namespace gs1

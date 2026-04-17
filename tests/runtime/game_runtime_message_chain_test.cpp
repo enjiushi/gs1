@@ -13,14 +13,14 @@
 namespace
 {
 using gs1::CampaignState;
-using gs1::GameCommand;
-using gs1::GameCommandType;
+using gs1::GameMessage;
+using gs1::GameMessageType;
 using gs1::GameRuntime;
-using gs1::InventoryItemUseRequestedCommand;
+using gs1::InventoryItemUseRequestedMessage;
 using gs1::SiteRunState;
-using gs1::StartNewCampaignCommand;
-using gs1::StartSiteAttemptCommand;
-using gs1::TaskAcceptRequestedCommand;
+using gs1::StartNewCampaignMessage;
+using gs1::StartSiteAttemptMessage;
+using gs1::TaskAcceptRequestedMessage;
 using gs1::TaskRuntimeListKind;
 using gs1::TileCoord;
 
@@ -60,55 +60,55 @@ struct GameRuntimeProjectionTestAccess
 
 namespace
 {
-GameCommand make_start_campaign_command()
+GameMessage make_start_campaign_message()
 {
-    GameCommand command {};
-    command.type = GameCommandType::StartNewCampaign;
-    command.set_payload(StartNewCampaignCommand {42ULL, 30U});
-    return command;
+    GameMessage message {};
+    message.type = GameMessageType::StartNewCampaign;
+    message.set_payload(StartNewCampaignMessage {42ULL, 30U});
+    return message;
 }
 
-GameCommand make_start_site_attempt_command(std::uint32_t site_id)
+GameMessage make_start_site_attempt_message(std::uint32_t site_id)
 {
-    GameCommand command {};
-    command.type = GameCommandType::StartSiteAttempt;
-    command.set_payload(StartSiteAttemptCommand {site_id});
-    return command;
+    GameMessage message {};
+    message.type = GameMessageType::StartSiteAttempt;
+    message.set_payload(StartSiteAttemptMessage {site_id});
+    return message;
 }
 
-GameCommand make_accept_task_command(std::uint32_t task_instance_id)
+GameMessage make_accept_task_message(std::uint32_t task_instance_id)
 {
-    GameCommand command {};
-    command.type = GameCommandType::TaskAcceptRequested;
-    command.set_payload(TaskAcceptRequestedCommand {task_instance_id});
-    return command;
+    GameMessage message {};
+    message.type = GameMessageType::TaskAcceptRequested;
+    message.set_payload(TaskAcceptRequestedMessage {task_instance_id});
+    return message;
 }
 
-GameCommand make_inventory_use_command(
+GameMessage make_inventory_use_message(
     std::uint32_t item_id,
     std::uint32_t quantity,
     Gs1InventoryContainerKind container_kind,
     std::uint32_t slot_index)
 {
-    GameCommand command {};
-    command.type = GameCommandType::InventoryItemUseRequested;
-    command.set_payload(InventoryItemUseRequestedCommand {
+    GameMessage message {};
+    message.type = GameMessageType::InventoryItemUseRequested;
+    message.set_payload(InventoryItemUseRequestedMessage {
         item_id,
         static_cast<std::uint16_t>(quantity),
         container_kind,
         static_cast<std::uint8_t>(slot_index)});
-    return command;
+    return message;
 }
 
-std::vector<Gs1EngineCommand> drain_engine_commands(GameRuntime& runtime)
+std::vector<Gs1EngineMessage> drain_engine_messages(GameRuntime& runtime)
 {
-    std::vector<Gs1EngineCommand> commands {};
-    Gs1EngineCommand command {};
-    while (runtime.pop_engine_command(command) == GS1_STATUS_OK)
+    std::vector<Gs1EngineMessage> messages {};
+    Gs1EngineMessage message {};
+    while (runtime.pop_engine_message(message) == GS1_STATUS_OK)
     {
-        commands.push_back(command);
+        messages.push_back(message);
     }
-    return commands;
+    return messages;
 }
 
 void run_phase1(GameRuntime& runtime, double real_delta_seconds, Gs1Phase1Result& out_result)
@@ -121,80 +121,80 @@ void run_phase1(GameRuntime& runtime, double real_delta_seconds, Gs1Phase1Result
     assert(runtime.run_phase1(request, out_result) == GS1_STATUS_OK);
 }
 
-std::vector<const Gs1EngineCommand*> collect_commands_of_type(
-    const std::vector<Gs1EngineCommand>& commands,
-    Gs1EngineCommandType type)
+std::vector<const Gs1EngineMessage*> collect_messages_of_type(
+    const std::vector<Gs1EngineMessage>& messages,
+    Gs1EngineMessageType type)
 {
-    std::vector<const Gs1EngineCommand*> matches {};
-    for (const auto& command : commands)
+    std::vector<const Gs1EngineMessage*> matches {};
+    for (const auto& message : messages)
     {
-        if (command.type == type)
+        if (message.type == type)
         {
-            matches.push_back(&command);
+            matches.push_back(&message);
         }
     }
     return matches;
 }
 
-const Gs1EngineCommand* find_inventory_slot_command(
-    const std::vector<Gs1EngineCommand>& commands,
+const Gs1EngineMessage* find_inventory_slot_message(
+    const std::vector<Gs1EngineMessage>& messages,
     Gs1InventoryContainerKind container_kind,
     std::uint16_t slot_index)
 {
-    for (const auto& command : commands)
+    for (const auto& message : messages)
     {
-        if (command.type != GS1_ENGINE_COMMAND_SITE_INVENTORY_SLOT_UPSERT)
+        if (message.type != GS1_ENGINE_MESSAGE_SITE_INVENTORY_SLOT_UPSERT)
         {
             continue;
         }
 
-        const auto& payload = command.payload_as<Gs1EngineCommandInventorySlotData>();
+        const auto& payload = message.payload_as<Gs1EngineMessageInventorySlotData>();
         if (payload.container_kind == container_kind && payload.slot_index == slot_index)
         {
-            return &command;
+            return &message;
         }
     }
 
     return nullptr;
 }
 
-const Gs1EngineCommand* find_task_command(
-    const std::vector<Gs1EngineCommand>& commands,
+const Gs1EngineMessage* find_task_message(
+    const std::vector<Gs1EngineMessage>& messages,
     std::uint32_t task_instance_id)
 {
-    for (const auto& command : commands)
+    for (const auto& message : messages)
     {
-        if (command.type != GS1_ENGINE_COMMAND_SITE_TASK_UPSERT)
+        if (message.type != GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT)
         {
             continue;
         }
 
-        const auto& payload = command.payload_as<Gs1EngineCommandTaskData>();
+        const auto& payload = message.payload_as<Gs1EngineMessageTaskData>();
         if (payload.task_instance_id == task_instance_id)
         {
-            return &command;
+            return &message;
         }
     }
 
     return nullptr;
 }
 
-const Gs1EngineCommand* find_tile_command(
-    const std::vector<Gs1EngineCommand>& commands,
+const Gs1EngineMessage* find_tile_message(
+    const std::vector<Gs1EngineMessage>& messages,
     TileCoord coord)
 {
-    for (const auto& command : commands)
+    for (const auto& message : messages)
     {
-        if (command.type != GS1_ENGINE_COMMAND_SITE_TILE_UPSERT)
+        if (message.type != GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT)
         {
             continue;
         }
 
-        const auto& payload = command.payload_as<Gs1EngineCommandSiteTileData>();
+        const auto& payload = message.payload_as<Gs1EngineMessageSiteTileData>();
         if (payload.x == static_cast<std::uint32_t>(coord.x) &&
             payload.y == static_cast<std::uint32_t>(coord.y))
         {
-            return &command;
+            return &message;
         }
     }
 
@@ -203,13 +203,13 @@ const Gs1EngineCommand* find_tile_command(
 
 void bootstrap_site_one(GameRuntime& runtime)
 {
-    assert(runtime.handle_command(make_start_campaign_command()) == GS1_STATUS_OK);
+    assert(runtime.handle_message(make_start_campaign_message()) == GS1_STATUS_OK);
     auto& campaign = gs1::GameRuntimeProjectionTestAccess::campaign(runtime);
     assert(campaign.has_value());
     assert(!campaign->sites.empty());
 
     const auto site_id = campaign->sites.front().site_id.value;
-    assert(runtime.handle_command(make_start_site_attempt_command(site_id)) == GS1_STATUS_OK);
+    assert(runtime.handle_message(make_start_site_attempt_message(site_id)) == GS1_STATUS_OK);
     assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).has_value());
 }
 
@@ -261,12 +261,12 @@ void inventory_item_use_updates_worker_and_projection()
     assert(site_run.inventory.worker_pack_slots[0].item_id.value == 1U);
     assert(site_run.inventory.worker_pack_slots[0].item_quantity == 2U);
 
-    drain_engine_commands(runtime);
+    drain_engine_messages(runtime);
 
     set_worker_hydration(site_run, 80.0f);
     assert(approx_equal(gs1::site_world_access::worker_conditions(site_run).hydration, 80.0f));
 
-    assert(runtime.handle_command(make_inventory_use_command(
+    assert(runtime.handle_message(make_inventory_use_message(
                1U,
                1U,
                GS1_INVENTORY_CONTAINER_WORKER_PACK,
@@ -279,35 +279,35 @@ void inventory_item_use_updates_worker_and_projection()
     assert(approx_equal(worker_conditions.hydration, 92.0f));
 
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    const auto commands = drain_engine_commands(runtime);
+    const auto messages = drain_engine_messages(runtime);
 
-    const auto snapshot_commands =
-        collect_commands_of_type(commands, GS1_ENGINE_COMMAND_BEGIN_SITE_SNAPSHOT);
-    assert(snapshot_commands.size() == 1U);
-    const auto worker_commands =
-        collect_commands_of_type(commands, GS1_ENGINE_COMMAND_SITE_WORKER_UPDATE);
-    const auto hud_commands = collect_commands_of_type(commands, GS1_ENGINE_COMMAND_HUD_STATE);
-    assert(worker_commands.size() == 1U);
-    assert(hud_commands.size() == 1U);
+    const auto snapshot_messages =
+        collect_messages_of_type(messages, GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT);
+    assert(snapshot_messages.size() == 1U);
+    const auto worker_messages =
+        collect_messages_of_type(messages, GS1_ENGINE_MESSAGE_SITE_WORKER_UPDATE);
+    const auto hud_messages = collect_messages_of_type(messages, GS1_ENGINE_MESSAGE_HUD_STATE);
+    assert(worker_messages.size() == 1U);
+    assert(hud_messages.size() == 1U);
 
-    const auto* slot_command =
-        find_inventory_slot_command(commands, GS1_INVENTORY_CONTAINER_WORKER_PACK, 0U);
-    assert(slot_command != nullptr);
+    const auto* slot_message =
+        find_inventory_slot_message(messages, GS1_INVENTORY_CONTAINER_WORKER_PACK, 0U);
+    assert(slot_message != nullptr);
     {
-        const auto& payload = slot_command->payload_as<Gs1EngineCommandInventorySlotData>();
+        const auto& payload = slot_message->payload_as<Gs1EngineMessageInventorySlotData>();
         assert(payload.item_id == 1U);
         assert(payload.quantity == 1U);
         assert(payload.flags == 1U);
     }
 
     {
-        const auto& payload = worker_commands.front()->payload_as<Gs1EngineCommandWorkerData>();
+        const auto& payload = worker_messages.front()->payload_as<Gs1EngineMessageWorkerData>();
         assert(approx_equal(payload.hydration_normalized, 0.92f));
         assert(approx_equal(payload.health_normalized, 1.0f));
     }
 
     {
-        const auto& payload = hud_commands.front()->payload_as<Gs1EngineCommandHudStateData>();
+        const auto& payload = hud_messages.front()->payload_as<Gs1EngineMessageHudStateData>();
         assert(approx_equal(payload.player_hydration, 92.0f));
         assert(payload.current_money == 45);
         assert(payload.active_task_count == 0U);
@@ -329,13 +329,13 @@ void ecology_growth_completes_task_and_site_attempt()
     assert(site_run.task_board.visible_tasks.size() == 1U);
     assert(site_run.task_board.visible_tasks.front().target_amount == 10U);
 
-    drain_engine_commands(runtime);
+    drain_engine_messages(runtime);
 
-    assert(runtime.handle_command(make_accept_task_command(1U)) == GS1_STATUS_OK);
+    assert(runtime.handle_message(make_accept_task_message(1U)) == GS1_STATUS_OK);
     assert(site_run.task_board.accepted_task_ids.size() == 1U);
 
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    drain_engine_commands(runtime);
+    drain_engine_messages(runtime);
 
     const std::vector<TileCoord> seeded_tiles {
         TileCoord {0, 0},
@@ -376,27 +376,27 @@ void ecology_growth_completes_task_and_site_attempt()
     assert(tile_state.plant_id.value == gs1::k_plant_wind_reed);
     assert(tile_state.ground_cover_type_id == 0U);
 
-    const auto phase1_commands = drain_engine_commands(runtime);
-    const auto* grown_tile_command = find_tile_command(phase1_commands, seeded_tiles.front());
-    assert(grown_tile_command != nullptr);
+    const auto phase1_messages = drain_engine_messages(runtime);
+    const auto* grown_tile_message = find_tile_message(phase1_messages, seeded_tiles.front());
+    assert(grown_tile_message != nullptr);
     {
-        const auto& payload = grown_tile_command->payload_as<Gs1EngineCommandSiteTileData>();
+        const auto& payload = grown_tile_message->payload_as<Gs1EngineMessageSiteTileData>();
         assert(payload.plant_type_id == gs1::k_plant_wind_reed);
         assert(payload.ground_cover_type_id == 0U);
         assert(approx_equal(payload.plant_density, 1.0f));
     }
 
-    const auto app_state_commands =
-        collect_commands_of_type(phase1_commands, GS1_ENGINE_COMMAND_SET_APP_STATE);
-    const auto site_result_commands =
-        collect_commands_of_type(phase1_commands, GS1_ENGINE_COMMAND_SITE_RESULT_READY);
-    assert(!app_state_commands.empty());
-    assert(site_result_commands.size() == 1U);
+    const auto app_state_messages =
+        collect_messages_of_type(phase1_messages, GS1_ENGINE_MESSAGE_SET_APP_STATE);
+    const auto site_result_messages =
+        collect_messages_of_type(phase1_messages, GS1_ENGINE_MESSAGE_SITE_RESULT_READY);
+    assert(!app_state_messages.empty());
+    assert(site_result_messages.size() == 1U);
 
     bool saw_site_result_state = false;
-    for (const auto* command : app_state_commands)
+    for (const auto* message : app_state_messages)
     {
-        if (command->payload_as<Gs1EngineCommandSetAppStateData>().app_state == GS1_APP_STATE_SITE_RESULT)
+        if (message->payload_as<Gs1EngineMessageSetAppStateData>().app_state == GS1_APP_STATE_SITE_RESULT)
         {
             saw_site_result_state = true;
             break;
@@ -405,29 +405,29 @@ void ecology_growth_completes_task_and_site_attempt()
     assert(saw_site_result_state);
 
     {
-        const auto& payload = site_result_commands.front()->payload_as<Gs1EngineCommandSiteResultData>();
+        const auto& payload = site_result_messages.front()->payload_as<Gs1EngineMessageSiteResultData>();
         assert(payload.site_id == 1U);
         assert(payload.result == GS1_SITE_ATTEMPT_RESULT_COMPLETED);
         assert(payload.newly_revealed_site_count == 1U);
     }
 
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    const auto follow_up_commands = drain_engine_commands(runtime);
+    const auto follow_up_messages = drain_engine_messages(runtime);
 
-    const auto* task_command = find_task_command(follow_up_commands, 1U);
-    assert(task_command != nullptr);
+    const auto* task_message = find_task_message(follow_up_messages, 1U);
+    assert(task_message != nullptr);
     {
-        const auto& payload = task_command->payload_as<Gs1EngineCommandTaskData>();
+        const auto& payload = task_message->payload_as<Gs1EngineMessageTaskData>();
         assert(payload.current_progress == 10U);
         assert(payload.target_progress == 10U);
         assert(payload.list_kind == GS1_TASK_PRESENTATION_LIST_COMPLETED);
     }
 
-    const auto follow_up_hud_commands =
-        collect_commands_of_type(follow_up_commands, GS1_ENGINE_COMMAND_HUD_STATE);
-    assert(follow_up_hud_commands.size() == 1U);
+    const auto follow_up_hud_messages =
+        collect_messages_of_type(follow_up_messages, GS1_ENGINE_MESSAGE_HUD_STATE);
+    assert(follow_up_hud_messages.size() == 1U);
     {
-        const auto& payload = follow_up_hud_commands.front()->payload_as<Gs1EngineCommandHudStateData>();
+        const auto& payload = follow_up_hud_messages.front()->payload_as<Gs1EngineMessageHudStateData>();
         assert(payload.active_task_count == 0U);
         assert(approx_equal(payload.site_completion_normalized, 1.0f));
     }

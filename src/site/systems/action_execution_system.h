@@ -22,10 +22,10 @@ public:
             site_component_mask_of(SiteComponent::Action)};
     }
 
-    [[nodiscard]] static bool subscribes_to(GameCommandType type) noexcept;
-    [[nodiscard]] static Gs1Status process_command(
+    [[nodiscard]] static bool subscribes_to(GameMessageType type) noexcept;
+    [[nodiscard]] static Gs1Status process_message(
         SiteSystemContext<ActionExecutionSystem>& context,
-        const GameCommand& command);
+        const GameMessage& message);
     static void run(SiteSystemContext<ActionExecutionSystem>& context);
 };
 }  // namespace gs1
