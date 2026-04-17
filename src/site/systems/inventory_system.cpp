@@ -601,6 +601,33 @@ Gs1Status handle_inventory_craft_commit(
     });
 }
 
+Gs1Status handle_site_device_broken(
+    SiteSystemContext<InventorySystem>& context,
+    const SiteDeviceBrokenMessage& payload) noexcept
+{
+    return mutate_inventory_storage(context, [&]() -> Gs1Status {
+        const auto container =
+            inventory_storage::find_device_storage_container(context.site_run, payload.device_entity_id);
+        if (!container.is_valid())
+        {
+            return GS1_STATUS_OK;
+        }
+
+        const auto storage_id =
+            inventory_storage::storage_id_for_container(context.site_run, container);
+        if (context.world.own_inventory().opened_device_storage_id == storage_id)
+        {
+            context.world.own_inventory().opened_device_storage_id = 0U;
+        }
+
+        if (inventory_storage::destroy_storage_container(context.site_run, container))
+        {
+            context.world.mark_inventory_storage_descriptors_projection_dirty();
+        }
+        return GS1_STATUS_OK;
+    });
+}
+
 Gs1Status handle_inventory_transfer(
     SiteSystemContext<InventorySystem>& context,
     const InventoryTransferRequestedMessage& payload) noexcept
@@ -854,6 +881,7 @@ bool InventorySystem::subscribes_to(GameMessageType type) noexcept
     {
     case GameMessageType::SiteRunStarted:
     case GameMessageType::SiteDevicePlaced:
+    case GameMessageType::SiteDeviceBroken:
     case GameMessageType::InventoryDeliveryRequested:
     case GameMessageType::InventoryItemUseRequested:
     case GameMessageType::InventoryItemConsumeRequested:
@@ -881,6 +909,11 @@ Gs1Status InventorySystem::process_message(
         (void)ensure_inventory_storage_initialized(context);
         (void)ensure_device_storage_containers(context);
         return GS1_STATUS_OK;
+
+    case GameMessageType::SiteDeviceBroken:
+        return handle_site_device_broken(
+            context,
+            message.payload_as<SiteDeviceBrokenMessage>());
 
     case GameMessageType::InventoryDeliveryRequested:
         return handle_inventory_delivery_requested(

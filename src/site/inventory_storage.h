@@ -962,6 +962,53 @@ inline flecs::entity find_device_storage_container(
         device_entity_id);
 }
 
+inline bool destroy_storage_container(SiteRunState& site_run, flecs::entity container)
+{
+    auto* storage_state =
+        find_storage_container_state_by_entity_id(site_run.inventory, container.id());
+    if (storage_state == nullptr || !container.is_valid())
+    {
+        return false;
+    }
+
+    bool removed_items = false;
+    for (const auto item_entity_id : storage_state->slot_item_instance_ids)
+    {
+        if (item_entity_id == 0U)
+        {
+            continue;
+        }
+
+        auto item_entity = entity_from_id(site_run, item_entity_id);
+        if (item_entity.is_valid())
+        {
+            item_entity.destruct();
+        }
+
+        removed_items = true;
+    }
+
+    const auto storage_id = storage_state->storage_id;
+    container.destruct();
+    auto& containers = site_run.inventory.storage_containers;
+    containers.erase(
+        std::remove_if(
+            containers.begin(),
+            containers.end(),
+            [storage_id](const StorageContainerState& storage) {
+                return storage.storage_id == storage_id;
+            }),
+        containers.end());
+
+    if (removed_items)
+    {
+        bump_item_membership_revision(site_run.inventory);
+    }
+
+    sync_projection_views(site_run);
+    return true;
+}
+
 inline const StorageContainerState* storage_container_state_for_storage_id(
     const SiteRunState& site_run,
     std::uint32_t storage_id) noexcept

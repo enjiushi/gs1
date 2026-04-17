@@ -29,8 +29,9 @@ inline constexpr std::uint32_t k_recipe_cook_food_pack = 1U;
 inline constexpr std::uint32_t k_recipe_craft_camp_stove = 2U;
 inline constexpr std::uint32_t k_recipe_craft_workbench = 3U;
 inline constexpr std::uint32_t k_recipe_craft_storage_crate = 4U;
+inline constexpr std::uint32_t k_recipe_craft_hammer = 5U;
 
-inline constexpr std::array<CraftRecipeDef, 4> k_prototype_craft_recipe_defs {{
+inline constexpr std::array<CraftRecipeDef, 5> k_prototype_craft_recipe_defs {{
     CraftRecipeDef {
         RecipeId {k_recipe_cook_food_pack},
         StructureId {k_structure_camp_stove},
@@ -72,6 +73,17 @@ inline constexpr std::array<CraftRecipeDef, 4> k_prototype_craft_recipe_defs {{
         1.0f,
         {CraftRecipeIngredientDef {ItemId {k_item_wood_bundle}, 3U},
          CraftRecipeIngredientDef {ItemId {k_item_iron_bundle}, 2U},
+         CraftRecipeIngredientDef {},
+         CraftRecipeIngredientDef {}},
+        2U},
+    CraftRecipeDef {
+        RecipeId {k_recipe_craft_hammer},
+        StructureId {k_structure_workbench},
+        ItemId {k_item_hammer},
+        1U,
+        1.0f,
+        {CraftRecipeIngredientDef {ItemId {k_item_wood_bundle}, 2U},
+         CraftRecipeIngredientDef {ItemId {k_item_iron_bundle}, 1U},
          CraftRecipeIngredientDef {},
          CraftRecipeIngredientDef {}},
         2U},

@@ -111,7 +111,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         10: { name: "Wind Reed Fiber", shortName: "Fiber", stackSize: 20, canUse: false, canPlant: false, canDeploy: false },
         11: { name: "Camp Stove Kit", shortName: "Stove Kit", stackSize: 1, canUse: false, canPlant: false, canDeploy: true, deployStructureId: 201 },
         12: { name: "Workbench Kit", shortName: "Bench Kit", stackSize: 1, canUse: false, canPlant: false, canDeploy: true, deployStructureId: 202 },
-        13: { name: "Storage Crate Kit", shortName: "Crate Kit", stackSize: 1, canUse: false, canPlant: false, canDeploy: true, deployStructureId: 203 }
+        13: { name: "Storage Crate Kit", shortName: "Crate Kit", stackSize: 1, canUse: false, canPlant: false, canDeploy: true, deployStructureId: 203 },
+        14: { name: "Hammer", shortName: "Hammer", stackSize: 1, canUse: false, canPlant: false, canDeploy: false }
     };
     const itemVisuals = {
         1: { glyph: "H2", light: "#5d8eb3", dark: "#33546f" },
@@ -126,7 +127,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         10: { glyph: "FB", light: "#a2bb7b", dark: "#607541" },
         11: { glyph: "ST", light: "#c7835a", dark: "#7b4327" },
         12: { glyph: "WB", light: "#b2966c", dark: "#6b5437" },
-        13: { glyph: "CR", light: "#af8c63", dark: "#694d2c" }
+        13: { glyph: "CR", light: "#af8c63", dark: "#694d2c" },
+        14: { glyph: "HM", light: "#9ea9b7", dark: "#5c6775" }
     };
     const structureCatalog = {
         201: { name: "Camp Stove", shortName: "Stove", slotCount: 6 },
@@ -171,6 +173,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 ingredients: [
                     { itemId: 8, quantity: 3 },
                     { itemId: 9, quantity: 2 }
+                ]
+            },
+            {
+                outputItemId: 14,
+                outputQuantity: 1,
+                craftMinutes: 1.0,
+                ingredients: [
+                    { itemId: 8, quantity: 2 },
+                    { itemId: 9, quantity: 1 }
                 ]
             }
         ]
@@ -521,6 +532,18 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function getInventorySlotsByKind(state, containerKind) {
         return getAllInventorySlots(state).filter((slot) => slot.containerKind === containerKind);
+    }
+
+    function getCarriedItemQuantity(state, itemId) {
+        let total = 0;
+        getInventorySlotsByKind(state, "WORKER_PACK").forEach((slot) => {
+            if (!isOccupiedSlot(slot) || slot.itemId !== itemId) {
+                return;
+            }
+
+            total += slot.quantity;
+        });
+        return total;
     }
 
     function getBuyListings(state) {
@@ -929,6 +952,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (actionKind === 2) {
             return "Build";
         }
+        if (actionKind === 3) {
+            return "Repair";
+        }
         if (actionKind === 4) {
             return "Water";
         }
@@ -1101,6 +1127,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const storageContainers = getOpenableStorageContainersForTile(state, tileX, tileY);
         const carriedSeeds = getCarriedSeedOptions(state);
         const carriedDeployables = getCarriedDeployableOptions(state);
+        const carriedHammerCount = getCarriedItemQuantity(state, 14);
         const rootItems = [];
         const tileHasStructure = structureId !== 0;
 
@@ -1202,6 +1229,37 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 })
             });
             }
+        }
+
+        if (tileHasStructure) {
+            rootItems.push({
+                id: "repair",
+                label: "Repair",
+                meta: carriedHammerCount > 0
+                    ? ("Hammer x" + carriedHammerCount + " carried")
+                    : "Requires a carried hammer.",
+                iconGlyph: "HM",
+                iconLight: "#9ea9b7",
+                iconDark: "#5c6775",
+                disabled: carriedHammerCount === 0,
+                onSelect: function () {
+                    statusChip.textContent =
+                        "Moving to (" + tileX + "," + tileY + ") to repair " + getStructureLabel(structureId) + ".";
+                    postSiteAction({
+                        actionKind: "REPAIR",
+                        flags: 4,
+                        quantity: 1,
+                        targetTileX: tileX,
+                        targetTileY: tileY,
+                        primarySubjectId: 0,
+                        secondarySubjectId: 0,
+                        itemId: 14
+                    }).catch(() => {
+                        statusChip.textContent = "Failed to send repair action.";
+                    });
+                    closeTileContextMenu();
+                }
+            });
         }
 
         if (!tileHasStructure && carriedSeeds.length > 0) {

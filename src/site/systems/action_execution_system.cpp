@@ -24,6 +24,15 @@ namespace
 {
 constexpr double k_minimum_action_duration_minutes = 0.25;
 constexpr double k_action_minutes_per_real_second = 0.8;
+constexpr float k_repair_integrity_full = 1.0f;
+constexpr float k_repair_integrity_epsilon = 0.0001f;
+
+ItemId repair_tool_item_id(std::uint32_t requested_item_id) noexcept
+{
+    return requested_item_id == 0U || requested_item_id == k_item_hammer
+        ? ItemId {k_item_hammer}
+        : ItemId {};
+}
 
 ActionKind to_action_kind(Gs1SiteActionKind kind) noexcept
 {
@@ -348,6 +357,29 @@ bool action_requires_item(ActionKind action_kind, std::uint32_t item_id) noexcep
     }
 
     return action_kind == ActionKind::Plant && item_id != 0U;
+}
+
+SiteActionFailureReason validate_repair_target(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    TileCoord target_tile) noexcept
+{
+    if (!context.world.tile_coord_in_bounds(target_tile))
+    {
+        return SiteActionFailureReason::InvalidTarget;
+    }
+
+    const auto tile = context.world.read_tile(target_tile);
+    if (tile.device.structure_id.value == 0U || tile.device.device_integrity <= 0.0f)
+    {
+        return SiteActionFailureReason::InvalidTarget;
+    }
+
+    if (tile.device.device_integrity >= (k_repair_integrity_full - k_repair_integrity_epsilon))
+    {
+        return SiteActionFailureReason::InvalidState;
+    }
+
+    return SiteActionFailureReason::None;
 }
 
 const CraftRecipeDef* resolve_craft_recipe_for_action(
@@ -709,6 +741,16 @@ void emit_action_fact_messages(GameMessageQueue& queue, const ActionState& actio
         break;
 
     case ActionKind::Repair:
+        enqueue_message(
+            queue,
+            GameMessageType::SiteDeviceRepaired,
+            SiteDeviceRepairedMessage {
+                action_id,
+                target_tile.x,
+                target_tile.y,
+                flags});
+        break;
+
     case ActionKind::None:
     default:
         break;
@@ -768,6 +810,18 @@ SiteActionFailureReason validate_craft_completion(
     return SiteActionFailureReason::None;
 }
 
+SiteActionFailureReason validate_repair_completion(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    const ActionState& action_state)
+{
+    if (!action_state.target_tile.has_value())
+    {
+        return SiteActionFailureReason::InvalidState;
+    }
+
+    return validate_repair_target(context, *action_state.target_tile);
+}
+
 }  // namespace
 
 bool ActionExecutionSystem::subscribes_to(GameMessageType type) noexcept
@@ -812,7 +866,7 @@ Gs1Status ActionExecutionSystem::process_message(
         }
 
         const ActionKind action_kind = to_action_kind(payload.action_kind);
-        if (action_kind == ActionKind::None || action_kind == ActionKind::Repair)
+        if (action_kind == ActionKind::None)
         {
             emit_site_action_failed(
                 context.message_queue,
@@ -826,6 +880,10 @@ Gs1Status ActionExecutionSystem::process_message(
             return GS1_STATUS_OK;
         }
 
+        const ItemId repair_tool_id = action_kind == ActionKind::Repair
+            ? repair_tool_item_id(payload.item_id)
+            : ItemId {};
+
         if (!context.world.tile_coord_in_bounds(target_tile))
         {
             emit_site_action_failed(
@@ -838,6 +896,52 @@ Gs1Status ActionExecutionSystem::process_message(
                 payload.primary_subject_id,
                 payload.secondary_subject_id);
             return GS1_STATUS_OK;
+        }
+
+        if (action_kind == ActionKind::Repair)
+        {
+            const auto repair_failure_reason = validate_repair_target(context, target_tile);
+            if (repair_failure_reason != SiteActionFailureReason::None)
+            {
+                emit_site_action_failed(
+                    context.message_queue,
+                    0U,
+                    action_kind,
+                    repair_failure_reason,
+                    payload.flags,
+                    target_tile,
+                    payload.primary_subject_id,
+                    payload.secondary_subject_id);
+                return GS1_STATUS_OK;
+            }
+
+            if (repair_tool_id.value == 0U)
+            {
+                emit_site_action_failed(
+                    context.message_queue,
+                    0U,
+                    action_kind,
+                    SiteActionFailureReason::InvalidState,
+                    payload.flags,
+                    target_tile,
+                    payload.primary_subject_id,
+                    payload.secondary_subject_id);
+                return GS1_STATUS_OK;
+            }
+
+            if (available_worker_pack_item_quantity(context.world.read_inventory(), repair_tool_id) == 0U)
+            {
+                emit_site_action_failed(
+                    context.message_queue,
+                    0U,
+                    action_kind,
+                    SiteActionFailureReason::InsufficientResources,
+                    payload.flags,
+                    target_tile,
+                    payload.primary_subject_id,
+                    payload.secondary_subject_id);
+                return GS1_STATUS_OK;
+            }
         }
 
         if (action_requires_item(action_kind, payload.item_id))
@@ -935,7 +1039,9 @@ Gs1Status ActionExecutionSystem::process_message(
             action_kind == ActionKind::Craft && craft_recipe != nullptr
             ? craft_recipe->recipe_id.value
             : payload.secondary_subject_id;
-        action_state.item_id = payload.item_id;
+        action_state.item_id = action_kind == ActionKind::Repair
+            ? repair_tool_id.value
+            : payload.item_id;
         action_state.quantity =
             action_kind == ActionKind::Craft
             ? 1U
@@ -1115,6 +1221,27 @@ void ActionExecutionSystem::run(SiteSystemContext<ActionExecutionSystem>& contex
     if (action_state.action_kind == ActionKind::Craft)
     {
         const auto failure_reason = validate_craft_completion(context, action_state);
+        if (failure_reason != SiteActionFailureReason::None)
+        {
+            emit_site_action_failed(
+                context.message_queue,
+                action_id_value(action_state),
+                action_state.action_kind,
+                failure_reason,
+                action_state.request_flags,
+                action_target_tile(action_state),
+                action_state.primary_subject_id,
+                action_state.secondary_subject_id);
+            emit_placement_reservation_released(context.message_queue, action_state);
+            clear_action_state(action_state);
+            context.world.mark_projection_dirty(
+                SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
+            return;
+        }
+    }
+    else if (action_state.action_kind == ActionKind::Repair)
+    {
+        const auto failure_reason = validate_repair_completion(context, action_state);
         if (failure_reason != SiteActionFailureReason::None)
         {
             emit_site_action_failed(

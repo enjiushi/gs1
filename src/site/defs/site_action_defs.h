@@ -47,7 +47,7 @@ inline constexpr std::array<SiteActionDef, 6> k_prototype_site_action_defs {{
         0.0f,
         PlacementOccupancyLayer::None,
         false,
-        false,
+        true,
         0U},
     SiteActionDef {
         ActionKind::Water,
