@@ -1,6 +1,7 @@
 #include "site/systems/device_maintenance_system.h"
 
 #include "site/site_run_state.h"
+#include "site/tile_footprint.h"
 
 #include <algorithm>
 #include <cmath>
@@ -50,14 +51,30 @@ Gs1Status DeviceMaintenanceSystem::process_message(
             return GS1_STATUS_INVALID_ARGUMENT;
         }
 
-        auto tile = context.world.read_tile(target_tile);
-        if (tile.device.structure_id.value == 0U)
+        const auto anchor_tile = context.world.read_tile(target_tile);
+        if (anchor_tile.device.structure_id.value == 0U)
         {
             return GS1_STATUS_OK;
         }
 
-        tile.device.device_integrity = 1.0f;
-        context.world.write_tile(target_tile, tile);
+        for_each_tile_in_footprint(
+            target_tile,
+            resolve_structure_tile_footprint(anchor_tile.device.structure_id),
+            [&](TileCoord footprint_coord) {
+                if (!context.world.tile_coord_in_bounds(footprint_coord))
+                {
+                    return;
+                }
+
+                auto tile = context.world.read_tile(footprint_coord);
+                if (tile.device.structure_id != anchor_tile.device.structure_id)
+                {
+                    return;
+                }
+
+                tile.device.device_integrity = 1.0f;
+                context.world.write_tile(footprint_coord, tile);
+            });
         return GS1_STATUS_OK;
     }
 
@@ -73,11 +90,21 @@ Gs1Status DeviceMaintenanceSystem::process_message(
         return GS1_STATUS_INVALID_ARGUMENT;
     }
 
-    auto tile = context.world.read_tile(target_tile);
-    tile.device.structure_id = StructureId {payload.structure_id};
-    tile.device.device_integrity = 1.0f;
-    context.world.write_tile(target_tile, tile);
-    context.world.mark_tile_projection_dirty(target_tile);
+    for_each_tile_in_footprint(
+        target_tile,
+        resolve_structure_tile_footprint(StructureId {payload.structure_id}),
+        [&](TileCoord footprint_coord) {
+            if (!context.world.tile_coord_in_bounds(footprint_coord))
+            {
+                return;
+            }
+
+            auto tile = context.world.read_tile(footprint_coord);
+            tile.device.structure_id = StructureId {payload.structure_id};
+            tile.device.device_integrity = 1.0f;
+            context.world.write_tile(footprint_coord, tile);
+            context.world.mark_tile_projection_dirty(footprint_coord);
+        });
     return GS1_STATUS_OK;
 }
 
