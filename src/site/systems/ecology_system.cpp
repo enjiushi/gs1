@@ -3,6 +3,7 @@
 #include "content/defs/plant_defs.h"
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
+#include "site/tile_footprint.h"
 
 #include <algorithm>
 #include <cmath>
@@ -516,10 +517,15 @@ Gs1Status EcologySystem::process_message(
     {
         const auto& payload = message.payload_as<SiteTilePlantingCompletedMessage>();
         const TileCoord coord {payload.target_tile_x, payload.target_tile_y};
-        emit_tile_ecology_changed(
-            context,
+        for_each_tile_in_footprint(
             coord,
-            apply_planting(context.world, coord, payload));
+            resolve_plant_tile_footprint(PlantId {payload.plant_type_id}),
+            [&](TileCoord footprint_coord) {
+                emit_tile_ecology_changed(
+                    context,
+                    footprint_coord,
+                    apply_planting(context.world, footprint_coord, payload));
+            });
         break;
     }
 

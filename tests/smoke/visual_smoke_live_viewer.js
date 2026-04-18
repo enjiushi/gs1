@@ -3627,6 +3627,60 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return leaf;
     }
 
+    function resolvePlantPalette(tile) {
+        if (tile.plantTypeId === 1) {
+            return { primary: 0x8fb76b, secondary: 0x6f8d49, glow: 0x4f652e };
+        }
+        if (tile.plantTypeId === 2) {
+            return { primary: 0x8ba762, secondary: 0x6a7e44, glow: 0x45542b };
+        }
+        if (tile.plantTypeId === 3) {
+            return { primary: 0x8aa160, secondary: 0x64794a, glow: 0x405029 };
+        }
+        if (tile.plantTypeId === 4) {
+            return { primary: 0x9abd66, secondary: 0x728c42, glow: 0x4b5a29 };
+        }
+        return { primary: 0x95b866, secondary: 0x728f4b, glow: 0x4b5f31 };
+    }
+
+    function addPlantDensityShell(plantGroup, tile, plantDensity, palette) {
+        const shellCount = 4 + Math.round(plantDensity * 10);
+        const shellRadius = 0.12 + plantDensity * 0.26;
+        const shellHeight = 0.03 + plantDensity * 0.11;
+
+        for (let index = 0; index < shellCount; index += 1) {
+            const angle = deterministicNoise01(tile.x, tile.y, index + 171) * Math.PI * 2;
+            const radius =
+                shellRadius *
+                (0.18 + deterministicNoise01(tile.y, tile.x, index + 181) * 0.82);
+            const frond = createLeafMesh(
+                index % 3 === 0 ? palette.secondary : palette.primary,
+                0.055 + plantDensity * 0.06,
+                0.012 + plantDensity * 0.01,
+                0.09 + plantDensity * 0.12
+            );
+            frond.position.set(
+                Math.cos(angle) * radius,
+                shellHeight + deterministicNoise01(tile.x, tile.y, index + 191) * 0.05,
+                Math.sin(angle) * radius
+            );
+            frond.rotation.y = angle;
+            frond.rotation.x = -0.18 + deterministicNoise01(tile.y, tile.x, index + 201) * 0.36;
+            frond.rotation.z = deterministicNoise01(tile.x, tile.y, index + 211) * Math.PI;
+            plantGroup.add(frond);
+        }
+
+        if (plantDensity >= 0.45) {
+            const canopy = new THREE_NS.Mesh(
+                new THREE_NS.SphereGeometry(0.18 + plantDensity * 0.16, 14, 14),
+                createPlantMaterial(palette.primary, 0.86, palette.glow, 0.03 + plantDensity * 0.04)
+            );
+            canopy.position.y = 0.06 + plantDensity * 0.08;
+            canopy.scale.set(1.0 + plantDensity * 0.35, 0.22 + plantDensity * 0.22, 1.0 + plantDensity * 0.35);
+            plantGroup.add(canopy);
+        }
+    }
+
     function addWindReedPlant(plantGroup, tile, plantDensity) {
         const stemColor = 0x6b8b4c;
         const leafColor = 0x93b868;
@@ -3818,8 +3872,16 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function createPlantVisual(tile, tileHeight, plantDensity) {
         const plantGroup = new THREE_NS.Group();
+        const palette = resolvePlantPalette(tile);
         plantGroup.position.y = tileHeight + 0.02;
         plantGroup.rotation.y = deterministicNoise01(tile.x, tile.y, tile.plantTypeId + 161) * Math.PI * 2;
+        plantGroup.scale.set(
+            0.92 + plantDensity * 0.26,
+            0.88 + plantDensity * 0.34,
+            0.92 + plantDensity * 0.26
+        );
+
+        addPlantDensityShell(plantGroup, tile, plantDensity, palette);
 
         if (tile.plantTypeId === 1) {
             addWindReedPlant(plantGroup, tile, plantDensity);

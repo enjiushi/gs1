@@ -556,6 +556,11 @@ void placement_validation_regression_runner(
 
         if (parse_bool(values, "pre_reserve_same_tile", false))
         {
+            const auto occupancy_layer = parse_occupancy_layer(values, "layer");
+            const auto subject_kind =
+                occupancy_layer == PlacementOccupancyLayer::Structure
+                ? gs1::PlacementReservationSubjectKind::StructureType
+                : gs1::PlacementReservationSubjectKind::GroundCoverType;
             GS1_SYSTEM_TEST_REQUIRE(
                 context,
                 PlacementValidationSystem::process_message(
@@ -566,12 +571,18 @@ void placement_validation_regression_runner(
                             parse_u32(context, values, "pre_action_id", 90U),
                             coord.x,
                             coord.y,
-                            parse_occupancy_layer(values, "layer"),
-                            {0U, 0U, 0U},
+                            occupancy_layer,
+                            subject_kind,
+                            {0U, 0U},
                             1U})) == GS1_STATUS_OK);
             queue.clear();
         }
 
+        const auto occupancy_layer = parse_occupancy_layer(values, "layer");
+        const auto subject_kind =
+            occupancy_layer == PlacementOccupancyLayer::Structure
+            ? gs1::PlacementReservationSubjectKind::StructureType
+            : gs1::PlacementReservationSubjectKind::GroundCoverType;
         GS1_SYSTEM_TEST_REQUIRE(
             context,
             PlacementValidationSystem::process_message(
@@ -582,8 +593,9 @@ void placement_validation_regression_runner(
                         parse_u32(context, values, "action_id", 91U),
                         coord.x,
                         coord.y,
-                        parse_occupancy_layer(values, "layer"),
-                        {0U, 0U, 0U},
+                        occupancy_layer,
+                        subject_kind,
+                        {0U, 0U},
                         1U})) == GS1_STATUS_OK);
         GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
         const std::string expect_result = parse_string(values, "expect_result", "accepted");

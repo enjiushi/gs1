@@ -24,7 +24,8 @@ struct StructureDef final
     std::uint16_t storage_slot_count {0U};
     CraftingStationKind crafting_station_kind {CraftingStationKind::None};
     bool grants_storage {false};
-    std::uint8_t reserved0 {0U};
+    std::uint8_t footprint_width {1U};
+    std::uint8_t footprint_height {1U};
 };
 
 inline constexpr std::uint32_t k_structure_camp_stove = 201U;
@@ -40,7 +41,8 @@ inline constexpr std::array<StructureDef, 3> k_prototype_structure_defs {{
         6U,
         CraftingStationKind::Cooking,
         true,
-        0U},
+        1U,
+        1U},
     StructureDef {
         StructureId {k_structure_workbench},
         "Workbench",
@@ -49,7 +51,8 @@ inline constexpr std::array<StructureDef, 3> k_prototype_structure_defs {{
         8U,
         CraftingStationKind::Fabrication,
         true,
-        0U},
+        1U,
+        1U},
     StructureDef {
         StructureId {k_structure_storage_crate},
         "Storage Crate",
@@ -58,7 +61,8 @@ inline constexpr std::array<StructureDef, 3> k_prototype_structure_defs {{
         10U,
         CraftingStationKind::None,
         true,
-        0U},
+        1U,
+        1U},
 }};
 
 [[nodiscard]] inline constexpr const StructureDef* find_structure_def(StructureId structure_id) noexcept

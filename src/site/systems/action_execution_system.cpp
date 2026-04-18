@@ -691,6 +691,7 @@ void emit_placement_reservation_requested(
     std::uint32_t action_id,
     ActionKind action_kind,
     TileCoord target_tile,
+    PlacementReservationSubjectKind subject_kind,
     std::uint32_t subject_id)
 {
     enqueue_message(
@@ -701,8 +702,49 @@ void emit_placement_reservation_requested(
             target_tile.x,
             target_tile.y,
             placement_occupancy_layer(action_kind),
-            {0U, 0U, 0U},
+            subject_kind,
+            {0U, 0U},
             subject_id});
+}
+
+PlacementReservationSubjectKind placement_reservation_subject_kind(
+    ActionKind action_kind,
+    std::uint32_t item_id) noexcept
+{
+    if (action_kind == ActionKind::Build)
+    {
+        return PlacementReservationSubjectKind::StructureType;
+    }
+
+    if (action_kind != ActionKind::Plant)
+    {
+        return PlacementReservationSubjectKind::None;
+    }
+
+    const auto* item_def = action_item_def(action_kind, item_id);
+    return item_def == nullptr
+        ? PlacementReservationSubjectKind::GroundCoverType
+        : PlacementReservationSubjectKind::PlantType;
+}
+
+std::uint32_t placement_reservation_subject_id(
+    ActionKind action_kind,
+    std::uint32_t item_id,
+    std::uint32_t primary_subject_id) noexcept
+{
+    if (action_kind == ActionKind::Build)
+    {
+        const auto* item_def = action_item_def(action_kind, item_id);
+        return item_def == nullptr ? 0U : item_def->linked_structure_id.value;
+    }
+
+    if (action_kind != ActionKind::Plant)
+    {
+        return primary_subject_id;
+    }
+
+    const auto* item_def = action_item_def(action_kind, item_id);
+    return item_def == nullptr ? primary_subject_id : item_def->linked_plant_id.value;
 }
 
 void emit_placement_reservation_released(
@@ -1200,7 +1242,13 @@ Gs1Status ActionExecutionSystem::process_message(
                 action_id.value,
                 action_kind,
                 target_tile,
-                payload.primary_subject_id);
+                placement_reservation_subject_kind(
+                    action_kind,
+                    action_state.item_id),
+                placement_reservation_subject_id(
+                    action_kind,
+                    action_state.item_id,
+                    payload.primary_subject_id));
         }
         else if (!action_requires_worker_approach(action_kind) ||
             worker_is_at_action_approach_tile(context, action_state))
