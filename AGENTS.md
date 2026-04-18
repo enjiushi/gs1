@@ -2,8 +2,25 @@
 
 This file is a quick orientation guide for agents working in this repository.
 
+## Folder Guideline Workflow
+
+- `AGENTS.md` is the root entry point for repository navigation.
+- Before exploring a folder in detail, check whether that folder contains `guideline.md`. If it does, read it first for a short description of the folder plus the files and child folders inside it.
+- If you open a child folder, repeat the same check there and continue recursively as needed.
+- When a file or folder is added, removed, renamed, or meaningfully changed, update the `guideline.md` in its parent folder in the same change.
+- When a root-level file or folder is added, removed, renamed, or meaningfully changed, update `AGENTS.md` because it acts as the root guideline.
+- The maintained guideline set covers the source-controlled project folders. Generated or ephemeral folders such as `build/`, `out/`, `.git/`, and `.agent-progress/` do not need `guideline.md` maintenance unless a task explicitly targets them.
+
 ## Repository Map
 
+- `.agent-progress/`: Session-progress and merge-coordination scratch area used by worktree/session rules.
+- `build/`: Local CMake build tree and IDE-generated build artifacts.
+- `include/`: Public headers exposed to the gameplay DLL host boundary. Read `include/guideline.md` before drilling deeper.
+- `out/`: Generated binaries, logs, exported headers, and local browser/debug profiles.
+- `scripts/`: PowerShell helpers for building and running tests. Read `scripts/guideline.md` before drilling deeper.
+- `src/`: Gameplay/runtime implementation code grouped by ownership domain. Read `src/guideline.md` before drilling deeper.
+- `tests/`: Runtime, smoke, and system test code plus scripted/system-test assets. Read `tests/guideline.md` before drilling deeper.
+- `third_party/`: Vendored external dependencies. Read `third_party/guideline.md` before drilling deeper.
 - `CMakeLists.txt`: Builds the gameplay DLL and smoke host executables.
 - `include/gs1/export.h`: Public DLL export/import macros.
 - `include/gs1/game_api.h`: C ABI entry points exposed by the gameplay DLL.
