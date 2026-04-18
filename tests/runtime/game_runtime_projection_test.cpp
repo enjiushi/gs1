@@ -409,6 +409,27 @@ bool contains_ui_element_text(
     return false;
 }
 
+const Gs1EngineMessage* find_regional_map_site_message(
+    const std::vector<Gs1EngineMessage>& messages,
+    std::uint32_t site_id)
+{
+    for (const auto& message : messages)
+    {
+        if (message.type != GS1_ENGINE_MESSAGE_REGIONAL_MAP_SITE_UPSERT)
+        {
+            continue;
+        }
+
+        const auto& payload = message.payload_as<Gs1EngineMessageRegionalMapSiteData>();
+        if (payload.site_id == site_id)
+        {
+            return &message;
+        }
+    }
+
+    return nullptr;
+}
+
 }  // namespace
 
 int main()
@@ -430,6 +451,47 @@ int main()
     assert(contains_ui_element_text(loadout_ui_messages, "Water x2"));
     assert(contains_ui_element_text(loadout_ui_messages, "Wind Reed Seeds x8"));
     assert(contains_ui_element_text(loadout_ui_messages, "Wood x6"));
+
+    GameRuntime support_runtime {create_desc};
+    assert(support_runtime.handle_message(make_start_campaign_message()) == GS1_STATUS_OK);
+    assert(gs1::GameRuntimeProjectionTestAccess::campaign(support_runtime).has_value());
+    auto& support_campaign = gs1::GameRuntimeProjectionTestAccess::campaign(support_runtime).value();
+    support_campaign.sites[0].site_state = GS1_SITE_STATE_COMPLETED;
+    support_campaign.sites[1].site_state = GS1_SITE_STATE_AVAILABLE;
+    support_campaign.regional_map_state.available_site_ids = {gs1::SiteId {2U}};
+    support_campaign.regional_map_state.completed_site_ids = {gs1::SiteId {1U}};
+    drain_engine_messages(support_runtime);
+    assert(support_runtime.handle_message(make_select_site_message(2U)) == GS1_STATUS_OK);
+    const auto support_loadout_messages = drain_engine_messages(support_runtime);
+    assert(contains_ui_element_text(support_loadout_messages, "Saltbush Seeds x4"));
+    assert(contains_ui_element_text(support_loadout_messages, "Wood x8"));
+    assert(contains_ui_element_text(support_loadout_messages, "Adj Support x1"));
+    assert(contains_ui_element_text(support_loadout_messages, "Aura Ready x1"));
+    {
+        const auto* contributor_message = find_regional_map_site_message(support_loadout_messages, 1U);
+        assert(contributor_message != nullptr);
+        const auto& payload = contributor_message->payload_as<Gs1EngineMessageRegionalMapSiteData>();
+        assert(payload.support_package_id == 1001U);
+        assert(payload.support_preview_mask != 0U);
+    }
+    {
+        const auto* target_message = find_regional_map_site_message(support_loadout_messages, 2U);
+        assert(target_message != nullptr);
+        const auto& payload = target_message->payload_as<Gs1EngineMessageRegionalMapSiteData>();
+        assert(payload.support_preview_mask == 0U);
+    }
+    assert(support_runtime.handle_message(make_start_site_attempt_message(2U)) == GS1_STATUS_OK);
+    assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(support_runtime).has_value());
+    auto& supported_site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(support_runtime).value();
+    assert(supported_site_run.modifier.active_nearby_aura_modifier_ids.size() == 1U);
+    assert(gs1::inventory_storage::available_item_quantity_in_container(
+               supported_site_run,
+               gs1::inventory_storage::starter_storage_container(supported_site_run),
+               gs1::ItemId {gs1::k_item_saltbush_seed_bundle}) == 4U);
+    assert(gs1::inventory_storage::available_item_quantity_in_container(
+               supported_site_run,
+               gs1::inventory_storage::starter_storage_container(supported_site_run),
+               gs1::ItemId {gs1::k_item_wood_bundle}) == 8U);
 
     const auto first_site_id = campaign_site_id;
     assert(runtime.handle_message(make_start_site_attempt_message(first_site_id)) == GS1_STATUS_OK);

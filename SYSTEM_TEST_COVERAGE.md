@@ -105,8 +105,12 @@ Implemented behavior coverage should verify:
 
 Implemented behavior coverage should verify:
 
-- The system subscribes only to `DeploymentSiteSelectionChanged`.
+- The system rebuilds selection/loadout state from
+  `SelectDeploymentSite`, `ClearDeploymentSiteSelection`, and
+  `DeploymentSiteSelectionChanged`.
 - A non-zero selected site updates `selected_target_site_id`.
+- Selecting a site rebuilds adjacent completed-site support into exported items,
+  nearby aura ids, support quota, and the deployment loadout.
 - A zero selected site clears `selected_target_site_id`.
 - Unrelated messages are ignored.
 

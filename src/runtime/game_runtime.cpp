@@ -52,6 +52,94 @@ namespace
     return count;
 }
 
+[[nodiscard]] const SiteMetaState* find_site_meta(
+    const CampaignState& campaign,
+    std::uint32_t site_id) noexcept
+{
+    for (const auto& site : campaign.sites)
+    {
+        if (site.site_id.value == site_id)
+        {
+            return &site;
+        }
+    }
+
+    return nullptr;
+}
+
+[[nodiscard]] bool site_contributes_to_selected_target(
+    const CampaignState& campaign,
+    const SiteMetaState& contributor) noexcept
+{
+    if (!campaign.regional_map_state.selected_site_id.has_value() ||
+        contributor.site_state != GS1_SITE_STATE_COMPLETED)
+    {
+        return false;
+    }
+
+    const auto* selected_site =
+        find_site_meta(campaign, campaign.regional_map_state.selected_site_id->value);
+    if (selected_site == nullptr)
+    {
+        return false;
+    }
+
+    for (const auto adjacent_site_id : selected_site->adjacent_site_ids)
+    {
+        if (adjacent_site_id == contributor.site_id)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+enum RegionalSupportPreviewBits : std::uint16_t
+{
+    REGIONAL_SUPPORT_PREVIEW_ITEMS = 1U << 0,
+    REGIONAL_SUPPORT_PREVIEW_WIND = 1U << 1,
+    REGIONAL_SUPPORT_PREVIEW_FERTILITY = 1U << 2,
+    REGIONAL_SUPPORT_PREVIEW_RECOVERY = 1U << 3
+};
+
+[[nodiscard]] std::uint16_t support_preview_mask_for_site(const SiteMetaState& site) noexcept
+{
+    std::uint16_t mask = 0U;
+    for (const auto& slot : site.exported_support_items)
+    {
+        if (slot.occupied && slot.item_id.value != 0U && slot.quantity > 0U)
+        {
+            mask |= REGIONAL_SUPPORT_PREVIEW_ITEMS;
+            break;
+        }
+    }
+
+    for (const auto modifier_id : site.nearby_aura_modifier_ids)
+    {
+        if (modifier_id.value == 0U)
+        {
+            continue;
+        }
+
+        const auto bucket = modifier_id.value % 3U;
+        if (bucket == 1U)
+        {
+            mask |= REGIONAL_SUPPORT_PREVIEW_WIND;
+        }
+        else if (bucket == 2U)
+        {
+            mask |= REGIONAL_SUPPORT_PREVIEW_FERTILITY;
+        }
+        else
+        {
+            mask |= REGIONAL_SUPPORT_PREVIEW_RECOVERY;
+        }
+    }
+
+    return mask;
+}
+
 std::size_t message_type_index(GameMessageType type) noexcept
 {
     return static_cast<std::size_t>(type);
@@ -1295,11 +1383,15 @@ void GameRuntime::queue_regional_map_selection_ui_messages()
 
     const auto site_id = campaign_->regional_map_state.selected_site_id->value;
     const auto loadout_label_count = visible_loadout_slot_count(campaign_->loadout_planner_state);
+    const bool has_support_contributors = campaign_->loadout_planner_state.support_quota > 0U;
+    const bool has_aura_support = !campaign_->loadout_planner_state.active_nearby_aura_modifier_ids.empty();
+    const std::uint32_t summary_label_count =
+        (has_support_contributors ? 1U : 0U) + (has_aura_support ? 1U : 0U);
 
     queue_ui_setup_begin_message(
         GS1_UI_SETUP_REGIONAL_MAP_SELECTION,
         GS1_UI_SETUP_PRESENTATION_OVERLAY,
-        static_cast<std::uint32_t>(3U + loadout_label_count),
+        static_cast<std::uint32_t>(3U + summary_label_count + loadout_label_count),
         site_id);
 
     Gs1UiAction no_action {};
@@ -1313,6 +1405,38 @@ void GameRuntime::queue_regional_map_selection_ui_messages()
         label_text);
 
     std::uint32_t next_element_id = 2U;
+    if (has_support_contributors)
+    {
+        char support_text[64] {};
+        std::snprintf(
+            support_text,
+            sizeof(support_text),
+            "Adj Support x%u",
+            static_cast<unsigned>(campaign_->loadout_planner_state.support_quota));
+        queue_ui_element_message(
+            next_element_id++,
+            GS1_UI_ELEMENT_LABEL,
+            GS1_UI_ELEMENT_FLAG_NONE,
+            no_action,
+            support_text);
+    }
+
+    if (has_aura_support)
+    {
+        char aura_text[64] {};
+        std::snprintf(
+            aura_text,
+            sizeof(aura_text),
+            "Aura Ready x%u",
+            static_cast<unsigned>(campaign_->loadout_planner_state.active_nearby_aura_modifier_ids.size()));
+        queue_ui_element_message(
+            next_element_id++,
+            GS1_UI_ELEMENT_LABEL,
+            GS1_UI_ELEMENT_FLAG_NONE,
+            no_action,
+            aura_text);
+    }
+
     for (const auto& slot : campaign_->loadout_planner_state.selected_loadout_slots)
     {
         if (!slot.occupied || slot.item_id.value == 0U || slot.quantity == 0U)
@@ -1487,7 +1611,10 @@ void GameRuntime::queue_regional_map_site_upsert_message(const SiteMetaState& si
     payload.map_y = 0;
     payload.support_package_id =
         site.has_support_package_id ? site.support_package_id : 0U;
-    payload.support_preview_mask = 0U;
+    payload.support_preview_mask =
+        site_contributes_to_selected_target(*campaign_, site)
+            ? support_preview_mask_for_site(site)
+            : 0U;
     engine_messages_.push_back(site_message);
 }
 

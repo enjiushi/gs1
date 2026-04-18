@@ -20,6 +20,8 @@ struct SiteMetaState final
     std::uint32_t attempt_count {0};
     std::uint32_t support_package_id {0};
     bool has_support_package_id {false};
+    std::vector<LoadoutSlot> exported_support_items {};
+    std::vector<ModifierId> nearby_aura_modifier_ids {};
 };
 
 struct RegionalMapState final

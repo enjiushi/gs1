@@ -5,6 +5,17 @@
 
 namespace gs1
 {
+namespace
+{
+[[nodiscard]] LoadoutSlot make_support_loadout_slot(ItemId item_id, std::uint32_t quantity) noexcept
+{
+    return LoadoutSlot {
+        item_id,
+        quantity,
+        item_id.value != 0U && quantity > 0U};
+}
+}  // namespace
+
 CampaignState CampaignFactory::create_prototype_campaign(
     std::uint64_t campaign_seed,
     std::uint32_t campaign_days)
@@ -29,6 +40,15 @@ CampaignState CampaignFactory::create_prototype_campaign(
         site.site_state = site_content.initial_state;
         site.adjacent_site_ids = site_content.adjacent_site_ids;
         site.site_archetype_id = site_content.site_archetype_id;
+        site.support_package_id = site_content.support_package_id;
+        site.has_support_package_id = site.support_package_id != 0U;
+        site.exported_support_items.reserve(site_content.exported_support_items.size());
+        for (const auto& item : site_content.exported_support_items)
+        {
+            site.exported_support_items.push_back(
+                make_support_loadout_slot(item.item_id, item.quantity));
+        }
+        site.nearby_aura_modifier_ids = site_content.nearby_aura_modifier_ids;
         campaign.sites.push_back(site);
     }
 
