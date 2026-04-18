@@ -41,11 +41,13 @@ This file is a quick orientation guide for agents working in this repository.
 
 ## Session Handoff Rule
 
-- At the start of any task or implementation session, create a temporary Markdown file at `.agent-progress/<session-name>.md`.
-- Use that file as a live task tracker for the session and list every intended work item before doing it.
+- After a session chooses a worktree, create the fixed Markdown file `.agent-progress/session.md` in that worktree. Do not use task names or session names in the tracker file name.
+- Treat `.agent-progress/session.md` as both the live task tracker for that session and the occupancy marker showing that the worktree is in use.
+- Use that file to list every intended work item before doing it, and keep appending new task items as the session takes on more work. Do not erase earlier task entries from the file.
 - Every listed item must include a status and only the statuses `pending`, `processing`, or `done` may be used.
 - Update the file as work progresses so another agent can immediately see what is planned, what is in flight, and what is finished.
-- Keep `.agent-progress/` out of commits and remove the temporary session file once every listed item is `done` and no further session work remains.
+- Keep `.agent-progress/` out of commits.
+- Remove `.agent-progress/session.md` only after the session's changes have been successfully merged back to `main`. Do not remove it earlier, even if the current task list is complete.
 
 ## Worktree Alignment Rule
 
@@ -56,13 +58,9 @@ This file is a quick orientation guide for agents working in this repository.
 
 - Worktrees are no longer manually assigned.
 - When a task needs a git worktree, the agent must discover the available candidates from `git worktree list` and choose a specific free worktree on its own.
-- Determine whether a candidate worktree is free by checking that worktree's `.agent-progress/` folder for task-tracker Markdown files. Ignore `.agent-progress/merge-log.md`, but treat any other session task Markdown file as an active assignment for that worktree.
-- Inspect candidate worktrees one by one. If the current candidate has an ongoing task Markdown file, skip it and continue to the next candidate worktree.
+- Determine whether a candidate worktree is free by checking whether `.agent-progress/session.md` exists in that worktree. If that file exists, the worktree is occupied and the session must choose another candidate.
+- Inspect candidate worktrees one by one. If the current candidate already has `.agent-progress/session.md`, skip it and continue to the next candidate worktree.
 - If no candidate worktree is free, wait 10 seconds and repeat the one-by-one worktree scan until a free worktree becomes available.
-- Because a new task tracker file may not exist immediately when a session begins, every time an agent updates its own `.agent-progress/<session-name>.md` file it must also check that worktree for other session task Markdown files.
-- If more than one session task Markdown file exists in the same worktree, sort those file names in ascending character order and use that ordering as the tie-break.
-- If the current session's task tracker file is first in that character-order list, that session keeps the worktree and continues the remaining task work there.
-- If the current session's task tracker file is not first in that character-order list, that session must stop using that worktree, revert only the changes made by that session if any exist, and then resume the free-worktree search process from the beginning.
 - Use `.agent-progress/merge-log.md` as the shared merge coordination file for merges from a source worktree into a target worktree, including merges into `main`, unless the source is `main` and the target is another worktree.
 - Merges from `main` into another worktree do not use this rule and do not need to read or write `.agent-progress/merge-log.md`.
 - If `.agent-progress/merge-log.md` does not exist when an in-scope merge is about to start, create it in `.agent-progress/` before doing anything else related to that merge.
