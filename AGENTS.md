@@ -54,6 +54,15 @@ This file is a quick orientation guide for agents working in this repository.
 
 ## Merge Coordination Rule
 
+- Worktrees are no longer manually assigned.
+- When a task needs a git worktree, the agent must discover the available candidates from `git worktree list` and choose a specific free worktree on its own.
+- Determine whether a candidate worktree is free by checking that worktree's `.agent-progress/` folder for task-tracker Markdown files. Ignore `.agent-progress/merge-log.md`, but treat any other session task Markdown file as an active assignment for that worktree.
+- Inspect candidate worktrees one by one. If the current candidate has an ongoing task Markdown file, skip it and continue to the next candidate worktree.
+- If no candidate worktree is free, wait 10 seconds and repeat the one-by-one worktree scan until a free worktree becomes available.
+- Because a new task tracker file may not exist immediately when a session begins, every time an agent updates its own `.agent-progress/<session-name>.md` file it must also check that worktree for other session task Markdown files.
+- If more than one session task Markdown file exists in the same worktree, sort those file names in ascending character order and use that ordering as the tie-break.
+- If the current session's task tracker file is first in that character-order list, that session keeps the worktree and continues the remaining task work there.
+- If the current session's task tracker file is not first in that character-order list, that session must stop using that worktree, revert only the changes made by that session if any exist, and then resume the free-worktree search process from the beginning.
 - Use `.agent-progress/merge-log.md` as the shared merge coordination file for merges from a source worktree into a target worktree, including merges into `main`, unless the source is `main` and the target is another worktree.
 - Merges from `main` into another worktree do not use this rule and do not need to read or write `.agent-progress/merge-log.md`.
 - If `.agent-progress/merge-log.md` does not exist when an in-scope merge is about to start, create it in `.agent-progress/` before doing anything else related to that merge.
