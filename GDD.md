@@ -1561,14 +1561,14 @@ The current target is a few plants, not a full roster. If this smaller set is no
 To keep the first playable understandable:
 
 - Each plant should combine 2 roles rather than being purely one thing
-- Each plant should have a direct effect on its own tile, and any neighborhood effect should come from positive contribution values plus shared `auraSize`
-- Neighbor effects should use `auraSize` with Manhattan-distance reach for readability
+- Each plant should have a direct effect on its own tile, and any neighborhood effect should come from positive contribution values plus authored reach fields
+- Wind-side neighbor effects should use `windProtectionRange`, while the other shared plant contribution channels continue to use `auraSize` with Manhattan-distance reach for readability
 - Same-type bonuses should stack softly or cap early so the board stays readable
 - The player should be able to understand a placement decision in a few seconds
 - The player should only place the lowest-density starter version of a plant; stronger plant states should come from growth, not instant deployment
 - Density should be the main driver of plant power, survival, and natural spread
 - Salty tiles should create visibly different plant choices, with some plants occupying them early and others mainly preparing them for later crops
-- One plant-derived starter material is allowed for extremely poor sand: `Straw Checkerboard` starts at maximum `tilePlantDensity`, uses the shared plant trait fields with notable `windProtectionPower`, `dustProtectionPower`, and `fertilityImprovePower`, and uses `growable = false` plus a positive `constantWitherRate` while its `growthPressure` stays `0`
+- One plant-derived starter material is allowed for extremely poor sand: `Straw Checkerboard` starts at maximum `tilePlantDensity`, uses the shared plant trait fields with notable `windProtectionPower`, `windProtectionRange`, `dustProtectionPower`, and `fertilityImprovePower`, and uses `growable = false` plus a positive `constantWitherRate` while its `growthPressure` stays `0`
 
 ### Plant Set (Temp Design)
 
@@ -1958,14 +1958,15 @@ Ecological contribution profile:
 
 | Field | Range | Meaning |
 |---|---|---|
-| `auraSize` | Small integer `0-2` | Maximum Manhattan-distance reach of this object's positive contribution values; `0` means own tile only |
-| `windProtectionPower` | `0-100` | How strongly this plant reduces nearby `tileWind` |
+| `auraSize` | Small integer `0-2` | Maximum Manhattan-distance reach of this object's shared non-wind contribution values; `0` means own tile only |
+| `windProtectionRange` | Small integer `0-2` | Maximum Manhattan-distance reach of this object's wind protection; `0` means own tile only |
+| `windProtectionPower` | `0-100` | How strongly this plant or device reduces `tileWind` inside `windProtectionRange` |
 | `heatProtectionPower` | `0-100` | How strongly this plant reduces nearby `tileHeat` |
 | `dustProtectionPower` | `0-100` | How strongly this plant reduces nearby `tileDust` |
 | `fertilityImprovePower` | `0-100` | How strongly this plant gradually improves `tileSoilFertility` while healthy and how strongly it pushes back against erosion-driven fertility loss in the current design |
 | `salinityReductionPower` | `0-100` | How strongly this plant gradually reduces `tileSoilSalinity` while healthy |
 
-These contribution traits are plant-side inputs into the shared object contribution meters. `auraSize` belongs to the same contribution family and determines how far those contribution values can reach, while current `tilePlantDensity` scales how much of each contribution is currently active.
+These contribution traits are plant-side inputs into the shared object contribution meters. `windProtectionPower` now uses its own `windProtectionRange`, while `auraSize` continues to control the shared reach for heat, dust, fertility, and salinity contributions. Current `tilePlantDensity` still scales how much of each plant-side contribution is currently active.
 
 Expansion and output profile:
 
@@ -1979,7 +1980,7 @@ Note:
 
 - the current set tables can keep using design language such as `Low`, `Medium`, and `High`
 
-Ground-cover definitions should not define a separate trait family. In the current design, `Straw Checkerboard` should use the same trait fields as plants, especially non-zero `windProtectionPower`, `dustProtectionPower`, and `fertilityImprovePower`, set `growable = false`, set `constantWitherRate` to a positive value, set `auraSize` as needed for local setup support, set spread-related fields to `0`, and use the shared runtime meter `tilePlantDensity`, which starts full and steadily loses density while present.
+Ground-cover definitions should not define a separate trait family. In the current design, `Straw Checkerboard` should use the same trait fields as plants, especially non-zero `windProtectionPower`, `dustProtectionPower`, and `fertilityImprovePower`, set `growable = false`, set `constantWitherRate` to a positive value, set `windProtectionRange` and `auraSize` as needed for local setup support, set spread-related fields to `0`, and use the shared runtime meter `tilePlantDensity`, which starts full and steadily loses density while present.
 
 #### Object Contribution And Resolved Local Weather Build Rules
 
@@ -1990,19 +1991,20 @@ Use this contribution pattern:
 | Source | Reach | `windProtectionPower` | `heatProtectionPower` | `dustProtectionPower` | Rule |
 |---|---|---|---|---|---|
 | Own-tile living plant or ground cover | Own tile always | Add current local contribution | Add current local contribution | Add current local contribution | Scale by current `tilePlantDensity` and the relevant shared plant contribution values |
-| Neighbor tile within plant `auraSize` | Manhattan distance `<= auraSize` | Add small to medium contribution | Add small to medium contribution | Add small to medium contribution | Only positive plant contribution values reach neighbors; keep neighbor effect weaker than own-tile effect in the current design |
-| Nearby device or rock shelter | Device footprint or authored shelter range | Add medium to strong contribution | Add medium to strong contribution | Add light to medium contribution | Scale by device power, `deviceEfficiency`, or authored rock-shelter value |
+| Neighbor tile within plant support reach | Manhattan distance `<= windProtectionRange` for wind, `<= auraSize` for the other shared plant channels | Add small to medium contribution | Add small to medium contribution | Add small to medium contribution | Only positive plant contribution values reach neighbors; keep neighbor effect weaker than own-tile effect in the current design |
+| Nearby device or rock shelter | Device footprint or authored `windProtectionRange` | Add medium to strong contribution | None in the current code path | None in the current code path | Scale wind reduction by authored device power and `deviceEfficiency`, or by authored rock-shelter value |
 
 Rules:
 
-- plant-side neighborhood reach should come from shared `auraSize`, not from separate per-contribution neighbor-aura fields
-- `auraSize = 0` means own tile only
-- `auraSize = 1` means own tile plus the `4` orthogonal neighbors
-- `auraSize = 2` means own tile plus all tiles within Manhattan distance `2`
-- if a plant has no positive contribution values, `auraSize` has no gameplay effect
+- plant-side wind neighborhood reach should come from explicit `windProtectionRange`
+- `windProtectionRange = 0` means own tile only
+- `windProtectionRange = 1` means own tile plus the `4` orthogonal neighbors
+- `windProtectionRange = 2` means own tile plus all tiles within Manhattan distance `2`
+- shared non-wind plant contribution reach should continue to come from `auraSize`
+- if a plant has no positive wind contribution, `windProtectionRange` has no wind-gameplay effect
 - if a tile has no living plant and no `Straw Checkerboard`, nearby support may still create useful object contribution meters and resolved local weather reduction, but the tile remains empty until planted or spread into
 - rock protection should usually be low-radius and local, just enough to make lee-side placement readable
-- `Straw Checkerboard` uses the same own-tile and neighbor contribution logic as other plant-authored occupants, scaled by current `tilePlantDensity` and `auraSize`
+- `Straw Checkerboard` uses the same own-tile and neighbor contribution logic as other plant-authored occupants, scaled by current `tilePlantDensity`, with wind reach on `windProtectionRange` and the other shared channels on `auraSize`
 - `Drip Irrigator` is not an object-contribution source for weather protection; it applies irrigation directly to `tileMoisture`
 
 This pattern keeps local support readable:
@@ -2212,7 +2214,7 @@ Design intent:
 - it uses the same plant-side contribution traits as other plant-authored occupants, especially meaningful `windProtectionPower`, `dustProtectionPower`, and `fertilityImprovePower`
 - set `growable = false`
 - set `constantWitherRate` to a positive value
-- set `auraSize` as needed for setup reach
+- set `windProtectionRange` and `auraSize` as needed for setup reach
 - on placement, start it at full `tilePlantDensity`
 - its `growthPressure` should stay at zero
 - it can exist on the same tile as one living plant type
@@ -3299,11 +3301,11 @@ Every unlocked content row should own exactly `3` persistent update families in 
 | `Village Committee` | `recipe` | `Endurance Blend` | `playerEnergyCap`, `playerEnergy`, `playerWorkEfficiency` | Make food and drink better at sustaining long work windows and reducing work slowdown. |
 | `Village Committee` | `recipe` | `Comfort Blend` | `playerMorale`, `itemFreshness` | Make crafted goods better at maintaining morale and staying usable for longer. |
 | `Forestry Bureau of Autonomous Region` | `plant` | `Establishment Update` | `growthPressure`, `plantDensityModifier`, `salinityDensityCap` | Help a new plant establish on difficult land and hold density sooner. |
-| `Forestry Bureau of Autonomous Region` | `plant` | `Protection Update` | `windProtectionPower`, `heatProtectionPower`, `dustProtectionPower`, `auraSize` | Make the plant provide stronger local protection once it is established. |
+| `Forestry Bureau of Autonomous Region` | `plant` | `Protection Update` | `windProtectionPower`, `windProtectionRange`, `heatProtectionPower`, `dustProtectionPower`, `auraSize` | Make the plant provide stronger local protection once it is established. |
 | `Forestry Bureau of Autonomous Region` | `plant` | `Rehab Update` | `fertilityImprovePower`, `salinityReductionPower` | Make the plant better at long-term land recovery and soil rehabilitation. |
 | `Autonomous Region Agricultural University` | `device` | `Calibration Update` | `deviceEfficiency`, linked device primary output values | Make the device perform its main job more efficiently once deployed. |
 | `Autonomous Region Agricultural University` | `device` | `Hardening Update` | `deviceIntegrity`, `burialSensitivity` | Make the device more durable and less vulnerable to harsh conditions. |
-| `Autonomous Region Agricultural University` | `device` | `Field Envelope Update` | `auraSize`, `windProtectionPower`, `heatProtectionPower`, `dustProtectionPower`, linked device support values | Make the device shape a stronger local support pocket around itself. |
+| `Autonomous Region Agricultural University` | `device` | `Field Envelope Update` | `windProtectionPower`, `windProtectionRange`, linked device support values | Make the device shape a stronger local wind-protection pocket around itself. |
 
 Important rule:
 
@@ -4342,7 +4344,7 @@ This summary should include only core runtime meters and the core plant-side val
 | Plant meters | `tilePlantDensity`, `growthPressure`, `salinityDensityCap` | Shared plant-side runtime meters. `tilePlantDensity` tracks current plant presence, `growthPressure` governs growth-capable plants, and `salinityDensityCap` is the plant-side density ceiling created by salty ground. |
 | Plant behavior values | `growable`, `constantWitherRate` | Core plant-side behavior values. `growable` decides whether favorable conditions may increase density, and `constantWitherRate` applies steady density loss to plant density when defined. |
 | Plant resistance values | `saltTolerance`, `heatTolerance`, `windResistance`, `dustTolerance` | Plant-definition values that turn salinity, heat, wind, and dust pressure into species-specific density limits and pressure resistance. |
-| Object contribution meters | `auraSize`, `windProtectionPower`, `heatProtectionPower`, `dustProtectionPower`, `fertilityImprovePower`, `salinityReductionPower` | Shared local contribution values and meters. Plants, devices, and terrain shelter may feed them; object definition sets local contribution ceilings and reach, while `tilePlantDensity` scales plant-side output. |
+| Object contribution meters | `auraSize`, `windProtectionRange`, `windProtectionPower`, `heatProtectionPower`, `dustProtectionPower`, `fertilityImprovePower`, `salinityReductionPower` | Shared local contribution values and meters. Plants feed all of these channels, while authored devices currently feed wind protection through `windProtectionPower` plus `windProtectionRange`; object definition sets local contribution ceilings and reach, and `tilePlantDensity` scales plant-side output. |
 
 ### Event Meter Relationships
 
@@ -4411,11 +4413,11 @@ Technology content updates are not separate runtime meters. They are persistent 
 | `Village Committee` | `Endurance Blend` | `playerEnergyCap`, `playerEnergy`, `playerWorkEfficiency` | Applies when the linked recipe item is consumed. |
 | `Village Committee` | `Comfort Blend` | `playerMorale`, `itemFreshness` | Lets field food stay useful longer and support comfort. |
 | `Forestry Bureau of Autonomous Region` | `Establishment Update` | `growthPressure`, `plantDensityModifier`, `salinityDensityCap` | Applies to the linked plant definition. |
-| `Forestry Bureau of Autonomous Region` | `Protection Update` | `windProtectionPower`, `heatProtectionPower`, `dustProtectionPower`, `auraSize` | Applies to the linked plant definition. |
+| `Forestry Bureau of Autonomous Region` | `Protection Update` | `windProtectionPower`, `windProtectionRange`, `heatProtectionPower`, `dustProtectionPower`, `auraSize` | Applies to the linked plant definition. |
 | `Forestry Bureau of Autonomous Region` | `Rehab Update` | `fertilityImprovePower`, `salinityReductionPower` | Applies to the linked plant definition. |
 | `Autonomous Region Agricultural University` | `Calibration Update` | `deviceEfficiency`, linked device primary output values | Applies to the linked device definition. |
 | `Autonomous Region Agricultural University` | `Hardening Update` | `deviceIntegrity`, `burialSensitivity` | Applies to the linked device definition and harsh-event durability behavior. |
-| `Autonomous Region Agricultural University` | `Field Envelope Update` | `auraSize`, `windProtectionPower`, `heatProtectionPower`, `dustProtectionPower`, linked device support values | Applies only to the support values present on the linked device row. |
+| `Autonomous Region Agricultural University` | `Field Envelope Update` | `windProtectionPower`, `windProtectionRange`, linked device support values | Applies only to the support values present on the linked device row. |
 
 ### Terrain Meter Relationships
 
@@ -4432,21 +4434,22 @@ Technology content updates are not separate runtime meters. They are persistent 
 |---|---|---|---|
 | `growable` | Plant definition only | `tilePlantDensity` | Allows favorable conditions to create density gain. If `false`, low `growthPressure` does not produce positive growth. |
 | `constantWitherRate` | Plant definition only | `tilePlantDensity` | Applies steady density loss every fixed simulation step. |
-| `auraSize` | Object definition only | Reach of `windProtectionPower`, `heatProtectionPower`, `dustProtectionPower`, `fertilityImprovePower`, and `salinityReductionPower` | Shared contribution reach value. `0` means own tile only, and larger values extend contribution reach by Manhattan distance. |
-| `windProtectionPower` | Object definition only, `tilePlantDensity`, `deviceEfficiency`, `auraSize` | `tileWind` | Shared local wind-protection meter. Any object with positive wind protection may feed it. Plant density scales plant-side output, while device efficiency scales device-side output. |
-| `heatProtectionPower` | Object definition only, `tilePlantDensity`, `deviceEfficiency`, `auraSize` | `tileHeat` | Shared local heat-protection meter. Any object with positive heat protection may feed it. Plant density scales plant-side output, while device efficiency scales device-side output. |
-| `dustProtectionPower` | Object definition only, `tilePlantDensity`, `deviceEfficiency`, `auraSize` | `tileDust` | Shared local dust-protection meter. Any object with positive dust protection may feed it. Plant density scales plant-side output, while device efficiency scales device-side output. |
-| `fertilityImprovePower` | Object definition only, `tilePlantDensity`, `deviceEfficiency`, `auraSize` | `tileSoilFertility` | Shared local soil-building meter. Plant density scales plant-side output, while device efficiency scales device-side output when a device supports soil recovery. |
-| `salinityReductionPower` | Object definition only, `tilePlantDensity`, `deviceEfficiency`, `auraSize` | `tileSoilSalinity` | Shared local salinity-reduction meter. Plant density scales plant-side output, while device efficiency scales device-side output when a device supports salinity recovery. |
+| `auraSize` | Object definition only | Reach of `heatProtectionPower`, `dustProtectionPower`, `fertilityImprovePower`, and `salinityReductionPower` | Shared non-wind contribution reach value. `0` means own tile only, and larger values extend contribution reach by Manhattan distance. |
+| `windProtectionRange` | Object definition only | Reach of `windProtectionPower` | Wind-specific contribution reach value. `0` means own tile only, and larger values extend wind protection by Manhattan distance. |
+| `windProtectionPower` | Object definition only, `tilePlantDensity`, `deviceEfficiency`, `windProtectionRange` | `tileWind` | Shared local wind-protection meter. Any object with positive wind protection may feed it. Plant density scales plant-side output, while device efficiency scales device-side output. |
+| `heatProtectionPower` | Object definition only, `tilePlantDensity`, `auraSize` | `tileHeat` | Shared local heat-protection meter. Positive plant contribution uses the shared `auraSize` reach. |
+| `dustProtectionPower` | Object definition only, `tilePlantDensity`, `auraSize` | `tileDust` | Shared local dust-protection meter. Positive plant contribution uses the shared `auraSize` reach. |
+| `fertilityImprovePower` | Object definition only, `tilePlantDensity`, `auraSize` | `tileSoilFertility` | Shared local soil-building meter. Plant density scales plant-side output while `auraSize` controls reach. |
+| `salinityReductionPower` | Object definition only, `tilePlantDensity`, `auraSize` | `tileSoilSalinity` | Shared local salinity-reduction meter. Plant density scales plant-side output while `auraSize` controls reach. |
 | `saltTolerance` | Plant definition only | `salinityDensityCap` | Preserves usable density on salty ground. |
 | `heatTolerance` | Plant definition only | `growthPressure` | Lowers heat-side growth pressure. |
 | `windResistance` | Plant definition only | `growthPressure` | Lowers wind-side growth pressure. |
 | `dustTolerance` | Plant definition only | `growthPressure` | Covers dust exposure and burial-side pressure. |
 | `growthPressure` | `tileMoisture`, `tileSoilFertility`, `tileSandBurial`, `tileHeat`, `tileWind`, `tileDust`, `heatTolerance`, `windResistance`, `dustTolerance` | `tilePlantDensity` | Final plant pressure meter for growth-capable plants. |
 | `salinityDensityCap` | `tileSoilSalinity`, `saltTolerance` | `tilePlantDensity` | Plant-side density ceiling on salty ground. |
-| `tilePlantDensity` | `growthPressure`, `salinityDensityCap`, `growable`, `constantWitherRate` | `windProtectionPower`, `heatProtectionPower`, `dustProtectionPower`, `fertilityImprovePower`, `salinityReductionPower` | Current plant strength and effect scale. Higher density strengthens the plant-fed share of the shared object contribution meters first, while `auraSize` controls how far those plant-side contributions can reach. |
+| `tilePlantDensity` | `growthPressure`, `salinityDensityCap`, `growable`, `constantWitherRate` | `windProtectionPower`, `heatProtectionPower`, `dustProtectionPower`, `fertilityImprovePower`, `salinityReductionPower` | Current plant strength and effect scale. Higher density strengthens the plant-fed share of the shared object contribution meters first, while `windProtectionRange` controls plant-side wind reach and `auraSize` controls the other shared plant-side contribution reach. |
 
-`Straw Checkerboard` should be authored through the same shared plant rows: start it at maximum `tilePlantDensity`, set `growable = false`, set a positive `constantWitherRate`, set `auraSize` as needed for setup reach, keep `growthPressure` at `0`, and rely on normal shared contribution values such as `fertilityImprovePower`.
+`Straw Checkerboard` should be authored through the same shared plant rows: start it at maximum `tilePlantDensity`, set `growable = false`, set a positive `constantWitherRate`, set `windProtectionRange` and `auraSize` as needed for setup reach, keep `growthPressure` at `0`, and rely on normal shared contribution values such as `fertilityImprovePower`.
 
 ### Per-Site Modifier Channel Relationships
 

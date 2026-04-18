@@ -30,7 +30,7 @@ struct PlantDef final
     std::uint8_t aura_size;
     std::uint8_t footprint_width;
     std::uint8_t footprint_height;
-    std::uint8_t reserved0;
+    std::uint8_t wind_protection_range;
     float plant_action_duration_minutes;
     float constant_wither_rate;
     float salt_tolerance;
@@ -104,7 +104,7 @@ inline constexpr std::array<PlantDef, 4> k_prototype_plant_defs {
         1U,
         2U,
         2U,
-        0U,
+        1U,
         0.75f,
         0.0f,
         45.0f,
@@ -127,7 +127,7 @@ inline constexpr std::array<PlantDef, 4> k_prototype_plant_defs {
         1U,
         2U,
         2U,
-        0U,
+        1U,
         1.0f,
         0.0f,
         82.0f,
@@ -150,7 +150,7 @@ inline constexpr std::array<PlantDef, 4> k_prototype_plant_defs {
         1U,
         2U,
         2U,
-        0U,
+        1U,
         1.5f,
         0.0f,
         48.0f,
@@ -173,7 +173,7 @@ inline constexpr std::array<PlantDef, 4> k_prototype_plant_defs {
         1U,
         2U,
         2U,
-        0U,
+        1U,
         1.25f,
         0.0f,
         18.0f,

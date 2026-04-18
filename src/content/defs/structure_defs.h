@@ -20,7 +20,8 @@ struct StructureDef final
     StructureId structure_id {};
     std::string_view display_name {};
     float durability {0.0f};
-    float support_value {0.0f};
+    float wind_protection_value {0.0f};
+    std::uint8_t wind_protection_range {0U};
     std::uint16_t storage_slot_count {0U};
     CraftingStationKind crafting_station_kind {CraftingStationKind::None};
     bool grants_storage {false};
@@ -31,13 +32,15 @@ struct StructureDef final
 inline constexpr std::uint32_t k_structure_camp_stove = 201U;
 inline constexpr std::uint32_t k_structure_workbench = 202U;
 inline constexpr std::uint32_t k_structure_storage_crate = 203U;
+inline constexpr std::uint32_t k_structure_wind_fence = 204U;
 
-inline constexpr std::array<StructureDef, 3> k_prototype_structure_defs {{
+inline constexpr std::array<StructureDef, 4> k_prototype_structure_defs {{
     StructureDef {
         StructureId {k_structure_camp_stove},
         "Camp Stove",
         1.0f,
-        0.1f,
+        0.0f,
+        0U,
         6U,
         CraftingStationKind::Cooking,
         true,
@@ -47,7 +50,8 @@ inline constexpr std::array<StructureDef, 3> k_prototype_structure_defs {{
         StructureId {k_structure_workbench},
         "Workbench",
         1.0f,
-        0.2f,
+        0.0f,
+        0U,
         8U,
         CraftingStationKind::Fabrication,
         true,
@@ -58,9 +62,21 @@ inline constexpr std::array<StructureDef, 3> k_prototype_structure_defs {{
         "Storage Crate",
         1.0f,
         0.0f,
+        0U,
         10U,
         CraftingStationKind::None,
         true,
+        1U,
+        1U},
+    StructureDef {
+        StructureId {k_structure_wind_fence},
+        "Wind Fence",
+        1.0f,
+        42.0f,
+        1U,
+        0U,
+        CraftingStationKind::None,
+        false,
         1U,
         1U},
 }};
