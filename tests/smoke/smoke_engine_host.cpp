@@ -166,6 +166,12 @@ const char* ui_action_name(Gs1UiActionType action_type)
         return "BUY_PHONE_LISTING";
     case GS1_UI_ACTION_SELL_PHONE_LISTING:
         return "SELL_PHONE_LISTING";
+    case GS1_UI_ACTION_ADD_PHONE_LISTING_TO_CART:
+        return "ADD_PHONE_LISTING_TO_CART";
+    case GS1_UI_ACTION_REMOVE_PHONE_LISTING_FROM_CART:
+        return "REMOVE_PHONE_LISTING_FROM_CART";
+    case GS1_UI_ACTION_CHECKOUT_PHONE_CART:
+        return "CHECKOUT_PHONE_CART";
     case GS1_UI_ACTION_USE_INVENTORY_ITEM:
         return "USE_INVENTORY_ITEM";
     case GS1_UI_ACTION_TRANSFER_INVENTORY_ITEM:
@@ -1478,6 +1484,7 @@ void SmokeEngineHost::apply_site_phone_listing_upsert(const Gs1EngineMessage& me
     projection.price = payload.price;
     projection.related_site_id = payload.related_site_id;
     projection.quantity = payload.quantity;
+    projection.cart_quantity = payload.cart_quantity;
     projection.listing_kind = payload.listing_kind;
     projection.flags = payload.flags;
 

@@ -54,6 +54,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let openedInventoryContainerKey = "";
     let inventoryPanelOpen = true;
     let phonePanelOpen = false;
+    let phoneCartViewOpen = false;
     let lastOverlayAppState = "";
     let tileContextMenuState = null;
     let localActionProgressState = null;
@@ -247,6 +248,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         WORKER_PACK: 0,
         DEVICE_STORAGE: 1
     };
+    const inventoryStorageFlags = {
+        deliveryBox: 1,
+        retrievalOnly: 2
+    };
+    const phoneDeliveryFee = 5;
     let inventoryCache = createEmptyInventoryCache();
     const itemCatalog = {
         1: { name: "Water", shortName: "H2O", stackSize: 5, canUse: true, canPlant: false, canDeploy: false, useLabel: "Drink" },
@@ -887,6 +893,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 containerTileX: typeof storage.tileX === "number" ? storage.tileX : 0,
                 containerTileY: typeof storage.tileY === "number" ? storage.tileY : 0,
                 slotCount: typeof storage.slotCount === "number" ? storage.slotCount : 0,
+                flags: typeof storage.flags === "number" ? storage.flags : 0,
                 isOpenedView:
                     !!(siteState &&
                         siteState.openedStorage &&
@@ -934,6 +941,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     ownerEntityId: typeof sourceSlot.containerOwnerId === "number" ? sourceSlot.containerOwnerId : 0,
                     containerTileX: normalizedSlot.containerTileX,
                     containerTileY: normalizedSlot.containerTileY,
+                    flags: 0,
                     slotCount:
                         normalizedSlot.containerKind === "WORKER_PACK"
                             ? workerPackSlots.length
@@ -1249,6 +1257,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             containerTileX: containerInfo.containerTileX,
             containerTileY: containerInfo.containerTileY,
             slotCount: containerInfo.slotCount,
+            flags: containerInfo.flags || 0,
             isOpenedView: !!containerInfo.isOpenedView,
             slots: containerInfo.slots.slice()
         }));
@@ -1348,6 +1357,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
         if (containerInfo.containerKind === "WORKER_PACK") {
             return "Worker Pack";
+        }
+        if ((containerInfo.flags & inventoryStorageFlags.deliveryBox) !== 0) {
+            return "Delivery Box (" + containerInfo.containerTileX + ", " + containerInfo.containerTileY + ")";
         }
 
         const tile = getTileSnapshot(state, containerInfo.containerTileX, containerInfo.containerTileY);
@@ -1495,7 +1507,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         if (sourceSlot.containerKind === "WORKER_PACK") {
             const openedContainer = findOpenedInventoryContainer(state);
-            return !!(openedContainer && openedContainer.containerKind === "DEVICE_STORAGE");
+            return !!(
+                openedContainer &&
+                openedContainer.containerKind === "DEVICE_STORAGE" &&
+                (openedContainer.flags & inventoryStorageFlags.retrievalOnly) === 0
+            );
         }
 
         if (sourceSlot.containerKind === "DEVICE_STORAGE") {
@@ -2662,9 +2678,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             currentOpenedContainer.slots.length,
             1);
         storagePanelSubtitle.textContent = currentOpenedContainer.isOpenedView
-            ? (structureMeta
-                ? ("Device storage - " + slotCount + " slots")
-                : "Device storage")
+            ? ((currentOpenedContainer.flags & inventoryStorageFlags.deliveryBox) !== 0
+                ? ("Retrieval-only delivery storage - " + slotCount + " slots")
+                : (structureMeta
+                    ? ("Device storage - " + slotCount + " slots")
+                    : "Device storage"))
             : "Loading storage snapshot...";
 
         storagePanelBody.innerHTML = "";
@@ -2849,6 +2867,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             parts.push("available x" + listing.quantity);
         } else if (listing.listingKind === "HIRE_CONTRACTOR") {
             parts.push("open slots x" + listing.quantity);
+        } else if (listing.listingKind === "BUY_ITEM") {
+            parts.push("stock x" + listing.quantity);
+            parts.push("in cart x" + (listing.cartQuantity || 0));
         } else {
             parts.push("stock x" + listing.quantity);
         }
@@ -2875,9 +2896,40 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
     }
 
+    function getPhoneCartListings(state) {
+        return getBuyListings(state).filter((listing) => (listing.cartQuantity || 0) > 0);
+    }
+
+    function getPhoneCartItemCount(state) {
+        return getPhoneCartListings(state).reduce((total, listing) => total + (listing.cartQuantity || 0), 0);
+    }
+
+    function getPhoneCartSubtotal(state) {
+        return getPhoneCartListings(state).reduce(
+            (total, listing) => total + ((listing.price || 0) * (listing.cartQuantity || 0)),
+            0
+        );
+    }
+
+    function canAddPhoneListingToCart(listing) {
+        const cartQuantity = listing.cartQuantity || 0;
+        return (listing.quantity || 0) === 0 || cartQuantity < listing.quantity;
+    }
+
+    function canCheckoutPhoneCart(state) {
+        const hud = getHudState(state);
+        const currentMoney = hud && typeof hud.currentMoney === "number" ? hud.currentMoney : 0;
+        const subtotal = getPhoneCartSubtotal(state);
+        const cartItemCount = getPhoneCartItemCount(state);
+        return cartItemCount > 0 && currentMoney >= (subtotal + phoneDeliveryFee);
+    }
+
     function canUsePhoneListing(state, listing) {
         if (listing.listingKind === "SELL_ITEM") {
             return listing.quantity > 0;
+        }
+        if (listing.listingKind === "BUY_ITEM") {
+            return canAddPhoneListingToCart(listing);
         }
 
         const hud = getHudState(state);
@@ -2892,6 +2944,103 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             arg0: 1,
             arg1: 0
         });
+    }
+
+    function postPhoneCartAction(type, listing) {
+        return postJson("/ui-action", {
+            type: type,
+            targetId: listing.listingId,
+            arg0: 1,
+            arg1: 0
+        });
+    }
+
+    function postPhoneCartCheckout() {
+        return postJson("/ui-action", {
+            type: "CHECKOUT_PHONE_CART",
+            targetId: 0,
+            arg0: 0,
+            arg1: 0
+        });
+    }
+
+    function makePhoneStepperButton(label, onClick, disabled) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "phone-stepper-button";
+        button.textContent = label;
+        button.disabled = !!disabled;
+        button.addEventListener("click", onClick);
+        return button;
+    }
+
+    function makePhoneCartButton(cartItemCount, active) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "phone-cart-button" + (active ? " active" : "");
+
+        const glyph = document.createElement("span");
+        glyph.className = "phone-cart-icon";
+        glyph.innerHTML =
+            '<span class="phone-cart-icon-basket"></span>' +
+            '<span class="phone-cart-icon-handle"></span>';
+        button.appendChild(glyph);
+
+        const label = document.createElement("span");
+        label.className = "phone-cart-button-label";
+        label.textContent = active ? "Shop" : "Cart";
+        button.appendChild(label);
+
+        if (cartItemCount > 0) {
+            const badge = document.createElement("span");
+            badge.className = "phone-cart-count-badge";
+            badge.textContent = String(cartItemCount);
+            button.appendChild(badge);
+        }
+
+        button.addEventListener("click", function () {
+            phoneCartViewOpen = !phoneCartViewOpen;
+            if (latestState) {
+                renderPhonePanel(latestState);
+            }
+        });
+        return button;
+    }
+
+    function appendPhoneBuyControls(card, listing) {
+        const controls = document.createElement("div");
+        controls.className = "phone-stepper-row";
+
+        controls.appendChild(
+            makePhoneStepperButton(
+                "-",
+                function () {
+                    postPhoneCartAction("REMOVE_PHONE_LISTING_FROM_CART", listing).catch(() => {
+                        statusChip.textContent = "Failed to remove item from cart.";
+                    });
+                },
+                (listing.cartQuantity || 0) <= 0
+            )
+        );
+
+        const count = document.createElement("div");
+        count.className = "phone-cart-inline-count";
+        count.textContent = "In Cart " + String(listing.cartQuantity || 0);
+        controls.appendChild(count);
+
+        controls.appendChild(
+            makePhoneStepperButton(
+                "+",
+                function () {
+                    postPhoneCartAction("ADD_PHONE_LISTING_TO_CART", listing).catch(() => {
+                        statusChip.textContent = "Failed to add item to cart.";
+                    });
+                },
+                !canAddPhoneListingToCart(listing)
+            )
+        );
+
+        card.appendChild(controls);
     }
 
     function appendPhoneListingSection(container, title, metaText, listings, state) {
@@ -2928,24 +3077,111 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             metaElement.textContent = getPhoneListingMetaText(listing, affordable);
             card.appendChild(metaElement);
 
-            card.appendChild(
-                makePhoneActionButton(
-                    getPhoneListingActionLabel(listing),
-                    function () {
-                        postPhoneListingAction(listing).catch(() => {
-                            statusChip.textContent = listing.listingKind === "SELL_ITEM"
-                                ? "Failed to sell listing."
-                                : "Failed to use phone listing.";
-                        });
-                    },
-                    listing.listingKind === "SELL_ITEM",
-                    !affordable
-                )
-            );
+            if (listing.listingKind === "BUY_ITEM") {
+                appendPhoneBuyControls(card, listing);
+            } else {
+                card.appendChild(
+                    makePhoneActionButton(
+                        getPhoneListingActionLabel(listing),
+                        function () {
+                            postPhoneListingAction(listing).catch(() => {
+                                statusChip.textContent = listing.listingKind === "SELL_ITEM"
+                                    ? "Failed to sell listing."
+                                    : "Failed to use phone listing.";
+                            });
+                        },
+                        listing.listingKind === "SELL_ITEM",
+                        !affordable
+                    )
+                );
+            }
 
             stack.appendChild(card);
         });
 
+        container.appendChild(section);
+    }
+
+    function appendPhoneCartSection(container, state) {
+        const cartListings = getPhoneCartListings(state);
+        const cartItemCount = getPhoneCartItemCount(state);
+        const subtotal = getPhoneCartSubtotal(state);
+        const totalCost = subtotal + phoneDeliveryFee;
+        const affordable = canCheckoutPhoneCart(state);
+        const section = makePhoneSection(
+            "Cart",
+            cartItemCount > 0
+                ? ("Items " + cartItemCount + "  |  Goods $" + subtotal + "  |  Total $" + totalCost)
+                : "Your cart is empty."
+        );
+        const header = section.querySelector(".phone-section-header");
+        header.appendChild(makePhoneCartButton(cartItemCount, true));
+
+        if (cartListings.length === 0) {
+            const emptyState = document.createElement("div");
+            emptyState.className = "phone-empty-state";
+            emptyState.textContent = "Add marketplace items with + to prepare a delivery order.";
+            section.appendChild(emptyState);
+            container.appendChild(section);
+            return;
+        }
+
+        const stack = document.createElement("div");
+        stack.className = "phone-list-stack";
+        section.appendChild(stack);
+
+        cartListings.forEach((listing) => {
+            const card = document.createElement("article");
+            card.className = "phone-list-card";
+
+            const headerRow = document.createElement("div");
+            headerRow.className = "phone-list-header";
+
+            const titleElement = document.createElement("div");
+            titleElement.className = "phone-list-title";
+            titleElement.textContent = getPhoneListingTitle(listing);
+            headerRow.appendChild(titleElement);
+
+            const badge = document.createElement("div");
+            badge.className = "phone-list-badge";
+            badge.textContent = "Cart";
+            headerRow.appendChild(badge);
+            card.appendChild(headerRow);
+
+            const metaElement = document.createElement("div");
+            metaElement.className = "phone-list-meta";
+            metaElement.textContent =
+                "$" + listing.price +
+                "  |  qty x" + (listing.cartQuantity || 0) +
+                "  |  line $" + ((listing.price || 0) * (listing.cartQuantity || 0));
+            card.appendChild(metaElement);
+
+            appendPhoneBuyControls(card, listing);
+            stack.appendChild(card);
+        });
+
+        const footer = document.createElement("div");
+        footer.className = "phone-cart-footer";
+
+        const fee = document.createElement("div");
+        fee.className = "phone-cart-fee";
+        fee.textContent = "Delivery Fee $" + phoneDeliveryFee + "  |  Total $" + totalCost;
+        footer.appendChild(fee);
+
+        footer.appendChild(
+            makePhoneActionButton(
+                "Buy For $" + totalCost,
+                function () {
+                    postPhoneCartCheckout().catch(() => {
+                        statusChip.textContent = "Failed to submit the cart checkout.";
+                    });
+                },
+                true,
+                !affordable
+            )
+        );
+
+        section.appendChild(footer);
         container.appendChild(section);
     }
 
@@ -3049,30 +3285,87 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const sellListings = getSellListings(state);
         const specialListings = getSpecialPhoneListings(state);
         const currentMoney = hud && typeof hud.currentMoney === "number" ? hud.currentMoney : 0;
+        const cartItemCount = getPhoneCartItemCount(state);
         const activeTaskCount = hud && typeof hud.activeTaskCount === "number"
             ? hud.activeTaskCount
             : countTasksByListKind(tasks, "ACCEPTED");
         const visibleTaskCount = countTasksByListKind(tasks, "VISIBLE");
+        if (phoneCartViewOpen && cartItemCount === 0) {
+            phoneCartViewOpen = false;
+        }
 
         phoneAppSubtitle.textContent =
-            activeTaskCount > 0
-                ? activeTaskCount + " active contract" + (activeTaskCount === 1 ? "" : "s") + ". Press F to pocket the handset."
-                : "Pocket market access, contracts, and remote services. Press F to pocket it again.";
+            phoneCartViewOpen
+                ? "Cart review with delivery fee routing to the field drop box. Press F to pocket the handset."
+                : (activeTaskCount > 0
+                    ? activeTaskCount + " active contract" + (activeTaskCount === 1 ? "" : "s") + ". Press F to pocket the handset."
+                    : "Pocket market access, contracts, and remote services. Press F to pocket it again.");
 
         const summaryGrid = document.createElement("div");
         summaryGrid.className = "phone-summary-grid";
         appendPhoneSummaryCard(summaryGrid, "Money", "$" + String(currentMoney));
+        appendPhoneSummaryCard(summaryGrid, "Cart", String(cartItemCount));
         appendPhoneSummaryCard(summaryGrid, "Buy", String(buyListings.length));
         appendPhoneSummaryCard(summaryGrid, "Sell", String(sellListings.length));
         appendPhoneSummaryCard(summaryGrid, "Tasks", String(activeTaskCount + visibleTaskCount));
         phoneScreenBody.appendChild(summaryGrid);
 
         appendPhoneTaskSection(phoneScreenBody, tasks);
-        appendPhoneListingSection(phoneScreenBody, "Marketplace", "Remote orders routed to camp stock", buyListings, state);
+        if (phoneCartViewOpen) {
+            appendPhoneCartSection(phoneScreenBody, state);
+        } else {
+            const marketplaceSection = makePhoneSection(
+                "Marketplace",
+                "Remote orders wait for delivery-box space before transit."
+            );
+            const marketplaceHeader = marketplaceSection.querySelector(".phone-section-header");
+            marketplaceHeader.appendChild(makePhoneCartButton(cartItemCount, false));
+            if (buyListings.length === 0) {
+                const emptyMarket = document.createElement("div");
+                emptyMarket.className = "phone-empty-state";
+                emptyMarket.textContent = "No buy listings are available right now.";
+                marketplaceSection.appendChild(emptyMarket);
+            } else {
+                const stack = document.createElement("div");
+                stack.className = "phone-list-stack";
+                marketplaceSection.appendChild(stack);
+                buyListings.forEach((listing) => {
+                    const card = document.createElement("article");
+                    card.className = "phone-list-card";
+
+                    const header = document.createElement("div");
+                    header.className = "phone-list-header";
+
+                    const titleElement = document.createElement("div");
+                    titleElement.className = "phone-list-title";
+                    titleElement.textContent = getPhoneListingTitle(listing);
+                    header.appendChild(titleElement);
+
+                    const badge = document.createElement("div");
+                    badge.className = "phone-list-badge";
+                    badge.textContent = getPhoneListingBadgeLabel(listing);
+                    header.appendChild(badge);
+                    card.appendChild(header);
+
+                    const metaElement = document.createElement("div");
+                    metaElement.className = "phone-list-meta";
+                    metaElement.textContent = getPhoneListingMetaText(listing, canAddPhoneListingToCart(listing));
+                    card.appendChild(metaElement);
+
+                    appendPhoneBuyControls(card, listing);
+                    stack.appendChild(card);
+                });
+            }
+            phoneScreenBody.appendChild(marketplaceSection);
+        }
         appendPhoneListingSection(phoneScreenBody, "Sellback", "Current inventory surfaced for quick sale", sellListings, state);
         appendPhoneListingSection(phoneScreenBody, "Services", "Remote services and unlockables", specialListings, state);
 
-        if (buyListings.length === 0 && sellListings.length === 0 && specialListings.length === 0) {
+        if (!phoneCartViewOpen &&
+            tasks.length === 0 &&
+            buyListings.length === 0 &&
+            sellListings.length === 0 &&
+            specialListings.length === 0) {
             const emptyState = document.createElement("div");
             emptyState.className = "phone-empty-state";
             emptyState.textContent = "No remote listings are available on the phone right now.";

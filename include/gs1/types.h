@@ -104,7 +104,10 @@ enum Gs1UiActionType : std::uint8_t
     GS1_UI_ACTION_USE_INVENTORY_ITEM = 10,
     GS1_UI_ACTION_TRANSFER_INVENTORY_ITEM = 11,
     GS1_UI_ACTION_HIRE_CONTRACTOR = 12,
-    GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE = 13
+    GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE = 13,
+    GS1_UI_ACTION_ADD_PHONE_LISTING_TO_CART = 14,
+    GS1_UI_ACTION_REMOVE_PHONE_LISTING_FROM_CART = 15,
+    GS1_UI_ACTION_CHECKOUT_PHONE_CART = 16
 };
 
 enum Gs1SiteActionKind : std::uint8_t
@@ -593,6 +596,9 @@ struct Gs1EngineMessageInventoryStorageData
     std::uint8_t flags;
 };
 
+inline constexpr std::uint8_t GS1_INVENTORY_STORAGE_FLAG_DELIVERY_BOX = 1U << 0U;
+inline constexpr std::uint8_t GS1_INVENTORY_STORAGE_FLAG_RETRIEVAL_ONLY = 1U << 1U;
+
 struct Gs1EngineMessageInventorySlotData
 {
     std::uint32_t item_id;
@@ -674,6 +680,7 @@ struct Gs1EngineMessagePhoneListingData
     std::int32_t price;
     std::uint32_t related_site_id;
     std::uint16_t quantity;
+    std::uint16_t cart_quantity;
     Gs1PhoneListingPresentationKind listing_kind;
     std::uint8_t flags;
 };
@@ -819,7 +826,7 @@ GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageCraftContextOptionData, 12U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePlacementPreviewData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePlacementFailureData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageTaskData, 20U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePhoneListingData, 20U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePhoneListingData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteActionData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageHudStateData, 28U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageNotificationData, 56U);

@@ -16,7 +16,14 @@ struct StorageContainerState final
     std::uint64_t owner_device_entity_id {0};
     Gs1InventoryContainerKind container_kind {GS1_INVENTORY_CONTAINER_WORKER_PACK};
     TileCoord tile_coord {};
+    std::uint32_t flags {0};
     std::vector<std::uint64_t> slot_item_instance_ids {};
+};
+
+enum class PendingDeliveryState : std::uint8_t
+{
+    Pending = 0,
+    InTransit = 1
 };
 
 struct InventorySlot final
@@ -34,6 +41,7 @@ struct PendingDelivery final
     DeliveryId delivery_id {};
     std::vector<InventorySlot> item_stacks {};
     double minutes_until_arrival {0.0};
+    PendingDeliveryState state {PendingDeliveryState::Pending};
 };
 
 struct PendingDeviceStorageOpen final

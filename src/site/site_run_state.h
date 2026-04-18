@@ -57,6 +57,7 @@ struct CampState final
 {
     TileCoord camp_anchor_tile {};
     TileCoord starter_storage_tile {};
+    TileCoord delivery_box_tile {};
     float camp_durability {100.0f};
     bool camp_protection_resolved {true};
     bool delivery_point_operational {true};

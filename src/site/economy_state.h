@@ -22,6 +22,7 @@ struct PhoneListingState final
     std::uint32_t listing_id {0};
     std::int32_t price {0};
     std::uint32_t quantity {0};
+    std::uint32_t cart_quantity {0};
     bool occupied {false};
 };
 

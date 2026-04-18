@@ -64,6 +64,18 @@ std::optional<Gs1UiActionType> parse_ui_action_type(const std::string& value)
     {
         return GS1_UI_ACTION_SELL_PHONE_LISTING;
     }
+    if (value == "ADD_PHONE_LISTING_TO_CART")
+    {
+        return GS1_UI_ACTION_ADD_PHONE_LISTING_TO_CART;
+    }
+    if (value == "REMOVE_PHONE_LISTING_FROM_CART")
+    {
+        return GS1_UI_ACTION_REMOVE_PHONE_LISTING_FROM_CART;
+    }
+    if (value == "CHECKOUT_PHONE_CART")
+    {
+        return GS1_UI_ACTION_CHECKOUT_PHONE_CART;
+    }
     if (value == "USE_INVENTORY_ITEM")
     {
         return GS1_UI_ACTION_USE_INVENTORY_ITEM;

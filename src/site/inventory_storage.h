@@ -19,6 +19,8 @@ namespace gs1::inventory_storage
 using namespace site_ecs;
 
 inline constexpr std::uint32_t k_default_device_storage_slot_count = 6U;
+inline constexpr std::uint32_t k_inventory_storage_flag_delivery_box = 1U << 0U;
+inline constexpr std::uint32_t k_inventory_storage_flag_retrieval_only = 1U << 1U;
 
 inline flecs::world* ecs_world_ptr(SiteRunState& site_run) noexcept
 {
@@ -157,7 +159,8 @@ inline flecs::entity ensure_storage_container(
     std::uint32_t slot_count,
     TileCoord tile_coord = TileCoord {0, 0},
     bool attach_to_tile = false,
-    std::uint64_t owner_device_entity_id = 0U)
+    std::uint64_t owner_device_entity_id = 0U,
+    std::uint32_t flags = 0U)
 {
     auto* world = ecs_world_ptr(site_run);
     if (world == nullptr)
@@ -203,6 +206,7 @@ inline flecs::entity ensure_storage_container(
             ? GS1_INVENTORY_CONTAINER_WORKER_PACK
             : GS1_INVENTORY_CONTAINER_DEVICE_STORAGE;
     storage_state->tile_coord = tile_coord;
+    storage_state->flags = flags;
     if (storage_state->slot_item_instance_ids.size() != slot_count)
     {
         storage_state->slot_item_instance_ids.resize(slot_count, 0ULL);
@@ -228,6 +232,19 @@ inline flecs::entity starter_storage_container(SiteRunState& site_run) noexcept
     }
 
     const auto device_entity_id = site_run.site_world->device_entity_id(site_run.camp.starter_storage_tile);
+    return device_entity_id == 0U
+        ? flecs::entity {}
+        : find_device_storage_container(site_run, device_entity_id);
+}
+
+inline flecs::entity delivery_box_container(SiteRunState& site_run) noexcept
+{
+    if (site_run.site_world == nullptr || !site_run.site_world->contains(site_run.camp.delivery_box_tile))
+    {
+        return {};
+    }
+
+    const auto device_entity_id = site_run.site_world->device_entity_id(site_run.camp.delivery_box_tile);
     return device_entity_id == 0U
         ? flecs::entity {}
         : find_device_storage_container(site_run, device_entity_id);
@@ -941,7 +958,8 @@ inline flecs::entity ensure_device_storage_container(
     SiteRunState& site_run,
     std::uint64_t device_entity_id,
     TileCoord tile_coord,
-    std::uint32_t slot_count = k_default_device_storage_slot_count)
+    std::uint32_t slot_count = k_default_device_storage_slot_count,
+    std::uint32_t flags = 0U)
 {
     return ensure_storage_container(
         site_run,
@@ -949,7 +967,8 @@ inline flecs::entity ensure_device_storage_container(
         slot_count,
         tile_coord,
         true,
-        device_entity_id);
+        device_entity_id,
+        flags);
 }
 
 inline flecs::entity find_device_storage_container(

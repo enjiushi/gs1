@@ -97,6 +97,12 @@ const char* ui_action_name(Gs1UiActionType action_type)
         return "BUY_PHONE_LISTING";
     case GS1_UI_ACTION_SELL_PHONE_LISTING:
         return "SELL_PHONE_LISTING";
+    case GS1_UI_ACTION_ADD_PHONE_LISTING_TO_CART:
+        return "ADD_PHONE_LISTING_TO_CART";
+    case GS1_UI_ACTION_REMOVE_PHONE_LISTING_FROM_CART:
+        return "REMOVE_PHONE_LISTING_FROM_CART";
+    case GS1_UI_ACTION_CHECKOUT_PHONE_CART:
+        return "CHECKOUT_PHONE_CART";
     case GS1_UI_ACTION_USE_INVENTORY_ITEM:
         return "USE_INVENTORY_ITEM";
     case GS1_UI_ACTION_TRANSFER_INVENTORY_ITEM:
@@ -796,6 +802,8 @@ void append_site_phone_listings_json(std::string& json, const SmokeEngineHost::S
         json += std::to_string(listing.related_site_id);
         json += ",\"quantity\":";
         json += std::to_string(listing.quantity);
+        json += ",\"cartQuantity\":";
+        json += std::to_string(listing.cart_quantity);
         json += ",\"listingKind\":";
         append_json_string(json, phone_listing_kind_name(listing.listing_kind));
         json += ",\"flags\":";
