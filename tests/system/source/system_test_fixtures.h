@@ -37,6 +37,16 @@ inline TileCoord default_starter_storage_tile(TileCoord camp_anchor_tile) noexce
     return TileCoord {camp_anchor_tile.x - 1, camp_anchor_tile.y};
 }
 
+inline TileCoord default_delivery_box_tile(
+    TileCoord camp_anchor_tile,
+    std::uint32_t width,
+    std::uint32_t height) noexcept
+{
+    (void)height;
+    const auto max_x = static_cast<std::int32_t>(width == 0U ? 0U : width - 1U);
+    return TileCoord {std::min(camp_anchor_tile.x + 10, max_x), camp_anchor_tile.y};
+}
+
 inline bool approx_equal(float lhs, float rhs, float epsilon = 0.001f) noexcept
 {
     return std::fabs(lhs - rhs) <= epsilon;
@@ -112,6 +122,7 @@ inline SiteRunState make_test_site_run(
     site_run.clock.day_phase = DayPhase::Dawn;
     site_run.camp.camp_anchor_tile = camp_anchor_tile;
     site_run.camp.starter_storage_tile = default_starter_storage_tile(camp_anchor_tile);
+    site_run.camp.delivery_box_tile = default_delivery_box_tile(camp_anchor_tile, width, height);
     site_run.inventory.worker_pack_slot_count = 6U;
     site_run.inventory.worker_pack_slots.resize(site_run.inventory.worker_pack_slot_count);
     site_run.task_board.accepted_task_cap = 3U;
@@ -140,6 +151,13 @@ inline SiteRunState make_test_site_run(
         tile.device.structure_id = gs1::StructureId {gs1::k_structure_storage_crate};
         tile.device.device_integrity = 1.0f;
         site_run.site_world->set_tile(site_run.camp.starter_storage_tile, tile);
+    }
+    if (site_run.site_world->contains(site_run.camp.delivery_box_tile))
+    {
+        auto tile = site_run.site_world->tile_at(site_run.camp.delivery_box_tile);
+        tile.device.structure_id = gs1::StructureId {gs1::k_structure_storage_crate};
+        tile.device.device_integrity = 1.0f;
+        site_run.site_world->set_tile(site_run.camp.delivery_box_tile, tile);
     }
     if (site_id == 1U && site_run.site_world->contains(default_starter_workbench_tile(camp_anchor_tile)))
     {

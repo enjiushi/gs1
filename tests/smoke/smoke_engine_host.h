@@ -264,6 +264,7 @@ public:
         std::int32_t price {0};
         std::uint32_t related_site_id {0};
         std::uint32_t quantity {0};
+        std::uint32_t cart_quantity {0};
         Gs1PhoneListingPresentationKind listing_kind {GS1_PHONE_LISTING_PRESENTATION_BUY_ITEM};
         std::uint32_t flags {0};
     };

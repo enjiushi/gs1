@@ -1755,7 +1755,7 @@ void GameRuntime::queue_site_inventory_storage_upsert_message(std::uint32_t stor
     payload.tile_x = static_cast<std::int16_t>(storage_state->tile_coord.x);
     payload.tile_y = static_cast<std::int16_t>(storage_state->tile_coord.y);
     payload.container_kind = storage_state->container_kind;
-    payload.flags = 0U;
+    payload.flags = static_cast<std::uint8_t>(storage_state->flags);
     engine_messages_.push_back(message);
 }
 
@@ -2048,6 +2048,7 @@ void GameRuntime::queue_site_phone_listing_upsert_message(std::size_t listing_in
     payload.price = listing.price;
     payload.related_site_id = active_site_run_->site_id.value;
     payload.quantity = static_cast<std::uint16_t>(std::min<std::uint32_t>(listing.quantity, 65535U));
+    payload.cart_quantity = static_cast<std::uint16_t>(std::min<std::uint32_t>(listing.cart_quantity, 65535U));
     payload.listing_kind = to_phone_listing_presentation_kind(listing.kind);
     payload.flags = listing.occupied ? 1U : 0U;
     engine_messages_.push_back(message);
@@ -2453,6 +2454,37 @@ Gs1Status GameRuntime::translate_ui_action_to_message(const Gs1UiAction& action,
             action.target_id,
             static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0),
             0U});
+        return GS1_STATUS_OK;
+
+    case GS1_UI_ACTION_ADD_PHONE_LISTING_TO_CART:
+        if (action.target_id == 0U ||
+            action.arg0 > static_cast<std::uint64_t>(std::numeric_limits<std::uint16_t>::max()))
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        out_message.type = GameMessageType::PhoneListingCartAddRequested;
+        out_message.set_payload(PhoneListingCartAddRequestedMessage {
+            action.target_id,
+            static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0),
+            0U});
+        return GS1_STATUS_OK;
+
+    case GS1_UI_ACTION_REMOVE_PHONE_LISTING_FROM_CART:
+        if (action.target_id == 0U ||
+            action.arg0 > static_cast<std::uint64_t>(std::numeric_limits<std::uint16_t>::max()))
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        out_message.type = GameMessageType::PhoneListingCartRemoveRequested;
+        out_message.set_payload(PhoneListingCartRemoveRequestedMessage {
+            action.target_id,
+            static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0),
+            0U});
+        return GS1_STATUS_OK;
+
+    case GS1_UI_ACTION_CHECKOUT_PHONE_CART:
+        out_message.type = GameMessageType::PhoneCartCheckoutRequested;
+        out_message.set_payload(PhoneCartCheckoutRequestedMessage {});
         return GS1_STATUS_OK;
 
     case GS1_UI_ACTION_SELL_PHONE_LISTING:

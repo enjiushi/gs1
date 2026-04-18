@@ -61,7 +61,11 @@ enum class GameMessageType : std::uint8_t
     TaskRewardClaimRequested,
     PhoneListingPurchaseRequested,
     PhoneListingSaleRequested,
+    PhoneListingCartAddRequested,
+    PhoneListingCartRemoveRequested,
+    PhoneCartCheckoutRequested,
     InventoryDeliveryRequested,
+    InventoryDeliveryBatchRequested,
     InventoryItemUseRequested,
     InventoryItemConsumeRequested,
     InventoryGlobalItemConsumeRequested,
@@ -411,11 +415,45 @@ struct PhoneListingSaleRequestedMessage final
     std::uint16_t flags;
 };
 
+struct PhoneListingCartAddRequestedMessage final
+{
+    std::uint32_t listing_id;
+    std::uint16_t quantity;
+    std::uint16_t flags;
+};
+
+struct PhoneListingCartRemoveRequestedMessage final
+{
+    std::uint32_t listing_id;
+    std::uint16_t quantity;
+    std::uint16_t flags;
+};
+
+struct PhoneCartCheckoutRequestedMessage final
+{
+};
+
 struct InventoryDeliveryRequestedMessage final
 {
     std::uint32_t item_id;
     std::uint16_t quantity;
     std::uint16_t minutes_until_arrival;
+};
+
+struct InventoryDeliveryBatchEntry final
+{
+    std::uint16_t item_id;
+    std::uint16_t quantity;
+};
+
+inline constexpr std::size_t k_inventory_delivery_batch_entry_count = 10U;
+
+struct InventoryDeliveryBatchRequestedMessage final
+{
+    std::uint16_t minutes_until_arrival;
+    std::uint8_t entry_count;
+    std::uint8_t reserved0;
+    InventoryDeliveryBatchEntry entries[k_inventory_delivery_batch_entry_count];
 };
 
 struct InventoryItemUseRequestedMessage final
@@ -539,7 +577,12 @@ GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TaskAcceptRequestedMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TaskRewardClaimRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingPurchaseRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingSaleRequestedMessage, 8U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingCartAddRequestedMessage, 8U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingCartRemoveRequestedMessage, 8U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneCartCheckoutRequestedMessage, 1U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryDeliveryRequestedMessage, 8U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryDeliveryBatchEntry, 4U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryDeliveryBatchRequestedMessage, 44U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryItemUseRequestedMessage, 12U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryItemConsumeRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryGlobalItemConsumeRequestedMessage, 8U);

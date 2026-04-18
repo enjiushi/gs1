@@ -24,6 +24,11 @@ TileCoord starter_workbench_tile(TileCoord camp_anchor_tile) noexcept
 {
     return TileCoord {camp_anchor_tile.x + 1, camp_anchor_tile.y};
 }
+
+TileCoord delivery_box_tile(TileCoord camp_anchor_tile) noexcept
+{
+    return TileCoord {camp_anchor_tile.x + 10, camp_anchor_tile.y};
+}
 }
 
 SiteRunState SiteRunFactory::create_site_run(
@@ -48,11 +53,13 @@ SiteRunState SiteRunFactory::create_site_run(
         run.site_archetype_id = site_content->site_archetype_id;
         run.camp.camp_anchor_tile = site_content->camp_anchor_tile;
         run.camp.starter_storage_tile = starter_storage_tile(site_content->camp_anchor_tile);
+        run.camp.delivery_box_tile = delivery_box_tile(site_content->camp_anchor_tile);
         run.counters.site_completion_tile_threshold = site_content->site_completion_tile_threshold;
     }
     else
     {
         run.camp.starter_storage_tile = starter_storage_tile(run.camp.camp_anchor_tile);
+        run.camp.delivery_box_tile = delivery_box_tile(run.camp.camp_anchor_tile);
     }
 
     const auto worker_tile_coord = run.camp.camp_anchor_tile;
@@ -81,6 +88,13 @@ SiteRunState SiteRunFactory::create_site_run(
         tile.device.structure_id = StructureId {k_structure_storage_crate};
         tile.device.device_integrity = 1.0f;
         run.site_world->set_tile(run.camp.starter_storage_tile, tile);
+    }
+    if (run.site_world->contains(run.camp.delivery_box_tile))
+    {
+        auto tile = run.site_world->tile_at(run.camp.delivery_box_tile);
+        tile.device.structure_id = StructureId {k_structure_storage_crate};
+        tile.device.device_integrity = 1.0f;
+        run.site_world->set_tile(run.camp.delivery_box_tile, tile);
     }
     if (run.site_id.value == 1U)
     {

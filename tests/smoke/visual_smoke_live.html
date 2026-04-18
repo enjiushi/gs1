@@ -1653,6 +1653,80 @@ body {
   color: rgba(96, 66, 33, 0.62);
 }
 
+.phone-cart-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 8px 10px;
+  border: 1px solid rgba(118, 86, 50, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 252, 247, 0.9);
+  color: rgba(69, 48, 22, 0.88);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.phone-cart-button.active {
+  background: rgba(106, 152, 97, 0.14);
+  border-color: rgba(106, 152, 97, 0.22);
+}
+
+.phone-cart-icon {
+  position: relative;
+  width: 18px;
+  height: 14px;
+  display: inline-block;
+}
+
+.phone-cart-icon-basket {
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  bottom: 0;
+  height: 9px;
+  border: 2px solid rgba(92, 68, 40, 0.78);
+  border-top: 0;
+  border-radius: 0 0 4px 4px;
+}
+
+.phone-cart-icon-handle {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 0;
+  height: 7px;
+  border: 2px solid rgba(92, 68, 40, 0.78);
+  border-bottom: 0;
+  border-radius: 999px 999px 0 0;
+}
+
+.phone-cart-button-label {
+  line-height: 1;
+}
+
+.phone-cart-count-badge {
+  position: absolute;
+  left: 2px;
+  top: 1px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #bb2f28;
+  color: #fff7f4;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0;
+  box-shadow: 0 4px 10px rgba(122, 22, 18, 0.26);
+  transform: translate(-46%, -42%);
+}
+
 .phone-list-stack {
   display: flex;
   flex-direction: column;
@@ -1725,6 +1799,45 @@ body {
   color: rgba(92, 68, 40, 0.74);
 }
 
+.phone-stepper-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.phone-stepper-button {
+  height: 38px;
+  border: 1px solid rgba(123, 95, 62, 0.16);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 252, 247, 0.92), rgba(231, 217, 196, 0.82));
+  color: rgba(47, 34, 18, 0.94);
+  font-size: 22px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.phone-stepper-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.phone-cart-inline-count {
+  min-height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: rgba(255, 250, 242, 0.72);
+  border: 1px solid rgba(123, 95, 62, 0.1);
+  color: rgba(69, 48, 22, 0.84);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .action-button.phone-action-button {
   width: 100%;
   min-width: 0;
@@ -1746,6 +1859,20 @@ body {
 
 .action-button.phone-action-button::after {
   background: linear-gradient(180deg, rgba(255, 245, 226, 0.08), transparent 36%);
+}
+
+.phone-cart-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 10px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.phone-cart-fee {
+  color: rgba(87, 62, 31, 0.8);
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .phone-task-track {
