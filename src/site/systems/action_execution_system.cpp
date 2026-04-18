@@ -26,6 +26,10 @@ constexpr double k_minimum_action_duration_minutes = 0.25;
 constexpr double k_action_minutes_per_real_second = 0.8;
 constexpr float k_repair_integrity_full = 1.0f;
 constexpr float k_repair_integrity_epsilon = 0.0001f;
+constexpr float k_minimum_action_progress_scale = 0.35f;
+constexpr float k_maximum_action_progress_scale = 2.0f;
+constexpr float k_wind_action_penalty_per_unit = 0.0065f;
+constexpr float k_sheltered_wind_penalty_scale = 0.35f;
 
 ItemId repair_tool_item_id(std::uint32_t requested_item_id) noexcept
 {
@@ -635,9 +639,39 @@ double current_action_total_duration_minutes(const ActionState& action_state) no
     return std::max(action_state.total_action_minutes, k_minimum_action_duration_minutes);
 }
 
-double action_elapsed_minutes_for_step(double fixed_step_seconds) noexcept
+float resolve_action_progress_scale(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    const ActionState& action_state) noexcept
 {
-    return std::max(0.0, fixed_step_seconds) * k_action_minutes_per_real_second;
+    const auto worker = context.world.read_worker();
+    const float modifier_bonus = context.world.read_modifier().resolved_channel_totals.work_efficiency;
+    const float efficiency_scale = std::clamp(
+        worker.conditions.work_efficiency + modifier_bonus,
+        k_minimum_action_progress_scale,
+        k_maximum_action_progress_scale);
+
+    const TileCoord weather_coord =
+        action_state.target_tile.value_or(worker.position.tile_coord);
+    const auto local_weather = context.world.tile_coord_in_bounds(weather_coord)
+        ? context.world.read_tile_local_weather(weather_coord)
+        : SiteWorld::TileLocalWeatherData {};
+    const float wind_penalty_scale = worker.conditions.is_sheltered
+        ? k_sheltered_wind_penalty_scale
+        : 1.0f;
+    const float wind_scale = std::clamp(
+        1.0f - std::max(local_weather.wind, 0.0f) * k_wind_action_penalty_per_unit * wind_penalty_scale,
+        k_minimum_action_progress_scale,
+        1.0f);
+    return efficiency_scale * wind_scale;
+}
+
+double action_elapsed_minutes_for_step(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    const ActionState& action_state) noexcept
+{
+    return std::max(0.0, context.fixed_step_seconds) *
+        k_action_minutes_per_real_second *
+        static_cast<double>(resolve_action_progress_scale(context, action_state));
 }
 
 std::optional<TileCoord> resolve_action_approach_tile(
@@ -1608,7 +1642,7 @@ void ActionExecutionSystem::run(SiteSystemContext<ActionExecutionSystem>& contex
         std::max(
             0.0,
             action_state.remaining_action_minutes -
-                action_elapsed_minutes_for_step(context.fixed_step_seconds));
+                action_elapsed_minutes_for_step(context, action_state));
 
     if (action_state.remaining_action_minutes > 0.0)
     {

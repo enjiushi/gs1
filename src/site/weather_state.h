@@ -12,6 +12,7 @@ struct WeatherState final
     float weather_heat {0.0f};
     float weather_wind {0.0f};
     float weather_dust {0.0f};
+    float weather_wind_direction_degrees {0.0f};
     ForecastProfileState forecast_profile_state {};
     float site_weather_bias {0.0f};
 };

@@ -106,6 +106,75 @@ body {
   filter: blur(2.2px) saturate(0.2) brightness(0.74);
 }
 
+.wind-overlay {
+  position: absolute;
+  inset: -8%;
+  z-index: 1;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  filter: blur(10px) saturate(1.04);
+  transition: opacity 220ms ease, filter 220ms ease;
+}
+
+.wind-overlay::before,
+.wind-overlay::after {
+  content: "";
+  position: absolute;
+  inset: -14%;
+  will-change: transform;
+  animation: wind-sweep var(--wind-overlay-speed, 4.8s) linear infinite;
+}
+
+.wind-overlay::before {
+  background:
+    repeating-linear-gradient(
+      var(--wind-overlay-tilt, -18deg),
+      rgba(247, 239, 221, 0) 0 24px,
+      rgba(247, 239, 221, 0.18) 24px 28px,
+      rgba(181, 157, 115, 0.06) 28px 34px
+    );
+  opacity: calc(var(--wind-overlay-opacity, 0) * 1.08);
+}
+
+.wind-overlay::after {
+  background:
+    radial-gradient(circle at 22% 28%, rgba(255, 248, 235, var(--wind-overlay-dust-alpha, 0)) 0 8%, transparent 30%),
+    radial-gradient(circle at 68% 44%, rgba(224, 198, 151, calc(var(--wind-overlay-dust-alpha, 0) * 0.88)) 0 7%, transparent 28%),
+    radial-gradient(circle at 42% 74%, rgba(239, 225, 195, calc(var(--wind-overlay-dust-alpha, 0) * 0.74)) 0 8%, transparent 32%);
+  background-size: 190px 150px, 230px 190px, 250px 210px;
+  opacity: calc(var(--wind-overlay-opacity, 0) * 1.22);
+  animation-duration: calc(var(--wind-overlay-speed, 4.8s) * 1.35);
+}
+
+.stage-frame.wind-overlay-active .wind-overlay {
+  opacity: 1;
+}
+
+.stage-frame.wind-overlay-severe .wind-overlay {
+  filter: blur(12px) saturate(1.1);
+}
+
+.stage-frame.wind-overlay-critical .wind-overlay::before {
+  background:
+    repeating-linear-gradient(
+      var(--wind-overlay-tilt, -18deg),
+      rgba(252, 244, 226, 0) 0 18px,
+      rgba(252, 244, 226, 0.26) 18px 23px,
+      rgba(205, 175, 123, 0.1) 23px 29px
+    );
+}
+
+@keyframes wind-sweep {
+  from {
+    transform: translate3d(var(--wind-overlay-from-x, -8%), var(--wind-overlay-from-y, 2%), 0) scale(1.02);
+  }
+  to {
+    transform: translate3d(var(--wind-overlay-to-x, 8%), var(--wind-overlay-to-y, -3%), 0) scale(1.08);
+  }
+}
+
 .overlay {
   position: absolute;
   inset: 0;
@@ -1962,6 +2031,7 @@ body {
   <div class="stage-frame" id="stage-frame">
     <div class="photo-backdrop" aria-hidden="true"></div>
     <div id="game-view"></div>
+    <div class="wind-overlay" id="wind-overlay" aria-hidden="true"></div>
 
     <div class="overlay">
       <div class="hud-row">

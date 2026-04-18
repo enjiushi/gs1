@@ -20,13 +20,15 @@ void apply_site_weather(
     SiteSystemContext<WeatherEventSystem>& context,
     float heat,
     float wind,
-    float dust)
+    float dust,
+    float wind_direction_degrees)
 {
     auto& weather = context.world.own_weather();
     const bool changed =
         std::fabs(weather.weather_heat - heat) > k_weather_epsilon ||
         std::fabs(weather.weather_wind - wind) > k_weather_epsilon ||
-        std::fabs(weather.weather_dust - dust) > k_weather_epsilon;
+        std::fabs(weather.weather_dust - dust) > k_weather_epsilon ||
+        std::fabs(weather.weather_wind_direction_degrees - wind_direction_degrees) > k_weather_epsilon;
     if (!changed)
     {
         return;
@@ -35,6 +37,7 @@ void apply_site_weather(
     weather.weather_heat = heat;
     weather.weather_wind = wind;
     weather.weather_dust = dust;
+    weather.weather_wind_direction_degrees = wind_direction_degrees;
     context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
 }
 
@@ -50,6 +53,25 @@ float resolve_phase_pressure(EventPhase phase)
     case EventPhase::Decay:
     case EventPhase::Aftermath:
         return 0.3f;
+    default:
+        return 0.0f;
+    }
+}
+
+float resolve_phase_wind_direction(EventPhase phase) noexcept
+{
+    switch (phase)
+    {
+    case EventPhase::Warning:
+        return 35.0f;
+    case EventPhase::Build:
+        return 52.0f;
+    case EventPhase::Peak:
+        return 74.0f;
+    case EventPhase::Decay:
+        return 58.0f;
+    case EventPhase::Aftermath:
+        return 41.0f;
     default:
         return 0.0f;
     }
@@ -88,7 +110,12 @@ Gs1Status WeatherEventSystem::process_message(
     event.aftermath_relief_resolved = 0.0f;
 
     context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
-    apply_site_weather(context, k_mild_weather_heat, k_mild_weather_wind, k_mild_weather_dust);
+    apply_site_weather(
+        context,
+        k_mild_weather_heat,
+        k_mild_weather_wind,
+        k_mild_weather_dust,
+        resolve_phase_wind_direction(EventPhase::Warning));
 
     return GS1_STATUS_OK;
 }
@@ -138,7 +165,7 @@ void WeatherEventSystem::run(SiteSystemContext<WeatherEventSystem>& context)
             event.event_dust_pressure = 0.0f;
             event.aftermath_relief_resolved = 1.0f;
             context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
-            apply_site_weather(context, 0.0f, 0.0f, 0.0f);
+            apply_site_weather(context, 0.0f, 0.0f, 0.0f, 0.0f);
             return;
         }
 
@@ -159,6 +186,7 @@ void WeatherEventSystem::run(SiteSystemContext<WeatherEventSystem>& context)
         context,
         k_mild_weather_heat * pressure_scale,
         k_mild_weather_wind * pressure_scale,
-        k_mild_weather_dust * pressure_scale);
+        k_mild_weather_dust * pressure_scale,
+        resolve_phase_wind_direction(event.event_phase));
 }
 }  // namespace gs1

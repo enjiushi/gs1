@@ -169,6 +169,7 @@ public:
         float heat {0.0f};
         float wind {0.0f};
         float dust {0.0f};
+        float wind_direction_degrees {0.0f};
         std::uint32_t event_template_id {0};
         Gs1WeatherEventPhase event_phase {GS1_WEATHER_EVENT_PHASE_NONE};
         float phase_minutes_remaining {0.0f};

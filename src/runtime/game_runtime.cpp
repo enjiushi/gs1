@@ -94,6 +94,59 @@ constexpr auto record_timing_sample = [](auto& accumulator, double elapsed_ms) n
     accumulator.max_elapsed_ms = std::max(accumulator.max_elapsed_ms, elapsed_ms);
 };
 
+enum : std::uint16_t
+{
+    k_hud_warning_none = 0U,
+    k_hud_warning_wind_watch = 1U,
+    k_hud_warning_wind_exposure = 2U,
+    k_hud_warning_severe_gale = 3U,
+    k_hud_warning_sandblast = 4U
+};
+
+std::uint16_t resolve_hud_warning_code(const SiteRunState& site_run) noexcept
+{
+    if (site_run.site_world == nullptr || !site_run.site_world->initialized())
+    {
+        return k_hud_warning_none;
+    }
+
+    const auto worker = site_run.site_world->worker();
+    if (!site_world_access::tile_coord_in_bounds(site_run, worker.position.tile_coord))
+    {
+        return k_hud_warning_none;
+    }
+
+    const auto local_weather =
+        site_world_access::tile_local_weather(site_run, worker.position.tile_coord);
+    const float wind = std::max(local_weather.wind, 0.0f);
+    const float dust = std::max(local_weather.dust, 0.0f);
+
+    if (wind >= 65.0f || (wind >= 50.0f && dust >= 18.0f))
+    {
+        return k_hud_warning_sandblast;
+    }
+
+    if (!worker.conditions.is_sheltered && wind >= 45.0f)
+    {
+        return k_hud_warning_severe_gale;
+    }
+
+    if (!worker.conditions.is_sheltered && wind >= 28.0f)
+    {
+        return k_hud_warning_wind_exposure;
+    }
+
+    if (wind >= 18.0f ||
+        site_run.weather.weather_wind >= 14.0f ||
+        site_run.event.event_phase == EventPhase::Build ||
+        site_run.event.event_phase == EventPhase::Peak)
+    {
+        return k_hud_warning_wind_watch;
+    }
+
+    return k_hud_warning_none;
+}
+
 std::uint64_t pack_inventory_use_arg(
     Gs1InventoryContainerKind container_kind,
     std::uint32_t slot_index,
@@ -1599,9 +1652,10 @@ void GameRuntime::queue_site_weather_update_message()
     weather_payload.heat = active_site_run_->weather.weather_heat;
     weather_payload.wind = active_site_run_->weather.weather_wind;
     weather_payload.dust = active_site_run_->weather.weather_dust;
+    weather_payload.wind_direction_degrees = active_site_run_->weather.weather_wind_direction_degrees;
     weather_payload.event_template_id =
         active_site_run_->event.active_event_template_id.has_value()
-            ? active_site_run_->event.active_event_template_id->value
+        ? active_site_run_->event.active_event_template_id->value
             : 0U;
     weather_payload.event_phase =
         static_cast<Gs1WeatherEventPhase>(active_site_run_->event.event_phase);
@@ -2167,6 +2221,7 @@ void GameRuntime::queue_hud_state_message()
             ? static_cast<float>(active_site_run_->counters.fully_grown_tile_count) /
                 static_cast<float>(active_site_run_->counters.site_completion_tile_threshold)
             : 0.0f;
+    payload.warning_code = resolve_hud_warning_code(active_site_run_.value());
     engine_messages_.push_back(hud_message);
 }
 
@@ -2311,7 +2366,9 @@ void GameRuntime::flush_site_presentation_if_dirty()
 
     queue_site_delta_messages(dirty_flags);
 
-    if ((dirty_flags & SITE_PROJECTION_UPDATE_HUD) != 0U)
+    if ((dirty_flags & (SITE_PROJECTION_UPDATE_HUD |
+            SITE_PROJECTION_UPDATE_WORKER |
+            SITE_PROJECTION_UPDATE_WEATHER)) != 0U)
     {
         queue_hud_state_message();
     }
