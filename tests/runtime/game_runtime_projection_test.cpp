@@ -427,8 +427,12 @@ int main()
     {
         const auto& weather_payload =
             weather_messages.front()->payload_as<Gs1EngineMessageWeatherData>();
+        assert(weather_payload.heat == 0.0f);
+        assert(weather_payload.wind == 0.0f);
+        assert(weather_payload.dust == 0.0f);
         assert(weather_payload.wind_direction_degrees > 0.0f);
         assert(weather_payload.wind_direction_degrees < 360.0f);
+        assert(weather_payload.event_phase == GS1_WEATHER_EVENT_PHASE_WARNING);
     }
     {
         const auto* starter_storage_message = find_inventory_storage_message(

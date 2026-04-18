@@ -69,7 +69,8 @@ SmokeLiveHttpServer::SmokeLiveHttpServer(
     PostBodyCallback site_action_cancel_callback,
     PostBodyCallback site_storage_view_callback,
     PostBodyCallback site_context_callback,
-    PostBodyCallback site_control_callback)
+    PostBodyCallback site_control_callback,
+    PostBodyCallback client_log_callback)
     : repo_root_(std::move(repo_root))
     , state_callback_(std::move(state_callback))
     , ui_action_callback_(std::move(ui_action_callback))
@@ -78,6 +79,7 @@ SmokeLiveHttpServer::SmokeLiveHttpServer(
     , site_storage_view_callback_(std::move(site_storage_view_callback))
     , site_context_callback_(std::move(site_context_callback))
     , site_control_callback_(std::move(site_control_callback))
+    , client_log_callback_(std::move(client_log_callback))
 {
 }
 
@@ -332,6 +334,13 @@ bool SmokeLiveHttpServer::handle_client(std::uintptr_t client_socket_value)
     if (method == "POST" && path == "/site-control")
     {
         site_control_callback_(body);
+        send_response(client_socket, 200, "OK", "application/json; charset=utf-8", "{\"ok\":true}");
+        return false;
+    }
+
+    if (method == "POST" && path == "/client-log")
+    {
+        client_log_callback_(body);
         send_response(client_socket, 200, "OK", "application/json; charset=utf-8", "{\"ok\":true}");
         return false;
     }

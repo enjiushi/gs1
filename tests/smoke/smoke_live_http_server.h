@@ -24,7 +24,8 @@ public:
         PostBodyCallback site_action_cancel_callback,
         PostBodyCallback site_storage_view_callback,
         PostBodyCallback site_context_callback,
-        PostBodyCallback site_control_callback);
+        PostBodyCallback site_control_callback,
+        PostBodyCallback client_log_callback);
     SmokeLiveHttpServer(const SmokeLiveHttpServer&) = delete;
     SmokeLiveHttpServer& operator=(const SmokeLiveHttpServer&) = delete;
     ~SmokeLiveHttpServer() noexcept;
@@ -61,6 +62,7 @@ private:
     PostBodyCallback site_storage_view_callback_ {};
     PostBodyCallback site_context_callback_ {};
     PostBodyCallback site_control_callback_ {};
+    PostBodyCallback client_log_callback_ {};
     std::atomic<bool> running_ {false};
     std::uintptr_t listen_socket_ {static_cast<std::uintptr_t>(~0ULL)};
     std::thread server_thread_ {};

@@ -6,6 +6,7 @@
 #include "site/systems/device_support_system.h"
 #include "site/systems/local_weather_resolve_system.h"
 #include "site/systems/modifier_system.h"
+#include "site/systems/site_flow_system.h"
 #include "site/systems/weather_event_system.h"
 #include "site/systems/worker_condition_system.h"
 #include "testing/system_test_registry.h"
@@ -22,6 +23,7 @@ using gs1::GameMessageQueue;
 using gs1::GameMessageType;
 using gs1::LocalWeatherResolveSystem;
 using gs1::ModifierSystem;
+using gs1::SiteFlowSystem;
 using gs1::SiteRunStartedMessage;
 using gs1::TileCoord;
 using gs1::WeatherEventSystem;
@@ -60,7 +62,13 @@ void weather_event_seeds_site_one_and_ignores_other_sites(gs1::testing::SystemTe
     GS1_SYSTEM_TEST_CHECK(context, site_one_run.weather.forecast_profile_state.forecast_profile_id == 1U);
     GS1_SYSTEM_TEST_CHECK(context, site_one_run.event.active_event_template_id.has_value());
     GS1_SYSTEM_TEST_CHECK(context, site_one_run.event.event_phase == EventPhase::Warning);
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_one_run.weather.weather_heat, 15.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_one_run.weather.weather_heat, 0.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_one_run.weather.weather_wind, 0.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_one_run.weather.weather_dust, 0.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_one_run.event.event_heat_pressure, 0.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_one_run.event.event_wind_pressure, 0.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_one_run.event.event_dust_pressure, 0.0f));
+    GS1_SYSTEM_TEST_CHECK(context, site_one_run.weather.weather_wind_direction_degrees > 0.0f);
     GS1_SYSTEM_TEST_CHECK(
         context,
         (site_one_run.pending_projection_update_flags & gs1::SITE_PROJECTION_UPDATE_WEATHER) != 0U);
@@ -91,9 +99,24 @@ void weather_event_run_advances_through_full_lifecycle(gs1::testing::SystemTestE
     {
         WeatherEventSystem::run(site_context);
     }
-    GS1_SYSTEM_TEST_CHECK(context, site_run.event.event_phase == EventPhase::Build);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.event.event_phase == EventPhase::Warning);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.weather.weather_heat, 0.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.weather.weather_wind, 0.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.weather.weather_dust, 0.0f));
 
-    for (int index = 0; index < 40; ++index)
+    for (int index = 0; index < 25; ++index)
+    {
+        WeatherEventSystem::run(site_context);
+    }
+    GS1_SYSTEM_TEST_CHECK(context, site_run.event.event_phase == EventPhase::Build);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_heat > 0.0f);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_heat < 7.5f);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_wind > 0.0f);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_wind < 5.0f);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_dust > 0.0f);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_dust < 2.5f);
+
+    for (int index = 0; index < 120; ++index)
     {
         WeatherEventSystem::run(site_context);
     }
@@ -132,6 +155,79 @@ void weather_event_does_not_reseed_when_event_is_already_active(
     GS1_SYSTEM_TEST_CHECK(context, site_run.event.active_event_template_id.has_value());
     GS1_SYSTEM_TEST_CHECK(context, site_run.event.active_event_template_id->value == 8U);
     GS1_SYSTEM_TEST_CHECK(context, site_run.event.event_phase == EventPhase::Peak);
+}
+
+void weather_event_phase_countdown_tracks_site_clock_progress(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 1105U);
+    GameMessageQueue queue {};
+    auto site_flow_context = make_site_context<SiteFlowSystem>(campaign, site_run, queue);
+    auto weather_context = make_site_context<WeatherEventSystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        WeatherEventSystem::process_message(
+            weather_context,
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    const auto initial_phase = site_run.event.event_phase;
+    const double initial_world_minutes = site_run.clock.world_time_minutes;
+    const double initial_phase_minutes = site_run.event.phase_minutes_remaining;
+
+    for (int index = 0; index < 10; ++index)
+    {
+        SiteFlowSystem::run(site_flow_context);
+        WeatherEventSystem::run(weather_context);
+    }
+
+    GS1_SYSTEM_TEST_CHECK(context, site_run.event.event_phase == initial_phase);
+    const double world_minutes_elapsed =
+        site_run.clock.world_time_minutes - initial_world_minutes;
+    const double phase_minutes_elapsed =
+        initial_phase_minutes - site_run.event.phase_minutes_remaining;
+    GS1_SYSTEM_TEST_CHECK(context, std::fabs(world_minutes_elapsed - 2.0) <= 0.0001);
+    GS1_SYSTEM_TEST_CHECK(context, std::fabs(phase_minutes_elapsed - world_minutes_elapsed) <= 0.0001);
+}
+
+void weather_event_phase_transition_smooths_weather_toward_new_target(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 1106U);
+    GameMessageQueue queue {};
+    auto weather_context = make_site_context<WeatherEventSystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        WeatherEventSystem::process_message(
+            weather_context,
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    site_run.event.event_phase = EventPhase::Peak;
+    site_run.event.phase_minutes_remaining = 0.0;
+    site_run.event.event_heat_pressure = 15.0f;
+    site_run.event.event_wind_pressure = 10.0f;
+    site_run.event.event_dust_pressure = 5.0f;
+    site_run.weather.weather_heat = 15.0f;
+    site_run.weather.weather_wind = 10.0f;
+    site_run.weather.weather_dust = 5.0f;
+    site_run.weather.weather_wind_direction_degrees = 74.0f;
+
+    WeatherEventSystem::run(weather_context);
+
+    GS1_SYSTEM_TEST_CHECK(context, site_run.event.event_phase == EventPhase::Decay);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_heat < 15.0f);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_heat > 4.5f);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_wind < 10.0f);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_wind > 3.0f);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_dust < 5.0f);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_dust > 1.5f);
 }
 
 void local_weather_resolve_spreads_full_refresh_over_multiple_runs(
@@ -526,6 +622,14 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "weather_event",
     "does_not_reseed_when_event_is_already_active",
     weather_event_does_not_reseed_when_event_is_already_active);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "weather_event",
+    "phase_countdown_tracks_site_clock_progress",
+    weather_event_phase_countdown_tracks_site_clock_progress);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "weather_event",
+    "phase_transition_smooths_weather_toward_new_target",
+    weather_event_phase_transition_smooths_weather_toward_new_target);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "local_weather_resolve",
     "spreads_full_refresh_over_multiple_runs",

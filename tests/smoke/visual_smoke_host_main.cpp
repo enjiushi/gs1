@@ -366,6 +366,9 @@ void run_live_mode(
                 session.site_control.world_move_y = 0.0f;
                 session.site_control.world_move_z = 0.0f;
             }
+        },
+        [](const std::string& body) {
+            smoke_log::infof("[CLIENT] %s\n", body.c_str());
         }};
 
     if (!server.start(preferred_port))

@@ -65,6 +65,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let rendererWidth = 0;
     let rendererHeight = 0;
     let weatherPostProcess = null;
+    let smoothedWeatherEventLevel = 0;
     let cameraOrbitDragPointerId = null;
     let cameraOrbitDragButton = -1;
     let cameraOrbitDragLastClientX = 0;
@@ -184,12 +185,16 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 vec2(0.001),
                 vec2(0.999));
             vec4 sceneColor = texture2D(tSceneColor, sampleUv);
-            float heatLift = 2.0 * uStrength * (0.30 + heatScale * 0.85) * mix(0.22, 0.58, shimmerMask);
+            float heatLift = 3.4 * uStrength * (0.42 + heatScale * 1.05) * mix(0.28, 0.82, shimmerMask);
             float brightAreaMask = smoothstep(0.45, 1.45, dot(sceneColor.rgb, vec3(0.30, 0.59, 0.11)) * 1.6);
-            vec3 warmLift = vec3(0.30, 0.21, 0.09) * heatLift;
-            vec3 color = sceneColor.rgb * (1.0 + heatLift * (0.34 + heatScale * 0.30));
-            color += warmLift;
-            color += warmLift * brightAreaMask * (0.80 + heatScale * 0.42);
+            vec3 warmLift = vec3(0.38, 0.27, 0.12) * heatLift;
+            vec3 heatGlow = vec3(0.24, 0.16, 0.05) * heatLift * mix(0.45, 1.0, horizonHaze);
+            float sunBloom = uStrength * heatScale * mix(0.10, 0.30, shimmerMask);
+            vec3 color = sceneColor.rgb * (1.0 + heatLift * (0.52 + heatScale * 0.48));
+            color += warmLift * (1.0 + heatScale * 0.22);
+            color += warmLift * brightAreaMask * (1.05 + heatScale * 0.56);
+            color += heatGlow;
+            color += vec3(0.45, 0.31, 0.12) * sunBloom * brightAreaMask;
             vec3 dustTint = vec3(0.78, 0.67, 0.52);
             float transmittance = exp(-opticalDepth * 1.22);
             float inscatter = 1.0 - transmittance;
@@ -268,6 +273,17 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         201: { name: "Camp Stove", shortName: "Stove", slotCount: 6 },
         202: { name: "Workbench", shortName: "Workbench", slotCount: 8 },
         203: { name: "Storage Crate", shortName: "Crate", slotCount: 10 }
+    };
+    const plantFootprintCatalog = Object.freeze({
+        1: { width: 2, height: 2 },
+        2: { width: 2, height: 2 },
+        3: { width: 2, height: 2 },
+        4: { width: 2, height: 2 }
+    });
+    const plantWindShaderUniforms = {
+        uPlantTime: { value: 0.0 },
+        uPlantWindStrength: { value: 0.0 },
+        uPlantWindDirection: { value: new THREE_NS.Vector2(0.0, 1.0) }
     };
     const craftRecipeCatalog = {
         201: [
@@ -425,6 +441,41 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return Math.max(0, Math.min(value, 1));
     }
 
+    function smoothstep01(edge0, edge1, value) {
+        if (edge0 === edge1) {
+            return value < edge0 ? 0 : 1;
+        }
+        const t = clamp01((value - edge0) / (edge1 - edge0));
+        return t * t * (3.0 - 2.0 * t);
+    }
+
+    function blendToward(current, target, ratePerSecond, deltaSeconds) {
+        if (!(deltaSeconds > 0)) {
+            return target;
+        }
+        const blend = 1.0 - Math.exp(-ratePerSecond * deltaSeconds);
+        return current + (target - current) * blend;
+    }
+
+    function updateSmoothedWeatherEventLevel(state, deltaSeconds) {
+        if (!state) {
+            smoothedWeatherEventLevel = clamp01(
+                blendToward(smoothedWeatherEventLevel, 0.0, 3.0, deltaSeconds)
+            );
+            return;
+        }
+
+        const siteState = getSiteState(state);
+        const weather = siteState ? siteState.weather : null;
+        const targetEventLevel =
+            weather && weather.eventPhase && weather.eventPhase !== "NONE"
+                ? 1.0
+                : 0.0;
+        smoothedWeatherEventLevel = clamp01(
+            blendToward(smoothedWeatherEventLevel, targetEventLevel, 3.0, deltaSeconds)
+        );
+    }
+
     function getWeatherVisualResponse(state) {
         if (!state || state.appState !== "SITE_ACTIVE") {
             return {
@@ -448,13 +499,14 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         const heatLevel = clamp01(weather.heat / 100.0);
         const dustLevel = clamp01(weather.dust / 18.0);
-        const eventLevel = weather.eventPhase && weather.eventPhase !== "NONE" ? 1.0 : 0.0;
-        const eventBoost = eventLevel * 0.06;
-        const baseStrength = heatLevel > 0.001 ? 0.08 : 0.0;
+        const eventLevel = smoothedWeatherEventLevel;
+        const eventBoost = eventLevel * 0.10;
+        const heatPresence = smoothstep01(0.0, 0.18, heatLevel);
+        const baseStrength = heatPresence * 0.14;
         const blendedStrength =
             baseStrength +
-            heatLevel * 0.36 +
-            heatLevel * heatLevel * 0.16 +
+            heatLevel * 0.52 +
+            heatLevel * heatLevel * 0.24 +
             dustLevel * 0.20 +
             dustLevel * dustLevel * 0.16 +
             eventBoost;
@@ -463,7 +515,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             heatLevel,
             dustLevel,
             eventLevel,
-            effectStrength: Math.min(blendedStrength, 0.78)
+            effectStrength: Math.min(blendedStrength, 0.92)
         };
     }
 
@@ -583,6 +635,50 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             directionDegrees: directionDegrees,
             severity: severity
         };
+    }
+
+    function formatViewerError(error) {
+        if (!error) {
+            return "Unknown error";
+        }
+        if (typeof error === "string") {
+            return error;
+        }
+        if (error && typeof error.message === "string" && error.message.length > 0) {
+            return error.message;
+        }
+        return String(error);
+    }
+
+    function reportViewerError(tag, error) {
+        const message = formatViewerError(error);
+        postViewerLog("error", tag, {
+            message: message,
+            stack: error && error.stack ? String(error.stack) : ""
+        });
+        if (typeof console !== "undefined" && typeof console.error === "function") {
+            console.error("[viewer-error]", tag, error);
+        }
+        if (statusChip) {
+            statusChip.textContent = "Viewer Error\n" + tag + "\n" + message;
+        }
+    }
+
+    function postViewerLog(level, tag, details) {
+        const payload = {
+            level: level,
+            tag: tag,
+            frameNumber: latestState && typeof latestState.frameNumber === "number"
+                ? latestState.frameNumber
+                : null,
+            appState: latestState && latestState.appState ? latestState.appState : null,
+            details: details || {}
+        };
+
+        try {
+            postJson("/client-log", payload).catch(function () {});
+        } catch (_error) {
+        }
     }
 
     function applyWindOverlay(state) {
@@ -4337,20 +4433,200 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return value - Math.floor(value);
     }
 
-    function createPlantMaterial(color, roughness, emissive, emissiveIntensity) {
-        return new THREE_NS.MeshStandardMaterial({
+    function resolvePlantFootprintByType(plantTypeId) {
+        return plantFootprintCatalog[plantTypeId] || { width: 1, height: 1 };
+    }
+
+    function alignTileAxisToSpan(coord, span) {
+        const normalizedSpan = Math.max(1, span || 1);
+        const remainder = coord % normalizedSpan;
+        if (remainder === 0) {
+            return coord;
+        }
+        return coord - (remainder < 0 ? (remainder + normalizedSpan) : remainder);
+    }
+
+    function buildSiteTileMap(tiles) {
+        const tileMap = new Map();
+        (tiles || []).forEach((tile) => {
+            tileMap.set(tile.x + ":" + tile.y, tile);
+        });
+        return tileMap;
+    }
+
+    function buildPlantRenderSpec(anchorTile, footprintTiles, footprint) {
+        const tiles = footprintTiles && footprintTiles.length > 0 ? footprintTiles : [anchorTile];
+        const footprintWidth = Math.max(1, footprint.width || 1);
+        const footprintHeight = Math.max(1, footprint.height || 1);
+        const footprintArea = Math.max(1, footprintWidth * footprintHeight);
+        const areaScale = Math.sqrt(footprintArea);
+        const plantDensity =
+            tiles.reduce((total, tile) => total + clamp01(tile.plantDensity || 0), 0) /
+            Math.max(tiles.length, 1);
+        const baseHeight =
+            tiles.reduce((total, tile) => total + computeSiteTileVisualHeight(tile), 0) /
+            Math.max(tiles.length, 1);
+        const fullSpanX = 0.74 + Math.max(0, footprintWidth - 1) * 0.92;
+        const fullSpanZ = 0.74 + Math.max(0, footprintHeight - 1) * 0.92;
+
+        return {
+            anchorTile: anchorTile,
+            footprintTiles: tiles,
+            plantTypeId: anchorTile.plantTypeId || 0,
+            plantDensity: plantDensity,
+            footprintWidth: footprintWidth,
+            footprintHeight: footprintHeight,
+            footprintArea: footprintArea,
+            areaScale: areaScale,
+            fullSpanX: fullSpanX,
+            fullSpanZ: fullSpanZ,
+            halfSpanX: fullSpanX * 0.5,
+            halfSpanZ: fullSpanZ * 0.5,
+            baseHeight: baseHeight,
+            centerX: anchorTile.x + (footprintWidth - 1) * 0.5,
+            centerZ: anchorTile.y + (footprintHeight - 1) * 0.5
+        };
+    }
+
+    function collectPlantVisualSpecs(tiles) {
+        const tileMap = buildSiteTileMap(tiles);
+        const specs = [];
+
+        (tiles || []).forEach((tile) => {
+            const plantDensity = clamp01(tile && tile.plantDensity ? tile.plantDensity : 0);
+            const hasPlant = tile && (tile.plantTypeId !== 0 || plantDensity > 0.05);
+            if (!hasPlant) {
+                return;
+            }
+
+            const footprint = resolvePlantFootprintByType(tile.plantTypeId || 0);
+            const anchorX = alignTileAxisToSpan(tile.x, footprint.width);
+            const anchorY = alignTileAxisToSpan(tile.y, footprint.height);
+            if (tile.x !== anchorX || tile.y !== anchorY) {
+                return;
+            }
+
+            const footprintTiles = [];
+            let footprintComplete = true;
+            for (let offsetY = 0; offsetY < footprint.height; offsetY += 1) {
+                for (let offsetX = 0; offsetX < footprint.width; offsetX += 1) {
+                    const footprintTile = tileMap.get((anchorX + offsetX) + ":" + (anchorY + offsetY));
+                    if (!footprintTile || footprintTile.plantTypeId !== tile.plantTypeId) {
+                        footprintComplete = false;
+                        break;
+                    }
+                    footprintTiles.push(footprintTile);
+                }
+                if (!footprintComplete) {
+                    break;
+                }
+            }
+
+            specs.push(
+                buildPlantRenderSpec(
+                    tile,
+                    footprintComplete ? footprintTiles : [tile],
+                    footprintComplete ? footprint : { width: 1, height: 1 }
+                )
+            );
+        });
+
+        return specs;
+    }
+
+    function applyPlantWindShader(material, windFlexibility) {
+        const flexibility = windFlexibility == null ? 1.0 : windFlexibility;
+        material.onBeforeCompile = function (shader) {
+            shader.uniforms.uPlantTime = plantWindShaderUniforms.uPlantTime;
+            shader.uniforms.uPlantWindStrength = plantWindShaderUniforms.uPlantWindStrength;
+            shader.uniforms.uPlantWindDirection = plantWindShaderUniforms.uPlantWindDirection;
+            shader.uniforms.uPlantWindFlexibility = { value: flexibility };
+            shader.vertexShader = shader.vertexShader.replace(
+                "#include <common>",
+                "#include <common>\n" +
+                "uniform float uPlantTime;\n" +
+                "uniform float uPlantWindStrength;\n" +
+                "uniform vec2 uPlantWindDirection;\n" +
+                "uniform float uPlantWindFlexibility;\n"
+            );
+            shader.vertexShader = shader.vertexShader.replace(
+                "#include <begin_vertex>",
+                "#include <begin_vertex>\n" +
+                "float plantWindLevel = clamp(uPlantWindStrength, 0.0, 1.0);\n" +
+                "vec4 plantWorldPosition = modelMatrix * vec4(transformed, 1.0);\n" +
+                "vec3 modelBasisX = normalize(vec3(modelMatrix[0].x, modelMatrix[0].y, modelMatrix[0].z));\n" +
+                "vec3 modelBasisZ = normalize(vec3(modelMatrix[2].x, modelMatrix[2].y, modelMatrix[2].z));\n" +
+                "vec3 worldWindDirection = normalize(vec3(uPlantWindDirection.x, 0.0, uPlantWindDirection.y));\n" +
+                "vec3 localWindDirection = vec3(dot(worldWindDirection, modelBasisX), 0.0, dot(worldWindDirection, modelBasisZ));\n" +
+                "localWindDirection.y = 0.0;\n" +
+                "float localWindLength = max(length(localWindDirection), 0.0001);\n" +
+                "localWindDirection /= localWindLength;\n" +
+                "float plantVerticalWeight = smoothstep(-0.22, 0.38, transformed.y);\n" +
+                "float plantWave = sin(dot(plantWorldPosition.xz, vec2(0.38, 0.54)) + uPlantTime * (1.6 + plantWindLevel * 3.4));\n" +
+                "float plantGust = sin(dot(plantWorldPosition.xz, vec2(-0.84, 1.18)) * 1.7 + uPlantTime * (2.8 + plantWindLevel * 4.1));\n" +
+                "float plantFlutter = sin(uPlantTime * 5.2 + plantWorldPosition.y * 1.8 + plantWorldPosition.x * 0.6);\n" +
+                "float plantSway = (plantWave * 0.58 + plantGust * 0.28 + plantFlutter * 0.14) * plantVerticalWeight * plantWindLevel * uPlantWindFlexibility;\n" +
+                "transformed += localWindDirection * plantSway * (0.025 + plantWindLevel * 0.11);\n" +
+                "transformed.y += abs(plantGust) * plantVerticalWeight * plantWindLevel * uPlantWindFlexibility * 0.028;\n"
+            );
+        };
+        material.customProgramCacheKey = function () {
+            return "plant-wind-v1";
+        };
+        return material;
+    }
+
+    function updatePlantWindShaderUniforms(state, elapsedSeconds) {
+        if (!state) {
+            plantWindShaderUniforms.uPlantTime.value = elapsedSeconds;
+            plantWindShaderUniforms.uPlantWindStrength.value = 0.0;
+            plantWindShaderUniforms.uPlantWindDirection.value.set(0.0, 1.0);
+            return;
+        }
+
+        const siteState = getSiteState(state);
+        const weather = siteState ? siteState.weather : null;
+        const windStrength = weather ? clamp01((weather.wind || 0) / 80.0) : 0.0;
+        const directionDegrees =
+            weather && typeof weather.windDirectionDegrees === "number"
+                ? weather.windDirectionDegrees
+                : 0;
+        const directionRadians = directionDegrees * Math.PI / 180.0;
+
+        plantWindShaderUniforms.uPlantTime.value = elapsedSeconds;
+        plantWindShaderUniforms.uPlantWindStrength.value = windStrength;
+        plantWindShaderUniforms.uPlantWindDirection.value.set(
+            Math.sin(directionRadians),
+            Math.cos(directionRadians)
+        );
+    }
+
+    function createPlantMaterial(color, roughness, emissive, emissiveIntensity, options) {
+        const material = new THREE_NS.MeshStandardMaterial({
             color: color,
             roughness: roughness == null ? 0.84 : roughness,
             metalness: 0.01,
             emissive: emissive == null ? 0x000000 : emissive,
             emissiveIntensity: emissiveIntensity == null ? 0.0 : emissiveIntensity
         });
+        const windReactive = !options || options.windReactive !== false;
+        if (windReactive) {
+            applyPlantWindShader(
+                material,
+                options && typeof options.windFlexibility === "number"
+                    ? options.windFlexibility
+                    : 1.0
+            );
+        }
+        return material;
     }
 
-    function createLeafMesh(color, width, thickness, length) {
+    function createLeafMesh(color, width, thickness, length, windFlexibility) {
         const leaf = new THREE_NS.Mesh(
             new THREE_NS.SphereGeometry(1, 10, 10),
-            createPlantMaterial(color, 0.78, color, 0.04)
+            createPlantMaterial(color, 0.78, color, 0.04, {
+                windFlexibility: windFlexibility == null ? 1.0 : windFlexibility
+            })
         );
         leaf.scale.set(width, thickness, length);
         return leaf;
@@ -4372,26 +4648,29 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return { primary: 0x95b866, secondary: 0x728f4b, glow: 0x4b5f31 };
     }
 
-    function addPlantDensityShell(plantGroup, tile, plantDensity, palette) {
-        const shellCount = 4 + Math.round(plantDensity * 10);
-        const shellRadius = 0.12 + plantDensity * 0.26;
+    function addPlantDensityShell(plantGroup, plantSpec, palette) {
+        const tile = plantSpec.anchorTile;
+        const plantDensity = plantSpec.plantDensity;
+        const shellCount =
+            Math.max(4, Math.round((4 + plantDensity * 10) * Math.max(1.0, plantSpec.areaScale * 0.72)));
+        const shellRadiusX = plantSpec.halfSpanX * (0.48 + plantDensity * 0.28);
+        const shellRadiusZ = plantSpec.halfSpanZ * (0.48 + plantDensity * 0.28);
         const shellHeight = 0.03 + plantDensity * 0.11;
 
         for (let index = 0; index < shellCount; index += 1) {
             const angle = deterministicNoise01(tile.x, tile.y, index + 171) * Math.PI * 2;
-            const radius =
-                shellRadius *
-                (0.18 + deterministicNoise01(tile.y, tile.x, index + 181) * 0.82);
+            const radius = 0.18 + deterministicNoise01(tile.y, tile.x, index + 181) * 0.82;
             const frond = createLeafMesh(
                 index % 3 === 0 ? palette.secondary : palette.primary,
                 0.055 + plantDensity * 0.06,
                 0.012 + plantDensity * 0.01,
-                0.09 + plantDensity * 0.12
+                0.09 + plantDensity * 0.12,
+                1.1
             );
             frond.position.set(
-                Math.cos(angle) * radius,
+                Math.cos(angle) * shellRadiusX * radius,
                 shellHeight + deterministicNoise01(tile.x, tile.y, index + 191) * 0.05,
-                Math.sin(angle) * radius
+                Math.sin(angle) * shellRadiusZ * radius
             );
             frond.rotation.y = angle;
             frond.rotation.x = -0.18 + deterministicNoise01(tile.y, tile.x, index + 201) * 0.36;
@@ -4401,40 +4680,67 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         if (plantDensity >= 0.45) {
             const canopy = new THREE_NS.Mesh(
-                new THREE_NS.SphereGeometry(0.18 + plantDensity * 0.16, 14, 14),
-                createPlantMaterial(palette.primary, 0.86, palette.glow, 0.03 + plantDensity * 0.04)
+                new THREE_NS.SphereGeometry(
+                    0.18 + plantDensity * 0.12 + (plantSpec.areaScale - 1.0) * 0.06,
+                    14,
+                    14
+                ),
+                createPlantMaterial(
+                    palette.primary,
+                    0.86,
+                    palette.glow,
+                    0.03 + plantDensity * 0.04,
+                    { windFlexibility: 0.92 }
+                )
             );
             canopy.position.y = 0.06 + plantDensity * 0.08;
-            canopy.scale.set(1.0 + plantDensity * 0.35, 0.22 + plantDensity * 0.22, 1.0 + plantDensity * 0.35);
+            canopy.scale.set(
+                1.0 + plantDensity * 0.18 + (plantSpec.footprintWidth - 1) * 0.9,
+                0.22 + plantDensity * 0.22,
+                1.0 + plantDensity * 0.18 + (plantSpec.footprintHeight - 1) * 0.9
+            );
             plantGroup.add(canopy);
         }
     }
 
-    function addWindReedPlant(plantGroup, tile, plantDensity) {
+    function addWindReedPlant(plantGroup, plantSpec) {
+        const tile = plantSpec.anchorTile;
+        const plantDensity = plantSpec.plantDensity;
         const stemColor = 0x6b8b4c;
         const leafColor = 0x93b868;
-        const bunchCount = 5 + Math.round(plantDensity * 3);
-        const baseHeight = 0.34 + plantDensity * 0.38;
+        const bunchCount =
+            Math.max(5, Math.round((5 + plantDensity * 3) * Math.max(1.0, plantSpec.areaScale * 0.84)));
+        const baseHeight = 0.34 + plantDensity * 0.38 + (plantSpec.areaScale - 1.0) * 0.08;
 
         for (let index = 0; index < bunchCount; index += 1) {
-            const angle = (index / bunchCount) * Math.PI * 2 + deterministicNoise01(tile.x, tile.y, index + 1) * 0.42;
-            const offsetRadius = 0.03 + deterministicNoise01(tile.y, tile.x, index + 11) * 0.06;
+            const angle =
+                (index / bunchCount) * Math.PI * 2 +
+                deterministicNoise01(tile.x, tile.y, index + 1) * 0.42;
+            const offsetRadius = 0.18 + deterministicNoise01(tile.y, tile.x, index + 11) * 0.68;
             const stemHeight = baseHeight * (0.72 + deterministicNoise01(tile.x, tile.y, index + 21) * 0.38);
-            const stemRadius = 0.012 + deterministicNoise01(tile.y, tile.x, index + 31) * 0.008;
+            const stemRadius =
+                (0.012 + deterministicNoise01(tile.y, tile.x, index + 31) * 0.008) *
+                (1.0 + (plantSpec.areaScale - 1.0) * 0.08);
             const stem = new THREE_NS.Mesh(
                 new THREE_NS.CylinderGeometry(stemRadius * 0.55, stemRadius, stemHeight, 5),
-                createPlantMaterial(stemColor)
+                createPlantMaterial(stemColor, 0.84, 0x2d3719, 0.02, { windFlexibility: 0.62 })
             );
             stem.position.set(
-                Math.cos(angle) * offsetRadius,
+                Math.cos(angle) * plantSpec.halfSpanX * offsetRadius,
                 stemHeight * 0.5,
-                Math.sin(angle) * offsetRadius
+                Math.sin(angle) * plantSpec.halfSpanZ * offsetRadius
             );
             stem.rotation.z = Math.cos(angle) * 0.2;
             stem.rotation.x = -Math.sin(angle) * 0.18;
             plantGroup.add(stem);
 
-            const blade = createLeafMesh(leafColor, 0.02, 0.009, 0.14 + plantDensity * 0.1);
+            const blade = createLeafMesh(
+                leafColor,
+                0.02,
+                0.009,
+                0.14 + plantDensity * 0.1 + (plantSpec.areaScale - 1.0) * 0.05,
+                1.26
+            );
             blade.position.set(
                 stem.position.x * 0.6,
                 stemHeight * (0.56 + deterministicNoise01(tile.x, tile.y, index + 41) * 0.12),
@@ -4446,32 +4752,54 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
     }
 
-    function addSaltbushPlant(plantGroup, tile, plantDensity) {
+    function addSaltbushPlant(plantGroup, plantSpec) {
+        const tile = plantSpec.anchorTile;
+        const plantDensity = plantSpec.plantDensity;
         const twigColor = 0x6b5c3b;
         const leafColors = [0x88a45d, 0x95b568, 0x78914d];
-        const branchCount = 4 + Math.round(plantDensity * 2);
-        const bushRadius = 0.2 + plantDensity * 0.14;
+        const branchCount =
+            Math.max(4, Math.round((4 + plantDensity * 2) * Math.max(1.0, plantSpec.areaScale * 0.76)));
+        const bushRadiusX = plantSpec.halfSpanX * (0.46 + plantDensity * 0.22);
+        const bushRadiusZ = plantSpec.halfSpanZ * (0.46 + plantDensity * 0.22);
 
         for (let index = 0; index < branchCount; index += 1) {
-            const angle = (index / branchCount) * Math.PI * 2 + deterministicNoise01(tile.x, tile.y, index + 61) * 0.6;
-            const branchHeight = 0.12 + plantDensity * 0.12 + deterministicNoise01(tile.y, tile.x, index + 71) * 0.08;
+            const angle =
+                (index / branchCount) * Math.PI * 2 +
+                deterministicNoise01(tile.x, tile.y, index + 61) * 0.6;
+            const branchHeight =
+                0.12 + plantDensity * 0.12 + deterministicNoise01(tile.y, tile.x, index + 71) * 0.08;
             const branch = new THREE_NS.Mesh(
                 new THREE_NS.CylinderGeometry(0.015, 0.022, branchHeight, 5),
-                createPlantMaterial(twigColor, 0.9)
+                createPlantMaterial(twigColor, 0.9, 0x23170c, 0.0, { windFlexibility: 0.44 })
             );
-            branch.position.set(0, branchHeight * 0.38, 0);
+            branch.position.set(
+                Math.cos(angle) * bushRadiusX * 0.16,
+                branchHeight * 0.38,
+                Math.sin(angle) * bushRadiusZ * 0.16
+            );
             branch.rotation.z = Math.cos(angle) * 0.65;
             branch.rotation.x = -Math.sin(angle) * 0.65;
             plantGroup.add(branch);
         }
 
-        const clumpCount = 7 + Math.round(plantDensity * 4);
+        const clumpCount =
+            Math.max(7, Math.round((7 + plantDensity * 4) * Math.max(1.0, plantSpec.areaScale * 0.86)));
         for (let index = 0; index < clumpCount; index += 1) {
             const angle = deterministicNoise01(tile.x, tile.y, index + 81) * Math.PI * 2;
-            const radius = bushRadius * (0.28 + deterministicNoise01(tile.y, tile.x, index + 91) * 0.72);
+            const radius = 0.28 + deterministicNoise01(tile.y, tile.x, index + 91) * 0.72;
             const clump = new THREE_NS.Mesh(
-                new THREE_NS.SphereGeometry(0.09 + deterministicNoise01(tile.x, tile.y, index + 101) * 0.03, 10, 10),
-                createPlantMaterial(leafColors[index % leafColors.length], 0.8, 0x42522a, 0.04)
+                new THREE_NS.SphereGeometry(
+                    0.09 + deterministicNoise01(tile.x, tile.y, index + 101) * 0.03,
+                    10,
+                    10
+                ),
+                createPlantMaterial(
+                    leafColors[index % leafColors.length],
+                    0.8,
+                    0x42522a,
+                    0.04,
+                    { windFlexibility: 0.9 }
+                )
             );
             clump.scale.set(
                 0.95 + deterministicNoise01(tile.x, tile.y, index + 111) * 0.3,
@@ -4479,34 +4807,41 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 0.95 + deterministicNoise01(tile.x, tile.y, index + 131) * 0.3
             );
             clump.position.set(
-                Math.cos(angle) * radius,
+                Math.cos(angle) * bushRadiusX * radius,
                 0.12 + plantDensity * 0.08 + deterministicNoise01(tile.y, tile.x, index + 141) * 0.12,
-                Math.sin(angle) * radius
+                Math.sin(angle) * bushRadiusZ * radius
             );
             plantGroup.add(clump);
         }
     }
 
-    function addShadeCactusPlant(plantGroup, tile, plantDensity) {
-        const bodyMaterial = createPlantMaterial(0x6b8c52, 0.82, 0x30411e, 0.06);
-        const height = 0.48 + plantDensity * 0.42;
+    function addShadeCactusPlant(plantGroup, plantSpec) {
+        const plantDensity = plantSpec.plantDensity;
+        const bodyMaterial = createPlantMaterial(0x6b8c52, 0.82, 0x30411e, 0.06, { windFlexibility: 0.18 });
+        const height = 0.48 + plantDensity * 0.42 + (plantSpec.areaScale - 1.0) * 0.12;
         const trunk = new THREE_NS.Mesh(
             new THREE_NS.CylinderGeometry(0.09, 0.12, height, 8),
             bodyMaterial
         );
         trunk.position.y = height * 0.5;
+        trunk.scale.set(
+            1.0 + (plantSpec.footprintWidth - 1) * 0.72,
+            1.0,
+            1.0 + (plantSpec.footprintHeight - 1) * 0.72
+        );
         plantGroup.add(trunk);
 
+        const armLengthScale = 1.0 + (plantSpec.areaScale - 1.0) * 0.22;
         const armPairs = [
-            { side: -1, heightFactor: 0.5, length: 0.26 + plantDensity * 0.1, tilt: -0.95 },
-            { side: 1, heightFactor: 0.66, length: 0.22 + plantDensity * 0.08, tilt: 0.92 }
+            { side: -1, heightFactor: 0.5, length: (0.26 + plantDensity * 0.1) * armLengthScale, tilt: -0.95 },
+            { side: 1, heightFactor: 0.66, length: (0.22 + plantDensity * 0.08) * armLengthScale, tilt: 0.92 }
         ];
         armPairs.forEach((armSpec) => {
             const arm = new THREE_NS.Mesh(
                 new THREE_NS.CylinderGeometry(0.045, 0.055, armSpec.length, 7),
                 bodyMaterial
             );
-            arm.position.set(armSpec.side * 0.11, height * armSpec.heightFactor, 0);
+            arm.position.set(armSpec.side * (0.11 + (plantSpec.footprintWidth - 1) * 0.08), height * armSpec.heightFactor, 0);
             arm.rotation.z = armSpec.tilt;
             plantGroup.add(arm);
 
@@ -4524,27 +4859,29 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         });
 
         const bloom = new THREE_NS.Mesh(
-            new THREE_NS.SphereGeometry(0.038, 10, 10),
-            createPlantMaterial(0xcfa56a, 0.7, 0x8c5c26, 0.08)
+            new THREE_NS.SphereGeometry(0.038 + (plantSpec.areaScale - 1.0) * 0.01, 10, 10),
+            createPlantMaterial(0xcfa56a, 0.7, 0x8c5c26, 0.08, { windFlexibility: 0.32 })
         );
         bloom.position.set(0, height + 0.02, 0);
         bloom.scale.set(1.0, 0.8, 1.0);
         plantGroup.add(bloom);
     }
 
-    function addSunfruitVinePlant(plantGroup, tile, plantDensity) {
-        const stemMaterial = createPlantMaterial(0x6e7a37, 0.86);
+    function addSunfruitVinePlant(plantGroup, plantSpec) {
+        const plantDensity = plantSpec.plantDensity;
+        const stemMaterial = createPlantMaterial(0x6e7a37, 0.86, 0x233014, 0.01, { windFlexibility: 0.82 });
         const leafColors = [0x8db05e, 0x7a984b, 0x97bc64];
         const fruitColor = 0xd5a34f;
-        const span = 0.18 + plantDensity * 0.14;
+        const spanX = plantSpec.halfSpanX * (0.82 + plantDensity * 0.22);
+        const spanZ = plantSpec.halfSpanZ * (0.34 + plantDensity * 0.16);
         const vineCurve = new THREE_NS.CatmullRomCurve3([
-            new THREE_NS.Vector3(-span, 0.03, -0.08),
-            new THREE_NS.Vector3(-0.06, 0.12 + plantDensity * 0.05, 0.04),
-            new THREE_NS.Vector3(0.07, 0.08 + plantDensity * 0.06, -0.03),
-            new THREE_NS.Vector3(span, 0.14 + plantDensity * 0.08, 0.08)
+            new THREE_NS.Vector3(-spanX, 0.03, -spanZ),
+            new THREE_NS.Vector3(-spanX * 0.36, 0.12 + plantDensity * 0.05, spanZ * 0.45),
+            new THREE_NS.Vector3(spanX * 0.42, 0.08 + plantDensity * 0.06, -spanZ * 0.28),
+            new THREE_NS.Vector3(spanX, 0.14 + plantDensity * 0.08, spanZ)
         ]);
         const vine = new THREE_NS.Mesh(
-            new THREE_NS.TubeGeometry(vineCurve, 16, 0.018, 6, false),
+            new THREE_NS.TubeGeometry(vineCurve, 16, 0.018 + (plantSpec.areaScale - 1.0) * 0.002, 6, false),
             stemMaterial
         );
         plantGroup.add(vine);
@@ -4555,9 +4892,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             const tangent = vineCurve.getTangent(t);
             const leaf = createLeafMesh(
                 leafColors[index % leafColors.length],
-                0.08 + plantDensity * 0.03,
+                0.08 + plantDensity * 0.03 + (plantSpec.areaScale - 1.0) * 0.02,
                 0.014,
-                0.12 + plantDensity * 0.04
+                0.12 + plantDensity * 0.04 + (plantSpec.areaScale - 1.0) * 0.03,
+                1.08
             );
             leaf.position.copy(point);
             leaf.position.y += 0.02 + (index % 2) * 0.015;
@@ -4566,13 +4904,14 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             plantGroup.add(leaf);
         }
 
-        const fruitCount = 1 + Math.round(plantDensity * 2);
+        const fruitCount =
+            Math.max(1, Math.round((1 + plantDensity * 2) * Math.max(1.0, plantSpec.areaScale * 0.72)));
         for (let index = 0; index < fruitCount; index += 1) {
-            const t = 0.42 + index * 0.18;
+            const t = 0.28 + index * (0.56 / Math.max(fruitCount, 1));
             const point = vineCurve.getPoint(Math.min(t, 0.92));
             const fruit = new THREE_NS.Mesh(
                 new THREE_NS.SphereGeometry(0.034 + plantDensity * 0.01, 10, 10),
-                createPlantMaterial(fruitColor, 0.62, 0x7c4d16, 0.12)
+                createPlantMaterial(fruitColor, 0.62, 0x7c4d16, 0.12, { windFlexibility: 0.54 })
             );
             fruit.position.copy(point);
             fruit.position.y -= 0.015;
@@ -4581,47 +4920,68 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
     }
 
-    function addGenericPlant(plantGroup, tile, plantDensity) {
+    function addGenericPlant(plantGroup, plantSpec) {
+        const tile = plantSpec.anchorTile;
+        const plantDensity = plantSpec.plantDensity;
         const stem = new THREE_NS.Mesh(
-            new THREE_NS.CylinderGeometry(0.03, 0.04, 0.26 + plantDensity * 0.18, 6),
-            createPlantMaterial(0x72884d)
+            new THREE_NS.CylinderGeometry(
+                0.03 + (plantSpec.areaScale - 1.0) * 0.005,
+                0.04 + (plantSpec.areaScale - 1.0) * 0.006,
+                0.26 + plantDensity * 0.18 + (plantSpec.areaScale - 1.0) * 0.08,
+                6
+            ),
+            createPlantMaterial(0x72884d, 0.84, 0x263016, 0.01, { windFlexibility: 0.56 })
         );
         stem.position.y = 0.16 + plantDensity * 0.09;
         plantGroup.add(stem);
 
         for (let index = 0; index < 3; index += 1) {
-            const angle = (index / 3) * Math.PI * 2 + deterministicNoise01(tile.x, tile.y, index + 151) * 0.5;
-            const leaf = createLeafMesh(0x96b867, 0.05, 0.012, 0.11 + plantDensity * 0.04);
-            leaf.position.set(Math.cos(angle) * 0.04, 0.14 + index * 0.04, Math.sin(angle) * 0.04);
+            const angle =
+                (index / 3) * Math.PI * 2 +
+                deterministicNoise01(tile.x, tile.y, index + 151) * 0.5;
+            const leaf = createLeafMesh(
+                0x96b867,
+                0.05 + (plantSpec.areaScale - 1.0) * 0.015,
+                0.012,
+                0.11 + plantDensity * 0.04 + (plantSpec.areaScale - 1.0) * 0.02,
+                1.0
+            );
+            leaf.position.set(
+                Math.cos(angle) * plantSpec.halfSpanX * 0.18,
+                0.14 + index * 0.04,
+                Math.sin(angle) * plantSpec.halfSpanZ * 0.18
+            );
             leaf.rotation.y = angle;
             leaf.rotation.z = 0.5;
             plantGroup.add(leaf);
         }
     }
 
-    function createPlantVisual(tile, tileHeight, plantDensity) {
+    function createPlantVisual(plantSpec) {
+        const tile = plantSpec.anchorTile;
+        const plantDensity = plantSpec.plantDensity;
         const plantGroup = new THREE_NS.Group();
         const palette = resolvePlantPalette(tile);
-        plantGroup.position.y = tileHeight + 0.02;
+        plantGroup.position.y = plantSpec.baseHeight + 0.02;
         plantGroup.rotation.y = deterministicNoise01(tile.x, tile.y, tile.plantTypeId + 161) * Math.PI * 2;
         plantGroup.scale.set(
-            0.92 + plantDensity * 0.26,
-            0.88 + plantDensity * 0.34,
-            0.92 + plantDensity * 0.26
+            1.0,
+            0.88 + plantDensity * 0.34 + (plantSpec.areaScale - 1.0) * 0.08,
+            1.0
         );
 
-        addPlantDensityShell(plantGroup, tile, plantDensity, palette);
+        addPlantDensityShell(plantGroup, plantSpec, palette);
 
         if (tile.plantTypeId === 1) {
-            addWindReedPlant(plantGroup, tile, plantDensity);
+            addWindReedPlant(plantGroup, plantSpec);
         } else if (tile.plantTypeId === 2) {
-            addSaltbushPlant(plantGroup, tile, plantDensity);
+            addSaltbushPlant(plantGroup, plantSpec);
         } else if (tile.plantTypeId === 3) {
-            addShadeCactusPlant(plantGroup, tile, plantDensity);
+            addShadeCactusPlant(plantGroup, plantSpec);
         } else if (tile.plantTypeId === 4) {
-            addSunfruitVinePlant(plantGroup, tile, plantDensity);
+            addSunfruitVinePlant(plantGroup, plantSpec);
         } else {
-            addGenericPlant(plantGroup, tile, plantDensity);
+            addGenericPlant(plantGroup, plantSpec);
         }
 
         return plantGroup;
@@ -4789,6 +5149,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         );
         siteBorder.position.set(0, -0.01, 0);
         worldGroup.add(siteBorder);
+        const plantVisualSpecs = collectPlantVisualSpecs(siteBootstrap.tiles);
 
         siteBootstrap.tiles.forEach((tile) => {
             const plantDensity = Math.max(0, Math.min(tile.plantDensity || 0, 1));
@@ -4819,19 +5180,19 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             worldGroup.add(tileMesh);
             tilePickables.push(tileMesh);
 
-            if (hasPlant) {
-                const plantVisual = createPlantVisual(tile, tileHeight, plantDensity);
-                plantVisual.position.x = tile.x - offsetX;
-                plantVisual.position.z = tile.y - offsetZ;
-                worldGroup.add(plantVisual);
-            }
-
             if (tile.structureTypeId !== 0) {
                 const structureVisual = createStructureVisual(tile, tileHeight);
                 structureVisual.position.x = tile.x - offsetX;
                 structureVisual.position.z = tile.y - offsetZ;
                 worldGroup.add(structureVisual);
             }
+        });
+
+        plantVisualSpecs.forEach((plantSpec) => {
+            const plantVisual = createPlantVisual(plantSpec);
+            plantVisual.position.x = plantSpec.centerX - offsetX;
+            plantVisual.position.z = plantSpec.centerZ - offsetZ;
+            worldGroup.add(plantVisual);
         });
 
         if (siteBootstrap.camp) {
@@ -5006,14 +5367,19 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function renderState(state) {
-        latestState = state;
-        updateOverlay(state);
-        applyWindOverlay(state);
-        rebuildWorld(state);
-        if (state.appState === "SITE_ACTIVE" && tileContextMenuState) {
-            renderTileContextMenu();
-        } else if (tileContextMenuState) {
-            closeTileContextMenu();
+        try {
+            latestState = state;
+            updateOverlay(state);
+            applyWindOverlay(state);
+            rebuildWorld(state);
+            if (state.appState === "SITE_ACTIVE" && tileContextMenuState) {
+                renderTileContextMenu();
+            } else if (tileContextMenuState) {
+                closeTileContextMenu();
+            }
+        } catch (error) {
+            reportViewerError("renderState", error);
+            throw error;
         }
     }
 
@@ -5033,6 +5399,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const deltaSeconds = Math.min(animationClock.getDelta(), 0.1);
         animationTimeSeconds += deltaSeconds;
         const elapsed = animationTimeSeconds;
+        updateSmoothedWeatherEventLevel(latestState, deltaSeconds);
         worldGroup.traverse((node) => {
             if (node.userData.spinY) {
                 node.rotation.y += node.userData.spinY * 0.01;
@@ -5115,6 +5482,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             updateWindFieldVisual(siteSceneCache, latestState, elapsed);
         }
 
+        updatePlantWindShaderUniforms(latestState, elapsed);
         fitRenderer();
         renderActionProgressBar(latestState);
         renderPlacementFailureToast();
@@ -5213,83 +5581,88 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function handleIncomingState(state, forceRender, patch) {
-        const normalizedState = normalizeState(state);
-        viewerCompatibilityWarning = getVisualSmokeCompatibilityWarning(normalizedState);
-        rebuildInventoryCache(normalizedState);
-        syncPlacementFailureToast(normalizedState);
-        const previousState = latestState;
-        syncLocalActionProgress(normalizedState);
-        const lightweightPatchParts =
-            !forceRender && normalizedState.appState === "SITE_ACTIVE"
-                ? getSiteLightweightPatchParts(patch)
-                : null;
-        if (lightweightPatchParts) {
-            latestState = normalizedState;
-            if (lightweightPatchParts.worker) {
-                updateSiteWorkerTargetFromState(getSiteState(normalizedState), normalizedState.frameNumber || 0);
-            }
-            if (lightweightPatchParts.placementPreview) {
-                if (isPlacementModeActive(normalizedState)) {
-                    closeTileContextMenu();
+        try {
+            const normalizedState = normalizeState(state);
+            viewerCompatibilityWarning = getVisualSmokeCompatibilityWarning(normalizedState);
+            rebuildInventoryCache(normalizedState);
+            syncPlacementFailureToast(normalizedState);
+            const previousState = latestState;
+            syncLocalActionProgress(normalizedState);
+            const lightweightPatchParts =
+                !forceRender && normalizedState.appState === "SITE_ACTIVE"
+                    ? getSiteLightweightPatchParts(patch)
+                    : null;
+            if (lightweightPatchParts) {
+                latestState = normalizedState;
+                if (lightweightPatchParts.worker) {
+                    updateSiteWorkerTargetFromState(getSiteState(normalizedState), normalizedState.frameNumber || 0);
                 }
-                updateSitePlacementPreviewVisual(normalizedState);
-            }
-            if (lightweightPatchParts.placementFailure) {
-                renderPlacementFailureToast();
+                if (lightweightPatchParts.placementPreview) {
+                    if (isPlacementModeActive(normalizedState)) {
+                        closeTileContextMenu();
+                    }
+                    updateSitePlacementPreviewVisual(normalizedState);
+                }
+                if (lightweightPatchParts.placementFailure) {
+                    renderPlacementFailureToast();
+                }
+
+                const previousActionKind =
+                    previousState && previousState.siteState && previousState.siteState.worker
+                        ? previousState.siteState.worker.currentActionKind || 0
+                        : 0;
+                const nextActionKind =
+                    normalizedState.siteState && normalizedState.siteState.worker
+                        ? normalizedState.siteState.worker.currentActionKind || 0
+                        : 0;
+                if (lightweightPatchParts.hud ||
+                    lightweightPatchParts.siteAction ||
+                    lightweightPatchParts.placementPreview ||
+                    lightweightPatchParts.placementFailure ||
+                    lightweightPatchParts.weather ||
+                    previousActionKind !== nextActionKind) {
+                    renderSiteStatusChip(normalizedState);
+                }
+                if (lightweightPatchParts.hud) {
+                    renderSiteInventoryPanel(
+                        normalizedState,
+                        getInventorySlotsByKind(normalizedState, "WORKER_PACK"));
+                    renderStoragePanel(normalizedState, findOpenedInventoryContainer(normalizedState));
+                    if (phonePanelOpen) {
+                        renderPhonePanel(normalizedState);
+                    }
+                }
+                renderActionProgressBar(normalizedState);
+                return;
             }
 
-            const previousActionKind =
-                previousState && previousState.siteState && previousState.siteState.worker
-                    ? previousState.siteState.worker.currentActionKind || 0
-                    : 0;
-            const nextActionKind =
-                normalizedState.siteState && normalizedState.siteState.worker
-                    ? normalizedState.siteState.worker.currentActionKind || 0
-                    : 0;
-            if (lightweightPatchParts.hud ||
-                lightweightPatchParts.siteAction ||
-                lightweightPatchParts.placementPreview ||
-                lightweightPatchParts.placementFailure ||
-                lightweightPatchParts.weather ||
-                previousActionKind !== nextActionKind) {
-                renderSiteStatusChip(normalizedState);
-            }
-            if (lightweightPatchParts.hud) {
-                renderSiteInventoryPanel(
-                    normalizedState,
-                    getInventorySlotsByKind(normalizedState, "WORKER_PACK"));
-                renderStoragePanel(normalizedState, findOpenedInventoryContainer(normalizedState));
-                if (phonePanelOpen) {
-                    renderPhonePanel(normalizedState);
+            if (forceRender || normalizedState.appState === "SITE_ACTIVE") {
+                if (normalizedState.appState === "SITE_ACTIVE") {
+                    latestPresentationSignature = "";
+                } else {
+                    latestPresentationSignature = buildPresentationSignature(normalizedState);
                 }
-            }
-            renderActionProgressBar(normalizedState);
-            return;
-        }
-
-        if (forceRender || normalizedState.appState === "SITE_ACTIVE") {
-            if (normalizedState.appState === "SITE_ACTIVE") {
-                latestPresentationSignature = "";
-            } else {
-                latestPresentationSignature = buildPresentationSignature(normalizedState);
-            }
-            renderState(normalizedState);
-        } else {
-            const presentationSignature = buildPresentationSignature(normalizedState);
-            if (presentationSignature !== latestPresentationSignature) {
-                latestPresentationSignature = presentationSignature;
                 renderState(normalizedState);
             } else {
-                latestState = normalizedState;
+                const presentationSignature = buildPresentationSignature(normalizedState);
+                if (presentationSignature !== latestPresentationSignature) {
+                    latestPresentationSignature = presentationSignature;
+                    renderState(normalizedState);
+                } else {
+                    latestState = normalizedState;
+                }
             }
-        }
 
-        if (normalizedState.appState !== "MAIN_MENU" && normalizedState.appState !== "SITE_ACTIVE") {
-            statusChip.textContent =
-                "Connected\nFrame " + normalizedState.frameNumber +
-                "\nSelected Site: " + (normalizedState.selectedSiteId == null ? "none" : normalizedState.selectedSiteId);
+            if (normalizedState.appState !== "MAIN_MENU" && normalizedState.appState !== "SITE_ACTIVE") {
+                statusChip.textContent =
+                    "Connected\nFrame " + normalizedState.frameNumber +
+                    "\nSelected Site: " + (normalizedState.selectedSiteId == null ? "none" : normalizedState.selectedSiteId);
+            }
+            renderActionProgressBar(normalizedState);
+        } catch (error) {
+            reportViewerError("handleIncomingState", error);
+            throw error;
         }
-        renderActionProgressBar(normalizedState);
     }
 
     function connectStateStream() {
@@ -5299,13 +5672,21 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         stateStream = new EventSource("/events");
         stateStream.addEventListener("full-state", function (event) {
-            const state = normalizeState(JSON.parse(event.data));
-            handleIncomingState(state, true);
+            try {
+                const state = normalizeState(JSON.parse(event.data));
+                handleIncomingState(state, true);
+            } catch (error) {
+                reportViewerError("full-state", error);
+            }
         });
         stateStream.addEventListener("state-patch", function (event) {
-            const patch = JSON.parse(event.data);
-            const state = mergeStatePatch(patch);
-            handleIncomingState(state, false, patch);
+            try {
+                const patch = JSON.parse(event.data);
+                const state = mergeStatePatch(patch);
+                handleIncomingState(state, false, patch);
+            } catch (error) {
+                reportViewerError("state-patch", error);
+            }
         });
         stateStream.onerror = function () {
             statusChip.textContent = "Waiting for host...";
@@ -5706,6 +6087,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     });
 
     window.addEventListener("resize", fitRenderer);
+    window.addEventListener("error", function (event) {
+        reportViewerError("window.error", event.error || event.message || "Unknown window error");
+    });
+    window.addEventListener("unhandledrejection", function (event) {
+        reportViewerError("window.unhandledrejection", event.reason || "Unhandled rejection");
+    });
 
     fitRenderer();
     storagePanelClose.addEventListener("click", function () {
