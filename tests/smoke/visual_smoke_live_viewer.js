@@ -79,6 +79,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const orbitMouseButton = 2;
     const orbitMouseButtonsMask = 2;
     const orbitDragThresholdPixels = 6;
+    const forcedHeatForVfxTest = 100;
+    const heatColorAddGainForVfx = 1.0;
     const hudWarningCodes = {
         none: 0,
         windWatch: 1,
@@ -115,6 +117,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         uniform vec2 uResolution;
         uniform float uTime;
         uniform float uHeatLevel;
+        uniform float uHeatColorAddGain;
         uniform float uDustLevel;
         uniform float uEventLevel;
         uniform float uStrength;
@@ -195,20 +198,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 vec2(0.001),
                 vec2(0.999));
             vec4 sceneColor = texture2D(tSceneColor, sampleUv);
-            float heatLift = 4.6 * uStrength * (0.48 + heatScale * 1.18) * mix(0.28, 0.82, shimmerMask);
             float brightAreaMask = smoothstep(0.45, 1.45, dot(sceneColor.rgb, vec3(0.30, 0.59, 0.11)) * 1.6);
-            vec3 warmLift = vec3(0.38, 0.27, 0.12) * heatLift;
-            vec3 heatGlow = vec3(0.24, 0.16, 0.05) * heatLift * mix(0.45, 1.0, horizonHaze);
-            float sunBloom = uStrength * heatScale * mix(0.10, 0.30, shimmerMask);
-            vec3 color = sceneColor.rgb * (1.0 + heatLift * (0.52 + heatScale * 0.48));
-            color += warmLift * (1.0 + heatScale * 0.22);
-            color += warmLift * brightAreaMask * (1.05 + heatScale * 0.56);
-            color += heatGlow;
-            color += vec3(0.45, 0.31, 0.12) * sunBloom * brightAreaMask;
+            float heatAddAmount = clamp(heatScale * uHeatColorAddGain, 0.0, 1.0);
+            vec3 heatSunOnSandColor = vec3(0.88, 0.66, 0.36);
+            vec3 color = sceneColor.rgb + heatSunOnSandColor * heatAddAmount;
             vec3 dustTint = vec3(0.78, 0.67, 0.52);
             float transmittance = exp(-opticalDepth * mix(1.02, 0.34, heatDominance));
             float inscatter = 1.0 - transmittance;
-            float luminance = dot(color, vec3(0.30, 0.59, 0.11));
             vec3 colorExtinct = color * transmittance;
             vec3 mieFog = dustTint * inscatter;
             float forwardLift = brightAreaMask * dustScale * veilDepth * mix(0.05, 0.02, heatDominance) * (1.0 + eventScale * 0.22);
@@ -415,6 +411,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 uResolution: { value: new THREE_NS.Vector2(1, 1) },
                 uTime: { value: 0 },
                 uHeatLevel: { value: 0 },
+                uHeatColorAddGain: { value: heatColorAddGainForVfx },
                 uDustLevel: { value: 0 },
                 uEventLevel: { value: 0 },
                 uStrength: { value: 0 }
@@ -468,6 +465,20 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return current + (target - current) * blend;
     }
 
+    function getEffectiveWeatherHeat(weather) {
+        if (!weather) {
+            return 0;
+        }
+
+        // Temporary smoke-viewer override so we can inspect an extreme-heat VFX pass without
+        // changing the gameplay weather simulation underneath it.
+        if (forcedHeatForVfxTest > 0) {
+            return forcedHeatForVfxTest;
+        }
+
+        return typeof weather.heat === "number" ? weather.heat : 0;
+    }
+
     function buildTargetWeatherVisualResponse(state) {
         if (!state || state.appState !== "SITE_ACTIVE") {
             return {
@@ -489,7 +500,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             };
         }
 
-        const rawHeatLevel = clamp01(weather.heat / 100.0);
+        const rawHeatLevel = clamp01(getEffectiveWeatherHeat(weather) / 100.0);
         const rawDustLevel = clamp01(weather.dust / 18.0);
         const rawWindLevel = clamp01((weather.wind || 0) / 80.0);
         const heatLevel = smoothstep01(0.12, 0.58, rawHeatLevel);
@@ -725,6 +736,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         weatherPostProcess.material.uniforms.uTime.value = elapsedSeconds;
         weatherPostProcess.material.uniforms.uHeatLevel.value = weatherVisualResponse.heatLevel;
+        weatherPostProcess.material.uniforms.uHeatColorAddGain.value = heatColorAddGainForVfx;
         weatherPostProcess.material.uniforms.uDustLevel.value = weatherVisualResponse.dustLevel;
         weatherPostProcess.material.uniforms.uEventLevel.value = 0;
         weatherPostProcess.material.uniforms.uStrength.value = weatherVisualResponse.effectStrength;
@@ -1751,7 +1763,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const energy = hud ? Math.round(hud.playerEnergy) : 0;
         const completion = hud ? Math.round((hud.siteCompletionNormalized || 0) * 100) : 0;
         const eventPhase = weather ? weather.eventPhase : "NONE";
-        const weatherHeat = weather ? Math.round(weather.heat || 0) : 0;
+        const weatherHeat = Math.round(getEffectiveWeatherHeat(weather));
         const weatherWind = weather ? Math.round(weather.wind || 0) : 0;
         const weatherDust = weather ? Math.round(weather.dust || 0) : 0;
         const windDirection = weather ? Math.round(weather.windDirectionDegrees || 0) : 0;
