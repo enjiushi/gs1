@@ -107,7 +107,8 @@ enum Gs1UiActionType : std::uint8_t
     GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE = 13,
     GS1_UI_ACTION_ADD_PHONE_LISTING_TO_CART = 14,
     GS1_UI_ACTION_REMOVE_PHONE_LISTING_FROM_CART = 15,
-    GS1_UI_ACTION_CHECKOUT_PHONE_CART = 16
+    GS1_UI_ACTION_CHECKOUT_PHONE_CART = 16,
+    GS1_UI_ACTION_SET_PHONE_PANEL_SECTION = 17
 };
 
 enum Gs1SiteActionKind : std::uint8_t
@@ -211,6 +212,12 @@ enum Gs1PhoneListingPresentationKind : std::uint8_t
     GS1_PHONE_LISTING_PRESENTATION_PURCHASE_UNLOCKABLE = 3
 };
 
+enum Gs1PhonePanelSection : std::uint8_t
+{
+    GS1_PHONE_PANEL_SECTION_MARKETPLACE = 0,
+    GS1_PHONE_PANEL_SECTION_CART = 1
+};
+
 enum Gs1NotificationKind : std::uint8_t
 {
     GS1_NOTIFICATION_KIND_INFO = 0,
@@ -275,6 +282,7 @@ enum Gs1EngineMessageType : std::uint8_t
     GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_END = 36,
     GS1_ENGINE_MESSAGE_SITE_PLACEMENT_PREVIEW = 37,
     GS1_ENGINE_MESSAGE_SITE_PLACEMENT_FAILURE = 38,
+    GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE = 39,
 
     GS1_ENGINE_MESSAGE_HUD_STATE = 40,
     GS1_ENGINE_MESSAGE_NOTIFICATION_PUSH = 41,
@@ -303,7 +311,8 @@ enum Gs1RuntimeProfileSystemId : std::uint8_t
     GS1_RUNTIME_PROFILE_SYSTEM_PLACEMENT_VALIDATION = 16,
     GS1_RUNTIME_PROFILE_SYSTEM_FAILURE_RECOVERY = 17,
     GS1_RUNTIME_PROFILE_SYSTEM_SITE_COMPLETION = 18,
-    GS1_RUNTIME_PROFILE_SYSTEM_COUNT = 19
+    GS1_RUNTIME_PROFILE_SYSTEM_PHONE_PANEL = 19,
+    GS1_RUNTIME_PROFILE_SYSTEM_COUNT = 20
 };
 
 struct Gs1RuntimeCreateDesc
@@ -685,6 +694,19 @@ struct Gs1EngineMessagePhoneListingData
     std::uint8_t flags;
 };
 
+struct Gs1EngineMessagePhonePanelData
+{
+    Gs1PhonePanelSection active_section;
+    std::uint8_t reserved0[3];
+    std::uint32_t visible_task_count;
+    std::uint32_t accepted_task_count;
+    std::uint32_t buy_listing_count;
+    std::uint32_t sell_listing_count;
+    std::uint32_t service_listing_count;
+    std::uint32_t cart_item_count;
+    std::uint32_t flags;
+};
+
 struct Gs1EngineMessageSiteActionData
 {
     std::uint32_t action_id;
@@ -828,6 +850,7 @@ GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePlacementPreviewData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePlacementFailureData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageTaskData, 20U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePhoneListingData, 24U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePhonePanelData, 32U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteActionData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageHudStateData, 32U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageNotificationData, 56U);
@@ -858,6 +881,7 @@ static_assert(sizeof(Gs1EngineMessagePlacementPreviewData) <= GS1_MESSAGE_PAYLOA
 static_assert(sizeof(Gs1EngineMessagePlacementFailureData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageTaskData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessagePhoneListingData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessagePhonePanelData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageSiteActionData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageHudStateData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageNotificationData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);

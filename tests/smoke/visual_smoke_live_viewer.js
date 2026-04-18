@@ -58,7 +58,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let openedInventoryContainerKey = "";
     let inventoryPanelOpen = true;
     let phonePanelOpen = false;
-    let phoneCartViewOpen = false;
     let phoneBodyScrollTop = 0;
     const phoneSectionScrollTops = {};
     let phonePointerInteractionActive = false;
@@ -818,6 +817,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         });
     }
 
+    function refreshStateSnapshot() {
+        return fetch("/state")
+            .then((response) => response.json())
+            .then((state) => {
+                handleIncomingState(state, true);
+            })
+            .catch(() => {});
+    }
+
     function makeButton(label, onClick, secondary, disabled, skipClickHandler) {
         const button = document.createElement("button");
         button.type = "button";
@@ -1192,6 +1200,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             listing.listingKind !== "BUY_ITEM" &&
             listing.listingKind !== "SELL_ITEM" &&
             listing.quantity !== 0);
+    }
+
+    function getPhonePanelState(state) {
+        const siteState = getSiteState(state);
+        if (!siteState || !siteState.phonePanel) {
+            return null;
+        }
+
+        return siteState.phonePanel;
     }
 
     function getSiteTasks(state) {
@@ -3112,6 +3129,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         });
     }
 
+    function postPhonePanelSection(sectionName) {
+        return postJson("/ui-action", {
+            type: "SET_PHONE_PANEL_SECTION",
+            targetId: 0,
+            arg0: sectionName === "CART" ? 1 : 0,
+            arg1: 0
+        });
+    }
+
     function makePhoneStepperButton(label, onClick, disabled) {
         const button = document.createElement("button");
         button.type = "button";
@@ -3147,10 +3173,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
 
         bindReliablePrimaryPress(button, function () {
-            phoneCartViewOpen = !phoneCartViewOpen;
-            if (latestState) {
-                renderPhonePanel(latestState);
-            }
+            postPhonePanelSection(active ? "MARKETPLACE" : "CART").catch(() => {
+                statusChip.textContent = "Failed to switch phone panel section.";
+            });
         });
         return button;
     }
@@ -3433,19 +3458,28 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         phoneStatusTime.textContent = formatPhoneClockLabel();
 
         const hud = getHudState(state);
+        const phonePanelState = getPhonePanelState(state);
         const tasks = getSiteTasks(state);
         const buyListings = getBuyListings(state);
         const sellListings = getSellListings(state);
         const specialListings = getSpecialPhoneListings(state);
         const currentMoney = hud && typeof hud.currentMoney === "number" ? hud.currentMoney : 0;
         const cartItemCount = getPhoneCartItemCount(state);
-        const activeTaskCount = hud && typeof hud.activeTaskCount === "number"
-            ? hud.activeTaskCount
-            : countTasksByListKind(tasks, "ACCEPTED");
-        const visibleTaskCount = countTasksByListKind(tasks, "VISIBLE");
-        if (phoneCartViewOpen && cartItemCount === 0) {
-            phoneCartViewOpen = false;
-        }
+        const phoneCartViewOpen = !!phonePanelState && phonePanelState.activeSection === "CART";
+        const activeTaskCount = phonePanelState && typeof phonePanelState.acceptedTaskCount === "number"
+            ? phonePanelState.acceptedTaskCount
+            : (hud && typeof hud.activeTaskCount === "number"
+                ? hud.activeTaskCount
+                : countTasksByListKind(tasks, "ACCEPTED"));
+        const visibleTaskCount = phonePanelState && typeof phonePanelState.visibleTaskCount === "number"
+            ? phonePanelState.visibleTaskCount
+            : countTasksByListKind(tasks, "VISIBLE");
+        const buyListingCount = phonePanelState && typeof phonePanelState.buyListingCount === "number"
+            ? phonePanelState.buyListingCount
+            : buyListings.length;
+        const sellListingCount = phonePanelState && typeof phonePanelState.sellListingCount === "number"
+            ? phonePanelState.sellListingCount
+            : sellListings.length;
 
         phoneAppSubtitle.textContent =
             phoneCartViewOpen
@@ -3458,8 +3492,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         summaryGrid.className = "phone-summary-grid";
         appendPhoneSummaryCard(summaryGrid, "Money", "$" + String(currentMoney));
         appendPhoneSummaryCard(summaryGrid, "Cart", String(cartItemCount));
-        appendPhoneSummaryCard(summaryGrid, "Buy", String(buyListings.length));
-        appendPhoneSummaryCard(summaryGrid, "Sell", String(sellListings.length));
+        appendPhoneSummaryCard(summaryGrid, "Buy", String(buyListingCount));
+        appendPhoneSummaryCard(summaryGrid, "Sell", String(sellListingCount));
         appendPhoneSummaryCard(summaryGrid, "Tasks", String(activeTaskCount + visibleTaskCount));
         phoneScreenBody.appendChild(summaryGrid);
 
@@ -3675,7 +3709,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         appendSelectedInventoryActions(state, selectedSlot);
     }
 
-    function updateOverlay(state) {
+    function updateOverlay(state, options) {
+        const renderOptions = options || {};
         stageFrame.classList.toggle("main-menu-mode", state.appState === "MAIN_MENU");
         stageFrame.classList.toggle("regional-map-mode", state.appState === "REGIONAL_MAP");
         stageFrame.classList.toggle("site-active-mode", state.appState === "SITE_ACTIVE");
@@ -3744,7 +3779,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             break;
         }
 
-        if (state.appState !== "SITE_ACTIVE" || !phonePanelOpen || !isPhoneInteractionLocked()) {
+        if (state.appState !== "SITE_ACTIVE" ||
+            !phonePanelOpen ||
+            !isPhoneInteractionLocked() ||
+            renderOptions.forcePhonePanelRender) {
             renderPhonePanel(state);
         }
         lastOverlayAppState = state.appState;
@@ -5813,10 +5851,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
     }
 
-    function renderState(state) {
+    function renderState(state, options) {
         try {
             latestState = state;
-            updateOverlay(state);
+            updateOverlay(state, options);
             applyWindOverlay(state);
             rebuildWorld(state);
             if (state.appState === "SITE_ACTIVE" && tileContextMenuState) {
@@ -6028,6 +6066,24 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return lightweightParts;
     }
 
+    function patchTouchesPhoneState(patch) {
+        if (!patch) {
+            return false;
+        }
+
+        const patchFields = Object.keys(patch).filter((key) => key !== "frameNumber");
+        if (patchFields.includes("siteState")) {
+            return true;
+        }
+
+        if (!patch.siteStatePatch) {
+            return false;
+        }
+
+        return Object.prototype.hasOwnProperty.call(patch.siteStatePatch, "phonePanel") ||
+            Object.prototype.hasOwnProperty.call(patch.siteStatePatch, "phoneListings");
+    }
+
     function handleIncomingState(state, forceRender, patch) {
         try {
             const normalizedState = normalizeState(state);
@@ -6085,18 +6141,23 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 return;
             }
 
+            const forcePhonePanelRender = patchTouchesPhoneState(patch);
             if (forceRender || normalizedState.appState === "SITE_ACTIVE") {
                 if (normalizedState.appState === "SITE_ACTIVE") {
                     latestPresentationSignature = "";
                 } else {
                     latestPresentationSignature = buildPresentationSignature(normalizedState);
                 }
-                renderState(normalizedState);
+                renderState(normalizedState, {
+                    forcePhonePanelRender: forcePhonePanelRender
+                });
             } else {
                 const presentationSignature = buildPresentationSignature(normalizedState);
                 if (presentationSignature !== latestPresentationSignature) {
                     latestPresentationSignature = presentationSignature;
-                    renderState(normalizedState);
+                    renderState(normalizedState, {
+                        forcePhonePanelRender: forcePhonePanelRender
+                    });
                 } else {
                     latestState = normalizedState;
                 }
@@ -6238,6 +6299,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (event.code === "KeyF" && !event.repeat && latestState && latestState.appState === "SITE_ACTIVE") {
             phonePanelOpen = !phonePanelOpen;
             renderPhonePanel(latestState);
+            if (phonePanelOpen) {
+                refreshStateSnapshot();
+            }
             event.preventDefault();
             return;
         }

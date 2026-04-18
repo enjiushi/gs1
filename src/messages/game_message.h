@@ -64,6 +64,7 @@ enum class GameMessageType : std::uint8_t
     PhoneListingCartAddRequested,
     PhoneListingCartRemoveRequested,
     PhoneCartCheckoutRequested,
+    PhonePanelSectionRequested,
     InventoryDeliveryRequested,
     InventoryDeliveryBatchRequested,
     InventoryItemUseRequested,
@@ -433,6 +434,12 @@ struct PhoneCartCheckoutRequestedMessage final
 {
 };
 
+struct PhonePanelSectionRequestedMessage final
+{
+    Gs1PhonePanelSection section;
+    std::uint8_t reserved0[3];
+};
+
 struct InventoryDeliveryRequestedMessage final
 {
     std::uint32_t item_id;
@@ -580,6 +587,7 @@ GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingSaleRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingCartAddRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingCartRemoveRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneCartCheckoutRequestedMessage, 1U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhonePanelSectionRequestedMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryDeliveryRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryDeliveryBatchEntry, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryDeliveryBatchRequestedMessage, 44U);

@@ -269,6 +269,18 @@ public:
         std::uint32_t flags {0};
     };
 
+    struct SitePhonePanelProjection final
+    {
+        Gs1PhonePanelSection active_section {GS1_PHONE_PANEL_SECTION_MARKETPLACE};
+        std::uint32_t visible_task_count {0};
+        std::uint32_t accepted_task_count {0};
+        std::uint32_t buy_listing_count {0};
+        std::uint32_t sell_listing_count {0};
+        std::uint32_t service_listing_count {0};
+        std::uint32_t cart_item_count {0};
+        std::uint32_t flags {0};
+    };
+
     struct SiteSnapshotProjection final
     {
         std::uint32_t site_id {0};
@@ -280,6 +292,7 @@ public:
         std::vector<SiteInventorySlotProjection> worker_pack_slots {};
         std::vector<SiteTaskProjection> tasks {};
         std::vector<SitePhoneListingProjection> phone_listings {};
+        SitePhonePanelProjection phone_panel {};
         std::optional<SiteInventoryViewProjection> opened_storage {};
         std::optional<SiteCraftContextProjection> craft_context {};
         std::optional<SitePlacementPreviewProjection> placement_preview {};
@@ -376,6 +389,7 @@ private:
     void apply_site_placement_preview(const Gs1EngineMessage& message);
     void apply_site_placement_failure(const Gs1EngineMessage& message);
     void apply_site_task_upsert(const Gs1EngineMessage& message);
+    void apply_site_phone_panel_state(const Gs1EngineMessage& message);
     void apply_site_phone_listing_remove(const Gs1EngineMessage& message);
     void apply_site_phone_listing_upsert(const Gs1EngineMessage& message);
     void apply_site_snapshot_end();
