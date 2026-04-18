@@ -29,6 +29,22 @@ struct ReservedItemStack final
     std::uint8_t reserved0[3] {};
 };
 
+struct PlacementModeState final
+{
+    bool active {false};
+    ActionKind action_kind {ActionKind::None};
+    std::optional<TileCoord> target_tile {};
+    std::uint32_t primary_subject_id {0};
+    std::uint32_t secondary_subject_id {0};
+    std::uint32_t item_id {0};
+    std::uint16_t quantity {0};
+    std::uint8_t request_flags {0};
+    std::uint8_t footprint_width {1U};
+    std::uint8_t footprint_height {1U};
+    std::uint8_t reserved0[2] {};
+    std::uint64_t blocked_mask {0ULL};
+};
+
 struct ActionState final
 {
     std::optional<RuntimeActionId> current_action_id {};
@@ -46,5 +62,6 @@ struct ActionState final
     double remaining_action_minutes {0.0};
     std::vector<ReservedItemStack> reserved_input_item_stacks {};
     std::optional<double> started_at_world_minute {};
+    PlacementModeState placement_mode {};
 };
 }  // namespace gs1

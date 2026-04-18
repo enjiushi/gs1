@@ -21,6 +21,7 @@ public:
         GetStringCallback state_callback,
         PostBodyCallback ui_action_callback,
         PostBodyCallback site_action_callback,
+        PostBodyCallback site_action_cancel_callback,
         PostBodyCallback site_storage_view_callback,
         PostBodyCallback site_context_callback,
         PostBodyCallback site_control_callback);
@@ -56,6 +57,7 @@ private:
     GetStringCallback state_callback_ {};
     PostBodyCallback ui_action_callback_ {};
     PostBodyCallback site_action_callback_ {};
+    PostBodyCallback site_action_cancel_callback_ {};
     PostBodyCallback site_storage_view_callback_ {};
     PostBodyCallback site_context_callback_ {};
     PostBodyCallback site_control_callback_ {};

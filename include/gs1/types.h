@@ -125,13 +125,15 @@ enum Gs1SiteActionRequestFlags : std::uint8_t
     GS1_SITE_ACTION_REQUEST_FLAG_NONE = 0,
     GS1_SITE_ACTION_REQUEST_FLAG_HAS_PRIMARY_SUBJECT = 1u << 0,
     GS1_SITE_ACTION_REQUEST_FLAG_HAS_SECONDARY_SUBJECT = 1u << 1,
-    GS1_SITE_ACTION_REQUEST_FLAG_HAS_ITEM = 1u << 2
+    GS1_SITE_ACTION_REQUEST_FLAG_HAS_ITEM = 1u << 2,
+    GS1_SITE_ACTION_REQUEST_FLAG_DEFERRED_TARGET_SELECTION = 1u << 3
 };
 
 enum Gs1SiteActionCancelFlags : std::uint32_t
 {
     GS1_SITE_ACTION_CANCEL_FLAG_NONE = 0,
-    GS1_SITE_ACTION_CANCEL_FLAG_CURRENT_ACTION = 1u << 0
+    GS1_SITE_ACTION_CANCEL_FLAG_CURRENT_ACTION = 1u << 0,
+    GS1_SITE_ACTION_CANCEL_FLAG_PLACEMENT_MODE = 1u << 1
 };
 
 enum Gs1SiteActionPresentationFlags : std::uint8_t
@@ -268,6 +270,8 @@ enum Gs1EngineMessageType : std::uint8_t
     GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_BEGIN = 34,
     GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_OPTION_UPSERT = 35,
     GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_END = 36,
+    GS1_ENGINE_MESSAGE_SITE_PLACEMENT_PREVIEW = 37,
+    GS1_ENGINE_MESSAGE_SITE_PLACEMENT_FAILURE = 38,
 
     GS1_ENGINE_MESSAGE_HUD_STATE = 40,
     GS1_ENGINE_MESSAGE_NOTIFICATION_PUSH = 41,
@@ -628,6 +632,29 @@ struct Gs1EngineMessageCraftContextOptionData
     std::uint16_t reserved0;
 };
 
+struct Gs1EngineMessagePlacementPreviewData
+{
+    std::int32_t tile_x;
+    std::int32_t tile_y;
+    std::uint64_t blocked_mask;
+    std::uint32_t item_id;
+    std::uint8_t footprint_width;
+    std::uint8_t footprint_height;
+    Gs1SiteActionKind action_kind;
+    std::uint8_t flags;
+};
+
+struct Gs1EngineMessagePlacementFailureData
+{
+    std::int32_t tile_x;
+    std::int32_t tile_y;
+    std::uint64_t blocked_mask;
+    std::uint32_t sequence_id;
+    Gs1SiteActionKind action_kind;
+    std::uint8_t flags;
+    std::uint16_t reserved0;
+};
+
 struct Gs1EngineMessageTaskData
 {
     std::uint32_t task_instance_id;
@@ -788,6 +815,8 @@ GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageInventorySlotData, 36U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageInventoryViewData, 8U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageCraftContextData, 12U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageCraftContextOptionData, 12U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePlacementPreviewData, 24U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePlacementFailureData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageTaskData, 20U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePhoneListingData, 20U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteActionData, 24U);
@@ -816,6 +845,8 @@ static_assert(sizeof(Gs1EngineMessageInventorySlotData) <= GS1_MESSAGE_PAYLOAD_B
 static_assert(sizeof(Gs1EngineMessageInventoryViewData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageCraftContextData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageCraftContextOptionData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessagePlacementPreviewData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessagePlacementFailureData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageTaskData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessagePhoneListingData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageSiteActionData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);

@@ -97,19 +97,41 @@ Gs1HostEvent make_site_action_request_event(
     Gs1SiteActionKind action_kind,
     TileCoord target_tile,
     std::uint32_t primary_subject_id,
-    std::uint32_t item_id = 0U)
+    std::uint32_t item_id = 0U,
+    std::uint8_t flags = 0U)
 {
     Gs1HostEvent event {};
     event.type = GS1_HOST_EVENT_SITE_ACTION_REQUEST;
     event.payload.site_action_request.action_kind = action_kind;
-    event.payload.site_action_request.flags = item_id != 0U
-        ? GS1_SITE_ACTION_REQUEST_FLAG_HAS_ITEM
-        : GS1_SITE_ACTION_REQUEST_FLAG_HAS_PRIMARY_SUBJECT;
+    event.payload.site_action_request.flags = flags != 0U
+        ? flags
+        : (item_id != 0U
+            ? GS1_SITE_ACTION_REQUEST_FLAG_HAS_ITEM
+            : GS1_SITE_ACTION_REQUEST_FLAG_HAS_PRIMARY_SUBJECT);
     event.payload.site_action_request.quantity = 1U;
     event.payload.site_action_request.target_tile_x = target_tile.x;
     event.payload.site_action_request.target_tile_y = target_tile.y;
     event.payload.site_action_request.primary_subject_id = primary_subject_id;
     event.payload.site_action_request.item_id = item_id;
+    return event;
+}
+
+Gs1HostEvent make_site_context_request_event(TileCoord target_tile)
+{
+    Gs1HostEvent event {};
+    event.type = GS1_HOST_EVENT_SITE_CONTEXT_REQUEST;
+    event.payload.site_context_request.tile_x = target_tile.x;
+    event.payload.site_context_request.tile_y = target_tile.y;
+    event.payload.site_context_request.flags = 0U;
+    return event;
+}
+
+Gs1HostEvent make_site_action_cancel_event(std::uint32_t flags)
+{
+    Gs1HostEvent event {};
+    event.type = GS1_HOST_EVENT_SITE_ACTION_CANCEL;
+    event.payload.site_action_cancel.action_id = 0U;
+    event.payload.site_action_cancel.flags = flags;
     return event;
 }
 
@@ -739,6 +761,112 @@ int main()
                 payload.plant_density >= 0.2f;
         });
     assert(projected_action_tile != action_tile_messages.end());
+
+    Gs1RuntimeCreateDesc placement_preview_desc {};
+    placement_preview_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
+    placement_preview_desc.api_version = gs1::k_api_version;
+    placement_preview_desc.fixed_step_seconds = 1.0 / 60.0;
+
+    GameRuntime placement_preview_runtime {placement_preview_desc};
+    assert(placement_preview_runtime.handle_message(make_start_campaign_message()) == GS1_STATUS_OK);
+    const auto placement_preview_site_id =
+        gs1::GameRuntimeProjectionTestAccess::campaign(placement_preview_runtime)->sites.front().site_id.value;
+    assert(placement_preview_runtime.handle_message(make_start_site_attempt_message(placement_preview_site_id)) == GS1_STATUS_OK);
+    auto& placement_preview_site_run =
+        gs1::GameRuntimeProjectionTestAccess::active_site_run(placement_preview_runtime).value();
+    drain_engine_messages(placement_preview_runtime);
+
+    placement_preview_site_run.inventory.worker_pack_slots[2].occupied = true;
+    placement_preview_site_run.inventory.worker_pack_slots[2].item_id = gs1::ItemId {gs1::k_item_wind_reed_seed_bundle};
+    placement_preview_site_run.inventory.worker_pack_slots[2].item_quantity = 2U;
+    placement_preview_site_run.inventory.worker_pack_slots[2].item_condition = 1.0f;
+    placement_preview_site_run.inventory.worker_pack_slots[2].item_freshness = 1.0f;
+
+    auto placement_mode_event = make_site_action_request_event(
+        GS1_SITE_ACTION_PLANT,
+        TileCoord {4, 4},
+        0U,
+        gs1::k_item_wind_reed_seed_bundle,
+        GS1_SITE_ACTION_REQUEST_FLAG_HAS_ITEM |
+            GS1_SITE_ACTION_REQUEST_FLAG_DEFERRED_TARGET_SELECTION);
+    assert(placement_preview_runtime.submit_host_events(&placement_mode_event, 1U) == GS1_STATUS_OK);
+    run_phase1(placement_preview_runtime, 0.0);
+    const auto placement_mode_messages = drain_engine_messages(placement_preview_runtime);
+    const auto placement_preview_messages =
+        collect_messages_of_type(placement_mode_messages, GS1_ENGINE_MESSAGE_SITE_PLACEMENT_PREVIEW);
+    assert(placement_preview_messages.size() == 1U);
+    {
+        const auto& payload =
+            placement_preview_messages.front()->payload_as<Gs1EngineMessagePlacementPreviewData>();
+        assert(payload.tile_x == 4);
+        assert(payload.tile_y == 4);
+        assert(payload.item_id == gs1::k_item_wind_reed_seed_bundle);
+        assert(payload.action_kind == GS1_SITE_ACTION_PLANT);
+        assert(payload.footprint_width == 2U);
+        assert(payload.footprint_height == 2U);
+        assert((payload.flags & 1U) != 0U);
+        assert((payload.flags & 2U) != 0U);
+        assert(payload.blocked_mask == 0ULL);
+    }
+
+    auto blocked_tile = placement_preview_site_run.site_world->tile_at(TileCoord {6, 4});
+    blocked_tile.ecology.ground_cover_type_id = 9U;
+    placement_preview_site_run.site_world->set_tile(TileCoord {6, 4}, blocked_tile);
+
+    auto cursor_update_event = make_site_context_request_event(TileCoord {5, 4});
+    assert(placement_preview_runtime.submit_host_events(&cursor_update_event, 1U) == GS1_STATUS_OK);
+    run_phase1(placement_preview_runtime, 0.0);
+    const auto cursor_update_messages = drain_engine_messages(placement_preview_runtime);
+    const auto blocked_preview_messages =
+        collect_messages_of_type(cursor_update_messages, GS1_ENGINE_MESSAGE_SITE_PLACEMENT_PREVIEW);
+    assert(blocked_preview_messages.size() == 1U);
+    {
+        const auto& payload =
+            blocked_preview_messages.front()->payload_as<Gs1EngineMessagePlacementPreviewData>();
+        assert(payload.tile_x == 5);
+        assert(payload.tile_y == 4);
+        assert((payload.flags & 1U) != 0U);
+        assert((payload.flags & 2U) == 0U);
+        assert(payload.blocked_mask == (1ULL << 1U));
+    }
+
+    auto blocked_confirm_event = make_site_action_request_event(
+        GS1_SITE_ACTION_PLANT,
+        TileCoord {5, 4},
+        0U,
+        gs1::k_item_wind_reed_seed_bundle,
+        GS1_SITE_ACTION_REQUEST_FLAG_HAS_ITEM);
+    assert(placement_preview_runtime.submit_host_events(&blocked_confirm_event, 1U) == GS1_STATUS_OK);
+    run_phase1(placement_preview_runtime, 0.0);
+    const auto blocked_confirm_messages = drain_engine_messages(placement_preview_runtime);
+    const auto placement_failure_messages =
+        collect_messages_of_type(blocked_confirm_messages, GS1_ENGINE_MESSAGE_SITE_PLACEMENT_FAILURE);
+    assert(placement_failure_messages.size() == 1U);
+    {
+        const auto& payload =
+            placement_failure_messages.front()->payload_as<Gs1EngineMessagePlacementFailureData>();
+        assert(payload.tile_x == 5);
+        assert(payload.tile_y == 4);
+        assert(payload.action_kind == GS1_SITE_ACTION_PLANT);
+        assert(payload.blocked_mask == (1ULL << 1U));
+        assert(payload.sequence_id != 0U);
+        assert((payload.flags & 1U) != 0U);
+    }
+
+    auto cancel_placement_event = make_site_action_cancel_event(GS1_SITE_ACTION_CANCEL_FLAG_PLACEMENT_MODE);
+    assert(placement_preview_runtime.submit_host_events(&cancel_placement_event, 1U) == GS1_STATUS_OK);
+    run_phase1(placement_preview_runtime, 0.0);
+    const auto cancel_placement_messages = drain_engine_messages(placement_preview_runtime);
+    const auto clear_preview_messages =
+        collect_messages_of_type(cancel_placement_messages, GS1_ENGINE_MESSAGE_SITE_PLACEMENT_PREVIEW);
+    assert(clear_preview_messages.size() == 1U);
+    {
+        const auto& payload =
+            clear_preview_messages.front()->payload_as<Gs1EngineMessagePlacementPreviewData>();
+        assert((payload.flags & 4U) != 0U);
+        assert(payload.action_kind == GS1_SITE_ACTION_NONE);
+        assert(payload.item_id == 0U);
+    }
 
     Gs1RuntimeCreateDesc storage_walk_desc {};
     storage_walk_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);

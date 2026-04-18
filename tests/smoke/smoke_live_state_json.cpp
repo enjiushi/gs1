@@ -689,6 +689,60 @@ void append_craft_context_json(std::string& json, const SmokeEngineHost::SiteSna
     json += "]}";
 }
 
+void append_placement_preview_json(std::string& json, const SmokeEngineHost::SiteSnapshotProjection& site_snapshot)
+{
+    json += "\"placementPreview\":";
+    if (!site_snapshot.placement_preview.has_value())
+    {
+        json += "null";
+        return;
+    }
+
+    const auto& preview = site_snapshot.placement_preview.value();
+    json += "{\"tileX\":";
+    json += std::to_string(preview.tile_x);
+    json += ",\"tileY\":";
+    json += std::to_string(preview.tile_y);
+    json += ",\"blockedMask\":";
+    json += std::to_string(preview.blocked_mask);
+    json += ",\"itemId\":";
+    json += std::to_string(preview.item_id);
+    json += ",\"actionKind\":";
+    json += std::to_string(preview.action_kind);
+    json += ",\"flags\":";
+    json += std::to_string(preview.flags);
+    json += ",\"footprintWidth\":";
+    json += std::to_string(preview.footprint_width);
+    json += ",\"footprintHeight\":";
+    json += std::to_string(preview.footprint_height);
+    json += "}";
+}
+
+void append_placement_failure_json(std::string& json, const SmokeEngineHost::SiteSnapshotProjection& site_snapshot)
+{
+    json += "\"placementFailure\":";
+    if (!site_snapshot.placement_failure.has_value())
+    {
+        json += "null";
+        return;
+    }
+
+    const auto& failure = site_snapshot.placement_failure.value();
+    json += "{\"tileX\":";
+    json += std::to_string(failure.tile_x);
+    json += ",\"tileY\":";
+    json += std::to_string(failure.tile_y);
+    json += ",\"blockedMask\":";
+    json += std::to_string(failure.blocked_mask);
+    json += ",\"actionKind\":";
+    json += std::to_string(failure.action_kind);
+    json += ",\"sequenceId\":";
+    json += std::to_string(failure.sequence_id);
+    json += ",\"flags\":";
+    json += std::to_string(failure.flags);
+    json += "}";
+}
+
 void append_site_tasks_json(std::string& json, const SmokeEngineHost::SiteSnapshotProjection& site_snapshot)
 {
     json += "\"tasks\":[";
@@ -775,6 +829,10 @@ void append_site_state_json(std::string& json, const std::optional<SmokeEngineHo
     json += ",";
     append_craft_context_json(json, site_snapshot);
     json += ",";
+    append_placement_preview_json(json, site_snapshot);
+    json += ",";
+    append_placement_failure_json(json, site_snapshot);
+    json += ",";
     append_site_tasks_json(json, site_snapshot);
     json += ",";
     append_site_phone_listings_json(json, site_snapshot);
@@ -825,6 +883,14 @@ void append_site_state_patch_json(
     if ((field_mask & SmokeEngineHost::LiveStatePatchField_SiteStateCraftContext) != 0U)
     {
         append_field([&]() { append_craft_context_json(json, site_snapshot); });
+    }
+    if ((field_mask & SmokeEngineHost::LiveStatePatchField_SiteStatePlacementPreview) != 0U)
+    {
+        append_field([&]() { append_placement_preview_json(json, site_snapshot); });
+    }
+    if ((field_mask & SmokeEngineHost::LiveStatePatchField_SitePlacementFailure) != 0U)
+    {
+        append_field([&]() { append_placement_failure_json(json, site_snapshot); });
     }
     if ((field_mask & SmokeEngineHost::LiveStatePatchField_SiteStateTasks) != 0U)
     {
@@ -969,6 +1035,8 @@ std::string SmokeEngineHost::build_live_state_patch_json(
         LiveStatePatchField_SiteStateWeather |
         LiveStatePatchField_SiteStateInventory |
         LiveStatePatchField_SiteStateCraftContext |
+        LiveStatePatchField_SiteStatePlacementPreview |
+        LiveStatePatchField_SitePlacementFailure |
         LiveStatePatchField_SiteStateTasks |
         LiveStatePatchField_SiteStatePhone;
 
