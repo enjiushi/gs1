@@ -19,6 +19,12 @@ inline bool tile_is_traversable(const SiteRunState& site_run, TileCoord coord) n
         site_run.site_world->tile_at(coord).static_data.traversable;
 }
 
+inline bool tile_in_interaction_range(TileCoord source, TileCoord target) noexcept
+{
+    return std::abs(target.x - source.x) <= 1 &&
+        std::abs(target.y - source.y) <= 1;
+}
+
 inline bool worker_is_at_tile(
     const SiteWorld::WorkerData& worker,
     TileCoord tile) noexcept
@@ -114,5 +120,18 @@ inline std::optional<TileCoord> resolve_interaction_range_approach_tile(
     }
 
     return best_tile;
+}
+
+inline bool worker_is_in_interaction_range(
+    const SiteRunState& site_run,
+    const SiteWorld::WorkerData& worker,
+    TileCoord target_tile) noexcept
+{
+    if (!tile_in_interaction_range(target_tile, worker.position.tile_coord))
+    {
+        return false;
+    }
+
+    return tile_is_traversable(site_run, worker.position.tile_coord);
 }
 }  // namespace gs1::device_interaction_logic

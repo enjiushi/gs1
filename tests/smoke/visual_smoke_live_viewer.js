@@ -663,26 +663,41 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function findOpenedInventoryContainer(state) {
-        if (!openedInventoryContainerKey) {
+        const siteState = getSiteState(state);
+        const openedStorage =
+            siteState && siteState.openedStorage && typeof siteState.openedStorage.storageId === "number"
+                ? siteState.openedStorage
+                : null;
+        if (!openedStorage) {
             return null;
         }
 
+        openedInventoryContainerKey = containerKey("DEVICE_STORAGE", openedStorage.storageId);
         return findInventoryContainerByKey(openedInventoryContainerKey);
     }
 
     function clearOpenedInventoryContainerIfInvalid(state) {
-        if (!openedInventoryContainerKey || !state || state.appState !== "SITE_ACTIVE") {
+        if (!state || state.appState !== "SITE_ACTIVE") {
             openedInventoryContainerKey = "";
             return;
         }
 
-        if (!findOpenedInventoryContainer(state)) {
+        const siteState = getSiteState(state);
+        const openedStorage =
+            siteState && siteState.openedStorage && typeof siteState.openedStorage.storageId === "number"
+                ? siteState.openedStorage
+                : null;
+        if (!openedStorage) {
+            openedInventoryContainerKey = "";
+            return;
+        }
+
+        if (!findInventoryContainerByKey(containerKey("DEVICE_STORAGE", openedStorage.storageId))) {
             openedInventoryContainerKey = "";
         }
     }
 
     function openInventoryContainer(containerInfo) {
-        openedInventoryContainerKey = containerInfo ? containerInfo.key : "";
         if (containerInfo && typeof containerInfo.storageId === "number") {
             postJson("/site-storage-view", {
                 storageId: containerInfo.storageId,
@@ -698,7 +713,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function closeOpenedInventoryContainer() {
         const openedContainer = latestState ? findOpenedInventoryContainer(latestState) : null;
-        const closedContainerKey = openedInventoryContainerKey;
+        const closedContainerKey = openedContainer ? openedContainer.key : openedInventoryContainerKey;
         openedInventoryContainerKey = "";
         if (closedContainerKey && selectedInventorySlotKey.startsWith(closedContainerKey + ":")) {
             selectedInventorySlotKey = "";

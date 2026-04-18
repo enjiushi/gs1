@@ -131,6 +131,31 @@ bool open_device_storage_now(
     return true;
 }
 
+void close_opened_device_storage_if_out_of_range(
+    SiteSystemContext<InventorySystem>& context) noexcept
+{
+    auto& inventory = context.world.own_inventory();
+    if (inventory.opened_device_storage_id == 0U)
+    {
+        return;
+    }
+
+    const auto* storage_state =
+        inventory_storage::storage_container_state_for_storage_id(
+            context.site_run,
+            inventory.opened_device_storage_id);
+    if (storage_state == nullptr ||
+        storage_state->container_kind != GS1_INVENTORY_CONTAINER_DEVICE_STORAGE ||
+        !device_interaction_logic::worker_is_in_interaction_range(
+            context.site_run,
+            context.world.read_worker(),
+            storage_state->tile_coord))
+    {
+        inventory.opened_device_storage_id = 0U;
+        context.world.mark_inventory_view_state_projection_dirty();
+    }
+}
+
 void progress_pending_device_storage_open(SiteSystemContext<InventorySystem>& context) noexcept
 {
     auto& inventory = context.world.own_inventory();
@@ -1237,6 +1262,7 @@ void InventorySystem::run(SiteSystemContext<InventorySystem>& context)
     {
         context.world.mark_inventory_storage_descriptors_projection_dirty();
     }
+    close_opened_device_storage_if_out_of_range(context);
     progress_pending_device_storage_open(context);
     progress_pending_deliveries(context);
 }
