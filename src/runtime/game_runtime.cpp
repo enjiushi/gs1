@@ -18,6 +18,7 @@
 #include "site/systems/inventory_system.h"
 #include "site/systems/local_weather_resolve_system.h"
 #include "site/systems/modifier_system.h"
+#include "site/systems/phone_panel_system.h"
 #include "site/systems/placement_validation_system.h"
 #include "site/systems/failure_recovery_system.h"
 #include "site/systems/site_completion_system.h"
@@ -366,6 +367,18 @@ Gs1PhoneListingPresentationKind to_phone_listing_presentation_kind(PhoneListingK
     }
 }
 
+Gs1PhonePanelSection to_phone_panel_section(PhonePanelSection section) noexcept
+{
+    switch (section)
+    {
+    case PhonePanelSection::Cart:
+        return GS1_PHONE_PANEL_SECTION_CART;
+    case PhonePanelSection::Marketplace:
+    default:
+        return GS1_PHONE_PANEL_SECTION_MARKETPLACE;
+    }
+}
+
 template <typename SiteSystemTag, typename ProcessMessageFn>
 Gs1Status dispatch_site_system_message(
     ProcessMessageFn process_message_fn,
@@ -484,6 +497,7 @@ void GameRuntime::initialize_subscription_tables()
         InventorySystem::access(),
         CraftSystem::access(),
         EconomyPhoneSystem::access(),
+        PhonePanelSystem::access(),
         CampDurabilitySystem::access(),
         DeviceSupportSystem::access(),
         DeviceMaintenanceSystem::access(),
@@ -577,6 +591,11 @@ void GameRuntime::initialize_subscription_tables()
         if (EconomyPhoneSystem::subscribes_to(type))
         {
             subscribers.push_back(MessageSubscriberId::EconomyPhone);
+        }
+
+        if (PhonePanelSystem::subscribes_to(type))
+        {
+            subscribers.push_back(MessageSubscriberId::PhonePanel);
         }
 
         if (CampDurabilitySystem::subscribes_to(type))
@@ -1020,6 +1039,26 @@ Gs1Status GameRuntime::dispatch_subscribed_message(const GameMessage& message)
             break;
         }
 
+        case MessageSubscriberId::PhonePanel:
+        {
+            const auto status = dispatch_profiled_message(
+                GS1_RUNTIME_PROFILE_SYSTEM_PHONE_PANEL,
+                [&]() -> Gs1Status {
+                    return dispatch_site_system_message<PhonePanelSystem>(
+                        PhonePanelSystem::process_message,
+                        message,
+                        campaign_,
+                        active_site_run_,
+                        message_queue_,
+                        fixed_step_seconds_);
+                });
+            if (status != GS1_STATUS_OK)
+            {
+                return status;
+            }
+            break;
+        }
+
         case MessageSubscriberId::CampDurability:
         {
             const auto status = dispatch_profiled_message(
@@ -1221,6 +1260,7 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
     case GameMessageType::TaskRewardClaimRequested:
     case GameMessageType::PhoneListingPurchaseRequested:
     case GameMessageType::PhoneListingSaleRequested:
+    case GameMessageType::PhonePanelSectionRequested:
     case GameMessageType::InventoryDeliveryRequested:
     case GameMessageType::InventoryItemUseRequested:
     case GameMessageType::InventoryItemConsumeRequested:
@@ -2161,7 +2201,7 @@ void GameRuntime::queue_site_phone_listing_upsert_message(std::size_t listing_in
         return;
     }
 
-    const auto& listings = active_site_run_->economy.available_phone_listings;
+    const auto& listings = active_site_run_->phone_panel.listings;
     if (listing_index >= listings.size())
     {
         return;
@@ -2178,6 +2218,30 @@ void GameRuntime::queue_site_phone_listing_upsert_message(std::size_t listing_in
     payload.cart_quantity = static_cast<std::uint16_t>(std::min<std::uint32_t>(listing.cart_quantity, 65535U));
     payload.listing_kind = to_phone_listing_presentation_kind(listing.kind);
     payload.flags = listing.occupied ? 1U : 0U;
+    engine_messages_.push_back(message);
+}
+
+void GameRuntime::queue_site_phone_panel_state_message()
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
+
+    const auto& phone_panel = active_site_run_->phone_panel;
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE);
+    auto& payload = message.emplace_payload<Gs1EngineMessagePhonePanelData>();
+    payload.active_section = to_phone_panel_section(phone_panel.active_section);
+    payload.reserved0[0] = 0U;
+    payload.reserved0[1] = 0U;
+    payload.reserved0[2] = 0U;
+    payload.visible_task_count = phone_panel.visible_task_count;
+    payload.accepted_task_count = phone_panel.accepted_task_count;
+    payload.buy_listing_count = phone_panel.buy_listing_count;
+    payload.sell_listing_count = phone_panel.sell_listing_count;
+    payload.service_listing_count = phone_panel.service_listing_count;
+    payload.cart_item_count = phone_panel.cart_item_count;
+    payload.flags = 0U;
     engine_messages_.push_back(message);
 }
 
@@ -2209,8 +2273,8 @@ void GameRuntime::queue_all_site_phone_listing_upsert_messages()
     }
 
     std::vector<std::uint32_t> current_listing_ids {};
-    current_listing_ids.reserve(active_site_run_->economy.available_phone_listings.size());
-    for (const auto& listing : active_site_run_->economy.available_phone_listings)
+    current_listing_ids.reserve(active_site_run_->phone_panel.listings.size());
+    for (const auto& listing : active_site_run_->phone_panel.listings)
     {
         current_listing_ids.push_back(listing.listing_id);
     }
@@ -2224,7 +2288,7 @@ void GameRuntime::queue_all_site_phone_listing_upsert_messages()
         }
     }
 
-    for (std::size_t index = 0; index < active_site_run_->economy.available_phone_listings.size(); ++index)
+    for (std::size_t index = 0; index < active_site_run_->phone_panel.listings.size(); ++index)
     {
         queue_site_phone_listing_upsert_message(index);
     }
@@ -2247,6 +2311,7 @@ void GameRuntime::queue_site_bootstrap_messages()
     queue_all_site_inventory_storage_upsert_messages();
     queue_all_site_inventory_slot_upsert_messages();
     queue_all_site_task_upsert_messages();
+    queue_site_phone_panel_state_message();
     queue_all_site_phone_listing_upsert_messages();
     queue_site_snapshot_end_message();
 
@@ -2321,6 +2386,7 @@ void GameRuntime::queue_site_delta_messages(std::uint64_t dirty_flags)
 
     if ((site_dirty_flags & SITE_PROJECTION_UPDATE_PHONE) != 0U)
     {
+        queue_site_phone_panel_state_message();
         queue_all_site_phone_listing_upsert_messages();
     }
 
@@ -2531,9 +2597,28 @@ void GameRuntime::flush_site_presentation_if_dirty()
         return;
     }
 
-    queue_site_delta_messages(dirty_flags);
+    if ((dirty_flags & (SITE_PROJECTION_UPDATE_PHONE |
+            SITE_PROJECTION_UPDATE_TASKS |
+            SITE_PROJECTION_UPDATE_INVENTORY)) != 0U)
+    {
+        auto phone_panel_context = make_site_system_context<PhonePanelSystem>(
+            *campaign_,
+            *active_site_run_,
+            message_queue_,
+            fixed_step_seconds_,
+            SiteMoveDirectionInput {});
+        PhonePanelSystem::run(phone_panel_context);
+    }
 
-    if ((dirty_flags & (SITE_PROJECTION_UPDATE_HUD |
+    const auto projected_dirty_flags = active_site_run_->pending_projection_update_flags;
+    if (projected_dirty_flags == 0U)
+    {
+        return;
+    }
+
+    queue_site_delta_messages(projected_dirty_flags);
+
+    if ((projected_dirty_flags & (SITE_PROJECTION_UPDATE_HUD |
             SITE_PROJECTION_UPDATE_WORKER |
             SITE_PROJECTION_UPDATE_WEATHER)) != 0U)
     {
@@ -2651,6 +2736,17 @@ Gs1Status GameRuntime::translate_ui_action_to_message(const Gs1UiAction& action,
     case GS1_UI_ACTION_CHECKOUT_PHONE_CART:
         out_message.type = GameMessageType::PhoneCartCheckoutRequested;
         out_message.set_payload(PhoneCartCheckoutRequestedMessage {});
+        return GS1_STATUS_OK;
+
+    case GS1_UI_ACTION_SET_PHONE_PANEL_SECTION:
+        if (action.arg0 > static_cast<std::uint64_t>(GS1_PHONE_PANEL_SECTION_CART))
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        out_message.type = GameMessageType::PhonePanelSectionRequested;
+        out_message.set_payload(PhonePanelSectionRequestedMessage {
+            static_cast<Gs1PhonePanelSection>(action.arg0),
+            {0U, 0U, 0U}});
         return GS1_STATUS_OK;
 
     case GS1_UI_ACTION_SELL_PHONE_LISTING:
@@ -3188,6 +3284,17 @@ void GameRuntime::run_fixed_step()
             fixed_step_seconds_,
             move_direction);
         EconomyPhoneSystem::run(economy_context);
+    });
+
+    run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_PHONE_PANEL, [&]()
+    {
+        auto phone_panel_context = make_site_system_context<PhonePanelSystem>(
+            *campaign_,
+            *active_site_run_,
+            message_queue_,
+            fixed_step_seconds_,
+            move_direction);
+        PhonePanelSystem::run(phone_panel_context);
     });
 
     run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_FAILURE_RECOVERY, [&]()

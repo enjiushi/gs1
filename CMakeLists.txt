@@ -71,6 +71,7 @@ add_library(gs1_game SHARED
     src/site/systems/craft_system.cpp
     src/site/systems/local_weather_resolve_system.cpp
     src/site/systems/modifier_system.cpp
+    src/site/systems/phone_panel_system.cpp
     src/site/systems/placement_validation_system.cpp
     src/site/systems/site_completion_system.cpp
     src/site/systems/site_flow_system.cpp
@@ -169,6 +170,7 @@ if(GS1_BUILD_TESTS)
         src/site/systems/craft_system.cpp
         src/site/systems/local_weather_resolve_system.cpp
         src/site/systems/modifier_system.cpp
+        src/site/systems/phone_panel_system.cpp
         src/site/systems/placement_validation_system.cpp
         src/site/systems/site_completion_system.cpp
         src/site/systems/site_flow_system.cpp
@@ -197,6 +199,7 @@ if(GS1_BUILD_TESTS)
         src/site/systems/craft_system.cpp
         src/site/systems/local_weather_resolve_system.cpp
         src/site/systems/modifier_system.cpp
+        src/site/systems/phone_panel_system.cpp
         src/site/systems/placement_validation_system.cpp
         src/site/systems/site_completion_system.cpp
         src/site/systems/site_flow_system.cpp
@@ -224,6 +227,7 @@ if(GS1_BUILD_TESTS)
         src/site/systems/craft_system.cpp
         src/site/systems/local_weather_resolve_system.cpp
         src/site/systems/modifier_system.cpp
+        src/site/systems/phone_panel_system.cpp
         src/site/systems/placement_validation_system.cpp
         src/site/systems/site_completion_system.cpp
         src/site/systems/site_flow_system.cpp

@@ -103,6 +103,8 @@ const char* ui_action_name(Gs1UiActionType action_type)
         return "REMOVE_PHONE_LISTING_FROM_CART";
     case GS1_UI_ACTION_CHECKOUT_PHONE_CART:
         return "CHECKOUT_PHONE_CART";
+    case GS1_UI_ACTION_SET_PHONE_PANEL_SECTION:
+        return "SET_PHONE_PANEL_SECTION";
     case GS1_UI_ACTION_USE_INVENTORY_ITEM:
         return "USE_INVENTORY_ITEM";
     case GS1_UI_ACTION_TRANSFER_INVENTORY_ITEM:
@@ -205,6 +207,18 @@ const char* phone_listing_kind_name(Gs1PhoneListingPresentationKind kind)
     case GS1_PHONE_LISTING_PRESENTATION_BUY_ITEM:
     default:
         return "BUY_ITEM";
+    }
+}
+
+const char* phone_panel_section_name(Gs1PhonePanelSection section)
+{
+    switch (section)
+    {
+    case GS1_PHONE_PANEL_SECTION_CART:
+        return "CART";
+    case GS1_PHONE_PANEL_SECTION_MARKETPLACE:
+    default:
+        return "MARKETPLACE";
     }
 }
 
@@ -813,6 +827,28 @@ void append_site_phone_listings_json(std::string& json, const SmokeEngineHost::S
     json += "]";
 }
 
+void append_site_phone_panel_json(std::string& json, const SmokeEngineHost::SiteSnapshotProjection& site_snapshot)
+{
+    const auto& phone_panel = site_snapshot.phone_panel;
+    json += "\"phonePanel\":{\"activeSection\":";
+    append_json_string(json, phone_panel_section_name(phone_panel.active_section));
+    json += ",\"visibleTaskCount\":";
+    json += std::to_string(phone_panel.visible_task_count);
+    json += ",\"acceptedTaskCount\":";
+    json += std::to_string(phone_panel.accepted_task_count);
+    json += ",\"buyListingCount\":";
+    json += std::to_string(phone_panel.buy_listing_count);
+    json += ",\"sellListingCount\":";
+    json += std::to_string(phone_panel.sell_listing_count);
+    json += ",\"serviceListingCount\":";
+    json += std::to_string(phone_panel.service_listing_count);
+    json += ",\"cartItemCount\":";
+    json += std::to_string(phone_panel.cart_item_count);
+    json += ",\"flags\":";
+    json += std::to_string(phone_panel.flags);
+    json += "}";
+}
+
 void append_site_state_json(std::string& json, const std::optional<SmokeEngineHost::SiteSnapshotProjection>& snapshot)
 {
     if (!snapshot.has_value())
@@ -844,6 +880,8 @@ void append_site_state_json(std::string& json, const std::optional<SmokeEngineHo
     append_placement_failure_json(json, site_snapshot);
     json += ",";
     append_site_tasks_json(json, site_snapshot);
+    json += ",";
+    append_site_phone_panel_json(json, site_snapshot);
     json += ",";
     append_site_phone_listings_json(json, site_snapshot);
     json += '}';
@@ -908,6 +946,7 @@ void append_site_state_patch_json(
     }
     if ((field_mask & SmokeEngineHost::LiveStatePatchField_SiteStatePhone) != 0U)
     {
+        append_field([&]() { append_site_phone_panel_json(json, site_snapshot); });
         append_field([&]() { append_site_phone_listings_json(json, site_snapshot); });
     }
 

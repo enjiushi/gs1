@@ -528,7 +528,16 @@ int main()
     assert(storage_messages.size() == 4U);
     assert(weather_messages.size() == 1U);
     assert(!collect_messages_of_type(bootstrap_messages, GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT).empty());
+    const auto bootstrap_phone_panel_messages =
+        collect_messages_of_type(bootstrap_messages, GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE);
+    assert(!bootstrap_phone_panel_messages.empty());
     assert(!collect_messages_of_type(bootstrap_messages, GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_UPSERT).empty());
+    {
+        const auto& phone_panel_payload =
+            bootstrap_phone_panel_messages.front()->payload_as<Gs1EngineMessagePhonePanelData>();
+        assert(phone_panel_payload.active_section == GS1_PHONE_PANEL_SECTION_MARKETPLACE);
+        assert(phone_panel_payload.buy_listing_count >= 9U);
+    }
     {
         const auto& weather_payload =
             weather_messages.front()->payload_as<Gs1EngineMessageWeatherData>();
@@ -684,6 +693,45 @@ int main()
     const auto fallback_tiles = collect_messages_of_type(fallback_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(!fallback_tiles.empty());
     assert(fallback_tiles.size() == gs1::site_world_access::tile_count(site_run));
+
+    Gs1RuntimeCreateDesc phone_panel_desc {};
+    phone_panel_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
+    phone_panel_desc.api_version = gs1::k_api_version;
+    phone_panel_desc.fixed_step_seconds = 1.0 / 60.0;
+
+    GameRuntime phone_panel_runtime {phone_panel_desc};
+    assert(phone_panel_runtime.handle_message(make_start_campaign_message()) == GS1_STATUS_OK);
+    const auto phone_panel_site_id =
+        gs1::GameRuntimeProjectionTestAccess::campaign(phone_panel_runtime)->sites.front().site_id.value;
+    assert(phone_panel_runtime.handle_message(make_start_site_attempt_message(phone_panel_site_id)) == GS1_STATUS_OK);
+    assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(phone_panel_runtime).has_value());
+    auto& phone_panel_site_run =
+        gs1::GameRuntimeProjectionTestAccess::active_site_run(phone_panel_runtime).value();
+    drain_engine_messages(phone_panel_runtime);
+
+    GameMessage buy_sellable_listing {};
+    buy_sellable_listing.type = GameMessageType::PhoneListingPurchaseRequested;
+    buy_sellable_listing.set_payload(PhoneListingPurchaseRequestedMessage {5U, 1U, 0U});
+    assert(phone_panel_runtime.handle_message(buy_sellable_listing) == GS1_STATUS_OK);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(phone_panel_runtime);
+    drain_engine_messages(phone_panel_runtime);
+
+    Gs1Phase1Result phone_panel_delivery_result {};
+    run_phase1(phone_panel_runtime, 3.0, phone_panel_delivery_result);
+    const auto delivered_sellable_slot_index = find_delivery_box_slot_index(
+        phone_panel_site_run,
+        gs1::ItemId {gs1::k_item_saltbush_seed_bundle},
+        1U);
+    assert(delivered_sellable_slot_index != std::numeric_limits<std::uint16_t>::max());
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(phone_panel_runtime);
+    const auto phone_panel_delivery_messages = drain_engine_messages(phone_panel_runtime);
+    assert(contains_phone_listing_message(
+        phone_panel_delivery_messages,
+        GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_UPSERT,
+        1000U + gs1::k_item_saltbush_seed_bundle));
+    assert(!collect_messages_of_type(
+        phone_panel_delivery_messages,
+        GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE).empty());
 
     Gs1RuntimeCreateDesc ui_desc {};
     ui_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);

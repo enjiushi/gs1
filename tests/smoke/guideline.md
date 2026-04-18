@@ -13,11 +13,11 @@ DLL-loading smoke harness, scripted smoke runner, live-state server, and visual 
 - `runtime_dll_loader.cpp`: Runtime DLL loader implementation.
 - `scripts/`: Scripted smoke scenario files.
 - `smoke_engine_host.h`: Smoke host abstraction over the gameplay DLL runtime.
-- `smoke_engine_host.cpp`: Smoke host implementation, including site phone listing upsert/remove projection application.
+- `smoke_engine_host.cpp`: Smoke host implementation, including authoritative site phone panel state plus phone listing projection application.
 - `smoke_host_main.cpp`: Standard smoke host executable entry point.
 - `smoke_live_http_server.h`: HTTP server interface for exposing live smoke state.
 - `smoke_live_http_server.cpp`: HTTP server implementation for the visual smoke viewer.
-- `smoke_live_state_json.cpp`: JSON serialization of live smoke/runtime state.
+- `smoke_live_state_json.cpp`: JSON serialization of live smoke/runtime state, including phone panel section/count snapshot fields.
 - `smoke_log.h`: Smoke logging helper declarations.
 - `smoke_log.cpp`: Smoke logging helper implementation.
 - `smoke_script_directive.h`: Parsed smoke-script directive/value definitions.
@@ -25,4 +25,4 @@ DLL-loading smoke harness, scripted smoke runner, live-state server, and visual 
 - `smoke_script_runner.cpp`: Smoke script runner implementation.
 - `visual_smoke_host_main.cpp`: Visual smoke host executable entry point.
 - `visual_smoke_live.html`: Browser UI shell and HUD/panel styling for the live visual smoke viewer, including the phone panel layout and section scrolling styles.
-- `visual_smoke_live_viewer.js`: Client-side scene, HUD, inventory, storage, phone panel, and interaction logic for the live visual smoke viewer, including preserved scroll/interaction stability plus weather/VFX presentation sourced from runtime state.
+- `visual_smoke_live_viewer.js`: Client-side scene, HUD, inventory, storage, phone panel, and interaction logic for the live visual smoke viewer, including DLL-driven phone panel section switching plus weather/VFX presentation sourced from runtime state.

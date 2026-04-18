@@ -8,6 +8,7 @@
 #include "site/inventory_state.h"
 #include "site/local_weather_resolve_state.h"
 #include "site/modifier_state.h"
+#include "site/phone_panel_state.h"
 #include "site/task_board_state.h"
 #include "site/weather_state.h"
 #include "support/id_types.h"
@@ -88,6 +89,7 @@ struct SiteRunState final
     TaskBoardState task_board {};
     ModifierState modifier {};
     EconomyState economy {};
+    PhonePanelState phone_panel {};
     CraftState craft {};
     ActionState site_action {};
     SiteCounters counters {};

@@ -20,6 +20,7 @@ Site-owned state, ECS world support, and helper logic for active site gameplay.
 - `inventory_storage.h`: Inventory container/storage primitives and stack helpers.
 - `local_weather_resolve_state.h`: Local weather resolution scratch/state.
 - `modifier_state.h`: Modifier application state for site effects.
+- `phone_panel_state.h`: Authoritative phone panel section and projected listing/task snapshot state for the active site.
 - `placement_preview.h`: Placement-preview state for build/placement UI flows.
 - `site_projection_update_flags.h`: Dirty/update flags for projection refresh decisions.
 - `site_run_state.h`: Aggregate active site-run state that owns the site slice.

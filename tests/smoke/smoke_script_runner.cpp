@@ -76,6 +76,10 @@ std::optional<Gs1UiActionType> parse_ui_action_type(const std::string& value)
     {
         return GS1_UI_ACTION_CHECKOUT_PHONE_CART;
     }
+    if (value == "SET_PHONE_PANEL_SECTION")
+    {
+        return GS1_UI_ACTION_SET_PHONE_PANEL_SECTION;
+    }
     if (value == "USE_INVENTORY_ITEM")
     {
         return GS1_UI_ACTION_USE_INVENTORY_ITEM;

@@ -75,10 +75,11 @@ private:
         Inventory = 9,
         Craft = 10,
         EconomyPhone = 11,
-        CampDurability = 12,
-        DeviceSupport = 13,
-        DeviceMaintenance = 14,
-        Modifier = 15
+        PhonePanel = 12,
+        CampDurability = 13,
+        DeviceSupport = 14,
+        DeviceMaintenance = 15,
+        Modifier = 16
     };
 
     enum class FeedbackEventSubscriberId : std::uint8_t
@@ -157,6 +158,7 @@ private:
     void queue_site_placement_failure_message(const PlacementModeCommitRejectedMessage& payload);
     void queue_site_task_upsert_message(std::size_t task_index);
     void queue_all_site_task_upsert_messages();
+    void queue_site_phone_panel_state_message();
     void queue_site_phone_listing_remove_message(std::uint32_t listing_id);
     void queue_site_phone_listing_upsert_message(std::size_t listing_index);
     void queue_all_site_phone_listing_upsert_messages();
