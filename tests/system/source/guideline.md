@@ -11,7 +11,7 @@ Source-authored system tests and supporting fixtures/runner registration code.
 - `README.md`: Notes on how source-authored system tests in this folder are discovered.
 - `action_ecology_placement_system_tests.cpp`: Cross-system regression tests for actions, ecology, and placement.
 - `asset_regression_runners.cpp`: Registers and implements runtime runners for asset-authored system tests.
-- `campaign_progress_system_tests.cpp`: System tests for campaign progression behavior.
+- `campaign_progress_system_tests.cpp`: System tests for campaign progression behavior, including selected-site support assembly.
 - `craft_system_tests.cpp`: System tests covering crafting behavior.
 - `device_interaction_system_tests.cpp`: System tests for device interaction flows.
 - `environment_worker_device_system_tests.cpp`: System tests across environment, worker, and device interactions.

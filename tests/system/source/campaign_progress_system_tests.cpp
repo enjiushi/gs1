@@ -361,6 +361,53 @@ void loadout_planner_tracks_selected_target_site(gs1::testing::SystemTestExecuti
     GS1_SYSTEM_TEST_CHECK(context, campaign.loadout_planner_state.selected_loadout_slots.size() == 6U);
 }
 
+void loadout_planner_builds_adjacent_completed_site_support(gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto* site_one = find_site_meta(campaign, 1U);
+    auto* site_two = find_site_meta(campaign, 2U);
+    GS1_SYSTEM_TEST_REQUIRE(context, site_one != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(context, site_two != nullptr);
+    site_one->site_state = GS1_SITE_STATE_COMPLETED;
+    site_two->site_state = GS1_SITE_STATE_AVAILABLE;
+
+    auto campaign_context = make_campaign_context(campaign);
+    auto select_message = make_message(
+        GameMessageType::DeploymentSiteSelectionChanged,
+        DeploymentSiteSelectionChangedMessage {2U});
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        LoadoutPlannerSystem::process_message(campaign_context, select_message) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_REQUIRE(context, campaign.loadout_planner_state.selected_target_site_id.has_value());
+    GS1_SYSTEM_TEST_CHECK(context, campaign.loadout_planner_state.selected_target_site_id->value == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, campaign.loadout_planner_state.support_quota == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, campaign.loadout_planner_state.available_exported_support_items.size() == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, campaign.loadout_planner_state.active_nearby_aura_modifier_ids.size() == 1U);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        find_loadout_slot(
+            campaign.loadout_planner_state.selected_loadout_slots,
+            gs1::k_item_saltbush_seed_bundle) != nullptr);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        find_loadout_slot(
+            campaign.loadout_planner_state.selected_loadout_slots,
+            gs1::k_item_saltbush_seed_bundle)
+            ->quantity == 4U);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        find_loadout_slot(
+            campaign.loadout_planner_state.selected_loadout_slots,
+            gs1::k_item_wood_bundle) != nullptr);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        find_loadout_slot(
+            campaign.loadout_planner_state.selected_loadout_slots,
+            gs1::k_item_wood_bundle)
+            ->quantity == 8U);
+}
+
 void site_flow_moves_worker_and_marks_projection_dirty(gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
@@ -511,6 +558,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "loadout_planner",
     "tracks_selected_target_site",
     loadout_planner_tracks_selected_target_site);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "loadout_planner",
+    "builds_adjacent_completed_site_support",
+    loadout_planner_builds_adjacent_completed_site_support);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "site_flow",
     "moves_worker_and_marks_projection_dirty",
