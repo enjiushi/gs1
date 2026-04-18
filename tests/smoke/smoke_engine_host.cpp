@@ -1562,6 +1562,7 @@ void SmokeEngineHost::apply_hud_state(const Gs1EngineMessage& message)
     projection.player_health = payload.player_health;
     projection.player_hydration = payload.player_hydration;
     projection.player_energy = payload.player_energy;
+    projection.player_morale = payload.player_morale;
     projection.current_money = payload.current_money;
     projection.active_task_count = payload.active_task_count;
     projection.warning_code = payload.warning_code;
@@ -1839,6 +1840,7 @@ std::string SmokeEngineHost::describe_message(const Gs1EngineMessage& message)
         description += " health=" + std::to_string(payload.player_health);
         description += " hydration=" + std::to_string(payload.player_hydration);
         description += " energy=" + std::to_string(payload.player_energy);
+        description += " morale=" + std::to_string(payload.player_morale);
         description += " completion=" + std::to_string(payload.site_completion_normalized);
         break;
     }

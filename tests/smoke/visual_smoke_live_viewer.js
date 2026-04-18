@@ -7,6 +7,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const hudEyebrow = document.getElementById("hud-eyebrow");
     const hudTitle = document.getElementById("hud-title");
     const hudSubtitle = document.getElementById("hud-subtitle");
+    const siteVitalsPanel = document.getElementById("site-vitals-panel");
+    const siteVitalsMoney = document.getElementById("site-vitals-money");
+    const siteVitalsBars = document.getElementById("site-vitals-bars");
     const statusChip = document.getElementById("status-chip");
     const menuPanel = document.getElementById("menu-panel");
     const menuEyebrow = document.getElementById("menu-eyebrow");
@@ -15,6 +18,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const menuCopy = document.getElementById("menu-copy");
     const menuMeta = document.getElementById("menu-meta");
     const menuActions = document.getElementById("menu-actions");
+    const selectionChip = document.getElementById("selection-chip");
     const selectionEyebrow = document.getElementById("selection-eyebrow");
     const selectionText = document.getElementById("selection-text");
     const selectionInventory = document.getElementById("selection-inventory");
@@ -89,6 +93,20 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         severeGale: 3,
         sandblast: 4
     };
+    const siteTutorialTips = [
+        "Move with WASD and drag with the right mouse button to orbit the camera around the worker.",
+        "Press B to open the player pack, then click a carried item to use it or move it into opened storage.",
+        "Press F to raise the phone for the market, delivery box flow, and task board information.",
+        "Short right-click any tile to open context actions such as gather, water, repair, plant, or build.",
+        "Planting and deployment enter placement mode first, so confirm with a left-click and cancel with Esc.",
+        "Carry seeds in the pack before you deploy so the right-click tile menu can arm planting actions.",
+        "Open crates, benches, and other devices from the map to move items one click at a time through the pack.",
+        "Wind, heat, and dust drain the worker over time, so use shelter and cover to limit exposure.",
+        "Health, hydration, energy, and morale all matter; consumables and safer routing help stabilize them.",
+        "Task progress and site completion rise as you restore tiles, place useful structures, and keep supplies flowing.",
+        "The camp and nearby devices are your safe logistics hub for storage, crafting, and recovery planning.",
+        "Delivery box items arrive outside the carried pack, so check it after shopping or ordered support arrives."
+    ];
 
     const moveAxes = {
         x: 0,
@@ -857,6 +875,25 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function getSiteState(state) {
         return state.siteState || null;
+    }
+
+    function getActiveSiteName(state) {
+        const siteBootstrap = getSiteBootstrap(state);
+        if (siteBootstrap && typeof siteBootstrap.siteId === "number") {
+            return "Site " + siteBootstrap.siteId;
+        }
+
+        const siteState = getSiteState(state);
+        if (siteState && typeof siteState.siteId === "number") {
+            return "Site " + siteState.siteId;
+        }
+
+        return "Active Site";
+    }
+
+    function getActiveSiteTip() {
+        const tipIndex = Math.floor(performance.now() / 20000) % siteTutorialTips.length;
+        return siteTutorialTips[tipIndex];
     }
 
     function createEmptyInventoryCache() {
@@ -1761,44 +1798,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 : ("Tile " + localActionProgressState.targetTileX + ", " + localActionProgressState.targetTileY);
     }
 
-    function renderSiteStatusChip(state) {
-        if (viewerCompatibilityWarning) {
-            statusChip.textContent = viewerCompatibilityWarning;
-            return;
-        }
-
-        const siteState = getSiteState(state);
-        const hud = getHudState(state);
-        const weather = siteState ? siteState.weather : null;
-        const carriedSeeds = getCarriedSeedOptions(state);
-        const placementPreview = getPlacementPreview(state);
-        const workerActionKind =
-            siteState && siteState.worker ? siteState.worker.currentActionKind : 0;
-        const warning = getHudWarningPresentation(state);
-        const hydration = hud ? Math.round(hud.playerHydration) : 0;
-        const energy = hud ? Math.round(hud.playerEnergy) : 0;
-        const completion = hud ? Math.round((hud.siteCompletionNormalized || 0) * 100) : 0;
-        const eventPhase = weather ? weather.eventPhase : "NONE";
-        const weatherHeat = Math.round(getEffectiveWeatherHeat(weather));
-        const weatherWind = weather ? Math.round(weather.wind || 0) : 0;
-        const weatherDust = weather ? Math.round(weather.dust || 0) : 0;
-        const windDirection = weather ? Math.round(weather.windDirectionDegrees || 0) : 0;
-
-        statusChip.textContent =
-            "Site Live\nHydration " + hydration +
-            "\nEnergy " + energy +
-            "\nCompletion " + completion + "%" +
-            "\nHeat " + weatherHeat +
-            "\nWind " + weatherWind +
-            "\nBearing " + windDirection + "deg" +
-            "\nDust " + weatherDust +
-            "\nEvent " + eventPhase +
-            "\nAlert " + warning.headline +
-            "\nSeeds " + carriedSeeds.reduce((total, seed) => total + seed.quantity, 0) +
-            "\nAction " + getSiteActionLabel(workerActionKind) +
-            "\nMode " + (isPlacementModeActive(state) ? placementModeLabel(placementPreview) : "None");
-    }
-
     function pickSiteTileAtClientPosition(clientX, clientY) {
         if (!latestState || latestState.appState !== "SITE_ACTIVE" || !siteSceneCache || !siteSceneCache.tilePickables) {
             return null;
@@ -2282,34 +2281,17 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return Math.round(clamp01((typeof value === "number" ? value : 0) / 100) * 100);
     }
 
-    function appendInventorySummaryCard(container, label, valueText, fillPercent, fillClassName) {
-        const card = document.createElement("div");
-        card.className = "inventory-summary-card";
-
-        const labelElement = document.createElement("div");
-        labelElement.className = "inventory-summary-label";
-        labelElement.textContent = label;
-        card.appendChild(labelElement);
-
-        const valueElement = document.createElement("div");
-        valueElement.className = "inventory-summary-value" + (fillClassName === "money" ? " money" : "");
-        valueElement.textContent = valueText;
-        card.appendChild(valueElement);
-
-        if (fillClassName !== "money") {
-            const meterTrack = document.createElement("div");
-            meterTrack.className = "inventory-meter-track";
-            const meterFill = document.createElement("div");
-            meterFill.className = "inventory-meter-fill " + fillClassName;
-            meterFill.style.width = Math.max(0, Math.min(fillPercent, 100)) + "%";
-            meterTrack.appendChild(meterFill);
-            card.appendChild(meterTrack);
+    function renderSiteVitalsPanel(state) {
+        if (!siteVitalsPanel || !siteVitalsMoney || !siteVitalsBars) {
+            return;
         }
 
-        container.appendChild(card);
-    }
+        if (!state || state.appState !== "SITE_ACTIVE") {
+            siteVitalsPanel.hidden = true;
+            siteVitalsBars.innerHTML = "";
+            return;
+        }
 
-    function appendInventorySummarySection(container, state) {
         const hud = getHudState(state);
         const siteState = getSiteState(state);
         const worker = siteState ? siteState.worker : null;
@@ -2322,54 +2304,73 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const energy = hud && typeof hud.playerEnergy === "number"
             ? hud.playerEnergy
             : (worker && typeof worker.energyNormalized === "number" ? worker.energyNormalized * 100 : 0);
+        const morale = hud && typeof hud.playerMorale === "number"
+            ? hud.playerMorale
+            : 0;
         const currentMoney = hud && typeof hud.currentMoney === "number" ? hud.currentMoney : 0;
 
-        const section = document.createElement("section");
-        section.className = "inventory-section";
+        siteVitalsPanel.hidden = false;
+        siteVitalsMoney.textContent = String(currentMoney);
+        siteVitalsBars.innerHTML = "";
 
-        const header = document.createElement("div");
-        header.className = "inventory-section-header";
+        [
+            { label: "Health", percent: clampMeterPercent(health), className: "health" },
+            { label: "Hydration", percent: clampMeterPercent(hydration), className: "hydration" },
+            { label: "Energy", percent: clampMeterPercent(energy), className: "energy" },
+            { label: "Morale", percent: clampMeterPercent(morale), className: "morale" }
+        ].forEach((meter) => {
+            const bar = document.createElement("div");
+            bar.className = "site-vitals-bar " + meter.className;
+            bar.style.setProperty("--site-meter-percent", meter.percent + "%");
 
-        const titleElement = document.createElement("div");
-        titleElement.className = "inventory-section-title";
-        titleElement.textContent = "Field Status";
-        header.appendChild(titleElement);
+            const content = document.createElement("div");
+            content.className = "site-vitals-bar-content";
 
-        const metaElement = document.createElement("div");
-        metaElement.className = "inventory-section-meta";
-        metaElement.textContent = "HUD-driven values  |  Toggle B";
-        header.appendChild(metaElement);
-        section.appendChild(header);
+            const label = document.createElement("span");
+            label.textContent = meter.label;
+            content.appendChild(label);
 
-        const summaryGrid = document.createElement("div");
-        summaryGrid.className = "inventory-summary-grid";
-        section.appendChild(summaryGrid);
+            const value = document.createElement("span");
+            value.textContent = meter.percent + "%";
+            content.appendChild(value);
 
-        appendInventorySummaryCard(summaryGrid, "Health", clampMeterPercent(health) + "%", clampMeterPercent(health), "health");
-        appendInventorySummaryCard(summaryGrid, "Hydration", clampMeterPercent(hydration) + "%", clampMeterPercent(hydration), "hydration");
-        appendInventorySummaryCard(summaryGrid, "Energy", clampMeterPercent(energy) + "%", clampMeterPercent(energy), "energy");
-        appendInventorySummaryCard(summaryGrid, "Money", "$" + String(currentMoney), 0, "money");
+            bar.appendChild(content);
+            siteVitalsBars.appendChild(bar);
+        });
+    }
 
-        container.appendChild(section);
+    function renderSiteHudChrome(state) {
+        if (!state || state.appState !== "SITE_ACTIVE") {
+            renderSiteVitalsPanel(null);
+            return;
+        }
+
+        const warning = getHudWarningPresentation(state);
+        hudEyebrow.textContent = warning.code !== hudWarningCodes.none ? warning.headline : "Site Active";
+        hudTitle.textContent = getActiveSiteName(state);
+        hudSubtitle.textContent = getActiveSiteTip();
+        renderSiteVitalsPanel(state);
     }
 
     function makeInventorySection(title, metaText, gridClassName, columnCount) {
         const section = document.createElement("section");
         section.className = "inventory-section";
 
-        const header = document.createElement("div");
-        header.className = "inventory-section-header";
+        if (title || metaText) {
+            const header = document.createElement("div");
+            header.className = "inventory-section-header";
 
-        const titleElement = document.createElement("div");
-        titleElement.className = "inventory-section-title";
-        titleElement.textContent = title;
-        header.appendChild(titleElement);
+            const titleElement = document.createElement("div");
+            titleElement.className = "inventory-section-title";
+            titleElement.textContent = title;
+            header.appendChild(titleElement);
 
-        const metaElement = document.createElement("div");
-        metaElement.className = "inventory-section-meta";
-        metaElement.textContent = metaText;
-        header.appendChild(metaElement);
-        section.appendChild(header);
+            const metaElement = document.createElement("div");
+            metaElement.className = "inventory-section-meta";
+            metaElement.textContent = metaText;
+            header.appendChild(metaElement);
+            section.appendChild(header);
+        }
 
         const grid = document.createElement("div");
         grid.className = "inventory-grid" + (gridClassName ? " " + gridClassName : "");
@@ -2617,55 +2618,38 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function renderSiteInventoryPanel(state, workerPackSlots) {
-        selectionInventory.hidden = false;
-        selectionInventory.innerHTML = "";
-
         if (!inventoryPanelOpen) {
-            const hiddenNote = document.createElement("div");
-            hiddenNote.className = "inventory-panel-hidden-note";
-            hiddenNote.textContent = "Inventory panel hidden. Press B to reopen.";
-            selectionInventory.appendChild(hiddenNote);
+            selectionChip.hidden = true;
+            selectionInventory.hidden = true;
+            selectionInventory.innerHTML = "";
             hideInventoryTooltip();
             return;
         }
+
+        const workerPackContainer = findWorkerPackInventoryContainer(state);
+        const slotCount = Math.max(
+            workerPackContainer && typeof workerPackContainer.slotCount === "number"
+                ? workerPackContainer.slotCount
+                : 0,
+            workerPackSlots.length,
+            1);
+
+        selectionChip.hidden = false;
+        selectionInventory.hidden = false;
+        selectionInventory.innerHTML = "";
 
         const stack = document.createElement("div");
         stack.className = "site-panel-stack";
         selectionInventory.appendChild(stack);
 
-        appendInventorySummarySection(stack, state);
-
-        const topGrid = document.createElement("div");
-        topGrid.className = "site-panel-grid";
-        stack.appendChild(topGrid);
-
-        appendInventoryGridSection(topGrid, "Worker Pack", "Live carried inventory", workerPackSlots, {
+        appendInventoryGridSection(stack, "", "", workerPackSlots, {
             state: state,
             containerKind: "WORKER_PACK",
-            slotCount: 6,
-            columns: 3,
+            slotCount: slotCount,
+            columns: 4,
             slotLabelPrefix: "Pack",
             selectedSlotKey: selectedInventorySlotKey
         });
-
-        const footnote = document.createElement("div");
-        footnote.className = "inventory-footnote";
-        const carriedSeeds = getCarriedSeedOptions(state);
-        const carriedDeployables = getCarriedDeployableOptions(state);
-        const footnoteParts = [];
-        footnoteParts.push("Press B to toggle the worker pack. Right-click a storage or crafting device to open its separate storage panel, then left-click items to move them between that storage and the pack.");
-        if (carriedSeeds.length > 0) {
-            footnoteParts.push(
-                "Seeds: " +
-                carriedSeeds.map((seed) => seed.shortLabel + " x" + seed.quantity).join("  | "));
-        }
-        if (carriedDeployables.length > 0) {
-            footnoteParts.push(
-                "Deployables: " +
-                carriedDeployables.map((item) => item.shortLabel + " x" + item.quantity).join("  | "));
-        }
-        footnote.textContent = footnoteParts.join("     ");
-        stack.appendChild(footnote);
     }
 
     function renderStoragePanel(state, openedContainerInfo) {
@@ -2722,11 +2706,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function appendSelectedInventoryActions(state, selectedSlot) {
         if (!selectedSlot) {
-            const helper = document.createElement("div");
-            helper.className = "helper-note";
-            helper.textContent =
-                "Hover any item for details. Click pack items to move them into the opened storage, or click opened storage items to carry them into the pack. Usable carried items still surface actions here when no storage is open.";
-            contextActions.appendChild(helper);
             return;
         }
 
@@ -3484,7 +3463,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     function renderFallbackOverlay(state) {
         const siteBootstrap = getSiteBootstrap(state);
         menuPanel.hidden = true;
+        selectionChip.hidden = false;
         selectionEyebrow.textContent = "Current View";
+        selectionText.hidden = false;
         selectionText.textContent =
             siteBootstrap
                 ? "Site " + siteBootstrap.siteId + " placeholder view."
@@ -3496,49 +3477,22 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function renderSiteOverlay(state) {
-        const siteBootstrap = getSiteBootstrap(state);
         const workerPackSlots = getInventorySlotsByKind(state, "WORKER_PACK");
-        const carriedSeeds = getCarriedSeedOptions(state);
-        const carriedDeployables = getCarriedDeployableOptions(state);
 
         menuPanel.hidden = true;
-        selectionEyebrow.textContent = "Site Active";
+        selectionChip.hidden = false;
+        selectionEyebrow.textContent = "Player Pack";
+        selectionText.hidden = true;
+        selectionText.textContent = "";
         contextActions.innerHTML = "";
         clearSelectedInventorySlotIfInvalid(state);
         clearOpenedInventoryContainerIfInvalid(state);
 
         const selectedSlot = findSelectedInventorySlot(state);
         const openedContainerInfo = findOpenedInventoryContainer(state);
-        const placementPreview = getPlacementPreview(state);
-        const plantingText = carriedSeeds.length > 0
-            ? ("Right-click any tile to arm planting. Carried seeds: " +
-                carriedSeeds.map((seed) => seed.shortLabel + " x" + seed.quantity).join("  |  "))
-            : "Carry seeds into the worker pack to unlock planting from the right-click menu.";
-        const deployText = carriedDeployables.length > 0
-            ? ("Right-click any tile to arm deployment. Kits: " +
-                carriedDeployables.map((item) => item.shortLabel + " x" + item.quantity).join("  | "))
-            : "Craft or collect deployable kits, then right-click any tile to place them.";
-        const storageText = openedContainerInfo
-            ? ("Opened container: " + getContainerDisplayName(state, openedContainerInfo) + ". Left-click pack items to send them there, or left-click storage items to carry them back into the pack.")
-            : "Right-click a storage crate, workbench, stove, or another storage device to open that specific container. Items move between storage and the worker pack one click at a time.";
-        const placementText = isPlacementModeActive(state)
-            ? ("Placement mode active for " + placementModeLabel(placementPreview) + ". Left-click the map to confirm. Red tiles are blocked. Press Esc or short right-click to cancel.")
-            : "Short right-click a tile to open context actions. Plant and deploy now enter placement mode before the worker starts moving.";
-        selectionText.innerHTML = siteBootstrap
-            ? (
-                "Site " + siteBootstrap.siteId +
-                " is live. Use WASD to move, press B to open or close the worker pack, press F to open or close the phone, drag with right mouse to orbit the camera, and short right-click a tile to choose a site action." +
-                "<br><br>" + placementText +
-                "<br><br>" + plantingText +
-                "<br><br>" + deployText +
-                "<br><br>" + storageText +
-                "<br><br>Inventory and storage panels resolve slots from the adapter's cached site snapshot and refresh as inventory slot updates arrive."
-            )
-            : "Site bootstrap is loading.";
         renderSiteInventoryPanel(state, workerPackSlots);
         renderStoragePanel(state, openedContainerInfo);
         appendSelectedInventoryActions(state, selectedSlot);
-        renderSiteStatusChip(state);
     }
 
     function updateOverlay(state) {
@@ -3546,17 +3500,19 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         stageFrame.classList.toggle("regional-map-mode", state.appState === "REGIONAL_MAP");
         stageFrame.classList.toggle("site-active-mode", state.appState === "SITE_ACTIVE");
         const appStateChanged = lastOverlayAppState !== state.appState;
-        const warning = getHudWarningPresentation(state);
 
         switch (state.appState) {
         case "MAIN_MENU":
             hudEyebrow.textContent = "App State";
             hudTitle.textContent = state.appState || "NONE";
             hudSubtitle.textContent = "Austere, painterly, and severe: the campaign opens under hostile conditions.";
+            renderSiteVitalsPanel(null);
             inventoryPanelOpen = true;
             phonePanelOpen = false;
             selectedInventorySlotKey = "";
             openedInventoryContainerKey = "";
+            selectionChip.hidden = false;
+            selectionText.hidden = false;
             clearSelectionInventory();
             renderMenuOverlay(state);
             statusChip.textContent = "Prototype Build\nVisual Smoke";
@@ -3565,10 +3521,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             hudEyebrow.textContent = "App State";
             hudTitle.textContent = state.appState || "NONE";
             hudSubtitle.textContent = "Review the campaign survey board and choose the next deployment route.";
+            renderSiteVitalsPanel(null);
             inventoryPanelOpen = true;
             phonePanelOpen = false;
             selectedInventorySlotKey = "";
             openedInventoryContainerKey = "";
+            selectionChip.hidden = false;
+            selectionText.hidden = false;
             clearSelectionInventory();
             renderRegionalMapOverlay(state);
             statusChip.textContent =
@@ -3576,27 +3535,27 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 "\nSelected Site: " + (state.selectedSiteId == null ? "none" : state.selectedSiteId);
             break;
         case "SITE_ACTIVE":
-            hudEyebrow.textContent = warning.code !== hudWarningCodes.none ? "Weather Alert" : "Site Active";
-            hudTitle.textContent = warning.code !== hudWarningCodes.none ? warning.headline : (state.appState || "NONE");
             if (appStateChanged) {
                 inventoryPanelOpen = false;
                 phonePanelOpen = false;
                 selectedInventorySlotKey = "";
                 openedInventoryContainerKey = "";
+                statusChip.textContent = viewerCompatibilityWarning || "";
             }
-            hudSubtitle.textContent = warning.code !== hudWarningCodes.none
-                ? (warning.detail + " Press B for inventory, F for phone, and use cover to cut wind exposure.")
-                : "Field movement is now live. Press B to toggle the inventory panel, press F to pocket or raise the phone, drag with right mouse to orbit the follow camera, or short right-click a tile to open its action menu.";
+            renderSiteHudChrome(state);
             renderSiteOverlay(state);
             break;
         default:
             hudEyebrow.textContent = "App State";
             hudTitle.textContent = state.appState || "NONE";
             hudSubtitle.textContent = "The current adapter only styles the core early flow for now.";
+            renderSiteVitalsPanel(null);
             inventoryPanelOpen = true;
             phonePanelOpen = false;
             selectedInventorySlotKey = "";
             openedInventoryContainerKey = "";
+            selectionChip.hidden = false;
+            selectionText.hidden = false;
             clearSelectionInventory();
             renderFallbackOverlay(state);
             statusChip.textContent =
@@ -5790,6 +5749,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         updatePlantWindShaderUniforms(latestState, elapsed);
         fitRenderer();
+        renderSiteHudChrome(latestState);
         renderActionProgressBar(latestState);
         renderPlacementFailureToast();
         updateDustOverlay(latestState, elapsed);
@@ -5927,9 +5887,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     lightweightPatchParts.placementFailure ||
                     lightweightPatchParts.weather ||
                     previousActionKind !== nextActionKind) {
-                    renderSiteStatusChip(normalizedState);
+                    renderSiteHudChrome(normalizedState);
                 }
                 if (lightweightPatchParts.hud) {
+                    renderSiteHudChrome(normalizedState);
                     renderSiteInventoryPanel(
                         normalizedState,
                         getInventorySlotsByKind(normalizedState, "WORKER_PACK"));

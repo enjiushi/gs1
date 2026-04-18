@@ -929,6 +929,8 @@ void append_hud_json(std::string& json, const std::optional<SmokeEngineHost::Hud
     json += std::to_string(hud.player_hydration);
     json += ",\"playerEnergy\":";
     json += std::to_string(hud.player_energy);
+    json += ",\"playerMorale\":";
+    json += std::to_string(hud.player_morale);
     json += ",\"currentMoney\":";
     json += std::to_string(hud.current_money);
     json += ",\"activeTaskCount\":";

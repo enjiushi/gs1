@@ -123,7 +123,7 @@ inline SiteRunState make_test_site_run(
     site_run.camp.camp_anchor_tile = camp_anchor_tile;
     site_run.camp.starter_storage_tile = default_starter_storage_tile(camp_anchor_tile);
     site_run.camp.delivery_box_tile = default_delivery_box_tile(camp_anchor_tile, width, height);
-    site_run.inventory.worker_pack_slot_count = 6U;
+    site_run.inventory.worker_pack_slot_count = 8U;
     site_run.inventory.worker_pack_slots.resize(site_run.inventory.worker_pack_slot_count);
     site_run.task_board.accepted_task_cap = 3U;
     site_run.counters.site_completion_tile_threshold = 3U;

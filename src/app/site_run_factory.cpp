@@ -44,7 +44,7 @@ SiteRunState SiteRunFactory::create_site_run(
     run.site_attempt_seed = campaign.campaign_seed + site_meta.site_id.value + site_meta.attempt_count;
     run.run_status = SiteRunStatus::Active;
     run.clock.day_phase = DayPhase::Dawn;
-    run.inventory.worker_pack_slot_count = 6U;
+    run.inventory.worker_pack_slot_count = 8U;
     run.inventory.worker_pack_slots.resize(run.inventory.worker_pack_slot_count);
     run.task_board.accepted_task_cap = 3U;
 

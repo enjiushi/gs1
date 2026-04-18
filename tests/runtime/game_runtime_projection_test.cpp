@@ -427,7 +427,7 @@ int main()
     auto& bootstrap_site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
     assert(gs1::site_world_access::width(bootstrap_site_run) == 32U);
     assert(gs1::site_world_access::height(bootstrap_site_run) == 32U);
-    assert(bootstrap_site_run.inventory.worker_pack_slots.size() == 6U);
+    assert(bootstrap_site_run.inventory.worker_pack_slots.size() == 8U);
     assert(bootstrap_site_run.inventory.worker_pack_slots[0].occupied);
     assert(bootstrap_site_run.inventory.worker_pack_slots[0].item_id.value == 1U);
     assert(gs1::inventory_storage::available_item_quantity_in_container(

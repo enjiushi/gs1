@@ -2212,6 +2212,7 @@ void GameRuntime::queue_hud_state_message()
     payload.player_health = worker_conditions.health;
     payload.player_hydration = worker_conditions.hydration;
     payload.player_energy = worker_conditions.energy;
+    payload.player_morale = worker_conditions.morale;
     payload.current_money = active_site_run_->economy.money;
     payload.active_task_count =
         static_cast<std::uint16_t>(active_site_run_->task_board.accepted_task_ids.size());

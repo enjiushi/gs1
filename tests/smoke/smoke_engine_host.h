@@ -294,6 +294,7 @@ public:
         float player_health {0.0f};
         float player_hydration {0.0f};
         float player_energy {0.0f};
+        float player_morale {0.0f};
         std::int32_t current_money {0};
         std::uint32_t active_task_count {0};
         std::uint32_t warning_code {0};

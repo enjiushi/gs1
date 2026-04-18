@@ -24,5 +24,5 @@ DLL-loading smoke harness, scripted smoke runner, live-state server, and visual 
 - `smoke_script_runner.h`: Smoke script runner interface.
 - `smoke_script_runner.cpp`: Smoke script runner implementation.
 - `visual_smoke_host_main.cpp`: Visual smoke host executable entry point.
-- `visual_smoke_live.html`: Browser UI for the live visual smoke viewer.
-- `visual_smoke_live_viewer.js`: Client-side logic for the live visual smoke viewer.
+- `visual_smoke_live.html`: Browser UI shell and HUD/panel styling for the live visual smoke viewer.
+- `visual_smoke_live_viewer.js`: Client-side scene, HUD, inventory, storage, and interaction logic for the live visual smoke viewer.

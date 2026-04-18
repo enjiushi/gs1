@@ -12,4 +12,4 @@ Public C ABI and shared runtime type declarations exposed outside the gameplay D
 - `game_api.h`: Main exported gameplay entry points and host-facing function declarations.
 - `status.h`: Public result/status codes returned across the DLL boundary.
 - `system_test_api.h`: Public hooks for the standalone system-test host and test asset runners.
-- `types.h`: Shared API structs, payloads, handles, and enums used by runtime callers.
+- `types.h`: Shared API structs, payloads, engine-message transport layouts, handles, and enums used by runtime callers.

@@ -193,6 +193,14 @@ body {
   align-items: flex-start;
 }
 
+.hud-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+  min-width: 0;
+}
+
 .hud-chip,
 .status-chip,
 .selection-chip {
@@ -236,6 +244,108 @@ body {
   font-size: 13px;
   color: var(--muted);
   white-space: pre-line;
+}
+
+.status-chip:empty,
+.action-bar:empty {
+  display: none;
+}
+
+.site-vitals-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: min(320px, calc(100vw - 40px));
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  pointer-events: none;
+}
+
+.site-vitals-money {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #63d27a;
+  text-shadow:
+    0 2px 4px rgba(34, 22, 10, 0.82),
+    0 6px 16px rgba(26, 18, 10, 0.42);
+}
+
+.site-vitals-money::before {
+  content: "$";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(31, 23, 16, 0.82);
+  color: #f7d899;
+  font-size: 14px;
+  box-shadow: 0 8px 18px rgba(25, 17, 10, 0.28);
+}
+
+.site-vitals-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.site-vitals-bar {
+  position: relative;
+  overflow: hidden;
+  min-height: 30px;
+  border-radius: 999px;
+  box-shadow: 0 10px 20px rgba(20, 14, 8, 0.24);
+}
+
+.site-vitals-bar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 48%),
+    linear-gradient(90deg, var(--site-meter-fill) 0 var(--site-meter-percent), var(--site-meter-track) var(--site-meter-percent) 100%);
+}
+
+.site-vitals-bar-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 7px 12px 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 249, 239, 0.96);
+}
+
+.site-vitals-bar.health {
+  --site-meter-fill: #4f965b;
+  --site-meter-track: #203221;
+}
+
+.site-vitals-bar.hydration {
+  --site-meter-fill: #3e84c7;
+  --site-meter-track: #182b41;
+}
+
+.site-vitals-bar.energy {
+  --site-meter-fill: #c68d2f;
+  --site-meter-track: #3c2814;
+}
+
+.site-vitals-bar.morale {
+  --site-meter-fill: #c45a48;
+  --site-meter-track: #3b1f1d;
 }
 
 .center-layer {
@@ -944,85 +1054,6 @@ body {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.55),
     0 10px 22px rgba(55, 35, 14, 0.08);
-}
-
-.inventory-summary-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
-}
-
-.inventory-summary-card {
-  min-width: 0;
-  padding: 10px 11px 11px;
-  border: 1px solid rgba(108, 83, 49, 0.14);
-  background:
-    linear-gradient(180deg, rgba(255, 251, 244, 0.92), rgba(236, 223, 203, 0.76));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.62),
-    0 8px 18px rgba(55, 35, 14, 0.06);
-}
-
-.inventory-summary-label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: rgba(96, 66, 33, 0.68);
-}
-
-.inventory-summary-value {
-  margin-top: 5px;
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 1;
-  color: rgba(45, 31, 16, 0.94);
-}
-
-.inventory-summary-value.money {
-  letter-spacing: 0.02em;
-}
-
-.inventory-meter-track {
-  margin-top: 10px;
-  height: 8px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: rgba(73, 53, 31, 0.12);
-  box-shadow: inset 0 1px 1px rgba(44, 30, 16, 0.08);
-}
-
-.inventory-meter-fill {
-  height: 100%;
-  width: 0;
-  border-radius: inherit;
-  background: linear-gradient(90deg, var(--meter-fill-start, #8f7a64), var(--meter-fill-end, #5a4837));
-  box-shadow: 0 1px 6px rgba(58, 38, 18, 0.18);
-}
-
-.inventory-meter-fill.health {
-  --meter-fill-start: #9b7a6f;
-  --meter-fill-end: #71473d;
-}
-
-.inventory-meter-fill.hydration {
-  --meter-fill-start: #7fa6c4;
-  --meter-fill-end: #436b8f;
-}
-
-.inventory-meter-fill.energy {
-  --meter-fill-start: #c9b074;
-  --meter-fill-end: #8e6b31;
-}
-
-.inventory-panel-hidden-note {
-  padding: 12px 14px;
-  border: 1px dashed rgba(108, 83, 49, 0.28);
-  background: rgba(250, 242, 229, 0.62);
-  color: rgba(88, 63, 34, 0.78);
-  font-size: 12px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .inventory-section-header {
@@ -2037,7 +2068,9 @@ body {
 }
 
 .stage-frame.site-active-mode .selection-chip {
-  max-width: 520px;
+  max-width: 356px;
+  width: min(356px, calc(100vw - 40px));
+  max-height: min(34vh, calc(100vh - 220px));
 }
 
 @media (max-width: 900px) {
@@ -2073,6 +2106,10 @@ body {
 
   .selection-chip {
     max-width: none;
+  }
+
+  .site-vitals-panel {
+    min-width: min(300px, calc(100vw - 28px));
   }
 
   .storage-panel {
@@ -2162,10 +2199,17 @@ body {
 
     <div class="overlay">
       <div class="hud-row">
-        <div class="hud-chip">
-          <div class="eyebrow" id="hud-eyebrow">State</div>
-          <div class="title" id="hud-title">Booting</div>
-          <div class="subtitle" id="hud-subtitle">Waiting for host state.</div>
+        <div class="hud-stack">
+          <div class="hud-chip">
+            <div class="eyebrow" id="hud-eyebrow">State</div>
+            <div class="title" id="hud-title">Booting</div>
+            <div class="subtitle" id="hud-subtitle">Waiting for host state.</div>
+          </div>
+
+          <div class="site-vitals-panel" id="site-vitals-panel" hidden>
+            <div class="site-vitals-money" id="site-vitals-money">0</div>
+            <div class="site-vitals-bars" id="site-vitals-bars"></div>
+          </div>
         </div>
 
         <div class="status-chip" id="status-chip">
