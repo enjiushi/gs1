@@ -153,6 +153,8 @@ private:
     void queue_all_site_inventory_slot_upsert_messages();
     void queue_pending_site_inventory_slot_upsert_messages();
     void queue_site_craft_context_messages();
+    void queue_site_placement_preview_message();
+    void queue_site_placement_failure_message(const PlacementModeCommitRejectedMessage& payload);
     void queue_site_task_upsert_message(std::size_t task_index);
     void queue_all_site_task_upsert_messages();
     void queue_site_phone_listing_upsert_message(std::size_t listing_index);

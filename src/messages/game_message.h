@@ -68,6 +68,8 @@ enum class GameMessageType : std::uint8_t
     InventoryTransferRequested,
     InventoryStorageViewRequest,
     InventoryCraftContextRequested,
+    PlacementModeCursorMoved,
+    PlacementModeCommitRejected,
     InventoryCraftCommitRequested,
     ContractorHireRequested,
     SiteUnlockablePurchaseRequested,
@@ -467,6 +469,22 @@ struct CraftContextRequestedMessage final
     std::uint32_t flags;
 };
 
+struct PlacementModeCursorMovedMessage final
+{
+    std::int32_t tile_x;
+    std::int32_t tile_y;
+    std::uint32_t flags;
+};
+
+struct PlacementModeCommitRejectedMessage final
+{
+    std::int32_t tile_x;
+    std::int32_t tile_y;
+    std::uint64_t blocked_mask;
+    Gs1SiteActionKind action_kind;
+    std::uint32_t item_id;
+};
+
 struct InventoryCraftCommitRequestedMessage final
 {
     std::uint32_t recipe_id;
@@ -527,6 +545,8 @@ GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryGlobalItemConsumeRequestedMessage, 8U
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryTransferRequestedMessage, 16U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryStorageViewRequestMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(CraftContextRequestedMessage, 12U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PlacementModeCursorMovedMessage, 12U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PlacementModeCommitRejectedMessage, 24U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryCraftCommitRequestedMessage, 16U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(ContractorHireRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteUnlockablePurchaseRequestedMessage, 4U);

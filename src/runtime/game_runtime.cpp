@@ -1060,6 +1060,11 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
         queue_site_action_update_message();
         break;
 
+    case GameMessageType::PlacementModeCommitRejected:
+        queue_site_placement_failure_message(
+            message.payload_as<PlacementModeCommitRejectedMessage>());
+        break;
+
     case GameMessageType::DeploymentSiteSelectionChanged:
     case GameMessageType::StartSiteAction:
     case GameMessageType::CancelSiteAction:
@@ -1873,6 +1878,62 @@ void GameRuntime::queue_site_craft_context_messages()
     engine_messages_.push_back(make_engine_message(GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_END));
 }
 
+void GameRuntime::queue_site_placement_preview_message()
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
+
+    const auto& placement_mode = active_site_run_->site_action.placement_mode;
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_PLACEMENT_PREVIEW);
+    auto& payload = message.emplace_payload<Gs1EngineMessagePlacementPreviewData>();
+    if (placement_mode.active && placement_mode.target_tile.has_value())
+    {
+        payload.tile_x = placement_mode.target_tile->x;
+        payload.tile_y = placement_mode.target_tile->y;
+        payload.blocked_mask = placement_mode.blocked_mask;
+        payload.item_id = placement_mode.item_id;
+        payload.footprint_width = placement_mode.footprint_width;
+        payload.footprint_height = placement_mode.footprint_height;
+        payload.action_kind = static_cast<Gs1SiteActionKind>(placement_mode.action_kind);
+        payload.flags = 1U;
+        if (placement_mode.blocked_mask == 0ULL)
+        {
+            payload.flags |= 2U;
+        }
+    }
+    else
+    {
+        payload.tile_x = 0;
+        payload.tile_y = 0;
+        payload.blocked_mask = 0ULL;
+        payload.item_id = 0U;
+        payload.footprint_width = 1U;
+        payload.footprint_height = 1U;
+        payload.action_kind = GS1_SITE_ACTION_NONE;
+        payload.flags = 4U;
+    }
+
+    engine_messages_.push_back(message);
+}
+
+void GameRuntime::queue_site_placement_failure_message(const PlacementModeCommitRejectedMessage& payload)
+{
+    static std::uint32_t next_sequence_id = 1U;
+
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_PLACEMENT_FAILURE);
+    auto& engine_payload = message.emplace_payload<Gs1EngineMessagePlacementFailureData>();
+    engine_payload.tile_x = payload.tile_x;
+    engine_payload.tile_y = payload.tile_y;
+    engine_payload.blocked_mask = payload.blocked_mask;
+    engine_payload.sequence_id = next_sequence_id++;
+    engine_payload.action_kind = payload.action_kind;
+    engine_payload.flags = 1U;
+    engine_payload.reserved0 = 0U;
+    engine_messages_.push_back(message);
+}
+
 void GameRuntime::queue_site_task_upsert_message(std::size_t task_index)
 {
     if (!active_site_run_.has_value())
@@ -1988,6 +2049,7 @@ void GameRuntime::queue_site_delta_messages(std::uint64_t dirty_flags)
             SITE_PROJECTION_UPDATE_WEATHER |
             SITE_PROJECTION_UPDATE_INVENTORY |
             SITE_PROJECTION_UPDATE_CRAFT_CONTEXT |
+            SITE_PROJECTION_UPDATE_PLACEMENT_PREVIEW |
             SITE_PROJECTION_UPDATE_TASKS |
             SITE_PROJECTION_UPDATE_PHONE);
     if (site_dirty_flags == 0U)
@@ -2025,6 +2087,11 @@ void GameRuntime::queue_site_delta_messages(std::uint64_t dirty_flags)
     if ((site_dirty_flags & SITE_PROJECTION_UPDATE_CRAFT_CONTEXT) != 0U)
     {
         queue_site_craft_context_messages();
+    }
+
+    if ((site_dirty_flags & SITE_PROJECTION_UPDATE_PLACEMENT_PREVIEW) != 0U)
+    {
+        queue_site_placement_preview_message();
     }
 
     if ((site_dirty_flags & SITE_PROJECTION_UPDATE_TASKS) != 0U)
@@ -2425,7 +2492,8 @@ Gs1Status GameRuntime::translate_site_action_cancel_to_message(
     GameMessage& out_message) const
 {
     if (action.action_id == 0U &&
-        (action.flags & GS1_SITE_ACTION_CANCEL_FLAG_CURRENT_ACTION) == 0U)
+        (action.flags & (GS1_SITE_ACTION_CANCEL_FLAG_CURRENT_ACTION |
+            GS1_SITE_ACTION_CANCEL_FLAG_PLACEMENT_MODE)) == 0U)
     {
         return GS1_STATUS_INVALID_ARGUMENT;
     }
@@ -2459,11 +2527,25 @@ Gs1Status GameRuntime::translate_site_context_request_to_message(
     const Gs1HostEventSiteContextRequestData& request,
     GameMessage& out_message) const
 {
-    out_message.type = GameMessageType::InventoryCraftContextRequested;
-    out_message.set_payload(CraftContextRequestedMessage {
-        request.tile_x,
-        request.tile_y,
-        request.flags});
+    const bool placement_mode_active =
+        active_site_run_.has_value() &&
+        active_site_run_->site_action.placement_mode.active;
+    if (placement_mode_active)
+    {
+        out_message.type = GameMessageType::PlacementModeCursorMoved;
+        out_message.set_payload(PlacementModeCursorMovedMessage {
+            request.tile_x,
+            request.tile_y,
+            request.flags});
+    }
+    else
+    {
+        out_message.type = GameMessageType::InventoryCraftContextRequested;
+        out_message.set_payload(CraftContextRequestedMessage {
+            request.tile_x,
+            request.tile_y,
+            request.flags});
+    }
     return GS1_STATUS_OK;
 }
 

@@ -316,6 +316,14 @@ void run_live_mode(
             session.host.queue_site_action_request(action);
         },
         [&session](const std::string& body) {
+            Gs1HostEventSiteActionCancelData action {};
+            action.action_id = extract_number_field<std::uint32_t>(body, "actionId").value_or(0U);
+            action.flags = extract_number_field<std::uint32_t>(body, "flags").value_or(0U);
+
+            std::scoped_lock lock {session.mutex};
+            session.host.queue_site_action_cancel(action);
+        },
+        [&session](const std::string& body) {
             const auto event_kind_name = extract_string_field(body, "eventKind");
             if (!event_kind_name.has_value())
             {

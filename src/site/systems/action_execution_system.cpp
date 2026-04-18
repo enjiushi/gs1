@@ -8,6 +8,7 @@
 #include "site/craft_logic.h"
 #include "site/defs/site_action_defs.h"
 #include "site/inventory_storage.h"
+#include "site/placement_preview.h"
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
 #include "support/id_types.h"
@@ -168,6 +169,21 @@ void clear_action_state(ActionState& action_state) noexcept
     action_state.started_at_world_minute.reset();
 }
 
+void clear_placement_mode(PlacementModeState& placement_mode) noexcept
+{
+    placement_mode.active = false;
+    placement_mode.action_kind = ActionKind::None;
+    placement_mode.target_tile.reset();
+    placement_mode.primary_subject_id = 0U;
+    placement_mode.secondary_subject_id = 0U;
+    placement_mode.item_id = 0U;
+    placement_mode.quantity = 0U;
+    placement_mode.request_flags = 0U;
+    placement_mode.footprint_width = 1U;
+    placement_mode.footprint_height = 1U;
+    placement_mode.blocked_mask = 0ULL;
+}
+
 std::uint32_t action_id_value(const ActionState& action_state) noexcept
 {
     if (action_state.current_action_id.has_value())
@@ -309,6 +325,17 @@ bool has_active_action(const ActionState& action_state) noexcept
 {
     return action_state.current_action_id.has_value() &&
         action_state.action_kind != ActionKind::None;
+}
+
+bool has_active_placement_mode(const ActionState& action_state) noexcept
+{
+    return action_state.placement_mode.active &&
+        action_state.placement_mode.action_kind != ActionKind::None;
+}
+
+bool action_supports_deferred_target_selection(ActionKind action_kind) noexcept
+{
+    return action_kind == ActionKind::Plant || action_kind == ActionKind::Build;
 }
 
 std::uint32_t available_worker_pack_item_quantity(
@@ -747,6 +774,69 @@ std::uint32_t placement_reservation_subject_id(
     return item_def == nullptr ? primary_subject_id : item_def->linked_plant_id.value;
 }
 
+TileCoord resolve_initial_placement_mode_tile(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    TileCoord requested_target_tile) noexcept
+{
+    if (context.world.tile_coord_in_bounds(requested_target_tile))
+    {
+        return requested_target_tile;
+    }
+
+    const auto worker_tile = context.world.read_worker().position.tile_coord;
+    return context.world.tile_coord_in_bounds(worker_tile)
+        ? worker_tile
+        : TileCoord {};
+}
+
+void update_placement_mode_preview(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    PlacementModeState& placement_mode,
+    TileCoord target_tile)
+{
+    const auto preview = build_placement_preview(
+        context.world,
+        target_tile,
+        placement_occupancy_layer(placement_mode.action_kind),
+        placement_reservation_subject_kind(
+            placement_mode.action_kind,
+            placement_mode.item_id),
+        placement_reservation_subject_id(
+            placement_mode.action_kind,
+            placement_mode.item_id,
+            placement_mode.primary_subject_id));
+    placement_mode.target_tile = target_tile;
+    placement_mode.footprint_width = preview.footprint.width;
+    placement_mode.footprint_height = preview.footprint.height;
+    placement_mode.blocked_mask = preview.blocked_mask;
+}
+
+bool placement_mode_can_commit_to_tile(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    PlacementModeState& placement_mode,
+    TileCoord target_tile)
+{
+    update_placement_mode_preview(context, placement_mode, target_tile);
+    return context.world.tile_coord_in_bounds(target_tile) &&
+        placement_mode.blocked_mask == 0ULL;
+}
+
+bool placement_mode_matches_request(
+    const PlacementModeState& placement_mode,
+    ActionKind action_kind,
+    std::uint16_t quantity,
+    std::uint32_t primary_subject_id,
+    std::uint32_t secondary_subject_id,
+    std::uint32_t item_id) noexcept
+{
+    return placement_mode.active &&
+        placement_mode.action_kind == action_kind &&
+        placement_mode.quantity == quantity &&
+        placement_mode.primary_subject_id == primary_subject_id &&
+        placement_mode.secondary_subject_id == secondary_subject_id &&
+        placement_mode.item_id == item_id;
+}
+
 void emit_placement_reservation_released(
     GameMessageQueue& queue,
     const ActionState& action_state)
@@ -762,6 +852,22 @@ void emit_placement_reservation_released(
         PlacementReservationReleasedMessage {
             action_state.current_action_id->value,
             action_state.placement_reservation_token});
+}
+
+void emit_placement_mode_commit_rejected(
+    GameMessageQueue& queue,
+    const PlacementModeState& placement_mode,
+    TileCoord target_tile)
+{
+    enqueue_message(
+        queue,
+        GameMessageType::PlacementModeCommitRejected,
+        PlacementModeCommitRejectedMessage {
+            target_tile.x,
+            target_tile.y,
+            placement_mode.blocked_mask,
+            to_gs1_action_kind(placement_mode.action_kind),
+            placement_mode.item_id});
 }
 
 void emit_action_fact_messages(GameMessageQueue& queue, const ActionState& action_state)
@@ -984,6 +1090,7 @@ bool ActionExecutionSystem::subscribes_to(GameMessageType type) noexcept
     {
     case GameMessageType::StartSiteAction:
     case GameMessageType::CancelSiteAction:
+    case GameMessageType::PlacementModeCursorMoved:
     case GameMessageType::PlacementReservationAccepted:
     case GameMessageType::PlacementReservationRejected:
         return true;
@@ -1003,23 +1110,89 @@ Gs1Status ActionExecutionSystem::process_message(
     case GameMessageType::StartSiteAction:
     {
         const auto& payload = message.payload_as<StartSiteActionMessage>();
-        const TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
+        const ActionKind action_kind = to_action_kind(payload.action_kind);
+        const bool deferred_target_selection =
+            (payload.flags & GS1_SITE_ACTION_REQUEST_FLAG_DEFERRED_TARGET_SELECTION) != 0U;
+        const std::uint8_t request_flags = static_cast<std::uint8_t>(
+            payload.flags & ~GS1_SITE_ACTION_REQUEST_FLAG_DEFERRED_TARGET_SELECTION);
+        const std::uint16_t requested_quantity = payload.quantity == 0U ? 1U : payload.quantity;
+        TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
+        std::uint32_t primary_subject_id = payload.primary_subject_id;
+        std::uint32_t secondary_subject_id = payload.secondary_subject_id;
+        std::uint32_t item_id = payload.item_id;
 
-        if (has_active_action(action_state))
+        if (has_active_placement_mode(action_state))
+        {
+            if (deferred_target_selection)
+            {
+                emit_site_action_failed(
+                    context.message_queue,
+                    0U,
+                    action_kind,
+                    SiteActionFailureReason::Busy,
+                    request_flags,
+                    target_tile,
+                    primary_subject_id,
+                    secondary_subject_id);
+                return GS1_STATUS_OK;
+            }
+
+            if (!placement_mode_matches_request(
+                    action_state.placement_mode,
+                    action_kind,
+                    requested_quantity,
+                    primary_subject_id,
+                    secondary_subject_id,
+                    item_id))
+            {
+                emit_site_action_failed(
+                    context.message_queue,
+                    0U,
+                    action_kind,
+                    SiteActionFailureReason::Busy,
+                    request_flags,
+                    target_tile,
+                    primary_subject_id,
+                    secondary_subject_id);
+                return GS1_STATUS_OK;
+            }
+
+            if (!placement_mode_can_commit_to_tile(
+                    context,
+                    action_state.placement_mode,
+                    target_tile))
+            {
+                emit_placement_mode_commit_rejected(
+                    context.message_queue,
+                    action_state.placement_mode,
+                    target_tile);
+                context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_PLACEMENT_PREVIEW);
+                return GS1_STATUS_OK;
+            }
+
+            const auto placement_mode = action_state.placement_mode;
+            clear_placement_mode(action_state.placement_mode);
+            context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_PLACEMENT_PREVIEW);
+
+            target_tile = placement_mode.target_tile.value_or(target_tile);
+            primary_subject_id = placement_mode.primary_subject_id;
+            secondary_subject_id = placement_mode.secondary_subject_id;
+            item_id = placement_mode.item_id;
+        }
+        else if (has_active_action(action_state))
         {
             emit_site_action_failed(
                 context.message_queue,
                 0U,
-                to_action_kind(payload.action_kind),
+                action_kind,
                 SiteActionFailureReason::Busy,
-                payload.flags,
+                request_flags,
                 target_tile,
-                payload.primary_subject_id,
-                payload.secondary_subject_id);
+                primary_subject_id,
+                secondary_subject_id);
             return GS1_STATUS_OK;
         }
 
-        const ActionKind action_kind = to_action_kind(payload.action_kind);
         if (action_kind == ActionKind::None)
         {
             emit_site_action_failed(
@@ -1027,16 +1200,84 @@ Gs1Status ActionExecutionSystem::process_message(
                 0U,
                 action_kind,
                 SiteActionFailureReason::InvalidState,
-                payload.flags,
-                {payload.target_tile_x, payload.target_tile_y},
-                payload.primary_subject_id,
-                payload.secondary_subject_id);
+                request_flags,
+                target_tile,
+                primary_subject_id,
+                secondary_subject_id);
+            return GS1_STATUS_OK;
+        }
+
+        if (deferred_target_selection &&
+            !action_supports_deferred_target_selection(action_kind))
+        {
+            emit_site_action_failed(
+                context.message_queue,
+                0U,
+                action_kind,
+                SiteActionFailureReason::InvalidState,
+                request_flags,
+                target_tile,
+                primary_subject_id,
+                secondary_subject_id);
             return GS1_STATUS_OK;
         }
 
         const ItemId repair_tool_id = action_kind == ActionKind::Repair
-            ? repair_tool_item_id(payload.item_id)
+            ? repair_tool_item_id(item_id)
             : ItemId {};
+
+        if (action_requires_item(action_kind, item_id))
+        {
+            const auto* item_def = action_item_def(action_kind, item_id);
+            if (item_def == nullptr)
+            {
+                emit_site_action_failed(
+                    context.message_queue,
+                    0U,
+                    action_kind,
+                    SiteActionFailureReason::InvalidState,
+                    request_flags,
+                    target_tile,
+                    primary_subject_id,
+                    secondary_subject_id);
+                return GS1_STATUS_OK;
+            }
+
+            const auto required_quantity = requested_quantity;
+            if (available_worker_pack_item_quantity(context.world.read_inventory(), item_def->item_id) <
+                required_quantity)
+            {
+                emit_site_action_failed(
+                    context.message_queue,
+                    0U,
+                    action_kind,
+                    SiteActionFailureReason::InsufficientResources,
+                    request_flags,
+                    target_tile,
+                    primary_subject_id,
+                    secondary_subject_id);
+                return GS1_STATUS_OK;
+            }
+        }
+
+        if (deferred_target_selection)
+        {
+            auto& placement_mode = action_state.placement_mode;
+            clear_placement_mode(placement_mode);
+            placement_mode.active = true;
+            placement_mode.action_kind = action_kind;
+            placement_mode.primary_subject_id = primary_subject_id;
+            placement_mode.secondary_subject_id = secondary_subject_id;
+            placement_mode.item_id = item_id;
+            placement_mode.quantity = requested_quantity;
+            placement_mode.request_flags = request_flags;
+            update_placement_mode_preview(
+                context,
+                placement_mode,
+                resolve_initial_placement_mode_tile(context, target_tile));
+            context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_PLACEMENT_PREVIEW);
+            return GS1_STATUS_OK;
+        }
 
         if (!context.world.tile_coord_in_bounds(target_tile))
         {
@@ -1045,10 +1286,10 @@ Gs1Status ActionExecutionSystem::process_message(
                 0U,
                 action_kind,
                 SiteActionFailureReason::InvalidTarget,
-                payload.flags,
+                request_flags,
                 target_tile,
-                payload.primary_subject_id,
-                payload.secondary_subject_id);
+                primary_subject_id,
+                secondary_subject_id);
             return GS1_STATUS_OK;
         }
 
@@ -1062,10 +1303,10 @@ Gs1Status ActionExecutionSystem::process_message(
                     0U,
                     action_kind,
                     repair_failure_reason,
-                    payload.flags,
+                    request_flags,
                     target_tile,
-                    payload.primary_subject_id,
-                    payload.secondary_subject_id);
+                    primary_subject_id,
+                    secondary_subject_id);
                 return GS1_STATUS_OK;
             }
 
@@ -1076,10 +1317,10 @@ Gs1Status ActionExecutionSystem::process_message(
                     0U,
                     action_kind,
                     SiteActionFailureReason::InvalidState,
-                    payload.flags,
+                    request_flags,
                     target_tile,
-                    payload.primary_subject_id,
-                    payload.secondary_subject_id);
+                    primary_subject_id,
+                    secondary_subject_id);
                 return GS1_STATUS_OK;
             }
 
@@ -1090,44 +1331,10 @@ Gs1Status ActionExecutionSystem::process_message(
                     0U,
                     action_kind,
                     SiteActionFailureReason::InsufficientResources,
-                    payload.flags,
+                    request_flags,
                     target_tile,
-                    payload.primary_subject_id,
-                    payload.secondary_subject_id);
-                return GS1_STATUS_OK;
-            }
-        }
-
-        if (action_requires_item(action_kind, payload.item_id))
-        {
-            const auto* item_def = action_item_def(action_kind, payload.item_id);
-            if (item_def == nullptr)
-            {
-                emit_site_action_failed(
-                    context.message_queue,
-                    0U,
-                    action_kind,
-                    SiteActionFailureReason::InvalidState,
-                    payload.flags,
-                    target_tile,
-                    payload.primary_subject_id,
-                    payload.secondary_subject_id);
-                return GS1_STATUS_OK;
-            }
-
-            const auto required_quantity = payload.quantity == 0U ? 1U : payload.quantity;
-            if (available_worker_pack_item_quantity(context.world.read_inventory(), item_def->item_id) <
-                required_quantity)
-            {
-                emit_site_action_failed(
-                    context.message_queue,
-                    0U,
-                    action_kind,
-                    SiteActionFailureReason::InsufficientResources,
-                    payload.flags,
-                    target_tile,
-                    payload.primary_subject_id,
-                    payload.secondary_subject_id);
+                    primary_subject_id,
+                    secondary_subject_id);
                 return GS1_STATUS_OK;
             }
         }
@@ -1139,7 +1346,7 @@ Gs1Status ActionExecutionSystem::process_message(
             craft_recipe = resolve_craft_recipe_for_action(
                 context,
                 target_tile,
-                payload.item_id,
+                item_id,
                 &craft_device_entity_id);
             if (craft_recipe == nullptr || craft_device_entity_id == 0U)
             {
@@ -1148,10 +1355,10 @@ Gs1Status ActionExecutionSystem::process_message(
                     0U,
                     action_kind,
                     SiteActionFailureReason::InvalidTarget,
-                    payload.flags,
+                    request_flags,
                     target_tile,
-                    payload.primary_subject_id,
-                    payload.secondary_subject_id);
+                    primary_subject_id,
+                    secondary_subject_id);
                 return GS1_STATUS_OK;
             }
 
@@ -1166,10 +1373,10 @@ Gs1Status ActionExecutionSystem::process_message(
                     0U,
                     action_kind,
                     SiteActionFailureReason::InsufficientResources,
-                    payload.flags,
+                    request_flags,
                     target_tile,
-                    payload.primary_subject_id,
-                    payload.secondary_subject_id);
+                    primary_subject_id,
+                    secondary_subject_id);
                 return GS1_STATUS_OK;
             }
         }
@@ -1180,27 +1387,27 @@ Gs1Status ActionExecutionSystem::process_message(
                   k_minimum_action_duration_minutes)
             : compute_duration_minutes(
                   action_kind,
-                  payload.quantity == 0U ? 1U : payload.quantity,
-                  payload.item_id);
+                  requested_quantity,
+                  item_id);
         const RuntimeActionId action_id = allocate_runtime_action_id();
 
         action_state.current_action_id = action_id;
         action_state.action_kind = action_kind;
         action_state.target_tile = target_tile;
         action_state.approach_tile.reset();
-        action_state.primary_subject_id = payload.primary_subject_id;
+        action_state.primary_subject_id = primary_subject_id;
         action_state.secondary_subject_id =
             action_kind == ActionKind::Craft && craft_recipe != nullptr
             ? craft_recipe->recipe_id.value
-            : payload.secondary_subject_id;
+            : secondary_subject_id;
         action_state.item_id = action_kind == ActionKind::Repair
             ? repair_tool_id.value
-            : payload.item_id;
+            : item_id;
         action_state.quantity =
             action_kind == ActionKind::Craft
             ? 1U
-            : (payload.quantity == 0U ? 1U : payload.quantity);
-        action_state.request_flags = payload.flags;
+            : requested_quantity;
+        action_state.request_flags = request_flags;
         action_state.total_action_minutes = duration_minutes;
         action_state.remaining_action_minutes = duration_minutes;
         action_state.started_at_world_minute.reset();
@@ -1225,10 +1432,10 @@ Gs1Status ActionExecutionSystem::process_message(
                     0U,
                     action_kind,
                     SiteActionFailureReason::InvalidTarget,
-                    payload.flags,
+                    request_flags,
                     target_tile,
-                    payload.primary_subject_id,
-                    payload.secondary_subject_id);
+                    primary_subject_id,
+                    secondary_subject_id);
                 return GS1_STATUS_OK;
             }
 
@@ -1248,7 +1455,7 @@ Gs1Status ActionExecutionSystem::process_message(
                 placement_reservation_subject_id(
                     action_kind,
                     action_state.item_id,
-                    payload.primary_subject_id));
+                    primary_subject_id));
         }
         else if (!action_requires_worker_approach(action_kind) ||
             worker_is_at_action_approach_tile(context, action_state))
@@ -1264,14 +1471,22 @@ Gs1Status ActionExecutionSystem::process_message(
     case GameMessageType::CancelSiteAction:
     {
         const auto& payload = message.payload_as<CancelSiteActionMessage>();
+        const bool cancels_current =
+            (payload.flags & GS1_SITE_ACTION_CANCEL_FLAG_CURRENT_ACTION) != 0U;
+        const bool cancels_placement_mode =
+            (payload.flags & GS1_SITE_ACTION_CANCEL_FLAG_PLACEMENT_MODE) != 0U;
 
         if (!has_active_action(action_state))
         {
+            if (has_active_placement_mode(action_state) &&
+                (cancels_current || cancels_placement_mode))
+            {
+                clear_placement_mode(action_state.placement_mode);
+                context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_PLACEMENT_PREVIEW);
+            }
             return GS1_STATUS_OK;
         }
 
-        const bool cancels_current =
-            (payload.flags & GS1_SITE_ACTION_CANCEL_FLAG_CURRENT_ACTION) != 0U;
         const bool matches_id =
             action_state.current_action_id.has_value() &&
             payload.action_id == action_state.current_action_id->value;
@@ -1295,6 +1510,23 @@ Gs1Status ActionExecutionSystem::process_message(
         clear_action_state(action_state);
         context.world.mark_projection_dirty(
             SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
+        return GS1_STATUS_OK;
+    }
+
+    case GameMessageType::PlacementModeCursorMoved:
+    {
+        if (!has_active_placement_mode(action_state))
+        {
+            return GS1_STATUS_OK;
+        }
+
+        const auto& payload = message.payload_as<PlacementModeCursorMovedMessage>();
+        const TileCoord target_tile {payload.tile_x, payload.tile_y};
+        update_placement_mode_preview(
+            context,
+            action_state.placement_mode,
+            target_tile);
+        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_PLACEMENT_PREVIEW);
         return GS1_STATUS_OK;
     }
 

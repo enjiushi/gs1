@@ -39,7 +39,9 @@ public:
         LiveStatePatchField_SiteStateInventory = 1U << 13,
         LiveStatePatchField_SiteStateTasks = 1U << 14,
         LiveStatePatchField_SiteStatePhone = 1U << 15,
-        LiveStatePatchField_SiteStateCraftContext = 1U << 16
+        LiveStatePatchField_SiteStateCraftContext = 1U << 16,
+        LiveStatePatchField_SiteStatePlacementPreview = 1U << 17,
+        LiveStatePatchField_SitePlacementFailure = 1U << 18
     };
 
     struct LiveStateSnapshot;
@@ -54,6 +56,7 @@ public:
     void update(double delta_seconds);
     void queue_ui_action(const Gs1UiAction& action);
     void queue_site_action_request(const Gs1HostEventSiteActionRequestData& action);
+    void queue_site_action_cancel(const Gs1HostEventSiteActionCancelData& action);
     void queue_site_storage_view(const Gs1HostEventSiteStorageViewData& request);
     void queue_site_context_request(const Gs1HostEventSiteContextRequestData& request);
     void queue_site_move_direction(float world_move_x, float world_move_y, float world_move_z);
@@ -220,6 +223,28 @@ public:
         std::vector<SiteCraftContextOptionProjection> options {};
     };
 
+    struct SitePlacementPreviewProjection final
+    {
+        std::int32_t tile_x {0};
+        std::int32_t tile_y {0};
+        std::uint64_t blocked_mask {0ULL};
+        std::uint32_t item_id {0};
+        std::uint32_t action_kind {0};
+        std::uint32_t flags {0};
+        std::uint32_t footprint_width {1U};
+        std::uint32_t footprint_height {1U};
+    };
+
+    struct SitePlacementFailureProjection final
+    {
+        std::int32_t tile_x {0};
+        std::int32_t tile_y {0};
+        std::uint64_t blocked_mask {0ULL};
+        std::uint32_t action_kind {0};
+        std::uint32_t sequence_id {0};
+        std::uint32_t flags {0};
+    };
+
     struct SiteTaskProjection final
     {
         std::uint32_t task_instance_id {0};
@@ -255,6 +280,8 @@ public:
         std::vector<SitePhoneListingProjection> phone_listings {};
         std::optional<SiteInventoryViewProjection> opened_storage {};
         std::optional<SiteCraftContextProjection> craft_context {};
+        std::optional<SitePlacementPreviewProjection> placement_preview {};
+        std::optional<SitePlacementFailureProjection> placement_failure {};
         std::optional<SiteWorkerProjection> worker {};
         std::optional<SiteCampProjection> camp {};
         std::optional<SiteWeatherProjection> weather {};
@@ -343,6 +370,8 @@ private:
     void apply_site_craft_context_begin(const Gs1EngineMessage& message);
     void apply_site_craft_context_option_upsert(const Gs1EngineMessage& message);
     void apply_site_craft_context_end();
+    void apply_site_placement_preview(const Gs1EngineMessage& message);
+    void apply_site_placement_failure(const Gs1EngineMessage& message);
     void apply_site_task_upsert(const Gs1EngineMessage& message);
     void apply_site_phone_listing_upsert(const Gs1EngineMessage& message);
     void apply_site_snapshot_end();

@@ -71,6 +71,10 @@ const char* message_type_name(Gs1EngineMessageType type)
         return "SITE_CRAFT_CONTEXT_OPTION_UPSERT";
     case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_END:
         return "SITE_CRAFT_CONTEXT_END";
+    case GS1_ENGINE_MESSAGE_SITE_PLACEMENT_PREVIEW:
+        return "SITE_PLACEMENT_PREVIEW";
+    case GS1_ENGINE_MESSAGE_SITE_PLACEMENT_FAILURE:
+        return "SITE_PLACEMENT_FAILURE";
     case GS1_ENGINE_MESSAGE_HUD_STATE:
         return "HUD_STATE";
     case GS1_ENGINE_MESSAGE_NOTIFICATION_PUSH:
@@ -374,6 +378,14 @@ void SmokeEngineHost::queue_site_action_request(const Gs1HostEventSiteActionRequ
     Gs1HostEvent event {};
     event.type = GS1_HOST_EVENT_SITE_ACTION_REQUEST;
     event.payload.site_action_request = action;
+    pending_pre_phase1_host_events_.push_back(event);
+}
+
+void SmokeEngineHost::queue_site_action_cancel(const Gs1HostEventSiteActionCancelData& action)
+{
+    Gs1HostEvent event {};
+    event.type = GS1_HOST_EVENT_SITE_ACTION_CANCEL;
+    event.payload.site_action_cancel = action;
     pending_pre_phase1_host_events_.push_back(event);
 }
 
@@ -781,6 +793,13 @@ void SmokeEngineHost::flush_engine_messages(const char* stage_label)
         case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_END:
             apply_site_craft_context_end();
             break;
+        case GS1_ENGINE_MESSAGE_SITE_PLACEMENT_PREVIEW:
+            apply_site_placement_preview(message);
+            break;
+        case GS1_ENGINE_MESSAGE_SITE_PLACEMENT_FAILURE:
+            apply_site_placement_failure(message);
+            live_state_patch_mask = LiveStatePatchField_SitePlacementFailure;
+            break;
         case GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT:
             apply_site_task_upsert(message);
             break;
@@ -1099,6 +1118,8 @@ void SmokeEngineHost::apply_site_snapshot_begin(const Gs1EngineMessage& message)
         pending_site_snapshot_->phone_listings.clear();
         pending_site_snapshot_->opened_storage.reset();
         pending_site_snapshot_->craft_context.reset();
+        pending_site_snapshot_->placement_preview.reset();
+        pending_site_snapshot_->placement_failure.reset();
         pending_site_snapshot_->worker.reset();
         pending_site_snapshot_->camp.reset();
         pending_site_snapshot_->weather.reset();
@@ -1359,6 +1380,54 @@ void SmokeEngineHost::apply_site_craft_context_end()
         return lhs.recipe_id < rhs.recipe_id;
     });
     pending_site_snapshot_patch_mask_ |= LiveStatePatchField_SiteStateCraftContext;
+}
+
+void SmokeEngineHost::apply_site_placement_preview(const Gs1EngineMessage& message)
+{
+    if (!pending_site_snapshot_.has_value())
+    {
+        return;
+    }
+
+    const auto& payload = message.payload_as<Gs1EngineMessagePlacementPreviewData>();
+    if ((payload.flags & 1U) == 0U)
+    {
+        pending_site_snapshot_->placement_preview.reset();
+    }
+    else
+    {
+        pending_site_snapshot_->placement_preview = SitePlacementPreviewProjection {
+            payload.tile_x,
+            payload.tile_y,
+            payload.blocked_mask,
+            payload.item_id,
+            payload.action_kind,
+            payload.flags,
+            payload.footprint_width,
+            payload.footprint_height};
+    }
+
+    pending_site_snapshot_patch_mask_ |= LiveStatePatchField_SiteStatePlacementPreview;
+}
+
+void SmokeEngineHost::apply_site_placement_failure(const Gs1EngineMessage& message)
+{
+    auto* snapshot = pending_site_snapshot_.has_value()
+        ? &pending_site_snapshot_.value()
+        : (active_site_snapshot_.has_value() ? &active_site_snapshot_.value() : nullptr);
+    if (snapshot == nullptr)
+    {
+        return;
+    }
+
+    const auto& payload = message.payload_as<Gs1EngineMessagePlacementFailureData>();
+    snapshot->placement_failure = SitePlacementFailureProjection {
+        payload.tile_x,
+        payload.tile_y,
+        payload.blocked_mask,
+        payload.action_kind,
+        payload.sequence_id,
+        payload.flags};
 }
 
 void SmokeEngineHost::apply_site_task_upsert(const Gs1EngineMessage& message)

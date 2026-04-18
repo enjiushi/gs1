@@ -34,6 +34,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const actionProgressFill = document.getElementById("action-progress-fill");
     const actionProgressPercent = document.getElementById("action-progress-percent");
     const actionProgressTarget = document.getElementById("action-progress-target");
+    const placementToast = document.getElementById("placement-toast");
+    const placementToastBody = document.getElementById("placement-toast-body");
     const inventoryTooltip = document.getElementById("inventory-tooltip");
     const inventoryTooltipTitle = document.getElementById("inventory-tooltip-title");
     const inventoryTooltipMeta = document.getElementById("inventory-tooltip-meta");
@@ -54,7 +56,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let lastOverlayAppState = "";
     let tileContextMenuState = null;
     let localActionProgressState = null;
+    let placementFailureToastState = null;
     let viewerCompatibilityWarning = "";
+    let placementCursorSendInFlight = false;
+    let lastSentPlacementCursorSignature = "";
     let animationTimeSeconds = 0;
     let rendererWidth = 0;
     let rendererHeight = 0;
@@ -93,6 +98,14 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const runtimeFixedStepSeconds = 1.0 / 60.0;
     const siteActionMinutesPerRealSecond = 0.8;
     const craftCacheRadiusTiles = 5;
+    const siteActionRequestFlags = {
+        hasItem: 4,
+        deferredTargetSelection: 8
+    };
+    const siteActionCancelFlags = {
+        currentAction: 1,
+        placementMode: 2
+    };
     const inventoryContainerCodes = {
         WORKER_PACK: 0,
         DEVICE_STORAGE: 1
@@ -597,6 +610,82 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return craftContext;
     }
 
+    function getPlacementPreview(state) {
+        const siteState = getSiteState(state);
+        return siteState ? (siteState.placementPreview || null) : null;
+    }
+
+    function isPlacementModeActive(state) {
+        const preview = getPlacementPreview(state);
+        return !!(preview && (preview.flags & 1) !== 0 && preview.actionKind !== 0);
+    }
+
+    function placementPreviewIsValid(preview) {
+        return !!(preview && (preview.flags & 2) !== 0);
+    }
+
+    function placementActionKindName(actionKind) {
+        if (actionKind === 1) {
+            return "PLANT";
+        }
+        if (actionKind === 2) {
+            return "BUILD";
+        }
+        return "";
+    }
+
+    function placementModeLabel(preview) {
+        if (!preview) {
+            return "Placement";
+        }
+
+        if (preview.itemId) {
+            const itemMeta = getItemMeta(preview.itemId);
+            if (itemMeta) {
+                return itemMeta.shortName || itemMeta.name;
+            }
+        }
+
+        return getSiteActionLabel(preview.actionKind || 0);
+    }
+
+    function renderPlacementFailureToast() {
+        if (!placementToast) {
+            return;
+        }
+
+        if (!placementFailureToastState || performance.now() >= placementFailureToastState.expiresAtMs) {
+            placementToast.hidden = true;
+            return;
+        }
+
+        placementToast.hidden = false;
+        placementToastBody.textContent = placementFailureToastState.message;
+    }
+
+    function syncPlacementFailureToast(state) {
+        const siteState = getSiteState(state);
+        const failure = siteState ? (siteState.placementFailure || null) : null;
+        if (!failure || !failure.sequenceId) {
+            return;
+        }
+
+        if (placementFailureToastState &&
+            placementFailureToastState.sequenceId === failure.sequenceId) {
+            return;
+        }
+
+        const actionLabel = getSiteActionLabel(failure.actionKind || 0);
+        placementFailureToastState = {
+            sequenceId: failure.sequenceId,
+            expiresAtMs: performance.now() + 1800,
+            message: actionLabel === "Idle"
+                ? "This placement is blocked."
+                : (actionLabel + " placement is blocked.")
+        };
+        renderPlacementFailureToast();
+    }
+
     function containerKey(containerKind, containerOwnerId) {
         return containerKind + ":" + String(containerOwnerId || 0);
     }
@@ -952,11 +1041,80 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return postJson("/site-action", payload);
     }
 
+    function postSiteActionCancel(payload) {
+        return postJson("/site-action-cancel", payload);
+    }
+
     function postSiteContextRequest(tileX, tileY) {
         return postJson("/site-context", {
             tileX: tileX,
             tileY: tileY,
             flags: 0
+        });
+    }
+
+    function cancelPlacementMode() {
+        if (!isPlacementModeActive(latestState)) {
+            return Promise.resolve();
+        }
+
+        return postSiteActionCancel({
+            actionId: 0,
+            flags: siteActionCancelFlags.placementMode
+        }).catch(() => {
+            statusChip.textContent = "Failed to cancel placement mode.";
+        });
+    }
+
+    function sendPlacementCursorUpdate(tileX, tileY) {
+        if (!isPlacementModeActive(latestState)) {
+            lastSentPlacementCursorSignature = "";
+            return;
+        }
+
+        const signature = String(tileX) + ":" + String(tileY);
+        if (placementCursorSendInFlight || signature === lastSentPlacementCursorSignature) {
+            return;
+        }
+
+        placementCursorSendInFlight = true;
+        postSiteContextRequest(tileX, tileY)
+            .then(() => {
+                lastSentPlacementCursorSignature = signature;
+            })
+            .catch(() => {})
+            .finally(() => {
+                placementCursorSendInFlight = false;
+            });
+    }
+
+    function confirmPlacementModeAtTile(tileData) {
+        const preview = getPlacementPreview(latestState);
+        if (!tileData || !preview) {
+            return;
+        }
+
+        const actionKind = placementActionKindName(preview.actionKind || 0);
+        if (!actionKind) {
+            return;
+        }
+
+        statusChip.textContent =
+            placementPreviewIsValid(preview)
+                ? ("Confirming " + placementModeLabel(preview) + " at (" + tileData.tileX + "," + tileData.tileY + ").")
+                : ("Blocked placement at (" + tileData.tileX + "," + tileData.tileY + ").");
+
+        postSiteAction({
+            actionKind: actionKind,
+            flags: preview.itemId ? siteActionRequestFlags.hasItem : 0,
+            quantity: 1,
+            targetTileX: tileData.tileX,
+            targetTileY: tileData.tileY,
+            primarySubjectId: 0,
+            secondarySubjectId: 0,
+            itemId: preview.itemId || 0
+        }).catch(() => {
+            statusChip.textContent = "Failed to confirm placement action.";
         });
     }
 
@@ -1063,6 +1221,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const hud = getHudState(state);
         const weather = siteState ? siteState.weather : null;
         const carriedSeeds = getCarriedSeedOptions(state);
+        const placementPreview = getPlacementPreview(state);
         const workerActionKind =
             siteState && siteState.worker ? siteState.worker.currentActionKind : 0;
         const hydration = hud ? Math.round(hud.playerHydration) : 0;
@@ -1076,7 +1235,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             "\nCompletion " + completion + "%" +
             "\nEvent " + eventPhase +
             "\nSeeds " + carriedSeeds.reduce((total, seed) => total + seed.quantity, 0) +
-            "\nAction " + getSiteActionLabel(workerActionKind);
+            "\nAction " + getSiteActionLabel(workerActionKind) +
+            "\nMode " + (isPlacementModeActive(state) ? placementModeLabel(placementPreview) : "None");
     }
 
     function pickSiteTileAtClientPosition(clientX, clientY) {
@@ -1285,11 +1445,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             });
         }
 
-        if (!tileHasStructure && carriedSeeds.length > 0) {
+        if (carriedSeeds.length > 0) {
             rootItems.push({
                 id: "plant",
                 label: "Plant",
-                meta: "Choose one carried seed type.",
+                meta: "Choose one carried seed type for placement mode.",
                 iconGlyph: "PL",
                 iconLight: "#7a9d67",
                 iconDark: "#4a6b3b",
@@ -1303,10 +1463,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                         iconDark: seed.iconDark,
                         onSelect: function () {
                             statusChip.textContent =
-                                "Walking to tile (" + tileX + "," + tileY + ") to plant " + seed.shortLabel + ".";
+                                "Placement mode: " + seed.shortLabel + ". Left-click to confirm, Esc or right-click to cancel.";
                             postSiteAction({
                                 actionKind: "PLANT",
-                                flags: 4,
+                                flags: siteActionRequestFlags.hasItem | siteActionRequestFlags.deferredTargetSelection,
                                 quantity: 1,
                                 targetTileX: tileX,
                                 targetTileY: tileY,
@@ -1323,11 +1483,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             });
         }
 
-        if (!tileHasStructure && carriedDeployables.length > 0) {
+        if (carriedDeployables.length > 0) {
             rootItems.push({
                 id: "deploy",
                 label: "Deploy",
-                meta: "Place a carried device kit here.",
+                meta: "Choose one carried device kit for placement mode.",
                 iconGlyph: "DP",
                 iconLight: "#b48857",
                 iconDark: "#6a4b2e",
@@ -1341,10 +1501,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                         iconDark: item.iconDark,
                         onSelect: function () {
                             statusChip.textContent =
-                                "Moving to (" + tileX + "," + tileY + ") to deploy " + item.shortLabel + ".";
+                                "Placement mode: " + item.shortLabel + ". Left-click to confirm, Esc or right-click to cancel.";
                             postSiteAction({
                                 actionKind: "BUILD",
-                                flags: 4,
+                                flags: siteActionRequestFlags.hasItem | siteActionRequestFlags.deferredTargetSelection,
                                 quantity: 1,
                                 targetTileX: tileX,
                                 targetTileY: tileY,
@@ -1381,7 +1541,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function renderTileContextMenu() {
-        if (!tileContextMenuState || !latestState || latestState.appState !== "SITE_ACTIVE") {
+        if (!tileContextMenuState ||
+            !latestState ||
+            latestState.appState !== "SITE_ACTIVE" ||
+            isPlacementModeActive(latestState)) {
             closeTileContextMenu();
             return;
         }
@@ -1488,7 +1651,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function openTileContextMenu(tileData, clientX, clientY) {
-        if (!latestState || latestState.appState !== "SITE_ACTIVE") {
+        if (!latestState || latestState.appState !== "SITE_ACTIVE" || isPlacementModeActive(latestState)) {
             return;
         }
 
@@ -2509,21 +2672,26 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         const selectedSlot = findSelectedInventorySlot(state);
         const openedContainerInfo = findOpenedInventoryContainer(state);
+        const placementPreview = getPlacementPreview(state);
         const plantingText = carriedSeeds.length > 0
-            ? ("Right-click open ground to plant. Carried seeds: " +
+            ? ("Right-click any tile to arm planting. Carried seeds: " +
                 carriedSeeds.map((seed) => seed.shortLabel + " x" + seed.quantity).join("  |  "))
-            : "Carry seeds into the worker pack to unlock planting from the tile menu.";
+            : "Carry seeds into the worker pack to unlock planting from the right-click menu.";
         const deployText = carriedDeployables.length > 0
-            ? ("Deployable kits: " +
+            ? ("Right-click any tile to arm deployment. Kits: " +
                 carriedDeployables.map((item) => item.shortLabel + " x" + item.quantity).join("  | "))
-            : "Craft or collect deployable kits, then right-click open ground to place them.";
+            : "Craft or collect deployable kits, then right-click any tile to place them.";
         const storageText = openedContainerInfo
             ? ("Opened container: " + getContainerDisplayName(state, openedContainerInfo) + ". Left-click pack items to send them there, or left-click storage items to carry them back into the pack.")
             : "Right-click a storage crate, workbench, stove, or another storage device to open that specific container. Items move between storage and the worker pack one click at a time.";
+        const placementText = isPlacementModeActive(state)
+            ? ("Placement mode active for " + placementModeLabel(placementPreview) + ". Left-click the map to confirm. Red tiles are blocked. Press Esc or short right-click to cancel.")
+            : "Short right-click a tile to open context actions. Plant and deploy now enter placement mode before the worker starts moving.";
         selectionText.innerHTML = siteBootstrap
             ? (
                 "Site " + siteBootstrap.siteId +
                 " is live. Use WASD to move, press B to open or close the worker pack, press F to open or close the phone, drag with right mouse to orbit the camera, and short right-click a tile to choose a site action." +
+                "<br><br>" + placementText +
                 "<br><br>" + plantingText +
                 "<br><br>" + deployText +
                 "<br><br>" + storageText +
@@ -3968,6 +4136,89 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return structureGroup;
     }
 
+    function computeSiteTileVisualHeight(tile) {
+        const plantDensity = Math.max(0, Math.min(tile && tile.plantDensity ? tile.plantDensity : 0, 1));
+        const burial = Math.max(0, Math.min(tile && tile.sandBurial ? tile.sandBurial : 0, 1));
+        const tileX = tile && typeof tile.x === "number" ? tile.x : 0;
+        const tileY = tile && typeof tile.y === "number" ? tile.y : 0;
+        const noise = ((tileX * 17 + tileY * 29) % 7) * 0.008;
+        return 0.08 + burial * 0.14 + plantDensity * 0.18 + noise;
+    }
+
+    function disposePlacementPreviewGroup(cache) {
+        if (!cache || !cache.placementPreviewGroup) {
+            return;
+        }
+
+        const previewGroup = cache.placementPreviewGroup;
+        worldGroup.remove(previewGroup);
+        previewGroup.traverse((node) => {
+            if (node.geometry && typeof node.geometry.dispose === "function") {
+                node.geometry.dispose();
+            }
+            if (node.material && typeof node.material.dispose === "function") {
+                node.material.dispose();
+            }
+        });
+        cache.placementPreviewGroup = null;
+    }
+
+    function updateSitePlacementPreviewVisual(state) {
+        if (!siteSceneCache || !worldGroup) {
+            return;
+        }
+
+        disposePlacementPreviewGroup(siteSceneCache);
+
+        const preview = getPlacementPreview(state);
+        if (!preview || (preview.flags & 1) === 0) {
+            return;
+        }
+
+        const footprintWidth = Math.max(1, preview.footprintWidth || 1);
+        const footprintHeight = Math.max(1, preview.footprintHeight || 1);
+        const previewGroup = new THREE_NS.Group();
+        const blockedMask = Number(preview.blockedMask || 0);
+
+        for (let offsetY = 0; offsetY < footprintHeight; offsetY += 1) {
+            for (let offsetX = 0; offsetX < footprintWidth; offsetX += 1) {
+                const tileIndex = offsetY * footprintWidth + offsetX;
+                const blocked =
+                    Math.floor(blockedMask / Math.pow(2, tileIndex)) % 2 >= 1;
+                const tileX = (preview.tileX || 0) + offsetX;
+                const tileY = (preview.tileY || 0) + offsetY;
+                const tile = getTileSnapshot(state, tileX, tileY) || {
+                    x: tileX,
+                    y: tileY,
+                    plantDensity: 0,
+                    sandBurial: 0
+                };
+                const tileHeight = computeSiteTileVisualHeight(tile);
+                const mesh = new THREE_NS.Mesh(
+                    new THREE_NS.BoxGeometry(0.9, 0.06, 0.9),
+                    new THREE_NS.MeshStandardMaterial({
+                        color: blocked ? 0xbd5f50 : 0x5f9f6b,
+                        emissive: blocked ? 0x4a120c : 0x123d1a,
+                        emissiveIntensity: 0.65,
+                        roughness: 0.38,
+                        metalness: 0.02,
+                        transparent: true,
+                        opacity: blocked ? 0.78 : 0.58
+                    })
+                );
+                mesh.position.set(
+                    tileX - siteSceneCache.offsetX,
+                    tileHeight + 0.09,
+                    tileY - siteSceneCache.offsetZ
+                );
+                previewGroup.add(mesh);
+            }
+        }
+
+        worldGroup.add(previewGroup);
+        siteSceneCache.placementPreviewGroup = previewGroup;
+    }
+
     function rebuildStaticSiteScene(siteBootstrap, offsetX, offsetZ, width, height, previousCache, bootstrapSignature) {
         clearWorld();
         currentSceneKind = "SITE_ACTIVE";
@@ -4088,6 +4339,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             lastWorkerTargetFrameNumber: 0,
             lastWorkerTargetX: 0,
             lastWorkerTargetZ: 0,
+            placementPreviewGroup: null,
             cameraTargetX: 0,
             cameraTargetZ: 0,
             cameraOrbitGroundDistance: cameraOrbitState.groundDistance,
@@ -4173,6 +4425,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
 
         updateSiteWorkerTargetFromState(siteState, state.frameNumber || 0);
+        updateSitePlacementPreviewVisual(state);
 
         if (needsStaticRebuild) {
             applySiteCameraTransform(
@@ -4309,6 +4562,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         fitRenderer();
         renderActionProgressBar(latestState);
+        renderPlacementFailureToast();
         renderer.render(scene, camera);
     }
 
@@ -4349,7 +4603,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             worker: false,
             weather: false,
             hud: false,
-            siteAction: false
+            siteAction: false,
+            placementPreview: false,
+            placementFailure: false
         };
 
         for (const field of patchFields) {
@@ -4376,11 +4632,24 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     lightweightParts.weather = true;
                     continue;
                 }
+                if (siteField === "placementPreview") {
+                    lightweightParts.placementPreview = true;
+                    continue;
+                }
+                if (siteField === "placementFailure") {
+                    lightweightParts.placementFailure = true;
+                    continue;
+                }
                 return null;
             }
         }
 
-        if (!lightweightParts.worker && !lightweightParts.weather && !lightweightParts.hud && !lightweightParts.siteAction) {
+        if (!lightweightParts.worker &&
+            !lightweightParts.weather &&
+            !lightweightParts.hud &&
+            !lightweightParts.siteAction &&
+            !lightweightParts.placementPreview &&
+            !lightweightParts.placementFailure) {
             return null;
         }
 
@@ -4391,6 +4660,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const normalizedState = normalizeState(state);
         viewerCompatibilityWarning = getVisualSmokeCompatibilityWarning(normalizedState);
         rebuildInventoryCache(normalizedState);
+        syncPlacementFailureToast(normalizedState);
         const previousState = latestState;
         syncLocalActionProgress(normalizedState);
         const lightweightPatchParts =
@@ -4401,6 +4671,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             latestState = normalizedState;
             if (lightweightPatchParts.worker) {
                 updateSiteWorkerTargetFromState(getSiteState(normalizedState), normalizedState.frameNumber || 0);
+            }
+            if (lightweightPatchParts.placementPreview) {
+                if (isPlacementModeActive(normalizedState)) {
+                    closeTileContextMenu();
+                }
+                updateSitePlacementPreviewVisual(normalizedState);
+            }
+            if (lightweightPatchParts.placementFailure) {
+                renderPlacementFailureToast();
             }
 
             const previousActionKind =
@@ -4413,6 +4692,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     : 0;
             if (lightweightPatchParts.hud ||
                 lightweightPatchParts.siteAction ||
+                lightweightPatchParts.placementPreview ||
+                lightweightPatchParts.placementFailure ||
                 lightweightPatchParts.weather ||
                 previousActionKind !== nextActionKind) {
                 renderSiteStatusChip(normalizedState);
@@ -4580,8 +4861,17 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             event.preventDefault();
             return;
         }
-        if (event.code === "Escape" && tileContextMenuState) {
-            closeTileContextMenu();
+        if (event.code === "Escape" && latestState && latestState.appState === "SITE_ACTIVE") {
+            if (isPlacementModeActive(latestState)) {
+                cancelPlacementMode();
+                event.preventDefault();
+                return;
+            }
+            if (tileContextMenuState) {
+                closeTileContextMenu();
+                event.preventDefault();
+                return;
+            }
         }
         keys.add(event.code);
         updateMoveAxis();
@@ -4704,6 +4994,36 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         event.preventDefault();
     });
 
+    renderer.domElement.addEventListener("pointermove", function (event) {
+        if (!isSiteActiveView() || !siteSceneCache || !isPlacementModeActive(latestState)) {
+            lastSentPlacementCursorSignature = "";
+            return;
+        }
+        if (cameraOrbitDragPointerId != null || (pendingSiteOrbitGesture && pendingSiteOrbitGesture.dragging)) {
+            return;
+        }
+
+        const tileData = pickSiteTileAtClientPosition(event.clientX, event.clientY);
+        if (!tileData) {
+            return;
+        }
+
+        sendPlacementCursorUpdate(tileData.tileX, tileData.tileY);
+    });
+
+    renderer.domElement.addEventListener("pointerup", function (event) {
+        if (!isSiteActiveView() || !isPlacementModeActive(latestState) || event.button !== 0 || !siteSceneCache) {
+            return;
+        }
+
+        const tileData = pickSiteTileAtClientPosition(event.clientX, event.clientY);
+        if (tileData) {
+            confirmPlacementModeAtTile(tileData);
+        }
+        event.preventDefault();
+        event.stopPropagation();
+    });
+
     renderer.domElement.addEventListener("pointerup", function (event) {
         if (!pendingSiteOrbitGesture || event.pointerId !== pendingSiteOrbitGesture.pointerId) {
             return;
@@ -4716,11 +5036,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         stopCameraOrbitDrag(event.pointerId);
         clearPendingSiteOrbitGesture(event.pointerId);
         if (!wasDragging && isSiteActiveView()) {
-            const tileData = pickSiteTileAtClientPosition(releaseClientX, releaseClientY);
-            if (!tileData) {
-                closeTileContextMenu();
+            if (isPlacementModeActive(latestState)) {
+                cancelPlacementMode();
             } else {
-                openTileContextMenu(tileData, releaseClientX, releaseClientY);
+                const tileData = pickSiteTileAtClientPosition(releaseClientX, releaseClientY);
+                if (!tileData) {
+                    closeTileContextMenu();
+                } else {
+                    openTileContextMenu(tileData, releaseClientX, releaseClientY);
+                }
             }
         }
         event.preventDefault();
