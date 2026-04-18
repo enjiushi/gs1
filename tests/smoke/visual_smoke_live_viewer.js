@@ -3,6 +3,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 (function () {
     const stageFrame = document.getElementById("stage-frame");
     const gameView = document.getElementById("game-view");
+    const windOverlay = document.getElementById("wind-overlay");
     const hudEyebrow = document.getElementById("hud-eyebrow");
     const hudTitle = document.getElementById("hud-title");
     const hudSubtitle = document.getElementById("hud-subtitle");
@@ -72,6 +73,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const orbitMouseButton = 2;
     const orbitMouseButtonsMask = 2;
     const orbitDragThresholdPixels = 6;
+    const hudWarningCodes = {
+        none: 0,
+        windWatch: 1,
+        windExposure: 2,
+        severeGale: 3,
+        sandblast: 4
+    };
 
     const moveAxes = {
         x: 0,
@@ -370,6 +378,147 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             heatLevel,
             effectStrength: Math.min(blendedStrength, 0.58)
         };
+    }
+
+    function getHudWarningPresentation(state) {
+        const hud = getHudState(state);
+        const siteState = getSiteState(state);
+        const weather = siteState ? siteState.weather : null;
+        const warningCode = hud && typeof hud.warningCode === "number"
+            ? hud.warningCode
+            : hudWarningCodes.none;
+        const wind = weather && typeof weather.wind === "number" ? Math.round(weather.wind) : 0;
+        const dust = weather && typeof weather.dust === "number" ? Math.round(weather.dust) : 0;
+        const windDirection =
+            weather && typeof weather.windDirectionDegrees === "number"
+                ? Math.round(weather.windDirectionDegrees)
+                : 0;
+        const eventPhase = weather && weather.eventPhase ? weather.eventPhase : "NONE";
+        const weatherBrief = "Wind " + wind + " @" + windDirection + "deg  |  Dust " + dust +
+            (eventPhase !== "NONE" ? ("  |  " + eventPhase) : "");
+
+        switch (warningCode) {
+        case hudWarningCodes.windWatch:
+            return {
+                code: warningCode,
+                headline: "Wind Building",
+                detail: "Crosswind is pushing grit across the site. " + weatherBrief + "."
+            };
+        case hudWarningCodes.windExposure:
+            return {
+                code: warningCode,
+                headline: "Wind Exposure",
+                detail: "Open-ground work is slowing and worker drain is rising. " + weatherBrief + "."
+            };
+        case hudWarningCodes.severeGale:
+            return {
+                code: warningCode,
+                headline: "Severe Gale",
+                detail: "Strong gusts are cutting action throughput hard. Find cover. " + weatherBrief + "."
+            };
+        case hudWarningCodes.sandblast:
+            return {
+                code: warningCode,
+                headline: "Sandblast Front",
+                detail: "Wind and airborne grit are peaking. Shelter now. " + weatherBrief + "."
+            };
+        default:
+            return {
+                code: hudWarningCodes.none,
+                headline: "Field Stable",
+                detail: weather ? ("Local weather is manageable. " + weatherBrief + ".") : "Weather telemetry is quiet."
+            };
+        }
+    }
+
+    function getWindVisualResponse(state) {
+        if (!state || state.appState !== "SITE_ACTIVE") {
+            return {
+                opacity: 0,
+                dustAlpha: 0,
+                speedSeconds: 4.8,
+                tiltDegrees: -18,
+                directionDegrees: 0,
+                severity: "none"
+            };
+        }
+
+        const siteState = getSiteState(state);
+        const weather = siteState ? siteState.weather : null;
+        const hud = getHudState(state);
+        if (!weather) {
+            return {
+                opacity: 0,
+                dustAlpha: 0,
+                speedSeconds: 4.8,
+                tiltDegrees: -18,
+                directionDegrees: 0,
+                severity: "none"
+            };
+        }
+
+        const windLevel = clamp01((weather.wind || 0) / 80.0);
+        const dustLevel = clamp01((weather.dust || 0) / 26.0);
+        const directionDegrees =
+            typeof weather.windDirectionDegrees === "number"
+                ? weather.windDirectionDegrees
+                : 0;
+        const warningCode = hud && typeof hud.warningCode === "number"
+            ? hud.warningCode
+            : hudWarningCodes.none;
+        const warningBoost = warningCode >= hudWarningCodes.sandblast
+            ? 0.18
+            : warningCode >= hudWarningCodes.severeGale
+                ? 0.12
+                : warningCode >= hudWarningCodes.windExposure
+                    ? 0.07
+                    : warningCode >= hudWarningCodes.windWatch
+                        ? 0.03
+                        : 0.0;
+        const opacity = Math.min(0.68, windLevel * 0.28 + dustLevel * 0.14 + warningBoost);
+        const dustAlpha = Math.min(0.44, dustLevel * 0.22 + windLevel * 0.08 + warningBoost * 0.7);
+        let severity = "watch";
+        if (warningCode >= hudWarningCodes.sandblast) {
+            severity = "critical";
+        } else if (warningCode >= hudWarningCodes.severeGale) {
+            severity = "severe";
+        } else if (warningCode >= hudWarningCodes.windExposure) {
+            severity = "exposure";
+        } else if (opacity <= 0.04) {
+            severity = "none";
+        }
+
+        return {
+            opacity: opacity,
+            dustAlpha: dustAlpha,
+            speedSeconds: Math.max(1.9, 5.2 - windLevel * 2.5),
+            tiltDegrees: directionDegrees - 90.0,
+            directionDegrees: directionDegrees,
+            severity: severity
+        };
+    }
+
+    function applyWindOverlay(state) {
+        if (!windOverlay) {
+            return;
+        }
+
+        const response = getWindVisualResponse(state);
+        const isActive = response.opacity > 0.02;
+        const directionRadians = (response.directionDegrees || 0) * Math.PI / 180.0;
+        const driftX = Math.sin(directionRadians) * 10.0;
+        const driftY = -Math.cos(directionRadians) * 6.0;
+        stageFrame.classList.toggle("wind-overlay-active", isActive);
+        stageFrame.classList.toggle("wind-overlay-severe", response.severity === "severe" || response.severity === "critical");
+        stageFrame.classList.toggle("wind-overlay-critical", response.severity === "critical");
+        stageFrame.style.setProperty("--wind-overlay-opacity", response.opacity.toFixed(3));
+        stageFrame.style.setProperty("--wind-overlay-dust-alpha", response.dustAlpha.toFixed(3));
+        stageFrame.style.setProperty("--wind-overlay-speed", response.speedSeconds.toFixed(2) + "s");
+        stageFrame.style.setProperty("--wind-overlay-tilt", response.tiltDegrees.toFixed(1) + "deg");
+        stageFrame.style.setProperty("--wind-overlay-from-x", (-driftX).toFixed(2) + "%");
+        stageFrame.style.setProperty("--wind-overlay-from-y", (-driftY).toFixed(2) + "%");
+        stageFrame.style.setProperty("--wind-overlay-to-x", driftX.toFixed(2) + "%");
+        stageFrame.style.setProperty("--wind-overlay-to-y", driftY.toFixed(2) + "%");
     }
 
     function renderSceneWithHeatDistortion(state, elapsedSeconds) {
@@ -1383,16 +1532,24 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const placementPreview = getPlacementPreview(state);
         const workerActionKind =
             siteState && siteState.worker ? siteState.worker.currentActionKind : 0;
+        const warning = getHudWarningPresentation(state);
         const hydration = hud ? Math.round(hud.playerHydration) : 0;
         const energy = hud ? Math.round(hud.playerEnergy) : 0;
         const completion = hud ? Math.round((hud.siteCompletionNormalized || 0) * 100) : 0;
         const eventPhase = weather ? weather.eventPhase : "NONE";
+        const wind = weather ? Math.round(weather.wind || 0) : 0;
+        const dust = weather ? Math.round(weather.dust || 0) : 0;
+        const windDirection = weather ? Math.round(weather.windDirectionDegrees || 0) : 0;
 
         statusChip.textContent =
             "Site Live\nHydration " + hydration +
             "\nEnergy " + energy +
             "\nCompletion " + completion + "%" +
+            "\nWind " + wind +
+            "\nBearing " + windDirection + "deg" +
+            "\nDust " + dust +
             "\nEvent " + eventPhase +
+            "\nAlert " + warning.headline +
             "\nSeeds " + carriedSeeds.reduce((total, seed) => total + seed.quantity, 0) +
             "\nAction " + getSiteActionLabel(workerActionKind) +
             "\nMode " + (isPlacementModeActive(state) ? placementModeLabel(placementPreview) : "None");
@@ -2867,12 +3024,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         stageFrame.classList.toggle("main-menu-mode", state.appState === "MAIN_MENU");
         stageFrame.classList.toggle("regional-map-mode", state.appState === "REGIONAL_MAP");
         stageFrame.classList.toggle("site-active-mode", state.appState === "SITE_ACTIVE");
-        hudEyebrow.textContent = "App State";
-        hudTitle.textContent = state.appState || "NONE";
         const appStateChanged = lastOverlayAppState !== state.appState;
+        const warning = getHudWarningPresentation(state);
 
         switch (state.appState) {
         case "MAIN_MENU":
+            hudEyebrow.textContent = "App State";
+            hudTitle.textContent = state.appState || "NONE";
             hudSubtitle.textContent = "Austere, painterly, and severe: the campaign opens under hostile conditions.";
             inventoryPanelOpen = true;
             phonePanelOpen = false;
@@ -2883,6 +3041,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             statusChip.textContent = "Prototype Build\nVisual Smoke";
             break;
         case "REGIONAL_MAP":
+            hudEyebrow.textContent = "App State";
+            hudTitle.textContent = state.appState || "NONE";
             hudSubtitle.textContent = "Review the campaign survey board and choose the next deployment route.";
             inventoryPanelOpen = true;
             phonePanelOpen = false;
@@ -2895,17 +3055,22 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 "\nSelected Site: " + (state.selectedSiteId == null ? "none" : state.selectedSiteId);
             break;
         case "SITE_ACTIVE":
+            hudEyebrow.textContent = warning.code !== hudWarningCodes.none ? "Weather Alert" : "Site Active";
+            hudTitle.textContent = warning.code !== hudWarningCodes.none ? warning.headline : (state.appState || "NONE");
             if (appStateChanged) {
                 inventoryPanelOpen = false;
                 phonePanelOpen = false;
                 selectedInventorySlotKey = "";
                 openedInventoryContainerKey = "";
             }
-            hudSubtitle.textContent =
-                "Field movement is now live. Press B to toggle the inventory panel, press F to pocket or raise the phone, drag with right mouse to orbit the follow camera, or short right-click a tile to open its action menu.";
+            hudSubtitle.textContent = warning.code !== hudWarningCodes.none
+                ? (warning.detail + " Press B for inventory, F for phone, and use cover to cut wind exposure.")
+                : "Field movement is now live. Press B to toggle the inventory panel, press F to pocket or raise the phone, drag with right mouse to orbit the follow camera, or short right-click a tile to open its action menu.";
             renderSiteOverlay(state);
             break;
         default:
+            hudEyebrow.textContent = "App State";
+            hudTitle.textContent = state.appState || "NONE";
             hudSubtitle.textContent = "The current adapter only styles the core early flow for now.";
             inventoryPanelOpen = true;
             phonePanelOpen = false;
@@ -3494,6 +3659,118 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 shadow: shadow
             }
         };
+    }
+
+    function createWindFieldVisual(width, height) {
+        const group = new THREE_NS.Group();
+        const streaks = [];
+        const streakCount = Math.max(18, Math.min(42, Math.round((width + height) * 0.75)));
+        const horizontalSpan = Math.max(width, height) * 0.72;
+        const depthSpan = Math.max(width, height) * 0.92;
+
+        for (let index = 0; index < streakCount; index += 1) {
+            const widthScale = 0.55 + ((index * 13) % 9) * 0.08;
+            const lengthScale = 0.85 + ((index * 7) % 11) * 0.09;
+            const mesh = new THREE_NS.Mesh(
+                new THREE_NS.PlaneGeometry(0.17 * widthScale, 1.35 * lengthScale),
+                new THREE_NS.MeshBasicMaterial({
+                    color: 0xf6edd7,
+                    transparent: true,
+                    opacity: 0.0,
+                    depthWrite: false,
+                    blending: THREE_NS.AdditiveBlending,
+                    side: THREE_NS.DoubleSide
+                })
+            );
+            mesh.rotation.x = -Math.PI / 2;
+            mesh.position.y = 0.9 + (index % 5) * 0.08;
+            group.add(mesh);
+            streaks.push({
+                mesh: mesh,
+                progressSeed: ((index * 17) % 37) / 37,
+                lateralSeed: (((index % 7) - 3) / 3) + (((index * 19) % 5) - 2) * 0.18,
+                verticalSeed: ((index * 11) % 6) * 0.05,
+                swaySeed: ((index * 23) % 29) / 29,
+                speedScale: 0.72 + ((index * 5) % 9) * 0.09,
+                widthScale: widthScale,
+                lengthScale: lengthScale
+            });
+        }
+
+        group.visible = false;
+        return {
+            group: group,
+            streaks: streaks,
+            horizontalSpan: horizontalSpan,
+            depthSpan: depthSpan
+        };
+    }
+
+    function updateWindFieldVisual(cache, state, elapsedSeconds) {
+        if (!cache || !cache.windField) {
+            return;
+        }
+
+        const siteState = getSiteState(state);
+        const weather = siteState ? siteState.weather : null;
+        const warning = getHudWarningPresentation(state);
+        const windField = cache.windField;
+        if (!weather || !weather.wind || weather.wind <= 3) {
+            windField.group.visible = false;
+            return;
+        }
+
+        const windLevel = clamp01((weather.wind || 0) / 80.0);
+        const dustLevel = clamp01((weather.dust || 0) / 28.0);
+        const directionDegrees =
+            typeof weather.windDirectionDegrees === "number"
+                ? weather.windDirectionDegrees
+                : 0;
+        const directionRadians = directionDegrees * Math.PI / 180.0;
+        const severityBoost = warning.code >= hudWarningCodes.sandblast
+            ? 0.18
+            : warning.code >= hudWarningCodes.severeGale
+                ? 0.10
+                : warning.code >= hudWarningCodes.windExposure
+                    ? 0.05
+                    : 0.0;
+        const alpha = Math.min(0.46, windLevel * 0.26 + dustLevel * 0.12 + severityBoost);
+        const streakLength = lerp(0.82, 1.9, windLevel);
+        const streakWidth = lerp(0.72, 1.25, windLevel);
+        const flowDistance = windField.depthSpan * (1.05 + windLevel * 0.65);
+        const activeStreakCount = Math.max(
+            6,
+            Math.min(
+                windField.streaks.length,
+                Math.round(lerp(8, windField.streaks.length, windLevel))
+            )
+        );
+
+        windField.group.visible = alpha > 0.02;
+        windField.group.rotation.y = directionRadians;
+
+        windField.streaks.forEach((streak, index) => {
+            const streakEnabled = index < activeStreakCount;
+            const progress = (elapsedSeconds * (0.16 + windLevel * 0.55) * streak.speedScale + streak.progressSeed) % 1.0;
+            const flowOffset = (progress - 0.5) * flowDistance;
+            const lateralOffset = streak.lateralSeed * windField.horizontalSpan;
+            const verticalBob = Math.sin((elapsedSeconds + streak.swaySeed * 6.0) * (1.2 + windLevel * 1.8)) * 0.05;
+            streak.mesh.position.x = lateralOffset;
+            streak.mesh.position.z = flowOffset;
+            streak.mesh.position.y = 0.74 + streak.verticalSeed + verticalBob + windLevel * 0.24;
+            streak.mesh.rotation.z = Math.sin(elapsedSeconds * 1.6 + index * 0.5) * 0.08;
+            streak.mesh.scale.set(
+                streakWidth * streak.widthScale,
+                streakLength * streak.lengthScale,
+                1.0
+            );
+            streak.mesh.material.opacity = streakEnabled
+                ? alpha * (0.62 + streak.speedScale * 0.22)
+                : 0.0;
+            streak.mesh.material.color.setHex(
+                warning.code >= hudWarningCodes.sandblast ? 0xf5d6aa : 0xf6edd7
+            );
+        });
     }
 
     function updateHumanoidWorkerAnimation(cache, deltaSeconds, elapsed, movementSpeed, distanceToTarget, currentActionKind) {
@@ -4471,6 +4748,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const workerGroup = workerVisual.group;
         worldGroup.add(workerGroup);
 
+        const windField = createWindFieldVisual(width, height);
+        worldGroup.add(windField.group);
+
         siteSceneCache = {
             siteId: siteBootstrap.siteId,
             bootstrapSignature: bootstrapSignature,
@@ -4482,6 +4762,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             tilePickables: tilePickables,
             workerGroup: workerGroup,
             workerRig: workerVisual.rig,
+            windField: windField,
             workerInitialized: false,
             workerAnimPhase: 0,
             workerActionPhase: 0,
@@ -4617,6 +4898,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     function renderState(state) {
         latestState = state;
         updateOverlay(state);
+        applyWindOverlay(state);
         rebuildWorld(state);
         if (state.appState === "SITE_ACTIVE" && tileContextMenuState) {
             renderTileContextMenu();
@@ -4717,6 +4999,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 workerGroup.position.x,
                 workerGroup.position.z,
                 cameraBlend);
+        }
+
+        if (siteSceneCache && siteSceneCache.windField) {
+            updateWindFieldVisual(siteSceneCache, latestState, elapsed);
         }
 
         fitRenderer();

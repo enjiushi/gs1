@@ -15,9 +15,12 @@ public:
             site_component_mask_of(
                 SiteComponent::Time,
                 SiteComponent::TileLayout,
+                SiteComponent::TileWeather,
                 SiteComponent::DeviceCondition,
                 SiteComponent::WorkerMotion,
+                SiteComponent::WorkerNeeds,
                 SiteComponent::Inventory,
+                SiteComponent::Modifier,
                 SiteComponent::Craft,
                 SiteComponent::Action),
             site_component_mask_of(SiteComponent::Action)};

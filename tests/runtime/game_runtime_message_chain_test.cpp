@@ -1,5 +1,6 @@
 #include "runtime/game_runtime.h"
 #include "content/defs/item_defs.h"
+#include "site/site_projection_update_flags.h"
 #include "content/defs/plant_defs.h"
 #include "site/site_world_access.h"
 #include "site/site_world_components.h"
@@ -55,6 +56,11 @@ struct GameRuntimeProjectionTestAccess
     static void flush_projection(GameRuntime& runtime)
     {
         runtime.flush_site_presentation_if_dirty();
+    }
+
+    static void mark_projection_dirty(GameRuntime& runtime, std::uint64_t dirty_flags)
+    {
+        runtime.mark_site_projection_update_dirty(dirty_flags);
     }
 };
 }  // namespace gs1
@@ -440,11 +446,61 @@ void ecology_growth_completes_task_and_site_attempt()
         assert(approx_equal(payload.site_completion_normalized, 1.0f));
     }
 }
+
+void site_weather_changes_emit_hud_wind_warning_codes()
+{
+    constexpr std::uint16_t k_hud_warning_wind_watch = 1U;
+    constexpr std::uint16_t k_hud_warning_wind_exposure = 2U;
+
+    Gs1RuntimeCreateDesc create_desc {};
+    create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
+    create_desc.api_version = gs1::k_api_version;
+    create_desc.fixed_step_seconds = 1.0 / 60.0;
+
+    GameRuntime runtime {create_desc};
+    bootstrap_site_one(runtime);
+
+    auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
+    drain_engine_messages(runtime);
+
+    const auto worker_position = gs1::site_world_access::worker_position(site_run);
+    gs1::site_world_access::set_tile_local_weather(
+        site_run,
+        worker_position.tile_coord,
+        gs1::SiteWorld::TileLocalWeatherData {8.0f, 36.0f, 6.0f});
+    gs1::GameRuntimeProjectionTestAccess::mark_projection_dirty(runtime, gs1::SITE_PROJECTION_UPDATE_WEATHER);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+
+    const auto weather_messages = drain_engine_messages(runtime);
+    const auto weather_hud_messages =
+        collect_messages_of_type(weather_messages, GS1_ENGINE_MESSAGE_HUD_STATE);
+    assert(weather_hud_messages.size() == 1U);
+    {
+        const auto& payload = weather_hud_messages.front()->payload_as<Gs1EngineMessageHudStateData>();
+        assert(payload.warning_code == k_hud_warning_wind_exposure);
+    }
+
+    auto worker_conditions = gs1::site_world_access::worker_conditions(site_run);
+    worker_conditions.is_sheltered = true;
+    gs1::site_world_access::set_worker_conditions(site_run, worker_conditions);
+    gs1::GameRuntimeProjectionTestAccess::mark_projection_dirty(runtime, gs1::SITE_PROJECTION_UPDATE_WORKER);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+
+    const auto sheltered_messages = drain_engine_messages(runtime);
+    const auto sheltered_hud_messages =
+        collect_messages_of_type(sheltered_messages, GS1_ENGINE_MESSAGE_HUD_STATE);
+    assert(sheltered_hud_messages.size() == 1U);
+    {
+        const auto& payload = sheltered_hud_messages.front()->payload_as<Gs1EngineMessageHudStateData>();
+        assert(payload.warning_code == k_hud_warning_wind_watch);
+    }
+}
 }  // namespace
 
 int main()
 {
     inventory_item_use_updates_worker_and_projection();
     ecology_growth_completes_task_and_site_attempt();
+    site_weather_changes_emit_hud_wind_warning_codes();
     return 0;
 }

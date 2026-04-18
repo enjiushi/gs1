@@ -417,10 +417,19 @@ int main()
     const auto bootstrap_messages = drain_engine_messages(runtime);
     const auto storage_messages =
         collect_messages_of_type(bootstrap_messages, GS1_ENGINE_MESSAGE_SITE_INVENTORY_STORAGE_UPSERT);
+    const auto weather_messages =
+        collect_messages_of_type(bootstrap_messages, GS1_ENGINE_MESSAGE_SITE_WEATHER_UPDATE);
     assert(!collect_messages_of_type(bootstrap_messages, GS1_ENGINE_MESSAGE_SITE_INVENTORY_SLOT_UPSERT).empty());
     assert(storage_messages.size() == 3U);
+    assert(weather_messages.size() == 1U);
     assert(!collect_messages_of_type(bootstrap_messages, GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT).empty());
     assert(!collect_messages_of_type(bootstrap_messages, GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_UPSERT).empty());
+    {
+        const auto& weather_payload =
+            weather_messages.front()->payload_as<Gs1EngineMessageWeatherData>();
+        assert(weather_payload.wind_direction_degrees > 0.0f);
+        assert(weather_payload.wind_direction_degrees < 360.0f);
+    }
     {
         const auto* starter_storage_message = find_inventory_storage_message(
             bootstrap_messages,

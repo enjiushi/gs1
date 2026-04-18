@@ -44,6 +44,10 @@ constexpr float kEnergyDrainPerSecond = 0.05f;
 constexpr float kMoraleDrainPerSecond = 0.01f;
 constexpr float kStarvationHealthDrainPerSecond = 0.02f;
 constexpr float kMeterChangeThreshold = 0.01f;
+constexpr float kWindHydrationDrainPerUnitPerSecond = 0.0012f;
+constexpr float kWindEnergyDrainPerUnitPerSecond = 0.0010f;
+constexpr float kWindMoraleDrainPerUnitPerSecond = 0.0006f;
+constexpr float kShelteredWindExposureScale = 0.2f;
 
 constexpr std::uint32_t kWorkerMetersChangedInitialMask =
     WORKER_METER_CHANGED_HEALTH |
@@ -199,6 +203,32 @@ void apply_passive_decay(SiteWorld::WorkerConditionData& worker, float step_seco
     }
 }
 
+void apply_wind_exposure_decay(
+    SiteWorld::WorkerConditionData& worker,
+    const SiteWorld::TileLocalWeatherData& local_weather,
+    float step_seconds) noexcept
+{
+    const float wind = std::max(local_weather.wind, 0.0f);
+    if (wind <= 0.0f || step_seconds <= 0.0f)
+    {
+        return;
+    }
+
+    const float exposure_scale = worker.is_sheltered ? kShelteredWindExposureScale : 1.0f;
+    worker.hydration = std::clamp(
+        worker.hydration - wind * kWindHydrationDrainPerUnitPerSecond * exposure_scale * step_seconds,
+        kMeterMin,
+        kHydrationMax);
+    worker.energy = std::clamp(
+        worker.energy - wind * kWindEnergyDrainPerUnitPerSecond * exposure_scale * step_seconds,
+        kMeterMin,
+        worker.energy_cap);
+    worker.morale = std::clamp(
+        worker.morale - wind * kWindMoraleDrainPerUnitPerSecond * exposure_scale * step_seconds,
+        kMeterMin,
+        kMoraleMax);
+}
+
 void apply_worker_meter_delta(
     SiteWorld::WorkerConditionData& worker,
     const WorkerMeterDeltaRequestedMessage& payload) noexcept
@@ -278,6 +308,10 @@ void WorkerConditionSystem::run(SiteSystemContext<WorkerConditionSystem>& contex
     auto worker = context.world.read_worker();
     const auto previous = worker.conditions;
     apply_passive_decay(worker.conditions, step_seconds);
+    apply_wind_exposure_decay(
+        worker.conditions,
+        context.world.read_tile_local_weather(worker.position.tile_coord),
+        step_seconds);
     const bool modified = worker_conditions_changed(previous, worker.conditions);
     if (modified)
     {

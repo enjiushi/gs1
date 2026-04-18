@@ -540,6 +540,8 @@ void append_site_weather_json(std::string& json, const SmokeEngineHost::SiteSnap
     json += std::to_string(weather.wind);
     json += ",\"dust\":";
     json += std::to_string(weather.dust);
+    json += ",\"windDirectionDegrees\":";
+    json += std::to_string(weather.wind_direction_degrees);
     json += ",\"eventTemplateId\":";
     json += std::to_string(weather.event_template_id);
     json += ",\"eventPhase\":";

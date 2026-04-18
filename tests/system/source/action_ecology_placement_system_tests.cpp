@@ -176,6 +176,73 @@ void action_execution_water_starts_immediately_and_emits_cost(
             -2.0f));
 }
 
+void action_execution_progress_slows_in_high_wind_and_recovers_under_shelter(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    const TileCoord target_tile {2, 2};
+
+    auto calm_run = make_test_site_run(1U, 5031U);
+    auto windy_run = make_test_site_run(1U, 5032U);
+    auto sheltered_run = make_test_site_run(1U, 5033U);
+    GameMessageQueue calm_queue {};
+    GameMessageQueue windy_queue {};
+    GameMessageQueue sheltered_queue {};
+    auto calm_context = make_site_context<ActionExecutionSystem>(campaign, calm_run, calm_queue, 1.0);
+    auto windy_context = make_site_context<ActionExecutionSystem>(campaign, windy_run, windy_queue, 1.0);
+    auto sheltered_context =
+        make_site_context<ActionExecutionSystem>(campaign, sheltered_run, sheltered_queue, 1.0);
+
+    auto windy_tile = windy_run.site_world->tile_at(target_tile);
+    windy_tile.local_weather.wind = 80.0f;
+    windy_run.site_world->set_tile(target_tile, windy_tile);
+
+    auto sheltered_tile = sheltered_run.site_world->tile_at(target_tile);
+    sheltered_tile.local_weather.wind = 80.0f;
+    sheltered_run.site_world->set_tile(target_tile, sheltered_tile);
+
+    auto sheltered_worker = gs1::site_world_access::worker_conditions(sheltered_run);
+    sheltered_worker.is_sheltered = true;
+    gs1::site_world_access::set_worker_conditions(sheltered_run, sheltered_worker);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            calm_context,
+            make_start_action_message(GS1_SITE_ACTION_WATER, target_tile, 2U)) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            windy_context,
+            make_start_action_message(GS1_SITE_ACTION_WATER, target_tile, 2U)) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            sheltered_context,
+            make_start_action_message(GS1_SITE_ACTION_WATER, target_tile, 2U)) == GS1_STATUS_OK);
+
+    calm_queue.clear();
+    windy_queue.clear();
+    sheltered_queue.clear();
+
+    ActionExecutionSystem::run(calm_context);
+    ActionExecutionSystem::run(windy_context);
+    ActionExecutionSystem::run(sheltered_context);
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        calm_run.site_action.remaining_action_minutes <
+            windy_run.site_action.remaining_action_minutes);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        sheltered_run.site_action.remaining_action_minutes <
+            windy_run.site_action.remaining_action_minutes);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        sheltered_run.site_action.remaining_action_minutes >
+            calm_run.site_action.remaining_action_minutes);
+}
+
 void action_execution_plant_waits_for_reservation_then_starts_on_accept(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -1293,6 +1360,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "action_execution",
     "water_starts_immediately_and_emits_cost",
     action_execution_water_starts_immediately_and_emits_cost);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "action_execution",
+    "progress_slows_in_high_wind_and_recovers_under_shelter",
+    action_execution_progress_slows_in_high_wind_and_recovers_under_shelter);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "action_execution",
     "plant_waits_for_reservation_then_starts_on_accept",

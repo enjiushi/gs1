@@ -14,6 +14,8 @@ public:
             "WorkerConditionSystem",
             site_component_mask_of(
                 SiteComponent::RunMeta,
+                SiteComponent::TileWeather,
+                SiteComponent::WorkerMotion,
                 SiteComponent::WorkerNeeds),
             site_component_mask_of(SiteComponent::WorkerNeeds)};
     }

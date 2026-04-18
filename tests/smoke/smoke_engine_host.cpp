@@ -1212,6 +1212,7 @@ void SmokeEngineHost::apply_site_weather_update(const Gs1EngineMessage& message)
     projection.heat = payload.heat;
     projection.wind = payload.wind;
     projection.dust = payload.dust;
+    projection.wind_direction_degrees = payload.wind_direction_degrees;
     projection.event_template_id = payload.event_template_id;
     projection.event_phase = payload.event_phase;
     projection.phase_minutes_remaining = payload.phase_minutes_remaining;

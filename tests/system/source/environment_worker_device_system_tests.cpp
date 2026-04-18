@@ -298,6 +298,55 @@ void worker_condition_run_drains_resources_and_health_when_starving(
     GS1_SYSTEM_TEST_CHECK(context, queue.size() == 1U);
 }
 
+void worker_condition_run_applies_wind_exposure_and_shelter_softens_it(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto exposed_run = make_test_site_run(1U, 1303U);
+    auto sheltered_run = make_test_site_run(1U, 1304U);
+    GameMessageQueue exposed_queue {};
+    GameMessageQueue sheltered_queue {};
+    auto exposed_context =
+        make_site_context<WorkerConditionSystem>(campaign, exposed_run, exposed_queue, 10.0);
+    auto sheltered_context =
+        make_site_context<WorkerConditionSystem>(campaign, sheltered_run, sheltered_queue, 10.0);
+
+    auto exposed_tile = exposed_run.site_world->tile_at(TileCoord {2, 2});
+    exposed_tile.local_weather.wind = 80.0f;
+    exposed_run.site_world->set_tile(TileCoord {2, 2}, exposed_tile);
+
+    auto sheltered_tile = sheltered_run.site_world->tile_at(TileCoord {2, 2});
+    sheltered_tile.local_weather.wind = 80.0f;
+    sheltered_run.site_world->set_tile(TileCoord {2, 2}, sheltered_tile);
+
+    auto exposed_worker = gs1::site_world_access::worker_conditions(exposed_run);
+    exposed_worker.hydration = 50.0f;
+    exposed_worker.energy = 60.0f;
+    exposed_worker.morale = 70.0f;
+    gs1::site_world_access::set_worker_conditions(exposed_run, exposed_worker);
+
+    auto sheltered_worker = gs1::site_world_access::worker_conditions(sheltered_run);
+    sheltered_worker.hydration = 50.0f;
+    sheltered_worker.energy = 60.0f;
+    sheltered_worker.morale = 70.0f;
+    sheltered_worker.is_sheltered = true;
+    gs1::site_world_access::set_worker_conditions(sheltered_run, sheltered_worker);
+
+    WorkerConditionSystem::run(exposed_context);
+    WorkerConditionSystem::run(sheltered_context);
+
+    const auto exposed = gs1::site_world_access::worker_conditions(exposed_run);
+    const auto sheltered = gs1::site_world_access::worker_conditions(sheltered_run);
+    GS1_SYSTEM_TEST_CHECK(context, exposed.hydration < 50.0f);
+    GS1_SYSTEM_TEST_CHECK(context, exposed.energy < 60.0f);
+    GS1_SYSTEM_TEST_CHECK(context, exposed.morale < 70.0f);
+    GS1_SYSTEM_TEST_CHECK(context, exposed.hydration < sheltered.hydration);
+    GS1_SYSTEM_TEST_CHECK(context, exposed.energy < sheltered.energy);
+    GS1_SYSTEM_TEST_CHECK(context, exposed.morale < sheltered.morale);
+    GS1_SYSTEM_TEST_CHECK(context, exposed_queue.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, sheltered_queue.size() == 1U);
+}
+
 void device_support_updates_efficiency_and_water_from_heat(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -445,6 +494,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "worker_condition",
     "run_drains_resources_and_health_when_starving",
     worker_condition_run_drains_resources_and_health_when_starving);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "worker_condition",
+    "run_applies_wind_exposure_and_shelter_softens_it",
+    worker_condition_run_applies_wind_exposure_and_shelter_softens_it);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "device_support",
     "updates_efficiency_and_water_from_heat",
