@@ -228,6 +228,54 @@ void local_weather_resolve_refreshes_dirty_neighborhood_from_tile_ecology_change
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(far_weather.dust, 4.25f));
 }
 
+void local_weather_resolve_applies_device_wind_protection_value_and_range(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(2U, 1203U, 101U, 5U, 5U);
+    GameMessageQueue queue {};
+    auto site_context = make_site_context<LocalWeatherResolveSystem>(campaign, site_run, queue);
+
+    site_run.weather.weather_heat = 10.0f;
+    site_run.weather.weather_wind = 10.0f;
+    site_run.weather.weather_dust = 3.0f;
+
+    LocalWeatherResolveSystem::run(site_context);
+
+    auto tile = site_run.site_world->tile_at(TileCoord {2, 2});
+    tile.device.structure_id = gs1::StructureId {gs1::k_structure_wind_fence};
+    tile.device.device_integrity = 1.0f;
+    tile.device.device_efficiency = 0.5f;
+    site_run.site_world->set_tile(TileCoord {2, 2}, tile);
+
+    GS1_SYSTEM_TEST_CHECK(context, LocalWeatherResolveSystem::subscribes_to(GameMessageType::SiteDevicePlaced));
+    GS1_SYSTEM_TEST_CHECK(context, LocalWeatherResolveSystem::subscribes_to(GameMessageType::SiteDeviceBroken));
+    GS1_SYSTEM_TEST_CHECK(context, LocalWeatherResolveSystem::subscribes_to(GameMessageType::SiteDeviceRepaired));
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        LocalWeatherResolveSystem::process_message(
+            site_context,
+            make_message(
+                GameMessageType::SiteDevicePlaced,
+                gs1::SiteDevicePlacedMessage {
+                    1U,
+                    2,
+                    2,
+                    gs1::k_structure_wind_fence,
+                    0U})) == GS1_STATUS_OK);
+
+    LocalWeatherResolveSystem::run(site_context);
+
+    const auto own_weather = site_run.site_world->tile_local_weather(TileCoord {2, 2});
+    const auto neighbor_weather = site_run.site_world->tile_local_weather(TileCoord {3, 2});
+    const auto out_of_range_weather = site_run.site_world->tile_local_weather(TileCoord {4, 2});
+    GS1_SYSTEM_TEST_CHECK(context, own_weather.wind < 10.0f);
+    GS1_SYSTEM_TEST_CHECK(context, neighbor_weather.wind < 10.0f);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(neighbor_weather.heat, 10.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(neighbor_weather.dust, 4.25f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(out_of_range_weather.wind, 10.0f));
+}
+
 void worker_condition_requested_delta_emits_initial_full_mask_and_clamps(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -437,6 +485,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "local_weather_resolve",
     "refreshes_dirty_neighborhood_from_tile_ecology_changed",
     local_weather_resolve_refreshes_dirty_neighborhood_from_tile_ecology_changed);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "local_weather_resolve",
+    "applies_device_wind_protection_value_and_range",
+    local_weather_resolve_applies_device_wind_protection_value_and_range);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "worker_condition",
     "requested_delta_emits_initial_full_mask_and_clamps",

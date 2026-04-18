@@ -1,7 +1,9 @@
 #include "site/systems/local_weather_resolve_system.h"
 
 #include "content/defs/plant_defs.h"
+#include "content/defs/structure_defs.h"
 #include "site/site_run_state.h"
+#include "site/tile_footprint.h"
 
 #include <algorithm>
 #include <array>
@@ -11,7 +13,7 @@
 namespace
 {
 constexpr float k_local_weather_epsilon = 0.0001f;
-constexpr int k_max_supported_plant_aura = 2;
+constexpr int k_max_supported_support_range = 2;
 constexpr float k_own_tile_contribution_scale = 0.04f;
 constexpr float k_neighbor_contribution_scale = 0.018f;
 constexpr float k_bare_tile_dust_bias = 0.9f;
@@ -83,6 +85,28 @@ bool ecology_change_affects_local_weather(std::uint32_t changed_mask) noexcept
             gs1::TILE_ECOLOGY_CHANGED_SAND_BURIAL)) != 0U;
 }
 
+[[nodiscard]] float resolve_contribution_scale(int manhattan_distance) noexcept
+{
+    return manhattan_distance == 0
+        ? k_own_tile_contribution_scale
+        : (k_neighbor_contribution_scale / static_cast<float>(manhattan_distance));
+}
+
+[[nodiscard]] bool device_tile_is_support_anchor(
+    gs1::TileCoord coord,
+    gs1::StructureId structure_id) noexcept
+{
+    const auto anchor =
+        align_tile_anchor_to_footprint(coord, resolve_structure_tile_footprint(structure_id));
+    return anchor.x == coord.x && anchor.y == coord.y;
+}
+
+[[nodiscard]] bool structure_has_wind_protection(gs1::StructureId structure_id) noexcept
+{
+    const auto* structure_def = gs1::find_structure_def(structure_id);
+    return structure_def != nullptr && structure_def->wind_protection_value > k_local_weather_epsilon;
+}
+
 void ensure_local_weather_runtime_buffers(
     gs1::LocalWeatherResolveState& state,
     std::size_t tile_count)
@@ -139,6 +163,24 @@ void queue_dirty_neighborhood(
     }
 }
 
+void queue_dirty_structure_footprint_neighborhood(
+    gs1::SiteSystemContext<gs1::LocalWeatherResolveSystem>& context,
+    gs1::TileCoord anchor,
+    gs1::StructureId structure_id)
+{
+    for_each_tile_in_footprint(
+        anchor,
+        resolve_structure_tile_footprint(structure_id),
+        [&](gs1::TileCoord footprint_coord) {
+            if (!context.world.tile_coord_in_bounds(footprint_coord))
+            {
+                return;
+            }
+
+            queue_dirty_neighborhood(context, footprint_coord);
+        });
+}
+
 BaseLocalWeather compute_base_local_weather(
     gs1::SiteSystemContext<gs1::LocalWeatherResolveSystem>& context)
 {
@@ -158,7 +200,7 @@ WeatherSupportMeters accumulate_weather_support(
 
     for (const auto sample : k_weather_support_samples)
     {
-        if (sample.manhattan_distance > k_max_supported_plant_aura)
+        if (sample.manhattan_distance > k_max_supported_support_range)
         {
             continue;
         }
@@ -169,32 +211,61 @@ WeatherSupportMeters accumulate_weather_support(
             continue;
         }
 
-        const auto source_ecology = context.world.read_tile_ecology(source_coord);
-        if (!ecology_has_weather_support_source(source_ecology))
+        const auto source_tile = context.world.read_tile(source_coord);
+        const auto& source_ecology = source_tile.ecology;
+        const float contribution_scale = resolve_contribution_scale(sample.manhattan_distance);
+
+        if (ecology_has_weather_support_source(source_ecology))
+        {
+            const float density = std::clamp(source_ecology.plant_density, 0.0f, 1.0f);
+            if (density > k_local_weather_epsilon)
+            {
+                const auto& plant_def = resolve_occupant_def(source_ecology);
+                const bool within_shared_aura =
+                    sample.manhattan_distance == 0 ||
+                    sample.manhattan_distance <= static_cast<int>(plant_def.aura_size);
+                if (within_shared_aura)
+                {
+                    support.heat += plant_def.heat_protection_power * density * contribution_scale;
+                    support.dust += plant_def.dust_protection_power * density * contribution_scale;
+                }
+
+                const bool within_wind_range =
+                    sample.manhattan_distance == 0 ||
+                    sample.manhattan_distance <= static_cast<int>(plant_def.wind_protection_range);
+                if (within_wind_range)
+                {
+                    support.wind += plant_def.wind_protection_power * density * contribution_scale;
+                }
+            }
+        }
+
+        const auto structure_id = source_tile.device.structure_id;
+        if (structure_id.value == 0U ||
+            !device_tile_is_support_anchor(source_coord, structure_id))
         {
             continue;
         }
 
-        const float density = std::clamp(source_ecology.plant_density, 0.0f, 1.0f);
-        if (density <= k_local_weather_epsilon)
+        const auto* structure_def = gs1::find_structure_def(structure_id);
+        if (structure_def == nullptr || structure_def->wind_protection_value <= k_local_weather_epsilon)
         {
             continue;
         }
 
-        const auto& plant_def = resolve_occupant_def(source_ecology);
         if (sample.manhattan_distance > 0 &&
-            sample.manhattan_distance > static_cast<int>(plant_def.aura_size))
+            sample.manhattan_distance > static_cast<int>(structure_def->wind_protection_range))
         {
             continue;
         }
 
-        const float contribution_scale =
-            sample.manhattan_distance == 0
-                ? k_own_tile_contribution_scale
-                : (k_neighbor_contribution_scale / static_cast<float>(sample.manhattan_distance));
-        support.heat += plant_def.heat_protection_power * density * contribution_scale;
-        support.wind += plant_def.wind_protection_power * density * contribution_scale;
-        support.dust += plant_def.dust_protection_power * density * contribution_scale;
+        const float efficiency = std::clamp(source_tile.device.device_efficiency, 0.0f, 1.0f);
+        if (efficiency <= k_local_weather_epsilon)
+        {
+            continue;
+        }
+
+        support.wind += structure_def->wind_protection_value * efficiency * contribution_scale;
     }
 
     return support;
@@ -297,14 +368,17 @@ namespace gs1
 {
 bool LocalWeatherResolveSystem::subscribes_to(GameMessageType type) noexcept
 {
-    return type == GameMessageType::TileEcologyChanged;
+    return type == GameMessageType::TileEcologyChanged ||
+        type == GameMessageType::SiteDevicePlaced ||
+        type == GameMessageType::SiteDeviceBroken ||
+        type == GameMessageType::SiteDeviceRepaired;
 }
 
 Gs1Status LocalWeatherResolveSystem::process_message(
     SiteSystemContext<LocalWeatherResolveSystem>& context,
     const GameMessage& message)
 {
-    if (!context.world.has_world() || message.type != GameMessageType::TileEcologyChanged)
+    if (!context.world.has_world())
     {
         return GS1_STATUS_OK;
     }
@@ -312,19 +386,78 @@ Gs1Status LocalWeatherResolveSystem::process_message(
     auto& runtime = context.world.own_local_weather_runtime();
     ensure_local_weather_runtime_buffers(runtime, context.world.tile_count());
 
-    const auto& payload = message.payload_as<TileEcologyChangedMessage>();
-    if (!ecology_change_affects_local_weather(payload.changed_mask))
+    if (message.type == GameMessageType::TileEcologyChanged)
     {
+        const auto& payload = message.payload_as<TileEcologyChangedMessage>();
+        if (!ecology_change_affects_local_weather(payload.changed_mask))
+        {
+            return GS1_STATUS_OK;
+        }
+
+        const TileCoord center {payload.target_tile_x, payload.target_tile_y};
+        if (!context.world.tile_coord_in_bounds(center))
+        {
+            return GS1_STATUS_OK;
+        }
+
+        queue_dirty_neighborhood(context, center);
         return GS1_STATUS_OK;
     }
 
-    const TileCoord center {payload.target_tile_x, payload.target_tile_y};
-    if (!context.world.tile_coord_in_bounds(center))
+    if (message.type == GameMessageType::SiteDevicePlaced)
     {
+        const auto& payload = message.payload_as<SiteDevicePlacedMessage>();
+        if (!structure_has_wind_protection(StructureId {payload.structure_id}))
+        {
+            return GS1_STATUS_OK;
+        }
+
+        const TileCoord anchor {payload.target_tile_x, payload.target_tile_y};
+        if (!context.world.tile_coord_in_bounds(anchor))
+        {
+            return GS1_STATUS_OK;
+        }
+
+        queue_dirty_structure_footprint_neighborhood(context, anchor, StructureId {payload.structure_id});
         return GS1_STATUS_OK;
     }
 
-    queue_dirty_neighborhood(context, center);
+    if (message.type == GameMessageType::SiteDeviceBroken)
+    {
+        const auto& payload = message.payload_as<SiteDeviceBrokenMessage>();
+        if (!structure_has_wind_protection(StructureId {payload.structure_id}))
+        {
+            return GS1_STATUS_OK;
+        }
+
+        const TileCoord anchor {payload.target_tile_x, payload.target_tile_y};
+        if (!context.world.tile_coord_in_bounds(anchor))
+        {
+            return GS1_STATUS_OK;
+        }
+
+        queue_dirty_structure_footprint_neighborhood(context, anchor, StructureId {payload.structure_id});
+        return GS1_STATUS_OK;
+    }
+
+    if (message.type == GameMessageType::SiteDeviceRepaired)
+    {
+        const auto& payload = message.payload_as<SiteDeviceRepairedMessage>();
+        const TileCoord anchor {payload.target_tile_x, payload.target_tile_y};
+        if (!context.world.tile_coord_in_bounds(anchor))
+        {
+            return GS1_STATUS_OK;
+        }
+
+        const auto structure_id = context.world.read_tile(anchor).device.structure_id;
+        if (!structure_has_wind_protection(structure_id))
+        {
+            return GS1_STATUS_OK;
+        }
+
+        queue_dirty_structure_footprint_neighborhood(context, anchor, structure_id);
+    }
+
     return GS1_STATUS_OK;
 }
 
