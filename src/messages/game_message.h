@@ -103,6 +103,14 @@ enum class PlacementReservationRejectionReason : std::uint8_t
     Reserved = 4
 };
 
+enum class PlacementReservationSubjectKind : std::uint8_t
+{
+    None = 0,
+    GroundCoverType = 1,
+    PlantType = 2,
+    StructureType = 3
+};
+
 enum WorkerMeterChangedFlags : std::uint32_t
 {
     WORKER_METER_CHANGED_NONE = 0,
@@ -241,7 +249,8 @@ struct PlacementReservationRequestedMessage final
     std::int32_t target_tile_x;
     std::int32_t target_tile_y;
     PlacementOccupancyLayer occupancy_layer;
-    std::uint8_t reserved0[3];
+    PlacementReservationSubjectKind subject_kind;
+    std::uint8_t reserved0[2];
     std::uint32_t subject_id;
 };
 

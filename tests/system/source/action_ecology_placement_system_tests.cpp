@@ -22,6 +22,8 @@ using gs1::InventoryItemConsumeRequestedMessage;
 using gs1::PlacementOccupancyLayer;
 using gs1::PlacementReservationAcceptedMessage;
 using gs1::PlacementReservationRejectedMessage;
+using gs1::PlacementReservationRequestedMessage;
+using gs1::PlacementReservationSubjectKind;
 using gs1::PlacementValidationSystem;
 using gs1::RuntimeActionId;
 using gs1::SiteActionCompletedMessage;
@@ -431,6 +433,14 @@ void action_execution_item_based_plant_completion_consumes_seed_and_emits_planti
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.awaiting_placement_reservation);
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::PlacementReservationRequested);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        queue.front().payload_as<PlacementReservationRequestedMessage>().subject_kind ==
+            PlacementReservationSubjectKind::PlantType);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        queue.front().payload_as<PlacementReservationRequestedMessage>().subject_id ==
+            gs1::k_plant_wind_reed);
 
     queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(
@@ -616,8 +626,9 @@ void placement_validation_accepts_releases_and_rejects_reserved_tiles(
             2,
             2,
             PlacementOccupancyLayer::GroundCover,
-            {0U, 0U, 0U},
-            1U});
+            PlacementReservationSubjectKind::GroundCoverType,
+            {0U, 0U},
+            0U});
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -638,8 +649,9 @@ void placement_validation_accepts_releases_and_rejects_reserved_tiles(
                     2,
                     2,
                     PlacementOccupancyLayer::GroundCover,
-                    {0U, 0U, 0U},
-                    1U})) == GS1_STATUS_OK);
+                    PlacementReservationSubjectKind::GroundCoverType,
+                    {0U, 0U},
+                    0U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::PlacementReservationRejected);
     GS1_SYSTEM_TEST_CHECK(
@@ -667,8 +679,9 @@ void placement_validation_accepts_releases_and_rejects_reserved_tiles(
                     2,
                     2,
                     PlacementOccupancyLayer::GroundCover,
-                    {0U, 0U, 0U},
-                    1U})) == GS1_STATUS_OK);
+                    PlacementReservationSubjectKind::GroundCoverType,
+                    {0U, 0U},
+                    0U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, queue.back().type == GameMessageType::PlacementReservationAccepted);
 }
 
@@ -697,8 +710,9 @@ void placement_validation_rejects_blocked_and_occupied_tiles(
                     1,
                     1,
                     PlacementOccupancyLayer::GroundCover,
-                    {0U, 0U, 0U},
-                    1U})) == GS1_STATUS_OK);
+                    PlacementReservationSubjectKind::GroundCoverType,
+                    {0U, 0U},
+                    0U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(
         context,
@@ -720,8 +734,9 @@ void placement_validation_rejects_blocked_and_occupied_tiles(
                     3,
                     3,
                     PlacementOccupancyLayer::GroundCover,
-                    {0U, 0U, 0U},
-                    1U})) == GS1_STATUS_OK);
+                    PlacementReservationSubjectKind::GroundCoverType,
+                    {0U, 0U},
+                    0U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(
         context,
@@ -754,8 +769,9 @@ void placement_validation_structure_layer_handles_blocked_occupied_and_valid_til
                     5,
                     5,
                     PlacementOccupancyLayer::Structure,
-                    {0U, 0U, 0U},
-                    1U})) == GS1_STATUS_OK);
+                    PlacementReservationSubjectKind::StructureType,
+                    {0U, 0U},
+                    gs1::k_structure_storage_crate})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(
         context,
@@ -777,8 +793,9 @@ void placement_validation_structure_layer_handles_blocked_occupied_and_valid_til
                     6,
                     5,
                     PlacementOccupancyLayer::Structure,
-                    {0U, 0U, 0U},
-                    1U})) == GS1_STATUS_OK);
+                    PlacementReservationSubjectKind::StructureType,
+                    {0U, 0U},
+                    gs1::k_structure_storage_crate})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(
         context,
@@ -797,10 +814,113 @@ void placement_validation_structure_layer_handles_blocked_occupied_and_valid_til
                     1,
                     5,
                     PlacementOccupancyLayer::Structure,
-                    {0U, 0U, 0U},
-                    1U})) == GS1_STATUS_OK);
+                    PlacementReservationSubjectKind::StructureType,
+                    {0U, 0U},
+                    gs1::k_structure_storage_crate})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::PlacementReservationAccepted);
+}
+
+void placement_validation_living_plants_use_2x2_footprint(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 604U);
+    GameMessageQueue queue {};
+    auto site_context = make_site_context<PlacementValidationSystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        PlacementValidationSystem::process_message(
+            site_context,
+            make_message(
+                GameMessageType::PlacementReservationRequested,
+                PlacementReservationRequestedMessage {
+                    41U,
+                    4,
+                    4,
+                    PlacementOccupancyLayer::GroundCover,
+                    PlacementReservationSubjectKind::PlantType,
+                    {0U, 0U},
+                    gs1::k_plant_wind_reed})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::PlacementReservationAccepted);
+    const auto token = queue.front().payload_as<PlacementReservationAcceptedMessage>().reservation_token;
+
+    queue.clear();
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        PlacementValidationSystem::process_message(
+            site_context,
+            make_message(
+                GameMessageType::PlacementReservationRequested,
+                PlacementReservationRequestedMessage {
+                    42U,
+                    5,
+                    5,
+                    PlacementOccupancyLayer::GroundCover,
+                    PlacementReservationSubjectKind::GroundCoverType,
+                    {0U, 0U},
+                    0U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        queue.front().payload_as<PlacementReservationRejectedMessage>().reason_code ==
+            gs1::PlacementReservationRejectionReason::Reserved);
+
+    queue.clear();
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        PlacementValidationSystem::process_message(
+            site_context,
+            make_message(
+                GameMessageType::PlacementReservationRequested,
+                PlacementReservationRequestedMessage {
+                    43U,
+                    7,
+                    7,
+                    PlacementOccupancyLayer::GroundCover,
+                    PlacementReservationSubjectKind::PlantType,
+                    {0U, 0U},
+                    gs1::k_plant_wind_reed})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        queue.front().payload_as<PlacementReservationRejectedMessage>().reason_code ==
+            gs1::PlacementReservationRejectionReason::OutOfBounds);
+
+    queue.clear();
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        PlacementValidationSystem::process_message(
+            site_context,
+            make_message(
+                GameMessageType::PlacementReservationReleased,
+                gs1::PlacementReservationReleasedMessage {0U, token})) == GS1_STATUS_OK);
+
+    auto occupied_tile = site_run.site_world->tile_at(TileCoord {5, 4});
+    occupied_tile.ecology.ground_cover_type_id = 9U;
+    site_run.site_world->set_tile(TileCoord {5, 4}, occupied_tile);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        PlacementValidationSystem::process_message(
+            site_context,
+            make_message(
+                GameMessageType::PlacementReservationRequested,
+                PlacementReservationRequestedMessage {
+                    44U,
+                    4,
+                    4,
+                    PlacementOccupancyLayer::GroundCover,
+                    PlacementReservationSubjectKind::PlantType,
+                    {0U, 0U},
+                    gs1::k_plant_wind_reed})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        queue.front().payload_as<PlacementReservationRejectedMessage>().reason_code ==
+            gs1::PlacementReservationRejectionReason::Occupied);
 }
 
 void ecology_ground_cover_and_planting_update_tile_state(
@@ -836,11 +956,21 @@ void ecology_ground_cover_and_planting_update_tile_state(
             site_context,
             make_message(
                 GameMessageType::SiteTilePlantingCompleted,
-                SiteTilePlantingCompletedMessage {2U, 2, 2, 8U, 0.6f, 0U})) == GS1_STATUS_OK);
-    tile = site_run.site_world->tile_at(TileCoord {2, 2});
-    GS1_SYSTEM_TEST_CHECK(context, tile.ecology.plant_id.value == 8U);
-    GS1_SYSTEM_TEST_CHECK(context, tile.ecology.ground_cover_type_id == 0U);
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.plant_density, 0.6f));
+                SiteTilePlantingCompletedMessage {
+                    2U,
+                    2,
+                    2,
+                    gs1::k_plant_wind_reed,
+                    0.6f,
+                    0U})) == GS1_STATUS_OK);
+    for (const auto coord : {TileCoord {2, 2}, TileCoord {3, 2}, TileCoord {2, 3}, TileCoord {3, 3}})
+    {
+        tile = site_run.site_world->tile_at(coord);
+        GS1_SYSTEM_TEST_CHECK(context, tile.ecology.plant_id.value == gs1::k_plant_wind_reed);
+        GS1_SYSTEM_TEST_CHECK(context, tile.ecology.ground_cover_type_id == 0U);
+        GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.plant_density, 0.6f));
+    }
+    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::TileEcologyChanged) == 4U);
 }
 
 void ecology_watering_and_burial_clear_require_valid_targets(
@@ -990,6 +1120,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "placement_validation",
     "structure_layer_handles_blocked_occupied_and_valid_tiles",
     placement_validation_structure_layer_handles_blocked_occupied_and_valid_tiles);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "placement_validation",
+    "living_plants_use_2x2_footprint",
+    placement_validation_living_plants_use_2x2_footprint);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "ecology",
     "ground_cover_and_planting_update_tile_state",

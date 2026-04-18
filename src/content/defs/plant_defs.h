@@ -28,7 +28,9 @@ struct PlantDef final
     PlantHeightClass height_class;
     bool growable;
     std::uint8_t aura_size;
-    std::uint16_t reserved0;
+    std::uint8_t footprint_width;
+    std::uint8_t footprint_height;
+    std::uint8_t reserved0;
     float plant_action_duration_minutes;
     float constant_wither_rate;
     float salt_tolerance;
@@ -51,6 +53,8 @@ inline constexpr PlantDef k_generic_living_plant_def {
     PlantHeightClass::Low,
     true,
     0U,
+    1U,
+    1U,
     0U,
     1.0f,
     0.0f,
@@ -73,6 +77,8 @@ inline constexpr PlantDef k_generic_ground_cover_def {
     PlantHeightClass::None,
     false,
     0U,
+    1U,
+    1U,
     0U,
     1.0f,
     0.0f,
@@ -96,6 +102,8 @@ inline constexpr std::array<PlantDef, 4> k_prototype_plant_defs {
         PlantHeightClass::Low,
         true,
         1U,
+        2U,
+        2U,
         0U,
         0.75f,
         0.0f,
@@ -117,6 +125,8 @@ inline constexpr std::array<PlantDef, 4> k_prototype_plant_defs {
         PlantHeightClass::Low,
         true,
         1U,
+        2U,
+        2U,
         0U,
         1.0f,
         0.0f,
@@ -138,6 +148,8 @@ inline constexpr std::array<PlantDef, 4> k_prototype_plant_defs {
         PlantHeightClass::Medium,
         true,
         1U,
+        2U,
+        2U,
         0U,
         1.5f,
         0.0f,
@@ -159,6 +171,8 @@ inline constexpr std::array<PlantDef, 4> k_prototype_plant_defs {
         PlantHeightClass::Low,
         true,
         1U,
+        2U,
+        2U,
         0U,
         1.25f,
         0.0f,

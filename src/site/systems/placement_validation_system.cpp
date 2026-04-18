@@ -1,6 +1,7 @@
 #include "site/systems/placement_validation_system.h"
 
 #include "site/site_run_state.h"
+#include "site/tile_footprint.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -65,52 +66,71 @@ PlacementReservationRejectionReason validate_request(
     const SiteWorldAccess<PlacementValidationSystem>& world,
     TileCoord target_tile,
     PlacementOccupancyLayer occupancy_layer,
-    std::uint32_t excluding_action_id) noexcept
+    std::uint32_t excluding_action_id,
+    TileFootprint footprint) noexcept
 {
-    if (!world.tile_coord_in_bounds(target_tile))
-    {
-        return PlacementReservationRejectionReason::OutOfBounds;
-    }
+    PlacementReservationRejectionReason rejection_reason =
+        PlacementReservationRejectionReason::None;
+    for_each_tile_in_footprint(
+        target_tile,
+        footprint,
+        [&](TileCoord coord) {
+            if (rejection_reason != PlacementReservationRejectionReason::None)
+            {
+                return;
+            }
 
-    const auto tile = world.read_tile(target_tile);
-    if (occupancy_layer == PlacementOccupancyLayer::GroundCover)
-    {
-        if (!tile.static_data.plantable)
-        {
-            return PlacementReservationRejectionReason::TerrainBlocked;
-        }
+            if (!world.tile_coord_in_bounds(coord))
+            {
+                rejection_reason = PlacementReservationRejectionReason::OutOfBounds;
+                return;
+            }
 
-        if (tile.static_data.reserved_by_structure ||
-            tile.device.structure_id.value != 0U ||
-            tile.ecology.plant_id.value != 0U ||
-            tile.ecology.ground_cover_type_id != 0U)
-        {
-            return PlacementReservationRejectionReason::Occupied;
-        }
-    }
-    else if (occupancy_layer == PlacementOccupancyLayer::Structure)
-    {
-        if (!tile.static_data.traversable)
-        {
-            return PlacementReservationRejectionReason::TerrainBlocked;
-        }
+            const auto tile = world.read_tile(coord);
+            if (occupancy_layer == PlacementOccupancyLayer::GroundCover)
+            {
+                if (!tile.static_data.plantable)
+                {
+                    rejection_reason = PlacementReservationRejectionReason::TerrainBlocked;
+                    return;
+                }
 
-        if (tile.device.structure_id.value != 0U)
-        {
-            return PlacementReservationRejectionReason::Occupied;
-        }
-    }
-    else
-    {
-        return PlacementReservationRejectionReason::TerrainBlocked;
-    }
+                if (tile.static_data.reserved_by_structure ||
+                    tile.device.structure_id.value != 0U ||
+                    tile.ecology.plant_id.value != 0U ||
+                    tile.ecology.ground_cover_type_id != 0U)
+                {
+                    rejection_reason = PlacementReservationRejectionReason::Occupied;
+                    return;
+                }
+            }
+            else if (occupancy_layer == PlacementOccupancyLayer::Structure)
+            {
+                if (!tile.static_data.traversable)
+                {
+                    rejection_reason = PlacementReservationRejectionReason::TerrainBlocked;
+                    return;
+                }
 
-    if (is_tile_reserved(site_run_id, target_tile, excluding_action_id))
-    {
-        return PlacementReservationRejectionReason::Reserved;
-    }
+                if (tile.device.structure_id.value != 0U)
+                {
+                    rejection_reason = PlacementReservationRejectionReason::Occupied;
+                    return;
+                }
+            }
+            else
+            {
+                rejection_reason = PlacementReservationRejectionReason::TerrainBlocked;
+                return;
+            }
 
-    return PlacementReservationRejectionReason::None;
+            if (is_tile_reserved(site_run_id, coord, excluding_action_id))
+            {
+                rejection_reason = PlacementReservationRejectionReason::Reserved;
+            }
+        });
+
+    return rejection_reason;
 }
 
 void handle_site_run_started(SiteSystemContext<PlacementValidationSystem>& context) noexcept
@@ -123,12 +143,17 @@ void handle_reservation_requested(
     const PlacementReservationRequestedMessage& payload)
 {
     const TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
+    const TileFootprint footprint = resolve_placement_reservation_footprint(
+        payload.occupancy_layer,
+        payload.subject_kind,
+        payload.subject_id);
     const auto rejection_reason = validate_request(
         context.world.site_run_id(),
         context.world,
         target_tile,
         payload.occupancy_layer,
-        payload.action_id);
+        payload.action_id,
+        footprint);
     if (rejection_reason != PlacementReservationRejectionReason::None)
     {
         enqueue_message(
@@ -144,13 +169,18 @@ void handle_reservation_requested(
     }
 
     const std::uint32_t reservation_token = g_next_reservation_token++;
-    g_reservations.push_back(PlacementReservationRecord {
-        context.world.site_run_id(),
-        payload.action_id,
-        reservation_token,
+    for_each_tile_in_footprint(
         target_tile,
-        payload.occupancy_layer,
-        payload.subject_id});
+        footprint,
+        [&](TileCoord coord) {
+            g_reservations.push_back(PlacementReservationRecord {
+                context.world.site_run_id(),
+                payload.action_id,
+                reservation_token,
+                coord,
+                payload.occupancy_layer,
+                payload.subject_id});
+        });
 
     enqueue_message(
         context.message_queue,
