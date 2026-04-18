@@ -809,11 +809,11 @@ int main()
         assert(payload.blocked_mask == 0ULL);
     }
 
-    auto blocked_tile = placement_preview_site_run.site_world->tile_at(TileCoord {6, 4});
+    auto blocked_tile = placement_preview_site_run.site_world->tile_at(TileCoord {5, 4});
     blocked_tile.ecology.ground_cover_type_id = 9U;
-    placement_preview_site_run.site_world->set_tile(TileCoord {6, 4}, blocked_tile);
+    placement_preview_site_run.site_world->set_tile(TileCoord {5, 4}, blocked_tile);
 
-    auto cursor_update_event = make_site_context_request_event(TileCoord {5, 4});
+    auto cursor_update_event = make_site_context_request_event(TileCoord {5, 5});
     assert(placement_preview_runtime.submit_host_events(&cursor_update_event, 1U) == GS1_STATUS_OK);
     run_phase1(placement_preview_runtime, 0.0);
     const auto cursor_update_messages = drain_engine_messages(placement_preview_runtime);
@@ -823,7 +823,7 @@ int main()
     {
         const auto& payload =
             blocked_preview_messages.front()->payload_as<Gs1EngineMessagePlacementPreviewData>();
-        assert(payload.tile_x == 5);
+        assert(payload.tile_x == 4);
         assert(payload.tile_y == 4);
         assert((payload.flags & 1U) != 0U);
         assert((payload.flags & 2U) == 0U);
@@ -832,7 +832,7 @@ int main()
 
     auto blocked_confirm_event = make_site_action_request_event(
         GS1_SITE_ACTION_PLANT,
-        TileCoord {5, 4},
+        TileCoord {5, 5},
         0U,
         gs1::k_item_wind_reed_seed_bundle,
         GS1_SITE_ACTION_REQUEST_FLAG_HAS_ITEM);
@@ -845,7 +845,7 @@ int main()
     {
         const auto& payload =
             placement_failure_messages.front()->payload_as<Gs1EngineMessagePlacementFailureData>();
-        assert(payload.tile_x == 5);
+        assert(payload.tile_x == 4);
         assert(payload.tile_y == 4);
         assert(payload.action_kind == GS1_SITE_ACTION_PLANT);
         assert(payload.blocked_mask == (1ULL << 1U));

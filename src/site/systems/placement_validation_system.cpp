@@ -69,6 +69,16 @@ PlacementReservationRejectionReason validate_request(
     std::uint32_t excluding_action_id,
     TileFootprint footprint) noexcept
 {
+    if (!is_power_of_two_tile_footprint(footprint))
+    {
+        return PlacementReservationRejectionReason::TerrainBlocked;
+    }
+
+    if (!is_tile_anchor_aligned_to_footprint(target_tile, footprint))
+    {
+        return PlacementReservationRejectionReason::Misaligned;
+    }
+
     PlacementReservationRejectionReason rejection_reason =
         PlacementReservationRejectionReason::None;
     for_each_tile_in_footprint(

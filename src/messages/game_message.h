@@ -102,7 +102,8 @@ enum class PlacementReservationRejectionReason : std::uint8_t
     OutOfBounds = 1,
     TerrainBlocked = 2,
     Occupied = 3,
-    Reserved = 4
+    Reserved = 4,
+    Misaligned = 5
 };
 
 enum class PlacementReservationSubjectKind : std::uint8_t

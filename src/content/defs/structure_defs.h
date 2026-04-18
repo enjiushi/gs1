@@ -90,4 +90,26 @@ inline constexpr std::array<StructureDef, 3> k_prototype_structure_defs {{
     return structure_def != nullptr &&
         structure_def->crafting_station_kind != CraftingStationKind::None;
 }
+
+static_assert(
+    []() constexpr {
+        for (const auto& structure_def : k_prototype_structure_defs)
+        {
+            const bool width_is_power_of_two =
+                structure_def.footprint_width != 0U &&
+                (structure_def.footprint_width &
+                    static_cast<std::uint8_t>(structure_def.footprint_width - 1U)) == 0U;
+            const bool height_is_power_of_two =
+                structure_def.footprint_height != 0U &&
+                (structure_def.footprint_height &
+                    static_cast<std::uint8_t>(structure_def.footprint_height - 1U)) == 0U;
+            if (!width_is_power_of_two || !height_is_power_of_two)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }(),
+    "Prototype structure footprints must use power-of-two tile sizes.");
 }  // namespace gs1

@@ -18,9 +18,54 @@ struct TileFootprint final
 
 [[nodiscard]] inline constexpr TileFootprint normalize_tile_footprint(TileFootprint footprint) noexcept
 {
-        return TileFootprint {
+    return TileFootprint {
         footprint.width == 0U ? 1U : footprint.width,
         footprint.height == 0U ? 1U : footprint.height};
+}
+
+[[nodiscard]] inline constexpr bool is_power_of_two_tile_span(std::uint8_t span) noexcept
+{
+    return span != 0U && (span & static_cast<std::uint8_t>(span - 1U)) == 0U;
+}
+
+[[nodiscard]] inline constexpr bool is_power_of_two_tile_footprint(TileFootprint footprint) noexcept
+{
+    const TileFootprint normalized = normalize_tile_footprint(footprint);
+    return is_power_of_two_tile_span(normalized.width) &&
+        is_power_of_two_tile_span(normalized.height);
+}
+
+[[nodiscard]] inline constexpr std::int32_t align_tile_axis_to_span(
+    std::int32_t coord,
+    std::uint8_t span) noexcept
+{
+    const std::int32_t normalized_span =
+        static_cast<std::int32_t>(span == 0U ? 1U : span);
+    const std::int32_t remainder = coord % normalized_span;
+    if (remainder == 0)
+    {
+        return coord;
+    }
+
+    return coord - (remainder < 0 ? (remainder + normalized_span) : remainder);
+}
+
+[[nodiscard]] inline constexpr TileCoord align_tile_anchor_to_footprint(
+    TileCoord anchor,
+    TileFootprint footprint) noexcept
+{
+    const TileFootprint normalized = normalize_tile_footprint(footprint);
+    return TileCoord {
+        align_tile_axis_to_span(anchor.x, normalized.width),
+        align_tile_axis_to_span(anchor.y, normalized.height)};
+}
+
+[[nodiscard]] inline constexpr bool is_tile_anchor_aligned_to_footprint(
+    TileCoord anchor,
+    TileFootprint footprint) noexcept
+{
+    const TileCoord aligned_anchor = align_tile_anchor_to_footprint(anchor, footprint);
+    return aligned_anchor.x == anchor.x && aligned_anchor.y == anchor.y;
 }
 
 template <typename Func>

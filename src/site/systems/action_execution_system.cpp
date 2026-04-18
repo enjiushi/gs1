@@ -774,6 +774,36 @@ std::uint32_t placement_reservation_subject_id(
     return item_def == nullptr ? primary_subject_id : item_def->linked_plant_id.value;
 }
 
+TileFootprint resolve_action_placement_footprint(
+    ActionKind action_kind,
+    std::uint32_t item_id,
+    std::uint32_t primary_subject_id) noexcept
+{
+    return resolve_placement_reservation_footprint(
+        placement_occupancy_layer(action_kind),
+        placement_reservation_subject_kind(action_kind, item_id),
+        placement_reservation_subject_id(action_kind, item_id, primary_subject_id));
+}
+
+TileCoord align_action_target_tile(
+    ActionKind action_kind,
+    std::uint32_t item_id,
+    std::uint32_t primary_subject_id,
+    TileCoord target_tile) noexcept
+{
+    if (!should_request_placement_reservation(action_kind))
+    {
+        return target_tile;
+    }
+
+    return align_tile_anchor_to_footprint(
+        target_tile,
+        resolve_action_placement_footprint(
+            action_kind,
+            item_id,
+            primary_subject_id));
+}
+
 TileCoord resolve_initial_placement_mode_tile(
     SiteSystemContext<ActionExecutionSystem>& context,
     TileCoord requested_target_tile) noexcept
@@ -794,9 +824,15 @@ void update_placement_mode_preview(
     PlacementModeState& placement_mode,
     TileCoord target_tile)
 {
+    const TileCoord aligned_target_tile = align_tile_anchor_to_footprint(
+        target_tile,
+        resolve_action_placement_footprint(
+            placement_mode.action_kind,
+            placement_mode.item_id,
+            placement_mode.primary_subject_id));
     const auto preview = build_placement_preview(
         context.world,
-        target_tile,
+        aligned_target_tile,
         placement_occupancy_layer(placement_mode.action_kind),
         placement_reservation_subject_kind(
             placement_mode.action_kind,
@@ -805,7 +841,7 @@ void update_placement_mode_preview(
             placement_mode.action_kind,
             placement_mode.item_id,
             placement_mode.primary_subject_id));
-    placement_mode.target_tile = target_tile;
+    placement_mode.target_tile = aligned_target_tile;
     placement_mode.footprint_width = preview.footprint.width;
     placement_mode.footprint_height = preview.footprint.height;
     placement_mode.blocked_mask = preview.blocked_mask;
@@ -817,7 +853,8 @@ bool placement_mode_can_commit_to_tile(
     TileCoord target_tile)
 {
     update_placement_mode_preview(context, placement_mode, target_tile);
-    return context.world.tile_coord_in_bounds(target_tile) &&
+    return placement_mode.target_tile.has_value() &&
+        context.world.tile_coord_in_bounds(*placement_mode.target_tile) &&
         placement_mode.blocked_mask == 0ULL;
 }
 
@@ -859,12 +896,13 @@ void emit_placement_mode_commit_rejected(
     const PlacementModeState& placement_mode,
     TileCoord target_tile)
 {
+    const TileCoord rejected_tile = placement_mode.target_tile.value_or(target_tile);
     enqueue_message(
         queue,
         GameMessageType::PlacementModeCommitRejected,
         PlacementModeCommitRejectedMessage {
-            target_tile.x,
-            target_tile.y,
+            rejected_tile.x,
+            rejected_tile.y,
             placement_mode.blocked_mask,
             to_gs1_action_kind(placement_mode.action_kind),
             placement_mode.item_id});
@@ -1292,6 +1330,12 @@ Gs1Status ActionExecutionSystem::process_message(
                 secondary_subject_id);
             return GS1_STATUS_OK;
         }
+
+        target_tile = align_action_target_tile(
+            action_kind,
+            item_id,
+            primary_subject_id,
+            target_tile);
 
         if (action_kind == ActionKind::Repair)
         {

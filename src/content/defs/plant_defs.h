@@ -203,6 +203,28 @@ inline constexpr std::array<PlantDef, 4> k_prototype_plant_defs {
     return nullptr;
 }
 
+static_assert(
+    []() constexpr {
+        for (const auto& plant_def : k_prototype_plant_defs)
+        {
+            const bool width_is_power_of_two =
+                plant_def.footprint_width != 0U &&
+                (plant_def.footprint_width &
+                    static_cast<std::uint8_t>(plant_def.footprint_width - 1U)) == 0U;
+            const bool height_is_power_of_two =
+                plant_def.footprint_height != 0U &&
+                (plant_def.footprint_height &
+                    static_cast<std::uint8_t>(plant_def.footprint_height - 1U)) == 0U;
+            if (!width_is_power_of_two || !height_is_power_of_two)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }(),
+    "Prototype plant footprints must use power-of-two tile sizes.");
+
 static_assert(std::is_standard_layout_v<PlantDef>, "PlantDef must remain standard layout.");
 static_assert(std::is_trivial_v<PlantDef>, "PlantDef must remain trivial.");
 static_assert(std::is_trivially_copyable_v<PlantDef>, "PlantDef must remain trivially copyable.");
