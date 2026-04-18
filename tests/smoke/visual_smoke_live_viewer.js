@@ -63,6 +63,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let animationTimeSeconds = 0;
     let rendererWidth = 0;
     let rendererHeight = 0;
+    let heatPostProcess = null;
     let cameraOrbitDragPointerId = null;
     let cameraOrbitDragButton = -1;
     let cameraOrbitDragLastClientX = 0;
@@ -85,6 +86,56 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const cameraRightOnGround = new THREE_NS.Vector3();
     const desiredMoveOnGround = new THREE_NS.Vector3();
     const worldUp = new THREE_NS.Vector3(0, 1, 0);
+    const heatDistortionVertexShader = `
+        varying vec2 vUv;
+
+        void main() {
+            vUv = uv;
+            gl_Position = vec4(position.xy, 0.0, 1.0);
+        }
+    `;
+    const heatDistortionFragmentShader = `
+        precision highp float;
+
+        uniform sampler2D tSceneColor;
+        uniform vec2 uResolution;
+        uniform float uTime;
+        uniform float uHeatLevel;
+        uniform float uStrength;
+
+        varying vec2 vUv;
+
+        void main() {
+            vec2 uv = vUv;
+            vec2 texel = 1.0 / max(uResolution, vec2(1.0));
+            float lowerMask = smoothstep(0.04, 0.22, uv.y);
+            float upperMask = 1.0 - smoothstep(0.74, 0.96, uv.y);
+            float edgeMask = smoothstep(0.06, 0.20, uv.x) * (1.0 - smoothstep(0.80, 0.94, uv.x));
+            float shimmerMask = lowerMask * upperMask * mix(0.92, 1.05, edgeMask);
+
+            float bandA = sin(uv.y * 28.0 - uTime * 1.8 + sin(uv.x * 9.0 + uTime * 0.55));
+            float bandB = sin((uv.y + uv.x * 0.10) * 58.0 + uTime * 2.8);
+            float bandC = sin((uv.y * 96.0) - uTime * 4.0 + uv.x * 16.0);
+            float ripple = bandA * 0.68 + bandB * 0.22 + bandC * 0.10;
+            float heatScale = smoothstep(0.0, 1.0, uHeatLevel);
+
+            vec2 distortion = vec2(ripple * 4.9, (bandB * 0.55 + bandC * 0.45) * 0.78);
+            vec2 sampleUv = clamp(
+                uv + distortion * texel * uStrength * shimmerMask * mix(0.84, 1.22, heatScale),
+                vec2(0.001),
+                vec2(0.999));
+            vec4 sceneColor = texture2D(tSceneColor, sampleUv);
+            float heatLift = 2.0 * uStrength * (0.48 + heatScale * 1.35) * mix(0.28, 0.72, shimmerMask);
+            float brightAreaMask = smoothstep(0.45, 1.45, dot(sceneColor.rgb, vec3(0.30, 0.59, 0.11)) * 1.6);
+            vec3 warmLift = vec3(0.30, 0.21, 0.09) * heatLift;
+            vec3 color = sceneColor.rgb * (1.0 + heatLift * (0.34 + heatScale * 0.30));
+            color += warmLift;
+            color += warmLift * brightAreaMask * (0.80 + heatScale * 0.42);
+            color = min(color, vec3(1.0));
+
+            gl_FragColor = vec4(color, sceneColor.a);
+        }
+    `;
     const siteCameraDefaults = {
         offsetX: 4.6,
         offsetZ: 5.2,
@@ -218,6 +269,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const worldGroup = new THREE_NS.Group();
     scene.add(worldGroup);
 
+    heatPostProcess = createHeatDistortionPostProcess();
+
     function fitRenderer() {
         const width = Math.max(gameView.clientWidth, 320);
         const height = Math.max(gameView.clientHeight, 240);
@@ -228,8 +281,114 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         rendererWidth = width;
         rendererHeight = height;
         renderer.setSize(width, height, false);
+        resizeHeatDistortionPostProcess(heatPostProcess, width, height);
         camera.aspect = width / height;
         camera.updateProjectionMatrix();
+    }
+
+    function createHeatDistortionPostProcess() {
+        const renderTarget = new THREE_NS.WebGLRenderTarget(1, 1, {
+            minFilter: THREE_NS.LinearFilter,
+            magFilter: THREE_NS.LinearFilter,
+            generateMipmaps: false,
+            stencilBuffer: false
+        });
+        if (renderer.capabilities.isWebGL2) {
+            renderTarget.samples = 2;
+        }
+
+        const material = new THREE_NS.ShaderMaterial({
+            uniforms: {
+                tSceneColor: { value: renderTarget.texture },
+                uResolution: { value: new THREE_NS.Vector2(1, 1) },
+                uTime: { value: 0 },
+                uHeatLevel: { value: 0 },
+                uStrength: { value: 0 }
+            },
+            vertexShader: heatDistortionVertexShader,
+            fragmentShader: heatDistortionFragmentShader,
+            depthWrite: false,
+            depthTest: false
+        });
+
+        const postScene = new THREE_NS.Scene();
+        const postCamera = new THREE_NS.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+        const postQuad = new THREE_NS.Mesh(new THREE_NS.PlaneGeometry(2, 2), material);
+        postQuad.frustumCulled = false;
+        postScene.add(postQuad);
+
+        return {
+            renderTarget,
+            material,
+            scene: postScene,
+            camera: postCamera
+        };
+    }
+
+    function resizeHeatDistortionPostProcess(postProcess, width, height) {
+        if (!postProcess) {
+            return;
+        }
+
+        postProcess.renderTarget.setSize(Math.max(width, 1), Math.max(height, 1));
+        postProcess.material.uniforms.uResolution.value.set(Math.max(width, 1), Math.max(height, 1));
+    }
+
+    function clamp01(value) {
+        return Math.max(0, Math.min(value, 1));
+    }
+
+    function getHeatVisualResponse(state) {
+        if (!state || state.appState !== "SITE_ACTIVE") {
+            return {
+                heatLevel: 0,
+                effectStrength: 0
+            };
+        }
+
+        const siteState = getSiteState(state);
+        const weather = siteState ? siteState.weather : null;
+        if (!weather) {
+            return {
+                heatLevel: 0,
+                effectStrength: 0
+            };
+        }
+
+        const heatLevel = clamp01(weather.heat / 100.0);
+        const dustWeight = clamp01(weather.dust / 30.0);
+        const eventBoost = weather.eventPhase && weather.eventPhase !== "NONE" ? 0.04 : 0.0;
+        const baseStrength = heatLevel > 0.001 ? 0.08 : 0.0;
+        const blendedStrength =
+            baseStrength +
+            heatLevel * 0.36 +
+            heatLevel * heatLevel * 0.16 +
+            dustWeight * 0.08 +
+            eventBoost;
+
+        return {
+            heatLevel,
+            effectStrength: Math.min(blendedStrength, 0.58)
+        };
+    }
+
+    function renderSceneWithHeatDistortion(state, elapsedSeconds) {
+        const heatVisualResponse = getHeatVisualResponse(state);
+        if (!heatPostProcess || heatVisualResponse.effectStrength <= 0.001) {
+            renderer.setRenderTarget(null);
+            renderer.render(scene, camera);
+            return;
+        }
+
+        heatPostProcess.material.uniforms.uTime.value = elapsedSeconds;
+        heatPostProcess.material.uniforms.uHeatLevel.value = heatVisualResponse.heatLevel;
+        heatPostProcess.material.uniforms.uStrength.value = heatVisualResponse.effectStrength;
+        heatPostProcess.material.uniforms.tSceneColor.value = heatPostProcess.renderTarget.texture;
+
+        renderer.setRenderTarget(heatPostProcess.renderTarget);
+        renderer.render(scene, camera);
+        renderer.setRenderTarget(null);
+        renderer.render(heatPostProcess.scene, heatPostProcess.camera);
     }
 
     function disposeObject(object) {
@@ -4563,7 +4722,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         fitRenderer();
         renderActionProgressBar(latestState);
         renderPlacementFailureToast();
-        renderer.render(scene, camera);
+        renderSceneWithHeatDistortion(latestState, elapsed);
     }
 
     function normalizeState(state) {
