@@ -125,7 +125,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 vec2(0.001),
                 vec2(0.999));
             vec4 sceneColor = texture2D(tSceneColor, sampleUv);
-            float heatLift = 2.0 * uStrength * (0.48 + heatScale * 1.35) * mix(0.28, 0.72, shimmerMask);
+            float heatLift = 2.0 * uStrength * (0.30 + heatScale * 0.85) * mix(0.22, 0.58, shimmerMask);
             float brightAreaMask = smoothstep(0.45, 1.45, dot(sceneColor.rgb, vec3(0.30, 0.59, 0.11)) * 1.6);
             vec3 warmLift = vec3(0.30, 0.21, 0.09) * heatLift;
             vec3 color = sceneColor.rgb * (1.0 + heatLift * (0.34 + heatScale * 0.30));
