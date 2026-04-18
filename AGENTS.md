@@ -42,12 +42,14 @@ This file is a quick orientation guide for agents working in this repository.
 ## Session Handoff Rule
 
 - Unless the user explicitly says to create a new session, run the task in the main worktree.
-- After a session chooses a worktree, create the fixed Markdown file `.agent-progress/session.md` in that worktree. Do not use task names or session names in the tracker file name.
+- The main worktree does not use the session-occupancy rules in this section. These rules apply only to non-main worktrees used for explicit sessions.
+- After a session chooses a non-main worktree, create the fixed Markdown file `.agent-progress/session.md` in that worktree. Do not use task names or session names in the tracker file name.
 - Treat `.agent-progress/session.md` as both the live task tracker for that session and the occupancy marker showing that the worktree is in use.
 - Use that file to list every intended work item before doing it, and keep appending new task items as the session takes on more work. Do not erase earlier task entries from the file.
 - Every listed item must include a status and only the statuses `pending`, `processing`, or `done` may be used.
 - Update the file as work progresses so another agent can immediately see what is planned, what is in flight, and what is finished.
 - Keep `.agent-progress/` out of commits.
+- Unless the user explicitly says to end the session, the current non-main session continues to occupy that worktree.
 - Remove `.agent-progress/session.md` only after the session's changes have been successfully merged back to `main`. Do not remove it earlier, even if the current task list is complete.
 - When a task is done, the agent must always tell the user which worktree it is currently using.
 
@@ -60,6 +62,7 @@ This file is a quick orientation guide for agents working in this repository.
 
 - Worktrees are no longer manually assigned.
 - Create or choose a non-main worktree only when the user explicitly asks to start a new session or otherwise clearly requires work outside the main worktree.
+- If the work is staying on the main worktree, the non-main session occupancy rules do not apply.
 - When a task needs a non-main git worktree, the agent must discover the available candidates from `git worktree list` and choose a specific free worktree on its own.
 - Determine whether a candidate worktree is free by checking whether `.agent-progress/session.md` exists in that worktree. If that file exists, the worktree is occupied and the session must choose another candidate.
 - Inspect candidate worktrees one by one. If the current candidate already has `.agent-progress/session.md`, skip it and continue to the next candidate worktree.
