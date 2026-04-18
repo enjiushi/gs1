@@ -64,7 +64,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let animationTimeSeconds = 0;
     let rendererWidth = 0;
     let rendererHeight = 0;
-    let heatPostProcess = null;
+    let weatherPostProcess = null;
     let cameraOrbitDragPointerId = null;
     let cameraOrbitDragButton = -1;
     let cameraOrbitDragLastClientX = 0;
@@ -94,7 +94,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const cameraRightOnGround = new THREE_NS.Vector3();
     const desiredMoveOnGround = new THREE_NS.Vector3();
     const worldUp = new THREE_NS.Vector3(0, 1, 0);
-    const heatDistortionVertexShader = `
+    const weatherDistortionVertexShader = `
         varying vec2 vUv;
 
         void main() {
@@ -102,16 +102,46 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             gl_Position = vec4(position.xy, 0.0, 1.0);
         }
     `;
-    const heatDistortionFragmentShader = `
+    const weatherDistortionFragmentShader = `
         precision highp float;
 
         uniform sampler2D tSceneColor;
         uniform vec2 uResolution;
         uniform float uTime;
         uniform float uHeatLevel;
+        uniform float uDustLevel;
+        uniform float uEventLevel;
         uniform float uStrength;
 
         varying vec2 vUv;
+
+        float hash12(vec2 p) {
+            vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+            p3 += dot(p3, p3.yzx + 33.33);
+            return fract((p3.x + p3.y) * p3.z);
+        }
+
+        float noise2d(vec2 p) {
+            vec2 i = floor(p);
+            vec2 f = fract(p);
+            float a = hash12(i);
+            float b = hash12(i + vec2(1.0, 0.0));
+            float c = hash12(i + vec2(0.0, 1.0));
+            float d = hash12(i + vec2(1.0, 1.0));
+            vec2 u = f * f * (3.0 - 2.0 * f);
+            return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+        }
+
+        float fbm(vec2 p) {
+            float value = 0.0;
+            float amplitude = 0.5;
+            for (int octave = 0; octave < 4; ++octave) {
+                value += noise2d(p) * amplitude;
+                p = p * 2.03 + vec2(17.1, 9.7);
+                amplitude *= 0.5;
+            }
+            return value;
+        }
 
         void main() {
             vec2 uv = vUv;
@@ -126,8 +156,29 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             float bandC = sin((uv.y * 96.0) - uTime * 4.0 + uv.x * 16.0);
             float ripple = bandA * 0.68 + bandB * 0.22 + bandC * 0.10;
             float heatScale = smoothstep(0.0, 1.0, uHeatLevel);
+            float dustScale = smoothstep(0.0, 1.0, uDustLevel);
+            float eventScale = smoothstep(0.0, 1.0, uEventLevel);
+            float horizonHaze = smoothstep(0.10, 0.98, uv.y);
+            float lateralMask = smoothstep(0.00, 0.12, uv.x) * (1.0 - smoothstep(0.88, 1.0, uv.x));
+            float dustMask = horizonHaze * mix(0.84, 1.0, lateralMask);
+            vec2 dustFlowUv = uv * vec2(2.2, 4.6) + vec2(-uTime * 0.022, uTime * 0.006);
+            vec2 dustShapeUv = uv * vec2(5.8, 13.0) + vec2(-uTime * 0.045, uTime * 0.012);
+            float dustVolume = fbm(dustFlowUv);
+            float dustStrata = fbm(dustShapeUv);
+            float dustDensityField =
+                mix(dustVolume, dustStrata, 0.28) * 0.72 +
+                (sin((uv.y * 9.0 - uv.x * 1.8) - uTime * 0.12) * 0.5 + 0.5) * 0.28;
+            float opticalDepth =
+                dustScale *
+                dustMask *
+                mix(0.28, 1.85, horizonHaze) *
+                mix(0.80, 1.35, dustDensityField) *
+                (1.0 + eventScale * 0.22);
+            float veilDepth = smoothstep(0.10, 0.95, opticalDepth * 0.68);
+            float gustDistortion = (dustStrata - 0.5) * dustScale * dustMask;
 
             vec2 distortion = vec2(ripple * 4.9, (bandB * 0.55 + bandC * 0.45) * 0.78);
+            distortion += vec2(gustDistortion * (2.6 + eventScale * 0.8), gustDistortion * 0.22);
             vec2 sampleUv = clamp(
                 uv + distortion * texel * uStrength * shimmerMask * mix(0.84, 1.22, heatScale),
                 vec2(0.001),
@@ -139,6 +190,17 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             vec3 color = sceneColor.rgb * (1.0 + heatLift * (0.34 + heatScale * 0.30));
             color += warmLift;
             color += warmLift * brightAreaMask * (0.80 + heatScale * 0.42);
+            vec3 dustTint = vec3(0.78, 0.67, 0.52);
+            float transmittance = exp(-opticalDepth * 1.22);
+            float inscatter = 1.0 - transmittance;
+            float luminance = dot(color, vec3(0.30, 0.59, 0.11));
+            vec3 colorExtinct = color * transmittance;
+            vec3 mieFog = dustTint * inscatter;
+            float forwardLift = brightAreaMask * dustScale * veilDepth * (0.05 + eventScale * 0.03);
+            color = colorExtinct + mieFog;
+            color = mix(color, vec3(dot(color, vec3(0.30, 0.59, 0.11))), inscatter * 0.18);
+            color += dustTint * forwardLift;
+            color = mix(color, dustTint, veilDepth * dustScale * 0.08);
             color = min(color, vec3(1.0));
 
             gl_FragColor = vec4(color, sceneColor.a);
@@ -264,6 +326,21 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     renderer.outputColorSpace = THREE_NS.SRGBColorSpace;
     renderer.domElement.style.touchAction = "none";
     gameView.appendChild(renderer.domElement);
+    const dustOverlay = document.createElement("div");
+    dustOverlay.style.position = "absolute";
+    dustOverlay.style.inset = "-8%";
+    dustOverlay.style.pointerEvents = "none";
+    dustOverlay.style.zIndex = "4";
+    dustOverlay.style.opacity = "0";
+    dustOverlay.style.transition = "opacity 140ms linear";
+    dustOverlay.style.backgroundImage =
+        "radial-gradient(ellipse at 22% 62%, rgba(208, 177, 129, 0.32) 0%, rgba(208, 177, 129, 0.18) 24%, rgba(208, 177, 129, 0.00) 58%)," +
+        "radial-gradient(ellipse at 74% 48%, rgba(190, 156, 108, 0.28) 0%, rgba(190, 156, 108, 0.12) 28%, rgba(190, 156, 108, 0.00) 62%)," +
+        "linear-gradient(180deg, rgba(232, 209, 174, 0.04) 0%, rgba(220, 189, 145, 0.12) 38%, rgba(198, 160, 113, 0.22) 72%, rgba(174, 136, 92, 0.34) 100%)";
+    dustOverlay.style.backgroundSize = "150% 140%, 145% 135%, 100% 100%";
+    dustOverlay.style.filter = "blur(28px) saturate(0.92)";
+    dustOverlay.style.mixBlendMode = "normal";
+    gameView.appendChild(dustOverlay);
 
     const scene = new THREE_NS.Scene();
     scene.background = new THREE_NS.Color(0xf4e6cf);
@@ -277,7 +354,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const worldGroup = new THREE_NS.Group();
     scene.add(worldGroup);
 
-    heatPostProcess = createHeatDistortionPostProcess();
+    weatherPostProcess = createWeatherDistortionPostProcess();
 
     function fitRenderer() {
         const width = Math.max(gameView.clientWidth, 320);
@@ -289,12 +366,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         rendererWidth = width;
         rendererHeight = height;
         renderer.setSize(width, height, false);
-        resizeHeatDistortionPostProcess(heatPostProcess, width, height);
+        resizeWeatherDistortionPostProcess(weatherPostProcess, width, height);
         camera.aspect = width / height;
         camera.updateProjectionMatrix();
     }
 
-    function createHeatDistortionPostProcess() {
+    function createWeatherDistortionPostProcess() {
         const renderTarget = new THREE_NS.WebGLRenderTarget(1, 1, {
             minFilter: THREE_NS.LinearFilter,
             magFilter: THREE_NS.LinearFilter,
@@ -311,10 +388,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 uResolution: { value: new THREE_NS.Vector2(1, 1) },
                 uTime: { value: 0 },
                 uHeatLevel: { value: 0 },
+                uDustLevel: { value: 0 },
+                uEventLevel: { value: 0 },
                 uStrength: { value: 0 }
             },
-            vertexShader: heatDistortionVertexShader,
-            fragmentShader: heatDistortionFragmentShader,
+            vertexShader: weatherDistortionVertexShader,
+            fragmentShader: weatherDistortionFragmentShader,
             depthWrite: false,
             depthTest: false
         });
@@ -333,7 +412,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         };
     }
 
-    function resizeHeatDistortionPostProcess(postProcess, width, height) {
+    function resizeWeatherDistortionPostProcess(postProcess, width, height) {
         if (!postProcess) {
             return;
         }
@@ -346,10 +425,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return Math.max(0, Math.min(value, 1));
     }
 
-    function getHeatVisualResponse(state) {
+    function getWeatherVisualResponse(state) {
         if (!state || state.appState !== "SITE_ACTIVE") {
             return {
                 heatLevel: 0,
+                dustLevel: 0,
+                eventLevel: 0,
                 effectStrength: 0
             };
         }
@@ -359,24 +440,30 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (!weather) {
             return {
                 heatLevel: 0,
+                dustLevel: 0,
+                eventLevel: 0,
                 effectStrength: 0
             };
         }
 
         const heatLevel = clamp01(weather.heat / 100.0);
-        const dustWeight = clamp01(weather.dust / 30.0);
-        const eventBoost = weather.eventPhase && weather.eventPhase !== "NONE" ? 0.04 : 0.0;
+        const dustLevel = clamp01(weather.dust / 18.0);
+        const eventLevel = weather.eventPhase && weather.eventPhase !== "NONE" ? 1.0 : 0.0;
+        const eventBoost = eventLevel * 0.06;
         const baseStrength = heatLevel > 0.001 ? 0.08 : 0.0;
         const blendedStrength =
             baseStrength +
             heatLevel * 0.36 +
             heatLevel * heatLevel * 0.16 +
-            dustWeight * 0.08 +
+            dustLevel * 0.20 +
+            dustLevel * dustLevel * 0.16 +
             eventBoost;
 
         return {
             heatLevel,
-            effectStrength: Math.min(blendedStrength, 0.58)
+            dustLevel,
+            eventLevel,
+            effectStrength: Math.min(blendedStrength, 0.78)
         };
     }
 
@@ -521,23 +608,44 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         stageFrame.style.setProperty("--wind-overlay-to-y", driftY.toFixed(2) + "%");
     }
 
-    function renderSceneWithHeatDistortion(state, elapsedSeconds) {
-        const heatVisualResponse = getHeatVisualResponse(state);
-        if (!heatPostProcess || heatVisualResponse.effectStrength <= 0.001) {
+    function renderSceneWithWeatherDistortion(state, elapsedSeconds) {
+        const weatherVisualResponse = getWeatherVisualResponse(state);
+        if (!weatherPostProcess || weatherVisualResponse.effectStrength <= 0.001) {
             renderer.setRenderTarget(null);
             renderer.render(scene, camera);
             return;
         }
 
-        heatPostProcess.material.uniforms.uTime.value = elapsedSeconds;
-        heatPostProcess.material.uniforms.uHeatLevel.value = heatVisualResponse.heatLevel;
-        heatPostProcess.material.uniforms.uStrength.value = heatVisualResponse.effectStrength;
-        heatPostProcess.material.uniforms.tSceneColor.value = heatPostProcess.renderTarget.texture;
+        weatherPostProcess.material.uniforms.uTime.value = elapsedSeconds;
+        weatherPostProcess.material.uniforms.uHeatLevel.value = weatherVisualResponse.heatLevel;
+        weatherPostProcess.material.uniforms.uDustLevel.value = weatherVisualResponse.dustLevel;
+        weatherPostProcess.material.uniforms.uEventLevel.value = weatherVisualResponse.eventLevel;
+        weatherPostProcess.material.uniforms.uStrength.value = weatherVisualResponse.effectStrength;
+        weatherPostProcess.material.uniforms.tSceneColor.value = weatherPostProcess.renderTarget.texture;
 
-        renderer.setRenderTarget(heatPostProcess.renderTarget);
+        renderer.setRenderTarget(weatherPostProcess.renderTarget);
         renderer.render(scene, camera);
         renderer.setRenderTarget(null);
-        renderer.render(heatPostProcess.scene, heatPostProcess.camera);
+        renderer.render(weatherPostProcess.scene, weatherPostProcess.camera);
+    }
+
+    function updateDustOverlay(state, elapsedSeconds) {
+        const weatherVisualResponse = getWeatherVisualResponse(state);
+        if (!state || state.appState !== "SITE_ACTIVE" || weatherVisualResponse.dustLevel <= 0.001) {
+            dustOverlay.style.opacity = "0";
+            return;
+        }
+
+        const driftPrimary = (-elapsedSeconds * (18.0 + weatherVisualResponse.eventLevel * 7.0)).toFixed(1);
+        const driftSecondary = (-elapsedSeconds * (11.0 + weatherVisualResponse.dustLevel * 5.0)).toFixed(1);
+        const hazePulse =
+            0.08 +
+            weatherVisualResponse.dustLevel * 0.22 +
+            weatherVisualResponse.eventLevel * 0.05 +
+            (Math.sin(elapsedSeconds * 0.28) * 0.5 + 0.5) * 0.03;
+        dustOverlay.style.opacity = Math.min(hazePulse, 0.36).toFixed(3);
+        dustOverlay.style.backgroundPosition =
+            driftPrimary + "px 0px, " + driftSecondary + "px 0px, 0px 0px";
     }
 
     function disposeObject(object) {
@@ -1537,17 +1645,19 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const energy = hud ? Math.round(hud.playerEnergy) : 0;
         const completion = hud ? Math.round((hud.siteCompletionNormalized || 0) * 100) : 0;
         const eventPhase = weather ? weather.eventPhase : "NONE";
-        const wind = weather ? Math.round(weather.wind || 0) : 0;
-        const dust = weather ? Math.round(weather.dust || 0) : 0;
+        const weatherHeat = weather ? Math.round(weather.heat || 0) : 0;
+        const weatherWind = weather ? Math.round(weather.wind || 0) : 0;
+        const weatherDust = weather ? Math.round(weather.dust || 0) : 0;
         const windDirection = weather ? Math.round(weather.windDirectionDegrees || 0) : 0;
 
         statusChip.textContent =
             "Site Live\nHydration " + hydration +
             "\nEnergy " + energy +
             "\nCompletion " + completion + "%" +
-            "\nWind " + wind +
+            "\nHeat " + weatherHeat +
+            "\nWind " + weatherWind +
             "\nBearing " + windDirection + "deg" +
-            "\nDust " + dust +
+            "\nDust " + weatherDust +
             "\nEvent " + eventPhase +
             "\nAlert " + warning.headline +
             "\nSeeds " + carriedSeeds.reduce((total, seed) => total + seed.quantity, 0) +
@@ -5008,7 +5118,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         fitRenderer();
         renderActionProgressBar(latestState);
         renderPlacementFailureToast();
-        renderSceneWithHeatDistortion(latestState, elapsed);
+        updateDustOverlay(latestState, elapsed);
+        renderSceneWithWeatherDistortion(latestState, elapsed);
     }
 
     function normalizeState(state) {
