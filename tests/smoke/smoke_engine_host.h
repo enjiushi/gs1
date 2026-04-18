@@ -375,6 +375,7 @@ private:
     void apply_site_placement_preview(const Gs1EngineMessage& message);
     void apply_site_placement_failure(const Gs1EngineMessage& message);
     void apply_site_task_upsert(const Gs1EngineMessage& message);
+    void apply_site_phone_listing_remove(const Gs1EngineMessage& message);
     void apply_site_phone_listing_upsert(const Gs1EngineMessage& message);
     void apply_site_snapshot_end();
     void apply_hud_state(const Gs1EngineMessage& message);

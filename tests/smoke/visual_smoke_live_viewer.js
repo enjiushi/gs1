@@ -55,6 +55,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let inventoryPanelOpen = true;
     let phonePanelOpen = false;
     let phoneCartViewOpen = false;
+    let phoneBodyScrollTop = 0;
+    const phoneSectionScrollTops = {};
+    let phonePointerInteractionActive = false;
+    let phoneWheelInteractionUntil = 0;
+    let phoneInteractionResumeTimer = 0;
+    let phoneActiveScrollRegionKey = "";
     let lastOverlayAppState = "";
     let tileContextMenuState = null;
     let localActionProgressState = null;
@@ -80,7 +86,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const orbitMouseButton = 2;
     const orbitMouseButtonsMask = 2;
     const orbitDragThresholdPixels = 6;
-    const forcedHeatForVfxTest = 100;
     const heatColorAddGainForVfx = 1.0;
     const hudWarningCodes = {
         none: 0,
@@ -471,20 +476,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return current + (target - current) * blend;
     }
 
-    function getEffectiveWeatherHeat(weather) {
-        if (!weather) {
-            return 0;
-        }
-
-        // Temporary smoke-viewer override so we can inspect an extreme-heat VFX pass without
-        // changing the gameplay weather simulation underneath it.
-        if (forcedHeatForVfxTest > 0) {
-            return forcedHeatForVfxTest;
-        }
-
-        return typeof weather.heat === "number" ? weather.heat : 0;
-    }
-
     function buildTargetWeatherVisualResponse(state) {
         if (!state || state.appState !== "SITE_ACTIVE") {
             return {
@@ -506,7 +497,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             };
         }
 
-        const rawHeatLevel = clamp01(getEffectiveWeatherHeat(weather) / 100.0);
+        const rawHeatLevel = clamp01((typeof weather.heat === "number" ? weather.heat : 0) / 100.0);
         const rawDustLevel = clamp01(weather.dust / 18.0);
         const rawWindLevel = clamp01((weather.wind || 0) / 80.0);
         const heatLevel = smoothstep01(0.12, 0.58, rawHeatLevel);
@@ -809,19 +800,54 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         });
     }
 
-    function makeButton(label, onClick, secondary, disabled) {
+    function makeButton(label, onClick, secondary, disabled, skipClickHandler) {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "action-button" + (secondary ? " secondary" : "");
         button.textContent = label;
         button.disabled = !!disabled;
-        button.addEventListener("click", onClick);
+        if (!skipClickHandler) {
+            button.addEventListener("click", onClick);
+        }
         return button;
     }
 
+    function bindReliablePrimaryPress(button, onPress) {
+        let suppressClick = false;
+
+        button.addEventListener("mousedown", function (event) {
+            if (event.button !== 0 || button.disabled) {
+                return;
+            }
+
+            suppressClick = true;
+            phonePointerInteractionActive = true;
+            phoneActiveScrollRegionKey = "";
+            phoneWheelInteractionUntil = 0;
+            event.preventDefault();
+            event.stopPropagation();
+            onPress(event);
+        });
+
+        button.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (suppressClick) {
+                suppressClick = false;
+                return;
+            }
+
+            if (!button.disabled) {
+                onPress(event);
+            }
+        });
+    }
+
     function makePhoneActionButton(label, onClick, secondary, disabled) {
-        const button = makeButton(label, onClick, secondary, disabled);
+        const button = makeButton(label, onClick, secondary, disabled, true);
         button.classList.add("phone-action-button");
+        bindReliablePrimaryPress(button, onClick);
         return button;
     }
 
@@ -1779,7 +1805,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const energy = hud ? Math.round(hud.playerEnergy) : 0;
         const completion = hud ? Math.round((hud.siteCompletionNormalized || 0) * 100) : 0;
         const eventPhase = weather ? weather.eventPhase : "NONE";
-        const weatherHeat = Math.round(getEffectiveWeatherHeat(weather));
+        const weatherHeat = weather ? Math.round(weather.heat || 0) : 0;
         const weatherWind = weather ? Math.round(weather.wind || 0) : 0;
         const weatherDust = weather ? Math.round(weather.dust || 0) : 0;
         const windDirection = weather ? Math.round(weather.windDirectionDegrees || 0) : 0;
@@ -2777,6 +2803,17 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function clearPhonePanel() {
+        phoneBodyScrollTop = 0;
+        Object.keys(phoneSectionScrollTops).forEach(function (key) {
+            delete phoneSectionScrollTops[key];
+        });
+        phonePointerInteractionActive = false;
+        phoneWheelInteractionUntil = 0;
+        phoneActiveScrollRegionKey = "";
+        if (phoneInteractionResumeTimer !== 0) {
+            window.clearTimeout(phoneInteractionResumeTimer);
+            phoneInteractionResumeTimer = 0;
+        }
         phoneScreenBody.innerHTML = "";
         phoneLayer.classList.remove("open");
         phoneLayer.classList.add("hidden-view");
@@ -2836,13 +2873,96 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         titleElement.textContent = title;
         header.appendChild(titleElement);
 
-        const metaElement = document.createElement("div");
-        metaElement.className = "phone-section-meta";
-        metaElement.textContent = metaText;
-        header.appendChild(metaElement);
+        if (metaText) {
+            const metaElement = document.createElement("div");
+            metaElement.className = "phone-section-meta";
+            metaElement.textContent = metaText;
+            header.appendChild(metaElement);
+        }
 
         section.appendChild(header);
         return section;
+    }
+
+    function appendPhoneSectionContent(section, scrollable) {
+        const content = document.createElement("div");
+        content.className = "phone-section-content" + (scrollable ? " scrollable" : "");
+        section.appendChild(content);
+        return content;
+    }
+
+    function schedulePhonePanelRefreshAfterInteraction() {
+        if (phoneInteractionResumeTimer !== 0) {
+            window.clearTimeout(phoneInteractionResumeTimer);
+        }
+
+        phoneInteractionResumeTimer = window.setTimeout(function () {
+            phoneInteractionResumeTimer = 0;
+            if (phonePanelOpen && latestState && phoneActiveScrollRegionKey === "") {
+                renderPhonePanel(latestState);
+            }
+        }, 260);
+    }
+
+    function isPhoneInteractionLocked() {
+        return phonePointerInteractionActive ||
+            performance.now() < phoneWheelInteractionUntil ||
+            phoneActiveScrollRegionKey !== "";
+    }
+
+    function notePhoneScrollInteraction() {
+        phoneWheelInteractionUntil = performance.now() + 260;
+        capturePhoneScrollPositions();
+        schedulePhonePanelRefreshAfterInteraction();
+    }
+
+    function bindPhoneScrollableRegion(content, scrollKey) {
+        if (!scrollKey) {
+            return;
+        }
+
+        content.setAttribute("data-phone-scroll-key", scrollKey);
+
+        content.addEventListener("mouseenter", function () {
+            if (content.scrollHeight <= content.clientHeight + 1) {
+                return;
+            }
+
+            phoneActiveScrollRegionKey = scrollKey;
+            capturePhoneScrollPositions();
+        });
+
+        content.addEventListener("mouseleave", function () {
+            if (phoneActiveScrollRegionKey !== scrollKey) {
+                return;
+            }
+
+            phoneActiveScrollRegionKey = "";
+            capturePhoneScrollPositions();
+            schedulePhonePanelRefreshAfterInteraction();
+        });
+    }
+
+    function capturePhoneScrollPositions() {
+        phoneBodyScrollTop = phoneScreenBody.scrollTop;
+        phoneScreenBody.querySelectorAll("[data-phone-scroll-key]").forEach(function (element) {
+            const key = element.getAttribute("data-phone-scroll-key");
+            if (!key) {
+                return;
+            }
+            phoneSectionScrollTops[key] = element.scrollTop;
+        });
+    }
+
+    function restorePhoneScrollPositions() {
+        phoneScreenBody.scrollTop = phoneBodyScrollTop;
+        phoneScreenBody.querySelectorAll("[data-phone-scroll-key]").forEach(function (element) {
+            const key = element.getAttribute("data-phone-scroll-key");
+            if (!key) {
+                return;
+            }
+            element.scrollTop = phoneSectionScrollTops[key] || 0;
+        });
     }
 
     function getPhoneListingBadgeLabel(listing) {
@@ -2982,7 +3102,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         button.className = "phone-stepper-button";
         button.textContent = label;
         button.disabled = !!disabled;
-        button.addEventListener("click", onClick);
+        bindReliablePrimaryPress(button, onClick);
         return button;
     }
 
@@ -3010,7 +3130,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             button.appendChild(badge);
         }
 
-        button.addEventListener("click", function () {
+        bindReliablePrimaryPress(button, function () {
             phoneCartViewOpen = !phoneCartViewOpen;
             if (latestState) {
                 renderPhonePanel(latestState);
@@ -3055,15 +3175,17 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         card.appendChild(controls);
     }
 
-    function appendPhoneListingSection(container, title, metaText, listings, state) {
+    function appendPhoneListingSection(container, title, metaText, listings, state, scrollKey) {
         if (listings.length === 0) {
             return;
         }
 
         const section = makePhoneSection(title, metaText);
+        const content = appendPhoneSectionContent(section, true);
+        bindPhoneScrollableRegion(content, scrollKey);
         const stack = document.createElement("div");
         stack.className = "phone-list-stack";
-        section.appendChild(stack);
+        content.appendChild(stack);
 
         listings.forEach((listing) => {
             const affordable = canUsePhoneListing(state, listing);
@@ -3233,9 +3355,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return;
         }
 
+        const content = appendPhoneSectionContent(section, true);
+        bindPhoneScrollableRegion(content, "contracts");
         const stack = document.createElement("div");
         stack.className = "phone-list-stack";
-        section.appendChild(stack);
+        content.appendChild(stack);
 
         tasks.forEach((task) => {
             const targetProgress = Math.max(task.targetProgress || 0, 1);
@@ -3283,6 +3407,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     function renderPhonePanel(state) {
         const isSiteActive = !!state && state.appState === "SITE_ACTIVE";
         syncPhonePanelVisibility(isSiteActive);
+        capturePhoneScrollPositions();
         phoneScreenBody.innerHTML = "";
 
         if (!isSiteActive || !phonePanelOpen) {
@@ -3328,7 +3453,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         } else {
             const marketplaceSection = makePhoneSection(
                 "Marketplace",
-                "Remote orders wait for delivery-box space before transit."
+                ""
             );
             const marketplaceHeader = marketplaceSection.querySelector(".phone-section-header");
             marketplaceHeader.appendChild(makePhoneCartButton(cartItemCount, false));
@@ -3338,9 +3463,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 emptyMarket.textContent = "No buy listings are available right now.";
                 marketplaceSection.appendChild(emptyMarket);
             } else {
+                const content = appendPhoneSectionContent(marketplaceSection, true);
+                bindPhoneScrollableRegion(content, "marketplace");
                 const stack = document.createElement("div");
                 stack.className = "phone-list-stack";
-                marketplaceSection.appendChild(stack);
+                content.appendChild(stack);
                 buyListings.forEach((listing) => {
                     const card = document.createElement("article");
                     card.className = "phone-list-card";
@@ -3370,8 +3497,22 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             }
             phoneScreenBody.appendChild(marketplaceSection);
         }
-        appendPhoneListingSection(phoneScreenBody, "Sellback", "Current inventory surfaced for quick sale", sellListings, state);
-        appendPhoneListingSection(phoneScreenBody, "Services", "Remote services and unlockables", specialListings, state);
+        appendPhoneListingSection(
+            phoneScreenBody,
+            "Sellback",
+            "Current inventory surfaced for quick sale",
+            sellListings,
+            state,
+            "sellback"
+        );
+        appendPhoneListingSection(
+            phoneScreenBody,
+            "Services",
+            "Remote services and unlockables",
+            specialListings,
+            state,
+            "services"
+        );
 
         if (!phoneCartViewOpen &&
             tasks.length === 0 &&
@@ -3383,6 +3524,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             emptyState.textContent = "No remote listings are available on the phone right now.";
             phoneScreenBody.appendChild(emptyState);
         }
+
+        restorePhoneScrollPositions();
     }
 
     function updateMoveAxis() {
@@ -3605,7 +3748,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             break;
         }
 
-        renderPhonePanel(state);
+        if (state.appState !== "SITE_ACTIVE" || !phonePanelOpen || !isPhoneInteractionLocked()) {
+            renderPhonePanel(state);
+        }
         lastOverlayAppState = state.appState;
     }
 
@@ -5934,7 +6079,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                         normalizedState,
                         getInventorySlotsByKind(normalizedState, "WORKER_PACK"));
                     renderStoragePanel(normalizedState, findOpenedInventoryContainer(normalizedState));
-                    if (phonePanelOpen) {
+                    if (phonePanelOpen && !isPhoneInteractionLocked()) {
                         renderPhonePanel(normalizedState);
                     }
                 }
@@ -6346,7 +6491,48 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         releaseCameraPointerLock();
         stopCameraOrbitDrag();
         clearPendingSiteOrbitGesture();
+        phonePointerInteractionActive = false;
+        phoneWheelInteractionUntil = 0;
     });
+
+    phoneLayer.addEventListener("mousedown", function (event) {
+        if (!phonePanelOpen || event.button !== 0) {
+            return;
+        }
+
+        phonePointerInteractionActive = true;
+        event.stopPropagation();
+    });
+
+    phoneLayer.addEventListener("wheel", function (event) {
+        if (!phonePanelOpen) {
+            return;
+        }
+
+        phoneWheelInteractionUntil = performance.now() + 260;
+        event.stopPropagation();
+    }, { passive: true });
+
+    phoneLayer.addEventListener("scroll", function (event) {
+        if (!phonePanelOpen) {
+            return;
+        }
+
+        const target = event.target;
+        if (target === phoneScreenBody ||
+            (target instanceof HTMLElement && target.hasAttribute("data-phone-scroll-key"))) {
+            notePhoneScrollInteraction();
+        }
+    }, { passive: true, capture: true });
+
+    document.addEventListener("mouseup", function () {
+        if (!phonePointerInteractionActive) {
+            return;
+        }
+
+        phonePointerInteractionActive = false;
+        schedulePhonePanelRefreshAfterInteraction();
+    }, true);
 
     document.addEventListener("pointerdown", function (event) {
         if (!tileContextMenuState) {

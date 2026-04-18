@@ -1733,6 +1733,33 @@ body {
   gap: 8px;
 }
 
+.phone-section-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.phone-section-content.scrollable {
+  max-height: 252px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+  margin-right: -4px;
+}
+
+.phone-section-content.scrollable::-webkit-scrollbar {
+  width: 5px;
+}
+
+.phone-section-content.scrollable::-webkit-scrollbar-thumb {
+  background: rgba(101, 73, 39, 0.22);
+  border-radius: 999px;
+}
+
+.phone-section-content.scrollable::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.2);
+}
+
 .phone-list-card,
 .phone-task-card {
   padding: 10px 11px 11px;

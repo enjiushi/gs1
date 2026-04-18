@@ -898,6 +898,113 @@ void economy_invalid_listing_or_money_returns_failures(gs1::testing::SystemTestE
                 gs1::ContractorHireRequestedMessage {9U, 1U})) == GS1_STATUS_INVALID_STATE);
 }
 
+void economy_repeated_sell_requests_do_not_oversubscribe_inventory(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 907U);
+    GameMessageQueue queue {};
+    auto economy_context = make_site_context<EconomyPhoneSystem>(campaign, site_run, queue);
+    auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
+    seed_site_one_inventory(campaign, site_run);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        EconomyPhoneSystem::process_message(
+            economy_context,
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    auto* sell_listing = find_listing_by_id(site_run.economy, 1001U);
+    GS1_SYSTEM_TEST_REQUIRE(context, sell_listing != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, sell_listing->quantity == 2U);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        EconomyPhoneSystem::process_message(
+            economy_context,
+            make_message(
+                GameMessageType::PhoneListingSaleRequested,
+                gs1::PhoneListingSaleRequestedMessage {1001U, 1U, 0U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        EconomyPhoneSystem::process_message(
+            economy_context,
+            make_message(
+                GameMessageType::PhoneListingSaleRequested,
+                gs1::PhoneListingSaleRequestedMessage {1001U, 1U, 0U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 51);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, queue[0].type == GameMessageType::InventoryGlobalItemConsumeRequested);
+    GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameMessageType::InventoryGlobalItemConsumeRequested);
+
+    while (!queue.empty())
+    {
+        const auto message = queue.front();
+        queue.pop_front();
+        GS1_SYSTEM_TEST_CHECK(
+            context,
+            InventorySystem::process_message(inventory_context, message) == GS1_STATUS_OK);
+    }
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        gs1::inventory_storage::available_item_quantity_in_container(
+            site_run,
+            gs1::inventory_storage::worker_pack_container(site_run),
+            gs1::ItemId {gs1::k_item_water_container}) == 0U);
+
+    EconomyPhoneSystem::run(economy_context);
+    sell_listing = find_listing_by_id(site_run.economy, 1001U);
+    GS1_SYSTEM_TEST_CHECK(context, sell_listing == nullptr || sell_listing->quantity == 0U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        EconomyPhoneSystem::process_message(
+            economy_context,
+            make_message(
+                GameMessageType::PhoneListingSaleRequested,
+                gs1::PhoneListingSaleRequestedMessage {1001U, 1U, 0U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 51);
+}
+
+void economy_repeated_cart_add_requests_clamp_without_failure(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 908U);
+    GameMessageQueue queue {};
+    auto site_context = make_site_context<EconomyPhoneSystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        EconomyPhoneSystem::process_message(
+            site_context,
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    auto* listing = find_listing_by_id(site_run.economy, 1U);
+    GS1_SYSTEM_TEST_REQUIRE(context, listing != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, listing->quantity == 6U);
+
+    for (std::uint32_t index = 0U; index < 8U; ++index)
+    {
+        GS1_SYSTEM_TEST_CHECK(
+            context,
+            EconomyPhoneSystem::process_message(
+                site_context,
+                make_message(
+                    GameMessageType::PhoneListingCartAddRequested,
+                    gs1::PhoneListingCartAddRequestedMessage {1U, 1U, 0U})) == GS1_STATUS_OK);
+    }
+
+    listing = find_listing_by_id(site_run.economy, 1U);
+    GS1_SYSTEM_TEST_REQUIRE(context, listing != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, listing->cart_quantity == 6U);
+    GS1_SYSTEM_TEST_CHECK(context, listing->quantity == 6U);
+}
+
 void task_board_site_run_started_seeds_site_one_board(gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
@@ -1088,6 +1195,14 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "economy_phone",
     "invalid_listing_or_money_returns_failures",
     economy_invalid_listing_or_money_returns_failures);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "economy_phone",
+    "repeated_sell_requests_do_not_oversubscribe_inventory",
+    economy_repeated_sell_requests_do_not_oversubscribe_inventory);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "economy_phone",
+    "repeated_cart_add_requests_clamp_without_failure",
+    economy_repeated_cart_add_requests_clamp_without_failure);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "task_board",
     "site_run_started_seeds_site_one_board",

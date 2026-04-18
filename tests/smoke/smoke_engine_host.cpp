@@ -809,6 +809,9 @@ void SmokeEngineHost::flush_engine_messages(const char* stage_label)
         case GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT:
             apply_site_task_upsert(message);
             break;
+        case GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_REMOVE:
+            apply_site_phone_listing_remove(message);
+            break;
         case GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_UPSERT:
             apply_site_phone_listing_upsert(message);
             break;
@@ -1500,6 +1503,24 @@ void SmokeEngineHost::apply_site_phone_listing_upsert(const Gs1EngineMessage& me
     {
         listings.push_back(projection);
     }
+
+    pending_site_snapshot_patch_mask_ |= LiveStatePatchField_SiteStatePhone;
+}
+
+void SmokeEngineHost::apply_site_phone_listing_remove(const Gs1EngineMessage& message)
+{
+    if (!pending_site_snapshot_.has_value())
+    {
+        return;
+    }
+
+    const auto& payload = message.payload_as<Gs1EngineMessagePhoneListingData>();
+    auto& listings = pending_site_snapshot_->phone_listings;
+    listings.erase(
+        std::remove_if(listings.begin(), listings.end(), [&](const SitePhoneListingProjection& listing) {
+            return listing.listing_id == payload.listing_id;
+        }),
+        listings.end());
 
     pending_site_snapshot_patch_mask_ |= LiveStatePatchField_SiteStatePhone;
 }

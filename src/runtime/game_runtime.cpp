@@ -2054,6 +2054,26 @@ void GameRuntime::queue_site_phone_listing_upsert_message(std::size_t listing_in
     engine_messages_.push_back(message);
 }
 
+void GameRuntime::queue_site_phone_listing_remove_message(std::uint32_t listing_id)
+{
+    if (!active_site_run_.has_value() || listing_id == 0U)
+    {
+        return;
+    }
+
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_REMOVE);
+    auto& payload = message.emplace_payload<Gs1EngineMessagePhoneListingData>();
+    payload.listing_id = listing_id;
+    payload.item_or_unlockable_id = 0U;
+    payload.price = 0;
+    payload.related_site_id = active_site_run_->site_id.value;
+    payload.quantity = 0U;
+    payload.cart_quantity = 0U;
+    payload.listing_kind = GS1_PHONE_LISTING_PRESENTATION_BUY_ITEM;
+    payload.flags = 0U;
+    engine_messages_.push_back(message);
+}
+
 void GameRuntime::queue_all_site_phone_listing_upsert_messages()
 {
     if (!active_site_run_.has_value())
@@ -2061,10 +2081,28 @@ void GameRuntime::queue_all_site_phone_listing_upsert_messages()
         return;
     }
 
+    std::vector<std::uint32_t> current_listing_ids {};
+    current_listing_ids.reserve(active_site_run_->economy.available_phone_listings.size());
+    for (const auto& listing : active_site_run_->economy.available_phone_listings)
+    {
+        current_listing_ids.push_back(listing.listing_id);
+    }
+
+    for (const auto previous_listing_id : last_emitted_phone_listing_ids_)
+    {
+        if (std::find(current_listing_ids.begin(), current_listing_ids.end(), previous_listing_id) ==
+            current_listing_ids.end())
+        {
+            queue_site_phone_listing_remove_message(previous_listing_id);
+        }
+    }
+
     for (std::size_t index = 0; index < active_site_run_->economy.available_phone_listings.size(); ++index)
     {
         queue_site_phone_listing_upsert_message(index);
     }
+
+    last_emitted_phone_listing_ids_ = std::move(current_listing_ids);
 }
 
 void GameRuntime::queue_site_bootstrap_messages()

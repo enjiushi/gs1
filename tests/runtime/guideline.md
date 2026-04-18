@@ -10,6 +10,6 @@ Runtime-level tests and probes that validate queue flow, projections, and perfor
 ## Contents
 - `game_runtime_message_chain_test.cpp`: Verifies chained gameplay message dispatch behavior in the runtime.
 - `game_runtime_performance_test.cpp`: Runtime performance-oriented test coverage.
-- `game_runtime_projection_test.cpp`: Verifies projected runtime/UI state output.
+- `game_runtime_projection_test.cpp`: Verifies projected runtime/UI state output, including phone listing removal emission when listings disappear.
 - `local_weather_perf_probe.cpp`: Focused performance probe for local weather processing.
 - `site_system_message_flow_test.cpp`: Verifies message flow between site systems through the runtime path.
