@@ -65,7 +65,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let rendererWidth = 0;
     let rendererHeight = 0;
     let weatherPostProcess = null;
-    let smoothedWeatherEventLevel = 0;
+    let smoothedWeatherVisualResponse = {
+        heatLevel: 0,
+        dustLevel: 0,
+        windLevel: 0,
+        effectStrength: 0
+    };
     let cameraOrbitDragPointerId = null;
     let cameraOrbitDragButton = -1;
     let cameraOrbitDragLastClientX = 0;
@@ -147,6 +152,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         void main() {
             vec2 uv = vUv;
             vec2 texel = 1.0 / max(uResolution, vec2(1.0));
+            vec4 baseSceneColor = texture2D(tSceneColor, uv);
             float lowerMask = smoothstep(0.04, 0.22, uv.y);
             float upperMask = 1.0 - smoothstep(0.74, 0.96, uv.y);
             float edgeMask = smoothstep(0.06, 0.20, uv.x) * (1.0 - smoothstep(0.80, 0.94, uv.x));
@@ -159,6 +165,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             float heatScale = smoothstep(0.0, 1.0, uHeatLevel);
             float dustScale = smoothstep(0.0, 1.0, uDustLevel);
             float eventScale = smoothstep(0.0, 1.0, uEventLevel);
+            float weatherBlend = smoothstep(0.0, 1.0, uStrength);
+            float heatDominance = smoothstep(0.08, 0.42, heatScale);
             float horizonHaze = smoothstep(0.10, 0.98, uv.y);
             float lateralMask = smoothstep(0.00, 0.12, uv.x) * (1.0 - smoothstep(0.88, 1.0, uv.x));
             float dustMask = horizonHaze * mix(0.84, 1.0, lateralMask);
@@ -171,9 +179,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 (sin((uv.y * 9.0 - uv.x * 1.8) - uTime * 0.12) * 0.5 + 0.5) * 0.28;
             float opticalDepth =
                 dustScale *
+                weatherBlend *
+                mix(1.0, 0.38, heatDominance) *
                 dustMask *
-                mix(0.28, 1.85, horizonHaze) *
-                mix(0.80, 1.35, dustDensityField) *
+                mix(0.12, 0.72, horizonHaze) *
+                mix(0.84, 1.12, dustDensityField) *
                 (1.0 + eventScale * 0.22);
             float veilDepth = smoothstep(0.10, 0.95, opticalDepth * 0.68);
             float gustDistortion = (dustStrata - 0.5) * dustScale * dustMask;
@@ -185,7 +195,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 vec2(0.001),
                 vec2(0.999));
             vec4 sceneColor = texture2D(tSceneColor, sampleUv);
-            float heatLift = 3.4 * uStrength * (0.42 + heatScale * 1.05) * mix(0.28, 0.82, shimmerMask);
+            float heatLift = 4.6 * uStrength * (0.48 + heatScale * 1.18) * mix(0.28, 0.82, shimmerMask);
             float brightAreaMask = smoothstep(0.45, 1.45, dot(sceneColor.rgb, vec3(0.30, 0.59, 0.11)) * 1.6);
             vec3 warmLift = vec3(0.38, 0.27, 0.12) * heatLift;
             vec3 heatGlow = vec3(0.24, 0.16, 0.05) * heatLift * mix(0.45, 1.0, horizonHaze);
@@ -196,19 +206,20 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             color += heatGlow;
             color += vec3(0.45, 0.31, 0.12) * sunBloom * brightAreaMask;
             vec3 dustTint = vec3(0.78, 0.67, 0.52);
-            float transmittance = exp(-opticalDepth * 1.22);
+            float transmittance = exp(-opticalDepth * mix(1.02, 0.34, heatDominance));
             float inscatter = 1.0 - transmittance;
             float luminance = dot(color, vec3(0.30, 0.59, 0.11));
             vec3 colorExtinct = color * transmittance;
             vec3 mieFog = dustTint * inscatter;
-            float forwardLift = brightAreaMask * dustScale * veilDepth * (0.05 + eventScale * 0.03);
+            float forwardLift = brightAreaMask * dustScale * veilDepth * mix(0.05, 0.02, heatDominance) * (1.0 + eventScale * 0.22);
             color = colorExtinct + mieFog;
             color = mix(color, vec3(dot(color, vec3(0.30, 0.59, 0.11))), inscatter * 0.18);
             color += dustTint * forwardLift;
-            color = mix(color, dustTint, veilDepth * dustScale * 0.08);
+            color = mix(color, dustTint, veilDepth * dustScale * mix(0.05, 0.015, heatDominance));
+            color = mix(baseSceneColor.rgb, color, weatherBlend);
             color = min(color, vec3(1.0));
 
-            gl_FragColor = vec4(color, sceneColor.a);
+            gl_FragColor = vec4(color, baseSceneColor.a);
         }
     `;
     const siteCameraDefaults = {
@@ -457,31 +468,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return current + (target - current) * blend;
     }
 
-    function updateSmoothedWeatherEventLevel(state, deltaSeconds) {
-        if (!state) {
-            smoothedWeatherEventLevel = clamp01(
-                blendToward(smoothedWeatherEventLevel, 0.0, 3.0, deltaSeconds)
-            );
-            return;
-        }
-
-        const siteState = getSiteState(state);
-        const weather = siteState ? siteState.weather : null;
-        const targetEventLevel =
-            weather && weather.eventPhase && weather.eventPhase !== "NONE"
-                ? 1.0
-                : 0.0;
-        smoothedWeatherEventLevel = clamp01(
-            blendToward(smoothedWeatherEventLevel, targetEventLevel, 3.0, deltaSeconds)
-        );
-    }
-
-    function getWeatherVisualResponse(state) {
+    function buildTargetWeatherVisualResponse(state) {
         if (!state || state.appState !== "SITE_ACTIVE") {
             return {
                 heatLevel: 0,
                 dustLevel: 0,
-                eventLevel: 0,
+                windLevel: 0,
                 effectStrength: 0
             };
         }
@@ -492,31 +484,62 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return {
                 heatLevel: 0,
                 dustLevel: 0,
-                eventLevel: 0,
+                windLevel: 0,
                 effectStrength: 0
             };
         }
 
-        const heatLevel = clamp01(weather.heat / 100.0);
-        const dustLevel = clamp01(weather.dust / 18.0);
-        const eventLevel = smoothedWeatherEventLevel;
-        const eventBoost = eventLevel * 0.10;
+        const rawHeatLevel = clamp01(weather.heat / 100.0);
+        const rawDustLevel = clamp01(weather.dust / 18.0);
+        const rawWindLevel = clamp01((weather.wind || 0) / 80.0);
+        const heatLevel = smoothstep01(0.12, 0.58, rawHeatLevel);
+        const dustLevel = smoothstep01(0.18, 0.70, rawDustLevel);
+        const windLevel = smoothstep01(0.10, 0.52, rawWindLevel);
         const heatPresence = smoothstep01(0.0, 0.18, heatLevel);
-        const baseStrength = heatPresence * 0.14;
+        const baseStrength = heatPresence * 0.20;
         const blendedStrength =
             baseStrength +
-            heatLevel * 0.52 +
-            heatLevel * heatLevel * 0.24 +
-            dustLevel * 0.20 +
-            dustLevel * dustLevel * 0.16 +
-            eventBoost;
+            heatLevel * 0.74 +
+            heatLevel * heatLevel * 0.38 +
+            dustLevel * 0.14 +
+            dustLevel * dustLevel * 0.08;
 
         return {
             heatLevel,
             dustLevel,
-            eventLevel,
+            windLevel,
             effectStrength: Math.min(blendedStrength, 0.92)
         };
+    }
+
+    function updateSmoothedWeatherVisualResponse(state, deltaSeconds) {
+        const target = buildTargetWeatherVisualResponse(state);
+        const riseRate = 5.0;
+        const fallRate = 1.8;
+
+        function blendWeatherVisualChannel(current, nextTarget) {
+            return clamp01(
+                blendToward(
+                    current,
+                    nextTarget,
+                    nextTarget > current ? riseRate : fallRate,
+                    deltaSeconds
+                )
+            );
+        }
+
+        smoothedWeatherVisualResponse.heatLevel =
+            blendWeatherVisualChannel(smoothedWeatherVisualResponse.heatLevel, target.heatLevel);
+        smoothedWeatherVisualResponse.dustLevel =
+            blendWeatherVisualChannel(smoothedWeatherVisualResponse.dustLevel, target.dustLevel);
+        smoothedWeatherVisualResponse.windLevel =
+            blendWeatherVisualChannel(smoothedWeatherVisualResponse.windLevel, target.windLevel);
+        smoothedWeatherVisualResponse.effectStrength =
+            blendWeatherVisualChannel(smoothedWeatherVisualResponse.effectStrength, target.effectStrength);
+    }
+
+    function getWeatherVisualResponse() {
+        return smoothedWeatherVisualResponse;
     }
 
     function getHudWarningPresentation(state) {
@@ -584,7 +607,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         const siteState = getSiteState(state);
         const weather = siteState ? siteState.weather : null;
-        const hud = getHudState(state);
         if (!weather) {
             return {
                 opacity: 0,
@@ -596,32 +618,21 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             };
         }
 
-        const windLevel = clamp01((weather.wind || 0) / 80.0);
-        const dustLevel = clamp01((weather.dust || 0) / 26.0);
+        const weatherVisualResponse = getWeatherVisualResponse();
+        const windLevel = weatherVisualResponse.windLevel;
+        const dustLevel = weatherVisualResponse.dustLevel;
         const directionDegrees =
             typeof weather.windDirectionDegrees === "number"
                 ? weather.windDirectionDegrees
                 : 0;
-        const warningCode = hud && typeof hud.warningCode === "number"
-            ? hud.warningCode
-            : hudWarningCodes.none;
-        const warningBoost = warningCode >= hudWarningCodes.sandblast
-            ? 0.18
-            : warningCode >= hudWarningCodes.severeGale
-                ? 0.12
-                : warningCode >= hudWarningCodes.windExposure
-                    ? 0.07
-                    : warningCode >= hudWarningCodes.windWatch
-                        ? 0.03
-                        : 0.0;
-        const opacity = Math.min(0.68, windLevel * 0.28 + dustLevel * 0.14 + warningBoost);
-        const dustAlpha = Math.min(0.44, dustLevel * 0.22 + windLevel * 0.08 + warningBoost * 0.7);
+        const opacity = Math.min(0.68, windLevel * 0.28 + dustLevel * 0.14);
+        const dustAlpha = Math.min(0.44, dustLevel * 0.22 + windLevel * 0.08);
         let severity = "watch";
-        if (warningCode >= hudWarningCodes.sandblast) {
+        if (windLevel >= 0.8 || (windLevel >= 0.62 && dustLevel >= 0.7)) {
             severity = "critical";
-        } else if (warningCode >= hudWarningCodes.severeGale) {
+        } else if (windLevel >= 0.56) {
             severity = "severe";
-        } else if (warningCode >= hudWarningCodes.windExposure) {
+        } else if (windLevel >= 0.35) {
             severity = "exposure";
         } else if (opacity <= 0.04) {
             severity = "none";
@@ -705,7 +716,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function renderSceneWithWeatherDistortion(state, elapsedSeconds) {
-        const weatherVisualResponse = getWeatherVisualResponse(state);
+        const weatherVisualResponse = getWeatherVisualResponse();
         if (!weatherPostProcess || weatherVisualResponse.effectStrength <= 0.001) {
             renderer.setRenderTarget(null);
             renderer.render(scene, camera);
@@ -715,7 +726,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         weatherPostProcess.material.uniforms.uTime.value = elapsedSeconds;
         weatherPostProcess.material.uniforms.uHeatLevel.value = weatherVisualResponse.heatLevel;
         weatherPostProcess.material.uniforms.uDustLevel.value = weatherVisualResponse.dustLevel;
-        weatherPostProcess.material.uniforms.uEventLevel.value = weatherVisualResponse.eventLevel;
+        weatherPostProcess.material.uniforms.uEventLevel.value = 0;
         weatherPostProcess.material.uniforms.uStrength.value = weatherVisualResponse.effectStrength;
         weatherPostProcess.material.uniforms.tSceneColor.value = weatherPostProcess.renderTarget.texture;
 
@@ -726,18 +737,17 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function updateDustOverlay(state, elapsedSeconds) {
-        const weatherVisualResponse = getWeatherVisualResponse(state);
+        const weatherVisualResponse = getWeatherVisualResponse();
         if (!state || state.appState !== "SITE_ACTIVE" || weatherVisualResponse.dustLevel <= 0.001) {
             dustOverlay.style.opacity = "0";
             return;
         }
 
-        const driftPrimary = (-elapsedSeconds * (18.0 + weatherVisualResponse.eventLevel * 7.0)).toFixed(1);
+        const driftPrimary = (-elapsedSeconds * 18.0).toFixed(1);
         const driftSecondary = (-elapsedSeconds * (11.0 + weatherVisualResponse.dustLevel * 5.0)).toFixed(1);
         const hazePulse =
             0.08 +
             weatherVisualResponse.dustLevel * 0.22 +
-            weatherVisualResponse.eventLevel * 0.05 +
             (Math.sin(elapsedSeconds * 0.28) * 0.5 + 0.5) * 0.03;
         dustOverlay.style.opacity = Math.min(hazePulse, 0.36).toFixed(3);
         dustOverlay.style.backgroundPosition =
@@ -3919,28 +3929,21 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         const siteState = getSiteState(state);
         const weather = siteState ? siteState.weather : null;
-        const warning = getHudWarningPresentation(state);
+        const weatherVisualResponse = getWeatherVisualResponse();
         const windField = cache.windField;
-        if (!weather || !weather.wind || weather.wind <= 3) {
+        if (!weather || weatherVisualResponse.windLevel <= 0.04) {
             windField.group.visible = false;
             return;
         }
 
-        const windLevel = clamp01((weather.wind || 0) / 80.0);
-        const dustLevel = clamp01((weather.dust || 0) / 28.0);
+        const windLevel = weatherVisualResponse.windLevel;
+        const dustLevel = weatherVisualResponse.dustLevel;
         const directionDegrees =
             typeof weather.windDirectionDegrees === "number"
                 ? weather.windDirectionDegrees
                 : 0;
         const directionRadians = directionDegrees * Math.PI / 180.0;
-        const severityBoost = warning.code >= hudWarningCodes.sandblast
-            ? 0.18
-            : warning.code >= hudWarningCodes.severeGale
-                ? 0.10
-                : warning.code >= hudWarningCodes.windExposure
-                    ? 0.05
-                    : 0.0;
-        const alpha = Math.min(0.46, windLevel * 0.26 + dustLevel * 0.12 + severityBoost);
+        const alpha = Math.min(0.46, windLevel * 0.26 + dustLevel * 0.12);
         const streakLength = lerp(0.82, 1.9, windLevel);
         const streakWidth = lerp(0.72, 1.25, windLevel);
         const flowDistance = windField.depthSpan * (1.05 + windLevel * 0.65);
@@ -3973,9 +3976,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             streak.mesh.material.opacity = streakEnabled
                 ? alpha * (0.62 + streak.speedScale * 0.22)
                 : 0.0;
-            streak.mesh.material.color.setHex(
-                warning.code >= hudWarningCodes.sandblast ? 0xf5d6aa : 0xf6edd7
-            );
+            streak.mesh.material.color.setHex(dustLevel >= 0.55 ? 0xf5d6aa : 0xf6edd7);
         });
     }
 
@@ -5399,7 +5400,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const deltaSeconds = Math.min(animationClock.getDelta(), 0.1);
         animationTimeSeconds += deltaSeconds;
         const elapsed = animationTimeSeconds;
-        updateSmoothedWeatherEventLevel(latestState, deltaSeconds);
+        updateSmoothedWeatherVisualResponse(latestState, deltaSeconds);
         worldGroup.traverse((node) => {
             if (node.userData.spinY) {
                 node.rotation.y += node.userData.spinY * 0.01;

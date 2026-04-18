@@ -13,7 +13,6 @@ namespace
 constexpr float k_mild_weather_heat = 15.0f;
 constexpr float k_mild_weather_wind = 10.0f;
 constexpr float k_mild_weather_dust = 5.0f;
-constexpr EventPhase k_site_start_phase = EventPhase::Warning;
 constexpr double k_phase_duration_minutes = 5.0;
 
 // Keep event phase countdown aligned with the site clock progression.
@@ -183,22 +182,7 @@ Gs1Status WeatherEventSystem::process_message(
 
     weather.forecast_profile_state.forecast_profile_id = 1U;
     weather.site_weather_bias = 0.0f;
-    event.active_event_template_id = EventTemplateId{1U};
-    event.event_phase = k_site_start_phase;
-    event.phase_minutes_remaining = resolve_phase_duration_minutes(k_site_start_phase);
-    event.event_heat_pressure = k_mild_weather_heat * resolve_phase_pressure(k_site_start_phase);
-    event.event_wind_pressure = k_mild_weather_wind * resolve_phase_pressure(k_site_start_phase);
-    event.event_dust_pressure = k_mild_weather_dust * resolve_phase_pressure(k_site_start_phase);
     event.aftermath_relief_resolved = 0.0f;
-
-    context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
-    const float warning_pressure_scale = resolve_phase_pressure(k_site_start_phase);
-    apply_site_weather(
-        context,
-        k_mild_weather_heat * warning_pressure_scale,
-        k_mild_weather_wind * warning_pressure_scale,
-        k_mild_weather_dust * warning_pressure_scale,
-        resolve_phase_wind_direction(k_site_start_phase));
 
     return GS1_STATUS_OK;
 }
