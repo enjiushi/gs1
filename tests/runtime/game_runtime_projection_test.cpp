@@ -299,6 +299,17 @@ const Gs1EngineMessage* find_inventory_slot_message(
     return nullptr;
 }
 
+bool contains_phone_listing_message(
+    const std::vector<Gs1EngineMessage>& messages,
+    Gs1EngineMessageType message_type,
+    std::uint32_t listing_id)
+{
+    return std::any_of(messages.begin(), messages.end(), [&](const Gs1EngineMessage& message) {
+        return message.type == message_type &&
+            message.payload_as<Gs1EngineMessagePhoneListingData>().listing_id == listing_id;
+    });
+}
+
 std::uint32_t starter_storage_owner_id(const gs1::SiteRunState& site_run)
 {
     return static_cast<std::uint32_t>(site_run.site_world->device_entity_id(site_run.camp.starter_storage_tile));
@@ -540,6 +551,22 @@ int main()
     assert(bootstrap_site_run.economy.available_phone_listings[0].quantity == 5U);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
     drain_engine_messages(runtime);
+
+    GameMessage sell_listing {};
+    sell_listing.type = GameMessageType::PhoneListingSaleRequested;
+    sell_listing.set_payload(gs1::PhoneListingSaleRequestedMessage {1001U, 1U, 0U});
+    assert(runtime.handle_message(sell_listing) == GS1_STATUS_OK);
+    assert(runtime.handle_message(sell_listing) == GS1_STATUS_OK);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+    const auto sell_projection_messages = drain_engine_messages(runtime);
+    assert(contains_phone_listing_message(
+        sell_projection_messages,
+        GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_REMOVE,
+        1001U));
+    assert(!contains_phone_listing_message(
+        sell_projection_messages,
+        GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_UPSERT,
+        1001U));
 
     Gs1Phase1Result delivery_result {};
     run_phase1(runtime, 3.0, delivery_result);

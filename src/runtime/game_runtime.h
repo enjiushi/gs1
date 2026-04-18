@@ -157,6 +157,7 @@ private:
     void queue_site_placement_failure_message(const PlacementModeCommitRejectedMessage& payload);
     void queue_site_task_upsert_message(std::size_t task_index);
     void queue_all_site_task_upsert_messages();
+    void queue_site_phone_listing_remove_message(std::uint32_t listing_id);
     void queue_site_phone_listing_upsert_message(std::size_t listing_index);
     void queue_all_site_phone_listing_upsert_messages();
     void queue_site_bootstrap_messages();
@@ -220,6 +221,7 @@ private:
     std::map<Gs1UiSetupId, Gs1UiSetupPresentationType> active_ui_setups_ {};
     std::optional<Gs1UiSetupId> active_normal_ui_setup_ {};
     std::optional<Gs1AppState> last_emitted_app_state_ {};
+    std::vector<std::uint32_t> last_emitted_phone_listing_ids_ {};
     bool boot_initialized_ {false};
 };
 

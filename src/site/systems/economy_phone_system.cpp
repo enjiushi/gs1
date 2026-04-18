@@ -416,13 +416,22 @@ Gs1Status process_cart_add(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    if (listing.quantity != 0U &&
-        (listing.cart_quantity > listing.quantity || listing.quantity - listing.cart_quantity < quantity))
+    if (listing.quantity != 0U && listing.cart_quantity >= listing.quantity)
     {
-        return GS1_STATUS_INVALID_STATE;
+        return GS1_STATUS_OK;
     }
 
-    listing.cart_quantity += quantity;
+    const auto remaining_capacity =
+        listing.quantity == 0U
+            ? quantity
+            : (listing.quantity > listing.cart_quantity ? (listing.quantity - listing.cart_quantity) : 0U);
+    const auto quantity_to_add = listing.quantity == 0U ? quantity : std::min(quantity, remaining_capacity);
+    if (quantity_to_add == 0U)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    listing.cart_quantity += quantity_to_add;
     mark_phone_dirty(context);
     return GS1_STATUS_OK;
 }
@@ -432,9 +441,14 @@ Gs1Status process_cart_remove(
     PhoneListingState& listing,
     std::uint32_t quantity)
 {
-    if (listing.kind != PhoneListingKind::BuyItem || listing.cart_quantity == 0U)
+    if (listing.kind != PhoneListingKind::BuyItem)
     {
         return GS1_STATUS_INVALID_STATE;
+    }
+
+    if (listing.cart_quantity == 0U)
+    {
+        return GS1_STATUS_OK;
     }
 
     listing.cart_quantity =
@@ -527,13 +541,16 @@ Gs1Status process_sell_listing(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    const auto available = available_global_item_quantity(context, listing.item_id);
-    if (available < quantity)
+    const auto inventory_available = available_global_item_quantity(context, listing.item_id);
+    const auto effective_available = std::min(listing.quantity, inventory_available);
+    const auto quantity_to_sell = std::min(quantity, effective_available);
+    if (quantity_to_sell == 0U)
     {
-        return GS1_STATUS_INVALID_STATE;
+        refresh_dynamic_sell_listings(context, true);
+        return GS1_STATUS_OK;
     }
 
-    const auto total_gain = static_cast<std::int64_t>(listing.price) * quantity;
+    const auto total_gain = static_cast<std::int64_t>(listing.price) * quantity_to_sell;
     if (total_gain < 0 || !money_delta_fits(total_gain))
     {
         return GS1_STATUS_INVALID_STATE;
@@ -544,13 +561,13 @@ Gs1Status process_sell_listing(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    listing.quantity = available - quantity;
+    listing.quantity = effective_available - quantity_to_sell;
 
     GameMessage consume_message {};
     consume_message.type = GameMessageType::InventoryGlobalItemConsumeRequested;
     consume_message.set_payload(InventoryGlobalItemConsumeRequestedMessage {
         listing.item_id.value,
-        static_cast<std::uint16_t>(quantity),
+        static_cast<std::uint16_t>(quantity_to_sell),
         0U});
     context.message_queue.push_back(consume_message);
 
@@ -782,7 +799,8 @@ Gs1Status EconomyPhoneSystem::process_message(
                 payload.listing_id_or_item_id);
             if (listing == nullptr)
             {
-                return GS1_STATUS_NOT_FOUND;
+                refresh_dynamic_sell_listings(context, true);
+                return GS1_STATUS_OK;
             }
         }
 
