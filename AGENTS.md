@@ -74,6 +74,7 @@ This file is a quick orientation guide for agents working in this repository.
 ## Worktree Alignment Rule
 
 - If a task starts from a git worktree, align that worktree branch with the current local `main` branch before making task-specific changes.
+- If the user explicitly starts a new session in a specific non-main worktree, do not realign that targeted worktree with `main` before starting the session work.
 - Resolve or report any alignment conflicts before proceeding with implementation in that worktree.
 
 ## Merge Coordination Rule
