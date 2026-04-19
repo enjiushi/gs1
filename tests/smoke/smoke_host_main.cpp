@@ -18,6 +18,16 @@ int main(int argc, char** argv)
     const std::string script_path = argc > 2
         ? argv[2]
         : "tests/smoke/scripts/main_menu_to_site_active.smoke";
+    bool verbose_logging = false;
+
+    for (int index = 3; index < argc; ++index)
+    {
+        const std::string argument = argv[index];
+        if (argument == "--verbose")
+        {
+            verbose_logging = true;
+        }
+    }
 
     const auto log_path = repo_root / "out" / "logs" / "smoke_host_latest.log";
     const bool logging_ready = smoke_log::initialize_file_sink(log_path);
@@ -49,7 +59,10 @@ int main(int argc, char** argv)
     assert(api.create_runtime(&create_desc, &runtime) == GS1_STATUS_OK);
     assert(runtime != nullptr);
 
-    SmokeEngineHost smoke_host {api, runtime};
+    const auto log_mode = verbose_logging
+        ? SmokeEngineHost::LogMode::Verbose
+        : SmokeEngineHost::LogMode::ActivityOnly;
+    SmokeEngineHost smoke_host {api, runtime, log_mode};
     SmokeScriptRunner runner {};
     const bool loaded = runner.load_file(script_path);
 

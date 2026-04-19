@@ -16,6 +16,7 @@ $buildPath = Resolve-RepoPath -Path $BuildDir -RepoRoot $repoRoot
 $visualExePath = Join-Path $buildPath "$Configuration\gs1_visual_smoke_host.exe"
 $dllPath = Join-Path $buildPath "$Configuration\gs1_game.dll"
 $resolvedLogPath = Resolve-RepoPath -Path $LogPath -RepoRoot $repoRoot
+$hostVerbose = $VerbosePreference -ne 'SilentlyContinue'
 
 function Get-NewestWriteTimeUtc {
     param(
@@ -107,14 +108,16 @@ $arguments = @($dllPath)
 if ($Port -gt 0) {
     $arguments += @("--port", "$Port")
 }
+if ($hostVerbose) {
+    $arguments += "--verbose"
+}
 
 $escapedRepoRoot = $repoRoot -replace "'", "''"
 $escapedExePath = $visualExePath -replace "'", "''"
-$escapedDllPath = $dllPath -replace "'", "''"
-$launchCommand = "Set-Location '$escapedRepoRoot'; & '$escapedExePath' '$escapedDllPath'"
-if ($Port -gt 0) {
-    $launchCommand += " --port $Port"
+$escapedArguments = $arguments | ForEach-Object {
+    "'" + (($_ -replace "'", "''")) + "'"
 }
+$launchCommand = "Set-Location '$escapedRepoRoot'; & '$escapedExePath' $($escapedArguments -join ' ')"
 
 Write-Host ">> powershell.exe -Command $launchCommand"
 $process = Start-Process `

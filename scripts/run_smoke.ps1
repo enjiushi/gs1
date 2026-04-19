@@ -14,6 +14,7 @@ $buildPath = Resolve-RepoPath -Path $BuildDir -RepoRoot $repoRoot
 $smokeExePath = Join-Path $buildPath "$Configuration\gs1_smoke_host.exe"
 $dllPath = Join-Path $buildPath "$Configuration\gs1_game.dll"
 $resolvedScriptPath = Resolve-RepoPath -Path $ScriptPath -RepoRoot $repoRoot
+$hostVerbose = $VerbosePreference -ne 'SilentlyContinue'
 
 if ($BuildFirst) {
     & (Join-Path $PSScriptRoot "build_gameplay_dll.ps1") -Configuration $Configuration -BuildDir $BuildDir -CMakePath $CMakePath
@@ -39,8 +40,13 @@ if (!(Test-Path $resolvedScriptPath)) {
     throw "Smoke script not found: $resolvedScriptPath"
 }
 
-Write-Host ">> $smokeExePath $dllPath $resolvedScriptPath"
-& $smokeExePath $dllPath $resolvedScriptPath
+$arguments = @($dllPath, $resolvedScriptPath)
+if ($hostVerbose) {
+    $arguments += "--verbose"
+}
+
+Write-Host ">> $smokeExePath $($arguments -join ' ')"
+& $smokeExePath @arguments
 if ($LASTEXITCODE -ne 0) {
     throw "Smoke test failed with exit code $LASTEXITCODE."
 }
