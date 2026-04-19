@@ -104,7 +104,7 @@ inline constexpr std::array<PlantDef, 4> k_prototype_plant_defs {
         1U,
         2U,
         2U,
-        1U,
+        2U,
         0.75f,
         0.0f,
         45.0f,

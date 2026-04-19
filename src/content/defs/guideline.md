@@ -13,7 +13,7 @@ Data-only definition headers for the major authored content domains.
 - `event_defs.h`: Authored event definitions used by event/state systems.
 - `item_defs.h`: Item definition records and item-domain metadata.
 - `modifier_defs.h`: Modifier definition records applied by modifier/weather flows.
-- `plant_defs.h`: Plant/ecology definition records.
+- `plant_defs.h`: Plant/ecology definition records, including authored wind-protection range and power values used by directional shelter resolution.
 - `recipe_defs.h`: General recipe definition records shared by authored content.
 - `reward_defs.h`: Reward definition records for grants and payouts.
 - `site_content_defs.h`: Site template/content definitions for active site runs.

@@ -75,7 +75,8 @@ float compute_salinity_density_cap(
 float compute_growth_pressure(
     const SiteWorld::TileData& tile,
     const PlantDef& plant_def,
-    const ModifierChannelTotals& modifiers) noexcept
+    const ModifierChannelTotals& modifiers,
+    float effective_wind) noexcept
 {
     if (!has_tile_occupant(tile.ecology.plant_id, tile.ecology.ground_cover_type_id))
     {
@@ -88,7 +89,7 @@ float compute_growth_pressure(
         0.0f,
         1.0f);
     const float wind_term = std::clamp(
-        (tile.local_weather.wind * k_growth_pressure_wind_scale) -
+        (effective_wind * k_growth_pressure_wind_scale) -
             (plant_def.wind_resistance * 0.01f),
         0.0f,
         1.0f);
@@ -121,6 +122,7 @@ float compute_growth_pressure(
 float compute_next_moisture(
     const SiteWorld::TileData& tile,
     const ModifierChannelTotals& modifiers,
+    float effective_wind,
     double fixed_step_seconds) noexcept
 {
     const float density = std::clamp(tile.ecology.plant_density, 0.0f, 1.0f);
@@ -129,7 +131,7 @@ float compute_next_moisture(
         std::max(
             0.0f,
             (tile.local_weather.heat * k_moisture_drain_heat_scale +
-                tile.local_weather.wind * k_moisture_drain_wind_scale) *
+                effective_wind * k_moisture_drain_wind_scale) *
                     static_cast<float>(fixed_step_seconds) -
                 retention);
 
@@ -143,6 +145,7 @@ float compute_next_fertility(
     const SiteWorld::TileData& tile,
     const PlantDef& plant_def,
     const ModifierChannelTotals& modifiers,
+    float effective_wind,
     double fixed_step_seconds) noexcept
 {
     const float density = std::clamp(tile.ecology.plant_density, 0.0f, 1.0f);
@@ -155,7 +158,7 @@ float compute_next_fertility(
         static_cast<float>(fixed_step_seconds);
     const float erosion_loss = std::max(
         0.0f,
-        (tile.local_weather.wind * k_fertility_loss_wind_scale +
+        (effective_wind * k_fertility_loss_wind_scale +
             tile.local_weather.dust * k_fertility_loss_dust_scale +
             tile.ecology.sand_burial * k_fertility_loss_burial_scale) *
                 static_cast<float>(fixed_step_seconds) -
@@ -241,6 +244,45 @@ float compute_density_delta(
     float net_delta = density_gain - density_loss;
     net_delta *= 1.0f + (modifiers.plant_density * 0.35f);
     return net_delta;
+}
+
+float compute_effective_wind_exposure(
+    SiteWorldAccess<EcologySystem>& world,
+    TileCoord coord,
+    const SiteWorld::TileData& tile) noexcept
+{
+    if (tile.ecology.plant_id.value == 0U)
+    {
+        return tile.local_weather.wind;
+    }
+
+    const TileFootprint footprint = resolve_plant_tile_footprint(tile.ecology.plant_id);
+    const TileCoord anchor = align_tile_anchor_to_footprint(coord, footprint);
+
+    float total_wind = 0.0f;
+    std::uint32_t sample_count = 0U;
+    for_each_tile_in_footprint(
+        anchor,
+        footprint,
+        [&](TileCoord footprint_coord) {
+            if (!world.tile_coord_in_bounds(footprint_coord))
+            {
+                return;
+            }
+
+            const auto footprint_tile = world.read_tile(footprint_coord);
+            if (footprint_tile.ecology.plant_id != tile.ecology.plant_id)
+            {
+                return;
+            }
+
+            total_wind += footprint_tile.local_weather.wind;
+            ++sample_count;
+        });
+
+    return sample_count == 0U
+        ? tile.local_weather.wind
+        : (total_wind / static_cast<float>(sample_count));
 }
 
 void emit_tile_ecology_changed(
@@ -590,9 +632,11 @@ void EcologySystem::run(SiteSystemContext<EcologySystem>& context)
 
         const auto& plant_def = resolve_occupant_def(tile);
         std::uint32_t changed_mask = TILE_ECOLOGY_CHANGED_NONE;
+        const float effective_wind =
+            compute_effective_wind_exposure(context.world, coord, tile);
 
         const float next_moisture =
-            compute_next_moisture(tile, modifiers, context.fixed_step_seconds);
+            compute_next_moisture(tile, modifiers, effective_wind, context.fixed_step_seconds);
         if (std::fabs(next_moisture - tile.ecology.moisture) > k_density_epsilon)
         {
             tile.ecology.moisture = next_moisture;
@@ -600,7 +644,12 @@ void EcologySystem::run(SiteSystemContext<EcologySystem>& context)
         }
 
         const float next_fertility =
-            compute_next_fertility(tile, plant_def, modifiers, context.fixed_step_seconds);
+            compute_next_fertility(
+                tile,
+                plant_def,
+                modifiers,
+                effective_wind,
+                context.fixed_step_seconds);
         if (std::fabs(next_fertility - tile.ecology.soil_fertility) > k_density_epsilon)
         {
             tile.ecology.soil_fertility = next_fertility;
@@ -616,7 +665,7 @@ void EcologySystem::run(SiteSystemContext<EcologySystem>& context)
         }
 
         const float next_growth_pressure =
-            compute_growth_pressure(tile, plant_def, modifiers);
+            compute_growth_pressure(tile, plant_def, modifiers, effective_wind);
         if (std::fabs(next_growth_pressure - tile.ecology.growth_pressure) > k_density_epsilon)
         {
             tile.ecology.growth_pressure = next_growth_pressure;

@@ -1204,6 +1204,7 @@ Responsibilities:
 
 - recompute `tileHeat`, `tileWind`, `tileDust` every step
 - combine site weather, event pressure, nearby support, local plant support, structure support, terrain shelter, and modifier channels
+- treat wind shelter as directional lee-side support driven by `weatherWindDirectionDegrees`, with nonlinear falloff across the authored wind-protection range
 
 ### 10.5 `WorkerConditionSystem`
 
@@ -1247,6 +1248,7 @@ Responsibilities:
 - apply soil moisture/fertility/salinity changes
 - apply burial gain and clearing effects
 - compute `growthPressure`
+- use footprint-averaged resolved wind when a multi-tile plant evaluates wind-side stress
 - apply `tilePlantDensity` gain/loss
 - resolve density-state thresholds
 - update `fullyGrownTileCount`

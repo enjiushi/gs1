@@ -19,7 +19,7 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `device_support_system.h`: Device support system interface.
 - `device_support_system.cpp`: Resolves support effects and dependencies for site devices.
 - `ecology_system.h`: Ecology system interface.
-- `ecology_system.cpp`: Updates plants, burial, watering, and broader ecology progression.
+- `ecology_system.cpp`: Updates plants, burial, watering, and broader ecology progression, including footprint-averaged wind stress for multi-tile plants.
 - `economy_phone_system.h`: Economy phone system interface.
 - `economy_phone_system.cpp`: Handles phone storefront interactions and economy-driven purchases.
 - `failure_recovery_system.h`: Failure recovery system interface.
@@ -27,7 +27,7 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `inventory_system.h`: Inventory system interface.
 - `inventory_system.cpp`: Applies item moves, uses, and inventory ownership changes.
 - `local_weather_resolve_system.h`: Local weather resolve system interface.
-- `local_weather_resolve_system.cpp`: Resolves local weather updates into owned site state.
+- `local_weather_resolve_system.cpp`: Resolves local weather updates into owned site state, including directional lee-side wind shelter with nonlinear range falloff.
 - `modifier_system.h`: Modifier system interface.
 - `modifier_system.cpp`: Applies and expires site modifiers/effects.
 - `phone_panel_system.h`: Phone panel system interface.

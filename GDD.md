@@ -814,6 +814,7 @@ Use these runtime fields:
 | `weatherHeat` | Continuous `0-100` | Current site-wide heat pressure |
 | `weatherWind` | Continuous `0-100` | Current site-wide wind pressure |
 | `weatherDust` | Continuous `0-100` | Current site-wide airborne sand, dust-load, and visibility pressure; shown to the player as `Dust` |
+| `weatherWindDirectionDegrees` | Continuous `0-360` | Current site-wide wind-flow direction measured clockwise on the tile grid, with `0` pointing east/right |
 | `siteHeatBias` | Continuous `-20` to `20` | Site-specific baseline heat tendency |
 | `siteWindBias` | Continuous `-20` to `20` | Site-specific baseline wind tendency |
 | `siteDustBias` | Continuous `-20` to `20` | Site-specific baseline loose-dust tendency |
@@ -829,6 +830,7 @@ Use these runtime fields:
 Core rule:
 
 - `weatherHeat`, `weatherWind`, and `weatherDust` are site-wide ambient values
+- `weatherWindDirectionDegrees` tells local shelter which side of a plant, structure, or terrain shelter is downwind
 - `eventHeatPressure`, `eventWindPressure`, and `eventDustPressure` are site-wide event meters that can sit at `0` when no harsh event is active
 - local terrain, plants, devices, and player field work do not rewrite the weather itself
 - they change how hard the weather lands on a given tile, worker, device, or storage area
@@ -1576,8 +1578,8 @@ The following plants are temporary placeholders for the current build. Their nam
 
 | Plant | Role Mix | Effect Ceiling (Temp) | Work Demand (Temp) | Own Tile Effect | Neighbor Tile Effect | Use |
 |---|---|---|---|---|---|---|
-| `Straw Checkerboard` | Protection + Fertility setup | Medium | Low | Plant-derived straw grid placed on bare sand; it starts with strong near-surface wind and sand reduction on its own tile, while its shared contribution powers scale down as density decays over time | Adjacent tiles gain early erosion relief, slightly better establishment odds, and a temporary protection buffer while the checkerboard is still fresh | Critical opener for least fertile or pure sand tiles; makes hostile sand workable for later living plants |
-| `Wind Reed` | Protection + Anti-dehydration | Medium | Low | Cheap early plant that reduces wind damage and slows dehydration on its own tile | Adjacent tiles get small wind reduction and slight dehydration relief | First safety plant; teaches line placement and perimeter thinking |
+| `Straw Checkerboard` | Protection + Fertility setup | Medium | Low | Plant-derived straw grid placed on bare sand; it starts with strong near-surface wind and sand reduction on its own tile, while its shared contribution powers scale down as density decays over time | Downwind tiles gain early erosion relief, slightly better establishment odds, and a temporary protection buffer while the checkerboard is still fresh | Critical opener for least fertile or pure sand tiles; makes hostile sand workable for later living plants |
+| `Wind Reed` | Protection + Anti-dehydration | Medium | Low | Cheap early plant that reduces wind damage and slows dehydration on its own tile | Downwind tiles behind the reed get a readable lee-side wind shadow that stays strong near the plant and fades sharply near the range edge | First safety plant; teaches line placement and perimeter thinking |
 | `Shade Cactus` | Anti-dehydration + Worker support | Medium | Low | Strong local heat reduction and low water demand | Adjacent tiles lose water more slowly; nearby work zones feel safer during hot periods | Teaches oasis pockets, camp-edge defense, and local survival planning |
 | `Root Binder` | Fertilize + Protection | Medium | Medium | Stabilizes soil, reduces erosion, and slowly improves difficult ground on its own tile | Adjacent tiles gain fertility and mild erosion resistance, helping surrounding salty tiles recover over time | Teaches groundwork and setup before high-value planting |
 | `Salt Bean` | Output + Fertilize | Medium | Medium | Produces modest food or sellable yield if the tile is stable enough while also serving as the main early salt-rehab crop | Adjacent tiles gain a small fertility bonus and light salinity-recovery support that helps future crops | Teaches low-risk output and the value of mixed production rows on difficult land |
@@ -1959,14 +1961,14 @@ Ecological contribution profile:
 | Field | Range | Meaning |
 |---|---|---|
 | `auraSize` | Small integer `0-2` | Maximum Manhattan-distance reach of this object's shared non-wind contribution values; `0` means own tile only |
-| `windProtectionRange` | Small integer `0-2` | Maximum Manhattan-distance reach of this object's wind protection; `0` means own tile only |
+| `windProtectionRange` | Small integer `0-2` | Maximum downwind reach in tile units of this object's directional wind shelter; `0` means own tile only |
 | `windProtectionPower` | `0-100` | How strongly this plant or device reduces `tileWind` inside `windProtectionRange` |
 | `heatProtectionPower` | `0-100` | How strongly this plant reduces nearby `tileHeat` |
 | `dustProtectionPower` | `0-100` | How strongly this plant reduces nearby `tileDust` |
 | `fertilityImprovePower` | `0-100` | How strongly this plant gradually improves `tileSoilFertility` while healthy and how strongly it pushes back against erosion-driven fertility loss in the current design |
 | `salinityReductionPower` | `0-100` | How strongly this plant gradually reduces `tileSoilSalinity` while healthy |
 
-These contribution traits are plant-side inputs into the shared object contribution meters. `windProtectionPower` now uses its own `windProtectionRange`, while `auraSize` continues to control the shared reach for heat, dust, fertility, and salinity contributions. Current `tilePlantDensity` still scales how much of each plant-side contribution is currently active.
+These contribution traits are plant-side inputs into the shared object contribution meters. `windProtectionPower` now uses its own `windProtectionRange`, while `auraSize` continues to control the shared reach for heat, dust, fertility, and salinity contributions. Current `tilePlantDensity` still scales how much of each plant-side contribution is currently active, and wind shelter should now fade non-linearly across the authored downwind reach so the shelter stays strong near the source and collapses quickly near the end of the range.
 
 Expansion and output profile:
 
@@ -1991,20 +1993,23 @@ Use this contribution pattern:
 | Source | Reach | `windProtectionPower` | `heatProtectionPower` | `dustProtectionPower` | Rule |
 |---|---|---|---|---|---|
 | Own-tile living plant or ground cover | Own tile always | Add current local contribution | Add current local contribution | Add current local contribution | Scale by current `tilePlantDensity` and the relevant shared plant contribution values |
-| Neighbor tile within plant support reach | Manhattan distance `<= windProtectionRange` for wind, `<= auraSize` for the other shared plant channels | Add small to medium contribution | Add small to medium contribution | Add small to medium contribution | Only positive plant contribution values reach neighbors; keep neighbor effect weaker than own-tile effect in the current design |
-| Nearby device or rock shelter | Device footprint or authored `windProtectionRange` | Add medium to strong contribution | None in the current code path | None in the current code path | Scale wind reduction by authored device power and `deviceEfficiency`, or by authored rock-shelter value |
+| Downwind tile within plant support reach | Downwind distance `<= windProtectionRange` for wind, `<= auraSize` with Manhattan distance for the other shared plant channels | Add small to medium contribution | Add small to medium contribution | Add small to medium contribution | Wind shelter should apply only on the lee side defined by `weatherWindDirectionDegrees`; fade it non-linearly so the first protected tile stays strong and the last protected tile drops off sharply |
+| Nearby device or rock shelter | Own footprint or authored `windProtectionRange` | Add medium to strong contribution | None in the current code path | None in the current code path | Resolve wind shelter from the current wind direction and the source footprint/range; scale by authored device power and `deviceEfficiency`, or by authored rock-shelter value |
 
 Rules:
 
 - plant-side wind neighborhood reach should come from explicit `windProtectionRange`
 - `windProtectionRange = 0` means own tile only
-- `windProtectionRange = 1` means own tile plus the `4` orthogonal neighbors
-- `windProtectionRange = 2` means own tile plus all tiles within Manhattan distance `2`
+- `windProtectionRange = 1` means own tile plus the first clearly downwind tile band
+- `windProtectionRange = 2` means own tile plus a deeper lee-side pocket whose protection fades sharply near the far edge
+- wind shelter should read `weatherWindDirectionDegrees` as the direction the wind is traveling toward, not the direction it came from
+- wind shelter should be directional for plants, windbreak devices, and terrain shelter instead of radial
 - shared non-wind plant contribution reach should continue to come from `auraSize`
 - if a plant has no positive wind contribution, `windProtectionRange` has no wind-gameplay effect
 - if a tile has no living plant and no `Straw Checkerboard`, nearby support may still create useful object contribution meters and resolved local weather reduction, but the tile remains empty until planted or spread into
 - rock protection should usually be low-radius and local, just enough to make lee-side placement readable
-- `Straw Checkerboard` uses the same own-tile and neighbor contribution logic as other plant-authored occupants, scaled by current `tilePlantDensity`, with wind reach on `windProtectionRange` and the other shared channels on `auraSize`
+- `Straw Checkerboard` uses the same own-tile and downwind wind-shadow logic as other plant-authored occupants, scaled by current `tilePlantDensity`, with wind reach on `windProtectionRange` and the other shared channels on `auraSize`
+- when one plant covers multiple tiles, evaluate its wind-side stress from the average resolved wind across the tiles in its footprint so one exposed corner does not behave like a separate plant
 - `Drip Irrigator` is not an object-contribution source for weather protection; it applies irrigation directly to `tileMoisture`
 
 This pattern keeps local support readable:
@@ -4435,7 +4440,7 @@ Technology content updates are not separate runtime meters. They are persistent 
 | `growable` | Plant definition only | `tilePlantDensity` | Allows favorable conditions to create density gain. If `false`, low `growthPressure` does not produce positive growth. |
 | `constantWitherRate` | Plant definition only | `tilePlantDensity` | Applies steady density loss every fixed simulation step. |
 | `auraSize` | Object definition only | Reach of `heatProtectionPower`, `dustProtectionPower`, `fertilityImprovePower`, and `salinityReductionPower` | Shared non-wind contribution reach value. `0` means own tile only, and larger values extend contribution reach by Manhattan distance. |
-| `windProtectionRange` | Object definition only | Reach of `windProtectionPower` | Wind-specific contribution reach value. `0` means own tile only, and larger values extend wind protection by Manhattan distance. |
+| `windProtectionRange` | Object definition only | Reach of `windProtectionPower` | Wind-specific contribution reach value. `0` means own tile only, and larger values extend directional downwind shelter farther behind the source. |
 | `windProtectionPower` | Object definition only, `tilePlantDensity`, `deviceEfficiency`, `windProtectionRange` | `tileWind` | Shared local wind-protection meter. Any object with positive wind protection may feed it. Plant density scales plant-side output, while device efficiency scales device-side output. |
 | `heatProtectionPower` | Object definition only, `tilePlantDensity`, `auraSize` | `tileHeat` | Shared local heat-protection meter. Positive plant contribution uses the shared `auraSize` reach. |
 | `dustProtectionPower` | Object definition only, `tilePlantDensity`, `auraSize` | `tileDust` | Shared local dust-protection meter. Positive plant contribution uses the shared `auraSize` reach. |

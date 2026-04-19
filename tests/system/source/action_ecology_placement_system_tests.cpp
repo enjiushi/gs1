@@ -1312,6 +1312,43 @@ void ecology_watering_and_burial_clear_require_valid_targets(
             gs1::TILE_ECOLOGY_CHANGED_SAND_BURIAL);
 }
 
+void ecology_uses_average_wind_across_multitile_plant_footprint(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 7021U);
+    GameMessageQueue queue {};
+    auto site_context = make_site_context<EcologySystem>(campaign, site_run, queue, 1.0);
+
+    for (const auto coord : {TileCoord {2, 2}, TileCoord {3, 2}, TileCoord {2, 3}, TileCoord {3, 3}})
+    {
+        auto tile = site_run.site_world->tile_at(coord);
+        tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_wind_reed};
+        tile.ecology.plant_density = 0.6f;
+        tile.ecology.moisture = 0.0f;
+        tile.ecology.soil_fertility = 0.0f;
+        tile.ecology.soil_salinity = 0.0f;
+        tile.ecology.sand_burial = 0.0f;
+        tile.local_weather.heat = 0.0f;
+        tile.local_weather.dust = 0.0f;
+        tile.local_weather.wind =
+            (coord.y == 2) ? 0.0f : 40.0f;
+        site_run.site_world->set_tile(coord, tile);
+    }
+
+    EcologySystem::run(site_context);
+
+    const auto top_left = site_run.site_world->tile_at(TileCoord {2, 2});
+    const auto top_right = site_run.site_world->tile_at(TileCoord {3, 2});
+    const auto bottom_left = site_run.site_world->tile_at(TileCoord {2, 3});
+    const auto bottom_right = site_run.site_world->tile_at(TileCoord {3, 3});
+
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(top_left.ecology.growth_pressure, 0.215f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(top_right.ecology.growth_pressure, 0.215f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(bottom_left.ecology.growth_pressure, 0.215f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(bottom_right.ecology.growth_pressure, 0.215f));
+}
+
 void ecology_run_grows_occupied_tiles_and_updates_progress(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -1436,6 +1473,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "ecology",
     "watering_and_burial_clear_require_valid_targets",
     ecology_watering_and_burial_clear_require_valid_targets);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "ecology",
+    "uses_average_wind_across_multitile_plant_footprint",
+    ecology_uses_average_wind_across_multitile_plant_footprint);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "ecology",
     "run_grows_occupied_tiles_and_updates_progress",

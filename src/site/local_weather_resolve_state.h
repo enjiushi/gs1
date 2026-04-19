@@ -14,6 +14,7 @@ struct LocalWeatherResolveState final
     float last_base_heat {0.0f};
     float last_base_wind {0.0f};
     float last_base_dust {0.0f};
+    float last_base_wind_direction_degrees {0.0f};
     bool base_inputs_cached {false};
 };
 }  // namespace gs1
