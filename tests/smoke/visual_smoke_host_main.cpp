@@ -28,8 +28,11 @@ struct SiteControlState final
 
 struct LiveSession final
 {
-    explicit LiveSession(const Gs1RuntimeApi& api, Gs1RuntimeHandle* runtime) noexcept
-        : host(api, runtime, SmokeEngineHost::LogMode::ActivityOnly)
+    explicit LiveSession(
+        const Gs1RuntimeApi& api,
+        Gs1RuntimeHandle* runtime,
+        SmokeEngineHost::LogMode log_mode) noexcept
+        : host(api, runtime, log_mode)
     {
     }
 
@@ -264,9 +267,10 @@ void run_live_mode(
     const Gs1RuntimeApi& api,
     Gs1RuntimeHandle* runtime,
     const std::filesystem::path& repo_root,
-    std::uint16_t preferred_port)
+    std::uint16_t preferred_port,
+    SmokeEngineHost::LogMode log_mode)
 {
-    LiveSession session {api, runtime};
+    LiveSession session {api, runtime, log_mode};
     WindowsTimerResolution timer_resolution {1U};
 
     SmokeLiveHttpServer server {
@@ -436,6 +440,7 @@ int main(int argc, char** argv)
         : (repo_root / "build" / "Debug" / "gs1_game.dll");
 
     std::uint16_t preferred_port = 0U;
+    bool verbose_logging = false;
 
     for (int index = 2; index < argc; ++index)
     {
@@ -443,6 +448,12 @@ int main(int argc, char** argv)
         if (argument == "--port" && (index + 1) < argc)
         {
             preferred_port = static_cast<std::uint16_t>(std::strtoul(argv[++index], nullptr, 10));
+            continue;
+        }
+
+        if (argument == "--verbose")
+        {
+            verbose_logging = true;
         }
     }
 
@@ -478,7 +489,10 @@ int main(int argc, char** argv)
     int exit_code = 0;
     try
     {
-        run_live_mode(api, runtime, repo_root, preferred_port);
+        const auto log_mode = verbose_logging
+            ? SmokeEngineHost::LogMode::Verbose
+            : SmokeEngineHost::LogMode::ActivityOnly;
+        run_live_mode(api, runtime, repo_root, preferred_port, log_mode);
     }
     catch (const std::exception& exception)
     {

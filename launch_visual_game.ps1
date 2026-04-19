@@ -8,4 +8,5 @@ param(
     -Configuration "Debug" `
     -BuildDir "build" `
     -Port $Port `
-    -BuildFirst:$BuildFirst
+    -BuildFirst:$BuildFirst `
+    -Verbose:$($VerbosePreference -ne 'SilentlyContinue')
