@@ -30,6 +30,8 @@ constexpr float k_growth_pressure_dust_scale = 0.04f;
 constexpr float k_growth_gain_scale = 0.0012f;
 constexpr float k_growth_loss_scale = 0.0024f;
 constexpr float k_salinity_cap_softening = 0.75f;
+constexpr float k_highway_cover_gain_wind_scale = 0.00028f;
+constexpr float k_highway_cover_gain_dust_scale = 0.00045f;
 
 bool has_tile_occupant(PlantId plant_id, std::uint32_t ground_cover_type_id) noexcept
 {
@@ -471,10 +473,11 @@ std::uint32_t apply_watering(
 }
 
 std::uint32_t apply_burial_cleared(
-    SiteWorldAccess<EcologySystem>& world,
+    SiteSystemContext<EcologySystem>& context,
     TileCoord coord,
     const SiteTileBurialClearedMessage& payload)
 {
+    auto& world = context.world;
     if (!world.tile_coord_in_bounds(coord))
     {
         return TILE_ECOLOGY_CHANGED_NONE;
@@ -482,6 +485,25 @@ std::uint32_t apply_burial_cleared(
 
     auto tile = world.read_tile(coord);
     const float reduction = std::max(0.0f, payload.cleared_amount);
+    const auto tile_index = world.tile_index(coord);
+    const auto& objective = world.read_objective();
+    const bool is_highway_target =
+        objective.type == SiteObjectiveType::HighwayProtection &&
+        tile_index < objective.target_tile_mask.size() &&
+        objective.target_tile_mask[tile_index] != 0U;
+    if (is_highway_target)
+    {
+        const float next_cover = std::max(0.0f, tile.ecology.soil_fertility - reduction);
+        if (std::fabs(tile.ecology.soil_fertility - next_cover) <= k_density_epsilon)
+        {
+            return TILE_ECOLOGY_CHANGED_NONE;
+        }
+
+        tile.ecology.soil_fertility = next_cover;
+        world.write_tile(coord, tile);
+        return TILE_ECOLOGY_CHANGED_FERTILITY;
+    }
+
     const float next_burial = std::max(0.0f, tile.ecology.sand_burial - reduction);
     if (std::fabs(tile.ecology.sand_burial - next_burial) <= k_density_epsilon)
     {
@@ -512,6 +534,7 @@ void update_restoration_progress(
             static_cast<float>(counters.site_completion_tile_threshold);
         normalized_progress = std::clamp(normalized_progress, 0.0f, 1.0f);
     }
+    counters.objective_progress_normalized = normalized_progress;
 
     GameMessage progress_message {};
     progress_message.type = GameMessageType::RestorationProgressChanged;
@@ -520,6 +543,44 @@ void update_restoration_progress(
         counters.site_completion_tile_threshold,
         normalized_progress});
     context.message_queue.push_back(progress_message);
+    context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_HUD);
+}
+
+float compute_highway_sand_cover_delta(
+    const SiteWorld::TileData& tile,
+    double fixed_step_seconds) noexcept
+{
+    const float step_seconds = static_cast<float>(std::max(0.0, fixed_step_seconds));
+    return
+        (std::max(tile.local_weather.wind, 0.0f) * k_highway_cover_gain_wind_scale +
+            std::max(tile.local_weather.dust, 0.0f) * k_highway_cover_gain_dust_scale) *
+        step_seconds;
+}
+
+void update_highway_protection_progress(
+    SiteSystemContext<EcologySystem>& context,
+    float average_sand_cover)
+{
+    auto& counters = context.world.own_counters();
+    const auto& objective = context.world.read_objective();
+    const float clamped_average = std::clamp(average_sand_cover, 0.0f, 1.0f);
+    const float previous_average = counters.highway_average_sand_cover;
+    float normalized_progress = 1.0f;
+    if (objective.highway_max_average_sand_cover > k_density_epsilon)
+    {
+        normalized_progress =
+            1.0f - (clamped_average / objective.highway_max_average_sand_cover);
+        normalized_progress = std::clamp(normalized_progress, 0.0f, 1.0f);
+    }
+
+    if (std::fabs(previous_average - clamped_average) <= k_density_epsilon &&
+        std::fabs(counters.objective_progress_normalized - normalized_progress) <= k_density_epsilon)
+    {
+        return;
+    }
+
+    counters.highway_average_sand_cover = clamped_average;
+    counters.objective_progress_normalized = normalized_progress;
     context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_HUD);
 }
 }  // namespace
@@ -589,7 +650,7 @@ Gs1Status EcologySystem::process_message(
         emit_tile_ecology_changed(
             context,
             coord,
-            apply_burial_cleared(context.world, coord, payload));
+            apply_burial_cleared(context, coord, payload));
         break;
     }
 
@@ -608,13 +669,39 @@ void EcologySystem::run(SiteSystemContext<EcologySystem>& context)
     }
 
     const auto& modifiers = context.world.read_modifier().resolved_channel_totals;
+    const auto& objective = context.world.read_objective();
     std::uint32_t fully_grown_count = 0U;
+    float highway_cover_sum = 0.0f;
+    std::uint32_t highway_tile_count = 0U;
 
     const auto tile_count = context.world.tile_count();
     for (std::size_t index = 0; index < tile_count; ++index)
     {
         auto tile = context.world.read_tile_at_index(index);
         const auto coord = context.world.tile_coord(index);
+        const bool is_highway_target =
+            objective.type == SiteObjectiveType::HighwayProtection &&
+            index < objective.target_tile_mask.size() &&
+            objective.target_tile_mask[index] != 0U;
+
+        if (is_highway_target)
+        {
+            const float next_cover = std::clamp(
+                tile.ecology.soil_fertility +
+                    compute_highway_sand_cover_delta(tile, context.fixed_step_seconds),
+                0.0f,
+                1.0f);
+            if (std::fabs(next_cover - tile.ecology.soil_fertility) > k_density_epsilon)
+            {
+                tile.ecology.soil_fertility = next_cover;
+                context.world.write_tile_at_index(index, tile);
+                emit_tile_ecology_changed(context, coord, TILE_ECOLOGY_CHANGED_FERTILITY);
+            }
+
+            highway_cover_sum += tile.ecology.soil_fertility;
+            highway_tile_count += 1U;
+            continue;
+        }
 
         if (!has_tile_occupant(tile.ecology.plant_id, tile.ecology.ground_cover_type_id))
         {
@@ -714,6 +801,16 @@ void EcologySystem::run(SiteSystemContext<EcologySystem>& context)
         {
             ++fully_grown_count;
         }
+    }
+
+    if (objective.type == SiteObjectiveType::HighwayProtection)
+    {
+        const float average_cover =
+            highway_tile_count == 0U
+            ? 0.0f
+            : (highway_cover_sum / static_cast<float>(highway_tile_count));
+        update_highway_protection_progress(context, average_cover);
+        return;
     }
 
     update_restoration_progress(context, fully_grown_count);

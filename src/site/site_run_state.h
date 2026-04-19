@@ -9,6 +9,7 @@
 #include "site/local_weather_resolve_state.h"
 #include "site/modifier_state.h"
 #include "site/phone_panel_state.h"
+#include "site/site_objective_state.h"
 #include "site/task_board_state.h"
 #include "site/weather_state.h"
 #include "support/id_types.h"
@@ -69,6 +70,8 @@ struct SiteCounters final
 {
     std::uint32_t fully_grown_tile_count {0};
     std::uint32_t site_completion_tile_threshold {0};
+    float objective_progress_normalized {0.0f};
+    float highway_average_sand_cover {0.0f};
 };
 
 struct SiteRunState final
@@ -93,6 +96,7 @@ struct SiteRunState final
     CraftState craft {};
     ActionState site_action {};
     SiteCounters counters {};
+    SiteObjectiveState objective {};
     LocalWeatherResolveState local_weather_resolve {};
     std::uint32_t result_newly_revealed_site_count {0};
     std::uint64_t pending_projection_update_flags {0};

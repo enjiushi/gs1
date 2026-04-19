@@ -1383,6 +1383,59 @@ void ecology_run_grows_occupied_tiles_and_updates_progress(
     GS1_SYSTEM_TEST_CHECK(context, progress->fully_grown_tile_count == 2U);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(progress->normalized_progress, 1.0f));
 }
+
+void ecology_highway_target_tiles_accumulate_cover_and_clear_via_burial_action(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(5U, 704U);
+    GameMessageQueue queue {};
+    auto site_context = make_site_context<EcologySystem>(campaign, site_run, queue, 60.0);
+
+    configure_highway_protection_objective(
+        site_run,
+        gs1::SiteObjectiveTargetEdge::East,
+        12.0,
+        0.5f);
+    const TileCoord road_coord {7, 2};
+    mark_objective_target_tile(site_run, road_coord);
+
+    auto road_tile = site_run.site_world->tile_at(road_coord);
+    road_tile.local_weather.wind = 50.0f;
+    road_tile.local_weather.dust = 35.0f;
+    site_run.site_world->set_tile(road_coord, road_tile);
+
+    EcologySystem::run(site_context);
+
+    road_tile = site_run.site_world->tile_at(road_coord);
+    GS1_SYSTEM_TEST_CHECK(context, !road_tile.static_data.plantable);
+    GS1_SYSTEM_TEST_CHECK(context, road_tile.ecology.soil_fertility > 0.0f);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            site_run.counters.highway_average_sand_cover,
+            road_tile.ecology.soil_fertility));
+    GS1_SYSTEM_TEST_CHECK(context, site_run.counters.objective_progress_normalized < 1.0f);
+    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::RestorationProgressChanged) == 0U);
+
+    const float cover_after_accumulation = road_tile.ecology.soil_fertility;
+    queue.clear();
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        EcologySystem::process_message(
+            site_context,
+            make_message(
+                GameMessageType::SiteTileBurialCleared,
+                SiteTileBurialClearedMessage {
+                    1U,
+                    road_coord.x,
+                    road_coord.y,
+                    0.1f,
+                    0U})) == GS1_STATUS_OK);
+    road_tile = site_run.site_world->tile_at(road_coord);
+    GS1_SYSTEM_TEST_CHECK(context, road_tile.ecology.soil_fertility < cover_after_accumulation);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(road_tile.ecology.sand_burial, 0.0f));
+}
 }  // namespace
 
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
@@ -1481,3 +1534,7 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "ecology",
     "run_grows_occupied_tiles_and_updates_progress",
     ecology_run_grows_occupied_tiles_and_updates_progress);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "ecology",
+    "highway_target_tiles_accumulate_cover_and_clear_via_burial_action",
+    ecology_highway_target_tiles_accumulate_cover_and_clear_via_burial_action);

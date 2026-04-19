@@ -31,6 +31,7 @@ These areas are defined strongly enough to start module design and runtime-struc
 - Shared schema layering direction from global to feature to game-specific data
 - Core gameplay loop and site loop
 - Fixed-step simulation contract and high-level update order
+- Multiple site objective modes, with dense-restoration and highway-protection runtime paths ready to formalize first and green-wall/pure-survival behavior design-locked for later implementation
 - Tile model, occupancy model, tile layers, placement, and sharing rules
 - Terrain meters and plant meters
 - Weather, hazard, harsh-event, and aftermath model
@@ -70,6 +71,7 @@ These areas are the main missing formal sections if we want a safe full-game arc
 | Contract board runtime | `Ready` | Prototype task data shape, completion, reward-generation, and chain rules are now defined strongly enough for system design. |
 | Economy runtime | `Ready` | Economic flow, buy/sell directions, and relative value hierarchy are clear enough for system design; exact prices stay as later tuning tables. |
 | Campaign meta and nearby-site support | `Ready` | Reveal rules, static adjacency, route choice, campaign-time behavior, authored support packages, export timing, and the single-site-output-modifier rule are now defined strongly enough for system design. |
+| Site objective modes | `Ready for staged implementation` | `Dense Restoration` remains the baseline path, `Highway Protection` is specific enough to implement now, and `Green Wall Connection` plus `Pure Survival` are defined clearly enough to stay documented while their objective-specific runtime work is deferred. |
 | Failure, retry, and save systems | `Ready for prototype` | Failure and retry rules are defined strongly enough for the current prototype path. Save/load remains a later TODO rather than an active blocker for now. |
 | Off-screen simulation | `Ready` | Prototype scope only resolves completed-site exported-support catch-up when the `Regional Map` opens; broader future off-screen simulation stays deferred. |
 

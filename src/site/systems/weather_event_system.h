@@ -14,6 +14,7 @@ public:
             "WeatherEventSystem",
             site_component_mask_of(
                 SiteComponent::RunMeta,
+                SiteComponent::Objective,
                 SiteComponent::Weather,
                 SiteComponent::Event),
             site_component_mask_of(

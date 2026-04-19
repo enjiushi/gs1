@@ -2833,11 +2833,7 @@ void GameRuntime::queue_hud_state_message()
         static_cast<std::uint16_t>(active_site_run_->task_board.accepted_task_ids.size());
     payload.current_action_kind =
         static_cast<Gs1SiteActionKind>(active_site_run_->site_action.action_kind);
-    payload.site_completion_normalized =
-        active_site_run_->counters.site_completion_tile_threshold > 0U
-            ? static_cast<float>(active_site_run_->counters.fully_grown_tile_count) /
-                static_cast<float>(active_site_run_->counters.site_completion_tile_threshold)
-            : 0.0f;
+    payload.site_completion_normalized = active_site_run_->counters.objective_progress_normalized;
     payload.warning_code = resolve_hud_warning_code(active_site_run_.value());
     engine_messages_.push_back(hud_message);
 }

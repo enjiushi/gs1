@@ -13,7 +13,9 @@ public:
             "SiteCompletionSystem",
             site_component_mask_of(
                 SiteComponent::RunMeta,
-                SiteComponent::Counters),
+                SiteComponent::Time,
+                SiteComponent::Counters,
+                SiteComponent::Objective),
             0U};
     }
 

@@ -19,7 +19,7 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `device_support_system.h`: Device support system interface.
 - `device_support_system.cpp`: Resolves support effects and dependencies for site devices.
 - `ecology_system.h`: Ecology system interface.
-- `ecology_system.cpp`: Updates plants, burial, watering, and broader ecology progression, including footprint-averaged wind stress for multi-tile plants.
+- `ecology_system.cpp`: Updates plants, burial, watering, broader ecology progression, and highway-target sand-cover accumulation for objective-driven site progress.
 - `economy_phone_system.h`: Economy phone system interface.
 - `economy_phone_system.cpp`: Handles phone storefront interactions and economy-driven purchases.
 - `failure_recovery_system.h`: Failure recovery system interface.
@@ -35,13 +35,13 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `placement_validation_system.h`: Placement validation system interface.
 - `placement_validation_system.cpp`: Validates structure placement requests against tile/world constraints.
 - `site_completion_system.h`: Site completion system interface.
-- `site_completion_system.cpp`: Determines site success/completion outcomes.
+- `site_completion_system.cpp`: Determines site success/failure outcomes for the active site objective mode.
 - `site_flow_system.h`: Site flow system interface.
 - `site_flow_system.cpp`: Coordinates major site flow transitions during a run.
 - `site_system_context.h`: Shared dependency bundle passed into site systems.
 - `task_board_system.h`: Task board system interface.
-- `task_board_system.cpp`: Manages board listings, acceptance, completion, and reset flow.
+- `task_board_system.cpp`: Manages board listings, acceptance, completion, and reset flow, keeping the authored site-one task on dense-restoration sites only.
 - `weather_event_system.h`: Weather event system interface.
-- `weather_event_system.cpp`: Applies incoming weather events to site-owned weather/event state.
+- `weather_event_system.cpp`: Applies incoming weather events to site-owned weather/event state, including recurring one-sided highway-protection waves.
 - `worker_condition_system.h`: Worker condition system interface.
 - `worker_condition_system.cpp`: Updates worker condition and related penalties/recovery.

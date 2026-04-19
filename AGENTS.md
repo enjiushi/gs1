@@ -21,7 +21,6 @@ This file is a quick orientation guide for agents working in this repository.
 - `src/`: Gameplay/runtime implementation code grouped by ownership domain. Read `src/guideline.md` before drilling deeper.
 - `tests/`: Runtime, smoke, and system test code plus scripted/system-test assets. Read `tests/guideline.md` before drilling deeper.
 - `third_party/`: Vendored external dependencies. Read `third_party/guideline.md` before drilling deeper.
-<<<<<<< HEAD
 - `CMakeLists.txt`: Builds the gameplay DLL plus the smoke, visual smoke, runtime-test, and system-test executables, including the campaign faction-reputation and technology sources used by runtime/UI coverage.
 - `launch_visual_game.ps1`: Convenience wrapper for the visual smoke host that forwards PowerShell `-Verbose` into host-side verbose logging.
 - `include/gs1/export.h`: Public DLL export/import macros.
@@ -40,10 +39,10 @@ This file is a quick orientation guide for agents working in this repository.
 - `tests/smoke/`: Smoke host, runtime DLL loader, script runner, live-state JSON, live HTTP server, and visual smoke UI.
 - `tests/smoke/scripts/`: Scripted smoke-test scenarios.
 - `scripts/`: PowerShell build and smoke-test helpers.
-- `GDD.md`: Game design document, including the directional wind-shadow and plant-footprint shelter rules.
+- `GDD.md`: Game design document, including the directional wind-shadow and plant-footprint shelter rules plus the staged four-mode site-objective direction.
 - `GAME_STRUCTURE.md`: High-level gameplay/runtime structure notes.
-- `GAME_SYSTEM_DESIGN_V1.md`: System design reference, including directional local-weather resolution responsibilities.
-- `SYSTEM_DESIGN_STATUS.md`: Current system status and implementation tracking.
+- `GAME_SYSTEM_DESIGN_V1.md`: System design reference, including directional local-weather resolution responsibilities and staged site-objective implementation notes.
+- `SYSTEM_DESIGN_STATUS.md`: Current system status and implementation tracking, including site-objective readiness notes.
 - `CONTENT_AUTHORING_CONTRACT.md`: Content authoring contract and data expectations.
 - `MISSING_DEFINITION_DESCRIPTIONS.md`: Notes for definitions that still need descriptions.
 

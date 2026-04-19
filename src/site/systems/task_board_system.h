@@ -14,7 +14,8 @@ public:
             "TaskBoardSystem",
             site_component_mask_of(
                 SiteComponent::TaskBoard,
-                SiteComponent::Counters),
+                SiteComponent::Counters,
+                SiteComponent::Objective),
             site_component_mask_of(SiteComponent::TaskBoard)};
     }
 

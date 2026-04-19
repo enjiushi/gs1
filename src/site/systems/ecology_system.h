@@ -17,7 +17,8 @@ public:
                 SiteComponent::TileEcology,
                 SiteComponent::TileWeather,
                 SiteComponent::Modifier,
-                SiteComponent::Counters),
+                SiteComponent::Counters,
+                SiteComponent::Objective),
             site_component_mask_of(
                 SiteComponent::TileEcology,
                 SiteComponent::Counters)};

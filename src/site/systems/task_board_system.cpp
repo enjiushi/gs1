@@ -93,7 +93,8 @@ void handle_site_run_started(
     auto& board = context.world.own_task_board();
     reset_task_board(board);
 
-    if (payload.site_id != 1U)
+    if (payload.site_id != 1U ||
+        context.world.read_objective().type != SiteObjectiveType::DenseRestoration)
     {
         return;
     }

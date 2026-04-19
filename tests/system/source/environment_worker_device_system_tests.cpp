@@ -239,6 +239,43 @@ void weather_event_phase_transition_smooths_weather_toward_new_target(
     GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_dust > 1.5f);
 }
 
+void weather_event_highway_objective_schedules_repeating_waves_with_one_sided_wind(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(5U, 1107U);
+    GameMessageQueue queue {};
+    auto weather_context = make_site_context<WeatherEventSystem>(campaign, site_run, queue);
+
+    configure_highway_protection_objective(
+        site_run,
+        gs1::SiteObjectiveTargetEdge::East,
+        30.0,
+        0.5f);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        WeatherEventSystem::process_message(
+            weather_context,
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {5U, 1U, 105U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.forecast_profile_state.forecast_profile_id == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.event.minutes_until_next_wave >= 4.0);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.event.minutes_until_next_wave <= 8.0);
+
+    for (int index = 0; index < 40; ++index)
+    {
+        WeatherEventSystem::run(weather_context);
+    }
+
+    GS1_SYSTEM_TEST_REQUIRE(context, site_run.event.active_event_template_id.has_value());
+    GS1_SYSTEM_TEST_CHECK(context, site_run.event.wave_sequence_index == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_wind_direction_degrees < 90.0f ||
+        site_run.weather.weather_wind_direction_degrees > 270.0f);
+}
+
 void local_weather_resolve_spreads_full_refresh_over_multiple_runs(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -677,6 +714,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "weather_event",
     "phase_transition_smooths_weather_toward_new_target",
     weather_event_phase_transition_smooths_weather_toward_new_target);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "weather_event",
+    "highway_objective_schedules_repeating_waves_with_one_sided_wind",
+    weather_event_highway_objective_schedules_repeating_waves_with_one_sided_wind);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "local_weather_resolve",
     "spreads_full_refresh_over_multiple_runs",

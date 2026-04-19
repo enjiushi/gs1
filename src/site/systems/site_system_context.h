@@ -39,6 +39,7 @@ enum class SiteComponent : std::uint8_t
     Craft,
     Action,
     Counters,
+    Objective,
     Count
 };
 
@@ -103,6 +104,8 @@ template <typename... Components>
         return "Action";
     case SiteComponent::Counters:
         return "Counters";
+    case SiteComponent::Objective:
+        return "Objective";
     case SiteComponent::Count:
     default:
         return "Unknown";
@@ -481,6 +484,9 @@ public:
 
     [[nodiscard]] const SiteCounters& read_counters() const noexcept { return site_run_.counters; }
     [[nodiscard]] SiteCounters& own_counters() noexcept { return site_run_.counters; }
+
+    [[nodiscard]] const SiteObjectiveState& read_objective() const noexcept { return site_run_.objective; }
+    [[nodiscard]] SiteObjectiveState& own_objective() noexcept { return site_run_.objective; }
 
     void mark_projection_dirty(std::uint64_t dirty_flags) noexcept
     {

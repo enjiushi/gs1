@@ -1618,12 +1618,14 @@ Test full subsystem flows:
 - accept task -> complete task -> claim reward
 - site failure -> retry -> fresh attempt state
 - site completion -> regional support unlock
+- site objective mode evaluation -> success/failure message -> campaign/site state transition
 
 ### 15.3 Simulation Tests
 
 Run deterministic fixed-step site simulations for:
 
 - harsh event survival
+- highway-protection sand-cover buildup versus protected-edge recovery
 - moisture/erosion/growth balance sanity
 - board refresh and chain behavior
 - modifier stacking limits
@@ -1644,6 +1646,13 @@ Code in this order:
 10. ui view models and host-side integration mapping
 
 This order minimizes rework because content and runtime foundations exist before high-level systems start depending on them.
+
+Objective-mode staging note:
+
+- `Dense Restoration` remains the implemented baseline objective mode
+- `Highway Protection` is ready for runtime implementation with explicit target-edge tiles, average sand-cover tracking, and one-sided harsh-weather wind
+- `Green Wall Connection` is design-locked for later implementation and needs authored/generated edge-plant regions, protection-band tracking, a paused main timer during completion hold, and resettable completion countdown logic
+- `Pure Survival` is design-locked for later implementation and needs authored time-limit configuration plus failure flow that relies on the worker-health loss path instead of plant-coverage checks
 
 ## 17. Final Readiness Check
 

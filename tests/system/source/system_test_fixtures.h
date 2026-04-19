@@ -11,6 +11,7 @@
 #include "site/site_world.h"
 #include "site/site_world_components.h"
 #include "site/systems/site_system_context.h"
+#include "support/site_objective_types.h"
 
 #include <flecs.h>
 
@@ -127,6 +128,7 @@ inline SiteRunState make_test_site_run(
     site_run.inventory.worker_pack_slots.resize(site_run.inventory.worker_pack_slot_count);
     site_run.task_board.accepted_task_cap = 3U;
     site_run.counters.site_completion_tile_threshold = 3U;
+    site_run.objective.type = SiteObjectiveType::DenseRestoration;
 
     site_run.site_world = std::make_shared<SiteWorld>();
     site_run.site_world->initialize(
@@ -169,6 +171,51 @@ inline SiteRunState make_test_site_run(
     site_run.pending_tile_projection_update_mask.assign(site_run.site_world->tile_count(), 0U);
     inventory_storage::initialize_site_inventory_storage(site_run);
     return site_run;
+}
+
+inline void configure_highway_protection_objective(
+    SiteRunState& site_run,
+    SiteObjectiveTargetEdge edge,
+    double time_limit_minutes,
+    float max_average_sand_cover,
+    std::uint8_t band_width = 1U)
+{
+    site_run.objective.type = SiteObjectiveType::HighwayProtection;
+    site_run.objective.time_limit_minutes = time_limit_minutes;
+    site_run.objective.target_edge = edge;
+    site_run.objective.target_band_width = band_width;
+    site_run.objective.highway_max_average_sand_cover = max_average_sand_cover;
+    site_run.counters.objective_progress_normalized = 1.0f;
+    site_run.counters.highway_average_sand_cover = 0.0f;
+    site_run.objective.target_tile_indices.clear();
+    site_run.objective.target_tile_mask.assign(site_run.site_world->tile_count(), 0U);
+}
+
+inline void mark_objective_target_tile(SiteRunState& site_run, TileCoord coord)
+{
+    if (site_run.site_world == nullptr || !site_run.site_world->contains(coord))
+    {
+        return;
+    }
+
+    const auto index = site_run.site_world->tile_index(coord);
+    if (site_run.objective.target_tile_mask.size() != site_run.site_world->tile_count())
+    {
+        site_run.objective.target_tile_mask.assign(site_run.site_world->tile_count(), 0U);
+    }
+    if (site_run.objective.target_tile_mask[index] == 0U)
+    {
+        site_run.objective.target_tile_mask[index] = 1U;
+        site_run.objective.target_tile_indices.push_back(index);
+    }
+
+    auto tile = site_run.site_world->tile_at(coord);
+    tile.static_data.plantable = false;
+    tile.static_data.traversable = true;
+    tile.ecology.plant_id = PlantId {};
+    tile.ecology.ground_cover_type_id = 0U;
+    tile.ecology.plant_density = 0.0f;
+    site_run.site_world->set_tile(coord, tile);
 }
 
 template <typename SystemTag>

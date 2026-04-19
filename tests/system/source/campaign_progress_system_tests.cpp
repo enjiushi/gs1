@@ -515,6 +515,59 @@ void site_completion_only_emits_when_threshold_is_met(gs1::testing::SystemTestEx
     GS1_SYSTEM_TEST_CHECK(context, queue.empty());
 }
 
+void site_completion_highway_protection_fails_when_average_cover_reaches_target(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(5U, 403U);
+    GameMessageQueue queue {};
+
+    configure_highway_protection_objective(
+        site_run,
+        gs1::SiteObjectiveTargetEdge::East,
+        12.0,
+        0.5f);
+    mark_objective_target_tile(site_run, TileCoord {7, 2});
+    site_run.counters.highway_average_sand_cover = 0.5f;
+    site_run.counters.objective_progress_normalized = 0.0f;
+
+    auto site_context = make_site_context<SiteCompletionSystem>(campaign, site_run, queue);
+    SiteCompletionSystem::run(site_context);
+
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::SiteAttemptEnded);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        queue.front().payload_as<SiteAttemptEndedMessage>().result == GS1_SITE_ATTEMPT_RESULT_FAILED);
+}
+
+void site_completion_highway_protection_completes_at_time_limit_when_cover_stays_safe(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(5U, 404U);
+    GameMessageQueue queue {};
+
+    configure_highway_protection_objective(
+        site_run,
+        gs1::SiteObjectiveTargetEdge::East,
+        12.0,
+        0.5f);
+    mark_objective_target_tile(site_run, TileCoord {7, 2});
+    site_run.clock.world_time_minutes = 12.0;
+    site_run.counters.highway_average_sand_cover = 0.35f;
+    site_run.counters.objective_progress_normalized = 0.3f;
+
+    auto site_context = make_site_context<SiteCompletionSystem>(campaign, site_run, queue);
+    SiteCompletionSystem::run(site_context);
+
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::SiteAttemptEnded);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        queue.front().payload_as<SiteAttemptEndedMessage>().result == GS1_SITE_ATTEMPT_RESULT_COMPLETED);
+}
+
 void failure_recovery_only_emits_when_worker_health_is_zero(gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
@@ -857,6 +910,14 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "site_completion",
     "only_emits_when_threshold_is_met",
     site_completion_only_emits_when_threshold_is_met);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "site_completion",
+    "highway_protection_fails_when_average_cover_reaches_target",
+    site_completion_highway_protection_fails_when_average_cover_reaches_target);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "site_completion",
+    "highway_protection_completes_at_time_limit_when_cover_stays_safe",
+    site_completion_highway_protection_completes_at_time_limit_when_cover_stays_safe);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "failure_recovery",
     "only_emits_when_worker_health_is_zero",

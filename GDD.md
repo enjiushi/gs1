@@ -1160,18 +1160,28 @@ The base should feel expandable, but it is not a city builder in v1.
 
 ### Site Completion And Campaign Time
 
-For the current design, site completion should avoid hard-to-read abstract site scores. Instead, completion should be determined by a simple count of `Fully Grown Tile`s on the current `Site`.
+For the current design, site completion should avoid hard-to-read abstract site scores. Each site should instead declare one readable `Site Objective Mode`, and the runtime should evaluate that mode directly.
 
-The core completion rule is:
+The current mode set is:
 
-- each site tracks `fullyGrownTileCount`
-- each site defines a `siteCompletionTileThreshold`
-- if `fullyGrownTileCount >= siteCompletionTileThreshold`, the site is considered completed
-- only `Fully Grown Tile`s count toward completion in the current prototype direction
-- camp condition, survival state, money, and other site-session-only values should not add separate completion requirements in the current prototype direction
-- once a site is completed, it should stay completed in the current prototype direction
+- `Dense Restoration`: the current rule. Each site tracks `fullyGrownTileCount` and a `siteCompletionTileThreshold`. If `fullyGrownTileCount >= siteCompletionTileThreshold`, the site is completed.
+- `Highway Protection`: one map edge contains traversable non-plantable highway tiles. Those tiles reuse the existing per-tile ecology meters, but the fertility-side meter should represent local sand-cover percentage instead of soil quality. The site tracks the average sand cover across all highway tiles. If that average reaches the authored target, the site is lost immediately. If the player keeps the average below the target until the site time limit expires, the site is completed.
+- `Green Wall Connection`: two authored or procedurally generated planted regions start on opposite sides of the site with a protection band behind them. The player camp starts between them. The player must connect the two planted sides, then keep the protection band from gaining further sand long enough for a completion countdown to finish. If sand starts increasing again, that countdown resets. While the completion countdown is running, the main site time-limit countdown pauses. This mode is design-locked now but remains a later implementation step.
+- `Pure Survival`: the player must survive until the site time limit expires. If player health reaches zero before then, the site is lost. This mode is design-locked now but remains a later implementation step.
 
-Water access, shelter, devices, and other systems still matter because they help the player survive long enough to grow and protect plants, but they should not be turned into separate opaque completion scores.
+Current prototype content assignment:
+
+- the first four authored sites should continue using `Dense Restoration`
+- `Highway Protection` is the first alternate objective mode we should implement in runtime after the refactor
+- `Green Wall Connection` and `Pure Survival` should stay in the design docs until their objective-specific runtime systems and authored maps are ready
+
+Harsh-event rule for objective modes:
+
+- `Dense Restoration` can keep the existing general harsh-event behavior
+- `Highway Protection` and `Green Wall Connection` should use one-sided harsh-weather wind that always blows broadly toward the highway or protection band; the angle may vary, including diagonal approaches, but it must not flip and blow back from the protected edge toward the player side
+- `Pure Survival` can use general harsh-weather waves without the one-sided edge restriction
+
+Water access, shelter, devices, and other systems still matter because they help the player survive, protect plants, and keep objective target zones stable, but they should not be turned into separate opaque completion scores.
 
 The campaign-level pressure should come from time:
 
@@ -1193,14 +1203,17 @@ These values are used for task generation and high-level site-state checks:
 
 | Counter | Runtime Field | Type | Meaning |
 |---|---|---|---|
-| Fully Grown Tiles | `fullyGrownTileCount` | Integer | Number of mature planted tiles currently counted toward site completion |
-| Completion Threshold | `siteCompletionTileThreshold` | Integer | Number of fully grown tiles required for the site to count as completed |
+| Fully Grown Tiles | `fullyGrownTileCount` | Integer | Number of mature planted tiles currently counted toward `Dense Restoration` completion |
+| Completion Threshold | `siteCompletionTileThreshold` | Integer | Number of fully grown tiles required for a `Dense Restoration` site to count as completed |
+| Objective Progress | `objectiveProgressNormalized` | Float | HUD-facing normalized progress value for the active site objective mode |
+| Highway Average Sand Cover | `highwayAverageSandCover` | Float | Average sand-cover percentage across highway target tiles during `Highway Protection` |
 | Funds | `money` | Integer | Task rewards, sales, purchases, and hiring |
 | Campaign Days Remaining | `campaignDaysRemaining` | Integer | Remaining campaign time before the run ends |
 
 Important rule:
 
-- `fullyGrownTileCount` and `siteCompletionTileThreshold` should be explicit counters, not hidden derived vibes
+- `fullyGrownTileCount` and `siteCompletionTileThreshold` should stay explicit counters for `Dense Restoration`, not hidden derived vibes
+- alternate site modes should introduce their own equally explicit authored counters or thresholds instead of collapsing back into one generic hidden score
 - `money` is both a summary value and the exact site-run currency
 - `campaignDaysRemaining` is the main long-horizon pressure value in the campaign
 
