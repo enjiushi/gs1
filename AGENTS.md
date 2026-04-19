@@ -21,7 +21,7 @@ This file is a quick orientation guide for agents working in this repository.
 - `src/`: Gameplay/runtime implementation code grouped by ownership domain. Read `src/guideline.md` before drilling deeper.
 - `tests/`: Runtime, smoke, and system test code plus scripted/system-test assets. Read `tests/guideline.md` before drilling deeper.
 - `third_party/`: Vendored external dependencies. Read `third_party/guideline.md` before drilling deeper.
-- `CMakeLists.txt`: Builds the gameplay DLL plus the smoke, visual smoke, runtime-test, and system-test executables.
+- `CMakeLists.txt`: Builds the gameplay DLL plus the smoke, visual smoke, runtime-test, and system-test executables, including the campaign faction-reputation and technology sources used by runtime/UI coverage.
 - `include/gs1/export.h`: Public DLL export/import macros.
 - `include/gs1/game_api.h`: C ABI entry points exposed by the gameplay DLL.
 - `include/gs1/status.h`: Public status/result codes.

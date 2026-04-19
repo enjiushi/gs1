@@ -17,11 +17,14 @@ struct SiteMetaState final
     Gs1SiteState site_state {GS1_SITE_STATE_LOCKED};
     std::vector<SiteId> adjacent_site_ids {};
     std::uint32_t site_archetype_id {0};
+    FactionId featured_faction_id {};
     std::uint32_t attempt_count {0};
     std::uint32_t support_package_id {0};
     bool has_support_package_id {false};
     std::vector<LoadoutSlot> exported_support_items {};
     std::vector<ModifierId> nearby_aura_modifier_ids {};
+    std::int32_t completion_reputation_reward {0};
+    std::int32_t completion_faction_reputation_reward {0};
 };
 
 struct RegionalMapState final
@@ -30,6 +33,8 @@ struct RegionalMapState final
     std::vector<SiteId> available_site_ids {};
     std::vector<SiteId> completed_site_ids {};
     std::optional<SiteId> selected_site_id {};
+    bool tech_tree_open {false};
+    FactionId selected_tech_tree_faction_id {FactionId {1U}};
 };
 
 struct CampaignState final

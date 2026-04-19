@@ -539,6 +539,7 @@ Required fields:
 ```text
 factionId
 factionReputation
+occupiedReputation
 unlockedAssistantPackage
 onboardingCompleted
 tutorialCompleted
@@ -550,16 +551,15 @@ Required fields:
 
 ```text
 reputation
-availableTechPicks
-unlockedNodeIds[]
-appliedContentUpdateNodeIds[]
+purchasedNodeIds[]
 ```
 
 Rules:
 
 - `reputation` is never spent
-- `availableTechPicks` is spent when claiming nodes
-- `unlockedNodeIds[]` is authoritative progression state
+- faction technology claims do not spend down total faction reputation; they occupy part of that faction's reputation budget instead
+- available faction reputation is `factionReputation - occupiedReputation`
+- `purchasedNodeIds[]` is authoritative progression state
 
 ### 6.7 `LoadoutPlannerState`
 
@@ -1304,9 +1304,9 @@ Responsibilities:
 
 Responsibilities:
 
-- validate node claim prerequisites
-- spend `availableTechPicks`
-- mark node unlocked
+- validate faction-tier claim prerequisites
+- occupy faction reputation for claimed tech without reducing total reputation
+- mark node purchased
 - update `ContentDatabase` eligibility view for recipes, plants, and devices
 
 ## 11. Content Loading And Runtime Eligibility

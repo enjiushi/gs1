@@ -3,6 +3,7 @@
 #include "app/campaign_factory.h"
 #include "app/site_run_factory.h"
 #include "campaign/campaign_state.h"
+#include "content/prototype_content.h"
 
 namespace gs1
 {
@@ -70,12 +71,18 @@ bool CampaignFlowSystem::subscribes_to(GameMessageType type) noexcept
     case GameMessageType::StartNewCampaign:
     case GameMessageType::SelectDeploymentSite:
     case GameMessageType::ClearDeploymentSiteSelection:
+    case GameMessageType::OpenRegionalMapTechTree:
+    case GameMessageType::CloseRegionalMapTechTree:
+    case GameMessageType::SelectRegionalMapTechTreeFaction:
     case GameMessageType::StartSiteAttempt:
     case GameMessageType::ReturnToRegionalMap:
     case GameMessageType::SiteAttemptEnded:
         return true;
 
     case GameMessageType::DeploymentSiteSelectionChanged:
+    case GameMessageType::CampaignReputationAwardRequested:
+    case GameMessageType::FactionReputationAwardRequested:
+    case GameMessageType::TechnologyNodeClaimRequested:
     case GameMessageType::PresentLog:
     default:
         return false;
@@ -164,6 +171,40 @@ Gs1Status CampaignFlowSystem::process_message(
         return GS1_STATUS_OK;
     }
 
+    case GameMessageType::OpenRegionalMapTechTree:
+    {
+        if (!context.campaign.has_value() || context.app_state != GS1_APP_STATE_REGIONAL_MAP)
+        {
+            return GS1_STATUS_INVALID_STATE;
+        }
+
+        context.campaign->regional_map_state.tech_tree_open = true;
+        return GS1_STATUS_OK;
+    }
+
+    case GameMessageType::CloseRegionalMapTechTree:
+    {
+        if (!context.campaign.has_value())
+        {
+            return GS1_STATUS_INVALID_STATE;
+        }
+
+        context.campaign->regional_map_state.tech_tree_open = false;
+        return GS1_STATUS_OK;
+    }
+
+    case GameMessageType::SelectRegionalMapTechTreeFaction:
+    {
+        if (!context.campaign.has_value() || context.app_state != GS1_APP_STATE_REGIONAL_MAP)
+        {
+            return GS1_STATUS_INVALID_STATE;
+        }
+
+        const auto& payload = message.payload_as<SelectRegionalMapTechTreeFactionMessage>();
+        context.campaign->regional_map_state.selected_tech_tree_faction_id = FactionId {payload.faction_id};
+        return GS1_STATUS_OK;
+    }
+
     case GameMessageType::StartSiteAttempt:
     {
         if (!context.campaign.has_value())
@@ -184,6 +225,7 @@ Gs1Status CampaignFlowSystem::process_message(
         }
 
         site->attempt_count += 1U;
+        context.campaign->regional_map_state.tech_tree_open = false;
         context.active_site_run = SiteRunFactory::create_site_run(*context.campaign, *site);
         context.campaign->active_site_id = SiteId {payload.site_id};
         context.app_state = GS1_APP_STATE_SITE_ACTIVE;
@@ -250,6 +292,26 @@ Gs1Status CampaignFlowSystem::process_message(
                     context.active_site_run->result_newly_revealed_site_count += 1U;
                 }
             }
+
+            if (site->completion_reputation_reward > 0)
+            {
+                GameMessage reputation_award {};
+                reputation_award.type = GameMessageType::CampaignReputationAwardRequested;
+                reputation_award.set_payload(CampaignReputationAwardRequestedMessage {
+                    site->completion_reputation_reward});
+                context.message_queue.push_back(reputation_award);
+            }
+
+            if (site->featured_faction_id.value != 0U &&
+                site->completion_faction_reputation_reward > 0)
+            {
+                GameMessage faction_award {};
+                faction_award.type = GameMessageType::FactionReputationAwardRequested;
+                faction_award.set_payload(FactionReputationAwardRequestedMessage {
+                    site->featured_faction_id.value,
+                    site->completion_faction_reputation_reward});
+                context.message_queue.push_back(faction_award);
+            }
         }
 
         context.app_state = GS1_APP_STATE_SITE_RESULT;
@@ -259,6 +321,9 @@ Gs1Status CampaignFlowSystem::process_message(
     }
 
     case GameMessageType::DeploymentSiteSelectionChanged:
+    case GameMessageType::CampaignReputationAwardRequested:
+    case GameMessageType::FactionReputationAwardRequested:
+    case GameMessageType::TechnologyNodeClaimRequested:
     case GameMessageType::PresentLog:
     default:
         return GS1_STATUS_OK;

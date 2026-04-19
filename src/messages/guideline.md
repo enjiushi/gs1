@@ -8,7 +8,7 @@ Gameplay message contracts and dispatcher helpers for cross-system coordination.
 - When files or folders in this directory change, update this file in the same change.
 
 ## Contents
-- `game_message.h`: Core internal gameplay message enums and payload structures, including phone panel section-switch requests.
+- `game_message.h`: Core internal gameplay message enums and payload structures, including phone panel section-switch requests plus campaign faction-reputation and technology requests.
 - `handlers/`: Handler interface types used by message subscribers.
 - `message_dispatcher.h`: Dispatcher declarations for routing subscribed messages to systems.
 - `message_dispatcher.cpp`: Dispatcher implementation.

@@ -2995,7 +2995,11 @@ To make the game more compelling without feeling manipulative, these systems wou
 - `Reputation`: total campaign standing with the restoration program, earned progressively from official work and never spent
 - `Faction Reputation`: cumulative standing with each individual `Faction`, earned mainly from that faction's `Site Task`s, faction events, and aligned follow-through
 
-`Reputation` should function as thresholded trust, not consumable currency. Reaching a threshold unlocks access to new tech levels and support tiers; choosing a tech node does not reduce current reputation. `Faction Reputation` should behave the same way inside each branch.
+`Reputation` should function as thresholded trust, not consumable currency. `Faction Reputation` should also remain cumulative, but faction tech no longer uses a separate pick currency. Instead, each faction branch tracks how much of that faction's total reputation is already occupied by claimed tech. The available amount for new tech claims is:
+
+- available faction reputation = total `Faction Reputation` minus occupied faction reputation
+
+Claiming faction tech therefore never lowers the visible total trust value. It only increases how much of that trust budget is already committed inside that branch.
 
 For clarity, `Faction Reputation` from `Site Task`s should usually be a guaranteed completion payout tied to the task's publisher, with the amount scaling by task tier or level, while the task's visible reward draft should stay focused on immediate tactical rewards.
 
@@ -3211,42 +3215,23 @@ High replay value depends on making progression choices meaningfully different a
 
 ### Faction Technology
 
-The `Persistent Tech Tree` is the long-term campaign progression layer. In the current design, it should stay small, readable, and data-driven. Faction technology should mainly do two things:
-
-- unlock branch-defining content
-- apply persistent modifier updates to that unlocked content
-
-The tree should not become a huge mixed list of unrelated bonuses. Neutral utility nodes may still exist for broad campaign systems such as inventory size or board capacity, but the three faction branches should stay focused on their signature content families and their signature play styles.
+The `Persistent Tech Tree` is the long-term campaign progression layer. In the current design, it should stay faction-first, tabbed, readable, and data-driven. The regional-map tech panel should expose three separate faction tabs, one for each branch. The currently selected faction tab owns the full visible branch slice for that panel.
 
 #### Technology Design Rules
 
-- faction technology should use one shared node model rather than bespoke logic per faction
-- every branch should own one signature unlock family
-- each unlocked content piece should expose exactly `3` reusable update families in the current design
-- update nodes should target already-defined meters or already-defined content values
-- branch identity should come from what kind of content is unlocked and what meter directions its updates favor
-- reputation pacing should stay slow enough that the player usually unlocks only `1` major node or `2` smaller nodes after one site
-
-#### Shared Technology Node Direction
-
-Each technology node should clearly specify:
-
-- which faction branch or neutral branch it belongs to
-- whether it unlocks content, updates existing content, or grants a small neutral utility
-- which broad reputation tier it belongs to
-- which content family it targets, such as `recipe`, `plant`, `device`, or `utility`
-- what specific content it links to, if any
-- whether it belongs to one of the content's `3` reusable update families
-- what campaign-wide and faction-specific reputation gates it requires
-- what small authored prerequisite chain it depends on
-- what permanent modifier update or content unlock it applies when claimed
-
-Important rule:
-
-- `unlockContent` nodes make the linked content eligible for future use
-- `contentUpdate` nodes permanently modify one already unlocked piece of linked content
-- `neutralUtility` nodes should stay rare and should cover only small cross-faction basics such as slot count or board capacity
-- technology should not require a different code path per faction; the faction identity should mostly come from content family plus modifier bundle data
+- the current prototype tech panel should show `3` faction tabs and no shared neutral branch lane
+- each faction branch should be divided into explicit tiers
+- each faction tier should contain exactly `3` base tech choices
+- each base tech should expose exactly `2` mutually exclusive amplification choices
+- an amplification may be purchased only after its paired base tech has already been purchased
+- once one amplification is chosen for a base tech, the sibling amplification is permanently locked out for that campaign
+- tier `1` starts unlocked
+- a later tier unlocks only after the previous tier already contains at least `1` purchased base tech and at least `1` purchased amplification
+- each tier defines its own base reputation cost, and higher tiers should start from a higher base cost than lower tiers
+- each additional purchase inside the same tier increases the next purchase cost inside that tier by a cumulative `1.2x` multiplier, regardless of whether the next purchase is a base tech or an amplification
+- faction tech claims use only that faction's available reputation budget, not global campaign reputation and not a separate pick currency
+- available faction reputation is total branch reputation minus already occupied branch reputation
+- branch identity should still come from signature content family plus amplification direction rather than bespoke code per faction
 
 #### Technology Progression Meters
 
@@ -3254,15 +3239,15 @@ Technology should remain tied to a tiny set of progression meters:
 
 | Meter | Meaning |
 |---|---|
-| `reputation` | Campaign-wide trust that unlocks higher tech tiers and additional tech picks |
-| `factionReputation[factionId]` | Branch-specific trust that gates faction nodes and improves branch-side follow-through |
-| `availableTechPicks` | Unspent campaign technology picks available to claim nodes |
+| `reputation` | Campaign-wide trust that still represents broad program standing, but does not directly pay for faction tech in the current design |
+| `factionReputation[factionId]` | Total branch trust earned with one faction |
+| `occupiedFactionReputation[factionId]` | The amount of that faction's total reputation already committed to claimed branch tech |
 
 Important rule:
 
-- unlocked node state is persistent boolean progression, not a separate meter
-- update-family completion on one unlockable should also be stored as node state, not as a hidden stat ladder
-- the runtime impact should come from the linked node's `modifierBundle`, not from a special hard-coded branch bonus table
+- available branch reputation is `factionReputation[factionId] - occupiedFactionReputation[factionId]`
+- claimed tech state is persistent node ownership, not an unspent-pick inventory
+- the runtime impact should still come from linked content plus persistent modifier direction, not from a hidden branch bonus table
 
 #### Branch Content Rule
 
@@ -3281,19 +3266,19 @@ Delivery rule:
 - university device unlocks should add new tech-eligible device options to the `Site Unlockable` pool
 - if a faction branch wants to influence other content later, it should usually do so through modifier bundles or neutral utility nodes rather than by stealing another branch's main unlock family
 
-#### Shared Node Kinds
+#### Tier Structure
 
-Use only these three node kinds in the current design:
+Use this shared faction-tier structure in the current design:
 
-| Node kind | Use | Notes |
+| Tier element | Count | Rule |
 |---|---|---|
-| `unlockContent` | Unlock one branch-defining recipe, plant, or device | This is the node that makes a new linked content row available at all. |
-| `contentUpdate` | Apply one persistent modifier update to one unlocked content row | Each unlocked content row should expose exactly `3` update families. |
-| `neutralUtility` | Small non-faction campaign utility | Keep these few so the faction branches stay readable. |
+| Base techs per faction tier | `3` | These are the main branch claims inside that tier. |
+| Amplifications per base tech | `2` | They are mutually exclusive and require the paired base tech first. |
+| Unlock requirement for next tier | `1` base tech + `1` amplification | Both must already be purchased in the previous tier. |
 
 #### Per-Unlockable Update Rule
 
-Every unlocked content row should own exactly `3` persistent update families in the current design. These update families should be reusable templates driven by data, not unique one-off hand-coded logic.
+Every base tech should use its `2` amplification choices to push that base tech in two different strategic directions. These amplification families should be reusable templates driven by data, not unique one-off hand-coded logic.
 
 | Faction | Signature content | Update family | Main target meters / values | Design intent |
 |---|---|---|---|---|
@@ -3309,23 +3294,23 @@ Every unlocked content row should own exactly `3` persistent update families in 
 
 Important rule:
 
-- not every target in a family applies to every linked content row
+- not every target in an amplification family applies to every linked content row
 - a content row should use only the targets that already exist on that content row
-- this keeps the system data-driven: one update family template can serve many plants, recipes, or devices without new code
+- this keeps the system data-driven: one amplification family template can serve many plants, recipes, or devices without new code
 
 #### Prototype Technology Slice
 
-For the prototype, keep the branch content count tiny but structurally complete:
+For the prototype, keep the branch content count small but structurally complete:
 
-- `1` neutral starter utility node is enough for basic campaign support
-- each faction should have `1` branch-defining content unlock in the first playable
-- each of those first unlocks should already expose its `3` update families
-- this means the first complete prototype tech package is `1` neutral node plus `4` nodes per faction: `1` unlock node and `3` update nodes
+- each faction should expose `4` temporary prototype tiers in the first playable implementation
+- each tier should already use the full `3` base tech + `2` amplification choices per base tech structure
+- this is enough to prove faction tabs, tier gating, amplification lockout, and escalating per-tier occupied-reputation cost
 
 This is enough to show:
 
 - that each faction has a different identity
-- that content unlock and content upgrade are different decisions
+- that tier order matters
+- that amplification choice meaningfully specializes one claimed base tech
 - that technology modifies existing meters instead of inventing a parallel stat game
 
 ### Site Unlockables And Run Modifiers
@@ -4336,7 +4321,7 @@ This summary should include only core runtime meters and the core plant-side val
 | Event meters | `eventHeatPressure`, `eventWindPressure`, `eventDustPressure` | Site-wide harsh-event channel meters. They represent current event force and feed the weather layer rather than acting as weather themselves. |
 | Weather meters | `weatherHeat`, `weatherWind`, `weatherDust` | Site-wide ambient weather outputs after baseline site conditions and current event meters are combined. |
 | Resolved local weather meters | `tileHeat`, `tileWind`, `tileDust` | Per-tile weather result after site weather, local support, and shelter are combined. They bridge site weather and final terrain or plant pressure. |
-| Technology progression meters | `reputation`, `factionReputation[factionId]`, `availableTechPicks` | Campaign progression meters that gate faction tiers, node eligibility, and permanent tech claims. |
+| Technology progression meters | `reputation`, `factionReputation[factionId]`, `occupiedFactionReputation[factionId]` | Campaign progression meters that gate faction tiers, determine available branch budget, and track permanent tech claims. |
 | Worker state meters | `playerHealth`, `playerHydration`, `playerNourishment`, `playerEnergyCap`, `playerEnergy`, `playerMorale`, `playerWorkEfficiency` | Core worker survival and performance meters. They represent the worker's current physical and mental condition plus the resolved action-energy modifier used during site play. |
 | Item state meters | `itemQuantity`, `itemCondition`, `itemFreshness` | Core runtime item-stack meters. `itemQuantity` tracks how much of a stack remains, `itemCondition` tracks damage-sensitive item usability, and `itemFreshness` tracks spoilable item usability. |
 | Persistent terrain soil meters | `tileSoilFertility`, `tileMoisture`, `tileSoilSalinity` | Long-lived or short-lived land condition on plantable `Ground`. These meters determine what can grow well. |
@@ -4386,13 +4371,13 @@ This summary should include only core runtime meters and the core plant-side val
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `reputation` | Site completion, selected task rewards, commendations, major campaign progress | Tech-tier eligibility, `availableTechPicks` | Campaign-wide trust meter. It should unlock broader tech bands and grant new pick opportunities, but should never be spent. |
-| `factionReputation[factionId]` | Completed tasks from that faction, faction events, aftermath follow-through | Faction-node eligibility, aftermath relief quality, faction-side event quality | Branch-specific trust meter. It should gate faction technology depth and improve same-faction support quality. |
-| `availableTechPicks` | Reaching authored `reputation` thresholds, rare milestone rewards if added later | `unlockContent` and `contentUpdate` node claims | Pick-scarcity meter for permanent tech choice. The player spends picks, not `reputation` itself, when claiming nodes. |
+| `reputation` | Site completion, selected task rewards, commendations, major campaign progress | Broad program trust, non-faction progression gates if used later | Campaign-wide trust meter. It should remain useful for broader campaign pacing, but it does not directly pay for faction tech in the current design. |
+| `factionReputation[factionId]` | Completed tasks from that faction, faction events, aftermath follow-through | Faction-tier eligibility, available branch budget, aftermath relief quality, faction-side event quality | Branch-specific total trust meter. It should gate faction technology depth and improve same-faction support quality. |
+| `occupiedFactionReputation[factionId]` | Claiming faction tech inside that branch | Available faction-tech budget | Tracks how much of one faction's total reputation is already committed to claimed tech. The available amount is total minus occupied. |
 
 Important rule:
 
-- `techNodeUnlocked` and `contentUpdateUnlocked` should be stored as persistent node-state booleans, not as separate meters
+- claimed tech and chosen amplification state should be stored as persistent node-state booleans, not as separate meters
 - technology should modify content by attaching persistent `modifierBundle`s to linked recipes, plants, or devices before those rows are used in site play
 
 ### Item State Meter Relationships

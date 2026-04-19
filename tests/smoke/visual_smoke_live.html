@@ -1076,6 +1076,212 @@ body {
   color: rgba(96, 66, 33, 0.62);
 }
 
+.tech-tree-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tech-tree-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tech-tree-tab {
+  border: 1px solid rgba(108, 80, 44, 0.16);
+  background: linear-gradient(180deg, rgba(255, 251, 243, 0.94), rgba(231, 216, 193, 0.78));
+  color: rgba(67, 47, 24, 0.88);
+  padding: 10px 12px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.6),
+    0 8px 18px rgba(55, 35, 14, 0.06);
+}
+
+.tech-tree-tab.active {
+  background: linear-gradient(180deg, rgba(134, 98, 55, 0.96), rgba(83, 58, 31, 0.96));
+  color: rgba(249, 238, 220, 0.96);
+  border-color: rgba(89, 61, 31, 0.24);
+}
+
+.tech-tree-tier-stack {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 12px;
+}
+
+.tech-tier-card {
+  padding: 12px;
+  border: 1px solid rgba(108, 80, 44, 0.14);
+  background:
+    linear-gradient(180deg, rgba(255, 252, 246, 0.92), rgba(234, 219, 198, 0.82));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.62),
+    0 10px 18px rgba(55, 35, 14, 0.06);
+}
+
+.tech-tier-title {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(87, 60, 27, 0.86);
+}
+
+.tech-tier-meta {
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: rgba(100, 72, 38, 0.72);
+}
+
+.tech-tier-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.tech-column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tech-amp-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tech-base-card,
+.tech-amp-card {
+  width: 100%;
+  border: 1px solid rgba(113, 83, 48, 0.14);
+  padding: 11px 12px 12px;
+  text-align: left;
+  background:
+    linear-gradient(180deg, rgba(255, 251, 244, 0.96), rgba(235, 221, 199, 0.88));
+  color: rgba(43, 31, 17, 0.94);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.62),
+    0 8px 14px rgba(55, 35, 14, 0.05);
+  cursor: pointer;
+}
+
+.tech-base-card {
+  min-height: 156px;
+}
+
+.tech-amp-card {
+  min-height: 122px;
+  padding: 10px 10px 11px;
+}
+
+.tech-base-card.claimable,
+.tech-amp-card.claimable {
+  border-color: rgba(94, 123, 80, 0.24);
+  background:
+    linear-gradient(180deg, rgba(245, 250, 237, 0.98), rgba(225, 235, 210, 0.92));
+}
+
+.tech-base-card.claimed,
+.tech-amp-card.claimed {
+  border-color: rgba(120, 99, 63, 0.18);
+  background:
+    linear-gradient(180deg, rgba(239, 231, 215, 0.92), rgba(221, 206, 181, 0.84));
+}
+
+.tech-base-card.locked,
+.tech-base-card.disabled,
+.tech-amp-card.locked,
+.tech-amp-card.disabled {
+  opacity: 0.72;
+  cursor: default;
+}
+
+.tech-base-card:disabled,
+.tech-amp-card:disabled {
+  cursor: default;
+}
+
+.tech-node-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.tech-node-icon {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 30% 24%, rgba(255,255,255,0.26), transparent 42%),
+    linear-gradient(180deg, rgba(141, 107, 63, 0.94), rgba(82, 57, 31, 0.96));
+  color: rgba(252, 245, 232, 0.96);
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.16),
+    0 10px 18px rgba(55, 35, 14, 0.12);
+}
+
+.tech-node-icon.amp {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  font-size: 14px;
+}
+
+.tech-node-cost {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(74, 96, 58, 0.92);
+  text-align: right;
+  align-self: flex-start;
+}
+
+.tech-base-card.locked .tech-node-cost,
+.tech-base-card.disabled .tech-node-cost,
+.tech-amp-card.locked .tech-node-cost,
+.tech-amp-card.disabled .tech-node-cost {
+  color: rgba(102, 80, 52, 0.72);
+}
+
+.tech-node-title {
+  margin-top: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  color: rgba(35, 25, 14, 0.96);
+}
+
+.tech-node-state {
+  margin-top: 5px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgba(88, 63, 34, 0.74);
+}
+
+.tech-placeholder {
+  display: grid;
+  place-items: center;
+  border-style: dashed;
+  color: rgba(106, 85, 58, 0.54);
+  background: rgba(255, 250, 241, 0.56);
+  cursor: default;
+}
+
 .inventory-grid {
   display: grid;
   grid-template-columns: repeat(var(--inventory-columns, 8), minmax(0, 1fr));

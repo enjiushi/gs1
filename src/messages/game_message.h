@@ -31,7 +31,13 @@ enum class GameMessageType : std::uint8_t
     StartNewCampaign,
     SelectDeploymentSite,
     ClearDeploymentSiteSelection,
+    OpenRegionalMapTechTree,
+    CloseRegionalMapTechTree,
+    SelectRegionalMapTechTreeFaction,
     DeploymentSiteSelectionChanged,
+    CampaignReputationAwardRequested,
+    FactionReputationAwardRequested,
+    TechnologyNodeClaimRequested,
     StartSiteAttempt,
     ReturnToRegionalMap,
     SiteAttemptEnded,
@@ -163,9 +169,38 @@ struct ClearDeploymentSiteSelectionMessage final
 {
 };
 
+struct OpenRegionalMapTechTreeMessage final
+{
+};
+
+struct CloseRegionalMapTechTreeMessage final
+{
+};
+
+struct SelectRegionalMapTechTreeFactionMessage final
+{
+    std::uint32_t faction_id;
+};
+
 struct DeploymentSiteSelectionChangedMessage final
 {
     std::uint32_t selected_site_id;
+};
+
+struct CampaignReputationAwardRequestedMessage final
+{
+    std::int32_t delta;
+};
+
+struct FactionReputationAwardRequestedMessage final
+{
+    std::uint32_t faction_id;
+    std::int32_t delta;
+};
+
+struct TechnologyNodeClaimRequestedMessage final
+{
+    std::uint32_t tech_node_id;
 };
 
 struct StartSiteAttemptMessage final
@@ -554,7 +589,13 @@ GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(OpenMainMenuMessage, 1U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(StartNewCampaignMessage, 16U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SelectDeploymentSiteMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(ClearDeploymentSiteSelectionMessage, 1U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(OpenRegionalMapTechTreeMessage, 1U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(CloseRegionalMapTechTreeMessage, 1U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SelectRegionalMapTechTreeFactionMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(DeploymentSiteSelectionChangedMessage, 4U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(CampaignReputationAwardRequestedMessage, 4U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(FactionReputationAwardRequestedMessage, 8U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TechnologyNodeClaimRequestedMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(StartSiteAttemptMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(ReturnToRegionalMapMessage, 1U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteAttemptEndedMessage, 8U);
