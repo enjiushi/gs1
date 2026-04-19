@@ -1,10 +1,13 @@
 #include "campaign/campaign_state.h"
 #include "campaign/systems/campaign_flow_system.h"
+#include "campaign/systems/faction_reputation_system.h"
 #include "campaign/systems/loadout_planner_system.h"
 #include "campaign/systems/regional_support_system.h"
 #include "campaign/systems/technology_system.h"
-#include "messages/game_message.h"
+#include "content/defs/faction_defs.h"
 #include "content/defs/item_defs.h"
+#include "content/defs/technology_defs.h"
+#include "messages/game_message.h"
 #include "site/site_world_access.h"
 #include "site/systems/failure_recovery_system.h"
 #include "site/systems/site_completion_system.h"
@@ -22,6 +25,7 @@ using gs1::CampaignFlowSystem;
 using gs1::DayPhase;
 using gs1::DeploymentSiteSelectionChangedMessage;
 using gs1::FailureRecoverySystem;
+using gs1::FactionReputationSystem;
 using gs1::GameMessage;
 using gs1::GameMessageQueue;
 using gs1::GameMessageType;
@@ -36,6 +40,7 @@ using gs1::SiteRunStatus;
 using gs1::StartNewCampaignMessage;
 using gs1::StartSiteAttemptMessage;
 using gs1::TileCoord;
+using gs1::TechnologySystem;
 using namespace gs1::testing::fixtures;
 
 template <typename Payload>
@@ -92,6 +97,16 @@ void campaign_flow_start_new_campaign_initializes_state(gs1::testing::SystemTest
     GS1_SYSTEM_TEST_CHECK(context, campaign->regional_map_state.revealed_site_ids.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, campaign->regional_map_state.available_site_ids.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, campaign->regional_map_state.available_site_ids.front().value == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, campaign->faction_progress.size() == 3U);
+    GS1_SYSTEM_TEST_CHECK(context, gs1::k_faction_tech_tier_count == 4U);
+    GS1_SYSTEM_TEST_CHECK(context, campaign->faction_progress[0].faction_id.value == gs1::k_faction_village_committee);
+    GS1_SYSTEM_TEST_CHECK(context, campaign->faction_progress[1].faction_id.value == gs1::k_faction_forestry_bureau);
+    GS1_SYSTEM_TEST_CHECK(context, campaign->faction_progress[2].faction_id.value == gs1::k_faction_agricultural_university);
+    GS1_SYSTEM_TEST_CHECK(context, !campaign->regional_map_state.tech_tree_open);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        campaign->regional_map_state.selected_tech_tree_faction_id.value == gs1::k_faction_village_committee);
+    GS1_SYSTEM_TEST_CHECK(context, campaign->faction_progress[0].occupied_reputation == 0);
     GS1_SYSTEM_TEST_CHECK(context, campaign->loadout_planner_state.baseline_deployment_items.size() == 6U);
     GS1_SYSTEM_TEST_CHECK(context, campaign->loadout_planner_state.selected_loadout_slots.size() == 6U);
     GS1_SYSTEM_TEST_REQUIRE(
@@ -194,6 +209,8 @@ void campaign_flow_start_attempt_and_return_to_map(gs1::testing::SystemTestExecu
         app_state,
         queue};
 
+    campaign->regional_map_state.tech_tree_open = true;
+
     const auto start_message = make_message(
         GameMessageType::StartSiteAttempt,
         StartSiteAttemptMessage {1U});
@@ -208,6 +225,7 @@ void campaign_flow_start_attempt_and_return_to_map(gs1::testing::SystemTestExecu
     GS1_SYSTEM_TEST_CHECK(context, campaign->app_state == GS1_APP_STATE_SITE_ACTIVE);
     GS1_SYSTEM_TEST_CHECK(context, campaign->active_site_id.has_value());
     GS1_SYSTEM_TEST_CHECK(context, campaign->active_site_id->value == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, !campaign->regional_map_state.tech_tree_open);
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::SiteRunStarted);
     GS1_SYSTEM_TEST_CHECK(
@@ -278,6 +296,12 @@ void campaign_flow_completed_attempt_reveals_adjacent_sites(gs1::testing::System
             campaign->regional_map_state.available_site_ids.begin(),
             campaign->regional_map_state.available_site_ids.end(),
             SiteId {2U}) != campaign->regional_map_state.available_site_ids.end());
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        count_messages(queue, GameMessageType::CampaignReputationAwardRequested) == 1U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        count_messages(queue, GameMessageType::FactionReputationAwardRequested) == 1U);
 }
 
 void campaign_flow_failed_attempt_preserves_locked_neighbors(gs1::testing::SystemTestExecutionContext& context)
@@ -517,10 +541,269 @@ void failure_recovery_only_emits_when_worker_health_is_zero(gs1::testing::System
     GS1_SYSTEM_TEST_CHECK(context, queue.size() == 1U);
 }
 
-void technology_placeholder_test_plan_is_recorded(gs1::testing::SystemTestExecutionContext& context)
+void campaign_flow_tech_tree_open_and_close_toggles_regional_map_state(
+    gs1::testing::SystemTestExecutionContext& context)
 {
-    (void)sizeof(gs1::TechnologySystem);
-    GS1_SYSTEM_TEST_CHECK(context, true);
+    std::optional<gs1::CampaignState> campaign {make_campaign()};
+    std::optional<gs1::SiteRunState> active_site_run {};
+    Gs1AppState app_state = GS1_APP_STATE_REGIONAL_MAP;
+    GameMessageQueue queue {};
+
+    CampaignFlowMessageContext flow_context {
+        campaign,
+        active_site_run,
+        app_state,
+        queue};
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        CampaignFlowSystem::process_message(
+            flow_context,
+            make_message(
+                GameMessageType::OpenRegionalMapTechTree,
+                gs1::OpenRegionalMapTechTreeMessage {})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, campaign->regional_map_state.tech_tree_open);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        CampaignFlowSystem::process_message(
+            flow_context,
+            make_message(
+                GameMessageType::CloseRegionalMapTechTree,
+                gs1::CloseRegionalMapTechTreeMessage {})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, !campaign->regional_map_state.tech_tree_open);
+}
+
+void campaign_flow_selects_tech_tree_faction_tab(gs1::testing::SystemTestExecutionContext& context)
+{
+    std::optional<gs1::CampaignState> campaign {make_campaign()};
+    std::optional<gs1::SiteRunState> active_site_run {};
+    Gs1AppState app_state = GS1_APP_STATE_REGIONAL_MAP;
+    GameMessageQueue queue {};
+
+    CampaignFlowMessageContext flow_context {
+        campaign,
+        active_site_run,
+        app_state,
+        queue};
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        CampaignFlowSystem::process_message(
+            flow_context,
+            make_message(
+                GameMessageType::SelectRegionalMapTechTreeFaction,
+                gs1::SelectRegionalMapTechTreeFactionMessage {
+                    gs1::k_faction_forestry_bureau})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        campaign->regional_map_state.selected_tech_tree_faction_id.value == gs1::k_faction_forestry_bureau);
+}
+
+void faction_reputation_awards_unlock_assistant_at_threshold(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto campaign_context = make_campaign_context(campaign);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        FactionReputationSystem::process_message(
+            campaign_context,
+            make_message(
+                GameMessageType::FactionReputationAwardRequested,
+                gs1::FactionReputationAwardRequestedMessage {
+                    gs1::k_faction_village_committee,
+                    10})) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_CHECK(context, campaign.faction_progress[0].faction_reputation == 10);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::available_faction_reputation(campaign, gs1::FactionId {gs1::k_faction_village_committee}) ==
+            10);
+    GS1_SYSTEM_TEST_CHECK(context, campaign.faction_progress[0].has_unlocked_assistant_package);
+    GS1_SYSTEM_TEST_CHECK(context, campaign.faction_progress[0].unlocked_assistant_package_id == 1001U);
+}
+
+void technology_claim_occupies_faction_reputation_and_records_purchase(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto campaign_context = make_campaign_context(campaign);
+    campaign.faction_progress[0].faction_reputation = 40;
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TechnologySystem::process_message(
+            campaign_context,
+            make_message(
+                GameMessageType::TechnologyNodeClaimRequested,
+                gs1::TechnologyNodeClaimRequestedMessage {
+                    gs1::k_tech_node_village_t1_field_rations})) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_CHECK(context, campaign.faction_progress[0].occupied_reputation == 10);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::available_faction_reputation(campaign, gs1::FactionId {gs1::k_faction_village_committee}) ==
+            30);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::node_purchased(
+            campaign,
+            gs1::TechNodeId {gs1::k_tech_node_village_t1_field_rations}));
+}
+
+void technology_amplification_requires_base_and_locks_other_choice(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto campaign_context = make_campaign_context(campaign);
+    campaign.faction_progress[0].faction_reputation = 80;
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::process_message(
+            campaign_context,
+            make_message(
+                GameMessageType::TechnologyNodeClaimRequested,
+                gs1::TechnologyNodeClaimRequestedMessage {
+                    gs1::k_tech_node_village_t1_field_rations_amp_recovery})) == GS1_STATUS_INVALID_STATE);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TechnologySystem::process_message(
+            campaign_context,
+            make_message(
+                GameMessageType::TechnologyNodeClaimRequested,
+                gs1::TechnologyNodeClaimRequestedMessage {
+                    gs1::k_tech_node_village_t1_field_rations})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TechnologySystem::process_message(
+            campaign_context,
+            make_message(
+                GameMessageType::TechnologyNodeClaimRequested,
+                gs1::TechnologyNodeClaimRequestedMessage {
+                    gs1::k_tech_node_village_t1_field_rations_amp_recovery})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, campaign.faction_progress[0].occupied_reputation == 22);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::process_message(
+            campaign_context,
+            make_message(
+                GameMessageType::TechnologyNodeClaimRequested,
+                gs1::TechnologyNodeClaimRequestedMessage {
+                    gs1::k_tech_node_village_t1_field_rations_amp_comfort})) == GS1_STATUS_INVALID_STATE);
+}
+
+void technology_next_tier_requires_base_and_amplification_in_previous_tier(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto campaign_context = make_campaign_context(campaign);
+    campaign.faction_progress[0].faction_reputation = 80;
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::process_message(
+            campaign_context,
+            make_message(
+                GameMessageType::TechnologyNodeClaimRequested,
+                gs1::TechnologyNodeClaimRequestedMessage {
+                    gs1::k_tech_node_village_t2_stove_network})) == GS1_STATUS_INVALID_STATE);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TechnologySystem::process_message(
+            campaign_context,
+            make_message(
+                GameMessageType::TechnologyNodeClaimRequested,
+                gs1::TechnologyNodeClaimRequestedMessage {
+                    gs1::k_tech_node_village_t1_field_rations})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::process_message(
+            campaign_context,
+            make_message(
+                GameMessageType::TechnologyNodeClaimRequested,
+                gs1::TechnologyNodeClaimRequestedMessage {
+                    gs1::k_tech_node_village_t2_stove_network})) == GS1_STATUS_INVALID_STATE);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TechnologySystem::process_message(
+            campaign_context,
+            make_message(
+                GameMessageType::TechnologyNodeClaimRequested,
+                gs1::TechnologyNodeClaimRequestedMessage {
+                    gs1::k_tech_node_village_t1_field_rations_amp_recovery})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TechnologySystem::process_message(
+            campaign_context,
+            make_message(
+                GameMessageType::TechnologyNodeClaimRequested,
+                gs1::TechnologyNodeClaimRequestedMessage {
+                    gs1::k_tech_node_village_t2_stove_network})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, campaign.faction_progress[0].occupied_reputation == 40);
+}
+
+void technology_additional_same_tier_purchase_increases_cost(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto campaign_context = make_campaign_context(campaign);
+    campaign.faction_progress[0].faction_reputation = 100;
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::current_reputation_cost(
+            campaign,
+            *gs1::find_technology_node_def(gs1::TechNodeId {gs1::k_tech_node_village_t1_field_rations})) == 10);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TechnologySystem::process_message(
+            campaign_context,
+            make_message(
+                GameMessageType::TechnologyNodeClaimRequested,
+                gs1::TechnologyNodeClaimRequestedMessage {
+                    gs1::k_tech_node_village_t1_field_rations})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::current_reputation_cost(
+            campaign,
+            *gs1::find_technology_node_def(gs1::TechNodeId {gs1::k_tech_node_village_t1_shift_meals})) == 12);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TechnologySystem::process_message(
+            campaign_context,
+            make_message(
+                GameMessageType::TechnologyNodeClaimRequested,
+                gs1::TechnologyNodeClaimRequestedMessage {
+                    gs1::k_tech_node_village_t1_shift_meals})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::current_reputation_cost(
+            campaign,
+            *gs1::find_technology_node_def(gs1::TechNodeId {gs1::k_tech_node_village_t1_supply_runners})) == 15);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TechnologySystem::process_message(
+            campaign_context,
+            make_message(
+                GameMessageType::TechnologyNodeClaimRequested,
+                gs1::TechnologyNodeClaimRequestedMessage {
+                    gs1::k_tech_node_village_t1_supply_runners})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::current_reputation_cost(
+            campaign,
+            *gs1::find_technology_node_def(gs1::TechNodeId {
+                gs1::k_tech_node_village_t1_field_rations_amp_recovery})) == 18);
+    GS1_SYSTEM_TEST_CHECK(context, campaign.faction_progress[0].occupied_reputation == 37);
 }
 
 void regional_support_placeholder_test_plan_is_recorded(gs1::testing::SystemTestExecutionContext& context)
@@ -579,9 +862,33 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "only_emits_when_worker_health_is_zero",
     failure_recovery_only_emits_when_worker_health_is_zero);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "campaign_flow",
+    "tech_tree_open_and_close_toggles_regional_map_state",
+    campaign_flow_tech_tree_open_and_close_toggles_regional_map_state);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "campaign_flow",
+    "selects_tech_tree_faction_tab",
+    campaign_flow_selects_tech_tree_faction_tab);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "faction_reputation",
+    "awards_unlock_assistant_at_threshold",
+    faction_reputation_awards_unlock_assistant_at_threshold);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "technology",
-    "placeholder_test_plan_is_recorded",
-    technology_placeholder_test_plan_is_recorded);
+    "claim_occupies_faction_reputation_and_records_purchase",
+    technology_claim_occupies_faction_reputation_and_records_purchase);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "technology",
+    "amplification_requires_base_and_locks_other_choice",
+    technology_amplification_requires_base_and_locks_other_choice);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "technology",
+    "next_tier_requires_base_and_amplification_in_previous_tier",
+    technology_next_tier_requires_base_and_amplification_in_previous_tier);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "technology",
+    "additional_same_tier_purchase_increases_cost",
+    technology_additional_same_tier_purchase_increases_cost);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "regional_support",
     "placeholder_test_plan_is_recorded",

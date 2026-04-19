@@ -1,6 +1,7 @@
 #include "app/campaign_factory.h"
 
 #include "campaign/systems/loadout_planner_system.h"
+#include "content/defs/faction_defs.h"
 #include "content/prototype_content.h"
 
 namespace gs1
@@ -29,7 +30,14 @@ CampaignState CampaignFactory::create_prototype_campaign(
     campaign.campaign_days_total = campaign_days;
     campaign.campaign_days_remaining = campaign_days;
     campaign.app_state = GS1_APP_STATE_REGIONAL_MAP;
-    campaign.faction_progress.push_back(FactionProgressState{FactionId{1U}});
+    campaign.regional_map_state.tech_tree_open = false;
+    campaign.regional_map_state.selected_tech_tree_faction_id = FactionId {k_faction_village_committee};
+    campaign.faction_progress.reserve(k_prototype_faction_defs.size());
+    for (const auto& faction_def : k_prototype_faction_defs)
+    {
+        campaign.faction_progress.push_back(FactionProgressState {faction_def.faction_id});
+    }
+    campaign.technology_state.reputation = 0;
     LoadoutPlannerSystem::initialize_campaign_state(campaign);
 
     campaign.sites.reserve(content.sites.size());
@@ -40,8 +48,11 @@ CampaignState CampaignFactory::create_prototype_campaign(
         site.site_state = site_content.initial_state;
         site.adjacent_site_ids = site_content.adjacent_site_ids;
         site.site_archetype_id = site_content.site_archetype_id;
+        site.featured_faction_id = site_content.featured_faction_id;
         site.support_package_id = site_content.support_package_id;
         site.has_support_package_id = site.support_package_id != 0U;
+        site.completion_reputation_reward = site_content.completion_reputation_reward;
+        site.completion_faction_reputation_reward = site_content.completion_faction_reputation_reward;
         site.exported_support_items.reserve(site_content.exported_support_items.size());
         for (const auto& item : site_content.exported_support_items)
         {

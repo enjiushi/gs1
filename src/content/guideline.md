@@ -13,5 +13,5 @@ Prototype content storage, indexing, and validation shells used to feed gameplay
 - `content_loader.h`: Content loading entry points and loader-facing contracts.
 - `content_validator.h`: Validation entry points for loaded content data.
 - `defs/`: Per-domain content definition structs.
-- `prototype_content.h`: Prototype content package declarations, including authored regional-support seed data for prototype sites.
-- `prototype_content.cpp`: Prototype content construction and seed-data implementation, including authored support packages and nearby-aura seeds.
+- `prototype_content.h`: Prototype content package declarations, including authored regional-support seeds, site faction ownership, site-completion reputation rewards, and tech-pick thresholds.
+- `prototype_content.cpp`: Prototype content construction and seed-data implementation, including authored support packages, nearby-aura seeds, faction-linked site rewards, and prototype tech-pick thresholds.

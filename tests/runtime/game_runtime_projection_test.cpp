@@ -1,5 +1,7 @@
 #include "runtime/game_runtime.h"
+#include "content/defs/faction_defs.h"
 #include "content/defs/item_defs.h"
+#include "content/defs/technology_defs.h"
 #include "site/inventory_storage.h"
 #include "site/site_world_access.h"
 
@@ -451,6 +453,46 @@ int main()
     assert(contains_ui_element_text(loadout_ui_messages, "Water x2"));
     assert(contains_ui_element_text(loadout_ui_messages, "Wind Reed Seeds x8"));
     assert(contains_ui_element_text(loadout_ui_messages, "Wood x6"));
+    assert(contains_ui_element_text(loadout_ui_messages, "Open Tech Tree"));
+
+    GameMessage open_tech_tree_message {};
+    open_tech_tree_message.type = GameMessageType::OpenRegionalMapTechTree;
+    open_tech_tree_message.set_payload(gs1::OpenRegionalMapTechTreeMessage {});
+    assert(runtime.handle_message(open_tech_tree_message) == GS1_STATUS_OK);
+    const auto tech_tree_messages = drain_engine_messages(runtime);
+    assert(contains_ui_element_text(tech_tree_messages, "Faction Tech Tree"));
+    assert(contains_ui_element_text(tech_tree_messages, "Tab: Village Committee"));
+
+    GameMessage select_forestry_tab_message {};
+    select_forestry_tab_message.type = GameMessageType::SelectRegionalMapTechTreeFaction;
+    select_forestry_tab_message.set_payload(gs1::SelectRegionalMapTechTreeFactionMessage {
+        gs1::k_faction_forestry_bureau});
+    assert(runtime.handle_message(select_forestry_tab_message) == GS1_STATUS_OK);
+    const auto forestry_messages = drain_engine_messages(runtime);
+    assert(contains_ui_element_text(forestry_messages, "Tab: Forestry Bureau"));
+
+    GameMessage faction_reputation_award {};
+    faction_reputation_award.type = GameMessageType::FactionReputationAwardRequested;
+    faction_reputation_award.set_payload(gs1::FactionReputationAwardRequestedMessage {
+        gs1::k_faction_village_committee,
+        40});
+    assert(runtime.handle_message(faction_reputation_award) == GS1_STATUS_OK);
+
+    GameMessage select_village_tab_message {};
+    select_village_tab_message.type = GameMessageType::SelectRegionalMapTechTreeFaction;
+    select_village_tab_message.set_payload(gs1::SelectRegionalMapTechTreeFactionMessage {
+        gs1::k_faction_village_committee});
+    assert(runtime.handle_message(select_village_tab_message) == GS1_STATUS_OK);
+    const auto awarded_messages = drain_engine_messages(runtime);
+    assert(contains_ui_element_text(awarded_messages, "Tab: Village Committee"));
+
+    GameMessage claim_tech_node_message {};
+    claim_tech_node_message.type = GameMessageType::TechnologyNodeClaimRequested;
+    claim_tech_node_message.set_payload(gs1::TechnologyNodeClaimRequestedMessage {
+        gs1::k_tech_node_village_t1_field_rations});
+    assert(runtime.handle_message(claim_tech_node_message) == GS1_STATUS_OK);
+    const auto claimed_messages = drain_engine_messages(runtime);
+    assert(contains_ui_element_text(claimed_messages, "Faction Tech Tree"));
 
     GameRuntime support_runtime {create_desc};
     assert(support_runtime.handle_message(make_start_campaign_message()) == GS1_STATUS_OK);

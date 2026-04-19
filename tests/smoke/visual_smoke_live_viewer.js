@@ -2697,6 +2697,259 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         stack.appendChild(footnote);
     }
 
+    function technologyIconGlyph(titleText, isAmplification) {
+        const words = String(titleText || "").trim().split(/\s+/).filter(Boolean);
+        if (words.length === 0) {
+            return isAmplification ? "A" : "T";
+        }
+        const glyph = words.slice(0, 2).map((word) => word.charAt(0).toUpperCase()).join("");
+        return glyph || (isAmplification ? "A" : "T");
+    }
+
+    function parseTechTreeActionElement(element) {
+        if (!element || !element.action) {
+            return null;
+        }
+
+        const text = element.text || "";
+        const parts = text.split("|").map((part) => part.trim());
+        const leftText = parts[0] || "";
+        const titleText = parts.length > 1 ? parts.slice(1).join(" | ") : leftText;
+        const targetId = element.action.targetId || 0;
+        const localId = targetId % 100;
+        const isAmplification = localId >= 10;
+        const baseSlotIndex = isAmplification ? Math.floor(localId / 10) - 1 : (localId - 1);
+        const amplificationChoiceIndex = isAmplification ? ((localId % 10) - 1) : -1;
+        const leftMatch = leftText.match(/^(Tech|Amp)\s+(\d+)\s+(.*)$/);
+        const statusText = leftMatch ? leftMatch[3] : leftText;
+        const costMatch = statusText.match(/(?:Cost|Need)\s+(\d+)/);
+        const costText = costMatch ? ("Rep " + costMatch[1]) : statusText;
+
+        return {
+            element: element,
+            titleText: titleText,
+            statusText: statusText,
+            costText: costText,
+            isAmplification: isAmplification,
+            baseSlotIndex: Math.max(0, baseSlotIndex),
+            amplificationChoiceIndex: amplificationChoiceIndex,
+            isClaimable: (element.flags & 1) !== 0,
+            isDisabled: (element.flags & 2) !== 0,
+            isClaimed: /Claimed/i.test(statusText),
+            isLocked: /Locked/i.test(statusText) || /Needs Base/i.test(statusText)
+        };
+    }
+
+    function buildTechTreeNodeButton(nodeModel, extraClassName) {
+        const nodeButton = document.createElement("button");
+        nodeButton.type = "button";
+        nodeButton.className = extraClassName;
+        if (nodeModel.isClaimable) {
+            nodeButton.classList.add("claimable");
+        }
+        if (nodeModel.isDisabled) {
+            nodeButton.disabled = true;
+            nodeButton.classList.add("disabled");
+        }
+        if (nodeModel.isClaimed) {
+            nodeButton.classList.add("claimed");
+        } else if (nodeModel.isLocked) {
+            nodeButton.classList.add("locked");
+        }
+        nodeButton.addEventListener("click", function () {
+            postJson("/ui-action", nodeModel.element.action).catch(() => {
+                statusChip.textContent = "Failed to send tech-tree action.";
+            });
+        });
+
+        const nodeTop = document.createElement("div");
+        nodeTop.className = "tech-node-top";
+        nodeButton.appendChild(nodeTop);
+
+        const nodeIcon = document.createElement("div");
+        nodeIcon.className = "tech-node-icon";
+        if (nodeModel.isAmplification) {
+            nodeIcon.classList.add("amp");
+        }
+        nodeIcon.textContent = technologyIconGlyph(nodeModel.titleText, nodeModel.isAmplification);
+        nodeTop.appendChild(nodeIcon);
+
+        const nodeCost = document.createElement("div");
+        nodeCost.className = "tech-node-cost";
+        nodeCost.textContent = nodeModel.costText;
+        nodeTop.appendChild(nodeCost);
+
+        const nodeTitle = document.createElement("div");
+        nodeTitle.className = "tech-node-title";
+        nodeTitle.textContent = nodeModel.titleText;
+        nodeButton.appendChild(nodeTitle);
+
+        const nodeState = document.createElement("div");
+        nodeState.className = "tech-node-state";
+        nodeState.textContent = nodeModel.statusText;
+        nodeButton.appendChild(nodeState);
+
+        return nodeButton;
+    }
+
+    function appendRegionalMapTechTreePanel(techTreeSetup) {
+        if (!techTreeSetup) {
+            return;
+        }
+
+        selectionInventory.hidden = false;
+        let stack = selectionInventory.querySelector(".site-panel-stack");
+        if (!stack) {
+            stack = document.createElement("div");
+            stack.className = "site-panel-stack";
+            selectionInventory.appendChild(stack);
+        }
+
+        const section = document.createElement("section");
+        section.className = "inventory-section tech-tree-panel";
+        stack.appendChild(section);
+
+        const labels = getLabelElements(techTreeSetup);
+        const actions = getVisibleActionElements(techTreeSetup);
+        const title = labels.length > 0 ? labels[0].text : "Faction Tech Tree";
+        const subtitle = labels.length > 1 ? labels[1].text : "Claim nodes with available faction reputation.";
+
+        const titleElement = document.createElement("div");
+        titleElement.className = "inventory-title";
+        titleElement.textContent = title;
+        section.appendChild(titleElement);
+
+        const subtitleElement = document.createElement("div");
+        subtitleElement.className = "inventory-subtitle";
+        subtitleElement.textContent = subtitle;
+        section.appendChild(subtitleElement);
+
+        const tabButtons = actions.filter((element) => element.action && element.action.type === "SELECT_TECH_TREE_FACTION_TAB");
+        if (tabButtons.length > 0) {
+            const tabRow = document.createElement("div");
+            tabRow.className = "tech-tree-tabs";
+            section.appendChild(tabRow);
+
+            tabButtons.forEach((element) => {
+                const button = document.createElement("button");
+                button.type = "button";
+                button.className = "tech-tree-tab";
+                if ((element.flags & 1) !== 0) {
+                    button.classList.add("active");
+                }
+                button.textContent = (element.text || "").replace(/^Tab:\s*/, "");
+                button.addEventListener("click", function () {
+                    postJson("/ui-action", element.action).catch(() => {
+                        statusChip.textContent = "Failed to switch tech-tree faction.";
+                    });
+                });
+                tabRow.appendChild(button);
+            });
+        }
+
+        const tierStack = document.createElement("div");
+        tierStack.className = "tech-tree-tier-stack";
+        section.appendChild(tierStack);
+
+        const tierElements = [];
+        let activeTier = null;
+        techTreeSetup.elements.forEach((element) => {
+            if (!element) {
+                return;
+            }
+            if (element.action && element.action.type === "SELECT_TECH_TREE_FACTION_TAB") {
+                return;
+            }
+            if (!element.action || element.action.type === "NONE") {
+                if (element.text === title || element.text === subtitle) {
+                    return;
+                }
+                activeTier = {
+                    label: element.text || "Tier",
+                    nodes: []
+                };
+                tierElements.push(activeTier);
+                return;
+            }
+            if (activeTier) {
+                activeTier.nodes.push(element);
+            }
+        });
+
+        tierElements.forEach((tierElement) => {
+            const tierCard = document.createElement("section");
+            tierCard.className = "tech-tier-card";
+            tierStack.appendChild(tierCard);
+
+            const tierParts = (tierElement.label || "").split("|").map((part) => part.trim()).filter(Boolean);
+            const tierTitle = document.createElement("div");
+            tierTitle.className = "tech-tier-title";
+            tierTitle.textContent = tierParts.length > 0 ? tierParts[0] : "Tier";
+            tierCard.appendChild(tierTitle);
+
+            if (tierParts.length > 1) {
+                const tierMeta = document.createElement("div");
+                tierMeta.className = "tech-tier-meta";
+                tierMeta.textContent = tierParts.slice(1).join("  |  ");
+                tierCard.appendChild(tierMeta);
+            }
+
+            const tierGrid = document.createElement("div");
+            tierGrid.className = "tech-tier-grid";
+            tierCard.appendChild(tierGrid);
+
+            const slotModels = new Array(3).fill(null).map(() => ({
+                base: null,
+                amps: [null, null]
+            }));
+
+            tierElement.nodes.forEach((element) => {
+                const nodeModel = parseTechTreeActionElement(element);
+                if (!nodeModel) {
+                    return;
+                }
+
+                const slotModel = slotModels[Math.max(0, Math.min(2, nodeModel.baseSlotIndex))];
+                if (nodeModel.isAmplification) {
+                    const ampIndex = Math.max(0, Math.min(1, nodeModel.amplificationChoiceIndex));
+                    slotModel.amps[ampIndex] = nodeModel;
+                } else {
+                    slotModel.base = nodeModel;
+                }
+            });
+
+            slotModels.forEach((slotModel, slotIndex) => {
+                const column = document.createElement("div");
+                column.className = "tech-column";
+                tierGrid.appendChild(column);
+
+                if (slotModel.base) {
+                    column.appendChild(buildTechTreeNodeButton(slotModel.base, "tech-base-card"));
+                } else {
+                    const basePlaceholder = document.createElement("div");
+                    basePlaceholder.className = "tech-base-card tech-placeholder";
+                    basePlaceholder.textContent = "Tech " + String(slotIndex + 1);
+                    column.appendChild(basePlaceholder);
+                }
+
+                const ampRow = document.createElement("div");
+                ampRow.className = "tech-amp-row";
+                column.appendChild(ampRow);
+
+                slotModel.amps.forEach((ampModel, ampIndex) => {
+                    if (ampModel) {
+                        ampRow.appendChild(buildTechTreeNodeButton(ampModel, "tech-amp-card"));
+                    } else {
+                        const ampPlaceholder = document.createElement("div");
+                        ampPlaceholder.className = "tech-amp-card tech-placeholder";
+                        ampPlaceholder.textContent = ampIndex === 0 ? "Left Amp" : "Right Amp";
+                        ampRow.appendChild(ampPlaceholder);
+                    }
+                });
+            });
+        });
+    }
+
     function renderSiteInventoryPanel(state, workerPackSlots) {
         if (!inventoryPanelOpen) {
             selectionChip.hidden = true;
@@ -3631,9 +3884,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function renderRegionalMapOverlay(state) {
+        const menuSetup = getSetup(state, "REGIONAL_MAP_MENU");
         const selectionSetup = getSetup(state, "REGIONAL_MAP_SELECTION");
+        const techTreeSetup = getSetup(state, "REGIONAL_MAP_TECH_TREE");
         const labels = getLabelElements(selectionSetup);
         const actions = getVisibleActionElements(selectionSetup);
+        const menuActions = getVisibleActionElements(menuSetup);
         const primaryLabel = labels.length > 0 ? labels[0].text : "";
 
         menuPanel.hidden = true;
@@ -3648,9 +3904,24 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
 
         renderRegionalMapLoadoutPanel(state, selectionSetup, primaryLabel);
+        appendRegionalMapTechTreePanel(techTreeSetup);
         renderStoragePanel(null, null);
 
         contextActions.innerHTML = "";
+        menuActions.forEach((element) => {
+            contextActions.appendChild(
+                makeButton(
+                    element.text || element.action.type,
+                    function () {
+                        postJson("/ui-action", element.action).catch(() => {
+                            statusChip.textContent = "Failed to send UI action.";
+                        });
+                    },
+                    false,
+                    (element.flags & 2) !== 0
+                )
+            );
+        });
         actions.forEach((element) => {
             let label = element.text || element.action.type;
             if (element.action && element.action.type === "START_SITE_ATTEMPT") {

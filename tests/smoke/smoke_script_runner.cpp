@@ -80,6 +80,22 @@ std::optional<Gs1UiActionType> parse_ui_action_type(const std::string& value)
     {
         return GS1_UI_ACTION_SET_PHONE_PANEL_SECTION;
     }
+    if (value == "OPEN_REGIONAL_MAP_TECH_TREE")
+    {
+        return GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE;
+    }
+    if (value == "CLOSE_REGIONAL_MAP_TECH_TREE")
+    {
+        return GS1_UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE;
+    }
+    if (value == "CLAIM_TECHNOLOGY_NODE")
+    {
+        return GS1_UI_ACTION_CLAIM_TECHNOLOGY_NODE;
+    }
+    if (value == "SELECT_TECH_TREE_FACTION_TAB")
+    {
+        return GS1_UI_ACTION_SELECT_TECH_TREE_FACTION_TAB;
+    }
     if (value == "USE_INVENTORY_ITEM")
     {
         return GS1_UI_ACTION_USE_INVENTORY_ITEM;

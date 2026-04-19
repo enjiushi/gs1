@@ -65,21 +65,23 @@ private:
     {
         CampaignFlow = 0,
         LoadoutPlanner = 1,
-        ActionExecution = 2,
-        WeatherEvent = 3,
-        WorkerCondition = 4,
-        Ecology = 5,
-        TaskBoard = 6,
-        PlacementValidation = 7,
-        LocalWeatherResolve = 8,
-        Inventory = 9,
-        Craft = 10,
-        EconomyPhone = 11,
-        PhonePanel = 12,
-        CampDurability = 13,
-        DeviceSupport = 14,
-        DeviceMaintenance = 15,
-        Modifier = 16
+        FactionReputation = 2,
+        Technology = 3,
+        ActionExecution = 4,
+        WeatherEvent = 5,
+        WorkerCondition = 6,
+        Ecology = 7,
+        TaskBoard = 8,
+        PlacementValidation = 9,
+        LocalWeatherResolve = 10,
+        Inventory = 11,
+        Craft = 12,
+        EconomyPhone = 13,
+        PhonePanel = 14,
+        CampDurability = 15,
+        DeviceSupport = 16,
+        DeviceMaintenance = 17,
+        Modifier = 18
     };
 
     enum class FeedbackEventSubscriberId : std::uint8_t
@@ -127,7 +129,9 @@ private:
     void queue_ui_setup_end_message();
     void queue_clear_ui_setup_messages(Gs1UiSetupId setup_id);
     void queue_main_menu_ui_messages();
+    void queue_regional_map_menu_ui_messages();
     void queue_regional_map_selection_ui_messages();
+    void queue_regional_map_tech_tree_ui_messages();
     void queue_site_result_ui_messages(std::uint32_t site_id, Gs1SiteAttemptResult result);
     void queue_regional_map_snapshot_messages();
     void queue_regional_map_site_upsert_message(const SiteMetaState& site);

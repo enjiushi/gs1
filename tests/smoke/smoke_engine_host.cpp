@@ -127,6 +127,10 @@ const char* ui_setup_name(Gs1UiSetupId setup_id)
         return "REGIONAL_MAP_SELECTION";
     case GS1_UI_SETUP_SITE_RESULT:
         return "SITE_RESULT";
+    case GS1_UI_SETUP_REGIONAL_MAP_MENU:
+        return "REGIONAL_MAP_MENU";
+    case GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE:
+        return "REGIONAL_MAP_TECH_TREE";
     default:
         return "NONE";
     }
@@ -176,6 +180,14 @@ const char* ui_action_name(Gs1UiActionType action_type)
         return "CHECKOUT_PHONE_CART";
     case GS1_UI_ACTION_SET_PHONE_PANEL_SECTION:
         return "SET_PHONE_PANEL_SECTION";
+    case GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE:
+        return "OPEN_REGIONAL_MAP_TECH_TREE";
+    case GS1_UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE:
+        return "CLOSE_REGIONAL_MAP_TECH_TREE";
+    case GS1_UI_ACTION_CLAIM_TECHNOLOGY_NODE:
+        return "CLAIM_TECHNOLOGY_NODE";
+    case GS1_UI_ACTION_SELECT_TECH_TREE_FACTION_TAB:
+        return "SELECT_TECH_TREE_FACTION_TAB";
     case GS1_UI_ACTION_USE_INVENTORY_ITEM:
         return "USE_INVENTORY_ITEM";
     case GS1_UI_ACTION_TRANSFER_INVENTORY_ITEM:

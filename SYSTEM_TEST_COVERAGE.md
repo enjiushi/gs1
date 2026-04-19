@@ -116,16 +116,16 @@ Implemented behavior coverage should verify:
 
 ### `technology`
 
-Current placeholder coverage should verify:
+Implemented behavior coverage should verify:
 
-- The system has no gameplay implementation yet.
-- Test coverage records current no-op expectations only.
-
-Future design-driven coverage should include:
-
-- Reputation-to-tech unlock progression.
-- Available pick generation.
-- Applied content update tracking.
+- Claims occupy faction reputation instead of spending down total faction reputation.
+- Available faction reputation is total minus occupied reputation.
+- A tier starts unlocked only for tier `1`; later tiers require at least one base tech plus one amplification purchased in the previous tier.
+- Each tier contains three base techs and two mutually exclusive amplifications per base tech.
+- Amplifications require their paired base tech first.
+- Claiming one amplification locks out the sibling amplification for that same base tech.
+- Additional purchases in the same tier increase the next tier purchase cost by the cumulative `1.2x` modifier.
+- Purchased tech state is stored as node ownership, not as unspent pick inventory.
 
 ### `regional_support`
 

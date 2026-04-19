@@ -9,6 +9,7 @@ Data-only definition headers for the major authored content domains.
 
 ## Contents
 - `campaign_content_defs.h`: Campaign-level authored content records.
+- `faction_defs.h`: Prototype faction identity and assistant unlock definition records.
 - `craft_recipe_defs.h`: Crafting recipe authoring records for craft-system use.
 - `event_defs.h`: Authored event definitions used by event/state systems.
 - `item_defs.h`: Item definition records and item-domain metadata.
@@ -19,4 +20,4 @@ Data-only definition headers for the major authored content domains.
 - `site_content_defs.h`: Site template/content definitions for active site runs.
 - `structure_defs.h`: Structure/buildable definition records.
 - `task_defs.h`: Task board/authored task definition records.
-- `technology_defs.h`: Technology tree definition records.
+- `technology_defs.h`: Technology tree definition records, including prototype faction tabs, four temporary modifier tiers per faction, base-tech entries, and mutually exclusive amplification choices.

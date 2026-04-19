@@ -57,7 +57,9 @@ add_library(gs1_game SHARED
     src/app/campaign_factory.cpp
     src/app/site_run_factory.cpp
     src/campaign/systems/campaign_flow_system.cpp
+    src/campaign/systems/faction_reputation_system.cpp
     src/campaign/systems/loadout_planner_system.cpp
+    src/campaign/systems/technology_system.cpp
     src/messages/message_dispatcher.cpp
     src/content/prototype_content.cpp
     src/site/systems/action_execution_system.cpp
@@ -156,7 +158,9 @@ if(GS1_BUILD_TESTS)
         src/app/campaign_factory.cpp
         src/app/site_run_factory.cpp
         src/campaign/systems/campaign_flow_system.cpp
+        src/campaign/systems/faction_reputation_system.cpp
         src/campaign/systems/loadout_planner_system.cpp
+        src/campaign/systems/technology_system.cpp
         src/messages/message_dispatcher.cpp
         src/content/prototype_content.cpp
         src/site/systems/action_execution_system.cpp
@@ -185,7 +189,9 @@ if(GS1_BUILD_TESTS)
         src/app/campaign_factory.cpp
         src/app/site_run_factory.cpp
         src/campaign/systems/campaign_flow_system.cpp
+        src/campaign/systems/faction_reputation_system.cpp
         src/campaign/systems/loadout_planner_system.cpp
+        src/campaign/systems/technology_system.cpp
         src/messages/message_dispatcher.cpp
         src/content/prototype_content.cpp
         src/site/systems/action_execution_system.cpp
@@ -214,7 +220,9 @@ if(GS1_BUILD_TESTS)
         src/app/campaign_factory.cpp
         src/app/site_run_factory.cpp
         src/campaign/systems/campaign_flow_system.cpp
+        src/campaign/systems/faction_reputation_system.cpp
         src/campaign/systems/loadout_planner_system.cpp
+        src/campaign/systems/technology_system.cpp
         src/content/prototype_content.cpp
         src/site/systems/action_execution_system.cpp
         src/site/systems/camp_durability_system.cpp
@@ -247,7 +255,9 @@ if(GS1_BUILD_TESTS)
         src/app/campaign_factory.cpp
         src/app/site_run_factory.cpp
         src/campaign/systems/campaign_flow_system.cpp
+        src/campaign/systems/faction_reputation_system.cpp
         src/campaign/systems/loadout_planner_system.cpp
+        src/campaign/systems/technology_system.cpp
         src/messages/message_dispatcher.cpp
         src/content/prototype_content.cpp
         src/site/systems/action_execution_system.cpp
@@ -261,6 +271,7 @@ if(GS1_BUILD_TESTS)
         src/site/systems/craft_system.cpp
         src/site/systems/local_weather_resolve_system.cpp
         src/site/systems/modifier_system.cpp
+        src/site/systems/phone_panel_system.cpp
         src/site/systems/placement_validation_system.cpp
         src/site/systems/site_completion_system.cpp
         src/site/systems/site_flow_system.cpp

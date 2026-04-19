@@ -2,9 +2,13 @@
 
 #include "campaign/systems/campaign_flow_system.h"
 #include "campaign/systems/campaign_system_context.h"
+#include "campaign/systems/faction_reputation_system.h"
 #include "campaign/systems/loadout_planner_system.h"
+#include "campaign/systems/technology_system.h"
+#include "content/defs/faction_defs.h"
 #include "messages/message_dispatcher.h"
 #include "content/defs/item_defs.h"
+#include "content/defs/technology_defs.h"
 #include "site/inventory_storage.h"
 #include "site/site_world_access.h"
 #include "site/systems/action_execution_system.h"
@@ -62,6 +66,21 @@ namespace
         if (site.site_id.value == site_id)
         {
             return &site;
+        }
+    }
+
+    return nullptr;
+}
+
+[[nodiscard]] const FactionProgressState* find_faction_progress(
+    const CampaignState& campaign,
+    FactionId faction_id) noexcept
+{
+    for (const auto& faction_progress : campaign.faction_progress)
+    {
+        if (faction_progress.faction_id == faction_id)
+        {
+            return &faction_progress;
         }
     }
 
@@ -538,6 +557,16 @@ void GameRuntime::initialize_subscription_tables()
             subscribers.push_back(MessageSubscriberId::LoadoutPlanner);
         }
 
+        if (FactionReputationSystem::subscribes_to(type))
+        {
+            subscribers.push_back(MessageSubscriberId::FactionReputation);
+        }
+
+        if (TechnologySystem::subscribes_to(type))
+        {
+            subscribers.push_back(MessageSubscriberId::Technology);
+        }
+
         if (ActionExecutionSystem::subscribes_to(type))
         {
             subscribers.push_back(MessageSubscriberId::ActionExecution);
@@ -831,6 +860,46 @@ Gs1Status GameRuntime::dispatch_subscribed_message(const GameMessage& message)
                 [&]() -> Gs1Status {
                     CampaignSystemContext context {*campaign_};
                     return LoadoutPlannerSystem::process_message(context, message);
+                });
+            if (status != GS1_STATUS_OK)
+            {
+                return status;
+            }
+            break;
+        }
+
+        case MessageSubscriberId::FactionReputation:
+        {
+            if (!campaign_.has_value())
+            {
+                break;
+            }
+
+            const auto status = dispatch_profiled_message(
+                GS1_RUNTIME_PROFILE_SYSTEM_FACTION_REPUTATION,
+                [&]() -> Gs1Status {
+                    CampaignSystemContext context {*campaign_};
+                    return FactionReputationSystem::process_message(context, message);
+                });
+            if (status != GS1_STATUS_OK)
+            {
+                return status;
+            }
+            break;
+        }
+
+        case MessageSubscriberId::Technology:
+        {
+            if (!campaign_.has_value())
+            {
+                break;
+            }
+
+            const auto status = dispatch_profiled_message(
+                GS1_RUNTIME_PROFILE_SYSTEM_TECHNOLOGY,
+                [&]() -> Gs1Status {
+                    CampaignSystemContext context {*campaign_};
+                    return TechnologySystem::process_message(context, message);
                 });
             if (status != GS1_STATUS_OK)
             {
@@ -1169,6 +1238,7 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
     {
     case GameMessageType::OpenMainMenu:
         queue_close_active_normal_ui_if_open();
+        queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE);
         queue_app_state_message(app_state_);
         queue_main_menu_ui_messages();
         queue_log_message("Entered main menu.");
@@ -1178,24 +1248,54 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
         queue_close_ui_setup_if_open(GS1_UI_SETUP_MAIN_MENU);
         queue_app_state_message(app_state_);
         queue_regional_map_snapshot_messages();
+        queue_regional_map_menu_ui_messages();
         queue_regional_map_selection_ui_messages();
         queue_log_message("Started new GS1 campaign.");
         break;
 
     case GameMessageType::SelectDeploymentSite:
         queue_regional_map_snapshot_messages();
+        queue_regional_map_menu_ui_messages();
         queue_regional_map_selection_ui_messages();
         queue_log_message("Selected deployment site.");
         break;
 
     case GameMessageType::ClearDeploymentSiteSelection:
         queue_regional_map_snapshot_messages();
+        queue_regional_map_menu_ui_messages();
         queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_SELECTION);
         queue_log_message("Cleared deployment site selection.");
         break;
 
+    case GameMessageType::OpenRegionalMapTechTree:
+        queue_regional_map_menu_ui_messages();
+        queue_regional_map_tech_tree_ui_messages();
+        break;
+
+    case GameMessageType::CloseRegionalMapTechTree:
+        queue_regional_map_menu_ui_messages();
+        queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE);
+        break;
+
+    case GameMessageType::SelectRegionalMapTechTreeFaction:
+        queue_regional_map_menu_ui_messages();
+        queue_regional_map_tech_tree_ui_messages();
+        break;
+
+    case GameMessageType::CampaignReputationAwardRequested:
+    case GameMessageType::FactionReputationAwardRequested:
+    case GameMessageType::TechnologyNodeClaimRequested:
+        if (app_state_ == GS1_APP_STATE_REGIONAL_MAP)
+        {
+            queue_regional_map_menu_ui_messages();
+            queue_regional_map_tech_tree_ui_messages();
+        }
+        break;
+
     case GameMessageType::StartSiteAttempt:
         queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_SELECTION);
+        queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_MENU);
+        queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE);
         queue_app_state_message(app_state_);
         break;
 
@@ -1210,6 +1310,7 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
         queue_app_state_message(app_state_);
         queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_RESULT);
         queue_regional_map_snapshot_messages();
+        queue_regional_map_menu_ui_messages();
         queue_regional_map_selection_ui_messages();
         break;
 
@@ -1414,6 +1515,53 @@ void GameRuntime::queue_main_menu_ui_messages()
     queue_ui_setup_end_message();
 }
 
+void GameRuntime::queue_regional_map_menu_ui_messages()
+{
+    if (!campaign_.has_value() || app_state_ != GS1_APP_STATE_REGIONAL_MAP)
+    {
+        return;
+    }
+
+    queue_ui_setup_begin_message(
+        GS1_UI_SETUP_REGIONAL_MAP_MENU,
+        GS1_UI_SETUP_PRESENTATION_NORMAL,
+        2U,
+        0U);
+
+    Gs1UiAction no_action {};
+    const auto selected_faction_id = campaign_->regional_map_state.selected_tech_tree_faction_id.value != 0U
+        ? campaign_->regional_map_state.selected_tech_tree_faction_id
+        : FactionId {k_faction_village_committee};
+    const auto* selected_faction_def = find_faction_def(selected_faction_id);
+    char summary_text[64] {};
+    std::snprintf(
+        summary_text,
+        sizeof(summary_text),
+        "%.*s Tech | Available Rep %d",
+        selected_faction_def == nullptr ? 0 : static_cast<int>(selected_faction_def->display_name.size()),
+        selected_faction_def == nullptr ? "" : selected_faction_def->display_name.data(),
+        TechnologySystem::available_faction_reputation(*campaign_, selected_faction_id));
+    queue_ui_element_message(
+        1U,
+        GS1_UI_ELEMENT_LABEL,
+        GS1_UI_ELEMENT_FLAG_NONE,
+        no_action,
+        summary_text);
+
+    Gs1UiAction toggle_action {};
+    toggle_action.type = campaign_->regional_map_state.tech_tree_open
+        ? GS1_UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE
+        : GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE;
+    queue_ui_element_message(
+        2U,
+        GS1_UI_ELEMENT_BUTTON,
+        GS1_UI_ELEMENT_FLAG_PRIMARY,
+        toggle_action,
+        campaign_->regional_map_state.tech_tree_open ? "Close Tech Tree" : "Open Tech Tree");
+
+    queue_ui_setup_end_message();
+}
+
 void GameRuntime::queue_regional_map_selection_ui_messages()
 {
     if (!campaign_.has_value() || !campaign_->regional_map_state.selected_site_id.has_value())
@@ -1532,6 +1680,242 @@ void GameRuntime::queue_regional_map_selection_ui_messages()
         GS1_UI_ELEMENT_BUTTON,
         GS1_UI_ELEMENT_FLAG_BACKGROUND_CLICK,
         clear_selection_action,
+        "");
+
+    queue_ui_setup_end_message();
+}
+
+void GameRuntime::queue_regional_map_tech_tree_ui_messages()
+{
+    if (!campaign_.has_value() ||
+        app_state_ != GS1_APP_STATE_REGIONAL_MAP ||
+        !campaign_->regional_map_state.tech_tree_open)
+    {
+        return;
+    }
+
+    const auto selected_faction_id = campaign_->regional_map_state.selected_tech_tree_faction_id.value != 0U
+        ? campaign_->regional_map_state.selected_tech_tree_faction_id
+        : FactionId {k_faction_village_committee};
+    const auto* selected_faction_def = find_faction_def(selected_faction_id);
+    std::uint32_t element_count = 2U + static_cast<std::uint32_t>(k_prototype_faction_defs.size()) + 1U;
+    for (const auto& tier_def : k_prototype_technology_tier_defs)
+    {
+        if (tier_def.faction_id != selected_faction_id)
+        {
+            continue;
+        }
+
+        element_count += 1U;
+        for (const auto& node_def : k_prototype_technology_node_defs)
+        {
+            if (node_def.faction_id == selected_faction_id &&
+                node_def.tier_index == tier_def.tier_index)
+            {
+                element_count += 1U;
+            }
+        }
+    }
+
+    queue_ui_setup_begin_message(
+        GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE,
+        GS1_UI_SETUP_PRESENTATION_OVERLAY,
+        element_count,
+        0U);
+
+    Gs1UiAction no_action {};
+    queue_ui_element_message(
+        1U,
+        GS1_UI_ELEMENT_LABEL,
+        GS1_UI_ELEMENT_FLAG_NONE,
+        no_action,
+        "Faction Tech Tree");
+
+    char summary_text[64] {};
+    const auto* faction_progress = find_faction_progress(*campaign_, selected_faction_id);
+    std::snprintf(
+        summary_text,
+        sizeof(summary_text),
+        "%.*s | Total %d | Occupied %d | Available %d",
+        selected_faction_def == nullptr ? 0 : static_cast<int>(selected_faction_def->display_name.size()),
+        selected_faction_def == nullptr ? "" : selected_faction_def->display_name.data(),
+        faction_progress == nullptr ? 0 : faction_progress->faction_reputation,
+        faction_progress == nullptr ? 0 : faction_progress->occupied_reputation,
+        TechnologySystem::available_faction_reputation(*campaign_, selected_faction_id));
+    queue_ui_element_message(
+        2U,
+        GS1_UI_ELEMENT_LABEL,
+        GS1_UI_ELEMENT_FLAG_NONE,
+        no_action,
+        summary_text);
+
+    std::uint32_t next_element_id = 3U;
+
+    for (const auto& faction_def : k_prototype_faction_defs)
+    {
+        Gs1UiAction tab_action {};
+        tab_action.type = GS1_UI_ACTION_SELECT_TECH_TREE_FACTION_TAB;
+        tab_action.target_id = faction_def.faction_id.value;
+        const auto tab_flags =
+            faction_def.faction_id == selected_faction_id ? GS1_UI_ELEMENT_FLAG_PRIMARY : GS1_UI_ELEMENT_FLAG_NONE;
+        char tab_text[64] {};
+        std::snprintf(
+            tab_text,
+            sizeof(tab_text),
+            "Tab: %.*s",
+            static_cast<int>(faction_def.display_name.size()),
+            faction_def.display_name.data());
+        queue_ui_element_message(
+            next_element_id++,
+            GS1_UI_ELEMENT_BUTTON,
+            tab_flags,
+            tab_action,
+            tab_text);
+    }
+
+    for (const auto& tier_def : k_prototype_technology_tier_defs)
+    {
+        if (tier_def.faction_id != selected_faction_id)
+        {
+            continue;
+        }
+
+        char tier_text[96] {};
+        std::snprintf(
+            tier_text,
+            sizeof(tier_text),
+            "%.*s | Base Cost %d | Purchased %u | %s",
+            static_cast<int>(tier_def.display_name.size()),
+            tier_def.display_name.data(),
+            tier_def.base_reputation_cost,
+            static_cast<unsigned>(TechnologySystem::purchased_count_in_tier(
+                *campaign_,
+                tier_def.faction_id,
+                tier_def.tier_index)),
+            TechnologySystem::tier_unlocked(*campaign_, tier_def) ? "Unlocked" : "Locked");
+        queue_ui_element_message(
+            next_element_id++,
+            GS1_UI_ELEMENT_LABEL,
+            GS1_UI_ELEMENT_FLAG_NONE,
+            no_action,
+            tier_text);
+
+        for (const auto& node_def : k_prototype_technology_node_defs)
+        {
+            if (node_def.faction_id != selected_faction_id ||
+                node_def.tier_index != tier_def.tier_index)
+            {
+                continue;
+            }
+
+            Gs1UiAction action {};
+            action.type = GS1_UI_ACTION_CLAIM_TECHNOLOGY_NODE;
+            action.target_id = node_def.tech_node_id.value;
+
+            char node_text[128] {};
+            std::uint32_t flags = GS1_UI_ELEMENT_FLAG_NONE;
+            const auto reputation_cost = TechnologySystem::current_reputation_cost(*campaign_, node_def);
+            if (TechnologySystem::node_purchased(*campaign_, node_def.tech_node_id))
+            {
+                std::snprintf(
+                    node_text,
+                    sizeof(node_text),
+                    "%s %u Claimed | %.*s",
+                    node_def.entry_kind == TechnologyEntryKind::BaseTech ? "Tech" : "Amp",
+                    static_cast<unsigned>(node_def.entry_kind == TechnologyEntryKind::BaseTech
+                        ? (node_def.base_slot_index + 1U)
+                        : (node_def.amplification_choice_index + 1U)),
+                    static_cast<int>(node_def.display_name.size()),
+                    node_def.display_name.data());
+                flags |= GS1_UI_ELEMENT_FLAG_DISABLED;
+            }
+            else if (TechnologySystem::node_claimable(*campaign_, node_def))
+            {
+                std::snprintf(
+                    node_text,
+                    sizeof(node_text),
+                    "%s %u Cost %d | %.*s",
+                    node_def.entry_kind == TechnologyEntryKind::BaseTech ? "Tech" : "Amp",
+                    static_cast<unsigned>(node_def.entry_kind == TechnologyEntryKind::BaseTech
+                        ? (node_def.base_slot_index + 1U)
+                        : (node_def.amplification_choice_index + 1U)),
+                    reputation_cost,
+                    static_cast<int>(node_def.display_name.size()),
+                    node_def.display_name.data());
+                flags |= GS1_UI_ELEMENT_FLAG_PRIMARY;
+            }
+            else
+            {
+                if (!TechnologySystem::tier_unlocked(*campaign_, tier_def))
+                {
+                    std::snprintf(
+                        node_text,
+                        sizeof(node_text),
+                        "%s %u Locked by Tier | %.*s",
+                        node_def.entry_kind == TechnologyEntryKind::BaseTech ? "Tech" : "Amp",
+                        static_cast<unsigned>(node_def.entry_kind == TechnologyEntryKind::BaseTech
+                            ? (node_def.base_slot_index + 1U)
+                            : (node_def.amplification_choice_index + 1U)),
+                        static_cast<int>(node_def.display_name.size()),
+                        node_def.display_name.data());
+                }
+                else if (
+                    node_def.entry_kind == TechnologyEntryKind::Amplification &&
+                    !TechnologySystem::node_purchased(*campaign_, node_def.parent_base_tech_id))
+                {
+                    std::snprintf(
+                        node_text,
+                        sizeof(node_text),
+                        "Amp %u Needs Base | %.*s",
+                        static_cast<unsigned>(node_def.amplification_choice_index + 1U),
+                        static_cast<int>(node_def.display_name.size()),
+                        node_def.display_name.data());
+                }
+                else if (
+                    node_def.entry_kind == TechnologyEntryKind::Amplification &&
+                    TechnologySystem::amplification_choice_locked(*campaign_, node_def))
+                {
+                    std::snprintf(
+                        node_text,
+                        sizeof(node_text),
+                        "Amp %u Locked Out | %.*s",
+                        static_cast<unsigned>(node_def.amplification_choice_index + 1U),
+                        static_cast<int>(node_def.display_name.size()),
+                        node_def.display_name.data());
+                }
+                else
+                {
+                    std::snprintf(
+                        node_text,
+                        sizeof(node_text),
+                        "%s %u Need %d | %.*s",
+                        node_def.entry_kind == TechnologyEntryKind::BaseTech ? "Tech" : "Amp",
+                        static_cast<unsigned>(node_def.entry_kind == TechnologyEntryKind::BaseTech
+                            ? (node_def.base_slot_index + 1U)
+                            : (node_def.amplification_choice_index + 1U)),
+                        reputation_cost,
+                        static_cast<int>(node_def.display_name.size()),
+                        node_def.display_name.data());
+                }
+                flags |= GS1_UI_ELEMENT_FLAG_DISABLED;
+            }
+
+            queue_ui_element_message(
+                next_element_id++,
+                GS1_UI_ELEMENT_BUTTON,
+                flags,
+                action,
+                node_text);
+        }
+    }
+
+    Gs1UiAction close_action {};
+    close_action.type = GS1_UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE;
+    queue_ui_element_message(
+        next_element_id,
+        GS1_UI_ELEMENT_BUTTON,
+        GS1_UI_ELEMENT_FLAG_BACKGROUND_CLICK,
+        close_action,
         "");
 
     queue_ui_setup_end_message();
@@ -2659,6 +3043,25 @@ Gs1Status GameRuntime::translate_ui_action_to_message(const Gs1UiAction& action,
         out_message.set_payload(ClearDeploymentSiteSelectionMessage {});
         return GS1_STATUS_OK;
 
+    case GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE:
+        out_message.type = GameMessageType::OpenRegionalMapTechTree;
+        out_message.set_payload(OpenRegionalMapTechTreeMessage {});
+        return GS1_STATUS_OK;
+
+    case GS1_UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE:
+        out_message.type = GameMessageType::CloseRegionalMapTechTree;
+        out_message.set_payload(CloseRegionalMapTechTreeMessage {});
+        return GS1_STATUS_OK;
+
+    case GS1_UI_ACTION_SELECT_TECH_TREE_FACTION_TAB:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        out_message.type = GameMessageType::SelectRegionalMapTechTreeFaction;
+        out_message.set_payload(SelectRegionalMapTechTreeFactionMessage {action.target_id});
+        return GS1_STATUS_OK;
+
     case GS1_UI_ACTION_START_SITE_ATTEMPT:
         if (action.target_id == 0U)
         {
@@ -2692,6 +3095,15 @@ Gs1Status GameRuntime::translate_ui_action_to_message(const Gs1UiAction& action,
         out_message.set_payload(TaskRewardClaimRequestedMessage {
             action.target_id,
             static_cast<std::uint32_t>(action.arg0)});
+        return GS1_STATUS_OK;
+
+    case GS1_UI_ACTION_CLAIM_TECHNOLOGY_NODE:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        out_message.type = GameMessageType::TechnologyNodeClaimRequested;
+        out_message.set_payload(TechnologyNodeClaimRequestedMessage {action.target_id});
         return GS1_STATUS_OK;
 
     case GS1_UI_ACTION_BUY_PHONE_LISTING:
