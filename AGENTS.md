@@ -81,6 +81,8 @@ This file is a quick orientation guide for agents working in this repository.
 
 - Worktrees are no longer manually assigned.
 - Create or choose a non-main worktree only when the user explicitly asks to start a new session or otherwise clearly requires work outside the main worktree.
+- If the user explicitly asks to start a new session in a specific non-main worktree, use that exact worktree for the session.
+- An explicitly targeted non-main worktree overrides the occupied/free selection constraints for choosing a worktree, so the session should skip the occupancy scan and work there directly.
 - If the work is staying on the main worktree, the non-main session occupancy rules do not apply.
 - When a task needs a non-main git worktree, the agent must discover the available candidates from `git worktree list` and choose a specific free worktree on its own.
 - Determine whether a candidate worktree is free by checking whether `.agent-progress/session.md` exists in that worktree. If that file exists, the worktree is occupied and the session must choose another candidate.
