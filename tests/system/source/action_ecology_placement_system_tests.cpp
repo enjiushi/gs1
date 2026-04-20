@@ -732,6 +732,90 @@ void action_execution_item_based_plant_completion_consumes_seed_and_emits_planti
     GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.current_action_id.has_value());
 }
 
+void action_execution_checkerboard_item_uses_2x2_placement_and_rejects_occupied_tiles(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 5081U);
+    GameMessageQueue queue {};
+    auto action_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue);
+
+    site_run.inventory.worker_pack_slots[4].occupied = true;
+    site_run.inventory.worker_pack_slots[4].item_id = gs1::ItemId {gs1::k_item_basic_straw_checkerboard};
+    site_run.inventory.worker_pack_slots[4].item_quantity = 2U;
+    site_run.inventory.worker_pack_slots[4].item_condition = 1.0f;
+    site_run.inventory.worker_pack_slots[4].item_freshness = 1.0f;
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            action_context,
+            make_start_action_message(
+                GS1_SITE_ACTION_PLANT,
+                TileCoord {4, 4},
+                1U,
+                0U,
+                gs1::k_item_basic_straw_checkerboard,
+                GS1_SITE_ACTION_REQUEST_FLAG_HAS_ITEM |
+                    GS1_SITE_ACTION_REQUEST_FLAG_DEFERRED_TARGET_SELECTION)) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.current_action_id.has_value());
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.active);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.action_kind == ActionKind::Plant);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        site_run.site_action.placement_mode.item_id == gs1::k_item_basic_straw_checkerboard);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.target_tile.has_value());
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.target_tile->x == 4);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.target_tile->y == 4);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.footprint_width == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.footprint_height == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.blocked_mask == 0ULL);
+
+    auto occupied_tile = site_run.site_world->tile_at(TileCoord {5, 5});
+    occupied_tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_wind_reed};
+    occupied_tile.ecology.plant_density = 0.6f;
+    site_run.site_world->set_tile(TileCoord {5, 5}, occupied_tile);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            action_context,
+            make_message(
+                GameMessageType::PlacementModeCursorMoved,
+                PlacementModeCursorMovedMessage {5, 5, 0U})) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.target_tile.has_value());
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.target_tile->x == 4);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.target_tile->y == 4);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.blocked_mask == (1ULL << 3U));
+
+    queue.clear();
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            action_context,
+            make_start_action_message(
+                GS1_SITE_ACTION_PLANT,
+                TileCoord {5, 5},
+                1U,
+                0U,
+                gs1::k_item_basic_straw_checkerboard,
+                GS1_SITE_ACTION_REQUEST_FLAG_HAS_ITEM)) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.active);
+    GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.current_action_id.has_value());
+    GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::PlacementModeCommitRejected) == 1U);
+    const auto* placement_rejected =
+        first_message_payload<PlacementModeCommitRejectedMessage>(
+            queue,
+            GameMessageType::PlacementModeCommitRejected);
+    GS1_SYSTEM_TEST_REQUIRE(context, placement_rejected != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, placement_rejected->tile_x == 4);
+    GS1_SYSTEM_TEST_CHECK(context, placement_rejected->tile_y == 4);
+    GS1_SYSTEM_TEST_CHECK(context, placement_rejected->blocked_mask == (1ULL << 3U));
+}
+
 void action_execution_plant_progress_tracks_fixed_step_duration(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -1492,6 +1576,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "action_execution",
     "item_based_plant_completion_consumes_seed_and_emits_planting",
     action_execution_item_based_plant_completion_consumes_seed_and_emits_planting);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "action_execution",
+    "checkerboard_item_uses_2x2_placement_and_rejects_occupied_tiles",
+    action_execution_checkerboard_item_uses_2x2_placement_and_rejects_occupied_tiles);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "action_execution",
     "plant_progress_tracks_fixed_step_duration",

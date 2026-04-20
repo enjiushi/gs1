@@ -103,7 +103,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         "Press F to raise the phone for the market, delivery crate flow, and task board information.",
         "Short right-click any tile to open context actions such as gather, water, repair, plant, or build.",
         "Planting and deployment enter placement mode first, so confirm with a left-click and cancel with Esc.",
-        "Carry seeds in the pack before you deploy so the right-click tile menu can arm planting actions.",
+        "Carry plantables such as seeds or straw checkerboard in the pack before you deploy so the right-click tile menu can arm planting actions.",
         "Open crates, benches, and other devices from the map to move items one click at a time through the pack.",
         "Wind, heat, and dust drain the worker over time, so use shelter and cover to limit exposure.",
         "Health, hydration, energy, and morale all matter; consumables and safer routing help stabilize them.",
@@ -286,7 +286,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         11: { name: "Camp Stove Kit", shortName: "Stove Kit", stackSize: 1, canUse: false, canPlant: false, canDeploy: true, deployStructureId: 201 },
         12: { name: "Workbench Kit", shortName: "Bench Kit", stackSize: 1, canUse: false, canPlant: false, canDeploy: true, deployStructureId: 202 },
         13: { name: "Storage Crate Kit", shortName: "Crate Kit", stackSize: 1, canUse: false, canPlant: false, canDeploy: true, deployStructureId: 203 },
-        14: { name: "Hammer", shortName: "Hammer", stackSize: 1, canUse: false, canPlant: false, canDeploy: false }
+        14: { name: "Hammer", shortName: "Hammer", stackSize: 1, canUse: false, canPlant: false, canDeploy: false },
+        15: { name: "Basic Straw Checkerboard", shortName: "Checkerboard", stackSize: 10, canUse: false, canPlant: true, canDeploy: false }
     };
     const itemVisuals = {
         1: { glyph: "H2", light: "#5d8eb3", dark: "#33546f" },
@@ -302,7 +303,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         11: { glyph: "ST", light: "#c7835a", dark: "#7b4327" },
         12: { glyph: "WB", light: "#b2966c", dark: "#6b5437" },
         13: { glyph: "CR", light: "#af8c63", dark: "#694d2c" },
-        14: { glyph: "HM", light: "#9ea9b7", dark: "#5c6775" }
+        14: { glyph: "HM", light: "#9ea9b7", dark: "#5c6775" },
+        15: { glyph: "CB", light: "#c8a46a", dark: "#7d5c31" }
     };
     const structureCatalog = {
         201: { name: "Camp Stove", shortName: "Stove", slotCount: 6 },
@@ -313,7 +315,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         1: { width: 2, height: 2 },
         2: { width: 2, height: 2 },
         3: { width: 2, height: 2 },
-        4: { width: 2, height: 2 }
+        4: { width: 2, height: 2 },
+        5: { width: 2, height: 2 }
     });
     const plantWindShaderUniforms = {
         uPlantTime: { value: 0.0 },
@@ -5474,7 +5477,81 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (tile.plantTypeId === 4) {
             return { primary: 0x9abd66, secondary: 0x728c42, glow: 0x4b5a29 };
         }
+        if (tile.plantTypeId === 5) {
+            return { primary: 0xcaa15c, secondary: 0xa67b3e, glow: 0x6d4f21 };
+        }
         return { primary: 0x95b866, secondary: 0x728f4b, glow: 0x4b5f31 };
+    }
+
+    function addStrawCheckerboardPlant(plantGroup, plantSpec, palette) {
+        const tile = plantSpec.anchorTile;
+        const plantDensity = plantSpec.plantDensity;
+        const fullSpanX = plantSpec.fullSpanX;
+        const fullSpanZ = plantSpec.fullSpanZ;
+        const halfSpanX = plantSpec.halfSpanX;
+        const halfSpanZ = plantSpec.halfSpanZ;
+        const tuftLength = 0.1 + plantDensity * 0.08;
+        const tuftWidth = 0.02 + plantDensity * 0.01;
+        const tuftThickness = 0.008 + plantDensity * 0.004;
+        const lineHeight = 0.035 + plantDensity * 0.025;
+        const linePadding = 0.04;
+        const lineCountX = Math.max(7, Math.round(fullSpanX * (8 + plantDensity * 4)));
+        const lineCountZ = Math.max(7, Math.round(fullSpanZ * (8 + plantDensity * 4)));
+        const strawColors = [palette.primary, palette.secondary, 0xd9bb74];
+
+        function addStrawTuft(x, z, orientation, seed) {
+            const tuft = createLeafMesh(
+                strawColors[Math.floor(deterministicNoise01(tile.x, tile.y, seed) * strawColors.length) % strawColors.length],
+                tuftWidth * (0.9 + deterministicNoise01(tile.y, tile.x, seed + 31) * 0.45),
+                tuftThickness,
+                tuftLength * (0.82 + deterministicNoise01(tile.x, tile.y, seed + 17) * 0.5),
+                0.18
+            );
+            tuft.position.set(
+                x + (deterministicNoise01(tile.x, tile.y, seed + 7) - 0.5) * 0.035,
+                lineHeight + deterministicNoise01(tile.y, tile.x, seed + 13) * 0.03,
+                z + (deterministicNoise01(tile.x, tile.y, seed + 19) - 0.5) * 0.035
+            );
+            tuft.rotation.y = orientation + (deterministicNoise01(tile.y, tile.x, seed + 23) - 0.5) * 0.45;
+            tuft.rotation.z = (deterministicNoise01(tile.x, tile.y, seed + 29) - 0.5) * 0.8;
+            tuft.rotation.x = -0.65 + deterministicNoise01(tile.y, tile.x, seed + 37) * 0.4;
+            plantGroup.add(tuft);
+        }
+
+        function addLineSegment(startX, startZ, endX, endZ, count, seedBase) {
+            for (let index = 0; index < count; index += 1) {
+                const t = count <= 1 ? 0.5 : index / (count - 1);
+                const x = THREE_NS.MathUtils.lerp(startX, endX, t);
+                const z = THREE_NS.MathUtils.lerp(startZ, endZ, t);
+                const orientation = Math.atan2(endX - startX, endZ - startZ);
+                addStrawTuft(x, z, orientation, seedBase + index * 47);
+            }
+        }
+
+        addLineSegment(-halfSpanX + linePadding, -halfSpanZ + linePadding, halfSpanX - linePadding, -halfSpanZ + linePadding, lineCountX, 101);
+        addLineSegment(-halfSpanX + linePadding, halfSpanZ - linePadding, halfSpanX - linePadding, halfSpanZ - linePadding, lineCountX, 401);
+        addLineSegment(-halfSpanX + linePadding, -halfSpanZ + linePadding, -halfSpanX + linePadding, halfSpanZ - linePadding, lineCountZ, 701);
+        addLineSegment(halfSpanX - linePadding, -halfSpanZ + linePadding, halfSpanX - linePadding, halfSpanZ - linePadding, lineCountZ, 1001);
+        addLineSegment(0, -halfSpanZ + linePadding, 0, halfSpanZ - linePadding, lineCountZ, 1301);
+        addLineSegment(-halfSpanX + linePadding, 0, halfSpanX - linePadding, 0, lineCountX, 1601);
+
+        const postHeight = 0.05 + plantDensity * 0.035;
+        [
+            [-halfSpanX + linePadding, -halfSpanZ + linePadding],
+            [halfSpanX - linePadding, -halfSpanZ + linePadding],
+            [-halfSpanX + linePadding, halfSpanZ - linePadding],
+            [halfSpanX - linePadding, halfSpanZ - linePadding]
+        ].forEach((corner, index) => {
+            const post = new THREE_NS.Mesh(
+                new THREE_NS.BoxGeometry(0.04, postHeight, 0.04),
+                createPlantMaterial(palette.secondary, 0.92, 0x4b3513, 0.0, {
+                    windReactive: false
+                })
+            );
+            post.position.set(corner[0], postHeight * 0.5, corner[1]);
+            post.rotation.y = deterministicNoise01(tile.x, tile.y, 2001 + index) * Math.PI * 0.15;
+            plantGroup.add(post);
+        });
     }
 
     function addPlantDensityShell(plantGroup, plantSpec, palette) {
@@ -5792,6 +5869,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const plantGroup = new THREE_NS.Group();
         const palette = resolvePlantPalette(tile);
         plantGroup.position.y = plantSpec.baseHeight + 0.02;
+        if (tile.plantTypeId === 5) {
+            addStrawCheckerboardPlant(plantGroup, plantSpec, palette);
+            return plantGroup;
+        }
+
         plantGroup.rotation.y = deterministicNoise01(tile.x, tile.y, tile.plantTypeId + 161) * Math.PI * 2;
         plantGroup.scale.set(
             1.0,
@@ -6015,6 +6097,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 ? (tile.plantTypeId === 1 ? 0x8ea56a
                     : tile.plantTypeId === 2 ? 0x7f9b62
                     : tile.plantTypeId === 3 ? 0x8a8f58
+                    : tile.plantTypeId === 5 ? 0xbe9a62
                     : 0x9d8f5a)
                 : hasPlant
                     ? 0x97a66d
