@@ -831,8 +831,10 @@ Required fields:
 
 ```text
 activeEventTemplateId?
-eventPhase                // None | Warning | Build | Peak | Decay | Aftermath
-phaseMinutesRemaining
+startTimeMinutes
+peakTimeMinutes
+peakDurationMinutes
+endTimeMinutes
 eventHeatPressure
 eventWindPressure
 eventDustPressure
@@ -1196,10 +1198,10 @@ V1 rule:
 
 Responsibilities:
 
-- advance event phases
+- advance absolute event timelines
 - set `eventHeatPressure`, `eventWindPressure`, `eventDustPressure`
 - resolve event start from eligible templates
-- resolve `Aftermath` and potential relief offers
+- resolve event completion and potential relief offers
 
 ### 10.4 `LocalWeatherResolveSystem`
 

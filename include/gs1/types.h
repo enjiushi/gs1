@@ -180,16 +180,6 @@ enum Gs1PresentationDirtyFlags : std::uint32_t
     GS1_PRESENTATION_DIRTY_ALL = 0xffffffffu
 };
 
-enum Gs1WeatherEventPhase : std::uint8_t
-{
-    GS1_WEATHER_EVENT_PHASE_NONE = 0,
-    GS1_WEATHER_EVENT_PHASE_WARNING = 1,
-    GS1_WEATHER_EVENT_PHASE_BUILD = 2,
-    GS1_WEATHER_EVENT_PHASE_PEAK = 3,
-    GS1_WEATHER_EVENT_PHASE_DECAY = 4,
-    GS1_WEATHER_EVENT_PHASE_AFTERMATH = 5
-};
-
 enum Gs1TaskPresentationListKind : std::uint8_t
 {
     GS1_TASK_PRESENTATION_LIST_VISIBLE = 0,
@@ -600,8 +590,10 @@ struct Gs1EngineMessageWeatherData
     float dust;
     float wind_direction_degrees;
     std::uint32_t event_template_id;
-    Gs1WeatherEventPhase event_phase;
-    float phase_minutes_remaining;
+    float event_start_time_minutes;
+    float event_peak_time_minutes;
+    float event_peak_duration_minutes;
+    float event_end_time_minutes;
 };
 
 struct Gs1EngineMessageInventoryStorageData
@@ -850,7 +842,7 @@ GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteSnapshotData, 16U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteTileData, 32U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageWorkerData, 28U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageCampData, 16U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageWeatherData, 28U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageWeatherData, 36U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageInventoryStorageData, 16U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageInventorySlotData, 36U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageInventoryViewData, 8U);

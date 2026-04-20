@@ -171,8 +171,10 @@ public:
         float dust {0.0f};
         float wind_direction_degrees {0.0f};
         std::uint32_t event_template_id {0};
-        Gs1WeatherEventPhase event_phase {GS1_WEATHER_EVENT_PHASE_NONE};
-        float phase_minutes_remaining {0.0f};
+        float event_start_time_minutes {0.0f};
+        float event_peak_time_minutes {0.0f};
+        float event_peak_duration_minutes {0.0f};
+        float event_end_time_minutes {0.0f};
     };
 
     struct SiteInventoryStorageProjection final

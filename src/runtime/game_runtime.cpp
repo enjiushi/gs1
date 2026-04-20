@@ -248,8 +248,7 @@ std::uint16_t resolve_hud_warning_code(const SiteRunState& site_run) noexcept
 
     if (wind >= 18.0f ||
         site_run.weather.weather_wind >= 14.0f ||
-        site_run.event.event_phase == EventPhase::Build ||
-        site_run.event.event_phase == EventPhase::Peak)
+        site_run.event.event_wind_pressure >= 4.0f)
     {
         return k_hud_warning_wind_watch;
     }
@@ -2211,10 +2210,14 @@ void GameRuntime::queue_site_weather_update_message()
         active_site_run_->event.active_event_template_id.has_value()
         ? active_site_run_->event.active_event_template_id->value
             : 0U;
-    weather_payload.event_phase =
-        static_cast<Gs1WeatherEventPhase>(active_site_run_->event.event_phase);
-    weather_payload.phase_minutes_remaining =
-        static_cast<float>(active_site_run_->event.phase_minutes_remaining);
+    weather_payload.event_start_time_minutes =
+        static_cast<float>(active_site_run_->event.start_time_minutes);
+    weather_payload.event_peak_time_minutes =
+        static_cast<float>(active_site_run_->event.peak_time_minutes);
+    weather_payload.event_peak_duration_minutes =
+        static_cast<float>(active_site_run_->event.peak_duration_minutes);
+    weather_payload.event_end_time_minutes =
+        static_cast<float>(active_site_run_->event.end_time_minutes);
     engine_messages_.push_back(weather_message);
 }
 

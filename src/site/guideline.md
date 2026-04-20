@@ -15,7 +15,7 @@ Site-owned state, ECS world support, and helper logic for active site gameplay.
 - `defs/`: Site-specific authored definition helpers.
 - `device_interaction_logic.h`: Helper rules for device interaction behavior.
 - `economy_state.h`: Site-local economy/shop/finance state.
-- `event_state.h`: Site event state for active/local event tracking.
+- `event_state.h`: Site event state for active/local event tracking, including absolute event timeline markers for weather interpolation.
 - `inventory_state.h`: Inventory ownership/state for items in the site run.
 - `inventory_storage.h`: Inventory container/storage primitives and stack helpers.
 - `local_weather_resolve_state.h`: Local weather resolution scratch/state, including cached site-wind direction for directional shelter refreshes.
