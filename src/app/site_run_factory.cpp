@@ -34,7 +34,7 @@ TileCoord site1_onboarding_burial_tile(TileCoord camp_anchor_tile) noexcept
 
 TileCoord delivery_box_tile(TileCoord camp_anchor_tile) noexcept
 {
-    return TileCoord {camp_anchor_tile.x + 10, camp_anchor_tile.y};
+    return TileCoord {camp_anchor_tile.x + 2, camp_anchor_tile.y};
 }
 
 bool is_in_target_edge_band(
@@ -174,13 +174,6 @@ SiteRunState SiteRunFactory::create_site_run(
             1.0f,
             false});
     apply_highway_objective_layout(run);
-    if (run.site_world->contains(run.camp.starter_storage_tile))
-    {
-        auto tile = run.site_world->tile_at(run.camp.starter_storage_tile);
-        tile.device.structure_id = StructureId {k_structure_storage_crate};
-        tile.device.device_integrity = 1.0f;
-        run.site_world->set_tile(run.camp.starter_storage_tile, tile);
-    }
     if (run.site_world->contains(run.camp.delivery_box_tile))
     {
         auto tile = run.site_world->tile_at(run.camp.delivery_box_tile);

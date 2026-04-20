@@ -45,7 +45,7 @@ inline TileCoord default_delivery_box_tile(
 {
     (void)height;
     const auto max_x = static_cast<std::int32_t>(width == 0U ? 0U : width - 1U);
-    return TileCoord {std::min(camp_anchor_tile.x + 10, max_x), camp_anchor_tile.y};
+    return TileCoord {std::min(camp_anchor_tile.x + 2, max_x), camp_anchor_tile.y};
 }
 
 inline bool approx_equal(float lhs, float rhs, float epsilon = 0.001f) noexcept

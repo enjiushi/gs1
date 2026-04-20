@@ -61,8 +61,9 @@ inline constexpr std::uint32_t k_item_camp_stove_kit = 11U;
 inline constexpr std::uint32_t k_item_workbench_kit = 12U;
 inline constexpr std::uint32_t k_item_storage_crate_kit = 13U;
 inline constexpr std::uint32_t k_item_hammer = 14U;
+inline constexpr std::uint32_t k_item_basic_straw_checkerboard = 15U;
 
-inline constexpr std::array<ItemDef, 14> k_prototype_item_defs {{
+inline constexpr std::array<ItemDef, 15> k_prototype_item_defs {{
     ItemDef {
         ItemId {k_item_water_container},
         "Water",
@@ -268,6 +269,21 @@ inline constexpr std::array<ItemDef, 14> k_prototype_item_defs {{
         4,
         ITEM_CAPABILITY_SELL,
         PlantId {},
+        StructureId {},
+        0.0f,
+        0.0f,
+        0.0f,
+        0.0f},
+    ItemDef {
+        ItemId {k_item_basic_straw_checkerboard},
+        "Basic Straw Checkerboard",
+        10U,
+        ItemSourceRule::BuyOnly,
+        false,
+        6,
+        3,
+        ITEM_CAPABILITY_PLANT | ITEM_CAPABILITY_SELL,
+        PlantId {k_plant_straw_checkerboard},
         StructureId {},
         0.0f,
         0.0f,

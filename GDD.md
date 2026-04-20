@@ -80,7 +80,7 @@ These terms are stable and should be used consistently in future design and impl
 | `Support Quota` | The pre-deployment support score used to claim exported loadout items from nearby stabilized sites. In the current prototype direction it is fixed, baseline support does not spend it, and later `Village Committee` tech may raise it. |
 | `Inventory` | The player's slot-based carried storage for `Item`s during a `Site` session. Capacity is limited and can be expanded by the `Persistent Tech Tree`. |
 | `Item` | Any carriable object that can occupy `Inventory` or `Container` slots. In the current design, every item should use one shared data-driven gameplay model, with behavior decided by tags, capabilities, and linked content rather than by a fixed top-level item type. |
-| `Container` | Any storage-capable on-site device, such as the starter storage crate, a built storage crate, or a crafting station with slots, used to store `Item`s outside the player's carried `Inventory`. |
+| `Container` | Any storage-capable on-site device, such as the green near-camp delivery crate, a built storage crate, or a crafting station with slots, used to store `Item`s outside the player's carried `Inventory`. |
 | `Site Output Modifier` | A persistent bonus trait attached to a stabilized site's regional support output, such as increased wind protection, fertility support, specific loadout-item yield, or support range. In the current prototype direction, a completed site should usually provide at most `1` such modifier: one chosen support direction with one rolled amount. These traits strengthen that site's exported `Nearby-Site Aura` or `Loadout Item Output`. |
 | `Nearby-Site Aura` | A passive `Per-Site Modifier` package projected from adjacent stabilized sites into the current site session before deployment. It should be weaker and steadier than a claimed `Run Modifier`, usually focuses on one support channel or one linked pair of meters, and should never grant full hazard immunity. |
 | `Camp Support` | The light support infrastructure on a `Site`, including shelter, `Container`s, service devices, and hired labor access. |
@@ -1137,7 +1137,7 @@ That tradeoff is the core feeling. Harsh events should create agency through dan
 
 ### Player Base
 
-Each `Site` includes a player base camp rather than an abstract support camp or a full colony. The base is the player's anchored safe core on the site: the place where they shelter, store harvest and water, place camp-side crafting or utility devices, receive deliveries, and recover between field pushes.
+Each `Site` includes a player base camp rather than an abstract support camp or a full colony. The base is the player's anchored safe core on the site: the place where they shelter, store harvest and water, place camp-side crafting or utility devices, keep the green delivery crate near camp, receive later deliveries, and recover between field pushes.
 
 Core base functions:
 
@@ -1288,7 +1288,7 @@ The game should support these carried-storage and device-storage locations:
 | Location | Capacity | Purpose |
 |---|---|---|
 | Carried Inventory | `6` slots | What the player carries into the field |
-| Starter Storage Crate | authored storage-crate slot count, currently `10` | Baseline on-site storage available when a site begins, implemented as the starter device-storage container |
+| Delivery Crate | authored storage-crate slot count, currently `10` | Green near-camp crate that already holds the starting loadout when the site session begins and also receives later deliveries |
 | Other Device Storage | per-device authored slot count | Individual local storage attached to deployed crafting or storage devices |
 | Pending Delivery Queue | unbounded list of packages | Ordered supplies waiting to arrive at camp |
 
@@ -1300,7 +1300,7 @@ Rules:
 - each stack should have its own runtime item-instance identity even when several stacks share the same authored `ItemId`
 - merging should preserve authored stack limits; if a merge overflows, the excess stays in another stack
 - empty slots are explicit
-- future tech can expand `workerPackSlotCount`, while device-storage capacity should come from authored structure slot counts; the game should start at `6` worker-pack slots plus a starter storage crate device
+- future tech can expand `workerPackSlotCount`, while device-storage capacity should come from authored structure slot counts; the game should start at `6` worker-pack slots plus a green delivery crate device placed near camp
 - the player should only be able to carry a limited working set away from camp, even if the camp has much more storage available
 - carrying a lot of one exact `Item` should therefore compete directly with carrying water, seed bundles, repair supplies, device kits, or harvested goods
 
@@ -1312,7 +1312,7 @@ Example inventory pressure:
 
 Container rules:
 
-- the site begins with one starter storage crate device plus a starter workbench so the first fabrication recipes are reachable
+- the site begins with one green delivery crate device near camp plus a starter workbench so the first fabrication recipes are reachable
 - deployed crafting devices and storage crates should keep their own local slot sets instead of aliasing one global camp container
 - crafting-device storage is both an output destination and a valid nearby ingredient source for later recipes
 - losing, burying, or exposing a deployed storage or crafting device can put the items in that specific device at risk during harsh events
@@ -1321,9 +1321,10 @@ Container rules:
 
 Use these item-flow rules:
 
+- the site's initial loadout is already packed into the green delivery crate when the site session begins; it does not wait in `pendingDeliveryQueue`
 - phone purchases create a package in `pendingDeliveryQueue`
 - each purchased package should arrive at camp after `30` in-game minutes if the camp delivery point is operational
-- delivered items enter the starter storage crate device, not `workerPack`
+- later delivered items enter the green delivery crate device, not `workerPack`
 - the player can transfer items between `workerPack` and any nearby device storage through the shared inventory interaction panel
 - plant placement, repair work, and burial clearing consume from `workerPack` when they require carried items
 - deployable structure kits consume from `workerPack`
@@ -3053,7 +3054,7 @@ Loadout rules:
 - claimed exported items should be consumed from the current stored exported counts on the contributing nearby sites
 - unclaimed exported item counts should carry over until they reach their cap
 - adjacency for exported support and `Nearby-Site Aura` should be checked when the player selects the target site and assembles that deployment
-- claimed exported item support should enter the player's starting site inventory at the beginning of the site session
+- claimed exported item support should already be packed into the green delivery crate at the beginning of the site session
 
 In the current design, a loadout can include:
 
@@ -3110,7 +3111,7 @@ Use these temporary rules:
 - each contributing site may provide `Loadout Item Output` for pre-deployment assembly
 - each contributing site may also provide a passive `Nearby-Site Aura` on the new site, especially small wind protection, heat protection, fertility support, moisture retention, or worker recovery support
 - claiming exported loadout items should consume their stored counts, while passive `Nearby-Site Aura` should apply automatically at deployment
-- claimed exported loadout items should become starting inventory when the site session begins
+- claimed exported loadout items should already exist inside the green delivery crate when the site session begins
 - exported support should not be interrupted in the current prototype direction
 - these bonuses should be noticeable but deliberately small; they should help the player start better, not solve the new site
 

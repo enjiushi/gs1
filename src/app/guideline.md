@@ -17,4 +17,4 @@ Application-facing glue that assembles campaign/site state and exposes the gamep
 - `game_loop.h`: Per-frame loop coordination between host input, runtime update, and projection output.
 - `scene_coordinator.h`: Scene switching/orchestration helpers between campaign and site flows.
 - `site_run_factory.h`: Factory declarations for creating active site runs.
-- `site_run_factory.cpp`: Site-run factory implementation, initialization wiring, carried/storage bootstrap defaults, and site-one onboarding state seeding such as the damaged starter workbench and nearby burial drift.
+- `site_run_factory.cpp`: Site-run factory implementation, initialization wiring, delivery-box bootstrap defaults, and site-one onboarding state seeding such as the damaged starter workbench and nearby burial drift.

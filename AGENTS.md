@@ -39,9 +39,9 @@ This file is a quick orientation guide for agents working in this repository.
 - `tests/smoke/`: Smoke host, runtime DLL loader, script runner, live-state JSON, live HTTP server, and visual smoke UI.
 - `tests/smoke/scripts/`: Scripted smoke-test scenarios.
 - `scripts/`: PowerShell build and smoke-test helpers.
-- `GDD.md`: Game design document, including the directional wind-shadow and plant-footprint shelter rules plus the staged four-mode site-objective direction.
+- `GDD.md`: Game design document, including the directional wind-shadow and plant-footprint shelter rules, the staged four-mode site-objective direction, and the near-camp green delivery-crate loadout rule for site starts versus later timed deliveries.
 - `GAME_STRUCTURE.md`: High-level gameplay/runtime structure notes.
-- `GAME_SYSTEM_DESIGN_V1.md`: System design reference, including directional local-weather resolution responsibilities and staged site-objective implementation notes.
+- `GAME_SYSTEM_DESIGN_V1.md`: System design reference, including directional local-weather resolution responsibilities, staged site-objective implementation notes, and the direct-on-start delivery-crate loadout seeding rule.
 - `SYSTEM_DESIGN_STATUS.md`: Current system status and implementation tracking, including site-objective readiness notes.
 - `SYSTEM_TEST_COVERAGE.md`: Per-system automated coverage expectations, including placeholder-versus-implemented test scope for campaign, site, and runtime behavior.
 - `CONTENT_AUTHORING_CONTRACT.md`: Content authoring contract and data expectations.

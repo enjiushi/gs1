@@ -107,30 +107,30 @@ void campaign_flow_start_new_campaign_initializes_state(gs1::testing::SystemTest
         context,
         campaign->regional_map_state.selected_tech_tree_faction_id.value == gs1::k_faction_village_committee);
     GS1_SYSTEM_TEST_CHECK(context, campaign->faction_progress[0].occupied_reputation == 0);
-    GS1_SYSTEM_TEST_CHECK(context, campaign->loadout_planner_state.baseline_deployment_items.size() == 6U);
-    GS1_SYSTEM_TEST_CHECK(context, campaign->loadout_planner_state.selected_loadout_slots.size() == 6U);
+    GS1_SYSTEM_TEST_CHECK(context, campaign->loadout_planner_state.baseline_deployment_items.size() == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, campaign->loadout_planner_state.selected_loadout_slots.size() == 2U);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         find_loadout_slot(
             campaign->loadout_planner_state.selected_loadout_slots,
-            gs1::k_item_wind_reed_seed_bundle) != nullptr);
+            gs1::k_item_basic_straw_checkerboard) != nullptr);
     GS1_SYSTEM_TEST_CHECK(
         context,
         find_loadout_slot(
             campaign->loadout_planner_state.selected_loadout_slots,
-            gs1::k_item_wind_reed_seed_bundle)
+            gs1::k_item_basic_straw_checkerboard)
             ->quantity == 8U);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         find_loadout_slot(
             campaign->loadout_planner_state.selected_loadout_slots,
-            gs1::k_item_wood_bundle) != nullptr);
+            gs1::k_item_water_container) != nullptr);
     GS1_SYSTEM_TEST_CHECK(
         context,
         find_loadout_slot(
             campaign->loadout_planner_state.selected_loadout_slots,
-            gs1::k_item_wood_bundle)
-            ->quantity == 6U);
+            gs1::k_item_water_container)
+            ->quantity == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue.empty());
 }
 
@@ -373,7 +373,7 @@ void loadout_planner_tracks_selected_target_site(gs1::testing::SystemTestExecuti
         LoadoutPlannerSystem::process_message(campaign_context, select_message) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, campaign.loadout_planner_state.selected_target_site_id.has_value());
     GS1_SYSTEM_TEST_CHECK(context, campaign.loadout_planner_state.selected_target_site_id->value == 3U);
-    GS1_SYSTEM_TEST_CHECK(context, campaign.loadout_planner_state.selected_loadout_slots.size() == 6U);
+    GS1_SYSTEM_TEST_CHECK(context, campaign.loadout_planner_state.selected_loadout_slots.size() == 2U);
 
     auto clear_message = make_message(
         GameMessageType::DeploymentSiteSelectionChanged,
@@ -382,7 +382,7 @@ void loadout_planner_tracks_selected_target_site(gs1::testing::SystemTestExecuti
         context,
         LoadoutPlannerSystem::process_message(campaign_context, clear_message) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, !campaign.loadout_planner_state.selected_target_site_id.has_value());
-    GS1_SYSTEM_TEST_CHECK(context, campaign.loadout_planner_state.selected_loadout_slots.size() == 6U);
+    GS1_SYSTEM_TEST_CHECK(context, campaign.loadout_planner_state.selected_loadout_slots.size() == 2U);
 }
 
 void loadout_planner_builds_adjacent_completed_site_support(gs1::testing::SystemTestExecutionContext& context)
@@ -429,7 +429,7 @@ void loadout_planner_builds_adjacent_completed_site_support(gs1::testing::System
         find_loadout_slot(
             campaign.loadout_planner_state.selected_loadout_slots,
             gs1::k_item_wood_bundle)
-            ->quantity == 8U);
+            ->quantity == 2U);
 }
 
 void site_flow_moves_worker_and_marks_projection_dirty(gs1::testing::SystemTestExecutionContext& context)

@@ -14,7 +14,7 @@ namespace gs1
 {
 namespace
 {
-constexpr std::int32_t k_site1_initial_money = 45;
+constexpr std::int32_t k_site1_initial_money = 50;
 constexpr std::int32_t k_phone_delivery_fee = 5;
 constexpr std::uint16_t k_default_delivery_minutes = 30U;
 constexpr std::uint32_t k_site1_water_listing_id = 1U;

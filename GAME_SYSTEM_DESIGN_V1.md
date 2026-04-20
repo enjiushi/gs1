@@ -108,7 +108,8 @@ The current prototype implementation makes these item/storage rules explicit:
 - authored materials such as wood, iron, plant fiber, water, and seed bundles are all ordinary `ItemDef` rows
 - `ItemDef` may be both consumable and a crafting ingredient; crafting-material behavior does not require a separate authored attribute
 - deployable kits are also ordinary items and point at an authored `StructureDef`
-- the site begins with a starter storage crate device, and all on-site storage resolves through per-device storage containers with authored slot counts
+- the site begins with a green delivery crate device placed near camp, and all on-site storage resolves through per-device storage containers with authored slot counts
+- the starting site-session loadout is seeded directly into that delivery crate on `SiteRunStarted`; only later purchases or reward deliveries use timed arrival
 - crafting stations cache nearby item-instance ids from local storage plus the worker pack when the worker is inside the craft radius
 - crafting actions are timed site actions; on completion they resolve recipe consumption across matching stacks and place output into the acting device's own storage
 - phone selling resolves against a global item-instance cache that includes worker-pack items plus all device storage
@@ -404,8 +405,8 @@ Rules:
 2. derive `siteAttemptSeed`
 3. create empty `SiteRunState`
 4. create `siteWorld` and build the fixed dense tile ECS domain from the authored site archetype
-5. initialize site resources plus worker and other required entities
-6. apply baseline deployment support
+5. initialize site resources plus worker and other required entities, including the near-camp green delivery crate
+6. seed baseline deployment support directly into the delivery crate
 7. apply adjacent completed-site support packages and nearby auras
 8. build direct-purchase unlockable eligibility view
 9. initialize onboarding or normal task board
@@ -1261,6 +1262,7 @@ Responsibilities:
 - move items between worker pack and device storage
 - process delivery arrival
 - handle stack merge/split
+- seed the starting loadout directly into the delivery crate when the site run starts
 - consume carried items for actions
 - apply device-stored item damage or spoilage during severe hazards
 

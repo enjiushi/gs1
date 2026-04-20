@@ -21,11 +21,11 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `ecology_system.h`: Ecology system interface.
 - `ecology_system.cpp`: Updates plants, burial, watering, broader ecology progression, and highway-target sand-cover accumulation for objective-driven site progress.
 - `economy_phone_system.h`: Economy phone system interface.
-- `economy_phone_system.cpp`: Handles phone storefront interactions and economy-driven purchases.
+- `economy_phone_system.cpp`: Handles phone storefront interactions, site-one opening cash, and economy-driven purchases.
 - `failure_recovery_system.h`: Failure recovery system interface.
 - `failure_recovery_system.cpp`: Resolves failure fallout and recovery flow for the site.
 - `inventory_system.h`: Inventory system interface.
-- `inventory_system.cpp`: Applies item moves, uses, and inventory ownership changes.
+- `inventory_system.cpp`: Applies item moves, uses, inventory ownership changes, and delivery-box loadout seeding.
 - `local_weather_resolve_system.h`: Local weather resolve system interface.
 - `local_weather_resolve_system.cpp`: Resolves local weather updates into owned site state, including directional lee-side wind shelter with nonlinear range falloff.
 - `modifier_system.h`: Modifier system interface.

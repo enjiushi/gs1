@@ -312,11 +312,13 @@ void planting_auto_move_reaches_tile_before_action_starts(
     auto flow_context = make_site_context<SiteFlowSystem>(campaign, site_run, queue);
     SiteFlowSystem::run(flow_context);
 
+    GS1_SYSTEM_TEST_REQUIRE(context, site_run.site_action.approach_tile.has_value());
+    const auto expected_approach_tile = site_run.site_action.approach_tile.value();
     const auto worker = site_run.site_world->worker();
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(worker.position.tile_x, 4.0f));
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(worker.position.tile_y, 2.0f));
-    GS1_SYSTEM_TEST_CHECK(context, worker.position.tile_coord.x == 4);
-    GS1_SYSTEM_TEST_CHECK(context, worker.position.tile_coord.y == 2);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(worker.position.tile_x, static_cast<float>(expected_approach_tile.x)));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(worker.position.tile_y, static_cast<float>(expected_approach_tile.y)));
+    GS1_SYSTEM_TEST_CHECK(context, worker.position.tile_coord.x == expected_approach_tile.x);
+    GS1_SYSTEM_TEST_CHECK(context, worker.position.tile_coord.y == expected_approach_tile.y);
 
     queue.clear();
     ActionExecutionSystem::run(action_context);

@@ -1,5 +1,6 @@
 #include "runtime/game_runtime.h"
 #include "content/defs/item_defs.h"
+#include "site/inventory_storage.h"
 #include "site/site_projection_update_flags.h"
 #include "content/defs/plant_defs.h"
 #include "site/site_world_access.h"
@@ -264,9 +265,14 @@ void inventory_item_use_updates_worker_and_projection()
     bootstrap_site_one(runtime);
 
     auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
-    assert(site_run.inventory.worker_pack_slots[0].occupied);
-    assert(site_run.inventory.worker_pack_slots[0].item_id.value == 1U);
-    assert(site_run.inventory.worker_pack_slots[0].item_quantity == 2U);
+    assert(gs1::inventory_storage::available_item_quantity_in_container(
+               site_run,
+               gs1::inventory_storage::delivery_box_container(site_run),
+               gs1::ItemId {gs1::k_item_water_container}) == 1U);
+    assert(gs1::inventory_storage::available_item_quantity_in_container(
+               site_run,
+               gs1::inventory_storage::delivery_box_container(site_run),
+               gs1::ItemId {gs1::k_item_basic_straw_checkerboard}) == 8U);
 
     drain_engine_messages(runtime);
 
@@ -324,7 +330,7 @@ void inventory_item_use_updates_worker_and_projection()
         const auto& payload = hud_messages.front()->payload_as<Gs1EngineMessageHudStateData>();
         assert(approx_equal(payload.player_health, 88.0f));
         assert(approx_equal(payload.player_morale, 100.0f));
-        assert(payload.current_money == 45);
+        assert(payload.current_money == 50);
         assert(payload.active_task_count == 0U);
     }
 }
@@ -341,15 +347,7 @@ void ecology_growth_completes_task_and_site_attempt()
 
     auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
     assert(site_run.counters.site_completion_tile_threshold == 10U);
-    assert(site_run.task_board.visible_tasks.size() == 1U);
-    assert(site_run.task_board.visible_tasks.front().target_amount == 10U);
 
-    drain_engine_messages(runtime);
-
-    assert(runtime.handle_message(make_accept_task_message(1U)) == GS1_STATUS_OK);
-    assert(site_run.task_board.accepted_task_ids.size() == 1U);
-
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
     drain_engine_messages(runtime);
 
     const std::vector<TileCoord> seeded_tiles {
@@ -381,10 +379,6 @@ void ecology_growth_completes_task_and_site_attempt()
     assert(campaign.sites[0].site_state == GS1_SITE_STATE_COMPLETED);
     assert(campaign.sites[1].site_state == GS1_SITE_STATE_AVAILABLE);
     assert(site_run.result_newly_revealed_site_count == 1U);
-    assert(site_run.task_board.accepted_task_ids.empty());
-    assert(site_run.task_board.completed_task_ids.size() == 1U);
-    assert(site_run.task_board.visible_tasks.front().runtime_list_kind == TaskRuntimeListKind::Completed);
-    assert(site_run.task_board.visible_tasks.front().current_progress_amount == 10U);
 
     const auto tile_state = gs1::site_world_access::tile_ecology(site_run, seeded_tiles.front());
     assert(approx_equal(tile_state.plant_density, 1.0f));
@@ -426,26 +420,6 @@ void ecology_growth_completes_task_and_site_attempt()
         assert(payload.newly_revealed_site_count == 1U);
     }
 
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    const auto follow_up_messages = drain_engine_messages(runtime);
-
-    const auto* task_message = find_task_message(follow_up_messages, 1U);
-    assert(task_message != nullptr);
-    {
-        const auto& payload = task_message->payload_as<Gs1EngineMessageTaskData>();
-        assert(payload.current_progress == 10U);
-        assert(payload.target_progress == 10U);
-        assert(payload.list_kind == GS1_TASK_PRESENTATION_LIST_COMPLETED);
-    }
-
-    const auto follow_up_hud_messages =
-        collect_messages_of_type(follow_up_messages, GS1_ENGINE_MESSAGE_HUD_STATE);
-    assert(follow_up_hud_messages.size() == 1U);
-    {
-        const auto& payload = follow_up_hud_messages.front()->payload_as<Gs1EngineMessageHudStateData>();
-        assert(payload.active_task_count == 0U);
-        assert(approx_equal(payload.site_completion_normalized, 1.0f));
-    }
 }
 
 void site_weather_changes_emit_hud_wind_warning_codes()

@@ -100,7 +100,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const siteTutorialTips = [
         "Move with WASD and drag with the right mouse button to orbit the camera around the worker.",
         "Press B to open the player pack, then click a carried item to use it or move it into opened storage.",
-        "Press F to raise the phone for the market, delivery box flow, and task board information.",
+        "Press F to raise the phone for the market, delivery crate flow, and task board information.",
         "Short right-click any tile to open context actions such as gather, water, repair, plant, or build.",
         "Planting and deployment enter placement mode first, so confirm with a left-click and cancel with Esc.",
         "Carry seeds in the pack before you deploy so the right-click tile menu can arm planting actions.",
@@ -1451,7 +1451,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return "Worker Pack";
         }
         if ((containerInfo.flags & inventoryStorageFlags.deliveryBox) !== 0) {
-            return "Delivery Box (" + containerInfo.containerTileX + ", " + containerInfo.containerTileY + ")";
+            return "Delivery Crate (" + containerInfo.containerTileX + ", " + containerInfo.containerTileY + ")";
         }
 
         const tile = getTileSnapshot(state, containerInfo.containerTileX, containerInfo.containerTileY);
@@ -2693,7 +2693,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const footnote = document.createElement("div");
         footnote.className = "inventory-footnote";
         footnote.textContent =
-            "Baseline support is packed before deployment. Water and recovery supplies start carried; seeds and raw materials begin in the starter storage crate.";
+            "Site 1 starts with its opening loadout already packed in the delivery crate: basic straw checkerboard, one water, and the opening cash reserve.";
         stack.appendChild(footnote);
     }
 
@@ -3008,7 +3008,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             1);
         storagePanelSubtitle.textContent = currentOpenedContainer.isOpenedView
             ? ((currentOpenedContainer.flags & inventoryStorageFlags.deliveryBox) !== 0
-                ? ("Retrieval-only delivery storage - " + slotCount + " slots")
+                ? ("Delivery crate storage - " + slotCount + " slots")
                 : (structureMeta
                     ? ("Device storage - " + slotCount + " slots")
                     : "Device storage"))
@@ -5819,6 +5819,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     function createStructureVisual(tile, tileHeight) {
         const structureGroup = new THREE_NS.Group();
         structureGroup.position.y = tileHeight;
+        const isDeliveryBoxCrate = inventoryCache.containers.some((containerInfo) =>
+            containerInfo &&
+            containerInfo.containerKind === "DEVICE_STORAGE" &&
+            (containerInfo.flags & inventoryStorageFlags.deliveryBox) !== 0 &&
+            containerInfo.containerTileX === tile.x &&
+            containerInfo.containerTileY === tile.y
+        );
 
         if (tile.structureTypeId === 201) {
             const stoveBase = new THREE_NS.Mesh(
@@ -5855,10 +5862,28 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         } else if (tile.structureTypeId === 203) {
             const crate = new THREE_NS.Mesh(
                 new THREE_NS.BoxGeometry(0.58, 0.46, 0.58),
-                new THREE_NS.MeshStandardMaterial({ color: 0x8a633d, roughness: 0.92, metalness: 0.02 })
+                new THREE_NS.MeshStandardMaterial({
+                    color: isDeliveryBoxCrate ? 0x5f8f4d : 0x8a633d,
+                    roughness: 0.92,
+                    metalness: 0.02
+                })
             );
             crate.position.y = 0.24;
             structureGroup.add(crate);
+            if (isDeliveryBoxCrate) {
+                const band = new THREE_NS.Mesh(
+                    new THREE_NS.BoxGeometry(0.62, 0.08, 0.62),
+                    new THREE_NS.MeshStandardMaterial({
+                        color: 0x9fd37a,
+                        emissive: 0x4d7d38,
+                        emissiveIntensity: 0.2,
+                        roughness: 0.8,
+                        metalness: 0.03
+                    })
+                );
+                band.position.y = 0.38;
+                structureGroup.add(band);
+            }
         } else {
             const fallback = new THREE_NS.Mesh(
                 new THREE_NS.BoxGeometry(0.5, 0.3, 0.5),

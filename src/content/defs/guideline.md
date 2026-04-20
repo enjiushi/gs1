@@ -12,9 +12,9 @@ Data-only definition headers for the major authored content domains.
 - `faction_defs.h`: Prototype faction identity and assistant unlock definition records.
 - `craft_recipe_defs.h`: Crafting recipe authoring records for craft-system use.
 - `event_defs.h`: Authored event definitions used by event/state systems.
-- `item_defs.h`: Item definition records and item-domain metadata.
+- `item_defs.h`: Item definition records and item-domain metadata, including the authored starter checkerboard item.
 - `modifier_defs.h`: Modifier definition records applied by modifier/weather flows.
-- `plant_defs.h`: Plant/ecology definition records, including authored wind-protection range and power values used by directional shelter resolution.
+- `plant_defs.h`: Plant/ecology definition records, including authored wind-protection range/power values and the starter straw checkerboard definition used by directional shelter resolution.
 - `recipe_defs.h`: General recipe definition records shared by authored content.
 - `reward_defs.h`: Reward definition records for grants and payouts.
 - `site_content_defs.h`: Site template/content definitions for active site runs.

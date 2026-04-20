@@ -200,6 +200,11 @@ void drink_action_breaks_pending_storage_open_chain(
             make_message(
                 GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        gs1::inventory_storage::worker_pack_container(site_run),
+        gs1::ItemId {gs1::k_item_water_container},
+        1U);
 
     const auto storage_container = gs1::inventory_storage::starter_storage_container(site_run);
     const auto storage_id = gs1::inventory_storage::storage_id_for_container(site_run, storage_container);

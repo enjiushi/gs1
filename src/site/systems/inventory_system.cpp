@@ -24,8 +24,7 @@ namespace
 constexpr double k_default_delivery_minutes = 30.0;
 constexpr double k_site_minutes_per_step = 0.2;
 constexpr std::uint32_t k_delivery_box_storage_flags =
-    inventory_storage::k_inventory_storage_flag_delivery_box |
-    inventory_storage::k_inventory_storage_flag_retrieval_only;
+    inventory_storage::k_inventory_storage_flag_delivery_box;
 
 std::uint32_t normalize_quantity(std::uint32_t quantity) noexcept
 {
@@ -111,11 +110,6 @@ bool storage_has_any_item(SiteRunState& site_run) noexcept
 }
 
 bool ensure_device_storage_containers(SiteSystemContext<InventorySystem>& context) noexcept;
-
-bool storage_is_retrieval_only(const StorageContainerState& storage_state) noexcept
-{
-    return (storage_state.flags & inventory_storage::k_inventory_storage_flag_retrieval_only) != 0U;
-}
 
 void clear_pending_device_storage_open(InventoryState& inventory) noexcept
 {
@@ -277,40 +271,6 @@ bool ensure_device_storage_containers(SiteSystemContext<InventorySystem>& contex
     }
 
     return created_any;
-}
-
-flecs::entity resolve_starter_storage_container(SiteSystemContext<InventorySystem>& context) noexcept
-{
-    if (!context.world.has_world() || context.site_run.site_world == nullptr)
-    {
-        return {};
-    }
-
-    const auto tile = context.world.read_camp().starter_storage_tile;
-    if (!context.world.tile_coord_in_bounds(tile))
-    {
-        return {};
-    }
-
-    const auto tile_data = context.world.read_tile(tile);
-    const auto* structure_def = find_structure_def(tile_data.device.structure_id);
-    if (structure_def == nullptr || !structure_def->grants_storage || structure_def->storage_slot_count == 0U)
-    {
-        return {};
-    }
-
-    const auto device_entity_id = context.site_run.site_world->device_entity_id(tile);
-    if (device_entity_id == 0U)
-    {
-        return {};
-    }
-
-    return inventory_storage::ensure_device_storage_container(
-        context.site_run,
-        device_entity_id,
-        tile,
-        structure_def->storage_slot_count,
-        0U);
 }
 
 flecs::entity resolve_delivery_box_container(SiteSystemContext<InventorySystem>& context) noexcept
@@ -699,12 +659,6 @@ PendingDelivery make_pending_delivery(
     return delivery;
 }
 
-[[nodiscard]] bool item_prefers_worker_pack(ItemId item_id) noexcept
-{
-    const auto* item_def = find_item_def(item_id);
-    return item_def != nullptr && item_is_directly_usable(*item_def);
-}
-
 void seed_inventory_from_loadout(SiteSystemContext<InventorySystem>& context) noexcept
 {
     ensure_inventory_storage_initialized(context);
@@ -724,8 +678,8 @@ void seed_inventory_from_loadout(SiteSystemContext<InventorySystem>& context) no
     }
 
     const auto worker_pack = inventory_storage::worker_pack_container(context.site_run);
-    const auto starter_storage = resolve_starter_storage_container(context);
-    const auto default_storage = starter_storage.is_valid() ? starter_storage : worker_pack;
+    const auto delivery_box = resolve_delivery_box_container(context);
+    const auto default_storage = delivery_box.is_valid() ? delivery_box : worker_pack;
 
     for (const auto& slot : loadout_slots)
     {
@@ -734,13 +688,9 @@ void seed_inventory_from_loadout(SiteSystemContext<InventorySystem>& context) no
             continue;
         }
 
-        const auto container =
-            item_prefers_worker_pack(slot.item_id)
-                ? worker_pack
-                : default_storage;
         (void)inventory_storage::add_item_to_container(
             context.site_run,
-            container,
+            default_storage,
             slot.item_id,
             slot.quantity);
     }
@@ -1052,12 +1002,6 @@ Gs1Status handle_inventory_transfer(
         if (!((source_is_worker_pack && destination_is_worker_pack) ||
                 (source_is_worker_pack && destination_is_device_storage) ||
                 (source_is_device_storage && destination_is_worker_pack)))
-        {
-            return GS1_STATUS_INVALID_STATE;
-        }
-
-        if (source_is_worker_pack && source_storage->container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK &&
-            destination_is_device_storage && storage_is_retrieval_only(*destination_storage))
         {
             return GS1_STATUS_INVALID_STATE;
         }
