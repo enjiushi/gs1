@@ -85,7 +85,7 @@ These terms are stable and should be used consistently in future design and impl
 | `Nearby-Site Aura` | A passive `Per-Site Modifier` package projected from adjacent stabilized sites into the current site session before deployment. It should be weaker and steadier than a claimed `Run Modifier`, usually focuses on one support channel or one linked pair of meters, and should never grant full hazard immunity. |
 | `Camp Support` | The light support infrastructure on a `Site`, including shelter, `Container`s, service devices, and hired labor access. |
 | `Player Condition` | The worker's physical and mental state, represented by survival and output meters such as health, hydration, nourishment, energy cap, energy, morale, and work efficiency. |
-| `Aftermath Relief Offer` | A faction support offer that can appear after a harsh event enters `Aftermath`; its strength depends on current `Faction Reputation` and site damage. |
+| `Aftermath Relief Offer` | A faction support offer that can appear after a harsh event fully resolves and the site enters recovery; its strength depends on current `Faction Reputation` and site damage. |
 | `Wind Protection` | The total local wind-erosion shielding on a tile or patch from plant adjacency, terrain shelter, and devices; higher protection reduces exposure damage and fertility loss. |
 | `Plant Density` | The current strength and maturity of living cover or plant-derived starter cover on a tile or cluster; higher density means stronger traits, better survival, and possible natural spread for living plants, while lower density means weaker effects and higher hazard vulnerability. |
 | `Plant Trend` | The derived direction of plant density on a tile, shown as `Growing`, `Holding`, or `Withering`, based on whether the patch is gaining or losing density. |
@@ -453,7 +453,9 @@ Discrete or integer runtime values:
 - `plantDensityState`
 - `taskState`
 - `contractState`
-- `eventState`
+- `forecastProfileId`
+- `eventTemplateId`
+- `eventWaveSequenceIndex`
 - `tileTraversable`
 - `tilePlantable`
 - `tileReservedByStructure`
@@ -820,23 +822,27 @@ Use these runtime fields:
 | `weatherWind` | Continuous `0-100` | Current site-wide wind pressure |
 | `weatherDust` | Continuous `0-100` | Current site-wide airborne sand, dust-load, and visibility pressure; shown to the player as `Dust` |
 | `weatherWindDirectionDegrees` | Continuous `0-360` | Current site-wide wind-flow direction measured clockwise on the tile grid, with `0` pointing east/right |
-| `siteHeatBias` | Continuous `-20` to `20` | Site-specific baseline heat tendency |
-| `siteWindBias` | Continuous `-20` to `20` | Site-specific baseline wind tendency |
-| `siteDustBias` | Continuous `-20` to `20` | Site-specific baseline loose-dust tendency |
-| `forecastConfidence` | Continuous `0-100` | How trustworthy the current forecast is |
-| `forecastLeadMinutes` | Continuous | How much warning time the forecast currently gives |
-| `eventTypeId` | Discrete | Current extreme event archetype or `None` |
-| `eventState` | Discrete | `Inactive`, `Warning`, `Build`, `Peak`, `Decay`, or `Aftermath` |
-| `eventTier` | Discrete | Relative severity band for the current event |
+| `siteWeatherBias` | Continuous | Single placeholder site-wide weather bias; currently initialized to `0` |
+| `forecastProfileId` | Discrete | Current authored forecast profile for the site |
+| `eventTemplateId` | Discrete | Current harsh-event template or `None` |
+| `eventStartTimeMinutes` | Continuous | Absolute in-game minute when the current event starts applying pressure |
+| `eventPeakTimeMinutes` | Continuous | Absolute in-game minute when the current event reaches full pressure |
+| `eventPeakDurationMinutes` | Continuous | Full-pressure hold window length for the current event |
+| `eventEndTimeMinutes` | Continuous | Absolute in-game minute when the current event fully ends |
 | `eventHeatPressure` | Continuous `0-100` | Current event-side heat pressure that feeds `weatherHeat` |
 | `eventWindPressure` | Continuous `0-100` | Current event-side wind pressure that feeds `weatherWind` |
 | `eventDustPressure` | Continuous `0-100` | Current event-side dust pressure that feeds `weatherDust` |
+| `minutesUntilNextWave` | Continuous | Countdown to the next highway-protection wave while no event is active |
+| `eventWaveSequenceIndex` | Integer | Number of highway-protection waves already started in the current site run |
+| `aftermathReliefResolved` | Continuous `0-1` | Recovery-ready flag set once the active event fully ends |
 
 Core rule:
 
 - `weatherHeat`, `weatherWind`, and `weatherDust` are site-wide ambient values
 - `weatherWindDirectionDegrees` tells local shelter which side of a plant, structure, or terrain shelter is downwind
+- the current prototype does not use a separate runtime `eventState` enum or `eventTier`; it derives event intensity from `eventTemplateId` plus the absolute event timeline markers
 - `eventHeatPressure`, `eventWindPressure`, and `eventDustPressure` are site-wide event meters that can sit at `0` when no harsh event is active
+- highway-protection sites reuse the same timeline curve in short repeating waves, with `minutesUntilNextWave` and `eventWaveSequenceIndex` tracking cadence
 - local terrain, plants, devices, and player field work do not rewrite the weather itself
 - they change how hard the weather lands on a given tile, worker, device, or storage area
 
@@ -857,46 +863,47 @@ Resolution rule:
 - instead, they directly change the resolved local results `tileHeat`, `tileWind`, and `tileDust`
 - those resolved local weather meters then drive tile moisture loss, burial, fertility setback, and the weather-linked parts of plant pressure
 
-#### Baseline Daily Weather Curve
+#### Baseline Site Weather Behavior
 
-Outside of extreme events, weather should still follow a readable daily rhythm.
+Outside of harsh events, site-wide weather should still feel calm and readable.
 
 Baseline behavior:
 
-- `weatherHeat` should be lowest overnight, rise through morning, peak around midday, then fall in evening
-- `weatherWind` should fluctuate more than heat and can spike during exposed parts of the day even without a named event
-- `weatherDust` should be partly derived from wind, site dust bias, and recent hazard aftermath
+- outside an active harsh event, the current prototype smooths `weatherHeat`, `weatherWind`, and `weatherDust` back toward `0`
+- site 1 still bootstraps in calm conditions with `heat = 0`, `wind = 0`, `dust = 0`, and wind direction `0`
+- `weatherWindDirectionDegrees` should stay readable because local shelter and lee-side protection use it directly
+- richer day-night ambient curves, gust modeling, and separate per-channel site biases are future work rather than current runtime behavior
 
 Use this relationship:
 
-- `weatherHeat` should come from the daily heat curve plus site bias plus current `eventHeatPressure`
-- `weatherWind` should come from the daily wind curve plus site bias plus gust variation plus current `eventWindPressure`
-- `weatherDust` should come from site dust bias, current wind, current `eventDustPressure`, and recent-event aftermath
+- when an event is active, `eventHeatPressure`, `eventWindPressure`, and `eventDustPressure` become the target site-wide weather values and the weather state eases toward them
+- when no event is active, the site-wide weather values ease back toward calm conditions
+- `siteWeatherBias` is the single placeholder bias field for later site-specific weather offsets, but the current prototype resets it to `0`
 
 Engineering note:
 
-- `dayHeatCurve` and `dayWindCurve` can be authored as simple curves rather than hand-written formulas
+- any future return of daily heat or wind curves should layer on top of the current event-pressure contract instead of replacing it
 - `gustNoise` should be low-amplitude short variation, not full randomness spikes with no warning
 
 #### Extreme Event Archetypes
 
-The current design only needs a small event set:
+The current prototype ships a much smaller harsh-event set than the older multi-archetype plan:
 
-| Event | Typical Event-Meter Pattern | Main Gameplay Pressure |
+| Runtime Id | Current Use | Main Gameplay Pressure |
 |---|---|---|
-| `HeatWave` | high `eventHeatPressure`, small `eventWindPressure`, small `eventDustPressure` | hydration drain, energy drain, exposed worker pressure, weak seedling survival |
-| `Sandstorm` | medium `eventHeatPressure`, high `eventWindPressure`, very high `eventDustPressure` | visibility collapse, extreme wind-sand exposure, burial, device damage, movement pressure |
-| `CompoundFront` | high values in all three channels | rare high-tier event that tests the full support layout |
+| `forecastProfileId = 1` | Site-one startup forecast profile | onboarding weather profile with no recurring wave scheduling |
+| `forecastProfileId = 2` | `Highway Protection` objective | recurring short one-sided waves that test directional shelter placement |
+| `eventTemplateId = 1` | Active harsh-event wave | full-strength target of `Heat 15`, `Wind 10`, and `Dust 5` before local-weather resolution |
 
 Limits:
 
-- during the first three onboarding sites, a normal site day should have `0` or `1` major extreme event most of the time
-- back-to-back extreme events or authored wave sequences should be rare and mainly reserved for the fourth-site proof case or later high-tier campaign pressure
-- `CompoundFront` can be used as a capstone late-wave pressure spike if needed, but it should remain uncommon enough that it feels memorable rather than routine
+- most sites still run without an automatically scheduled harsh event
+- `Highway Protection` is currently the only objective mode that loops repeated harsh-event waves
+- additional archetypes such as heat-only spikes or higher-tier compound fronts remain future content, not current runtime behavior
 
 #### Event Timeline Contract
 
-Every extreme event should use the same four timeline markers:
+Every active harsh event currently uses the same four absolute timeline markers:
 
 | Field | Purpose | Behavior |
 |---|---|---|
@@ -905,50 +912,33 @@ Every extreme event should use the same four timeline markers:
 | `peakDuration` | Full-force hold window | Pressure stays at full strength from `peakTime` through `peakTime + peakDuration` |
 | `endTime` | Final event influence minute | Pressure linearly interpolates back to `0` between `peakTime + peakDuration` and `endTime` |
 
-Duration targets:
+Current prototype timings:
 
-- `startTime -> peakTime`: usually `30-90` in-game minutes
-- `peakDuration`: usually `30-120` in-game minutes
-- `peakTime + peakDuration -> endTime`: usually `30-120` in-game minutes
-- any lingering repair or relief consequences should come from the aftermath state the event leaves behind, not from a separate weather phase enum
+- `startTime -> peakTime`: fixed `5` in-game minutes
+- `peakDuration`: fixed `5` in-game minutes
+- `peakTime + peakDuration -> endTime`: fixed `5` in-game minutes
+- for `Highway Protection`, once a wave fully ends the next wave is seeded after a random `4-8` in-game minute delay if the objective timer is still running
+- recovery and relief logic should key off the cleared event timeline plus `aftermathReliefResolved`, not a separate weather-phase enum
 
 #### Forecast Contract
 
-Forecasting should be imperfect, but actionable.
+Forecasting is currently profile-based rather than simulation-driven.
 
-Forecast output should include:
+Runtime contract:
 
-- predicted event type if one is likely
-- predicted start window
-- predicted intensity band for `Heat`, `Wind`, and `Dust`
-- `forecastConfidence`
+- `forecastProfileId = 1` is assigned to the site-one startup flow
+- `forecastProfileId = 2` is assigned to `Highway Protection` sites and signals recurring wave behavior
+- the runtime does not currently expose `forecastConfidence`, `forecastLeadMinutes`, or per-channel forecast error bands
+- until richer forecasting exists, forecast presentation should treat the profile as authored scenario context rather than a probabilistic weather model
 
-Base forecast values:
+Future direction:
 
-- `forecastLeadMinutes = 180`
-- base intensity error band = `+/- 15`
-- base start-time error band = `+/- 60` in-game minutes
-- base `forecastConfidence` should usually sit around `55-70`
+- later weather passes can add confidence, lead time, and channel-specific uncertainty back on top of the current profile system if those fields return to code
 
-Improvement sources:
+Prototype presentation note:
 
-- `Autonomous Region Agricultural University` tech or support that improves forecast range or certainty
-- persistent tech that improves forecast range or certainty
-- site-scoped unlocks or modifiers that improve local site precision
-
-Improvement effects:
-
-- higher `forecastLeadMinutes`
-- smaller intensity error band
-- smaller start-time error band
-- higher `forecastConfidence`
-- earlier access to more precise channel-specific forecast information
-- clearer identification of which weather channel is expected to be most dangerous
-
-Important rule:
-
-- forecasting should improve planning quality, not fully remove uncertainty
-- even strong forecasting should still preserve some tension in exact intensity, duration, or zone impact
+- the latest smoke-viewer work includes temporary wind-focused presentation scaffolding, including stronger visual normalization for low runtime wind values and fade-out retention of the last event wind heading
+- that smoke/test presentation code should not be treated as the gameplay startup weather contract; the gameplay/runtime contract for site 1 still starts calm until a real event or other weather-driving system changes it
 
 #### Runtime Pressure And Aftermath Rules
 
@@ -964,17 +954,15 @@ Design consistency rule:
 
 - each weather channel should leave readable artifacts on at least 3 layers at once when relevant: player pressure, land/tile condition, and plant growth or degeneration
 
-When `eventState` is `Peak`, the event should mainly push the weather system itself into extreme values rather than bypassing it with separate direct plant-damage rules.
+When the event pressure curve is in its full-strength hold window, the event should mainly push the weather system itself into stronger values rather than bypassing it with a separate plant-damage phase machine.
 
-During `Peak`, the event should mainly raise:
+During that full-strength hold window, the event should mainly raise:
 
 - `eventHeatPressure`
 - `eventWindPressure`
 - `eventDustPressure`
-- worker outdoor action speed penalties
-- worker hydration and energy drain
-- worker health risk from severe exposure
-- device damage pressure
+- local exposure warnings once site-wide and resolved local weather cross dangerous thresholds
+- camp durability wear and device stress through the same weather channels that already read site-wide and event pressure
 
 Those extreme weather values should then be what actually causes:
 
@@ -983,7 +971,7 @@ Those extreme weather values should then be what actually causes:
 - `tileSandBurial` gain
 - `deviceEfficiency` loss
 
-When `eventState` enters `Aftermath`, the event should stop dealing peak pressure, but it should leave behind recoverable problems:
+Once `worldTimeMinutes` reaches `endTimeMinutes`, direct event pressure should drop back toward `0`, site-wide weather should smooth toward calm conditions, and `aftermathReliefResolved` should flip to `1`. The event should then leave behind recoverable problems:
 
 - extra `tileSandBurial`
 - reduced `deviceEfficiency` from burial or damage
@@ -991,18 +979,17 @@ When `eventState` enters `Aftermath`, the event should stop dealing peak pressur
 - lower short-term worker morale until the site feels under control again
 - possible `Aftermath Relief Offer`s from high-reputation factions, giving the player a recovery choice rather than automatic rescue
 
-This phase is important because the strategy game continues after the spectacle ends. Strong reputation should improve relief speed, package quality, and subsidy level, but it should never erase the event's damage for free.
+There is no separate runtime `Aftermath` enum in the current prototype; recovery is inferred from the cleared event timeline plus the relief-ready flag. Strong reputation should improve relief speed, package quality, and subsidy level, but it should never erase the event's damage for free.
 
 ### Extreme Hazard Events
 
 In addition to normal heat, wind, and dust pressure, some sites should experience extreme hazard events that make the environment temporarily fierce and genuinely threatening. These are not routine background conditions. They are short periods where survival, shelter, preparation, and site layout are put under serious stress.
 
-Example extreme event directions:
+Current prototype event directions:
 
-- Severe sandstorm front
-- Extended heat-wave spike
-- Multi-phase wind burst event
-- Combined heat and visibility-collapse event
+- a short harsh-event pressure spike built from the shared ramp-up, hold, and ramp-down curve
+- a repeating one-sided highway wave chain that reuses the same pressure shape with varying wind direction
+- future heat-only, dust-heavy, or compound archetypes can return later, but they are not part of the current runtime contract
 
 Design goals for extreme events:
 
@@ -1102,7 +1089,7 @@ The design target is still "I saved that patch," but the reason should be that t
 
 ### Harsh-Event Work Rules
 
-The game should formalize this as normal player actions performed under event-modified pressure during `Warning`, `Build`, `Peak`, `Decay`, and `Aftermath`, rather than as separate action types.
+The game should formalize this as normal player actions performed under nonzero event pressure and the short recovery window after the event, rather than as separate action types or a named harsh-event phase ladder.
 
 Core rules:
 
@@ -1115,10 +1102,9 @@ Core rules:
 
 Exposure rules:
 
-- during `Build`, outdoor action time is multiplied by `1.15`
-- during `Peak`, outdoor action time is multiplied by `1.35`
-- during `Peak`, hydration and energy drain from the current weather continue on top of the action's direct work cost
-- if visibility is critically low during a `Sandstorm`, movement to the target should often be the real cost, not only the work itself
+- the current prototype should let resolved weather, worker-condition rules, and local exposure warnings carry most of the event-time cost
+- if wind and dust spike, movement and field exposure should feel worse because the same weather channels feed local weather, HUD warnings, device wear, and camp durability pressure
+- future explicit action-time multipliers can be added later if the action model grows a dedicated harsh-weather timing hook
 - if the worker is already in critical survival danger, action start should be blocked until they recover enough to act
 
 Interruption rules:
@@ -1131,7 +1117,7 @@ Design intent:
 
 - save the seedlings or save the irrigator
 - rescue the fringe output tile or protect the camp edge
-- go outside during `Peak` for a risky fix or accept a smaller loss and recover faster after
+- go outside during the full-pressure window for a risky fix or accept a smaller loss and recover faster after
 
 That tradeoff is the core feeling. Harsh events should create agency through dangerous normal work, not through a parallel emergency-action subsystem.
 
@@ -3484,7 +3470,7 @@ Events should create pivots and memorable stories, but they must remain readable
 
 ### Harsh-Event Faction Relief
 
-After a harsh event enters `Aftermath`, factions should evaluate whether to offer help based on current `Faction Reputation`, recent task history, and the site's current damage profile.
+After a harsh event fully ends and recovery becomes available, factions should evaluate whether to offer help based on current `Faction Reputation`, recent task history, and the site's current damage profile.
 
 Rules:
 
@@ -4361,17 +4347,17 @@ This summary should include only core runtime meters and the core plant-side val
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `eventHeatPressure` | Current event archetype, current event timeline intensity, `eventTier` | `weatherHeat` | Event-side heat channel. When no harsh event is active, this should sit at or near `0`. |
-| `eventWindPressure` | Current event archetype, current event timeline intensity, `eventTier` | `weatherWind` | Event-side wind channel. |
-| `eventDustPressure` | Current event archetype, current event timeline intensity, `eventTier` | `weatherDust` | Event-side dust channel. |
+| `eventHeatPressure` | Active `eventTemplateId`, current event timeline intensity | `weatherHeat` | Event-side heat channel. When no harsh event is active, this should sit at or near `0`. |
+| `eventWindPressure` | Active `eventTemplateId`, current event timeline intensity | `weatherWind` | Event-side wind channel. |
+| `eventDustPressure` | Active `eventTemplateId`, current event timeline intensity | `weatherDust` | Event-side dust channel. |
 
 ### Weather Meter Relationships
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `weatherHeat` | Daily heat curve, site heat bias, `eventHeatPressure` | `tileHeat` | Site-wide heat should resolve into local heat before it affects terrain, plants, or worker meters. |
-| `weatherWind` | Daily wind curve, site wind bias, gust variation, `eventWindPressure` | `tileWind` | Site-wide wind should resolve into local wind before it affects terrain, plants, or worker meters. |
-| `weatherDust` | Site dust bias, current wind, recent-event aftermath, `eventDustPressure` | `tileDust` | Site-wide dust pressure should resolve into local dust before it affects terrain, plants, or worker meters. |
+| `weatherHeat` | `eventHeatPressure`, smoothing toward current target, future `siteWeatherBias` work | `tileHeat` | Site-wide heat should resolve into local heat before it affects terrain, plants, or worker meters. The current prototype relaxes this back toward `0` when no event is active. |
+| `weatherWind` | `eventWindPressure`, smoothing toward current target, future `siteWeatherBias` work | `tileWind` | Site-wide wind should resolve into local wind before it affects terrain, plants, or worker meters. |
+| `weatherDust` | `eventDustPressure`, smoothing toward current target, future `siteWeatherBias` work | `tileDust` | Site-wide dust pressure should resolve into local dust before it affects terrain, plants, or worker meters. The current prototype does not yet add a separate aftermath-dust layer. |
 
 ### Resolved Local Weather Meter Relationships
 
