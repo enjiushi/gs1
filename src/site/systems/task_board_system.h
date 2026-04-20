@@ -15,7 +15,9 @@ public:
             site_component_mask_of(
                 SiteComponent::TaskBoard,
                 SiteComponent::Counters,
-                SiteComponent::Objective),
+                SiteComponent::Objective,
+                SiteComponent::Economy,
+                SiteComponent::Modifier),
             site_component_mask_of(SiteComponent::TaskBoard)};
     }
 

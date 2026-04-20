@@ -365,6 +365,8 @@ Gs1TaskPresentationListKind to_task_presentation_list_kind(TaskRuntimeListKind k
         return GS1_TASK_PRESENTATION_LIST_ACCEPTED;
     case TaskRuntimeListKind::Completed:
         return GS1_TASK_PRESENTATION_LIST_COMPLETED;
+    case TaskRuntimeListKind::Claimed:
+        return GS1_TASK_PRESENTATION_LIST_CLAIMED;
     case TaskRuntimeListKind::Visible:
     default:
         return GS1_TASK_PRESENTATION_LIST_VISIBLE;
@@ -1361,6 +1363,11 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
     case GameMessageType::RestorationProgressChanged:
     case GameMessageType::TaskAcceptRequested:
     case GameMessageType::TaskRewardClaimRequested:
+    case GameMessageType::PhoneListingPurchased:
+    case GameMessageType::PhoneListingSold:
+    case GameMessageType::InventoryTransferCompleted:
+    case GameMessageType::InventoryItemUseCompleted:
+    case GameMessageType::InventoryCraftCompleted:
     case GameMessageType::PhoneListingPurchaseRequested:
     case GameMessageType::PhoneListingSaleRequested:
     case GameMessageType::PhonePanelSectionRequested:
@@ -2627,6 +2634,8 @@ void GameRuntime::queue_site_phone_panel_state_message()
     payload.reserved0[2] = 0U;
     payload.visible_task_count = phone_panel.visible_task_count;
     payload.accepted_task_count = phone_panel.accepted_task_count;
+    payload.completed_task_count = phone_panel.completed_task_count;
+    payload.claimed_task_count = phone_panel.claimed_task_count;
     payload.buy_listing_count = phone_panel.buy_listing_count;
     payload.sell_listing_count = phone_panel.sell_listing_count;
     payload.service_listing_count = phone_panel.service_listing_count;

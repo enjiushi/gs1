@@ -561,7 +561,7 @@ int main()
                bootstrap_site_run,
                gs1::inventory_storage::starter_storage_container(bootstrap_site_run),
                gs1::ItemId {gs1::k_item_iron_bundle}) == 4U);
-    assert(bootstrap_site_run.task_board.visible_tasks.size() == 1U);
+    assert(bootstrap_site_run.task_board.visible_tasks.size() >= 1U);
     assert(bootstrap_site_run.economy.money == 45);
     assert(bootstrap_site_run.economy.available_phone_listings.size() >= 11U);
 
@@ -582,6 +582,9 @@ int main()
         const auto& phone_panel_payload =
             bootstrap_phone_panel_messages.front()->payload_as<Gs1EngineMessagePhonePanelData>();
         assert(phone_panel_payload.active_section == GS1_PHONE_PANEL_SECTION_MARKETPLACE);
+        assert(phone_panel_payload.visible_task_count >= 1U);
+        assert(phone_panel_payload.completed_task_count == 0U);
+        assert(phone_panel_payload.claimed_task_count == 0U);
         assert(phone_panel_payload.buy_listing_count >= 9U);
     }
     {

@@ -1486,6 +1486,8 @@ void SmokeEngineHost::apply_site_phone_panel_state(const Gs1EngineMessage& messa
         payload.active_section,
         payload.visible_task_count,
         payload.accepted_task_count,
+        payload.completed_task_count,
+        payload.claimed_task_count,
         payload.buy_listing_count,
         payload.sell_listing_count,
         payload.service_listing_count,

@@ -806,6 +806,14 @@ Gs1Status handle_inventory_item_use(
         {
             return GS1_STATUS_INVALID_STATE;
         }
+
+        GameMessage completed_message {};
+        completed_message.type = GameMessageType::InventoryItemUseCompleted;
+        completed_message.set_payload(InventoryItemUseCompletedMessage {
+            stack->item_id.value,
+            static_cast<std::uint16_t>(requested_quantity),
+            0U});
+        context.message_queue.push_back(completed_message);
         context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_HUD);
         return GS1_STATUS_OK;
     });
@@ -982,7 +990,20 @@ Gs1Status handle_inventory_craft_commit(
             output_container,
             recipe_def->output_item_id,
             recipe_def->output_quantity);
-        return remaining_output == 0U ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
+        if (remaining_output != 0U)
+        {
+            return GS1_STATUS_INVALID_STATE;
+        }
+
+        GameMessage completed_message {};
+        completed_message.type = GameMessageType::InventoryCraftCompleted;
+        completed_message.set_payload(InventoryCraftCompletedMessage {
+            recipe_def->recipe_id.value,
+            recipe_def->output_item_id.value,
+            recipe_def->output_quantity,
+            0U});
+        context.message_queue.push_back(completed_message);
+        return GS1_STATUS_OK;
     });
 }
 
@@ -1128,6 +1149,16 @@ Gs1Status handle_inventory_transfer(
             {
                 return GS1_STATUS_INVALID_STATE;
             }
+
+            GameMessage completed_message {};
+            completed_message.type = GameMessageType::InventoryTransferCompleted;
+            completed_message.set_payload(InventoryTransferCompletedMessage {
+                payload.source_storage_id,
+                payload.destination_storage_id,
+                source_stack->item_id.value,
+                static_cast<std::uint16_t>(transferred_quantity),
+                payload.flags});
+            context.message_queue.push_back(completed_message);
             return GS1_STATUS_OK;
         }
 
@@ -1162,16 +1193,33 @@ Gs1Status handle_inventory_transfer(
             }
         }
 
+        const auto transferred_quantity =
+            std::min<std::uint32_t>(normalize_quantity(payload.quantity), source_stack->quantity);
+
         const bool transferred = inventory_storage::transfer_between_slots(
             context.site_run,
             source_storage->container_kind,
             payload.source_slot_index,
             destination_storage->container_kind,
             payload.destination_slot_index,
-            normalize_quantity(payload.quantity),
+            transferred_quantity,
             source_storage->owner_device_entity_id,
             destination_storage->owner_device_entity_id);
-        return transferred ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
+        if (!transferred)
+        {
+            return GS1_STATUS_INVALID_STATE;
+        }
+
+        GameMessage completed_message {};
+        completed_message.type = GameMessageType::InventoryTransferCompleted;
+        completed_message.set_payload(InventoryTransferCompletedMessage {
+            payload.source_storage_id,
+            payload.destination_storage_id,
+            source_stack->item_id.value,
+            static_cast<std::uint16_t>(transferred_quantity),
+            payload.flags});
+        context.message_queue.push_back(completed_message);
+        return GS1_STATUS_OK;
     });
 }
 

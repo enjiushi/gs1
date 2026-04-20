@@ -21,17 +21,17 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `ecology_system.h`: Ecology system interface.
 - `ecology_system.cpp`: Updates plants, burial, watering, broader ecology progression, and highway-target sand-cover accumulation for objective-driven site progress.
 - `economy_phone_system.h`: Economy phone system interface.
-- `economy_phone_system.cpp`: Handles phone storefront interactions and economy-driven purchases.
+- `economy_phone_system.cpp`: Handles phone storefront interactions, economy-driven purchases, owner-confirmed buy/sell completion messages for onboarding-task progress, and task-reward money/unlockable reveal awards routed through message handling.
 - `failure_recovery_system.h`: Failure recovery system interface.
 - `failure_recovery_system.cpp`: Resolves failure fallout and recovery flow for the site.
 - `inventory_system.h`: Inventory system interface.
-- `inventory_system.cpp`: Applies item moves, uses, inventory ownership changes, and fixed-step-derived delivery countdown progress.
+- `inventory_system.cpp`: Applies item moves, uses, inventory ownership changes, owner-confirmed transfer/use/craft completion messages for onboarding-task progress, and fixed-step-derived delivery countdown progress.
 - `local_weather_resolve_system.h`: Local weather resolve system interface.
 - `local_weather_resolve_system.cpp`: Resolves local weather updates into owned site state, including directional lee-side wind shelter with nonlinear range falloff.
 - `modifier_system.h`: Modifier system interface.
-- `modifier_system.cpp`: Applies and expires site modifiers/effects.
+- `modifier_system.cpp`: Applies and expires site modifiers/effects, including task-reward run-modifier awards routed through message handling.
 - `phone_panel_system.h`: Phone panel system interface.
-- `phone_panel_system.cpp`: Owns phone panel section state plus authoritative projected phone listings/counts for the adapter.
+- `phone_panel_system.cpp`: Owns phone panel section state plus authoritative projected phone listings/task counts for the adapter, including completed and claimed history counts.
 - `placement_validation_system.h`: Placement validation system interface.
 - `placement_validation_system.cpp`: Validates structure placement requests against tile/world constraints.
 - `site_completion_system.h`: Site completion system interface.
@@ -42,7 +42,7 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `site_time_system.cpp`: Owns fixed-step-derived site clock, day index, and day-phase advancement.
 - `site_system_context.h`: Shared dependency bundle passed into site systems.
 - `task_board_system.h`: Task board system interface.
-- `task_board_system.cpp`: Manages board listings, acceptance, completion, and reset flow, keeping the authored site-one task on dense-restoration sites only.
+- `task_board_system.cpp`: Manages board listings, acceptance, onboarding-task progress tracking, reward-draft seeding, reward-claim routing, claimed-history transitions, and reset flow, keeping the site-one onboarding override plus restoration task on dense-restoration sites.
 - `weather_event_system.h`: Weather event system interface.
 - `weather_event_system.cpp`: Applies incoming weather events to site-owned weather/event state, including start/peak/end timeline interpolation and recurring one-sided highway-protection waves.
 - `worker_condition_system.h`: Worker condition system interface.

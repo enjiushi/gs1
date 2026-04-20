@@ -332,6 +332,7 @@ Core UI rules:
 - the `Regional Map` should be the single campaign-planning hub for site selection, selected-site summary, nearby-site support review, `Loadout` assembly, `Nearby-Site Aura` preview, available `Persistent Tech Tree` picks, and deployment
 - the `Field Phone` should be the single on-site management hub for `Contract Board` tasks, buying, selling, hiring, revealed `Site Unlockables`, and current faction-status review
 - site reward-claim flow and `Aftermath Relief Offer` choice should appear through the same phone flow or the same shared modal family, not as separate large systems
+- claimed tasks should move into a separate phone-facing claimed/history presentation instead of staying mixed into the active completion list
 - site-play HUD should stay compact and always visible, covering current `Hydration`, `Energy`, money, time of day, `Heat`, `Wind`, `Dust`, current event state when relevant, and simple site-completion progress
 - accepted tasks should have a compact always-available tracker during normal site play so the player does not need to reopen the phone for every progress check
 - item description should not become a separate permanent screen; use one contextual inspect panel for tiles, plants, structures, items, and selected regional-map sites
@@ -2579,7 +2580,7 @@ Key rules:
 - Accepted tasks move into an active list and do not rotate out on refresh
 - Unaccepted tasks remain on the board and may rotate out when the pool refreshes
 - The game should not allow free task abandonment, because accepting a task is itself the strategic commitment
-- Faction-published tasks should bias reward drafts, `Faction Reputation` gain, and `Faction Assistant` availability
+- Faction-published tasks should always grant their own guaranteed publisher `Faction Reputation`, but the immediate reward draft should come from one shared eligible reward pool rather than a faction-locked reward table in the current prototype
 - Each `Site Task` should display one `Task Reward Draft` before the player accepts it
 - Completing a `Site Task` should always grant its guaranteed `Faction Reputation` payout from the publishing `Faction`
 - That `Faction Reputation` payout should be guaranteed on completion, but its amount should scale by task tier or level and task type rather than being chosen from the reward draft
@@ -2604,7 +2605,7 @@ Key rules:
 - a `Site Unlockable` such as a plant, device, field action, or other site-scoped option
 - a `Run Modifier`
 - a `Task Reward Package` containing money, item bundles, or a mixed tactical bundle
-- if the chosen option is a `Site Unlockable`, it becomes available on the current site and may still require money to purchase or use
+- if the chosen option is a `Site Unlockable`, it becomes available on the current site immediately and may then require money to purchase or use
 - if the chosen option is a `Run Modifier`, it activates immediately for the current site session only
 - if the player leaves, fails, or restarts the current site session, all active `Run Modifier`s from that session are lost
 - `Site Unlockable` availability should primarily depend on `Site Task` completion plus `Persistent Tech Tree` prerequisites, but the site should also offer a limited direct-purchase fallback for tech-eligible unlockables at very high money cost
@@ -2627,7 +2628,7 @@ Prototype task progress rule:
 Prototype task data rule:
 
 - the prototype does not need a dedicated task-state field yet
-- for the prototype, a task's meaning should come from which runtime list currently owns it, such as available-board tasks, accepted tasks, or completed tasks
+- for the prototype, a task's meaning should come from which runtime list currently owns it, such as available-board tasks, accepted tasks, completed-awaiting-claim tasks, or claimed-history tasks
 - do not use a separate `failed` state in the current prototype direction, because unfinished tasks stay in the task list until completed
 - do not add task withdrawal in the current prototype direction
 - chain continuation should not be represented as a task state; if chain tracking exists, store it in separate chain runtime data
@@ -2644,7 +2645,7 @@ The exact task data structure or field list should not be locked inside the GDD.
 
 Prototype task lifetime rule:
 
-- the prototype does not need full persistent per-task history after a task leaves the board
+- the prototype does not need full campaign-persistent per-task history after a task leaves the board
 - task runtime data only needs to live for the current site session
 - if later systems need longer memory for duplication control or analytics, add a separate lightweight history system rather than inflating the task runtime object itself
 
@@ -2654,7 +2655,7 @@ For the current prototype direction, task progress should stay simple and readab
 
 Prototype completion rule:
 
-- task progress should come from either matching player actions or the player's current owned amount of the requested item
+- task progress should come from matching successful player actions
 - action-style tasks should progress when the player completes the relevant action
 - repeat-style tasks such as "do something `x` times" should accumulate progress from repeated matching action completions
 - item-state tasks should read the player's current owned total of the requested item on the current site
@@ -2753,10 +2754,11 @@ Typical `Site Task` examples:
 Typical rewards:
 
 - Show a `Task Reward Draft` with `2` options on the task before acceptance
-- On completion, let the player choose `1` reward from unlockables, modifiers, or item-focused bundles in that task's shown draft
+- On completion, let the player choose `1` reward from unlockables, modifiers, money, or item-focused bundles in that task's shown draft
 - Always grant the guaranteed publisher `Faction Reputation` payout on completion before the choice is made; the amount should scale with task tier or level
-- If the chosen result is a `Site Unlockable`, reveal it for current-site purchase or use
+- If the chosen result is a `Site Unlockable`, reveal it immediately for current-site purchase or use
 - If the chosen result is a `Run Modifier`, activate it immediately for the current site session
+- Item-focused reward bundles should use the delivery flow in the current prototype
 - One-time delivery drops or contractor offers when appropriate
 
 The design goal is that the player can inspect a clear reward draft before accepting a `Site Task`, finish that task, automatically gain trust with its publisher, and then make one meaningful tactical choice right away. That single choice should still create strong tension: reveal a new plant or device, activate a site-wide modifier, or take immediate money and item bundles.
@@ -2774,8 +2776,7 @@ Prototype reward-draft rule:
 - the current prototype should not change reward-draft generation based on current site state, local weak zones, weather, or other dynamic context
 - the current prototype does not need numeric weight tables in the GDD; simple authored pool rules are enough
 - reward generation should use the shared `Reward Band` ladder so task tier directly controls both reward type quality and reward amount tier
-- when possible, one option in the draft should come from the publishing faction's signature reward direction
-- the other option should come from a shared general reward pool or another eligible option from the same publisher
+- reward options should come from one shared eligible pool of immediate reward types rather than a faction-specific reward table in the current prototype
 - higher `Task Tier`s should unlock stronger reward bands rather than only larger numbers
 - lower-tier tasks should mainly offer basic item bundles, modest money packages, or basic site unlocks
 - higher-tier tasks may offer stronger unlockables, better mixed bundles, and stronger `Run Modifier` access
@@ -3914,6 +3915,8 @@ This is the minimum that still lets the player compare factions instead of only 
 - `Site 2`: `Forestry Bureau of Autonomous Region` only, `Accepted Task Cap = 2`
 - `Site 3`: `Autonomous Region Agricultural University` only, `Accepted Task Cap = 2`
 - `Site 4`: full prototype board with all `3` factions, `6` visible tasks, and `Accepted Task Cap = 3`
+- current `Site 1` onboarding task pool should focus on teachable actions: buy, sell, transfer, plant, craft, and consume
+- the current implementation may still keep one dense-restoration progress task alongside that onboarding pool while the broader site-completion tutorial flow is being migrated
 - accepted tasks do not expire
 - unaccepted tasks may be replaced by simple refresh rules after tutorial sets are cleared
 - no free task abandonment in the prototype
@@ -3923,7 +3926,7 @@ This is the minimum that still lets the player compare factions instead of only 
 - `Faction Reputation` amount is fixed by the task definition, but scales by task level or tier
 - no `Task Chain`s in the minimum playable build
 - no jackpot-tier tasks in the minimum playable build
-- no `Run Modifier`s in the minimum playable build
+- simple `Run Modifier` rewards are allowed in the current prototype, but they should stay easy to read and should be revisited in a later modifier-design pass
 
 This keeps the board strategic without requiring the full late-game board economy.
 
