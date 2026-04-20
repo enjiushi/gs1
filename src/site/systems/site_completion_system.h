@@ -15,6 +15,8 @@ public:
                 SiteComponent::RunMeta,
                 SiteComponent::Time,
                 SiteComponent::Counters,
+                SiteComponent::TileLayout,
+                SiteComponent::TileEcology,
                 SiteComponent::Objective),
             0U};
     }

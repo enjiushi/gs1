@@ -191,6 +191,49 @@ inline void configure_highway_protection_objective(
     site_run.objective.target_tile_mask.assign(site_run.site_world->tile_count(), 0U);
 }
 
+inline void configure_green_wall_connection_objective(
+    SiteRunState& site_run,
+    SiteObjectiveTargetEdge edge,
+    double time_limit_minutes,
+    double completion_hold_minutes,
+    std::uint8_t band_width = 1U)
+{
+    site_run.objective.type = SiteObjectiveType::GreenWallConnection;
+    site_run.objective.time_limit_minutes = time_limit_minutes;
+    site_run.objective.completion_hold_minutes = completion_hold_minutes;
+    site_run.objective.completion_hold_progress_minutes = 0.0;
+    site_run.objective.paused_main_timer_minutes = 0.0;
+    site_run.objective.last_evaluated_world_time_minutes = 0.0;
+    site_run.objective.target_edge = edge;
+    site_run.objective.target_band_width = band_width;
+    site_run.objective.highway_max_average_sand_cover = 0.0f;
+    site_run.objective.last_target_average_sand_level = 0.0f;
+    site_run.objective.has_hold_baseline = false;
+    site_run.counters.objective_progress_normalized = 0.0f;
+    site_run.counters.highway_average_sand_cover = 0.0f;
+    site_run.objective.target_tile_indices.clear();
+    site_run.objective.target_tile_mask.assign(site_run.site_world->tile_count(), 0U);
+    site_run.objective.connection_start_tile_indices.clear();
+    site_run.objective.connection_start_tile_mask.assign(site_run.site_world->tile_count(), 0U);
+    site_run.objective.connection_goal_tile_indices.clear();
+    site_run.objective.connection_goal_tile_mask.assign(site_run.site_world->tile_count(), 0U);
+}
+
+inline void configure_pure_survival_objective(
+    SiteRunState& site_run,
+    double time_limit_minutes)
+{
+    site_run.objective.type = SiteObjectiveType::PureSurvival;
+    site_run.objective.time_limit_minutes = time_limit_minutes;
+    site_run.objective.completion_hold_minutes = 0.0;
+    site_run.objective.completion_hold_progress_minutes = 0.0;
+    site_run.objective.paused_main_timer_minutes = 0.0;
+    site_run.objective.last_evaluated_world_time_minutes = 0.0;
+    site_run.objective.last_target_average_sand_level = 0.0f;
+    site_run.objective.has_hold_baseline = false;
+    site_run.counters.objective_progress_normalized = 0.0f;
+}
+
 inline void mark_objective_target_tile(SiteRunState& site_run, TileCoord coord)
 {
     if (site_run.site_world == nullptr || !site_run.site_world->contains(coord))
@@ -216,6 +259,44 @@ inline void mark_objective_target_tile(SiteRunState& site_run, TileCoord coord)
     tile.ecology.ground_cover_type_id = 0U;
     tile.ecology.plant_density = 0.0f;
     site_run.site_world->set_tile(coord, tile);
+}
+
+inline void mark_green_wall_connection_start_tile(SiteRunState& site_run, TileCoord coord)
+{
+    if (site_run.site_world == nullptr || !site_run.site_world->contains(coord))
+    {
+        return;
+    }
+
+    const auto index = site_run.site_world->tile_index(coord);
+    if (site_run.objective.connection_start_tile_mask.size() != site_run.site_world->tile_count())
+    {
+        site_run.objective.connection_start_tile_mask.assign(site_run.site_world->tile_count(), 0U);
+    }
+    if (site_run.objective.connection_start_tile_mask[index] == 0U)
+    {
+        site_run.objective.connection_start_tile_mask[index] = 1U;
+        site_run.objective.connection_start_tile_indices.push_back(index);
+    }
+}
+
+inline void mark_green_wall_connection_goal_tile(SiteRunState& site_run, TileCoord coord)
+{
+    if (site_run.site_world == nullptr || !site_run.site_world->contains(coord))
+    {
+        return;
+    }
+
+    const auto index = site_run.site_world->tile_index(coord);
+    if (site_run.objective.connection_goal_tile_mask.size() != site_run.site_world->tile_count())
+    {
+        site_run.objective.connection_goal_tile_mask.assign(site_run.site_world->tile_count(), 0U);
+    }
+    if (site_run.objective.connection_goal_tile_mask[index] == 0U)
+    {
+        site_run.objective.connection_goal_tile_mask[index] = 1U;
+        site_run.objective.connection_goal_tile_indices.push_back(index);
+    }
 }
 
 template <typename SystemTag>

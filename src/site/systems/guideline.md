@@ -29,13 +29,13 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `local_weather_resolve_system.h`: Local weather resolve system interface.
 - `local_weather_resolve_system.cpp`: Resolves local weather updates into owned site state, including directional lee-side wind shelter with nonlinear range falloff.
 - `modifier_system.h`: Modifier system interface.
-- `modifier_system.cpp`: Applies and expires site modifiers/effects.
+- `modifier_system.cpp`: Applies and expires site modifiers/effects, importing nearby auras plus campaign-unlocked assistant and technology modifiers when a site run starts.
 - `phone_panel_system.h`: Phone panel system interface.
 - `phone_panel_system.cpp`: Owns phone panel section state plus authoritative projected phone listings/counts for the adapter.
 - `placement_validation_system.h`: Placement validation system interface.
 - `placement_validation_system.cpp`: Validates structure placement requests against tile/world constraints.
 - `site_completion_system.h`: Site completion system interface.
-- `site_completion_system.cpp`: Determines site success/failure outcomes for the active site objective mode.
+- `site_completion_system.cpp`: Determines site success/failure outcomes for the active site objective mode, including pure-survival time completion and green-wall hold/timer-pause evaluation.
 - `site_flow_system.h`: Site flow system interface.
 - `site_flow_system.cpp`: Coordinates major site flow transitions during a run.
 - `site_system_context.h`: Shared dependency bundle passed into site systems.
