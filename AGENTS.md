@@ -26,7 +26,7 @@ This file is a quick orientation guide for agents working in this repository.
 - `include/gs1/export.h`: Public DLL export/import macros.
 - `include/gs1/game_api.h`: C ABI entry points exposed by the gameplay DLL.
 - `include/gs1/status.h`: Public status/result codes.
-- `include/gs1/types.h`: Public API data types, message/event payload structs, runtime-facing enums, and site-weather event timeline transport fields.
+- `include/gs1/types.h`: Public API data types, message/event payload structs, runtime-facing enums, claimed-task/phone-panel transport fields, and site-weather event timeline transport fields.
 - `src/app/`: Runtime bootstrap, API glue, scene coordination, and campaign/site factory entry points.
 - `src/campaign/`: Campaign state and campaign-level systems such as flow, dedicated campaign time progression, loadout planning, regional support, and technology.
 - `src/messages/`: Internal game message IDs, payloads, handlers, and dispatcher.
@@ -39,12 +39,14 @@ This file is a quick orientation guide for agents working in this repository.
 - `tests/smoke/`: Smoke host, runtime DLL loader, script runner, live-state JSON, live HTTP server, and visual smoke UI.
 - `tests/smoke/scripts/`: Scripted smoke-test scenarios.
 - `scripts/`: PowerShell build and smoke-test helpers.
-- `GDD.md`: Game design document, including the directional wind-shadow and plant-footprint shelter rules, the current profile-based harsh-weather runtime contract with calm site-one startup weather, start/peak/peak-duration/end event markers, repeating highway-protection waves, and smoke-viewer wind-presentation caveats, the staged four-mode site-objective direction, the site-result-panel `OK` return contract, and the 30-real-minute in-game day timing contract.
+<<<<<<< HEAD
+- `GDD.md`: Game design document, including the directional wind-shadow and plant-footprint shelter rules, the current profile-based harsh-weather/runtime weather-event contract with start/peak/peak-duration/end timing direction, the site-one onboarding task-pool direction, phone-based claimed-task history direction, the staged four-mode site-objective direction, the site-result-panel `OK` return contract, and the 30-real-minute in-game day timing contract.
 - `GAME_STRUCTURE.md`: High-level gameplay/runtime structure notes.
-- `GAME_SYSTEM_DESIGN_V1.md`: System design reference, including directional local-weather resolution responsibilities, start/peak/peak-duration/end weather-event timelines, staged site-objective implementation notes, the `SiteResult` panel `OK`-return contract, and the canonical fixed-step time conversion rules that keep one in-game day at 30 real-time minutes.
+- `GAME_SYSTEM_DESIGN_V1.md`: System design reference, including directional local-weather resolution responsibilities, start/peak/peak-duration/end weather-event timelines, staged site-objective implementation notes, claimed-task history direction for task rewards, site-one onboarding task-pool notes, the `SiteResult` panel `OK`-return contract, and the canonical fixed-step time conversion rules that keep one in-game day at 30 real-time minutes.
 - `SYSTEM_DESIGN_STATUS.md`: Current system status and implementation tracking, including site-objective readiness notes.
 - `CONTENT_AUTHORING_CONTRACT.md`: Content authoring contract and data expectations.
 - `MISSING_DEFINITION_DESCRIPTIONS.md`: Notes for definitions that still need descriptions.
+- `TASK_BOARD_OPEN_QUESTIONS.md`: Follow-up product-contract questions for task-board reward presentation, claim lifetime, reward delivery semantics, and prototype board scope.
 
 ## Code Style
 

@@ -179,6 +179,8 @@ const char* task_list_kind_name(Gs1TaskPresentationListKind kind)
         return "ACCEPTED";
     case GS1_TASK_PRESENTATION_LIST_COMPLETED:
         return "COMPLETED";
+    case GS1_TASK_PRESENTATION_LIST_CLAIMED:
+        return "CLAIMED";
     case GS1_TASK_PRESENTATION_LIST_VISIBLE:
     default:
         return "VISIBLE";
@@ -831,6 +833,10 @@ void append_site_phone_panel_json(std::string& json, const SmokeEngineHost::Site
     json += std::to_string(phone_panel.visible_task_count);
     json += ",\"acceptedTaskCount\":";
     json += std::to_string(phone_panel.accepted_task_count);
+    json += ",\"completedTaskCount\":";
+    json += std::to_string(phone_panel.completed_task_count);
+    json += ",\"claimedTaskCount\":";
+    json += std::to_string(phone_panel.claimed_task_count);
     json += ",\"buyListingCount\":";
     json += std::to_string(phone_panel.buy_listing_count);
     json += ",\"sellListingCount\":";

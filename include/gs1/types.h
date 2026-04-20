@@ -184,7 +184,8 @@ enum Gs1TaskPresentationListKind : std::uint8_t
 {
     GS1_TASK_PRESENTATION_LIST_VISIBLE = 0,
     GS1_TASK_PRESENTATION_LIST_ACCEPTED = 1,
-    GS1_TASK_PRESENTATION_LIST_COMPLETED = 2
+    GS1_TASK_PRESENTATION_LIST_COMPLETED = 2,
+    GS1_TASK_PRESENTATION_LIST_CLAIMED = 3
 };
 
 enum Gs1InventoryContainerKind : std::uint8_t
@@ -702,6 +703,8 @@ struct Gs1EngineMessagePhonePanelData
     std::uint8_t reserved0[3];
     std::uint32_t visible_task_count;
     std::uint32_t accepted_task_count;
+    std::uint32_t completed_task_count;
+    std::uint32_t claimed_task_count;
     std::uint32_t buy_listing_count;
     std::uint32_t sell_listing_count;
     std::uint32_t service_listing_count;
@@ -852,7 +855,7 @@ GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePlacementPreviewData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePlacementFailureData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageTaskData, 20U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePhoneListingData, 24U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePhonePanelData, 32U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePhonePanelData, 40U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteActionData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageHudStateData, 32U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageNotificationData, 56U);

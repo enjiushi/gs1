@@ -16,8 +16,8 @@ Data-only definition headers for the major authored content domains.
 - `modifier_defs.h`: Modifier definition records applied by modifier/weather flows.
 - `plant_defs.h`: Plant/ecology definition records, including authored wind-protection range and power values used by directional shelter resolution.
 - `recipe_defs.h`: General recipe definition records shared by authored content.
-- `reward_defs.h`: Reward definition records for grants and payouts.
+- `reward_defs.h`: Reward definition records for grants and payouts, including the shared prototype task-reward pool, simple modifier rewards, immediate unlockable reveals, and delivery-based item bundle candidates.
 - `site_content_defs.h`: Site template/content definitions for active site runs.
 - `structure_defs.h`: Structure/buildable definition records.
-- `task_defs.h`: Task board/authored task definition records.
+- `task_defs.h`: Task board/authored task definition records, including the site-one onboarding task pool, progress-kind metadata, and lookup helpers.
 - `technology_defs.h`: Technology tree definition records, including prototype faction tabs, four temporary modifier tiers per faction, base-tech entries, and mutually exclusive amplification choices.

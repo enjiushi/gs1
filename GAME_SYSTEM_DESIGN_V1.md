@@ -866,7 +866,7 @@ taskTierId
 targetAmount
 currentProgressAmount
 rewardDraftOptions[]
-runtimeListKind          // Visible | Accepted | Completed
+runtimeListKind          // Visible | Accepted | Completed | Claimed
 chainId?
 chainStepIndex?
 followUpTaskTemplateId?
@@ -877,6 +877,7 @@ Rules:
 - do not store a separate failed task state in v1
 - runtime list ownership is the authoritative task status
 - reward draft options are instantiated when the task enters the visible pool
+- claimed tasks move out of the completion bucket into a separate claimed/history presentation for the current site session
 
 `activeChainState` fields:
 
@@ -1287,10 +1288,11 @@ Responsibilities:
 - build eligible visible task pool
 - instantiate task runtime entries from templates
 - track progress
-- move tasks between visible, accepted, and completed lists
+- move tasks between visible, accepted, completed, and claimed-history lists
 - generate reward drafts at task instantiation time
 - award guaranteed faction reputation on task completion
 - handle chain continuation
+- in the current site-one onboarding override, seed teach-by-doing tasks such as buy, sell, transfer, plant, craft, and consume from the onboarding pool before the broader generated board is fully implemented
 
 ### 10.13 `ModifierSystem`
 

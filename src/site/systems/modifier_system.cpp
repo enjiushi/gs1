@@ -186,11 +186,33 @@ void handle_site_run_started(
 
     resolve_modifier_totals(context);
 }
+
+void handle_run_modifier_award_requested(
+    SiteSystemContext<ModifierSystem>& context,
+    const RunModifierAwardRequestedMessage& payload) noexcept
+{
+    if (payload.modifier_id == 0U)
+    {
+        return;
+    }
+
+    auto& modifier_state = context.world.own_modifier();
+    const ModifierId modifier_id {payload.modifier_id};
+    if (std::find(
+            modifier_state.active_run_modifier_ids.begin(),
+            modifier_state.active_run_modifier_ids.end(),
+            modifier_id) == modifier_state.active_run_modifier_ids.end())
+    {
+        modifier_state.active_run_modifier_ids.push_back(modifier_id);
+        resolve_modifier_totals(context);
+    }
+}
 }  // namespace
 
 bool ModifierSystem::subscribes_to(GameMessageType type) noexcept
 {
-    return type == GameMessageType::SiteRunStarted;
+    return type == GameMessageType::SiteRunStarted ||
+        type == GameMessageType::RunModifierAwardRequested;
 }
 
 Gs1Status ModifierSystem::process_message(
@@ -200,6 +222,12 @@ Gs1Status ModifierSystem::process_message(
     if (message.type == GameMessageType::SiteRunStarted)
     {
         handle_site_run_started(context, message.payload_as<SiteRunStartedMessage>());
+    }
+    else if (message.type == GameMessageType::RunModifierAwardRequested)
+    {
+        handle_run_modifier_award_requested(
+            context,
+            message.payload_as<RunModifierAwardRequestedMessage>());
     }
 
     return GS1_STATUS_OK;

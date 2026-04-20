@@ -341,7 +341,7 @@ void ecology_growth_completes_task_and_site_attempt()
 
     auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
     assert(site_run.counters.site_completion_tile_threshold == 10U);
-    assert(site_run.task_board.visible_tasks.size() == 1U);
+    assert(site_run.task_board.visible_tasks.size() >= 1U);
     assert(site_run.task_board.visible_tasks.front().target_amount == 10U);
 
     drain_engine_messages(runtime);

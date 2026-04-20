@@ -65,6 +65,14 @@ enum class GameMessageType : std::uint8_t
     RestorationProgressChanged,
     TaskAcceptRequested,
     TaskRewardClaimRequested,
+    PhoneListingPurchased,
+    PhoneListingSold,
+    InventoryTransferCompleted,
+    InventoryItemUseCompleted,
+    InventoryCraftCompleted,
+    EconomyMoneyAwardRequested,
+    SiteUnlockableRevealRequested,
+    RunModifierAwardRequested,
     PhoneListingPurchaseRequested,
     PhoneListingSaleRequested,
     PhoneListingCartAddRequested,
@@ -437,6 +445,61 @@ struct TaskRewardClaimRequestedMessage final
     std::uint32_t reward_candidate_id;
 };
 
+struct PhoneListingPurchasedMessage final
+{
+    std::uint32_t listing_id;
+    std::uint32_t item_id;
+    std::uint16_t quantity;
+    std::uint16_t flags;
+};
+
+struct PhoneListingSoldMessage final
+{
+    std::uint32_t listing_id;
+    std::uint32_t item_id;
+    std::uint16_t quantity;
+    std::uint16_t flags;
+};
+
+struct InventoryTransferCompletedMessage final
+{
+    std::uint32_t source_storage_id;
+    std::uint32_t destination_storage_id;
+    std::uint32_t item_id;
+    std::uint16_t quantity;
+    std::uint16_t flags;
+};
+
+struct InventoryItemUseCompletedMessage final
+{
+    std::uint32_t item_id;
+    std::uint16_t quantity;
+    std::uint16_t flags;
+};
+
+struct InventoryCraftCompletedMessage final
+{
+    std::uint32_t recipe_id;
+    std::uint32_t output_item_id;
+    std::uint16_t output_quantity;
+    std::uint16_t flags;
+};
+
+struct EconomyMoneyAwardRequestedMessage final
+{
+    std::int32_t delta;
+};
+
+struct SiteUnlockableRevealRequestedMessage final
+{
+    std::uint32_t unlockable_id;
+};
+
+struct RunModifierAwardRequestedMessage final
+{
+    std::uint32_t modifier_id;
+};
+
 struct PhoneListingPurchaseRequestedMessage final
 {
     std::uint32_t listing_id;
@@ -623,6 +686,14 @@ GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TileEcologyChangedMessage, 28U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(RestorationProgressChangedMessage, 12U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TaskAcceptRequestedMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TaskRewardClaimRequestedMessage, 8U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingPurchasedMessage, 12U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingSoldMessage, 12U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryTransferCompletedMessage, 16U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryItemUseCompletedMessage, 8U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryCraftCompletedMessage, 12U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(EconomyMoneyAwardRequestedMessage, 4U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteUnlockableRevealRequestedMessage, 4U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(RunModifierAwardRequestedMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingPurchaseRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingSaleRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingCartAddRequestedMessage, 8U);

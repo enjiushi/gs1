@@ -84,8 +84,10 @@ void phone_panel_site_run_started_seeds_marketplace_snapshot(
 
     const auto& phone_panel = site_run.phone_panel;
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.active_section == PhonePanelSection::Marketplace);
-    GS1_SYSTEM_TEST_CHECK(context, phone_panel.visible_task_count == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, phone_panel.visible_task_count == 7U);
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.accepted_task_count == 0U);
+    GS1_SYSTEM_TEST_CHECK(context, phone_panel.completed_task_count == 0U);
+    GS1_SYSTEM_TEST_CHECK(context, phone_panel.claimed_task_count == 0U);
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.buy_listing_count >= 9U);
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.sell_listing_count >= 1U);
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.service_listing_count >= 2U);
@@ -160,11 +162,20 @@ void phone_panel_sell_list_refreshes_when_purchase_delivery_arrives(
             make_message(
                 GameMessageType::PhoneListingPurchaseRequested,
                 gs1::PhoneListingPurchaseRequestedMessage {5U, 1U, 0U})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
-    GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::InventoryDeliveryBatchRequested);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        InventorySystem::process_message(inventory_context, queue.front()) == GS1_STATUS_OK);
+    bool processed_delivery = false;
+    while (!queue.empty())
+    {
+        const auto message = queue.front();
+        queue.pop_front();
+        if (message.type == GameMessageType::InventoryDeliveryBatchRequested)
+        {
+            GS1_SYSTEM_TEST_REQUIRE(
+                context,
+                InventorySystem::process_message(inventory_context, message) == GS1_STATUS_OK);
+            processed_delivery = true;
+        }
+    }
+    GS1_SYSTEM_TEST_REQUIRE(context, processed_delivery);
     queue.clear();
 
     GS1_SYSTEM_TEST_REQUIRE(context, site_run.inventory.pending_delivery_queue.size() == 1U);

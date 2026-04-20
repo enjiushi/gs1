@@ -18,6 +18,8 @@ struct PhonePanelState final
     PhonePanelSection active_section {PhonePanelSection::Marketplace};
     std::uint32_t visible_task_count {0U};
     std::uint32_t accepted_task_count {0U};
+    std::uint32_t completed_task_count {0U};
+    std::uint32_t claimed_task_count {0U};
     std::uint32_t buy_listing_count {0U};
     std::uint32_t sell_listing_count {0U};
     std::uint32_t service_listing_count {0U};

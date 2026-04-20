@@ -160,15 +160,27 @@ void build_projected_listings(
 void count_projected_tasks(
     const TaskBoardState& task_board,
     std::uint32_t& out_visible_count,
-    std::uint32_t& out_accepted_count) noexcept
+    std::uint32_t& out_accepted_count,
+    std::uint32_t& out_completed_count,
+    std::uint32_t& out_claimed_count) noexcept
 {
     out_visible_count = 0U;
     out_accepted_count = 0U;
+    out_completed_count = 0U;
+    out_claimed_count = 0U;
     for (const auto& task : task_board.visible_tasks)
     {
         if (task.runtime_list_kind == TaskRuntimeListKind::Accepted)
         {
             out_accepted_count += 1U;
+        }
+        else if (task.runtime_list_kind == TaskRuntimeListKind::Completed)
+        {
+            out_completed_count += 1U;
+        }
+        else if (task.runtime_list_kind == TaskRuntimeListKind::Claimed)
+        {
+            out_claimed_count += 1U;
         }
         else if (task.runtime_list_kind == TaskRuntimeListKind::Visible)
         {
@@ -219,10 +231,14 @@ void sync_phone_panel_projection(
 
     std::uint32_t visible_task_count = 0U;
     std::uint32_t accepted_task_count = 0U;
+    std::uint32_t completed_task_count = 0U;
+    std::uint32_t claimed_task_count = 0U;
     count_projected_tasks(
         context.world.read_task_board(),
         visible_task_count,
-        accepted_task_count);
+        accepted_task_count,
+        completed_task_count,
+        claimed_task_count);
 
     std::uint32_t buy_listing_count = 0U;
     std::uint32_t sell_listing_count = 0U;
@@ -239,6 +255,8 @@ void sync_phone_panel_projection(
         !same_listing_vector(projected_listings, phone_panel.listings) ||
         phone_panel.visible_task_count != visible_task_count ||
         phone_panel.accepted_task_count != accepted_task_count ||
+        phone_panel.completed_task_count != completed_task_count ||
+        phone_panel.claimed_task_count != claimed_task_count ||
         phone_panel.buy_listing_count != buy_listing_count ||
         phone_panel.sell_listing_count != sell_listing_count ||
         phone_panel.service_listing_count != service_listing_count ||
@@ -247,6 +265,8 @@ void sync_phone_panel_projection(
     phone_panel.listings = std::move(projected_listings);
     phone_panel.visible_task_count = visible_task_count;
     phone_panel.accepted_task_count = accepted_task_count;
+    phone_panel.completed_task_count = completed_task_count;
+    phone_panel.claimed_task_count = claimed_task_count;
     phone_panel.buy_listing_count = buy_listing_count;
     phone_panel.sell_listing_count = sell_listing_count;
     phone_panel.service_listing_count = service_listing_count;

@@ -20,7 +20,7 @@ Site-owned state, ECS world support, and helper logic for active site gameplay.
 - `inventory_storage.h`: Inventory container/storage primitives and stack helpers.
 - `local_weather_resolve_state.h`: Local weather resolution scratch/state, including cached site-wind direction for directional shelter refreshes.
 - `modifier_state.h`: Modifier application state for site effects.
-- `phone_panel_state.h`: Authoritative phone panel section and projected listing/task snapshot state for the active site.
+- `phone_panel_state.h`: Authoritative phone panel section and projected listing/task snapshot state for the active site, including live/completed/claimed task counts.
 - `placement_preview.h`: Placement-preview state for build/placement UI flows.
 - `site_projection_update_flags.h`: Dirty/update flags for projection refresh decisions.
 - `site_objective_state.h`: Site objective mode/config state, including highway target-band metadata for objective evaluation.
@@ -30,6 +30,6 @@ Site-owned state, ECS world support, and helper logic for active site gameplay.
 - `site_world_access.h`: Owner-scoped ECS access helpers for reading/writing site components.
 - `site_world_components.h`: ECS component structs attached to site entities.
 - `systems/`: Site system declarations and implementations.
-- `task_board_state.h`: Task-board state for current site objectives and listings.
+- `task_board_state.h`: Task-board state for current site objectives and listings, including claimed-history tracking for reward-resolved tasks.
 - `tile_footprint.h`: Tile-footprint geometry helpers for structures and placement.
 - `weather_state.h`: Weather state tracked during the active site run.

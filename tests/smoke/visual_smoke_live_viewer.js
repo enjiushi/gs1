@@ -3600,6 +3600,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return "Active";
         case "COMPLETED":
             return "Done";
+        case "CLAIMED":
+            return "History";
         case "VISIBLE":
         default:
             return "Open";
@@ -3610,7 +3612,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         let className = "phone-task-state";
         if (task.listKind === "ACCEPTED") {
             className += " accepted";
-        } else if (task.listKind === "COMPLETED") {
+        } else if (task.listKind === "COMPLETED" || task.listKind === "CLAIMED") {
             className += " completed";
         }
         return className;
