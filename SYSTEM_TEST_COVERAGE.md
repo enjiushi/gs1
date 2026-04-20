@@ -276,9 +276,9 @@ Implemented behavior coverage should verify:
 - `SiteRunStarted` seeds the site-one event/weather state only when no event is
   active.
 - Other sites or already-active event states are ignored.
-- `run()` advances through `Warning`, `Build`, `Peak`, `Decay`, and
-  `Aftermath`.
-- Exiting `Aftermath` clears the active event, zeroes pressures, resolves
+- `run()` interpolates event pressure from `startTime` to `peakTime`, holds for
+  `peakDuration`, and then interpolates back down to `endTime`.
+- Passing `endTime` clears the active event, zeroes pressures, resolves
   aftermath relief, and resets site weather.
 - Projection dirty flags are raised when the weather/event state changes.
 

@@ -13,11 +13,11 @@ DLL-loading smoke harness, scripted smoke runner, live-state server, and visual 
 - `runtime_dll_loader.cpp`: Runtime DLL loader implementation.
 - `scripts/`: Scripted smoke scenario files.
 - `smoke_engine_host.h`: Smoke host abstraction over the gameplay DLL runtime.
-- `smoke_engine_host.cpp`: Smoke host implementation, including authoritative site phone panel state, phone listing projection application, and logging names for regional-map tech-tree UI actions/setups.
+- `smoke_engine_host.cpp`: Smoke host implementation, including authoritative site phone panel state, weather-event timeline projection application, and logging names for regional-map tech-tree UI actions/setups.
 - `smoke_host_main.cpp`: Standard smoke host executable entry point, including the optional `--verbose` switch for full engine logging.
 - `smoke_live_http_server.h`: HTTP server interface for exposing live smoke state.
 - `smoke_live_http_server.cpp`: HTTP server implementation for the visual smoke viewer.
-- `smoke_live_state_json.cpp`: JSON serialization of live smoke/runtime state, including phone panel section/count snapshot fields plus regional-map tech-tree tab/action/setup names.
+- `smoke_live_state_json.cpp`: JSON serialization of live smoke/runtime state, including phone panel section/count snapshot fields, weather-event timeline fields, and regional-map tech-tree tab/action/setup names.
 - `smoke_log.h`: Smoke logging helper declarations.
 - `smoke_log.cpp`: Smoke logging helper implementation.
 - `smoke_script_directive.h`: Parsed smoke-script directive/value definitions.

@@ -14,7 +14,9 @@ namespace
 constexpr float k_mild_weather_heat = 15.0f;
 constexpr float k_mild_weather_wind = 10.0f;
 constexpr float k_mild_weather_dust = 5.0f;
-constexpr double k_phase_duration_minutes = 5.0;
+constexpr double k_event_ramp_up_minutes = 5.0;
+constexpr double k_event_peak_hold_minutes = 5.0;
+constexpr double k_event_ramp_down_minutes = 5.0;
 constexpr float k_weather_epsilon = 0.0001f;
 constexpr float k_weather_transition_rate_per_second = 2.4f;
 constexpr double k_min_wave_delay_minutes = 4.0;
@@ -43,24 +45,6 @@ void apply_site_weather(
     weather.weather_dust = dust;
     weather.weather_wind_direction_degrees = wind_direction_degrees;
     context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
-}
-
-float resolve_phase_pressure(EventPhase phase)
-{
-    switch (phase)
-    {
-    case EventPhase::Warning:
-        return 0.0f;
-    case EventPhase::Build:
-        return 0.5f;
-    case EventPhase::Peak:
-        return 1.0f;
-    case EventPhase::Decay:
-    case EventPhase::Aftermath:
-        return 0.3f;
-    default:
-        return 0.0f;
-    }
 }
 
 float resolve_weather_lerp_factor(double fixed_step_seconds) noexcept
@@ -124,21 +108,6 @@ void smooth_site_weather_toward(
             lerp_factor));
 }
 
-double resolve_phase_duration_minutes(EventPhase phase) noexcept
-{
-    switch (phase)
-    {
-    case EventPhase::Warning:
-    case EventPhase::Build:
-    case EventPhase::Peak:
-    case EventPhase::Decay:
-    case EventPhase::Aftermath:
-        return k_phase_duration_minutes;
-    default:
-        return 0.0;
-    }
-}
-
 std::uint64_t hash_u64(std::uint64_t value) noexcept
 {
     value ^= value >> 33U;
@@ -173,61 +142,85 @@ float resolve_edge_base_wind_direction(SiteObjectiveTargetEdge edge) noexcept
     }
 }
 
-float resolve_phase_wind_direction(
-    const SiteSystemContext<WeatherEventSystem>& context,
-    EventPhase phase) noexcept
+bool has_active_event(const EventState& event) noexcept
+{
+    return event.active_event_template_id.has_value();
+}
+
+double resolve_peak_end_time_minutes(const EventState& event) noexcept
+{
+    const double peak_time = std::max(event.peak_time_minutes, event.start_time_minutes);
+    return peak_time + std::max(event.peak_duration_minutes, 0.0);
+}
+
+double resolve_end_time_minutes(const EventState& event) noexcept
+{
+    return std::max(event.end_time_minutes, resolve_peak_end_time_minutes(event));
+}
+
+float resolve_event_pressure_scale(
+    const EventState& event,
+    double world_time_minutes) noexcept
+{
+    if (!has_active_event(event))
+    {
+        return 0.0f;
+    }
+
+    const double start_time = event.start_time_minutes;
+    const double peak_time = std::max(event.peak_time_minutes, start_time);
+    const double peak_end_time = resolve_peak_end_time_minutes(event);
+    const double end_time = resolve_end_time_minutes(event);
+    if (world_time_minutes < start_time || end_time <= start_time)
+    {
+        return 0.0f;
+    }
+
+    if (world_time_minutes < peak_time)
+    {
+        const double rise_duration = std::max(peak_time - start_time, 0.0001);
+        return static_cast<float>(std::clamp(
+            (world_time_minutes - start_time) / rise_duration,
+            0.0,
+            1.0));
+    }
+
+    if (world_time_minutes < peak_end_time)
+    {
+        return 1.0f;
+    }
+
+    if (world_time_minutes < end_time)
+    {
+        const double fall_duration = std::max(end_time - peak_end_time, 0.0001);
+        return static_cast<float>(std::clamp(
+            1.0 - ((world_time_minutes - peak_end_time) / fall_duration),
+            0.0,
+            1.0));
+    }
+
+    return 0.0f;
+}
+
+float resolve_event_wind_direction(
+    const SiteSystemContext<WeatherEventSystem>& context) noexcept
 {
     const auto& objective = context.world.read_objective();
     if (objective.type == SiteObjectiveType::HighwayProtection)
     {
         const auto& event = context.world.read_event();
         const float edge_base = resolve_edge_base_wind_direction(objective.target_edge);
+        const auto wave_index = std::max(event.wave_sequence_index, 1U);
         const float random_offset =
             (normalized_hash(
                  context.world.site_attempt_seed() +
-                 static_cast<std::uint64_t>(event.wave_sequence_index + 1U) * 97ULL) *
+                 static_cast<std::uint64_t>(wave_index) * 97ULL) *
                 70.0f) -
             35.0f;
-        float phase_offset = 0.0f;
-        switch (phase)
-        {
-        case EventPhase::Warning:
-            phase_offset = -12.0f;
-            break;
-        case EventPhase::Build:
-            phase_offset = -4.0f;
-            break;
-        case EventPhase::Peak:
-            phase_offset = 11.0f;
-            break;
-        case EventPhase::Decay:
-            phase_offset = 4.0f;
-            break;
-        case EventPhase::Aftermath:
-            phase_offset = -7.0f;
-            break;
-        default:
-            break;
-        }
-
-        return normalize_wind_direction_degrees(edge_base + random_offset + phase_offset);
+        return normalize_wind_direction_degrees(edge_base + random_offset);
     }
 
-    switch (phase)
-    {
-    case EventPhase::Warning:
-        return 35.0f;
-    case EventPhase::Build:
-        return 52.0f;
-    case EventPhase::Peak:
-        return 74.0f;
-    case EventPhase::Decay:
-        return 58.0f;
-    case EventPhase::Aftermath:
-        return 41.0f;
-    default:
-        return 0.0f;
-    }
+    return 74.0f;
 }
 
 double resolve_next_wave_delay_minutes(
@@ -242,12 +235,28 @@ double resolve_next_wave_delay_minutes(
         (k_max_wave_delay_minutes - k_min_wave_delay_minutes) * static_cast<double>(sample);
 }
 
+void clear_event_timeline(EventState& event) noexcept
+{
+    event.active_event_template_id.reset();
+    event.start_time_minutes = 0.0;
+    event.peak_time_minutes = 0.0;
+    event.peak_duration_minutes = 0.0;
+    event.end_time_minutes = 0.0;
+    event.event_heat_pressure = 0.0f;
+    event.event_wind_pressure = 0.0f;
+    event.event_dust_pressure = 0.0f;
+}
+
 void start_next_wave(SiteSystemContext<WeatherEventSystem>& context)
 {
     auto& event = context.world.own_event();
+    const double world_time_minutes = context.world.read_time().world_time_minutes;
     event.active_event_template_id = EventTemplateId {1U};
-    event.event_phase = EventPhase::Warning;
-    event.phase_minutes_remaining = resolve_phase_duration_minutes(EventPhase::Warning);
+    event.start_time_minutes = world_time_minutes;
+    event.peak_time_minutes = world_time_minutes + k_event_ramp_up_minutes;
+    event.peak_duration_minutes = k_event_peak_hold_minutes;
+    event.end_time_minutes =
+        event.peak_time_minutes + event.peak_duration_minutes + k_event_ramp_down_minutes;
     event.minutes_until_next_wave = 0.0;
     event.aftermath_relief_resolved = 0.0f;
     event.wave_sequence_index += 1U;
@@ -272,7 +281,7 @@ Gs1Status WeatherEventSystem::process_message(
     auto& weather = context.world.own_weather();
     auto& event = context.world.own_event();
     const auto& objective = context.world.read_objective();
-    if (event.event_phase != EventPhase::None)
+    if (has_active_event(event))
     {
         return GS1_STATUS_OK;
     }
@@ -298,38 +307,19 @@ Gs1Status WeatherEventSystem::process_message(
     return GS1_STATUS_OK;
 }
 
-namespace
-{
-EventPhase advance_phase(EventPhase current) noexcept
-{
-    switch (current)
-    {
-    case EventPhase::Warning:
-        return EventPhase::Build;
-    case EventPhase::Build:
-        return EventPhase::Peak;
-    case EventPhase::Peak:
-        return EventPhase::Decay;
-    case EventPhase::Decay:
-        return EventPhase::Aftermath;
-    default:
-        return EventPhase::Aftermath;
-    }
-}
-}  // namespace
-
 void WeatherEventSystem::run(SiteSystemContext<WeatherEventSystem>& context)
 {
     const double step_minutes =
         runtime_minutes_from_real_seconds(context.fixed_step_seconds);
     auto& event = context.world.own_event();
     const auto& objective = context.world.read_objective();
-    if (event.event_phase == EventPhase::None ||
-        !event.active_event_template_id.has_value())
+    const double world_time_minutes = context.world.read_time().world_time_minutes;
+    if (!has_active_event(event))
     {
+        clear_event_timeline(event);
         if (objective.type == SiteObjectiveType::HighwayProtection &&
             objective.time_limit_minutes > 0.0 &&
-            context.world.read_time().world_time_minutes < objective.time_limit_minutes)
+            world_time_minutes < objective.time_limit_minutes)
         {
             event.minutes_until_next_wave =
                 std::max(0.0, event.minutes_until_next_wave - step_minutes);
@@ -343,51 +333,37 @@ void WeatherEventSystem::run(SiteSystemContext<WeatherEventSystem>& context)
         return;
     }
 
-    const auto previous_phase = event.event_phase;
     const auto previous_template_id = event.active_event_template_id;
-
-    event.phase_minutes_remaining -= step_minutes;
-    if (event.phase_minutes_remaining <= 0.0)
+    const double end_time_minutes = resolve_end_time_minutes(event);
+    if (world_time_minutes >= end_time_minutes)
     {
-        if (event.event_phase == EventPhase::Aftermath)
+        clear_event_timeline(event);
+        if (objective.type == SiteObjectiveType::HighwayProtection &&
+            objective.time_limit_minutes > 0.0 &&
+            world_time_minutes < objective.time_limit_minutes)
         {
-            event.event_phase = EventPhase::None;
-            event.phase_minutes_remaining = 0.0;
-            event.active_event_template_id.reset();
-            if (objective.type == SiteObjectiveType::HighwayProtection &&
-                objective.time_limit_minutes > 0.0 &&
-                context.world.read_time().world_time_minutes < objective.time_limit_minutes)
-            {
-                event.minutes_until_next_wave =
-                    resolve_next_wave_delay_minutes(context, event.wave_sequence_index);
-            }
-            event.event_heat_pressure = 0.0f;
-            event.event_wind_pressure = 0.0f;
-            event.event_dust_pressure = 0.0f;
-            event.aftermath_relief_resolved = 1.0f;
-            context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
+            event.minutes_until_next_wave =
+                resolve_next_wave_delay_minutes(context, event.wave_sequence_index);
         }
-        else
-        {
-            event.event_phase = advance_phase(event.event_phase);
-            event.phase_minutes_remaining = resolve_phase_duration_minutes(event.event_phase);
-        }
+        event.aftermath_relief_resolved = 1.0f;
+        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
+        smooth_site_weather_toward(context, 0.0f, 0.0f, 0.0f, 0.0f);
+        return;
     }
 
-    const float pressure_scale = resolve_phase_pressure(event.event_phase);
+    const float pressure_scale = resolve_event_pressure_scale(event, world_time_minutes);
     event.event_heat_pressure = k_mild_weather_heat * pressure_scale;
     event.event_wind_pressure = k_mild_weather_wind * pressure_scale;
     event.event_dust_pressure = k_mild_weather_dust * pressure_scale;
-    if (event.event_phase != previous_phase ||
-        event.active_event_template_id != previous_template_id)
+    if (event.active_event_template_id != previous_template_id)
     {
         context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
     }
     smooth_site_weather_toward(
         context,
-        k_mild_weather_heat * pressure_scale,
-        k_mild_weather_wind * pressure_scale,
-        k_mild_weather_dust * pressure_scale,
-        resolve_phase_wind_direction(context, event.event_phase));
+        event.event_heat_pressure,
+        event.event_wind_pressure,
+        event.event_dust_pressure,
+        resolve_event_wind_direction(context));
 }
 }  // namespace gs1

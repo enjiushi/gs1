@@ -145,27 +145,6 @@ const char* site_state_name(Gs1SiteState site_state)
     }
 }
 
-const char* weather_phase_name(Gs1WeatherEventPhase phase)
-{
-    switch (phase)
-    {
-    case GS1_WEATHER_EVENT_PHASE_NONE:
-        return "NONE";
-    case GS1_WEATHER_EVENT_PHASE_WARNING:
-        return "WARNING";
-    case GS1_WEATHER_EVENT_PHASE_BUILD:
-        return "BUILD";
-    case GS1_WEATHER_EVENT_PHASE_PEAK:
-        return "PEAK";
-    case GS1_WEATHER_EVENT_PHASE_DECAY:
-        return "DECAY";
-    case GS1_WEATHER_EVENT_PHASE_AFTERMATH:
-        return "AFTERMATH";
-    default:
-        return "UNKNOWN";
-    }
-}
-
 const char* site_attempt_result_name(Gs1SiteAttemptResult result)
 {
     switch (result)
@@ -576,10 +555,14 @@ void append_site_weather_json(std::string& json, const SmokeEngineHost::SiteSnap
     json += std::to_string(weather.wind_direction_degrees);
     json += ",\"eventTemplateId\":";
     json += std::to_string(weather.event_template_id);
-    json += ",\"eventPhase\":";
-    append_json_string(json, weather_phase_name(weather.event_phase));
-    json += ",\"phaseMinutesRemaining\":";
-    json += std::to_string(weather.phase_minutes_remaining);
+    json += ",\"eventStartTimeMinutes\":";
+    json += std::to_string(weather.event_start_time_minutes);
+    json += ",\"eventPeakTimeMinutes\":";
+    json += std::to_string(weather.event_peak_time_minutes);
+    json += ",\"eventPeakDurationMinutes\":";
+    json += std::to_string(weather.event_peak_duration_minutes);
+    json += ",\"eventEndTimeMinutes\":";
+    json += std::to_string(weather.event_end_time_minutes);
     json += '}';
 }
 

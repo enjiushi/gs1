@@ -44,6 +44,6 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `task_board_system.h`: Task board system interface.
 - `task_board_system.cpp`: Manages board listings, acceptance, completion, and reset flow, keeping the authored site-one task on dense-restoration sites only.
 - `weather_event_system.h`: Weather event system interface.
-- `weather_event_system.cpp`: Applies incoming weather events to site-owned weather/event state, including fixed-step-derived event countdowns and recurring one-sided highway-protection waves.
+- `weather_event_system.cpp`: Applies incoming weather events to site-owned weather/event state, including start/peak/end timeline interpolation and recurring one-sided highway-protection waves.
 - `worker_condition_system.h`: Worker condition system interface.
 - `worker_condition_system.cpp`: Updates worker condition and related penalties/recovery.

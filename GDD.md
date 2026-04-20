@@ -891,26 +891,23 @@ Limits:
 - back-to-back extreme events or authored wave sequences should be rare and mainly reserved for the fourth-site proof case or later high-tier campaign pressure
 - `CompoundFront` can be used as a capstone late-wave pressure spike if needed, but it should remain uncommon enough that it feels memorable rather than routine
 
-#### Event Phase Contract
+#### Event Timeline Contract
 
-Every extreme event should move through the same phase model:
+Every extreme event should use the same four timeline markers:
 
-| `eventState` | Purpose | Behavior |
+| Field | Purpose | Behavior |
 |---|---|---|
-| `Inactive` | No active extreme event | Weather comes only from baseline curve and minor gust noise |
-| `Warning` | Forecasted approach window | No large direct modifier yet; player receives warning and prep time |
-| `Build` | Pressure begins rising | Work becomes riskier, visibility may start dropping, and exposed zones start taking meaningful pressure |
-| `Peak` | Main danger window | Strongest modifiers, strongest burial or hydration punishment, and the most dangerous field-work window |
-| `Decay` | Event is weakening | Still dangerous, but the player can begin broader recovery actions |
-| `Aftermath` | Lingering site disruption | Lower ambient pressure than peak, but burial, damage, morale hit, and repair backlog remain |
+| `startTime` | First event influence minute | Event pressure is `0` before this point |
+| `peakTime` | Minute the event reaches full force | Pressure linearly interpolates from `0` to full strength between `startTime` and `peakTime` |
+| `peakDuration` | Full-force hold window | Pressure stays at full strength from `peakTime` through `peakTime + peakDuration` |
+| `endTime` | Final event influence minute | Pressure linearly interpolates back to `0` between `peakTime + peakDuration` and `endTime` |
 
 Duration targets:
 
-- `Warning`: `60-180` in-game minutes
-- `Build`: `30-90` in-game minutes
-- `Peak`: `30-120` in-game minutes
-- `Decay`: `30-90` in-game minutes
-- `Aftermath`: `60-240` in-game minutes
+- `startTime -> peakTime`: usually `30-90` in-game minutes
+- `peakDuration`: usually `30-120` in-game minutes
+- `peakTime + peakDuration -> endTime`: usually `30-120` in-game minutes
+- any lingering repair or relief consequences should come from the aftermath state the event leaves behind, not from a separate weather phase enum
 
 #### Forecast Contract
 
@@ -2126,7 +2123,7 @@ Density resolution rule:
 - if the plant is currently above its `salinityDensityCap`, density should fall until it returns to what that tile can support
 - low-density plants should be the most fragile stage
 - dense established plants should hold more steadily under normal pressure
-- peak-phase events should increase plant danger mainly by pushing the weather meters higher, not by bypassing the meter model with a separate direct plant-damage rule
+- peak-intensity windows should increase plant danger mainly by pushing the weather meters higher, not by bypassing the meter model with a separate direct plant-damage rule
 
 Placement rule:
 
@@ -2179,7 +2176,7 @@ A tile is eligible only if all of these are true:
 - the source tile is not badly buried
 - the source tile has enough water, fertility, and protection to count as locally stable
 - the current salinity situation still allows strong density for that plant
-- the current extreme hazard phase is not `Peak`
+- the current extreme hazard timeline intensity is below its peak hold window
 
 Candidate target rules:
 
@@ -4355,9 +4352,9 @@ This summary should include only core runtime meters and the core plant-side val
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `eventHeatPressure` | Current event archetype, current event phase, `eventTier` | `weatherHeat` | Event-side heat channel. When no harsh event is active, this should sit at or near `0`. |
-| `eventWindPressure` | Current event archetype, current event phase, `eventTier` | `weatherWind` | Event-side wind channel. |
-| `eventDustPressure` | Current event archetype, current event phase, `eventTier` | `weatherDust` | Event-side dust channel. |
+| `eventHeatPressure` | Current event archetype, current event timeline intensity, `eventTier` | `weatherHeat` | Event-side heat channel. When no harsh event is active, this should sit at or near `0`. |
+| `eventWindPressure` | Current event archetype, current event timeline intensity, `eventTier` | `weatherWind` | Event-side wind channel. |
+| `eventDustPressure` | Current event archetype, current event timeline intensity, `eventTier` | `weatherDust` | Event-side dust channel. |
 
 ### Weather Meter Relationships
 

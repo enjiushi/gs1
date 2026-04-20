@@ -22,7 +22,8 @@ struct CampDurabilityMemory final
 constexpr float k_camp_durability_max = 100.0f;
 constexpr float k_base_wear_per_second = 0.01f;
 constexpr float k_weather_wear_scale = 0.00075f;
-constexpr float k_event_phase_wear_per_second = 0.04f;
+constexpr float k_event_timeline_wear_per_second = 0.04f;
+constexpr float k_peak_event_pressure_total = 30.0f;
 constexpr float k_durability_dirty_threshold = 0.25f;
 
 constexpr float k_protection_threshold = 70.0f;
@@ -36,28 +37,13 @@ float compute_weather_intensity(const WeatherState& weather) noexcept
     return weather.weather_heat + weather.weather_wind + weather.weather_dust;
 }
 
-float resolve_event_phase_scale(EventPhase phase) noexcept
+float compute_event_pressure_ratio(const EventState& event) noexcept
 {
-    switch (phase)
-    {
-    case EventPhase::Warning:
-        return 0.25f;
-    case EventPhase::Build:
-        return 0.5f;
-    case EventPhase::Peak:
-        return 1.0f;
-    case EventPhase::Decay:
-        return 0.5f;
-    case EventPhase::Aftermath:
-        return 0.1f;
-    default:
-        return 0.0f;
-    }
-}
-
-float compute_event_phase_wear(EventPhase phase) noexcept
-{
-    return k_event_phase_wear_per_second * resolve_event_phase_scale(phase);
+    const float total_pressure =
+        std::max(event.event_heat_pressure, 0.0f) +
+        std::max(event.event_wind_pressure, 0.0f) +
+        std::max(event.event_dust_pressure, 0.0f);
+    return std::clamp(total_pressure / k_peak_event_pressure_total, 0.0f, 1.0f);
 }
 
 void refresh_memory_with_current_state(SiteSystemContext<CampDurabilitySystem>& context)
@@ -145,7 +131,8 @@ void CampDurabilitySystem::run(SiteSystemContext<CampDurabilitySystem>& context)
     const float wear_rate_per_second =
         k_base_wear_per_second +
         compute_weather_intensity(context.world.read_weather()) * k_weather_wear_scale +
-        compute_event_phase_wear(context.world.read_event().event_phase);
+        (k_event_timeline_wear_per_second *
+            compute_event_pressure_ratio(context.world.read_event()));
     const float wear_amount = wear_rate_per_second * step_seconds;
     const float previous = camp.camp_durability;
     camp.camp_durability =

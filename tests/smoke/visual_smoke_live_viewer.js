@@ -580,9 +580,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             weather && typeof weather.windDirectionDegrees === "number"
                 ? Math.round(weather.windDirectionDegrees)
                 : 0;
-        const eventPhase = weather && weather.eventPhase ? weather.eventPhase : "NONE";
+        const eventTemplateId =
+            weather && typeof weather.eventTemplateId === "number"
+                ? weather.eventTemplateId
+                : 0;
         const weatherBrief = "Wind " + wind + " @" + windDirection + "deg  |  Dust " + dust +
-            (eventPhase !== "NONE" ? ("  |  " + eventPhase) : "");
+            (eventTemplateId !== 0 ? ("  |  Event " + eventTemplateId) : "");
 
         switch (warningCode) {
         case hudWarningCodes.windWatch:
@@ -1858,11 +1861,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const hydration = hud ? Math.round(hud.playerHydration) : 0;
         const energy = hud ? Math.round(hud.playerEnergy) : 0;
         const completion = hud ? Math.round((hud.siteCompletionNormalized || 0) * 100) : 0;
-        const eventPhase = weather ? weather.eventPhase : "NONE";
         const weatherHeat = weather ? Math.round(weather.heat || 0) : 0;
         const weatherWind = weather ? Math.round(weather.wind || 0) : 0;
         const weatherDust = weather ? Math.round(weather.dust || 0) : 0;
         const windDirection = weather ? Math.round(weather.windDirectionDegrees || 0) : 0;
+        const eventTemplateId = weather ? Math.round(weather.eventTemplateId || 0) : 0;
+        const eventStartTime = weather ? Math.round(weather.eventStartTimeMinutes || 0) : 0;
+        const eventPeakTime = weather ? Math.round(weather.eventPeakTimeMinutes || 0) : 0;
+        const eventPeakDuration = weather ? Math.round(weather.eventPeakDurationMinutes || 0) : 0;
+        const eventEndTime = weather ? Math.round(weather.eventEndTimeMinutes || 0) : 0;
 
         statusChip.textContent =
             "Site Live\nHydration " + hydration +
@@ -1872,7 +1879,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             "\nWind " + weatherWind +
             "\nBearing " + windDirection + "deg" +
             "\nDust " + weatherDust +
-            "\nEvent " + eventPhase +
+            "\nEvent " + eventTemplateId +
+            "\nTimeline " + eventStartTime + "-" + eventPeakTime + "+" + eventPeakDuration + "-" + eventEndTime +
             "\nAlert " + warning.headline +
             "\nSeeds " + carriedSeeds.reduce((total, seed) => total + seed.quantity, 0) +
             "\nAction " + getSiteActionLabel(workerActionKind) +
