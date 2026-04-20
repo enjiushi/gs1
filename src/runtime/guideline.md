@@ -12,7 +12,7 @@ Core runtime services that drive fixed-step execution, queue dispatch, clocks, a
 - `engine_message_queue.h`: Queue helpers for engine-originated messages entering gameplay.
 - `fixed_step_runner.h`: Fixed-timestep runner used by the runtime update loop.
 - `game_runtime.h`: Main runtime type declarations and update entry points.
-- `game_runtime.cpp`: Runtime loop implementation, integration wiring, projected engine/HUD message emission, authoritative phone panel state plus phone listing projection emission, regional-map support previews, and regional-map faction tech-tree UI projection.
+- `game_runtime.cpp`: Runtime loop implementation, integration wiring, projected engine/HUD message emission, authoritative phone panel state plus phone listing projection emission, site-result `OK` return action projection, regional-map support previews, and regional-map faction tech-tree UI projection.
 - `id_allocator.h`: Lightweight runtime ID allocation helpers.
 - `message_queue.h`: Internal gameplay message queue declarations.
 - `random_service.h`: Runtime random-number service/state wrapper.

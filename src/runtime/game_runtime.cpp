@@ -1954,7 +1954,7 @@ void GameRuntime::queue_site_result_ui_messages(std::uint32_t site_id, Gs1SiteAt
         GS1_UI_ELEMENT_BUTTON,
         GS1_UI_ELEMENT_FLAG_PRIMARY,
         return_action,
-        "Return To Regional Map");
+        "OK");
 
     queue_ui_setup_end_message();
 }

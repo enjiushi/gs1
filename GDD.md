@@ -339,6 +339,9 @@ Core UI rules:
 - planting, device placement, repair, watering, burial clearing, and similar explicit field-work choices should use one shared field-actions panel rather than multiple permanent build, plant, and utility panels
 - crafting should stay contextual to the `Field Workshop` and should not become a globally available full-screen system in the current stage
 - full-screen planning UI and pause/system UI should pause time
+- when a site ends in success or failure, the player should immediately see a dedicated result panel from that shared modal family instead of remaining in an unresolved site-play state
+- the site-result panel should show a clear outcome title and one primary `OK` action
+- pressing `OK` should always leave the result panel and return the player to the `Regional Map`
 
 Current-stage simplification rules:
 
@@ -1167,6 +1170,12 @@ The current mode set is:
 - `Highway Protection`: one map edge contains traversable non-plantable highway tiles. Those tiles reuse the existing per-tile ecology meters, but the fertility-side meter should represent local sand-cover percentage instead of soil quality. The site tracks the average sand cover across all highway tiles. If that average reaches the authored target, the site is lost immediately. If the player keeps the average below the target until the site time limit expires, the site is completed.
 - `Green Wall Connection`: two authored or procedurally generated planted regions start on opposite sides of the site with a protection band behind them. The player camp starts between them. The player must connect the two planted sides, then keep the protection band from gaining further sand long enough for a completion countdown to finish. If sand starts increasing again, that countdown resets. While the completion countdown is running, the main site time-limit countdown pauses. This mode is design-locked now but remains a later implementation step.
 - `Pure Survival`: the player must survive until the site time limit expires. If player health reaches zero before then, the site is lost. This mode is design-locked now but remains a later implementation step.
+
+Site-result flow contract for all objective modes:
+
+- as soon as the runtime decides that a site has completed or failed, gameplay should transition into a dedicated `Site Result` state instead of leaving the player in an interactable site-play state
+- that state should present a result panel with the objective outcome and any immediate summary we want to expose, such as newly revealed nearby sites
+- the result panel should expose one primary `OK` action, and confirming `OK` should return the player to the `Regional Map`
 
 Current prototype content assignment:
 

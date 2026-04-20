@@ -845,6 +845,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return state.siteState || null;
     }
 
+    function getSiteResult(state) {
+        return state.siteResult || null;
+    }
+
     function getActiveSiteName(state) {
         const siteBootstrap = getSiteBootstrap(state);
         if (siteBootstrap && typeof siteBootstrap.siteId === "number") {
@@ -2291,6 +2295,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function clearSelectionInventory() {
+        selectionInventory.classList.remove("site-result-actions");
         selectionInventory.hidden = true;
         selectionInventory.innerHTML = "";
         hideInventoryTooltip();
@@ -3900,6 +3905,69 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         contextActions.innerHTML = "";
     }
 
+    function renderSiteResultOverlay(state) {
+        const resultSetup = getSetup(state, "SITE_RESULT");
+        const labels = getLabelElements(resultSetup);
+        const actions = getVisibleActionElements(resultSetup);
+        const siteResult = getSiteResult(state);
+        const primaryLabel = labels.length > 0 ? labels[0].text : "";
+        const resultCompleted = !!siteResult && siteResult.result === "COMPLETED";
+        const resultLine =
+            primaryLabel ||
+            (siteResult
+                ? ("Site " + siteResult.siteId + " " + (resultCompleted ? "completed" : "failed"))
+                : "Site result ready");
+        const revealCount =
+            siteResult && typeof siteResult.newlyRevealedSiteCount === "number"
+                ? siteResult.newlyRevealedSiteCount
+                : 0;
+
+        menuPanel.hidden = true;
+        selectionChip.hidden = false;
+        selectionEyebrow.textContent = resultCompleted ? "Mission Success" : "Mission Failed";
+        selectionText.hidden = false;
+        selectionText.textContent = resultLine;
+        selectionInventory.classList.remove("site-result-actions");
+        selectionInventory.hidden = false;
+        selectionInventory.innerHTML = "";
+        renderStoragePanel(null, null);
+        contextActions.innerHTML = "";
+        actionProgress.hidden = true;
+        statusChip.textContent = "";
+
+        const summary = document.createElement("div");
+        summary.className = "site-result-summary";
+        summary.textContent =
+            revealCount > 0
+                ? ("Nearby survey updated. " + revealCount + " new route" + (revealCount === 1 ? " is" : "s are") + " now visible on the regional map.")
+                : "Field report logged. Confirm the result to return to the regional survey.";
+        selectionInventory.appendChild(summary);
+
+        const actionGroup = document.createElement("div");
+        actionGroup.className = "site-result-actions";
+        selectionInventory.appendChild(actionGroup);
+
+        actions.forEach((element) => {
+            let label = element.text || element.action.type;
+            if (element.action && element.action.type === "RETURN_TO_REGIONAL_MAP") {
+                label = "OK";
+            }
+
+            actionGroup.appendChild(
+                makeButton(
+                    label,
+                    function () {
+                        postJson("/ui-action", element.action).catch(() => {
+                            statusChip.textContent = "Failed to send UI action.";
+                        });
+                    },
+                    false,
+                    (element.flags & 2) !== 0
+                )
+            );
+        });
+    }
+
     function renderSiteOverlay(state) {
         const workerPackSlots = getInventorySlotsByKind(state, "WORKER_PACK");
 
@@ -3924,6 +3992,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         stageFrame.classList.toggle("main-menu-mode", state.appState === "MAIN_MENU");
         stageFrame.classList.toggle("regional-map-mode", state.appState === "REGIONAL_MAP");
         stageFrame.classList.toggle("site-active-mode", state.appState === "SITE_ACTIVE");
+        stageFrame.classList.toggle("site-result-mode", state.appState === "SITE_RESULT");
         const appStateChanged = lastOverlayAppState !== state.appState;
 
         switch (state.appState) {
@@ -3969,6 +4038,20 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             }
             renderSiteHudChrome(state);
             renderSiteOverlay(state);
+            break;
+        case "SITE_RESULT":
+            hudEyebrow.textContent = "App State";
+            hudTitle.textContent = state.appState || "NONE";
+            hudSubtitle.textContent = "The field report is in. Confirm the result and return to the regional survey.";
+            renderSiteVitalsPanel(null);
+            inventoryPanelOpen = false;
+            phonePanelOpen = false;
+            selectedInventorySlotKey = "";
+            openedInventoryContainerKey = "";
+            selectionChip.hidden = false;
+            selectionText.hidden = false;
+            clearSelectionInventory();
+            renderSiteResultOverlay(state);
             break;
         default:
             hudEyebrow.textContent = "App State";

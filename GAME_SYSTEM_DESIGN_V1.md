@@ -354,6 +354,7 @@ Rules:
 - `SiteActive` is the only state that runs fixed-step gameplay simulation
 - `SitePaused` freezes both fixed-step simulation and board refresh timers
 - `SiteResult` resolves success or failure and decides whether to return to `RegionalMap` or `CampaignEnd`
+- `SiteResult` must project a dedicated result UI surface with a clear success/failure label and one primary `OK` action that returns to `RegionalMap`
 
 ### 4.2 Campaign Flow State Machine
 
@@ -1381,6 +1382,13 @@ The begin/end fence defines one transactional UI setup batch for one semantic su
 - main menu
 - regional-map selection panel
 - site-result panel
+
+For the current prototype, the `site-result panel` contract is:
+
+- one label element describing the site outcome
+- one primary button element labeled `OK`
+- the `OK` button must emit the DLL-defined `RETURN_TO_REGIONAL_MAP` action token
+- adapters should treat this as the canonical way to leave `SiteResult`; the result surface should not strand the player in a non-interactable in-site presentation
 
 ### 12.2 Required UI View Models
 
