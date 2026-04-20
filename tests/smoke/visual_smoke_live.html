@@ -268,12 +268,16 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  width: fit-content;
+  padding: 8px 14px 8px 10px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(72, 156, 88, 0.95), rgba(40, 103, 56, 0.94));
+  border: 1px solid rgba(205, 176, 126, 0.34);
+  box-shadow: 0 12px 24px rgba(17, 48, 24, 0.22);
   font-size: 18px;
   font-weight: 700;
-  color: #63d27a;
-  text-shadow:
-    0 2px 4px rgba(34, 22, 10, 0.82),
-    0 6px 16px rgba(26, 18, 10, 0.42);
+  color: #d6b587;
+  text-shadow: none;
 }
 
 .site-vitals-money::before {
@@ -284,10 +288,10 @@ body {
   width: 22px;
   height: 22px;
   border-radius: 999px;
-  background: rgba(31, 23, 16, 0.82);
-  color: #f7d899;
+  background: rgba(214, 181, 135, 0.18);
+  color: #d6b587;
   font-size: 14px;
-  box-shadow: 0 8px 18px rgba(25, 17, 10, 0.28);
+  box-shadow: none;
 }
 
 .site-vitals-bars {
@@ -329,8 +333,8 @@ body {
 }
 
 .site-vitals-bar.health {
-  --site-meter-fill: #4f965b;
-  --site-meter-track: #203221;
+  --site-meter-fill: #c84f45;
+  --site-meter-track: #401a1a;
 }
 
 .site-vitals-bar.hydration {
@@ -344,8 +348,8 @@ body {
 }
 
 .site-vitals-bar.morale {
-  --site-meter-fill: #c45a48;
-  --site-meter-track: #3b1f1d;
+  --site-meter-fill: #8b6aa6;
+  --site-meter-track: #2f2338;
 }
 
 .center-layer {
@@ -2196,6 +2200,11 @@ body {
 
 .stage-frame.main-menu-mode .hud-row {
   justify-content: flex-end;
+}
+
+.stage-frame.main-menu-mode .site-vitals-panel,
+.stage-frame.regional-map-mode .site-vitals-panel {
+  display: none;
 }
 
 .stage-frame.main-menu-mode .hud-chip {
