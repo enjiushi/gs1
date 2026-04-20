@@ -568,6 +568,114 @@ void site_completion_highway_protection_completes_at_time_limit_when_cover_stays
         queue.front().payload_as<SiteAttemptEndedMessage>().result == GS1_SITE_ATTEMPT_RESULT_COMPLETED);
 }
 
+void site_completion_pure_survival_completes_at_time_limit(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(6U, 405U);
+    GameMessageQueue queue {};
+
+    configure_pure_survival_objective(site_run, 8.0);
+    site_run.clock.world_time_minutes = 8.0;
+
+    auto site_context = make_site_context<SiteCompletionSystem>(campaign, site_run, queue);
+    SiteCompletionSystem::run(site_context);
+
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::SiteAttemptEnded);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        queue.front().payload_as<SiteAttemptEndedMessage>().result == GS1_SITE_ATTEMPT_RESULT_COMPLETED);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.counters.objective_progress_normalized, 1.0f));
+}
+
+void site_completion_green_wall_completes_after_stable_hold_and_pauses_main_timer(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(7U, 406U);
+    GameMessageQueue queue {};
+
+    configure_green_wall_connection_objective(
+        site_run,
+        gs1::SiteObjectiveTargetEdge::East,
+        0.2,
+        0.4);
+    mark_objective_target_tile(site_run, TileCoord {5, 2});
+    mark_green_wall_connection_start_tile(site_run, TileCoord {1, 2});
+    mark_green_wall_connection_goal_tile(site_run, TileCoord {3, 2});
+    for (const TileCoord coord : {TileCoord {1, 2}, TileCoord {2, 2}, TileCoord {3, 2}})
+    {
+        auto tile = site_run.site_world->tile_at(coord);
+        tile.ecology.ground_cover_type_id = 1U;
+        tile.ecology.plant_density = 1.0f;
+        site_run.site_world->set_tile(coord, tile);
+    }
+
+    auto target_tile = site_run.site_world->tile_at(TileCoord {5, 2});
+    target_tile.ecology.sand_burial = 0.2f;
+    site_run.site_world->set_tile(TileCoord {5, 2}, target_tile);
+
+    auto site_context = make_site_context<SiteCompletionSystem>(campaign, site_run, queue);
+    site_run.clock.world_time_minutes = 0.2;
+    SiteCompletionSystem::run(site_context);
+    GS1_SYSTEM_TEST_CHECK(context, queue.empty());
+    GS1_SYSTEM_TEST_CHECK(context, site_run.objective.completion_hold_progress_minutes >= 0.19);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.objective.paused_main_timer_minutes >= 0.19);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.counters.objective_progress_normalized >= 0.74f);
+
+    site_run.clock.world_time_minutes = 0.4;
+    SiteCompletionSystem::run(site_context);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        queue.front().payload_as<SiteAttemptEndedMessage>().result == GS1_SITE_ATTEMPT_RESULT_COMPLETED);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.objective.paused_main_timer_minutes >= 0.39);
+}
+
+void site_completion_green_wall_resets_hold_when_target_band_worsens(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(7U, 407U);
+    GameMessageQueue queue {};
+
+    configure_green_wall_connection_objective(
+        site_run,
+        gs1::SiteObjectiveTargetEdge::East,
+        4.0,
+        0.6);
+    mark_objective_target_tile(site_run, TileCoord {5, 2});
+    mark_green_wall_connection_start_tile(site_run, TileCoord {1, 2});
+    mark_green_wall_connection_goal_tile(site_run, TileCoord {3, 2});
+    for (const TileCoord coord : {TileCoord {1, 2}, TileCoord {2, 2}, TileCoord {3, 2}})
+    {
+        auto tile = site_run.site_world->tile_at(coord);
+        tile.ecology.ground_cover_type_id = 1U;
+        tile.ecology.plant_density = 1.0f;
+        site_run.site_world->set_tile(coord, tile);
+    }
+
+    auto target_tile = site_run.site_world->tile_at(TileCoord {5, 2});
+    target_tile.ecology.sand_burial = 0.1f;
+    site_run.site_world->set_tile(TileCoord {5, 2}, target_tile);
+
+    auto site_context = make_site_context<SiteCompletionSystem>(campaign, site_run, queue);
+    site_run.clock.world_time_minutes = 0.2;
+    SiteCompletionSystem::run(site_context);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.objective.completion_hold_progress_minutes >= 0.19);
+
+    target_tile = site_run.site_world->tile_at(TileCoord {5, 2});
+    target_tile.ecology.sand_burial = 0.35f;
+    site_run.site_world->set_tile(TileCoord {5, 2}, target_tile);
+    site_run.clock.world_time_minutes = 0.4;
+    SiteCompletionSystem::run(site_context);
+
+    GS1_SYSTEM_TEST_CHECK(context, queue.empty());
+    GS1_SYSTEM_TEST_CHECK(context, site_run.objective.completion_hold_progress_minutes <= 0.001);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.counters.objective_progress_normalized <= 0.51f);
+}
+
 void failure_recovery_only_emits_when_worker_health_is_zero(gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
@@ -918,6 +1026,18 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "site_completion",
     "highway_protection_completes_at_time_limit_when_cover_stays_safe",
     site_completion_highway_protection_completes_at_time_limit_when_cover_stays_safe);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "site_completion",
+    "pure_survival_completes_at_time_limit",
+    site_completion_pure_survival_completes_at_time_limit);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "site_completion",
+    "green_wall_completes_after_stable_hold_and_pauses_main_timer",
+    site_completion_green_wall_completes_after_stable_hold_and_pauses_main_timer);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "site_completion",
+    "green_wall_resets_hold_when_target_band_worsens",
+    site_completion_green_wall_resets_hold_when_target_band_worsens);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "failure_recovery",
     "only_emits_when_worker_health_is_zero",

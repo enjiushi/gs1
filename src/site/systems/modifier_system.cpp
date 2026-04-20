@@ -1,6 +1,7 @@
 #include "site/systems/modifier_system.h"
 
 #include "campaign/campaign_state.h"
+#include "content/defs/technology_defs.h"
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
 
@@ -136,6 +137,56 @@ bool totals_match(const ModifierChannelTotals& lhs, const ModifierChannelTotals&
         std::fabs(lhs.work_efficiency - rhs.work_efficiency) <= k_modifier_change_epsilon;
 }
 
+bool contains_modifier_id(
+    const std::vector<ModifierId>& ids,
+    ModifierId id) noexcept
+{
+    return std::find(ids.begin(), ids.end(), id) != ids.end();
+}
+
+void append_modifier_if_present(
+    std::vector<ModifierId>& destination,
+    ModifierId id)
+{
+    if (id.value == 0U || contains_modifier_id(destination, id))
+    {
+        return;
+    }
+
+    destination.push_back(id);
+}
+
+void import_campaign_run_modifiers(
+    const CampaignState& campaign,
+    ModifierState& modifier_state)
+{
+    for (const auto& faction_progress : campaign.faction_progress)
+    {
+        if (!faction_progress.has_unlocked_assistant_package)
+        {
+            continue;
+        }
+
+        append_modifier_if_present(
+            modifier_state.active_run_modifier_ids,
+            ModifierId {faction_progress.unlocked_assistant_package_id});
+    }
+
+    for (const auto tech_node_id : campaign.technology_state.purchased_node_ids)
+    {
+        const auto* node_def = find_technology_node_def(tech_node_id);
+        if (node_def == nullptr ||
+            node_def->entry_kind != TechnologyEntryKind::Amplification)
+        {
+            continue;
+        }
+
+        append_modifier_if_present(
+            modifier_state.active_run_modifier_ids,
+            node_def->linked_modifier_id);
+    }
+}
+
 ModifierChannelTotals resolve_owned_totals(
     const ModifierState& modifier_state,
     const CampState& camp) noexcept
@@ -183,6 +234,7 @@ void handle_site_run_started(
         modifier_state.active_nearby_aura_modifier_ids.end(),
         aura_ids.begin(),
         aura_ids.end());
+    import_campaign_run_modifiers(context.campaign, modifier_state);
 
     resolve_modifier_totals(context);
 }

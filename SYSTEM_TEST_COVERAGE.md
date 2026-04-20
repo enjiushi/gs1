@@ -159,6 +159,13 @@ Implemented behavior coverage should verify:
 
 - The system emits `SiteAttemptEnded(COMPLETED)` once the fully-grown tile count
   meets the site threshold.
+- `Pure Survival` emits `SiteAttemptEnded(COMPLETED)` once the authored time
+  limit expires.
+- `Green Wall Connection` completes only after a connected planted path is
+  established and the target protection band stays stable for the authored hold
+  duration.
+- `Green Wall Connection` resets its hold countdown if target-band sand rises
+  again, and its main objective timer pauses while the hold countdown is active.
 - It does not emit when the run is not active, when the threshold is zero, when
   progress is below threshold, or when a pending site transition message already
   exists.
@@ -286,8 +293,10 @@ Implemented behavior coverage should verify:
 
 Implemented behavior coverage should verify:
 
-- The system currently subscribes to no messages and `process_message()` is a
-  no-op.
+- The system subscribes to `TileEcologyChanged`, `SiteDevicePlaced`,
+  `SiteDeviceBroken`, and `SiteDeviceRepaired`.
+- Ecology and shelter-device changes queue local-weather neighborhood refreshes
+  through `process_message()`.
 - `run()` writes per-tile local heat, wind, and dust from site weather plus
   occupant-density/cover adjustments.
 - Covered tiles reduce wind and dust relative to exposed tiles.
@@ -321,8 +330,11 @@ Implemented behavior coverage should verify:
 
 Implemented behavior coverage should verify:
 
-- The system currently subscribes to no messages and `process_message()` is a
-  no-op.
+- The system subscribes to `SiteDevicePlaced` and `SiteDeviceRepaired`.
+- `SiteDevicePlaced` seeds placed-device footprint tiles with the new structure
+  and full integrity.
+- `SiteDeviceRepaired` restores the existing structure footprint to full
+  integrity.
 - Weather intensity and sand burial reduce device integrity over time.
 - Integrity clamps at zero and one.
 - Devices without a structure id are ignored.
@@ -346,7 +358,8 @@ Implemented behavior coverage should verify:
 Implemented behavior coverage should verify:
 
 - `SiteRunStarted` clears modifier state, imports nearby aura modifiers from the
-  campaign loadout planner, and resolves totals.
+  campaign loadout planner, imports unlocked assistant packages plus purchased
+  technology amplification modifiers, and resolves totals.
 - `run()` recomputes totals from nearby auras, run modifiers, and camp comfort.
 - Channel totals clamp to the configured range.
 - Projection dirty flags are raised when resolved totals change.

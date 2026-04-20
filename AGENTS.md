@@ -43,6 +43,7 @@ This file is a quick orientation guide for agents working in this repository.
 - `GAME_STRUCTURE.md`: High-level gameplay/runtime structure notes.
 - `GAME_SYSTEM_DESIGN_V1.md`: System design reference, including directional local-weather resolution responsibilities and staged site-objective implementation notes.
 - `SYSTEM_DESIGN_STATUS.md`: Current system status and implementation tracking, including site-objective readiness notes.
+- `SYSTEM_TEST_COVERAGE.md`: Per-system automated coverage expectations, including placeholder-versus-implemented test scope for campaign, site, and runtime behavior.
 - `CONTENT_AUTHORING_CONTRACT.md`: Content authoring contract and data expectations.
 - `MISSING_DEFINITION_DESCRIPTIONS.md`: Notes for definitions that still need descriptions.
 
