@@ -28,20 +28,20 @@ This file is a quick orientation guide for agents working in this repository.
 - `include/gs1/status.h`: Public status/result codes.
 - `include/gs1/types.h`: Public API data types, message/event payload structs, and runtime-facing enums.
 - `src/app/`: Runtime bootstrap, API glue, scene coordination, and campaign/site factory entry points.
-- `src/campaign/`: Campaign state and campaign-level systems such as flow, loadout planning, regional support, and technology.
+- `src/campaign/`: Campaign state and campaign-level systems such as flow, dedicated campaign time progression, loadout planning, regional support, and technology.
 - `src/messages/`: Internal game message IDs, payloads, handlers, and dispatcher.
 - `src/content/`: Prototype content database, loader/validator shells, and content definition types, including authored wind-shelter plant stats.
 - `src/events/`: Translated engine feedback event types. Internal gameplay cross-system messages should use `GameMessage`, not runtime gameplay events.
 - `src/runtime/`: Core runtime loop, fixed-step runner, host-event dispatch plus transient phase-control handling, message queues, random service, and engine message emission.
-- `src/site/`: Active site-run state and site systems for actions, weather, ecology, directional local wind shelter, inventory, economy, task board, camp durability, and completion/failure flow.
+- `src/site/`: Active site-run state and site systems for dedicated site time progression, actions, weather, ecology, directional local wind shelter, inventory, economy, task board, camp durability, and completion/failure flow.
 - `src/support/`: Shared support types such as typed IDs.
 - `src/ui/`: View-model and presenter state for HUD, phone, notifications, inspection, regional map, and UI presentation.
 - `tests/smoke/`: Smoke host, runtime DLL loader, script runner, live-state JSON, live HTTP server, and visual smoke UI.
 - `tests/smoke/scripts/`: Scripted smoke-test scenarios.
 - `scripts/`: PowerShell build and smoke-test helpers.
-- `GDD.md`: Game design document, including the directional wind-shadow and plant-footprint shelter rules plus the staged four-mode site-objective direction.
+- `GDD.md`: Game design document, including the directional wind-shadow and plant-footprint shelter rules, the staged four-mode site-objective direction, and the 30-real-minute in-game day timing contract.
 - `GAME_STRUCTURE.md`: High-level gameplay/runtime structure notes.
-- `GAME_SYSTEM_DESIGN_V1.md`: System design reference, including directional local-weather resolution responsibilities and staged site-objective implementation notes.
+- `GAME_SYSTEM_DESIGN_V1.md`: System design reference, including directional local-weather resolution responsibilities, staged site-objective implementation notes, and the canonical fixed-step time conversion rules that keep one in-game day at 30 real-time minutes.
 - `SYSTEM_DESIGN_STATUS.md`: Current system status and implementation tracking, including site-objective readiness notes.
 - `CONTENT_AUTHORING_CONTRACT.md`: Content authoring contract and data expectations.
 - `MISSING_DEFINITION_DESCRIPTIONS.md`: Notes for definitions that still need descriptions.

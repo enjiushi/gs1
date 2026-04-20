@@ -16,4 +16,4 @@ Core runtime services that drive fixed-step execution, queue dispatch, clocks, a
 - `id_allocator.h`: Lightweight runtime ID allocation helpers.
 - `message_queue.h`: Internal gameplay message queue declarations.
 - `random_service.h`: Runtime random-number service/state wrapper.
-- `runtime_clock.h`: Runtime clock/timing value helpers.
+- `runtime_clock.h`: Canonical runtime day-length constants plus real-seconds-to-in-game-minutes conversion helpers.

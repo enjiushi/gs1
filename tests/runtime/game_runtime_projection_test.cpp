@@ -1,4 +1,5 @@
 #include "runtime/game_runtime.h"
+#include "runtime/runtime_clock.h"
 #include "content/defs/faction_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/technology_defs.h"
@@ -24,6 +25,9 @@ using gs1::StartNewCampaignMessage;
 using gs1::StartSiteAttemptMessage;
 using gs1::TaskAcceptRequestedMessage;
 using gs1::TileCoord;
+
+constexpr double k_default_delivery_real_seconds =
+    (30.0 / gs1::k_runtime_minutes_per_real_second) + (1.0 / 60.0);
 }
 
 namespace gs1
@@ -682,7 +686,7 @@ int main()
         1001U));
 
     Gs1Phase1Result delivery_result {};
-    run_phase1(runtime, 3.0, delivery_result);
+    run_phase1(runtime, k_default_delivery_real_seconds, delivery_result);
     const auto delivered_slot_index = find_delivery_box_slot_index(
         bootstrap_site_run,
         gs1::ItemId {gs1::k_item_water_container},
@@ -759,7 +763,7 @@ int main()
     drain_engine_messages(phone_panel_runtime);
 
     Gs1Phase1Result phone_panel_delivery_result {};
-    run_phase1(phone_panel_runtime, 3.0, phone_panel_delivery_result);
+    run_phase1(phone_panel_runtime, k_default_delivery_real_seconds, phone_panel_delivery_result);
     const auto delivered_sellable_slot_index = find_delivery_box_slot_index(
         phone_panel_site_run,
         gs1::ItemId {gs1::k_item_saltbush_seed_bundle},

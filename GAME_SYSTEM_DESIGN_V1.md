@@ -627,8 +627,11 @@ deliveryAccumulator
 
 Rules:
 
-- fixed simulation step is `0.25` real seconds
-- each simulation step advances `0.2` in-game minutes
+- `1` in-game day is `1440` in-game minutes and must resolve in `30` real-time minutes
+- canonical time conversion is `0.8` in-game minutes per real second
+- recommended fixed simulation step is `0.25` real seconds
+- each simulation step advances `fixedStepSeconds * 0.8` in-game minutes
+- at the recommended `0.25` second step, that is `0.2` in-game minutes
 - `ecologyPulseAccumulator` triggers every `10` in-game minutes
 - `taskRefreshAccumulator` uses the authored or tuned board refresh interval
 - `deliveryAccumulator` is used for the `30` minute delivery arrival rule

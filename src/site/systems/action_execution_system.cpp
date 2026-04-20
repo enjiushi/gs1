@@ -4,6 +4,7 @@
 #include "content/defs/item_defs.h"
 #include "content/defs/plant_defs.h"
 #include "content/defs/structure_defs.h"
+#include "runtime/runtime_clock.h"
 #include "site/device_interaction_logic.h"
 #include "site/craft_logic.h"
 #include "site/defs/site_action_defs.h"
@@ -23,7 +24,6 @@ namespace gs1
 namespace
 {
 constexpr double k_minimum_action_duration_minutes = 0.25;
-constexpr double k_action_minutes_per_real_second = 0.8;
 constexpr float k_repair_integrity_full = 1.0f;
 constexpr float k_repair_integrity_epsilon = 0.0001f;
 constexpr float k_minimum_action_progress_scale = 0.35f;
@@ -670,7 +670,7 @@ double action_elapsed_minutes_for_step(
     const ActionState& action_state) noexcept
 {
     return std::max(0.0, context.fixed_step_seconds) *
-        k_action_minutes_per_real_second *
+        k_runtime_minutes_per_real_second *
         static_cast<double>(resolve_action_progress_scale(context, action_state));
 }
 

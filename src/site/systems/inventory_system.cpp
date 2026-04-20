@@ -4,6 +4,7 @@
 #include "content/defs/craft_recipe_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/structure_defs.h"
+#include "runtime/runtime_clock.h"
 #include "site/craft_logic.h"
 #include "site/defs/site_action_defs.h"
 #include "site/device_interaction_logic.h"
@@ -22,7 +23,6 @@ namespace gs1
 namespace
 {
 constexpr double k_default_delivery_minutes = 30.0;
-constexpr double k_site_minutes_per_step = 0.2;
 constexpr std::uint32_t k_delivery_box_storage_flags =
     inventory_storage::k_inventory_storage_flag_delivery_box |
     inventory_storage::k_inventory_storage_flag_retrieval_only;
@@ -1312,6 +1312,8 @@ Gs1Status handle_inventory_delivery_batch_requested(
 void progress_pending_deliveries(SiteSystemContext<InventorySystem>& context) noexcept
 {
     ensure_inventory_storage_initialized(context);
+    const double step_minutes =
+        runtime_minutes_from_real_seconds(context.fixed_step_seconds);
     auto& inventory = context.world.own_inventory();
     if (inventory.pending_delivery_queue.empty())
     {
@@ -1359,7 +1361,7 @@ void progress_pending_deliveries(SiteSystemContext<InventorySystem>& context) no
         }
 
         delivery.minutes_until_arrival =
-            std::max(0.0, delivery.minutes_until_arrival - k_site_minutes_per_step);
+            std::max(0.0, delivery.minutes_until_arrival - step_minutes);
         if (delivery.minutes_until_arrival > 0.0)
         {
             continue;

@@ -1,6 +1,7 @@
 #include "runtime/game_runtime.h"
 
 #include "campaign/systems/campaign_flow_system.h"
+#include "campaign/systems/campaign_time_system.h"
 #include "campaign/systems/campaign_system_context.h"
 #include "campaign/systems/faction_reputation_system.h"
 #include "campaign/systems/loadout_planner_system.h"
@@ -27,6 +28,7 @@
 #include "site/systems/failure_recovery_system.h"
 #include "site/systems/site_completion_system.h"
 #include "site/systems/site_flow_system.h"
+#include "site/systems/site_time_system.h"
 #include "site/systems/task_board_system.h"
 #include "site/systems/weather_event_system.h"
 #include "site/systems/worker_condition_system.h"
@@ -523,6 +525,7 @@ void GameRuntime::initialize_subscription_tables()
         ModifierSystem::access(),
         FailureRecoverySystem::access(),
         SiteCompletionSystem::access(),
+        SiteTimeSystem::access(),
         SiteFlowSystem::access()};
     const auto validation = validate_site_system_access_registry(site_system_access_registry);
     if (!validation.ok)
@@ -3528,17 +3531,28 @@ void GameRuntime::run_fixed_step()
             elapsed_milliseconds_since(started_at));
     };
 
-    run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_CAMPAIGN_FLOW, [&]()
-    {
-        CampaignFixedStepContext campaign_context {*campaign_};
-        CampaignFlowSystem::run(campaign_context);
-    });
-
     const SiteMoveDirectionInput move_direction {
         phase1_site_move_direction_.world_move_x,
         phase1_site_move_direction_.world_move_y,
         phase1_site_move_direction_.world_move_z,
         phase1_site_move_direction_.present};
+
+    run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_CAMPAIGN_TIME, [&]()
+    {
+        CampaignFixedStepContext campaign_context {*campaign_, fixed_step_seconds_};
+        CampaignTimeSystem::run(campaign_context);
+    });
+
+    run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_SITE_TIME, [&]()
+    {
+        auto site_time_context = make_site_system_context<SiteTimeSystem>(
+            *campaign_,
+            *active_site_run_,
+            message_queue_,
+            fixed_step_seconds_,
+            move_direction);
+        SiteTimeSystem::run(site_time_context);
+    });
 
     run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_SITE_FLOW, [&]()
     {

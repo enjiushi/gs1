@@ -9,9 +9,6 @@ namespace gs1
 {
 namespace
 {
-constexpr double k_site_fixed_step_minutes = 0.2;
-constexpr double k_minutes_per_day = 1440.0;
-
 void rebuild_regional_map_caches(CampaignState& campaign)
 {
     auto& map = campaign.regional_map_state;
@@ -330,15 +327,4 @@ Gs1Status CampaignFlowSystem::process_message(
     }
 }
 
-void CampaignFlowSystem::run(CampaignFixedStepContext& context)
-{
-    context.campaign.campaign_clock_minutes_elapsed += k_site_fixed_step_minutes;
-
-    const auto elapsed_days =
-        static_cast<std::uint32_t>(context.campaign.campaign_clock_minutes_elapsed / k_minutes_per_day);
-    context.campaign.campaign_days_remaining =
-        (elapsed_days >= context.campaign.campaign_days_total)
-            ? 0U
-            : (context.campaign.campaign_days_total - elapsed_days);
-}
 }  // namespace gs1

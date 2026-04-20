@@ -57,6 +57,7 @@ add_library(gs1_game SHARED
     src/app/campaign_factory.cpp
     src/app/site_run_factory.cpp
     src/campaign/systems/campaign_flow_system.cpp
+    src/campaign/systems/campaign_time_system.cpp
     src/campaign/systems/faction_reputation_system.cpp
     src/campaign/systems/loadout_planner_system.cpp
     src/campaign/systems/technology_system.cpp
@@ -77,6 +78,7 @@ add_library(gs1_game SHARED
     src/site/systems/placement_validation_system.cpp
     src/site/systems/site_completion_system.cpp
     src/site/systems/site_flow_system.cpp
+    src/site/systems/site_time_system.cpp
     src/site/systems/task_board_system.cpp
     src/site/systems/weather_event_system.cpp
     src/site/systems/worker_condition_system.cpp
@@ -158,6 +160,7 @@ if(GS1_BUILD_TESTS)
         src/app/campaign_factory.cpp
         src/app/site_run_factory.cpp
         src/campaign/systems/campaign_flow_system.cpp
+        src/campaign/systems/campaign_time_system.cpp
         src/campaign/systems/faction_reputation_system.cpp
         src/campaign/systems/loadout_planner_system.cpp
         src/campaign/systems/technology_system.cpp
@@ -178,6 +181,7 @@ if(GS1_BUILD_TESTS)
         src/site/systems/placement_validation_system.cpp
         src/site/systems/site_completion_system.cpp
         src/site/systems/site_flow_system.cpp
+        src/site/systems/site_time_system.cpp
         src/site/systems/task_board_system.cpp
         src/site/systems/weather_event_system.cpp
         src/site/systems/worker_condition_system.cpp
@@ -189,6 +193,7 @@ if(GS1_BUILD_TESTS)
         src/app/campaign_factory.cpp
         src/app/site_run_factory.cpp
         src/campaign/systems/campaign_flow_system.cpp
+        src/campaign/systems/campaign_time_system.cpp
         src/campaign/systems/faction_reputation_system.cpp
         src/campaign/systems/loadout_planner_system.cpp
         src/campaign/systems/technology_system.cpp
@@ -209,6 +214,7 @@ if(GS1_BUILD_TESTS)
         src/site/systems/placement_validation_system.cpp
         src/site/systems/site_completion_system.cpp
         src/site/systems/site_flow_system.cpp
+        src/site/systems/site_time_system.cpp
         src/site/systems/task_board_system.cpp
         src/site/systems/weather_event_system.cpp
         src/site/systems/worker_condition_system.cpp
@@ -220,6 +226,7 @@ if(GS1_BUILD_TESTS)
         src/app/campaign_factory.cpp
         src/app/site_run_factory.cpp
         src/campaign/systems/campaign_flow_system.cpp
+        src/campaign/systems/campaign_time_system.cpp
         src/campaign/systems/faction_reputation_system.cpp
         src/campaign/systems/loadout_planner_system.cpp
         src/campaign/systems/technology_system.cpp
@@ -239,6 +246,7 @@ if(GS1_BUILD_TESTS)
         src/site/systems/placement_validation_system.cpp
         src/site/systems/site_completion_system.cpp
         src/site/systems/site_flow_system.cpp
+        src/site/systems/site_time_system.cpp
         src/site/systems/task_board_system.cpp
         src/site/systems/weather_event_system.cpp
         src/site/systems/worker_condition_system.cpp
@@ -255,6 +263,7 @@ if(GS1_BUILD_TESTS)
         src/app/campaign_factory.cpp
         src/app/site_run_factory.cpp
         src/campaign/systems/campaign_flow_system.cpp
+        src/campaign/systems/campaign_time_system.cpp
         src/campaign/systems/faction_reputation_system.cpp
         src/campaign/systems/loadout_planner_system.cpp
         src/campaign/systems/technology_system.cpp
@@ -275,6 +284,7 @@ if(GS1_BUILD_TESTS)
         src/site/systems/placement_validation_system.cpp
         src/site/systems/site_completion_system.cpp
         src/site/systems/site_flow_system.cpp
+        src/site/systems/site_time_system.cpp
         src/site/systems/task_board_system.cpp
         src/site/systems/weather_event_system.cpp
         src/site/systems/worker_condition_system.cpp

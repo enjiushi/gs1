@@ -1,5 +1,6 @@
 #include "site/systems/weather_event_system.h"
 
+#include "runtime/runtime_clock.h"
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
 
@@ -14,9 +15,6 @@ constexpr float k_mild_weather_heat = 15.0f;
 constexpr float k_mild_weather_wind = 10.0f;
 constexpr float k_mild_weather_dust = 5.0f;
 constexpr double k_phase_duration_minutes = 5.0;
-
-// Keep event phase countdown aligned with the site clock progression.
-constexpr double k_phase_step_minutes = 0.2;
 constexpr float k_weather_epsilon = 0.0001f;
 constexpr float k_weather_transition_rate_per_second = 2.4f;
 constexpr double k_min_wave_delay_minutes = 4.0;
@@ -322,6 +320,8 @@ EventPhase advance_phase(EventPhase current) noexcept
 
 void WeatherEventSystem::run(SiteSystemContext<WeatherEventSystem>& context)
 {
+    const double step_minutes =
+        runtime_minutes_from_real_seconds(context.fixed_step_seconds);
     auto& event = context.world.own_event();
     const auto& objective = context.world.read_objective();
     if (event.event_phase == EventPhase::None ||
@@ -332,7 +332,7 @@ void WeatherEventSystem::run(SiteSystemContext<WeatherEventSystem>& context)
             context.world.read_time().world_time_minutes < objective.time_limit_minutes)
         {
             event.minutes_until_next_wave =
-                std::max(0.0, event.minutes_until_next_wave - k_phase_step_minutes);
+                std::max(0.0, event.minutes_until_next_wave - step_minutes);
             if (event.minutes_until_next_wave <= 0.0)
             {
                 start_next_wave(context);
@@ -346,7 +346,7 @@ void WeatherEventSystem::run(SiteSystemContext<WeatherEventSystem>& context)
     const auto previous_phase = event.event_phase;
     const auto previous_template_id = event.active_event_template_id;
 
-    event.phase_minutes_remaining -= k_phase_step_minutes;
+    event.phase_minutes_remaining -= step_minutes;
     if (event.phase_minutes_remaining <= 0.0)
     {
         if (event.event_phase == EventPhase::Aftermath)

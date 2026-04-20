@@ -2,7 +2,6 @@
 
 #include "site/defs/site_action_defs.h"
 #include "site/site_projection_update_flags.h"
-#include "site/site_run_state.h"
 
 #include <algorithm>
 #include <cmath>
@@ -11,30 +10,9 @@ namespace gs1
 {
 namespace
 {
-constexpr double k_step_minutes = 0.2;
-constexpr double k_minutes_per_day = 1440.0;
 constexpr float k_worker_move_speed_tiles_per_second = 3.5f;
 constexpr float k_radians_to_degrees = 57.2957795f;
 constexpr float k_worker_position_epsilon = 0.0001f;
-
-DayPhase resolve_day_phase(double world_time_minutes)
-{
-    const double minute_in_day = std::fmod(world_time_minutes, k_minutes_per_day);
-
-    if (minute_in_day < 360.0)
-    {
-        return DayPhase::Dawn;
-    }
-    if (minute_in_day < 900.0)
-    {
-        return DayPhase::Day;
-    }
-    if (minute_in_day < 1140.0)
-    {
-        return DayPhase::Dusk;
-    }
-    return DayPhase::Night;
-}
 
 bool has_active_action(const ActionState& action_state) noexcept
 {
@@ -76,12 +54,6 @@ float facing_degrees_for_direction(float direction_x, float direction_y) noexcep
 
 void SiteFlowSystem::run(SiteSystemContext<SiteFlowSystem>& context)
 {
-    auto& clock = context.world.own_time();
-    clock.world_time_minutes += k_step_minutes;
-    clock.day_index =
-        static_cast<std::uint32_t>(clock.world_time_minutes / k_minutes_per_day);
-    clock.day_phase = resolve_day_phase(clock.world_time_minutes);
-
     const std::uint32_t width = context.world.tile_width();
     const std::uint32_t height = context.world.tile_height();
     if (width == 0U || height == 0U)

@@ -378,8 +378,10 @@ Core time contract:
 
 - `1` full in-game day = `30` real-time minutes
 - `1` in-game day = `1440` in-game minutes
+- canonical time conversion = `0.8` in-game minutes per real second
 - recommended fixed simulation step = `0.25` real seconds
-- each fixed simulation step advances time by `0.2` in-game minutes, or `12` in-game seconds
+- each fixed simulation step advances time by `fixedStepSeconds * 0.8` in-game minutes
+- at the recommended `0.25` second step, that is `0.2` in-game minutes, or `12` in-game seconds
 
 This keeps the simulation readable and stable while still feeling continuous to the player.
 

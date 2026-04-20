@@ -7,6 +7,7 @@
 #include "site/systems/local_weather_resolve_system.h"
 #include "site/systems/modifier_system.h"
 #include "site/systems/site_flow_system.h"
+#include "site/systems/site_time_system.h"
 #include "site/systems/weather_event_system.h"
 #include "site/systems/worker_condition_system.h"
 #include "testing/system_test_registry.h"
@@ -25,6 +26,7 @@ using gs1::LocalWeatherResolveSystem;
 using gs1::ModifierSystem;
 using gs1::SiteFlowSystem;
 using gs1::SiteRunStartedMessage;
+using gs1::SiteTimeSystem;
 using gs1::TileCoord;
 using gs1::WeatherEventSystem;
 using gs1::WorkerConditionSystem;
@@ -85,7 +87,7 @@ void weather_event_run_advances_active_event_through_full_lifecycle(
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(1U, 1103U);
     GameMessageQueue queue {};
-    auto site_context = make_site_context<WeatherEventSystem>(campaign, site_run, queue);
+    auto site_context = make_site_context<WeatherEventSystem>(campaign, site_run, queue, 0.25);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -167,8 +169,8 @@ void weather_event_phase_countdown_tracks_site_clock_progress(
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(1U, 1105U);
     GameMessageQueue queue {};
-    auto site_flow_context = make_site_context<SiteFlowSystem>(campaign, site_run, queue);
-    auto weather_context = make_site_context<WeatherEventSystem>(campaign, site_run, queue);
+    auto site_time_context = make_site_context<SiteTimeSystem>(campaign, site_run, queue, 0.25);
+    auto weather_context = make_site_context<WeatherEventSystem>(campaign, site_run, queue, 0.25);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -188,7 +190,7 @@ void weather_event_phase_countdown_tracks_site_clock_progress(
 
     for (int index = 0; index < 10; ++index)
     {
-        SiteFlowSystem::run(site_flow_context);
+        SiteTimeSystem::run(site_time_context);
         WeatherEventSystem::run(weather_context);
     }
 
