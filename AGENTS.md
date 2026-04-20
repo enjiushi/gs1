@@ -39,8 +39,7 @@ This file is a quick orientation guide for agents working in this repository.
 - `tests/smoke/`: Smoke host, runtime DLL loader, script runner, live-state JSON, live HTTP server, and visual smoke UI.
 - `tests/smoke/scripts/`: Scripted smoke-test scenarios.
 - `scripts/`: PowerShell build and smoke-test helpers.
-<<<<<<< HEAD
-- `GDD.md`: Game design document, including the directional wind-shadow and plant-footprint shelter rules, the current profile-based harsh-weather/runtime weather-event contract with start/peak/peak-duration/end timing direction, the site-one onboarding task-pool direction, phone-based claimed-task history direction, the staged four-mode site-objective direction, the site-result-panel `OK` return contract, and the 30-real-minute in-game day timing contract.
+- `GDD.md`: Game design document, including the directional wind-shadow and plant-footprint shelter rules, the current profile-based harsh-weather/runtime weather-event contract with start/peak/peak-duration/end timing direction, the site-one onboarding task-pool direction, phone-based claimed-task history direction, the staged four-mode site-objective direction, the straw-checkerboard special-plant `2x2` tile-occupancy rule, the site-result-panel `OK` return contract, and the 30-real-minute in-game day timing contract.
 - `GAME_STRUCTURE.md`: High-level gameplay/runtime structure notes.
 - `GAME_SYSTEM_DESIGN_V1.md`: System design reference, including directional local-weather resolution responsibilities, start/peak/peak-duration/end weather-event timelines, staged site-objective implementation notes, claimed-task history direction for task rewards, site-one onboarding task-pool notes, the `SiteResult` panel `OK`-return contract, and the canonical fixed-step time conversion rules that keep one in-game day at 30 real-time minutes.
 - `SYSTEM_DESIGN_STATUS.md`: Current system status and implementation tracking, including site-objective readiness notes.

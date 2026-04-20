@@ -20,6 +20,7 @@ inline constexpr std::uint32_t k_plant_wind_reed = 1U;
 inline constexpr std::uint32_t k_plant_saltbush = 2U;
 inline constexpr std::uint32_t k_plant_shade_cactus = 3U;
 inline constexpr std::uint32_t k_plant_sunfruit_vine = 4U;
+inline constexpr std::uint32_t k_plant_straw_checkerboard = 5U;
 
 struct PlantDef final
 {
@@ -95,7 +96,30 @@ inline constexpr PlantDef k_generic_ground_cover_def {
     0.0f,
     0.0f};
 
-inline constexpr std::array<PlantDef, 4> k_prototype_plant_defs {
+inline constexpr std::array<PlantDef, 5> k_prototype_plant_defs {
+    PlantDef {
+        PlantId {k_plant_straw_checkerboard},
+        "Straw Checkerboard",
+        PlantHeightClass::None,
+        false,
+        1U,
+        2U,
+        2U,
+        1U,
+        0.6f,
+        10.0f,
+        100.0f,
+        100.0f,
+        100.0f,
+        100.0f,
+        52.0f,
+        10.0f,
+        34.0f,
+        18.0f,
+        0.0f,
+        0.0f,
+        0.0f,
+        0.0f},
     PlantDef {
         PlantId {k_plant_wind_reed},
         "Wind Reed",

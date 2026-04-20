@@ -523,7 +523,7 @@ The tile model should separate different kinds of state instead of treating ever
 | `terrainDefinition` | Base terrain identity and hard placement flags | `terrainTypeId`, `tileTraversable`, `tilePlantable` | Static `Ground` or `Rock` role |
 | `terrainSoilState` | Persistent quality of plantable ground | `tileSoilFertility`, `tileMoisture`, `tileSoilSalinity` | Only meaningful on plantable `Ground` |
 | `occupancyState` | What currently occupies the tile | `plantTypeId`, `groundCoverTypeId`, `structureTypeId` | Answers only what is present, not the state of that occupant |
-| `plantState` | Runtime state of the current living plant or `Straw Checkerboard` cover | `tilePlantDensity`, `growthPressure` | `Plant Trend` is derived for display rather than stored as separate plant state; `Straw Checkerboard` uses the same density meter and shared plant contribution model, but with `growable = false` and a positive `constantWitherRate` |
+| `plantState` | Runtime state of the current living plant or special non-growable `Straw Checkerboard` occupant | `tilePlantDensity`, `growthPressure` | `Plant Trend` is derived for display rather than stored as separate plant state; `Straw Checkerboard` uses the same density meter and shared plant contribution model, but with `growable = false` and a positive `constantWitherRate` |
 | `structureState` | Runtime state of the current structure | `deviceIntegrity`, `deviceEfficiency`, `deviceStoredWater` | `deviceStoredWater` is mainly meaningful for water-storage structures |
 | `resolvedLocalWeatherState` | Final local weather intensity after site weather, local support, and shelter effects are combined | `tileHeat`, `tileWind`, `tileDust` | Bridging layer between weather/support logic and final terrain or plant changes |
 | `temporaryTileState` | Temporary tile-only hazard state | `tileSandBurial` | Burial is the only true temporary tile state in the current design |
@@ -531,7 +531,7 @@ The tile model should separate different kinds of state instead of treating ever
 Important cleanup rule:
 
 - `occupancyState` should only answer what is on the tile; density, integrity, and efficiency belong to their own runtime states, while `Plant Trend` is a derived state
-- `Straw Checkerboard` uses `groundCoverTypeId` for occupancy identity, reuses plant trait fields for its effects, and uses `tilePlantDensity` with `growable = false` plus a positive `constantWitherRate`
+- `Straw Checkerboard` uses `plantTypeId` for occupancy identity, reuses plant trait fields for its effects, occupies the tile as its own plant slot, and uses `tilePlantDensity` with `growable = false` plus a positive `constantWitherRate`
 - `tileHeat`, `tileWind`, and `tileDust` are resolved local weather meters, not persistent terrain state
 - the game should not use a separate `tileSoilStability` meter
 
@@ -542,23 +542,23 @@ Each tile should conceptually contain these layers:
 | Layer | Max Occupancy | Purpose | Examples |
 |---|---|---|---|
 | `terrainLayer` | `1` | Base terrain definition and core flags | `Ground`, `Rock` |
-| `groundCoverLayer` | `1` | Surface-cover type or material that prepares or protects land beneath living plants | `Straw Checkerboard` |
-| `livingPlantLayer` | `1` plant type | Main living plant type occupying the tile; density measures how much of that type fills the tile | Any living plant from the current set |
+| `groundCoverLayer` | `1` | Surface-cover type or material that prepares or protects land without becoming the tile's plant occupant | Future non-plant cover types |
+| `livingPlantLayer` | `1` plant type | Main plant occupant occupying the tile; density measures how much of that type fills the tile | Any living plant from the current set plus the special non-growable `Straw Checkerboard` occupant |
 | `structureLayer` | `1` footprint reservation per tile | Player-built support devices and camp structures | Shelter, irrigation device, sensor, workshop, solar utility |
 | `dynamicOverlayLayer` | many transient flags | Temporary state, not persistent occupancy identity | Burial |
 
 For simplicity:
 
-- a tile may contain both `groundCoverLayer` and `livingPlantLayer`
+- a tile may not contain both `groundCoverLayer` and `livingPlantLayer`
 - a tile may not contain both `groundCoverLayer` and `structureLayer`
 - a tile may contain both `livingPlantLayer` and `structureLayer` only if the placed structure explicitly supports plant sharing and the plant's height class is allowed by that structure
 - dynamic overlays do not count as occupancy conflicts
 
-This means `Straw Checkerboard` can prepare a tile and later coexist with one living plant type, while some structures may also coexist with certain living plants if their sharing rule allows it.
+This means `Straw Checkerboard` is treated as a special plant occupant that takes the tile while it lasts, while some structures may also coexist with certain living plants if their sharing rule allows it.
 
 Clarification:
 
-- `groundCoverLayer` means non-living or plant-derived surface cover that sits under later living plants and helps prepare land
+- `groundCoverLayer` means non-living surface cover; `Straw Checkerboard` is not part of this layer because it is a special non-growable plant occupant
 - `device` means a player-built support utility or camp structure, not a plant and not a consumable item
 - task markers, repair markers, reservation flags, and similar workflow indicators should belong to their own systems, not to tile runtime state
 
@@ -627,9 +627,9 @@ Use these hard rules:
 - one living plant type per tile maximum
 - one ground-cover type or material per tile maximum
 - one structure-footprint reservation per tile maximum
-- living plants can be planted onto tiles that already have `Straw Checkerboard`
+- `Straw Checkerboard` occupies the tile as its own special plant and cannot share the tile with another plant
 - structures cannot be placed onto tiles already containing `Straw Checkerboard`
-- `Straw Checkerboard` cannot be placed onto tiles already reserved by a structure
+- `Straw Checkerboard` cannot be placed onto tiles already containing another plant, other ground cover, or a structure reservation
 - a structure may share a tile with one living plant only if that structure's `plantShareRule` allows it
 - if a structure allows plant sharing, the tile's living plant must have a `plantHeightClass` at or below the structure's `sharedPlantHeightLimit`
 - if a structure does not allow plant sharing, placing it still requires the tile to contain no living plant
@@ -1586,7 +1586,7 @@ The following plants are temporary placeholders for the current build. Their nam
 
 | Plant | Role Mix | Effect Ceiling (Temp) | Work Demand (Temp) | Own Tile Effect | Neighbor Tile Effect | Use |
 |---|---|---|---|---|---|---|
-| `Straw Checkerboard` | Protection + Fertility setup | Medium | Low | Plant-derived straw grid placed on bare sand; it starts with strong near-surface wind and sand reduction on its own tile, while its shared contribution powers scale down as density decays over time | Downwind tiles gain early erosion relief, slightly better establishment odds, and a temporary protection buffer while the checkerboard is still fresh | Critical opener for least fertile or pure sand tiles; makes hostile sand workable for later living plants |
+| `Straw Checkerboard` | Protection + Fertility setup | Medium | Low | Plant-derived `2x2` straw grid placed on bare sand; it starts with strong near-surface wind and sand reduction across its occupied footprint, while its shared contribution powers scale down as density decays over time | Downwind tiles gain early erosion relief, slightly better establishment odds, and a temporary protection buffer while the checkerboard is still fresh | Critical opener for least fertile or pure sand tiles; makes hostile sand workable for later living plants |
 | `Wind Reed` | Protection + Anti-dehydration | Medium | Low | Cheap early plant that reduces wind damage and slows dehydration on its own tile | Downwind tiles behind the reed get a readable lee-side wind shadow that stays strong near the plant and fades sharply near the range edge | First safety plant; teaches line placement and perimeter thinking |
 | `Shade Cactus` | Anti-dehydration + Worker support | Medium | Low | Strong local heat reduction and low water demand | Adjacent tiles lose water more slowly; nearby work zones feel safer during hot periods | Teaches oasis pockets, camp-edge defense, and local survival planning |
 | `Root Binder` | Fertilize + Protection | Medium | Medium | Stabilizes soil, reduces erosion, and slowly improves difficult ground on its own tile | Adjacent tiles gain fertility and mild erosion resistance, helping surrounding salty tiles recover over time | Teaches groundwork and setup before high-value planting |
@@ -1597,7 +1597,7 @@ The following plants are temporary placeholders for the current build. Their nam
 | `Medicinal Sage` | Output + Worker support | Medium | Medium | Produces a modest herb yield and improves comfort in its immediate area | Adjacent tiles slightly improve short-rest efficiency and morale feel when conditions are stable | Teaches support-economy patches and non-food output value |
 | `Sand Willow` | Protection + Anti-dehydration anchor | High | High | Large anchor plant that creates strong local shelter and heat relief when sustained | Adjacent tiles gain one of the strongest protection and dehydration-relief effects in the current set | Late anchor plant for turning one hard-earned zone into a true refuge core |
 
-`Straw Checkerboard` is inspired by the real Chinese straw checkerboard dune-control method, abstracted here into a plant-authored ground-cover option for sand fixation and land preparation.
+`Straw Checkerboard` is inspired by the real Chinese straw checkerboard dune-control method, abstracted here into a special non-growable plant occupant for sand fixation and land preparation.
 
 `Effect Ceiling` is the rough maximum payoff of a dense healthy tile. `Work Demand` is the rough amount of setup, maintenance, and rescue attention the plant usually asks for before it feels dependable. Both are temporary tuning tags for iteration, not locked balance values.
 
@@ -1629,7 +1629,7 @@ This should be enough to make salty tiles create real placement choices without 
 
 | Plant | Salt Tolerance | Salinity Reduction | Salty-Tile Role |
 |---|---|---|---|
-| `Straw Checkerboard` | `N/A` | `None` | Ground cover setup layer; it can help prepare the surface, but it is not a true saline-soil answer by itself |
+| `Straw Checkerboard` | `N/A` | `None` | Special non-growable setup plant; it can help prepare the surface, but it is not a true saline-soil answer by itself |
 | `Wind Reed` | `Medium` | `Low` | Acceptable first stabilizer on mildly salty exposed tiles |
 | `Shade Cactus` | `Medium` | `None` | Can survive some salinity, but mainly solves heat and dehydration |
 | `Root Binder` | `Medium` | `Medium` | Good support plant for gradually improving difficult soil |
@@ -1652,7 +1652,7 @@ To support structure-sharing rules, the current plant set should also carry a si
 
 | Plant | Height Class | Structure-Sharing Read |
 |---|---|---|
-| `Straw Checkerboard` | `N/A` | Ground cover only; structure sharing with living plants does not apply |
+| `Straw Checkerboard` | `N/A` | Special non-growable plant occupant; structure sharing with living plants does not apply |
 | `Wind Reed` | `Low` | Good candidate for sharing under `Solar Array` or through `Drip Irrigator` |
 | `Shade Cactus` | `Medium` | Usually too tall for low-clearance shared structures |
 | `Root Binder` | `Low` | Good under technical support structures that allow low plants |
@@ -1728,6 +1728,8 @@ Core growth rules:
 Shared-model checkerboard notes:
 
 - `Straw Checkerboard` is a plant-authored starter cover used for hostile sand
+- It uses an authored `2x2` footprint, so one placement occupies four tiles
+- It occupies the tile as its own plant slot and cannot share that tile with another plant
 - It should not produce output and should not naturally spread
 - It should reuse the same plant trait fields as living plants for protection, setup, and soil-support effects
 - It should begin at full `tilePlantDensity`, then gradually lose density over time through `constantWitherRate`
@@ -1924,11 +1926,11 @@ Each occupied `livingPlantLayer` tile should have these authoritative runtime va
 - `tileSoilSalinity`
 - `tileSandBurial`
 
-If the same tile also contains `groundCoverLayer`, that layer contributes through:
+If the same tile also contains a non-plant `groundCoverLayer`, that layer contributes through:
 
 - `groundCoverTypeId`
 - `tilePlantDensity`
-- the `Straw Checkerboard` plant trait profile, evaluated through current `tilePlantDensity`
+- its own authored support profile, evaluated through the runtime density meter if that cover type uses one
 
 Important modeling rule:
 
@@ -1936,7 +1938,7 @@ Important modeling rule:
 - `tilePlantDensity` and `growthPressure` belong to plant state, not to occupancy identity
 - `Plant Trend` belongs to player-facing display and should be derived from density direction and pressure, not stored as a separate authoritative plant state
 - `deviceIntegrity` and `deviceEfficiency` belong to structure state, not to occupancy identity
-- `Straw Checkerboard` is a ground-cover occupant that reuses plant trait fields, starts at full `tilePlantDensity`, and uses `growable = false` plus a positive `constantWitherRate`
+- `Straw Checkerboard` is a special non-growable plant occupant that reuses plant trait fields, starts at full `tilePlantDensity`, and uses `growable = false` plus a positive `constantWitherRate`
 - `tileHeat`, `tileWind`, and `tileDust` are resolved local weather meters rebuilt each fixed simulation step after site weather and current local support are combined
 - the game should not use a separate `tileSoilStability` meter or a separately stored `tilePlantStress` value
 
@@ -2192,7 +2194,7 @@ Selection and success rules:
 
 Special rule:
 
-- `Straw Checkerboard` never uses natural spread because it is a `groundCoverLayer` preparation object, not a living plant
+- `Straw Checkerboard` never uses natural spread because it is a special non-growable setup plant, not a living plant
 
 #### Salinity Resolution Rule
 
@@ -2223,14 +2225,14 @@ Design intent:
 
 `Straw Checkerboard` should be authored through the same shared plant trait model:
 
-- it uses `groundCoverTypeId` for layer occupancy so it can prepare land beneath a later living plant
+- it uses `plantTypeId` for occupancy because it is a special non-growable plant occupant
 - it uses the same plant-side contribution traits as other plant-authored occupants, especially meaningful `windProtectionPower`, `dustProtectionPower`, and `fertilityImprovePower`
 - set `growable = false`
 - set `constantWitherRate` to a positive value
 - set `windProtectionRange` and `auraSize` as needed for setup reach
 - on placement, start it at full `tilePlantDensity`
 - its `growthPressure` should stay at zero
-- it can exist on the same tile as one living plant type
+- it occupies the tile by itself and cannot share that tile with another plant
 - it does not produce output
 - it does not naturally spread
 - it does not regrow through the living-plant density ladder because `growable` is `false`
