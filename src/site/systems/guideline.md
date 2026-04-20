@@ -40,7 +40,7 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `site_flow_system.cpp`: Coordinates major site flow transitions during a run.
 - `site_system_context.h`: Shared dependency bundle passed into site systems.
 - `task_board_system.h`: Task board system interface.
-- `task_board_system.cpp`: Manages board listings, acceptance, completion, and reset flow, keeping the authored site-one task on dense-restoration sites only.
+- `task_board_system.cpp`: Manages board listings, acceptance, completion, reward-delivery triggers, and reset flow, keeping the authored site-one onboarding task set on dense-restoration site one only.
 - `weather_event_system.h`: Weather event system interface.
 - `weather_event_system.cpp`: Applies incoming weather events to site-owned weather/event state, including recurring one-sided highway-protection waves.
 - `worker_condition_system.h`: Worker condition system interface.

@@ -84,7 +84,7 @@ void phone_panel_site_run_started_seeds_marketplace_snapshot(
 
     const auto& phone_panel = site_run.phone_panel;
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.active_section == PhonePanelSection::Marketplace);
-    GS1_SYSTEM_TEST_CHECK(context, phone_panel.visible_task_count == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, phone_panel.visible_task_count == 4U);
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.accepted_task_count == 0U);
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.buy_listing_count >= 9U);
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.sell_listing_count >= 1U);
