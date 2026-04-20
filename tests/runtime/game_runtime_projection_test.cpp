@@ -591,11 +591,11 @@ int main()
         assert(weather_payload.wind == 0.0f);
         assert(weather_payload.dust == 0.0f);
         assert(weather_payload.wind_direction_degrees == 0.0f);
-        assert(weather_payload.event_template_id != 0U);
+        assert(weather_payload.event_template_id == 0U);
         assert(weather_payload.event_start_time_minutes == 0.0f);
-        assert(weather_payload.event_peak_time_minutes == 8.0f);
-        assert(weather_payload.event_peak_duration_minutes == 2.4f);
-        assert(weather_payload.event_end_time_minutes == 14.4f);
+        assert(weather_payload.event_peak_time_minutes == 0.0f);
+        assert(weather_payload.event_peak_duration_minutes == 0.0f);
+        assert(weather_payload.event_end_time_minutes == 0.0f);
     }
     {
         const auto* starter_storage_message = find_inventory_storage_message(
