@@ -74,6 +74,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let animationTimeSeconds = 0;
     let rendererWidth = 0;
     let rendererHeight = 0;
+    let retainedVisualWindDirectionDegrees = 0;
+    let retainEventWindDirectionDuringFade = false;
     let weatherPostProcess = null;
     let smoothedWeatherVisualResponse = {
         heatLevel: 0,
@@ -226,6 +228,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         hasItem: 4,
         deferredTargetSelection: 8
     };
+    const visibleWindStreakThreshold = 0.04;
     const siteActionCancelFlags = {
         currentAction: 1,
         placementMode: 2
@@ -455,6 +458,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return clamp01((typeof value === "number" ? value : 0) / 100.0);
     }
 
+    function normalizeWindVisualValue(value) {
+        return clamp01((typeof value === "number" ? value : 0) / 10.0);
+    }
+
     function blendToward(current, target, ratePerSecond, deltaSeconds) {
         if (!(deltaSeconds > 0)) {
             return target;
@@ -485,7 +492,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return {
             heatLevel: normalizeWeatherValue(weather.heat),
             dustLevel: normalizeWeatherValue(weather.dust),
-            windLevel: normalizeWeatherValue(weather.wind)
+            windLevel: normalizeWindVisualValue(weather.wind)
         };
     }
 
@@ -507,6 +514,37 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function getWeatherVisualResponse() {
         return smoothedWeatherVisualResponse;
+    }
+
+    function resolveVisualWindDirectionDegrees(weather) {
+        if (!weather) {
+            return retainedVisualWindDirectionDegrees;
+        }
+
+        const hasDirection = typeof weather.windDirectionDegrees === "number";
+        const visibleWindLevel = getWeatherVisualResponse().windLevel;
+        const eventTemplateId =
+            typeof weather.eventTemplateId === "number"
+                ? weather.eventTemplateId
+                : 0;
+        const eventActive = eventTemplateId !== 0;
+
+        if (eventActive && hasDirection) {
+            retainedVisualWindDirectionDegrees = weather.windDirectionDegrees;
+            retainEventWindDirectionDuringFade = true;
+            return retainedVisualWindDirectionDegrees;
+        }
+
+        if (retainEventWindDirectionDuringFade && visibleWindLevel > visibleWindStreakThreshold) {
+            return retainedVisualWindDirectionDegrees;
+        }
+
+        retainEventWindDirectionDuringFade = false;
+        if (hasDirection) {
+            retainedVisualWindDirectionDegrees = weather.windDirectionDegrees;
+        }
+
+        return retainedVisualWindDirectionDegrees;
     }
 
     function getHudWarningPresentation(state) {
@@ -590,12 +628,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         const weatherVisualResponse = getWeatherVisualResponse();
         const windLevel = weatherVisualResponse.windLevel;
-        const directionDegrees =
-            typeof weather.windDirectionDegrees === "number"
-                ? weather.windDirectionDegrees
-                : 0;
-        const opacity = Math.min(0.68, windLevel * 0.42);
-        const dustAlpha = Math.min(0.44, windLevel * 0.16);
+        const windDensityLevel = Math.pow(clamp01(windLevel), 1.35);
+        const windSpeedLevel = Math.pow(clamp01(windLevel), 1.18);
+        const directionDegrees = resolveVisualWindDirectionDegrees(weather);
+        const opacity = Math.min(0.2, windDensityLevel * 0.2);
+        const dustAlpha = Math.min(0.09, windDensityLevel * 0.09);
         let severity = "watch";
         if (windLevel >= 0.8) {
             severity = "critical";
@@ -610,7 +647,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return {
             opacity: opacity,
             dustAlpha: dustAlpha,
-            speedSeconds: Math.max(1.9, 5.2 - windLevel * 2.5),
+            speedSeconds: Math.max(4.17, 5.4 - windSpeedLevel * 1.23),
             tiltDegrees: directionDegrees - 90.0,
             directionDegrees: directionDegrees,
             severity: severity
@@ -4657,15 +4694,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     function createWindFieldVisual(width, height) {
         const group = new THREE_NS.Group();
         const streaks = [];
-        const streakCount = Math.max(18, Math.min(42, Math.round((width + height) * 0.75)));
-        const horizontalSpan = Math.max(width, height) * 0.72;
-        const depthSpan = Math.max(width, height) * 0.92;
+        const streakCount = Math.max(24, Math.min(64, Math.round((width + height) * 1.15)));
+        const horizontalSpan = Math.max(width, height) * 0.82;
+        const depthSpan = Math.max(width, height) * 1.04;
 
         for (let index = 0; index < streakCount; index += 1) {
-            const widthScale = 0.55 + ((index * 13) % 9) * 0.08;
-            const lengthScale = 0.85 + ((index * 7) % 11) * 0.09;
+            const widthScale = 0.42 + ((index * 13) % 11) * 0.055;
+            const lengthScale = 0.72 + ((index * 7) % 13) * 0.07;
             const mesh = new THREE_NS.Mesh(
-                new THREE_NS.PlaneGeometry(0.17 * widthScale, 1.35 * lengthScale),
+                new THREE_NS.PlaneGeometry(0.13 * widthScale, 1.2 * lengthScale),
                 new THREE_NS.MeshBasicMaterial({
                     color: 0xf6edd7,
                     transparent: true,
@@ -4676,17 +4713,32 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 })
             );
             mesh.rotation.x = -Math.PI / 2;
-            mesh.position.y = 0.9 + (index % 5) * 0.08;
+            mesh.position.y = 0.84 + (index % 7) * 0.07;
             group.add(mesh);
             streaks.push({
                 mesh: mesh,
                 progressSeed: ((index * 17) % 37) / 37,
-                lateralSeed: (((index % 7) - 3) / 3) + (((index * 19) % 5) - 2) * 0.18,
-                verticalSeed: ((index * 11) % 6) * 0.05,
+                lateralSeed: (((index % 11) - 5) / 5) + (((index * 19) % 7) - 3) * 0.14,
+                lateralDriftSeed: ((index * 29) % 41) / 41,
+                lateralDriftPhase: ((index * 31) % 53) / 53,
+                verticalSeed: ((index * 11) % 8) * 0.04,
                 swaySeed: ((index * 23) % 29) / 29,
                 speedScale: 0.72 + ((index * 5) % 9) * 0.09,
                 widthScale: widthScale,
-                lengthScale: lengthScale
+                lengthScale: lengthScale,
+                spawnCycle: 0,
+                active: false,
+                nextSpawnAt: (((index * 17) % 37) / 37) * 1.4,
+                spawnTime: -1000,
+                lifeSeconds: 0,
+                streamStartX: 0,
+                streamEndX: 0,
+                streamY: 0,
+                opacityScale: 0,
+                streamLengthScale: 1.0,
+                streamWidthScale: 1.0,
+                travelSpan: depthSpan,
+                rotationJitter: 0
             });
         }
 
@@ -4699,6 +4751,50 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         };
     }
 
+    function sampleWindStreakNoise(streak, salt) {
+        const value = Math.sin(
+            (streak.progressSeed + 0.37) * 157.1 +
+            (streak.lateralSeed + 1.41) * 311.7 +
+            (streak.spawnCycle + salt) * 73.7 +
+            streak.swaySeed * 19.9) * 43758.5453123;
+        return value - Math.floor(value);
+    }
+
+    function scheduleWindStreakRespawn(streak, elapsedSeconds, minDelaySeconds, maxDelaySeconds) {
+        const delayNoise = sampleWindStreakNoise(streak, 0.73);
+        streak.active = false;
+        streak.nextSpawnAt = elapsedSeconds + lerp(minDelaySeconds, maxDelaySeconds, delayNoise);
+        streak.mesh.material.opacity = 0.0;
+    }
+
+    function activateWindStreak(streak, windField, elapsedSeconds, windDensityLevel, windSpeedLevel, flowDistance) {
+        streak.spawnCycle += 1;
+        streak.active = true;
+        streak.spawnTime = elapsedSeconds;
+
+        const lateralNoise = sampleWindStreakNoise(streak, 0.11) * 2.0 - 1.0;
+        const directionNoise = sampleWindStreakNoise(streak, 0.29) * 2.0 - 1.0;
+        const heightNoise = sampleWindStreakNoise(streak, 0.47);
+        const lifeNoise = sampleWindStreakNoise(streak, 0.61);
+        const opacityNoise = sampleWindStreakNoise(streak, 0.83);
+        const spanNoise = sampleWindStreakNoise(streak, 1.07);
+        const widthNoise = sampleWindStreakNoise(streak, 1.31);
+        const lengthNoise = sampleWindStreakNoise(streak, 1.57);
+        const rotationNoise = sampleWindStreakNoise(streak, 1.79) * 2.0 - 1.0;
+
+        streak.lifeSeconds = lerp(4.8, 2.8, windSpeedLevel) * (0.86 + lifeNoise * 0.38);
+        streak.travelSpan = flowDistance * (0.8 + spanNoise * 0.3);
+        streak.streamStartX = lateralNoise * windField.horizontalSpan * 0.58;
+        streak.streamEndX =
+            streak.streamStartX +
+            directionNoise * streak.travelSpan * lerp(0.015, 0.06, windDensityLevel);
+        streak.streamY = 0.66 + heightNoise * 0.56 + windDensityLevel * 0.12;
+        streak.opacityScale = 0.45 + opacityNoise * 0.55;
+        streak.streamWidthScale = 0.82 + widthNoise * 0.34;
+        streak.streamLengthScale = 0.78 + lengthNoise * 0.5;
+        streak.rotationJitter = rotationNoise * 0.045;
+    }
+
     function updateWindFieldVisual(cache, state, elapsedSeconds) {
         if (!cache || !cache.windField) {
             return;
@@ -4708,50 +4804,84 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const weather = siteState ? siteState.weather : null;
         const weatherVisualResponse = getWeatherVisualResponse();
         const windField = cache.windField;
-        if (!weather || weatherVisualResponse.windLevel <= 0.04) {
+        if (!weather || weatherVisualResponse.windLevel <= visibleWindStreakThreshold) {
             windField.group.visible = false;
             return;
         }
 
         const windLevel = weatherVisualResponse.windLevel;
-        const directionDegrees =
-            typeof weather.windDirectionDegrees === "number"
-                ? weather.windDirectionDegrees
-                : 0;
+        const windDensityLevel = Math.pow(clamp01(windLevel), 1.45);
+        const windSpeedLevel = Math.pow(clamp01(windLevel), 1.2);
+        const directionDegrees = resolveVisualWindDirectionDegrees(weather);
         const directionRadians = directionDegrees * Math.PI / 180.0;
-        const alpha = Math.min(0.46, windLevel * 0.38);
-        const streakLength = lerp(0.82, 1.9, windLevel);
-        const streakWidth = lerp(0.72, 1.25, windLevel);
-        const flowDistance = windField.depthSpan * (1.05 + windLevel * 0.65);
-        const activeStreakCount = Math.max(
-            6,
+        const alpha = Math.min(0.2, 0.015 + windDensityLevel * 0.185);
+        const streakLength = lerp(0.72, 2.1, windDensityLevel);
+        const streakWidth = lerp(0.62, 1.08, windDensityLevel);
+        const flowDistance = windField.depthSpan * (0.94 + windSpeedLevel * 1.28);
+        const targetActiveStreakCount = Math.max(
+            2,
             Math.min(
                 windField.streaks.length,
-                Math.round(lerp(8, windField.streaks.length, windLevel))
+                Math.round(lerp(3, windField.streaks.length * 0.72, windDensityLevel))
             )
         );
+        const minRespawnDelaySeconds = lerp(0.52, 0.05, windLevel);
+        const maxRespawnDelaySeconds = lerp(1.35, 0.16, windLevel);
 
         windField.group.visible = alpha > 0.02;
         windField.group.rotation.y = directionRadians;
 
+        let activeStreakCount = 0;
+        windField.streaks.forEach((streak) => {
+            if (streak.active && elapsedSeconds >= streak.spawnTime + streak.lifeSeconds) {
+                scheduleWindStreakRespawn(streak, elapsedSeconds, minRespawnDelaySeconds, maxRespawnDelaySeconds);
+            }
+            if (streak.active) {
+                activeStreakCount += 1;
+            }
+        });
+
+        windField.streaks.forEach((streak) => {
+            if (!streak.active &&
+                elapsedSeconds >= streak.nextSpawnAt &&
+                activeStreakCount < targetActiveStreakCount) {
+                activateWindStreak(streak, windField, elapsedSeconds, windDensityLevel, windSpeedLevel, flowDistance);
+                activeStreakCount += 1;
+            }
+        });
+
         windField.streaks.forEach((streak, index) => {
-            const streakEnabled = index < activeStreakCount;
-            const progress = (elapsedSeconds * (0.16 + windLevel * 0.55) * streak.speedScale + streak.progressSeed) % 1.0;
-            const flowOffset = (progress - 0.5) * flowDistance;
-            const lateralOffset = streak.lateralSeed * windField.horizontalSpan;
-            const verticalBob = Math.sin((elapsedSeconds + streak.swaySeed * 6.0) * (1.2 + windLevel * 1.8)) * 0.05;
+            if (!streak.active) {
+                streak.mesh.material.opacity = 0.0;
+                return;
+            }
+
+            const progress = clamp01((elapsedSeconds - streak.spawnTime) / Math.max(streak.lifeSeconds, 0.0001));
+            const flowOffset = lerp(-0.5 * streak.travelSpan, 0.5 * streak.travelSpan, progress);
+            const lateralOffset =
+                lerp(streak.streamStartX, streak.streamEndX, progress) +
+                Math.sin(
+                    elapsedSeconds * (0.18 + streak.speedScale * 0.14) +
+                    streak.lateralDriftPhase * Math.PI * 2.0) *
+                    windField.horizontalSpan *
+                    (0.01 + streak.lateralDriftSeed * 0.022);
+            const verticalBob =
+                Math.sin((elapsedSeconds + streak.swaySeed * 6.0) * (0.84 + windSpeedLevel * 1.25)) *
+                (0.014 + windDensityLevel * 0.018);
+            const fadeIn = smoothstep01(0.0, 0.14, progress);
+            const fadeOut = 1.0 - smoothstep01(0.72, 1.0, progress);
             streak.mesh.position.x = lateralOffset;
             streak.mesh.position.z = flowOffset;
-            streak.mesh.position.y = 0.74 + streak.verticalSeed + verticalBob + windLevel * 0.24;
-            streak.mesh.rotation.z = Math.sin(elapsedSeconds * 1.6 + index * 0.5) * 0.08;
+            streak.mesh.position.y = streak.streamY + streak.verticalSeed + verticalBob;
+            streak.mesh.rotation.z =
+                streak.rotationJitter +
+                Math.sin(elapsedSeconds * (0.55 + windSpeedLevel * 0.65) + index * 0.4) * 0.035;
             streak.mesh.scale.set(
-                streakWidth * streak.widthScale,
-                streakLength * streak.lengthScale,
+                streakWidth * streak.widthScale * streak.streamWidthScale,
+                streakLength * streak.lengthScale * streak.streamLengthScale,
                 1.0
             );
-            streak.mesh.material.opacity = streakEnabled
-                ? alpha * (0.62 + streak.speedScale * 0.22)
-                : 0.0;
+            streak.mesh.material.opacity = alpha * streak.opacityScale * fadeIn * fadeOut;
             streak.mesh.material.color.setHex(0xf6edd7);
         });
     }
