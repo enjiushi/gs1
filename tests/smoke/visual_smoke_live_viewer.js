@@ -78,8 +78,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let smoothedWeatherVisualResponse = {
         heatLevel: 0,
         dustLevel: 0,
-        windLevel: 0,
-        effectStrength: 0
+        windLevel: 0
     };
     let cameraOrbitDragPointerId = null;
     let cameraOrbitDragButton = -1;
@@ -142,8 +141,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         uniform float uHeatLevel;
         uniform float uHeatColorAddGain;
         uniform float uDustLevel;
-        uniform float uEventLevel;
-        uniform float uStrength;
 
         varying vec2 vUv;
 
@@ -179,66 +176,37 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             vec2 uv = vUv;
             vec2 texel = 1.0 / max(uResolution, vec2(1.0));
             vec4 baseSceneColor = texture2D(tSceneColor, uv);
-            float lowerMask = smoothstep(0.04, 0.22, uv.y);
-            float upperMask = 1.0 - smoothstep(0.74, 0.96, uv.y);
-            float edgeMask = smoothstep(0.06, 0.20, uv.x) * (1.0 - smoothstep(0.80, 0.94, uv.x));
-            float shimmerMask = lowerMask * upperMask * mix(0.92, 1.05, edgeMask);
+            float heatAmount = clamp(uHeatLevel, 0.0, 1.0);
+            float dustAmount = clamp(uDustLevel, 0.0, 1.0);
 
-            float bandA = sin(uv.y * 28.0 - uTime * 1.8 + sin(uv.x * 9.0 + uTime * 0.55));
-            float bandB = sin((uv.y + uv.x * 0.10) * 58.0 + uTime * 2.8);
-            float bandC = sin((uv.y * 96.0) - uTime * 4.0 + uv.x * 16.0);
-            float ripple = bandA * 0.68 + bandB * 0.22 + bandC * 0.10;
-            float heatScale = smoothstep(0.0, 1.0, uHeatLevel);
-            float dustScale = smoothstep(0.0, 1.0, uDustLevel);
-            float eventScale = smoothstep(0.0, 1.0, uEventLevel);
-            float weatherBlend = smoothstep(0.0, 1.0, uStrength);
-            float heatDominance = smoothstep(0.08, 0.42, heatScale);
-            float horizonHaze = smoothstep(0.10, 0.98, uv.y);
-            float lateralMask = smoothstep(0.00, 0.12, uv.x) * (1.0 - smoothstep(0.88, 1.0, uv.x));
-            float dustMask = horizonHaze * mix(0.84, 1.0, lateralMask);
-            vec2 dustFlowUv = uv * vec2(2.2, 4.6) + vec2(-uTime * 0.022, uTime * 0.006);
-            vec2 dustShapeUv = uv * vec2(5.8, 13.0) + vec2(-uTime * 0.045, uTime * 0.012);
-            float dustVolume = fbm(dustFlowUv);
-            float dustStrata = fbm(dustShapeUv);
-            float dustDensityField =
-                mix(dustVolume, dustStrata, 0.28) * 0.72 +
-                (sin((uv.y * 9.0 - uv.x * 1.8) - uTime * 0.12) * 0.5 + 0.5) * 0.28;
-            float opticalDepth =
-                dustScale *
-                weatherBlend *
-                mix(1.0, 0.38, heatDominance) *
-                dustMask *
-                mix(0.12, 0.72, horizonHaze) *
-                mix(0.84, 1.12, dustDensityField) *
-                (1.0 + eventScale * 0.22);
-            float veilDepth = smoothstep(0.10, 0.95, opticalDepth * 0.68);
-            float gustDistortion = (dustStrata - 0.5) * dustScale * dustMask;
-
-            vec2 distortion = vec2(ripple * 4.9, (bandB * 0.55 + bandC * 0.45) * 0.78);
-            distortion += vec2(gustDistortion * (2.6 + eventScale * 0.8), gustDistortion * 0.22);
+            float heatWaveA = sin(uv.y * 34.0 - uTime * 2.0 + uv.x * 8.0);
+            float heatWaveB = sin(uv.y * 70.0 + uTime * 3.0 - uv.x * 5.0);
+            vec2 distortion = vec2(
+                heatWaveA * 0.75 + heatWaveB * 0.25,
+                heatWaveB * 0.18);
             vec2 sampleUv = clamp(
-                uv + distortion * texel * uStrength * shimmerMask * mix(0.84, 1.22, heatScale),
+                uv + distortion * texel * heatAmount * 6.0,
                 vec2(0.001),
                 vec2(0.999));
-            vec4 sceneColor = texture2D(tSceneColor, sampleUv);
-            float brightAreaMask = smoothstep(0.45, 1.45, dot(sceneColor.rgb, vec3(0.30, 0.59, 0.11)) * 1.6);
-            float heatAddAmount = clamp(heatScale * uHeatColorAddGain, 0.0, 1.0);
+            vec3 distortedColor = texture2D(tSceneColor, sampleUv).rgb;
             vec3 heatSunOnSandColor = vec3(0.88, 0.66, 0.36);
-            vec3 color = sceneColor.rgb + heatSunOnSandColor * heatAddAmount;
+            vec3 color = distortedColor;
+            color += heatSunOnSandColor * (heatAmount * uHeatColorAddGain);
+
             vec3 dustTint = vec3(0.78, 0.67, 0.52);
-            float transmittance = exp(-opticalDepth * mix(1.02, 0.34, heatDominance));
-            float inscatter = 1.0 - transmittance;
-            vec3 colorExtinct = color * transmittance;
-            vec3 mieFog = dustTint * inscatter;
-            float forwardLift = brightAreaMask * dustScale * veilDepth * mix(0.05, 0.02, heatDominance) * (1.0 + eventScale * 0.22);
-            color = colorExtinct + mieFog;
-            color = mix(color, vec3(dot(color, vec3(0.30, 0.59, 0.11))), inscatter * 0.18);
-            color += dustTint * forwardLift;
-            color = mix(color, dustTint, veilDepth * dustScale * mix(0.05, 0.015, heatDominance));
-            color = mix(baseSceneColor.rgb, color, weatherBlend);
+            float horizonMask = smoothstep(0.10, 0.98, uv.y);
+            float dustNoise = fbm(uv * vec2(3.2, 7.4) + vec2(-uTime * 0.03, uTime * 0.01));
+            float opticalDepth =
+                dustAmount *
+                horizonMask *
+                mix(0.45, 1.0, dustNoise);
+            float transmittance = exp(-opticalDepth);
+            vec3 mieFog = dustTint * (1.0 - transmittance);
+            color = color * transmittance + mieFog;
             color = min(color, vec3(1.0));
 
             gl_FragColor = vec4(color, baseSceneColor.a);
+            #include <colorspace_fragment>
         }
     `;
     const siteCameraDefaults = {
@@ -441,8 +409,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 uHeatLevel: { value: 0 },
                 uHeatColorAddGain: { value: heatColorAddGainForVfx },
                 uDustLevel: { value: 0 },
-                uEventLevel: { value: 0 },
-                uStrength: { value: 0 }
             },
             vertexShader: weatherDistortionVertexShader,
             fragmentShader: weatherDistortionFragmentShader,
@@ -485,6 +451,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return t * t * (3.0 - 2.0 * t);
     }
 
+    function normalizeWeatherValue(value) {
+        return clamp01((typeof value === "number" ? value : 0) / 100.0);
+    }
+
     function blendToward(current, target, ratePerSecond, deltaSeconds) {
         if (!(deltaSeconds > 0)) {
             return target;
@@ -498,8 +468,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return {
                 heatLevel: 0,
                 dustLevel: 0,
-                windLevel: 0,
-                effectStrength: 0
+                windLevel: 0
             };
         }
 
@@ -509,48 +478,23 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return {
                 heatLevel: 0,
                 dustLevel: 0,
-                windLevel: 0,
-                effectStrength: 0
+                windLevel: 0
             };
         }
 
-        const rawHeatLevel = clamp01((typeof weather.heat === "number" ? weather.heat : 0) / 100.0);
-        const rawDustLevel = clamp01(weather.dust / 18.0);
-        const rawWindLevel = clamp01((weather.wind || 0) / 80.0);
-        const heatLevel = smoothstep01(0.12, 0.58, rawHeatLevel);
-        const dustLevel = smoothstep01(0.18, 0.70, rawDustLevel);
-        const windLevel = smoothstep01(0.10, 0.52, rawWindLevel);
-        const heatPresence = smoothstep01(0.0, 0.18, heatLevel);
-        const baseStrength = heatPresence * 0.20;
-        const blendedStrength =
-            baseStrength +
-            heatLevel * 0.74 +
-            heatLevel * heatLevel * 0.38 +
-            dustLevel * 0.14 +
-            dustLevel * dustLevel * 0.08;
-
         return {
-            heatLevel,
-            dustLevel,
-            windLevel,
-            effectStrength: Math.min(blendedStrength, 0.92)
+            heatLevel: normalizeWeatherValue(weather.heat),
+            dustLevel: normalizeWeatherValue(weather.dust),
+            windLevel: normalizeWeatherValue(weather.wind)
         };
     }
 
     function updateSmoothedWeatherVisualResponse(state, deltaSeconds) {
         const target = buildTargetWeatherVisualResponse(state);
-        const riseRate = 5.0;
-        const fallRate = 1.8;
+        const blendRate = 6.0;
 
         function blendWeatherVisualChannel(current, nextTarget) {
-            return clamp01(
-                blendToward(
-                    current,
-                    nextTarget,
-                    nextTarget > current ? riseRate : fallRate,
-                    deltaSeconds
-                )
-            );
+            return clamp01(blendToward(current, nextTarget, blendRate, deltaSeconds));
         }
 
         smoothedWeatherVisualResponse.heatLevel =
@@ -559,8 +503,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             blendWeatherVisualChannel(smoothedWeatherVisualResponse.dustLevel, target.dustLevel);
         smoothedWeatherVisualResponse.windLevel =
             blendWeatherVisualChannel(smoothedWeatherVisualResponse.windLevel, target.windLevel);
-        smoothedWeatherVisualResponse.effectStrength =
-            blendWeatherVisualChannel(smoothedWeatherVisualResponse.effectStrength, target.effectStrength);
     }
 
     function getWeatherVisualResponse() {
@@ -648,15 +590,14 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         const weatherVisualResponse = getWeatherVisualResponse();
         const windLevel = weatherVisualResponse.windLevel;
-        const dustLevel = weatherVisualResponse.dustLevel;
         const directionDegrees =
             typeof weather.windDirectionDegrees === "number"
                 ? weather.windDirectionDegrees
                 : 0;
-        const opacity = Math.min(0.68, windLevel * 0.28 + dustLevel * 0.14);
-        const dustAlpha = Math.min(0.44, dustLevel * 0.22 + windLevel * 0.08);
+        const opacity = Math.min(0.68, windLevel * 0.42);
+        const dustAlpha = Math.min(0.44, windLevel * 0.16);
         let severity = "watch";
-        if (windLevel >= 0.8 || (windLevel >= 0.62 && dustLevel >= 0.7)) {
+        if (windLevel >= 0.8) {
             severity = "critical";
         } else if (windLevel >= 0.56) {
             severity = "severe";
@@ -745,7 +686,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function renderSceneWithWeatherDistortion(state, elapsedSeconds) {
         const weatherVisualResponse = getWeatherVisualResponse();
-        if (!weatherPostProcess || weatherVisualResponse.effectStrength <= 0.001) {
+        if (!weatherPostProcess ||
+            (weatherVisualResponse.heatLevel <= 0.001 &&
+                weatherVisualResponse.dustLevel <= 0.001)) {
             renderer.setRenderTarget(null);
             renderer.render(scene, camera);
             return;
@@ -755,8 +698,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         weatherPostProcess.material.uniforms.uHeatLevel.value = weatherVisualResponse.heatLevel;
         weatherPostProcess.material.uniforms.uHeatColorAddGain.value = heatColorAddGainForVfx;
         weatherPostProcess.material.uniforms.uDustLevel.value = weatherVisualResponse.dustLevel;
-        weatherPostProcess.material.uniforms.uEventLevel.value = 0;
-        weatherPostProcess.material.uniforms.uStrength.value = weatherVisualResponse.effectStrength;
         weatherPostProcess.material.uniforms.tSceneColor.value = weatherPostProcess.renderTarget.texture;
 
         renderer.setRenderTarget(weatherPostProcess.renderTarget);
@@ -766,21 +707,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function updateDustOverlay(state, elapsedSeconds) {
-        const weatherVisualResponse = getWeatherVisualResponse();
-        if (!state || state.appState !== "SITE_ACTIVE" || weatherVisualResponse.dustLevel <= 0.001) {
+        if (!state || state.appState !== "SITE_ACTIVE") {
             dustOverlay.style.opacity = "0";
             return;
         }
-
-        const driftPrimary = (-elapsedSeconds * 18.0).toFixed(1);
-        const driftSecondary = (-elapsedSeconds * (11.0 + weatherVisualResponse.dustLevel * 5.0)).toFixed(1);
-        const hazePulse =
-            0.08 +
-            weatherVisualResponse.dustLevel * 0.22 +
-            (Math.sin(elapsedSeconds * 0.28) * 0.5 + 0.5) * 0.03;
-        dustOverlay.style.opacity = Math.min(hazePulse, 0.36).toFixed(3);
-        dustOverlay.style.backgroundPosition =
-            driftPrimary + "px 0px, " + driftSecondary + "px 0px, 0px 0px";
+        dustOverlay.style.opacity = "0";
     }
 
     function disposeObject(object) {
@@ -4700,13 +4631,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
 
         const windLevel = weatherVisualResponse.windLevel;
-        const dustLevel = weatherVisualResponse.dustLevel;
         const directionDegrees =
             typeof weather.windDirectionDegrees === "number"
                 ? weather.windDirectionDegrees
                 : 0;
         const directionRadians = directionDegrees * Math.PI / 180.0;
-        const alpha = Math.min(0.46, windLevel * 0.26 + dustLevel * 0.12);
+        const alpha = Math.min(0.46, windLevel * 0.38);
         const streakLength = lerp(0.82, 1.9, windLevel);
         const streakWidth = lerp(0.72, 1.25, windLevel);
         const flowDistance = windField.depthSpan * (1.05 + windLevel * 0.65);
@@ -4739,7 +4669,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             streak.mesh.material.opacity = streakEnabled
                 ? alpha * (0.62 + streak.speedScale * 0.22)
                 : 0.0;
-            streak.mesh.material.color.setHex(dustLevel >= 0.55 ? 0xf5d6aa : 0xf6edd7);
+            streak.mesh.material.color.setHex(0xf6edd7);
         });
     }
 

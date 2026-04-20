@@ -14,13 +14,27 @@ namespace
 constexpr float k_mild_weather_heat = 15.0f;
 constexpr float k_mild_weather_wind = 10.0f;
 constexpr float k_mild_weather_dust = 5.0f;
+constexpr float k_site_one_heat_vfx_peak_heat = 100.0f;
 constexpr double k_event_ramp_up_minutes = 5.0;
 constexpr double k_event_peak_hold_minutes = 5.0;
 constexpr double k_event_ramp_down_minutes = 5.0;
+constexpr double k_site_one_heat_vfx_ramp_up_minutes = runtime_minutes_from_real_seconds(10.0);
+constexpr double k_site_one_heat_vfx_peak_hold_minutes = runtime_minutes_from_real_seconds(3.0);
+constexpr double k_site_one_heat_vfx_ramp_down_minutes = runtime_minutes_from_real_seconds(5.0);
 constexpr float k_weather_epsilon = 0.0001f;
 constexpr float k_weather_transition_rate_per_second = 2.4f;
 constexpr double k_min_wave_delay_minutes = 4.0;
 constexpr double k_max_wave_delay_minutes = 8.0;
+constexpr std::uint32_t k_site_one_heat_vfx_event_template_id = 1001U;
+
+struct EventWeatherTargets final
+{
+    float heat {0.0f};
+    float wind {0.0f};
+    float dust {0.0f};
+    float wind_direction_degrees {0.0f};
+    bool apply_immediately {false};
+};
 
 void apply_site_weather(
     SiteSystemContext<WeatherEventSystem>& context,
@@ -147,6 +161,12 @@ bool has_active_event(const EventState& event) noexcept
     return event.active_event_template_id.has_value();
 }
 
+bool is_site_one_heat_vfx_event(const EventState& event) noexcept
+{
+    return event.active_event_template_id.has_value() &&
+        event.active_event_template_id->value == k_site_one_heat_vfx_event_template_id;
+}
+
 double resolve_peak_end_time_minutes(const EventState& event) noexcept
 {
     const double peak_time = std::max(event.peak_time_minutes, event.start_time_minutes);
@@ -235,6 +255,29 @@ double resolve_next_wave_delay_minutes(
         (k_max_wave_delay_minutes - k_min_wave_delay_minutes) * static_cast<double>(sample);
 }
 
+EventWeatherTargets resolve_event_weather_targets(
+    const SiteSystemContext<WeatherEventSystem>& context,
+    const EventState& event,
+    float pressure_scale) noexcept
+{
+    if (is_site_one_heat_vfx_event(event))
+    {
+        return EventWeatherTargets {
+            k_site_one_heat_vfx_peak_heat * pressure_scale,
+            0.0f,
+            0.0f,
+            0.0f,
+            true};
+    }
+
+    return EventWeatherTargets {
+        k_mild_weather_heat * pressure_scale,
+        k_mild_weather_wind * pressure_scale,
+        k_mild_weather_dust * pressure_scale,
+        resolve_event_wind_direction(context),
+        false};
+}
+
 void clear_event_timeline(EventState& event) noexcept
 {
     event.active_event_template_id.reset();
@@ -300,9 +343,21 @@ Gs1Status WeatherEventSystem::process_message(
         return GS1_STATUS_OK;
     }
 
+    const double world_time_minutes = context.world.read_time().world_time_minutes;
     weather.forecast_profile_state.forecast_profile_id = 1U;
     weather.site_weather_bias = 0.0f;
+    apply_site_weather(context, 0.0f, 0.0f, 0.0f, 0.0f);
+    event.active_event_template_id = EventTemplateId {k_site_one_heat_vfx_event_template_id};
+    event.start_time_minutes = world_time_minutes;
+    event.peak_time_minutes = world_time_minutes + k_site_one_heat_vfx_ramp_up_minutes;
+    event.peak_duration_minutes = k_site_one_heat_vfx_peak_hold_minutes;
+    event.end_time_minutes =
+        event.peak_time_minutes + event.peak_duration_minutes + k_site_one_heat_vfx_ramp_down_minutes;
     event.aftermath_relief_resolved = 0.0f;
+    event.event_heat_pressure = 0.0f;
+    event.event_wind_pressure = 0.0f;
+    event.event_dust_pressure = 0.0f;
+    context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
 
     return GS1_STATUS_OK;
 }
@@ -337,6 +392,7 @@ void WeatherEventSystem::run(SiteSystemContext<WeatherEventSystem>& context)
     const double end_time_minutes = resolve_end_time_minutes(event);
     if (world_time_minutes >= end_time_minutes)
     {
+        const bool ended_site_one_heat_vfx_event = is_site_one_heat_vfx_event(event);
         clear_event_timeline(event);
         if (objective.type == SiteObjectiveType::HighwayProtection &&
             objective.time_limit_minutes > 0.0 &&
@@ -347,23 +403,40 @@ void WeatherEventSystem::run(SiteSystemContext<WeatherEventSystem>& context)
         }
         event.aftermath_relief_resolved = 1.0f;
         context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
+        if (ended_site_one_heat_vfx_event)
+        {
+            apply_site_weather(context, 0.0f, 0.0f, 0.0f, 0.0f);
+            return;
+        }
         smooth_site_weather_toward(context, 0.0f, 0.0f, 0.0f, 0.0f);
         return;
     }
 
     const float pressure_scale = resolve_event_pressure_scale(event, world_time_minutes);
-    event.event_heat_pressure = k_mild_weather_heat * pressure_scale;
-    event.event_wind_pressure = k_mild_weather_wind * pressure_scale;
-    event.event_dust_pressure = k_mild_weather_dust * pressure_scale;
+    const auto targets = resolve_event_weather_targets(context, event, pressure_scale);
+    event.event_heat_pressure = targets.heat;
+    event.event_wind_pressure = targets.wind;
+    event.event_dust_pressure = targets.dust;
     if (event.active_event_template_id != previous_template_id)
     {
         context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
     }
+    if (targets.apply_immediately)
+    {
+        apply_site_weather(
+            context,
+            targets.heat,
+            targets.wind,
+            targets.dust,
+            targets.wind_direction_degrees);
+        return;
+    }
+
     smooth_site_weather_toward(
         context,
-        event.event_heat_pressure,
-        event.event_wind_pressure,
-        event.event_dust_pressure,
-        resolve_event_wind_direction(context));
+        targets.heat,
+        targets.wind,
+        targets.dust,
+        targets.wind_direction_degrees);
 }
 }  // namespace gs1
