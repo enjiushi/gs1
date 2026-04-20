@@ -19,5 +19,5 @@ Data-only definition headers for the major authored content domains.
 - `reward_defs.h`: Reward definition records for grants and payouts.
 - `site_content_defs.h`: Site template/content definitions for active site runs.
 - `structure_defs.h`: Structure/buildable definition records.
-- `task_defs.h`: Task board/authored task definition records.
+- `task_defs.h`: Task board/authored task definition records, including the site-one onboarding tutorial task set and fixed reward-delivery metadata.
 - `technology_defs.h`: Technology tree definition records, including faction-authored tier names, base-tech unlockables, amplification modifier metadata, and mutually exclusive amplification choices.

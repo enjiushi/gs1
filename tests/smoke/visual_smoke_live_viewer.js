@@ -3391,6 +3391,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         });
     }
 
+    function postPhoneTaskAction(type, task) {
+        return postJson("/ui-action", {
+            type: type,
+            targetId: task.taskInstanceId,
+            arg0: task.taskTemplateId || 0,
+            arg1: 0
+        });
+    }
+
     function makePhoneStepperButton(label, onClick, disabled) {
         const button = document.createElement("button");
         button.type = "button";
@@ -3635,6 +3644,60 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return className;
     }
 
+    function getPhoneTaskTemplatePresentation(task) {
+        switch (task.taskTemplateId) {
+        case 1:
+            return {
+                title: "Clear the Camp Path",
+                summary: "Use Clear Burial on the drift packed against the camp approach.",
+                reward: "Reward: 2 Wood to the delivery box."
+            };
+        case 2:
+            return {
+                title: "Fix the Workbench",
+                summary: "Repair the damaged starter workbench beside camp.",
+                reward: "Reward: 2 Iron to the delivery box."
+            };
+        case 3:
+            return {
+                title: "Plant a Starter Patch",
+                summary: "Plant two Wind Reed tiles to learn the base restoration action.",
+                reward: "Reward: 2 Wind Reed Seeds to the delivery box."
+            };
+        case 4:
+            return {
+                title: "Water the Seedlings",
+                summary: "Use Water twice on planted tiles to learn follow-up care.",
+                reward: "Reward: 1 Water to the delivery box."
+            };
+        default:
+            return {
+                title: "Contract " + task.taskInstanceId,
+                summary: "Template " + task.taskTemplateId,
+                reward: ""
+            };
+        }
+    }
+
+    function appendPhoneTaskAction(card, task) {
+        if (task.listKind !== "VISIBLE") {
+            return;
+        }
+
+        card.appendChild(
+            makePhoneActionButton(
+                "Accept Contract",
+                function () {
+                    postPhoneTaskAction("ACCEPT_TASK", task).catch(() => {
+                        statusChip.textContent = "Failed to accept contract.";
+                    });
+                },
+                true,
+                false
+            )
+        );
+    }
+
     function appendPhoneTaskSection(container, tasks) {
         const visibleTaskCount = countTasksByListKind(tasks, "VISIBLE");
         const acceptedTaskCount = countTasksByListKind(tasks, "ACCEPTED");
@@ -3656,6 +3719,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         content.appendChild(stack);
 
         tasks.forEach((task) => {
+            const taskPresentation = getPhoneTaskTemplatePresentation(task);
             const targetProgress = Math.max(task.targetProgress || 0, 1);
             const currentProgress = Math.max(0, Math.min(task.currentProgress || 0, targetProgress));
             const completion = Math.round((currentProgress / targetProgress) * 100);
@@ -3667,7 +3731,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
             const titleElement = document.createElement("div");
             titleElement.className = "phone-task-title";
-            titleElement.textContent = "Contract " + task.taskInstanceId;
+            titleElement.textContent = taskPresentation.title;
             header.appendChild(titleElement);
 
             const stateElement = document.createElement("div");
@@ -3679,10 +3743,17 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             const metaElement = document.createElement("div");
             metaElement.className = "phone-task-meta";
             metaElement.textContent =
-                "Template " + task.taskTemplateId +
+                taskPresentation.summary +
                 "  |  Progress " + currentProgress + "/" + targetProgress +
                 "  |  " + completion + "%";
             card.appendChild(metaElement);
+
+            if (taskPresentation.reward) {
+                const rewardElement = document.createElement("div");
+                rewardElement.className = "phone-task-meta";
+                rewardElement.textContent = taskPresentation.reward;
+                card.appendChild(rewardElement);
+            }
 
             const track = document.createElement("div");
             track.className = "phone-task-track";
@@ -3691,6 +3762,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             fill.style.width = completion + "%";
             track.appendChild(fill);
             card.appendChild(track);
+
+            appendPhoneTaskAction(card, task);
 
             stack.appendChild(card);
         });

@@ -27,6 +27,11 @@ TileCoord starter_workbench_tile(TileCoord camp_anchor_tile) noexcept
     return TileCoord {camp_anchor_tile.x + 1, camp_anchor_tile.y};
 }
 
+TileCoord site1_onboarding_burial_tile(TileCoord camp_anchor_tile) noexcept
+{
+    return TileCoord {camp_anchor_tile.x, camp_anchor_tile.y + 1};
+}
+
 TileCoord delivery_box_tile(TileCoord camp_anchor_tile) noexcept
 {
     return TileCoord {camp_anchor_tile.x + 10, camp_anchor_tile.y};
@@ -190,8 +195,16 @@ SiteRunState SiteRunFactory::create_site_run(
         {
             auto tile = run.site_world->tile_at(workbench_tile);
             tile.device.structure_id = StructureId {k_structure_workbench};
-            tile.device.device_integrity = 1.0f;
+            tile.device.device_integrity = 0.55f;
             run.site_world->set_tile(workbench_tile, tile);
+        }
+
+        const auto burial_tile = site1_onboarding_burial_tile(run.camp.camp_anchor_tile);
+        if (run.site_world->contains(burial_tile))
+        {
+            auto tile = run.site_world->tile_at(burial_tile);
+            tile.ecology.sand_burial = 0.45f;
+            run.site_world->set_tile(burial_tile, tile);
         }
     }
     run.pending_tile_projection_update_mask.assign(run.site_world->tile_count(), 0U);

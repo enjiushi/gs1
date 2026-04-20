@@ -479,8 +479,6 @@ void task_board_regression_runner(
 
     if (scenario == "accept_and_complete_site_one")
     {
-        site_run.counters.site_completion_tile_threshold =
-            parse_u32(context, values, "site_completion_tile_threshold", 2U);
         GS1_SYSTEM_TEST_REQUIRE(
             context,
             TaskBoardSystem::process_message(
@@ -502,11 +500,8 @@ void task_board_regression_runner(
             TaskBoardSystem::process_message(
                 site_context,
                 make_message(
-                    GameMessageType::RestorationProgressChanged,
-                    gs1::RestorationProgressChangedMessage {
-                        parse_u32(context, values, "fully_grown_tile_count", 2U),
-                        parse_u32(context, values, "site_completion_tile_threshold", 2U),
-                        1.0f})) == GS1_STATUS_OK);
+                    GameMessageType::SiteTileBurialCleared,
+                    gs1::SiteTileBurialClearedMessage {1U, 2, 3, 0.35f, 0U})) == GS1_STATUS_OK);
         GS1_SYSTEM_TEST_CHECK(
             context,
             site_run.task_board.visible_tasks.front().runtime_list_kind ==

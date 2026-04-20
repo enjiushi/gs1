@@ -15,6 +15,6 @@ Source-authored system tests and supporting fixtures/runner registration code.
 - `craft_system_tests.cpp`: System tests covering crafting behavior.
 - `device_interaction_system_tests.cpp`: System tests for device interaction flows.
 - `environment_worker_device_system_tests.cpp`: System tests across environment, worker, and device interactions, including directional wind-shadow coverage for plants, windbreak devices, one-sided highway-protection weather waves, and modifier import from unlocked assistants plus purchased technology.
-- `inventory_economy_task_system_tests.cpp`: System tests spanning inventory, economy, task board behavior, and phone sell/cart regressions.
-- `phone_panel_system_tests.cpp`: System tests for authoritative phone panel snapshot state, section switching, and sell-list refresh after delivery arrivals.
+- `inventory_economy_task_system_tests.cpp`: System tests spanning inventory, economy, onboarding task-board behavior, reward-delivery queueing, and phone sell/cart regressions.
+- `phone_panel_system_tests.cpp`: System tests for authoritative phone panel snapshot state, including site-one onboarding task counts, section switching, and sell-list refresh after delivery arrivals.
 - `system_test_fixtures.h`: Shared campaign/site fixtures and helpers, including default worker-pack setup, used across the source-authored system tests.
