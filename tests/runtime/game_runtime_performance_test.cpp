@@ -82,8 +82,10 @@ struct NamedSystem final
 
 constexpr NamedSystem kNamedSystems[] {
     {"campaign_flow", "CampaignFlowSystem", GS1_RUNTIME_PROFILE_SYSTEM_CAMPAIGN_FLOW},
+    {"campaign_time", "CampaignTimeSystem", GS1_RUNTIME_PROFILE_SYSTEM_CAMPAIGN_TIME},
     {"loadout_planner", "LoadoutPlannerSystem", GS1_RUNTIME_PROFILE_SYSTEM_LOADOUT_PLANNER},
     {"site_flow", "SiteFlowSystem", GS1_RUNTIME_PROFILE_SYSTEM_SITE_FLOW},
+    {"site_time", "SiteTimeSystem", GS1_RUNTIME_PROFILE_SYSTEM_SITE_TIME},
     {"modifier", "ModifierSystem", GS1_RUNTIME_PROFILE_SYSTEM_MODIFIER},
     {"weather_event", "WeatherEventSystem", GS1_RUNTIME_PROFILE_SYSTEM_WEATHER_EVENT},
     {"action_execution", "ActionExecutionSystem", GS1_RUNTIME_PROFILE_SYSTEM_ACTION_EXECUTION},

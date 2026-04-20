@@ -14,7 +14,7 @@ namespace gs1
 {
 namespace
 {
-constexpr std::int32_t k_site1_initial_money = 50;
+constexpr std::int32_t k_site1_initial_money = 45;
 constexpr std::int32_t k_phone_delivery_fee = 5;
 constexpr std::uint16_t k_default_delivery_minutes = 30U;
 constexpr std::uint32_t k_site1_water_listing_id = 1U;
@@ -295,6 +295,46 @@ bool queue_single_delivery_message(
     return queue_delivery_batch_message(context, &entry, 1U);
 }
 
+void queue_purchase_completed_message(
+    SiteSystemContext<EconomyPhoneSystem>& context,
+    const PhoneListingState& listing,
+    std::uint32_t quantity) noexcept
+{
+    if (listing.item_id.value == 0U || quantity == 0U)
+    {
+        return;
+    }
+
+    GameMessage message {};
+    message.type = GameMessageType::PhoneListingPurchased;
+    message.set_payload(PhoneListingPurchasedMessage {
+        listing.listing_id,
+        listing.item_id.value,
+        static_cast<std::uint16_t>(std::min<std::uint32_t>(quantity, 65535U)),
+        0U});
+    context.message_queue.push_back(message);
+}
+
+void queue_sale_completed_message(
+    SiteSystemContext<EconomyPhoneSystem>& context,
+    const PhoneListingState& listing,
+    std::uint32_t quantity) noexcept
+{
+    if (listing.item_id.value == 0U || quantity == 0U)
+    {
+        return;
+    }
+
+    GameMessage message {};
+    message.type = GameMessageType::PhoneListingSold;
+    message.set_payload(PhoneListingSoldMessage {
+        listing.listing_id,
+        listing.item_id.value,
+        static_cast<std::uint16_t>(std::min<std::uint32_t>(quantity, 65535U)),
+        0U});
+    context.message_queue.push_back(message);
+}
+
 void refresh_dynamic_sell_listings(
     SiteSystemContext<EconomyPhoneSystem>& context,
     bool force_dirty = false)
@@ -401,6 +441,8 @@ Gs1Status process_buy_listing(
     {
         return GS1_STATUS_INVALID_STATE;
     }
+
+    queue_purchase_completed_message(context, listing, quantity);
 
     mark_phone_and_hud_dirty(context);
     return GS1_STATUS_OK;
@@ -522,9 +564,31 @@ Gs1Status process_cart_checkout(SiteSystemContext<EconomyPhoneSystem>& context)
         listing.cart_quantity = 0U;
     }
 
-    if (entry_count > 0U && !queue_delivery_batch_message(context, entries, entry_count))
+        if (entry_count > 0U && !queue_delivery_batch_message(context, entries, entry_count))
     {
         return GS1_STATUS_INVALID_STATE;
+    }
+
+    for (const auto& entry : entries)
+    {
+        if (entry.item_id == 0U || entry.quantity == 0U)
+        {
+            continue;
+        }
+
+        PhoneListingState synthetic_listing {};
+        synthetic_listing.listing_id = k_site1_water_listing_id;
+        synthetic_listing.item_id = ItemId {entry.item_id};
+        for (const auto& listing : economy.available_phone_listings)
+        {
+            if (listing.kind == PhoneListingKind::BuyItem &&
+                listing.item_id.value == entry.item_id)
+            {
+                synthetic_listing.listing_id = listing.listing_id;
+                break;
+            }
+        }
+        queue_purchase_completed_message(context, synthetic_listing, entry.quantity);
     }
 
     mark_phone_and_hud_dirty(context);
@@ -570,6 +634,7 @@ Gs1Status process_sell_listing(
         static_cast<std::uint16_t>(quantity_to_sell),
         0U});
     context.message_queue.push_back(consume_message);
+    queue_sale_completed_message(context, listing, quantity_to_sell);
 
     mark_phone_and_hud_dirty(context);
     return GS1_STATUS_OK;
@@ -646,6 +711,24 @@ Gs1Status process_unlockable_purchase(
 
     mark_phone_and_hud_dirty(context);
     return GS1_STATUS_OK;
+}
+
+void reveal_unlockable_for_site(
+    SiteSystemContext<EconomyPhoneSystem>& context,
+    std::uint32_t unlockable_id)
+{
+    if (unlockable_id == 0U)
+    {
+        return;
+    }
+
+    auto& economy = context.world.own_economy();
+    if (!contains_unlockable(economy.revealed_site_unlockable_ids, unlockable_id))
+    {
+        economy.revealed_site_unlockable_ids.push_back(unlockable_id);
+    }
+
+    mark_phone_and_hud_dirty(context);
 }
 
 void seed_site_economy(SiteSystemContext<EconomyPhoneSystem>& context, std::uint32_t site_id)
@@ -741,12 +824,14 @@ bool EconomyPhoneSystem::subscribes_to(GameMessageType type) noexcept
     switch (type)
     {
     case GameMessageType::SiteRunStarted:
+    case GameMessageType::EconomyMoneyAwardRequested:
     case GameMessageType::PhoneListingPurchaseRequested:
     case GameMessageType::PhoneListingSaleRequested:
     case GameMessageType::PhoneListingCartAddRequested:
     case GameMessageType::PhoneListingCartRemoveRequested:
     case GameMessageType::PhoneCartCheckoutRequested:
     case GameMessageType::ContractorHireRequested:
+    case GameMessageType::SiteUnlockableRevealRequested:
     case GameMessageType::SiteUnlockablePurchaseRequested:
         return true;
     default:
@@ -764,6 +849,23 @@ Gs1Status EconomyPhoneSystem::process_message(
     {
         const auto& payload = message.payload_as<SiteRunStartedMessage>();
         seed_site_economy(context, payload.site_id);
+        return GS1_STATUS_OK;
+    }
+
+    case GameMessageType::EconomyMoneyAwardRequested:
+    {
+        const auto& payload = message.payload_as<EconomyMoneyAwardRequestedMessage>();
+        if (payload.delta == 0)
+        {
+            return GS1_STATUS_OK;
+        }
+
+        if (!adjust_money(context, payload.delta))
+        {
+            return GS1_STATUS_INVALID_STATE;
+        }
+
+        mark_phone_and_hud_dirty(context);
         return GS1_STATUS_OK;
     }
 
@@ -848,6 +950,13 @@ Gs1Status EconomyPhoneSystem::process_message(
         }
 
         return process_unlockable_purchase(context, payload.unlockable_id, listing->price);
+    }
+
+    case GameMessageType::SiteUnlockableRevealRequested:
+    {
+        const auto& payload = message.payload_as<SiteUnlockableRevealRequestedMessage>();
+        reveal_unlockable_for_site(context, payload.unlockable_id);
+        return GS1_STATUS_OK;
     }
 
     default:

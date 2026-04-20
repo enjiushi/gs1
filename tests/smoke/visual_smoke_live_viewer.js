@@ -74,12 +74,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let animationTimeSeconds = 0;
     let rendererWidth = 0;
     let rendererHeight = 0;
+    let retainedVisualWindDirectionDegrees = 0;
+    let retainEventWindDirectionDuringFade = false;
     let weatherPostProcess = null;
     let smoothedWeatherVisualResponse = {
         heatLevel: 0,
         dustLevel: 0,
-        windLevel: 0,
-        effectStrength: 0
+        windLevel: 0
     };
     let cameraOrbitDragPointerId = null;
     let cameraOrbitDragButton = -1;
@@ -142,8 +143,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         uniform float uHeatLevel;
         uniform float uHeatColorAddGain;
         uniform float uDustLevel;
-        uniform float uEventLevel;
-        uniform float uStrength;
 
         varying vec2 vUv;
 
@@ -179,66 +178,37 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             vec2 uv = vUv;
             vec2 texel = 1.0 / max(uResolution, vec2(1.0));
             vec4 baseSceneColor = texture2D(tSceneColor, uv);
-            float lowerMask = smoothstep(0.04, 0.22, uv.y);
-            float upperMask = 1.0 - smoothstep(0.74, 0.96, uv.y);
-            float edgeMask = smoothstep(0.06, 0.20, uv.x) * (1.0 - smoothstep(0.80, 0.94, uv.x));
-            float shimmerMask = lowerMask * upperMask * mix(0.92, 1.05, edgeMask);
+            float heatAmount = clamp(uHeatLevel, 0.0, 1.0);
+            float dustAmount = clamp(uDustLevel, 0.0, 1.0);
 
-            float bandA = sin(uv.y * 28.0 - uTime * 1.8 + sin(uv.x * 9.0 + uTime * 0.55));
-            float bandB = sin((uv.y + uv.x * 0.10) * 58.0 + uTime * 2.8);
-            float bandC = sin((uv.y * 96.0) - uTime * 4.0 + uv.x * 16.0);
-            float ripple = bandA * 0.68 + bandB * 0.22 + bandC * 0.10;
-            float heatScale = smoothstep(0.0, 1.0, uHeatLevel);
-            float dustScale = smoothstep(0.0, 1.0, uDustLevel);
-            float eventScale = smoothstep(0.0, 1.0, uEventLevel);
-            float weatherBlend = smoothstep(0.0, 1.0, uStrength);
-            float heatDominance = smoothstep(0.08, 0.42, heatScale);
-            float horizonHaze = smoothstep(0.10, 0.98, uv.y);
-            float lateralMask = smoothstep(0.00, 0.12, uv.x) * (1.0 - smoothstep(0.88, 1.0, uv.x));
-            float dustMask = horizonHaze * mix(0.84, 1.0, lateralMask);
-            vec2 dustFlowUv = uv * vec2(2.2, 4.6) + vec2(-uTime * 0.022, uTime * 0.006);
-            vec2 dustShapeUv = uv * vec2(5.8, 13.0) + vec2(-uTime * 0.045, uTime * 0.012);
-            float dustVolume = fbm(dustFlowUv);
-            float dustStrata = fbm(dustShapeUv);
-            float dustDensityField =
-                mix(dustVolume, dustStrata, 0.28) * 0.72 +
-                (sin((uv.y * 9.0 - uv.x * 1.8) - uTime * 0.12) * 0.5 + 0.5) * 0.28;
-            float opticalDepth =
-                dustScale *
-                weatherBlend *
-                mix(1.0, 0.38, heatDominance) *
-                dustMask *
-                mix(0.12, 0.72, horizonHaze) *
-                mix(0.84, 1.12, dustDensityField) *
-                (1.0 + eventScale * 0.22);
-            float veilDepth = smoothstep(0.10, 0.95, opticalDepth * 0.68);
-            float gustDistortion = (dustStrata - 0.5) * dustScale * dustMask;
-
-            vec2 distortion = vec2(ripple * 4.9, (bandB * 0.55 + bandC * 0.45) * 0.78);
-            distortion += vec2(gustDistortion * (2.6 + eventScale * 0.8), gustDistortion * 0.22);
+            float heatWaveA = sin(uv.y * 34.0 - uTime * 2.0 + uv.x * 8.0);
+            float heatWaveB = sin(uv.y * 70.0 + uTime * 3.0 - uv.x * 5.0);
+            vec2 distortion = vec2(
+                heatWaveA * 0.75 + heatWaveB * 0.25,
+                heatWaveB * 0.18);
             vec2 sampleUv = clamp(
-                uv + distortion * texel * uStrength * shimmerMask * mix(0.84, 1.22, heatScale),
+                uv + distortion * texel * heatAmount * 6.0,
                 vec2(0.001),
                 vec2(0.999));
-            vec4 sceneColor = texture2D(tSceneColor, sampleUv);
-            float brightAreaMask = smoothstep(0.45, 1.45, dot(sceneColor.rgb, vec3(0.30, 0.59, 0.11)) * 1.6);
-            float heatAddAmount = clamp(heatScale * uHeatColorAddGain, 0.0, 1.0);
+            vec3 distortedColor = texture2D(tSceneColor, sampleUv).rgb;
             vec3 heatSunOnSandColor = vec3(0.88, 0.66, 0.36);
-            vec3 color = sceneColor.rgb + heatSunOnSandColor * heatAddAmount;
+            vec3 color = distortedColor;
+            color += heatSunOnSandColor * (heatAmount * uHeatColorAddGain);
+
             vec3 dustTint = vec3(0.78, 0.67, 0.52);
-            float transmittance = exp(-opticalDepth * mix(1.02, 0.34, heatDominance));
-            float inscatter = 1.0 - transmittance;
-            vec3 colorExtinct = color * transmittance;
-            vec3 mieFog = dustTint * inscatter;
-            float forwardLift = brightAreaMask * dustScale * veilDepth * mix(0.05, 0.02, heatDominance) * (1.0 + eventScale * 0.22);
-            color = colorExtinct + mieFog;
-            color = mix(color, vec3(dot(color, vec3(0.30, 0.59, 0.11))), inscatter * 0.18);
-            color += dustTint * forwardLift;
-            color = mix(color, dustTint, veilDepth * dustScale * mix(0.05, 0.015, heatDominance));
-            color = mix(baseSceneColor.rgb, color, weatherBlend);
+            float horizonMask = smoothstep(0.10, 0.98, uv.y);
+            float dustNoise = fbm(uv * vec2(3.2, 7.4) + vec2(-uTime * 0.03, uTime * 0.01));
+            float opticalDepth =
+                dustAmount *
+                horizonMask *
+                mix(0.45, 1.0, dustNoise);
+            float transmittance = exp(-opticalDepth);
+            vec3 mieFog = dustTint * (1.0 - transmittance);
+            color = color * transmittance + mieFog;
             color = min(color, vec3(1.0));
 
             gl_FragColor = vec4(color, baseSceneColor.a);
+            #include <colorspace_fragment>
         }
     `;
     const siteCameraDefaults = {
@@ -258,6 +228,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         hasItem: 4,
         deferredTargetSelection: 8
     };
+    const visibleWindStreakThreshold = 0.04;
     const siteActionCancelFlags = {
         currentAction: 1,
         placementMode: 2
@@ -444,8 +415,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 uHeatLevel: { value: 0 },
                 uHeatColorAddGain: { value: heatColorAddGainForVfx },
                 uDustLevel: { value: 0 },
-                uEventLevel: { value: 0 },
-                uStrength: { value: 0 }
             },
             vertexShader: weatherDistortionVertexShader,
             fragmentShader: weatherDistortionFragmentShader,
@@ -488,6 +457,14 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return t * t * (3.0 - 2.0 * t);
     }
 
+    function normalizeWeatherValue(value) {
+        return clamp01((typeof value === "number" ? value : 0) / 100.0);
+    }
+
+    function normalizeWindVisualValue(value) {
+        return clamp01((typeof value === "number" ? value : 0) / 10.0);
+    }
+
     function blendToward(current, target, ratePerSecond, deltaSeconds) {
         if (!(deltaSeconds > 0)) {
             return target;
@@ -501,8 +478,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return {
                 heatLevel: 0,
                 dustLevel: 0,
-                windLevel: 0,
-                effectStrength: 0
+                windLevel: 0
             };
         }
 
@@ -512,48 +488,23 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return {
                 heatLevel: 0,
                 dustLevel: 0,
-                windLevel: 0,
-                effectStrength: 0
+                windLevel: 0
             };
         }
 
-        const rawHeatLevel = clamp01((typeof weather.heat === "number" ? weather.heat : 0) / 100.0);
-        const rawDustLevel = clamp01(weather.dust / 18.0);
-        const rawWindLevel = clamp01((weather.wind || 0) / 80.0);
-        const heatLevel = smoothstep01(0.12, 0.58, rawHeatLevel);
-        const dustLevel = smoothstep01(0.18, 0.70, rawDustLevel);
-        const windLevel = smoothstep01(0.10, 0.52, rawWindLevel);
-        const heatPresence = smoothstep01(0.0, 0.18, heatLevel);
-        const baseStrength = heatPresence * 0.20;
-        const blendedStrength =
-            baseStrength +
-            heatLevel * 0.74 +
-            heatLevel * heatLevel * 0.38 +
-            dustLevel * 0.14 +
-            dustLevel * dustLevel * 0.08;
-
         return {
-            heatLevel,
-            dustLevel,
-            windLevel,
-            effectStrength: Math.min(blendedStrength, 0.92)
+            heatLevel: normalizeWeatherValue(weather.heat),
+            dustLevel: normalizeWeatherValue(weather.dust),
+            windLevel: normalizeWindVisualValue(weather.wind)
         };
     }
 
     function updateSmoothedWeatherVisualResponse(state, deltaSeconds) {
         const target = buildTargetWeatherVisualResponse(state);
-        const riseRate = 5.0;
-        const fallRate = 1.8;
+        const blendRate = 6.0;
 
         function blendWeatherVisualChannel(current, nextTarget) {
-            return clamp01(
-                blendToward(
-                    current,
-                    nextTarget,
-                    nextTarget > current ? riseRate : fallRate,
-                    deltaSeconds
-                )
-            );
+            return clamp01(blendToward(current, nextTarget, blendRate, deltaSeconds));
         }
 
         smoothedWeatherVisualResponse.heatLevel =
@@ -562,12 +513,41 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             blendWeatherVisualChannel(smoothedWeatherVisualResponse.dustLevel, target.dustLevel);
         smoothedWeatherVisualResponse.windLevel =
             blendWeatherVisualChannel(smoothedWeatherVisualResponse.windLevel, target.windLevel);
-        smoothedWeatherVisualResponse.effectStrength =
-            blendWeatherVisualChannel(smoothedWeatherVisualResponse.effectStrength, target.effectStrength);
     }
 
     function getWeatherVisualResponse() {
         return smoothedWeatherVisualResponse;
+    }
+
+    function resolveVisualWindDirectionDegrees(weather) {
+        if (!weather) {
+            return retainedVisualWindDirectionDegrees;
+        }
+
+        const hasDirection = typeof weather.windDirectionDegrees === "number";
+        const visibleWindLevel = getWeatherVisualResponse().windLevel;
+        const eventTemplateId =
+            typeof weather.eventTemplateId === "number"
+                ? weather.eventTemplateId
+                : 0;
+        const eventActive = eventTemplateId !== 0;
+
+        if (eventActive && hasDirection) {
+            retainedVisualWindDirectionDegrees = weather.windDirectionDegrees;
+            retainEventWindDirectionDuringFade = true;
+            return retainedVisualWindDirectionDegrees;
+        }
+
+        if (retainEventWindDirectionDuringFade && visibleWindLevel > visibleWindStreakThreshold) {
+            return retainedVisualWindDirectionDegrees;
+        }
+
+        retainEventWindDirectionDuringFade = false;
+        if (hasDirection) {
+            retainedVisualWindDirectionDegrees = weather.windDirectionDegrees;
+        }
+
+        return retainedVisualWindDirectionDegrees;
     }
 
     function getHudWarningPresentation(state) {
@@ -583,9 +563,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             weather && typeof weather.windDirectionDegrees === "number"
                 ? Math.round(weather.windDirectionDegrees)
                 : 0;
-        const eventPhase = weather && weather.eventPhase ? weather.eventPhase : "NONE";
+        const eventTemplateId =
+            weather && typeof weather.eventTemplateId === "number"
+                ? weather.eventTemplateId
+                : 0;
         const weatherBrief = "Wind " + wind + " @" + windDirection + "deg  |  Dust " + dust +
-            (eventPhase !== "NONE" ? ("  |  " + eventPhase) : "");
+            (eventTemplateId !== 0 ? ("  |  Event " + eventTemplateId) : "");
 
         switch (warningCode) {
         case hudWarningCodes.windWatch:
@@ -648,15 +631,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         const weatherVisualResponse = getWeatherVisualResponse();
         const windLevel = weatherVisualResponse.windLevel;
-        const dustLevel = weatherVisualResponse.dustLevel;
-        const directionDegrees =
-            typeof weather.windDirectionDegrees === "number"
-                ? weather.windDirectionDegrees
-                : 0;
-        const opacity = Math.min(0.68, windLevel * 0.28 + dustLevel * 0.14);
-        const dustAlpha = Math.min(0.44, dustLevel * 0.22 + windLevel * 0.08);
+        const windDensityLevel = Math.pow(clamp01(windLevel), 1.35);
+        const windSpeedLevel = Math.pow(clamp01(windLevel), 1.18);
+        const directionDegrees = resolveVisualWindDirectionDegrees(weather);
+        const opacity = Math.min(0.2, windDensityLevel * 0.2);
+        const dustAlpha = Math.min(0.09, windDensityLevel * 0.09);
         let severity = "watch";
-        if (windLevel >= 0.8 || (windLevel >= 0.62 && dustLevel >= 0.7)) {
+        if (windLevel >= 0.8) {
             severity = "critical";
         } else if (windLevel >= 0.56) {
             severity = "severe";
@@ -669,7 +650,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return {
             opacity: opacity,
             dustAlpha: dustAlpha,
-            speedSeconds: Math.max(1.9, 5.2 - windLevel * 2.5),
+            speedSeconds: Math.max(4.17, 5.4 - windSpeedLevel * 1.23),
             tiltDegrees: directionDegrees - 90.0,
             directionDegrees: directionDegrees,
             severity: severity
@@ -745,7 +726,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function renderSceneWithWeatherDistortion(state, elapsedSeconds) {
         const weatherVisualResponse = getWeatherVisualResponse();
-        if (!weatherPostProcess || weatherVisualResponse.effectStrength <= 0.001) {
+        if (!weatherPostProcess ||
+            (weatherVisualResponse.heatLevel <= 0.001 &&
+                weatherVisualResponse.dustLevel <= 0.001)) {
             renderer.setRenderTarget(null);
             renderer.render(scene, camera);
             return;
@@ -755,8 +738,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         weatherPostProcess.material.uniforms.uHeatLevel.value = weatherVisualResponse.heatLevel;
         weatherPostProcess.material.uniforms.uHeatColorAddGain.value = heatColorAddGainForVfx;
         weatherPostProcess.material.uniforms.uDustLevel.value = weatherVisualResponse.dustLevel;
-        weatherPostProcess.material.uniforms.uEventLevel.value = 0;
-        weatherPostProcess.material.uniforms.uStrength.value = weatherVisualResponse.effectStrength;
         weatherPostProcess.material.uniforms.tSceneColor.value = weatherPostProcess.renderTarget.texture;
 
         renderer.setRenderTarget(weatherPostProcess.renderTarget);
@@ -766,21 +747,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function updateDustOverlay(state, elapsedSeconds) {
-        const weatherVisualResponse = getWeatherVisualResponse();
-        if (!state || state.appState !== "SITE_ACTIVE" || weatherVisualResponse.dustLevel <= 0.001) {
+        if (!state || state.appState !== "SITE_ACTIVE") {
             dustOverlay.style.opacity = "0";
             return;
         }
-
-        const driftPrimary = (-elapsedSeconds * 18.0).toFixed(1);
-        const driftSecondary = (-elapsedSeconds * (11.0 + weatherVisualResponse.dustLevel * 5.0)).toFixed(1);
-        const hazePulse =
-            0.08 +
-            weatherVisualResponse.dustLevel * 0.22 +
-            (Math.sin(elapsedSeconds * 0.28) * 0.5 + 0.5) * 0.03;
-        dustOverlay.style.opacity = Math.min(hazePulse, 0.36).toFixed(3);
-        dustOverlay.style.backgroundPosition =
-            driftPrimary + "px 0px, " + driftSecondary + "px 0px, 0px 0px";
+        dustOverlay.style.opacity = "0";
     }
 
     function disposeObject(object) {
@@ -912,6 +883,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function getSiteState(state) {
         return state.siteState || null;
+    }
+
+    function getSiteResult(state) {
+        return state.siteResult || null;
     }
 
     function getActiveSiteName(state) {
@@ -1861,11 +1836,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const hydration = hud ? Math.round(hud.playerHydration) : 0;
         const energy = hud ? Math.round(hud.playerEnergy) : 0;
         const completion = hud ? Math.round((hud.siteCompletionNormalized || 0) * 100) : 0;
-        const eventPhase = weather ? weather.eventPhase : "NONE";
         const weatherHeat = weather ? Math.round(weather.heat || 0) : 0;
         const weatherWind = weather ? Math.round(weather.wind || 0) : 0;
         const weatherDust = weather ? Math.round(weather.dust || 0) : 0;
         const windDirection = weather ? Math.round(weather.windDirectionDegrees || 0) : 0;
+        const eventTemplateId = weather ? Math.round(weather.eventTemplateId || 0) : 0;
+        const eventStartTime = weather ? Math.round(weather.eventStartTimeMinutes || 0) : 0;
+        const eventPeakTime = weather ? Math.round(weather.eventPeakTimeMinutes || 0) : 0;
+        const eventPeakDuration = weather ? Math.round(weather.eventPeakDurationMinutes || 0) : 0;
+        const eventEndTime = weather ? Math.round(weather.eventEndTimeMinutes || 0) : 0;
 
         statusChip.textContent =
             "Site Live\nHydration " + hydration +
@@ -1875,7 +1854,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             "\nWind " + weatherWind +
             "\nBearing " + windDirection + "deg" +
             "\nDust " + weatherDust +
-            "\nEvent " + eventPhase +
+            "\nEvent " + eventTemplateId +
+            "\nTimeline " + eventStartTime + "-" + eventPeakTime + "+" + eventPeakDuration + "-" + eventEndTime +
             "\nAlert " + warning.headline +
             "\nSeeds " + carriedSeeds.reduce((total, seed) => total + seed.quantity, 0) +
             "\nAction " + getSiteActionLabel(workerActionKind) +
@@ -2355,6 +2335,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function clearSelectionInventory() {
+        selectionInventory.classList.remove("site-result-actions");
         selectionInventory.hidden = true;
         selectionInventory.innerHTML = "";
         hideInventoryTooltip();
@@ -3631,6 +3612,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return "Active";
         case "COMPLETED":
             return "Done";
+        case "CLAIMED":
+            return "History";
         case "VISIBLE":
         default:
             return "Open";
@@ -3641,7 +3624,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         let className = "phone-task-state";
         if (task.listKind === "ACCEPTED") {
             className += " accepted";
-        } else if (task.listKind === "COMPLETED") {
+        } else if (task.listKind === "COMPLETED" || task.listKind === "CLAIMED") {
             className += " completed";
         }
         return className;
@@ -4037,6 +4020,69 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         contextActions.innerHTML = "";
     }
 
+    function renderSiteResultOverlay(state) {
+        const resultSetup = getSetup(state, "SITE_RESULT");
+        const labels = getLabelElements(resultSetup);
+        const actions = getVisibleActionElements(resultSetup);
+        const siteResult = getSiteResult(state);
+        const primaryLabel = labels.length > 0 ? labels[0].text : "";
+        const resultCompleted = !!siteResult && siteResult.result === "COMPLETED";
+        const resultLine =
+            primaryLabel ||
+            (siteResult
+                ? ("Site " + siteResult.siteId + " " + (resultCompleted ? "completed" : "failed"))
+                : "Site result ready");
+        const revealCount =
+            siteResult && typeof siteResult.newlyRevealedSiteCount === "number"
+                ? siteResult.newlyRevealedSiteCount
+                : 0;
+
+        menuPanel.hidden = true;
+        selectionChip.hidden = false;
+        selectionEyebrow.textContent = resultCompleted ? "Mission Success" : "Mission Failed";
+        selectionText.hidden = false;
+        selectionText.textContent = resultLine;
+        selectionInventory.classList.remove("site-result-actions");
+        selectionInventory.hidden = false;
+        selectionInventory.innerHTML = "";
+        renderStoragePanel(null, null);
+        contextActions.innerHTML = "";
+        actionProgress.hidden = true;
+        statusChip.textContent = "";
+
+        const summary = document.createElement("div");
+        summary.className = "site-result-summary";
+        summary.textContent =
+            revealCount > 0
+                ? ("Nearby survey updated. " + revealCount + " new route" + (revealCount === 1 ? " is" : "s are") + " now visible on the regional map.")
+                : "Field report logged. Confirm the result to return to the regional survey.";
+        selectionInventory.appendChild(summary);
+
+        const actionGroup = document.createElement("div");
+        actionGroup.className = "site-result-actions";
+        selectionInventory.appendChild(actionGroup);
+
+        actions.forEach((element) => {
+            let label = element.text || element.action.type;
+            if (element.action && element.action.type === "RETURN_TO_REGIONAL_MAP") {
+                label = "OK";
+            }
+
+            actionGroup.appendChild(
+                makeButton(
+                    label,
+                    function () {
+                        postJson("/ui-action", element.action).catch(() => {
+                            statusChip.textContent = "Failed to send UI action.";
+                        });
+                    },
+                    false,
+                    (element.flags & 2) !== 0
+                )
+            );
+        });
+    }
+
     function renderSiteOverlay(state) {
         const workerPackSlots = getInventorySlotsByKind(state, "WORKER_PACK");
 
@@ -4061,6 +4107,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         stageFrame.classList.toggle("main-menu-mode", state.appState === "MAIN_MENU");
         stageFrame.classList.toggle("regional-map-mode", state.appState === "REGIONAL_MAP");
         stageFrame.classList.toggle("site-active-mode", state.appState === "SITE_ACTIVE");
+        stageFrame.classList.toggle("site-result-mode", state.appState === "SITE_RESULT");
         const appStateChanged = lastOverlayAppState !== state.appState;
 
         switch (state.appState) {
@@ -4106,6 +4153,20 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             }
             renderSiteHudChrome(state);
             renderSiteOverlay(state);
+            break;
+        case "SITE_RESULT":
+            hudEyebrow.textContent = "App State";
+            hudTitle.textContent = state.appState || "NONE";
+            hudSubtitle.textContent = "The field report is in. Confirm the result and return to the regional survey.";
+            renderSiteVitalsPanel(null);
+            inventoryPanelOpen = false;
+            phonePanelOpen = false;
+            selectedInventorySlotKey = "";
+            openedInventoryContainerKey = "";
+            selectionChip.hidden = false;
+            selectionText.hidden = false;
+            clearSelectionInventory();
+            renderSiteResultOverlay(state);
             break;
         default:
             hudEyebrow.textContent = "App State";
@@ -4711,15 +4772,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     function createWindFieldVisual(width, height) {
         const group = new THREE_NS.Group();
         const streaks = [];
-        const streakCount = Math.max(18, Math.min(42, Math.round((width + height) * 0.75)));
-        const horizontalSpan = Math.max(width, height) * 0.72;
-        const depthSpan = Math.max(width, height) * 0.92;
+        const streakCount = Math.max(24, Math.min(64, Math.round((width + height) * 1.15)));
+        const horizontalSpan = Math.max(width, height) * 0.82;
+        const depthSpan = Math.max(width, height) * 1.04;
 
         for (let index = 0; index < streakCount; index += 1) {
-            const widthScale = 0.55 + ((index * 13) % 9) * 0.08;
-            const lengthScale = 0.85 + ((index * 7) % 11) * 0.09;
+            const widthScale = 0.42 + ((index * 13) % 11) * 0.055;
+            const lengthScale = 0.72 + ((index * 7) % 13) * 0.07;
             const mesh = new THREE_NS.Mesh(
-                new THREE_NS.PlaneGeometry(0.17 * widthScale, 1.35 * lengthScale),
+                new THREE_NS.PlaneGeometry(0.13 * widthScale, 1.2 * lengthScale),
                 new THREE_NS.MeshBasicMaterial({
                     color: 0xf6edd7,
                     transparent: true,
@@ -4730,17 +4791,32 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 })
             );
             mesh.rotation.x = -Math.PI / 2;
-            mesh.position.y = 0.9 + (index % 5) * 0.08;
+            mesh.position.y = 0.84 + (index % 7) * 0.07;
             group.add(mesh);
             streaks.push({
                 mesh: mesh,
                 progressSeed: ((index * 17) % 37) / 37,
-                lateralSeed: (((index % 7) - 3) / 3) + (((index * 19) % 5) - 2) * 0.18,
-                verticalSeed: ((index * 11) % 6) * 0.05,
+                lateralSeed: (((index % 11) - 5) / 5) + (((index * 19) % 7) - 3) * 0.14,
+                lateralDriftSeed: ((index * 29) % 41) / 41,
+                lateralDriftPhase: ((index * 31) % 53) / 53,
+                verticalSeed: ((index * 11) % 8) * 0.04,
                 swaySeed: ((index * 23) % 29) / 29,
                 speedScale: 0.72 + ((index * 5) % 9) * 0.09,
                 widthScale: widthScale,
-                lengthScale: lengthScale
+                lengthScale: lengthScale,
+                spawnCycle: 0,
+                active: false,
+                nextSpawnAt: (((index * 17) % 37) / 37) * 1.4,
+                spawnTime: -1000,
+                lifeSeconds: 0,
+                streamStartX: 0,
+                streamEndX: 0,
+                streamY: 0,
+                opacityScale: 0,
+                streamLengthScale: 1.0,
+                streamWidthScale: 1.0,
+                travelSpan: depthSpan,
+                rotationJitter: 0
             });
         }
 
@@ -4753,6 +4829,50 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         };
     }
 
+    function sampleWindStreakNoise(streak, salt) {
+        const value = Math.sin(
+            (streak.progressSeed + 0.37) * 157.1 +
+            (streak.lateralSeed + 1.41) * 311.7 +
+            (streak.spawnCycle + salt) * 73.7 +
+            streak.swaySeed * 19.9) * 43758.5453123;
+        return value - Math.floor(value);
+    }
+
+    function scheduleWindStreakRespawn(streak, elapsedSeconds, minDelaySeconds, maxDelaySeconds) {
+        const delayNoise = sampleWindStreakNoise(streak, 0.73);
+        streak.active = false;
+        streak.nextSpawnAt = elapsedSeconds + lerp(minDelaySeconds, maxDelaySeconds, delayNoise);
+        streak.mesh.material.opacity = 0.0;
+    }
+
+    function activateWindStreak(streak, windField, elapsedSeconds, windDensityLevel, windSpeedLevel, flowDistance) {
+        streak.spawnCycle += 1;
+        streak.active = true;
+        streak.spawnTime = elapsedSeconds;
+
+        const lateralNoise = sampleWindStreakNoise(streak, 0.11) * 2.0 - 1.0;
+        const directionNoise = sampleWindStreakNoise(streak, 0.29) * 2.0 - 1.0;
+        const heightNoise = sampleWindStreakNoise(streak, 0.47);
+        const lifeNoise = sampleWindStreakNoise(streak, 0.61);
+        const opacityNoise = sampleWindStreakNoise(streak, 0.83);
+        const spanNoise = sampleWindStreakNoise(streak, 1.07);
+        const widthNoise = sampleWindStreakNoise(streak, 1.31);
+        const lengthNoise = sampleWindStreakNoise(streak, 1.57);
+        const rotationNoise = sampleWindStreakNoise(streak, 1.79) * 2.0 - 1.0;
+
+        streak.lifeSeconds = lerp(4.8, 2.8, windSpeedLevel) * (0.86 + lifeNoise * 0.38);
+        streak.travelSpan = flowDistance * (0.8 + spanNoise * 0.3);
+        streak.streamStartX = lateralNoise * windField.horizontalSpan * 0.58;
+        streak.streamEndX =
+            streak.streamStartX +
+            directionNoise * streak.travelSpan * lerp(0.015, 0.06, windDensityLevel);
+        streak.streamY = 0.66 + heightNoise * 0.56 + windDensityLevel * 0.12;
+        streak.opacityScale = 0.45 + opacityNoise * 0.55;
+        streak.streamWidthScale = 0.82 + widthNoise * 0.34;
+        streak.streamLengthScale = 0.78 + lengthNoise * 0.5;
+        streak.rotationJitter = rotationNoise * 0.045;
+    }
+
     function updateWindFieldVisual(cache, state, elapsedSeconds) {
         if (!cache || !cache.windField) {
             return;
@@ -4762,52 +4882,85 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const weather = siteState ? siteState.weather : null;
         const weatherVisualResponse = getWeatherVisualResponse();
         const windField = cache.windField;
-        if (!weather || weatherVisualResponse.windLevel <= 0.04) {
+        if (!weather || weatherVisualResponse.windLevel <= visibleWindStreakThreshold) {
             windField.group.visible = false;
             return;
         }
 
         const windLevel = weatherVisualResponse.windLevel;
-        const dustLevel = weatherVisualResponse.dustLevel;
-        const directionDegrees =
-            typeof weather.windDirectionDegrees === "number"
-                ? weather.windDirectionDegrees
-                : 0;
+        const windDensityLevel = Math.pow(clamp01(windLevel), 1.45);
+        const windSpeedLevel = Math.pow(clamp01(windLevel), 1.2);
+        const directionDegrees = resolveVisualWindDirectionDegrees(weather);
         const directionRadians = directionDegrees * Math.PI / 180.0;
-        const alpha = Math.min(0.46, windLevel * 0.26 + dustLevel * 0.12);
-        const streakLength = lerp(0.82, 1.9, windLevel);
-        const streakWidth = lerp(0.72, 1.25, windLevel);
-        const flowDistance = windField.depthSpan * (1.05 + windLevel * 0.65);
-        const activeStreakCount = Math.max(
-            6,
+        const alpha = Math.min(0.2, 0.015 + windDensityLevel * 0.185);
+        const streakLength = lerp(0.72, 2.1, windDensityLevel);
+        const streakWidth = lerp(0.62, 1.08, windDensityLevel);
+        const flowDistance = windField.depthSpan * (0.94 + windSpeedLevel * 1.28);
+        const targetActiveStreakCount = Math.max(
+            2,
             Math.min(
                 windField.streaks.length,
-                Math.round(lerp(8, windField.streaks.length, windLevel))
+                Math.round(lerp(3, windField.streaks.length * 0.72, windDensityLevel))
             )
         );
+        const minRespawnDelaySeconds = lerp(0.52, 0.05, windLevel);
+        const maxRespawnDelaySeconds = lerp(1.35, 0.16, windLevel);
 
         windField.group.visible = alpha > 0.02;
         windField.group.rotation.y = directionRadians;
 
+        let activeStreakCount = 0;
+        windField.streaks.forEach((streak) => {
+            if (streak.active && elapsedSeconds >= streak.spawnTime + streak.lifeSeconds) {
+                scheduleWindStreakRespawn(streak, elapsedSeconds, minRespawnDelaySeconds, maxRespawnDelaySeconds);
+            }
+            if (streak.active) {
+                activeStreakCount += 1;
+            }
+        });
+
+        windField.streaks.forEach((streak) => {
+            if (!streak.active &&
+                elapsedSeconds >= streak.nextSpawnAt &&
+                activeStreakCount < targetActiveStreakCount) {
+                activateWindStreak(streak, windField, elapsedSeconds, windDensityLevel, windSpeedLevel, flowDistance);
+                activeStreakCount += 1;
+            }
+        });
+
         windField.streaks.forEach((streak, index) => {
-            const streakEnabled = index < activeStreakCount;
-            const progress = (elapsedSeconds * (0.16 + windLevel * 0.55) * streak.speedScale + streak.progressSeed) % 1.0;
-            const flowOffset = (progress - 0.5) * flowDistance;
-            const lateralOffset = streak.lateralSeed * windField.horizontalSpan;
-            const verticalBob = Math.sin((elapsedSeconds + streak.swaySeed * 6.0) * (1.2 + windLevel * 1.8)) * 0.05;
+            if (!streak.active) {
+                streak.mesh.material.opacity = 0.0;
+                return;
+            }
+
+            const progress = clamp01((elapsedSeconds - streak.spawnTime) / Math.max(streak.lifeSeconds, 0.0001));
+            const flowOffset = lerp(-0.5 * streak.travelSpan, 0.5 * streak.travelSpan, progress);
+            const lateralOffset =
+                lerp(streak.streamStartX, streak.streamEndX, progress) +
+                Math.sin(
+                    elapsedSeconds * (0.18 + streak.speedScale * 0.14) +
+                    streak.lateralDriftPhase * Math.PI * 2.0) *
+                    windField.horizontalSpan *
+                    (0.01 + streak.lateralDriftSeed * 0.022);
+            const verticalBob =
+                Math.sin((elapsedSeconds + streak.swaySeed * 6.0) * (0.84 + windSpeedLevel * 1.25)) *
+                (0.014 + windDensityLevel * 0.018);
+            const fadeIn = smoothstep01(0.0, 0.14, progress);
+            const fadeOut = 1.0 - smoothstep01(0.72, 1.0, progress);
             streak.mesh.position.x = lateralOffset;
             streak.mesh.position.z = flowOffset;
-            streak.mesh.position.y = 0.74 + streak.verticalSeed + verticalBob + windLevel * 0.24;
-            streak.mesh.rotation.z = Math.sin(elapsedSeconds * 1.6 + index * 0.5) * 0.08;
+            streak.mesh.position.y = streak.streamY + streak.verticalSeed + verticalBob;
+            streak.mesh.rotation.z =
+                streak.rotationJitter +
+                Math.sin(elapsedSeconds * (0.55 + windSpeedLevel * 0.65) + index * 0.4) * 0.035;
             streak.mesh.scale.set(
-                streakWidth * streak.widthScale,
-                streakLength * streak.lengthScale,
+                streakWidth * streak.widthScale * streak.streamWidthScale,
+                streakLength * streak.lengthScale * streak.streamLengthScale,
                 1.0
             );
-            streak.mesh.material.opacity = streakEnabled
-                ? alpha * (0.62 + streak.speedScale * 0.22)
-                : 0.0;
-            streak.mesh.material.color.setHex(dustLevel >= 0.55 ? 0xf5d6aa : 0xf6edd7);
+            streak.mesh.material.opacity = alpha * streak.opacityScale * fadeIn * fadeOut;
+            streak.mesh.material.color.setHex(0xf6edd7);
         });
     }
 

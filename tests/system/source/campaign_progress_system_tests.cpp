@@ -1,5 +1,6 @@
 #include "campaign/campaign_state.h"
 #include "campaign/systems/campaign_flow_system.h"
+#include "campaign/systems/campaign_time_system.h"
 #include "campaign/systems/faction_reputation_system.h"
 #include "campaign/systems/loadout_planner_system.h"
 #include "campaign/systems/regional_support_system.h"
@@ -8,10 +9,12 @@
 #include "content/defs/item_defs.h"
 #include "content/defs/technology_defs.h"
 #include "messages/game_message.h"
+#include "runtime/runtime_clock.h"
 #include "site/site_world_access.h"
 #include "site/systems/failure_recovery_system.h"
 #include "site/systems/site_completion_system.h"
 #include "site/systems/site_flow_system.h"
+#include "site/systems/site_time_system.h"
 #include "testing/system_test_registry.h"
 #include "system_test_fixtures.h"
 
@@ -22,6 +25,7 @@ namespace
 using gs1::CampaignFixedStepContext;
 using gs1::CampaignFlowMessageContext;
 using gs1::CampaignFlowSystem;
+using gs1::CampaignTimeSystem;
 using gs1::DayPhase;
 using gs1::DeploymentSiteSelectionChangedMessage;
 using gs1::FailureRecoverySystem;
@@ -37,6 +41,7 @@ using gs1::SiteId;
 using gs1::SiteMoveDirectionInput;
 using gs1::SiteRunStartedMessage;
 using gs1::SiteRunStatus;
+using gs1::SiteTimeSystem;
 using gs1::StartNewCampaignMessage;
 using gs1::StartSiteAttemptMessage;
 using gs1::TileCoord;
@@ -344,20 +349,36 @@ void campaign_flow_run_advances_campaign_days(gs1::testing::SystemTestExecutionC
 {
     auto campaign = make_campaign(42ULL, 3U);
     CampaignFixedStepContext step_context {campaign};
+    const double default_step_minutes =
+        gs1::runtime_minutes_from_real_seconds(step_context.fixed_step_seconds);
 
-    CampaignFlowSystem::run(step_context);
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(campaign.campaign_clock_minutes_elapsed, 0.2));
+    CampaignTimeSystem::run(step_context);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(campaign.campaign_clock_minutes_elapsed, default_step_minutes));
     GS1_SYSTEM_TEST_CHECK(context, campaign.campaign_days_remaining == 3U);
 
-    campaign.campaign_clock_minutes_elapsed = 1439.9;
+    campaign.campaign_clock_minutes_elapsed = gs1::k_runtime_minutes_per_day - 0.1;
     campaign.campaign_days_remaining = 3U;
-    CampaignFlowSystem::run(step_context);
+    CampaignTimeSystem::run(step_context);
     GS1_SYSTEM_TEST_CHECK(context, campaign.campaign_days_remaining == 2U);
 
-    campaign.campaign_clock_minutes_elapsed = 3.0 * 1440.0;
+    campaign.campaign_clock_minutes_elapsed = 3.0 * gs1::k_runtime_minutes_per_day;
     campaign.campaign_days_remaining = 2U;
-    CampaignFlowSystem::run(step_context);
+    CampaignTimeSystem::run(step_context);
     GS1_SYSTEM_TEST_CHECK(context, campaign.campaign_days_remaining == 0U);
+
+    campaign.campaign_clock_minutes_elapsed = 0.0;
+    campaign.campaign_days_remaining = 3U;
+    CampaignFixedStepContext minute_step_context {campaign, 60.0};
+    for (int step = 0; step < 30; ++step)
+    {
+        CampaignTimeSystem::run(minute_step_context);
+    }
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(campaign.campaign_clock_minutes_elapsed, gs1::k_runtime_minutes_per_day));
+    GS1_SYSTEM_TEST_CHECK(context, campaign.campaign_days_remaining == 2U);
 }
 
 void loadout_planner_tracks_selected_target_site(gs1::testing::SystemTestExecutionContext& context)
@@ -456,7 +477,8 @@ void site_flow_moves_worker_and_marks_projection_dirty(gs1::testing::SystemTestE
         (site_run.pending_projection_update_flags & gs1::SITE_PROJECTION_UPDATE_WORKER) != 0U);
 }
 
-void site_flow_respects_traversability_and_updates_phase(gs1::testing::SystemTestExecutionContext& context)
+void site_flow_respects_traversability_and_time_system_updates_phase(
+    gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(1U, 302U, 101U, 8U, 8U, {2, 2}, {2, 2});
@@ -470,6 +492,12 @@ void site_flow_respects_traversability_and_updates_phase(gs1::testing::SystemTes
             TileCoord {3, 2},
             [](auto& traversable) { traversable.value = false; }));
 
+    auto time_context = make_site_context<SiteTimeSystem>(
+        campaign,
+        site_run,
+        queue,
+        0.25,
+        SiteMoveDirectionInput {1.0f, 0.0f, 0.0f, true});
     auto site_context = make_site_context<SiteFlowSystem>(
         campaign,
         site_run,
@@ -477,6 +505,7 @@ void site_flow_respects_traversability_and_updates_phase(gs1::testing::SystemTes
         0.25,
         SiteMoveDirectionInput {1.0f, 0.0f, 0.0f, true});
 
+    SiteTimeSystem::run(time_context);
     SiteFlowSystem::run(site_context);
 
     const auto worker = gs1::site_world_access::worker_position(site_run);
@@ -1012,8 +1041,8 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     site_flow_moves_worker_and_marks_projection_dirty);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "site_flow",
-    "respects_traversability_and_updates_phase",
-    site_flow_respects_traversability_and_updates_phase);
+    "respects_traversability_and_time_system_updates_phase",
+    site_flow_respects_traversability_and_time_system_updates_phase);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "site_completion",
     "only_emits_when_threshold_is_met",

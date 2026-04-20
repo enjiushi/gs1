@@ -12,7 +12,8 @@ enum class TaskRuntimeListKind : std::uint32_t
 {
     Visible = 0,
     Accepted = 1,
-    Completed = 2
+    Completed = 2,
+    Claimed = 3
 };
 
 struct TaskRewardDraftOption final
@@ -51,6 +52,7 @@ struct TaskBoardState final
     std::vector<TaskInstanceState> visible_tasks {};
     std::vector<TaskInstanceId> accepted_task_ids {};
     std::vector<TaskInstanceId> completed_task_ids {};
+    std::vector<TaskInstanceId> claimed_task_ids {};
     std::optional<TaskChainState> active_chain_state {};
     std::uint32_t task_pool_size {0};
     std::uint32_t accepted_task_cap {0};

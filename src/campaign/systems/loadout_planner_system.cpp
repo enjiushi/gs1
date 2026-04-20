@@ -21,10 +21,15 @@ constexpr std::uint32_t k_support_quota_per_contributor = 1U;
 
 [[nodiscard]] std::vector<LoadoutSlot> make_baseline_deployment_items()
 {
-    // Site one now opens with a single delivery package instead of split carried/crate supplies.
+    // Keep the baseline package small and fixed: survival basics, one starter seed line,
+    // and enough raw materials to let the starter workshop matter immediately.
     return {
-        make_loadout_slot(k_item_basic_straw_checkerboard, 8U),
-        make_loadout_slot(k_item_water_container, 1U)};
+        make_loadout_slot(k_item_water_container, 2U),
+        make_loadout_slot(k_item_food_pack, 1U),
+        make_loadout_slot(k_item_medicine_pack, 1U),
+        make_loadout_slot(k_item_wind_reed_seed_bundle, 8U),
+        make_loadout_slot(k_item_wood_bundle, 6U),
+        make_loadout_slot(k_item_iron_bundle, 4U)};
 }
 
 [[nodiscard]] const SiteMetaState* find_site(

@@ -229,27 +229,6 @@ const char* site_state_name(Gs1SiteState site_state)
     }
 }
 
-const char* weather_phase_name(Gs1WeatherEventPhase phase)
-{
-    switch (phase)
-    {
-    case GS1_WEATHER_EVENT_PHASE_NONE:
-        return "NONE";
-    case GS1_WEATHER_EVENT_PHASE_WARNING:
-        return "WARNING";
-    case GS1_WEATHER_EVENT_PHASE_BUILD:
-        return "BUILD";
-    case GS1_WEATHER_EVENT_PHASE_PEAK:
-        return "PEAK";
-    case GS1_WEATHER_EVENT_PHASE_DECAY:
-        return "DECAY";
-    case GS1_WEATHER_EVENT_PHASE_AFTERMATH:
-        return "AFTERMATH";
-    default:
-        return "UNKNOWN";
-    }
-}
-
 const char* site_attempt_result_name(Gs1SiteAttemptResult result)
 {
     switch (result)
@@ -1243,8 +1222,10 @@ void SmokeEngineHost::apply_site_weather_update(const Gs1EngineMessage& message)
     projection.dust = payload.dust;
     projection.wind_direction_degrees = payload.wind_direction_degrees;
     projection.event_template_id = payload.event_template_id;
-    projection.event_phase = payload.event_phase;
-    projection.phase_minutes_remaining = payload.phase_minutes_remaining;
+    projection.event_start_time_minutes = payload.event_start_time_minutes;
+    projection.event_peak_time_minutes = payload.event_peak_time_minutes;
+    projection.event_peak_duration_minutes = payload.event_peak_duration_minutes;
+    projection.event_end_time_minutes = payload.event_end_time_minutes;
     pending_site_snapshot_->weather = projection;
     pending_site_snapshot_patch_mask_ |= LiveStatePatchField_SiteStateWeather;
 }
@@ -1505,6 +1486,8 @@ void SmokeEngineHost::apply_site_phone_panel_state(const Gs1EngineMessage& messa
         payload.active_section,
         payload.visible_task_count,
         payload.accepted_task_count,
+        payload.completed_task_count,
+        payload.claimed_task_count,
         payload.buy_listing_count,
         payload.sell_listing_count,
         payload.service_listing_count,
@@ -1879,8 +1862,11 @@ std::string SmokeEngineHost::describe_message(const Gs1EngineMessage& message)
         description += " heat=" + std::to_string(payload.heat);
         description += " wind=" + std::to_string(payload.wind);
         description += " dust=" + std::to_string(payload.dust);
-        description += " phase=";
-        description += weather_phase_name(payload.event_phase);
+        description += " eventTemplate=" + std::to_string(payload.event_template_id);
+        description += " start=" + std::to_string(payload.event_start_time_minutes);
+        description += " peak=" + std::to_string(payload.event_peak_time_minutes);
+        description += " peakDuration=" + std::to_string(payload.event_peak_duration_minutes);
+        description += " end=" + std::to_string(payload.event_end_time_minutes);
         break;
     }
 

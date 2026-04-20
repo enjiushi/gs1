@@ -26,26 +26,27 @@ This file is a quick orientation guide for agents working in this repository.
 - `include/gs1/export.h`: Public DLL export/import macros.
 - `include/gs1/game_api.h`: C ABI entry points exposed by the gameplay DLL.
 - `include/gs1/status.h`: Public status/result codes.
-- `include/gs1/types.h`: Public API data types, message/event payload structs, and runtime-facing enums.
+- `include/gs1/types.h`: Public API data types, message/event payload structs, runtime-facing enums, claimed-task/phone-panel transport fields, and site-weather event timeline transport fields.
 - `src/app/`: Runtime bootstrap, API glue, scene coordination, and campaign/site factory entry points.
-- `src/campaign/`: Campaign state and campaign-level systems such as flow, loadout planning, regional support, and technology.
+- `src/campaign/`: Campaign state and campaign-level systems such as flow, dedicated campaign time progression, loadout planning, regional support, and technology.
 - `src/messages/`: Internal game message IDs, payloads, handlers, and dispatcher.
 - `src/content/`: Prototype content database, loader/validator shells, and content definition types, including authored wind-shelter plant stats.
 - `src/events/`: Translated engine feedback event types. Internal gameplay cross-system messages should use `GameMessage`, not runtime gameplay events.
 - `src/runtime/`: Core runtime loop, fixed-step runner, host-event dispatch plus transient phase-control handling, message queues, random service, and engine message emission.
-- `src/site/`: Active site-run state and site systems for actions, weather, ecology, directional local wind shelter, inventory, economy, task board, camp durability, and completion/failure flow.
+- `src/site/`: Active site-run state and site systems for dedicated site time progression, actions, weather, ecology, directional local wind shelter, inventory, economy, task board, camp durability, and completion/failure flow.
 - `src/support/`: Shared support types such as typed IDs.
 - `src/ui/`: View-model and presenter state for HUD, phone, notifications, inspection, regional map, and UI presentation.
 - `tests/smoke/`: Smoke host, runtime DLL loader, script runner, live-state JSON, live HTTP server, and visual smoke UI.
 - `tests/smoke/scripts/`: Scripted smoke-test scenarios.
 - `scripts/`: PowerShell build and smoke-test helpers.
-- `GDD.md`: Game design document, including the directional wind-shadow and plant-footprint shelter rules, the staged four-mode site-objective direction, the straw-checkerboard special-plant `2x2` tile-occupancy rule, and the near-camp green delivery-crate loadout rule for site starts versus later timed deliveries.
+- `GDD.md`: Game design document, including the directional wind-shadow and plant-footprint shelter rules, the current profile-based harsh-weather/runtime weather-event contract with start/peak/peak-duration/end timing direction, the site-one onboarding task-pool direction, phone-based claimed-task history direction, the staged four-mode site-objective direction, the straw-checkerboard special-plant `2x2` tile-occupancy rule, the site-result-panel `OK` return contract, and the 30-real-minute in-game day timing contract.
 - `GAME_STRUCTURE.md`: High-level gameplay/runtime structure notes.
-- `GAME_SYSTEM_DESIGN_V1.md`: System design reference, including directional local-weather resolution responsibilities, staged site-objective implementation notes, and the direct-on-start delivery-crate loadout seeding rule.
+- `GAME_SYSTEM_DESIGN_V1.md`: System design reference, including directional local-weather resolution responsibilities, start/peak/peak-duration/end weather-event timelines, staged site-objective implementation notes, claimed-task history direction for task rewards, site-one onboarding task-pool notes, the `SiteResult` panel `OK`-return contract, and the canonical fixed-step time conversion rules that keep one in-game day at 30 real-time minutes.
 - `SYSTEM_DESIGN_STATUS.md`: Current system status and implementation tracking, including site-objective readiness notes.
 - `SYSTEM_TEST_COVERAGE.md`: Per-system automated coverage expectations, including placeholder-versus-implemented test scope for campaign, site, and runtime behavior.
 - `CONTENT_AUTHORING_CONTRACT.md`: Content authoring contract and data expectations.
 - `MISSING_DEFINITION_DESCRIPTIONS.md`: Notes for definitions that still need descriptions.
+- `TASK_BOARD_OPEN_QUESTIONS.md`: Follow-up product-contract questions for task-board reward presentation, claim lifetime, reward delivery semantics, and prototype board scope.
 
 ## Code Style
 

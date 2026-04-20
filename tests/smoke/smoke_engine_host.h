@@ -171,8 +171,10 @@ public:
         float dust {0.0f};
         float wind_direction_degrees {0.0f};
         std::uint32_t event_template_id {0};
-        Gs1WeatherEventPhase event_phase {GS1_WEATHER_EVENT_PHASE_NONE};
-        float phase_minutes_remaining {0.0f};
+        float event_start_time_minutes {0.0f};
+        float event_peak_time_minutes {0.0f};
+        float event_peak_duration_minutes {0.0f};
+        float event_end_time_minutes {0.0f};
     };
 
     struct SiteInventoryStorageProjection final
@@ -274,6 +276,8 @@ public:
         Gs1PhonePanelSection active_section {GS1_PHONE_PANEL_SECTION_MARKETPLACE};
         std::uint32_t visible_task_count {0};
         std::uint32_t accepted_task_count {0};
+        std::uint32_t completed_task_count {0};
+        std::uint32_t claimed_task_count {0};
         std::uint32_t buy_listing_count {0};
         std::uint32_t sell_listing_count {0};
         std::uint32_t service_listing_count {0};

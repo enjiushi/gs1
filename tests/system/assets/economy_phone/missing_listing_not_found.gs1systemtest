@@ -7,4 +7,4 @@ scenario = purchase_listing
 listing_id = 999
 quantity = 1
 expect_status = not_found
-expect_money = 50
+expect_money = 45

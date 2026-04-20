@@ -1,6 +1,7 @@
 #include "runtime/game_runtime.h"
 
 #include "campaign/systems/campaign_flow_system.h"
+#include "campaign/systems/campaign_time_system.h"
 #include "campaign/systems/campaign_system_context.h"
 #include "campaign/systems/faction_reputation_system.h"
 #include "campaign/systems/loadout_planner_system.h"
@@ -27,6 +28,7 @@
 #include "site/systems/failure_recovery_system.h"
 #include "site/systems/site_completion_system.h"
 #include "site/systems/site_flow_system.h"
+#include "site/systems/site_time_system.h"
 #include "site/systems/task_board_system.h"
 #include "site/systems/weather_event_system.h"
 #include "site/systems/worker_condition_system.h"
@@ -246,8 +248,7 @@ std::uint16_t resolve_hud_warning_code(const SiteRunState& site_run) noexcept
 
     if (wind >= 18.0f ||
         site_run.weather.weather_wind >= 14.0f ||
-        site_run.event.event_phase == EventPhase::Build ||
-        site_run.event.event_phase == EventPhase::Peak)
+        site_run.event.event_wind_pressure >= 4.0f)
     {
         return k_hud_warning_wind_watch;
     }
@@ -364,6 +365,8 @@ Gs1TaskPresentationListKind to_task_presentation_list_kind(TaskRuntimeListKind k
         return GS1_TASK_PRESENTATION_LIST_ACCEPTED;
     case TaskRuntimeListKind::Completed:
         return GS1_TASK_PRESENTATION_LIST_COMPLETED;
+    case TaskRuntimeListKind::Claimed:
+        return GS1_TASK_PRESENTATION_LIST_CLAIMED;
     case TaskRuntimeListKind::Visible:
     default:
         return GS1_TASK_PRESENTATION_LIST_VISIBLE;
@@ -523,6 +526,7 @@ void GameRuntime::initialize_subscription_tables()
         ModifierSystem::access(),
         FailureRecoverySystem::access(),
         SiteCompletionSystem::access(),
+        SiteTimeSystem::access(),
         SiteFlowSystem::access()};
     const auto validation = validate_site_system_access_registry(site_system_access_registry);
     if (!validation.ok)
@@ -1359,6 +1363,11 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
     case GameMessageType::RestorationProgressChanged:
     case GameMessageType::TaskAcceptRequested:
     case GameMessageType::TaskRewardClaimRequested:
+    case GameMessageType::PhoneListingPurchased:
+    case GameMessageType::PhoneListingSold:
+    case GameMessageType::InventoryTransferCompleted:
+    case GameMessageType::InventoryItemUseCompleted:
+    case GameMessageType::InventoryCraftCompleted:
     case GameMessageType::PhoneListingPurchaseRequested:
     case GameMessageType::PhoneListingSaleRequested:
     case GameMessageType::PhonePanelSectionRequested:
@@ -1952,7 +1961,7 @@ void GameRuntime::queue_site_result_ui_messages(std::uint32_t site_id, Gs1SiteAt
         GS1_UI_ELEMENT_BUTTON,
         GS1_UI_ELEMENT_FLAG_PRIMARY,
         return_action,
-        "Return To Regional Map");
+        "OK");
 
     queue_ui_setup_end_message();
 }
@@ -2208,10 +2217,14 @@ void GameRuntime::queue_site_weather_update_message()
         active_site_run_->event.active_event_template_id.has_value()
         ? active_site_run_->event.active_event_template_id->value
             : 0U;
-    weather_payload.event_phase =
-        static_cast<Gs1WeatherEventPhase>(active_site_run_->event.event_phase);
-    weather_payload.phase_minutes_remaining =
-        static_cast<float>(active_site_run_->event.phase_minutes_remaining);
+    weather_payload.event_start_time_minutes =
+        static_cast<float>(active_site_run_->event.start_time_minutes);
+    weather_payload.event_peak_time_minutes =
+        static_cast<float>(active_site_run_->event.peak_time_minutes);
+    weather_payload.event_peak_duration_minutes =
+        static_cast<float>(active_site_run_->event.peak_duration_minutes);
+    weather_payload.event_end_time_minutes =
+        static_cast<float>(active_site_run_->event.end_time_minutes);
     engine_messages_.push_back(weather_message);
 }
 
@@ -2621,6 +2634,8 @@ void GameRuntime::queue_site_phone_panel_state_message()
     payload.reserved0[2] = 0U;
     payload.visible_task_count = phone_panel.visible_task_count;
     payload.accepted_task_count = phone_panel.accepted_task_count;
+    payload.completed_task_count = phone_panel.completed_task_count;
+    payload.claimed_task_count = phone_panel.claimed_task_count;
     payload.buy_listing_count = phone_panel.buy_listing_count;
     payload.sell_listing_count = phone_panel.sell_listing_count;
     payload.service_listing_count = phone_panel.service_listing_count;
@@ -3528,17 +3543,28 @@ void GameRuntime::run_fixed_step()
             elapsed_milliseconds_since(started_at));
     };
 
-    run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_CAMPAIGN_FLOW, [&]()
-    {
-        CampaignFixedStepContext campaign_context {*campaign_};
-        CampaignFlowSystem::run(campaign_context);
-    });
-
     const SiteMoveDirectionInput move_direction {
         phase1_site_move_direction_.world_move_x,
         phase1_site_move_direction_.world_move_y,
         phase1_site_move_direction_.world_move_z,
         phase1_site_move_direction_.present};
+
+    run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_CAMPAIGN_TIME, [&]()
+    {
+        CampaignFixedStepContext campaign_context {*campaign_, fixed_step_seconds_};
+        CampaignTimeSystem::run(campaign_context);
+    });
+
+    run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_SITE_TIME, [&]()
+    {
+        auto site_time_context = make_site_system_context<SiteTimeSystem>(
+            *campaign_,
+            *active_site_run_,
+            message_queue_,
+            fixed_step_seconds_,
+            move_direction);
+        SiteTimeSystem::run(site_time_context);
+    });
 
     run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_SITE_FLOW, [&]()
     {

@@ -4,21 +4,13 @@
 
 namespace gs1
 {
-enum class EventPhase : std::uint32_t
-{
-    None = 0,
-    Warning = 1,
-    Build = 2,
-    Peak = 3,
-    Decay = 4,
-    Aftermath = 5
-};
-
 struct EventState final
 {
     std::optional<EventTemplateId> active_event_template_id {};
-    EventPhase event_phase {EventPhase::None};
-    double phase_minutes_remaining {0.0};
+    double start_time_minutes {0.0};
+    double peak_time_minutes {0.0};
+    double peak_duration_minutes {0.0};
+    double end_time_minutes {0.0};
     double minutes_until_next_wave {0.0};
     float event_heat_pressure {0.0f};
     float event_wind_pressure {0.0f};

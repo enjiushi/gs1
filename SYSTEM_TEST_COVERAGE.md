@@ -96,6 +96,8 @@ Implemented behavior coverage should verify:
 - Ending a site attempt with `COMPLETED` marks the site completed, reveals
   adjacent locked sites, records newly revealed count on the result state, and
   moves to `SITE_RESULT`.
+- Completed-site resolution queues both campaign-reputation and featured-faction
+  reputation award requests when the site metadata defines those rewards.
 - Ending a site attempt with `FAILED` moves to `SITE_RESULT` without unlocking
   adjacent sites.
 - Fixed-step `run()` advances campaign time and decreases remaining days only
@@ -267,14 +269,28 @@ Implemented behavior coverage should verify:
 
 Implemented behavior coverage should verify:
 
-- `SiteRunStarted` seeds the site-one task list from current completion counters.
+- `SiteRunStarted` seeds the site-one task list from the restoration task plus
+  the current onboarding pool for buy, sell, transfer, plant, craft, and
+  consume actions.
 - Non-site-one runs clear the board and keep it empty.
 - Accepting a visible task moves it to the accepted list.
 - Accepting a task above the cap or re-accepting a non-visible task has no
   effect.
 - `RestorationProgressChanged` updates progress amounts.
+- Visible-progress updates alone do not auto-complete a task before the player
+  accepts it.
 - Hitting the task target completes the task, adds it to `completed_task_ids`,
-  and removes it from `accepted_task_ids`.
+  removes it from `accepted_task_ids`, and queues the guaranteed publisher
+  faction-reputation award.
+- Successful onboarding action messages such as purchase and transfer completion
+  advance the matching accepted onboarding task.
+- Site-start task seeding also instantiates the visible reward draft options for
+  the task.
+- Claiming a completed-task reward marks the chosen option selected and routes
+  the reward effect through the owning gameplay system for money, unlockable,
+  and run-modifier prototype rewards.
+- Claiming a reward moves the task into the claimed/history bucket instead of
+  leaving it in the live completed list.
 
 ### `weather_event`
 
@@ -283,9 +299,9 @@ Implemented behavior coverage should verify:
 - `SiteRunStarted` seeds the site-one event/weather state only when no event is
   active.
 - Other sites or already-active event states are ignored.
-- `run()` advances through `Warning`, `Build`, `Peak`, `Decay`, and
-  `Aftermath`.
-- Exiting `Aftermath` clears the active event, zeroes pressures, resolves
+- `run()` interpolates event pressure from `startTime` to `peakTime`, holds for
+  `peakDuration`, and then interpolates back down to `endTime`.
+- Passing `endTime` clears the active event, zeroes pressures, resolves
   aftermath relief, and resets site weather.
 - Projection dirty flags are raised when the weather/event state changes.
 

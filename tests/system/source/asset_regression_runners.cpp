@@ -500,8 +500,11 @@ void task_board_regression_runner(
             TaskBoardSystem::process_message(
                 site_context,
                 make_message(
-                    GameMessageType::SiteTileBurialCleared,
-                    gs1::SiteTileBurialClearedMessage {1U, 2, 3, 0.35f, 0U})) == GS1_STATUS_OK);
+                    GameMessageType::RestorationProgressChanged,
+                    gs1::RestorationProgressChangedMessage {
+                        site_run.task_board.visible_tasks.front().target_amount,
+                        site_run.task_board.visible_tasks.front().target_amount,
+                        1.0f})) == GS1_STATUS_OK);
         GS1_SYSTEM_TEST_CHECK(
             context,
             site_run.task_board.visible_tasks.front().runtime_list_kind ==

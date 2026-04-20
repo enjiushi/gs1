@@ -9,7 +9,7 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 
 ## Contents
 - `action_execution_system.h`: Action execution system interface.
-- `action_execution_system.cpp`: Executes queued site actions and emits follow-up gameplay messages.
+- `action_execution_system.cpp`: Executes queued site actions using the canonical real-seconds-to-action-minutes conversion and emits follow-up gameplay messages.
 - `camp_durability_system.h`: Camp durability system interface.
 - `camp_durability_system.cpp`: Applies camp wear/failure effects to camp durability state.
 - `craft_system.h`: Craft system interface.
@@ -21,27 +21,29 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `ecology_system.h`: Ecology system interface.
 - `ecology_system.cpp`: Updates plants, burial, watering, broader ecology progression, and highway-target sand-cover accumulation for objective-driven site progress.
 - `economy_phone_system.h`: Economy phone system interface.
-- `economy_phone_system.cpp`: Handles phone storefront interactions, site-one opening cash, and economy-driven purchases.
+- `economy_phone_system.cpp`: Handles phone storefront interactions, economy-driven purchases, owner-confirmed buy/sell completion messages for onboarding-task progress, and task-reward money/unlockable reveal awards routed through message handling.
 - `failure_recovery_system.h`: Failure recovery system interface.
 - `failure_recovery_system.cpp`: Resolves failure fallout and recovery flow for the site.
 - `inventory_system.h`: Inventory system interface.
-- `inventory_system.cpp`: Applies item moves, uses, inventory ownership changes, and delivery-box loadout seeding.
+- `inventory_system.cpp`: Applies item moves, uses, inventory ownership changes, owner-confirmed transfer/use/craft completion messages for onboarding-task progress, and fixed-step-derived delivery countdown progress.
 - `local_weather_resolve_system.h`: Local weather resolve system interface.
 - `local_weather_resolve_system.cpp`: Resolves local weather updates into owned site state, including directional lee-side wind shelter with nonlinear range falloff.
 - `modifier_system.h`: Modifier system interface.
-- `modifier_system.cpp`: Applies and expires site modifiers/effects, importing nearby auras plus campaign-unlocked assistant and technology modifiers when a site run starts.
+- `modifier_system.cpp`: Applies and expires site modifiers/effects, including task-reward run-modifier awards routed through message handling.
 - `phone_panel_system.h`: Phone panel system interface.
-- `phone_panel_system.cpp`: Owns phone panel section state plus authoritative projected phone listings/counts for the adapter.
+- `phone_panel_system.cpp`: Owns phone panel section state plus authoritative projected phone listings/task counts for the adapter, including completed and claimed history counts.
 - `placement_validation_system.h`: Placement validation system interface.
 - `placement_validation_system.cpp`: Validates structure placement requests against tile/world constraints.
 - `site_completion_system.h`: Site completion system interface.
 - `site_completion_system.cpp`: Determines site success/failure outcomes for the active site objective mode, including pure-survival time completion and green-wall hold/timer-pause evaluation.
 - `site_flow_system.h`: Site flow system interface.
-- `site_flow_system.cpp`: Coordinates major site flow transitions during a run.
+- `site_flow_system.cpp`: Coordinates major site flow transitions during a run, including worker motion and approach/interaction movement handling.
+- `site_time_system.h`: Site time system interface.
+- `site_time_system.cpp`: Owns fixed-step-derived site clock, day index, and day-phase advancement.
 - `site_system_context.h`: Shared dependency bundle passed into site systems.
 - `task_board_system.h`: Task board system interface.
-- `task_board_system.cpp`: Manages board listings, acceptance, completion, reward-delivery triggers, and reset flow, keeping the authored site-one onboarding task set on dense-restoration site one only.
+- `task_board_system.cpp`: Manages board listings, acceptance, onboarding-task progress tracking, reward-draft seeding, reward-claim routing, claimed-history transitions, and reset flow, keeping the site-one onboarding override plus restoration task on dense-restoration sites.
 - `weather_event_system.h`: Weather event system interface.
-- `weather_event_system.cpp`: Applies incoming weather events to site-owned weather/event state, including recurring one-sided highway-protection waves.
+- `weather_event_system.cpp`: Applies incoming weather events to site-owned weather/event state, including start/peak/end timeline interpolation and recurring one-sided highway-protection waves.
 - `worker_condition_system.h`: Worker condition system interface.
 - `worker_condition_system.cpp`: Updates worker condition and related penalties/recovery.

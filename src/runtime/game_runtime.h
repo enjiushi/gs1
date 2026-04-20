@@ -2,6 +2,7 @@
 
 #include "campaign/campaign_state.h"
 #include "messages/game_message.h"
+#include "runtime/runtime_clock.h"
 #include "site/site_run_state.h"
 #include "gs1/status.h"
 #include "gs1/types.h"
@@ -16,7 +17,6 @@
 namespace gs1
 {
 inline constexpr std::uint32_t k_api_version = 4;
-inline constexpr double k_default_fixed_step_seconds = 0.25;
 inline constexpr std::size_t k_feedback_event_type_count = 4U;
 
 class GameRuntime final

@@ -18,11 +18,6 @@ struct CampaignFlowMessageContext final
     GameMessageQueue& message_queue;
 };
 
-struct CampaignFixedStepContext final
-{
-    CampaignState& campaign;
-};
-
 class CampaignFlowSystem final
 {
 public:
@@ -30,6 +25,5 @@ public:
     [[nodiscard]] static Gs1Status process_message(
         CampaignFlowMessageContext& context,
         const GameMessage& message);
-    static void run(CampaignFixedStepContext& context);
 };
 }  // namespace gs1

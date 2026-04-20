@@ -145,27 +145,6 @@ const char* site_state_name(Gs1SiteState site_state)
     }
 }
 
-const char* weather_phase_name(Gs1WeatherEventPhase phase)
-{
-    switch (phase)
-    {
-    case GS1_WEATHER_EVENT_PHASE_NONE:
-        return "NONE";
-    case GS1_WEATHER_EVENT_PHASE_WARNING:
-        return "WARNING";
-    case GS1_WEATHER_EVENT_PHASE_BUILD:
-        return "BUILD";
-    case GS1_WEATHER_EVENT_PHASE_PEAK:
-        return "PEAK";
-    case GS1_WEATHER_EVENT_PHASE_DECAY:
-        return "DECAY";
-    case GS1_WEATHER_EVENT_PHASE_AFTERMATH:
-        return "AFTERMATH";
-    default:
-        return "UNKNOWN";
-    }
-}
-
 const char* site_attempt_result_name(Gs1SiteAttemptResult result)
 {
     switch (result)
@@ -200,6 +179,8 @@ const char* task_list_kind_name(Gs1TaskPresentationListKind kind)
         return "ACCEPTED";
     case GS1_TASK_PRESENTATION_LIST_COMPLETED:
         return "COMPLETED";
+    case GS1_TASK_PRESENTATION_LIST_CLAIMED:
+        return "CLAIMED";
     case GS1_TASK_PRESENTATION_LIST_VISIBLE:
     default:
         return "VISIBLE";
@@ -576,10 +557,14 @@ void append_site_weather_json(std::string& json, const SmokeEngineHost::SiteSnap
     json += std::to_string(weather.wind_direction_degrees);
     json += ",\"eventTemplateId\":";
     json += std::to_string(weather.event_template_id);
-    json += ",\"eventPhase\":";
-    append_json_string(json, weather_phase_name(weather.event_phase));
-    json += ",\"phaseMinutesRemaining\":";
-    json += std::to_string(weather.phase_minutes_remaining);
+    json += ",\"eventStartTimeMinutes\":";
+    json += std::to_string(weather.event_start_time_minutes);
+    json += ",\"eventPeakTimeMinutes\":";
+    json += std::to_string(weather.event_peak_time_minutes);
+    json += ",\"eventPeakDurationMinutes\":";
+    json += std::to_string(weather.event_peak_duration_minutes);
+    json += ",\"eventEndTimeMinutes\":";
+    json += std::to_string(weather.event_end_time_minutes);
     json += '}';
 }
 
@@ -848,6 +833,10 @@ void append_site_phone_panel_json(std::string& json, const SmokeEngineHost::Site
     json += std::to_string(phone_panel.visible_task_count);
     json += ",\"acceptedTaskCount\":";
     json += std::to_string(phone_panel.accepted_task_count);
+    json += ",\"completedTaskCount\":";
+    json += std::to_string(phone_panel.completed_task_count);
+    json += ",\"claimedTaskCount\":";
+    json += std::to_string(phone_panel.claimed_task_count);
     json += ",\"buyListingCount\":";
     json += std::to_string(phone_panel.buy_listing_count);
     json += ",\"sellListingCount\":";

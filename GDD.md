@@ -85,7 +85,7 @@ These terms are stable and should be used consistently in future design and impl
 | `Nearby-Site Aura` | A passive `Per-Site Modifier` package projected from adjacent stabilized sites into the current site session before deployment. It should be weaker and steadier than a claimed `Run Modifier`, usually focuses on one support channel or one linked pair of meters, and should never grant full hazard immunity. |
 | `Camp Support` | The light support infrastructure on a `Site`, including shelter, `Container`s, service devices, and hired labor access. |
 | `Player Condition` | The worker's physical and mental state, represented by survival and output meters such as health, hydration, nourishment, energy cap, energy, morale, and work efficiency. |
-| `Aftermath Relief Offer` | A faction support offer that can appear after a harsh event enters `Aftermath`; its strength depends on current `Faction Reputation` and site damage. |
+| `Aftermath Relief Offer` | A faction support offer that can appear after a harsh event fully resolves and the site enters recovery; its strength depends on current `Faction Reputation` and site damage. |
 | `Wind Protection` | The total local wind-erosion shielding on a tile or patch from plant adjacency, terrain shelter, and devices; higher protection reduces exposure damage and fertility loss. |
 | `Plant Density` | The current strength and maturity of living cover or plant-derived starter cover on a tile or cluster; higher density means stronger traits, better survival, and possible natural spread for living plants, while lower density means weaker effects and higher hazard vulnerability. |
 | `Plant Trend` | The derived direction of plant density on a tile, shown as `Growing`, `Holding`, or `Withering`, based on whether the patch is gaining or losing density. |
@@ -332,6 +332,7 @@ Core UI rules:
 - the `Regional Map` should be the single campaign-planning hub for site selection, selected-site summary, nearby-site support review, `Loadout` assembly, `Nearby-Site Aura` preview, available `Persistent Tech Tree` picks, and deployment
 - the `Field Phone` should be the single on-site management hub for `Contract Board` tasks, buying, selling, hiring, revealed `Site Unlockables`, and current faction-status review
 - site reward-claim flow and `Aftermath Relief Offer` choice should appear through the same phone flow or the same shared modal family, not as separate large systems
+- claimed tasks should move into a separate phone-facing claimed/history presentation instead of staying mixed into the active completion list
 - site-play HUD should stay compact and always visible, covering current `Hydration`, `Energy`, money, time of day, `Heat`, `Wind`, `Dust`, current event state when relevant, and simple site-completion progress
 - accepted tasks should have a compact always-available tracker during normal site play so the player does not need to reopen the phone for every progress check
 - item description should not become a separate permanent screen; use one contextual inspect panel for tiles, plants, structures, items, and selected regional-map sites
@@ -339,6 +340,9 @@ Core UI rules:
 - planting, device placement, repair, watering, burial clearing, and similar explicit field-work choices should use one shared field-actions panel rather than multiple permanent build, plant, and utility panels
 - crafting should stay contextual to the `Field Workshop` and should not become a globally available full-screen system in the current stage
 - full-screen planning UI and pause/system UI should pause time
+- when a site ends in success or failure, the player should immediately see a dedicated result panel from that shared modal family instead of remaining in an unresolved site-play state
+- the site-result panel should show a clear outcome title and one primary `OK` action
+- pressing `OK` should always leave the result panel and return the player to the `Regional Map`
 
 Current-stage simplification rules:
 
@@ -378,8 +382,10 @@ Core time contract:
 
 - `1` full in-game day = `30` real-time minutes
 - `1` in-game day = `1440` in-game minutes
+- canonical time conversion = `0.8` in-game minutes per real second
 - recommended fixed simulation step = `0.25` real seconds
-- each fixed simulation step advances time by `0.2` in-game minutes, or `12` in-game seconds
+- each fixed simulation step advances time by `fixedStepSeconds * 0.8` in-game minutes
+- at the recommended `0.25` second step, that is `0.2` in-game minutes, or `12` in-game seconds
 
 This keeps the simulation readable and stable while still feeling continuous to the player.
 
@@ -448,7 +454,9 @@ Discrete or integer runtime values:
 - `plantDensityState`
 - `taskState`
 - `contractState`
-- `eventState`
+- `forecastProfileId`
+- `eventTemplateId`
+- `eventWaveSequenceIndex`
 - `tileTraversable`
 - `tilePlantable`
 - `tileReservedByStructure`
@@ -815,23 +823,27 @@ Use these runtime fields:
 | `weatherWind` | Continuous `0-100` | Current site-wide wind pressure |
 | `weatherDust` | Continuous `0-100` | Current site-wide airborne sand, dust-load, and visibility pressure; shown to the player as `Dust` |
 | `weatherWindDirectionDegrees` | Continuous `0-360` | Current site-wide wind-flow direction measured clockwise on the tile grid, with `0` pointing east/right |
-| `siteHeatBias` | Continuous `-20` to `20` | Site-specific baseline heat tendency |
-| `siteWindBias` | Continuous `-20` to `20` | Site-specific baseline wind tendency |
-| `siteDustBias` | Continuous `-20` to `20` | Site-specific baseline loose-dust tendency |
-| `forecastConfidence` | Continuous `0-100` | How trustworthy the current forecast is |
-| `forecastLeadMinutes` | Continuous | How much warning time the forecast currently gives |
-| `eventTypeId` | Discrete | Current extreme event archetype or `None` |
-| `eventState` | Discrete | `Inactive`, `Warning`, `Build`, `Peak`, `Decay`, or `Aftermath` |
-| `eventTier` | Discrete | Relative severity band for the current event |
+| `siteWeatherBias` | Continuous | Single placeholder site-wide weather bias; currently initialized to `0` |
+| `forecastProfileId` | Discrete | Current authored forecast profile for the site |
+| `eventTemplateId` | Discrete | Current harsh-event template or `None` |
+| `eventStartTimeMinutes` | Continuous | Absolute in-game minute when the current event starts applying pressure |
+| `eventPeakTimeMinutes` | Continuous | Absolute in-game minute when the current event reaches full pressure |
+| `eventPeakDurationMinutes` | Continuous | Full-pressure hold window length for the current event |
+| `eventEndTimeMinutes` | Continuous | Absolute in-game minute when the current event fully ends |
 | `eventHeatPressure` | Continuous `0-100` | Current event-side heat pressure that feeds `weatherHeat` |
 | `eventWindPressure` | Continuous `0-100` | Current event-side wind pressure that feeds `weatherWind` |
 | `eventDustPressure` | Continuous `0-100` | Current event-side dust pressure that feeds `weatherDust` |
+| `minutesUntilNextWave` | Continuous | Countdown to the next highway-protection wave while no event is active |
+| `eventWaveSequenceIndex` | Integer | Number of highway-protection waves already started in the current site run |
+| `aftermathReliefResolved` | Continuous `0-1` | Recovery-ready flag set once the active event fully ends |
 
 Core rule:
 
 - `weatherHeat`, `weatherWind`, and `weatherDust` are site-wide ambient values
 - `weatherWindDirectionDegrees` tells local shelter which side of a plant, structure, or terrain shelter is downwind
+- the current prototype does not use a separate runtime `eventState` enum or `eventTier`; it derives event intensity from `eventTemplateId` plus the absolute event timeline markers
 - `eventHeatPressure`, `eventWindPressure`, and `eventDustPressure` are site-wide event meters that can sit at `0` when no harsh event is active
+- highway-protection sites reuse the same timeline curve in short repeating waves, with `minutesUntilNextWave` and `eventWaveSequenceIndex` tracking cadence
 - local terrain, plants, devices, and player field work do not rewrite the weather itself
 - they change how hard the weather lands on a given tile, worker, device, or storage area
 
@@ -852,101 +864,82 @@ Resolution rule:
 - instead, they directly change the resolved local results `tileHeat`, `tileWind`, and `tileDust`
 - those resolved local weather meters then drive tile moisture loss, burial, fertility setback, and the weather-linked parts of plant pressure
 
-#### Baseline Daily Weather Curve
+#### Baseline Site Weather Behavior
 
-Outside of extreme events, weather should still follow a readable daily rhythm.
+Outside of harsh events, site-wide weather should still feel calm and readable.
 
 Baseline behavior:
 
-- `weatherHeat` should be lowest overnight, rise through morning, peak around midday, then fall in evening
-- `weatherWind` should fluctuate more than heat and can spike during exposed parts of the day even without a named event
-- `weatherDust` should be partly derived from wind, site dust bias, and recent hazard aftermath
+- outside an active harsh event, the current prototype smooths `weatherHeat`, `weatherWind`, and `weatherDust` back toward `0`
+- site 1 still bootstraps in calm conditions with `heat = 0`, `wind = 0`, `dust = 0`, and wind direction `0`
+- `weatherWindDirectionDegrees` should stay readable because local shelter and lee-side protection use it directly
+- richer day-night ambient curves, gust modeling, and separate per-channel site biases are future work rather than current runtime behavior
 
 Use this relationship:
 
-- `weatherHeat` should come from the daily heat curve plus site bias plus current `eventHeatPressure`
-- `weatherWind` should come from the daily wind curve plus site bias plus gust variation plus current `eventWindPressure`
-- `weatherDust` should come from site dust bias, current wind, current `eventDustPressure`, and recent-event aftermath
+- when an event is active, `eventHeatPressure`, `eventWindPressure`, and `eventDustPressure` become the target site-wide weather values and the weather state eases toward them
+- when no event is active, the site-wide weather values ease back toward calm conditions
+- `siteWeatherBias` is the single placeholder bias field for later site-specific weather offsets, but the current prototype resets it to `0`
 
 Engineering note:
 
-- `dayHeatCurve` and `dayWindCurve` can be authored as simple curves rather than hand-written formulas
+- any future return of daily heat or wind curves should layer on top of the current event-pressure contract instead of replacing it
 - `gustNoise` should be low-amplitude short variation, not full randomness spikes with no warning
 
 #### Extreme Event Archetypes
 
-The current design only needs a small event set:
+The current prototype ships a much smaller harsh-event set than the older multi-archetype plan:
 
-| Event | Typical Event-Meter Pattern | Main Gameplay Pressure |
+| Runtime Id | Current Use | Main Gameplay Pressure |
 |---|---|---|
-| `HeatWave` | high `eventHeatPressure`, small `eventWindPressure`, small `eventDustPressure` | hydration drain, energy drain, exposed worker pressure, weak seedling survival |
-| `Sandstorm` | medium `eventHeatPressure`, high `eventWindPressure`, very high `eventDustPressure` | visibility collapse, extreme wind-sand exposure, burial, device damage, movement pressure |
-| `CompoundFront` | high values in all three channels | rare high-tier event that tests the full support layout |
+| `forecastProfileId = 1` | Site-one startup forecast profile | onboarding weather profile with no recurring wave scheduling |
+| `forecastProfileId = 2` | `Highway Protection` objective | recurring short one-sided waves that test directional shelter placement |
+| `eventTemplateId = 1` | Active harsh-event wave | full-strength target of `Heat 15`, `Wind 10`, and `Dust 5` before local-weather resolution |
 
 Limits:
 
-- during the first three onboarding sites, a normal site day should have `0` or `1` major extreme event most of the time
-- back-to-back extreme events or authored wave sequences should be rare and mainly reserved for the fourth-site proof case or later high-tier campaign pressure
-- `CompoundFront` can be used as a capstone late-wave pressure spike if needed, but it should remain uncommon enough that it feels memorable rather than routine
+- most sites still run without an automatically scheduled harsh event
+- `Highway Protection` is currently the only objective mode that loops repeated harsh-event waves
+- additional archetypes such as heat-only spikes or higher-tier compound fronts remain future content, not current runtime behavior
 
-#### Event Phase Contract
+#### Event Timeline Contract
 
-Every extreme event should move through the same phase model:
+Every active harsh event currently uses the same four absolute timeline markers:
 
-| `eventState` | Purpose | Behavior |
+| Field | Purpose | Behavior |
 |---|---|---|
-| `Inactive` | No active extreme event | Weather comes only from baseline curve and minor gust noise |
-| `Warning` | Forecasted approach window | No large direct modifier yet; player receives warning and prep time |
-| `Build` | Pressure begins rising | Work becomes riskier, visibility may start dropping, and exposed zones start taking meaningful pressure |
-| `Peak` | Main danger window | Strongest modifiers, strongest burial or hydration punishment, and the most dangerous field-work window |
-| `Decay` | Event is weakening | Still dangerous, but the player can begin broader recovery actions |
-| `Aftermath` | Lingering site disruption | Lower ambient pressure than peak, but burial, damage, morale hit, and repair backlog remain |
+| `startTime` | First event influence minute | Event pressure is `0` before this point |
+| `peakTime` | Minute the event reaches full force | Pressure linearly interpolates from `0` to full strength between `startTime` and `peakTime` |
+| `peakDuration` | Full-force hold window | Pressure stays at full strength from `peakTime` through `peakTime + peakDuration` |
+| `endTime` | Final event influence minute | Pressure linearly interpolates back to `0` between `peakTime + peakDuration` and `endTime` |
 
-Duration targets:
+Current prototype timings:
 
-- `Warning`: `60-180` in-game minutes
-- `Build`: `30-90` in-game minutes
-- `Peak`: `30-120` in-game minutes
-- `Decay`: `30-90` in-game minutes
-- `Aftermath`: `60-240` in-game minutes
+- `startTime -> peakTime`: fixed `5` in-game minutes
+- `peakDuration`: fixed `5` in-game minutes
+- `peakTime + peakDuration -> endTime`: fixed `5` in-game minutes
+- for `Highway Protection`, once a wave fully ends the next wave is seeded after a random `4-8` in-game minute delay if the objective timer is still running
+- recovery and relief logic should key off the cleared event timeline plus `aftermathReliefResolved`, not a separate weather-phase enum
 
 #### Forecast Contract
 
-Forecasting should be imperfect, but actionable.
+Forecasting is currently profile-based rather than simulation-driven.
 
-Forecast output should include:
+Runtime contract:
 
-- predicted event type if one is likely
-- predicted start window
-- predicted intensity band for `Heat`, `Wind`, and `Dust`
-- `forecastConfidence`
+- `forecastProfileId = 1` is assigned to the site-one startup flow
+- `forecastProfileId = 2` is assigned to `Highway Protection` sites and signals recurring wave behavior
+- the runtime does not currently expose `forecastConfidence`, `forecastLeadMinutes`, or per-channel forecast error bands
+- until richer forecasting exists, forecast presentation should treat the profile as authored scenario context rather than a probabilistic weather model
 
-Base forecast values:
+Future direction:
 
-- `forecastLeadMinutes = 180`
-- base intensity error band = `+/- 15`
-- base start-time error band = `+/- 60` in-game minutes
-- base `forecastConfidence` should usually sit around `55-70`
+- later weather passes can add confidence, lead time, and channel-specific uncertainty back on top of the current profile system if those fields return to code
 
-Improvement sources:
+Prototype presentation note:
 
-- `Autonomous Region Agricultural University` tech or support that improves forecast range or certainty
-- persistent tech that improves forecast range or certainty
-- site-scoped unlocks or modifiers that improve local site precision
-
-Improvement effects:
-
-- higher `forecastLeadMinutes`
-- smaller intensity error band
-- smaller start-time error band
-- higher `forecastConfidence`
-- earlier access to more precise channel-specific forecast information
-- clearer identification of which weather channel is expected to be most dangerous
-
-Important rule:
-
-- forecasting should improve planning quality, not fully remove uncertainty
-- even strong forecasting should still preserve some tension in exact intensity, duration, or zone impact
+- the latest smoke-viewer work includes temporary wind-focused presentation scaffolding, including stronger visual normalization for low runtime wind values and fade-out retention of the last event wind heading
+- that smoke/test presentation code should not be treated as the gameplay startup weather contract; the gameplay/runtime contract for site 1 still starts calm until a real event or other weather-driving system changes it
 
 #### Runtime Pressure And Aftermath Rules
 
@@ -962,17 +955,15 @@ Design consistency rule:
 
 - each weather channel should leave readable artifacts on at least 3 layers at once when relevant: player pressure, land/tile condition, and plant growth or degeneration
 
-When `eventState` is `Peak`, the event should mainly push the weather system itself into extreme values rather than bypassing it with separate direct plant-damage rules.
+When the event pressure curve is in its full-strength hold window, the event should mainly push the weather system itself into stronger values rather than bypassing it with a separate plant-damage phase machine.
 
-During `Peak`, the event should mainly raise:
+During that full-strength hold window, the event should mainly raise:
 
 - `eventHeatPressure`
 - `eventWindPressure`
 - `eventDustPressure`
-- worker outdoor action speed penalties
-- worker hydration and energy drain
-- worker health risk from severe exposure
-- device damage pressure
+- local exposure warnings once site-wide and resolved local weather cross dangerous thresholds
+- camp durability wear and device stress through the same weather channels that already read site-wide and event pressure
 
 Those extreme weather values should then be what actually causes:
 
@@ -981,7 +972,7 @@ Those extreme weather values should then be what actually causes:
 - `tileSandBurial` gain
 - `deviceEfficiency` loss
 
-When `eventState` enters `Aftermath`, the event should stop dealing peak pressure, but it should leave behind recoverable problems:
+Once `worldTimeMinutes` reaches `endTimeMinutes`, direct event pressure should drop back toward `0`, site-wide weather should smooth toward calm conditions, and `aftermathReliefResolved` should flip to `1`. The event should then leave behind recoverable problems:
 
 - extra `tileSandBurial`
 - reduced `deviceEfficiency` from burial or damage
@@ -989,18 +980,17 @@ When `eventState` enters `Aftermath`, the event should stop dealing peak pressur
 - lower short-term worker morale until the site feels under control again
 - possible `Aftermath Relief Offer`s from high-reputation factions, giving the player a recovery choice rather than automatic rescue
 
-This phase is important because the strategy game continues after the spectacle ends. Strong reputation should improve relief speed, package quality, and subsidy level, but it should never erase the event's damage for free.
+There is no separate runtime `Aftermath` enum in the current prototype; recovery is inferred from the cleared event timeline plus the relief-ready flag. Strong reputation should improve relief speed, package quality, and subsidy level, but it should never erase the event's damage for free.
 
 ### Extreme Hazard Events
 
 In addition to normal heat, wind, and dust pressure, some sites should experience extreme hazard events that make the environment temporarily fierce and genuinely threatening. These are not routine background conditions. They are short periods where survival, shelter, preparation, and site layout are put under serious stress.
 
-Example extreme event directions:
+Current prototype event directions:
 
-- Severe sandstorm front
-- Extended heat-wave spike
-- Multi-phase wind burst event
-- Combined heat and visibility-collapse event
+- a short harsh-event pressure spike built from the shared ramp-up, hold, and ramp-down curve
+- a repeating one-sided highway wave chain that reuses the same pressure shape with varying wind direction
+- future heat-only, dust-heavy, or compound archetypes can return later, but they are not part of the current runtime contract
 
 Design goals for extreme events:
 
@@ -1100,7 +1090,7 @@ The design target is still "I saved that patch," but the reason should be that t
 
 ### Harsh-Event Work Rules
 
-The game should formalize this as normal player actions performed under event-modified pressure during `Warning`, `Build`, `Peak`, `Decay`, and `Aftermath`, rather than as separate action types.
+The game should formalize this as normal player actions performed under nonzero event pressure and the short recovery window after the event, rather than as separate action types or a named harsh-event phase ladder.
 
 Core rules:
 
@@ -1113,10 +1103,9 @@ Core rules:
 
 Exposure rules:
 
-- during `Build`, outdoor action time is multiplied by `1.15`
-- during `Peak`, outdoor action time is multiplied by `1.35`
-- during `Peak`, hydration and energy drain from the current weather continue on top of the action's direct work cost
-- if visibility is critically low during a `Sandstorm`, movement to the target should often be the real cost, not only the work itself
+- the current prototype should let resolved weather, worker-condition rules, and local exposure warnings carry most of the event-time cost
+- if wind and dust spike, movement and field exposure should feel worse because the same weather channels feed local weather, HUD warnings, device wear, and camp durability pressure
+- future explicit action-time multipliers can be added later if the action model grows a dedicated harsh-weather timing hook
 - if the worker is already in critical survival danger, action start should be blocked until they recover enough to act
 
 Interruption rules:
@@ -1129,7 +1118,7 @@ Design intent:
 
 - save the seedlings or save the irrigator
 - rescue the fringe output tile or protect the camp edge
-- go outside during `Peak` for a risky fix or accept a smaller loss and recover faster after
+- go outside during the full-pressure window for a risky fix or accept a smaller loss and recover faster after
 
 That tradeoff is the core feeling. Harsh events should create agency through dangerous normal work, not through a parallel emergency-action subsystem.
 
@@ -1168,6 +1157,12 @@ The current mode set is:
 - `Highway Protection`: one map edge contains traversable non-plantable highway tiles. Those tiles reuse the existing per-tile ecology meters, but the fertility-side meter should represent local sand-cover percentage instead of soil quality. The site tracks the average sand cover across all highway tiles. If that average reaches the authored target, the site is lost immediately. If the player keeps the average below the target until the site time limit expires, the site is completed.
 - `Green Wall Connection`: two authored or procedurally generated planted regions start on opposite sides of the site with a protection band behind them. The player camp starts between them. The player must connect the two planted sides, then keep the protection band from gaining further sand long enough for a completion countdown to finish. If sand starts increasing again, that countdown resets. While the completion countdown is running, the main site time-limit countdown pauses. This mode is design-locked now but remains a later implementation step.
 - `Pure Survival`: the player must survive until the site time limit expires. If player health reaches zero before then, the site is lost. This mode is design-locked now but remains a later implementation step.
+
+Site-result flow contract for all objective modes:
+
+- as soon as the runtime decides that a site has completed or failed, gameplay should transition into a dedicated `Site Result` state instead of leaving the player in an interactable site-play state
+- that state should present a result panel with the objective outcome and any immediate summary we want to expose, such as newly revealed nearby sites
+- the result panel should expose one primary `OK` action, and confirming `OK` should return the player to the `Regional Map`
 
 Current prototype content assignment:
 
@@ -2127,7 +2122,7 @@ Density resolution rule:
 - if the plant is currently above its `salinityDensityCap`, density should fall until it returns to what that tile can support
 - low-density plants should be the most fragile stage
 - dense established plants should hold more steadily under normal pressure
-- peak-phase events should increase plant danger mainly by pushing the weather meters higher, not by bypassing the meter model with a separate direct plant-damage rule
+- peak-intensity windows should increase plant danger mainly by pushing the weather meters higher, not by bypassing the meter model with a separate direct plant-damage rule
 
 Placement rule:
 
@@ -2180,7 +2175,7 @@ A tile is eligible only if all of these are true:
 - the source tile is not badly buried
 - the source tile has enough water, fertility, and protection to count as locally stable
 - the current salinity situation still allows strong density for that plant
-- the current extreme hazard phase is not `Peak`
+- the current extreme hazard timeline intensity is below its peak hold window
 
 Candidate target rules:
 
@@ -2574,7 +2569,7 @@ Key rules:
 - Accepted tasks move into an active list and do not rotate out on refresh
 - Unaccepted tasks remain on the board and may rotate out when the pool refreshes
 - The game should not allow free task abandonment, because accepting a task is itself the strategic commitment
-- Faction-published tasks should bias reward drafts, `Faction Reputation` gain, and `Faction Assistant` availability
+- Faction-published tasks should always grant their own guaranteed publisher `Faction Reputation`, but the immediate reward draft should come from one shared eligible reward pool rather than a faction-locked reward table in the current prototype
 - Each `Site Task` should display one `Task Reward Draft` before the player accepts it
 - Completing a `Site Task` should always grant its guaranteed `Faction Reputation` payout from the publishing `Faction`
 - That `Faction Reputation` payout should be guaranteed on completion, but its amount should scale by task tier or level and task type rather than being chosen from the reward draft
@@ -2599,7 +2594,7 @@ Key rules:
 - a `Site Unlockable` such as a plant, device, field action, or other site-scoped option
 - a `Run Modifier`
 - a `Task Reward Package` containing money, item bundles, or a mixed tactical bundle
-- if the chosen option is a `Site Unlockable`, it becomes available on the current site and may still require money to purchase or use
+- if the chosen option is a `Site Unlockable`, it becomes available on the current site immediately and may then require money to purchase or use
 - if the chosen option is a `Run Modifier`, it activates immediately for the current site session only
 - if the player leaves, fails, or restarts the current site session, all active `Run Modifier`s from that session are lost
 - `Site Unlockable` availability should primarily depend on `Site Task` completion plus `Persistent Tech Tree` prerequisites, but the site should also offer a limited direct-purchase fallback for tech-eligible unlockables at very high money cost
@@ -2622,7 +2617,7 @@ Prototype task progress rule:
 Prototype task data rule:
 
 - the prototype does not need a dedicated task-state field yet
-- for the prototype, a task's meaning should come from which runtime list currently owns it, such as available-board tasks, accepted tasks, or completed tasks
+- for the prototype, a task's meaning should come from which runtime list currently owns it, such as available-board tasks, accepted tasks, completed-awaiting-claim tasks, or claimed-history tasks
 - do not use a separate `failed` state in the current prototype direction, because unfinished tasks stay in the task list until completed
 - do not add task withdrawal in the current prototype direction
 - chain continuation should not be represented as a task state; if chain tracking exists, store it in separate chain runtime data
@@ -2639,7 +2634,7 @@ The exact task data structure or field list should not be locked inside the GDD.
 
 Prototype task lifetime rule:
 
-- the prototype does not need full persistent per-task history after a task leaves the board
+- the prototype does not need full campaign-persistent per-task history after a task leaves the board
 - task runtime data only needs to live for the current site session
 - if later systems need longer memory for duplication control or analytics, add a separate lightweight history system rather than inflating the task runtime object itself
 
@@ -2649,7 +2644,7 @@ For the current prototype direction, task progress should stay simple and readab
 
 Prototype completion rule:
 
-- task progress should come from either matching player actions or the player's current owned amount of the requested item
+- task progress should come from matching successful player actions
 - action-style tasks should progress when the player completes the relevant action
 - repeat-style tasks such as "do something `x` times" should accumulate progress from repeated matching action completions
 - item-state tasks should read the player's current owned total of the requested item on the current site
@@ -2748,10 +2743,11 @@ Typical `Site Task` examples:
 Typical rewards:
 
 - Show a `Task Reward Draft` with `2` options on the task before acceptance
-- On completion, let the player choose `1` reward from unlockables, modifiers, or item-focused bundles in that task's shown draft
+- On completion, let the player choose `1` reward from unlockables, modifiers, money, or item-focused bundles in that task's shown draft
 - Always grant the guaranteed publisher `Faction Reputation` payout on completion before the choice is made; the amount should scale with task tier or level
-- If the chosen result is a `Site Unlockable`, reveal it for current-site purchase or use
+- If the chosen result is a `Site Unlockable`, reveal it immediately for current-site purchase or use
 - If the chosen result is a `Run Modifier`, activate it immediately for the current site session
+- Item-focused reward bundles should use the delivery flow in the current prototype
 - One-time delivery drops or contractor offers when appropriate
 
 The design goal is that the player can inspect a clear reward draft before accepting a `Site Task`, finish that task, automatically gain trust with its publisher, and then make one meaningful tactical choice right away. That single choice should still create strong tension: reveal a new plant or device, activate a site-wide modifier, or take immediate money and item bundles.
@@ -2769,8 +2765,7 @@ Prototype reward-draft rule:
 - the current prototype should not change reward-draft generation based on current site state, local weak zones, weather, or other dynamic context
 - the current prototype does not need numeric weight tables in the GDD; simple authored pool rules are enough
 - reward generation should use the shared `Reward Band` ladder so task tier directly controls both reward type quality and reward amount tier
-- when possible, one option in the draft should come from the publishing faction's signature reward direction
-- the other option should come from a shared general reward pool or another eligible option from the same publisher
+- reward options should come from one shared eligible pool of immediate reward types rather than a faction-specific reward table in the current prototype
 - higher `Task Tier`s should unlock stronger reward bands rather than only larger numbers
 - lower-tier tasks should mainly offer basic item bundles, modest money packages, or basic site unlocks
 - higher-tier tasks may offer stronger unlockables, better mixed bundles, and stronger `Run Modifier` access
@@ -3479,7 +3474,7 @@ Events should create pivots and memorable stories, but they must remain readable
 
 ### Harsh-Event Faction Relief
 
-After a harsh event enters `Aftermath`, factions should evaluate whether to offer help based on current `Faction Reputation`, recent task history, and the site's current damage profile.
+After a harsh event fully ends and recovery becomes available, factions should evaluate whether to offer help based on current `Faction Reputation`, recent task history, and the site's current damage profile.
 
 Rules:
 
@@ -3909,6 +3904,8 @@ This is the minimum that still lets the player compare factions instead of only 
 - `Site 2`: `Forestry Bureau of Autonomous Region` only, `Accepted Task Cap = 2`
 - `Site 3`: `Autonomous Region Agricultural University` only, `Accepted Task Cap = 2`
 - `Site 4`: full prototype board with all `3` factions, `6` visible tasks, and `Accepted Task Cap = 3`
+- current `Site 1` onboarding task pool should focus on teachable actions: buy, sell, transfer, plant, craft, and consume
+- the current implementation may still keep one dense-restoration progress task alongside that onboarding pool while the broader site-completion tutorial flow is being migrated
 - accepted tasks do not expire
 - unaccepted tasks may be replaced by simple refresh rules after tutorial sets are cleared
 - no free task abandonment in the prototype
@@ -3918,7 +3915,7 @@ This is the minimum that still lets the player compare factions instead of only 
 - `Faction Reputation` amount is fixed by the task definition, but scales by task level or tier
 - no `Task Chain`s in the minimum playable build
 - no jackpot-tier tasks in the minimum playable build
-- no `Run Modifier`s in the minimum playable build
+- simple `Run Modifier` rewards are allowed in the current prototype, but they should stay easy to read and should be revisited in a later modifier-design pass
 
 This keeps the board strategic without requiring the full late-game board economy.
 
@@ -4356,17 +4353,17 @@ This summary should include only core runtime meters and the core plant-side val
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `eventHeatPressure` | Current event archetype, current event phase, `eventTier` | `weatherHeat` | Event-side heat channel. When no harsh event is active, this should sit at or near `0`. |
-| `eventWindPressure` | Current event archetype, current event phase, `eventTier` | `weatherWind` | Event-side wind channel. |
-| `eventDustPressure` | Current event archetype, current event phase, `eventTier` | `weatherDust` | Event-side dust channel. |
+| `eventHeatPressure` | Active `eventTemplateId`, current event timeline intensity | `weatherHeat` | Event-side heat channel. When no harsh event is active, this should sit at or near `0`. |
+| `eventWindPressure` | Active `eventTemplateId`, current event timeline intensity | `weatherWind` | Event-side wind channel. |
+| `eventDustPressure` | Active `eventTemplateId`, current event timeline intensity | `weatherDust` | Event-side dust channel. |
 
 ### Weather Meter Relationships
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `weatherHeat` | Daily heat curve, site heat bias, `eventHeatPressure` | `tileHeat` | Site-wide heat should resolve into local heat before it affects terrain, plants, or worker meters. |
-| `weatherWind` | Daily wind curve, site wind bias, gust variation, `eventWindPressure` | `tileWind` | Site-wide wind should resolve into local wind before it affects terrain, plants, or worker meters. |
-| `weatherDust` | Site dust bias, current wind, recent-event aftermath, `eventDustPressure` | `tileDust` | Site-wide dust pressure should resolve into local dust before it affects terrain, plants, or worker meters. |
+| `weatherHeat` | `eventHeatPressure`, smoothing toward current target, future `siteWeatherBias` work | `tileHeat` | Site-wide heat should resolve into local heat before it affects terrain, plants, or worker meters. The current prototype relaxes this back toward `0` when no event is active. |
+| `weatherWind` | `eventWindPressure`, smoothing toward current target, future `siteWeatherBias` work | `tileWind` | Site-wide wind should resolve into local wind before it affects terrain, plants, or worker meters. |
+| `weatherDust` | `eventDustPressure`, smoothing toward current target, future `siteWeatherBias` work | `tileDust` | Site-wide dust pressure should resolve into local dust before it affects terrain, plants, or worker meters. The current prototype does not yet add a separate aftermath-dust layer. |
 
 ### Resolved Local Weather Meter Relationships
 

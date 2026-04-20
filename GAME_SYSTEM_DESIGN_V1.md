@@ -355,6 +355,7 @@ Rules:
 - `SiteActive` is the only state that runs fixed-step gameplay simulation
 - `SitePaused` freezes both fixed-step simulation and board refresh timers
 - `SiteResult` resolves success or failure and decides whether to return to `RegionalMap` or `CampaignEnd`
+- `SiteResult` must project a dedicated result UI surface with a clear success/failure label and one primary `OK` action that returns to `RegionalMap`
 
 ### 4.2 Campaign Flow State Machine
 
@@ -628,8 +629,11 @@ deliveryAccumulator
 
 Rules:
 
-- fixed simulation step is `0.25` real seconds
-- each simulation step advances `0.2` in-game minutes
+- `1` in-game day is `1440` in-game minutes and must resolve in `30` real-time minutes
+- canonical time conversion is `0.8` in-game minutes per real second
+- recommended fixed simulation step is `0.25` real seconds
+- each simulation step advances `fixedStepSeconds * 0.8` in-game minutes
+- at the recommended `0.25` second step, that is `0.2` in-game minutes
 - `ecologyPulseAccumulator` triggers every `10` in-game minutes
 - `taskRefreshAccumulator` uses the authored or tuned board refresh interval
 - `deliveryAccumulator` is used for the `30` minute delivery arrival rule
@@ -829,8 +833,10 @@ Required fields:
 
 ```text
 activeEventTemplateId?
-eventPhase                // None | Warning | Build | Peak | Decay | Aftermath
-phaseMinutesRemaining
+startTimeMinutes
+peakTimeMinutes
+peakDurationMinutes
+endTimeMinutes
 eventHeatPressure
 eventWindPressure
 eventDustPressure
@@ -861,7 +867,7 @@ taskTierId
 targetAmount
 currentProgressAmount
 rewardDraftOptions[]
-runtimeListKind          // Visible | Accepted | Completed
+runtimeListKind          // Visible | Accepted | Completed | Claimed
 chainId?
 chainStepIndex?
 followUpTaskTemplateId?
@@ -872,6 +878,7 @@ Rules:
 - do not store a separate failed task state in v1
 - runtime list ownership is the authoritative task status
 - reward draft options are instantiated when the task enters the visible pool
+- claimed tasks move out of the completion bucket into a separate claimed/history presentation for the current site session
 
 `activeChainState` fields:
 
@@ -1194,10 +1201,10 @@ V1 rule:
 
 Responsibilities:
 
-- advance event phases
+- advance absolute event timelines
 - set `eventHeatPressure`, `eventWindPressure`, `eventDustPressure`
 - resolve event start from eligible templates
-- resolve `Aftermath` and potential relief offers
+- resolve event completion and potential relief offers
 
 ### 10.4 `LocalWeatherResolveSystem`
 
@@ -1283,10 +1290,11 @@ Responsibilities:
 - build eligible visible task pool
 - instantiate task runtime entries from templates
 - track progress
-- move tasks between visible, accepted, and completed lists
+- move tasks between visible, accepted, completed, and claimed-history lists
 - generate reward drafts at task instantiation time
 - award guaranteed faction reputation on task completion
 - handle chain continuation
+- in the current site-one onboarding override, seed teach-by-doing tasks such as buy, sell, transfer, plant, craft, and consume from the onboarding pool before the broader generated board is fully implemented
 
 ### 10.13 `ModifierSystem`
 
@@ -1378,6 +1386,13 @@ The begin/end fence defines one transactional UI setup batch for one semantic su
 - main menu
 - regional-map selection panel
 - site-result panel
+
+For the current prototype, the `site-result panel` contract is:
+
+- one label element describing the site outcome
+- one primary button element labeled `OK`
+- the `OK` button must emit the DLL-defined `RETURN_TO_REGIONAL_MAP` action token
+- adapters should treat this as the canonical way to leave `SiteResult`; the result surface should not strand the player in a non-interactable in-site presentation
 
 ### 12.2 Required UI View Models
 

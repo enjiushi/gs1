@@ -4,6 +4,7 @@
 #include "content/defs/craft_recipe_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/structure_defs.h"
+#include "runtime/runtime_clock.h"
 #include "site/craft_logic.h"
 #include "site/defs/site_action_defs.h"
 #include "site/device_interaction_logic.h"
@@ -22,9 +23,9 @@ namespace gs1
 namespace
 {
 constexpr double k_default_delivery_minutes = 30.0;
-constexpr double k_site_minutes_per_step = 0.2;
 constexpr std::uint32_t k_delivery_box_storage_flags =
-    inventory_storage::k_inventory_storage_flag_delivery_box;
+    inventory_storage::k_inventory_storage_flag_delivery_box |
+    inventory_storage::k_inventory_storage_flag_retrieval_only;
 
 std::uint32_t normalize_quantity(std::uint32_t quantity) noexcept
 {
@@ -110,6 +111,11 @@ bool storage_has_any_item(SiteRunState& site_run) noexcept
 }
 
 bool ensure_device_storage_containers(SiteSystemContext<InventorySystem>& context) noexcept;
+
+bool storage_is_retrieval_only(const StorageContainerState& storage_state) noexcept
+{
+    return (storage_state.flags & inventory_storage::k_inventory_storage_flag_retrieval_only) != 0U;
+}
 
 void clear_pending_device_storage_open(InventoryState& inventory) noexcept
 {
@@ -271,6 +277,40 @@ bool ensure_device_storage_containers(SiteSystemContext<InventorySystem>& contex
     }
 
     return created_any;
+}
+
+flecs::entity resolve_starter_storage_container(SiteSystemContext<InventorySystem>& context) noexcept
+{
+    if (!context.world.has_world() || context.site_run.site_world == nullptr)
+    {
+        return {};
+    }
+
+    const auto tile = context.world.read_camp().starter_storage_tile;
+    if (!context.world.tile_coord_in_bounds(tile))
+    {
+        return {};
+    }
+
+    const auto tile_data = context.world.read_tile(tile);
+    const auto* structure_def = find_structure_def(tile_data.device.structure_id);
+    if (structure_def == nullptr || !structure_def->grants_storage || structure_def->storage_slot_count == 0U)
+    {
+        return {};
+    }
+
+    const auto device_entity_id = context.site_run.site_world->device_entity_id(tile);
+    if (device_entity_id == 0U)
+    {
+        return {};
+    }
+
+    return inventory_storage::ensure_device_storage_container(
+        context.site_run,
+        device_entity_id,
+        tile,
+        structure_def->storage_slot_count,
+        0U);
 }
 
 flecs::entity resolve_delivery_box_container(SiteSystemContext<InventorySystem>& context) noexcept
@@ -659,6 +699,12 @@ PendingDelivery make_pending_delivery(
     return delivery;
 }
 
+[[nodiscard]] bool item_prefers_worker_pack(ItemId item_id) noexcept
+{
+    const auto* item_def = find_item_def(item_id);
+    return item_def != nullptr && item_is_directly_usable(*item_def);
+}
+
 void seed_inventory_from_loadout(SiteSystemContext<InventorySystem>& context) noexcept
 {
     ensure_inventory_storage_initialized(context);
@@ -678,8 +724,8 @@ void seed_inventory_from_loadout(SiteSystemContext<InventorySystem>& context) no
     }
 
     const auto worker_pack = inventory_storage::worker_pack_container(context.site_run);
-    const auto delivery_box = resolve_delivery_box_container(context);
-    const auto default_storage = delivery_box.is_valid() ? delivery_box : worker_pack;
+    const auto starter_storage = resolve_starter_storage_container(context);
+    const auto default_storage = starter_storage.is_valid() ? starter_storage : worker_pack;
 
     for (const auto& slot : loadout_slots)
     {
@@ -688,9 +734,13 @@ void seed_inventory_from_loadout(SiteSystemContext<InventorySystem>& context) no
             continue;
         }
 
+        const auto container =
+            item_prefers_worker_pack(slot.item_id)
+                ? worker_pack
+                : default_storage;
         (void)inventory_storage::add_item_to_container(
             context.site_run,
-            default_storage,
+            container,
             slot.item_id,
             slot.quantity);
     }
@@ -756,6 +806,14 @@ Gs1Status handle_inventory_item_use(
         {
             return GS1_STATUS_INVALID_STATE;
         }
+
+        GameMessage completed_message {};
+        completed_message.type = GameMessageType::InventoryItemUseCompleted;
+        completed_message.set_payload(InventoryItemUseCompletedMessage {
+            stack->item_id.value,
+            static_cast<std::uint16_t>(requested_quantity),
+            0U});
+        context.message_queue.push_back(completed_message);
         context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_HUD);
         return GS1_STATUS_OK;
     });
@@ -932,7 +990,20 @@ Gs1Status handle_inventory_craft_commit(
             output_container,
             recipe_def->output_item_id,
             recipe_def->output_quantity);
-        return remaining_output == 0U ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
+        if (remaining_output != 0U)
+        {
+            return GS1_STATUS_INVALID_STATE;
+        }
+
+        GameMessage completed_message {};
+        completed_message.type = GameMessageType::InventoryCraftCompleted;
+        completed_message.set_payload(InventoryCraftCompletedMessage {
+            recipe_def->recipe_id.value,
+            recipe_def->output_item_id.value,
+            recipe_def->output_quantity,
+            0U});
+        context.message_queue.push_back(completed_message);
+        return GS1_STATUS_OK;
     });
 }
 
@@ -1006,6 +1077,12 @@ Gs1Status handle_inventory_transfer(
             return GS1_STATUS_INVALID_STATE;
         }
 
+        if (source_is_worker_pack && source_storage->container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK &&
+            destination_is_device_storage && storage_is_retrieval_only(*destination_storage))
+        {
+            return GS1_STATUS_INVALID_STATE;
+        }
+
         if (auto_resolve_destination)
         {
             if (same_container)
@@ -1072,6 +1149,16 @@ Gs1Status handle_inventory_transfer(
             {
                 return GS1_STATUS_INVALID_STATE;
             }
+
+            GameMessage completed_message {};
+            completed_message.type = GameMessageType::InventoryTransferCompleted;
+            completed_message.set_payload(InventoryTransferCompletedMessage {
+                payload.source_storage_id,
+                payload.destination_storage_id,
+                source_stack->item_id.value,
+                static_cast<std::uint16_t>(transferred_quantity),
+                payload.flags});
+            context.message_queue.push_back(completed_message);
             return GS1_STATUS_OK;
         }
 
@@ -1106,16 +1193,33 @@ Gs1Status handle_inventory_transfer(
             }
         }
 
+        const auto transferred_quantity =
+            std::min<std::uint32_t>(normalize_quantity(payload.quantity), source_stack->quantity);
+
         const bool transferred = inventory_storage::transfer_between_slots(
             context.site_run,
             source_storage->container_kind,
             payload.source_slot_index,
             destination_storage->container_kind,
             payload.destination_slot_index,
-            normalize_quantity(payload.quantity),
+            transferred_quantity,
             source_storage->owner_device_entity_id,
             destination_storage->owner_device_entity_id);
-        return transferred ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
+        if (!transferred)
+        {
+            return GS1_STATUS_INVALID_STATE;
+        }
+
+        GameMessage completed_message {};
+        completed_message.type = GameMessageType::InventoryTransferCompleted;
+        completed_message.set_payload(InventoryTransferCompletedMessage {
+            payload.source_storage_id,
+            payload.destination_storage_id,
+            source_stack->item_id.value,
+            static_cast<std::uint16_t>(transferred_quantity),
+            payload.flags});
+        context.message_queue.push_back(completed_message);
+        return GS1_STATUS_OK;
     });
 }
 
@@ -1256,6 +1360,8 @@ Gs1Status handle_inventory_delivery_batch_requested(
 void progress_pending_deliveries(SiteSystemContext<InventorySystem>& context) noexcept
 {
     ensure_inventory_storage_initialized(context);
+    const double step_minutes =
+        runtime_minutes_from_real_seconds(context.fixed_step_seconds);
     auto& inventory = context.world.own_inventory();
     if (inventory.pending_delivery_queue.empty())
     {
@@ -1303,7 +1409,7 @@ void progress_pending_deliveries(SiteSystemContext<InventorySystem>& context) no
         }
 
         delivery.minutes_until_arrival =
-            std::max(0.0, delivery.minutes_until_arrival - k_site_minutes_per_step);
+            std::max(0.0, delivery.minutes_until_arrival - step_minutes);
         if (delivery.minutes_until_arrival > 0.0)
         {
             continue;

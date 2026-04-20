@@ -2315,6 +2315,77 @@ body {
   max-height: min(34vh, calc(100vh - 220px));
 }
 
+.stage-frame.site-result-mode .hud-row {
+  display: none;
+}
+
+.stage-frame.site-result-mode .center-layer {
+  display: none;
+}
+
+.stage-frame.site-result-mode .bottom-row {
+  flex: 1 1 auto;
+  justify-content: center;
+  align-items: center;
+}
+
+.stage-frame.site-result-mode .selection-chip {
+  width: min(460px, calc(100vw - 40px));
+  max-width: 460px;
+  max-height: none;
+  padding: 24px 26px 22px;
+  text-align: center;
+  background:
+    linear-gradient(180deg, rgba(248, 241, 229, 0.97), rgba(230, 216, 191, 0.95));
+  border-color: rgba(120, 87, 49, 0.22);
+  box-shadow:
+    0 28px 60px rgba(45, 28, 13, 0.22),
+    inset 0 1px 0 rgba(255, 249, 236, 0.78);
+}
+
+.stage-frame.site-result-mode .selection-chip .eyebrow {
+  color: rgba(92, 63, 32, 0.74);
+}
+
+.stage-frame.site-result-mode .selection-chip .subtitle {
+  margin-top: 10px;
+  font-size: 18px;
+  line-height: 1.45;
+  color: #332111;
+}
+
+.stage-frame.site-result-mode .action-bar {
+  display: none;
+}
+
+.stage-frame.site-result-mode .selection-inventory {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  margin-top: 18px;
+  padding-right: 0;
+  overflow: visible;
+}
+
+.site-result-summary {
+  max-width: 34ch;
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgba(70, 48, 24, 0.76);
+}
+
+.site-result-actions {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.site-result-actions .action-button {
+  min-width: 180px;
+  text-align: center;
+}
+
 @media (max-width: 900px) {
   .overlay {
     padding: 14px;
@@ -2428,6 +2499,11 @@ body {
 
   .phone-handset {
     width: min(90vw, 336px, calc((100vh - 120px) * 0.5128));
+  }
+
+  .stage-frame.site-result-mode .selection-chip {
+    width: min(100%, calc(100vw - 28px));
+    padding: 22px 18px 20px;
   }
 }
 </style>

@@ -180,21 +180,12 @@ enum Gs1PresentationDirtyFlags : std::uint32_t
     GS1_PRESENTATION_DIRTY_ALL = 0xffffffffu
 };
 
-enum Gs1WeatherEventPhase : std::uint8_t
-{
-    GS1_WEATHER_EVENT_PHASE_NONE = 0,
-    GS1_WEATHER_EVENT_PHASE_WARNING = 1,
-    GS1_WEATHER_EVENT_PHASE_BUILD = 2,
-    GS1_WEATHER_EVENT_PHASE_PEAK = 3,
-    GS1_WEATHER_EVENT_PHASE_DECAY = 4,
-    GS1_WEATHER_EVENT_PHASE_AFTERMATH = 5
-};
-
 enum Gs1TaskPresentationListKind : std::uint8_t
 {
     GS1_TASK_PRESENTATION_LIST_VISIBLE = 0,
     GS1_TASK_PRESENTATION_LIST_ACCEPTED = 1,
-    GS1_TASK_PRESENTATION_LIST_COMPLETED = 2
+    GS1_TASK_PRESENTATION_LIST_COMPLETED = 2,
+    GS1_TASK_PRESENTATION_LIST_CLAIMED = 3
 };
 
 enum Gs1InventoryContainerKind : std::uint8_t
@@ -320,7 +311,9 @@ enum Gs1RuntimeProfileSystemId : std::uint8_t
     GS1_RUNTIME_PROFILE_SYSTEM_FAILURE_RECOVERY = 19,
     GS1_RUNTIME_PROFILE_SYSTEM_SITE_COMPLETION = 20,
     GS1_RUNTIME_PROFILE_SYSTEM_PHONE_PANEL = 21,
-    GS1_RUNTIME_PROFILE_SYSTEM_COUNT = 22
+    GS1_RUNTIME_PROFILE_SYSTEM_CAMPAIGN_TIME = 22,
+    GS1_RUNTIME_PROFILE_SYSTEM_SITE_TIME = 23,
+    GS1_RUNTIME_PROFILE_SYSTEM_COUNT = 24
 };
 
 struct Gs1RuntimeCreateDesc
@@ -598,8 +591,10 @@ struct Gs1EngineMessageWeatherData
     float dust;
     float wind_direction_degrees;
     std::uint32_t event_template_id;
-    Gs1WeatherEventPhase event_phase;
-    float phase_minutes_remaining;
+    float event_start_time_minutes;
+    float event_peak_time_minutes;
+    float event_peak_duration_minutes;
+    float event_end_time_minutes;
 };
 
 struct Gs1EngineMessageInventoryStorageData
@@ -708,6 +703,8 @@ struct Gs1EngineMessagePhonePanelData
     std::uint8_t reserved0[3];
     std::uint32_t visible_task_count;
     std::uint32_t accepted_task_count;
+    std::uint32_t completed_task_count;
+    std::uint32_t claimed_task_count;
     std::uint32_t buy_listing_count;
     std::uint32_t sell_listing_count;
     std::uint32_t service_listing_count;
@@ -848,7 +845,7 @@ GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteSnapshotData, 16U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteTileData, 32U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageWorkerData, 28U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageCampData, 16U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageWeatherData, 28U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageWeatherData, 36U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageInventoryStorageData, 16U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageInventorySlotData, 36U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageInventoryViewData, 8U);
@@ -858,7 +855,7 @@ GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePlacementPreviewData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePlacementFailureData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageTaskData, 20U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePhoneListingData, 24U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePhonePanelData, 32U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePhonePanelData, 40U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteActionData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageHudStateData, 32U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageNotificationData, 56U);

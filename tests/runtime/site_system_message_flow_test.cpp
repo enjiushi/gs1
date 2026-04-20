@@ -2,6 +2,7 @@
 #include "campaign/campaign_state.h"
 #include "campaign/systems/campaign_system_context.h"
 #include "campaign/systems/campaign_flow_system.h"
+#include "campaign/systems/campaign_time_system.h"
 #include "campaign/systems/loadout_planner_system.h"
 #include "messages/game_message.h"
 #include "site/site_run_state.h"
@@ -10,6 +11,7 @@
 #include "site/systems/failure_recovery_system.h"
 #include "site/systems/site_completion_system.h"
 #include "site/systems/site_flow_system.h"
+#include "site/systems/site_time_system.h"
 #include "site/systems/site_system_context.h"
 
 #include <cassert>
@@ -22,6 +24,7 @@ using gs1::CampaignFlowMessageContext;
 using gs1::CampaignSystemContext;
 using gs1::CampaignFactory;
 using gs1::CampaignFlowSystem;
+using gs1::CampaignTimeSystem;
 using gs1::DayPhase;
 using gs1::DeploymentSiteSelectionChangedMessage;
 using gs1::FailureRecoverySystem;
@@ -38,6 +41,7 @@ using gs1::SiteRunStatus;
 using gs1::SiteSystemContext;
 using gs1::SiteMoveDirectionInput;
 using gs1::StartSiteAttemptMessage;
+using gs1::SiteTimeSystem;
 using gs1::SiteWorld;
 using gs1::TileCoord;
 
@@ -86,9 +90,7 @@ void initialize_site_world(
 
 int main()
 {
-    CampaignState campaign {};
-    campaign.campaign_days_total = 30U;
-    campaign.campaign_days_remaining = 30U;
+    CampaignState campaign = CampaignFactory::create_prototype_campaign(42ULL, 30U);
 
     CampaignSystemContext campaign_context {campaign};
     gs1::GameMessage selection_changed {};
@@ -104,7 +106,7 @@ int main()
     assert(!campaign.loadout_planner_state.selected_target_site_id.has_value());
 
     CampaignFixedStepContext campaign_step_context {campaign};
-    CampaignFlowSystem::run(campaign_step_context);
+    CampaignTimeSystem::run(campaign_step_context);
     assert(campaign.campaign_clock_minutes_elapsed > 0.0);
     assert(campaign.campaign_days_remaining == 30U);
     campaign.campaign_clock_minutes_elapsed = 0.0;
@@ -140,9 +142,11 @@ int main()
     site_run.counters.fully_grown_tile_count = 0U;
 
     GameMessageQueue message_queue {};
+    auto site_time_context = make_site_context<SiteTimeSystem>(campaign, site_run, message_queue);
     auto site_flow_context = make_site_context<SiteFlowSystem>(campaign, site_run, message_queue);
     site_flow_context.move_direction = SiteMoveDirectionInput {1.0f, 0.0f, 0.0f, true};
 
+    SiteTimeSystem::run(site_time_context);
     SiteFlowSystem::run(site_flow_context);
     const auto worker_position = gs1::site_world_access::worker_position(site_run);
     assert(worker_position.tile_x > 2.0f);

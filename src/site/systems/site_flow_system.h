@@ -12,13 +12,11 @@ public:
         return SiteSystemAccess {
             "SiteFlowSystem",
             site_component_mask_of(
-                SiteComponent::Time,
                 SiteComponent::TileLayout,
                 SiteComponent::WorkerMotion,
                 SiteComponent::Action,
                 SiteComponent::Inventory),
             site_component_mask_of(
-                SiteComponent::Time,
                 SiteComponent::WorkerMotion)};
     }
 

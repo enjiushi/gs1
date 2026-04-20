@@ -1,4 +1,5 @@
 #include "runtime/game_runtime.h"
+#include "runtime/runtime_clock.h"
 #include "content/defs/faction_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/technology_defs.h"
@@ -24,6 +25,9 @@ using gs1::StartNewCampaignMessage;
 using gs1::StartSiteAttemptMessage;
 using gs1::TaskAcceptRequestedMessage;
 using gs1::TileCoord;
+
+constexpr double k_default_delivery_real_seconds =
+    (30.0 / gs1::k_runtime_minutes_per_real_second) + (1.0 / 60.0);
 }
 
 namespace gs1
@@ -312,6 +316,18 @@ bool contains_phone_listing_message(
     });
 }
 
+std::uint32_t starter_storage_owner_id(const gs1::SiteRunState& site_run)
+{
+    return static_cast<std::uint32_t>(site_run.site_world->device_entity_id(site_run.camp.starter_storage_tile));
+}
+
+std::uint32_t starter_storage_id(gs1::SiteRunState& site_run)
+{
+    return gs1::inventory_storage::storage_id_for_container(
+        site_run,
+        gs1::inventory_storage::starter_storage_container(site_run));
+}
+
 std::uint32_t delivery_box_owner_id(const gs1::SiteRunState& site_run)
 {
     return static_cast<std::uint32_t>(site_run.site_world->device_entity_id(site_run.camp.delivery_box_tile));
@@ -336,6 +352,26 @@ std::uint32_t starter_workbench_id(gs1::SiteRunState& site_run)
     return gs1::inventory_storage::storage_id_for_container(
         site_run,
         gs1::inventory_storage::find_device_storage_container(site_run, device_entity_id));
+}
+
+std::uint16_t find_starter_storage_slot_index(
+    gs1::SiteRunState& site_run,
+    gs1::ItemId item_id,
+    std::uint32_t quantity)
+{
+    const auto container = gs1::inventory_storage::starter_storage_container(site_run);
+    const auto slot_count = gs1::inventory_storage::slot_count_in_container(site_run, container);
+    for (std::uint32_t slot_index = 0U; slot_index < slot_count; ++slot_index)
+    {
+        const auto item = gs1::inventory_storage::item_entity_for_slot(site_run, container, slot_index);
+        const auto* stack = gs1::inventory_storage::stack_data(site_run, item);
+        if (stack != nullptr && stack->item_id == item_id && stack->quantity == quantity)
+        {
+            return static_cast<std::uint16_t>(slot_index);
+        }
+    }
+
+    return std::numeric_limits<std::uint16_t>::max();
 }
 
 std::uint16_t find_delivery_box_slot_index(
@@ -418,6 +454,9 @@ int main()
     drain_engine_messages(runtime);
     assert(runtime.handle_message(make_select_site_message(campaign_site_id)) == GS1_STATUS_OK);
     const auto loadout_ui_messages = drain_engine_messages(runtime);
+    assert(contains_ui_element_text(loadout_ui_messages, "Water x2"));
+    assert(contains_ui_element_text(loadout_ui_messages, "Wind Reed Seeds x8"));
+    assert(contains_ui_element_text(loadout_ui_messages, "Wood x6"));
     assert(contains_ui_element_text(loadout_ui_messages, "Open Tech Tree"));
 
     GameMessage open_tech_tree_message {};
@@ -471,7 +510,7 @@ int main()
     assert(support_runtime.handle_message(make_select_site_message(2U)) == GS1_STATUS_OK);
     const auto support_loadout_messages = drain_engine_messages(support_runtime);
     assert(contains_ui_element_text(support_loadout_messages, "Saltbush Seeds x4"));
-    assert(contains_ui_element_text(support_loadout_messages, "Wood x2"));
+    assert(contains_ui_element_text(support_loadout_messages, "Wood x8"));
     assert(contains_ui_element_text(support_loadout_messages, "Adj Support x1"));
     assert(contains_ui_element_text(support_loadout_messages, "Aura Ready x1"));
     {
@@ -493,12 +532,12 @@ int main()
     assert(supported_site_run.modifier.active_nearby_aura_modifier_ids.size() == 1U);
     assert(gs1::inventory_storage::available_item_quantity_in_container(
                supported_site_run,
-               gs1::inventory_storage::delivery_box_container(supported_site_run),
+               gs1::inventory_storage::starter_storage_container(supported_site_run),
                gs1::ItemId {gs1::k_item_saltbush_seed_bundle}) == 4U);
     assert(gs1::inventory_storage::available_item_quantity_in_container(
                supported_site_run,
-               gs1::inventory_storage::delivery_box_container(supported_site_run),
-               gs1::ItemId {gs1::k_item_wood_bundle}) == 2U);
+               gs1::inventory_storage::starter_storage_container(supported_site_run),
+               gs1::ItemId {gs1::k_item_wood_bundle}) == 8U);
 
     const auto first_site_id = campaign_site_id;
     assert(runtime.handle_message(make_start_site_attempt_message(first_site_id)) == GS1_STATUS_OK);
@@ -508,17 +547,22 @@ int main()
     assert(gs1::site_world_access::width(bootstrap_site_run) == 32U);
     assert(gs1::site_world_access::height(bootstrap_site_run) == 32U);
     assert(bootstrap_site_run.inventory.worker_pack_slots.size() == 8U);
-    assert(!bootstrap_site_run.inventory.worker_pack_slots[0].occupied);
+    assert(bootstrap_site_run.inventory.worker_pack_slots[0].occupied);
+    assert(bootstrap_site_run.inventory.worker_pack_slots[0].item_id.value == 1U);
     assert(gs1::inventory_storage::available_item_quantity_in_container(
                bootstrap_site_run,
-               gs1::inventory_storage::delivery_box_container(bootstrap_site_run),
-               gs1::ItemId {gs1::k_item_basic_straw_checkerboard}) == 8U);
+               gs1::inventory_storage::starter_storage_container(bootstrap_site_run),
+               gs1::ItemId {gs1::k_item_wind_reed_seed_bundle}) == 8U);
     assert(gs1::inventory_storage::available_item_quantity_in_container(
                bootstrap_site_run,
-               gs1::inventory_storage::delivery_box_container(bootstrap_site_run),
-               gs1::ItemId {gs1::k_item_water_container}) == 1U);
-    assert(bootstrap_site_run.task_board.visible_tasks.size() == 4U);
-    assert(bootstrap_site_run.economy.money == 50);
+               gs1::inventory_storage::starter_storage_container(bootstrap_site_run),
+               gs1::ItemId {gs1::k_item_wood_bundle}) == 6U);
+    assert(gs1::inventory_storage::available_item_quantity_in_container(
+               bootstrap_site_run,
+               gs1::inventory_storage::starter_storage_container(bootstrap_site_run),
+               gs1::ItemId {gs1::k_item_iron_bundle}) == 4U);
+    assert(bootstrap_site_run.task_board.visible_tasks.size() >= 1U);
+    assert(bootstrap_site_run.economy.money == 45);
     assert(bootstrap_site_run.economy.available_phone_listings.size() >= 11U);
 
     const auto bootstrap_messages = drain_engine_messages(runtime);
@@ -527,7 +571,7 @@ int main()
     const auto weather_messages =
         collect_messages_of_type(bootstrap_messages, GS1_ENGINE_MESSAGE_SITE_WEATHER_UPDATE);
     assert(!collect_messages_of_type(bootstrap_messages, GS1_ENGINE_MESSAGE_SITE_INVENTORY_SLOT_UPSERT).empty());
-    assert(storage_messages.size() == 3U);
+    assert(storage_messages.size() == 4U);
     assert(weather_messages.size() == 1U);
     assert(!collect_messages_of_type(bootstrap_messages, GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT).empty());
     const auto bootstrap_phone_panel_messages =
@@ -538,6 +582,9 @@ int main()
         const auto& phone_panel_payload =
             bootstrap_phone_panel_messages.front()->payload_as<Gs1EngineMessagePhonePanelData>();
         assert(phone_panel_payload.active_section == GS1_PHONE_PANEL_SECTION_MARKETPLACE);
+        assert(phone_panel_payload.visible_task_count >= 1U);
+        assert(phone_panel_payload.completed_task_count == 0U);
+        assert(phone_panel_payload.claimed_task_count == 0U);
         assert(phone_panel_payload.buy_listing_count >= 9U);
     }
     {
@@ -547,7 +594,23 @@ int main()
         assert(weather_payload.wind == 0.0f);
         assert(weather_payload.dust == 0.0f);
         assert(weather_payload.wind_direction_degrees == 0.0f);
-        assert(weather_payload.event_phase == GS1_WEATHER_EVENT_PHASE_NONE);
+        assert(weather_payload.event_template_id == 0U);
+        assert(weather_payload.event_start_time_minutes == 0.0f);
+        assert(weather_payload.event_peak_time_minutes == 0.0f);
+        assert(weather_payload.event_peak_duration_minutes == 0.0f);
+        assert(weather_payload.event_end_time_minutes == 0.0f);
+    }
+    {
+        const auto* starter_storage_message = find_inventory_storage_message(
+            bootstrap_messages,
+            GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
+            bootstrap_site_run.camp.starter_storage_tile);
+        assert(starter_storage_message != nullptr);
+        const auto& starter_payload =
+            starter_storage_message->payload_as<Gs1EngineMessageInventoryStorageData>();
+        assert(starter_payload.storage_id == starter_storage_id(bootstrap_site_run));
+        assert(starter_payload.owner_entity_id == starter_storage_owner_id(bootstrap_site_run));
+        assert(starter_payload.slot_count == 10U);
     }
     {
         const auto* delivery_box_message = find_inventory_storage_message(
@@ -560,6 +623,7 @@ int main()
         assert(delivery_payload.storage_id == delivery_box_id(bootstrap_site_run));
         assert(delivery_payload.owner_entity_id == delivery_box_owner_id(bootstrap_site_run));
         assert((delivery_payload.flags & GS1_INVENTORY_STORAGE_FLAG_DELIVERY_BOX) != 0U);
+        assert((delivery_payload.flags & GS1_INVENTORY_STORAGE_FLAG_RETRIEVAL_ONLY) != 0U);
         assert(delivery_payload.slot_count == 10U);
     }
     {
@@ -607,7 +671,7 @@ int main()
     buy_listing.type = GameMessageType::PhoneListingPurchaseRequested;
     buy_listing.set_payload(PhoneListingPurchaseRequestedMessage {1U, 1U, 0U});
     assert(runtime.handle_message(buy_listing) == GS1_STATUS_OK);
-    assert(bootstrap_site_run.economy.money == 40);
+    assert(bootstrap_site_run.economy.money == 35);
     assert(bootstrap_site_run.economy.available_phone_listings[0].quantity == 5U);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
     drain_engine_messages(runtime);
@@ -629,7 +693,7 @@ int main()
         1001U));
 
     Gs1Phase1Result delivery_result {};
-    run_phase1(runtime, 3.0, delivery_result);
+    run_phase1(runtime, k_default_delivery_real_seconds, delivery_result);
     const auto delivered_slot_index = find_delivery_box_slot_index(
         bootstrap_site_run,
         gs1::ItemId {gs1::k_item_water_container},
@@ -706,7 +770,7 @@ int main()
     drain_engine_messages(phone_panel_runtime);
 
     Gs1Phase1Result phone_panel_delivery_result {};
-    run_phase1(phone_panel_runtime, 3.0, phone_panel_delivery_result);
+    run_phase1(phone_panel_runtime, k_default_delivery_real_seconds, phone_panel_delivery_result);
     const auto delivered_sellable_slot_index = find_delivery_box_slot_index(
         phone_panel_site_run,
         gs1::ItemId {gs1::k_item_saltbush_seed_bundle},
@@ -735,16 +799,8 @@ int main()
     auto& ui_site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(ui_runtime).value();
     drain_engine_messages(ui_runtime);
 
-    auto ui_worker_position = gs1::site_world_access::worker_position(ui_site_run);
-    ui_worker_position.tile_coord = TileCoord {
-        ui_site_run.camp.delivery_box_tile.x - 1,
-        ui_site_run.camp.delivery_box_tile.y};
-    ui_worker_position.tile_x = static_cast<float>(ui_worker_position.tile_coord.x);
-    ui_worker_position.tile_y = static_cast<float>(ui_worker_position.tile_coord.y);
-    gs1::site_world_access::set_worker_position(ui_site_run, ui_worker_position);
-
     auto open_storage_event = make_storage_view_event(
-        delivery_box_id(ui_site_run),
+        starter_storage_id(ui_site_run),
         GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT);
     Gs1Phase1Result open_storage_result {};
     assert(ui_runtime.submit_host_events(&open_storage_event, 1U) == GS1_STATUS_OK);
@@ -755,7 +811,7 @@ int main()
     assert(find_inventory_slot_message(
                open_storage_messages,
                GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
-               delivery_box_id(ui_site_run),
+               starter_storage_id(ui_site_run),
                0U) != nullptr);
 
     auto ui_worker = gs1::site_world_access::worker_conditions(ui_site_run);
@@ -766,11 +822,11 @@ int main()
     transfer_action.type = GS1_UI_ACTION_TRANSFER_INVENTORY_ITEM;
     transfer_action.arg0 = pack_inventory_transfer_arg(
         GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
-        1U,
+        0U,
         GS1_INVENTORY_CONTAINER_WORKER_PACK,
         0U);
     transfer_action.arg1 = pack_inventory_transfer_owner_arg(
-        delivery_box_id(ui_site_run),
+        starter_storage_id(ui_site_run),
         ui_site_run.inventory.worker_pack_storage_id);
     auto transfer_event = make_ui_action_event(transfer_action);
 
@@ -780,24 +836,24 @@ int main()
     assert(transfer_result.processed_host_event_count == 1U);
     assert(gs1::inventory_storage::available_item_quantity_in_container(
                ui_site_run,
-               gs1::inventory_storage::delivery_box_container(ui_site_run),
-               gs1::ItemId {gs1::k_item_water_container}) == 0U);
-    assert(ui_site_run.inventory.worker_pack_slots[0].occupied);
-    assert(ui_site_run.inventory.worker_pack_slots[0].item_id.value == gs1::k_item_water_container);
-    assert(ui_site_run.inventory.worker_pack_slots[0].item_quantity == 1U);
+               gs1::inventory_storage::starter_storage_container(ui_site_run),
+               gs1::ItemId {gs1::k_item_wind_reed_seed_bundle}) == 0U);
+    assert(ui_site_run.inventory.worker_pack_slots[3].occupied);
+    assert(ui_site_run.inventory.worker_pack_slots[3].item_id.value == gs1::k_item_wind_reed_seed_bundle);
+    assert(ui_site_run.inventory.worker_pack_slots[3].item_quantity == 8U);
     const auto transfer_messages = drain_engine_messages(ui_runtime);
     const auto transfer_inventory_messages = collect_inventory_slot_messages(transfer_messages);
     assert(!transfer_inventory_messages.empty());
     assert(find_inventory_slot_message(
                transfer_messages,
                GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
-               delivery_box_id(ui_site_run),
-               1U) != nullptr);
+               starter_storage_id(ui_site_run),
+               0U) != nullptr);
     assert(find_inventory_slot_message(
                transfer_messages,
                GS1_INVENTORY_CONTAINER_WORKER_PACK,
                ui_site_run.inventory.worker_pack_storage_id,
-               0U) != nullptr);
+               3U) != nullptr);
 
     Gs1UiAction use_action {};
     use_action.type = GS1_UI_ACTION_USE_INVENTORY_ITEM;
@@ -814,7 +870,7 @@ int main()
     run_phase1(ui_runtime, 0.0, use_result);
     assert(use_result.processed_host_event_count == 1U);
     assert(ui_site_run.inventory.worker_pack_slots[0].occupied);
-    assert(ui_site_run.inventory.worker_pack_slots[0].item_quantity == 1U);
+    assert(ui_site_run.inventory.worker_pack_slots[0].item_quantity == 2U);
     assert(gs1::site_world_access::worker_conditions(ui_site_run).hydration == 70.0f);
     const auto use_messages = drain_engine_messages(ui_runtime);
     const auto use_inventory_messages = collect_inventory_slot_messages(use_messages);
@@ -1081,7 +1137,7 @@ int main()
     gs1::site_world_access::set_worker_position(storage_walk_site_run, worker_position);
 
     auto distant_open_event = make_storage_view_event(
-        delivery_box_id(storage_walk_site_run),
+        starter_storage_id(storage_walk_site_run),
         GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT);
     Gs1Phase1Result distant_open_result {};
     assert(storage_walk_runtime.submit_host_events(&distant_open_event, 1U) == GS1_STATUS_OK);
@@ -1134,26 +1190,26 @@ int main()
 
     auto close_worker_position = gs1::site_world_access::worker_position(storage_close_site_run);
     close_worker_position.tile_coord = TileCoord {
-        storage_close_site_run.camp.delivery_box_tile.x + 1,
-        storage_close_site_run.camp.delivery_box_tile.y};
+        storage_close_site_run.camp.starter_storage_tile.x + 1,
+        storage_close_site_run.camp.starter_storage_tile.y};
     close_worker_position.tile_x = static_cast<float>(close_worker_position.tile_coord.x);
     close_worker_position.tile_y = static_cast<float>(close_worker_position.tile_coord.y);
     gs1::site_world_access::set_worker_position(storage_close_site_run, close_worker_position);
 
     auto close_open_event = make_storage_view_event(
-        delivery_box_id(storage_close_site_run),
+        starter_storage_id(storage_close_site_run),
         GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT);
     Gs1Phase1Result close_open_result {};
     assert(storage_close_runtime.submit_host_events(&close_open_event, 1U) == GS1_STATUS_OK);
     run_phase1(storage_close_runtime, 0.0, close_open_result);
     assert(close_open_result.processed_host_event_count == 1U);
-    assert(storage_close_site_run.inventory.opened_device_storage_id == delivery_box_id(storage_close_site_run));
+    assert(storage_close_site_run.inventory.opened_device_storage_id == starter_storage_id(storage_close_site_run));
     const auto close_open_messages = drain_engine_messages(storage_close_runtime);
     const auto close_open_view_messages =
         collect_messages_of_type(close_open_messages, GS1_ENGINE_MESSAGE_SITE_INVENTORY_VIEW_STATE);
     assert(!close_open_view_messages.empty());
 
-    const auto storage_tile = storage_close_site_run.camp.delivery_box_tile;
+    const auto storage_tile = storage_close_site_run.camp.starter_storage_tile;
     const auto world_width = static_cast<std::int32_t>(storage_close_site_run.site_world->width());
     const auto world_height = static_cast<std::int32_t>(storage_close_site_run.site_world->height());
     TileCoord out_of_range_tile {
@@ -1194,7 +1250,7 @@ int main()
         close_view_messages.end(),
         [&](const Gs1EngineMessage* message) {
             const auto& payload = message->payload_as<Gs1EngineMessageInventoryViewData>();
-            return payload.storage_id == delivery_box_id(storage_close_site_run) &&
+            return payload.storage_id == starter_storage_id(storage_close_site_run) &&
                 payload.event_kind == GS1_INVENTORY_VIEW_EVENT_CLOSE;
         });
     assert(close_view_message != close_view_messages.end());
