@@ -46,8 +46,12 @@ Gs1Status FactionReputationSystem::process_message(
         return GS1_STATUS_NOT_FOUND;
     }
 
-    faction_progress->faction_reputation =
-        std::max(0, faction_progress->faction_reputation + payload.delta);
+    if (payload.delta <= 0)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    faction_progress->faction_reputation += payload.delta;
 
     if (const auto* faction_def = find_faction_def(faction_progress->faction_id);
         faction_def != nullptr &&

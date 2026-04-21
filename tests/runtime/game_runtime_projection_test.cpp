@@ -501,7 +501,7 @@ int main()
     GameMessage claim_tech_node_message {};
     claim_tech_node_message.type = GameMessageType::TechnologyNodeClaimRequested;
     claim_tech_node_message.set_payload(gs1::TechnologyNodeClaimRequestedMessage {
-        gs1::k_tech_node_village_t1_field_rations});
+        gs1::k_tech_node_village_t1_relief_protocol});
     assert(runtime.handle_message(claim_tech_node_message) == GS1_STATUS_OK);
     const auto claimed_messages = drain_engine_messages(runtime);
     assert(contains_ui_element_text(claimed_messages, "Faction Tech Tree"));
