@@ -5994,7 +5994,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 "#include <begin_vertex>\n" +
                 "float siteWindLevel = clamp(uPlantWindStrength, 0.0, 1.0);\n" +
                 "float plantWindLevel = clamp(uPlantLocalWindStrength, 0.0, 1.0);\n" +
-                "float synchronizedGustLevel = max(plantWindLevel, siteWindLevel * 0.35);\n" +
+                "float visiblePlantWindLevel = max(plantWindLevel, siteWindLevel * 0.22);\n" +
+                "float synchronizedGustLevel = max(visiblePlantWindLevel, siteWindLevel * 0.35);\n" +
                 "vec4 plantWorldPosition = modelMatrix * vec4(transformed, 1.0);\n" +
                 "vec3 modelBasisX = normalize(vec3(modelMatrix[0].x, modelMatrix[0].y, modelMatrix[0].z));\n" +
                 "vec3 modelBasisZ = normalize(vec3(modelMatrix[2].x, modelMatrix[2].y, modelMatrix[2].z));\n" +
@@ -6007,9 +6008,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 "float plantWave = sin(dot(plantWorldPosition.xz, vec2(0.38, 0.54)) + uPlantTime * (1.6 + synchronizedGustLevel * 3.4));\n" +
                 "float plantGust = sin(dot(plantWorldPosition.xz, vec2(-0.84, 1.18)) * 1.7 + uPlantTime * (2.8 + synchronizedGustLevel * 4.1));\n" +
                 "float plantFlutter = sin(uPlantTime * (4.4 + synchronizedGustLevel * 2.1) + plantWorldPosition.y * 1.8 + plantWorldPosition.x * 0.6);\n" +
-                "float plantSway = (plantWave * 0.58 + plantGust * 0.28 + plantFlutter * 0.14) * plantVerticalWeight * plantWindLevel * uPlantWindFlexibility;\n" +
-                "transformed += localWindDirection * plantSway * (0.025 + plantWindLevel * 0.11);\n" +
-                "transformed.y += abs(plantGust) * plantVerticalWeight * plantWindLevel * uPlantWindFlexibility * 0.028;\n"
+                "float plantSway = (plantWave * 0.58 + plantGust * 0.28 + plantFlutter * 0.14) * plantVerticalWeight * visiblePlantWindLevel * uPlantWindFlexibility;\n" +
+                "transformed += localWindDirection * plantSway * (0.025 + visiblePlantWindLevel * 0.11);\n" +
+                "transformed.y += abs(plantGust) * plantVerticalWeight * visiblePlantWindLevel * uPlantWindFlexibility * 0.028;\n"
             );
         };
         material.onBeforeRender = function (_renderer, _scene, _camera, _geometry, object) {
@@ -6025,7 +6026,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             shader.uniforms.uPlantLocalWindStrength.value = clamp01(perMeshWindStrength);
         };
         material.customProgramCacheKey = function () {
-            return "plant-wind-v2";
+            return "plant-wind-v3";
         };
         return material;
     }
