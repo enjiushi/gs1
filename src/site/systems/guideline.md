@@ -25,7 +25,7 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `failure_recovery_system.h`: Failure recovery system interface.
 - `failure_recovery_system.cpp`: Resolves failure fallout and recovery flow for the site.
 - `inventory_system.h`: Inventory system interface.
-- `inventory_system.cpp`: Applies item moves, uses, inventory ownership changes, owner-confirmed transfer/use/craft completion messages for onboarding-task progress, and fixed-step-derived delivery countdown progress.
+- `inventory_system.cpp`: Applies item moves, uses, inventory ownership changes, site-start loadout seeding into the delivery crate, owner-confirmed transfer/use/craft completion messages for onboarding-task progress, and fixed-step-derived delivery countdown progress.
 - `local_weather_resolve_system.h`: Local weather resolve system interface.
 - `local_weather_resolve_system.cpp`: Resolves local weather updates into owned site state, including directional lee-side wind shelter with nonlinear range falloff.
 - `modifier_system.h`: Modifier system interface.

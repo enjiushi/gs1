@@ -279,40 +279,6 @@ bool ensure_device_storage_containers(SiteSystemContext<InventorySystem>& contex
     return created_any;
 }
 
-flecs::entity resolve_starter_storage_container(SiteSystemContext<InventorySystem>& context) noexcept
-{
-    if (!context.world.has_world() || context.site_run.site_world == nullptr)
-    {
-        return {};
-    }
-
-    const auto tile = context.world.read_camp().starter_storage_tile;
-    if (!context.world.tile_coord_in_bounds(tile))
-    {
-        return {};
-    }
-
-    const auto tile_data = context.world.read_tile(tile);
-    const auto* structure_def = find_structure_def(tile_data.device.structure_id);
-    if (structure_def == nullptr || !structure_def->grants_storage || structure_def->storage_slot_count == 0U)
-    {
-        return {};
-    }
-
-    const auto device_entity_id = context.site_run.site_world->device_entity_id(tile);
-    if (device_entity_id == 0U)
-    {
-        return {};
-    }
-
-    return inventory_storage::ensure_device_storage_container(
-        context.site_run,
-        device_entity_id,
-        tile,
-        structure_def->storage_slot_count,
-        0U);
-}
-
 flecs::entity resolve_delivery_box_container(SiteSystemContext<InventorySystem>& context) noexcept
 {
     if (!context.world.has_world() || context.site_run.site_world == nullptr)
@@ -699,12 +665,6 @@ PendingDelivery make_pending_delivery(
     return delivery;
 }
 
-[[nodiscard]] bool item_prefers_worker_pack(ItemId item_id) noexcept
-{
-    const auto* item_def = find_item_def(item_id);
-    return item_def != nullptr && item_is_directly_usable(*item_def);
-}
-
 void seed_inventory_from_loadout(SiteSystemContext<InventorySystem>& context) noexcept
 {
     ensure_inventory_storage_initialized(context);
@@ -723,9 +683,11 @@ void seed_inventory_from_loadout(SiteSystemContext<InventorySystem>& context) no
         return;
     }
 
-    const auto worker_pack = inventory_storage::worker_pack_container(context.site_run);
-    const auto starter_storage = resolve_starter_storage_container(context);
-    const auto default_storage = starter_storage.is_valid() ? starter_storage : worker_pack;
+    const auto delivery_box = resolve_delivery_box_container(context);
+    if (!delivery_box.is_valid())
+    {
+        return;
+    }
 
     for (const auto& slot : loadout_slots)
     {
@@ -734,13 +696,9 @@ void seed_inventory_from_loadout(SiteSystemContext<InventorySystem>& context) no
             continue;
         }
 
-        const auto container =
-            item_prefers_worker_pack(slot.item_id)
-                ? worker_pack
-                : default_storage;
         (void)inventory_storage::add_item_to_container(
             context.site_run,
-            container,
+            delivery_box,
             slot.item_id,
             slot.quantity);
     }

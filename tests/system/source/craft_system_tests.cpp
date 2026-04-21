@@ -128,6 +128,18 @@ void inventory_craft_commit_consumes_nearby_ingredients_and_outputs_to_device_st
                 GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
+    const auto delivery_box = gs1::inventory_storage::delivery_box_container(site_run);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        delivery_box,
+        gs1::ItemId {gs1::k_item_wood_bundle},
+        5U);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        delivery_box,
+        gs1::ItemId {gs1::k_item_iron_bundle},
+        2U);
+
     const auto workbench_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -155,13 +167,13 @@ void inventory_craft_commit_consumes_nearby_ingredients_and_outputs_to_device_st
         gs1::inventory_storage::available_item_quantity_in_container(
             site_run,
             gs1::inventory_storage::starter_storage_container(site_run),
-            gs1::ItemId {gs1::k_item_wood_bundle}) == 3U);
+            gs1::ItemId {gs1::k_item_wood_bundle}) == 2U);
     GS1_SYSTEM_TEST_CHECK(
         context,
         gs1::inventory_storage::available_item_quantity_in_container(
             site_run,
             gs1::inventory_storage::starter_storage_container(site_run),
-            gs1::ItemId {gs1::k_item_iron_bundle}) == 2U);
+            gs1::ItemId {gs1::k_item_iron_bundle}) == 0U);
 }
 
 void inventory_craft_commit_crafts_hammer_from_wood_and_iron(
@@ -179,6 +191,18 @@ void inventory_craft_commit_crafts_hammer_from_wood_and_iron(
             make_message(
                 GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    const auto delivery_box = gs1::inventory_storage::delivery_box_container(site_run);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        delivery_box,
+        gs1::ItemId {gs1::k_item_wood_bundle},
+        5U);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        delivery_box,
+        gs1::ItemId {gs1::k_item_iron_bundle},
+        4U);
 
     const auto workbench_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);
     GS1_SYSTEM_TEST_REQUIRE(
@@ -207,7 +231,7 @@ void inventory_craft_commit_crafts_hammer_from_wood_and_iron(
         gs1::inventory_storage::available_item_quantity_in_container(
             site_run,
             gs1::inventory_storage::starter_storage_container(site_run),
-            gs1::ItemId {gs1::k_item_wood_bundle}) == 4U);
+            gs1::ItemId {gs1::k_item_wood_bundle}) == 3U);
     GS1_SYSTEM_TEST_CHECK(
         context,
         gs1::inventory_storage::available_item_quantity_in_container(

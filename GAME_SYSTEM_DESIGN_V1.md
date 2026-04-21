@@ -109,7 +109,9 @@ The current prototype implementation makes these item/storage rules explicit:
 - `ItemDef` may be both consumable and a crafting ingredient; crafting-material behavior does not require a separate authored attribute
 - deployable kits are also ordinary items and point at an authored `StructureDef`
 - the site begins with a green delivery crate device placed near camp, and all on-site storage resolves through per-device storage containers with authored slot counts
+- there is no separate startup crate; the green delivery crate occupies the near-camp crate position from the first frame of the site run
 - the starting site-session loadout is seeded directly into that delivery crate on `SiteRunStarted`; only later purchases or reward deliveries use timed arrival
+- site `1`'s baseline loadout is `1` `Water` plus `8` `Basic Straw Checkerboard`, already inside that delivery crate on `SiteRunStarted`
 - crafting stations cache nearby item-instance ids from local storage plus the worker pack when the worker is inside the craft radius
 - crafting actions are timed site actions; on completion they resolve recipe consumption across matching stacks and place output into the acting device's own storage
 - phone selling resolves against a global item-instance cache that includes worker-pack items plus all device storage

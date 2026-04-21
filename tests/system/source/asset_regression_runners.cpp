@@ -295,6 +295,15 @@ void inventory_regression_runner(
                 GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {site_id, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
+    if (scenario == "use_item" || scenario == "transfer")
+    {
+        site_run.inventory.worker_pack_slots[0].occupied = true;
+        site_run.inventory.worker_pack_slots[0].item_id = gs1::ItemId {gs1::k_item_water_container};
+        site_run.inventory.worker_pack_slots[0].item_quantity = 2U;
+        site_run.inventory.worker_pack_slots[0].item_condition = 1.0f;
+        site_run.inventory.worker_pack_slots[0].item_freshness = 1.0f;
+    }
+
     if (scenario == "use_item")
     {
         const auto status = InventorySystem::process_message(

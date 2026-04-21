@@ -1308,6 +1308,7 @@ Example inventory pressure:
 Container rules:
 
 - the site begins with one green delivery crate device near camp plus a starter workbench so the first fabrication recipes are reachable
+- there is no separate startup storage crate; the delivery crate uses that near-camp crate position by default
 - deployed crafting devices and storage crates should keep their own local slot sets instead of aliasing one global camp container
 - crafting-device storage is both an output destination and a valid nearby ingredient source for later recipes
 - losing, burying, or exposing a deployed storage or crafting device can put the items in that specific device at risk during harsh events
@@ -3052,6 +3053,8 @@ Loadout rules:
 - unclaimed exported item counts should carry over until they reach their cap
 - adjacency for exported support and `Nearby-Site Aura` should be checked when the player selects the target site and assembles that deployment
 - claimed exported item support should already be packed into the green delivery crate at the beginning of the site session
+- site `1`'s baseline deployment loadout is exactly `1` `Water` plus `8` `Basic Straw Checkerboard`, already packed into the green delivery crate when the site session begins
+- that site-start loadout appears instantly in the delivery crate; only later phone purchases or other later rewards use the ordinary timed delivery flow
 
 In the current design, a loadout can include:
 

@@ -51,15 +51,6 @@ gs1::PhoneListingState* find_listing_by_id(gs1::EconomyState& economy, std::uint
     return nullptr;
 }
 
-const gs1::site_ecs::StorageItemStack* starter_storage_slot_stack(
-    gs1::SiteRunState& site_run,
-    std::uint32_t slot_index)
-{
-    const auto container = starter_storage_container(site_run);
-    const auto item = gs1::inventory_storage::item_entity_for_slot(site_run, container, slot_index);
-    return gs1::inventory_storage::stack_data(site_run, item);
-}
-
 const gs1::site_ecs::StorageItemStack* delivery_box_slot_stack(
     gs1::SiteRunState& site_run,
     std::uint32_t slot_index)
@@ -76,6 +67,24 @@ const gs1::site_ecs::StorageItemStack* container_slot_stack(
 {
     const auto item = gs1::inventory_storage::item_entity_for_slot(site_run, container, slot_index);
     return gs1::inventory_storage::stack_data(site_run, item);
+}
+
+std::uint32_t find_container_slot_with_item(
+    gs1::SiteRunState& site_run,
+    flecs::entity container,
+    gs1::ItemId item_id)
+{
+    const auto slot_count = gs1::inventory_storage::slot_count_in_container(site_run, container);
+    for (std::uint32_t slot_index = 0U; slot_index < slot_count; ++slot_index)
+    {
+        const auto* stack = container_slot_stack(site_run, container, slot_index);
+        if (stack != nullptr && stack->item_id == item_id && stack->quantity > 0U)
+        {
+            return slot_index;
+        }
+    }
+
+    return slot_count;
 }
 
 std::uint32_t find_first_empty_worker_pack_slot(const gs1::SiteRunState& site_run)
@@ -167,32 +176,28 @@ void inventory_site_one_seed_is_applied_once(gs1::testing::SystemTestExecutionCo
                 GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
-    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].occupied);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].item_id.value == 1U);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].item_quantity == 2U);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[1].item_id.value == 2U);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[2].item_id.value == 3U);
+    GS1_SYSTEM_TEST_CHECK(context, !site_run.inventory.worker_pack_slots[0].occupied);
     GS1_SYSTEM_TEST_CHECK(
         context,
         gs1::inventory_storage::available_item_quantity_in_container(
             site_run,
             starter_storage_container(site_run),
-            gs1::ItemId {gs1::k_item_wind_reed_seed_bundle}) == 8U);
+            gs1::ItemId {gs1::k_item_water_container}) == 1U);
     GS1_SYSTEM_TEST_CHECK(
         context,
         gs1::inventory_storage::available_item_quantity_in_container(
             site_run,
             starter_storage_container(site_run),
-            gs1::ItemId {gs1::k_item_wood_bundle}) == 6U);
+            gs1::ItemId {gs1::k_item_basic_straw_checkerboard}) == 8U);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        gs1::inventory_storage::available_item_quantity_in_container(
-            site_run,
-            starter_storage_container(site_run),
-            gs1::ItemId {gs1::k_item_iron_bundle}) == 4U);
+        delivery_box_slot_stack(site_run, 0U) != nullptr);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        delivery_box_slot_stack(site_run, 0U)->item_id.value == gs1::k_item_water_container);
 
     {
-        auto container = gs1::inventory_storage::worker_pack_container(site_run);
+        auto container = gs1::inventory_storage::delivery_box_container(site_run);
         auto item = gs1::inventory_storage::item_entity_for_slot(site_run, container, 0U);
         auto& stack = item.get_mut<gs1::site_ecs::StorageItemStack>();
         stack.quantity = 99U;
@@ -206,7 +211,7 @@ void inventory_site_one_seed_is_applied_once(gs1::testing::SystemTestExecutionCo
             make_message(
                 GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].item_quantity == 99U);
+    GS1_SYSTEM_TEST_CHECK(context, delivery_box_slot_stack(site_run, 0U)->quantity == 99U);
 }
 
 void inventory_non_site_seed_and_run_resize_slots(gs1::testing::SystemTestExecutionContext& context)
@@ -229,14 +234,19 @@ void inventory_non_site_seed_and_run_resize_slots(gs1::testing::SystemTestExecut
             make_message(
                 GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {2U, 1U, 102U, 1U, 43ULL})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].occupied);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].item_id.value == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, !site_run.inventory.worker_pack_slots[0].occupied);
     GS1_SYSTEM_TEST_CHECK(
         context,
         gs1::inventory_storage::available_item_quantity_in_container(
             site_run,
             starter_storage_container(site_run),
-            gs1::ItemId {gs1::k_item_wind_reed_seed_bundle}) == 8U);
+            gs1::ItemId {gs1::k_item_water_container}) == 1U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        gs1::inventory_storage::available_item_quantity_in_container(
+            site_run,
+            starter_storage_container(site_run),
+            gs1::ItemId {gs1::k_item_basic_straw_checkerboard}) == 8U);
 }
 
 void inventory_item_use_validates_and_emits_meter_delta(gs1::testing::SystemTestExecutionContext& context)
@@ -267,11 +277,11 @@ void inventory_item_use_validates_and_emits_meter_delta(gs1::testing::SystemTest
                     1U,
                     0U})) == GS1_STATUS_INVALID_ARGUMENT);
 
-    site_run.inventory.worker_pack_slots[4].occupied = true;
-    site_run.inventory.worker_pack_slots[4].item_id = gs1::ItemId {gs1::k_item_medicine_pack};
-    site_run.inventory.worker_pack_slots[4].item_quantity = 1U;
-    site_run.inventory.worker_pack_slots[4].item_condition = 1.0f;
-    site_run.inventory.worker_pack_slots[4].item_freshness = 1.0f;
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        gs1::inventory_storage::worker_pack_container(site_run),
+        gs1::ItemId {gs1::k_item_medicine_pack},
+        1U);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -283,10 +293,11 @@ void inventory_item_use_validates_and_emits_meter_delta(gs1::testing::SystemTest
                     gs1::k_item_medicine_pack,
                     site_run.inventory.worker_pack_storage_id,
                     1U,
-                    4U})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, !site_run.inventory.worker_pack_slots[4].occupied);
-    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
+                    0U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, !site_run.inventory.worker_pack_slots[0].occupied);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 2U);
     GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::WorkerMeterDeltaRequested);
+    GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameMessageType::InventoryItemUseCompleted);
     GS1_SYSTEM_TEST_CHECK(
         context,
         approx_equal(
@@ -308,6 +319,12 @@ void inventory_transfer_moves_and_merges_stacks(gs1::testing::SystemTestExecutio
             make_message(
                 GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    site_run.inventory.worker_pack_slots[0].occupied = true;
+    site_run.inventory.worker_pack_slots[0].item_id = gs1::ItemId {gs1::k_item_water_container};
+    site_run.inventory.worker_pack_slots[0].item_quantity = 2U;
+    site_run.inventory.worker_pack_slots[0].item_condition = 1.0f;
+    site_run.inventory.worker_pack_slots[0].item_freshness = 1.0f;
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -370,7 +387,6 @@ void inventory_device_storage_items_must_route_through_worker_pack(
     const auto starter_storage = starter_storage_container(site_run);
     const auto worker_pack = gs1::inventory_storage::worker_pack_container(site_run);
     const auto workbench_storage_id = gs1::inventory_storage::storage_id_for_container(site_run, workbench_storage);
-    const auto starter_storage_id = gs1::inventory_storage::storage_id_for_container(site_run, starter_storage);
     GS1_SYSTEM_TEST_REQUIRE(context, workbench_storage.is_valid());
     GS1_SYSTEM_TEST_REQUIRE(context, starter_storage.is_valid());
     GS1_SYSTEM_TEST_REQUIRE(context, worker_pack.is_valid());
@@ -399,9 +415,23 @@ void inventory_device_storage_items_must_route_through_worker_pack(
                     0U,
                     gs1::k_inventory_transfer_flag_resolve_destination_in_dll,
                     0U})) == GS1_STATUS_INVALID_STATE);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].occupied);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].item_quantity == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, !site_run.inventory.worker_pack_slots[0].occupied);
 
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        worker_pack,
+        gs1::ItemId {gs1::k_item_water_container},
+        1U);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        worker_pack,
+        gs1::ItemId {gs1::k_item_food_pack},
+        1U);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        worker_pack,
+        gs1::ItemId {gs1::k_item_medicine_pack},
+        1U);
     (void)gs1::inventory_storage::add_item_to_container(
         site_run,
         worker_pack,
@@ -416,6 +446,16 @@ void inventory_device_storage_items_must_route_through_worker_pack(
         site_run,
         worker_pack,
         gs1::ItemId {gs1::k_item_iron_bundle},
+        1U);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        worker_pack,
+        gs1::ItemId {gs1::k_item_basic_straw_checkerboard},
+        1U);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        worker_pack,
+        gs1::ItemId {gs1::k_item_storage_crate_kit},
         1U);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -500,7 +540,7 @@ void inventory_device_storage_items_must_route_through_worker_pack(
                 GameMessageType::InventoryTransferRequested,
                 gs1::InventoryTransferRequestedMessage {
                     site_run.inventory.worker_pack_storage_id,
-                    starter_storage_id,
+                    workbench_storage_id,
                     3U,
                     0U,
                     0U,
@@ -514,7 +554,7 @@ void inventory_device_storage_items_must_route_through_worker_pack(
         context,
         gs1::inventory_storage::available_item_quantity_in_container(
             site_run,
-            starter_storage,
+            workbench_storage,
             gs1::ItemId {gs1::k_item_storage_crate_kit}) == starter_storage_kit_before + 1U);
 }
 
@@ -533,6 +573,12 @@ void inventory_item_consume_removes_quantity_across_matching_stacks(
             make_message(
                 GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    site_run.inventory.worker_pack_slots[0].occupied = true;
+    site_run.inventory.worker_pack_slots[0].item_id = gs1::ItemId {gs1::k_item_water_container};
+    site_run.inventory.worker_pack_slots[0].item_quantity = 2U;
+    site_run.inventory.worker_pack_slots[0].item_condition = 1.0f;
+    site_run.inventory.worker_pack_slots[0].item_freshness = 1.0f;
 
     site_run.inventory.worker_pack_slots[3].occupied = true;
     site_run.inventory.worker_pack_slots[3].item_id = gs1::ItemId {gs1::k_item_water_container};
@@ -573,6 +619,12 @@ void inventory_item_use_drink_defers_item_and_meter_changes_until_action_complet
             make_message(
                 GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    site_run.inventory.worker_pack_slots[0].occupied = true;
+    site_run.inventory.worker_pack_slots[0].item_id = gs1::ItemId {gs1::k_item_water_container};
+    site_run.inventory.worker_pack_slots[0].item_quantity = 2U;
+    site_run.inventory.worker_pack_slots[0].item_condition = 1.0f;
+    site_run.inventory.worker_pack_slots[0].item_freshness = 1.0f;
 
     auto worker_conditions = site_run.site_world->worker_conditions();
     worker_conditions.hydration = 40.0f;
@@ -715,7 +767,6 @@ void inventory_delivery_waits_for_delivery_box_capacity_and_arrives_after_start(
         context,
         delivery_box_slot_stack(site_run, 0U)->item_id.value == gs1::k_item_wind_reed_seed_bundle);
     GS1_SYSTEM_TEST_CHECK(context, delivery_box_slot_stack(site_run, 0U)->quantity == 3U);
-    GS1_SYSTEM_TEST_CHECK(context, starter_storage_slot_stack(site_run, 0U) == nullptr);
 }
 
 void economy_site_run_started_seeds_site_one_and_resets_other_sites(
@@ -758,6 +809,11 @@ void economy_purchase_sell_hire_and_unlockable_paths_update_money(
     GameMessageQueue queue {};
     auto site_context = make_site_context<EconomyPhoneSystem>(campaign, site_run, queue);
     seed_site_one_inventory(campaign, site_run);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        gs1::inventory_storage::delivery_box_container(site_run),
+        gs1::ItemId {gs1::k_item_water_container},
+        1U);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -964,6 +1020,11 @@ void economy_repeated_sell_requests_do_not_oversubscribe_inventory(
     auto economy_context = make_site_context<EconomyPhoneSystem>(campaign, site_run, queue);
     auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
     seed_site_one_inventory(campaign, site_run);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        gs1::inventory_storage::delivery_box_container(site_run),
+        gs1::ItemId {gs1::k_item_water_container},
+        1U);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -1381,8 +1442,20 @@ void task_board_transfer_task_completes_from_successful_transfer(
 
     const auto starter_storage =
         gs1::inventory_storage::starter_storage_container(site_run);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        starter_storage,
+        gs1::ItemId {gs1::k_item_wind_reed_seed_bundle},
+        1U);
     const auto starter_storage_id =
         gs1::inventory_storage::storage_id_for_container(site_run, starter_storage);
+    const auto seed_slot_index = find_container_slot_with_item(
+        site_run,
+        starter_storage,
+        gs1::ItemId {gs1::k_item_wind_reed_seed_bundle});
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        seed_slot_index < gs1::inventory_storage::slot_count_in_container(site_run, starter_storage));
     queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -1393,7 +1466,7 @@ void task_board_transfer_task_completes_from_successful_transfer(
                 gs1::InventoryTransferRequestedMessage {
                     starter_storage_id,
                     site_run.inventory.worker_pack_storage_id,
-                    0U,
+                    static_cast<std::uint16_t>(seed_slot_index),
                     3U,
                     1U,
                     0U,
