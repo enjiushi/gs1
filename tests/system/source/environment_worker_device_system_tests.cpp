@@ -429,6 +429,38 @@ void local_weather_resolve_applies_directional_wind_shadow_falloff_for_windbreak
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(upwind.wind, 12.0f));
 }
 
+void local_weather_resolve_marks_projected_plant_tiles_dirty_when_wind_changes(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(2U, 1205U, 101U, 5U, 5U);
+    GameMessageQueue queue {};
+    auto site_context = make_site_context<LocalWeatherResolveSystem>(campaign, site_run, queue);
+
+    auto tile = site_run.site_world->tile_at(TileCoord {2, 2});
+    tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_wind_reed};
+    tile.ecology.plant_density = 0.8f;
+    site_run.site_world->set_tile(TileCoord {2, 2}, tile);
+
+    site_run.weather.weather_wind = 10.0f;
+    site_run.weather.weather_wind_direction_degrees = 0.0f;
+    LocalWeatherResolveSystem::run(site_context);
+
+    site_run.pending_projection_update_flags = 0U;
+    site_run.pending_tile_projection_updates.clear();
+    site_run.pending_tile_projection_update_mask.assign(site_run.site_world->tile_count(), 0U);
+
+    site_run.weather.weather_wind = 18.0f;
+    LocalWeatherResolveSystem::run(site_context);
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        (site_run.pending_projection_update_flags & gs1::SITE_PROJECTION_UPDATE_TILES) != 0U);
+    GS1_SYSTEM_TEST_REQUIRE(context, site_run.pending_tile_projection_updates.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.pending_tile_projection_updates.front().x == 2);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.pending_tile_projection_updates.front().y == 2);
+}
+
 void local_weather_resolve_applies_device_wind_protection_value_and_range(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -798,6 +830,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "local_weather_resolve",
     "applies_directional_wind_shadow_falloff_for_windbreak_plants",
     local_weather_resolve_applies_directional_wind_shadow_falloff_for_windbreak_plants);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "local_weather_resolve",
+    "marks_projected_plant_tiles_dirty_when_wind_changes",
+    local_weather_resolve_marks_projected_plant_tiles_dirty_when_wind_changes);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "local_weather_resolve",
     "applies_device_wind_protection_value_and_range",

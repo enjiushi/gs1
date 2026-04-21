@@ -27,7 +27,7 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `inventory_system.h`: Inventory system interface.
 - `inventory_system.cpp`: Applies item moves, uses, inventory ownership changes, site-start loadout seeding into the delivery crate, owner-confirmed transfer/use/craft completion messages for onboarding-task progress, and fixed-step-derived delivery countdown progress.
 - `local_weather_resolve_system.h`: Local weather resolve system interface.
-- `local_weather_resolve_system.cpp`: Resolves local weather updates into owned site state, including directional lee-side wind shelter with nonlinear range falloff.
+- `local_weather_resolve_system.cpp`: Resolves local weather updates into owned site state, including directional lee-side wind shelter with nonlinear range falloff plus plant-tile projection dirties when visible local wind changes.
 - `modifier_system.h`: Modifier system interface.
 - `modifier_system.cpp`: Applies and expires site modifiers/effects, including task-reward run-modifier awards routed through message handling.
 - `phone_panel_system.h`: Phone panel system interface.

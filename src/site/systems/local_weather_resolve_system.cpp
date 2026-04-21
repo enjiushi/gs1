@@ -87,6 +87,11 @@ bool ecology_has_weather_support_source(const gs1::SiteWorld::TileEcologyData& e
     return ecology.plant_id.value != 0U || ecology.ground_cover_type_id != 0U;
 }
 
+bool ecology_has_projected_plant_visual(const gs1::SiteWorld::TileEcologyData& ecology) noexcept
+{
+    return ecology.plant_id.value != 0U || ecology.plant_density > k_local_weather_epsilon;
+}
+
 bool ecology_change_affects_local_weather(std::uint32_t changed_mask) noexcept
 {
     return (changed_mask &
@@ -418,6 +423,10 @@ bool resolve_tile_local_weather(
     }
 
     context.world.write_tile_local_weather_at_index(index, resolved_weather);
+    if (wind_changed && ecology_has_projected_plant_visual(ecology))
+    {
+        context.world.mark_tile_projection_dirty(coord);
+    }
     return true;
 }
 

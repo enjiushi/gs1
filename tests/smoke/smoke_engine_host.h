@@ -142,6 +142,7 @@ public:
         std::uint32_t ground_cover_type_id {0};
         float plant_density {0.0f};
         float sand_burial {0.0f};
+        float local_wind {0.0f};
     };
 
     struct SiteWorkerProjection final
