@@ -99,6 +99,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         severeGale: 3,
         sandblast: 4
     };
+    const highwayTerrainTypeId = 9001;
     const siteTutorialTips = [
         "Move with WASD and drag with the right mouse button to orbit the camera around the worker.",
         "Press B to open the player pack, then click a carried item to use it or move it into opened storage.",
@@ -6169,6 +6170,217 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return 0.08 + burial * 0.14 + plantDensity * 0.18 + noise;
     }
 
+    function getSiteTileByCoord(tileMap, width, height, tileX, tileY) {
+        const clampedX = Math.max(0, Math.min(Math.max(width - 1, 0), tileX));
+        const clampedY = Math.max(0, Math.min(Math.max(height - 1, 0), tileY));
+        return tileMap.get(clampedX + ":" + clampedY) || {
+            x: clampedX,
+            y: clampedY,
+            terrainTypeId: 0,
+            plantTypeId: 0,
+            structureTypeId: 0,
+            groundCoverTypeId: 0,
+            plantDensity: 0,
+            sandBurial: 0
+        };
+    }
+
+    function sampleSiteTileScalar(tileMap, width, height, tileX, tileY, readValue) {
+        const maxTileX = Math.max(width - 1, 0);
+        const maxTileY = Math.max(height - 1, 0);
+        const clampedTileX = Math.max(0, Math.min(maxTileX, tileX));
+        const clampedTileY = Math.max(0, Math.min(maxTileY, tileY));
+        const minX = Math.floor(clampedTileX);
+        const minY = Math.floor(clampedTileY);
+        const maxX = Math.min(maxTileX, minX + 1);
+        const maxY = Math.min(maxTileY, minY + 1);
+        const blendX = clampedTileX - minX;
+        const blendY = clampedTileY - minY;
+        const value00 = readValue(getSiteTileByCoord(tileMap, width, height, minX, minY));
+        const value10 = readValue(getSiteTileByCoord(tileMap, width, height, maxX, minY));
+        const value01 = readValue(getSiteTileByCoord(tileMap, width, height, minX, maxY));
+        const value11 = readValue(getSiteTileByCoord(tileMap, width, height, maxX, maxY));
+        const top = lerp(value00, value10, blendX);
+        const bottom = lerp(value01, value11, blendX);
+        return lerp(top, bottom, blendY);
+    }
+
+    function createTilePickMesh(tile, offsetX, offsetZ, tileHeight) {
+        const pickMesh = new THREE_NS.Mesh(
+            new THREE_NS.PlaneGeometry(0.98, 0.98),
+            new THREE_NS.MeshBasicMaterial({
+                color: 0xffffff,
+                side: THREE_NS.DoubleSide,
+                transparent: true,
+                opacity: 0,
+                depthWrite: false
+            })
+        );
+        pickMesh.rotation.x = -Math.PI / 2;
+        pickMesh.position.set(tile.x - offsetX, tileHeight + 0.025, tile.y - offsetZ);
+        pickMesh.userData = {
+            tileX: tile.x,
+            tileY: tile.y
+        };
+        return pickMesh;
+    }
+
+    function createSiteTerrainVisual(siteBootstrap, offsetX, offsetZ, width, height) {
+        const terrainGroup = new THREE_NS.Group();
+        const tilePickables = [];
+        const tileMap = buildSiteTileMap(siteBootstrap.tiles);
+        const terrainWidth = Math.max(width - 1, 1);
+        const terrainHeight = Math.max(height - 1, 1);
+        const terrainSegmentsX = Math.max(width * 5, 4);
+        const terrainSegmentsY = Math.max(height * 5, 4);
+        const terrainGeometry = new THREE_NS.PlaneGeometry(
+            terrainWidth,
+            terrainHeight,
+            terrainSegmentsX,
+            terrainSegmentsY
+        );
+        const terrainPositions = terrainGeometry.attributes.position;
+        const terrainColors = new Float32Array(terrainPositions.count * 3);
+        const duneShadowColor = new THREE_NS.Color(0xb98652);
+        const duneBaseColor = new THREE_NS.Color(0xd2aa74);
+        const duneHighlightColor = new THREE_NS.Color(0xe8cda0);
+        const hardpackColor = new THREE_NS.Color(0xb18a5b);
+        const plantTintColor = new THREE_NS.Color(0xa6a06d);
+        const scratchColor = new THREE_NS.Color();
+
+        for (let vertexIndex = 0; vertexIndex < terrainPositions.count; vertexIndex += 1) {
+            const localX = terrainPositions.getX(vertexIndex);
+            const localZ = terrainPositions.getY(vertexIndex);
+            const sampleTileX = localX + offsetX;
+            const sampleTileY = localZ + offsetZ;
+            const baseTileHeight = sampleSiteTileScalar(
+                tileMap,
+                width,
+                height,
+                sampleTileX,
+                sampleTileY,
+                (tile) => computeSiteTileVisualHeight(tile)
+            );
+            const burial = sampleSiteTileScalar(
+                tileMap,
+                width,
+                height,
+                sampleTileX,
+                sampleTileY,
+                (tile) => clamp01(tile && tile.sandBurial ? tile.sandBurial : 0)
+            );
+            const plantCoverage = sampleSiteTileScalar(
+                tileMap,
+                width,
+                height,
+                sampleTileX,
+                sampleTileY,
+                (tile) => tile && tile.plantTypeId !== 0 ? 1.0 : clamp01(tile && tile.plantDensity ? tile.plantDensity : 0)
+            );
+            const hardpackBlend = sampleSiteTileScalar(
+                tileMap,
+                width,
+                height,
+                sampleTileX,
+                sampleTileY,
+                (tile) => tile && tile.terrainTypeId === highwayTerrainTypeId ? 1.0 : 0.0
+            );
+            const macroNoise = deterministicNoise01(localX * 0.22, localZ * 0.22, 801);
+            const rippleNoise = deterministicNoise01(localZ * 0.94, localX * 0.94, 809);
+            const duneWave =
+                Math.sin(localX * 0.72 + localZ * 0.38 + macroNoise * Math.PI * 2.0) * 0.05;
+            const duneLift =
+                duneWave +
+                (macroNoise - 0.5) * 0.06 +
+                (rippleNoise - 0.5) * 0.025;
+            const terrainHeight = Math.max(0.025, baseTileHeight + duneLift * 0.35);
+            const highlightMix = clamp01(
+                0.38 +
+                burial * 0.22 +
+                (duneWave * 0.5 + 0.5) * 0.28 +
+                macroNoise * 0.12
+            );
+
+            terrainPositions.setZ(vertexIndex, terrainHeight);
+            scratchColor.copy(duneShadowColor).lerp(duneBaseColor, highlightMix);
+            scratchColor.lerp(duneHighlightColor, clamp01((macroNoise - 0.36) * 0.65 + burial * 0.26));
+            scratchColor.lerp(hardpackColor, hardpackBlend * 0.78);
+            scratchColor.lerp(plantTintColor, plantCoverage * 0.16);
+            terrainColors[vertexIndex * 3] = scratchColor.r;
+            terrainColors[vertexIndex * 3 + 1] = scratchColor.g;
+            terrainColors[vertexIndex * 3 + 2] = scratchColor.b;
+        }
+
+        terrainGeometry.setAttribute("color", new THREE_NS.Float32BufferAttribute(terrainColors, 3));
+        terrainGeometry.computeVertexNormals();
+
+        const terrainMesh = new THREE_NS.Mesh(
+            terrainGeometry,
+            new THREE_NS.MeshStandardMaterial({
+                vertexColors: true,
+                roughness: 0.98,
+                metalness: 0.01
+            })
+        );
+        terrainMesh.rotation.x = -Math.PI / 2;
+        terrainMesh.position.y = 0;
+        terrainGroup.add(terrainMesh);
+
+        siteBootstrap.tiles.forEach((tile) => {
+            const tileHeight = computeSiteTileVisualHeight(tile);
+            const pickMesh = createTilePickMesh(tile, offsetX, offsetZ, tileHeight);
+            terrainGroup.add(pickMesh);
+            tilePickables.push(pickMesh);
+        });
+
+        return {
+            group: terrainGroup,
+            tilePickables: tilePickables
+        };
+    }
+
+    function createPlacementGridVisual(siteBootstrap, offsetX, offsetZ) {
+        const linePositions = [];
+
+        (siteBootstrap.tiles || []).forEach((tile) => {
+            const tileHeight = computeSiteTileVisualHeight(tile) + 0.04;
+            const centerX = tile.x - offsetX;
+            const centerZ = tile.y - offsetZ;
+            const minX = centerX - 0.45;
+            const maxX = centerX + 0.45;
+            const minZ = centerZ - 0.45;
+            const maxZ = centerZ + 0.45;
+
+            linePositions.push(
+                minX, tileHeight, minZ,
+                maxX, tileHeight, minZ,
+                maxX, tileHeight, minZ,
+                maxX, tileHeight, maxZ,
+                maxX, tileHeight, maxZ,
+                minX, tileHeight, maxZ,
+                minX, tileHeight, maxZ,
+                minX, tileHeight, minZ
+            );
+        });
+
+        const gridGeometry = new THREE_NS.BufferGeometry();
+        gridGeometry.setAttribute(
+            "position",
+            new THREE_NS.Float32BufferAttribute(linePositions, 3)
+        );
+
+        const gridLines = new THREE_NS.LineSegments(
+            gridGeometry,
+            new THREE_NS.LineBasicMaterial({
+                color: 0x6b5436,
+                transparent: true,
+                opacity: 0.5
+            })
+        );
+        gridLines.visible = false;
+        return gridLines;
+    }
+
     function disposePlacementPreviewGroup(cache) {
         if (!cache || !cache.placementPreviewGroup) {
             return;
@@ -6195,7 +6407,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         disposePlacementPreviewGroup(siteSceneCache);
 
         const preview = getPlacementPreview(state);
-        if (!preview || (preview.flags & 1) === 0) {
+        const placementModeActive = !!(preview && (preview.flags & 1) !== 0);
+        if (siteSceneCache.placementGridGroup) {
+            siteSceneCache.placementGridGroup.visible = placementModeActive;
+        }
+        if (!placementModeActive) {
             return;
         }
 
@@ -6219,7 +6435,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 };
                 const tileHeight = computeSiteTileVisualHeight(tile);
                 const mesh = new THREE_NS.Mesh(
-                    new THREE_NS.BoxGeometry(0.9, 0.06, 0.9),
+                    new THREE_NS.PlaneGeometry(0.9, 0.9),
                     new THREE_NS.MeshStandardMaterial({
                         color: blocked ? 0xbd5f50 : 0x5f9f6b,
                         emissive: blocked ? 0x4a120c : 0x123d1a,
@@ -6227,12 +6443,14 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                         roughness: 0.38,
                         metalness: 0.02,
                         transparent: true,
-                        opacity: blocked ? 0.78 : 0.58
+                        opacity: blocked ? 0.82 : 0.62,
+                        side: THREE_NS.DoubleSide
                     })
                 );
+                mesh.rotation.x = -Math.PI / 2;
                 mesh.position.set(
                     tileX - siteSceneCache.offsetX,
-                    tileHeight + 0.09,
+                    tileHeight + 0.075,
                     tileY - siteSceneCache.offsetZ
                 );
                 previewGroup.add(mesh);
@@ -6248,7 +6466,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         currentSceneKind = "SITE_ACTIVE";
         scene.background = new THREE_NS.Color(0xe7d3b0);
         const cameraOrbitState = buildSiteCameraOrbitState(siteBootstrap, width, height, previousCache);
-        const tilePickables = [];
 
         const desertWidth = Math.max(width + 8, 20);
         const desertHeight = Math.max(height + 8, 20);
@@ -6267,37 +6484,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         );
         siteBorder.position.set(0, -0.01, 0);
         worldGroup.add(siteBorder);
+        const terrainVisual = createSiteTerrainVisual(siteBootstrap, offsetX, offsetZ, width, height);
+        worldGroup.add(terrainVisual.group);
+        const placementGridGroup = createPlacementGridVisual(siteBootstrap, offsetX, offsetZ);
+        worldGroup.add(placementGridGroup);
+        const tilePickables = terrainVisual.tilePickables;
         const plantVisualSpecs = collectPlantVisualSpecs(siteBootstrap.tiles);
 
         siteBootstrap.tiles.forEach((tile) => {
-            const plantDensity = Math.max(0, Math.min(tile.plantDensity || 0, 1));
-            const burial = Math.max(0, Math.min(tile.sandBurial || 0, 1));
-            const hasPlant = tile.plantTypeId !== 0 || plantDensity > 0.05;
-            const noise = ((tile.x * 17 + tile.y * 29) % 7) * 0.008;
-            const tileHeight = 0.08 + burial * 0.14 + plantDensity * 0.18 + noise;
-            const tileColor = tile.plantTypeId !== 0
-                ? (tile.plantTypeId === 1 ? 0x8ea56a
-                    : tile.plantTypeId === 2 ? 0x7f9b62
-                    : tile.plantTypeId === 3 ? 0x8a8f58
-                    : tile.plantTypeId === 5 ? 0xbe9a62
-                    : 0x9d8f5a)
-                : hasPlant
-                    ? 0x97a66d
-                    : burial > 0.45
-                        ? 0xdfc090
-                        : 0xc9a776;
-
-            const tileMesh = new THREE_NS.Mesh(
-                new THREE_NS.BoxGeometry(0.94, tileHeight, 0.94),
-                new THREE_NS.MeshStandardMaterial({ color: tileColor, roughness: 0.9, metalness: 0.02 })
-            );
-            tileMesh.position.set(tile.x - offsetX, tileHeight * 0.5, tile.y - offsetZ);
-            tileMesh.userData = {
-                tileX: tile.x,
-                tileY: tile.y
-            };
-            worldGroup.add(tileMesh);
-            tilePickables.push(tileMesh);
+            const tileHeight = computeSiteTileVisualHeight(tile);
 
             if (tile.structureTypeId !== 0) {
                 const structureVisual = createStructureVisual(tile, tileHeight);
@@ -6369,6 +6564,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             lastWorkerTargetFrameNumber: 0,
             lastWorkerTargetX: 0,
             lastWorkerTargetZ: 0,
+            placementGridGroup: placementGridGroup,
             placementPreviewGroup: null,
             cameraTargetX: 0,
             cameraTargetZ: 0,
