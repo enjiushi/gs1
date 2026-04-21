@@ -758,7 +758,7 @@ void modifier_imports_campaign_assistant_and_technology_run_modifiers(
     campaign.faction_progress[0].has_unlocked_assistant_package = true;
     campaign.faction_progress[0].unlocked_assistant_package_id = 1001U;
     campaign.technology_state.purchased_node_ids.push_back(
-        gs1::TechNodeId {gs1::k_tech_node_village_t1_field_rations_amp_recovery});
+        gs1::TechNodeId {gs1::k_tech_node_village_t1_relief_protocol});
     auto site_run = make_test_site_run(1U, 1602U);
     GameMessageQueue queue {};
     auto site_context = make_site_context<ModifierSystem>(campaign, site_run, queue);
@@ -772,7 +772,7 @@ void modifier_imports_campaign_assistant_and_technology_run_modifiers(
                 SiteRunStartedMessage {1U, 1602U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     const auto* imported_modifier = gs1::find_technology_node_def(
-        gs1::TechNodeId {gs1::k_tech_node_village_t1_field_rations_amp_recovery});
+        gs1::TechNodeId {gs1::k_tech_node_village_t1_relief_protocol});
     GS1_SYSTEM_TEST_REQUIRE(context, imported_modifier != nullptr);
     GS1_SYSTEM_TEST_CHECK(
         context,

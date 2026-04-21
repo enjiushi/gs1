@@ -43,7 +43,7 @@ This file is a quick orientation guide for agents working in this repository.
 - `GAME_STRUCTURE.md`: High-level gameplay/runtime structure notes.
 - `GAME_SYSTEM_DESIGN_V1.md`: System design reference, including directional local-weather resolution responsibilities, start/peak/peak-duration/end weather-event timelines, staged site-objective implementation notes, site-start loadout seeding into the single near-camp delivery crate with site-one's `1` water plus `8` straw-checkerboard baseline, claimed-task history direction for task rewards, site-one onboarding task-pool notes, the `SiteResult` panel `OK`-return contract, and the canonical fixed-step time conversion rules that keep one in-game day at 30 real-time minutes.
 - `SYSTEM_DESIGN_STATUS.md`: Current system status and implementation tracking, including site-objective readiness notes.
-- `SYSTEM_TEST_COVERAGE.md`: Per-system automated coverage expectations, including placeholder-versus-implemented test scope for campaign, site, and runtime behavior.
+- `SYSTEM_TEST_COVERAGE.md`: Per-system automated coverage expectations, including placeholder-versus-implemented test scope for campaign, site, and runtime behavior plus faction reputation-gated unlockable tiers and consumable tech-purchase coverage.
 - `CONTENT_AUTHORING_CONTRACT.md`: Content authoring contract and data expectations.
 - `MISSING_DEFINITION_DESCRIPTIONS.md`: Notes for definitions that still need descriptions.
 - `TASK_BOARD_OPEN_QUESTIONS.md`: Follow-up product-contract questions for task-board reward presentation, claim lifetime, reward delivery semantics, and prototype board scope.

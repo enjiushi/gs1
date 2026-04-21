@@ -22,26 +22,18 @@ public:
         const CampaignState& campaign,
         FactionId faction_id,
         std::uint8_t tier_index) noexcept;
-    [[nodiscard]] static std::uint32_t purchased_base_tech_count_in_tier(
-        const CampaignState& campaign,
-        FactionId faction_id,
-        std::uint8_t tier_index) noexcept;
-    [[nodiscard]] static std::uint32_t purchased_amplification_count_in_tier(
-        const CampaignState& campaign,
-        FactionId faction_id,
-        std::uint8_t tier_index) noexcept;
     [[nodiscard]] static bool tier_unlocked(
         const CampaignState& campaign,
         const TechnologyTierDef& tier_def) noexcept;
+    [[nodiscard]] static bool unlockable_available(
+        const CampaignState& campaign,
+        const FactionUnlockableDef& unlockable_def) noexcept;
     [[nodiscard]] static std::int32_t available_faction_reputation(
         const CampaignState& campaign,
         FactionId faction_id) noexcept;
     [[nodiscard]] static std::int32_t current_reputation_cost(
         const CampaignState& campaign,
         const TechnologyNodeDef& node_def) noexcept;
-    [[nodiscard]] static bool amplification_choice_locked(
-        const CampaignState& campaign,
-        const TechnologyNodeDef& amplification_def) noexcept;
     [[nodiscard]] static bool node_claimable(
         const CampaignState& campaign,
         const TechnologyNodeDef& node_def) noexcept;

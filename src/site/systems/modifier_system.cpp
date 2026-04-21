@@ -176,7 +176,7 @@ void import_campaign_run_modifiers(
     {
         const auto* node_def = find_technology_node_def(tech_node_id);
         if (node_def == nullptr ||
-            node_def->entry_kind != TechnologyEntryKind::Amplification)
+            node_def->entry_kind != TechnologyEntryKind::GlobalModifier)
         {
             continue;
         }

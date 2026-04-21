@@ -2712,13 +2712,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         stack.appendChild(footnote);
     }
 
-    function technologyIconGlyph(titleText, isAmplification) {
+    function technologyIconGlyph(titleText, kindText) {
         const words = String(titleText || "").trim().split(/\s+/).filter(Boolean);
         if (words.length === 0) {
-            return isAmplification ? "A" : "T";
+            return String(kindText || "T").slice(0, 2).toUpperCase();
         }
         const glyph = words.slice(0, 2).map((word) => word.charAt(0).toUpperCase()).join("");
-        return glyph || (isAmplification ? "A" : "T");
+        return glyph || String(kindText || "T").slice(0, 2).toUpperCase();
     }
 
     function parseTechTreeActionElement(element) {
@@ -2730,28 +2730,22 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const parts = text.split("|").map((part) => part.trim());
         const leftText = parts[0] || "";
         const titleText = parts.length > 1 ? parts.slice(1).join(" | ") : leftText;
-        const targetId = element.action.targetId || 0;
-        const localId = targetId % 100;
-        const isAmplification = localId >= 10;
-        const baseSlotIndex = isAmplification ? Math.floor(localId / 10) - 1 : (localId - 1);
-        const amplificationChoiceIndex = isAmplification ? ((localId % 10) - 1) : -1;
-        const leftMatch = leftText.match(/^(Tech|Amp)\s+(\d+)\s+(.*)$/);
-        const statusText = leftMatch ? leftMatch[3] : leftText;
+        const leftMatch = leftText.match(/^(Modifier|Mechanism)\s+(.*)$/i);
+        const kindText = leftMatch ? leftMatch[1] : "Tech";
+        const statusText = leftMatch ? leftMatch[2] : leftText;
         const costMatch = statusText.match(/(?:Cost|Need)\s+(\d+)/);
         const costText = costMatch ? ("Rep " + costMatch[1]) : statusText;
 
         return {
             element: element,
             titleText: titleText,
+            kindText: kindText,
             statusText: statusText,
             costText: costText,
-            isAmplification: isAmplification,
-            baseSlotIndex: Math.max(0, baseSlotIndex),
-            amplificationChoiceIndex: amplificationChoiceIndex,
             isClaimable: (element.flags & 1) !== 0,
             isDisabled: (element.flags & 2) !== 0,
             isClaimed: /Claimed/i.test(statusText),
-            isLocked: /Locked/i.test(statusText) || /Needs Base/i.test(statusText)
+            isLocked: /Locked/i.test(statusText)
         };
     }
 
@@ -2783,10 +2777,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         const nodeIcon = document.createElement("div");
         nodeIcon.className = "tech-node-icon";
-        if (nodeModel.isAmplification) {
-            nodeIcon.classList.add("amp");
-        }
-        nodeIcon.textContent = technologyIconGlyph(nodeModel.titleText, nodeModel.isAmplification);
+        nodeIcon.textContent = technologyIconGlyph(nodeModel.titleText, nodeModel.kindText);
         nodeTop.appendChild(nodeIcon);
 
         const nodeCost = document.createElement("div");
@@ -2875,15 +2866,20 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             if (element.action && element.action.type === "SELECT_TECH_TREE_FACTION_TAB") {
                 return;
             }
+            if (element.text === title || element.text === subtitle) {
+                return;
+            }
             if (!element.action || element.action.type === "NONE") {
-                if (element.text === title || element.text === subtitle) {
-                    return;
+                if (/^Tier\s+\d+/i.test(String(element.text || ""))) {
+                    activeTier = {
+                        label: element.text || "Tier",
+                        unlockables: [],
+                        nodes: []
+                    };
+                    tierElements.push(activeTier);
+                } else if (activeTier) {
+                    activeTier.unlockables.push(element.text || "");
                 }
-                activeTier = {
-                    label: element.text || "Tier",
-                    nodes: []
-                };
-                tierElements.push(activeTier);
                 return;
             }
             if (activeTier) {
@@ -2909,59 +2905,31 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 tierCard.appendChild(tierMeta);
             }
 
+            if (tierElement.unlockables.length > 0) {
+                const unlockableList = document.createElement("div");
+                unlockableList.className = "tech-tier-meta";
+                unlockableList.textContent = tierElement.unlockables.join("  |  ");
+                tierCard.appendChild(unlockableList);
+            }
+
             const tierGrid = document.createElement("div");
             tierGrid.className = "tech-tier-grid";
             tierCard.appendChild(tierGrid);
-
-            const slotModels = new Array(3).fill(null).map(() => ({
-                base: null,
-                amps: [null, null]
-            }));
 
             tierElement.nodes.forEach((element) => {
                 const nodeModel = parseTechTreeActionElement(element);
                 if (!nodeModel) {
                     return;
                 }
-
-                const slotModel = slotModels[Math.max(0, Math.min(2, nodeModel.baseSlotIndex))];
-                if (nodeModel.isAmplification) {
-                    const ampIndex = Math.max(0, Math.min(1, nodeModel.amplificationChoiceIndex));
-                    slotModel.amps[ampIndex] = nodeModel;
-                } else {
-                    slotModel.base = nodeModel;
-                }
+                tierGrid.appendChild(buildTechTreeNodeButton(nodeModel, "tech-base-card"));
             });
 
-            slotModels.forEach((slotModel, slotIndex) => {
-                const column = document.createElement("div");
-                column.className = "tech-column";
-                tierGrid.appendChild(column);
-
-                if (slotModel.base) {
-                    column.appendChild(buildTechTreeNodeButton(slotModel.base, "tech-base-card"));
-                } else {
-                    const basePlaceholder = document.createElement("div");
-                    basePlaceholder.className = "tech-base-card tech-placeholder";
-                    basePlaceholder.textContent = "Tech " + String(slotIndex + 1);
-                    column.appendChild(basePlaceholder);
-                }
-
-                const ampRow = document.createElement("div");
-                ampRow.className = "tech-amp-row";
-                column.appendChild(ampRow);
-
-                slotModel.amps.forEach((ampModel, ampIndex) => {
-                    if (ampModel) {
-                        ampRow.appendChild(buildTechTreeNodeButton(ampModel, "tech-amp-card"));
-                    } else {
-                        const ampPlaceholder = document.createElement("div");
-                        ampPlaceholder.className = "tech-amp-card tech-placeholder";
-                        ampPlaceholder.textContent = ampIndex === 0 ? "Left Amp" : "Right Amp";
-                        ampRow.appendChild(ampPlaceholder);
-                    }
-                });
-            });
+            if (tierElement.nodes.length === 0) {
+                const placeholder = document.createElement("div");
+                placeholder.className = "tech-base-card tech-placeholder";
+                placeholder.textContent = "No tech nodes";
+                tierGrid.appendChild(placeholder);
+            }
         });
     }
 

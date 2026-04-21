@@ -20,4 +20,4 @@ Data-only definition headers for the major authored content domains.
 - `site_content_defs.h`: Site template/content definitions for active site runs.
 - `structure_defs.h`: Structure/buildable definition records.
 - `task_defs.h`: Task board/authored task definition records, including the site-one onboarding task pool, progress-kind metadata, and lookup helpers.
-- `technology_defs.h`: Technology tree definition records, including prototype faction tabs, four temporary modifier tiers per faction, base-tech entries, and mutually exclusive amplification choices.
+- `technology_defs.h`: Faction-tier definition records, including three prototype reputation-gated tiers per faction, immediate tier unlockables, and TODO placeholder technologies for global modifiers and mechanism changes.

@@ -9,7 +9,7 @@ Campaign-owned state containers plus the campaign system layer that advances lon
 
 ## Contents
 - `campaign_state.h`: Aggregate campaign state owned outside individual campaign subsystems.
-- `faction_progress_state.h`: Regional/faction support and progress state tracked at campaign scope.
+- `faction_progress_state.h`: Regional/faction progress state tracked at campaign scope, including non-decreasing total reputation plus consumable reputation used by faction tech purchases.
 - `loadout_planner_state.h`: State for loadout planning, selected-site support assembly, and site-prep decisions.
 - `systems/`: Campaign system declarations and implementations, including faction-reputation and technology progression handlers.
 - `technology_state.h`: Campaign technology progression, purchased-node state, and campaign-wide non-faction reputation tracking.
