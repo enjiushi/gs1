@@ -9,6 +9,12 @@ namespace gs1
 {
 namespace
 {
+[[nodiscard]] bool app_state_supports_technology_tree(Gs1AppState app_state) noexcept
+{
+    return app_state == GS1_APP_STATE_REGIONAL_MAP ||
+        app_state == GS1_APP_STATE_SITE_ACTIVE;
+}
+
 void rebuild_regional_map_caches(CampaignState& campaign)
 {
     auto& map = campaign.regional_map_state;
@@ -170,7 +176,7 @@ Gs1Status CampaignFlowSystem::process_message(
 
     case GameMessageType::OpenRegionalMapTechTree:
     {
-        if (!context.campaign.has_value() || context.app_state != GS1_APP_STATE_REGIONAL_MAP)
+        if (!context.campaign.has_value() || !app_state_supports_technology_tree(context.app_state))
         {
             return GS1_STATUS_INVALID_STATE;
         }
@@ -192,7 +198,7 @@ Gs1Status CampaignFlowSystem::process_message(
 
     case GameMessageType::SelectRegionalMapTechTreeFaction:
     {
-        if (!context.campaign.has_value() || context.app_state != GS1_APP_STATE_REGIONAL_MAP)
+        if (!context.campaign.has_value() || !app_state_supports_technology_tree(context.app_state))
         {
             return GS1_STATUS_INVALID_STATE;
         }
@@ -249,6 +255,7 @@ Gs1Status CampaignFlowSystem::process_message(
 
         context.active_site_run.reset();
         context.campaign->active_site_id.reset();
+        context.campaign->regional_map_state.tech_tree_open = false;
         context.app_state = GS1_APP_STATE_REGIONAL_MAP;
         context.campaign->app_state = context.app_state;
         rebuild_regional_map_caches(*context.campaign);
@@ -311,6 +318,7 @@ Gs1Status CampaignFlowSystem::process_message(
             }
         }
 
+        context.campaign->regional_map_state.tech_tree_open = false;
         context.app_state = GS1_APP_STATE_SITE_RESULT;
         context.campaign->app_state = context.app_state;
         rebuild_regional_map_caches(*context.campaign);

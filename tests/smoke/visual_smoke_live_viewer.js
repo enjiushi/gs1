@@ -1022,6 +1022,39 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return setup.elements.filter((element) => !element.action || element.action.type === "NONE");
     }
 
+    function setTechTreeOverlayActive(active) {
+        stageFrame.classList.toggle("tech-tree-overlay-active", !!active);
+        selectionChip.classList.toggle("tech-tree-overlay", !!active);
+    }
+
+    function makeUiAction(type, targetId, arg0, arg1) {
+        return {
+            type: type,
+            targetId: targetId || 0,
+            arg0: arg0 || 0,
+            arg1: arg1 || 0
+        };
+    }
+
+    function splitInfoParts(text) {
+        return String(text || "")
+            .split("|")
+            .map((part) => part.trim())
+            .filter(Boolean);
+    }
+
+    function getTechTreeCloseAction(techTreeSetup) {
+        const backgroundElement = getBackgroundClickElement(techTreeSetup);
+        if (backgroundElement && backgroundElement.action) {
+            return backgroundElement.action;
+        }
+        return makeUiAction("CLOSE_REGIONAL_MAP_TECH_TREE", 0, 0, 0);
+    }
+
+    function getTechTreeSetup(state) {
+        return getSetup(state, "REGIONAL_MAP_TECH_TREE");
+    }
+
     function getSiteBootstrap(state) {
         return state.siteBootstrap || null;
     }
@@ -2534,6 +2567,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function clearSelectionInventory() {
         selectionInventory.classList.remove("site-result-actions");
+        setTechTreeOverlayActive(false);
         selectionInventory.hidden = true;
         selectionInventory.innerHTML = "";
         hideInventoryTooltip();
@@ -2838,6 +2872,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const labels = getLabelElements(selectionSetup);
         const loadoutSlots = parseRegionalLoadoutSlots(labels);
 
+        setTechTreeOverlayActive(false);
         selectionInventory.innerHTML = "";
         if (state.selectedSiteId == null || loadoutSlots.length === 0) {
             selectionInventory.hidden = true;
@@ -2940,7 +2975,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         } else if (nodeModel.isLocked) {
             nodeButton.classList.add("locked");
         }
-        nodeButton.addEventListener("click", function () {
+        bindReliablePrimaryPress(nodeButton, function () {
             postJson("/ui-action", nodeModel.element.action).catch(() => {
                 statusChip.textContent = "Failed to send tech-tree action.";
             });
@@ -2976,37 +3011,69 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return nodeButton;
     }
 
-    function appendRegionalMapTechTreePanel(techTreeSetup) {
+    function renderTechTreePanel(techTreeSetup, options) {
         if (!techTreeSetup) {
-            return;
+            return false;
         }
 
+        const panelOptions = options || {};
+        const closeAction = getTechTreeCloseAction(techTreeSetup);
+        const title = getLabelElements(techTreeSetup)[0];
+        const subtitle = getLabelElements(techTreeSetup)[1];
+        const titleText = title ? title.text : "Faction Tech Tree";
+        const subtitleText = subtitle ? subtitle.text : "Claim nodes with available faction reputation.";
+        const summaryParts = splitInfoParts(subtitleText);
+
+        setTechTreeOverlayActive(true);
         selectionInventory.hidden = false;
-        let stack = selectionInventory.querySelector(".site-panel-stack");
-        if (!stack) {
-            stack = document.createElement("div");
-            stack.className = "site-panel-stack";
-            selectionInventory.appendChild(stack);
-        }
+        selectionInventory.innerHTML = "";
 
         const section = document.createElement("section");
         section.className = "inventory-section tech-tree-panel";
-        stack.appendChild(section);
+        selectionInventory.appendChild(section);
 
-        const labels = getLabelElements(techTreeSetup);
         const actions = getVisibleActionElements(techTreeSetup);
-        const title = labels.length > 0 ? labels[0].text : "Faction Tech Tree";
-        const subtitle = labels.length > 1 ? labels[1].text : "Claim nodes with available faction reputation.";
+        const header = document.createElement("div");
+        header.className = "tech-tree-header";
+        section.appendChild(header);
+
+        const headerCopy = document.createElement("div");
+        headerCopy.className = "tech-tree-header-copy";
+        header.appendChild(headerCopy);
+
+        const kickerElement = document.createElement("div");
+        kickerElement.className = "tech-tree-kicker";
+        kickerElement.textContent = panelOptions.kickerText || "Campaign Research";
+        headerCopy.appendChild(kickerElement);
 
         const titleElement = document.createElement("div");
-        titleElement.className = "inventory-title";
-        titleElement.textContent = title;
-        section.appendChild(titleElement);
+        titleElement.className = "tech-tree-heading";
+        titleElement.textContent = titleText;
+        headerCopy.appendChild(titleElement);
 
-        const subtitleElement = document.createElement("div");
-        subtitleElement.className = "inventory-subtitle";
-        subtitleElement.textContent = subtitle;
-        section.appendChild(subtitleElement);
+        const closeButton = document.createElement("button");
+        closeButton.type = "button";
+        closeButton.className = "tech-tree-close";
+        closeButton.textContent = "Close";
+        bindReliablePrimaryPress(closeButton, function () {
+            postJson("/ui-action", closeAction).catch(() => {
+                statusChip.textContent = "Failed to close tech-tree panel.";
+            });
+        });
+        header.appendChild(closeButton);
+
+        if (summaryParts.length > 0) {
+            const summaryRow = document.createElement("div");
+            summaryRow.className = "tech-tree-summary-row";
+            section.appendChild(summaryRow);
+
+            summaryParts.forEach((part, index) => {
+                const chip = document.createElement("div");
+                chip.className = "tech-tree-summary-chip" + (index === 0 ? " active-faction" : "");
+                chip.textContent = part;
+                summaryRow.appendChild(chip);
+            });
+        }
 
         const tabButtons = actions.filter((element) => element.action && element.action.type === "SELECT_TECH_TREE_FACTION_TAB");
         if (tabButtons.length > 0) {
@@ -3022,7 +3089,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     button.classList.add("active");
                 }
                 button.textContent = (element.text || "").replace(/^Tab:\s*/, "");
-                button.addEventListener("click", function () {
+                bindReliablePrimaryPress(button, function () {
                     postJson("/ui-action", element.action).catch(() => {
                         statusChip.textContent = "Failed to switch tech-tree faction.";
                     });
@@ -3044,7 +3111,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             if (element.action && element.action.type === "SELECT_TECH_TREE_FACTION_TAB") {
                 return;
             }
-            if (element.text === title || element.text === subtitle) {
+            if (element.text === titleText || element.text === subtitleText) {
                 return;
             }
             if (!element.action || element.action.type === "NONE") {
@@ -3109,9 +3176,32 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 tierGrid.appendChild(placeholder);
             }
         });
+
+        return true;
+    }
+
+    function appendSiteTechTreeToggleAction(techTreeSetup) {
+        const isOpen = !!techTreeSetup;
+        const action = isOpen
+            ? getTechTreeCloseAction(techTreeSetup)
+            : makeUiAction("OPEN_REGIONAL_MAP_TECH_TREE", 0, 0, 0);
+
+        contextActions.appendChild(
+            makeButton(
+                isOpen ? "Close Tech Tree" : "Open Tech Tree",
+                function () {
+                    postJson("/ui-action", action).catch(() => {
+                        statusChip.textContent = "Failed to toggle tech-tree panel.";
+                    });
+                },
+                isOpen,
+                false
+            )
+        );
     }
 
     function renderSiteInventoryPanel(state, workerPackSlots) {
+        setTechTreeOverlayActive(false);
         if (!inventoryPanelOpen) {
             selectionChip.hidden = true;
             selectionInventory.hidden = true;
@@ -4276,13 +4366,26 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     function renderRegionalMapOverlay(state) {
         const menuSetup = getSetup(state, "REGIONAL_MAP_MENU");
         const selectionSetup = getSetup(state, "REGIONAL_MAP_SELECTION");
-        const techTreeSetup = getSetup(state, "REGIONAL_MAP_TECH_TREE");
+        const techTreeSetup = getTechTreeSetup(state);
         const labels = getLabelElements(selectionSetup);
         const actions = getVisibleActionElements(selectionSetup);
         const menuActions = getVisibleActionElements(menuSetup);
         const primaryLabel = labels.length > 0 ? labels[0].text : "";
 
         menuPanel.hidden = true;
+
+        if (techTreeSetup) {
+            selectionEyebrow.textContent = "Campaign Research";
+            selectionText.hidden = true;
+            selectionText.textContent = "";
+            renderTechTreePanel(techTreeSetup, {
+                kickerText: "Regional Research Board"
+            });
+            renderStoragePanel(null, null);
+            contextActions.innerHTML = "";
+            return;
+        }
+
         selectionEyebrow.textContent = "Field Survey";
 
         if (primaryLabel) {
@@ -4294,7 +4397,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
 
         renderRegionalMapLoadoutPanel(state, selectionSetup, primaryLabel);
-        appendRegionalMapTechTreePanel(techTreeSetup);
         renderStoragePanel(null, null);
 
         contextActions.innerHTML = "";
@@ -4415,21 +4517,34 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function renderSiteOverlay(state) {
+        const techTreeSetup = getTechTreeSetup(state);
         const workerPackSlots = getInventorySlotsByKind(state, "WORKER_PACK");
 
         menuPanel.hidden = true;
         selectionChip.hidden = false;
-        selectionEyebrow.textContent = "Player Pack";
-        selectionText.hidden = true;
-        selectionText.textContent = "";
         contextActions.innerHTML = "";
         clearSelectedInventorySlotIfInvalid(state);
         clearOpenedInventoryContainerIfInvalid(state);
 
+        if (techTreeSetup) {
+            selectionEyebrow.textContent = "Campaign Research";
+            selectionText.hidden = true;
+            selectionText.textContent = "";
+            renderTechTreePanel(techTreeSetup, {
+                kickerText: "Site Session Research"
+            });
+            renderStoragePanel(null, null);
+            return;
+        }
+
         const selectedSlot = findSelectedInventorySlot(state);
         const openedContainerInfo = findOpenedInventoryContainer(state);
+        selectionEyebrow.textContent = "Player Pack";
+        selectionText.hidden = true;
+        selectionText.textContent = "";
         renderSiteInventoryPanel(state, workerPackSlots);
         renderStoragePanel(state, openedContainerInfo);
+        appendSiteTechTreeToggleAction(techTreeSetup);
         appendSelectedInventoryActions(state, selectedSlot);
     }
 
@@ -4439,6 +4554,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         stageFrame.classList.toggle("regional-map-mode", state.appState === "REGIONAL_MAP");
         stageFrame.classList.toggle("site-active-mode", state.appState === "SITE_ACTIVE");
         stageFrame.classList.toggle("site-result-mode", state.appState === "SITE_RESULT");
+        setTechTreeOverlayActive(false);
         const appStateChanged = lastOverlayAppState !== state.appState;
 
         switch (state.appState) {
@@ -7363,11 +7479,14 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     renderSiteHudChrome(normalizedState);
                 }
                 if (lightweightPatchParts.hud) {
-                    renderSiteHudChrome(normalizedState);
-                    renderSiteInventoryPanel(
-                        normalizedState,
-                        getInventorySlotsByKind(normalizedState, "WORKER_PACK"));
-                    renderStoragePanel(normalizedState, findOpenedInventoryContainer(normalizedState));
+                    if (getTechTreeSetup(normalizedState)) {
+                        renderSiteOverlay(normalizedState);
+                    } else {
+                        renderSiteInventoryPanel(
+                            normalizedState,
+                            getInventorySlotsByKind(normalizedState, "WORKER_PACK"));
+                        renderStoragePanel(normalizedState, findOpenedInventoryContainer(normalizedState));
+                    }
                     if (phonePanelOpen && !isPhoneInteractionLocked()) {
                         renderPhonePanel(normalizedState);
                     }
