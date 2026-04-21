@@ -1606,8 +1606,8 @@ body {
 
 .phone-layer {
   position: absolute;
-  top: 98px;
-  right: 18px;
+  top: 72px;
+  right: 12px;
   z-index: 5;
   pointer-events: none;
   opacity: 0;
@@ -1626,7 +1626,7 @@ body {
 
 .phone-handset {
   position: relative;
-  width: min(316px, 29vw, calc((100vh - 190px) * 0.5128));
+  width: min(388px, 36vw, calc((100vh - 132px) * 0.5128));
   aspect-ratio: 10 / 19.5;
   padding: 10px;
   border-radius: 38px;
@@ -1808,7 +1808,7 @@ body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 14px 16px 28px;
+  padding: 14px 16px 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1828,16 +1828,12 @@ body {
   border-radius: 999px;
 }
 
-.phone-summary-grid {
+.phone-home-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.phone-app-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
+  margin: auto 0;
+  padding: 6px 0 14px;
 }
 
 .phone-app-launcher {
@@ -1854,11 +1850,37 @@ body {
   color: rgba(34, 25, 14, 0.96);
   text-align: left;
   cursor: pointer;
+  transition: transform 140ms ease, filter 140ms ease, border-color 140ms ease;
 }
 
 .phone-app-launcher:hover {
   transform: translateY(-1px);
   filter: brightness(1.03);
+}
+
+.phone-app-launcher-simple {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+  min-height: 120px;
+  aspect-ratio: 1 / 1;
+  padding: 18px 16px;
+}
+
+.phone-app-launcher-mark {
+  width: 38px;
+  height: 38px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: rgba(126, 102, 72, 0.12);
+  border: 1px solid rgba(126, 102, 72, 0.16);
+  color: rgba(77, 56, 31, 0.9);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .phone-app-launcher:focus-visible {
@@ -1867,72 +1889,14 @@ body {
 }
 
 .phone-app-launcher-name {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 800;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-}
-
-.phone-app-launcher-count {
-  margin-top: 6px;
-  font-size: 24px;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.phone-app-launcher-meta {
-  margin-top: 7px;
-  font-size: 11px;
-  line-height: 1.45;
-  color: rgba(92, 68, 40, 0.74);
-}
-
-.phone-app-launcher-badge {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  display: grid;
-  place-items: center;
-  border-radius: 999px;
-  background: rgba(187, 47, 40, 0.92);
-  color: #fff7f4;
-  font-size: 10px;
-  font-weight: 800;
-  box-shadow: 0 6px 14px rgba(122, 22, 18, 0.22);
-}
-
-.phone-summary-card {
-  min-width: 0;
-  padding: 10px 11px 11px;
-  border-radius: 18px;
-  border: 1px solid rgba(131, 103, 70, 0.12);
-  background:
-    linear-gradient(180deg, rgba(255, 251, 244, 0.92), rgba(239, 226, 205, 0.78));
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.6),
-    0 10px 18px rgba(55, 35, 14, 0.06);
-}
-
-.phone-summary-label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: rgba(96, 66, 33, 0.62);
-}
-
-.phone-summary-value {
-  margin-top: 5px;
-  font-size: 22px;
-  font-weight: 800;
-  line-height: 1;
-  color: rgba(34, 25, 14, 0.94);
 }
 
 .phone-section {
+  min-height: 0;
   padding: 12px;
   border-radius: 22px;
   border: 1px solid rgba(123, 95, 62, 0.12);
@@ -2078,16 +2042,26 @@ body {
 
 .phone-section-content {
   display: flex;
+  flex: 1;
+  min-height: 0;
   flex-direction: column;
   gap: 8px;
 }
 
 .phone-section-content.scrollable {
-  max-height: 252px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding-right: 4px;
   margin-right: -4px;
+}
+
+.phone-screen-body > .phone-section:last-child {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .phone-section-content.scrollable::-webkit-scrollbar {
@@ -2600,7 +2574,7 @@ body {
   }
 
   .phone-handset {
-    width: min(90vw, 336px, calc((100vh - 120px) * 0.5128));
+    width: min(94vw, 388px, calc((100vh - 72px) * 0.5128));
   }
 
   .stage-frame.site-result-mode .selection-chip {
@@ -2725,8 +2699,8 @@ body {
           </div>
           <div class="phone-app-header">
             <div class="phone-app-eyebrow">Field Device</div>
-            <div class="phone-app-title" id="phone-app-title">Phone</div>
-            <div class="phone-app-subtitle" id="phone-app-subtitle">Pocket market access, contracts, and remote services. Press F to pocket it again.</div>
+            <div class="phone-app-title" id="phone-app-title">Apps</div>
+            <div class="phone-app-subtitle" id="phone-app-subtitle" hidden></div>
           </div>
           <div class="phone-screen-body" id="phone-screen-body"></div>
           <div class="phone-home-indicator" aria-hidden="true"></div>

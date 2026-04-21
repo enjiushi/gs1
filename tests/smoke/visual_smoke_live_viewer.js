@@ -3113,23 +3113,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return tasks.filter((task) => task.listKind === listKind).length;
     }
 
-    function appendPhoneSummaryCard(container, label, value) {
-        const card = document.createElement("div");
-        card.className = "phone-summary-card";
-
-        const labelElement = document.createElement("div");
-        labelElement.className = "phone-summary-label";
-        labelElement.textContent = label;
-        card.appendChild(labelElement);
-
-        const valueElement = document.createElement("div");
-        valueElement.className = "phone-summary-value";
-        valueElement.textContent = value;
-        card.appendChild(valueElement);
-
-        container.appendChild(card);
-    }
-
     function makePhoneSection(title, metaText) {
         const section = document.createElement("section");
         section.className = "phone-section";
@@ -3456,32 +3439,20 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return button;
     }
 
-    function makePhoneAppLauncher(title, countValue, metaText, onClick, badgeValue) {
+    function makePhoneAppLauncher(title, onClick) {
         const button = document.createElement("button");
         button.type = "button";
-        button.className = "phone-app-launcher";
+        button.className = "phone-app-launcher phone-app-launcher-simple";
+
+        const mark = document.createElement("div");
+        mark.className = "phone-app-launcher-mark";
+        mark.textContent = title.slice(0, 1);
+        button.appendChild(mark);
 
         const name = document.createElement("div");
         name.className = "phone-app-launcher-name";
         name.textContent = title;
         button.appendChild(name);
-
-        const count = document.createElement("div");
-        count.className = "phone-app-launcher-count";
-        count.textContent = countValue;
-        button.appendChild(count);
-
-        const meta = document.createElement("div");
-        meta.className = "phone-app-launcher-meta";
-        meta.textContent = metaText;
-        button.appendChild(meta);
-
-        if (badgeValue > 0) {
-            const badge = document.createElement("div");
-            badge.className = "phone-app-launcher-badge";
-            badge.textContent = String(badgeValue);
-            button.appendChild(badge);
-        }
 
         bindReliablePrimaryPress(button, onClick);
         return button;
@@ -3835,117 +3806,80 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         container.appendChild(section);
     }
 
-    function setPhoneHeaderForSection(activeSection, activeTaskCount, visibleTaskCount, cartItemCount) {
+    function setPhoneHeader(title, subtitle) {
+        phoneAppTitle.textContent = title;
+        phoneAppSubtitle.hidden = !subtitle;
+        phoneAppSubtitle.textContent = subtitle || "";
+    }
+
+    function setPhoneHeaderForSection(activeSection) {
         switch (activeSection) {
         case "TASKS":
-            phoneAppTitle.textContent = "Tasks";
-            phoneAppSubtitle.textContent = "Contracts, progress, and rewards mirrored from the site board. Back returns to the home screen.";
+            setPhoneHeader("Tasks", "");
             break;
         case "BUY":
-            phoneAppTitle.textContent = "Buy";
-            phoneAppSubtitle.textContent =
-                "Remote market orders route to the field drop box. Cart " + cartItemCount + ". Back returns home.";
+            setPhoneHeader("Buy", "");
             break;
         case "SELL":
-            phoneAppTitle.textContent = "Sell";
-            phoneAppSubtitle.textContent = "Quick-sell inventory already on site. Back returns to the home screen.";
+            setPhoneHeader("Sell", "");
             break;
         case "HIRE":
-            phoneAppTitle.textContent = "Hire";
-            phoneAppSubtitle.textContent = "Remote hiring and unlockables. Back returns to the home screen.";
+            setPhoneHeader("Hire", "");
             break;
         case "CART":
-            phoneAppTitle.textContent = "Cart";
-            phoneAppSubtitle.textContent = "Review the delivery order before checkout. Back returns to Buy.";
+            setPhoneHeader("Cart", "Review the delivery order before checkout. Back returns to Buy.");
             break;
         case "HOME":
         default:
-            phoneAppTitle.textContent = "Phone";
-            phoneAppSubtitle.textContent =
-                activeTaskCount > 0
-                    ? activeTaskCount + " active contract" + (activeTaskCount === 1 ? "" : "s") +
-                        ", " + visibleTaskCount + " open. Press F to pocket the handset."
-                    : "Open Tasks, Buy, Sell, or Hire from the phone home screen. Press F to pocket it again.";
+            setPhoneHeader("Apps", "");
             break;
         }
     }
 
-    function appendPhoneHomeScreen(
-        container,
-        currentMoney,
-        cartItemCount,
-        buyListingCount,
-        sellListingCount,
-        serviceListingCount,
-        activeTaskCount,
-        visibleTaskCount
-    ) {
-        const summaryGrid = document.createElement("div");
-        summaryGrid.className = "phone-summary-grid";
-        appendPhoneSummaryCard(summaryGrid, "Money", "$" + String(currentMoney));
-        appendPhoneSummaryCard(summaryGrid, "Cart", String(cartItemCount));
-        appendPhoneSummaryCard(summaryGrid, "Buy", String(buyListingCount));
-        appendPhoneSummaryCard(summaryGrid, "Sell", String(sellListingCount));
-        appendPhoneSummaryCard(summaryGrid, "Tasks", String(activeTaskCount + visibleTaskCount));
-        container.appendChild(summaryGrid);
-
-        const appSection = makePhoneSection("Apps", "Open one tool at a time. The DLL tracks the active phone app.");
+    function appendPhoneHomeScreen(container) {
         const appGrid = document.createElement("div");
-        appGrid.className = "phone-app-grid";
+        appGrid.className = "phone-home-grid";
         appGrid.appendChild(
             makePhoneAppLauncher(
                 "Tasks",
-                String(activeTaskCount + visibleTaskCount),
-                "Open " + visibleTaskCount + "  |  Active " + activeTaskCount,
                 function () {
                     postPhonePanelSection("TASKS").catch(() => {
                         statusChip.textContent = "Failed to switch phone panel section.";
                     });
-                },
-                0
+                }
             )
         );
         appGrid.appendChild(
             makePhoneAppLauncher(
                 "Buy",
-                String(buyListingCount),
-                "Marketplace orders routed through the delivery drop box.",
                 function () {
                     postPhonePanelSection("BUY").catch(() => {
                         statusChip.textContent = "Failed to switch phone panel section.";
                     });
-                },
-                cartItemCount
+                }
             )
         );
         appGrid.appendChild(
             makePhoneAppLauncher(
                 "Sell",
-                String(sellListingCount),
-                "Quick sale surface for items currently available on site.",
                 function () {
                     postPhonePanelSection("SELL").catch(() => {
                         statusChip.textContent = "Failed to switch phone panel section.";
                     });
-                },
-                0
+                }
             )
         );
         appGrid.appendChild(
             makePhoneAppLauncher(
                 "Hire",
-                String(serviceListingCount),
-                "Contractor hiring and unlockable services.",
                 function () {
                     postPhonePanelSection("HIRE").catch(() => {
                         statusChip.textContent = "Failed to switch phone panel section.";
                     });
-                },
-                0
+                }
             )
         );
-        appSection.appendChild(appGrid);
-        container.appendChild(appSection);
+        container.appendChild(appGrid);
     }
 
     function appendPhoneBuyPanel(container, state, buyListings, buyListingCount, cartItemCount) {
@@ -4053,13 +3987,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         phoneStatusTime.textContent = formatPhoneClockLabel();
 
-        const hud = getHudState(state);
         const phonePanelState = getPhonePanelState(state);
         const tasks = getSiteTasks(state);
         const buyListings = getBuyListings(state);
         const sellListings = getSellListings(state);
         const specialListings = getSpecialPhoneListings(state);
-        const currentMoney = hud && typeof hud.currentMoney === "number" ? hud.currentMoney : 0;
         const cartItemCount = getPhoneCartItemCount(state);
         const activeSection =
             phonePanelState && typeof phonePanelState.activeSection === "string"
@@ -4067,9 +3999,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 : "HOME";
         const activeTaskCount = phonePanelState && typeof phonePanelState.acceptedTaskCount === "number"
             ? phonePanelState.acceptedTaskCount
-            : (hud && typeof hud.activeTaskCount === "number"
-                ? hud.activeTaskCount
-                : countTasksByListKind(tasks, "ACCEPTED"));
+            : countTasksByListKind(tasks, "ACCEPTED");
         const visibleTaskCount = phonePanelState && typeof phonePanelState.visibleTaskCount === "number"
             ? phonePanelState.visibleTaskCount
             : countTasksByListKind(tasks, "VISIBLE");
@@ -4083,7 +4013,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             ? phonePanelState.serviceListingCount
             : specialListings.length;
 
-        setPhoneHeaderForSection(activeSection, activeTaskCount, visibleTaskCount, cartItemCount);
+        setPhoneHeaderForSection(activeSection);
 
         switch (activeSection) {
         case "TASKS":
@@ -4103,16 +4033,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             break;
         case "HOME":
         default:
-            appendPhoneHomeScreen(
-                phoneScreenBody,
-                currentMoney,
-                cartItemCount,
-                buyListingCount,
-                sellListingCount,
-                serviceListingCount,
-                activeTaskCount,
-                visibleTaskCount
-            );
+            appendPhoneHomeScreen(phoneScreenBody);
             break;
         }
 
