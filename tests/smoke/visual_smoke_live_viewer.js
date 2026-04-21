@@ -5970,6 +5970,19 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return leaf;
     }
 
+    function createGrassBladeMesh(color, width, height, windFlexibility) {
+        const geometry = new THREE_NS.PlaneGeometry(width, height, 1, 5);
+        geometry.translate(0, height * 0.5, 0);
+        const blade = new THREE_NS.Mesh(
+            geometry,
+            createPlantMaterial(color, 0.74, color, 0.05, {
+                windFlexibility: windFlexibility == null ? 1.0 : windFlexibility
+            })
+        );
+        blade.material.side = THREE_NS.DoubleSide;
+        return blade;
+    }
+
     function resolvePlantPalette(tile) {
         if (tile.plantTypeId === 1) {
             return { primary: 0x8fb76b, secondary: 0x6f8d49, glow: 0x4f652e };
@@ -5997,66 +6010,117 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const fullSpanZ = plantSpec.fullSpanZ;
         const halfSpanX = plantSpec.halfSpanX;
         const halfSpanZ = plantSpec.halfSpanZ;
-        const tuftLength = 0.12 + densityHeightScale * 0.3;
-        const tuftWidth = 0.018 + plantDensity * 0.014;
-        const tuftThickness = 0.007 + plantDensity * 0.005;
-        const lineHeight = 0.028 + densityHeightScale * 0.11;
-        const linePadding = 0.04;
-        const lineCountX = Math.max(7, Math.round(fullSpanX * (8 + plantDensity * 4)));
-        const lineCountZ = Math.max(7, Math.round(fullSpanZ * (8 + plantDensity * 4)));
+        const linePadding = 0.05;
+        const bundleThickness = 0.022 + plantDensity * 0.014;
+        const baseBladeHeight = 0.15 + densityHeightScale * 0.14 + (plantSpec.areaScale - 1.0) * 0.02;
+        const baseBladeWidth = 0.04 + plantDensity * 0.018;
+        const baseLift = 0.01 + densityHeightScale * 0.018;
+        const lineCountX = Math.max(8, Math.round(fullSpanX * (8 + plantDensity * 4)));
+        const lineCountZ = Math.max(8, Math.round(fullSpanZ * (8 + plantDensity * 4)));
         const strawColors = [palette.primary, palette.secondary, 0xd9bb74];
 
-        function addStrawTuft(x, z, orientation, seed) {
-            const tuft = createLeafMesh(
-                strawColors[Math.floor(deterministicNoise01(tile.x, tile.y, seed) * strawColors.length) % strawColors.length],
-                tuftWidth * (0.9 + deterministicNoise01(tile.y, tile.x, seed + 31) * 0.45),
-                tuftThickness,
-                tuftLength * (0.82 + deterministicNoise01(tile.x, tile.y, seed + 17) * 0.5),
-                0.18
-            );
-            tuft.position.set(
-                x + (deterministicNoise01(tile.x, tile.y, seed + 7) - 0.5) * 0.035,
-                lineHeight + deterministicNoise01(tile.y, tile.x, seed + 13) * (0.03 + densityHeightScale * 0.08),
-                z + (deterministicNoise01(tile.x, tile.y, seed + 19) - 0.5) * 0.035
-            );
-            tuft.rotation.y = orientation + (deterministicNoise01(tile.y, tile.x, seed + 23) - 0.5) * 0.45;
-            tuft.rotation.z = (deterministicNoise01(tile.x, tile.y, seed + 29) - 0.5) * 0.8;
-            tuft.rotation.x = -0.32 + deterministicNoise01(tile.y, tile.x, seed + 37) * 0.24;
-            plantGroup.add(tuft);
+        function addBarrierBundle(x, z, orientation, seedBase) {
+            const bladeCount =
+                3 +
+                (deterministicNoise01(tile.x, tile.y, seedBase + 1) > 0.56 ? 1 : 0);
+            const alongX = Math.sin(orientation);
+            const alongZ = Math.cos(orientation);
+            const perpX = alongZ;
+            const perpZ = -alongX;
+            const bundleLift = baseLift + deterministicNoise01(tile.x, tile.y, seedBase + 5) * 0.014;
+
+            for (let bladeIndex = 0; bladeIndex < bladeCount; bladeIndex += 1) {
+                const bladeSeed = seedBase + bladeIndex * 53;
+                const sideOffset =
+                    (deterministicNoise01(tile.y, tile.x, bladeSeed + 7) - 0.5) * bundleThickness;
+                const alongOffset =
+                    (deterministicNoise01(tile.x, tile.y, bladeSeed + 11) - 0.5) * 0.02;
+                const blade = createGrassBladeMesh(
+                    strawColors[
+                        Math.floor(deterministicNoise01(tile.x, tile.y, bladeSeed + 13) * strawColors.length) % strawColors.length
+                    ],
+                    baseBladeWidth * (0.85 + deterministicNoise01(tile.y, tile.x, bladeSeed + 17) * 0.45),
+                    baseBladeHeight * (0.72 + deterministicNoise01(tile.x, tile.y, bladeSeed + 19) * 0.58),
+                    0.82
+                );
+                blade.position.set(
+                    x + perpX * sideOffset + alongX * alongOffset,
+                    bundleLift + deterministicNoise01(tile.x, tile.y, bladeSeed + 23) * 0.012,
+                    z + perpZ * sideOffset + alongZ * alongOffset
+                );
+                blade.rotation.y =
+                    orientation +
+                    (bladeIndex % 2 === 0 ? 0 : Math.PI * 0.5) +
+                    (deterministicNoise01(tile.y, tile.x, bladeSeed + 29) - 0.5) * 0.16;
+                blade.rotation.z = 0.08 + deterministicNoise01(tile.x, tile.y, bladeSeed + 31) * 0.22;
+                blade.rotation.x = -0.05 + deterministicNoise01(tile.y, tile.x, bladeSeed + 37) * 0.1;
+                plantGroup.add(blade);
+            }
         }
 
-        function addLineSegment(startX, startZ, endX, endZ, count, seedBase) {
+        function addBarrierLine(startX, startZ, endX, endZ, count, seedBase) {
+            const orientation = Math.atan2(endX - startX, endZ - startZ);
             for (let index = 0; index < count; index += 1) {
                 const t = count <= 1 ? 0.5 : index / (count - 1);
                 const x = THREE_NS.MathUtils.lerp(startX, endX, t);
                 const z = THREE_NS.MathUtils.lerp(startZ, endZ, t);
-                const orientation = Math.atan2(endX - startX, endZ - startZ);
-                addStrawTuft(x, z, orientation, seedBase + index * 47);
+                addBarrierBundle(x, z, orientation, seedBase + index * 47);
             }
         }
 
-        addLineSegment(-halfSpanX + linePadding, -halfSpanZ + linePadding, halfSpanX - linePadding, -halfSpanZ + linePadding, lineCountX, 101);
-        addLineSegment(-halfSpanX + linePadding, halfSpanZ - linePadding, halfSpanX - linePadding, halfSpanZ - linePadding, lineCountX, 401);
-        addLineSegment(-halfSpanX + linePadding, -halfSpanZ + linePadding, -halfSpanX + linePadding, halfSpanZ - linePadding, lineCountZ, 701);
-        addLineSegment(halfSpanX - linePadding, -halfSpanZ + linePadding, halfSpanX - linePadding, halfSpanZ - linePadding, lineCountZ, 1001);
-        addLineSegment(0, -halfSpanZ + linePadding, 0, halfSpanZ - linePadding, lineCountZ, 1301);
-        addLineSegment(-halfSpanX + linePadding, 0, halfSpanX - linePadding, 0, lineCountX, 1601);
-
-        const postHeight = 0.06 + densityHeightScale * 0.14;
-        [
+        addBarrierLine(
+            -halfSpanX + linePadding,
+            -halfSpanZ + linePadding,
+            halfSpanX - linePadding,
+            -halfSpanZ + linePadding,
+            lineCountX,
+            101
+        );
+        addBarrierLine(
+            -halfSpanX + linePadding,
+            halfSpanZ - linePadding,
+            halfSpanX - linePadding,
+            halfSpanZ - linePadding,
+            lineCountX,
+            401
+        );
+        addBarrierLine(
+            -halfSpanX + linePadding,
+            -halfSpanZ + linePadding,
+            -halfSpanX + linePadding,
+            halfSpanZ - linePadding,
+            lineCountZ,
+            701
+        );
+        addBarrierLine(
+            halfSpanX - linePadding,
+            -halfSpanZ + linePadding,
+            halfSpanX - linePadding,
+            halfSpanZ - linePadding,
+            lineCountZ,
+            1001
+        );
+        const edgePosts = [
             [-halfSpanX + linePadding, -halfSpanZ + linePadding],
             [halfSpanX - linePadding, -halfSpanZ + linePadding],
             [-halfSpanX + linePadding, halfSpanZ - linePadding],
             [halfSpanX - linePadding, halfSpanZ - linePadding]
-        ].forEach((corner, index) => {
+        ];
+        edgePosts.push([0, -halfSpanZ + linePadding]);
+        edgePosts.push([0, halfSpanZ - linePadding]);
+        edgePosts.push([-halfSpanX + linePadding, 0]);
+        edgePosts.push([halfSpanX - linePadding, 0]);
+        edgePosts.forEach((postPosition, postIndex) => {
+            const postSeed = 4001 + postIndex * 59;
+            const postHeight = 0.06 + densityHeightScale * 0.06 + deterministicNoise01(tile.y, tile.x, postSeed + 11) * 0.02;
             const post = new THREE_NS.Mesh(
-                new THREE_NS.BoxGeometry(0.04, postHeight, 0.04),
+                new THREE_NS.BoxGeometry(0.02, postHeight, 0.02),
                 createPlantMaterial(palette.secondary, 0.92, 0x4b3513, 0.0, {
                     windReactive: false
                 })
             );
-            post.position.set(corner[0], postHeight * 0.5, corner[1]);
-            post.rotation.y = deterministicNoise01(tile.x, tile.y, 2001 + index) * Math.PI * 0.15;
+            post.position.set(postPosition[0], postHeight * 0.5, postPosition[1]);
+            post.rotation.y = deterministicNoise01(tile.x, tile.y, postSeed + 13) * Math.PI * 0.2;
             plantGroup.add(post);
         });
     }
