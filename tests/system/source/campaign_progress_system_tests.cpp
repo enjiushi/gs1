@@ -734,60 +734,66 @@ void failure_recovery_only_emits_when_worker_health_is_zero(gs1::testing::System
 void campaign_flow_tech_tree_open_and_close_toggles_regional_map_state(
     gs1::testing::SystemTestExecutionContext& context)
 {
-    std::optional<gs1::CampaignState> campaign {make_campaign()};
-    std::optional<gs1::SiteRunState> active_site_run {};
-    Gs1AppState app_state = GS1_APP_STATE_REGIONAL_MAP;
-    GameMessageQueue queue {};
+    for (const auto supported_app_state : {GS1_APP_STATE_REGIONAL_MAP, GS1_APP_STATE_SITE_ACTIVE})
+    {
+        std::optional<gs1::CampaignState> campaign {make_campaign()};
+        std::optional<gs1::SiteRunState> active_site_run {};
+        Gs1AppState app_state = supported_app_state;
+        GameMessageQueue queue {};
 
-    CampaignFlowMessageContext flow_context {
-        campaign,
-        active_site_run,
-        app_state,
-        queue};
+        CampaignFlowMessageContext flow_context {
+            campaign,
+            active_site_run,
+            app_state,
+            queue};
 
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        CampaignFlowSystem::process_message(
-            flow_context,
-            make_message(
-                GameMessageType::OpenRegionalMapTechTree,
-                gs1::OpenRegionalMapTechTreeMessage {})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, campaign->regional_map_state.tech_tree_open);
+        GS1_SYSTEM_TEST_REQUIRE(
+            context,
+            CampaignFlowSystem::process_message(
+                flow_context,
+                make_message(
+                    GameMessageType::OpenRegionalMapTechTree,
+                    gs1::OpenRegionalMapTechTreeMessage {})) == GS1_STATUS_OK);
+        GS1_SYSTEM_TEST_CHECK(context, campaign->regional_map_state.tech_tree_open);
 
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        CampaignFlowSystem::process_message(
-            flow_context,
-            make_message(
-                GameMessageType::CloseRegionalMapTechTree,
-                gs1::CloseRegionalMapTechTreeMessage {})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, !campaign->regional_map_state.tech_tree_open);
+        GS1_SYSTEM_TEST_REQUIRE(
+            context,
+            CampaignFlowSystem::process_message(
+                flow_context,
+                make_message(
+                    GameMessageType::CloseRegionalMapTechTree,
+                    gs1::CloseRegionalMapTechTreeMessage {})) == GS1_STATUS_OK);
+        GS1_SYSTEM_TEST_CHECK(context, !campaign->regional_map_state.tech_tree_open);
+    }
 }
 
 void campaign_flow_selects_tech_tree_faction_tab(gs1::testing::SystemTestExecutionContext& context)
 {
-    std::optional<gs1::CampaignState> campaign {make_campaign()};
-    std::optional<gs1::SiteRunState> active_site_run {};
-    Gs1AppState app_state = GS1_APP_STATE_REGIONAL_MAP;
-    GameMessageQueue queue {};
+    for (const auto supported_app_state : {GS1_APP_STATE_REGIONAL_MAP, GS1_APP_STATE_SITE_ACTIVE})
+    {
+        std::optional<gs1::CampaignState> campaign {make_campaign()};
+        std::optional<gs1::SiteRunState> active_site_run {};
+        Gs1AppState app_state = supported_app_state;
+        GameMessageQueue queue {};
 
-    CampaignFlowMessageContext flow_context {
-        campaign,
-        active_site_run,
-        app_state,
-        queue};
+        CampaignFlowMessageContext flow_context {
+            campaign,
+            active_site_run,
+            app_state,
+            queue};
 
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        CampaignFlowSystem::process_message(
-            flow_context,
-            make_message(
-                GameMessageType::SelectRegionalMapTechTreeFaction,
-                gs1::SelectRegionalMapTechTreeFactionMessage {
-                    gs1::k_faction_forestry_bureau})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        campaign->regional_map_state.selected_tech_tree_faction_id.value == gs1::k_faction_forestry_bureau);
+        GS1_SYSTEM_TEST_REQUIRE(
+            context,
+            CampaignFlowSystem::process_message(
+                flow_context,
+                make_message(
+                    GameMessageType::SelectRegionalMapTechTreeFaction,
+                    gs1::SelectRegionalMapTechTreeFactionMessage {
+                        gs1::k_faction_forestry_bureau})) == GS1_STATUS_OK);
+        GS1_SYSTEM_TEST_CHECK(
+            context,
+            campaign->regional_map_state.selected_tech_tree_faction_id.value == gs1::k_faction_forestry_bureau);
+    }
 }
 
 void faction_reputation_awards_unlock_assistant_at_threshold(

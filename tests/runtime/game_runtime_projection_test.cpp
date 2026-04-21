@@ -553,6 +553,16 @@ int main()
                supported_site_run,
                gs1::inventory_storage::starter_storage_container(supported_site_run),
                gs1::ItemId {gs1::k_item_wood_bundle}) == 2U);
+    drain_engine_messages(support_runtime);
+
+    assert(support_runtime.handle_message(open_tech_tree_message) == GS1_STATUS_OK);
+    const auto site_tech_tree_messages = drain_engine_messages(support_runtime);
+    assert(contains_ui_element_text(site_tech_tree_messages, "Faction Tech Tree"));
+    assert(contains_ui_element_text(site_tech_tree_messages, "Tab: Village Committee"));
+
+    assert(support_runtime.handle_message(select_forestry_tab_message) == GS1_STATUS_OK);
+    const auto site_forestry_messages = drain_engine_messages(support_runtime);
+    assert(contains_ui_element_text(site_forestry_messages, "Tab: Forestry Bureau"));
 
     const auto first_site_id = campaign_site_id;
     assert(runtime.handle_message(make_start_site_attempt_message(first_site_id)) == GS1_STATUS_OK);
