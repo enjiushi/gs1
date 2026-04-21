@@ -25,6 +25,35 @@ std::uint32_t make_sell_listing_id(ItemId item_id) noexcept
     return k_sell_listing_id_base + item_id.value;
 }
 
+bool try_map_phone_panel_section(
+    Gs1PhonePanelSection requested_section,
+    PhonePanelSection& out_section) noexcept
+{
+    switch (requested_section)
+    {
+    case GS1_PHONE_PANEL_SECTION_HOME:
+        out_section = PhonePanelSection::Home;
+        return true;
+    case GS1_PHONE_PANEL_SECTION_TASKS:
+        out_section = PhonePanelSection::Tasks;
+        return true;
+    case GS1_PHONE_PANEL_SECTION_BUY:
+        out_section = PhonePanelSection::Buy;
+        return true;
+    case GS1_PHONE_PANEL_SECTION_SELL:
+        out_section = PhonePanelSection::Sell;
+        return true;
+    case GS1_PHONE_PANEL_SECTION_HIRE:
+        out_section = PhonePanelSection::Hire;
+        return true;
+    case GS1_PHONE_PANEL_SECTION_CART:
+        out_section = PhonePanelSection::Cart;
+        return true;
+    default:
+        return false;
+    }
+}
+
 void clamp_cart_quantity(PhoneListingState& listing) noexcept
 {
     if (listing.kind != PhoneListingKind::BuyItem)
@@ -307,16 +336,9 @@ Gs1Status PhonePanelSystem::process_message(
         const auto requested_section =
             message.payload_as<PhonePanelSectionRequestedMessage>().section;
         auto& phone_panel = context.world.own_phone_panel();
-        PhonePanelSection section = PhonePanelSection::Marketplace;
-        switch (requested_section)
+        PhonePanelSection section = PhonePanelSection::Home;
+        if (!try_map_phone_panel_section(requested_section, section))
         {
-        case GS1_PHONE_PANEL_SECTION_MARKETPLACE:
-            section = PhonePanelSection::Marketplace;
-            break;
-        case GS1_PHONE_PANEL_SECTION_CART:
-            section = PhonePanelSection::Cart;
-            break;
-        default:
             return GS1_STATUS_INVALID_ARGUMENT;
         }
 

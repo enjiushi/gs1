@@ -591,7 +591,7 @@ int main()
     {
         const auto& phone_panel_payload =
             bootstrap_phone_panel_messages.front()->payload_as<Gs1EngineMessagePhonePanelData>();
-        assert(phone_panel_payload.active_section == GS1_PHONE_PANEL_SECTION_MARKETPLACE);
+        assert(phone_panel_payload.active_section == GS1_PHONE_PANEL_SECTION_HOME);
         assert(phone_panel_payload.visible_task_count >= 1U);
         assert(phone_panel_payload.completed_task_count == 0U);
         assert(phone_panel_payload.claimed_task_count == 0U);
@@ -847,6 +847,24 @@ int main()
     assert(!collect_messages_of_type(
         phone_panel_delivery_messages,
         GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE).empty());
+
+    Gs1UiAction open_tasks_action {};
+    open_tasks_action.type = GS1_UI_ACTION_SET_PHONE_PANEL_SECTION;
+    open_tasks_action.arg0 = GS1_PHONE_PANEL_SECTION_TASKS;
+    const auto open_tasks_event = make_ui_action_event(open_tasks_action);
+    Gs1Phase1Result open_tasks_result {};
+    assert(phone_panel_runtime.submit_host_events(&open_tasks_event, 1U) == GS1_STATUS_OK);
+    run_phase1(phone_panel_runtime, 0.0, open_tasks_result);
+    assert(open_tasks_result.processed_host_event_count == 1U);
+    const auto open_tasks_messages = drain_engine_messages(phone_panel_runtime);
+    const auto open_tasks_phone_panel_messages =
+        collect_messages_of_type(open_tasks_messages, GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE);
+    assert(open_tasks_phone_panel_messages.size() == 1U);
+    {
+        const auto& payload =
+            open_tasks_phone_panel_messages.front()->payload_as<Gs1EngineMessagePhonePanelData>();
+        assert(payload.active_section == GS1_PHONE_PANEL_SECTION_TASKS);
+    }
 
     Gs1RuntimeCreateDesc ui_desc {};
     ui_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);

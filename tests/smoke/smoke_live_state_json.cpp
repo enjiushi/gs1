@@ -207,11 +207,19 @@ const char* phone_panel_section_name(Gs1PhonePanelSection section)
 {
     switch (section)
     {
+    case GS1_PHONE_PANEL_SECTION_TASKS:
+        return "TASKS";
+    case GS1_PHONE_PANEL_SECTION_BUY:
+        return "BUY";
+    case GS1_PHONE_PANEL_SECTION_SELL:
+        return "SELL";
+    case GS1_PHONE_PANEL_SECTION_HIRE:
+        return "HIRE";
     case GS1_PHONE_PANEL_SECTION_CART:
         return "CART";
-    case GS1_PHONE_PANEL_SECTION_MARKETPLACE:
+    case GS1_PHONE_PANEL_SECTION_HOME:
     default:
-        return "MARKETPLACE";
+        return "HOME";
     }
 }
 

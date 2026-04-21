@@ -9,13 +9,17 @@ namespace gs1
 {
 enum class PhonePanelSection : std::uint8_t
 {
-    Marketplace = 0,
-    Cart = 1
+    Home = 0,
+    Tasks = 1,
+    Buy = 2,
+    Sell = 3,
+    Hire = 4,
+    Cart = 5
 };
 
 struct PhonePanelState final
 {
-    PhonePanelSection active_section {PhonePanelSection::Marketplace};
+    PhonePanelSection active_section {PhonePanelSection::Home};
     std::uint32_t visible_task_count {0U};
     std::uint32_t accepted_task_count {0U};
     std::uint32_t completed_task_count {0U};

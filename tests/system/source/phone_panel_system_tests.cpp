@@ -56,7 +56,7 @@ void seed_site_one_inventory(gs1::CampaignState& campaign, gs1::SiteRunState& si
     (void)status;
 }
 
-void phone_panel_site_run_started_seeds_marketplace_snapshot(
+void phone_panel_site_run_started_seeds_home_snapshot(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
@@ -83,7 +83,7 @@ void phone_panel_site_run_started_seeds_marketplace_snapshot(
         PhonePanelSystem::process_message(phone_context, start_message) == GS1_STATUS_OK);
 
     const auto& phone_panel = site_run.phone_panel;
-    GS1_SYSTEM_TEST_CHECK(context, phone_panel.active_section == PhonePanelSection::Marketplace);
+    GS1_SYSTEM_TEST_CHECK(context, phone_panel.active_section == PhonePanelSection::Home);
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.visible_task_count == 7U);
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.accepted_task_count == 0U);
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.completed_task_count == 0U);
@@ -106,16 +106,42 @@ void phone_panel_section_request_switches_authoritative_section(
     GameMessageQueue queue {};
     auto phone_context = make_site_context<PhonePanelSystem>(campaign, site_run, queue);
 
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        PhonePanelSystem::process_message(
-            phone_context,
-            make_message(
-                GameMessageType::PhonePanelSectionRequested,
-                gs1::PhonePanelSectionRequestedMessage {
-                    GS1_PHONE_PANEL_SECTION_CART,
-                    {0U, 0U, 0U}})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.phone_panel.active_section == PhonePanelSection::Cart);
+    struct SectionCase final
+    {
+        Gs1PhonePanelSection requested_section;
+        PhonePanelSection expected_section;
+    };
+
+    const SectionCase cases[] = {
+        {GS1_PHONE_PANEL_SECTION_TASKS, PhonePanelSection::Tasks},
+        {GS1_PHONE_PANEL_SECTION_BUY, PhonePanelSection::Buy},
+        {GS1_PHONE_PANEL_SECTION_SELL, PhonePanelSection::Sell},
+        {GS1_PHONE_PANEL_SECTION_HIRE, PhonePanelSection::Hire},
+        {GS1_PHONE_PANEL_SECTION_CART, PhonePanelSection::Cart},
+        {GS1_PHONE_PANEL_SECTION_HOME, PhonePanelSection::Home}};
+
+    for (const auto& section_case : cases)
+    {
+        GS1_SYSTEM_TEST_REQUIRE(
+            context,
+            PhonePanelSystem::process_message(
+                phone_context,
+                make_message(
+                    GameMessageType::PhonePanelSectionRequested,
+                    gs1::PhonePanelSectionRequestedMessage {
+                        section_case.requested_section,
+                        {0U, 0U, 0U}})) == GS1_STATUS_OK);
+        GS1_SYSTEM_TEST_CHECK(context, site_run.phone_panel.active_section == section_case.expected_section);
+    }
+}
+
+void phone_panel_rejects_unknown_section_request(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 1204U);
+    GameMessageQueue queue {};
+    auto phone_context = make_site_context<PhonePanelSystem>(campaign, site_run, queue);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -124,9 +150,9 @@ void phone_panel_section_request_switches_authoritative_section(
             make_message(
                 GameMessageType::PhonePanelSectionRequested,
                 gs1::PhonePanelSectionRequestedMessage {
-                    GS1_PHONE_PANEL_SECTION_MARKETPLACE,
-                    {0U, 0U, 0U}})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.phone_panel.active_section == PhonePanelSection::Marketplace);
+                    static_cast<Gs1PhonePanelSection>(99U),
+                    {0U, 0U, 0U}})) == GS1_STATUS_INVALID_ARGUMENT);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.phone_panel.active_section == PhonePanelSection::Home);
 }
 
 void phone_panel_sell_list_refreshes_when_purchase_delivery_arrives(
@@ -197,12 +223,16 @@ void phone_panel_sell_list_refreshes_when_purchase_delivery_arrives(
 
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "phone_panel",
-    "site_run_started_seeds_marketplace_snapshot",
-    phone_panel_site_run_started_seeds_marketplace_snapshot);
+    "site_run_started_seeds_home_snapshot",
+    phone_panel_site_run_started_seeds_home_snapshot);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "phone_panel",
     "section_request_switches_authoritative_section",
     phone_panel_section_request_switches_authoritative_section);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "phone_panel",
+    "rejects_unknown_section_request",
+    phone_panel_rejects_unknown_section_request);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "phone_panel",
     "sell_list_refreshes_when_purchase_delivery_arrives",
