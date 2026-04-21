@@ -84,7 +84,7 @@ inline void for_each_tile_in_footprint(
     }
 }
 
-[[nodiscard]] inline constexpr TileFootprint resolve_plant_tile_footprint(PlantId plant_id) noexcept
+[[nodiscard]] inline TileFootprint resolve_plant_tile_footprint(PlantId plant_id) noexcept
 {
     const auto* plant_def = find_plant_def(plant_id);
     if (plant_def == nullptr)
@@ -96,7 +96,7 @@ inline void for_each_tile_in_footprint(
         TileFootprint {plant_def->footprint_width, plant_def->footprint_height});
 }
 
-[[nodiscard]] inline constexpr TileFootprint resolve_structure_tile_footprint(
+[[nodiscard]] inline TileFootprint resolve_structure_tile_footprint(
     StructureId structure_id) noexcept
 {
     const auto* structure_def = find_structure_def(structure_id);
@@ -109,7 +109,7 @@ inline void for_each_tile_in_footprint(
         TileFootprint {structure_def->footprint_width, structure_def->footprint_height});
 }
 
-[[nodiscard]] inline constexpr TileFootprint resolve_placement_reservation_footprint(
+[[nodiscard]] inline TileFootprint resolve_placement_reservation_footprint(
     PlacementOccupancyLayer occupancy_layer,
     PlacementReservationSubjectKind subject_kind,
     std::uint32_t subject_id) noexcept

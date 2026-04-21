@@ -265,7 +265,7 @@ inline bool can_store_output_after_recipe_consumption(
 inline std::vector<const CraftRecipeDef*> recipes_for_station(StructureId structure_id)
 {
     std::vector<const CraftRecipeDef*> recipes {};
-    for (const auto& recipe_def : k_prototype_craft_recipe_defs)
+    for (const auto& recipe_def : all_craft_recipe_defs())
     {
         if (recipe_def.station_structure_id == structure_id)
         {

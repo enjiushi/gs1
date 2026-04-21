@@ -30,6 +30,9 @@ set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
+add_compile_definitions(
+    GS1_CONTENT_TABLE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/src/content/tables")
+
 if(MSVC)
     # Visual Studio builds share a compile PDB per target by default.
     # /FS prevents parallel cl.exe instances from racing on vc143.pdb.
@@ -51,6 +54,12 @@ target_include_directories(flecs
 set_target_properties(flecs PROPERTIES
     POSITION_INDEPENDENT_CODE ON)
 
+set(GS1_CONTENT_RUNTIME_SOURCES
+    src/content/content_loader.cpp
+    src/content/content_lookup.cpp
+    src/content/content_validator.cpp
+    src/content/prototype_content.cpp)
+
 # Build the pure gameplay runtime as a shared library (the DLL).
 add_library(gs1_game SHARED
     src/app/game_api.cpp
@@ -62,7 +71,7 @@ add_library(gs1_game SHARED
     src/campaign/systems/loadout_planner_system.cpp
     src/campaign/systems/technology_system.cpp
     src/messages/message_dispatcher.cpp
-    src/content/prototype_content.cpp
+    ${GS1_CONTENT_RUNTIME_SOURCES}
     src/site/systems/action_execution_system.cpp
     src/site/systems/camp_durability_system.cpp
     src/site/systems/device_maintenance_system.cpp
@@ -134,7 +143,8 @@ if(GS1_BUILD_TESTS)
         tests/smoke/smoke_engine_host.cpp
         tests/smoke/smoke_log.cpp
         tests/smoke/runtime_dll_loader.cpp
-        tests/smoke/smoke_live_state_json.cpp)
+        tests/smoke/smoke_live_state_json.cpp
+        ${GS1_CONTENT_RUNTIME_SOURCES})
 
     # Build the text smoke host executable separately from the DLL.
     # This executable loads the gameplay DLL at runtime instead of linking to it.
@@ -165,7 +175,7 @@ if(GS1_BUILD_TESTS)
         src/campaign/systems/loadout_planner_system.cpp
         src/campaign/systems/technology_system.cpp
         src/messages/message_dispatcher.cpp
-        src/content/prototype_content.cpp
+        ${GS1_CONTENT_RUNTIME_SOURCES}
         src/site/systems/action_execution_system.cpp
         src/site/systems/camp_durability_system.cpp
         src/site/systems/device_maintenance_system.cpp
@@ -198,7 +208,7 @@ if(GS1_BUILD_TESTS)
         src/campaign/systems/loadout_planner_system.cpp
         src/campaign/systems/technology_system.cpp
         src/messages/message_dispatcher.cpp
-        src/content/prototype_content.cpp
+        ${GS1_CONTENT_RUNTIME_SOURCES}
         src/site/systems/action_execution_system.cpp
         src/site/systems/camp_durability_system.cpp
         src/site/systems/device_maintenance_system.cpp
@@ -230,7 +240,7 @@ if(GS1_BUILD_TESTS)
         src/campaign/systems/faction_reputation_system.cpp
         src/campaign/systems/loadout_planner_system.cpp
         src/campaign/systems/technology_system.cpp
-        src/content/prototype_content.cpp
+        ${GS1_CONTENT_RUNTIME_SOURCES}
         src/site/systems/action_execution_system.cpp
         src/site/systems/camp_durability_system.cpp
         src/site/systems/device_maintenance_system.cpp
@@ -254,7 +264,7 @@ if(GS1_BUILD_TESTS)
 
     add_executable(gs1_local_weather_perf_probe
         tests/runtime/local_weather_perf_probe.cpp
-        src/content/prototype_content.cpp
+        ${GS1_CONTENT_RUNTIME_SOURCES}
         src/site/systems/local_weather_resolve_system.cpp
         src/site/site_world.cpp)
 
@@ -268,7 +278,7 @@ if(GS1_BUILD_TESTS)
         src/campaign/systems/loadout_planner_system.cpp
         src/campaign/systems/technology_system.cpp
         src/messages/message_dispatcher.cpp
-        src/content/prototype_content.cpp
+        ${GS1_CONTENT_RUNTIME_SOURCES}
         src/site/systems/action_execution_system.cpp
         src/site/systems/camp_durability_system.cpp
         src/site/systems/device_maintenance_system.cpp

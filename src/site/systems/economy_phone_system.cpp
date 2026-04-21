@@ -353,7 +353,7 @@ void refresh_dynamic_sell_listings(
     }
 
     std::vector<PhoneListingState> sell_listings {};
-    for (const auto& item_def : k_prototype_item_defs)
+    for (const auto& item_def : all_item_defs())
     {
         if (!item_has_capability(item_def, ITEM_CAPABILITY_SELL))
         {
