@@ -264,21 +264,163 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         15: { name: "Basic Straw Checkerboard", shortName: "Checkerboard", stackSize: 10, canUse: false, canPlant: true, canDeploy: false }
     };
     const itemVisuals = {
-        1: { glyph: "H2", light: "#5d8eb3", dark: "#33546f" },
-        2: { glyph: "FD", light: "#b48a4f", dark: "#6f4a28" },
-        3: { glyph: "MD", light: "#9a676c", dark: "#62363b" },
-        4: { glyph: "WR", light: "#79a35f", dark: "#46693a" },
-        5: { glyph: "SB", light: "#8aa05c", dark: "#53683a" },
-        6: { glyph: "SC", light: "#6a8c67", dark: "#3c5841" },
-        7: { glyph: "SV", light: "#8f7c4c", dark: "#5c4526" },
-        8: { glyph: "WD", light: "#ac7d4b", dark: "#6e4a28" },
-        9: { glyph: "IR", light: "#9ca7b4", dark: "#596572" },
-        10: { glyph: "FB", light: "#a2bb7b", dark: "#607541" },
-        11: { glyph: "ST", light: "#c7835a", dark: "#7b4327" },
-        12: { glyph: "WB", light: "#b2966c", dark: "#6b5437" },
-        13: { glyph: "CR", light: "#af8c63", dark: "#694d2c" },
-        14: { glyph: "HM", light: "#9ea9b7", dark: "#5c6775" },
-        15: { glyph: "CB", light: "#c8a46a", dark: "#7d5c31" }
+        1: { iconKey: "water", light: "#5d8eb3", dark: "#33546f" },
+        2: { iconKey: "ration", light: "#b48a4f", dark: "#6f4a28" },
+        3: { iconKey: "medicine", light: "#9a676c", dark: "#62363b" },
+        4: { iconKey: "reed", light: "#79a35f", dark: "#46693a" },
+        5: { iconKey: "shrub", light: "#8aa05c", dark: "#53683a" },
+        6: { iconKey: "cactus", light: "#6a8c67", dark: "#3c5841" },
+        7: { iconKey: "vine", light: "#8f7c4c", dark: "#5c4526" },
+        8: { iconKey: "wood", light: "#ac7d4b", dark: "#6e4a28" },
+        9: { iconKey: "iron", light: "#9ca7b4", dark: "#596572" },
+        10: { iconKey: "fiber", light: "#a2bb7b", dark: "#607541" },
+        11: { iconKey: "flame", light: "#c7835a", dark: "#7b4327" },
+        12: { iconKey: "hammer", light: "#b2966c", dark: "#6b5437" },
+        13: { iconKey: "box", light: "#af8c63", dark: "#694d2c" },
+        14: { iconKey: "hammer", light: "#9ea9b7", dark: "#5c6775" },
+        15: { iconKey: "grid", light: "#c8a46a", dark: "#7d5c31" }
+    };
+    const uiIconMarkup = {
+        water: [
+            '<path d="M12 3C9.6 6.6 7 9.8 7 13a5 5 0 0 0 10 0c0-3.2-2.6-6.4-5-10Z"></path>',
+            '<path d="M10 14.5c.5.9 1.2 1.4 2.3 1.7"></path>'
+        ].join(""),
+        ration: [
+            '<path d="M6 13h12"></path>',
+            '<path d="M7 13a5 5 0 0 0 10 0"></path>',
+            '<path d="M10 9c0-1 .6-1.8 1.4-2.8"></path>',
+            '<path d="M13 9c0-.8.5-1.6 1.2-2.4"></path>'
+        ].join(""),
+        medicine: [
+            '<rect x="5" y="5" width="14" height="14" rx="4"></rect>',
+            '<path d="M12 8v8"></path>',
+            '<path d="M8 12h8"></path>'
+        ].join(""),
+        reed: [
+            '<path d="M8 19c0-4 .5-7.2 2-10"></path>',
+            '<path d="M12 19c0-5 1.8-8.3 4.4-11"></path>',
+            '<path d="M10 10c-1.4 0-2.7-.6-3.8-1.8"></path>',
+            '<path d="M15.8 8.5c.2-1.6.9-2.9 2.2-4"></path>'
+        ].join(""),
+        shrub: [
+            '<path d="M12 19v-4"></path>',
+            '<path d="M12 15c-3.2 0-5.8-2.4-6.2-5.8 3.4 0 5.7 1.7 6.2 5.8Z"></path>',
+            '<path d="M12 15c.4-4.1 2.8-5.8 6.2-5.8-.4 3.4-3 5.8-6.2 5.8Z"></path>',
+            '<path d="M12 12.5c-2.3 0-4.1-1.6-4.5-4 2.3 0 4.1 1.2 4.5 4Z"></path>'
+        ].join(""),
+        cactus: [
+            '<path d="M12 5v14"></path>',
+            '<path d="M12 10h-2.5a2.5 2.5 0 0 0-2.5 2.5V15"></path>',
+            '<path d="M12 12h2.5A2.5 2.5 0 0 1 17 14.5V16"></path>',
+            '<path d="M9 19h6"></path>'
+        ].join(""),
+        vine: [
+            '<path d="M12 19v-4.5c0-2.6 1.7-4.8 4.2-5.4"></path>',
+            '<path d="M12 13c-2.9 0-5-1.8-5.6-4.8 2.8 0 4.9 1.5 5.6 4.8Z"></path>',
+            '<circle cx="16.8" cy="8.2" r="1.8"></circle>',
+            '<path d="M16.8 10v3.2"></path>'
+        ].join(""),
+        wood: [
+            '<rect x="4.5" y="7" width="10" height="4" rx="2"></rect>',
+            '<rect x="9.5" y="13" width="10" height="4" rx="2"></rect>',
+            '<circle cx="13" cy="9" r="1.2"></circle>',
+            '<circle cx="11" cy="15" r="1.2"></circle>'
+        ].join(""),
+        iron: [
+            '<path d="M7 9h10l2 4-2 4H7l-2-4 2-4Z"></path>',
+            '<path d="M9 9l-2 4 2 4"></path>',
+            '<path d="M15 9l2 4-2 4"></path>'
+        ].join(""),
+        fiber: [
+            '<path d="M12 19V8"></path>',
+            '<path d="M9 18V10"></path>',
+            '<path d="M15 18V10"></path>',
+            '<path d="M9 11 7 9"></path>',
+            '<path d="M9 13 7 11"></path>',
+            '<path d="M15 11 17 9"></path>',
+            '<path d="M15 13 17 11"></path>',
+            '<path d="M9 19h6"></path>'
+        ].join(""),
+        flame: [
+            '<path d="M12 4c1.7 2 3 3.7 3 6a3 3 0 1 1-6 0c0-2 1-3.7 3-6Z"></path>',
+            '<path d="M12 10.2c.9 1 1.3 1.8 1.3 2.7a1.3 1.3 0 1 1-2.6 0c0-.9.4-1.7 1.3-2.7Z"></path>'
+        ].join(""),
+        hammer: [
+            '<path d="M14.5 5.5 18.5 9.5"></path>',
+            '<path d="M13.2 6.8 7 13"></path>',
+            '<path d="M7 13 5 18l5-2"></path>',
+            '<path d="M15.5 4.5 17.5 2.5"></path>'
+        ].join(""),
+        box: [
+            '<path d="m4 9 8-4 8 4-8 4-8-4Z"></path>',
+            '<path d="M4 9v6l8 4 8-4V9"></path>',
+            '<path d="M12 13v6"></path>'
+        ].join(""),
+        grid: [
+            '<rect x="5" y="5" width="14" height="14" rx="3"></rect>',
+            '<path d="M12 5v14"></path>',
+            '<path d="M5 12h14"></path>'
+        ].join(""),
+        sprout: [
+            '<path d="M12 19v-5"></path>',
+            '<path d="M12 14c-3 0-5-2-5.5-5 3 0 5 2 5.5 5Z"></path>',
+            '<path d="M12 14c.5-3 2.5-5 5.5-5-.5 3-2.5 5-5.5 5Z"></path>'
+        ].join(""),
+        craft: [
+            '<path d="M14.2 7.2 17.8 10.8"></path>',
+            '<path d="M13 8.4 7 14.4"></path>',
+            '<path d="M7 14.4 5.2 18.8 9.6 17"></path>',
+            '<path d="M17.5 4.5v3"></path>',
+            '<path d="M16 6h3"></path>'
+        ].join(""),
+        camp: [
+            '<path d="M6 10.5 12 5l6 5.5"></path>',
+            '<path d="M8 10.5V18h8v-7.5"></path>',
+            '<path d="M11 18v-4h2v4"></path>'
+        ].join(""),
+        idle: [
+            '<circle cx="12" cy="12" r="7"></circle>',
+            '<path d="M8 16 16 8"></path>'
+        ].join(""),
+        checklist: [
+            '<path d="M9.5 7H18"></path>',
+            '<path d="M9.5 12H18"></path>',
+            '<path d="M9.5 17H18"></path>',
+            '<path d="m5 7 1.4 1.4L8.4 6.4"></path>',
+            '<path d="m5 12 1.4 1.4 2-2"></path>',
+            '<path d="m5 17 1.4 1.4 2-2"></path>'
+        ].join(""),
+        cart: [
+            '<path d="M4.5 6H7l1.6 7h8.2l1.7-5.5H8.2"></path>',
+            '<circle cx="10" cy="17.5" r="1.3"></circle>',
+            '<circle cx="16" cy="17.5" r="1.3"></circle>'
+        ].join(""),
+        coins: [
+            '<path d="M7 8c0-1.1 2.2-2 5-2s5 .9 5 2-2.2 2-5 2-5-.9-5-2Z"></path>',
+            '<path d="M7 8v4c0 1.1 2.2 2 5 2s5-.9 5-2V8"></path>',
+            '<path d="M8.5 15.5c.8.4 2 .7 3.5.7 2.8 0 5-.9 5-2v-1"></path>'
+        ].join(""),
+        userPlus: [
+            '<circle cx="10" cy="9" r="3"></circle>',
+            '<path d="M4.5 18a5.5 5.5 0 0 1 11 0"></path>',
+            '<path d="M18 8v6"></path>',
+            '<path d="M15 11h6"></path>'
+        ].join(""),
+        wind: [
+            '<path d="M4 9h10a2 2 0 1 0-2-2"></path>',
+            '<path d="M4 13h14a2 2 0 1 1-2 2"></path>',
+            '<path d="M4 17h8"></path>'
+        ].join(""),
+        compass: [
+            '<circle cx="12" cy="12" r="7"></circle>',
+            '<path d="m10 14 1.7-4.7L16.5 7.5 14.7 12.3 10 14Z"></path>'
+        ].join("")
+    };
+    const phoneAppVisuals = {
+        Tasks: { iconKey: "checklist", light: "#7e8e61", dark: "#4f6140" },
+        Buy: { iconKey: "cart", light: "#6d8ea1", dark: "#3f5c6a" },
+        Sell: { iconKey: "coins", light: "#b98f58", dark: "#7a592d" },
+        Hire: { iconKey: "userPlus", light: "#a37c93", dark: "#694d60" }
     };
     const structureCatalog = {
         201: { name: "Camp Stove", shortName: "Stove", slotCount: 6 },
@@ -1065,7 +1207,32 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function getItemVisual(itemId) {
-        return itemVisuals[itemId] || { glyph: "??", light: "#8f7a64", dark: "#5a4837" };
+        return itemVisuals[itemId] || { iconKey: "idle", light: "#8f7a64", dark: "#5a4837" };
+    }
+
+    function createUiIcon(iconKey, extraClassName) {
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("viewBox", "0 0 24 24");
+        svg.setAttribute("fill", "none");
+        svg.setAttribute("stroke", "currentColor");
+        svg.setAttribute("stroke-width", "1.9");
+        svg.setAttribute("stroke-linecap", "round");
+        svg.setAttribute("stroke-linejoin", "round");
+        svg.setAttribute("aria-hidden", "true");
+        svg.classList.add("ui-icon-svg");
+        if (extraClassName) {
+            extraClassName.split(/\s+/).filter(Boolean).forEach((className) => svg.classList.add(className));
+        }
+        svg.innerHTML = uiIconMarkup[iconKey] || uiIconMarkup.idle;
+        return svg;
+    }
+
+    function appendUiIcon(container, iconKey, extraClassName) {
+        if (!container) {
+            return;
+        }
+        container.textContent = "";
+        container.appendChild(createUiIcon(iconKey, extraClassName));
     }
 
     function findItemIdByLabel(labelText) {
@@ -1469,7 +1636,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     label: itemMeta ? itemMeta.name : ("Item " + itemId),
                     shortLabel: itemMeta ? itemMeta.shortName : ("Item " + itemId),
                     quantity: quantity,
-                    iconGlyph: visual.glyph,
+                    iconKey: visual.iconKey,
                     iconLight: visual.light,
                     iconDark: visual.dark
                 };
@@ -1503,7 +1670,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     label: itemMeta ? itemMeta.name : ("Item " + itemId),
                     shortLabel: itemMeta ? itemMeta.shortName : ("Item " + itemId),
                     quantity: quantity,
-                    iconGlyph: visual.glyph,
+                    iconKey: visual.iconKey,
                     iconLight: visual.light,
                     iconDark: visual.dark
                 };
@@ -1946,7 +2113,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 id: "open-storage:" + containerInfo.key,
                 label: "Open Storage",
                 meta: getContainerDisplayName(state, containerInfo),
-                iconGlyph: "BX",
+                iconKey: "box",
                 iconLight: "#8f7a64",
                 iconDark: "#5a4837",
                 onSelect: function () {
@@ -1959,14 +2126,14 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 id: "open-storage",
                 label: "Open Storage",
                 meta: "Choose one attached container.",
-                iconGlyph: "BX",
+                iconKey: "box",
                 iconLight: "#8f7a64",
                 iconDark: "#5a4837",
                 children: storageContainers.map((containerInfo) => ({
                     id: "open-storage:" + containerInfo.key,
                     label: getContainerDisplayName(state, containerInfo),
                     meta: "Open this container",
-                    iconGlyph: "BX",
+                    iconKey: "box",
                     iconLight: "#8f7a64",
                     iconDark: "#5a4837",
                     onSelect: function () {
@@ -1980,7 +2147,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 id: "open-storage-unavailable",
                 label: "Open Storage",
                 meta: "Rebuild the visual smoke host and gameplay DLL.",
-                iconGlyph: "BX",
+                iconKey: "box",
                 iconLight: "#8f7a64",
                 iconDark: "#5a4837",
                 disabled: true
@@ -1993,7 +2160,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     id: "craft-loading",
                     label: "Craft",
                     meta: "Checking nearby supplies...",
-                    iconGlyph: "CF",
+                    iconKey: "craft",
                     iconLight: "#7a9d67",
                     iconDark: "#4a6b3b",
                     disabled: true
@@ -2003,7 +2170,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 id: "craft",
                 label: "Craft",
                 meta: "Choose one recipe.",
-                iconGlyph: "CF",
+                iconKey: "craft",
                 iconLight: "#7a9d67",
                 iconDark: "#4a6b3b",
                     children: craftContext.options.map((option) => {
@@ -2013,7 +2180,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                         id: "craft:" + option.outputItemId,
                         label: itemMeta ? itemMeta.name : ("Item " + option.outputItemId),
                         meta: "Ready",
-                        iconGlyph: visual.glyph,
+                        iconKey: visual.iconKey,
                         iconLight: visual.light,
                         iconDark: visual.dark,
                         onSelect: function () {
@@ -2047,7 +2214,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 meta: carriedHammerCount > 0
                     ? ("Hammer x" + carriedHammerCount + " carried")
                     : "Requires a carried hammer.",
-                iconGlyph: "HM",
+                iconKey: "hammer",
                 iconLight: "#9ea9b7",
                 iconDark: "#5c6775",
                 disabled: carriedHammerCount === 0,
@@ -2076,7 +2243,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 id: "plant",
                 label: "Plant",
                 meta: "Choose one carried seed type for placement mode.",
-                iconGlyph: "PL",
+                iconKey: "sprout",
                 iconLight: "#7a9d67",
                 iconDark: "#4a6b3b",
                 children: carriedSeeds.map((seed) => {
@@ -2084,7 +2251,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                         id: seed.id,
                         label: seed.label,
                         meta: "x" + seed.quantity + " carried",
-                        iconGlyph: seed.iconGlyph,
+                        iconKey: seed.iconKey,
                         iconLight: seed.iconLight,
                         iconDark: seed.iconDark,
                         onSelect: function () {
@@ -2114,7 +2281,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 id: "deploy",
                 label: "Deploy",
                 meta: "Choose one carried device kit for placement mode.",
-                iconGlyph: "DP",
+                iconKey: "camp",
                 iconLight: "#b48857",
                 iconDark: "#6a4b2e",
                 children: carriedDeployables.map((item) => {
@@ -2122,7 +2289,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                         id: item.id,
                         label: item.label,
                         meta: "x" + item.quantity + " carried",
-                        iconGlyph: item.iconGlyph,
+                        iconKey: item.iconKey,
                         iconLight: item.iconLight,
                         iconDark: item.iconDark,
                         onSelect: function () {
@@ -2155,7 +2322,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     meta: tileHasStructure
                         ? "This structure has no direct action right now."
                         : "Carry seeds or deployable kits, or use a crafting/storage device.",
-                    iconGlyph: "--",
+                    iconKey: "idle",
                     iconLight: "#a38e76",
                     iconDark: "#796652",
                     disabled: true
@@ -2267,7 +2434,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
                 const icon = document.createElement("div");
                 icon.className = "tile-context-item-icon";
-                icon.textContent = item.iconGlyph || "--";
+                appendUiIcon(icon, item.iconKey || "idle");
                 if (item.iconLight) {
                     icon.style.setProperty("--menu-icon-light", item.iconLight);
                 }
@@ -2567,15 +2734,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             const visual = getItemVisual(slot.itemId);
             icon.style.setProperty("--slot-accent-light", visual.light);
             icon.style.setProperty("--slot-accent-dark", visual.dark);
-            const glyph = document.createElement("div");
-            glyph.className = "inventory-slot-icon-glyph";
-            glyph.textContent = visual.glyph;
-            icon.appendChild(glyph);
+            appendUiIcon(icon, visual.iconKey || "idle");
         } else {
-            const glyph = document.createElement("div");
-            glyph.className = "inventory-slot-icon-glyph";
-            glyph.textContent = "--";
-            icon.appendChild(glyph);
+            appendUiIcon(icon, "idle");
         }
         card.appendChild(icon);
 
@@ -2712,13 +2873,27 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         stack.appendChild(footnote);
     }
 
-    function technologyIconGlyph(titleText, kindText) {
-        const words = String(titleText || "").trim().split(/\s+/).filter(Boolean);
-        if (words.length === 0) {
-            return String(kindText || "T").slice(0, 2).toUpperCase();
+    function technologyIconPresentation(titleText, kindText) {
+        const haystack = (String(kindText || "") + " " + String(titleText || "")).toLowerCase();
+        if (/(water|hydr|irrig|pump|well|mist)/.test(haystack)) {
+            return { iconKey: "water", light: "#6d91ad", dark: "#3d5c72" };
         }
-        const glyph = words.slice(0, 2).map((word) => word.charAt(0).toUpperCase()).join("");
-        return glyph || String(kindText || "T").slice(0, 2).toUpperCase();
+        if (/(wind|storm|gust|draft|air)/.test(haystack)) {
+            return { iconKey: "wind", light: "#8ca48f", dark: "#546a57" };
+        }
+        if (/(grow|plant|seed|soil|reed|vine|bush|root|flora)/.test(haystack)) {
+            return { iconKey: "sprout", light: "#86a266", dark: "#50683f" };
+        }
+        if (/(craft|forge|build|tool|repair|work|stove|frame)/.test(haystack)) {
+            return { iconKey: "hammer", light: "#ac8659", dark: "#6a4d2a" };
+        }
+        if (/(camp|storage|crate|supply|shelter|logistic|cache)/.test(haystack)) {
+            return { iconKey: "box", light: "#9f7a57", dark: "#624628" };
+        }
+        if (/(crew|worker|hire|team|support|morale|social)/.test(haystack)) {
+            return { iconKey: "userPlus", light: "#9f7b95", dark: "#644d60" };
+        }
+        return { iconKey: "compass", light: "#8d6b3f", dark: "#52391f" };
     }
 
     function parseTechTreeActionElement(element) {
@@ -2777,7 +2952,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         const nodeIcon = document.createElement("div");
         nodeIcon.className = "tech-node-icon";
-        nodeIcon.textContent = technologyIconGlyph(nodeModel.titleText, nodeModel.kindText);
+        const iconPresentation = technologyIconPresentation(nodeModel.titleText, nodeModel.kindText);
+        nodeIcon.style.setProperty("--tech-icon-light", iconPresentation.light);
+        nodeIcon.style.setProperty("--tech-icon-dark", iconPresentation.dark);
+        appendUiIcon(nodeIcon, iconPresentation.iconKey);
         nodeTop.appendChild(nodeIcon);
 
         const nodeCost = document.createElement("div");
@@ -3443,11 +3621,14 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const button = document.createElement("button");
         button.type = "button";
         button.className = "phone-app-launcher phone-app-launcher-simple";
+        const visual = phoneAppVisuals[title] || { iconKey: "compass", light: "#8f7a64", dark: "#5a4837" };
+        button.style.setProperty("--launcher-icon-light", visual.light);
+        button.style.setProperty("--launcher-icon-dark", visual.dark);
 
-        const mark = document.createElement("div");
-        mark.className = "phone-app-launcher-mark";
-        mark.textContent = title.slice(0, 1);
-        button.appendChild(mark);
+        const icon = document.createElement("div");
+        icon.className = "phone-app-launcher-icon";
+        appendUiIcon(icon, visual.iconKey);
+        button.appendChild(icon);
 
         const name = document.createElement("div");
         name.className = "phone-app-launcher-name";
