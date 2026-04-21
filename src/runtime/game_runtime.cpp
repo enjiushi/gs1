@@ -45,6 +45,52 @@ namespace gs1
 {
 namespace
 {
+constexpr float k_visible_tile_density_projection_step = 1.0f / 32.0f;
+constexpr float k_visible_tile_burial_projection_step = 1.0f / 64.0f;
+
+[[nodiscard]] std::uint16_t quantize_projected_tile_channel(float value, float step) noexcept
+{
+    if (step <= 0.0f)
+    {
+        return 0U;
+    }
+
+    const float clamped = std::clamp(value, 0.0f, 1.0f);
+    const float scaled = std::round(clamped / step);
+    return static_cast<std::uint16_t>(std::clamp(scaled, 0.0f, 65535.0f));
+}
+
+[[nodiscard]] ProjectedSiteTileState capture_projected_tile_state(
+    const SiteWorld::TileData& tile) noexcept
+{
+    return ProjectedSiteTileState {
+        tile.static_data.terrain_type_id,
+        tile.ecology.plant_id.value,
+        tile.device.structure_id.value,
+        tile.ecology.ground_cover_type_id,
+        quantize_projected_tile_channel(
+            tile.ecology.plant_density,
+            k_visible_tile_density_projection_step),
+        quantize_projected_tile_channel(
+            tile.ecology.sand_burial,
+            k_visible_tile_burial_projection_step),
+        true,
+        {0U, 0U, 0U}};
+}
+
+[[nodiscard]] bool projected_tile_state_matches(
+    const ProjectedSiteTileState& lhs,
+    const ProjectedSiteTileState& rhs) noexcept
+{
+    return lhs.valid == rhs.valid &&
+        lhs.terrain_type_id == rhs.terrain_type_id &&
+        lhs.plant_type_id == rhs.plant_type_id &&
+        lhs.structure_type_id == rhs.structure_type_id &&
+        lhs.ground_cover_type_id == rhs.ground_cover_type_id &&
+        lhs.plant_density_quantized == rhs.plant_density_quantized &&
+        lhs.sand_burial_quantized == rhs.sand_burial_quantized;
+}
+
 [[nodiscard]] std::uint32_t visible_loadout_slot_count(const LoadoutPlannerState& planner) noexcept
 {
     std::uint32_t count = 0U;
@@ -2091,6 +2137,20 @@ void GameRuntime::queue_site_tile_upsert_message(std::uint32_t x, std::uint32_t 
     }
 
     const auto tile = site_run.site_world->tile_at(coord);
+    const auto projected_state = capture_projected_tile_state(tile);
+    const auto tile_index = site_world_access::tile_index(site_run, coord);
+    if (tile_index >= site_run.last_projected_tile_states.size())
+    {
+        site_run.last_projected_tile_states.assign(site_run.site_world->tile_count(), ProjectedSiteTileState {});
+    }
+
+    if (tile_index < site_run.last_projected_tile_states.size() &&
+        projected_tile_state_matches(
+            site_run.last_projected_tile_states[tile_index],
+            projected_state))
+    {
+        return;
+    }
 
     auto tile_message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     auto& payload = tile_message.emplace_payload<Gs1EngineMessageSiteTileData>();
@@ -2103,6 +2163,11 @@ void GameRuntime::queue_site_tile_upsert_message(std::uint32_t x, std::uint32_t 
     payload.plant_density = tile.ecology.plant_density;
     payload.sand_burial = tile.ecology.sand_burial;
     engine_messages_.push_back(tile_message);
+
+    if (tile_index < site_run.last_projected_tile_states.size())
+    {
+        site_run.last_projected_tile_states[tile_index] = projected_state;
+    }
 }
 
 void GameRuntime::queue_all_site_tile_upsert_messages()
@@ -2112,8 +2177,12 @@ void GameRuntime::queue_all_site_tile_upsert_messages()
         return;
     }
 
-    const auto width = site_world_access::width(active_site_run_.value());
-    const auto height = site_world_access::height(active_site_run_.value());
+    auto& site_run = active_site_run_.value();
+    const auto tile_count = site_run.site_world->tile_count();
+    site_run.last_projected_tile_states.assign(tile_count, ProjectedSiteTileState {});
+
+    const auto width = site_world_access::width(site_run);
+    const auto height = site_world_access::height(site_run);
     for (std::uint32_t y = 0; y < height; ++y)
     {
         for (std::uint32_t x = 0; x < width; ++x)

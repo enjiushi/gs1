@@ -66,6 +66,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let phoneActiveScrollRegionKey = "";
     let lastOverlayAppState = "";
     let tileContextMenuState = null;
+    let tileContextMenuRenderSignature = "";
     let localActionProgressState = null;
     let placementFailureToastState = null;
     let viewerCompatibilityWarning = "";
@@ -1881,6 +1882,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function closeTileContextMenu() {
         tileContextMenuState = null;
+        tileContextMenuRenderSignature = "";
         tileContextMenu.hidden = true;
         tileContextMenu.innerHTML = "";
     }
@@ -2162,6 +2164,20 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return rootItems;
     }
 
+    function summarizeContextMenuTree(items) {
+        if (!Array.isArray(items)) {
+            return [];
+        }
+
+        return items.map((item) => ({
+            id: item.id || "",
+            label: item.label || "",
+            meta: item.meta || "",
+            disabled: !!item.disabled,
+            children: summarizeContextMenuTree(item.children || [])
+        }));
+    }
+
     function renderTileContextMenu() {
         if (!tileContextMenuState ||
             !latestState ||
@@ -2175,6 +2191,18 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             latestState,
             tileContextMenuState.tileX,
             tileContextMenuState.tileY);
+        const renderSignature = JSON.stringify({
+            tileX: tileContextMenuState.tileX,
+            tileY: tileContextMenuState.tileY,
+            anchorX: tileContextMenuState.anchorX,
+            anchorY: tileContextMenuState.anchorY,
+            hoverPath: tileContextMenuState.hoverPath,
+            items: summarizeContextMenuTree(rootItems)
+        });
+        if (renderSignature === tileContextMenuRenderSignature) {
+            return;
+        }
+        tileContextMenuRenderSignature = renderSignature;
         const panels = collectTileContextPanels(rootItems, tileContextMenuState.hoverPath);
         const panelWidth = 220;
         const panelGap = 10;
@@ -2284,6 +2312,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             anchorY: clientY,
             hoverPath: []
         };
+        tileContextMenuRenderSignature = "";
         const tile = getTileSnapshot(latestState, tileContextMenuState.tileX, tileContextMenuState.tileY);
         const structureId = tile ? (tile.structureTypeId || 0) : 0;
         if (getCraftRecipesForStructure(structureId).length > 0) {

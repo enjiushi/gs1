@@ -74,6 +74,18 @@ struct SiteCounters final
     float highway_average_sand_cover {0.0f};
 };
 
+struct ProjectedSiteTileState final
+{
+    std::uint32_t terrain_type_id {0};
+    std::uint32_t plant_type_id {0};
+    std::uint32_t structure_type_id {0};
+    std::uint32_t ground_cover_type_id {0};
+    std::uint16_t plant_density_quantized {0};
+    std::uint16_t sand_burial_quantized {0};
+    bool valid {false};
+    std::uint8_t reserved0[3] {};
+};
+
 struct SiteRunState final
 {
     SiteRunId site_run_id {};
@@ -103,6 +115,7 @@ struct SiteRunState final
     bool pending_full_tile_projection_update {false};
     std::vector<TileCoord> pending_tile_projection_updates {};
     std::vector<std::uint8_t> pending_tile_projection_update_mask {};
+    std::vector<ProjectedSiteTileState> last_projected_tile_states {};
     bool pending_full_inventory_projection_update {false};
     std::vector<std::uint32_t> pending_worker_pack_inventory_projection_updates {};
     std::vector<std::uint8_t> pending_worker_pack_inventory_projection_update_mask {};

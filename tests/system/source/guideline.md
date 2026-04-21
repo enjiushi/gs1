@@ -16,6 +16,6 @@ Source-authored system tests and supporting fixtures/runner registration code.
 - `device_interaction_system_tests.cpp`: System tests for device interaction flows.
 - `environment_worker_device_system_tests.cpp`: System tests across environment, worker, and device interactions, including directional wind-shadow coverage for plants, site-time-system-aligned weather timeline interpolation, windbreak devices, and one-sided highway-protection weather waves.
 - `inventory_economy_task_system_tests.cpp`: System tests spanning inventory, economy, site-start delivery-crate loadout seeding, onboarding task-board behavior, task reward routing, and phone sell/cart regressions.
-- `system_test_fixtures.h`: Shared campaign/site fixtures and helpers, including the single near-camp delivery-crate site bootstrap setup, used across the source-authored system tests.
+- `system_test_fixtures.h`: Shared campaign/site fixtures and helpers, including the single near-camp delivery-crate site bootstrap setup plus initialized tile-projection cache state, used across the source-authored system tests.
 - `phone_panel_system_tests.cpp`: System tests for authoritative phone panel snapshot state, section switching, and sell-list refresh after delivery arrivals.
 - `system_test_fixtures.h`: Shared campaign/site fixtures and helpers, including default worker-pack setup, used across the source-authored system tests.

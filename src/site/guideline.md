@@ -24,7 +24,7 @@ Site-owned state, ECS world support, and helper logic for active site gameplay.
 - `placement_preview.h`: Placement-preview state for build/placement UI flows.
 - `site_projection_update_flags.h`: Dirty/update flags for projection refresh decisions.
 - `site_objective_state.h`: Site objective mode/config state, including highway target-band metadata plus green-wall connection masks, hold countdown state, and paused main-timer tracking for objective evaluation.
-- `site_run_state.h`: Aggregate active site-run state that owns the site slice.
+- `site_run_state.h`: Aggregate active site-run state that owns the site slice, including pending projection dirtiness plus cached last-emitted tile projection state for delta coalescing.
 - `site_world.h`: ECS/world wrapper declarations for the active site.
 - `site_world.cpp`: ECS/world wrapper implementation and setup.
 - `site_world_access.h`: Owner-scoped ECS access helpers for reading/writing site components.

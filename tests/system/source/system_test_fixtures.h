@@ -162,6 +162,7 @@ inline SiteRunState make_test_site_run(
         site_run.site_world->set_tile(default_starter_workbench_tile(camp_anchor_tile), tile);
     }
     site_run.pending_tile_projection_update_mask.assign(site_run.site_world->tile_count(), 0U);
+    site_run.last_projected_tile_states.assign(site_run.site_world->tile_count(), gs1::ProjectedSiteTileState {});
     inventory_storage::initialize_site_inventory_storage(site_run);
     return site_run;
 }

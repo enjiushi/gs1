@@ -223,6 +223,19 @@ void set_tile_sand_burial(gs1::SiteRunState& site_run, TileCoord coord, float sa
     gs1::site_world_access::set_tile_ecology(site_run, coord, ecology);
 }
 
+void set_tile_plant_state(
+    gs1::SiteRunState& site_run,
+    TileCoord coord,
+    gs1::PlantId plant_id,
+    float plant_density)
+{
+    auto ecology = gs1::site_world_access::tile_ecology(site_run, coord);
+    ecology.plant_id = plant_id;
+    ecology.ground_cover_type_id = 0U;
+    ecology.plant_density = plant_density;
+    gs1::site_world_access::set_tile_ecology(site_run, coord, ecology);
+}
+
 std::vector<Gs1EngineMessage> flush_tile_delta_for(
     GameRuntime& runtime,
     TileCoord coord,
@@ -715,6 +728,38 @@ int main()
         assert(first_tile.sand_burial == 0.75f);
         assert(second_tile.x == 5U && second_tile.y == 4U);
         assert(second_tile.sand_burial == 0.5f);
+    }
+
+    const auto density_coord = TileCoord {6, 6};
+    set_tile_plant_state(site_run, density_coord, gs1::PlantId {gs1::k_plant_straw_checkerboard}, 0.1875f);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+    const auto density_first_messages = drain_engine_messages(runtime);
+    const auto density_first_tiles =
+        collect_messages_of_type(density_first_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
+    assert(density_first_tiles.size() == 1U);
+
+    set_tile_plant_state(site_run, density_coord, gs1::PlantId {gs1::k_plant_straw_checkerboard}, 0.195f);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+    const auto density_second_messages = drain_engine_messages(runtime);
+    const auto density_second_tiles =
+        collect_messages_of_type(density_second_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
+    assert(density_second_tiles.empty());
+
+    set_tile_plant_state(site_run, density_coord, gs1::PlantId {gs1::k_plant_straw_checkerboard}, 0.22f);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+    const auto density_third_messages = drain_engine_messages(runtime);
+    const auto density_third_tiles =
+        collect_messages_of_type(density_third_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
+    assert(density_third_tiles.size() == 1U);
+    {
+        const auto& payload = density_third_tiles.front()->payload_as<Gs1EngineMessageSiteTileData>();
+        assert(payload.x == static_cast<std::uint32_t>(density_coord.x));
+        assert(payload.y == static_cast<std::uint32_t>(density_coord.y));
+        assert(payload.plant_type_id == gs1::k_plant_straw_checkerboard);
+        assert(payload.plant_density == 0.22f);
     }
 
     set_tile_sand_burial(site_run, TileCoord {0, 0}, 0.9f);
