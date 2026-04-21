@@ -5129,7 +5129,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 tile.structureTypeId,
                 tile.groundCoverTypeId,
                 Math.round((tile.plantDensity || 0) * 100),
-                Math.round((tile.sandBurial || 0) * 100)
+                Math.round((tile.sandBurial || 0) * 100),
+                Math.round(tile.localWind || 0)
                 ])
             }
         );
@@ -5478,6 +5479,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const plantDensity =
             tiles.reduce((total, tile) => total + clamp01(tile.plantDensity || 0), 0) /
             Math.max(tiles.length, 1);
+        const localWind =
+            tiles.reduce((total, tile) => total + Math.max(0, tile.localWind || 0), 0) /
+            Math.max(tiles.length, 1);
         const baseHeight =
             tiles.reduce((total, tile) => total + computeSiteTileVisualHeight(tile), 0) /
             Math.max(tiles.length, 1);
@@ -5489,6 +5493,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             footprintTiles: tiles,
             plantTypeId: anchorTile.plantTypeId || 0,
             plantDensity: plantDensity,
+            localWind: localWind,
             footprintWidth: footprintWidth,
             footprintHeight: footprintHeight,
             footprintArea: footprintArea,
@@ -5555,19 +5560,24 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             shader.uniforms.uPlantTime = plantWindShaderUniforms.uPlantTime;
             shader.uniforms.uPlantWindStrength = plantWindShaderUniforms.uPlantWindStrength;
             shader.uniforms.uPlantWindDirection = plantWindShaderUniforms.uPlantWindDirection;
+            shader.uniforms.uPlantLocalWindStrength = { value: 0.0 };
             shader.uniforms.uPlantWindFlexibility = { value: flexibility };
+            material.userData.plantWindShader = shader;
             shader.vertexShader = shader.vertexShader.replace(
                 "#include <common>",
                 "#include <common>\n" +
                 "uniform float uPlantTime;\n" +
                 "uniform float uPlantWindStrength;\n" +
                 "uniform vec2 uPlantWindDirection;\n" +
+                "uniform float uPlantLocalWindStrength;\n" +
                 "uniform float uPlantWindFlexibility;\n"
             );
             shader.vertexShader = shader.vertexShader.replace(
                 "#include <begin_vertex>",
                 "#include <begin_vertex>\n" +
-                "float plantWindLevel = clamp(uPlantWindStrength, 0.0, 1.0);\n" +
+                "float siteWindLevel = clamp(uPlantWindStrength, 0.0, 1.0);\n" +
+                "float plantWindLevel = clamp(uPlantLocalWindStrength, 0.0, 1.0);\n" +
+                "float synchronizedGustLevel = max(plantWindLevel, siteWindLevel * 0.35);\n" +
                 "vec4 plantWorldPosition = modelMatrix * vec4(transformed, 1.0);\n" +
                 "vec3 modelBasisX = normalize(vec3(modelMatrix[0].x, modelMatrix[0].y, modelMatrix[0].z));\n" +
                 "vec3 modelBasisZ = normalize(vec3(modelMatrix[2].x, modelMatrix[2].y, modelMatrix[2].z));\n" +
@@ -5577,16 +5587,28 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 "float localWindLength = max(length(localWindDirection), 0.0001);\n" +
                 "localWindDirection /= localWindLength;\n" +
                 "float plantVerticalWeight = smoothstep(-0.22, 0.38, transformed.y);\n" +
-                "float plantWave = sin(dot(plantWorldPosition.xz, vec2(0.38, 0.54)) + uPlantTime * (1.6 + plantWindLevel * 3.4));\n" +
-                "float plantGust = sin(dot(plantWorldPosition.xz, vec2(-0.84, 1.18)) * 1.7 + uPlantTime * (2.8 + plantWindLevel * 4.1));\n" +
-                "float plantFlutter = sin(uPlantTime * 5.2 + plantWorldPosition.y * 1.8 + plantWorldPosition.x * 0.6);\n" +
+                "float plantWave = sin(dot(plantWorldPosition.xz, vec2(0.38, 0.54)) + uPlantTime * (1.6 + synchronizedGustLevel * 3.4));\n" +
+                "float plantGust = sin(dot(plantWorldPosition.xz, vec2(-0.84, 1.18)) * 1.7 + uPlantTime * (2.8 + synchronizedGustLevel * 4.1));\n" +
+                "float plantFlutter = sin(uPlantTime * (4.4 + synchronizedGustLevel * 2.1) + plantWorldPosition.y * 1.8 + plantWorldPosition.x * 0.6);\n" +
                 "float plantSway = (plantWave * 0.58 + plantGust * 0.28 + plantFlutter * 0.14) * plantVerticalWeight * plantWindLevel * uPlantWindFlexibility;\n" +
                 "transformed += localWindDirection * plantSway * (0.025 + plantWindLevel * 0.11);\n" +
                 "transformed.y += abs(plantGust) * plantVerticalWeight * plantWindLevel * uPlantWindFlexibility * 0.028;\n"
             );
         };
+        material.onBeforeRender = function (_renderer, _scene, _camera, _geometry, object) {
+            const shader = material.userData.plantWindShader;
+            if (!shader || !shader.uniforms || !shader.uniforms.uPlantLocalWindStrength) {
+                return;
+            }
+
+            const perMeshWindStrength =
+                object && object.userData && typeof object.userData.plantWindStrength === "number"
+                    ? object.userData.plantWindStrength
+                    : 0.0;
+            shader.uniforms.uPlantLocalWindStrength.value = clamp01(perMeshWindStrength);
+        };
         material.customProgramCacheKey = function () {
-            return "plant-wind-v1";
+            return "plant-wind-v2";
         };
         return material;
     }
@@ -5669,14 +5691,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     function addStrawCheckerboardPlant(plantGroup, plantSpec, palette) {
         const tile = plantSpec.anchorTile;
         const plantDensity = plantSpec.plantDensity;
+        const densityHeightScale = smoothstep01(0.0, 1.0, plantDensity);
         const fullSpanX = plantSpec.fullSpanX;
         const fullSpanZ = plantSpec.fullSpanZ;
         const halfSpanX = plantSpec.halfSpanX;
         const halfSpanZ = plantSpec.halfSpanZ;
-        const tuftLength = 0.1 + plantDensity * 0.08;
-        const tuftWidth = 0.02 + plantDensity * 0.01;
-        const tuftThickness = 0.008 + plantDensity * 0.004;
-        const lineHeight = 0.035 + plantDensity * 0.025;
+        const tuftLength = 0.12 + densityHeightScale * 0.3;
+        const tuftWidth = 0.018 + plantDensity * 0.014;
+        const tuftThickness = 0.007 + plantDensity * 0.005;
+        const lineHeight = 0.028 + densityHeightScale * 0.11;
         const linePadding = 0.04;
         const lineCountX = Math.max(7, Math.round(fullSpanX * (8 + plantDensity * 4)));
         const lineCountZ = Math.max(7, Math.round(fullSpanZ * (8 + plantDensity * 4)));
@@ -5692,12 +5715,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             );
             tuft.position.set(
                 x + (deterministicNoise01(tile.x, tile.y, seed + 7) - 0.5) * 0.035,
-                lineHeight + deterministicNoise01(tile.y, tile.x, seed + 13) * 0.03,
+                lineHeight + deterministicNoise01(tile.y, tile.x, seed + 13) * (0.03 + densityHeightScale * 0.08),
                 z + (deterministicNoise01(tile.x, tile.y, seed + 19) - 0.5) * 0.035
             );
             tuft.rotation.y = orientation + (deterministicNoise01(tile.y, tile.x, seed + 23) - 0.5) * 0.45;
             tuft.rotation.z = (deterministicNoise01(tile.x, tile.y, seed + 29) - 0.5) * 0.8;
-            tuft.rotation.x = -0.65 + deterministicNoise01(tile.y, tile.x, seed + 37) * 0.4;
+            tuft.rotation.x = -0.32 + deterministicNoise01(tile.y, tile.x, seed + 37) * 0.24;
             plantGroup.add(tuft);
         }
 
@@ -5718,7 +5741,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         addLineSegment(0, -halfSpanZ + linePadding, 0, halfSpanZ - linePadding, lineCountZ, 1301);
         addLineSegment(-halfSpanX + linePadding, 0, halfSpanX - linePadding, 0, lineCountX, 1601);
 
-        const postHeight = 0.05 + plantDensity * 0.035;
+        const postHeight = 0.06 + densityHeightScale * 0.14;
         [
             [-halfSpanX + linePadding, -halfSpanZ + linePadding],
             [halfSpanX - linePadding, -halfSpanZ + linePadding],
@@ -6049,11 +6072,23 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     function createPlantVisual(plantSpec) {
         const tile = plantSpec.anchorTile;
         const plantDensity = plantSpec.plantDensity;
+        const plantDensityScale = smoothstep01(0.0, 1.0, plantDensity);
+        const plantWindStrength = clamp01((plantSpec.localWind || 0) / 80.0);
         const plantGroup = new THREE_NS.Group();
         const palette = resolvePlantPalette(tile);
         plantGroup.position.y = plantSpec.baseHeight + 0.02;
         if (tile.plantTypeId === 5) {
+            plantGroup.scale.set(
+                1.0,
+                (0.55 + plantDensityScale * 1.55 + (plantSpec.areaScale - 1.0) * 0.08) * 5.0,
+                1.0
+            );
             addStrawCheckerboardPlant(plantGroup, plantSpec, palette);
+            plantGroup.traverse((node) => {
+                if (node && node.isMesh) {
+                    node.userData.plantWindStrength = plantWindStrength;
+                }
+            });
             return plantGroup;
         }
 
@@ -6078,6 +6113,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             addGenericPlant(plantGroup, plantSpec);
         }
 
+        plantGroup.traverse((node) => {
+            if (node && node.isMesh) {
+                node.userData.plantWindStrength = plantWindStrength;
+            }
+        });
         return plantGroup;
     }
 

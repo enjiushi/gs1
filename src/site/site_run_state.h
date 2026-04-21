@@ -82,8 +82,8 @@ struct ProjectedSiteTileState final
     std::uint32_t ground_cover_type_id {0};
     std::uint16_t plant_density_quantized {0};
     std::uint16_t sand_burial_quantized {0};
+    std::uint16_t local_wind_quantized {0};
     bool valid {false};
-    std::uint8_t reserved0[3] {};
 };
 
 struct SiteRunState final

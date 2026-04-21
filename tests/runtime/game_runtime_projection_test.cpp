@@ -236,6 +236,13 @@ void set_tile_plant_state(
     gs1::site_world_access::set_tile_ecology(site_run, coord, ecology);
 }
 
+void set_tile_local_wind(gs1::SiteRunState& site_run, TileCoord coord, float local_wind)
+{
+    auto local_weather = gs1::site_world_access::tile_local_weather(site_run, coord);
+    local_weather.wind = local_wind;
+    gs1::site_world_access::set_tile_local_weather(site_run, coord, local_weather);
+}
+
 std::vector<Gs1EngineMessage> flush_tile_delta_for(
     GameRuntime& runtime,
     TileCoord coord,
@@ -760,6 +767,38 @@ int main()
         assert(payload.y == static_cast<std::uint32_t>(density_coord.y));
         assert(payload.plant_type_id == gs1::k_plant_straw_checkerboard);
         assert(payload.plant_density == 0.22f);
+    }
+
+    set_tile_local_wind(site_run, density_coord, 14.0f);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+    const auto wind_first_messages = drain_engine_messages(runtime);
+    const auto wind_first_tiles =
+        collect_messages_of_type(wind_first_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
+    assert(wind_first_tiles.size() == 1U);
+    {
+        const auto& payload = wind_first_tiles.front()->payload_as<Gs1EngineMessageSiteTileData>();
+        assert(payload.local_wind == 14.0f);
+    }
+
+    set_tile_local_wind(site_run, density_coord, 15.0f);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+    const auto wind_second_messages = drain_engine_messages(runtime);
+    const auto wind_second_tiles =
+        collect_messages_of_type(wind_second_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
+    assert(wind_second_tiles.empty());
+
+    set_tile_local_wind(site_run, density_coord, 18.0f);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+    const auto wind_third_messages = drain_engine_messages(runtime);
+    const auto wind_third_tiles =
+        collect_messages_of_type(wind_third_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
+    assert(wind_third_tiles.size() == 1U);
+    {
+        const auto& payload = wind_third_tiles.front()->payload_as<Gs1EngineMessageSiteTileData>();
+        assert(payload.local_wind == 18.0f);
     }
 
     set_tile_sand_burial(site_run, TileCoord {0, 0}, 0.9f);

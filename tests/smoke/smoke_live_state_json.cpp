@@ -461,6 +461,8 @@ void append_site_bootstrap_json(std::string& json, const std::optional<SmokeEngi
         json += std::to_string(tile.plant_density);
         json += ",\"sandBurial\":";
         json += std::to_string(tile.sand_burial);
+        json += ",\"localWind\":";
+        json += std::to_string(tile.local_wind);
         json += '}';
     }
     json += "]";

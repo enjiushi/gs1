@@ -47,15 +47,19 @@ namespace
 {
 constexpr float k_visible_tile_density_projection_step = 1.0f / 32.0f;
 constexpr float k_visible_tile_burial_projection_step = 1.0f / 64.0f;
+constexpr float k_visible_tile_local_wind_projection_step = 2.5f;
 
-[[nodiscard]] std::uint16_t quantize_projected_tile_channel(float value, float step) noexcept
+[[nodiscard]] std::uint16_t quantize_projected_tile_channel(
+    float value,
+    float max_value,
+    float step) noexcept
 {
-    if (step <= 0.0f)
+    if (max_value <= 0.0f || step <= 0.0f)
     {
         return 0U;
     }
 
-    const float clamped = std::clamp(value, 0.0f, 1.0f);
+    const float clamped = std::clamp(value, 0.0f, max_value);
     const float scaled = std::round(clamped / step);
     return static_cast<std::uint16_t>(std::clamp(scaled, 0.0f, 65535.0f));
 }
@@ -70,12 +74,17 @@ constexpr float k_visible_tile_burial_projection_step = 1.0f / 64.0f;
         tile.ecology.ground_cover_type_id,
         quantize_projected_tile_channel(
             tile.ecology.plant_density,
+            1.0f,
             k_visible_tile_density_projection_step),
         quantize_projected_tile_channel(
             tile.ecology.sand_burial,
+            1.0f,
             k_visible_tile_burial_projection_step),
-        true,
-        {0U, 0U, 0U}};
+        quantize_projected_tile_channel(
+            tile.local_weather.wind,
+            100.0f,
+            k_visible_tile_local_wind_projection_step),
+        true};
 }
 
 [[nodiscard]] bool projected_tile_state_matches(
@@ -88,7 +97,8 @@ constexpr float k_visible_tile_burial_projection_step = 1.0f / 64.0f;
         lhs.structure_type_id == rhs.structure_type_id &&
         lhs.ground_cover_type_id == rhs.ground_cover_type_id &&
         lhs.plant_density_quantized == rhs.plant_density_quantized &&
-        lhs.sand_burial_quantized == rhs.sand_burial_quantized;
+        lhs.sand_burial_quantized == rhs.sand_burial_quantized &&
+        lhs.local_wind_quantized == rhs.local_wind_quantized;
 }
 
 [[nodiscard]] std::uint32_t visible_loadout_slot_count(const LoadoutPlannerState& planner) noexcept
@@ -2162,6 +2172,7 @@ void GameRuntime::queue_site_tile_upsert_message(std::uint32_t x, std::uint32_t 
     payload.ground_cover_type_id = tile.ecology.ground_cover_type_id;
     payload.plant_density = tile.ecology.plant_density;
     payload.sand_burial = tile.ecology.sand_burial;
+    payload.local_wind = tile.local_weather.wind;
     engine_messages_.push_back(tile_message);
 
     if (tile_index < site_run.last_projected_tile_states.size())
