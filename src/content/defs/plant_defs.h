@@ -2,8 +2,8 @@
 
 #include "support/id_types.h"
 
-#include <array>
 #include <cstdint>
+#include <span>
 #include <type_traits>
 
 namespace gs1
@@ -96,158 +96,8 @@ inline constexpr PlantDef k_generic_ground_cover_def {
     0.0f,
     0.0f};
 
-inline constexpr std::array<PlantDef, 5> k_prototype_plant_defs {
-    PlantDef {
-        PlantId {k_plant_straw_checkerboard},
-        "Straw Checkerboard",
-        PlantHeightClass::None,
-        false,
-        1U,
-        2U,
-        2U,
-        1U,
-        0.6f,
-        2.0f,
-        100.0f,
-        100.0f,
-        100.0f,
-        100.0f,
-        52.0f,
-        10.0f,
-        34.0f,
-        18.0f,
-        0.0f,
-        0.0f,
-        0.0f,
-        0.0f},
-    PlantDef {
-        PlantId {k_plant_wind_reed},
-        "Wind Reed",
-        PlantHeightClass::Low,
-        true,
-        1U,
-        2U,
-        2U,
-        2U,
-        0.75f,
-        0.0f,
-        45.0f,
-        38.0f,
-        78.0f,
-        58.0f,
-        68.0f,
-        18.0f,
-        28.0f,
-        14.0f,
-        10.0f,
-        55.0f,
-        35.0f,
-        10.0f},
-    PlantDef {
-        PlantId {k_plant_saltbush},
-        "Saltbush",
-        PlantHeightClass::Low,
-        true,
-        1U,
-        2U,
-        2U,
-        1U,
-        1.0f,
-        0.0f,
-        82.0f,
-        52.0f,
-        46.0f,
-        44.0f,
-        24.0f,
-        18.0f,
-        30.0f,
-        38.0f,
-        54.0f,
-        45.0f,
-        22.0f,
-        18.0f},
-    PlantDef {
-        PlantId {k_plant_shade_cactus},
-        "Shade Cactus",
-        PlantHeightClass::Medium,
-        true,
-        1U,
-        2U,
-        2U,
-        1U,
-        1.5f,
-        0.0f,
-        48.0f,
-        82.0f,
-        30.0f,
-        34.0f,
-        12.0f,
-        74.0f,
-        18.0f,
-        12.0f,
-        6.0f,
-        42.0f,
-        10.0f,
-        12.0f},
-    PlantDef {
-        PlantId {k_plant_sunfruit_vine},
-        "Sunfruit Vine",
-        PlantHeightClass::Low,
-        true,
-        1U,
-        2U,
-        2U,
-        1U,
-        1.25f,
-        0.0f,
-        18.0f,
-        28.0f,
-        24.0f,
-        20.0f,
-        8.0f,
-        20.0f,
-        6.0f,
-        10.0f,
-        0.0f,
-        70.0f,
-        14.0f,
-        78.0f}
-};
-
-[[nodiscard]] inline constexpr const PlantDef* find_plant_def(PlantId plant_id) noexcept
-{
-    for (const auto& plant_def : k_prototype_plant_defs)
-    {
-        if (plant_def.plant_id == plant_id)
-        {
-            return &plant_def;
-        }
-    }
-
-    return nullptr;
-}
-
-static_assert(
-    []() constexpr {
-        for (const auto& plant_def : k_prototype_plant_defs)
-        {
-            const bool width_is_power_of_two =
-                plant_def.footprint_width != 0U &&
-                (plant_def.footprint_width &
-                    static_cast<std::uint8_t>(plant_def.footprint_width - 1U)) == 0U;
-            const bool height_is_power_of_two =
-                plant_def.footprint_height != 0U &&
-                (plant_def.footprint_height &
-                    static_cast<std::uint8_t>(plant_def.footprint_height - 1U)) == 0U;
-            if (!width_is_power_of_two || !height_is_power_of_two)
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }(),
-    "Prototype plant footprints must use power-of-two tile sizes.");
+[[nodiscard]] std::span<const PlantDef> all_plant_defs() noexcept;
+[[nodiscard]] const PlantDef* find_plant_def(PlantId plant_id) noexcept;
 
 static_assert(std::is_standard_layout_v<PlantDef>, "PlantDef must remain standard layout.");
 static_assert(std::is_trivial_v<PlantDef>, "PlantDef must remain trivial.");

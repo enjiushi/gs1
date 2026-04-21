@@ -2,8 +2,8 @@
 
 #include "support/id_types.h"
 
-#include <array>
 #include <cstdint>
+#include <span>
 #include <string_view>
 
 namespace gs1
@@ -34,98 +34,8 @@ inline constexpr std::uint32_t k_structure_workbench = 202U;
 inline constexpr std::uint32_t k_structure_storage_crate = 203U;
 inline constexpr std::uint32_t k_structure_wind_fence = 204U;
 
-inline constexpr std::array<StructureDef, 4> k_prototype_structure_defs {{
-    StructureDef {
-        StructureId {k_structure_camp_stove},
-        "Camp Stove",
-        1.0f,
-        0.0f,
-        0U,
-        6U,
-        CraftingStationKind::Cooking,
-        true,
-        1U,
-        1U},
-    StructureDef {
-        StructureId {k_structure_workbench},
-        "Workbench",
-        1.0f,
-        0.0f,
-        0U,
-        8U,
-        CraftingStationKind::Fabrication,
-        true,
-        1U,
-        1U},
-    StructureDef {
-        StructureId {k_structure_storage_crate},
-        "Storage Crate",
-        1.0f,
-        0.0f,
-        0U,
-        10U,
-        CraftingStationKind::None,
-        true,
-        1U,
-        1U},
-    StructureDef {
-        StructureId {k_structure_wind_fence},
-        "Wind Fence",
-        1.0f,
-        42.0f,
-        1U,
-        0U,
-        CraftingStationKind::None,
-        false,
-        1U,
-        1U},
-}};
-
-[[nodiscard]] inline constexpr const StructureDef* find_structure_def(StructureId structure_id) noexcept
-{
-    for (const auto& structure_def : k_prototype_structure_defs)
-    {
-        if (structure_def.structure_id == structure_id)
-        {
-            return &structure_def;
-        }
-    }
-
-    return nullptr;
-}
-
-[[nodiscard]] inline constexpr bool structure_has_storage(StructureId structure_id) noexcept
-{
-    const auto* structure_def = find_structure_def(structure_id);
-    return structure_def != nullptr && structure_def->grants_storage && structure_def->storage_slot_count > 0U;
-}
-
-[[nodiscard]] inline constexpr bool structure_is_crafting_station(StructureId structure_id) noexcept
-{
-    const auto* structure_def = find_structure_def(structure_id);
-    return structure_def != nullptr &&
-        structure_def->crafting_station_kind != CraftingStationKind::None;
-}
-
-static_assert(
-    []() constexpr {
-        for (const auto& structure_def : k_prototype_structure_defs)
-        {
-            const bool width_is_power_of_two =
-                structure_def.footprint_width != 0U &&
-                (structure_def.footprint_width &
-                    static_cast<std::uint8_t>(structure_def.footprint_width - 1U)) == 0U;
-            const bool height_is_power_of_two =
-                structure_def.footprint_height != 0U &&
-                (structure_def.footprint_height &
-                    static_cast<std::uint8_t>(structure_def.footprint_height - 1U)) == 0U;
-            if (!width_is_power_of_two || !height_is_power_of_two)
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }(),
-    "Prototype structure footprints must use power-of-two tile sizes.");
+[[nodiscard]] std::span<const StructureDef> all_structure_defs() noexcept;
+[[nodiscard]] const StructureDef* find_structure_def(StructureId structure_id) noexcept;
+[[nodiscard]] bool structure_has_storage(StructureId structure_id) noexcept;
+[[nodiscard]] bool structure_is_crafting_station(StructureId structure_id) noexcept;
 }  // namespace gs1
