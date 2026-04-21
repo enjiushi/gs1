@@ -273,7 +273,7 @@ public:
 
     struct SitePhonePanelProjection final
     {
-        Gs1PhonePanelSection active_section {GS1_PHONE_PANEL_SECTION_MARKETPLACE};
+        Gs1PhonePanelSection active_section {GS1_PHONE_PANEL_SECTION_HOME};
         std::uint32_t visible_task_count {0};
         std::uint32_t accepted_task_count {0};
         std::uint32_t completed_task_count {0};

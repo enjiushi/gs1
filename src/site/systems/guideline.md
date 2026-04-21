@@ -31,7 +31,7 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `modifier_system.h`: Modifier system interface.
 - `modifier_system.cpp`: Applies and expires site modifiers/effects, including task-reward run-modifier awards routed through message handling.
 - `phone_panel_system.h`: Phone panel system interface.
-- `phone_panel_system.cpp`: Owns phone panel section state plus authoritative projected phone listings/task counts for the adapter, including completed and claimed history counts.
+- `phone_panel_system.cpp`: Owns phone home/app-panel section state plus authoritative projected phone listings/task counts for the adapter, including completed and claimed history counts.
 - `placement_validation_system.h`: Placement validation system interface.
 - `placement_validation_system.cpp`: Validates structure placement requests against tile/world constraints.
 - `site_completion_system.h`: Site completion system interface.

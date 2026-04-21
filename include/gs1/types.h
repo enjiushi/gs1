@@ -211,8 +211,12 @@ enum Gs1PhoneListingPresentationKind : std::uint8_t
 
 enum Gs1PhonePanelSection : std::uint8_t
 {
-    GS1_PHONE_PANEL_SECTION_MARKETPLACE = 0,
-    GS1_PHONE_PANEL_SECTION_CART = 1
+    GS1_PHONE_PANEL_SECTION_HOME = 0,
+    GS1_PHONE_PANEL_SECTION_TASKS = 1,
+    GS1_PHONE_PANEL_SECTION_BUY = 2,
+    GS1_PHONE_PANEL_SECTION_SELL = 3,
+    GS1_PHONE_PANEL_SECTION_HIRE = 4,
+    GS1_PHONE_PANEL_SECTION_CART = 5
 };
 
 enum Gs1NotificationKind : std::uint8_t

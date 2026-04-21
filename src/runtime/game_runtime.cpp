@@ -439,11 +439,20 @@ Gs1PhonePanelSection to_phone_panel_section(PhonePanelSection section) noexcept
 {
     switch (section)
     {
+    case PhonePanelSection::Home:
+        return GS1_PHONE_PANEL_SECTION_HOME;
+    case PhonePanelSection::Tasks:
+        return GS1_PHONE_PANEL_SECTION_TASKS;
+    case PhonePanelSection::Buy:
+        return GS1_PHONE_PANEL_SECTION_BUY;
+    case PhonePanelSection::Sell:
+        return GS1_PHONE_PANEL_SECTION_SELL;
+    case PhonePanelSection::Hire:
+        return GS1_PHONE_PANEL_SECTION_HIRE;
     case PhonePanelSection::Cart:
         return GS1_PHONE_PANEL_SECTION_CART;
-    case PhonePanelSection::Marketplace:
     default:
-        return GS1_PHONE_PANEL_SECTION_MARKETPLACE;
+        return GS1_PHONE_PANEL_SECTION_HOME;
     }
 }
 
