@@ -1,8 +1,13 @@
 #include "content/defs/craft_recipe_defs.h"
 #include "content/defs/item_defs.h"
+#include "content/defs/modifier_defs.h"
 #include "content/defs/plant_defs.h"
+#include "content/defs/reward_defs.h"
 #include "content/defs/structure_defs.h"
+#include "content/defs/task_defs.h"
+#include "content/defs/technology_defs.h"
 #include "content/content_loader.h"
+#include "site/defs/site_action_defs.h"
 
 namespace gs1
 {
@@ -89,5 +94,160 @@ const CraftRecipeDef* find_craft_recipe_def(RecipeId recipe_id) noexcept
     return it == content.index.craft_recipe_by_id.end()
         ? nullptr
         : &content.craft_recipe_defs[it->second];
+}
+
+std::span<const TaskTemplateDef> all_task_template_defs() noexcept
+{
+    return prototype_content_database().task_template_defs;
+}
+
+const TaskTemplateDef* find_task_template_def(TaskTemplateId task_template_id) noexcept
+{
+    const auto& content = prototype_content_database();
+    const auto it = content.index.task_template_by_id.find(task_template_id.value);
+    return it == content.index.task_template_by_id.end()
+        ? nullptr
+        : &content.task_template_defs[it->second];
+}
+
+std::span<const RewardCandidateDef> all_reward_candidate_defs() noexcept
+{
+    return prototype_content_database().reward_candidate_defs;
+}
+
+const RewardCandidateDef* find_reward_candidate_def(RewardCandidateId reward_candidate_id) noexcept
+{
+    const auto& content = prototype_content_database();
+    const auto it = content.index.reward_candidate_by_id.find(reward_candidate_id.value);
+    return it == content.index.reward_candidate_by_id.end()
+        ? nullptr
+        : &content.reward_candidate_defs[it->second];
+}
+
+std::span<const SiteActionDef> all_site_action_defs() noexcept
+{
+    return prototype_content_database().site_action_defs;
+}
+
+const SiteActionDef* find_site_action_def(ActionKind action_kind) noexcept
+{
+    const auto& content = prototype_content_database();
+    const auto it = content.index.site_action_by_kind.find(static_cast<std::uint32_t>(action_kind));
+    return it == content.index.site_action_by_kind.end()
+        ? nullptr
+        : &content.site_action_defs[it->second];
+}
+
+std::span<const ModifierPresetDef> all_nearby_aura_modifier_presets() noexcept
+{
+    return prototype_content_database().nearby_aura_modifier_presets;
+}
+
+std::span<const ModifierPresetDef> all_run_modifier_presets() noexcept
+{
+    return prototype_content_database().run_modifier_presets;
+}
+
+ModifierChannelTotals resolve_nearby_aura_modifier_preset(ModifierId id) noexcept
+{
+    const auto presets = all_nearby_aura_modifier_presets();
+    if (id.value == 0U || presets.empty())
+    {
+        return {};
+    }
+
+    const auto bucket = static_cast<std::size_t>(id.value) % presets.size();
+    return presets[bucket].totals;
+}
+
+ModifierChannelTotals resolve_run_modifier_preset(ModifierId id) noexcept
+{
+    const auto presets = all_run_modifier_presets();
+    if (id.value == 0U || presets.empty())
+    {
+        return {};
+    }
+
+    const auto bucket = static_cast<std::size_t>(id.value) % presets.size();
+    return presets[bucket].totals;
+}
+
+std::span<const TechnologyTierDef> all_technology_tier_defs() noexcept
+{
+    return prototype_content_database().technology_tier_defs;
+}
+
+std::span<const TotalReputationTierDef> all_total_reputation_tier_defs() noexcept
+{
+    return prototype_content_database().total_reputation_tier_defs;
+}
+
+std::span<const ReputationUnlockDef> all_reputation_unlock_defs() noexcept
+{
+    return prototype_content_database().reputation_unlock_defs;
+}
+
+std::span<const TechnologyNodeDef> all_technology_node_defs() noexcept
+{
+    return prototype_content_database().technology_node_defs;
+}
+
+std::span<const PlantId> all_initial_unlocked_plant_ids() noexcept
+{
+    return prototype_content_database().initial_unlocked_plant_ids;
+}
+
+const TechnologyTierDef* find_technology_tier_def(
+    FactionId faction_id,
+    std::uint8_t tier_index) noexcept
+{
+    for (const auto& tier_def : all_technology_tier_defs())
+    {
+        if (tier_def.faction_id == faction_id && tier_def.tier_index == tier_index)
+        {
+            return &tier_def;
+        }
+    }
+
+    return nullptr;
+}
+
+const TotalReputationTierDef* find_total_reputation_tier_def(std::uint8_t tier_index) noexcept
+{
+    for (const auto& tier_def : all_total_reputation_tier_defs())
+    {
+        if (tier_def.tier_index == tier_index)
+        {
+            return &tier_def;
+        }
+    }
+
+    return nullptr;
+}
+
+const ReputationUnlockDef* find_reputation_unlock_def(std::uint32_t unlock_id) noexcept
+{
+    for (const auto& unlock_def : all_reputation_unlock_defs())
+    {
+        if (unlock_def.unlock_id == unlock_id)
+        {
+            return &unlock_def;
+        }
+    }
+
+    return nullptr;
+}
+
+const TechnologyNodeDef* find_technology_node_def(TechNodeId tech_node_id) noexcept
+{
+    for (const auto& node_def : all_technology_node_defs())
+    {
+        if (node_def.tech_node_id == tech_node_id)
+        {
+            return &node_def;
+        }
+    }
+
+    return nullptr;
 }
 }  // namespace gs1

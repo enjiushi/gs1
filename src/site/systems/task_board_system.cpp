@@ -7,7 +7,6 @@
 #include "site/site_run_state.h"
 
 #include <algorithm>
-#include <array>
 #include <cstdint>
 #include <vector>
 
@@ -15,16 +14,6 @@ namespace gs1
 {
 namespace
 {
-constexpr std::array<TaskTemplateId, 7> k_site1_seeded_task_templates {{
-    TaskTemplateId {k_task_template_site1_restore_patch},
-    TaskTemplateId {k_task_template_site1_buy_water},
-    TaskTemplateId {k_task_template_site1_sell_water},
-    TaskTemplateId {k_task_template_site1_transfer_seeds},
-    TaskTemplateId {k_task_template_site1_plant_wind_reed},
-    TaskTemplateId {k_task_template_site1_craft_hammer},
-    TaskTemplateId {k_task_template_site1_consume_supply},
-}};
-
 std::uint32_t normalized_task_target(std::uint32_t requested_target) noexcept
 {
     return requested_target == 0U ? 1U : requested_target;
@@ -75,7 +64,7 @@ std::vector<RewardCandidateId> build_reward_candidate_pool(
     const auto& revealed_unlockables = context.world.read_economy().revealed_site_unlockable_ids;
     const auto& active_run_modifiers = context.world.read_modifier().active_run_modifier_ids;
 
-    for (const auto& reward_candidate_def : k_prototype_reward_candidate_defs)
+    for (const auto& reward_candidate_def : all_reward_candidate_defs())
     {
         switch (reward_candidate_def.effect_kind)
         {
@@ -411,10 +400,9 @@ void handle_site_run_started(
     }
 
     std::uint32_t next_task_instance_id = 1U;
-    for (const auto task_template_id : k_site1_seeded_task_templates)
+    for (const auto& task_template_def : all_task_template_defs())
     {
-        const auto* task_template_def = find_task_template_def(task_template_id);
-        if (task_template_def == nullptr)
+        if (task_template_def.task_template_id.value == 0U)
         {
             continue;
         }
@@ -422,9 +410,9 @@ void handle_site_run_started(
         auto task = make_task_instance(
             context,
             TaskInstanceId {next_task_instance_id++},
-            *task_template_def,
+            task_template_def,
             context.world.read_counters());
-        if (task_template_def->progress_kind == TaskProgressKind::RestorationTiles)
+        if (task_template_def.progress_kind == TaskProgressKind::RestorationTiles)
         {
             task.current_progress_amount = std::min(
                 task.target_amount,

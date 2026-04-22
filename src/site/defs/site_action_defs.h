@@ -3,8 +3,8 @@
 #include "messages/game_message.h"
 #include "site/action_state.h"
 
-#include <array>
 #include <cstdint>
+#include <span>
 #include <type_traits>
 
 namespace gs1
@@ -21,89 +21,6 @@ struct SiteActionDef final
     bool impacts_worker_movement;
     std::uint8_t reserved0;
 };
-
-inline constexpr std::array<SiteActionDef, 8> k_prototype_site_action_defs {{
-    SiteActionDef {
-        ActionKind::Plant,
-        1.0f,
-        2.0f,
-        0.75f,
-        PlacementOccupancyLayer::GroundCover,
-        true,
-        true,
-        true,
-        0U},
-    SiteActionDef {
-        ActionKind::Build,
-        2.5f,
-        2.0f,
-        0.75f,
-        PlacementOccupancyLayer::Structure,
-        true,
-        true,
-        true,
-        0U},
-    SiteActionDef {
-        ActionKind::Repair,
-        1.5f,
-        0.0f,
-        0.0f,
-        PlacementOccupancyLayer::None,
-        false,
-        true,
-        true,
-        0U},
-    SiteActionDef {
-        ActionKind::Water,
-        0.75f,
-        1.0f,
-        0.35f,
-        PlacementOccupancyLayer::None,
-        false,
-        false,
-        true,
-        0U},
-    SiteActionDef {
-        ActionKind::ClearBurial,
-        1.0f,
-        1.5f,
-        0.5f,
-        PlacementOccupancyLayer::None,
-        false,
-        false,
-        true,
-        0U},
-    SiteActionDef {
-        ActionKind::Craft,
-        1.0f,
-        1.5f,
-        0.5f,
-        PlacementOccupancyLayer::None,
-        false,
-        true,
-        true,
-        0U},
-    SiteActionDef {
-        ActionKind::Drink,
-        0.5f,
-        0.0f,
-        0.0f,
-        PlacementOccupancyLayer::None,
-        false,
-        false,
-        true,
-        0U},
-    SiteActionDef {
-        ActionKind::Eat,
-        0.75f,
-        0.0f,
-        0.0f,
-        PlacementOccupancyLayer::None,
-        false,
-        false,
-        true,
-        0U},
-}};
 
 [[nodiscard]] inline constexpr ActionKind action_kind_from_gs1(
     Gs1SiteActionKind action_kind) noexcept
@@ -131,26 +48,16 @@ inline constexpr std::array<SiteActionDef, 8> k_prototype_site_action_defs {{
     }
 }
 
-[[nodiscard]] inline constexpr const SiteActionDef* find_site_action_def(ActionKind action_kind) noexcept
-{
-    for (const auto& action_def : k_prototype_site_action_defs)
-    {
-        if (action_def.action_kind == action_kind)
-        {
-            return &action_def;
-        }
-    }
+[[nodiscard]] std::span<const SiteActionDef> all_site_action_defs() noexcept;
+[[nodiscard]] const SiteActionDef* find_site_action_def(ActionKind action_kind) noexcept;
 
-    return nullptr;
-}
-
-[[nodiscard]] inline constexpr bool action_impacts_worker_movement(ActionKind action_kind) noexcept
+[[nodiscard]] inline bool action_impacts_worker_movement(ActionKind action_kind) noexcept
 {
     const auto* action_def = find_site_action_def(action_kind);
     return action_def != nullptr && action_def->impacts_worker_movement;
 }
 
-[[nodiscard]] inline constexpr bool gs1_action_impacts_worker_movement(
+[[nodiscard]] inline bool gs1_action_impacts_worker_movement(
     Gs1SiteActionKind action_kind) noexcept
 {
     return action_impacts_worker_movement(action_kind_from_gs1(action_kind));

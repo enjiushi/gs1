@@ -2,6 +2,7 @@
 
 #include "campaign/campaign_state.h"
 #include "content/defs/item_defs.h"
+#include "content/prototype_content.h"
 
 #include <algorithm>
 
@@ -9,8 +10,6 @@ namespace gs1
 {
 namespace
 {
-constexpr std::uint32_t k_support_quota_per_contributor = 1U;
-
 [[nodiscard]] LoadoutSlot make_loadout_slot(std::uint32_t item_id, std::uint32_t quantity) noexcept
 {
     return LoadoutSlot {
@@ -19,11 +18,16 @@ constexpr std::uint32_t k_support_quota_per_contributor = 1U;
         item_id != 0U && quantity > 0U};
 }
 
-[[nodiscard]] std::vector<LoadoutSlot> make_baseline_deployment_items()
+[[nodiscard]] std::vector<LoadoutSlot> make_baseline_deployment_items(
+    const PrototypeCampaignContent& content)
 {
-    return {
-        make_loadout_slot(k_item_water_container, 1U),
-        make_loadout_slot(k_item_basic_straw_checkerboard, 8U)};
+    std::vector<LoadoutSlot> items {};
+    items.reserve(content.baseline_deployment_items.size());
+    for (const auto& item : content.baseline_deployment_items)
+    {
+        items.push_back(make_loadout_slot(item.item_id.value, item.quantity));
+    }
+    return items;
 }
 
 [[nodiscard]] const SiteMetaState* find_site(
@@ -94,7 +98,7 @@ void rebuild_selected_loadout(CampaignState& campaign)
             continue;
         }
 
-        planner.support_quota += k_support_quota_per_contributor;
+        planner.support_quota += planner.support_quota_per_contributor;
 
         for (const auto& slot : contributor->exported_support_items)
         {
@@ -117,12 +121,14 @@ void rebuild_selected_loadout(CampaignState& campaign)
 
 void LoadoutPlannerSystem::initialize_campaign_state(CampaignState& campaign)
 {
+    const auto& content = get_prototype_campaign_content();
     auto& planner = campaign.loadout_planner_state;
     planner.selected_target_site_id.reset();
-    planner.baseline_deployment_items = make_baseline_deployment_items();
+    planner.baseline_deployment_items = make_baseline_deployment_items(content);
     planner.selected_loadout_slots.clear();
     planner.available_exported_support_items.clear();
     planner.active_nearby_aura_modifier_ids.clear();
+    planner.support_quota_per_contributor = content.support_quota_per_contributor;
     planner.support_quota = 0U;
     rebuild_selected_loadout(campaign);
 }

@@ -16,7 +16,7 @@ Campaign-level systems that react to gameplay messages and mutate only campaign-
 - `faction_reputation_system.h`: Campaign faction-reputation system interface.
 - `faction_reputation_system.cpp`: Campaign faction-reputation implementation for non-decreasing per-faction trust totals plus assistant unlocks.
 - `loadout_planner_system.h`: Loadout planner system interface.
-- `loadout_planner_system.cpp`: Loadout planner system implementation, including the baseline site-deployment package with site-one's `1` water plus `8` basic straw checkerboard opening loadout.
+- `loadout_planner_system.cpp`: Loadout planner system implementation, including the content-authored baseline deployment package and content-authored per-contributor support quota.
 - `regional_support_system.h`: Regional support system interface for campaign support updates.
 - `technology_system.h`: Technology system interface for research/unlock progression.
 - `technology_system.cpp`: Technology system implementation for faction-tier gating, total-reputation plant-tier unlocks, persistent-cash tech purchases, and faction-tab query helpers.

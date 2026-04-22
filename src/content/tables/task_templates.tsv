@@ -1,0 +1,8 @@
+task_template_id	publisher_faction_id	task_tier_id	progress_kind	target_amount	item_id	recipe_id	completion_faction_reputation_delta
+1	1	1	RestorationTiles	0	0	0	5
+2	1	1	BuyItem	1	1	0	2
+3	1	1	SellItem	1	1	0	2
+4	1	1	TransferItem	1	4	0	2
+5	1	1	PlantItem	1	4	0	3
+6	1	1	CraftRecipe	1	0	5	3
+7	1	1	ConsumeItem	1	0	0	2

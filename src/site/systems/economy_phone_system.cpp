@@ -1,5 +1,6 @@
 #include "campaign/systems/technology_system.h"
 #include "content/defs/item_defs.h"
+#include "content/prototype_content.h"
 #include "site/craft_logic.h"
 #include "site/inventory_storage.h"
 #include "site/site_projection_update_flags.h"
@@ -15,26 +16,6 @@ namespace gs1
 {
 namespace
 {
-constexpr std::int32_t k_phone_delivery_fee = 5;
-constexpr std::uint16_t k_immediate_delivery_minutes = 0U;
-constexpr std::uint32_t k_site1_water_listing_id = 1U;
-constexpr std::uint32_t k_site1_food_listing_id = 2U;
-constexpr std::uint32_t k_site1_medicine_listing_id = 3U;
-constexpr std::uint32_t k_site1_wind_reed_listing_id = 4U;
-constexpr std::uint32_t k_site1_salt_bean_listing_id = 5U;
-constexpr std::uint32_t k_site1_shade_cactus_listing_id = 6U;
-constexpr std::uint32_t k_site1_sunfruit_vine_listing_id = 7U;
-constexpr std::uint32_t k_site1_wood_listing_id = 8U;
-constexpr std::uint32_t k_site1_iron_listing_id = 9U;
-constexpr std::uint32_t k_site1_contractor_listing_id = 10U;
-constexpr std::uint32_t k_site1_unlockable_listing_id = 11U;
-constexpr std::uint32_t k_site1_root_binder_listing_id = 12U;
-constexpr std::uint32_t k_site1_dew_grass_listing_id = 13U;
-constexpr std::uint32_t k_site1_thorn_shrub_listing_id = 14U;
-constexpr std::uint32_t k_site1_medicinal_sage_listing_id = 15U;
-constexpr std::uint32_t k_site1_sand_willow_listing_id = 16U;
-constexpr std::uint32_t k_site1_basic_straw_checkerboard_listing_id = 17U;
-constexpr std::uint32_t k_site1_unlockable_id = 101U;
 constexpr std::uint32_t k_sell_listing_id_base = 1000U;
 
 std::uint32_t normalize_quantity(std::uint16_t value) noexcept
@@ -288,7 +269,7 @@ bool queue_delivery_batch_message(
     GameMessage delivery_message {};
     delivery_message.type = GameMessageType::InventoryDeliveryBatchRequested;
     auto& payload = delivery_message.emplace_payload<InventoryDeliveryBatchRequestedMessage>();
-    payload.minutes_until_arrival = k_immediate_delivery_minutes;
+    payload.minutes_until_arrival = context.world.read_economy().phone_delivery_minutes;
     payload.entry_count = entry_count;
     payload.reserved0 = 0U;
     for (std::size_t index = 0; index < k_inventory_delivery_batch_entry_count; ++index)
@@ -445,7 +426,8 @@ Gs1Status process_buy_listing(
     }
 
     const auto total_cost =
-        static_cast<std::int64_t>(listing.price) * quantity + static_cast<std::int64_t>(k_phone_delivery_fee);
+        static_cast<std::int64_t>(listing.price) * quantity +
+        static_cast<std::int64_t>(context.world.read_economy().phone_delivery_fee);
     if (total_cost < 0 || !money_delta_fits(-total_cost))
     {
         return GS1_STATUS_INVALID_STATE;
@@ -566,7 +548,8 @@ Gs1Status process_cart_checkout(SiteSystemContext<EconomyPhoneSystem>& context)
         }
     }
 
-    const auto total_cost = subtotal + static_cast<std::int64_t>(k_phone_delivery_fee);
+    const auto total_cost =
+        subtotal + static_cast<std::int64_t>(context.world.read_economy().phone_delivery_fee);
     if (subtotal <= 0 || total_cost < 0 || !money_delta_fits(-total_cost))
     {
         return GS1_STATUS_INVALID_STATE;
@@ -605,7 +588,7 @@ Gs1Status process_cart_checkout(SiteSystemContext<EconomyPhoneSystem>& context)
         }
 
         PhoneListingState synthetic_listing {};
-        synthetic_listing.listing_id = k_site1_water_listing_id;
+        synthetic_listing.listing_id = 0U;
         synthetic_listing.item_id = ItemId {entry.item_id};
         for (const auto& listing : economy.available_phone_listings)
         {
@@ -762,106 +745,79 @@ void reveal_unlockable_for_site(
     mark_phone_and_hud_dirty(context);
 }
 
-void append_site_one_seed_listing(
+void append_seed_phone_listing(
     SiteSystemContext<EconomyPhoneSystem>& context,
-    std::uint32_t listing_id,
-    std::uint32_t item_id,
-    std::uint32_t quantity)
+    const PrototypePhoneListingContent& listing_content)
 {
-    const auto* item_def = find_item_def(ItemId {item_id});
-    if (item_def == nullptr)
+    switch (listing_content.kind)
     {
+    case PhoneListingKind::BuyItem:
+    {
+        const auto item_id = ItemId {listing_content.item_or_unlockable_id};
+        const auto* item_def = find_item_def(item_id);
+        if (item_def == nullptr)
+        {
+            return;
+        }
+
+        if (item_def->linked_plant_id.value != 0U &&
+            !TechnologySystem::plant_unlocked(context.campaign, item_def->linked_plant_id))
+        {
+            return;
+        }
+
+        context.world.own_economy().available_phone_listings.push_back(make_item_listing(
+            PhoneListingKind::BuyItem,
+            listing_content.listing_id,
+            item_id,
+            listing_content.quantity));
         return;
     }
 
-    if (item_def->linked_plant_id.value != 0U &&
-        !TechnologySystem::plant_unlocked(context.campaign, item_def->linked_plant_id))
-    {
+    case PhoneListingKind::HireContractor:
+    case PhoneListingKind::PurchaseUnlockable:
+        context.world.own_economy().available_phone_listings.push_back(PhoneListingState {
+            listing_content.kind,
+            ItemId {listing_content.item_or_unlockable_id},
+            listing_content.listing_id,
+            listing_content.price,
+            listing_content.quantity,
+            0U,
+            true});
+        return;
+
+    case PhoneListingKind::SellItem:
+    default:
         return;
     }
-
-    context.world.own_economy().available_phone_listings.push_back(make_item_listing(
-        PhoneListingKind::BuyItem,
-        listing_id,
-        ItemId {item_id},
-        quantity));
 }
 
 void seed_site_economy(SiteSystemContext<EconomyPhoneSystem>& context, std::uint32_t site_id)
 {
     auto& economy = context.world.own_economy();
+    const auto* site_content = find_prototype_site_content(SiteId {site_id});
     economy.phone_listing_source_membership_revision = 0U;
     economy.phone_listing_source_quantity_revision = 0U;
     economy.phone_listing_source_action_reservation_signature = 0U;
+    economy.phone_delivery_fee = site_content == nullptr ? 0 : site_content->phone_delivery_fee;
+    economy.phone_delivery_minutes = site_content == nullptr ? 0U : site_content->phone_delivery_minutes;
     economy.available_phone_listings.clear();
     economy.revealed_site_unlockable_ids.clear();
     economy.direct_purchase_unlockable_ids.clear();
     sync_projected_money(context);
 
-    if (site_id != 1U)
+    if (site_content == nullptr)
     {
         mark_phone_and_hud_dirty(context);
         return;
     }
 
-    economy.available_phone_listings.push_back(make_item_listing(
-        PhoneListingKind::BuyItem,
-        k_site1_water_listing_id,
-        ItemId {k_item_water_container},
-        6U));
-    economy.available_phone_listings.push_back(make_item_listing(
-        PhoneListingKind::BuyItem,
-        k_site1_food_listing_id,
-        ItemId {k_item_food_pack},
-        5U));
-    economy.available_phone_listings.push_back(make_item_listing(
-        PhoneListingKind::BuyItem,
-        k_site1_medicine_listing_id,
-        ItemId {k_item_medicine_pack},
-        4U));
-    append_site_one_seed_listing(context, k_site1_wind_reed_listing_id, k_item_wind_reed_seed_bundle, 10U);
-    append_site_one_seed_listing(context, k_site1_salt_bean_listing_id, k_item_salt_bean_seed_bundle, 8U);
-    append_site_one_seed_listing(context, k_site1_shade_cactus_listing_id, k_item_shade_cactus_seed_bundle, 8U);
-    append_site_one_seed_listing(context, k_site1_sunfruit_vine_listing_id, k_item_sunfruit_vine_seed_bundle, 6U);
-    economy.available_phone_listings.push_back(make_item_listing(
-        PhoneListingKind::BuyItem,
-        k_site1_wood_listing_id,
-        ItemId {k_item_wood_bundle},
-        12U));
-    economy.available_phone_listings.push_back(make_item_listing(
-        PhoneListingKind::BuyItem,
-        k_site1_iron_listing_id,
-        ItemId {k_item_iron_bundle},
-        10U));
-    append_site_one_seed_listing(
-        context,
-        k_site1_basic_straw_checkerboard_listing_id,
-        k_item_basic_straw_checkerboard,
-        8U);
-    append_site_one_seed_listing(context, k_site1_root_binder_listing_id, k_item_root_binder_seed_bundle, 8U);
-    append_site_one_seed_listing(context, k_site1_dew_grass_listing_id, k_item_dew_grass_seed_bundle, 8U);
-    append_site_one_seed_listing(context, k_site1_thorn_shrub_listing_id, k_item_thorn_shrub_seed_bundle, 6U);
-    append_site_one_seed_listing(context, k_site1_medicinal_sage_listing_id, k_item_medicinal_sage_seed_bundle, 6U);
-    append_site_one_seed_listing(context, k_site1_sand_willow_listing_id, k_item_sand_willow_seed_bundle, 4U);
-    economy.available_phone_listings.push_back(PhoneListingState {
-        PhoneListingKind::HireContractor,
-        ItemId {0U},
-        k_site1_contractor_listing_id,
-        8,
-        3U,
-        0U,
-        true});
-    economy.available_phone_listings.push_back(PhoneListingState {
-        PhoneListingKind::PurchaseUnlockable,
-        ItemId {k_site1_unlockable_id},
-        k_site1_unlockable_listing_id,
-        20,
-        1U,
-        0U,
-        true});
-
-    economy.revealed_site_unlockable_ids.push_back(k_site1_unlockable_id);
-    economy.direct_purchase_unlockable_ids.push_back(k_site1_unlockable_id);
+    economy.revealed_site_unlockable_ids = site_content->initial_revealed_unlockable_ids;
+    economy.direct_purchase_unlockable_ids = site_content->initial_direct_purchase_unlockable_ids;
+    for (const auto& listing_content : site_content->seeded_phone_listings)
+    {
+        append_seed_phone_listing(context, listing_content);
+    }
 
     refresh_dynamic_sell_listings(context, true);
     mark_phone_and_hud_dirty(context);

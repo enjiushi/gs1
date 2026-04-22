@@ -104,7 +104,7 @@ bool TechnologySystem::plant_unlocked(
         return false;
     }
 
-    for (const auto starter_plant_id : k_initial_unlocked_plant_ids)
+    for (const auto starter_plant_id : all_initial_unlocked_plant_ids())
     {
         if (starter_plant_id == plant_id)
         {
@@ -112,7 +112,7 @@ bool TechnologySystem::plant_unlocked(
         }
     }
 
-    for (const auto& unlock_def : k_prototype_total_reputation_unlock_defs)
+    for (const auto& unlock_def : all_reputation_unlock_defs())
     {
         if (unlock_def.unlock_kind != ReputationUnlockKind::Plant ||
             unlock_def.content_id != plant_id.value)

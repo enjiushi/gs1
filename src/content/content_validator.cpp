@@ -1,5 +1,7 @@
 #include "content/content_validator.h"
 
+#include "content/defs/faction_defs.h"
+
 namespace gs1
 {
 namespace
@@ -7,6 +9,20 @@ namespace
 [[nodiscard]] bool is_power_of_two(std::uint8_t value) noexcept
 {
     return value != 0U && (value & static_cast<std::uint8_t>(value - 1U)) == 0U;
+}
+
+[[nodiscard]] bool modifier_preset_indices_are_unique_and_contiguous(
+    std::span<const ModifierPresetDef> presets) noexcept
+{
+    for (std::size_t index = 0U; index < presets.size(); ++index)
+    {
+        if (presets[index].preset_index != index)
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 }  // namespace
 
@@ -98,6 +114,508 @@ std::vector<ContentValidationIssue> validate_content_database(
         if (!issues.empty() && issues.back().severity == ContentValidationSeverity::Error)
         {
             break;
+        }
+    }
+
+    if (issues.empty())
+    {
+        for (const auto& task_template_def : content.task_template_defs)
+        {
+            if (find_faction_def(task_template_def.publisher_faction_id) == nullptr)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Task template references an unknown publisher faction id."});
+                break;
+            }
+
+            if (task_template_def.item_id.value != 0U &&
+                !content.index.item_by_id.contains(task_template_def.item_id.value))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Task template references an unknown item id."});
+                break;
+            }
+
+            if (task_template_def.recipe_id.value != 0U &&
+                !content.index.craft_recipe_by_id.contains(task_template_def.recipe_id.value))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Task template references an unknown recipe id."});
+                break;
+            }
+        }
+    }
+
+    if (issues.empty())
+    {
+        for (const auto& reward_candidate_def : content.reward_candidate_defs)
+        {
+            if (reward_candidate_def.item_id.value != 0U &&
+                !content.index.item_by_id.contains(reward_candidate_def.item_id.value))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Reward candidate references an unknown item id."});
+                break;
+            }
+
+            if (reward_candidate_def.faction_id.value != 0U &&
+                find_faction_def(reward_candidate_def.faction_id) == nullptr)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Reward candidate references an unknown faction id."});
+                break;
+            }
+        }
+    }
+
+    if (issues.empty())
+    {
+        for (std::size_t index = 0U; index < content.site_action_defs.size(); ++index)
+        {
+            const auto& action_def = content.site_action_defs[index];
+            if (action_def.action_kind == ActionKind::None)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Site action definitions cannot include ActionKind::None."});
+                break;
+            }
+
+            if (action_def.duration_minutes_per_unit <= 0.0f)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Site action definitions must use positive action duration values."});
+                break;
+            }
+
+            for (std::size_t previous = 0U; previous < index; ++previous)
+            {
+                if (content.site_action_defs[previous].action_kind == action_def.action_kind)
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Site action definitions must use unique action kinds."});
+                    break;
+                }
+            }
+
+            if (!issues.empty() && issues.back().severity == ContentValidationSeverity::Error)
+            {
+                break;
+            }
+        }
+    }
+
+    if (issues.empty())
+    {
+        constexpr ActionKind k_required_action_kinds[] = {
+            ActionKind::Plant,
+            ActionKind::Build,
+            ActionKind::Repair,
+            ActionKind::Water,
+            ActionKind::ClearBurial,
+            ActionKind::Craft,
+            ActionKind::Drink,
+            ActionKind::Eat,
+        };
+
+        for (const auto action_kind : k_required_action_kinds)
+        {
+            if (!content.index.site_action_by_kind.contains(static_cast<std::uint32_t>(action_kind)))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Site action definitions must include the full required runtime action set."});
+                break;
+            }
+        }
+    }
+
+    if (issues.empty())
+    {
+        if (content.nearby_aura_modifier_presets.empty() ||
+            content.run_modifier_presets.empty())
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Modifier preset content must define at least one nearby-aura preset and one run-modifier preset."});
+        }
+        else if (!modifier_preset_indices_are_unique_and_contiguous(content.nearby_aura_modifier_presets) ||
+            !modifier_preset_indices_are_unique_and_contiguous(content.run_modifier_presets))
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Modifier preset indices must be unique and contiguous starting at zero within each preset kind."});
+        }
+    }
+
+    if (issues.empty())
+    {
+        for (const auto plant_id : content.initial_unlocked_plant_ids)
+        {
+            if (!content.index.plant_by_id.contains(plant_id.value))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Initial unlocked plant list references an unknown plant id."});
+                break;
+            }
+        }
+    }
+
+    if (issues.empty())
+    {
+        for (std::size_t index = 0U; index < content.technology_tier_defs.size(); ++index)
+        {
+            const auto& tier_def = content.technology_tier_defs[index];
+            if (find_faction_def(tier_def.faction_id) == nullptr || tier_def.tier_index == 0U)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Technology tier definitions must use valid faction ids and non-zero tier indices."});
+                break;
+            }
+
+            for (std::size_t previous = 0U; previous < index; ++previous)
+            {
+                if (content.technology_tier_defs[previous].faction_id == tier_def.faction_id &&
+                    content.technology_tier_defs[previous].tier_index == tier_def.tier_index)
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Technology tier definitions must be unique per faction and tier index."});
+                    break;
+                }
+            }
+
+            if (!issues.empty() && issues.back().severity == ContentValidationSeverity::Error)
+            {
+                break;
+            }
+        }
+    }
+
+    if (issues.empty())
+    {
+        for (std::size_t index = 0U; index < content.total_reputation_tier_defs.size(); ++index)
+        {
+            const auto& tier_def = content.total_reputation_tier_defs[index];
+            if (tier_def.tier_index == 0U)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Total reputation tier definitions must use non-zero tier indices."});
+                break;
+            }
+
+            for (std::size_t previous = 0U; previous < index; ++previous)
+            {
+                if (content.total_reputation_tier_defs[previous].tier_index == tier_def.tier_index)
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Total reputation tier definitions must use unique tier indices."});
+                    break;
+                }
+            }
+
+            if (!issues.empty() && issues.back().severity == ContentValidationSeverity::Error)
+            {
+                break;
+            }
+        }
+    }
+
+    if (issues.empty())
+    {
+        for (std::size_t index = 0U; index < content.reputation_unlock_defs.size(); ++index)
+        {
+            const auto& unlock_def = content.reputation_unlock_defs[index];
+            bool tier_exists = false;
+            for (const auto& tier_def : content.total_reputation_tier_defs)
+            {
+                if (tier_def.tier_index == unlock_def.tier_index)
+                {
+                    tier_exists = true;
+                    break;
+                }
+            }
+            if (!tier_exists)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Reputation unlock definitions must reference an existing total reputation tier."});
+                break;
+            }
+
+            if (unlock_def.unlock_kind == ReputationUnlockKind::Plant &&
+                !content.index.plant_by_id.contains(unlock_def.content_id))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Reputation unlock definitions reference an unknown plant id."});
+                break;
+            }
+
+            for (std::size_t previous = 0U; previous < index; ++previous)
+            {
+                if (content.reputation_unlock_defs[previous].unlock_id == unlock_def.unlock_id)
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Reputation unlock definitions must use unique unlock ids."});
+                    break;
+                }
+            }
+
+            if (!issues.empty() && issues.back().severity == ContentValidationSeverity::Error)
+            {
+                break;
+            }
+        }
+    }
+
+    if (issues.empty())
+    {
+        for (std::size_t index = 0U; index < content.technology_node_defs.size(); ++index)
+        {
+            const auto& node_def = content.technology_node_defs[index];
+            bool tier_exists = false;
+            for (const auto& tier_def : content.technology_tier_defs)
+            {
+                if (tier_def.faction_id == node_def.faction_id &&
+                    tier_def.tier_index == node_def.tier_index)
+                {
+                    tier_exists = true;
+                    break;
+                }
+            }
+            if (!tier_exists)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Technology node definitions must reference an existing faction tier."});
+                break;
+            }
+
+            for (std::size_t previous = 0U; previous < index; ++previous)
+            {
+                if (content.technology_node_defs[previous].tech_node_id == node_def.tech_node_id)
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Technology node definitions must use unique technology node ids."});
+                    break;
+                }
+            }
+
+            if (!issues.empty() && issues.back().severity == ContentValidationSeverity::Error)
+            {
+                break;
+            }
+        }
+    }
+
+    if (issues.empty())
+    {
+        if (content.prototype_campaign.starting_campaign_cash < 0)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Prototype campaign starting cash must be non-negative."});
+        }
+        else if (content.prototype_campaign.support_quota_per_contributor == 0U)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Prototype campaign support quota per contributor must be greater than zero."});
+        }
+    }
+
+    if (issues.empty())
+    {
+        for (const auto& loadout_item : content.prototype_campaign.baseline_deployment_items)
+        {
+            if (!content.index.item_by_id.contains(loadout_item.item_id.value))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Prototype campaign baseline loadout references an unknown item id."});
+                break;
+            }
+        }
+    }
+
+    for (const auto& site_def : content.prototype_campaign.sites)
+    {
+        if (find_faction_def(site_def.featured_faction_id) == nullptr)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Prototype site content references an unknown faction id."});
+            break;
+        }
+
+        for (const auto adjacent_site_id : site_def.adjacent_site_ids)
+        {
+            if (!content.index.site_by_id.contains(adjacent_site_id.value))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Prototype site content references an unknown adjacent site id."});
+                break;
+            }
+        }
+        if (!issues.empty() && issues.back().severity == ContentValidationSeverity::Error)
+        {
+            break;
+        }
+
+        for (const auto& support_item : site_def.exported_support_items)
+        {
+            if (!content.index.item_by_id.contains(support_item.item_id.value))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Prototype site content references an unknown support item id."});
+                break;
+            }
+        }
+        if (!issues.empty() && issues.back().severity == ContentValidationSeverity::Error)
+        {
+            break;
+        }
+
+        if (site_def.phone_delivery_fee < 0)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Prototype site content uses a negative phone delivery fee."});
+            break;
+        }
+
+        for (const auto unlockable_id : site_def.initial_direct_purchase_unlockable_ids)
+        {
+            bool present_in_revealed = false;
+            for (const auto revealed_id : site_def.initial_revealed_unlockable_ids)
+            {
+                if (revealed_id == unlockable_id)
+                {
+                    present_in_revealed = true;
+                    break;
+                }
+            }
+
+            if (!present_in_revealed)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Prototype site direct-purchase unlockables must also be in the revealed unlockable list."});
+                break;
+            }
+        }
+        if (!issues.empty() && issues.back().severity == ContentValidationSeverity::Error)
+        {
+            break;
+        }
+
+        for (std::size_t index = 0U; index < site_def.seeded_phone_listings.size(); ++index)
+        {
+            const auto& listing = site_def.seeded_phone_listings[index];
+            for (std::size_t previous = 0U; previous < index; ++previous)
+            {
+                if (site_def.seeded_phone_listings[previous].listing_id == listing.listing_id)
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Prototype site phone listings must use unique listing ids per site."});
+                    break;
+                }
+            }
+            if (!issues.empty() && issues.back().severity == ContentValidationSeverity::Error)
+            {
+                break;
+            }
+
+            switch (listing.kind)
+            {
+            case PhoneListingKind::BuyItem:
+                if (!content.index.item_by_id.contains(listing.item_or_unlockable_id))
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Prototype site buy listing references an unknown item id."});
+                }
+                break;
+
+            case PhoneListingKind::HireContractor:
+                if (listing.price <= 0 || listing.quantity == 0U)
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Prototype site contractor listings must have positive price and quantity."});
+                }
+                break;
+
+            case PhoneListingKind::PurchaseUnlockable:
+                if (listing.item_or_unlockable_id == 0U || listing.price < 0 || listing.quantity == 0U)
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Prototype site unlockable listings must have a non-zero unlockable id and quantity."});
+                }
+                break;
+
+            case PhoneListingKind::SellItem:
+            default:
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Prototype site seeded phone listings only support buy-item, hire-contractor, and purchase-unlockable entries."});
+                break;
+            }
+
+            if (!issues.empty() && issues.back().severity == ContentValidationSeverity::Error)
+            {
+                break;
+            }
+        }
+        if (!issues.empty() && issues.back().severity == ContentValidationSeverity::Error)
+        {
+            break;
+        }
+    }
+
+    if (issues.empty())
+    {
+        for (const auto site_id : content.prototype_campaign.initially_revealed_site_ids)
+        {
+            if (!content.index.site_by_id.contains(site_id.value))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Prototype campaign initial revealed site list references an unknown site id."});
+                break;
+            }
+        }
+    }
+
+    if (issues.empty())
+    {
+        for (const auto site_id : content.prototype_campaign.initially_available_site_ids)
+        {
+            if (!content.index.site_by_id.contains(site_id.value))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Prototype campaign initial available site list references an unknown site id."});
+                break;
+            }
         }
     }
 

@@ -1,0 +1,5 @@
+site_id	site_archetype_id	objective_type	featured_faction_id	initial_state	adjacent_site_ids	support_package_id	exported_support_items	nearby_aura_modifier_ids	site_completion_tile_threshold	site_time_limit_minutes	objective_target_edge	objective_target_band_width	highway_max_average_sand_cover	completion_reputation_reward	completion_faction_reputation_reward	camp_anchor_x	camp_anchor_y	phone_delivery_fee	phone_delivery_minutes	initial_revealed_unlockable_ids	initial_direct_purchase_unlockable_ids	initially_revealed	initially_available
+1	101	DenseRestoration	1	Available	2	1001	5:4;8:2	1	10	0.0	East	0	0.0	10	10	15	15	5	0	101	101	1	1
+2	102	DenseRestoration	2	Locked	1,3	1002	6:3;9:2	2	12	0.0	East	0	0.0	10	10	16	15	5	0			0	0
+3	103	DenseRestoration	3	Locked	2,4	1003	7:3;2:1	3	14	0.0	East	0	0.0	10	10	16	16	5	0			0	0
+4	104	DenseRestoration	1	Locked	3	1004	3:1;13:1	4	16	0.0	East	0	0.0	10	10	17	16	5	0			0	0

@@ -1,0 +1,8 @@
+preset_kind	preset_index	heat	wind	dust	moisture	fertility	salinity	growth_pressure	salinity_density_cap	plant_density	health	hydration	nourishment	energy_cap	energy	morale	work_efficiency
+NearbyAura	0	-0.15	-0.08	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.08	0.0
+NearbyAura	1	0.0	0.0	0.0	0.12	0.07	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.04	0.0
+NearbyAura	2	0.0	0.0	-0.1	0.0	0.0	0.0	0.0	0.0	0.1	0.0	0.0	0.0	0.0	0.0	0.0	0.05
+RunModifier	0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.15	0.0	0.05	0.25	0.0	0.08	0.1
+RunModifier	1	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.2	0.05	0.0	0.0	0.12	0.3
+RunModifier	2	0.0	0.0	0.0	0.14	0.0	0.0	0.0	0.0	0.0	0.0	0.25	0.15	0.0	0.0	0.04	0.0
+RunModifier	3	0.0	0.0	0.0	0.0	0.0	0.0	-0.18	0.0	0.2	0.0	0.0	0.0	0.0	0.0	0.0	0.05

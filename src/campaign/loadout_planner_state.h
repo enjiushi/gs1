@@ -22,6 +22,7 @@ struct LoadoutPlannerState final
     std::vector<LoadoutSlot> available_exported_support_items {};
     std::vector<LoadoutSlot> selected_loadout_slots {};
     std::vector<ModifierId> active_nearby_aura_modifier_ids {};
+    std::uint32_t support_quota_per_contributor {0};
     std::uint32_t support_quota {0};
 };
 }  // namespace gs1

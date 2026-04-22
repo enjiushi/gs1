@@ -3,8 +3,8 @@
 #include "content/defs/item_defs.h"
 #include "support/id_types.h"
 
-#include <array>
 #include <cstdint>
+#include <span>
 
 namespace gs1
 {
@@ -41,97 +41,7 @@ inline constexpr std::uint32_t k_reward_candidate_site1_water_delivery = 5U;
 inline constexpr std::uint32_t k_reward_candidate_site1_second_unlockable_reveal = 6U;
 inline constexpr std::uint32_t k_reward_candidate_site1_second_run_modifier = 7U;
 
-inline constexpr std::array<RewardCandidateDef, 7> k_prototype_reward_candidate_defs {{
-    RewardCandidateDef {
-        RewardCandidateId {k_reward_candidate_site1_money_stipend},
-        RewardEffectKind::Money,
-        12,
-        ItemId {},
-        0U,
-        0U,
-        ModifierId {},
-        FactionId {},
-        0U,
-        0},
-    RewardCandidateDef {
-        RewardCandidateId {k_reward_candidate_site1_food_delivery},
-        RewardEffectKind::ItemDelivery,
-        0,
-        ItemId {k_item_food_pack},
-        1U,
-        0U,
-        ModifierId {},
-        FactionId {},
-        0U,
-        0},
-    RewardCandidateDef {
-        RewardCandidateId {k_reward_candidate_site1_unlockable_reveal},
-        RewardEffectKind::RevealUnlockable,
-        0,
-        ItemId {},
-        0U,
-        102U,
-        ModifierId {},
-        FactionId {},
-        0U,
-        0},
-    RewardCandidateDef {
-        RewardCandidateId {k_reward_candidate_site1_run_modifier},
-        RewardEffectKind::RunModifier,
-        0,
-        ItemId {},
-        0U,
-        0U,
-        ModifierId {4U},
-        FactionId {},
-        0U,
-        0},
-    RewardCandidateDef {
-        RewardCandidateId {k_reward_candidate_site1_water_delivery},
-        RewardEffectKind::ItemDelivery,
-        0,
-        ItemId {k_item_water_container},
-        1U,
-        0U,
-        ModifierId {},
-        FactionId {},
-        0U,
-        0},
-    RewardCandidateDef {
-        RewardCandidateId {k_reward_candidate_site1_second_unlockable_reveal},
-        RewardEffectKind::RevealUnlockable,
-        0,
-        ItemId {},
-        0U,
-        103U,
-        ModifierId {},
-        FactionId {},
-        0U,
-        0},
-    RewardCandidateDef {
-        RewardCandidateId {k_reward_candidate_site1_second_run_modifier},
-        RewardEffectKind::RunModifier,
-        0,
-        ItemId {},
-        0U,
-        0U,
-        ModifierId {5U},
-        FactionId {},
-        0U,
-        0},
-}};
-
-[[nodiscard]] inline constexpr const RewardCandidateDef* find_reward_candidate_def(
-    RewardCandidateId reward_candidate_id) noexcept
-{
-    for (const auto& reward_candidate_def : k_prototype_reward_candidate_defs)
-    {
-        if (reward_candidate_def.reward_candidate_id == reward_candidate_id)
-        {
-            return &reward_candidate_def;
-        }
-    }
-
-    return nullptr;
-}
+[[nodiscard]] std::span<const RewardCandidateDef> all_reward_candidate_defs() noexcept;
+[[nodiscard]] const RewardCandidateDef* find_reward_candidate_def(
+    RewardCandidateId reward_candidate_id) noexcept;
 }  // namespace gs1
