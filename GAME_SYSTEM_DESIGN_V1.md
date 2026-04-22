@@ -714,6 +714,7 @@ Rules:
 
 - worker movement lives in ECS position/facing components owned by `SiteFlowSystem`
 - worker condition meters live in ECS vitals components owned by `WorkerConditionSystem`
+- `energyCap` and `workEfficiency` are derived snapshots stored on the worker ECS slice for presentation and downstream systems; they are recomputed from the current worker condition rather than authored as independent long-lived meters
 - action runtime state such as `currentActionId` stays in `ActionState`, not on the worker ECS slice
 
 Current code state:
@@ -1192,6 +1193,7 @@ Responsibilities:
 Responsibilities:
 
 - hold one active manual action for the worker
+- derive action duration and instant worker action-cost deltas from the previous-frame `workEfficiency` snapshot
 - check action completion against elapsed action time
 - on completion, emit domain messages that mutate inventory, tiles, or devices
 - apply interruption rules during severe hazards or cancellation
@@ -1222,9 +1224,12 @@ Responsibilities:
 
 Responsibilities:
 
-- apply hydration, nourishment, energy, morale, and health changes
-- apply recovery when sheltered
-- clamp all worker meters
+- resolve worker condition as `prevState -> resolve frame deltas -> currentState`
+- accumulate passive frame loss plus discrete action or item deltas into one bucket per worker meter before clamping
+- resolve current-frame `health`, `hydration`, `nourishment`, and `morale` first
+- derive current-frame `energyCap` from current-frame `health`, `hydration`, and `nourishment` before clamping `energy`
+- derive current-frame `workEfficiency` from current-frame `health`, `hydration`, `nourishment`, and `morale` after `energy` is resolved
+- clamp all worker meters and derived worker values
 - emit site-failure message when health reaches zero
 
 ### 10.6 `CampDurabilitySystem`
