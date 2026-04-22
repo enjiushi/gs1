@@ -15,6 +15,8 @@ namespace
 {
 constexpr float k_modifier_channel_limit = 1.0f;
 constexpr float k_modifier_change_epsilon = 1e-4f;
+constexpr float k_factor_weight_limit = 2.5f;
+constexpr float k_factor_bias_limit = 2.0f;
 
 void accumulate_totals(
     ModifierChannelTotals& destination,
@@ -96,6 +98,89 @@ bool totals_match(const ModifierChannelTotals& lhs, const ModifierChannelTotals&
         std::fabs(lhs.work_efficiency - rhs.work_efficiency) <= k_modifier_change_epsilon;
 }
 
+TerrainFactorModifierState resolve_terrain_factor_modifiers(
+    const ModifierChannelTotals& totals) noexcept
+{
+    TerrainFactorModifierState factors {};
+
+    factors.fertility_to_moisture_cap_weight =
+        std::clamp(1.0f + totals.moisture, 0.0f, k_factor_weight_limit);
+    factors.moisture_weight =
+        std::clamp(1.0f + totals.moisture, 0.0f, k_factor_weight_limit);
+    factors.heat_to_moisture_weight =
+        std::clamp(1.0f - totals.moisture, 0.0f, k_factor_weight_limit);
+    factors.wind_to_moisture_weight =
+        std::clamp(1.0f - totals.moisture, 0.0f, k_factor_weight_limit);
+
+    factors.salinity_to_fertility_cap_weight =
+        std::clamp(1.0f - totals.salinity, 0.0f, k_factor_weight_limit);
+    factors.fertility_weight =
+        std::clamp(1.0f + totals.fertility, 0.0f, k_factor_weight_limit);
+    factors.wind_to_fertility_weight =
+        std::clamp(1.0f - totals.fertility, 0.0f, k_factor_weight_limit);
+    factors.dust_to_fertility_weight =
+        std::clamp(1.0f - totals.fertility, 0.0f, k_factor_weight_limit);
+
+    factors.salinity_source_weight =
+        std::clamp(1.0f - totals.salinity, 0.0f, k_factor_weight_limit);
+    factors.salinity_reduction_weight =
+        std::clamp(1.0f + totals.salinity, 0.0f, k_factor_weight_limit);
+
+    factors.moisture_bias =
+        std::clamp(totals.moisture, -k_factor_bias_limit, k_factor_bias_limit);
+    factors.fertility_bias =
+        std::clamp(totals.fertility, -k_factor_bias_limit, k_factor_bias_limit);
+    factors.salinity_reduction_bias =
+        std::clamp(totals.salinity, -k_factor_bias_limit, k_factor_bias_limit);
+    factors.salinity_source_bias =
+        std::clamp(-totals.salinity, -k_factor_bias_limit, k_factor_bias_limit);
+
+    return factors;
+}
+
+bool terrain_factors_match(
+    const TerrainFactorModifierState& lhs,
+    const TerrainFactorModifierState& rhs) noexcept
+{
+    return
+        std::fabs(lhs.fertility_to_moisture_cap_weight - rhs.fertility_to_moisture_cap_weight) <=
+            k_modifier_change_epsilon &&
+        std::fabs(lhs.fertility_to_moisture_cap_bias - rhs.fertility_to_moisture_cap_bias) <=
+            k_modifier_change_epsilon &&
+        std::fabs(lhs.moisture_weight - rhs.moisture_weight) <= k_modifier_change_epsilon &&
+        std::fabs(lhs.moisture_bias - rhs.moisture_bias) <= k_modifier_change_epsilon &&
+        std::fabs(lhs.heat_to_moisture_weight - rhs.heat_to_moisture_weight) <=
+            k_modifier_change_epsilon &&
+        std::fabs(lhs.heat_to_moisture_bias - rhs.heat_to_moisture_bias) <=
+            k_modifier_change_epsilon &&
+        std::fabs(lhs.wind_to_moisture_weight - rhs.wind_to_moisture_weight) <=
+            k_modifier_change_epsilon &&
+        std::fabs(lhs.wind_to_moisture_bias - rhs.wind_to_moisture_bias) <=
+            k_modifier_change_epsilon &&
+        std::fabs(lhs.salinity_to_fertility_cap_weight - rhs.salinity_to_fertility_cap_weight) <=
+            k_modifier_change_epsilon &&
+        std::fabs(lhs.salinity_to_fertility_cap_bias - rhs.salinity_to_fertility_cap_bias) <=
+            k_modifier_change_epsilon &&
+        std::fabs(lhs.fertility_weight - rhs.fertility_weight) <= k_modifier_change_epsilon &&
+        std::fabs(lhs.fertility_bias - rhs.fertility_bias) <= k_modifier_change_epsilon &&
+        std::fabs(lhs.wind_to_fertility_weight - rhs.wind_to_fertility_weight) <=
+            k_modifier_change_epsilon &&
+        std::fabs(lhs.wind_to_fertility_bias - rhs.wind_to_fertility_bias) <=
+            k_modifier_change_epsilon &&
+        std::fabs(lhs.dust_to_fertility_weight - rhs.dust_to_fertility_weight) <=
+            k_modifier_change_epsilon &&
+        std::fabs(lhs.dust_to_fertility_bias - rhs.dust_to_fertility_bias) <=
+            k_modifier_change_epsilon &&
+        std::fabs(lhs.salinity_source_weight - rhs.salinity_source_weight) <=
+            k_modifier_change_epsilon &&
+        std::fabs(lhs.salinity_source_bias - rhs.salinity_source_bias) <=
+            k_modifier_change_epsilon &&
+        std::fabs(lhs.salinity_reduction_weight - rhs.salinity_reduction_weight) <=
+            k_modifier_change_epsilon &&
+        std::fabs(lhs.salinity_reduction_bias - rhs.salinity_reduction_bias) <=
+            k_modifier_change_epsilon;
+}
+
 bool contains_modifier_id(
     const std::vector<ModifierId>& ids,
     ModifierId id) noexcept
@@ -171,10 +256,14 @@ void resolve_modifier_totals(SiteSystemContext<ModifierSystem>& context)
     const auto next_totals =
         resolve_owned_totals(context.world.read_modifier(), context.world.read_camp());
     auto& current_totals = context.world.own_modifier().resolved_channel_totals;
+    const auto next_terrain_factors = resolve_terrain_factor_modifiers(next_totals);
+    auto& current_terrain_factors = context.world.own_modifier().resolved_terrain_factor_modifiers;
 
-    if (!totals_match(current_totals, next_totals))
+    if (!totals_match(current_totals, next_totals) ||
+        !terrain_factors_match(current_terrain_factors, next_terrain_factors))
     {
         current_totals = next_totals;
+        current_terrain_factors = next_terrain_factors;
         context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_HUD);
     }
 }
@@ -187,6 +276,7 @@ void handle_site_run_started(
     modifier_state.active_run_modifier_ids.clear();
     modifier_state.active_nearby_aura_modifier_ids.clear();
     modifier_state.resolved_channel_totals = {};
+    modifier_state.resolved_terrain_factor_modifiers = {};
 
     const auto& aura_ids = context.campaign.loadout_planner_state.active_nearby_aura_modifier_ids;
     modifier_state.active_nearby_aura_modifier_ids.insert(

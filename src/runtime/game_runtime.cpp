@@ -45,12 +45,12 @@ namespace gs1
 {
 namespace
 {
-constexpr float k_visible_tile_density_projection_step = 1.0f / 32.0f;
-constexpr float k_visible_tile_burial_projection_step = 1.0f / 64.0f;
+constexpr float k_visible_tile_density_projection_step = 100.0f / 32.0f;
+constexpr float k_visible_tile_burial_projection_step = 100.0f / 64.0f;
 constexpr float k_visible_tile_local_wind_projection_step = 2.5f;
-constexpr float k_visible_tile_moisture_projection_step = 1.0f / 64.0f;
-constexpr float k_visible_tile_soil_fertility_projection_step = 1.0f / 64.0f;
-constexpr float k_visible_tile_soil_salinity_projection_step = 1.0f / 64.0f;
+constexpr float k_visible_tile_moisture_projection_step = 100.0f / 64.0f;
+constexpr float k_visible_tile_soil_fertility_projection_step = 100.0f / 64.0f;
+constexpr float k_visible_tile_soil_salinity_projection_step = 100.0f / 64.0f;
 
 [[nodiscard]] bool app_state_supports_technology_tree(Gs1AppState app_state) noexcept
 {
@@ -83,11 +83,11 @@ constexpr float k_visible_tile_soil_salinity_projection_step = 1.0f / 64.0f;
         tile.ecology.ground_cover_type_id,
         quantize_projected_tile_channel(
             tile.ecology.plant_density,
-            1.0f,
+            100.0f,
             k_visible_tile_density_projection_step),
         quantize_projected_tile_channel(
             tile.ecology.sand_burial,
-            1.0f,
+            100.0f,
             k_visible_tile_burial_projection_step),
         quantize_projected_tile_channel(
             tile.local_weather.wind,
@@ -95,15 +95,15 @@ constexpr float k_visible_tile_soil_salinity_projection_step = 1.0f / 64.0f;
             k_visible_tile_local_wind_projection_step),
         quantize_projected_tile_channel(
             tile.ecology.moisture,
-            1.0f,
+            100.0f,
             k_visible_tile_moisture_projection_step),
         quantize_projected_tile_channel(
             tile.ecology.soil_fertility,
-            1.0f,
+            100.0f,
             k_visible_tile_soil_fertility_projection_step),
         quantize_projected_tile_channel(
             tile.ecology.soil_salinity,
-            1.0f,
+            100.0f,
             k_visible_tile_soil_salinity_projection_step),
         true};
 }

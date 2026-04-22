@@ -1216,9 +1216,11 @@ Responsibilities:
 
 Responsibilities:
 
+- recompute resolved tile contribution states `tileHeatProtection`, `tileWindProtection`, `tileDustProtection`, `tileFertilityImprove`, `tileSalinityReduction`, and `tileIrrigation` every step
 - recompute `tileHeat`, `tileWind`, `tileDust` every step
 - combine site weather, event pressure, nearby support, local plant support, structure support, terrain shelter, and modifier channels
 - treat wind shelter as directional lee-side support driven by `weatherWindDirectionDegrees`, with nonlinear falloff across the authored wind-protection range
+- keep device support on the same resolved tile contribution channels as plant support instead of special-case weather-only device logic
 
 ### 10.5 `WorkerConditionSystem`
 
@@ -1270,6 +1272,19 @@ Responsibilities:
 - resolve density-state thresholds
 - update `fullyGrownTileCount`
 - run ecology pulse actions such as spread
+
+V1 terrain-update rule:
+
+- every named terrain coefficient should use an explicit `...Factor` name
+- every runtime coefficient should resolve as `resolved = factor * weight + bias`
+- weights default to `1`
+- biases default to `0`
+- terrain formulas should multiply rates by in-game simulation delta, not wall-clock frame delta
+- use `simulationDtMinutes = runtime_minutes_from_real_seconds(fixedStepSeconds)` as the canonical terrain-step delta
+- terrain should read resolved local weather directly, not subtract protection a second time
+- moisture should read `tileIrrigation`, `tileHeat`, `tileWind`, and the fertility-derived moisture cap
+- fertility should read `tileFertilityImprove`, `tileWind`, `tileDust`, and the salinity-derived fertility cap
+- salinity should read `tileSalinityReduction` through the same `factor * weight + bias` pattern
 
 ### 10.10 `InventorySystem`
 

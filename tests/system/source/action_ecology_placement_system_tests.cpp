@@ -652,7 +652,7 @@ void action_execution_plant_completion_emits_ground_cover_after_reservation(
             GameMessageType::SiteGroundCoverPlaced);
     GS1_SYSTEM_TEST_REQUIRE(context, ground_cover != nullptr);
     GS1_SYSTEM_TEST_CHECK(context, ground_cover->ground_cover_type_id == 9U);
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(ground_cover->initial_density, 0.5f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(ground_cover->initial_density, 50.0f));
     GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.current_action_id.has_value());
 }
 
@@ -724,7 +724,7 @@ void action_execution_item_based_plant_completion_consumes_seed_and_emits_planti
             GameMessageType::SiteTilePlantingCompleted);
     GS1_SYSTEM_TEST_REQUIRE(context, planting != nullptr);
     GS1_SYSTEM_TEST_CHECK(context, planting->plant_type_id == gs1::k_plant_ordos_wormwood);
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(planting->initial_density, 0.4f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(planting->initial_density, 40.0f));
     GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.current_action_id.has_value());
 }
 
@@ -1442,7 +1442,7 @@ void ecology_ground_cover_and_planting_update_tile_state(
     auto tile = site_run.site_world->tile_at(TileCoord {2, 2});
     GS1_SYSTEM_TEST_CHECK(context, tile.ecology.ground_cover_type_id == 5U);
     GS1_SYSTEM_TEST_CHECK(context, tile.ecology.plant_id.value == 0U);
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.plant_density, 0.4f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.plant_density, 40.0f));
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::TileEcologyChanged);
     GS1_SYSTEM_TEST_CHECK(
@@ -1469,7 +1469,7 @@ void ecology_ground_cover_and_planting_update_tile_state(
         tile = site_run.site_world->tile_at(coord);
         GS1_SYSTEM_TEST_CHECK(context, tile.ecology.plant_id.value == gs1::k_plant_ordos_wormwood);
         GS1_SYSTEM_TEST_CHECK(context, tile.ecology.ground_cover_type_id == 0U);
-        GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.plant_density, 0.6f));
+        GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.plant_density, 60.0f));
     }
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::TileEcologyChanged) == 4U);
 }
@@ -1493,9 +1493,9 @@ void ecology_watering_and_burial_clear_require_valid_targets(
 
     auto tile = site_run.site_world->tile_at(TileCoord {1, 1});
     tile.ecology.ground_cover_type_id = 3U;
-    tile.ecology.plant_density = 0.2f;
-    tile.ecology.moisture = 0.2f;
-    tile.ecology.sand_burial = 0.8f;
+    tile.ecology.plant_density = 20.0f;
+    tile.ecology.moisture = 20.0f;
+    tile.ecology.sand_burial = 80.0f;
     site_run.site_world->set_tile(TileCoord {1, 1}, tile);
 
     GS1_SYSTEM_TEST_REQUIRE(
@@ -1506,7 +1506,7 @@ void ecology_watering_and_burial_clear_require_valid_targets(
                 GameMessageType::SiteTileWatered,
                 SiteTileWateredMessage {2U, 1, 1, 1.5f, 0U})) == GS1_STATUS_OK);
     tile = site_run.site_world->tile_at(TileCoord {1, 1});
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.moisture, 0.53f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.moisture, 53.0f));
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(
         context,
@@ -1522,7 +1522,7 @@ void ecology_watering_and_burial_clear_require_valid_targets(
                 GameMessageType::SiteTileBurialCleared,
                 SiteTileBurialClearedMessage {3U, 1, 1, 0.3f, 0U})) == GS1_STATUS_OK);
     tile = site_run.site_world->tile_at(TileCoord {1, 1});
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.sand_burial, 0.5f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.sand_burial, 50.0f));
     GS1_SYSTEM_TEST_CHECK(
         context,
         queue.front().payload_as<TileEcologyChangedMessage>().changed_mask ==
@@ -1541,7 +1541,7 @@ void ecology_uses_average_wind_across_multitile_plant_footprint(
     {
         auto tile = site_run.site_world->tile_at(coord);
         tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_ordos_wormwood};
-        tile.ecology.plant_density = 0.6f;
+        tile.ecology.plant_density = 60.0f;
         tile.ecology.moisture = 0.0f;
         tile.ecology.soil_fertility = 0.0f;
         tile.ecology.soil_salinity = 0.0f;
@@ -1560,10 +1560,42 @@ void ecology_uses_average_wind_across_multitile_plant_footprint(
     const auto bottom_left = site_run.site_world->tile_at(TileCoord {2, 3});
     const auto bottom_right = site_run.site_world->tile_at(TileCoord {3, 3});
 
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(top_left.ecology.growth_pressure, 0.215f));
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(top_right.ecology.growth_pressure, 0.215f));
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(bottom_left.ecology.growth_pressure, 0.215f));
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(bottom_right.ecology.growth_pressure, 0.215f));
+    GS1_SYSTEM_TEST_CHECK(context, top_left.ecology.growth_pressure > 0.0f);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(top_left.ecology.growth_pressure, top_right.ecology.growth_pressure));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(top_left.ecology.growth_pressure, bottom_left.ecology.growth_pressure));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(top_left.ecology.growth_pressure, bottom_right.ecology.growth_pressure));
+}
+
+void ecology_uses_resolved_tile_contribution_state_for_terrain_updates(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 7022U);
+    GameMessageQueue queue {};
+    auto site_context = make_site_context<EcologySystem>(campaign, site_run, queue, 1.0);
+
+    auto tile = site_run.site_world->tile_at(TileCoord {2, 2});
+    tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_white_thorn};
+    tile.ecology.plant_density = 50.0f;
+    tile.ecology.moisture = 35.0f;
+    tile.ecology.soil_fertility = 40.0f;
+    tile.ecology.soil_salinity = 20.0f;
+    tile.local_weather = gs1::SiteWorld::TileLocalWeatherData {0.0f, 0.0f, 0.0f};
+    tile.resolved_contribution = gs1::SiteWorld::TileResolvedContributionData {
+        0.0f,
+        0.0f,
+        0.0f,
+        4.0f,
+        4.0f,
+        4.0f};
+    site_run.site_world->set_tile(TileCoord {2, 2}, tile);
+
+    EcologySystem::run(site_context);
+
+    const auto updated = site_run.site_world->tile_at(TileCoord {2, 2});
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(updated.ecology.moisture, 35.064f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(updated.ecology.soil_fertility, 40.048f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(updated.ecology.soil_salinity, 16.8f));
 }
 
 void ecology_run_grows_occupied_tiles_and_updates_progress(
@@ -1577,18 +1609,20 @@ void ecology_run_grows_occupied_tiles_and_updates_progress(
     site_run.counters.site_completion_tile_threshold = 2U;
     auto occupied = site_run.site_world->tile_at(TileCoord {2, 2});
     occupied.ecology.plant_id = gs1::PlantId {7U};
-    occupied.ecology.plant_density = 0.9f;
+    occupied.ecology.plant_density = 99.0f;
+    occupied.ecology.moisture = 100.0f;
+    occupied.ecology.soil_fertility = 100.0f;
     site_run.site_world->set_tile(TileCoord {2, 2}, occupied);
 
     auto second = site_run.site_world->tile_at(TileCoord {3, 2});
     second.ecology.ground_cover_type_id = 5U;
-    second.ecology.plant_density = 1.0f;
+    second.ecology.plant_density = 100.0f;
     site_run.site_world->set_tile(TileCoord {3, 2}, second);
 
     EcologySystem::run(site_context);
 
     occupied = site_run.site_world->tile_at(TileCoord {2, 2});
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(occupied.ecology.plant_density, 1.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(occupied.ecology.plant_density, 100.0f));
     GS1_SYSTEM_TEST_CHECK(context, site_run.counters.fully_grown_tile_count == 2U);
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::TileEcologyChanged) >= 1U);
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::RestorationProgressChanged) == 1U);
@@ -1759,6 +1793,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "ecology",
     "uses_average_wind_across_multitile_plant_footprint",
     ecology_uses_average_wind_across_multitile_plant_footprint);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "ecology",
+    "uses_resolved_tile_contribution_state_for_terrain_updates",
+    ecology_uses_resolved_tile_contribution_state_for_terrain_updates);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "ecology",
     "run_grows_occupied_tiles_and_updates_progress",

@@ -13,21 +13,24 @@
 namespace
 {
 constexpr float k_local_weather_epsilon = 0.0001f;
+constexpr float k_density_epsilon_raw = 0.01f;
+constexpr float k_inverse_meter_scale = 0.01f;
 constexpr int k_max_supported_support_range = 2;
 constexpr float k_own_tile_contribution_scale = 0.04f;
 constexpr float k_neighbor_contribution_scale = 0.018f;
-constexpr float k_bare_tile_dust_bias = 0.9f;
-constexpr float k_burial_dust_bias = 1.75f;
 constexpr std::uint32_t k_local_weather_full_refresh_tile_budget = 32U;
 constexpr float k_wind_shadow_alignment_exponent = 2.0f;
 constexpr float k_wind_shadow_falloff_exponent = 3.0f;
 constexpr float k_wind_shadow_falloff_strength = 2.0f;
 
-struct WeatherSupportMeters final
+struct TileContributionMeters final
 {
-    float heat {0.0f};
-    float wind {0.0f};
-    float dust {0.0f};
+    float heat_protection {0.0f};
+    float wind_protection {0.0f};
+    float dust_protection {0.0f};
+    float fertility_improve {0.0f};
+    float salinity_reduction {0.0f};
+    float irrigation {0.0f};
 };
 
 struct NeighborSample final
@@ -89,7 +92,7 @@ bool ecology_has_weather_support_source(const gs1::SiteWorld::TileEcologyData& e
 
 bool ecology_has_projected_plant_visual(const gs1::SiteWorld::TileEcologyData& ecology) noexcept
 {
-    return ecology.plant_id.value != 0U || ecology.plant_density > k_local_weather_epsilon;
+    return ecology.plant_id.value != 0U || ecology.plant_density > k_density_epsilon_raw;
 }
 
 bool ecology_change_affects_local_weather(std::uint32_t changed_mask) noexcept
@@ -178,10 +181,16 @@ bool ecology_change_affects_local_weather(std::uint32_t changed_mask) noexcept
     return anchor.x == coord.x && anchor.y == coord.y;
 }
 
-[[nodiscard]] bool structure_has_wind_protection(gs1::StructureId structure_id) noexcept
+[[nodiscard]] bool structure_has_tile_contribution(gs1::StructureId structure_id) noexcept
 {
     const auto* structure_def = gs1::find_structure_def(structure_id);
-    return structure_def != nullptr && structure_def->wind_protection_value > k_local_weather_epsilon;
+    return structure_def != nullptr &&
+        (structure_def->wind_protection_value > k_local_weather_epsilon ||
+            structure_def->heat_protection_value > k_local_weather_epsilon ||
+            structure_def->dust_protection_value > k_local_weather_epsilon ||
+            structure_def->fertility_improve_value > k_local_weather_epsilon ||
+            structure_def->salinity_reduction_value > k_local_weather_epsilon ||
+            structure_def->irrigation_value > k_local_weather_epsilon);
 }
 
 void ensure_local_weather_runtime_buffers(
@@ -270,12 +279,12 @@ BaseLocalWeather compute_base_local_weather(
         normalize_wind_direction_degrees(weather.weather_wind_direction_degrees)};
 }
 
-WeatherSupportMeters accumulate_weather_support(
+TileContributionMeters accumulate_tile_contributions(
     gs1::SiteSystemContext<gs1::LocalWeatherResolveSystem>& context,
     gs1::TileCoord target_coord,
     const BaseLocalWeather& base_weather)
 {
-    WeatherSupportMeters support {};
+    TileContributionMeters support {};
     const UnitVector wind_direction =
         resolve_wind_direction_unit_vector(base_weather.wind_direction_degrees);
 
@@ -298,7 +307,8 @@ WeatherSupportMeters accumulate_weather_support(
 
         if (ecology_has_weather_support_source(source_ecology))
         {
-            const float density = std::clamp(source_ecology.plant_density, 0.0f, 1.0f);
+            const float density =
+                std::clamp(source_ecology.plant_density * k_inverse_meter_scale, 0.0f, 1.0f);
             if (density > k_local_weather_epsilon)
             {
                 const auto& plant_def = resolve_occupant_def(source_ecology);
@@ -307,13 +317,20 @@ WeatherSupportMeters accumulate_weather_support(
                     sample.manhattan_distance <= static_cast<int>(plant_def.aura_size);
                 if (within_shared_aura)
                 {
-                    support.heat += plant_def.heat_protection_power * density * contribution_scale;
-                    support.dust += plant_def.dust_protection_power * density * contribution_scale;
+                    support.heat_protection +=
+                        plant_def.heat_protection_power * density * contribution_scale;
+                    support.dust_protection +=
+                        plant_def.dust_protection_power * density * contribution_scale;
+                    support.fertility_improve +=
+                        plant_def.fertility_improve_power * density * contribution_scale;
+                    support.salinity_reduction +=
+                        plant_def.salinity_reduction_power * density * contribution_scale;
                 }
 
                 if (sample.manhattan_distance == 0)
                 {
-                    support.wind += plant_def.wind_protection_power * density * contribution_scale;
+                    support.wind_protection +=
+                        plant_def.wind_protection_power * density * contribution_scale;
                 }
                 else if (sample.manhattan_distance <= static_cast<int>(plant_def.wind_protection_range))
                 {
@@ -326,7 +343,7 @@ WeatherSupportMeters accumulate_weather_support(
                         wind_direction);
                     if (shadow_scale > k_local_weather_epsilon)
                     {
-                        support.wind +=
+                        support.wind_protection +=
                             plant_def.wind_protection_power *
                             density *
                             contribution_scale *
@@ -344,7 +361,7 @@ WeatherSupportMeters accumulate_weather_support(
         }
 
         const auto* structure_def = gs1::find_structure_def(structure_id);
-        if (structure_def == nullptr || structure_def->wind_protection_value <= k_local_weather_epsilon)
+        if (structure_def == nullptr)
         {
             continue;
         }
@@ -355,9 +372,32 @@ WeatherSupportMeters accumulate_weather_support(
             continue;
         }
 
+        const bool within_shared_aura =
+            sample.manhattan_distance == 0 ||
+            sample.manhattan_distance <= static_cast<int>(structure_def->aura_size);
+        if (within_shared_aura)
+        {
+            support.heat_protection +=
+                structure_def->heat_protection_value * efficiency * contribution_scale;
+            support.dust_protection +=
+                structure_def->dust_protection_value * efficiency * contribution_scale;
+            support.fertility_improve +=
+                structure_def->fertility_improve_value * efficiency * contribution_scale;
+            support.salinity_reduction +=
+                structure_def->salinity_reduction_value * efficiency * contribution_scale;
+            support.irrigation +=
+                structure_def->irrigation_value * efficiency * contribution_scale;
+        }
+
+        if (structure_def->wind_protection_value <= k_local_weather_epsilon)
+        {
+            continue;
+        }
+
         if (sample.manhattan_distance == 0)
         {
-            support.wind += structure_def->wind_protection_value * efficiency * contribution_scale;
+            support.wind_protection +=
+                structure_def->wind_protection_value * efficiency * contribution_scale;
             continue;
         }
 
@@ -378,7 +418,7 @@ WeatherSupportMeters accumulate_weather_support(
             continue;
         }
 
-        support.wind +=
+        support.wind_protection +=
             structure_def->wind_protection_value *
             efficiency *
             contribution_scale *
@@ -394,22 +434,24 @@ bool resolve_tile_local_weather(
     const BaseLocalWeather& base_weather)
 {
     const auto coord = context.world.tile_coord(index);
-    const auto ecology = context.world.read_tile_ecology_at_index(index);
-    const auto current_weather = context.world.read_tile_local_weather_at_index(index);
-    const bool has_cover = ecology_has_weather_support_source(ecology);
-    const float cover_density = std::clamp(ecology.plant_density, 0.0f, 1.0f);
-    const auto support = accumulate_weather_support(context, coord, base_weather);
+    const auto current_tile = context.world.read_tile_at_index(index);
+    const auto& ecology = current_tile.ecology;
+    const auto& current_weather = current_tile.local_weather;
+    const auto& current_support = current_tile.resolved_contribution;
+    const auto support = accumulate_tile_contributions(context, coord, base_weather);
+
+    const gs1::SiteWorld::TileResolvedContributionData resolved_support {
+        std::clamp(support.heat_protection, 0.0f, 100.0f),
+        std::clamp(support.wind_protection, 0.0f, 100.0f),
+        std::clamp(support.dust_protection, 0.0f, 100.0f),
+        std::clamp(support.fertility_improve, 0.0f, 100.0f),
+        std::clamp(support.salinity_reduction, 0.0f, 100.0f),
+        std::clamp(support.irrigation, 0.0f, 100.0f)};
 
     const gs1::SiteWorld::TileLocalWeatherData resolved_weather {
-        std::clamp(base_weather.heat - support.heat, 0.0f, 100.0f),
-        std::clamp(base_weather.wind - support.wind, 0.0f, 100.0f),
-        std::clamp(
-            base_weather.dust - support.dust +
-                ((1.0f - cover_density) * k_bare_tile_dust_bias) +
-                (ecology.sand_burial * k_burial_dust_bias) +
-                (has_cover ? 0.0f : 0.35f),
-            0.0f,
-            100.0f)};
+        std::clamp(base_weather.heat - resolved_support.heat_protection, 0.0f, 100.0f),
+        std::clamp(base_weather.wind - resolved_support.wind_protection, 0.0f, 100.0f),
+        std::clamp(base_weather.dust - resolved_support.dust_protection, 0.0f, 100.0f)};
 
     const bool heat_changed =
         std::fabs(current_weather.heat - resolved_weather.heat) > k_local_weather_epsilon;
@@ -417,12 +459,26 @@ bool resolve_tile_local_weather(
         std::fabs(current_weather.wind - resolved_weather.wind) > k_local_weather_epsilon;
     const bool dust_changed =
         std::fabs(current_weather.dust - resolved_weather.dust) > k_local_weather_epsilon;
-    if (!heat_changed && !wind_changed && !dust_changed)
+    const bool support_changed =
+        std::fabs(current_support.heat_protection - resolved_support.heat_protection) > k_local_weather_epsilon ||
+        std::fabs(current_support.wind_protection - resolved_support.wind_protection) > k_local_weather_epsilon ||
+        std::fabs(current_support.dust_protection - resolved_support.dust_protection) > k_local_weather_epsilon ||
+        std::fabs(current_support.fertility_improve - resolved_support.fertility_improve) > k_local_weather_epsilon ||
+        std::fabs(current_support.salinity_reduction - resolved_support.salinity_reduction) > k_local_weather_epsilon ||
+        std::fabs(current_support.irrigation - resolved_support.irrigation) > k_local_weather_epsilon;
+    if (!heat_changed && !wind_changed && !dust_changed && !support_changed)
     {
         return false;
     }
 
-    context.world.write_tile_local_weather_at_index(index, resolved_weather);
+    if (heat_changed || wind_changed || dust_changed || support_changed)
+    {
+        auto next_tile = current_tile;
+        next_tile.local_weather = resolved_weather;
+        next_tile.resolved_contribution = resolved_support;
+        context.world.write_tile_at_index(index, next_tile);
+    }
+
     if (wind_changed && ecology_has_projected_plant_visual(ecology))
     {
         context.world.mark_tile_projection_dirty(coord);
@@ -528,7 +584,7 @@ Gs1Status LocalWeatherResolveSystem::process_message(
     if (message.type == GameMessageType::SiteDevicePlaced)
     {
         const auto& payload = message.payload_as<SiteDevicePlacedMessage>();
-        if (!structure_has_wind_protection(StructureId {payload.structure_id}))
+        if (!structure_has_tile_contribution(StructureId {payload.structure_id}))
         {
             return GS1_STATUS_OK;
         }
@@ -546,7 +602,7 @@ Gs1Status LocalWeatherResolveSystem::process_message(
     if (message.type == GameMessageType::SiteDeviceBroken)
     {
         const auto& payload = message.payload_as<SiteDeviceBrokenMessage>();
-        if (!structure_has_wind_protection(StructureId {payload.structure_id}))
+        if (!structure_has_tile_contribution(StructureId {payload.structure_id}))
         {
             return GS1_STATUS_OK;
         }
@@ -571,7 +627,7 @@ Gs1Status LocalWeatherResolveSystem::process_message(
         }
 
         const auto structure_id = context.world.read_tile(anchor).device.structure_id;
-        if (!structure_has_wind_protection(structure_id))
+        if (!structure_has_tile_contribution(structure_id))
         {
             return GS1_STATUS_OK;
         }

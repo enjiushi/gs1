@@ -26,10 +26,37 @@ struct ModifierChannelTotals final
     float work_efficiency {0.0f};
 };
 
+struct TerrainFactorModifierState final
+{
+    float fertility_to_moisture_cap_weight {1.0f};
+    float fertility_to_moisture_cap_bias {0.0f};
+    float moisture_weight {1.0f};
+    float moisture_bias {0.0f};
+    float heat_to_moisture_weight {1.0f};
+    float heat_to_moisture_bias {0.0f};
+    float wind_to_moisture_weight {1.0f};
+    float wind_to_moisture_bias {0.0f};
+
+    float salinity_to_fertility_cap_weight {1.0f};
+    float salinity_to_fertility_cap_bias {0.0f};
+    float fertility_weight {1.0f};
+    float fertility_bias {0.0f};
+    float wind_to_fertility_weight {1.0f};
+    float wind_to_fertility_bias {0.0f};
+    float dust_to_fertility_weight {1.0f};
+    float dust_to_fertility_bias {0.0f};
+
+    float salinity_source_weight {1.0f};
+    float salinity_source_bias {0.0f};
+    float salinity_reduction_weight {1.0f};
+    float salinity_reduction_bias {0.0f};
+};
+
 struct ModifierState final
 {
     std::vector<ModifierId> active_run_modifier_ids {};
     std::vector<ModifierId> active_nearby_aura_modifier_ids {};
     ModifierChannelTotals resolved_channel_totals {};
+    TerrainFactorModifierState resolved_terrain_factor_modifiers {};
 };
 }  // namespace gs1

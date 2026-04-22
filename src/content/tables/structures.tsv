@@ -1,5 +1,5 @@
-structure_id	display_name	durability	wind_protection_value	wind_protection_range	storage_slot_count	crafting_station_kind	grants_storage	footprint_width	footprint_height
-201	Camp Stove	1.0	0.0	0	6	Cooking	1	1	1
-202	Workbench	1.0	0.0	0	8	Fabrication	1	1	1
-203	Storage Crate	1.0	0.0	0	10	None	1	1	1
-204	Wind Fence	1.0	42.0	1	0	None	0	1	1
+structure_id	display_name	durability	aura_size	wind_protection_value	wind_protection_range	heat_protection_value	dust_protection_value	fertility_improve_value	salinity_reduction_value	irrigation_value	storage_slot_count	crafting_station_kind	grants_storage	footprint_width	footprint_height
+201	Camp Stove	1.0	0	0.0	0	0.0	0.0	0.0	0.0	0.0	6	Cooking	1	1	1
+202	Workbench	1.0	0	0.0	0	0.0	0.0	0.0	0.0	0.0	8	Fabrication	1	1	1
+203	Storage Crate	1.0	0	0.0	0	0.0	0.0	0.0	0.0	0.0	10	None	1	1	1
+204	Wind Fence	1.0	0	42.0	1	0.0	0.0	0.0	0.0	0.0	0	None	0	1	1
