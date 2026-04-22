@@ -37,7 +37,7 @@ inline constexpr std::uint32_t k_task_template_site1_restore_patch = 1U;
 inline constexpr std::uint32_t k_task_template_site1_buy_water = 2U;
 inline constexpr std::uint32_t k_task_template_site1_sell_water = 3U;
 inline constexpr std::uint32_t k_task_template_site1_transfer_seeds = 4U;
-inline constexpr std::uint32_t k_task_template_site1_plant_wind_reed = 5U;
+inline constexpr std::uint32_t k_task_template_site1_plant_ordos_wormwood = 5U;
 inline constexpr std::uint32_t k_task_template_site1_craft_hammer = 6U;
 inline constexpr std::uint32_t k_task_template_site1_consume_supply = 7U;
 

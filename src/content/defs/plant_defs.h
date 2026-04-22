@@ -16,16 +16,16 @@ enum class PlantHeightClass : std::uint8_t
     Tall = 3
 };
 
-inline constexpr std::uint32_t k_plant_wind_reed = 1U;
-inline constexpr std::uint32_t k_plant_salt_bean = 2U;
-inline constexpr std::uint32_t k_plant_shade_cactus = 3U;
-inline constexpr std::uint32_t k_plant_sunfruit_vine = 4U;
+inline constexpr std::uint32_t k_plant_ordos_wormwood = 1U;
+inline constexpr std::uint32_t k_plant_white_thorn = 2U;
+inline constexpr std::uint32_t k_plant_red_tamarisk = 3U;
+inline constexpr std::uint32_t k_plant_ningxia_wolfberry = 4U;
 inline constexpr std::uint32_t k_plant_straw_checkerboard = 5U;
-inline constexpr std::uint32_t k_plant_root_binder = 6U;
-inline constexpr std::uint32_t k_plant_dew_grass = 7U;
-inline constexpr std::uint32_t k_plant_thorn_shrub = 8U;
-inline constexpr std::uint32_t k_plant_medicinal_sage = 9U;
-inline constexpr std::uint32_t k_plant_sand_willow = 10U;
+inline constexpr std::uint32_t k_plant_korshinsk_peashrub = 6U;
+inline constexpr std::uint32_t k_plant_jiji_grass = 7U;
+inline constexpr std::uint32_t k_plant_sea_buckthorn = 8U;
+inline constexpr std::uint32_t k_plant_desert_ephedra = 9U;
+inline constexpr std::uint32_t k_plant_saxaul = 10U;
 
 struct PlantDef final
 {

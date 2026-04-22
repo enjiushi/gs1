@@ -363,7 +363,7 @@ void ecology_growth_completes_task_and_site_attempt()
         TileCoord {4, 1}};
     for (const auto coord : seeded_tiles)
     {
-        seed_plant_tile(site_run, coord, gs1::k_plant_wind_reed, 0.9f);
+        seed_plant_tile(site_run, coord, gs1::k_plant_ordos_wormwood, 0.9f);
     }
 
     Gs1Phase1Result result {};
@@ -386,7 +386,7 @@ void ecology_growth_completes_task_and_site_attempt()
 
     const auto tile_state = gs1::site_world_access::tile_ecology(site_run, seeded_tiles.front());
     assert(approx_equal(tile_state.plant_density, 1.0f));
-    assert(tile_state.plant_id.value == gs1::k_plant_wind_reed);
+    assert(tile_state.plant_id.value == gs1::k_plant_ordos_wormwood);
     assert(tile_state.ground_cover_type_id == 0U);
 
     const auto phase1_messages = drain_engine_messages(runtime);
@@ -394,7 +394,7 @@ void ecology_growth_completes_task_and_site_attempt()
     assert(grown_tile_message != nullptr);
     {
         const auto& payload = grown_tile_message->payload_as<Gs1EngineMessageSiteTileData>();
-        assert(payload.plant_type_id == gs1::k_plant_wind_reed);
+        assert(payload.plant_type_id == gs1::k_plant_ordos_wormwood);
         assert(payload.ground_cover_type_id == 0U);
         assert(approx_equal(payload.plant_density, 1.0f));
     }

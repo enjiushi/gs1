@@ -495,7 +495,7 @@ int main()
     const auto tech_tree_messages = drain_engine_messages(runtime);
     assert(contains_ui_element_text(tech_tree_messages, "Prototype Tech Tree"));
     assert(contains_ui_element_text(tech_tree_messages, "Starter Plants"));
-    assert(contains_ui_element_text(tech_tree_messages, "Root Binder | Salt Bean"));
+    assert(contains_ui_element_text(tech_tree_messages, "Peashrub | White Thorn"));
     assert(contains_ui_element_text(tech_tree_messages, "Tab: Village Committee"));
 
     GameMessage select_forestry_tab_message {};
@@ -540,7 +540,7 @@ int main()
     drain_engine_messages(support_runtime);
     assert(support_runtime.handle_message(make_select_site_message(2U)) == GS1_STATUS_OK);
     const auto support_loadout_messages = drain_engine_messages(support_runtime);
-    assert(contains_ui_element_text(support_loadout_messages, "Salt Bean Seeds x4"));
+    assert(contains_ui_element_text(support_loadout_messages, "White Thorn Seeds x4"));
     assert(contains_ui_element_text(support_loadout_messages, "Wood x2"));
     assert(contains_ui_element_text(support_loadout_messages, "Adj Support x1"));
     assert(contains_ui_element_text(support_loadout_messages, "Aura Ready x1"));
@@ -564,7 +564,7 @@ int main()
     assert(gs1::inventory_storage::available_item_quantity_in_container(
                supported_site_run,
                gs1::inventory_storage::starter_storage_container(supported_site_run),
-               gs1::ItemId {gs1::k_item_salt_bean_seed_bundle}) == 4U);
+               gs1::ItemId {gs1::k_item_white_thorn_seed_bundle}) == 4U);
     assert(gs1::inventory_storage::available_item_quantity_in_container(
                supported_site_run,
                gs1::inventory_storage::starter_storage_container(supported_site_run),
@@ -897,7 +897,7 @@ int main()
     run_phase1(phone_panel_runtime, k_default_delivery_real_seconds, phone_panel_delivery_result);
     const auto delivered_sellable_slot_index = find_delivery_box_slot_index(
         phone_panel_site_run,
-        gs1::ItemId {gs1::k_item_salt_bean_seed_bundle},
+        gs1::ItemId {gs1::k_item_white_thorn_seed_bundle},
         1U);
     assert(delivered_sellable_slot_index != std::numeric_limits<std::uint16_t>::max());
     gs1::GameRuntimeProjectionTestAccess::flush_projection(phone_panel_runtime);
@@ -905,7 +905,7 @@ int main()
     assert(contains_phone_listing_message(
         phone_panel_delivery_messages,
         GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_UPSERT,
-        1000U + gs1::k_item_salt_bean_seed_bundle));
+        1000U + gs1::k_item_white_thorn_seed_bundle));
     assert(!collect_messages_of_type(
         phone_panel_delivery_messages,
         GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE).empty());
@@ -1109,7 +1109,7 @@ int main()
     auto& action_site_run =
         gs1::GameRuntimeProjectionTestAccess::active_site_run(action_runtime).value();
     action_site_run.inventory.worker_pack_slots[3].occupied = true;
-    action_site_run.inventory.worker_pack_slots[3].item_id = gs1::ItemId {gs1::k_item_wind_reed_seed_bundle};
+    action_site_run.inventory.worker_pack_slots[3].item_id = gs1::ItemId {gs1::k_item_ordos_wormwood_seed_bundle};
     action_site_run.inventory.worker_pack_slots[3].item_quantity = 2U;
     action_site_run.inventory.worker_pack_slots[3].item_condition = 1.0f;
     action_site_run.inventory.worker_pack_slots[3].item_freshness = 1.0f;
@@ -1119,20 +1119,20 @@ int main()
         GS1_SITE_ACTION_PLANT,
         action_target,
         0U,
-        gs1::k_item_wind_reed_seed_bundle);
+        gs1::k_item_ordos_wormwood_seed_bundle);
     assert(action_runtime.submit_host_events(&action_event, 1U) == GS1_STATUS_OK);
     gs1::SiteWorld::TileEcologyData action_ecology {};
     for (int step = 0; step < 10; ++step)
     {
         run_phase1(action_runtime, 60.0);
         action_ecology = gs1::site_world_access::tile_ecology(action_site_run, action_target);
-        if (action_ecology.plant_id.value == gs1::k_plant_wind_reed)
+        if (action_ecology.plant_id.value == gs1::k_plant_ordos_wormwood)
         {
             break;
         }
     }
 
-    assert(action_ecology.plant_id.value == gs1::k_plant_wind_reed);
+    assert(action_ecology.plant_id.value == gs1::k_plant_ordos_wormwood);
     assert(action_ecology.plant_density >= 0.2f);
     assert(action_site_run.inventory.worker_pack_slots[3].item_quantity == 1U);
 
@@ -1147,7 +1147,7 @@ int main()
             const auto& payload = message->payload_as<Gs1EngineMessageSiteTileData>();
             return payload.x == static_cast<std::uint32_t>(action_target.x) &&
                 payload.y == static_cast<std::uint32_t>(action_target.y) &&
-                payload.plant_type_id == gs1::k_plant_wind_reed &&
+                payload.plant_type_id == gs1::k_plant_ordos_wormwood &&
                 payload.plant_density >= 0.2f;
         });
     assert(projected_action_tile != action_tile_messages.end());
@@ -1167,7 +1167,7 @@ int main()
     drain_engine_messages(placement_preview_runtime);
 
     placement_preview_site_run.inventory.worker_pack_slots[2].occupied = true;
-    placement_preview_site_run.inventory.worker_pack_slots[2].item_id = gs1::ItemId {gs1::k_item_wind_reed_seed_bundle};
+    placement_preview_site_run.inventory.worker_pack_slots[2].item_id = gs1::ItemId {gs1::k_item_ordos_wormwood_seed_bundle};
     placement_preview_site_run.inventory.worker_pack_slots[2].item_quantity = 2U;
     placement_preview_site_run.inventory.worker_pack_slots[2].item_condition = 1.0f;
     placement_preview_site_run.inventory.worker_pack_slots[2].item_freshness = 1.0f;
@@ -1176,7 +1176,7 @@ int main()
         GS1_SITE_ACTION_PLANT,
         TileCoord {4, 4},
         0U,
-        gs1::k_item_wind_reed_seed_bundle,
+        gs1::k_item_ordos_wormwood_seed_bundle,
         GS1_SITE_ACTION_REQUEST_FLAG_HAS_ITEM |
             GS1_SITE_ACTION_REQUEST_FLAG_DEFERRED_TARGET_SELECTION);
     assert(placement_preview_runtime.submit_host_events(&placement_mode_event, 1U) == GS1_STATUS_OK);
@@ -1190,7 +1190,7 @@ int main()
             placement_preview_messages.front()->payload_as<Gs1EngineMessagePlacementPreviewData>();
         assert(payload.tile_x == 4);
         assert(payload.tile_y == 4);
-        assert(payload.item_id == gs1::k_item_wind_reed_seed_bundle);
+        assert(payload.item_id == gs1::k_item_ordos_wormwood_seed_bundle);
         assert(payload.action_kind == GS1_SITE_ACTION_PLANT);
         assert(payload.footprint_width == 2U);
         assert(payload.footprint_height == 2U);
@@ -1224,7 +1224,7 @@ int main()
         GS1_SITE_ACTION_PLANT,
         TileCoord {5, 5},
         0U,
-        gs1::k_item_wind_reed_seed_bundle,
+        gs1::k_item_ordos_wormwood_seed_bundle,
         GS1_SITE_ACTION_REQUEST_FLAG_HAS_ITEM);
     assert(placement_preview_runtime.submit_host_events(&blocked_confirm_event, 1U) == GS1_STATUS_OK);
     run_phase1(placement_preview_runtime, 0.0);

@@ -1,11 +1,11 @@
 plant_id	display_name	height_class	growable	aura_size	footprint_width	footprint_height	wind_protection_range	plant_action_duration_minutes	constant_wither_rate	salt_tolerance	heat_tolerance	wind_resistance	dust_tolerance	wind_protection_power	heat_protection_power	dust_protection_power	fertility_improve_power	salinity_reduction_power	spread_readiness	spread_chance	output_dependency
 5	Straw Checkerboard	None	0	1	2	2	1	0.6	2.0	100.0	100.0	100.0	100.0	52.0	10.0	34.0	18.0	0.0	0.0	0.0	0.0
-1	Wind Reed	Low	1	1	2	2	2	0.75	0.0	45.0	38.0	78.0	58.0	68.0	18.0	28.0	14.0	10.0	55.0	35.0	10.0
-2	Salt Bean	Low	1	1	2	2	1	1.0	0.0	88.0	48.0	42.0	40.0	20.0	16.0	24.0	36.0	62.0	44.0	20.0	34.0
-3	Shade Cactus	Medium	1	1	2	2	1	1.5	0.0	48.0	82.0	30.0	34.0	12.0	74.0	18.0	12.0	6.0	42.0	10.0	12.0
-4	Sunfruit Vine	Low	1	1	2	2	1	1.25	0.0	18.0	28.0	24.0	20.0	8.0	20.0	6.0	10.0	0.0	70.0	14.0	78.0
-6	Root Binder	Low	1	1	2	2	1	1.1	0.0	58.0	40.0	62.0	54.0	30.0	14.0	18.0	52.0	36.0	48.0	24.0	14.0
-7	Dew Grass	Low	1	1	2	2	1	0.9	0.0	60.0	58.0	42.0	46.0	10.0	26.0	14.0	28.0	26.0	56.0	30.0	16.0
-8	Thorn Shrub	Medium	1	1	2	2	2	1.2	0.0	56.0	50.0	72.0	64.0	58.0	18.0	20.0	16.0	16.0	52.0	20.0	40.0
-9	Medicinal Sage	Low	1	1	2	2	1	1.15	0.0	34.0	66.0	36.0	32.0	12.0	38.0	14.0	18.0	8.0	46.0	18.0	44.0
-10	Sand Willow	Tall	1	2	2	2	2	1.7	0.0	76.0	78.0	70.0	68.0	72.0	44.0	30.0	30.0	28.0	38.0	12.0	32.0
+1	Ordos Wormwood	Low	1	1	2	2	2	0.75	0.0	45.0	38.0	78.0	58.0	68.0	18.0	28.0	14.0	10.0	55.0	35.0	10.0
+2	White Thorn	Low	1	1	2	2	1	1.0	0.0	88.0	48.0	42.0	40.0	20.0	16.0	24.0	36.0	62.0	44.0	20.0	34.0
+3	Red Tamarisk	Medium	1	1	2	2	1	1.5	0.0	48.0	82.0	30.0	34.0	12.0	74.0	18.0	12.0	6.0	42.0	10.0	12.0
+4	Ningxia Wolfberry	Low	1	1	2	2	1	1.25	0.0	18.0	28.0	24.0	20.0	8.0	20.0	6.0	10.0	0.0	70.0	14.0	78.0
+6	Korshinsk Peashrub	Low	1	1	2	2	1	1.1	0.0	58.0	40.0	62.0	54.0	30.0	14.0	18.0	52.0	36.0	48.0	24.0	14.0
+7	Jiji Grass	Low	1	1	2	2	1	0.9	0.0	60.0	58.0	42.0	46.0	10.0	26.0	14.0	28.0	26.0	56.0	30.0	16.0
+8	Sea Buckthorn	Medium	1	1	2	2	2	1.2	0.0	56.0	50.0	72.0	64.0	58.0	18.0	20.0	16.0	16.0	52.0	20.0	40.0
+9	Desert Ephedra	Low	1	1	2	2	1	1.15	0.0	34.0	66.0	36.0	32.0	12.0	38.0	14.0	18.0	8.0	46.0	18.0	44.0
+10	Saxaul	Tall	1	2	2	2	2	1.7	0.0	76.0	78.0	70.0	68.0	72.0	44.0	30.0	30.0	28.0	38.0	12.0	32.0

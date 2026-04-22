@@ -250,13 +250,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         1: { name: "Water", shortName: "H2O", stackSize: 5, canUse: true, canPlant: false, canDeploy: false, useLabel: "Drink" },
         2: { name: "Food", shortName: "Ration", stackSize: 5, canUse: true, canPlant: false, canDeploy: false, useLabel: "Eat" },
         3: { name: "Medicine", shortName: "Med", stackSize: 3, canUse: true, canPlant: false, canDeploy: false, useLabel: "Use" },
-        4: { name: "Wind Reed Seeds", shortName: "Wind Reed", stackSize: 10, canUse: false, canPlant: true, canDeploy: false },
-        5: { name: "Salt Bean Seeds", shortName: "Salt Bean", stackSize: 10, canUse: false, canPlant: true, canDeploy: false },
-        6: { name: "Shade Cactus Seeds", shortName: "Shade Cactus", stackSize: 10, canUse: false, canPlant: true, canDeploy: false },
-        7: { name: "Sunfruit Vine Seeds", shortName: "Sunfruit Vine", stackSize: 10, canUse: false, canPlant: true, canDeploy: false },
+        4: { name: "Ordos Wormwood Seeds", shortName: "Ordos Wormwood", stackSize: 10, canUse: false, canPlant: true, canDeploy: false },
+        5: { name: "White Thorn Seeds", shortName: "White Thorn", stackSize: 10, canUse: false, canPlant: true, canDeploy: false },
+        6: { name: "Red Tamarisk Seeds", shortName: "Red Tamarisk", stackSize: 10, canUse: false, canPlant: true, canDeploy: false },
+        7: { name: "Ningxia Wolfberry Seeds", shortName: "Ningxia Wolfberry", stackSize: 10, canUse: false, canPlant: true, canDeploy: false },
         8: { name: "Wood", shortName: "Wood", stackSize: 20, canUse: false, canPlant: false, canDeploy: false },
         9: { name: "Iron", shortName: "Iron", stackSize: 20, canUse: false, canPlant: false, canDeploy: false },
-        10: { name: "Wind Reed Fiber", shortName: "Fiber", stackSize: 20, canUse: false, canPlant: false, canDeploy: false },
+        10: { name: "Wormwood Bundle", shortName: "Fiber", stackSize: 20, canUse: false, canPlant: false, canDeploy: false },
         11: { name: "Camp Stove Kit", shortName: "Stove Kit", stackSize: 1, canUse: false, canPlant: false, canDeploy: true, deployStructureId: 201 },
         12: { name: "Workbench Kit", shortName: "Bench Kit", stackSize: 1, canUse: false, canPlant: false, canDeploy: true, deployStructureId: 202 },
         13: { name: "Storage Crate Kit", shortName: "Crate Kit", stackSize: 1, canUse: false, canPlant: false, canDeploy: true, deployStructureId: 203 },
@@ -3999,8 +3999,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         case 3:
             return {
                 title: "Plant a Starter Patch",
-                summary: "Plant two Wind Reed tiles to learn the base restoration action.",
-                reward: "Reward: 2 Wind Reed Seeds to the delivery box."
+                summary: "Plant two Ordos Wormwood tiles to learn the base restoration action.",
+                reward: "Reward: 2 Ordos Wormwood Seeds to the delivery box."
             };
         case 4:
             return {
@@ -6189,6 +6189,30 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return blade;
     }
 
+    function createBerryMesh(color, radius, windFlexibility) {
+        return new THREE_NS.Mesh(
+            new THREE_NS.SphereGeometry(radius, 8, 8),
+            createPlantMaterial(color, 0.56, color, 0.08, {
+                windFlexibility: windFlexibility == null ? 0.48 : windFlexibility
+            })
+        );
+    }
+
+    function createBranchMesh(color, baseRadius, tipRadius, length, sides, windFlexibility) {
+        const branch = new THREE_NS.Mesh(
+            new THREE_NS.CylinderGeometry(
+                tipRadius,
+                baseRadius,
+                length,
+                sides == null ? 5 : sides
+            ),
+            createPlantMaterial(color, 0.88, 0x23180f, 0.0, {
+                windFlexibility: windFlexibility == null ? 0.32 : windFlexibility
+            })
+        );
+        return branch;
+    }
+
     function resolvePlantPalette(tile) {
         if (tile.plantTypeId === 1) {
             return { primary: 0x8fb76b, secondary: 0x6f8d49, glow: 0x4f652e };
@@ -6204,6 +6228,21 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
         if (tile.plantTypeId === 5) {
             return { primary: 0xcaa15c, secondary: 0xa67b3e, glow: 0x6d4f21 };
+        }
+        if (tile.plantTypeId === 6) {
+            return { primary: 0x91ad5e, secondary: 0x6d8642, glow: 0x45552a };
+        }
+        if (tile.plantTypeId === 7) {
+            return { primary: 0x8dbb74, secondary: 0x648c56, glow: 0x41613c };
+        }
+        if (tile.plantTypeId === 8) {
+            return { primary: 0x9bb37a, secondary: 0x738656, glow: 0x4c5839 };
+        }
+        if (tile.plantTypeId === 9) {
+            return { primary: 0x6f9457, secondary: 0x4d6a3d, glow: 0x314227 };
+        }
+        if (tile.plantTypeId === 10) {
+            return { primary: 0x89a36c, secondary: 0x61764f, glow: 0x43513a };
         }
         return { primary: 0x95b866, secondary: 0x728f4b, glow: 0x4b5f31 };
     }
@@ -6386,62 +6425,64 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
     }
 
-    function addWindReedPlant(plantGroup, plantSpec) {
+    function addOrdosWormwoodPlant(plantGroup, plantSpec) {
         const tile = plantSpec.anchorTile;
         const plantDensity = plantSpec.plantDensity;
-        const stemColor = 0x6b8b4c;
-        const leafColor = 0x93b868;
+        const stemColor = 0x7f8560;
+        const leafColors = [0xb5c69a, 0xa8bc8c, 0x96ab79];
         const bunchCount =
-            Math.max(5, Math.round((5 + plantDensity * 3) * Math.max(1.0, plantSpec.areaScale * 0.84)));
-        const baseHeight = 0.34 + plantDensity * 0.38 + (plantSpec.areaScale - 1.0) * 0.08;
+            Math.max(12, Math.round((12 + plantDensity * 12) * Math.max(1.0, plantSpec.areaScale * 0.9)));
+        const moundHeight = 0.18 + plantDensity * 0.14 + (plantSpec.areaScale - 1.0) * 0.05;
 
         for (let index = 0; index < bunchCount; index += 1) {
             const angle =
                 (index / bunchCount) * Math.PI * 2 +
                 deterministicNoise01(tile.x, tile.y, index + 1) * 0.42;
-            const offsetRadius = 0.18 + deterministicNoise01(tile.y, tile.x, index + 11) * 0.68;
-            const stemHeight = baseHeight * (0.72 + deterministicNoise01(tile.x, tile.y, index + 21) * 0.38);
+            const offsetRadius = 0.16 + deterministicNoise01(tile.y, tile.x, index + 11) * 0.72;
+            const stemHeight = moundHeight * (0.85 + deterministicNoise01(tile.x, tile.y, index + 21) * 1.15);
             const stemRadius =
                 (0.012 + deterministicNoise01(tile.y, tile.x, index + 31) * 0.008) *
                 (1.0 + (plantSpec.areaScale - 1.0) * 0.08);
-            const stem = new THREE_NS.Mesh(
-                new THREE_NS.CylinderGeometry(stemRadius * 0.55, stemRadius, stemHeight, 5),
-                createPlantMaterial(stemColor, 0.84, 0x2d3719, 0.02, { windFlexibility: 0.62 })
-            );
+            const stem = createBranchMesh(stemColor, stemRadius, stemRadius * 0.52, stemHeight, 5, 0.72);
             stem.position.set(
                 Math.cos(angle) * plantSpec.halfSpanX * offsetRadius,
                 stemHeight * 0.5,
                 Math.sin(angle) * plantSpec.halfSpanZ * offsetRadius
             );
-            stem.rotation.z = Math.cos(angle) * 0.2;
-            stem.rotation.x = -Math.sin(angle) * 0.18;
+            stem.rotation.z = Math.cos(angle) * 0.12;
+            stem.rotation.x = -Math.sin(angle) * 0.1;
             plantGroup.add(stem);
 
-            const blade = createLeafMesh(
-                leafColor,
-                0.02,
-                0.009,
-                0.14 + plantDensity * 0.1 + (plantSpec.areaScale - 1.0) * 0.05,
-                1.26
-            );
-            blade.position.set(
-                stem.position.x * 0.6,
-                stemHeight * (0.56 + deterministicNoise01(tile.x, tile.y, index + 41) * 0.12),
-                stem.position.z * 0.6
-            );
-            blade.rotation.y = angle;
-            blade.rotation.z = 0.48 + deterministicNoise01(tile.y, tile.x, index + 51) * 0.44;
-            plantGroup.add(blade);
+            const sprigCount = 2 + (index % 3);
+            for (let sprigIndex = 0; sprigIndex < sprigCount; sprigIndex += 1) {
+                const frond = createLeafMesh(
+                    leafColors[(index + sprigIndex) % leafColors.length],
+                    0.018 + deterministicNoise01(tile.x, tile.y, index + sprigIndex + 41) * 0.01,
+                    0.008,
+                    0.08 + plantDensity * 0.05 + deterministicNoise01(tile.y, tile.x, index + sprigIndex + 51) * 0.05,
+                    1.32
+                );
+                frond.position.set(
+                    stem.position.x * (0.72 + sprigIndex * 0.1),
+                    stemHeight * (0.48 + sprigIndex * 0.16),
+                    stem.position.z * (0.72 + sprigIndex * 0.1)
+                );
+                frond.rotation.y = angle + (sprigIndex - 1) * 0.9;
+                frond.rotation.z = 0.32 + deterministicNoise01(tile.y, tile.x, index + sprigIndex + 61) * 0.44;
+                frond.rotation.x = -0.14 + deterministicNoise01(tile.x, tile.y, index + sprigIndex + 71) * 0.28;
+                plantGroup.add(frond);
+            }
         }
     }
 
-    function addSaltbushPlant(plantGroup, plantSpec) {
+    function addWhiteThornPlant(plantGroup, plantSpec) {
         const tile = plantSpec.anchorTile;
         const plantDensity = plantSpec.plantDensity;
-        const twigColor = 0x6b5c3b;
-        const leafColors = [0x88a45d, 0x95b568, 0x78914d];
+        const twigColor = 0x766144;
+        const leafColors = [0x8aa062, 0x96ac6d, 0x7b8f57];
+        const berryColor = 0xb4c8de;
         const branchCount =
-            Math.max(4, Math.round((4 + plantDensity * 2) * Math.max(1.0, plantSpec.areaScale * 0.76)));
+            Math.max(7, Math.round((7 + plantDensity * 4) * Math.max(1.0, plantSpec.areaScale * 0.86)));
         const bushRadiusX = plantSpec.halfSpanX * (0.46 + plantDensity * 0.22);
         const bushRadiusZ = plantSpec.halfSpanZ * (0.46 + plantDensity * 0.22);
 
@@ -6450,156 +6491,375 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 (index / branchCount) * Math.PI * 2 +
                 deterministicNoise01(tile.x, tile.y, index + 61) * 0.6;
             const branchHeight =
-                0.12 + plantDensity * 0.12 + deterministicNoise01(tile.y, tile.x, index + 71) * 0.08;
-            const branch = new THREE_NS.Mesh(
-                new THREE_NS.CylinderGeometry(0.015, 0.022, branchHeight, 5),
-                createPlantMaterial(twigColor, 0.9, 0x23170c, 0.0, { windFlexibility: 0.44 })
-            );
+                0.18 + plantDensity * 0.12 + deterministicNoise01(tile.y, tile.x, index + 71) * 0.12;
+            const branch = createBranchMesh(twigColor, 0.024, 0.011, branchHeight, 5, 0.42);
             branch.position.set(
                 Math.cos(angle) * bushRadiusX * 0.16,
                 branchHeight * 0.38,
                 Math.sin(angle) * bushRadiusZ * 0.16
             );
-            branch.rotation.z = Math.cos(angle) * 0.65;
-            branch.rotation.x = -Math.sin(angle) * 0.65;
+            branch.rotation.z = Math.cos(angle) * 0.82;
+            branch.rotation.x = -Math.sin(angle) * 0.82;
             plantGroup.add(branch);
-        }
+            const branchTip = new THREE_NS.Vector3(
+                branch.position.x + Math.sin(branch.rotation.z) * branchHeight * 0.42,
+                branch.position.y + Math.cos(branch.rotation.z) * branchHeight * 0.34,
+                branch.position.z - Math.sin(branch.rotation.x) * branchHeight * 0.42
+            );
+            const leafPairCount = 2 + (index % 2);
+            for (let leafIndex = 0; leafIndex < leafPairCount; leafIndex += 1) {
+                const leaf = createLeafMesh(
+                    leafColors[(index + leafIndex) % leafColors.length],
+                    0.03,
+                    0.01,
+                    0.075 + deterministicNoise01(tile.x, tile.y, index + leafIndex + 81) * 0.03,
+                    0.94
+                );
+                leaf.position.copy(branchTip);
+                leaf.position.x += (leafIndex - 0.5) * 0.03;
+                leaf.position.y += leafIndex * 0.018;
+                leaf.rotation.y = angle + (leafIndex === 0 ? 0.55 : -0.55);
+                leaf.rotation.z = 0.5 + leafIndex * 0.12;
+                plantGroup.add(leaf);
+            }
 
-        const clumpCount =
-            Math.max(7, Math.round((7 + plantDensity * 4) * Math.max(1.0, plantSpec.areaScale * 0.86)));
-        for (let index = 0; index < clumpCount; index += 1) {
-            const angle = deterministicNoise01(tile.x, tile.y, index + 81) * Math.PI * 2;
-            const radius = 0.28 + deterministicNoise01(tile.y, tile.x, index + 91) * 0.72;
-            const clump = new THREE_NS.Mesh(
-                new THREE_NS.SphereGeometry(
-                    0.09 + deterministicNoise01(tile.x, tile.y, index + 101) * 0.03,
-                    10,
-                    10
-                ),
-                createPlantMaterial(
-                    leafColors[index % leafColors.length],
-                    0.8,
-                    0x42522a,
-                    0.04,
-                    { windFlexibility: 0.9 }
-                )
-            );
-            clump.scale.set(
-                0.95 + deterministicNoise01(tile.x, tile.y, index + 111) * 0.3,
-                0.7 + deterministicNoise01(tile.y, tile.x, index + 121) * 0.25,
-                0.95 + deterministicNoise01(tile.x, tile.y, index + 131) * 0.3
-            );
-            clump.position.set(
-                Math.cos(angle) * bushRadiusX * radius,
-                0.12 + plantDensity * 0.08 + deterministicNoise01(tile.y, tile.x, index + 141) * 0.12,
-                Math.sin(angle) * bushRadiusZ * radius
-            );
-            plantGroup.add(clump);
+            const berryChance = deterministicNoise01(tile.x, tile.y, index + 141);
+            if (berryChance > 0.48) {
+                const berry = createBerryMesh(
+                    berryColor,
+                    0.018 + plantDensity * 0.004,
+                    0.34
+                );
+                berry.position.copy(branchTip);
+                berry.position.y -= 0.01;
+                berry.position.x += (berryChance - 0.5) * 0.05;
+                plantGroup.add(berry);
+            }
         }
     }
 
-    function addShadeCactusPlant(plantGroup, plantSpec) {
+    function addRedTamariskPlant(plantGroup, plantSpec) {
+        const tile = plantSpec.anchorTile;
         const plantDensity = plantSpec.plantDensity;
-        const bodyMaterial = createPlantMaterial(0x6b8c52, 0.82, 0x30411e, 0.06, { windFlexibility: 0.18 });
-        const height = 0.48 + plantDensity * 0.42 + (plantSpec.areaScale - 1.0) * 0.12;
-        const trunk = new THREE_NS.Mesh(
-            new THREE_NS.CylinderGeometry(0.09, 0.12, height, 8),
-            bodyMaterial
-        );
-        trunk.position.y = height * 0.5;
-        trunk.scale.set(
-            1.0 + (plantSpec.footprintWidth - 1) * 0.72,
-            1.0,
-            1.0 + (plantSpec.footprintHeight - 1) * 0.72
-        );
+        const trunkColor = 0x8a6a53;
+        const frondColor = 0xa7be86;
+        const branchCount =
+            Math.max(14, Math.round((14 + plantDensity * 8) * Math.max(1.0, plantSpec.areaScale * 0.92)));
+        const shrubHeight = 0.4 + plantDensity * 0.38 + (plantSpec.areaScale - 1.0) * 0.1;
+
+        for (let index = 0; index < branchCount; index += 1) {
+            const angle =
+                (index / branchCount) * Math.PI * 2 +
+                deterministicNoise01(tile.x, tile.y, index + 201) * 0.46;
+            const branchLength =
+                shrubHeight * (0.72 + deterministicNoise01(tile.y, tile.x, index + 211) * 0.54);
+            const branch = createBranchMesh(
+                trunkColor,
+                0.018 + deterministicNoise01(tile.x, tile.y, index + 221) * 0.008,
+                0.005,
+                branchLength,
+                5,
+                0.7
+            );
+            branch.position.set(
+                Math.cos(angle) * plantSpec.halfSpanX * 0.08,
+                branchLength * 0.46,
+                Math.sin(angle) * plantSpec.halfSpanZ * 0.08
+            );
+            branch.rotation.z = Math.cos(angle) * (0.26 + deterministicNoise01(tile.y, tile.x, index + 231) * 0.28);
+            branch.rotation.x = -Math.sin(angle) * (0.26 + deterministicNoise01(tile.x, tile.y, index + 241) * 0.28);
+            plantGroup.add(branch);
+
+            const tuftCount = 3 + (index % 2);
+            for (let tuftIndex = 0; tuftIndex < tuftCount; tuftIndex += 1) {
+                const tuft = createGrassBladeMesh(
+                    frondColor,
+                    0.016,
+                    0.12 + plantDensity * 0.06,
+                    1.08
+                );
+                tuft.position.set(
+                    branch.position.x + Math.sin(branch.rotation.z) * branchLength * (0.2 + tuftIndex * 0.18),
+                    branch.position.y + branchLength * (0.08 + tuftIndex * 0.15),
+                    branch.position.z - Math.sin(branch.rotation.x) * branchLength * (0.2 + tuftIndex * 0.18)
+                );
+                tuft.rotation.y = angle + tuftIndex * 0.7;
+                tuft.rotation.z = 0.34 + deterministicNoise01(tile.x, tile.y, index + tuftIndex + 251) * 0.3;
+                plantGroup.add(tuft);
+            }
+        }
+    }
+
+    function addNingxiaWolfberryPlant(plantGroup, plantSpec) {
+        const tile = plantSpec.anchorTile;
+        const plantDensity = plantSpec.plantDensity;
+        const caneColor = 0x7f6a4d;
+        const leafColors = [0x8fb468, 0x7f9f59, 0x9abf74];
+        const fruitColor = 0xd45b39;
+        const caneCount =
+            Math.max(5, Math.round((5 + plantDensity * 3) * Math.max(1.0, plantSpec.areaScale * 0.82)));
+        const spreadX = plantSpec.halfSpanX * (0.72 + plantDensity * 0.12);
+        const spreadZ = plantSpec.halfSpanZ * (0.64 + plantDensity * 0.1);
+
+        for (let index = 0; index < caneCount; index += 1) {
+            const side = index % 2 === 0 ? -1 : 1;
+            const arc = index / Math.max(caneCount - 1, 1);
+            const caneCurve = new THREE_NS.CatmullRomCurve3([
+                new THREE_NS.Vector3(side * spreadX * 0.12, 0.02, (arc - 0.5) * spreadZ * 0.3),
+                new THREE_NS.Vector3(side * spreadX * 0.2, 0.18 + plantDensity * 0.05, (arc - 0.5) * spreadZ * 0.48),
+                new THREE_NS.Vector3(side * spreadX * 0.62, 0.28 + plantDensity * 0.08, (arc - 0.5) * spreadZ * 0.62),
+                new THREE_NS.Vector3(side * spreadX * (0.84 + deterministicNoise01(tile.x, tile.y, index + 301) * 0.08), 0.1 + plantDensity * 0.05, (arc - 0.5) * spreadZ)
+            ]);
+            const cane = new THREE_NS.Mesh(
+                new THREE_NS.TubeGeometry(caneCurve, 14, 0.012 + plantDensity * 0.002, 5, false),
+                createPlantMaterial(caneColor, 0.86, 0x24170f, 0.0, { windFlexibility: 0.9 })
+            );
+            plantGroup.add(cane);
+
+            for (let nodeIndex = 0; nodeIndex < 4; nodeIndex += 1) {
+                const t = 0.2 + nodeIndex * 0.18;
+                const point = caneCurve.getPoint(t);
+                const tangent = caneCurve.getTangent(t);
+                const leaf = createLeafMesh(
+                    leafColors[(index + nodeIndex) % leafColors.length],
+                    0.035 + plantDensity * 0.012,
+                    0.01,
+                    0.11 + plantDensity * 0.02,
+                    1.04
+                );
+                leaf.position.copy(point);
+                leaf.rotation.y = Math.atan2(tangent.x, tangent.z) + (nodeIndex % 2 === 0 ? 0.65 : -0.65);
+                leaf.rotation.z = nodeIndex % 2 === 0 ? -0.42 : 0.42;
+                plantGroup.add(leaf);
+
+                if (nodeIndex >= 1 && deterministicNoise01(tile.y, tile.x, index + nodeIndex + 331) > 0.34) {
+                    const berry = createBerryMesh(fruitColor, 0.022 + plantDensity * 0.004, 0.4);
+                    berry.position.copy(point);
+                    berry.position.y -= 0.016;
+                    berry.position.x += (nodeIndex % 2 === 0 ? -1 : 1) * 0.024;
+                    plantGroup.add(berry);
+                }
+            }
+        }
+    }
+
+    function addKorshinskPeashrubPlant(plantGroup, plantSpec) {
+        const tile = plantSpec.anchorTile;
+        const plantDensity = plantSpec.plantDensity;
+        const branchColor = 0x7a6945;
+        const leafColors = [0x8aac5f, 0x96b96a, 0x7d9d56];
+        const flowerColor = 0xd2bb58;
+        const branchCount =
+            Math.max(8, Math.round((8 + plantDensity * 4) * Math.max(1.0, plantSpec.areaScale * 0.84)));
+        for (let index = 0; index < branchCount; index += 1) {
+            const angle =
+                (index / branchCount) * Math.PI * 2 +
+                deterministicNoise01(tile.x, tile.y, index + 401) * 0.52;
+            const branchHeight = 0.24 + plantDensity * 0.16 + deterministicNoise01(tile.y, tile.x, index + 411) * 0.14;
+            const branch = createBranchMesh(branchColor, 0.024, 0.008, branchHeight, 5, 0.46);
+            branch.position.set(
+                Math.cos(angle) * plantSpec.halfSpanX * 0.1,
+                branchHeight * 0.44,
+                Math.sin(angle) * plantSpec.halfSpanZ * 0.1
+            );
+            branch.rotation.z = Math.cos(angle) * 0.54;
+            branch.rotation.x = -Math.sin(angle) * 0.54;
+            plantGroup.add(branch);
+
+            for (let nodeIndex = 0; nodeIndex < 3; nodeIndex += 1) {
+                const nodeHeight = branchHeight * (0.34 + nodeIndex * 0.2);
+                const nodeX = branch.position.x + Math.sin(branch.rotation.z) * nodeHeight * 0.4;
+                const nodeZ = branch.position.z - Math.sin(branch.rotation.x) * nodeHeight * 0.4;
+                for (let leafletIndex = 0; leafletIndex < 3; leafletIndex += 1) {
+                    const leaf = createLeafMesh(
+                        leafColors[(index + leafletIndex) % leafColors.length],
+                        0.024,
+                        0.008,
+                        0.06,
+                        0.88
+                    );
+                    leaf.position.set(
+                        nodeX + (leafletIndex - 1) * 0.02,
+                        branch.position.y - branchHeight * 0.18 + nodeHeight,
+                        nodeZ + (leafletIndex - 1) * 0.01
+                    );
+                    leaf.rotation.y = angle + (leafletIndex - 1) * 0.6;
+                    leaf.rotation.z = 0.38;
+                    plantGroup.add(leaf);
+                }
+
+                if (nodeIndex === 2 && deterministicNoise01(tile.x, tile.y, index + 421) > 0.58) {
+                    const flower = createBerryMesh(flowerColor, 0.018, 0.28);
+                    flower.position.set(nodeX, branch.position.y - branchHeight * 0.18 + nodeHeight + 0.02, nodeZ);
+                    plantGroup.add(flower);
+                }
+            }
+        }
+    }
+
+    function addJijiGrassPlant(plantGroup, plantSpec) {
+        const tile = plantSpec.anchorTile;
+        const plantDensity = plantSpec.plantDensity;
+        const bladeColors = [0x88b274, 0x6f9a61, 0x9ac182];
+        const bladeCount =
+            Math.max(18, Math.round((18 + plantDensity * 24) * Math.max(1.0, plantSpec.areaScale * 0.88)));
+        for (let index = 0; index < bladeCount; index += 1) {
+            const angle = deterministicNoise01(tile.x, tile.y, index + 451) * Math.PI * 2;
+            const radius = Math.pow(deterministicNoise01(tile.y, tile.x, index + 461), 0.72) * 0.58;
+            const bladeHeight =
+                0.26 + plantDensity * 0.26 + deterministicNoise01(tile.x, tile.y, index + 471) * 0.18;
+            const blade = createGrassBladeMesh(
+                bladeColors[index % bladeColors.length],
+                0.026 + deterministicNoise01(tile.y, tile.x, index + 481) * 0.016,
+                bladeHeight,
+                1.28
+            );
+            blade.position.set(
+                Math.cos(angle) * plantSpec.halfSpanX * radius,
+                0,
+                Math.sin(angle) * plantSpec.halfSpanZ * radius
+            );
+            blade.rotation.y = angle;
+            blade.rotation.z = 0.22 + deterministicNoise01(tile.x, tile.y, index + 491) * 0.54;
+            plantGroup.add(blade);
+        }
+    }
+
+    function addSeaBuckthornPlant(plantGroup, plantSpec) {
+        const tile = plantSpec.anchorTile;
+        const plantDensity = plantSpec.plantDensity;
+        const branchColor = 0x78664a;
+        const leafColors = [0xa0b48d, 0x92a97f, 0x859a73];
+        const berryColor = 0xde7a27;
+        const branchCount =
+            Math.max(8, Math.round((8 + plantDensity * 5) * Math.max(1.0, plantSpec.areaScale * 0.84)));
+        for (let index = 0; index < branchCount; index += 1) {
+            const angle =
+                (index / branchCount) * Math.PI * 2 +
+                deterministicNoise01(tile.x, tile.y, index + 501) * 0.44;
+            const branchHeight = 0.22 + plantDensity * 0.16 + deterministicNoise01(tile.y, tile.x, index + 511) * 0.12;
+            const branch = createBranchMesh(branchColor, 0.026, 0.008, branchHeight, 5, 0.38);
+            branch.position.set(
+                Math.cos(angle) * plantSpec.halfSpanX * 0.08,
+                branchHeight * 0.42,
+                Math.sin(angle) * plantSpec.halfSpanZ * 0.08
+            );
+            branch.rotation.z = Math.cos(angle) * 0.72;
+            branch.rotation.x = -Math.sin(angle) * 0.72;
+            plantGroup.add(branch);
+
+            for (let nodeIndex = 0; nodeIndex < 4; nodeIndex += 1) {
+                const nodeHeight = branchHeight * (0.2 + nodeIndex * 0.18);
+                const nodeX = branch.position.x + Math.sin(branch.rotation.z) * nodeHeight * 0.44;
+                const nodeZ = branch.position.z - Math.sin(branch.rotation.x) * nodeHeight * 0.44;
+                const leaf = createLeafMesh(
+                    leafColors[(index + nodeIndex) % leafColors.length],
+                    0.022,
+                    0.007,
+                    0.08,
+                    0.86
+                );
+                leaf.position.set(nodeX, branch.position.y - branchHeight * 0.2 + nodeHeight, nodeZ);
+                leaf.rotation.y = angle + (nodeIndex % 2 === 0 ? 0.52 : -0.52);
+                leaf.rotation.z = nodeIndex % 2 === 0 ? 0.44 : -0.44;
+                plantGroup.add(leaf);
+
+                if (nodeIndex >= 1 && deterministicNoise01(tile.x, tile.y, index + nodeIndex + 521) > 0.36) {
+                    const berryClusterCount = 1 + (nodeIndex % 2);
+                    for (let berryIndex = 0; berryIndex < berryClusterCount; berryIndex += 1) {
+                        const berry = createBerryMesh(berryColor, 0.02 + plantDensity * 0.004, 0.34);
+                        berry.position.set(
+                            nodeX + (berryIndex - 0.5) * 0.02,
+                            branch.position.y - branchHeight * 0.22 + nodeHeight - 0.018 - berryIndex * 0.008,
+                            nodeZ
+                        );
+                        plantGroup.add(berry);
+                    }
+                }
+            }
+        }
+    }
+
+    function addDesertEphedraPlant(plantGroup, plantSpec) {
+        const tile = plantSpec.anchorTile;
+        const plantDensity = plantSpec.plantDensity;
+        const stemColor = 0x73955f;
+        const stemCount =
+            Math.max(10, Math.round((10 + plantDensity * 10) * Math.max(1.0, plantSpec.areaScale * 0.88)));
+        for (let index = 0; index < stemCount; index += 1) {
+            const angle =
+                (index / stemCount) * Math.PI * 2 +
+                deterministicNoise01(tile.x, tile.y, index + 551) * 0.52;
+            const stemHeight = 0.24 + plantDensity * 0.22 + deterministicNoise01(tile.y, tile.x, index + 561) * 0.16;
+            const segmentCount = 3 + (index % 2);
+            for (let segmentIndex = 0; segmentIndex < segmentCount; segmentIndex += 1) {
+                const segmentHeight = stemHeight / segmentCount;
+                const segment = createBranchMesh(
+                    stemColor,
+                    0.014 - segmentIndex * 0.0015,
+                    Math.max(0.006, 0.011 - segmentIndex * 0.0012),
+                    segmentHeight,
+                    5,
+                    0.98
+                );
+                segment.position.set(
+                    Math.cos(angle) * plantSpec.halfSpanX * 0.12,
+                    segmentHeight * 0.5 + segmentIndex * segmentHeight * 0.82,
+                    Math.sin(angle) * plantSpec.halfSpanZ * 0.12
+                );
+                segment.rotation.z = Math.cos(angle) * (0.2 + segmentIndex * 0.12);
+                segment.rotation.x = -Math.sin(angle) * (0.2 + segmentIndex * 0.12);
+                plantGroup.add(segment);
+            }
+        }
+    }
+
+    function addSaxaulPlant(plantGroup, plantSpec) {
+        const tile = plantSpec.anchorTile;
+        const plantDensity = plantSpec.plantDensity;
+        const trunkColor = 0x7d6a56;
+        const twigColor = 0x8fa070;
+        const trunkHeight = 0.42 + plantDensity * 0.28 + (plantSpec.areaScale - 1.0) * 0.12;
+        const trunk = createBranchMesh(trunkColor, 0.08, 0.05, trunkHeight, 7, 0.18);
+        trunk.position.y = trunkHeight * 0.5;
+        trunk.rotation.z = 0.04;
+        trunk.rotation.x = -0.05;
         plantGroup.add(trunk);
 
-        const armLengthScale = 1.0 + (plantSpec.areaScale - 1.0) * 0.22;
-        const armPairs = [
-            { side: -1, heightFactor: 0.5, length: (0.26 + plantDensity * 0.1) * armLengthScale, tilt: -0.95 },
-            { side: 1, heightFactor: 0.66, length: (0.22 + plantDensity * 0.08) * armLengthScale, tilt: 0.92 }
-        ];
-        armPairs.forEach((armSpec) => {
-            const arm = new THREE_NS.Mesh(
-                new THREE_NS.CylinderGeometry(0.045, 0.055, armSpec.length, 7),
-                bodyMaterial
+        const crownCount =
+            Math.max(7, Math.round((7 + plantDensity * 4) * Math.max(1.0, plantSpec.areaScale * 0.84)));
+        for (let index = 0; index < crownCount; index += 1) {
+            const angle =
+                (index / crownCount) * Math.PI * 2 +
+                deterministicNoise01(tile.x, tile.y, index + 601) * 0.5;
+            const branchLength = 0.26 + plantDensity * 0.16 + deterministicNoise01(tile.y, tile.x, index + 611) * 0.12;
+            const branch = createBranchMesh(trunkColor, 0.026, 0.01, branchLength, 5, 0.38);
+            branch.position.set(
+                Math.cos(angle) * 0.03,
+                trunkHeight * (0.56 + deterministicNoise01(tile.x, tile.y, index + 621) * 0.18),
+                Math.sin(angle) * 0.03
             );
-            arm.position.set(armSpec.side * (0.11 + (plantSpec.footprintWidth - 1) * 0.08), height * armSpec.heightFactor, 0);
-            arm.rotation.z = armSpec.tilt;
-            plantGroup.add(arm);
+            branch.rotation.z = Math.cos(angle) * 0.76;
+            branch.rotation.x = -Math.sin(angle) * 0.76;
+            plantGroup.add(branch);
 
-            const armTip = new THREE_NS.Mesh(
-                new THREE_NS.SphereGeometry(0.052, 8, 8),
-                bodyMaterial
-            );
-            armTip.position.set(
-                arm.position.x + armSpec.side * (armSpec.length * 0.34),
-                arm.position.y + armSpec.length * 0.28,
-                0
-            );
-            armTip.scale.set(1.0, 1.1, 1.0);
-            plantGroup.add(armTip);
-        });
-
-        const bloom = new THREE_NS.Mesh(
-            new THREE_NS.SphereGeometry(0.038 + (plantSpec.areaScale - 1.0) * 0.01, 10, 10),
-            createPlantMaterial(0xcfa56a, 0.7, 0x8c5c26, 0.08, { windFlexibility: 0.32 })
-        );
-        bloom.position.set(0, height + 0.02, 0);
-        bloom.scale.set(1.0, 0.8, 1.0);
-        plantGroup.add(bloom);
-    }
-
-    function addSunfruitVinePlant(plantGroup, plantSpec) {
-        const plantDensity = plantSpec.plantDensity;
-        const stemMaterial = createPlantMaterial(0x6e7a37, 0.86, 0x233014, 0.01, { windFlexibility: 0.82 });
-        const leafColors = [0x8db05e, 0x7a984b, 0x97bc64];
-        const fruitColor = 0xd5a34f;
-        const spanX = plantSpec.halfSpanX * (0.82 + plantDensity * 0.22);
-        const spanZ = plantSpec.halfSpanZ * (0.34 + plantDensity * 0.16);
-        const vineCurve = new THREE_NS.CatmullRomCurve3([
-            new THREE_NS.Vector3(-spanX, 0.03, -spanZ),
-            new THREE_NS.Vector3(-spanX * 0.36, 0.12 + plantDensity * 0.05, spanZ * 0.45),
-            new THREE_NS.Vector3(spanX * 0.42, 0.08 + plantDensity * 0.06, -spanZ * 0.28),
-            new THREE_NS.Vector3(spanX, 0.14 + plantDensity * 0.08, spanZ)
-        ]);
-        const vine = new THREE_NS.Mesh(
-            new THREE_NS.TubeGeometry(vineCurve, 16, 0.018 + (plantSpec.areaScale - 1.0) * 0.002, 6, false),
-            stemMaterial
-        );
-        plantGroup.add(vine);
-
-        for (let index = 0; index < 4; index += 1) {
-            const t = 0.18 + index * 0.2;
-            const point = vineCurve.getPoint(t);
-            const tangent = vineCurve.getTangent(t);
-            const leaf = createLeafMesh(
-                leafColors[index % leafColors.length],
-                0.08 + plantDensity * 0.03 + (plantSpec.areaScale - 1.0) * 0.02,
-                0.014,
-                0.12 + plantDensity * 0.04 + (plantSpec.areaScale - 1.0) * 0.03,
-                1.08
-            );
-            leaf.position.copy(point);
-            leaf.position.y += 0.02 + (index % 2) * 0.015;
-            leaf.rotation.y = Math.atan2(tangent.x, tangent.z) + (index % 2 === 0 ? 0.6 : -0.65);
-            leaf.rotation.z = index % 2 === 0 ? -0.52 : 0.52;
-            plantGroup.add(leaf);
-        }
-
-        const fruitCount =
-            Math.max(1, Math.round((1 + plantDensity * 2) * Math.max(1.0, plantSpec.areaScale * 0.72)));
-        for (let index = 0; index < fruitCount; index += 1) {
-            const t = 0.28 + index * (0.56 / Math.max(fruitCount, 1));
-            const point = vineCurve.getPoint(Math.min(t, 0.92));
-            const fruit = new THREE_NS.Mesh(
-                new THREE_NS.SphereGeometry(0.034 + plantDensity * 0.01, 10, 10),
-                createPlantMaterial(fruitColor, 0.62, 0x7c4d16, 0.12, { windFlexibility: 0.54 })
-            );
-            fruit.position.copy(point);
-            fruit.position.y -= 0.015;
-            fruit.position.x += (index % 2 === 0 ? -1 : 1) * 0.028;
-            plantGroup.add(fruit);
+            const twigCount = 4;
+            for (let twigIndex = 0; twigIndex < twigCount; twigIndex += 1) {
+                const twig = createGrassBladeMesh(
+                    twigColor,
+                    0.016,
+                    0.12 + plantDensity * 0.04,
+                    0.96
+                );
+                twig.position.set(
+                    branch.position.x + Math.sin(branch.rotation.z) * branchLength * (0.28 + twigIndex * 0.12),
+                    branch.position.y + branchLength * (0.08 + twigIndex * 0.11),
+                    branch.position.z - Math.sin(branch.rotation.x) * branchLength * (0.28 + twigIndex * 0.12)
+                );
+                twig.rotation.y = angle + twigIndex * 0.6;
+                twig.rotation.z = 0.36 + deterministicNoise01(tile.x, tile.y, index + twigIndex + 631) * 0.26;
+                plantGroup.add(twig);
+            }
         }
     }
 
@@ -6669,16 +6929,24 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             1.0
         );
 
-        addPlantDensityShell(plantGroup, plantSpec, palette);
-
         if (tile.plantTypeId === 1) {
-            addWindReedPlant(plantGroup, plantSpec);
+            addOrdosWormwoodPlant(plantGroup, plantSpec);
         } else if (tile.plantTypeId === 2) {
-            addSaltbushPlant(plantGroup, plantSpec);
+            addWhiteThornPlant(plantGroup, plantSpec);
         } else if (tile.plantTypeId === 3) {
-            addShadeCactusPlant(plantGroup, plantSpec);
+            addRedTamariskPlant(plantGroup, plantSpec);
         } else if (tile.plantTypeId === 4) {
-            addSunfruitVinePlant(plantGroup, plantSpec);
+            addNingxiaWolfberryPlant(plantGroup, plantSpec);
+        } else if (tile.plantTypeId === 6) {
+            addKorshinskPeashrubPlant(plantGroup, plantSpec);
+        } else if (tile.plantTypeId === 7) {
+            addJijiGrassPlant(plantGroup, plantSpec);
+        } else if (tile.plantTypeId === 8) {
+            addSeaBuckthornPlant(plantGroup, plantSpec);
+        } else if (tile.plantTypeId === 9) {
+            addDesertEphedraPlant(plantGroup, plantSpec);
+        } else if (tile.plantTypeId === 10) {
+            addSaxaulPlant(plantGroup, plantSpec);
         } else {
             addGenericPlant(plantGroup, plantSpec);
         }

@@ -434,12 +434,12 @@ void loadout_planner_builds_adjacent_completed_site_support(gs1::testing::System
         context,
         find_loadout_slot(
             campaign.loadout_planner_state.selected_loadout_slots,
-            gs1::k_item_salt_bean_seed_bundle) != nullptr);
+            gs1::k_item_white_thorn_seed_bundle) != nullptr);
     GS1_SYSTEM_TEST_CHECK(
         context,
         find_loadout_slot(
             campaign.loadout_planner_state.selected_loadout_slots,
-            gs1::k_item_salt_bean_seed_bundle)
+            gs1::k_item_white_thorn_seed_bundle)
             ->quantity == 4U);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -866,31 +866,31 @@ void technology_total_reputation_tiers_unlock_plants(
     GS1_SYSTEM_TEST_REQUIRE(context, tier_two != nullptr);
     GS1_SYSTEM_TEST_REQUIRE(context, tier_three != nullptr);
     GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_straw_checkerboard}));
-    GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_wind_reed}));
-    GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_root_binder}));
-    GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_salt_bean}));
-    GS1_SYSTEM_TEST_CHECK(context, !TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_shade_cactus}));
-    GS1_SYSTEM_TEST_CHECK(context, !TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_dew_grass}));
+    GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_ordos_wormwood}));
+    GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_korshinsk_peashrub}));
+    GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_white_thorn}));
+    GS1_SYSTEM_TEST_CHECK(context, !TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_red_tamarisk}));
+    GS1_SYSTEM_TEST_CHECK(context, !TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_jiji_grass}));
     GS1_SYSTEM_TEST_CHECK(context, !TechnologySystem::total_reputation_tier_unlocked(campaign, *tier_one));
     GS1_SYSTEM_TEST_CHECK(context, !TechnologySystem::total_reputation_tier_unlocked(campaign, *tier_two));
     GS1_SYSTEM_TEST_CHECK(context, !TechnologySystem::total_reputation_tier_unlocked(campaign, *tier_three));
 
     campaign.technology_state.total_reputation = 10;
     GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::total_reputation_tier_unlocked(campaign, *tier_one));
-    GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_shade_cactus}));
-    GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_dew_grass}));
-    GS1_SYSTEM_TEST_CHECK(context, !TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_thorn_shrub}));
+    GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_red_tamarisk}));
+    GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_jiji_grass}));
+    GS1_SYSTEM_TEST_CHECK(context, !TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_sea_buckthorn}));
 
     campaign.technology_state.total_reputation = 25;
     GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::total_reputation_tier_unlocked(campaign, *tier_two));
-    GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_thorn_shrub}));
-    GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_medicinal_sage}));
-    GS1_SYSTEM_TEST_CHECK(context, !TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_sand_willow}));
+    GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_sea_buckthorn}));
+    GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_desert_ephedra}));
+    GS1_SYSTEM_TEST_CHECK(context, !TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_saxaul}));
 
     campaign.technology_state.total_reputation = 45;
     GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::total_reputation_tier_unlocked(campaign, *tier_three));
-    GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_sunfruit_vine}));
-    GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_sand_willow}));
+    GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_ningxia_wolfberry}));
+    GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_saxaul}));
 }
 
 void technology_claim_spends_campaign_cash_and_records_purchase(

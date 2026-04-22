@@ -411,7 +411,7 @@ void local_weather_resolve_applies_directional_wind_shadow_falloff_for_windbreak
     site_run.weather.weather_wind_direction_degrees = 0.0f;
 
     auto tile = site_run.site_world->tile_at(TileCoord {1, 2});
-    tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_wind_reed};
+    tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_ordos_wormwood};
     tile.ecology.plant_density = 1.0f;
     site_run.site_world->set_tile(TileCoord {1, 2}, tile);
 
@@ -438,7 +438,7 @@ void local_weather_resolve_marks_projected_plant_tiles_dirty_when_wind_changes(
     auto site_context = make_site_context<LocalWeatherResolveSystem>(campaign, site_run, queue);
 
     auto tile = site_run.site_world->tile_at(TileCoord {2, 2});
-    tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_wind_reed};
+    tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_ordos_wormwood};
     tile.ecology.plant_density = 0.8f;
     site_run.site_world->set_tile(TileCoord {2, 2}, tile);
 

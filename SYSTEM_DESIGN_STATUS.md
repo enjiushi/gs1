@@ -39,7 +39,7 @@ These areas are defined strongly enough to start module design and runtime-struc
 - Player base, containers, water handling, and contractor direction
 - Data-driven item model with runtime item meters
 - Small device roster and device behavior contract
-- Plant roster direction, density model, growth pressure, spread, salinity, and straw checkerboard behavior
+- China-desert plant roster direction, density model, growth pressure, spread, salinity, and straw checkerboard behavior
 - Contract-board concept, prototype task model, faction publishing, reward-draft direction, chain-task direction, and accepted-task-cap concept
 - Faction identities, assistants, onboarding order, and prototype four-site arc
 - Data-driven faction-technology model with three faction tiers, a separate total-reputation plant track, and cash-purchased faction tech nodes

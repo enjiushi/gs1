@@ -1885,14 +1885,14 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
         GS1_UI_ELEMENT_LABEL,
         GS1_UI_ELEMENT_FLAG_NONE,
         no_action,
-        "Checkerboard | Reed");
+        "Checkerboard | Wormwood");
 
     queue_ui_element_message(
         6U,
         GS1_UI_ELEMENT_LABEL,
         GS1_UI_ELEMENT_FLAG_NONE,
         no_action,
-        "Root Binder | Salt Bean");
+        "Peashrub | White Thorn");
 
     std::uint32_t next_element_id = 7U;
 

@@ -10,8 +10,8 @@ External prototype content tables loaded by the gameplay DLL at startup.
 - `campaign_setup.tsv`: Config-backed prototype campaign setup table for starting cash, support quota per contributor, and baseline deployment items.
 - `sites.tsv`: Config-backed prototype campaign/site authoring table for site graph, objective config, support exports, nearby aura seeds, completion rewards, camp anchors, and initial reveal/availability flags.
 - `phone_listings.tsv`: Config-backed seeded phone-listing table for per-site buy, unlockable, and contractor offers.
-- `items.tsv`: Config-backed item authoring table for runtime item definitions and item-domain metadata, including the full prototype seed-item roster for all ten plants.
-- `plants.tsv`: Config-backed plant authoring table for ecology, shelter, and planting behavior across the full prototype 10-plant roster.
+- `items.tsv`: Config-backed item authoring table for runtime item definitions and item-domain metadata, including the full prototype seed-item roster for the China-desert ten-plant set.
+- `plants.tsv`: Config-backed plant authoring table for ecology, shelter, and planting behavior across the full prototype China-desert 10-plant roster.
 - `structures.tsv`: Config-backed structure authoring table for buildables, storage, and crafting stations.
 - `craft_recipes.tsv`: Config-backed craft recipe authoring table for station/output/ingredient mappings.
 - `task_templates.tsv`: Config-backed authored task template table for task board progress metadata, item/recipe targets, and faction reputation rewards.

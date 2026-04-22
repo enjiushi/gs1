@@ -337,7 +337,7 @@ void action_execution_deferred_plant_enters_placement_mode_and_tracks_preview(
     auto action_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue);
 
     site_run.inventory.worker_pack_slots[2].occupied = true;
-    site_run.inventory.worker_pack_slots[2].item_id = gs1::ItemId {gs1::k_item_wind_reed_seed_bundle};
+    site_run.inventory.worker_pack_slots[2].item_id = gs1::ItemId {gs1::k_item_ordos_wormwood_seed_bundle};
     site_run.inventory.worker_pack_slots[2].item_quantity = 2U;
     site_run.inventory.worker_pack_slots[2].item_condition = 1.0f;
     site_run.inventory.worker_pack_slots[2].item_freshness = 1.0f;
@@ -351,14 +351,14 @@ void action_execution_deferred_plant_enters_placement_mode_and_tracks_preview(
                 TileCoord {4, 4},
                 1U,
                 0U,
-                gs1::k_item_wind_reed_seed_bundle,
+                gs1::k_item_ordos_wormwood_seed_bundle,
                 GS1_SITE_ACTION_REQUEST_FLAG_HAS_ITEM |
                     GS1_SITE_ACTION_REQUEST_FLAG_DEFERRED_TARGET_SELECTION)) == GS1_STATUS_OK);
 
     GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.current_action_id.has_value());
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.active);
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.action_kind == ActionKind::Plant);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.item_id == gs1::k_item_wind_reed_seed_bundle);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.item_id == gs1::k_item_ordos_wormwood_seed_bundle);
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.target_tile.has_value());
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.target_tile->x == 4);
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.target_tile->y == 4);
@@ -395,7 +395,7 @@ void action_execution_deferred_plant_enters_placement_mode_and_tracks_preview(
                 TileCoord {5, 5},
                 1U,
                 0U,
-                gs1::k_item_wind_reed_seed_bundle,
+                gs1::k_item_ordos_wormwood_seed_bundle,
                 GS1_SITE_ACTION_REQUEST_FLAG_HAS_ITEM)) == GS1_STATUS_OK);
 
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.active);
@@ -420,7 +420,7 @@ void action_execution_confirming_placement_mode_starts_real_action(
     auto action_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue);
 
     site_run.inventory.worker_pack_slots[3].occupied = true;
-    site_run.inventory.worker_pack_slots[3].item_id = gs1::ItemId {gs1::k_item_wind_reed_seed_bundle};
+    site_run.inventory.worker_pack_slots[3].item_id = gs1::ItemId {gs1::k_item_ordos_wormwood_seed_bundle};
     site_run.inventory.worker_pack_slots[3].item_quantity = 2U;
     site_run.inventory.worker_pack_slots[3].item_condition = 1.0f;
     site_run.inventory.worker_pack_slots[3].item_freshness = 1.0f;
@@ -434,7 +434,7 @@ void action_execution_confirming_placement_mode_starts_real_action(
                 TileCoord {4, 4},
                 1U,
                 0U,
-                gs1::k_item_wind_reed_seed_bundle,
+                gs1::k_item_ordos_wormwood_seed_bundle,
                 GS1_SITE_ACTION_REQUEST_FLAG_HAS_ITEM |
                     GS1_SITE_ACTION_REQUEST_FLAG_DEFERRED_TARGET_SELECTION)) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.active);
@@ -449,7 +449,7 @@ void action_execution_confirming_placement_mode_starts_real_action(
                 TileCoord {5, 4},
                 1U,
                 0U,
-                gs1::k_item_wind_reed_seed_bundle,
+                gs1::k_item_ordos_wormwood_seed_bundle,
                 GS1_SITE_ACTION_REQUEST_FLAG_HAS_ITEM)) == GS1_STATUS_OK);
 
     GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.placement_mode.active);
@@ -669,7 +669,7 @@ void action_execution_item_based_plant_completion_consumes_seed_and_emits_planti
     auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue, 60.0);
 
     site_run.inventory.worker_pack_slots[3].occupied = true;
-    site_run.inventory.worker_pack_slots[3].item_id = gs1::ItemId {gs1::k_item_wind_reed_seed_bundle};
+    site_run.inventory.worker_pack_slots[3].item_id = gs1::ItemId {gs1::k_item_ordos_wormwood_seed_bundle};
     site_run.inventory.worker_pack_slots[3].item_quantity = 2U;
     site_run.inventory.worker_pack_slots[3].item_condition = 1.0f;
     site_run.inventory.worker_pack_slots[3].item_freshness = 1.0f;
@@ -683,7 +683,7 @@ void action_execution_item_based_plant_completion_consumes_seed_and_emits_planti
                 TileCoord {2, 2},
                 2U,
                 0U,
-                gs1::k_item_wind_reed_seed_bundle)) == GS1_STATUS_OK);
+                gs1::k_item_ordos_wormwood_seed_bundle)) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, site_run.site_action.current_action_id.has_value());
     const auto action_id = site_run.site_action.current_action_id->value;
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.awaiting_placement_reservation);
@@ -696,7 +696,7 @@ void action_execution_item_based_plant_completion_consumes_seed_and_emits_planti
     GS1_SYSTEM_TEST_CHECK(
         context,
         queue.front().payload_as<PlacementReservationRequestedMessage>().subject_id ==
-            gs1::k_plant_wind_reed);
+            gs1::k_plant_ordos_wormwood);
 
     queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(
@@ -719,7 +719,7 @@ void action_execution_item_based_plant_completion_consumes_seed_and_emits_planti
             queue,
             GameMessageType::InventoryItemConsumeRequested);
     GS1_SYSTEM_TEST_REQUIRE(context, consume != nullptr);
-    GS1_SYSTEM_TEST_CHECK(context, consume->item_id == gs1::k_item_wind_reed_seed_bundle);
+    GS1_SYSTEM_TEST_CHECK(context, consume->item_id == gs1::k_item_ordos_wormwood_seed_bundle);
     GS1_SYSTEM_TEST_CHECK(context, consume->quantity == 2U);
     GS1_SYSTEM_TEST_CHECK(context, consume->container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK);
     const auto* planting =
@@ -727,7 +727,7 @@ void action_execution_item_based_plant_completion_consumes_seed_and_emits_planti
             queue,
             GameMessageType::SiteTilePlantingCompleted);
     GS1_SYSTEM_TEST_REQUIRE(context, planting != nullptr);
-    GS1_SYSTEM_TEST_CHECK(context, planting->plant_type_id == gs1::k_plant_wind_reed);
+    GS1_SYSTEM_TEST_CHECK(context, planting->plant_type_id == gs1::k_plant_ordos_wormwood);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(planting->initial_density, 0.4f));
     GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.current_action_id.has_value());
 }
@@ -741,7 +741,7 @@ void action_execution_item_based_plant_completion_rearms_placement_mode_when_see
     auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue, 60.0);
 
     site_run.inventory.worker_pack_slots[3].occupied = true;
-    site_run.inventory.worker_pack_slots[3].item_id = gs1::ItemId {gs1::k_item_wind_reed_seed_bundle};
+    site_run.inventory.worker_pack_slots[3].item_id = gs1::ItemId {gs1::k_item_ordos_wormwood_seed_bundle};
     site_run.inventory.worker_pack_slots[3].item_quantity = 2U;
     site_run.inventory.worker_pack_slots[3].item_condition = 1.0f;
     site_run.inventory.worker_pack_slots[3].item_freshness = 1.0f;
@@ -755,7 +755,7 @@ void action_execution_item_based_plant_completion_rearms_placement_mode_when_see
                 TileCoord {4, 4},
                 1U,
                 0U,
-                gs1::k_item_wind_reed_seed_bundle,
+                gs1::k_item_ordos_wormwood_seed_bundle,
                 GS1_SITE_ACTION_REQUEST_FLAG_HAS_ITEM |
                     GS1_SITE_ACTION_REQUEST_FLAG_DEFERRED_TARGET_SELECTION)) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.active);
@@ -770,7 +770,7 @@ void action_execution_item_based_plant_completion_rearms_placement_mode_when_see
                 TileCoord {5, 4},
                 1U,
                 0U,
-                gs1::k_item_wind_reed_seed_bundle,
+                gs1::k_item_ordos_wormwood_seed_bundle,
                 GS1_SITE_ACTION_REQUEST_FLAG_HAS_ITEM)) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, site_run.site_action.current_action_id.has_value());
     const auto action_id = site_run.site_action.current_action_id->value;
@@ -797,7 +797,7 @@ void action_execution_item_based_plant_completion_rearms_placement_mode_when_see
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.action_kind == ActionKind::Plant);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        site_run.site_action.placement_mode.item_id == gs1::k_item_wind_reed_seed_bundle);
+        site_run.site_action.placement_mode.item_id == gs1::k_item_ordos_wormwood_seed_bundle);
     GS1_SYSTEM_TEST_REQUIRE(context, site_run.site_action.placement_mode.target_tile.has_value());
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.target_tile->x == 4);
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.target_tile->y == 4);
@@ -815,7 +815,7 @@ void action_execution_item_based_plant_completion_stops_rearming_when_last_seed_
     auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue, 60.0);
 
     site_run.inventory.worker_pack_slots[3].occupied = true;
-    site_run.inventory.worker_pack_slots[3].item_id = gs1::ItemId {gs1::k_item_wind_reed_seed_bundle};
+    site_run.inventory.worker_pack_slots[3].item_id = gs1::ItemId {gs1::k_item_ordos_wormwood_seed_bundle};
     site_run.inventory.worker_pack_slots[3].item_quantity = 1U;
     site_run.inventory.worker_pack_slots[3].item_condition = 1.0f;
     site_run.inventory.worker_pack_slots[3].item_freshness = 1.0f;
@@ -829,7 +829,7 @@ void action_execution_item_based_plant_completion_stops_rearming_when_last_seed_
                 TileCoord {4, 4},
                 1U,
                 0U,
-                gs1::k_item_wind_reed_seed_bundle,
+                gs1::k_item_ordos_wormwood_seed_bundle,
                 GS1_SITE_ACTION_REQUEST_FLAG_HAS_ITEM |
                     GS1_SITE_ACTION_REQUEST_FLAG_DEFERRED_TARGET_SELECTION)) == GS1_STATUS_OK);
 
@@ -843,7 +843,7 @@ void action_execution_item_based_plant_completion_stops_rearming_when_last_seed_
                 TileCoord {5, 4},
                 1U,
                 0U,
-                gs1::k_item_wind_reed_seed_bundle,
+                gs1::k_item_ordos_wormwood_seed_bundle,
                 GS1_SITE_ACTION_REQUEST_FLAG_HAS_ITEM)) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, site_run.site_action.current_action_id.has_value());
     const auto action_id = site_run.site_action.current_action_id->value;
@@ -908,7 +908,7 @@ void action_execution_checkerboard_item_uses_2x2_placement_and_rejects_occupied_
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.blocked_mask == 0ULL);
 
     auto occupied_tile = site_run.site_world->tile_at(TileCoord {5, 5});
-    occupied_tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_wind_reed};
+    occupied_tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_ordos_wormwood};
     occupied_tile.ecology.plant_density = 0.6f;
     site_run.site_world->set_tile(TileCoord {5, 5}, occupied_tile);
 
@@ -961,7 +961,7 @@ void action_execution_plant_progress_tracks_fixed_step_duration(
     auto flow_context = make_site_context<SiteFlowSystem>(campaign, site_run, queue, 0.25);
 
     site_run.inventory.worker_pack_slots[3].occupied = true;
-    site_run.inventory.worker_pack_slots[3].item_id = gs1::ItemId {gs1::k_item_wind_reed_seed_bundle};
+    site_run.inventory.worker_pack_slots[3].item_id = gs1::ItemId {gs1::k_item_ordos_wormwood_seed_bundle};
     site_run.inventory.worker_pack_slots[3].item_quantity = 1U;
     site_run.inventory.worker_pack_slots[3].item_condition = 1.0f;
     site_run.inventory.worker_pack_slots[3].item_freshness = 1.0f;
@@ -975,7 +975,7 @@ void action_execution_plant_progress_tracks_fixed_step_duration(
                 TileCoord {2, 2},
                 1U,
                 0U,
-                gs1::k_item_wind_reed_seed_bundle)) == GS1_STATUS_OK);
+                gs1::k_item_ordos_wormwood_seed_bundle)) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, site_run.site_action.current_action_id.has_value());
     const auto action_id = site_run.site_action.current_action_id->value;
 
@@ -1035,7 +1035,7 @@ void action_execution_plant_duration_respects_small_fixed_steps(
     auto flow_context = make_site_context<SiteFlowSystem>(campaign, site_run, queue, 1.0 / 60.0);
 
     site_run.inventory.worker_pack_slots[3].occupied = true;
-    site_run.inventory.worker_pack_slots[3].item_id = gs1::ItemId {gs1::k_item_wind_reed_seed_bundle};
+    site_run.inventory.worker_pack_slots[3].item_id = gs1::ItemId {gs1::k_item_ordos_wormwood_seed_bundle};
     site_run.inventory.worker_pack_slots[3].item_quantity = 1U;
     site_run.inventory.worker_pack_slots[3].item_condition = 1.0f;
     site_run.inventory.worker_pack_slots[3].item_freshness = 1.0f;
@@ -1049,7 +1049,7 @@ void action_execution_plant_duration_respects_small_fixed_steps(
                 TileCoord {2, 2},
                 1U,
                 0U,
-                gs1::k_item_wind_reed_seed_bundle)) == GS1_STATUS_OK);
+                gs1::k_item_ordos_wormwood_seed_bundle)) == GS1_STATUS_OK);
     const auto action_id = site_run.site_action.current_action_id->value;
 
     queue.clear();
@@ -1317,7 +1317,7 @@ void placement_validation_living_plants_use_2x2_footprint(
                     PlacementOccupancyLayer::GroundCover,
                     PlacementReservationSubjectKind::PlantType,
                     {0U, 0U},
-                    gs1::k_plant_wind_reed})) == GS1_STATUS_OK);
+                    gs1::k_plant_ordos_wormwood})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::PlacementReservationAccepted);
     const auto token = queue.front().payload_as<PlacementReservationAcceptedMessage>().reservation_token;
@@ -1357,7 +1357,7 @@ void placement_validation_living_plants_use_2x2_footprint(
                     PlacementOccupancyLayer::GroundCover,
                     PlacementReservationSubjectKind::PlantType,
                     {0U, 0U},
-                    gs1::k_plant_wind_reed})) == GS1_STATUS_OK);
+                    gs1::k_plant_ordos_wormwood})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(
         context,
@@ -1390,7 +1390,7 @@ void placement_validation_living_plants_use_2x2_footprint(
                     PlacementOccupancyLayer::GroundCover,
                     PlacementReservationSubjectKind::PlantType,
                     {0U, 0U},
-                    gs1::k_plant_wind_reed})) == GS1_STATUS_OK);
+                    gs1::k_plant_ordos_wormwood})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(
         context,
@@ -1419,7 +1419,7 @@ void placement_validation_rejects_misaligned_multitile_requests(
                     PlacementOccupancyLayer::GroundCover,
                     PlacementReservationSubjectKind::PlantType,
                     {0U, 0U},
-                    gs1::k_plant_wind_reed})) == GS1_STATUS_OK);
+                    gs1::k_plant_ordos_wormwood})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::PlacementReservationRejected);
     GS1_SYSTEM_TEST_CHECK(
@@ -1465,13 +1465,13 @@ void ecology_ground_cover_and_planting_update_tile_state(
                     2U,
                     2,
                     2,
-                    gs1::k_plant_wind_reed,
+                    gs1::k_plant_ordos_wormwood,
                     0.6f,
                     0U})) == GS1_STATUS_OK);
     for (const auto coord : {TileCoord {2, 2}, TileCoord {3, 2}, TileCoord {2, 3}, TileCoord {3, 3}})
     {
         tile = site_run.site_world->tile_at(coord);
-        GS1_SYSTEM_TEST_CHECK(context, tile.ecology.plant_id.value == gs1::k_plant_wind_reed);
+        GS1_SYSTEM_TEST_CHECK(context, tile.ecology.plant_id.value == gs1::k_plant_ordos_wormwood);
         GS1_SYSTEM_TEST_CHECK(context, tile.ecology.ground_cover_type_id == 0U);
         GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.plant_density, 0.6f));
     }
@@ -1544,7 +1544,7 @@ void ecology_uses_average_wind_across_multitile_plant_footprint(
     for (const auto coord : {TileCoord {2, 2}, TileCoord {3, 2}, TileCoord {2, 3}, TileCoord {3, 3}})
     {
         auto tile = site_run.site_world->tile_at(coord);
-        tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_wind_reed};
+        tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_ordos_wormwood};
         tile.ecology.plant_density = 0.6f;
         tile.ecology.moisture = 0.0f;
         tile.ecology.soil_fertility = 0.0f;

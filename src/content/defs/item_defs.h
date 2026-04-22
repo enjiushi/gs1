@@ -50,23 +50,23 @@ struct ItemDef final
 inline constexpr std::uint32_t k_item_water_container = 1U;
 inline constexpr std::uint32_t k_item_food_pack = 2U;
 inline constexpr std::uint32_t k_item_medicine_pack = 3U;
-inline constexpr std::uint32_t k_item_wind_reed_seed_bundle = 4U;
-inline constexpr std::uint32_t k_item_salt_bean_seed_bundle = 5U;
-inline constexpr std::uint32_t k_item_shade_cactus_seed_bundle = 6U;
-inline constexpr std::uint32_t k_item_sunfruit_vine_seed_bundle = 7U;
+inline constexpr std::uint32_t k_item_ordos_wormwood_seed_bundle = 4U;
+inline constexpr std::uint32_t k_item_white_thorn_seed_bundle = 5U;
+inline constexpr std::uint32_t k_item_red_tamarisk_seed_bundle = 6U;
+inline constexpr std::uint32_t k_item_ningxia_wolfberry_seed_bundle = 7U;
 inline constexpr std::uint32_t k_item_wood_bundle = 8U;
 inline constexpr std::uint32_t k_item_iron_bundle = 9U;
-inline constexpr std::uint32_t k_item_wind_reed_fiber = 10U;
+inline constexpr std::uint32_t k_item_wormwood_bundle = 10U;
 inline constexpr std::uint32_t k_item_camp_stove_kit = 11U;
 inline constexpr std::uint32_t k_item_workbench_kit = 12U;
 inline constexpr std::uint32_t k_item_storage_crate_kit = 13U;
 inline constexpr std::uint32_t k_item_hammer = 14U;
 inline constexpr std::uint32_t k_item_basic_straw_checkerboard = 15U;
-inline constexpr std::uint32_t k_item_root_binder_seed_bundle = 16U;
-inline constexpr std::uint32_t k_item_dew_grass_seed_bundle = 17U;
-inline constexpr std::uint32_t k_item_thorn_shrub_seed_bundle = 18U;
-inline constexpr std::uint32_t k_item_medicinal_sage_seed_bundle = 19U;
-inline constexpr std::uint32_t k_item_sand_willow_seed_bundle = 20U;
+inline constexpr std::uint32_t k_item_korshinsk_peashrub_seed_bundle = 16U;
+inline constexpr std::uint32_t k_item_jiji_grass_seed_bundle = 17U;
+inline constexpr std::uint32_t k_item_sea_buckthorn_seed_bundle = 18U;
+inline constexpr std::uint32_t k_item_desert_ephedra_seed_bundle = 19U;
+inline constexpr std::uint32_t k_item_saxaul_seed_bundle = 20U;
 
 [[nodiscard]] std::span<const ItemDef> all_item_defs() noexcept;
 

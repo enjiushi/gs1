@@ -1302,7 +1302,7 @@ Rules:
 Example inventory pressure:
 
 - `7` `waterContainer` requires `2` slots because one slot can hold only `5`
-- `16` `seedBundle:windReed` requires `2` slots because one slot can hold only `10`
+- `16` `seedBundle:ordosWormwood` requires `2` slots because one slot can hold only `10`
 - `21` `harvestGood:fiber` requires `3` slots because each slot can hold only `10`
 
 Container rules:
@@ -1589,17 +1589,19 @@ The following plants are temporary placeholders for the current build. Their nam
 | Plant | Role Mix | Effect Ceiling (Temp) | Work Demand (Temp) | Own Tile Effect | Neighbor Tile Effect | Use |
 |---|---|---|---|---|---|---|
 | `Straw Checkerboard` | Protection + Fertility setup | Medium | Low | Plant-derived `2x2` straw grid placed on bare sand; it starts with strong near-surface wind and sand reduction across its occupied footprint, while its shared contribution powers scale down as density decays over time | Downwind tiles gain early erosion relief, slightly better establishment odds, and a temporary protection buffer while the checkerboard is still fresh | Critical opener for least fertile or pure sand tiles; makes hostile sand workable for later living plants |
-| `Wind Reed` | Protection + Anti-dehydration | Medium | Low | Cheap early plant that reduces wind damage and slows dehydration on its own tile | Downwind tiles behind the reed get a readable lee-side wind shadow that stays strong near the plant and fades sharply near the range edge | First safety plant; teaches line placement and perimeter thinking |
-| `Shade Cactus` | Anti-dehydration + Worker support | Medium | Low | Strong local heat reduction and low water demand | Adjacent tiles lose water more slowly; nearby work zones feel safer during hot periods | Teaches oasis pockets, camp-edge defense, and local survival planning |
-| `Root Binder` | Fertilize + Protection | Medium | Medium | Stabilizes soil, reduces erosion, and slowly improves difficult ground on its own tile | Adjacent tiles gain fertility and mild erosion resistance, helping surrounding salty tiles recover over time | Teaches groundwork and setup before high-value planting |
-| `Salt Bean` | Output + Fertilize | Medium | Medium | Produces modest food or sellable yield if the tile is stable enough while also serving as the main early salt-rehab crop | Adjacent tiles gain a small fertility bonus and light salinity-recovery support that helps future crops | Teaches low-risk output and the value of mixed production rows on difficult land |
-| `Sunfruit Vine` | Output + Anti-dehydration synergy | High | High | High output but weak when exposed | Adjacent shaded or fertilized tiles improve its performance; it also gives small output synergy to nearby output plants | Teaches greedy high-reward planting that depends on support plants |
-| `Dew Grass` | Anti-dehydration + Fertilize | Medium | Low | Captures trace moisture and softens local dryness on poor or mildly salty soil | Adjacent tiles gain slight moisture retention, a small fertility bump, and weak salinity-rehab support | Gentle bridge plant for expanding from safe patches into dry but not fully dead land |
-| `Thorn Shrub` | Protection + Output | Medium | Medium | Tough shrub that creates a sturdier barrier and a small fiber or resin yield | Adjacent tiles gain minor wind buffering and a little protection against density loss | Teaches productive perimeter building instead of pure defense |
-| `Medicinal Sage` | Output + Worker support | Medium | Medium | Produces a modest herb yield and improves comfort in its immediate area | Adjacent tiles slightly improve short-rest efficiency and morale feel when conditions are stable | Teaches support-economy patches and non-food output value |
-| `Sand Willow` | Protection + Anti-dehydration anchor | High | High | Large anchor plant that creates strong local shelter and heat relief when sustained | Adjacent tiles gain one of the strongest protection and dehydration-relief effects in the current set | Late anchor plant for turning one hard-earned zone into a true refuge core |
+| `Ordos Wormwood` | Protection + Anti-dehydration | Medium | Low | Cheap early shrub that cuts wind exposure and slows dehydration on its own tile | Downwind tiles behind the wormwood line gain a readable lee-side wind shadow that stays strong near the plant and fades sharply near the range edge | First safety plant; teaches line placement and perimeter thinking |
+| `Red Tamarisk` | Anti-dehydration + Worker support | Medium | Low | Deep-rooted desert shrub that creates strong local heat relief with modest upkeep | Adjacent tiles lose water more slowly; nearby work zones feel safer during hot periods | Teaches oasis pockets, camp-edge defense, and local survival planning |
+| `Korshinsk Peashrub` | Fertilize + Protection | Medium | Medium | Hardy legume that stabilizes soil, reduces erosion, and slowly improves difficult ground on its own tile | Adjacent tiles gain fertility and mild erosion resistance, helping surrounding salty tiles recover over time | Teaches groundwork and setup before high-value planting |
+| `White Thorn` | Output + Fertilize | Medium | Medium | Salt-tolerant berry shrub that produces modest yield if the tile is stable enough while also serving as the main early salt-rehab crop | Adjacent tiles gain a small fertility bonus and light salinity-recovery support that helps future crops | Teaches low-risk output and the value of mixed production rows on difficult land |
+| `Ningxia Wolfberry` | Output + Anti-dehydration synergy | High | High | Valuable berry crop with high payoff but weak exposed survivability | Adjacent shaded or fertilized tiles improve its performance; it also gives small output synergy to nearby output plants | Teaches greedy high-reward planting that depends on support plants |
+| `Jiji Grass` | Anti-dehydration + Fertilize | Medium | Low | Tufted dryland grass that captures trace moisture and softens local dryness on poor or mildly salty soil | Adjacent tiles gain slight moisture retention, a small fertility bump, and weak salinity-rehab support | Gentle bridge plant for expanding from safe patches into dry but not fully dead land |
+| `Sea Buckthorn` | Protection + Output | Medium | Medium | Thorny productive shrub that creates a sturdier barrier and a modest berry or fiber yield | Adjacent tiles gain minor wind buffering and a little protection against density loss | Teaches productive perimeter building instead of pure defense |
+| `Desert Ephedra` | Output + Worker support | Medium | Medium | Medicinal shrub that produces a modest herb yield and improves comfort in its immediate area | Adjacent tiles slightly improve short-rest efficiency and morale feel when conditions are stable | Teaches support-economy patches and non-food output value |
+| `Saxaul` | Protection + Anti-dehydration anchor | High | High | Large anchor shrub-tree that creates strong local shelter and heat relief when sustained | Adjacent tiles gain one of the strongest protection and dehydration-relief effects in the current set | Late anchor plant for turning one hard-earned zone into a true refuge core |
 
 `Straw Checkerboard` is inspired by the real Chinese straw checkerboard dune-control method, abstracted here into a special non-growable plant occupant for sand fixation and land preparation.
+
+The living prototype roster should now read as northwestern China desert and desert-steppe restoration flora: `Ordos Wormwood` (`Artemisia ordosica`), `White Thorn` (`Nitraria tangutorum`), `Red Tamarisk` (`Tamarix ramosissima`), `Ningxia Wolfberry` (`Lycium barbarum`), `Korshinsk Peashrub` (`Caragana korshinskii`), `Jiji Grass` (`Achnatherum splendens`), `Sea Buckthorn` (`Hippophae rhamnoides`), `Desert Ephedra` (`Ephedra przewalskii`), and `Saxaul` (`Haloxylon ammodendron`).
 
 `Effect Ceiling` is the rough maximum payoff of a dense healthy tile. `Work Demand` is the rough amount of setup, maintenance, and rescue attention the plant usually asks for before it feels dependable. Both are temporary tuning tags for iteration, not locked balance values.
 
@@ -1610,15 +1612,15 @@ For clarity, each plant should also carry a small trait package. These are tempo
 | Plant | Core Trait Combination | Main Risk Or Dependency |
 |---|---|---|
 | `Straw Checkerboard` | `Sand Fixation`, `Surface Roughness`, `Establishment Boost`, `Organic Matter Setup` | `No Yield`, `No Natural Spread`, contribution strength fades over time as current density falls |
-| `Wind Reed` | `Fast Establishment`, `Flexible Windbreak`, `Moisture Hold`, `Storm Recovery` | Effect ceiling is moderate; wants other plants behind it to convert safety into real value |
-| `Shade Cactus` | `Deep Shade`, `Low Water Demand`, `Heat Buffer`, `Comfort Pocket` | Best in concentrated pockets rather than long exposed lines |
-| `Root Binder` | `Soil Lock`, `Erosion Anchor`, `Fertility Lift`, `Salinity Prep` | Medium work and low direct payoff by itself; shines when followed by other plants |
-| `Salt Bean` | `Modest Yield`, `Soil Enrichment`, `Salt Rehab`, `Patch Builder` | Output drops hard if protection and fertility are not maintained |
-| `Sunfruit Vine` | `High Yield`, `Support Hungry`, `Shade Hungry`, `Fertility Hungry` | Very fragile in exposed or low-support zones; high rescue demand |
-| `Dew Grass` | `Dew Capture`, `Dryland Bridge`, `Soft Fertility`, `Light Salt Relief` | Lower peak payoff than harder specialist plants |
-| `Thorn Shrub` | `Tough Barrier`, `Edge Yield`, `Density Retention`, `Harsh Tolerance` | Not the best at pure defense or pure output; wins by doing both reasonably well |
-| `Medicinal Sage` | `Herb Yield`, `Comfort Aura`, `Rest Boost`, `Stable-Zone Preference` | Wants an already somewhat safe pocket before it feels worth the slot |
-| `Sand Willow` | `Refuge Canopy`, `Deep Root Anchor`, `Strong Shade`, `Refuge Core` | High early maintenance and high cost before it becomes a major payoff plant |
+| `Ordos Wormwood` | `Fast Establishment`, `Flexible Windbreak`, `Moisture Hold`, `Storm Recovery` | Effect ceiling is moderate; wants other plants behind it to convert safety into real value |
+| `Red Tamarisk` | `Deep Shade`, `Low Water Demand`, `Heat Buffer`, `Comfort Pocket` | Best in concentrated pockets rather than long exposed lines |
+| `Korshinsk Peashrub` | `Soil Lock`, `Erosion Anchor`, `Fertility Lift`, `Salinity Prep` | Medium work and low direct payoff by itself; shines when followed by other plants |
+| `White Thorn` | `Modest Yield`, `Soil Enrichment`, `Salt Rehab`, `Patch Builder` | Output drops hard if protection and fertility are not maintained |
+| `Ningxia Wolfberry` | `High Yield`, `Support Hungry`, `Shade Hungry`, `Fertility Hungry` | Very fragile in exposed or low-support zones; high rescue demand |
+| `Jiji Grass` | `Dew Capture`, `Dryland Bridge`, `Soft Fertility`, `Light Salt Relief` | Lower peak payoff than harder specialist plants |
+| `Sea Buckthorn` | `Tough Barrier`, `Edge Yield`, `Density Retention`, `Harsh Tolerance` | Not the best at pure defense or pure output; wins by doing both reasonably well |
+| `Desert Ephedra` | `Herb Yield`, `Comfort Aura`, `Rest Boost`, `Stable-Zone Preference` | Wants an already somewhat safe pocket before it feels worth the slot |
+| `Saxaul` | `Refuge Canopy`, `Deep Root Anchor`, `Strong Shade`, `Refuge Core` | High early maintenance and high cost before it becomes a major payoff plant |
 
 These trait combinations should be the main language for future tuning passes. If a plant feels weak or redundant later, adjust its trait package first before replacing the whole plant concept.
 
@@ -1632,20 +1634,20 @@ This should be enough to make salty tiles create real placement choices without 
 | Plant | Salt Tolerance | Salinity Reduction | Salty-Tile Role |
 |---|---|---|---|
 | `Straw Checkerboard` | `N/A` | `None` | Special non-growable setup plant; it can help prepare the surface, but it is not a true saline-soil answer by itself |
-| `Wind Reed` | `Medium` | `Low` | Acceptable first stabilizer on mildly salty exposed tiles |
-| `Shade Cactus` | `Medium` | `None` | Can survive some salinity, but mainly solves heat and dehydration |
-| `Root Binder` | `Medium` | `Medium` | Good support plant for gradually improving difficult soil |
-| `Salt Bean` | `High` | `High` | Primary salt specialist and best early answer for highly salty tiles |
-| `Sunfruit Vine` | `Low` | `None` | Poor choice for salty land unless the tile is improved first |
-| `Dew Grass` | `Medium` | `Low` | Bridge plant for moderately salty tiles that still need fertility recovery and gentler dryness |
-| `Thorn Shrub` | `Medium` | `Low` | Tough secondary option for harsher perimeter pockets |
-| `Medicinal Sage` | `Low` | `None` | Wants a cleaner, safer tile before it feels worthwhile |
-| `Sand Willow` | `High` | `Medium` | Late stronger anchor for salty refuge-building once support is in place |
+| `Ordos Wormwood` | `Medium` | `Low` | Acceptable first stabilizer on mildly salty exposed tiles |
+| `Red Tamarisk` | `Medium` | `None` | Can survive some salinity, but mainly solves heat and dehydration |
+| `Korshinsk Peashrub` | `Medium` | `Medium` | Good support plant for gradually improving difficult soil |
+| `White Thorn` | `High` | `High` | Primary salt specialist and best early answer for highly salty tiles |
+| `Ningxia Wolfberry` | `Low` | `None` | Poor choice for salty land unless the tile is improved first |
+| `Jiji Grass` | `Medium` | `Low` | Bridge plant for moderately salty tiles that still need fertility recovery and gentler dryness |
+| `Sea Buckthorn` | `Medium` | `Low` | Tough secondary option for harsher perimeter pockets |
+| `Desert Ephedra` | `Low` | `None` | Wants a cleaner, safer tile before it feels worthwhile |
+| `Saxaul` | `High` | `Medium` | Late stronger anchor for salty refuge-building once support is in place |
 
 Design intent:
 
-- `Salt Bean` should make the salinity system legible immediately
-- `Root Binder` and `Sand Willow` should create follow-up progression on difficult tiles
+- `White Thorn` should make the salinity system legible immediately
+- `Korshinsk Peashrub` and `Saxaul` should create follow-up progression on difficult tiles
 - low-tolerance plants should teach the player that some land must be prepared before high-value planting is realistic
 
 ### Plant Height Tags (Temp Design)
@@ -1655,15 +1657,15 @@ To support structure-sharing rules, the current plant set should also carry a si
 | Plant | Height Class | Structure-Sharing Read |
 |---|---|---|
 | `Straw Checkerboard` | `N/A` | Special non-growable plant occupant; structure sharing with living plants does not apply |
-| `Wind Reed` | `Low` | Good candidate for sharing under `Solar Array` or through `Drip Irrigator` |
-| `Shade Cactus` | `Medium` | Usually too tall for low-clearance shared structures |
-| `Root Binder` | `Low` | Good under technical support structures that allow low plants |
-| `Salt Bean` | `Low` | Good candidate for shared irrigation and solar-support tiles |
-| `Sunfruit Vine` | `Low` | Can share with permissive structures but still depends on broader support |
-| `Dew Grass` | `Low` | Good bridge plant for shared low-clearance support lanes |
-| `Thorn Shrub` | `Medium` | Usually blocked by low-clearance shared structures |
-| `Medicinal Sage` | `Low` | Can share with low-clearance support structures |
-| `Sand Willow` | `Tall` | Should usually require an open tile with no shared structure overhead |
+| `Ordos Wormwood` | `Low` | Good candidate for sharing under `Solar Array` or through `Drip Irrigator` |
+| `Red Tamarisk` | `Medium` | Usually too tall for low-clearance shared structures |
+| `Korshinsk Peashrub` | `Low` | Good under technical support structures that allow low plants |
+| `White Thorn` | `Low` | Good candidate for shared irrigation and solar-support tiles |
+| `Ningxia Wolfberry` | `Low` | Can share with permissive structures but still depends on broader support |
+| `Jiji Grass` | `Low` | Good bridge plant for shared low-clearance support lanes |
+| `Sea Buckthorn` | `Medium` | Usually blocked by low-clearance shared structures |
+| `Desert Ephedra` | `Low` | Can share with low-clearance support structures |
+| `Saxaul` | `Tall` | Should usually require an open tile with no shared structure overhead |
 
 Design intent:
 
@@ -1676,11 +1678,11 @@ Design intent:
 The game should use the plant roster to create short-term goals, not only long-term restoration.
 
 - Starting plant access should use a fixed early-session progression, not procedural variation from site to site
-- Begin the campaign with four basic plant types already available: `Straw Checkerboard`, `Wind Reed`, `Root Binder`, and `Salt Bean`
+- Begin the campaign with four basic plant types already available: `Straw Checkerboard`, `Ordos Wormwood`, `Korshinsk Peashrub`, and `White Thorn`
 - Use total campaign `Reputation` as a separate three-tier unlock track for the remaining six prototype plants
-- `Reputation` tier `I` should unlock `Shade Cactus` and `Dew Grass`
-- `Reputation` tier `II` should unlock `Thorn Shrub` and `Medicinal Sage`
-- `Reputation` tier `III` should unlock `Sunfruit Vine` and `Sand Willow`
+- `Reputation` tier `I` should unlock `Red Tamarisk` and `Jiji Grass`
+- `Reputation` tier `II` should unlock `Sea Buckthorn` and `Desert Ephedra`
+- `Reputation` tier `III` should unlock `Ningxia Wolfberry` and `Saxaul`
 - Make at least one short-term objective in the opening phase plant-related, such as fixing a bare sand lane, establishing a windbreak, stabilizing a dry patch, or producing a first safe harvest
 
 This keeps the early site loop readable:
@@ -1698,19 +1700,19 @@ This keeps the early site loop readable:
 
 This early set should already support a few clear placement stories:
 
-- `Straw Checkerboard` + `Root Binder`: turn pure sand into a workable starter patch for later living cover
-- `Straw Checkerboard` + `Wind Reed`: create a storm-facing starter barrier on exposed dunes
-- `Dew Grass` + `Root Binder`: create a soft restoration bridge that upgrades dry land into living soil
-- `Wind Reed` + `Shade Cactus`: create a survivable edge or protected work pocket
-- `Wind Reed` + `Thorn Shrub`: build a perimeter that both protects and slowly pays back
-- `Shade Cactus` + `Medicinal Sage`: create a support pocket that feels good to stand and recover in
-- `Root Binder` + `Salt Bean`: turn unstable salty land into a modest productive patch
-- `Dew Grass` + `Salt Bean`: open a mild-salinity lane that still needs water-sensitive support
-- `Root Binder` + `Sunfruit Vine`: set up a high-reward crop that feels earned
-- `Root Binder` + `Sand Willow`: build a refuge core that can hold against repeated weather pressure
-- `Wind Reed` + `Sunfruit Vine`: protect a risky output line from collapse
-- `Shade Cactus` + `Sunfruit Vine`: reduce dehydration pressure on a greedy output plant
-- `Sand Willow` + `Medicinal Sage`: create a late safe zone with strong recovery feel and support value
+- `Straw Checkerboard` + `Korshinsk Peashrub`: turn pure sand into a workable starter patch for later living cover
+- `Straw Checkerboard` + `Ordos Wormwood`: create a storm-facing starter barrier on exposed dunes
+- `Jiji Grass` + `Korshinsk Peashrub`: create a soft restoration bridge that upgrades dry land into living soil
+- `Ordos Wormwood` + `Red Tamarisk`: create a survivable edge or protected work pocket
+- `Ordos Wormwood` + `Sea Buckthorn`: build a perimeter that both protects and slowly pays back
+- `Red Tamarisk` + `Desert Ephedra`: create a support pocket that feels good to stand and recover in
+- `Korshinsk Peashrub` + `White Thorn`: turn unstable salty land into a modest productive patch
+- `Jiji Grass` + `White Thorn`: open a mild-salinity lane that still needs water-sensitive support
+- `Korshinsk Peashrub` + `Ningxia Wolfberry`: set up a high-reward crop that feels earned
+- `Korshinsk Peashrub` + `Saxaul`: build a refuge core that can hold against repeated weather pressure
+- `Ordos Wormwood` + `Ningxia Wolfberry`: protect a risky output line from collapse
+- `Red Tamarisk` + `Ningxia Wolfberry`: reduce dehydration pressure on a greedy output plant
+- `Saxaul` + `Desert Ephedra`: create a late safe zone with strong recovery feel and support value
 
 The game should not aim for perfect balance yet. It should aim for understandable combo moments where the player can feel "this plant supports that plant."
 
@@ -1778,10 +1780,10 @@ Important traits for `Straw Checkerboard`:
 
 Important traits for the added plants:
 
-- `Dew Grass`: low work bridge plant that smooths expansion into dry tiles without creating huge direct output
-- `Thorn Shrub`: perimeter plant that mixes safety and modest economy so defense can feel productive
-- `Medicinal Sage`: support-output plant that helps a patch feel inhabited and worth returning to
-- `Sand Willow`: high-work anchor that creates a strong refuge core when the player commits enough support
+- `Jiji Grass`: low work bridge plant that smooths expansion into dry tiles without creating huge direct output
+- `Sea Buckthorn`: perimeter plant that mixes safety and modest economy so defense can feel productive
+- `Desert Ephedra`: support-output plant that helps a patch feel inhabited and worth returning to
+- `Saxaul`: high-work anchor that creates a strong refuge core when the player commits enough support
 
 ### Plant Density And Degeneration
 
@@ -1847,9 +1849,9 @@ The game should support both upward and downward spirals.
 
 Good spiral example:
 
-- The player places `Wind Reed` and `Root Binder` in an exposed lane
+- The player places `Ordos Wormwood` and `Korshinsk Peashrub` in an exposed lane
 - The patch survives a harsh weather window
-- That survival protects a later `Salt Bean` or prepares the lane for a later `Sunfruit Vine`
+- That survival protects a later `White Thorn` or prepares the lane for a later `Ningxia Wolfberry`
 - The new output funds more tech, supplies, or repairs
 - The site becomes easier to expand safely
 
@@ -3687,12 +3689,12 @@ The design target is setbacks rather than total campaign reset. The player shoul
 | Role | Purpose | Current Placeholder |
 |---|---|---|
 | Sand-fix starter | Makes bare sand workable for later restoration | `Straw Checkerboard` |
-| Protection | Shields tiles, young plants, or work zones | `Wind Reed`, `Root Binder`, `Thorn Shrub`, `Sand Willow` |
-| Anti-dehydration | Slows water loss and lowers local heat stress | `Wind Reed`, `Shade Cactus`, `Dew Grass`, `Sunfruit Vine`, `Sand Willow` |
-| Fertilize | Improves soil quality and future plant performance | `Root Binder`, `Salt Bean`, `Dew Grass`, `Straw Checkerboard` setup support |
-| Salinity rehab | Reduces salty-tile density caps over time so later plants can use the tile better | `Salt Bean`, `Root Binder`, `Dew Grass`, `Sand Willow` |
-| Output | Provides food or limited sellable yield | `Salt Bean`, `Sunfruit Vine`, `Thorn Shrub`, `Medicinal Sage` |
-| Worker support | Improves comfort, recovery feel, or safe rest value | `Shade Cactus`, `Medicinal Sage`, `Sand Willow` dense pocket support |
+| Protection | Shields tiles, young plants, or work zones | `Ordos Wormwood`, `Korshinsk Peashrub`, `Sea Buckthorn`, `Saxaul` |
+| Anti-dehydration | Slows water loss and lowers local heat stress | `Ordos Wormwood`, `Red Tamarisk`, `Jiji Grass`, `Ningxia Wolfberry`, `Saxaul` |
+| Fertilize | Improves soil quality and future plant performance | `Korshinsk Peashrub`, `White Thorn`, `Jiji Grass`, `Straw Checkerboard` setup support |
+| Salinity rehab | Reduces salty-tile density caps over time so later plants can use the tile better | `White Thorn`, `Korshinsk Peashrub`, `Jiji Grass`, `Saxaul` |
+| Output | Provides food or limited sellable yield | `White Thorn`, `Ningxia Wolfberry`, `Sea Buckthorn`, `Desert Ephedra` |
+| Worker support | Improves comfort, recovery feel, or safe rest value | `Red Tamarisk`, `Desert Ephedra`, `Saxaul` dense pocket support |
 
 Section 11's current plant set is the current working content target. The game should stay at a hand-picked 10-entry roster, including one plant-derived starter material, until combo readability, progression fun, and role overlap are proven in playtests.
 
@@ -3938,9 +3940,9 @@ The player should feel pressure, but not have to manage many overlapping bars in
 - use only `4` plants in the minimum playable build
 - recommended set:
 - `Straw Checkerboard`
-- `Wind Reed`
-- `Root Binder`
-- `Salt Bean`
+- `Ordos Wormwood`
+- `Korshinsk Peashrub`
+- `White Thorn`
 - keep plant states simple but visible:
 - newly placed and fragile
 - established and protective

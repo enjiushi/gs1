@@ -435,7 +435,7 @@ void inventory_device_storage_items_must_route_through_worker_pack(
     (void)gs1::inventory_storage::add_item_to_container(
         site_run,
         worker_pack,
-        gs1::ItemId {gs1::k_item_wind_reed_seed_bundle},
+        gs1::ItemId {gs1::k_item_ordos_wormwood_seed_bundle},
         1U);
     (void)gs1::inventory_storage::add_item_to_container(
         site_run,
@@ -485,7 +485,7 @@ void inventory_device_storage_items_must_route_through_worker_pack(
     const auto freed_quantity = gs1::inventory_storage::consume_item_type_from_container(
         site_run,
         worker_pack,
-        gs1::ItemId {gs1::k_item_wind_reed_seed_bundle},
+        gs1::ItemId {gs1::k_item_ordos_wormwood_seed_bundle},
         1U);
     GS1_SYSTEM_TEST_REQUIRE(context, freed_quantity == 0U);
     GS1_SYSTEM_TEST_REQUIRE(context, find_first_empty_worker_pack_slot(site_run) == 3U);
@@ -721,7 +721,7 @@ void inventory_delivery_queues_only_overflow_until_delivery_crate_space_opens(
             make_message(
                 GameMessageType::InventoryDeliveryRequested,
                 gs1::InventoryDeliveryRequestedMessage {
-                    gs1::k_item_wind_reed_seed_bundle,
+                    gs1::k_item_ordos_wormwood_seed_bundle,
                     3U,
                     1U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.pending_delivery_queue.size() == 1U);
@@ -742,7 +742,7 @@ void inventory_delivery_queues_only_overflow_until_delivery_crate_space_opens(
         gs1::inventory_storage::available_item_quantity_in_container(
             site_run,
             delivery_box,
-            gs1::ItemId {gs1::k_item_wind_reed_seed_bundle}) == 0U);
+            gs1::ItemId {gs1::k_item_ordos_wormwood_seed_bundle}) == 0U);
 
     const auto cleared_quantity = gs1::inventory_storage::consume_item_type_from_container(
         site_run,
@@ -756,7 +756,7 @@ void inventory_delivery_queues_only_overflow_until_delivery_crate_space_opens(
     GS1_SYSTEM_TEST_REQUIRE(context, delivery_box_slot_stack(site_run, 0U) != nullptr);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        delivery_box_slot_stack(site_run, 0U)->item_id.value == gs1::k_item_wind_reed_seed_bundle);
+        delivery_box_slot_stack(site_run, 0U)->item_id.value == gs1::k_item_ordos_wormwood_seed_bundle);
     GS1_SYSTEM_TEST_CHECK(context, delivery_box_slot_stack(site_run, 0U)->quantity == 3U);
 }
 
@@ -1441,14 +1441,14 @@ void task_board_transfer_task_completes_from_successful_transfer(
     (void)gs1::inventory_storage::add_item_to_container(
         site_run,
         starter_storage,
-        gs1::ItemId {gs1::k_item_wind_reed_seed_bundle},
+        gs1::ItemId {gs1::k_item_ordos_wormwood_seed_bundle},
         1U);
     const auto starter_storage_id =
         gs1::inventory_storage::storage_id_for_container(site_run, starter_storage);
     const auto seed_slot_index = find_container_slot_with_item(
         site_run,
         starter_storage,
-        gs1::ItemId {gs1::k_item_wind_reed_seed_bundle});
+        gs1::ItemId {gs1::k_item_ordos_wormwood_seed_bundle});
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         seed_slot_index < gs1::inventory_storage::slot_count_in_container(site_run, starter_storage));
