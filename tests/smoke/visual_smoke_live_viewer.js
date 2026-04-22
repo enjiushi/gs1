@@ -6914,7 +6914,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (tile.plantTypeId === 5) {
             plantGroup.scale.set(
                 1.0,
-                (0.55 + plantDensityScale * 1.55 + (plantSpec.areaScale - 1.0) * 0.08) * 5.0,
+                0.55 + plantDensityScale * 1.55 + (plantSpec.areaScale - 1.0) * 0.08,
                 1.0
             );
             addStrawCheckerboardPlant(plantGroup, plantSpec, palette);
