@@ -1,0 +1,69 @@
+[[task_templates]]
+task_template_id = 1
+publisher_faction_id = 1
+task_tier_id = 1
+progress_kind = "RestorationTiles"
+target_amount = 0
+item_id = 0
+recipe_id = 0
+completion_faction_reputation_delta = 5
+
+[[task_templates]]
+task_template_id = 2
+publisher_faction_id = 1
+task_tier_id = 1
+progress_kind = "BuyItem"
+target_amount = 1
+item_id = 1
+recipe_id = 0
+completion_faction_reputation_delta = 2
+
+[[task_templates]]
+task_template_id = 3
+publisher_faction_id = 1
+task_tier_id = 1
+progress_kind = "SellItem"
+target_amount = 1
+item_id = 1
+recipe_id = 0
+completion_faction_reputation_delta = 2
+
+[[task_templates]]
+task_template_id = 4
+publisher_faction_id = 1
+task_tier_id = 1
+progress_kind = "TransferItem"
+target_amount = 1
+item_id = 4
+recipe_id = 0
+completion_faction_reputation_delta = 2
+
+[[task_templates]]
+task_template_id = 5
+publisher_faction_id = 1
+task_tier_id = 1
+progress_kind = "PlantItem"
+target_amount = 1
+item_id = 4
+recipe_id = 0
+completion_faction_reputation_delta = 3
+
+[[task_templates]]
+task_template_id = 6
+publisher_faction_id = 1
+task_tier_id = 1
+progress_kind = "CraftRecipe"
+target_amount = 1
+item_id = 0
+recipe_id = 5
+completion_faction_reputation_delta = 3
+
+[[task_templates]]
+task_template_id = 7
+publisher_faction_id = 1
+task_tier_id = 1
+progress_kind = "ConsumeItem"
+target_amount = 1
+item_id = 0
+recipe_id = 0
+completion_faction_reputation_delta = 2

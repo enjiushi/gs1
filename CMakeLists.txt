@@ -18,6 +18,8 @@ set(
     ""
     CACHE STRING
     "Semicolon-separated system filters passed to gs1_system_test_host. Empty runs all discovered system tests.")
+set(GS1_TOMLPLUSPLUS_INCLUDE_DIR
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tomlplusplus)
 
 file(GLOB_RECURSE GS1_SYSTEM_TEST_SOURCE_FILES CONFIGURE_DEPENDS
     tests/system/source/*.cpp)
@@ -106,7 +108,8 @@ target_include_directories(gs1_game
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
     PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${GS1_TOMLPLUSPLUS_INCLUDE_DIR})
 
 set_target_properties(gs1_game PROPERTIES
     OUTPUT_NAME "gs1_game"
@@ -305,25 +308,32 @@ if(GS1_BUILD_TESTS)
     # used to enrich live snapshot JSON for manual adapter verification.
     target_include_directories(gs1_smoke_host PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${GS1_TOMLPLUSPLUS_INCLUDE_DIR})
     target_include_directories(gs1_visual_smoke_host PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${GS1_TOMLPLUSPLUS_INCLUDE_DIR})
     target_include_directories(gs1_runtime_projection_test PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${GS1_TOMLPLUSPLUS_INCLUDE_DIR})
     target_include_directories(gs1_runtime_message_chain_test PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${GS1_TOMLPLUSPLUS_INCLUDE_DIR})
     target_include_directories(gs1_site_system_message_flow_test PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${GS1_TOMLPLUSPLUS_INCLUDE_DIR})
     target_include_directories(gs1_local_weather_perf_probe PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${GS1_TOMLPLUSPLUS_INCLUDE_DIR})
     target_include_directories(gs1_runtime_performance_test PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${GS1_TOMLPLUSPLUS_INCLUDE_DIR})
     target_include_directories(gs1_system_test_host PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src

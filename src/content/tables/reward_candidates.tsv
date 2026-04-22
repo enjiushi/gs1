@@ -1,8 +1,0 @@
-reward_candidate_id	effect_kind	money_delta	item_id	quantity	unlockable_id	modifier_id	faction_id	delivery_minutes	reputation_delta
-1	Money	12	0	0	0	0	0	0	0
-2	ItemDelivery	0	2	1	0	0	0	10	0
-3	RevealUnlockable	0	0	0	102	0	0	0	0
-4	RunModifier	0	0	0	0	4	0	0	0
-5	ItemDelivery	0	1	1	0	0	0	10	0
-6	RevealUnlockable	0	0	0	103	0	0	0	0
-7	RunModifier	0	0	0	0	5	0	0	0

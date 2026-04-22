@@ -1,6 +1,0 @@
-recipe_id	station_structure_id	output_item_id	output_quantity	craft_minutes	ingredients
-1	201	2	1	1.0	1:1;10:2
-2	202	11	1	1.5	8:4;9:2
-3	202	12	1	2.0	8:5;9:3
-4	202	13	1	1.0	8:3;9:2
-5	202	14	1	1.0	8:2;9:1
