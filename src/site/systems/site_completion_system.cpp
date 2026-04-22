@@ -265,14 +265,20 @@ void SiteCompletionSystem::run(SiteSystemContext<SiteCompletionSystem>& context)
         return;
 
     case SiteObjectiveType::HighwayProtection:
-        if (objective.highway_max_average_sand_cover <= 0.0f ||
+        {
+        const float cover_threshold =
+            objective.highway_max_average_sand_cover > 0.0f &&
+                objective.highway_max_average_sand_cover <= 1.0f
+            ? objective.highway_max_average_sand_cover * 100.0f
+            : objective.highway_max_average_sand_cover;
+        if (cover_threshold <= 0.0f ||
             objective.time_limit_minutes <= 0.0 ||
             objective.target_tile_indices.empty())
         {
             return;
         }
 
-        if (counters.highway_average_sand_cover >= objective.highway_max_average_sand_cover)
+        if (counters.highway_average_sand_cover >= cover_threshold)
         {
             enqueue_site_attempt_result(
                 context.message_queue,
@@ -291,6 +297,7 @@ void SiteCompletionSystem::run(SiteSystemContext<SiteCompletionSystem>& context)
             context.world.site_id_value(),
             GS1_SITE_ATTEMPT_RESULT_COMPLETED);
         return;
+        }
 
     case SiteObjectiveType::GreenWallConnection:
         run_green_wall_connection(context, clock);

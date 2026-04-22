@@ -58,6 +58,11 @@ struct GameRuntimeProjectionTestAccess
         runtime.flush_site_presentation_if_dirty();
     }
 
+    static void mark_tile_dirty(GameRuntime& runtime, TileCoord coord)
+    {
+        runtime.mark_site_tile_projection_dirty(coord);
+    }
+
     static void mark_projection_dirty(GameRuntime& runtime, std::uint64_t dirty_flags)
     {
         runtime.mark_site_projection_update_dirty(dirty_flags);
@@ -245,7 +250,7 @@ void seed_plant_tile(SiteRunState& site_run, TileCoord coord, std::uint32_t plan
     burial.value = 0.0f;
     plant.plant_id = gs1::PlantId {plant_id};
     ground_cover.ground_cover_type_id = 0U;
-    plant_density.value = density;
+    plant_density.value = (density > 0.0f && density <= 1.0f) ? density * 100.0f : density;
     entity.add<gs1::site_ecs::TileOccupantTag>();
     entity.modified<gs1::site_ecs::TileSandBurial>();
     entity.modified<gs1::site_ecs::TilePlantSlot>();
@@ -363,7 +368,8 @@ void ecology_growth_completes_task_and_site_attempt()
         TileCoord {4, 1}};
     for (const auto coord : seeded_tiles)
     {
-        seed_plant_tile(site_run, coord, gs1::k_plant_ordos_wormwood, 0.9f);
+        seed_plant_tile(site_run, coord, gs1::k_plant_ordos_wormwood, 1.0f);
+        gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, coord);
     }
 
     Gs1Phase1Result result {};
@@ -385,7 +391,7 @@ void ecology_growth_completes_task_and_site_attempt()
     assert(site_run.task_board.visible_tasks.front().current_progress_amount == 10U);
 
     const auto tile_state = gs1::site_world_access::tile_ecology(site_run, seeded_tiles.front());
-    assert(approx_equal(tile_state.plant_density, 1.0f));
+    assert(approx_equal(tile_state.plant_density, 100.0f));
     assert(tile_state.plant_id.value == gs1::k_plant_ordos_wormwood);
     assert(tile_state.ground_cover_type_id == 0U);
 
@@ -396,7 +402,7 @@ void ecology_growth_completes_task_and_site_attempt()
         const auto& payload = grown_tile_message->payload_as<Gs1EngineMessageSiteTileData>();
         assert(payload.plant_type_id == gs1::k_plant_ordos_wormwood);
         assert(payload.ground_cover_type_id == 0U);
-        assert(approx_equal(payload.plant_density, 1.0f));
+        assert(approx_equal(payload.plant_density, 100.0f));
     }
 
     const auto app_state_messages =

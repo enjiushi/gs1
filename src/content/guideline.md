@@ -11,7 +11,7 @@ Prototype content storage, indexing, validation, and config-table loading used t
 - `content_database.h`: Aggregate content database types that hold loaded definitions.
 - `content_index.h`: Lookup/index helpers over content definitions.
 - `content_loader.h`: Content loading entry points and loader-facing contracts.
-- `content_loader.cpp`: Config-table parsing and startup loading for the externalized prototype content slices, including the table-backed campaign/site graph, campaign setup, site phone-listing seeds, site action tuning, modifier presets, and technology progression authoring.
+- `content_loader.cpp`: Config-table parsing and startup loading for the externalized prototype content slices, including the table-backed campaign/site graph, campaign setup, site phone-listing seeds, site action tuning, modifier presets, technology progression authoring, and multi-channel structure support values used by resolved tile computation.
 - `content_lookup.cpp`: Runtime-backed definition accessors used by gameplay systems after content is loaded.
 - `content_validator.h`: Validation entry points for loaded content data.
 - `content_validator.cpp`: Validation checks for loaded content tables, campaign/site graph/setup references, seeded phone listings, site action coverage, modifier preset coverage, technology progression references, and cross-table references.

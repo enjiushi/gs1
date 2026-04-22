@@ -1068,7 +1068,7 @@ void emit_action_fact_messages(GameMessageQueue& queue, const ActionState& actio
                     target_tile.x,
                     target_tile.y,
                     item_def->linked_plant_id.value,
-                    std::min(1.0f, 0.2f * static_cast<float>(safe_quantity)),
+                    std::min(100.0f, 20.0f * static_cast<float>(safe_quantity)),
                     flags});
         }
         else
@@ -1081,7 +1081,7 @@ void emit_action_fact_messages(GameMessageQueue& queue, const ActionState& actio
                     target_tile.x,
                     target_tile.y,
                     action_state.primary_subject_id == 0U ? 1U : action_state.primary_subject_id,
-                    std::min(1.0f, 0.25f * static_cast<float>(safe_quantity)),
+                    std::min(100.0f, 25.0f * static_cast<float>(safe_quantity)),
                     flags});
         }
         break;
@@ -1106,7 +1106,7 @@ void emit_action_fact_messages(GameMessageQueue& queue, const ActionState& actio
                 action_id,
                 target_tile.x,
                 target_tile.y,
-                0.35f * static_cast<float>(action_state.quantity == 0U ? 1U : action_state.quantity),
+                35.0f * static_cast<float>(action_state.quantity == 0U ? 1U : action_state.quantity),
                 flags});
         break;
 

@@ -135,6 +135,36 @@ struct TileDust final
     float value;
 };
 
+struct TileHeatProtection final
+{
+    float value;
+};
+
+struct TileWindProtection final
+{
+    float value;
+};
+
+struct TileDustProtection final
+{
+    float value;
+};
+
+struct TileFertilityImprove final
+{
+    float value;
+};
+
+struct TileSalinityReduction final
+{
+    float value;
+};
+
+struct TileIrrigation final
+{
+    float value;
+};
+
 struct TilePlantSlot final
 {
     PlantId plant_id;
@@ -228,6 +258,12 @@ GS1_REQUIRE_TRIVIAL(TileSandBurial);
 GS1_REQUIRE_TRIVIAL(TileHeat);
 GS1_REQUIRE_TRIVIAL(TileWind);
 GS1_REQUIRE_TRIVIAL(TileDust);
+GS1_REQUIRE_TRIVIAL(TileHeatProtection);
+GS1_REQUIRE_TRIVIAL(TileWindProtection);
+GS1_REQUIRE_TRIVIAL(TileDustProtection);
+GS1_REQUIRE_TRIVIAL(TileFertilityImprove);
+GS1_REQUIRE_TRIVIAL(TileSalinityReduction);
+GS1_REQUIRE_TRIVIAL(TileIrrigation);
 GS1_REQUIRE_TRIVIAL(TilePlantSlot);
 GS1_REQUIRE_TRIVIAL(TileGroundCoverSlot);
 GS1_REQUIRE_TRIVIAL(TilePlantDensity);

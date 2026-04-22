@@ -1977,12 +1977,12 @@ Ecological contribution profile:
 | `auraSize` | Small integer `0-2` | Maximum Manhattan-distance reach of this object's shared non-wind contribution values; `0` means own tile only |
 | `windProtectionRange` | Small integer `0-2` | Maximum downwind reach in tile units of this object's directional wind shelter; `0` means own tile only |
 | `windProtectionPower` | `0-100` | How strongly this plant or device reduces `tileWind` inside `windProtectionRange` |
-| `heatProtectionPower` | `0-100` | How strongly this plant reduces nearby `tileHeat` |
-| `dustProtectionPower` | `0-100` | How strongly this plant reduces nearby `tileDust` |
-| `fertilityImprovePower` | `0-100` | How strongly this plant gradually improves `tileSoilFertility` while healthy and how strongly it pushes back against erosion-driven fertility loss in the current design |
-| `salinityReductionPower` | `0-100` | How strongly this plant gradually reduces `tileSoilSalinity` while healthy |
+| `heatProtectionPower` | `0-100` | How strongly this plant or device reduces nearby `tileHeat` |
+| `dustProtectionPower` | `0-100` | How strongly this plant or device reduces nearby `tileDust` |
+| `fertilityImprovePower` | `0-100` | How strongly this plant or device raises nearby `tileFertilityImprove` during the resolved-tile pass |
+| `salinityReductionPower` | `0-100` | How strongly this plant or device raises nearby `tileSalinityReduction` during the resolved-tile pass |
 
-These contribution traits are plant-side inputs into the shared object contribution meters. `windProtectionPower` now uses its own `windProtectionRange`, while `auraSize` continues to control the shared reach for heat, dust, fertility, and salinity contributions. Current `tilePlantDensity` still scales how much of each plant-side contribution is currently active, and wind shelter should now fade non-linearly across the authored downwind reach so the shelter stays strong near the source and collapses quickly near the end of the range.
+These contribution traits are authored maxima. Runtime should first convert them into current plant-side output from `tilePlantDensity`, then accumulate them into resolved tile contribution states. `windProtectionPower` uses its own `windProtectionRange`, while `auraSize` continues to control the shared reach for heat, dust, fertility, salinity, and irrigation support. Current `tilePlantDensity` still scales how much of each plant-side contribution and resistance is currently active, and wind shelter should now fade non-linearly across the authored downwind reach so the shelter stays strong near the source and collapses quickly near the end of the range.
 
 Expansion and output profile:
 
@@ -2000,15 +2000,24 @@ Ground-cover definitions should not define a separate trait family. In the curre
 
 #### Object Contribution And Resolved Local Weather Build Rules
 
-Shared object contribution meters should be rebuilt every fixed simulation step from nearby plants, devices, and terrain shelter. Then `tileHeat`, `tileWind`, and `tileDust` should be rebuilt from site weather plus those current local contribution meters and kept within their normal meter ranges.
+Shared object contribution meters should be rebuilt every fixed simulation step from nearby plants, devices, and terrain shelter. Resolve these per-tile contribution states first:
+
+- `tileHeatProtection`
+- `tileWindProtection`
+- `tileDustProtection`
+- `tileFertilityImprove`
+- `tileSalinityReduction`
+- `tileIrrigation`
+
+Then rebuild `tileHeat`, `tileWind`, and `tileDust` from site weather and those current local contribution meters and keep them within their normal meter ranges.
 
 Use this contribution pattern:
 
-| Source | Reach | `windProtectionPower` | `heatProtectionPower` | `dustProtectionPower` | Rule |
-|---|---|---|---|---|---|
-| Own-tile living plant or ground cover | Own tile always | Add current local contribution | Add current local contribution | Add current local contribution | Scale by current `tilePlantDensity` and the relevant shared plant contribution values |
-| Downwind tile within plant support reach | Downwind distance `<= windProtectionRange` for wind, `<= auraSize` with Manhattan distance for the other shared plant channels | Add small to medium contribution | Add small to medium contribution | Add small to medium contribution | Wind shelter should apply only on the lee side defined by `weatherWindDirectionDegrees`; fade it non-linearly so the first protected tile stays strong and the last protected tile drops off sharply |
-| Nearby device or rock shelter | Own footprint or authored `windProtectionRange` | Add medium to strong contribution | None in the current code path | None in the current code path | Resolve wind shelter from the current wind direction and the source footprint/range; scale by authored device power and `deviceEfficiency`, or by authored rock-shelter value |
+| Source | Reach | Channels | Rule |
+|---|---|---|---|
+| Own-tile living plant or ground cover | Own tile always | `tileHeatProtection`, `tileWindProtection`, `tileDustProtection`, `tileFertilityImprove`, `tileSalinityReduction` | Scale each plant-side channel linearly from `tilePlantDensity`, then add the current local contribution to the matching resolved tile state |
+| Downwind tile within plant support reach | Downwind distance `<= windProtectionRange` for wind, `<= auraSize` with Manhattan distance for the other shared plant channels | Same as above except `tileIrrigation` | Wind shelter should apply only on the lee side defined by `weatherWindDirectionDegrees`; fade it non-linearly so the first protected tile stays strong and the last protected tile drops off sharply |
+| Nearby device or rock shelter | Own footprint or authored `windProtectionRange` / `auraSize` | Any authored subset of `tileHeatProtection`, `tileWindProtection`, `tileDustProtection`, `tileFertilityImprove`, `tileSalinityReduction`, `tileIrrigation` | Resolve device contribution from authored device support values and current `deviceEfficiency`; devices should use the same resolved tile contribution states instead of bespoke support paths |
 
 Rules:
 
@@ -2018,26 +2027,33 @@ Rules:
 - `windProtectionRange = 2` means own tile plus a deeper lee-side pocket whose protection fades sharply near the far edge
 - wind shelter should read `weatherWindDirectionDegrees` as the direction the wind is traveling toward, not the direction it came from
 - wind shelter should be directional for plants, windbreak devices, and terrain shelter instead of radial
-- shared non-wind plant contribution reach should continue to come from `auraSize`
+- shared non-wind plant and device contribution reach should continue to come from `auraSize`
 - if a plant has no positive wind contribution, `windProtectionRange` has no wind-gameplay effect
 - if a tile has no living plant and no `Straw Checkerboard`, nearby support may still create useful object contribution meters and resolved local weather reduction, but the tile remains empty until planted or spread into
 - rock protection should usually be low-radius and local, just enough to make lee-side placement readable
 - `Straw Checkerboard` uses the same own-tile and downwind wind-shadow logic as other plant-authored occupants, scaled by current `tilePlantDensity`, with wind reach on `windProtectionRange` and the other shared channels on `auraSize`
 - when one plant covers multiple tiles, evaluate its wind-side stress from the average resolved wind across the tiles in its footprint so one exposed corner does not behave like a separate plant
-- `Drip Irrigator` is not an object-contribution source for weather protection; it applies irrigation directly to `tileMoisture`
+- `Drip Irrigator` is not an object-contribution source for weather protection; it applies irrigation through resolved `tileIrrigation`
 
 This pattern keeps local support readable:
 
-- `windProtectionPower` is the shared local wind-protection meter built from nearby objects
-- `heatProtectionPower` is the shared local heat-protection meter built from nearby objects
-- `dustProtectionPower` is the shared local dust-protection meter built from nearby objects
-- resolved local weather reads those shared object contribution meters instead of reading object names directly
+- `tileWindProtection` is the shared local wind-protection meter built from nearby objects
+- `tileHeatProtection` is the shared local heat-protection meter built from nearby objects
+- `tileDustProtection` is the shared local dust-protection meter built from nearby objects
+- `tileFertilityImprove`, `tileSalinityReduction`, and `tileIrrigation` are the shared local rehabilitation/support meters built from nearby objects
+- resolved local weather and terrain computation read those shared object contribution meters instead of reading object names directly
 
 #### Soil Meter Interaction Rules
 
 Every fixed simulation step, each plantable `Ground` tile should update its soil meters from weather, occupancy, and support.
 
-Use these relationship rules instead of locked formulas:
+Use these relationship rules and the v1 computation pattern:
+
+- every named terrain coefficient should be authored as `...Factor`
+- each runtime coefficient should resolve as `resolved = factor * weight + bias`
+- the default value for every weight should be `1`
+- the default value for every bias should be `0`
+- modifiers should later change weights and biases instead of bypassing the tile-meter model
 
 - `Straw Checkerboard` uses `tilePlantDensity` as its remaining surface-cover strength
 - while its `tilePlantDensity` is high, `Straw Checkerboard` provides stronger protection and stronger temporary setup value
@@ -2046,20 +2062,60 @@ Use these relationship rules instead of locked formulas:
 Moisture rule:
 
 - `tileHeat` and `tileWind` increase moisture loss
-- `watering` and direct irrigation such as `Drip Irrigator` increase `tileMoisture`
-- local support should already be reflected inside resolved `tileHeat` and `tileWind`, so terrain moisture reads those resolved meters instead of reading raw support values again
-- higher `tileSoilFertility` raises the tile's maximum `tileMoisture` capacity and slows moisture reduction, but does not directly add moisture
+- `watering` and resolved `tileIrrigation` increase `tileMoisture`
+- local support should already be reflected inside resolved `tileHeat` and `tileWind`, so terrain moisture reads those resolved meters directly
+- `tileSoilFertility` should set the current moisture cap through `fertilityToMoistureCapFactor`
 - `tileMoisture` should stay within its normal meter range
+- v1 computation:
+
+```text
+resolvedFertilityToMoistureCapFactor = fertilityToMoistureCapFactor * fertilityToMoistureCapWeight + fertilityToMoistureCapBias
+resolvedMoistureFactor = moistureFactor * moistureWeight + moistureBias
+resolvedHeatToMoistureFactor = heatToMoistureFactor * heatToMoistureWeight + heatToMoistureBias
+resolvedWindToMoistureFactor = windToMoistureFactor * windToMoistureWeight + windToMoistureBias
+
+tileHeat = clamp(0, 100, weatherHeat - tileHeatProtection)
+tileWind = clamp(0, 100, weatherWind - tileWindProtection)
+
+tileMoistureTop = clamp(0, 100, tileSoilFertility * resolvedFertilityToMoistureCapFactor)
+tileMoistureRate =
+    resolvedMoistureFactor *
+    (tileIrrigation
+     - tileHeat * resolvedHeatToMoistureFactor
+     - tileWind * resolvedWindToMoistureFactor)
+
+simulationDtMinutes = fixedStepSeconds * 0.8
+nextTileMoisture = clamp(0, tileMoistureTop, tileMoisture + simulationDtMinutes * tileMoistureRate)
+```
 
 Fertility rule:
 
 - `tileWind` and `tileDust` create erosion pressure
-- local support should already be reflected inside resolved `tileWind` and `tileDust`, so terrain fertility reads those resolved meters instead of reading raw support values again
-- `tileSandBurial` adds additional fertility loss if left uncleared
-- `fertilityImprovePower` is the full soil-building trait: on healthy tiles and on nearby tiles inside plant `auraSize`, it raises `tileSoilFertility` and also fights part of the fertility loss caused by erosion and burial
-- `Straw Checkerboard` uses the same `fertilityImprovePower` logic while present; because its `tilePlantDensity` falls through `constantWitherRate`, its total soil-building effect and its pushback against erosion-driven fertility loss both fade automatically over time
+- local support should already be reflected inside resolved `tileWind` and `tileDust`, so terrain fertility reads those resolved meters directly
+- resolved `tileFertilityImprove` is the full soil-building meter for nearby plants and devices
+- `Straw Checkerboard` uses the same `tileFertilityImprove` logic while present; because its `tilePlantDensity` falls through `constantWitherRate`, its total soil-building effect fades automatically over time
 - when `tilePlantDensity` is exhausted, clear the checkerboard from the tile
-- `tileSoilFertility` should stay within its normal meter range
+- `tileSoilFertility` should stay within its normal meter range and use salinity-derived cap math instead of a separate stored fertility-cap meter
+- v1 computation:
+
+```text
+resolvedSalinityToFertilityCapFactor = salinityToFertilityCapFactor * salinityToFertilityCapWeight + salinityToFertilityCapBias
+resolvedFertilityFactor = fertilityFactor * fertilityWeight + fertilityBias
+resolvedWindToFertilityFactor = windToFertilityFactor * windToFertilityWeight + windToFertilityBias
+resolvedDustToFertilityFactor = dustToFertilityFactor * dustToFertilityWeight + dustToFertilityBias
+
+tileDust = clamp(0, 100, weatherDust - tileDustProtection)
+
+tileFertilityTop = clamp(0, 100, 100 - tileSoilSalinity * resolvedSalinityToFertilityCapFactor)
+tileFertilityRate =
+    resolvedFertilityFactor *
+    (tileFertilityImprove
+     - tileWind * resolvedWindToFertilityFactor
+     - tileDust * resolvedDustToFertilityFactor)
+
+simulationDtMinutes = fixedStepSeconds * 0.8
+nextTileSoilFertility = clamp(0, tileFertilityTop, tileSoilFertility + simulationDtMinutes * tileFertilityRate)
+```
 
 Interpretation:
 
@@ -3310,7 +3366,7 @@ Every base tech should use its `2` amplification choices to push that base tech 
 | `Forestry Bureau of Autonomous Region` | `plant` | `Rehab Update` | `fertilityImprovePower`, `salinityReductionPower` | Make the plant better at long-term land recovery and soil rehabilitation. |
 | `Autonomous Region Agricultural University` | `device` | `Calibration Update` | `deviceEfficiency`, linked device primary output values | Make the device perform its main job more efficiently once deployed. |
 | `Autonomous Region Agricultural University` | `device` | `Hardening Update` | `deviceIntegrity`, `burialSensitivity` | Make the device more durable and less vulnerable to harsh conditions. |
-| `Autonomous Region Agricultural University` | `device` | `Field Envelope Update` | `windProtectionPower`, `windProtectionRange`, linked device support values | Make the device shape a stronger local wind-protection pocket around itself. |
+| `Autonomous Region Agricultural University` | `device` | `Field Envelope Update` | `windProtectionPower`, `windProtectionRange`, linked device support values | Make the device shape a stronger local protection or support pocket around itself. |
 
 Important rule:
 
@@ -4342,6 +4398,7 @@ This summary should include only core runtime meters and the core plant-side val
 |---|---|---|
 | Event meters | `eventHeatPressure`, `eventWindPressure`, `eventDustPressure` | Site-wide harsh-event channel meters. They represent current event force and feed the weather layer rather than acting as weather themselves. |
 | Weather meters | `weatherHeat`, `weatherWind`, `weatherDust` | Site-wide ambient weather outputs after baseline site conditions and current event meters are combined. |
+| Resolved tile contribution meters | `tileHeatProtection`, `tileWindProtection`, `tileDustProtection`, `tileFertilityImprove`, `tileSalinityReduction`, `tileIrrigation` | Per-tile support result after nearby plants, devices, and shelter are accumulated. They bridge local objects and final weather or terrain computation. |
 | Resolved local weather meters | `tileHeat`, `tileWind`, `tileDust` | Per-tile weather result after site weather, local support, and shelter are combined. They bridge site weather and final terrain or plant pressure. |
 | Technology progression meters | `reputation`, `factionReputation[factionId]`, `occupiedFactionReputation[factionId]` | Campaign progression meters that gate faction tiers, determine available branch budget, and track permanent tech claims. |
 | Worker state meters | `playerHealth`, `playerHydration`, `playerNourishment`, `playerEnergyCap`, `playerEnergy`, `playerMorale`, `playerWorkEfficiency` | Core worker survival and performance meters. They represent the worker's current physical and mental condition plus the resolved action-energy modifier used during site play. |
@@ -4351,7 +4408,7 @@ This summary should include only core runtime meters and the core plant-side val
 | Plant meters | `tilePlantDensity`, `growthPressure`, `salinityDensityCap` | Shared plant-side runtime meters. `tilePlantDensity` tracks current plant presence, `growthPressure` governs growth-capable plants, and `salinityDensityCap` is the plant-side density ceiling created by salty ground. |
 | Plant behavior values | `growable`, `constantWitherRate` | Core plant-side behavior values. `growable` decides whether favorable conditions may increase density, and `constantWitherRate` applies steady density loss to plant density when defined. |
 | Plant resistance values | `saltTolerance`, `heatTolerance`, `windResistance`, `dustTolerance` | Plant-definition values that turn salinity, heat, wind, and dust pressure into species-specific density limits and pressure resistance. |
-| Object contribution meters | `auraSize`, `windProtectionRange`, `windProtectionPower`, `heatProtectionPower`, `dustProtectionPower`, `fertilityImprovePower`, `salinityReductionPower` | Shared local contribution values and meters. Plants feed all of these channels, while authored devices currently feed wind protection through `windProtectionPower` plus `windProtectionRange`; object definition sets local contribution ceilings and reach, and `tilePlantDensity` scales plant-side output. |
+| Object contribution meters | `auraSize`, `windProtectionRange`, `windProtectionPower`, `heatProtectionPower`, `dustProtectionPower`, `fertilityImprovePower`, `salinityReductionPower`, `irrigationPower` | Shared local contribution values and meters. Plants feed the protection and rehabilitation channels, while authored devices may feed any authored subset of those channels; object definition sets local contribution ceilings and reach, and `tilePlantDensity` scales plant-side output. |
 
 ### Event Meter Relationships
 
@@ -4369,13 +4426,24 @@ This summary should include only core runtime meters and the core plant-side val
 | `weatherWind` | `eventWindPressure`, smoothing toward current target, future `siteWeatherBias` work | `tileWind` | Site-wide wind should resolve into local wind before it affects terrain, plants, or worker meters. |
 | `weatherDust` | `eventDustPressure`, smoothing toward current target, future `siteWeatherBias` work | `tileDust` | Site-wide dust pressure should resolve into local dust before it affects terrain, plants, or worker meters. The current prototype does not yet add a separate aftermath-dust layer. |
 
+### Resolved Tile Contribution Meter Relationships
+
+| Meter | Impacted by | Impact to | Notes |
+|---|---|---|---|
+| `tileHeatProtection` | Nearby `heatProtectionPower`, `tilePlantDensity`, `deviceEfficiency`, `auraSize` | `tileHeat` | Shared resolved local heat-protection state for one tile. |
+| `tileWindProtection` | Nearby `windProtectionPower`, `tilePlantDensity`, `deviceEfficiency`, `windProtectionRange`, wind direction | `tileWind` | Shared resolved local wind-protection state for one tile. Wind shelter should stay directional and non-linear downwind. |
+| `tileDustProtection` | Nearby `dustProtectionPower`, `tilePlantDensity`, `deviceEfficiency`, `auraSize` | `tileDust` | Shared resolved local dust-protection state for one tile. |
+| `tileFertilityImprove` | Nearby `fertilityImprovePower`, `tilePlantDensity`, `deviceEfficiency`, `auraSize` | `tileSoilFertility` | Shared resolved local fertility-improvement state for one tile. |
+| `tileSalinityReduction` | Nearby `salinityReductionPower`, `tilePlantDensity`, `deviceEfficiency`, `auraSize` | `tileSoilSalinity` | Shared resolved local salinity-reduction state for one tile. |
+| `tileIrrigation` | Nearby `irrigationPower`, `deviceEfficiency`, `auraSize` | `tileMoisture` | Shared resolved local irrigation state for one tile. |
+
 ### Resolved Local Weather Meter Relationships
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `tileHeat` | `weatherHeat`, `heatProtectionPower` | `playerHydration`, `playerHealth`, `playerWorkEfficiency`, `tileMoisture`, `growthPressure` | Final local heat pressure. It should hurt worker output through `playerWorkEfficiency`, not by directly draining `playerEnergy`. |
-| `tileWind` | `weatherWind`, `windProtectionPower` | `playerWorkEfficiency`, `tileMoisture`, `tileSoilFertility`, `growthPressure` | Final local wind exposure. It should hurt worker output through `playerWorkEfficiency`, not by directly draining `playerEnergy`. |
-| `tileDust` | `weatherDust`, `dustProtectionPower` | `playerHealth`, `playerWorkEfficiency`, `tileSandBurial`, `tileSoilFertility`, `growthPressure` | Final local dust exposure. It should hurt worker output through `playerWorkEfficiency`, not by directly draining `playerEnergy`. |
+| `tileHeat` | `weatherHeat`, `tileHeatProtection` | `playerHydration`, `playerHealth`, `playerWorkEfficiency`, `tileMoisture`, `growthPressure` | Final local heat pressure. It should hurt worker output through `playerWorkEfficiency`, not by directly draining `playerEnergy`. |
+| `tileWind` | `weatherWind`, `tileWindProtection` | `playerWorkEfficiency`, `tileMoisture`, `tileSoilFertility`, `growthPressure` | Final local wind exposure. It should hurt worker output through `playerWorkEfficiency`, not by directly draining `playerEnergy`. |
+| `tileDust` | `weatherDust`, `tileDustProtection` | `playerHealth`, `playerWorkEfficiency`, `tileSandBurial`, `tileSoilFertility`, `growthPressure` | Final local dust exposure. It should hurt worker output through `playerWorkEfficiency`, not by directly draining `playerEnergy`. |
 
 ### Worker State Meter Relationships
 
@@ -4430,9 +4498,9 @@ Technology content updates are not separate runtime meters. They are persistent 
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `tileMoisture` | Watering, direct irrigation such as `Drip Irrigator`, `tileHeat`, `tileWind`, `tileSoilFertility` | `growthPressure` | Stored water on the tile. Better moisture lowers plant pressure and softens heat stress. `tileSoilFertility` raises the maximum moisture capacity and slows moisture reduction, while watering and irrigation increase the current amount. |
-| `tileSoilFertility` | `fertilityImprovePower`, `tileWind`, `tileDust`, `tileSandBurial` | `tileMoisture`, `growthPressure` | Long-term land quality meter. Better fertility improves plant performance, raises the tile's maximum moisture capacity, and slows moisture reduction, but does not directly add moisture by itself. |
-| `tileSoilSalinity` | Authored starting salinity, `salinityReductionPower` | `salinityDensityCap` | Strategic placement and rehabilitation meter. |
+| `tileMoisture` | Watering, `tileIrrigation`, `tileHeat`, `tileWind`, `tileSoilFertility`, `fertilityToMoistureCapFactor`, `moistureFactor`, `heatToMoistureFactor`, `windToMoistureFactor` | `growthPressure` | Stored water on the tile. Better moisture lowers plant pressure and softens heat stress. The moisture-side coefficients should resolve as `factor * weight + bias`. |
+| `tileSoilFertility` | `tileFertilityImprove`, `tileWind`, `tileDust`, `tileSoilSalinity`, `salinityToFertilityCapFactor`, `fertilityFactor`, `windToFertilityFactor`, `dustToFertilityFactor` | `tileMoisture`, `growthPressure` | Long-term land quality meter. Better fertility improves plant performance and raises the tile's maximum moisture capacity. The fertility-side coefficients should resolve as `factor * weight + bias`. |
+| `tileSoilSalinity` | Authored starting salinity, `tileSalinityReduction`, `salinityFactor` | `salinityDensityCap`, `tileSoilFertility` | Strategic placement and rehabilitation meter. Its current value should also cap fertility through `salinityToFertilityCapFactor`. |
 | `tileSandBurial` | `tileDust`, burial-clearing actions | `tileSoilFertility`, `growthPressure` | Temporary overlay state rather than long-term soil quality. |
 
 ### Plant, Resistance, And Object Contribution Relationships
@@ -4441,7 +4509,7 @@ Technology content updates are not separate runtime meters. They are persistent 
 |---|---|---|---|
 | `growable` | Plant definition only | `tilePlantDensity` | Allows favorable conditions to create density gain. If `false`, low `growthPressure` does not produce positive growth. |
 | `constantWitherRate` | Plant definition only | `tilePlantDensity` | Applies steady density loss every fixed simulation step. |
-| `auraSize` | Object definition only | Reach of `heatProtectionPower`, `dustProtectionPower`, `fertilityImprovePower`, and `salinityReductionPower` | Shared non-wind contribution reach value. `0` means own tile only, and larger values extend contribution reach by Manhattan distance. |
+| `auraSize` | Object definition only | Reach of `heatProtectionPower`, `dustProtectionPower`, `fertilityImprovePower`, `salinityReductionPower`, and `irrigationPower` | Shared non-wind contribution reach value. `0` means own tile only, and larger values extend contribution reach by Manhattan distance. |
 | `windProtectionRange` | Object definition only | Reach of `windProtectionPower` | Wind-specific contribution reach value. `0` means own tile only, and larger values extend directional downwind shelter farther behind the source. |
 | `windProtectionPower` | Object definition only, `tilePlantDensity`, `deviceEfficiency`, `windProtectionRange` | `tileWind` | Shared local wind-protection meter. Any object with positive wind protection may feed it. Plant density scales plant-side output, while device efficiency scales device-side output. |
 | `heatProtectionPower` | Object definition only, `tilePlantDensity`, `auraSize` | `tileHeat` | Shared local heat-protection meter. Positive plant contribution uses the shared `auraSize` reach. |
@@ -4457,6 +4525,59 @@ Technology content updates are not separate runtime meters. They are persistent 
 | `tilePlantDensity` | `growthPressure`, `salinityDensityCap`, `growable`, `constantWitherRate` | `windProtectionPower`, `heatProtectionPower`, `dustProtectionPower`, `fertilityImprovePower`, `salinityReductionPower` | Current plant strength and effect scale. Higher density strengthens the plant-fed share of the shared object contribution meters first, while `windProtectionRange` controls plant-side wind reach and `auraSize` controls the other shared plant-side contribution reach. |
 
 `Straw Checkerboard` should be authored through the same shared plant rows: start it at maximum `tilePlantDensity`, set `growable = false`, set a positive `constantWitherRate`, set `windProtectionRange` and `auraSize` as needed for setup reach, keep `growthPressure` at `0`, and rely on normal shared contribution values such as `fertilityImprovePower`.
+
+### Resolved Tile Computation V1
+
+Use this v1 computation shape for the resolved-tile pass:
+
+```text
+resolvedHeatToMoistureFactor = heatToMoistureFactor * heatToMoistureWeight + heatToMoistureBias
+resolvedWindToMoistureFactor = windToMoistureFactor * windToMoistureWeight + windToMoistureBias
+resolvedFertilityToMoistureCapFactor = fertilityToMoistureCapFactor * fertilityToMoistureCapWeight + fertilityToMoistureCapBias
+resolvedMoistureFactor = moistureFactor * moistureWeight + moistureBias
+resolvedWindToFertilityFactor = windToFertilityFactor * windToFertilityWeight + windToFertilityBias
+resolvedDustToFertilityFactor = dustToFertilityFactor * dustToFertilityWeight + dustToFertilityBias
+resolvedSalinityToFertilityCapFactor = salinityToFertilityCapFactor * salinityToFertilityCapWeight + salinityToFertilityCapBias
+resolvedFertilityFactor = fertilityFactor * fertilityWeight + fertilityBias
+resolvedSalinityFactor = salinityFactor * salinityWeight + salinityBias
+```
+
+```text
+tileHeat = clamp(0, 100, weatherHeat - tileHeatProtection)
+tileWind = clamp(0, 100, weatherWind - tileWindProtection)
+tileDust = clamp(0, 100, weatherDust - tileDustProtection)
+```
+
+```text
+tileMoistureTop = clamp(0, 100, tileSoilFertility * resolvedFertilityToMoistureCapFactor)
+tileMoistureRate =
+    resolvedMoistureFactor *
+    (tileIrrigation
+     - tileHeat * resolvedHeatToMoistureFactor
+     - tileWind * resolvedWindToMoistureFactor)
+simulationDtMinutes = fixedStepSeconds * 0.8
+nextTileMoisture = clamp(0, tileMoistureTop, tileMoisture + simulationDtMinutes * tileMoistureRate)
+```
+
+```text
+tileFertilityTop = clamp(0, 100, 100 - tileSoilSalinity * resolvedSalinityToFertilityCapFactor)
+tileFertilityRate =
+    resolvedFertilityFactor *
+    (tileFertilityImprove
+     - tileWind * resolvedWindToFertilityFactor
+     - tileDust * resolvedDustToFertilityFactor)
+simulationDtMinutes = fixedStepSeconds * 0.8
+nextTileSoilFertility = clamp(0, tileFertilityTop, tileSoilFertility + simulationDtMinutes * tileFertilityRate)
+```
+
+```text
+tileSalinityRate =
+    resolvedSalinityFactor *
+    (tileSalinitySource
+     - tileSalinityReduction)
+simulationDtMinutes = fixedStepSeconds * 0.8
+nextTileSoilSalinity = clamp(0, 100, tileSoilSalinity + simulationDtMinutes * tileSalinityRate)
+```
 
 ### Per-Site Modifier Channel Relationships
 

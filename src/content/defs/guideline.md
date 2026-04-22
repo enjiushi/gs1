@@ -18,6 +18,6 @@ Definition types and runtime accessors for the major authored content domains.
 - `recipe_defs.h`: General recipe definition records shared by authored content.
 - `reward_defs.h`: Reward definition records and runtime accessors for grants and payouts, including the shared prototype task-reward pool, simple modifier rewards, immediate unlockable reveals, and delivery-crate-routed item bundle candidates.
 - `site_content_defs.h`: Site template/content definitions for active site runs.
-- `structure_defs.h`: Structure/buildable definition types plus runtime accessors over the loaded structure table.
+- `structure_defs.h`: Structure/buildable definition types plus runtime accessors over the loaded structure table, including authored multi-channel support values for resolved tile contribution state.
 - `task_defs.h`: Task board/authored task definition records plus runtime accessors, including the site-one onboarding task pool and progress-kind metadata.
 - `technology_defs.h`: Prototype progression definition records and runtime accessors, including faction-reputation-gated faction tiers, total-reputation-gated plant unlock tiers, starter plants available from campaign start, and placeholder technology nodes with cash costs.

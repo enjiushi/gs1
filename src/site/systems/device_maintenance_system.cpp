@@ -136,7 +136,7 @@ void DeviceMaintenanceSystem::run(SiteSystemContext<DeviceMaintenanceSystem>& co
             continue;
         }
 
-        const float burial_amount = std::clamp(tile.ecology.sand_burial, 0.0f, 1.0f);
+        const float burial_amount = std::clamp(tile.ecology.sand_burial / 100.0f, 0.0f, 1.0f);
         const float burial_wear = burial_amount * k_burial_wear_per_unit * step_seconds;
         const float total_wear = weather_wear + burial_wear;
         if (total_wear <= 0.0f)

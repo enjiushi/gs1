@@ -1373,7 +1373,7 @@ void load_structure_defs(ContentDatabase& content, const std::filesystem::path& 
         }
 
         const auto fields = split_delimited(line, '\t');
-        if (fields.size() != 10U)
+        if (fields.size() != 16U)
         {
             fail_load(path, line_number, "unexpected structure column count");
         }
@@ -1382,13 +1382,19 @@ void load_structure_defs(ContentDatabase& content, const std::filesystem::path& 
             StructureId {parse_unsigned<std::uint32_t>(path, line_number, fields[0])},
             store_string_view(content, fields[1]),
             parse_float(path, line_number, fields[2]),
-            parse_float(path, line_number, fields[3]),
-            parse_unsigned<std::uint8_t>(path, line_number, fields[4]),
-            parse_unsigned<std::uint16_t>(path, line_number, fields[5]),
-            parse_crafting_station_kind(path, line_number, fields[6]),
-            parse_bool(path, line_number, fields[7]),
-            parse_unsigned<std::uint8_t>(path, line_number, fields[8]),
-            parse_unsigned<std::uint8_t>(path, line_number, fields[9])});
+            parse_unsigned<std::uint8_t>(path, line_number, fields[3]),
+            parse_float(path, line_number, fields[4]),
+            parse_unsigned<std::uint8_t>(path, line_number, fields[5]),
+            parse_float(path, line_number, fields[6]),
+            parse_float(path, line_number, fields[7]),
+            parse_float(path, line_number, fields[8]),
+            parse_float(path, line_number, fields[9]),
+            parse_float(path, line_number, fields[10]),
+            parse_unsigned<std::uint16_t>(path, line_number, fields[11]),
+            parse_crafting_station_kind(path, line_number, fields[12]),
+            parse_bool(path, line_number, fields[13]),
+            parse_unsigned<std::uint8_t>(path, line_number, fields[14]),
+            parse_unsigned<std::uint8_t>(path, line_number, fields[15])});
     }
 }
 

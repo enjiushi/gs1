@@ -20,8 +20,14 @@ struct StructureDef final
     StructureId structure_id {};
     std::string_view display_name {};
     float durability {0.0f};
+    std::uint8_t aura_size {0U};
     float wind_protection_value {0.0f};
     std::uint8_t wind_protection_range {0U};
+    float heat_protection_value {0.0f};
+    float dust_protection_value {0.0f};
+    float fertility_improve_value {0.0f};
+    float salinity_reduction_value {0.0f};
+    float irrigation_value {0.0f};
     std::uint16_t storage_slot_count {0U};
     CraftingStationKind crafting_station_kind {CraftingStationKind::None};
     bool grants_storage {false};

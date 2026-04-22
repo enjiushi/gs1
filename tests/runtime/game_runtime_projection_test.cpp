@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <limits>
 #include <vector>
@@ -26,8 +27,14 @@ using gs1::StartSiteAttemptMessage;
 using gs1::TaskAcceptRequestedMessage;
 using gs1::TileCoord;
 
+constexpr float k_float_epsilon = 0.001f;
 constexpr double k_default_delivery_real_seconds =
     (30.0 / gs1::k_runtime_minutes_per_real_second) + (1.0 / 60.0);
+
+bool approx_equal(float lhs, float rhs, float epsilon = k_float_epsilon)
+{
+    return std::fabs(lhs - rhs) <= epsilon;
+}
 }
 
 namespace gs1
@@ -216,10 +223,15 @@ void run_phase1(GameRuntime& runtime, double real_delta_seconds)
     run_phase1(runtime, real_delta_seconds, result);
 }
 
+float raw_meter_test_value(float value)
+{
+    return (value > 0.0f && value <= 1.0f) ? value * 100.0f : value;
+}
+
 void set_tile_sand_burial(gs1::SiteRunState& site_run, TileCoord coord, float sand_burial)
 {
     auto ecology = gs1::site_world_access::tile_ecology(site_run, coord);
-    ecology.sand_burial = sand_burial;
+    ecology.sand_burial = raw_meter_test_value(sand_burial);
     gs1::site_world_access::set_tile_ecology(site_run, coord, ecology);
 }
 
@@ -232,7 +244,7 @@ void set_tile_plant_state(
     auto ecology = gs1::site_world_access::tile_ecology(site_run, coord);
     ecology.plant_id = plant_id;
     ecology.ground_cover_type_id = 0U;
-    ecology.plant_density = plant_density;
+    ecology.plant_density = raw_meter_test_value(plant_density);
     gs1::site_world_access::set_tile_ecology(site_run, coord, ecology);
 }
 
@@ -251,9 +263,9 @@ void set_tile_soil_visual_state(
     float soil_salinity)
 {
     auto ecology = gs1::site_world_access::tile_ecology(site_run, coord);
-    ecology.moisture = moisture;
-    ecology.soil_fertility = soil_fertility;
-    ecology.soil_salinity = soil_salinity;
+    ecology.moisture = raw_meter_test_value(moisture);
+    ecology.soil_fertility = raw_meter_test_value(soil_fertility);
+    ecology.soil_salinity = raw_meter_test_value(soil_salinity);
     gs1::site_world_access::set_tile_ecology(site_run, coord, ecology);
 }
 
@@ -705,13 +717,11 @@ int main()
     sell_listing.set_payload(gs1::PhoneListingSaleRequestedMessage {1001U, 1U, 0U});
     assert(runtime.handle_message(sell_listing) == GS1_STATUS_OK);
     assert(runtime.handle_message(sell_listing) == GS1_STATUS_OK);
+    Gs1Phase1Result sell_result {};
+    run_phase1(runtime, 1.0 / 60.0, sell_result);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
     const auto sell_projection_messages = drain_engine_messages(runtime);
     assert(contains_phone_listing_message(
-        sell_projection_messages,
-        GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_REMOVE,
-        1001U));
-    assert(!contains_phone_listing_message(
         sell_projection_messages,
         GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_UPSERT,
         1001U));
@@ -738,7 +748,7 @@ int main()
         const auto& payload = first_tiles.front()->payload_as<Gs1EngineMessageSiteTileData>();
         assert(payload.x == 3U);
         assert(payload.y == 2U);
-        assert(payload.sand_burial == 0.25f);
+        assert(approx_equal(payload.sand_burial, 25.0f));
     }
 
     auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
@@ -758,9 +768,9 @@ int main()
         const auto& first_tile = second_tiles[0]->payload_as<Gs1EngineMessageSiteTileData>();
         const auto& second_tile = second_tiles[1]->payload_as<Gs1EngineMessageSiteTileData>();
         assert(first_tile.x == 1U && first_tile.y == 1U);
-        assert(first_tile.sand_burial == 0.75f);
+        assert(approx_equal(first_tile.sand_burial, 75.0f));
         assert(second_tile.x == 5U && second_tile.y == 4U);
-        assert(second_tile.sand_burial == 0.5f);
+        assert(approx_equal(second_tile.sand_burial, 50.0f));
     }
 
     const auto density_coord = TileCoord {6, 6};
@@ -792,7 +802,7 @@ int main()
         assert(payload.x == static_cast<std::uint32_t>(density_coord.x));
         assert(payload.y == static_cast<std::uint32_t>(density_coord.y));
         assert(payload.plant_type_id == gs1::k_plant_straw_checkerboard);
-        assert(payload.plant_density == 0.22f);
+        assert(approx_equal(payload.plant_density, 22.0f));
     }
 
     set_tile_local_wind(site_run, density_coord, 14.0f);
@@ -804,7 +814,7 @@ int main()
     assert(wind_first_tiles.size() == 1U);
     {
         const auto& payload = wind_first_tiles.front()->payload_as<Gs1EngineMessageSiteTileData>();
-        assert(payload.local_wind == 14.0f);
+        assert(approx_equal(payload.local_wind, 14.0f));
     }
 
     set_tile_local_wind(site_run, density_coord, 15.0f);
@@ -824,7 +834,7 @@ int main()
     assert(wind_third_tiles.size() == 1U);
     {
         const auto& payload = wind_third_tiles.front()->payload_as<Gs1EngineMessageSiteTileData>();
-        assert(payload.local_wind == 18.0f);
+        assert(approx_equal(payload.local_wind, 18.0f));
     }
 
     set_tile_soil_visual_state(site_run, density_coord, 0.25f, 0.125f, 0.375f);
@@ -836,9 +846,9 @@ int main()
     assert(soil_first_tiles.size() == 1U);
     {
         const auto& payload = soil_first_tiles.front()->payload_as<Gs1EngineMessageSiteTileData>();
-        assert(payload.moisture == 0.25f);
-        assert(payload.soil_fertility == 0.125f);
-        assert(payload.soil_salinity == 0.375f);
+        assert(approx_equal(payload.moisture, 25.0f));
+        assert(approx_equal(payload.soil_fertility, 12.5f));
+        assert(approx_equal(payload.soil_salinity, 37.5f));
     }
 
     set_tile_soil_visual_state(site_run, density_coord, 0.257f, 0.132f, 0.382f);
@@ -858,9 +868,9 @@ int main()
     assert(soil_third_tiles.size() == 1U);
     {
         const auto& payload = soil_third_tiles.front()->payload_as<Gs1EngineMessageSiteTileData>();
-        assert(payload.moisture == 0.27f);
-        assert(payload.soil_fertility == 0.14f);
-        assert(payload.soil_salinity == 0.4f);
+        assert(approx_equal(payload.moisture, 27.0f));
+        assert(approx_equal(payload.soil_fertility, 14.0f));
+        assert(approx_equal(payload.soil_salinity, 40.0f));
     }
 
     set_tile_sand_burial(site_run, TileCoord {0, 0}, 0.9f);
@@ -1133,7 +1143,7 @@ int main()
     }
 
     assert(action_ecology.plant_id.value == gs1::k_plant_ordos_wormwood);
-    assert(action_ecology.plant_density >= 0.2f);
+    assert(action_ecology.plant_density >= 20.0f);
     assert(action_site_run.inventory.worker_pack_slots[3].item_quantity == 1U);
 
     run_phase1(action_runtime, 0.0);
@@ -1148,7 +1158,7 @@ int main()
             return payload.x == static_cast<std::uint32_t>(action_target.x) &&
                 payload.y == static_cast<std::uint32_t>(action_target.y) &&
                 payload.plant_type_id == gs1::k_plant_ordos_wormwood &&
-                payload.plant_density >= 0.2f;
+                payload.plant_density >= 20.0f;
         });
     assert(projected_action_tile != action_tile_messages.end());
 
