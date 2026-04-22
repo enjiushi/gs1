@@ -9,7 +9,7 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 
 ## Contents
 - `action_execution_system.h`: Action execution system interface.
-- `action_execution_system.cpp`: Executes queued site actions using the canonical real-seconds-to-action-minutes conversion, emits follow-up gameplay messages, and re-arms plant placement mode after successful item-based planting when matching seeds remain in the worker pack.
+- `action_execution_system.cpp`: Executes queued site actions using the canonical real-seconds-to-action-minutes conversion, derives action duration plus instant worker action costs from the previous-frame work-efficiency snapshot, emits follow-up gameplay messages, and re-arms plant placement mode after successful item-based planting when matching seeds remain in the worker pack.
 - `camp_durability_system.h`: Camp durability system interface.
 - `camp_durability_system.cpp`: Applies camp wear/failure effects to camp durability state.
 - `craft_system.h`: Craft system interface.
@@ -46,4 +46,4 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `weather_event_system.h`: Weather event system interface.
 - `weather_event_system.cpp`: Applies incoming weather events to site-owned weather/event state, including start/peak/end timeline interpolation and recurring one-sided highway-protection waves.
 - `worker_condition_system.h`: Worker condition system interface.
-- `worker_condition_system.cpp`: Updates worker condition and related penalties/recovery.
+- `worker_condition_system.cpp`: Resolves worker condition from previous-frame state plus accumulated frame deltas, recomputes derived energy-cap and work-efficiency snapshots, and applies passive environment-driven meter loss with shelter softening.

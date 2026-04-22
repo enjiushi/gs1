@@ -15,11 +15,11 @@ struct SiteActionDef final
     float duration_minutes_per_unit;
     float energy_cost_per_unit;
     float hydration_cost_per_unit;
+    float nourishment_cost_per_unit;
     PlacementOccupancyLayer placement_occupancy_layer;
     bool requests_placement_reservation;
     bool requires_worker_approach;
     bool impacts_worker_movement;
-    std::uint8_t reserved0;
 };
 
 [[nodiscard]] inline constexpr ActionKind action_kind_from_gs1(

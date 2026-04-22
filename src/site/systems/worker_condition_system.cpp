@@ -1,5 +1,6 @@
 #include "site/systems/worker_condition_system.h"
 
+#include "runtime/runtime_clock.h"
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
 
@@ -23,6 +24,17 @@ struct WorkerMeterSnapshot final
     float work_efficiency {0.0f};
 };
 
+struct WorkerMeterDeltas final
+{
+    float health {0.0f};
+    float hydration {0.0f};
+    float nourishment {0.0f};
+    float energy_cap {0.0f};
+    float energy {0.0f};
+    float morale {0.0f};
+    float work_efficiency {0.0f};
+};
+
 struct WorkerConditionMemory final
 {
     std::optional<SiteRunId> site_run_id {};
@@ -32,22 +44,47 @@ struct WorkerConditionMemory final
 constexpr float kHealthMax = 100.0f;
 constexpr float kHydrationMax = 100.0f;
 constexpr float kNourishmentMax = 100.0f;
-constexpr float kEnergyCapMax = 200.0f;
+constexpr float kEnergyCapMin = 50.0f;
+constexpr float kEnergyCapMax = 100.0f;
 constexpr float kMoraleMax = 100.0f;
 constexpr float kMeterMin = 0.0f;
-constexpr float kWorkEfficiencyMax = 2.0f;
-constexpr float kWorkEfficiencyMin = 0.0f;
+constexpr float kWorkEfficiencyMax = 1.0f;
+constexpr float kWorkEfficiencyMin = 0.4f;
+constexpr float kNormalizedMeterMax = 100.0f;
 
-constexpr float kHydrationDrainPerSecond = 0.03f;
-constexpr float kNourishmentDrainPerSecond = 0.02f;
-constexpr float kEnergyDrainPerSecond = 0.05f;
-constexpr float kMoraleDrainPerSecond = 0.01f;
-constexpr float kStarvationHealthDrainPerSecond = 0.02f;
+constexpr float kHydrationBaseLossPerGameMinuteBase = 0.0100f;
+constexpr float kHeatToHydrationFactorBase = 0.06875f;
+constexpr float kNourishmentBaseLossPerGameMinuteBase = 0.004375f;
+constexpr float kWindToNourishmentFactorBase = 0.00625f;
+constexpr float kHeatToNourishmentFactorBase = 0.00500f;
+constexpr float kDustToNourishmentFactorBase = 0.00500f;
+constexpr float kEnergyBaseLossPerGameMinuteBase = 0.00500f;
+constexpr float kWindToEnergyFactorBase = 0.00375f;
+constexpr float kHeatToEnergyFactorBase = 0.00375f;
+constexpr float kDustToEnergyFactorBase = 0.00375f;
+constexpr float kMoraleDecreaseSpeedBase = 1.0f;
+constexpr float kMoraleDecreaseFactorBase = 0.00375f;
+constexpr float kHeatToHealthFactorBase = 0.00375f;
+constexpr float kWindToHealthFactorBase = 0.00250f;
+constexpr float kDustToHealthFactorBase = 0.004375f;
+
+constexpr float kHealthEnergyCapFactorBase = 1.0f;
+constexpr float kHydrationEnergyCapFactorBase = 1.0f;
+constexpr float kNourishmentEnergyCapFactorBase = 1.0f;
+constexpr float kEnergyCapFactorBase = 1.0f;
+
+constexpr float kHealthEfficiencyFactorBase = 1.0f;
+constexpr float kHydrationEfficiencyFactorBase = 1.0f;
+constexpr float kNourishmentEfficiencyFactorBase = 1.0f;
+constexpr float kMoraleEfficiencyFactorBase = 1.0f;
+constexpr float kWorkEfficiencyFactorBase = 1.0f;
+
+constexpr float kFactorWeightDefault = 1.0f;
+constexpr float kFactorBiasDefault = 0.0f;
+constexpr float kFactorMin = 0.0f;
+constexpr float kFactorMax = 4.0f;
+constexpr float kShelteredExposureScale = 0.35f;
 constexpr float kMeterChangeThreshold = 0.01f;
-constexpr float kWindHydrationDrainPerUnitPerSecond = 0.0012f;
-constexpr float kWindEnergyDrainPerUnitPerSecond = 0.0010f;
-constexpr float kWindMoraleDrainPerUnitPerSecond = 0.0006f;
-constexpr float kShelteredWindExposureScale = 0.2f;
 
 constexpr std::uint32_t kWorkerMetersChangedInitialMask =
     WORKER_METER_CHANGED_HEALTH |
@@ -59,6 +96,26 @@ constexpr std::uint32_t kWorkerMetersChangedInitialMask =
     WORKER_METER_CHANGED_WORK_EFFICIENCY;
 
 WorkerConditionMemory g_worker_memory {};
+
+float clamp_meter(float value, float max_value) noexcept
+{
+    return std::clamp(value, kMeterMin, max_value);
+}
+
+float normalize_meter(float value) noexcept
+{
+    return std::clamp(value / kNormalizedMeterMax, 0.0f, 1.0f);
+}
+
+float resolve_factor(
+    float base,
+    float bias = kFactorBiasDefault,
+    float weight = kFactorWeightDefault,
+    float min_value = kFactorMin,
+    float max_value = kFactorMax) noexcept
+{
+    return std::clamp((base * weight) + bias, min_value, max_value);
+}
 
 WorkerMeterSnapshot make_snapshot(const SiteWorld::WorkerConditionData& worker) noexcept
 {
@@ -175,92 +232,119 @@ void emit_worker_meters_changed_if_needed(SiteSystemContext<WorkerConditionSyste
     }
 }
 
-void apply_passive_decay(SiteWorld::WorkerConditionData& worker, float step_seconds) noexcept
+WorkerMeterDeltas deltas_from_message(const WorkerMeterDeltaRequestedMessage& payload) noexcept
 {
-    worker.hydration = std::clamp(
-        worker.hydration - kHydrationDrainPerSecond * step_seconds,
-        kMeterMin,
-        kHydrationMax);
-    worker.nourishment = std::clamp(
-        worker.nourishment - kNourishmentDrainPerSecond * step_seconds,
-        kMeterMin,
-        kNourishmentMax);
-    worker.energy = std::clamp(
-        worker.energy - kEnergyDrainPerSecond * step_seconds,
-        kMeterMin,
-        worker.energy_cap);
-    worker.morale = std::clamp(
-        worker.morale - kMoraleDrainPerSecond * step_seconds,
-        kMeterMin,
-        kMoraleMax);
-
-    if (worker.hydration <= 0.0f || worker.nourishment <= 0.0f)
-    {
-        worker.health = std::clamp(
-            worker.health - kStarvationHealthDrainPerSecond * step_seconds,
-            kMeterMin,
-            kHealthMax);
-    }
+    return WorkerMeterDeltas {
+        payload.health_delta,
+        payload.hydration_delta,
+        payload.nourishment_delta,
+        payload.energy_cap_delta,
+        payload.energy_delta,
+        payload.morale_delta,
+        payload.work_efficiency_delta};
 }
 
-void apply_wind_exposure_decay(
-    SiteWorld::WorkerConditionData& worker,
+void accumulate_passive_deltas(
+    WorkerMeterDeltas& deltas,
+    const SiteWorld::WorkerConditionData& previous,
     const SiteWorld::TileLocalWeatherData& local_weather,
-    float step_seconds) noexcept
+    float step_game_minutes) noexcept
 {
-    const float wind = std::max(local_weather.wind, 0.0f);
-    if (wind <= 0.0f || step_seconds <= 0.0f)
+    if (step_game_minutes <= 0.0f)
     {
         return;
     }
 
-    const float exposure_scale = worker.is_sheltered ? kShelteredWindExposureScale : 1.0f;
-    worker.hydration = std::clamp(
-        worker.hydration - wind * kWindHydrationDrainPerUnitPerSecond * exposure_scale * step_seconds,
-        kMeterMin,
-        kHydrationMax);
-    worker.energy = std::clamp(
-        worker.energy - wind * kWindEnergyDrainPerUnitPerSecond * exposure_scale * step_seconds,
-        kMeterMin,
-        worker.energy_cap);
-    worker.morale = std::clamp(
-        worker.morale - wind * kWindMoraleDrainPerUnitPerSecond * exposure_scale * step_seconds,
-        kMeterMin,
-        kMoraleMax);
+    const float exposure_scale = previous.is_sheltered ? kShelteredExposureScale : 1.0f;
+    const float heat = normalize_meter(std::max(local_weather.heat, 0.0f)) * exposure_scale;
+    const float wind = normalize_meter(std::max(local_weather.wind, 0.0f)) * exposure_scale;
+    const float dust = normalize_meter(std::max(local_weather.dust, 0.0f)) * exposure_scale;
+
+    deltas.hydration -= step_game_minutes * (
+        resolve_factor(kHydrationBaseLossPerGameMinuteBase) +
+        heat * resolve_factor(kHeatToHydrationFactorBase));
+    deltas.nourishment -= step_game_minutes * (
+        resolve_factor(kNourishmentBaseLossPerGameMinuteBase) +
+        wind * resolve_factor(kWindToNourishmentFactorBase) +
+        heat * resolve_factor(kHeatToNourishmentFactorBase) +
+        dust * resolve_factor(kDustToNourishmentFactorBase));
+    deltas.energy -= step_game_minutes * (
+        resolve_factor(kEnergyBaseLossPerGameMinuteBase) +
+        wind * resolve_factor(kWindToEnergyFactorBase) +
+        heat * resolve_factor(kHeatToEnergyFactorBase) +
+        dust * resolve_factor(kDustToEnergyFactorBase));
+    deltas.morale -= step_game_minutes * (
+        resolve_factor(kMoraleDecreaseSpeedBase) *
+        resolve_factor(kMoraleDecreaseFactorBase));
+    deltas.health -= step_game_minutes * (
+        heat * resolve_factor(kHeatToHealthFactorBase) +
+        wind * resolve_factor(kWindToHealthFactorBase) +
+        dust * resolve_factor(kDustToHealthFactorBase));
 }
 
-void apply_worker_meter_delta(
-    SiteWorld::WorkerConditionData& worker,
-    const WorkerMeterDeltaRequestedMessage& payload) noexcept
+float resolve_energy_cap(
+    const SiteWorld::WorkerConditionData& current,
+    const ModifierChannelTotals& modifiers,
+    float direct_delta) noexcept
 {
-    worker.health = std::clamp(
-        worker.health + payload.health_delta,
+    const float normalized_health =
+        normalize_meter(current.health) * resolve_factor(kHealthEnergyCapFactorBase);
+    const float normalized_hydration =
+        normalize_meter(current.hydration) * resolve_factor(kHydrationEnergyCapFactorBase);
+    const float normalized_nourishment =
+        normalize_meter(current.nourishment) * resolve_factor(kNourishmentEnergyCapFactorBase);
+    const float energy_cap_factor =
+        resolve_factor(kEnergyCapFactorBase, modifiers.energy_cap);
+    const float raw_cap = std::min(
+                              normalized_health,
+                              std::min(normalized_hydration, normalized_nourishment)) *
+        energy_cap_factor *
+        kNormalizedMeterMax;
+    return std::clamp(raw_cap + direct_delta, kEnergyCapMin, kEnergyCapMax);
+}
+
+float resolve_work_efficiency(
+    const SiteWorld::WorkerConditionData& current,
+    const ModifierChannelTotals& modifiers,
+    float direct_delta) noexcept
+{
+    const float normalized_health =
+        normalize_meter(current.health) * resolve_factor(kHealthEfficiencyFactorBase);
+    const float normalized_hydration =
+        normalize_meter(current.hydration) * resolve_factor(kHydrationEfficiencyFactorBase);
+    const float normalized_nourishment =
+        normalize_meter(current.nourishment) * resolve_factor(kNourishmentEfficiencyFactorBase);
+    const float normalized_morale =
+        normalize_meter(current.morale) * resolve_factor(kMoraleEfficiencyFactorBase);
+    const float work_efficiency_factor =
+        resolve_factor(kWorkEfficiencyFactorBase, modifiers.work_efficiency);
+    const float raw_efficiency = std::min(
+                                     normalized_health,
+                                     std::min(
+                                         normalized_hydration,
+                                         std::min(normalized_nourishment, normalized_morale))) *
+        work_efficiency_factor;
+    return std::clamp(raw_efficiency + direct_delta, kWorkEfficiencyMin, kWorkEfficiencyMax);
+}
+
+SiteWorld::WorkerConditionData resolve_worker_conditions(
+    const SiteWorld::WorkerConditionData& previous,
+    const WorkerMeterDeltas& deltas,
+    const ModifierChannelTotals& modifiers) noexcept
+{
+    SiteWorld::WorkerConditionData current = previous;
+    current.health = clamp_meter(previous.health + deltas.health, kHealthMax);
+    current.hydration = clamp_meter(previous.hydration + deltas.hydration, kHydrationMax);
+    current.nourishment = clamp_meter(previous.nourishment + deltas.nourishment, kNourishmentMax);
+    current.morale = clamp_meter(previous.morale + deltas.morale, kMoraleMax);
+    current.energy_cap = resolve_energy_cap(current, modifiers, deltas.energy_cap);
+    current.energy = std::clamp(
+        previous.energy + deltas.energy,
         kMeterMin,
-        kHealthMax);
-    worker.hydration = std::clamp(
-        worker.hydration + payload.hydration_delta,
-        kMeterMin,
-        kHydrationMax);
-    worker.nourishment = std::clamp(
-        worker.nourishment + payload.nourishment_delta,
-        kMeterMin,
-        kNourishmentMax);
-    worker.energy_cap = std::clamp(
-        worker.energy_cap + payload.energy_cap_delta,
-        kMeterMin,
-        kEnergyCapMax);
-    worker.energy = std::clamp(
-        worker.energy + payload.energy_delta,
-        kMeterMin,
-        worker.energy_cap);
-    worker.morale = std::clamp(
-        worker.morale + payload.morale_delta,
-        kMeterMin,
-        kMoraleMax);
-    worker.work_efficiency = std::clamp(
-        worker.work_efficiency + payload.work_efficiency_delta,
-        kWorkEfficiencyMin,
-        kWorkEfficiencyMax);
+        current.energy_cap);
+    current.work_efficiency =
+        resolve_work_efficiency(current, modifiers, deltas.work_efficiency);
+    return current;
 }
 }  // namespace
 
@@ -285,9 +369,11 @@ Gs1Status WorkerConditionSystem::process_message(
 
     auto worker = context.world.read_worker();
     const auto previous = worker.conditions;
-    apply_worker_meter_delta(
-        worker.conditions,
-        message.payload_as<WorkerMeterDeltaRequestedMessage>());
+    const auto deltas = deltas_from_message(message.payload_as<WorkerMeterDeltaRequestedMessage>());
+    worker.conditions = resolve_worker_conditions(
+        previous,
+        deltas,
+        context.world.read_modifier().resolved_channel_totals);
     const bool modified = worker_conditions_changed(previous, worker.conditions);
     if (modified)
     {
@@ -304,14 +390,18 @@ void WorkerConditionSystem::run(SiteSystemContext<WorkerConditionSystem>& contex
         return;
     }
 
-    const auto step_seconds = static_cast<float>(context.fixed_step_seconds);
     auto worker = context.world.read_worker();
     const auto previous = worker.conditions;
-    apply_passive_decay(worker.conditions, step_seconds);
-    apply_wind_exposure_decay(
-        worker.conditions,
+    WorkerMeterDeltas deltas {};
+    accumulate_passive_deltas(
+        deltas,
+        previous,
         context.world.read_tile_local_weather(worker.position.tile_coord),
-        step_seconds);
+        static_cast<float>(runtime_minutes_from_real_seconds(context.fixed_step_seconds)));
+    worker.conditions = resolve_worker_conditions(
+        previous,
+        deltas,
+        context.world.read_modifier().resolved_channel_totals);
     const bool modified = worker_conditions_changed(previous, worker.conditions);
     if (modified)
     {

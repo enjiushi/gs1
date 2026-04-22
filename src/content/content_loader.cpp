@@ -1003,7 +1003,7 @@ void load_site_action_defs(ContentDatabase& content, const std::filesystem::path
         }
 
         const auto fields = split_delimited(line, '\t');
-        if (fields.size() != 8U)
+        if (fields.size() != 9U)
         {
             fail_load(path, line_number, "unexpected site action column count");
         }
@@ -1013,11 +1013,11 @@ void load_site_action_defs(ContentDatabase& content, const std::filesystem::path
             parse_float(path, line_number, fields[1]),
             parse_float(path, line_number, fields[2]),
             parse_float(path, line_number, fields[3]),
-            parse_placement_occupancy_layer(path, line_number, fields[4]),
-            parse_bool(path, line_number, fields[5]),
+            parse_float(path, line_number, fields[4]),
+            parse_placement_occupancy_layer(path, line_number, fields[5]),
             parse_bool(path, line_number, fields[6]),
             parse_bool(path, line_number, fields[7]),
-            0U});
+            parse_bool(path, line_number, fields[8])});
     }
 }
 

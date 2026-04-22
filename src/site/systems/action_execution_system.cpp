@@ -26,10 +26,8 @@ namespace
 constexpr double k_minimum_action_duration_minutes = 0.25;
 constexpr float k_repair_integrity_full = 1.0f;
 constexpr float k_repair_integrity_epsilon = 0.0001f;
-constexpr float k_minimum_action_progress_scale = 0.35f;
-constexpr float k_maximum_action_progress_scale = 2.0f;
-constexpr float k_wind_action_penalty_per_unit = 0.0065f;
-constexpr float k_sheltered_wind_penalty_scale = 0.35f;
+constexpr float k_minimum_action_efficiency = 0.4f;
+constexpr float k_maximum_action_efficiency = 1.0f;
 
 ItemId repair_tool_item_id(std::uint32_t requested_item_id) noexcept
 {
@@ -112,6 +110,13 @@ float action_hydration_cost(ActionKind kind, std::uint16_t quantity) noexcept
     return action_def == nullptr ? 0.0f : action_def->hydration_cost_per_unit * scale;
 }
 
+float action_nourishment_cost(ActionKind kind, std::uint16_t quantity) noexcept
+{
+    const float scale = static_cast<float>(quantity == 0U ? 1U : quantity);
+    const auto* action_def = find_site_action_def(kind);
+    return action_def == nullptr ? 0.0f : action_def->nourishment_cost_per_unit * scale;
+}
+
 double action_unit_duration_minutes(ActionKind kind, std::uint32_t item_id) noexcept
 {
     if (kind == ActionKind::Plant && item_id != 0U)
@@ -132,11 +137,24 @@ double action_unit_duration_minutes(ActionKind kind, std::uint32_t item_id) noex
     return base_duration_minutes(kind);
 }
 
-double compute_duration_minutes(ActionKind kind, std::uint16_t quantity, std::uint32_t item_id) noexcept
+float resolve_action_cost_multiplier(const SiteWorld::WorkerConditionData& worker) noexcept
+{
+    const float clamped_efficiency =
+        std::clamp(worker.work_efficiency, k_minimum_action_efficiency, k_maximum_action_efficiency);
+    return 2.0f - clamped_efficiency;
+}
+
+double compute_duration_minutes(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    ActionKind kind,
+    std::uint16_t quantity,
+    std::uint32_t item_id) noexcept
 {
     const std::uint16_t safe_quantity = quantity == 0U ? 1U : quantity;
     const double duration = action_unit_duration_minutes(kind, item_id) * static_cast<double>(safe_quantity);
-    return std::max(k_minimum_action_duration_minutes, duration);
+    return std::max(
+        k_minimum_action_duration_minutes,
+        duration * static_cast<double>(resolve_action_cost_multiplier(context.world.read_worker().conditions)));
 }
 
 RuntimeActionId allocate_runtime_action_id() noexcept
@@ -275,27 +293,32 @@ void emit_site_action_completed(GameMessageQueue& queue, const ActionState& acti
 }
 
 void emit_worker_meter_cost_request(
-    GameMessageQueue& queue,
+    SiteSystemContext<ActionExecutionSystem>& context,
     std::uint32_t action_id,
     ActionKind action_kind,
     std::uint16_t quantity)
 {
+    const float action_multiplier =
+        resolve_action_cost_multiplier(context.world.read_worker().conditions);
     const float hydration_cost = action_hydration_cost(action_kind, quantity);
-    const float energy_cost = action_energy_cost(action_kind, quantity);
-    if (hydration_cost == 0.0f && energy_cost == 0.0f)
+    const float nourishment_cost = action_nourishment_cost(action_kind, quantity);
+    const float energy_cost = action_energy_cost(action_kind, quantity) * action_multiplier;
+    if (hydration_cost == 0.0f && nourishment_cost == 0.0f && energy_cost == 0.0f)
     {
         return;
     }
 
     enqueue_message(
-        queue,
+        context.message_queue,
         GameMessageType::WorkerMeterDeltaRequested,
         WorkerMeterDeltaRequestedMessage {
             action_id,
-            WORKER_METER_CHANGED_HYDRATION | WORKER_METER_CHANGED_ENERGY,
+            WORKER_METER_CHANGED_HYDRATION |
+                WORKER_METER_CHANGED_NOURISHMENT |
+                WORKER_METER_CHANGED_ENERGY,
             0.0f,
             -hydration_cost,
-            0.0f,
+            -nourishment_cost,
             0.0f,
             -energy_cost,
             0.0f,
@@ -738,26 +761,9 @@ float resolve_action_progress_scale(
     SiteSystemContext<ActionExecutionSystem>& context,
     const ActionState& action_state) noexcept
 {
-    const auto worker = context.world.read_worker();
-    const float modifier_bonus = context.world.read_modifier().resolved_channel_totals.work_efficiency;
-    const float efficiency_scale = std::clamp(
-        worker.conditions.work_efficiency + modifier_bonus,
-        k_minimum_action_progress_scale,
-        k_maximum_action_progress_scale);
-
-    const TileCoord weather_coord =
-        action_state.target_tile.value_or(worker.position.tile_coord);
-    const auto local_weather = context.world.tile_coord_in_bounds(weather_coord)
-        ? context.world.read_tile_local_weather(weather_coord)
-        : SiteWorld::TileLocalWeatherData {};
-    const float wind_penalty_scale = worker.conditions.is_sheltered
-        ? k_sheltered_wind_penalty_scale
-        : 1.0f;
-    const float wind_scale = std::clamp(
-        1.0f - std::max(local_weather.wind, 0.0f) * k_wind_action_penalty_per_unit * wind_penalty_scale,
-        k_minimum_action_progress_scale,
-        1.0f);
-    return efficiency_scale * wind_scale;
+    static_cast<void>(context);
+    static_cast<void>(action_state);
+    return 1.0f;
 }
 
 double action_elapsed_minutes_for_step(
@@ -834,7 +840,7 @@ void begin_action_execution(
         action_state.primary_subject_id,
         static_cast<float>(action_state.remaining_action_minutes));
     emit_worker_meter_cost_request(
-        context.message_queue,
+        context,
         action_state.current_action_id->value,
         action_state.action_kind,
         action_state.quantity);
@@ -1563,6 +1569,7 @@ Gs1Status ActionExecutionSystem::process_message(
                   static_cast<double>(craft_recipe->craft_minutes),
                   k_minimum_action_duration_minutes)
             : compute_duration_minutes(
+                  context,
                   action_kind,
                   requested_quantity,
                   item_id);

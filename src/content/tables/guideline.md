@@ -16,7 +16,7 @@ External prototype content tables loaded by the gameplay DLL at startup.
 - `craft_recipes.tsv`: Config-backed craft recipe authoring table for station/output/ingredient mappings.
 - `task_templates.tsv`: Config-backed authored task template table for task board progress metadata, item/recipe targets, and faction reputation rewards.
 - `reward_candidates.tsv`: Config-backed reward candidate table for money, deliveries, unlockable reveals, run modifiers, and reputation rewards.
-- `site_actions.tsv`: Config-backed site action tuning table for action duration, worker costs, placement occupancy, and reservation/approach/movement flags.
+- `site_actions.tsv`: Config-backed site action tuning table for action duration, worker energy/hydration/nourishment costs, placement occupancy, and reservation/approach/movement flags.
 - `modifier_presets.tsv`: Config-backed modifier preset table for nearby-aura and run-modifier channel totals consumed by the site modifier system.
 - `technology_tiers.tsv`: Config-backed faction technology tier table for per-faction reputation requirements and display names.
 - `total_reputation_tiers.tsv`: Config-backed total-reputation tier table for global plant unlock thresholds and labels.

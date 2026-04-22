@@ -703,14 +703,14 @@ The player has explicit, separate meters:
 - Health
 - Hydration
 - Nourishment
-- Energy Cap
 - Energy
 - Morale
-- Work Efficiency
+- derived `Energy Cap`
+- derived `Work Efficiency`
 
 These are the core `Player Condition` values. They are always relevant, but not all decline at the same speed or for the same reasons.
 
-Health is the slower physical-condition meter. It reflects injury, illness risk, and bodily wear from repeated harsh exposure or risky field work. Hydration is the most urgent meter in hot conditions. `Nourishment` is slower, but important for sustained efficiency and recovery. `Energy Cap` is the currently usable ceiling on `Energy`, mainly limited by thirst and hunger. Energy limits daily work output and pushes rest timing, but it should not be fully usable when `Energy Cap` is low. Morale reflects comfort, momentum, and psychological strain under isolation and repeated setbacks. `Work Efficiency` is the resolved worker-output meter that turns current condition and local exposure into action energy cost.
+Health is the slower physical-condition meter. It reflects injury, illness risk, and bodily wear from repeated harsh exposure or risky field work. Hydration is the most urgent meter in hot conditions. `Nourishment` is slower, but important for sustained efficiency and recovery. `Energy Cap` is the current derived usable ceiling on `Energy`, mainly limited by health, thirst, and hunger rather than stored as its own independent meter. Energy limits daily work output and pushes rest timing, but it should not be fully usable when `Energy Cap` is low. Morale reflects comfort, momentum, and psychological strain under isolation and repeated setbacks. `Work Efficiency` is the derived worker-output value that turns current condition into action time and action energy cost.
 
 Current gameplay effect for `Health`:
 
@@ -727,12 +727,12 @@ Current gameplay effect for `Morale`:
 - when `Morale` is stable or high, normal `Work Efficiency` is preserved
 - for the current design, this is the minimum concrete `Morale` effect required; broader morale interactions can be added later if needed
 
-Current gameplay effect for `Energy Cap`:
+Current gameplay effect for derived `Energy Cap`:
 
-- `Hydration` and `Nourishment` should be the main meters that limit `Energy Cap`
+- `Health`, `Hydration`, and `Nourishment` should be the main values that limit `Energy Cap`
 - when `Energy Cap` is low, the worker may still own some stored `Energy`, but only a smaller usable portion should be available for action planning
-- recovery of `Hydration` and `Nourishment` should restore `Energy Cap` faster than rebuilding fully spent `Energy`
-- `Energy Cap` should make thirst and hunger feel immediately restrictive without forcing direct collapse of every other worker meter
+- recovery of `Health`, `Hydration`, and `Nourishment` should restore `Energy Cap` indirectly by lifting the derived cap
+- `Energy Cap` should make poor condition feel immediately restrictive without forcing direct collapse of every other worker meter
 
 ### Dense Cover Recovery
 
@@ -4344,7 +4344,7 @@ This summary should include only core runtime meters and the core plant-side val
 | Weather meters | `weatherHeat`, `weatherWind`, `weatherDust` | Site-wide ambient weather outputs after baseline site conditions and current event meters are combined. |
 | Resolved local weather meters | `tileHeat`, `tileWind`, `tileDust` | Per-tile weather result after site weather, local support, and shelter are combined. They bridge site weather and final terrain or plant pressure. |
 | Technology progression meters | `reputation`, `factionReputation[factionId]`, `occupiedFactionReputation[factionId]` | Campaign progression meters that gate faction tiers, determine available branch budget, and track permanent tech claims. |
-| Worker state meters | `playerHealth`, `playerHydration`, `playerNourishment`, `playerEnergyCap`, `playerEnergy`, `playerMorale`, `playerWorkEfficiency` | Core worker survival and performance meters. They represent the worker's current physical and mental condition plus the resolved action-energy modifier used during site play. |
+| Worker state meters and derived values | `playerHealth`, `playerHydration`, `playerNourishment`, `playerEnergy`, `playerMorale`, derived `playerEnergyCap`, derived `playerWorkEfficiency` | Core worker survival and performance values. `playerHealth`, `playerHydration`, `playerNourishment`, `playerEnergy`, and `playerMorale` are stored worker meters, while `playerEnergyCap` and `playerWorkEfficiency` are recomputed every frame from the current worker condition. |
 | Item state meters | `itemQuantity`, `itemCondition`, `itemFreshness` | Core runtime item-stack meters. `itemQuantity` tracks how much of a stack remains, `itemCondition` tracks damage-sensitive item usability, and `itemFreshness` tracks spoilable item usability. |
 | Persistent terrain soil meters | `tileSoilFertility`, `tileMoisture`, `tileSoilSalinity` | Long-lived or short-lived land condition on plantable `Ground`. These meters determine what can grow well. |
 | Temporary tile pressure | `tileSandBurial` | Recoverable sand overlay created mainly by sandstorms. If ignored, it can create lasting fertility loss. |
@@ -4379,15 +4379,172 @@ This summary should include only core runtime meters and the core plant-side val
 
 ### Worker State Meter Relationships
 
+Worker condition should resolve from `prevState -> resolve frame deltas -> currentState`.
+
+Use these rules:
+
+- passive frame loss, action costs, and item-consumption deltas should be accumulated into one delta bucket per worker meter before clamping
+- action duration and action energy cost for the current frame should use `playerWorkEfficiency` from the previous frame to avoid circular dependency
+- resolve current-frame `playerHealth`, `playerHydration`, `playerNourishment`, and `playerMorale` first
+- resolve current-frame derived `playerEnergyCap` from the current-frame `playerHealth`, `playerHydration`, and `playerNourishment`
+- resolve current-frame `playerEnergy` next and clamp it against the current-frame derived `playerEnergyCap`
+- resolve current-frame derived `playerWorkEfficiency` last so it becomes the input for the next frame
+
+Current computation model:
+
+```text
+dt = fixedStepSeconds * 0.8
+
+Th = clamp(tileHeat / 100, 0, 1)
+Tw = clamp(tileWind / 100, 0, 1)
+Td = clamp(tileDust / 100, 0, 1)
+
+resolvedXxx = clamp(xxxBase * xxxWeight + xxxBias, minAllowed, maxAllowed)
+```
+
+Passive frame deltas:
+
+```text
+playerHydrationDeltaPassive =
+  -dt * (
+    resolvedHydrationBaseLoss +
+    Th * resolvedHeatToHydrationFactor
+  )
+
+playerNourishmentDeltaPassive =
+  -dt * (
+    resolvedNourishmentBaseLoss +
+    Tw * resolvedWindToNourishmentFactor +
+    Th * resolvedHeatToNourishmentFactor +
+    Td * resolvedDustToNourishmentFactor
+  )
+
+playerEnergyDeltaPassive =
+  -dt * (
+    resolvedEnergyBaseLoss +
+    Tw * resolvedWindToEnergyFactor +
+    Th * resolvedHeatToEnergyFactor +
+    Td * resolvedDustToEnergyFactor
+  )
+
+playerMoraleDeltaPassive =
+  -dt * (
+    resolvedMoraleDecreaseSpeed *
+    resolvedMoraleDecreaseFactor
+  )
+
+playerHealthDeltaPassive =
+  -dt * (
+    Th * resolvedHeatToHealthFactor +
+    Tw * resolvedWindToHealthFactor +
+    Td * resolvedDustToHealthFactor
+  )
+```
+
+Discrete item and action deltas:
+
+```text
+playerHydrationDeltaFrame =
+  playerHydrationDeltaPassive +
+  actionHydrationDelta +
+  itemHydrationDelta
+
+playerNourishmentDeltaFrame =
+  playerNourishmentDeltaPassive +
+  actionNourishmentDelta +
+  itemNourishmentDelta
+
+playerEnergyDeltaFrame =
+  playerEnergyDeltaPassive +
+  actionEnergyDelta +
+  itemEnergyDelta
+
+playerMoraleDeltaFrame =
+  playerMoraleDeltaPassive +
+  actionMoraleDelta +
+  itemMoraleDelta
+
+playerHealthDeltaFrame =
+  playerHealthDeltaPassive +
+  actionHealthDelta +
+  itemHealthDelta
+```
+
+Current-frame worker meter resolution:
+
+```text
+playerHealthCurrent = clamp01(playerHealthPrev + playerHealthDeltaFrame)
+playerHydrationCurrent = clamp01(playerHydrationPrev + playerHydrationDeltaFrame)
+playerNourishmentCurrent = clamp01(playerNourishmentPrev + playerNourishmentDeltaFrame)
+playerMoraleCurrent = clamp01(playerMoralePrev + playerMoraleDeltaFrame)
+```
+
+Derived current-frame energy cap:
+
+```text
+playerEnergyCapCurrent =
+  clamp(
+    min(
+      playerHealthCurrent * resolvedHealthEnergyCapFactor,
+      playerHydrationCurrent * resolvedHydrationEnergyCapFactor,
+      playerNourishmentCurrent * resolvedNourishmentEnergyCapFactor
+    ) * resolvedEnergyCapFactor,
+    0.5,
+    1.0
+  )
+```
+
+Current-frame energy:
+
+```text
+playerEnergyCurrent =
+  clamp(
+    playerEnergyPrev + playerEnergyDeltaFrame,
+    0,
+    playerEnergyCapCurrent
+  )
+```
+
+Derived current-frame work efficiency:
+
+```text
+playerWorkEfficiencyCurrent =
+  clamp(
+    min(
+      playerHealthCurrent * resolvedHealthEfficiencyFactor,
+      playerHydrationCurrent * resolvedHydrationEfficiencyFactor,
+      playerNourishmentCurrent * resolvedNourishmentEfficiencyFactor,
+      playerMoraleCurrent * resolvedMoraleEfficiencyFactor
+    ) * resolvedWorkEfficiencyFactor,
+    0.4,
+    1.0
+  )
+```
+
+Action-cost and duration rule:
+
+```text
+actionMultiplier = 2 - playerWorkEfficiencyPrev
+
+effectiveActionEnergyCost =
+  baseActionEnergyCost *
+  actionMultiplier *
+  resolvedActionEnergyCostFactor
+
+effectiveActionDuration =
+  baseActionDuration *
+  actionMultiplier
+```
+
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `playerHealth` | Rest and shelter recovery, items with `useMedicine` capability, harsh outdoor exposure, dangerous field work, `tileHeat`, `tileDust`, low `playerHydration`, low `playerNourishment` | `playerEnergy`, `playerWorkEfficiency` | Slow physical-condition meter. Low health should make the worker less resilient and less efficient even if short-term energy is restored. |
-| `playerHydration` | Drinking actions, items with `drink` capability, time, `tileHeat`, outdoor work | `playerEnergyCap` | Most urgent worker survival meter in hot conditions. Local heat should make hydration fall faster on exposed tiles, which then limits how much energy can actually be used. |
-| `playerNourishment` | Eating actions, items with `eat` capability, time, outdoor work | `playerEnergyCap` | Slower-moving worker support meter for sustained efficiency and recovery. It should mainly limit the usable energy ceiling instead of directly draining `playerEnergy`. |
-| `playerEnergyCap` | `playerHydration`, `playerNourishment` | `playerEnergy` | Usable energy ceiling. Low cap should throttle how much stored energy the worker may actually access. |
-| `playerEnergy` | Work actions, rest recovery, `playerHealth`, `playerEnergyCap`, `playerWorkEfficiency` | None | Main short-term work-capacity meter and end-consumption meter. It should be clamped by `playerEnergyCap`, while low `playerWorkEfficiency` should raise the effective energy cost of each action and drain this meter faster. |
-| `playerMorale` | Safe rest, dense-cover recovery pockets, harsh-event aftermath, current site setbacks and recovery progress | `playerWorkEfficiency` | Worker comfort and psychological stability meter. Low morale should make routine work more energy-expensive or less reliable rather than directly lowering the energy meter. |
-| `playerWorkEfficiency` | `playerHealth`, `playerEnergy`, `playerEnergyCap`, `playerMorale`, `tileHeat`, `tileWind`, `tileDust`, workload strain | Action energy cost, `playerEnergy` | Resolved worker-output meter. This should be the main gameplay-facing meter for how expensive each action is. Worse local weather should mainly hurt the player by lowering this meter, which raises energy cost per action. |
+| `playerHealth` | Items with `useMedicine` capability, harsh outdoor exposure, dangerous field work, `tileHeat`, `tileWind`, `tileDust` | derived `playerEnergyCap`, derived `playerWorkEfficiency` | Slow physical-condition meter. Low health should reduce both the worker's usable-energy ceiling and the next frame's work efficiency. |
+| `playerHydration` | Drinking actions, items with `drink` capability, time, `tileHeat`, outdoor work | derived `playerEnergyCap`, derived `playerWorkEfficiency` | Most urgent worker survival meter in hot conditions. Local heat should make hydration fall faster on exposed tiles, which then limits how much energy can actually be used. |
+| `playerNourishment` | Eating actions, items with `eat` capability, time, `tileWind`, `tileHeat`, `tileDust`, outdoor work | derived `playerEnergyCap`, derived `playerWorkEfficiency` | Slower-moving worker support meter for sustained efficiency and recovery. It should mainly limit the usable energy ceiling and the next frame's work efficiency instead of acting as a separate direct failure timer. |
+| derived `playerEnergyCap` | current-frame `playerHealth`, current-frame `playerHydration`, current-frame `playerNourishment`, `energy-cap` factor modifiers | `playerEnergy` | Current usable energy ceiling. It is derived each frame rather than stored as an authored meter, and current-frame `playerEnergy` must always clamp against it. |
+| `playerEnergy` | Work actions, rest recovery, time, `tileHeat`, `tileWind`, `tileDust`, current-frame derived `playerEnergyCap` | None | Main short-term work-capacity meter and end-consumption meter. It should always clamp to the current-frame derived `playerEnergyCap`. |
+| `playerMorale` | Safe rest, dense-cover recovery pockets, harsh-event aftermath, current site setbacks and recovery progress | derived `playerWorkEfficiency` | Worker comfort and psychological stability meter. Low morale should make routine work slower and more energy-expensive rather than directly lowering the derived energy cap. |
+| derived `playerWorkEfficiency` | current-frame `playerHealth`, current-frame `playerHydration`, current-frame `playerNourishment`, current-frame `playerMorale`, `work-efficiency` factor modifiers | Action energy cost, action duration for the next frame | Derived worker-output value. It should be recomputed after current-frame condition resolution, then used as the previous-frame efficiency input for the next frame's action duration and action energy cost. |
 
 ### Technology Progression Meter Relationships
 
@@ -4496,7 +4653,7 @@ Use this loop as the core mental model:
 2. Event state updates `eventHeatPressure`, `eventWindPressure`, and `eventDustPressure`.
 3. Weather updates `weatherHeat`, `weatherWind`, and `weatherDust` from baseline site conditions plus current event meters.
 4. Site weather plus active `Per-Site Modifier`s, local plants, `Straw Checkerboard`, protective structures, and terrain shelter resolve `tileHeat`, `tileWind`, and `tileDust`.
-5. Worker state updates `playerHealth`, `playerHydration`, `playerNourishment`, `playerEnergyCap`, `playerEnergy`, `playerMorale`, and `playerWorkEfficiency` from local weather, active `Per-Site Modifier`s, work, rest, and valid item use such as `drink`, `eat`, or `useMedicine`.
+5. Worker state resolves from previous-frame worker condition plus current-frame passive weather loss, action deltas, and valid item-use deltas such as `drink`, `eat`, or `useMedicine`, then derives current-frame `playerEnergyCap` from `playerHealth`, `playerHydration`, and `playerNourishment`, and finally derives current-frame `playerWorkEfficiency`.
 6. Item state updates `itemQuantity`, `itemCondition`, and `itemFreshness` from use, transfers, harvest gain, sales, and hazard-side damage or spoilage on exposed stored items.
 7. Resolved local weather, active `Per-Site Modifier`s, irrigation, and plant contribution values update terrain pressure: moisture drain, burial, fertility change, and salinity change.
 8. Terrain state plus resolved local weather and plant resistance values feed `growthPressure`.
