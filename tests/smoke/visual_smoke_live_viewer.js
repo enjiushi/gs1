@@ -5539,15 +5539,18 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     ? [siteBootstrap.camp.tileX, siteBootstrap.camp.tileY]
                     : null,
                 tiles: siteBootstrap.tiles.map((tile) => [
-                tile.x,
-                tile.y,
-                tile.terrainTypeId,
-                tile.plantTypeId,
-                tile.structureTypeId,
-                tile.groundCoverTypeId,
-                Math.round((tile.plantDensity || 0) * 100),
-                Math.round((tile.sandBurial || 0) * 100),
-                Math.round(tile.localWind || 0)
+                    tile.x,
+                    tile.y,
+                    tile.terrainTypeId,
+                    tile.plantTypeId,
+                    tile.structureTypeId,
+                    tile.groundCoverTypeId,
+                    Math.round((tile.plantDensity || 0) * 100),
+                    Math.round((tile.sandBurial || 0) * 100),
+                    Math.round(tile.localWind || 0),
+                    Math.round((tile.moisture || 0) * 100),
+                    Math.round((tile.soilFertility || 0) * 100),
+                    Math.round((tile.soilSalinity || 0) * 100)
                 ])
             }
         );
@@ -6703,8 +6706,44 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             structureTypeId: 0,
             groundCoverTypeId: 0,
             plantDensity: 0,
-            sandBurial: 0
+            sandBurial: 0,
+            moisture: 0,
+            soilFertility: 0,
+            soilSalinity: 0
         };
+    }
+
+    function readTileMeter(tile, key) {
+        return clamp01(tile && typeof tile[key] === "number" ? tile[key] : 0);
+    }
+
+    function applyTerrainSurfaceShader(material) {
+        material.onBeforeCompile = function (shader) {
+            shader.vertexShader = shader.vertexShader.replace(
+                "#include <common>",
+                "#include <common>\n" +
+                "attribute float terrainRoughness;\n" +
+                "varying float vTerrainRoughness;\n"
+            );
+            shader.vertexShader = shader.vertexShader.replace(
+                "#include <begin_vertex>",
+                "#include <begin_vertex>\n" +
+                "vTerrainRoughness = terrainRoughness;\n"
+            );
+            shader.fragmentShader = shader.fragmentShader.replace(
+                "#include <common>",
+                "#include <common>\n" +
+                "varying float vTerrainRoughness;\n"
+            );
+            shader.fragmentShader = shader.fragmentShader.replace(
+                "float roughnessFactor = roughness;",
+                "float roughnessFactor = roughness * clamp(vTerrainRoughness, 0.18, 1.0);"
+            );
+        };
+        material.customProgramCacheKey = function () {
+            return "terrain-surface-v1";
+        };
+        return material;
     }
 
     function sampleSiteTileScalar(tileMap, width, height, tileX, tileY, readValue) {
@@ -6763,11 +6802,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         );
         const terrainPositions = terrainGeometry.attributes.position;
         const terrainColors = new Float32Array(terrainPositions.count * 3);
+        const terrainRoughness = new Float32Array(terrainPositions.count);
         const duneShadowColor = new THREE_NS.Color(0xb98652);
         const duneBaseColor = new THREE_NS.Color(0xd2aa74);
         const duneHighlightColor = new THREE_NS.Color(0xe8cda0);
         const hardpackColor = new THREE_NS.Color(0xb18a5b);
         const plantTintColor = new THREE_NS.Color(0xa6a06d);
+        const fertileSoilColor = new THREE_NS.Color(0x7d6040);
+        const wetSoilColor = new THREE_NS.Color(0x667257);
+        const salinityTintColor = new THREE_NS.Color(0xe3ddd0);
         const scratchColor = new THREE_NS.Color();
 
         for (let vertexIndex = 0; vertexIndex < terrainPositions.count; vertexIndex += 1) {
@@ -6789,7 +6832,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 height,
                 sampleTileX,
                 sampleTileY,
-                (tile) => clamp01(tile && tile.sandBurial ? tile.sandBurial : 0)
+                (tile) => readTileMeter(tile, "sandBurial")
             );
             const plantCoverage = sampleSiteTileScalar(
                 tileMap,
@@ -6807,6 +6850,30 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 sampleTileY,
                 (tile) => tile && tile.terrainTypeId === highwayTerrainTypeId ? 1.0 : 0.0
             );
+            const moisture = sampleSiteTileScalar(
+                tileMap,
+                width,
+                height,
+                sampleTileX,
+                sampleTileY,
+                (tile) => readTileMeter(tile, "moisture")
+            );
+            const soilFertility = sampleSiteTileScalar(
+                tileMap,
+                width,
+                height,
+                sampleTileX,
+                sampleTileY,
+                (tile) => readTileMeter(tile, "soilFertility")
+            );
+            const soilSalinity = sampleSiteTileScalar(
+                tileMap,
+                width,
+                height,
+                sampleTileX,
+                sampleTileY,
+                (tile) => readTileMeter(tile, "soilSalinity")
+            );
             const macroNoise = deterministicNoise01(localX * 0.22, localZ * 0.22, 801);
             const rippleNoise = deterministicNoise01(localZ * 0.94, localX * 0.94, 809);
             const duneWave =
@@ -6822,27 +6889,58 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 (duneWave * 0.5 + 0.5) * 0.28 +
                 macroNoise * 0.12
             );
+            const ecologicalBlendScale = 1.0 - hardpackBlend * 0.72;
+            const fertileBlend = clamp01(
+                (soilFertility * 0.82 + moisture * 0.18 - burial * 0.1) * ecologicalBlendScale
+            );
+            const wetBlend = clamp01(
+                (moisture * 0.78 + soilFertility * 0.12 - soilSalinity * 0.08) * ecologicalBlendScale
+            );
+            const mineralCrust = clamp01(
+                soilSalinity *
+                (1.0 - soilFertility * 0.6) *
+                (1.0 - moisture * 0.45) *
+                (0.58 + macroNoise * 0.28) *
+                ecologicalBlendScale
+            );
+            const surfaceRoughness = Math.max(
+                0.36,
+                Math.min(
+                    1.0,
+                    0.96 -
+                        moisture * 0.34 -
+                        soilFertility * 0.06 +
+                        burial * 0.08 +
+                        mineralCrust * 0.1 +
+                        hardpackBlend * 0.04
+                )
+            );
 
             terrainPositions.setZ(vertexIndex, terrainHeight);
             scratchColor.copy(duneShadowColor).lerp(duneBaseColor, highlightMix);
             scratchColor.lerp(duneHighlightColor, clamp01((macroNoise - 0.36) * 0.65 + burial * 0.26));
+            scratchColor.lerp(fertileSoilColor, fertileBlend * 0.62);
+            scratchColor.lerp(wetSoilColor, wetBlend * 0.46);
+            scratchColor.lerp(salinityTintColor, mineralCrust * 0.34);
             scratchColor.lerp(hardpackColor, hardpackBlend * 0.78);
             scratchColor.lerp(plantTintColor, plantCoverage * 0.16);
             terrainColors[vertexIndex * 3] = scratchColor.r;
             terrainColors[vertexIndex * 3 + 1] = scratchColor.g;
             terrainColors[vertexIndex * 3 + 2] = scratchColor.b;
+            terrainRoughness[vertexIndex] = surfaceRoughness;
         }
 
         terrainGeometry.setAttribute("color", new THREE_NS.Float32BufferAttribute(terrainColors, 3));
+        terrainGeometry.setAttribute("terrainRoughness", new THREE_NS.Float32BufferAttribute(terrainRoughness, 1));
         terrainGeometry.computeVertexNormals();
 
         const terrainMesh = new THREE_NS.Mesh(
             terrainGeometry,
-            new THREE_NS.MeshStandardMaterial({
+            applyTerrainSurfaceShader(new THREE_NS.MeshStandardMaterial({
                 vertexColors: true,
-                roughness: 0.98,
+                roughness: 1.0,
                 metalness: 0.01
-            })
+            }))
         );
         terrainMesh.rotation.x = -Math.PI / 2;
         terrainMesh.position.y = 0;

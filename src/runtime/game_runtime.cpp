@@ -48,6 +48,9 @@ namespace
 constexpr float k_visible_tile_density_projection_step = 1.0f / 32.0f;
 constexpr float k_visible_tile_burial_projection_step = 1.0f / 64.0f;
 constexpr float k_visible_tile_local_wind_projection_step = 2.5f;
+constexpr float k_visible_tile_moisture_projection_step = 1.0f / 64.0f;
+constexpr float k_visible_tile_soil_fertility_projection_step = 1.0f / 64.0f;
+constexpr float k_visible_tile_soil_salinity_projection_step = 1.0f / 64.0f;
 
 [[nodiscard]] bool app_state_supports_technology_tree(Gs1AppState app_state) noexcept
 {
@@ -90,6 +93,18 @@ constexpr float k_visible_tile_local_wind_projection_step = 2.5f;
             tile.local_weather.wind,
             100.0f,
             k_visible_tile_local_wind_projection_step),
+        quantize_projected_tile_channel(
+            tile.ecology.moisture,
+            1.0f,
+            k_visible_tile_moisture_projection_step),
+        quantize_projected_tile_channel(
+            tile.ecology.soil_fertility,
+            1.0f,
+            k_visible_tile_soil_fertility_projection_step),
+        quantize_projected_tile_channel(
+            tile.ecology.soil_salinity,
+            1.0f,
+            k_visible_tile_soil_salinity_projection_step),
         true};
 }
 
@@ -104,7 +119,10 @@ constexpr float k_visible_tile_local_wind_projection_step = 2.5f;
         lhs.ground_cover_type_id == rhs.ground_cover_type_id &&
         lhs.plant_density_quantized == rhs.plant_density_quantized &&
         lhs.sand_burial_quantized == rhs.sand_burial_quantized &&
-        lhs.local_wind_quantized == rhs.local_wind_quantized;
+        lhs.local_wind_quantized == rhs.local_wind_quantized &&
+        lhs.moisture_quantized == rhs.moisture_quantized &&
+        lhs.soil_fertility_quantized == rhs.soil_fertility_quantized &&
+        lhs.soil_salinity_quantized == rhs.soil_salinity_quantized;
 }
 
 [[nodiscard]] std::uint32_t visible_loadout_slot_count(const LoadoutPlannerState& planner) noexcept
@@ -2190,6 +2208,9 @@ void GameRuntime::queue_site_tile_upsert_message(std::uint32_t x, std::uint32_t 
     payload.plant_density = tile.ecology.plant_density;
     payload.sand_burial = tile.ecology.sand_burial;
     payload.local_wind = tile.local_weather.wind;
+    payload.moisture = tile.ecology.moisture;
+    payload.soil_fertility = tile.ecology.soil_fertility;
+    payload.soil_salinity = tile.ecology.soil_salinity;
     engine_messages_.push_back(tile_message);
 
     if (tile_index < site_run.last_projected_tile_states.size())

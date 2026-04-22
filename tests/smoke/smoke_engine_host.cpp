@@ -1152,6 +1152,9 @@ void SmokeEngineHost::apply_site_tile_upsert(const Gs1EngineMessage& message)
     projection.plant_density = payload.plant_density;
     projection.sand_burial = payload.sand_burial;
     projection.local_wind = payload.local_wind;
+    projection.moisture = payload.moisture;
+    projection.soil_fertility = payload.soil_fertility;
+    projection.soil_salinity = payload.soil_salinity;
 
     auto& tiles = pending_site_snapshot_->tiles;
     const auto existing = std::find_if(tiles.begin(), tiles.end(), [&](const SiteTileProjection& tile) {
