@@ -243,6 +243,20 @@ void set_tile_local_wind(gs1::SiteRunState& site_run, TileCoord coord, float loc
     gs1::site_world_access::set_tile_local_weather(site_run, coord, local_weather);
 }
 
+void set_tile_soil_visual_state(
+    gs1::SiteRunState& site_run,
+    TileCoord coord,
+    float moisture,
+    float soil_fertility,
+    float soil_salinity)
+{
+    auto ecology = gs1::site_world_access::tile_ecology(site_run, coord);
+    ecology.moisture = moisture;
+    ecology.soil_fertility = soil_fertility;
+    ecology.soil_salinity = soil_salinity;
+    gs1::site_world_access::set_tile_ecology(site_run, coord, ecology);
+}
+
 std::vector<Gs1EngineMessage> flush_tile_delta_for(
     GameRuntime& runtime,
     TileCoord coord,
@@ -809,6 +823,42 @@ int main()
     {
         const auto& payload = wind_third_tiles.front()->payload_as<Gs1EngineMessageSiteTileData>();
         assert(payload.local_wind == 18.0f);
+    }
+
+    set_tile_soil_visual_state(site_run, density_coord, 0.25f, 0.125f, 0.375f);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+    const auto soil_first_messages = drain_engine_messages(runtime);
+    const auto soil_first_tiles =
+        collect_messages_of_type(soil_first_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
+    assert(soil_first_tiles.size() == 1U);
+    {
+        const auto& payload = soil_first_tiles.front()->payload_as<Gs1EngineMessageSiteTileData>();
+        assert(payload.moisture == 0.25f);
+        assert(payload.soil_fertility == 0.125f);
+        assert(payload.soil_salinity == 0.375f);
+    }
+
+    set_tile_soil_visual_state(site_run, density_coord, 0.257f, 0.132f, 0.382f);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+    const auto soil_second_messages = drain_engine_messages(runtime);
+    const auto soil_second_tiles =
+        collect_messages_of_type(soil_second_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
+    assert(soil_second_tiles.empty());
+
+    set_tile_soil_visual_state(site_run, density_coord, 0.27f, 0.14f, 0.4f);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+    const auto soil_third_messages = drain_engine_messages(runtime);
+    const auto soil_third_tiles =
+        collect_messages_of_type(soil_third_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
+    assert(soil_third_tiles.size() == 1U);
+    {
+        const auto& payload = soil_third_tiles.front()->payload_as<Gs1EngineMessageSiteTileData>();
+        assert(payload.moisture == 0.27f);
+        assert(payload.soil_fertility == 0.14f);
+        assert(payload.soil_salinity == 0.4f);
     }
 
     set_tile_sand_burial(site_run, TileCoord {0, 0}, 0.9f);
