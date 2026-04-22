@@ -167,6 +167,7 @@ void clear_action_state(ActionState& action_state) noexcept
     action_state.quantity = 0U;
     action_state.request_flags = 0U;
     action_state.awaiting_placement_reservation = false;
+    action_state.reactivate_placement_mode_on_completion = false;
     action_state.total_action_minutes = 0.0;
     action_state.remaining_action_minutes = 0.0;
     action_state.reserved_input_item_stacks.clear();
@@ -342,6 +343,29 @@ bool action_supports_deferred_target_selection(ActionKind action_kind) noexcept
     return action_kind == ActionKind::Plant || action_kind == ActionKind::Build;
 }
 
+TileFootprint resolve_action_placement_footprint(
+    ActionKind action_kind,
+    std::uint32_t item_id,
+    std::uint32_t primary_subject_id) noexcept;
+
+std::uint64_t full_blocked_mask_for_footprint(TileFootprint footprint) noexcept
+{
+    const std::uint32_t cell_count =
+        static_cast<std::uint32_t>(footprint.width) *
+        static_cast<std::uint32_t>(footprint.height);
+    if (cell_count == 0U)
+    {
+        return 0ULL;
+    }
+
+    if (cell_count >= 64U)
+    {
+        return ~0ULL;
+    }
+
+    return (1ULL << cell_count) - 1ULL;
+}
+
 std::uint32_t available_worker_pack_item_quantity(
     const InventoryState& inventory,
     ItemId item_id) noexcept
@@ -355,6 +379,25 @@ std::uint32_t available_worker_pack_item_quantity(
         }
 
         total_quantity += slot.item_quantity;
+    }
+
+    return total_quantity;
+}
+
+std::uint32_t reserved_worker_pack_item_quantity(
+    const ActionState& action_state,
+    ItemId item_id) noexcept
+{
+    std::uint32_t total_quantity = 0U;
+    for (const auto& reserved_stack : action_state.reserved_input_item_stacks)
+    {
+        if (reserved_stack.container_kind != GS1_INVENTORY_CONTAINER_WORKER_PACK ||
+            reserved_stack.item_id != item_id)
+        {
+            continue;
+        }
+
+        total_quantity += reserved_stack.quantity;
     }
 
     return total_quantity;
@@ -415,6 +458,58 @@ bool action_requires_item(ActionKind action_kind, std::uint32_t item_id) noexcep
     }
 
     return false;
+}
+
+bool should_reactivate_plant_placement_mode_after_completion(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    const ActionState& action_state)
+{
+    if (!action_state.reactivate_placement_mode_on_completion ||
+        action_state.action_kind != ActionKind::Plant)
+    {
+        return false;
+    }
+
+    const auto* item_def = action_item_def(action_state.action_kind, action_state.item_id);
+    if (item_def == nullptr || item_def->linked_plant_id.value == 0U)
+    {
+        return false;
+    }
+
+    const std::uint32_t available_quantity =
+        available_worker_pack_item_quantity(
+            context.world.read_inventory(),
+            item_def->item_id);
+    const std::uint32_t reserved_quantity =
+        reserved_worker_pack_item_quantity(
+            action_state,
+            item_def->item_id);
+    return available_quantity > reserved_quantity;
+}
+
+void reactivate_plant_placement_mode_from_completed_action(
+    ActionState& action_state)
+{
+    const TileCoord target_tile = action_target_tile(action_state);
+    const TileFootprint footprint =
+        resolve_action_placement_footprint(
+            action_state.action_kind,
+            action_state.item_id,
+            action_state.primary_subject_id);
+
+    auto& placement_mode = action_state.placement_mode;
+    clear_placement_mode(placement_mode);
+    placement_mode.active = true;
+    placement_mode.action_kind = action_state.action_kind;
+    placement_mode.target_tile = target_tile;
+    placement_mode.primary_subject_id = action_state.primary_subject_id;
+    placement_mode.secondary_subject_id = action_state.secondary_subject_id;
+    placement_mode.item_id = action_state.item_id;
+    placement_mode.quantity = 1U;
+    placement_mode.request_flags = action_state.request_flags;
+    placement_mode.footprint_width = footprint.width;
+    placement_mode.footprint_height = footprint.height;
+    placement_mode.blocked_mask = full_blocked_mask_for_footprint(footprint);
 }
 
 Gs1InventoryContainerKind reserved_item_container_kind(const ActionState& action_state) noexcept
@@ -1192,6 +1287,7 @@ Gs1Status ActionExecutionSystem::process_message(
         std::uint32_t primary_subject_id = payload.primary_subject_id;
         std::uint32_t secondary_subject_id = payload.secondary_subject_id;
         std::uint32_t item_id = payload.item_id;
+        bool reactivate_plant_placement_mode_on_completion = false;
 
         if (has_active_placement_mode(action_state))
         {
@@ -1243,6 +1339,9 @@ Gs1Status ActionExecutionSystem::process_message(
             }
 
             const auto placement_mode = action_state.placement_mode;
+            reactivate_plant_placement_mode_on_completion =
+                placement_mode.action_kind == ActionKind::Plant &&
+                placement_mode.item_id != 0U;
             clear_placement_mode(action_state.placement_mode);
             context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_PLACEMENT_PREVIEW);
 
@@ -1486,6 +1585,8 @@ Gs1Status ActionExecutionSystem::process_message(
             ? 1U
             : requested_quantity;
         action_state.request_flags = request_flags;
+        action_state.reactivate_placement_mode_on_completion =
+            reactivate_plant_placement_mode_on_completion;
         action_state.total_action_minutes = duration_minutes;
         action_state.remaining_action_minutes = duration_minutes;
         action_state.started_at_world_minute.reset();
@@ -1758,8 +1859,22 @@ void ActionExecutionSystem::run(SiteSystemContext<ActionExecutionSystem>& contex
     emit_site_action_completed(context.message_queue, action_state);
     emit_action_fact_messages(context.message_queue, action_state);
     emit_placement_reservation_released(context.message_queue, action_state);
+    const bool reactivated_placement_mode =
+        should_reactivate_plant_placement_mode_after_completion(
+            context,
+            action_state);
+    if (reactivated_placement_mode)
+    {
+        reactivate_plant_placement_mode_from_completed_action(action_state);
+    }
     clear_action_state(action_state);
-    context.world.mark_projection_dirty(
-        SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
+    std::uint32_t dirty_flags =
+        SITE_PROJECTION_UPDATE_WORKER |
+        SITE_PROJECTION_UPDATE_HUD;
+    if (reactivated_placement_mode)
+    {
+        dirty_flags |= SITE_PROJECTION_UPDATE_PLACEMENT_PREVIEW;
+    }
+    context.world.mark_projection_dirty(dirty_flags);
 }
 }  // namespace gs1

@@ -9,7 +9,7 @@ Source-authored system tests and supporting fixtures/runner registration code.
 
 ## Contents
 - `README.md`: Notes on how source-authored system tests in this folder are discovered.
-- `action_ecology_placement_system_tests.cpp`: Cross-system regression tests for actions, ecology, placement, checkerboard `2x2` plant occupancy, multi-tile plant wind-exposure behavior, and highway-target sand-cover handling.
+- `action_ecology_placement_system_tests.cpp`: Cross-system regression tests for actions, ecology, placement, persistent item-based plant-mode rearming, checkerboard `2x2` plant occupancy, multi-tile plant wind-exposure behavior, and highway-target sand-cover handling.
 - `asset_regression_runners.cpp`: Registers and implements runtime runners for asset-authored system tests.
 - `campaign_progress_system_tests.cpp`: System tests for campaign progression behavior, including dedicated campaign/site time-system coverage for the 30-real-minute in-game day contract, selected-site support assembly, objective-mode completion/failure messaging, non-decreasing faction-reputation rewards, consumable faction tech purchases, reputation-gated unlockable tiers, and tech-tree open/tab flow from both the regional map and active site sessions.
 - `craft_system_tests.cpp`: System tests covering crafting behavior.
