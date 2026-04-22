@@ -106,7 +106,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         "Press B to open the player pack, then click a carried item to use it or move it into opened storage.",
         "Press F to raise the phone for the market, delivery crate flow, and task board information.",
         "Short right-click any tile to open context actions such as gather, water, repair, plant, or build.",
-        "Planting and deployment enter placement mode first, so confirm with a left-click and cancel with Esc.",
+        "Planting and deployment enter placement mode first, so confirm with a left-click and cancel with Esc or a short right-click.",
         "Carry plantables such as seeds or straw checkerboard in the pack before you deploy so the right-click tile menu can arm planting actions.",
         "Open crates, benches, and other devices from the map to move items one click at a time through the pack.",
         "Wind, heat, and dust drain the worker over time, so use shelter and cover to limit exposure.",

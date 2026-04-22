@@ -9,7 +9,7 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 
 ## Contents
 - `action_execution_system.h`: Action execution system interface.
-- `action_execution_system.cpp`: Executes queued site actions using the canonical real-seconds-to-action-minutes conversion and emits follow-up gameplay messages.
+- `action_execution_system.cpp`: Executes queued site actions using the canonical real-seconds-to-action-minutes conversion, emits follow-up gameplay messages, and re-arms plant placement mode after successful item-based planting when matching seeds remain in the worker pack.
 - `camp_durability_system.h`: Camp durability system interface.
 - `camp_durability_system.cpp`: Applies camp wear/failure effects to camp durability state.
 - `craft_system.h`: Craft system interface.
