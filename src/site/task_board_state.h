@@ -1,5 +1,6 @@
 #pragma once
 
+#include "site/action_state.h"
 #include "support/id_types.h"
 
 #include <cstdint>
@@ -29,12 +30,24 @@ struct TaskInstanceState final
     FactionId publisher_faction_id {};
     std::uint32_t task_tier_id {0};
     std::uint32_t target_amount {0};
+    std::uint32_t required_count {0};
     std::uint32_t current_progress_amount {0};
+    ItemId item_id {};
+    PlantId plant_id {};
+    RecipeId recipe_id {};
+    StructureId structure_id {};
+    StructureId secondary_structure_id {};
+    StructureId tertiary_structure_id {};
+    ActionKind action_kind {ActionKind::None};
+    float threshold_value {0.0f};
     std::vector<TaskRewardDraftOption> reward_draft_options {};
     TaskRuntimeListKind runtime_list_kind {TaskRuntimeListKind::Visible};
     std::uint32_t chain_id {0};
     std::uint32_t chain_step_index {0};
     TaskTemplateId follow_up_task_template_id {};
+    double progress_accumulator {0.0};
+    std::uint8_t requirement_mask {0U};
+    std::uint8_t reserved0[3] {};
     bool has_chain {false};
     bool has_follow_up_task_template {false};
 };

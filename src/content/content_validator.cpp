@@ -146,6 +146,66 @@ std::vector<ContentValidationIssue> validate_content_database(
                     "Task template references an unknown recipe id."});
                 break;
             }
+
+            if (task_template_def.plant_id.value != 0U &&
+                !content.index.plant_by_id.contains(task_template_def.plant_id.value))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Task template references an unknown plant id."});
+                break;
+            }
+
+            if (task_template_def.structure_id.value != 0U &&
+                !content.index.structure_by_id.contains(task_template_def.structure_id.value))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Task template references an unknown primary structure id."});
+                break;
+            }
+
+            if (task_template_def.secondary_structure_id.value != 0U &&
+                !content.index.structure_by_id.contains(task_template_def.secondary_structure_id.value))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Task template references an unknown secondary structure id."});
+                break;
+            }
+
+            if (task_template_def.tertiary_structure_id.value != 0U &&
+                !content.index.structure_by_id.contains(task_template_def.tertiary_structure_id.value))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Task template references an unknown tertiary structure id."});
+                break;
+            }
+
+            if (task_template_def.target_amount_max < task_template_def.target_amount_min)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Task template target amount max must be greater than or equal to the min."});
+                break;
+            }
+
+            if (task_template_def.required_count_max < task_template_def.required_count_min)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Task template required-count max must be greater than or equal to the min."});
+                break;
+            }
+
+            if (task_template_def.threshold_value_max < task_template_def.threshold_value_min)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Task template threshold max must be greater than or equal to the min."});
+                break;
+            }
         }
     }
 

@@ -84,7 +84,7 @@ void phone_panel_site_run_started_seeds_home_snapshot(
 
     const auto& phone_panel = site_run.phone_panel;
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.active_section == PhonePanelSection::Home);
-    GS1_SYSTEM_TEST_CHECK(context, phone_panel.visible_task_count == 7U);
+    GS1_SYSTEM_TEST_CHECK(context, phone_panel.visible_task_count == 25U);
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.accepted_task_count == 0U);
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.completed_task_count == 0U);
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.claimed_task_count == 0U);

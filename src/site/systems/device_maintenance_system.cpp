@@ -30,6 +30,24 @@ void emit_device_broken_message(
     queue.push_back(message);
 }
 
+void emit_device_condition_changed_message(
+    GameMessageQueue& queue,
+    TileCoord target_tile,
+    StructureId structure_id,
+    float integrity,
+    std::uint32_t flags = 0U)
+{
+    GameMessage message {};
+    message.type = GameMessageType::SiteDeviceConditionChanged;
+    message.set_payload(SiteDeviceConditionChangedMessage {
+        target_tile.x,
+        target_tile.y,
+        structure_id.value,
+        integrity,
+        flags});
+    queue.push_back(message);
+}
+
 }  // namespace
 
 bool DeviceMaintenanceSystem::subscribes_to(GameMessageType type) noexcept
@@ -74,6 +92,11 @@ Gs1Status DeviceMaintenanceSystem::process_message(
 
                 tile.device.device_integrity = 1.0f;
                 context.world.write_tile(footprint_coord, tile);
+                emit_device_condition_changed_message(
+                    context.message_queue,
+                    footprint_coord,
+                    tile.device.structure_id,
+                    tile.device.device_integrity);
             });
         return GS1_STATUS_OK;
     }
@@ -104,6 +127,11 @@ Gs1Status DeviceMaintenanceSystem::process_message(
             tile.device.device_integrity = 1.0f;
             context.world.write_tile(footprint_coord, tile);
             context.world.mark_tile_projection_dirty(footprint_coord);
+            emit_device_condition_changed_message(
+                context.message_queue,
+                footprint_coord,
+                tile.device.structure_id,
+                tile.device.device_integrity);
         });
     return GS1_STATUS_OK;
 }
@@ -159,6 +187,11 @@ void DeviceMaintenanceSystem::run(SiteSystemContext<DeviceMaintenanceSystem>& co
             tile.device = SiteWorld::TileDeviceData {};
             context.world.write_tile_at_index(index, tile);
             context.world.mark_tile_projection_dirty(coord);
+            emit_device_condition_changed_message(
+                context.message_queue,
+                coord,
+                tile.device.structure_id,
+                tile.device.device_integrity);
             if (device_entity_id != 0U)
             {
                 emit_device_broken_message(
@@ -172,6 +205,11 @@ void DeviceMaintenanceSystem::run(SiteSystemContext<DeviceMaintenanceSystem>& co
 
         tile.device.device_integrity = next_integrity;
         context.world.write_tile_at_index(index, tile);
+        emit_device_condition_changed_message(
+            context.message_queue,
+            coord,
+            tile.device.structure_id,
+            tile.device.device_integrity);
     }
 }
 }  // namespace gs1

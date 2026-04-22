@@ -60,9 +60,11 @@ enum class GameMessageType : std::uint8_t
     SiteDevicePlaced,
     SiteDeviceBroken,
     SiteDeviceRepaired,
+    SiteDeviceConditionChanged,
     WorkerMeterDeltaRequested,
     WorkerMetersChanged,
     TileEcologyChanged,
+    SiteTileStateChanged,
     RestorationProgressChanged,
     TaskAcceptRequested,
     TaskRewardClaimRequested,
@@ -398,6 +400,15 @@ struct SiteDeviceRepairedMessage final
     std::uint32_t flags;
 };
 
+struct SiteDeviceConditionChangedMessage final
+{
+    std::int32_t target_tile_x;
+    std::int32_t target_tile_y;
+    std::uint32_t structure_id;
+    float device_integrity;
+    std::uint32_t flags;
+};
+
 struct WorkerMeterDeltaRequestedMessage final
 {
     std::uint32_t source_id;
@@ -432,6 +443,21 @@ struct TileEcologyChangedMessage final
     std::uint32_t ground_cover_type_id;
     float plant_density;
     float sand_burial;
+};
+
+struct SiteTileStateChangedMessage final
+{
+    std::int32_t target_tile_x;
+    std::int32_t target_tile_y;
+    std::uint32_t changed_mask;
+    std::uint32_t plant_type_id;
+    float plant_density;
+    float moisture;
+    float heat;
+    float dust;
+    float wind_protection;
+    float heat_protection;
+    float dust_protection;
 };
 
 struct RestorationProgressChangedMessage final
@@ -692,9 +718,11 @@ GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteTileBurialClearedMessage, 20U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteDevicePlacedMessage, 20U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteDeviceBrokenMessage, 24U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteDeviceRepairedMessage, 16U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteDeviceConditionChangedMessage, 20U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(WorkerMeterDeltaRequestedMessage, 36U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(WorkerMetersChangedMessage, 32U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TileEcologyChangedMessage, 28U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteTileStateChangedMessage, 44U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(RestorationProgressChangedMessage, 12U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TaskAcceptRequestedMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TaskRewardClaimRequestedMessage, 8U);
