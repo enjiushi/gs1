@@ -76,13 +76,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let animationTimeSeconds = 0;
     let rendererWidth = 0;
     let rendererHeight = 0;
-    let retainedVisualWindDirectionDegrees = 0;
-    let retainEventWindDirectionDuringFade = false;
     let weatherPostProcess = null;
     let smoothedWeatherVisualResponse = {
         heatLevel: 0,
         dustLevel: 0,
-        windLevel: 0
+        windLevel: 0,
+        windDirectionDegrees: 0
     };
     let cameraOrbitDragPointerId = null;
     let cameraOrbitDragButton = -1;
@@ -618,12 +617,42 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return current + (target - current) * blend;
     }
 
+    function normalizeAngleDegrees(angle) {
+        let normalized = typeof angle === "number" ? angle : 0;
+        while (normalized >= 360.0) {
+            normalized -= 360.0;
+        }
+        while (normalized < 0.0) {
+            normalized += 360.0;
+        }
+        return normalized;
+    }
+
+    function blendAngleDegreesToward(current, target, ratePerSecond, deltaSeconds) {
+        if (!(deltaSeconds > 0)) {
+            return normalizeAngleDegrees(target);
+        }
+
+        const normalizedCurrent = normalizeAngleDegrees(current);
+        const normalizedTarget = normalizeAngleDegrees(target);
+        let delta = normalizedTarget - normalizedCurrent;
+        if (delta > 180.0) {
+            delta -= 360.0;
+        } else if (delta < -180.0) {
+            delta += 360.0;
+        }
+
+        const blend = 1.0 - Math.exp(-ratePerSecond * deltaSeconds);
+        return normalizeAngleDegrees(normalizedCurrent + delta * blend);
+    }
+
     function buildTargetWeatherVisualResponse(state) {
         if (!state || state.appState !== "SITE_ACTIVE") {
             return {
                 heatLevel: 0,
                 dustLevel: 0,
-                windLevel: 0
+                windLevel: 0,
+                windDirectionDegrees: smoothedWeatherVisualResponse.windDirectionDegrees
             };
         }
 
@@ -633,14 +662,19 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return {
                 heatLevel: 0,
                 dustLevel: 0,
-                windLevel: 0
+                windLevel: 0,
+                windDirectionDegrees: smoothedWeatherVisualResponse.windDirectionDegrees
             };
         }
 
         return {
             heatLevel: normalizeWeatherValue(weather.heat),
             dustLevel: normalizeWeatherValue(weather.dust),
-            windLevel: normalizeWindVisualValue(weather.wind)
+            windLevel: normalizeWindVisualValue(weather.wind),
+            windDirectionDegrees:
+                typeof weather.windDirectionDegrees === "number"
+                    ? normalizeAngleDegrees(weather.windDirectionDegrees)
+                    : smoothedWeatherVisualResponse.windDirectionDegrees
         };
     }
 
@@ -658,41 +692,19 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             blendWeatherVisualChannel(smoothedWeatherVisualResponse.dustLevel, target.dustLevel);
         smoothedWeatherVisualResponse.windLevel =
             blendWeatherVisualChannel(smoothedWeatherVisualResponse.windLevel, target.windLevel);
+        smoothedWeatherVisualResponse.windDirectionDegrees = blendAngleDegreesToward(
+            smoothedWeatherVisualResponse.windDirectionDegrees,
+            target.windDirectionDegrees,
+            blendRate,
+            deltaSeconds);
     }
 
     function getWeatherVisualResponse() {
         return smoothedWeatherVisualResponse;
     }
 
-    function resolveVisualWindDirectionDegrees(weather) {
-        if (!weather) {
-            return retainedVisualWindDirectionDegrees;
-        }
-
-        const hasDirection = typeof weather.windDirectionDegrees === "number";
-        const visibleWindLevel = getWeatherVisualResponse().windLevel;
-        const eventTemplateId =
-            typeof weather.eventTemplateId === "number"
-                ? weather.eventTemplateId
-                : 0;
-        const eventActive = eventTemplateId !== 0;
-
-        if (eventActive && hasDirection) {
-            retainedVisualWindDirectionDegrees = weather.windDirectionDegrees;
-            retainEventWindDirectionDuringFade = true;
-            return retainedVisualWindDirectionDegrees;
-        }
-
-        if (retainEventWindDirectionDuringFade && visibleWindLevel > visibleWindStreakThreshold) {
-            return retainedVisualWindDirectionDegrees;
-        }
-
-        retainEventWindDirectionDuringFade = false;
-        if (hasDirection) {
-            retainedVisualWindDirectionDegrees = weather.windDirectionDegrees;
-        }
-
-        return retainedVisualWindDirectionDegrees;
+    function resolveVisualWindDirectionDegrees() {
+        return normalizeAngleDegrees(getWeatherVisualResponse().windDirectionDegrees || 0);
     }
 
     function getHudWarningPresentation(state) {
@@ -762,8 +774,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
 
         const siteState = getSiteState(state);
-        const weather = siteState ? siteState.weather : null;
-        if (!weather) {
+        if (!siteState || !siteState.weather) {
             return {
                 opacity: 0,
                 dustAlpha: 0,
@@ -778,7 +789,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const windLevel = weatherVisualResponse.windLevel;
         const windDensityLevel = Math.pow(clamp01(windLevel), 1.35);
         const windSpeedLevel = Math.pow(clamp01(windLevel), 1.18);
-        const directionDegrees = resolveVisualWindDirectionDegrees(weather);
+        const directionDegrees = resolveVisualWindDirectionDegrees();
         const opacity = Math.min(0.2, windDensityLevel * 0.2);
         const dustAlpha = Math.min(0.09, windDensityLevel * 0.09);
         let severity = "watch";
@@ -5325,11 +5336,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return;
         }
 
-        const siteState = getSiteState(state);
-        const weather = siteState ? siteState.weather : null;
         const weatherVisualResponse = getWeatherVisualResponse();
         const windField = cache.windField;
-        if (!weather || weatherVisualResponse.windLevel <= visibleWindStreakThreshold) {
+        if (!state || state.appState !== "SITE_ACTIVE" || weatherVisualResponse.windLevel <= visibleWindStreakThreshold) {
             windField.group.visible = false;
             return;
         }
@@ -5337,7 +5346,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const windLevel = weatherVisualResponse.windLevel;
         const windDensityLevel = Math.pow(clamp01(windLevel), 1.45);
         const windSpeedLevel = Math.pow(clamp01(windLevel), 1.2);
-        const directionDegrees = resolveVisualWindDirectionDegrees(weather);
+        const directionDegrees = resolveVisualWindDirectionDegrees();
         const directionRadians = directionDegrees * Math.PI / 180.0;
         const alpha = Math.min(0.2, 0.015 + windDensityLevel * 0.185);
         const streakLength = lerp(0.72, 2.1, windDensityLevel);
@@ -5374,6 +5383,16 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 activeStreakCount += 1;
             }
         });
+
+        const minimumContinuousStreakCount = Math.min(targetActiveStreakCount, 2);
+        if (activeStreakCount < minimumContinuousStreakCount) {
+            windField.streaks.forEach((streak) => {
+                if (!streak.active && activeStreakCount < minimumContinuousStreakCount) {
+                    activateWindStreak(streak, windField, elapsedSeconds, windDensityLevel, windSpeedLevel, flowDistance);
+                    activeStreakCount += 1;
+                }
+            });
+        }
 
         windField.streaks.forEach((streak, index) => {
             if (!streak.active) {
@@ -5547,13 +5566,60 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     tile.groundCoverTypeId,
                     Math.round((tile.plantDensity || 0) * 100),
                     Math.round((tile.sandBurial || 0) * 100),
-                    Math.round(tile.localWind || 0),
                     Math.round((tile.moisture || 0) * 100),
                     Math.round((tile.soilFertility || 0) * 100),
                     Math.round((tile.soilSalinity || 0) * 100)
                 ])
             }
         );
+    }
+
+    function setPlantVisualWindStrength(plantVisual, localWind) {
+        const plantWindStrength = clamp01((localWind || 0) / 80.0);
+        plantVisual.traverse((node) => {
+            if (node && node.isMesh) {
+                node.userData.plantWindStrength = plantWindStrength;
+            }
+        });
+    }
+
+    function updateSitePlantVisualWindStrengths(cache, siteBootstrap) {
+        if (!cache || !cache.plantVisuals || !siteBootstrap || !siteBootstrap.tiles) {
+            return;
+        }
+
+        const tileMap = buildSiteTileMap(siteBootstrap.tiles);
+        cache.plantVisuals.forEach((plantVisual) => {
+            if (!plantVisual || !plantVisual.userData) {
+                return;
+            }
+
+            const anchorX = plantVisual.userData.plantAnchorX;
+            const anchorY = plantVisual.userData.plantAnchorY;
+            const footprintWidth = Math.max(1, plantVisual.userData.plantFootprintWidth || 1);
+            const footprintHeight = Math.max(1, plantVisual.userData.plantFootprintHeight || 1);
+            if (typeof anchorX !== "number" || typeof anchorY !== "number") {
+                return;
+            }
+
+            let totalLocalWind = 0.0;
+            let sampledTileCount = 0;
+            for (let offsetY = 0; offsetY < footprintHeight; offsetY += 1) {
+                for (let offsetX = 0; offsetX < footprintWidth; offsetX += 1) {
+                    const tile = tileMap.get((anchorX + offsetX) + ":" + (anchorY + offsetY));
+                    if (!tile) {
+                        continue;
+                    }
+                    totalLocalWind += Math.max(0, tile.localWind || 0);
+                    sampledTileCount += 1;
+                }
+            }
+
+            setPlantVisualWindStrength(
+                plantVisual,
+                sampledTileCount > 0 ? (totalLocalWind / sampledTileCount) : 0.0
+            );
+        });
     }
 
     function getSiteCameraOffsetYForGroundDistance(groundDistance) {
@@ -6042,13 +6108,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return;
         }
 
-        const siteState = getSiteState(state);
-        const weather = siteState ? siteState.weather : null;
-        const windStrength = weather ? clamp01((weather.wind || 0) / 80.0) : 0.0;
-        const directionDegrees =
-            weather && typeof weather.windDirectionDegrees === "number"
-                ? weather.windDirectionDegrees
-                : 0;
+        const weatherVisualResponse = getWeatherVisualResponse();
+        const windStrength = clamp01(weatherVisualResponse.windLevel || 0);
+        const directionDegrees = resolveVisualWindDirectionDegrees();
         const directionRadians = directionDegrees * Math.PI / 180.0;
 
         plantWindShaderUniforms.uPlantTime.value = elapsedSeconds;
@@ -6558,9 +6620,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const tile = plantSpec.anchorTile;
         const plantDensity = plantSpec.plantDensity;
         const plantDensityScale = smoothstep01(0.0, 1.0, plantDensity);
-        const plantWindStrength = clamp01((plantSpec.localWind || 0) / 80.0);
         const plantGroup = new THREE_NS.Group();
         const palette = resolvePlantPalette(tile);
+        plantGroup.userData.plantAnchorX = tile.x;
+        plantGroup.userData.plantAnchorY = tile.y;
+        plantGroup.userData.plantFootprintWidth = plantSpec.footprintWidth;
+        plantGroup.userData.plantFootprintHeight = plantSpec.footprintHeight;
         plantGroup.position.y = plantSpec.baseHeight + 0.02;
         if (tile.plantTypeId === 5) {
             plantGroup.scale.set(
@@ -6569,11 +6634,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 1.0
             );
             addStrawCheckerboardPlant(plantGroup, plantSpec, palette);
-            plantGroup.traverse((node) => {
-                if (node && node.isMesh) {
-                    node.userData.plantWindStrength = plantWindStrength;
-                }
-            });
+            setPlantVisualWindStrength(plantGroup, plantSpec.localWind);
             return plantGroup;
         }
 
@@ -6598,11 +6659,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             addGenericPlant(plantGroup, plantSpec);
         }
 
-        plantGroup.traverse((node) => {
-            if (node && node.isMesh) {
-                node.userData.plantWindStrength = plantWindStrength;
-            }
-        });
+        setPlantVisualWindStrength(plantGroup, plantSpec.localWind);
         return plantGroup;
     }
 
@@ -7082,6 +7139,17 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function rebuildStaticSiteScene(siteBootstrap, offsetX, offsetZ, width, height, previousCache, bootstrapSignature) {
+        const reusableWindField =
+            previousCache &&
+            previousCache.windField &&
+            previousCache.siteId === siteBootstrap.siteId &&
+            previousCache.width === width &&
+            previousCache.height === height
+                ? previousCache.windField
+                : null;
+        if (reusableWindField && reusableWindField.group && reusableWindField.group.parent === worldGroup) {
+            worldGroup.remove(reusableWindField.group);
+        }
         clearWorld();
         currentSceneKind = "SITE_ACTIVE";
         scene.background = new THREE_NS.Color(0xe7d3b0);
@@ -7110,6 +7178,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         worldGroup.add(placementGridGroup);
         const tilePickables = terrainVisual.tilePickables;
         const plantVisualSpecs = collectPlantVisualSpecs(siteBootstrap.tiles);
+        const plantVisuals = [];
 
         siteBootstrap.tiles.forEach((tile) => {
             const tileHeight = computeSiteTileVisualHeight(tile);
@@ -7127,6 +7196,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             plantVisual.position.x = plantSpec.centerX - offsetX;
             plantVisual.position.z = plantSpec.centerZ - offsetZ;
             worldGroup.add(plantVisual);
+            plantVisuals.push(plantVisual);
         });
 
         if (siteBootstrap.camp) {
@@ -7153,7 +7223,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const workerGroup = workerVisual.group;
         worldGroup.add(workerGroup);
 
-        const windField = createWindFieldVisual(width, height);
+        const windField = reusableWindField || createWindFieldVisual(width, height);
         worldGroup.add(windField.group);
 
         siteSceneCache = {
@@ -7165,6 +7235,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             width: width,
             height: height,
             tilePickables: tilePickables,
+            plantVisuals: plantVisuals,
             workerGroup: workerGroup,
             workerRig: workerVisual.rig,
             windField: windField,
@@ -7268,6 +7339,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         if (!siteSceneCache) {
             return;
+        }
+
+        if (bootstrapReferenceChanged && !needsStaticRebuild) {
+            siteSceneCache.sourceBootstrap = siteBootstrap;
+            updateSitePlantVisualWindStrengths(siteSceneCache, siteBootstrap);
         }
 
         updateSiteWorkerTargetFromState(siteState, state.frameNumber || 0);
