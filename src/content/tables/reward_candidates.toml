@@ -1,0 +1,83 @@
+[[reward_candidates]]
+reward_candidate_id = 1
+effect_kind = "Money"
+money_delta = 12
+item_id = 0
+quantity = 0
+unlockable_id = 0
+modifier_id = 0
+faction_id = 0
+delivery_minutes = 0
+reputation_delta = 0
+
+[[reward_candidates]]
+reward_candidate_id = 2
+effect_kind = "ItemDelivery"
+money_delta = 0
+item_id = 2
+quantity = 1
+unlockable_id = 0
+modifier_id = 0
+faction_id = 0
+delivery_minutes = 10
+reputation_delta = 0
+
+[[reward_candidates]]
+reward_candidate_id = 3
+effect_kind = "RevealUnlockable"
+money_delta = 0
+item_id = 0
+quantity = 0
+unlockable_id = 102
+modifier_id = 0
+faction_id = 0
+delivery_minutes = 0
+reputation_delta = 0
+
+[[reward_candidates]]
+reward_candidate_id = 4
+effect_kind = "RunModifier"
+money_delta = 0
+item_id = 0
+quantity = 0
+unlockable_id = 0
+modifier_id = 4
+faction_id = 0
+delivery_minutes = 0
+reputation_delta = 0
+
+[[reward_candidates]]
+reward_candidate_id = 5
+effect_kind = "ItemDelivery"
+money_delta = 0
+item_id = 1
+quantity = 1
+unlockable_id = 0
+modifier_id = 0
+faction_id = 0
+delivery_minutes = 10
+reputation_delta = 0
+
+[[reward_candidates]]
+reward_candidate_id = 6
+effect_kind = "RevealUnlockable"
+money_delta = 0
+item_id = 0
+quantity = 0
+unlockable_id = 103
+modifier_id = 0
+faction_id = 0
+delivery_minutes = 0
+reputation_delta = 0
+
+[[reward_candidates]]
+reward_candidate_id = 7
+effect_kind = "RunModifier"
+money_delta = 0
+item_id = 0
+quantity = 0
+unlockable_id = 0
+modifier_id = 5
+faction_id = 0
+delivery_minutes = 0
+reputation_delta = 0

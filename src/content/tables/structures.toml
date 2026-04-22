@@ -1,0 +1,71 @@
+[[structures]]
+structure_id = 201
+display_name = "Camp Stove"
+durability = 1.0
+aura_size = 0
+wind_protection_value = 0.0
+wind_protection_range = 0
+heat_protection_value = 0.0
+dust_protection_value = 0.0
+fertility_improve_value = 0.0
+salinity_reduction_value = 0.0
+irrigation_value = 0.0
+storage_slot_count = 6
+crafting_station_kind = "Cooking"
+grants_storage = true
+footprint_width = 1
+footprint_height = 1
+
+[[structures]]
+structure_id = 202
+display_name = "Workbench"
+durability = 1.0
+aura_size = 0
+wind_protection_value = 0.0
+wind_protection_range = 0
+heat_protection_value = 0.0
+dust_protection_value = 0.0
+fertility_improve_value = 0.0
+salinity_reduction_value = 0.0
+irrigation_value = 0.0
+storage_slot_count = 8
+crafting_station_kind = "Fabrication"
+grants_storage = true
+footprint_width = 1
+footprint_height = 1
+
+[[structures]]
+structure_id = 203
+display_name = "Storage Crate"
+durability = 1.0
+aura_size = 0
+wind_protection_value = 0.0
+wind_protection_range = 0
+heat_protection_value = 0.0
+dust_protection_value = 0.0
+fertility_improve_value = 0.0
+salinity_reduction_value = 0.0
+irrigation_value = 0.0
+storage_slot_count = 10
+crafting_station_kind = "None"
+grants_storage = true
+footprint_width = 1
+footprint_height = 1
+
+[[structures]]
+structure_id = 204
+display_name = "Wind Fence"
+durability = 1.0
+aura_size = 0
+wind_protection_value = 42.0
+wind_protection_range = 1
+heat_protection_value = 0.0
+dust_protection_value = 0.0
+fertility_improve_value = 0.0
+salinity_reduction_value = 0.0
+irrigation_value = 0.0
+storage_slot_count = 0
+crafting_station_kind = "None"
+grants_storage = false
+footprint_width = 1
+footprint_height = 1

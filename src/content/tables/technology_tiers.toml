@@ -1,0 +1,53 @@
+[[technology_tiers]]
+faction_id = 1
+tier_index = 1
+reputation_requirement = 10
+display_name = "Village Tier I"
+
+[[technology_tiers]]
+faction_id = 1
+tier_index = 2
+reputation_requirement = 25
+display_name = "Village Tier II"
+
+[[technology_tiers]]
+faction_id = 1
+tier_index = 3
+reputation_requirement = 45
+display_name = "Village Tier III"
+
+[[technology_tiers]]
+faction_id = 2
+tier_index = 1
+reputation_requirement = 10
+display_name = "Forestry Tier I"
+
+[[technology_tiers]]
+faction_id = 2
+tier_index = 2
+reputation_requirement = 25
+display_name = "Forestry Tier II"
+
+[[technology_tiers]]
+faction_id = 2
+tier_index = 3
+reputation_requirement = 45
+display_name = "Forestry Tier III"
+
+[[technology_tiers]]
+faction_id = 3
+tier_index = 1
+reputation_requirement = 10
+display_name = "University Tier I"
+
+[[technology_tiers]]
+faction_id = 3
+tier_index = 2
+reputation_requirement = 25
+display_name = "University Tier II"
+
+[[technology_tiers]]
+faction_id = 3
+tier_index = 3
+reputation_requirement = 45
+display_name = "University Tier III"

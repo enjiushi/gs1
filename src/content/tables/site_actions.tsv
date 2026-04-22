@@ -1,9 +1,0 @@
-action_kind	duration_minutes_per_unit	energy_cost_per_unit	hydration_cost_per_unit	nourishment_cost_per_unit	placement_occupancy_layer	requests_placement_reservation	requires_worker_approach	impacts_worker_movement
-Plant	1.0	2.0	0.75	0.30	GroundCover	1	1	1
-Build	2.5	2.0	0.75	0.40	Structure	1	1	1
-Repair	1.5	0.0	0.0	0.0	None	0	1	1
-Water	0.75	1.0	0.35	0.0	None	0	0	1
-ClearBurial	1.0	1.5	0.5	0.25	None	0	0	1
-Craft	1.0	1.5	0.5	0.20	None	0	1	1
-Drink	0.5	0.0	0.0	0.0	None	0	0	1
-Eat	0.75	0.0	0.0	0.0	None	0	0	1
