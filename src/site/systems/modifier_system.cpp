@@ -1,13 +1,12 @@
 #include "site/systems/modifier_system.h"
 
 #include "campaign/campaign_state.h"
+#include "content/defs/modifier_defs.h"
 #include "content/defs/technology_defs.h"
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
 
 #include <algorithm>
-#include <array>
-#include <cstddef>
 #include <cmath>
 
 namespace gs1
@@ -16,24 +15,6 @@ namespace
 {
 constexpr float k_modifier_channel_limit = 1.0f;
 constexpr float k_modifier_change_epsilon = 1e-4f;
-
-constexpr std::array<ModifierChannelTotals, 3> k_nearby_aura_presets = {
-    ModifierChannelTotals{
-        -0.15f, -0.08f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.08f, 0.0f},
-    ModifierChannelTotals{
-        0.0f, 0.0f, 0.0f, 0.12f, 0.07f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.04f, 0.0f},
-    ModifierChannelTotals{
-        0.0f, 0.0f, -0.1f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.1f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.05f}};
-
-constexpr std::array<ModifierChannelTotals, 4> k_run_modifier_presets = {
-    ModifierChannelTotals{
-        0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.15f, 0.0f, 0.05f, 0.25f, 0.0f, 0.08f, 0.1f},
-    ModifierChannelTotals{
-        0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.2f, 0.05f, 0.0f, 0.0f, 0.12f, 0.3f},
-    ModifierChannelTotals{
-        0.0f, 0.0f, 0.0f, 0.14f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.25f, 0.15f, 0.0f, 0.0f, 0.04f, 0.0f},
-    ModifierChannelTotals{
-        0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, -0.18f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.05f}};
 
 void accumulate_totals(
     ModifierChannelTotals& destination,
@@ -82,28 +63,6 @@ ModifierChannelTotals clamp_totals(ModifierChannelTotals totals) noexcept
     totals.work_efficiency =
         std::clamp(totals.work_efficiency, -k_modifier_channel_limit, k_modifier_channel_limit);
     return totals;
-}
-
-ModifierChannelTotals apply_nearby_aura_modifier(ModifierId id) noexcept
-{
-    if (id.value == 0U)
-    {
-        return {};
-    }
-
-    const auto bucket = static_cast<std::size_t>(id.value) % k_nearby_aura_presets.size();
-    return k_nearby_aura_presets[bucket];
-}
-
-ModifierChannelTotals apply_run_modifier(ModifierId id) noexcept
-{
-    if (id.value == 0U)
-    {
-        return {};
-    }
-
-    const auto bucket = static_cast<std::size_t>(id.value) % k_run_modifier_presets.size();
-    return k_run_modifier_presets[bucket];
 }
 
 ModifierChannelTotals camp_comfort_bias(const CampState& camp) noexcept
@@ -195,12 +154,12 @@ ModifierChannelTotals resolve_owned_totals(
 
     for (const auto modifier_id : modifier_state.active_nearby_aura_modifier_ids)
     {
-        accumulate_totals(totals, apply_nearby_aura_modifier(modifier_id));
+        accumulate_totals(totals, resolve_nearby_aura_modifier_preset(modifier_id));
     }
 
     for (const auto modifier_id : modifier_state.active_run_modifier_ids)
     {
-        accumulate_totals(totals, apply_run_modifier(modifier_id));
+        accumulate_totals(totals, resolve_run_modifier_preset(modifier_id));
     }
 
     accumulate_totals(totals, camp_comfort_bias(camp));

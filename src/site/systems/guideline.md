@@ -21,7 +21,7 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `ecology_system.h`: Ecology system interface.
 - `ecology_system.cpp`: Updates plants, burial, watering, broader ecology progression, and highway-target sand-cover accumulation for objective-driven site progress.
 - `economy_phone_system.h`: Economy phone system interface.
-- `economy_phone_system.cpp`: Handles phone storefront interactions, persistent-campaign-cash-backed purchases, plant-listing availability based on the starter-plus-total-reputation unlock track, immediate delivery-crate routing for bought items, owner-confirmed buy/sell completion messages for onboarding-task progress, and task-reward money/unlockable reveal awards routed through message handling.
+- `economy_phone_system.cpp`: Handles phone storefront interactions using content-authored seeded listings and delivery settings, persistent-campaign-cash-backed purchases, plant-listing availability based on the starter-plus-total-reputation unlock track, immediate delivery-crate routing for bought items, owner-confirmed buy/sell completion messages for onboarding-task progress, and task-reward money/unlockable reveal awards routed through message handling.
 - `failure_recovery_system.h`: Failure recovery system interface.
 - `failure_recovery_system.cpp`: Resolves failure fallout and recovery flow for the site.
 - `inventory_system.h`: Inventory system interface.
@@ -29,7 +29,7 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `local_weather_resolve_system.h`: Local weather resolve system interface.
 - `local_weather_resolve_system.cpp`: Resolves local weather updates into owned site state, including directional lee-side wind shelter with nonlinear range falloff plus plant-tile projection dirties when visible local wind changes.
 - `modifier_system.h`: Modifier system interface.
-- `modifier_system.cpp`: Applies and expires site modifiers/effects, including task-reward run-modifier awards plus imported campaign assistant/global-modifier technology effects routed through message handling.
+- `modifier_system.cpp`: Applies and expires site modifiers/effects using content-authored nearby-aura and run-modifier preset tables, including task-reward run-modifier awards plus imported campaign assistant/global-modifier technology effects routed through message handling.
 - `phone_panel_system.h`: Phone panel system interface.
 - `phone_panel_system.cpp`: Owns phone home/app-panel section state plus authoritative projected phone listings/task counts for the adapter, including completed and claimed history counts.
 - `placement_validation_system.h`: Placement validation system interface.

@@ -13,11 +13,11 @@ Definition types and runtime accessors for the major authored content domains.
 - `craft_recipe_defs.h`: Crafting recipe definition types plus runtime accessors over the loaded recipe table.
 - `event_defs.h`: Authored event definitions used by event/state systems.
 - `item_defs.h`: Item definition types plus runtime accessors over the loaded item table, including the authored starter checkerboard item and the full prototype 10-plant seed roster.
-- `modifier_defs.h`: Modifier definition records applied by modifier/weather flows.
+- `modifier_defs.h`: Modifier preset definition records and runtime accessors applied by modifier/weather flows.
 - `plant_defs.h`: Plant/ecology definition types plus runtime accessors over the loaded plant table, including the full 10-plant prototype roster, authored wind-protection range/power values, and the starter straw checkerboard definition with its authored `2x2` footprint plus tuned steady-wither behavior used by directional shelter resolution.
 - `recipe_defs.h`: General recipe definition records shared by authored content.
-- `reward_defs.h`: Reward definition records for grants and payouts, including the shared prototype task-reward pool, simple modifier rewards, immediate unlockable reveals, and delivery-crate-routed item bundle candidates.
+- `reward_defs.h`: Reward definition records and runtime accessors for grants and payouts, including the shared prototype task-reward pool, simple modifier rewards, immediate unlockable reveals, and delivery-crate-routed item bundle candidates.
 - `site_content_defs.h`: Site template/content definitions for active site runs.
 - `structure_defs.h`: Structure/buildable definition types plus runtime accessors over the loaded structure table.
-- `task_defs.h`: Task board/authored task definition records, including the site-one onboarding task pool, progress-kind metadata, and lookup helpers.
-- `technology_defs.h`: Prototype progression definition records, including three faction-reputation-gated faction tiers, three total-reputation-gated global plant tiers, four starter plants available from campaign start, and TODO placeholder technologies for global modifiers and mechanism changes with cash costs.
+- `task_defs.h`: Task board/authored task definition records plus runtime accessors, including the site-one onboarding task pool and progress-kind metadata.
+- `technology_defs.h`: Prototype progression definition records and runtime accessors, including faction-reputation-gated faction tiers, total-reputation-gated plant unlock tiers, starter plants available from campaign start, and placeholder technology nodes with cash costs.

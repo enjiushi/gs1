@@ -1806,10 +1806,14 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
     const auto selected_faction_id = campaign_->regional_map_state.selected_tech_tree_faction_id.value != 0U
         ? campaign_->regional_map_state.selected_tech_tree_faction_id
         : FactionId {k_faction_village_committee};
+    const auto total_reputation_tier_defs = all_total_reputation_tier_defs();
+    const auto reputation_unlock_defs = all_reputation_unlock_defs();
+    const auto technology_tier_defs = all_technology_tier_defs();
+    const auto technology_node_defs = all_technology_node_defs();
     std::uint32_t element_count = 5U + static_cast<std::uint32_t>(k_prototype_faction_defs.size()) + 1U;
-    element_count += static_cast<std::uint32_t>(k_total_reputation_tier_defs.size());
-    element_count += static_cast<std::uint32_t>(k_prototype_total_reputation_unlock_defs.size());
-    for (const auto& tier_def : k_prototype_technology_tier_defs)
+    element_count += static_cast<std::uint32_t>(total_reputation_tier_defs.size());
+    element_count += static_cast<std::uint32_t>(reputation_unlock_defs.size());
+    for (const auto& tier_def : technology_tier_defs)
     {
         if (tier_def.faction_id != selected_faction_id)
         {
@@ -1817,7 +1821,7 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
         }
 
         element_count += 1U;
-        for (const auto& node_def : k_prototype_technology_node_defs)
+        for (const auto& node_def : technology_node_defs)
         {
             if (node_def.faction_id == selected_faction_id &&
                 node_def.tier_index == tier_def.tier_index)
@@ -1892,7 +1896,7 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
 
     std::uint32_t next_element_id = 7U;
 
-    for (const auto& tier_def : k_total_reputation_tier_defs)
+    for (const auto& tier_def : total_reputation_tier_defs)
     {
         char tier_text[64] {};
         std::snprintf(
@@ -1909,7 +1913,7 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
             no_action,
             tier_text);
 
-        for (const auto& unlock_def : k_prototype_total_reputation_unlock_defs)
+        for (const auto& unlock_def : reputation_unlock_defs)
         {
             if (unlock_def.tier_index != tier_def.tier_index)
             {
@@ -1955,7 +1959,7 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
             tab_text);
     }
 
-    for (const auto& tier_def : k_prototype_technology_tier_defs)
+    for (const auto& tier_def : technology_tier_defs)
     {
         if (tier_def.faction_id != selected_faction_id)
         {
@@ -1979,7 +1983,7 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
             no_action,
             tier_text);
 
-        for (const auto& node_def : k_prototype_technology_node_defs)
+        for (const auto& node_def : technology_node_defs)
         {
             if (node_def.faction_id != selected_faction_id ||
                 node_def.tier_index != tier_def.tier_index)
