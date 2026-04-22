@@ -393,6 +393,86 @@ template <typename T>
     {
         return TaskProgressKind::ConsumeItem;
     }
+    if (field == "PerformAction")
+    {
+        return TaskProgressKind::PerformAction;
+    }
+    if (field == "CraftItem")
+    {
+        return TaskProgressKind::CraftItem;
+    }
+    if (field == "CraftAnyItem")
+    {
+        return TaskProgressKind::CraftAnyItem;
+    }
+    if (field == "BuildStructure")
+    {
+        return TaskProgressKind::BuildStructure;
+    }
+    if (field == "BuildAnyStructure")
+    {
+        return TaskProgressKind::BuildAnyStructure;
+    }
+    if (field == "BuildStructureSet")
+    {
+        return TaskProgressKind::BuildStructureSet;
+    }
+    if (field == "PlantAny")
+    {
+        return TaskProgressKind::PlantAny;
+    }
+    if (field == "EarnMoney")
+    {
+        return TaskProgressKind::EarnMoney;
+    }
+    if (field == "SellCraftedItem")
+    {
+        return TaskProgressKind::SellCraftedItem;
+    }
+    if (field == "KeepAllWorkerMetersAboveForDuration")
+    {
+        return TaskProgressKind::KeepAllWorkerMetersAboveForDuration;
+    }
+    if (field == "KeepTileMoistureAtLeastForDuration")
+    {
+        return TaskProgressKind::KeepTileMoistureAtLeastForDuration;
+    }
+    if (field == "KeepTileHeatAtMostForDuration")
+    {
+        return TaskProgressKind::KeepTileHeatAtMostForDuration;
+    }
+    if (field == "KeepTileDustAtMostForDuration")
+    {
+        return TaskProgressKind::KeepTileDustAtMostForDuration;
+    }
+    if (field == "PlantCountAtDensity")
+    {
+        return TaskProgressKind::PlantCountAtDensity;
+    }
+    if (field == "AnyPlantDensityAtLeast")
+    {
+        return TaskProgressKind::AnyPlantDensityAtLeast;
+    }
+    if (field == "PlantWindProtectionAtLeast")
+    {
+        return TaskProgressKind::PlantWindProtectionAtLeast;
+    }
+    if (field == "PlantHeatProtectionAtLeast")
+    {
+        return TaskProgressKind::PlantHeatProtectionAtLeast;
+    }
+    if (field == "PlantDustProtectionAtLeast")
+    {
+        return TaskProgressKind::PlantDustProtectionAtLeast;
+    }
+    if (field == "KeepAllDevicesIntegrityAboveForDuration")
+    {
+        return TaskProgressKind::KeepAllDevicesIntegrityAboveForDuration;
+    }
+    if (field == "NearbyPopulatedPlantTilesAtLeast")
+    {
+        return TaskProgressKind::NearbyPopulatedPlantTilesAtLeast;
+    }
 
     fail_load(path, line_number, "invalid task progress kind");
 }
@@ -464,6 +544,10 @@ template <typename T>
     std::size_t line_number,
     const std::string& field)
 {
+    if (field == "None")
+    {
+        return ActionKind::None;
+    }
     if (field == "Plant")
     {
         return ActionKind::Plant;
@@ -1030,9 +1114,22 @@ void load_task_template_defs(ContentDatabase& content, const std::filesystem::pa
                 path,
                 toml_line_number(entry),
                 require_toml_string(path, entry, "progress_kind")),
-            require_toml_unsigned<std::uint32_t>(path, entry, "target_amount"),
+            require_toml_unsigned<std::uint32_t>(path, entry, "target_amount_min"),
+            require_toml_unsigned<std::uint32_t>(path, entry, "target_amount_max"),
+            require_toml_unsigned<std::uint32_t>(path, entry, "required_count_min"),
+            require_toml_unsigned<std::uint32_t>(path, entry, "required_count_max"),
             ItemId {require_toml_unsigned<std::uint32_t>(path, entry, "item_id")},
+            PlantId {require_toml_unsigned<std::uint32_t>(path, entry, "plant_id")},
             RecipeId {require_toml_unsigned<std::uint32_t>(path, entry, "recipe_id")},
+            StructureId {require_toml_unsigned<std::uint32_t>(path, entry, "structure_id")},
+            StructureId {require_toml_unsigned<std::uint32_t>(path, entry, "secondary_structure_id")},
+            StructureId {require_toml_unsigned<std::uint32_t>(path, entry, "tertiary_structure_id")},
+            parse_action_kind(
+                path,
+                toml_line_number(entry),
+                require_toml_string(path, entry, "action_kind")),
+            require_toml_float(path, entry, "threshold_value_min"),
+            require_toml_float(path, entry, "threshold_value_max"),
             require_toml_signed<std::int32_t>(path, entry, "completion_faction_reputation_delta")});
     }
 }

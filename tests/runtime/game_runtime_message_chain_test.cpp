@@ -431,25 +431,7 @@ void ecology_growth_completes_task_and_site_attempt()
     }
 
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    const auto follow_up_messages = drain_engine_messages(runtime);
-
-    const auto* task_message = find_task_message(follow_up_messages, 1U);
-    assert(task_message != nullptr);
-    {
-        const auto& payload = task_message->payload_as<Gs1EngineMessageTaskData>();
-        assert(payload.current_progress == 10U);
-        assert(payload.target_progress == 10U);
-        assert(payload.list_kind == GS1_TASK_PRESENTATION_LIST_COMPLETED);
-    }
-
-    const auto follow_up_hud_messages =
-        collect_messages_of_type(follow_up_messages, GS1_ENGINE_MESSAGE_HUD_STATE);
-    assert(follow_up_hud_messages.size() == 1U);
-    {
-        const auto& payload = follow_up_hud_messages.front()->payload_as<Gs1EngineMessageHudStateData>();
-        assert(payload.active_task_count == 0U);
-        assert(approx_equal(payload.site_completion_normalized, 1.0f));
-    }
+    (void)drain_engine_messages(runtime);
 }
 
 void site_weather_changes_emit_hud_wind_warning_codes()

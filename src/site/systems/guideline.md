@@ -15,7 +15,7 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `craft_system.h`: Craft system interface.
 - `craft_system.cpp`: Handles crafting progress, completion, and crafting-related state updates.
 - `device_maintenance_system.h`: Device maintenance system interface.
-- `device_maintenance_system.cpp`: Applies repair/maintenance behavior for site devices.
+- `device_maintenance_system.cpp`: Applies repair/maintenance behavior for site devices and emits device-condition change messages when integrity or occupancy changes.
 - `device_support_system.h`: Device support system interface.
 - `device_support_system.cpp`: Resolves support effects and dependencies for site devices.
 - `ecology_system.h`: Ecology system interface.
@@ -27,7 +27,7 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `inventory_system.h`: Inventory system interface.
 - `inventory_system.cpp`: Applies item moves, uses, inventory ownership changes, site-start loadout seeding into the delivery crate, immediate delivery-crate insertion with queued overflow retries, and owner-confirmed transfer/use/craft completion messages for onboarding-task progress.
 - `local_weather_resolve_system.h`: Local weather resolve system interface.
-- `local_weather_resolve_system.cpp`: Resolves local weather updates into owned site state, including resolved per-tile support channels for heat/wind/dust/fertility/salinity/irrigation, directional lee-side wind shelter with nonlinear range falloff, and plant-tile projection dirties when visible local wind changes.
+- `local_weather_resolve_system.cpp`: Resolves local weather updates into owned site state, including resolved per-tile support channels for heat/wind/dust/fertility/salinity/irrigation, directional lee-side wind shelter with nonlinear range falloff, plant-tile projection dirties when visible local wind changes, and owner-emitted tile state-change messages for task tracking.
 - `modifier_system.h`: Modifier system interface.
 - `modifier_system.cpp`: Applies and expires site modifiers/effects using content-authored nearby-aura and run-modifier preset tables, including task-reward run-modifier awards plus imported campaign assistant/global-modifier technology effects routed through message handling, and resolves terrain factor weights/biases from the active modifier totals.
 - `phone_panel_system.h`: Phone panel system interface.
@@ -42,7 +42,7 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `site_time_system.cpp`: Owns fixed-step-derived site clock, day index, and day-phase advancement.
 - `site_system_context.h`: Shared dependency bundle passed into site systems.
 - `task_board_system.h`: Task board system interface.
-- `task_board_system.cpp`: Manages board listings, acceptance, onboarding-task progress tracking, reward-draft seeding, reward-claim routing, claimed-history transitions, and reset flow, keeping the site-one onboarding override plus restoration task on dense-restoration sites.
+- `task_board_system.cpp`: Manages board listings, acceptance, eligibility-filtered three-faction task-generator seeding, per-instance procedural resolution of x/y/z task values from authored ranges and eligible pools, subscribed progress tracking from owner-emitted buy/sell/transfer/plant/craft/build and worker/tile/device state messages, duration accumulation over those subscribed conditions, reward-claim no-ops for the current zero-reward contract, and reset flow on dense-restoration site one.
 - `weather_event_system.h`: Weather event system interface.
 - `weather_event_system.cpp`: Applies incoming weather events to site-owned weather/event state, including start/peak/end timeline interpolation and recurring one-sided highway-protection waves.
 - `worker_condition_system.h`: Worker condition system interface.

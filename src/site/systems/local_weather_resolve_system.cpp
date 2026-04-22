@@ -15,6 +15,8 @@ namespace
 constexpr float k_local_weather_epsilon = 0.0001f;
 constexpr float k_density_epsilon_raw = 0.01f;
 constexpr float k_inverse_meter_scale = 0.01f;
+constexpr std::uint32_t k_site_tile_state_changed_local_weather = 1U << 0U;
+constexpr std::uint32_t k_site_tile_state_changed_support = 1U << 1U;
 constexpr int k_max_supported_support_range = 2;
 constexpr float k_own_tile_contribution_scale = 0.04f;
 constexpr float k_neighbor_contribution_scale = 0.018f;
@@ -83,6 +85,44 @@ const gs1::PlantDef& resolve_occupant_def(const gs1::SiteWorld::TileEcologyData&
     }
 
     return gs1::k_generic_ground_cover_def;
+}
+
+void emit_site_tile_state_changed(
+    gs1::SiteSystemContext<gs1::LocalWeatherResolveSystem>& context,
+    gs1::TileCoord coord,
+    const gs1::SiteWorld::TileData& tile,
+    bool local_weather_changed,
+    bool support_changed)
+{
+    std::uint32_t changed_mask = 0U;
+    if (local_weather_changed)
+    {
+        changed_mask |= k_site_tile_state_changed_local_weather;
+    }
+    if (support_changed)
+    {
+        changed_mask |= k_site_tile_state_changed_support;
+    }
+    if (changed_mask == 0U)
+    {
+        return;
+    }
+
+    gs1::GameMessage message {};
+    message.type = gs1::GameMessageType::SiteTileStateChanged;
+    message.set_payload(gs1::SiteTileStateChangedMessage {
+        coord.x,
+        coord.y,
+        changed_mask,
+        tile.ecology.plant_id.value,
+        tile.ecology.plant_density,
+        tile.ecology.moisture,
+        tile.local_weather.heat,
+        tile.local_weather.dust,
+        tile.resolved_contribution.wind_protection,
+        tile.resolved_contribution.heat_protection,
+        tile.resolved_contribution.dust_protection});
+    context.message_queue.push_back(message);
 }
 
 bool ecology_has_weather_support_source(const gs1::SiteWorld::TileEcologyData& ecology) noexcept
@@ -477,6 +517,12 @@ bool resolve_tile_local_weather(
         next_tile.local_weather = resolved_weather;
         next_tile.resolved_contribution = resolved_support;
         context.world.write_tile_at_index(index, next_tile);
+        emit_site_tile_state_changed(
+            context,
+            coord,
+            next_tile,
+            heat_changed || wind_changed || dust_changed,
+            support_changed);
     }
 
     if (wind_changed && ecology_has_projected_plant_visual(ecology))

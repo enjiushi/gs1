@@ -30,6 +30,6 @@ Site-owned state, ECS world support, and helper logic for active site gameplay.
 - `site_world_access.h`: Owner-scoped ECS access helpers for reading/writing site components.
 - `site_world_components.h`: ECS component structs attached to site entities.
 - `systems/`: Site system declarations and implementations.
-- `task_board_state.h`: Task-board state for current site objectives and listings, including claimed-history tracking for reward-resolved tasks.
+- `task_board_state.h`: Task-board state for current site objectives and listings, including claimed-history tracking plus per-task resolved generator outputs, runtime accumulators, and masks used by procedural, duration, and multi-structure tasks.
 - `tile_footprint.h`: Tile-footprint geometry helpers for structures and placement.
 - `weather_state.h`: Weather state tracked during the active site run.
