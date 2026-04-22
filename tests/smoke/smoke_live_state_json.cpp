@@ -109,6 +109,8 @@ const char* ui_action_name(Gs1UiActionType action_type)
         return "CHECKOUT_PHONE_CART";
     case GS1_UI_ACTION_SET_PHONE_PANEL_SECTION:
         return "SET_PHONE_PANEL_SECTION";
+    case GS1_UI_ACTION_CLOSE_PHONE_PANEL:
+        return "CLOSE_PHONE_PANEL";
     case GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE:
         return "OPEN_REGIONAL_MAP_TECH_TREE";
     case GS1_UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE:
@@ -843,7 +845,9 @@ void append_site_phone_listings_json(std::string& json, const SmokeEngineHost::S
 void append_site_phone_panel_json(std::string& json, const SmokeEngineHost::SiteSnapshotProjection& site_snapshot)
 {
     const auto& phone_panel = site_snapshot.phone_panel;
-    json += "\"phonePanel\":{\"activeSection\":";
+    json += "\"phonePanel\":{\"open\":";
+    append_bool_json(json, (phone_panel.flags & GS1_PHONE_PANEL_FLAG_OPEN) != 0U);
+    json += ",\"activeSection\":";
     append_json_string(json, phone_panel_section_name(phone_panel.active_section));
     json += ",\"visibleTaskCount\":";
     json += std::to_string(phone_panel.visible_task_count);
@@ -864,6 +868,12 @@ void append_site_phone_panel_json(std::string& json, const SmokeEngineHost::Site
     json += ",\"flags\":";
     json += std::to_string(phone_panel.flags);
     json += "}";
+}
+
+void append_worker_pack_panel_json(std::string& json, const SmokeEngineHost::SiteSnapshotProjection& site_snapshot)
+{
+    json += "\"workerPackOpen\":";
+    append_bool_json(json, site_snapshot.worker_pack_open);
 }
 
 void append_site_state_json(std::string& json, const std::optional<SmokeEngineHost::SiteSnapshotProjection>& snapshot)
@@ -887,6 +897,8 @@ void append_site_state_json(std::string& json, const std::optional<SmokeEngineHo
     append_inventory_storages_json(json, site_snapshot);
     json += ",";
     append_inventory_slots_json(json, "workerPackSlots", site_snapshot.worker_pack_slots);
+    json += ",";
+    append_worker_pack_panel_json(json, site_snapshot);
     json += ",";
     append_opened_storage_json(json, site_snapshot);
     json += ",";
@@ -943,6 +955,7 @@ void append_site_state_patch_json(
     {
         append_field([&]() { append_inventory_storages_json(json, site_snapshot); });
         append_field([&]() { append_inventory_slots_json(json, "workerPackSlots", site_snapshot.worker_pack_slots); });
+        append_field([&]() { append_worker_pack_panel_json(json, site_snapshot); });
         append_field([&]() { append_opened_storage_json(json, site_snapshot); });
     }
     if ((field_mask & SmokeEngineHost::LiveStatePatchField_SiteStateCraftContext) != 0U)

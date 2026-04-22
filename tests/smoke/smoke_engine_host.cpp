@@ -182,6 +182,8 @@ const char* ui_action_name(Gs1UiActionType action_type)
         return "CHECKOUT_PHONE_CART";
     case GS1_UI_ACTION_SET_PHONE_PANEL_SECTION:
         return "SET_PHONE_PANEL_SECTION";
+    case GS1_UI_ACTION_CLOSE_PHONE_PANEL:
+        return "CLOSE_PHONE_PANEL";
     case GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE:
         return "OPEN_REGIONAL_MAP_TECH_TREE";
     case GS1_UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE:
@@ -1336,6 +1338,25 @@ void SmokeEngineHost::apply_site_inventory_view_state(const Gs1EngineMessage& me
     }
 
     const auto& payload = message.payload_as<Gs1EngineMessageInventoryViewData>();
+    const auto is_worker_pack_storage = [&]() {
+        const auto storage = std::find_if(
+            pending_site_snapshot_->inventory_storages.begin(),
+            pending_site_snapshot_->inventory_storages.end(),
+            [&](const SiteInventoryStorageProjection& projection) {
+                return projection.storage_id == payload.storage_id;
+            });
+        return storage != pending_site_snapshot_->inventory_storages.end() &&
+            storage->container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK;
+    }();
+
+    if (is_worker_pack_storage)
+    {
+        pending_site_snapshot_->worker_pack_open =
+            payload.event_kind == GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT;
+        pending_site_snapshot_patch_mask_ |= LiveStatePatchField_SiteStateInventory;
+        return;
+    }
+
     if (payload.event_kind == GS1_INVENTORY_VIEW_EVENT_CLOSE)
     {
         if (pending_site_snapshot_->opened_storage.has_value() &&

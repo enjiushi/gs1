@@ -19,6 +19,7 @@ enum class PhonePanelSection : std::uint8_t
 
 struct PhonePanelState final
 {
+    bool open {false};
     PhonePanelSection active_section {PhonePanelSection::Home};
     std::uint32_t visible_task_count {0U};
     std::uint32_t accepted_task_count {0U};

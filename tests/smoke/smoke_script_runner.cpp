@@ -80,6 +80,10 @@ std::optional<Gs1UiActionType> parse_ui_action_type(const std::string& value)
     {
         return GS1_UI_ACTION_SET_PHONE_PANEL_SECTION;
     }
+    if (value == "CLOSE_PHONE_PANEL")
+    {
+        return GS1_UI_ACTION_CLOSE_PHONE_PANEL;
+    }
     if (value == "OPEN_REGIONAL_MAP_TECH_TREE")
     {
         return GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE;

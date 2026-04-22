@@ -59,6 +59,8 @@ struct InventoryState final
     std::uint64_t worker_pack_container_entity_id {0};
     std::uint64_t item_membership_revision {1U};
     std::uint64_t item_quantity_revision {1U};
+    bool worker_pack_panel_open {false};
+    bool last_projected_worker_pack_panel_open {false};
     PendingDeviceStorageOpen pending_device_storage_open {};
     std::vector<StorageContainerState> storage_containers {};
     std::vector<InventorySlot> worker_pack_slots {};

@@ -120,6 +120,8 @@ private:
         Gs1UiSetupPresentationType presentation_type);
     void queue_close_ui_setup_if_open(Gs1UiSetupId setup_id);
     void queue_close_active_normal_ui_if_open();
+    void queue_close_site_inventory_panels_if_open();
+    void queue_close_site_phone_panel_if_open();
     void queue_ui_element_message(
         std::uint32_t element_id,
         Gs1UiElementType element_type,

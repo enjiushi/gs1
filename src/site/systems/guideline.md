@@ -25,13 +25,13 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `failure_recovery_system.h`: Failure recovery system interface.
 - `failure_recovery_system.cpp`: Resolves failure fallout and recovery flow for the site.
 - `inventory_system.h`: Inventory system interface.
-- `inventory_system.cpp`: Applies item moves, uses, inventory ownership changes, site-start loadout seeding into the delivery crate, immediate delivery-crate insertion with queued overflow retries, and owner-confirmed transfer/use/craft completion messages for onboarding-task progress.
+- `inventory_system.cpp`: Applies item moves, uses, inventory ownership changes, site-start loadout seeding into the delivery crate, immediate delivery-crate insertion with queued overflow retries, tracked worker-pack/device-storage panel open-close requests, and owner-confirmed transfer/use/craft completion messages for onboarding-task progress.
 - `local_weather_resolve_system.h`: Local weather resolve system interface.
 - `local_weather_resolve_system.cpp`: Resolves local weather updates into owned site state, including resolved per-tile support channels for heat/wind/dust/fertility/salinity/irrigation, directional lee-side wind shelter with nonlinear range falloff, and plant-tile projection dirties when visible local wind changes.
 - `modifier_system.h`: Modifier system interface.
 - `modifier_system.cpp`: Applies and expires site modifiers/effects using content-authored nearby-aura and run-modifier preset tables, including task-reward run-modifier awards plus imported campaign assistant/global-modifier technology effects routed through message handling, and resolves terrain factor weights/biases from the active modifier totals.
 - `phone_panel_system.h`: Phone panel system interface.
-- `phone_panel_system.cpp`: Owns phone home/app-panel section state plus authoritative projected phone listings/task counts for the adapter, including completed and claimed history counts.
+- `phone_panel_system.cpp`: Owns phone home/app-panel section state plus tracked phone open-close visibility and authoritative projected phone listings/task counts for the adapter, including completed and claimed history counts.
 - `placement_validation_system.h`: Placement validation system interface.
 - `placement_validation_system.cpp`: Validates structure placement requests against tile/world constraints.
 - `site_completion_system.h`: Site completion system interface.

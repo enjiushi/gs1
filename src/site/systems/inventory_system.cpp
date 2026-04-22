@@ -1138,6 +1138,16 @@ Gs1Status handle_inventory_storage_view_request(
     if (payload.event_kind == GS1_INVENTORY_VIEW_EVENT_CLOSE)
     {
         auto& inventory = context.world.own_inventory();
+        if (payload.storage_id == inventory.worker_pack_storage_id)
+        {
+            if (inventory.worker_pack_panel_open)
+            {
+                inventory.worker_pack_panel_open = false;
+                context.world.mark_inventory_view_state_projection_dirty();
+            }
+            return GS1_STATUS_OK;
+        }
+
         const bool cleared_pending =
             clear_pending_device_storage_open_for_storage(inventory, payload.storage_id);
         if (inventory.opened_device_storage_id == payload.storage_id)
@@ -1159,6 +1169,12 @@ Gs1Status handle_inventory_storage_view_request(
 
     if (payload.storage_id == context.world.read_inventory().worker_pack_storage_id)
     {
+        auto& inventory = context.world.own_inventory();
+        if (!inventory.worker_pack_panel_open)
+        {
+            inventory.worker_pack_panel_open = true;
+            context.world.mark_inventory_view_state_projection_dirty();
+        }
         return GS1_STATUS_OK;
     }
 

@@ -924,20 +924,21 @@ Gs1Status GameRuntime::dispatch_subscribed_message(const GameMessage& message)
         {
         case MessageSubscriberId::CampaignFlow:
         {
+            CampaignFlowMessageContext context {
+                campaign_,
+                active_site_run_,
+                app_state_,
+                message_queue_};
             const auto status = dispatch_profiled_message(
                 GS1_RUNTIME_PROFILE_SYSTEM_CAMPAIGN_FLOW,
                 [&]() -> Gs1Status {
-                    CampaignFlowMessageContext context {
-                        campaign_,
-                        active_site_run_,
-                        app_state_,
-                        message_queue_};
                     return CampaignFlowSystem::process_message(context, message);
                 });
             if (status != GS1_STATUS_OK)
             {
                 return status;
             }
+            app_state_ = context.app_state;
             break;
         }
 
@@ -1362,6 +1363,8 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
         break;
 
     case GameMessageType::OpenRegionalMapTechTree:
+        queue_close_site_inventory_panels_if_open();
+        queue_close_site_phone_panel_if_open();
         queue_regional_map_menu_ui_messages();
         queue_regional_map_tech_tree_ui_messages();
         break;
@@ -1392,6 +1395,41 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
             queue_regional_map_tech_tree_ui_messages();
         }
         break;
+
+    case GameMessageType::PhonePanelSectionRequested:
+        queue_close_site_inventory_panels_if_open();
+        if (campaign_.has_value() &&
+            app_state_supports_technology_tree(app_state_) &&
+            campaign_->regional_map_state.tech_tree_open)
+        {
+            GameMessage close_tech_tree {};
+            close_tech_tree.type = GameMessageType::CloseRegionalMapTechTree;
+            close_tech_tree.set_payload(CloseRegionalMapTechTreeMessage {});
+            message_queue_.push_back(close_tech_tree);
+        }
+        break;
+
+    case GameMessageType::ClosePhonePanel:
+        break;
+
+    case GameMessageType::InventoryStorageViewRequest:
+    {
+        const auto& payload = message.payload_as<InventoryStorageViewRequestMessage>();
+        if (payload.event_kind == GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT)
+        {
+            queue_close_site_phone_panel_if_open();
+            if (campaign_.has_value() &&
+                app_state_supports_technology_tree(app_state_) &&
+                campaign_->regional_map_state.tech_tree_open)
+            {
+                GameMessage close_tech_tree {};
+                close_tech_tree.type = GameMessageType::CloseRegionalMapTechTree;
+                close_tech_tree.set_payload(CloseRegionalMapTechTreeMessage {});
+                message_queue_.push_back(close_tech_tree);
+            }
+        }
+        break;
+    }
 
     case GameMessageType::StartSiteAttempt:
         queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_SELECTION);
@@ -1470,12 +1508,10 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
     case GameMessageType::InventoryCraftCompleted:
     case GameMessageType::PhoneListingPurchaseRequested:
     case GameMessageType::PhoneListingSaleRequested:
-    case GameMessageType::PhonePanelSectionRequested:
     case GameMessageType::InventoryDeliveryRequested:
     case GameMessageType::InventoryItemUseRequested:
     case GameMessageType::InventoryItemConsumeRequested:
     case GameMessageType::InventoryTransferRequested:
-    case GameMessageType::InventoryStorageViewRequest:
     case GameMessageType::InventoryCraftContextRequested:
     case GameMessageType::ContractorHireRequested:
     case GameMessageType::SiteUnlockablePurchaseRequested:
@@ -1569,6 +1605,59 @@ void GameRuntime::queue_close_active_normal_ui_if_open()
     }
 
     queue_close_ui_setup_if_open(active_normal_ui_setup_.value());
+}
+
+void GameRuntime::queue_close_site_inventory_panels_if_open()
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
+
+    const auto queue_close_storage = [this](std::uint32_t storage_id)
+    {
+        if (storage_id == 0U)
+        {
+            return;
+        }
+
+        GameMessage message {};
+        message.type = GameMessageType::InventoryStorageViewRequest;
+        message.set_payload(InventoryStorageViewRequestMessage {
+            storage_id,
+            GS1_INVENTORY_VIEW_EVENT_CLOSE,
+            {0U, 0U, 0U}});
+        message_queue_.push_back(message);
+    };
+
+    const auto& inventory = active_site_run_->inventory;
+    if (inventory.worker_pack_panel_open)
+    {
+        queue_close_storage(inventory.worker_pack_storage_id);
+    }
+    if (inventory.opened_device_storage_id != 0U)
+    {
+        queue_close_storage(inventory.opened_device_storage_id);
+    }
+    if (inventory.pending_device_storage_open.active &&
+        inventory.pending_device_storage_open.storage_id != 0U &&
+        inventory.pending_device_storage_open.storage_id != inventory.opened_device_storage_id)
+    {
+        queue_close_storage(inventory.pending_device_storage_open.storage_id);
+    }
+}
+
+void GameRuntime::queue_close_site_phone_panel_if_open()
+{
+    if (!active_site_run_.has_value() || !active_site_run_->phone_panel.open)
+    {
+        return;
+    }
+
+    GameMessage message {};
+    message.type = GameMessageType::ClosePhonePanel;
+    message.set_payload(ClosePhonePanelMessage {});
+    message_queue_.push_back(message);
 }
 
 void GameRuntime::queue_ui_element_message(
@@ -2571,6 +2660,22 @@ void GameRuntime::queue_pending_site_inventory_slot_upsert_messages()
 
     if (site_run.pending_inventory_view_state_projection_update)
     {
+        const bool previous_worker_pack_open = site_run.inventory.last_projected_worker_pack_panel_open;
+        const bool current_worker_pack_open = site_run.inventory.worker_pack_panel_open;
+        if (previous_worker_pack_open && !current_worker_pack_open)
+        {
+            queue_site_inventory_view_state_message(
+                site_run.inventory.worker_pack_storage_id,
+                GS1_INVENTORY_VIEW_EVENT_CLOSE);
+        }
+        else if (!previous_worker_pack_open && current_worker_pack_open)
+        {
+            queue_site_inventory_view_state_message(
+                site_run.inventory.worker_pack_storage_id,
+                GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT,
+                static_cast<std::uint32_t>(site_run.inventory.worker_pack_slots.size()));
+        }
+
         const auto previous_storage_id = site_run.inventory.last_projected_opened_device_storage_id;
         const auto current_storage_id = site_run.inventory.opened_device_storage_id;
         if (previous_storage_id != 0U && previous_storage_id != current_storage_id)
@@ -2589,6 +2694,7 @@ void GameRuntime::queue_pending_site_inventory_slot_upsert_messages()
                     : static_cast<std::uint32_t>(storage_state->slot_item_instance_ids.size()));
         }
         site_run.inventory.last_projected_opened_device_storage_id = current_storage_id;
+        site_run.inventory.last_projected_worker_pack_panel_open = current_worker_pack_open;
     }
 
     if (site_run.inventory.opened_device_storage_id == 0U)
@@ -2810,7 +2916,7 @@ void GameRuntime::queue_site_phone_panel_state_message()
     payload.sell_listing_count = phone_panel.sell_listing_count;
     payload.service_listing_count = phone_panel.service_listing_count;
     payload.cart_item_count = phone_panel.cart_item_count;
-    payload.flags = 0U;
+    payload.flags = phone_panel.open ? GS1_PHONE_PANEL_FLAG_OPEN : 0U;
     engine_messages_.push_back(message);
 }
 
@@ -3354,6 +3460,11 @@ Gs1Status GameRuntime::translate_ui_action_to_message(const Gs1UiAction& action,
         out_message.set_payload(PhonePanelSectionRequestedMessage {
             static_cast<Gs1PhonePanelSection>(action.arg0),
             {0U, 0U, 0U}});
+        return GS1_STATUS_OK;
+
+    case GS1_UI_ACTION_CLOSE_PHONE_PANEL:
+        out_message.type = GameMessageType::ClosePhonePanel;
+        out_message.set_payload(ClosePhonePanelMessage {});
         return GS1_STATUS_OK;
 
     case GS1_UI_ACTION_SELL_PHONE_LISTING:

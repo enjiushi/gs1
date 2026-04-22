@@ -301,6 +301,7 @@ public:
         std::vector<SiteInventorySlotProjection> worker_pack_slots {};
         std::vector<SiteTaskProjection> tasks {};
         std::vector<SitePhoneListingProjection> phone_listings {};
+        bool worker_pack_open {false};
         SitePhonePanelProjection phone_panel {};
         std::optional<SiteInventoryViewProjection> opened_storage {};
         std::optional<SiteCraftContextProjection> craft_context {};

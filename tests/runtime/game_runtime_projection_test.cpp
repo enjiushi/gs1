@@ -65,6 +65,7 @@ struct GameRuntimeProjectionTestAccess
     {
         runtime.flush_site_presentation_if_dirty();
     }
+
 };
 }  // namespace gs1
 
@@ -343,6 +344,49 @@ const Gs1EngineMessage* find_inventory_slot_message(
         if (payload.container_kind == container_kind &&
             payload.storage_id == storage_id &&
             payload.slot_index == slot_index)
+        {
+            return &message;
+        }
+    }
+
+    return nullptr;
+}
+
+const Gs1EngineMessage* find_inventory_view_message(
+    const std::vector<Gs1EngineMessage>& messages,
+    std::uint32_t storage_id,
+    Gs1InventoryViewEventKind event_kind)
+{
+    for (const auto& message : messages)
+    {
+        if (message.type != GS1_ENGINE_MESSAGE_SITE_INVENTORY_VIEW_STATE)
+        {
+            continue;
+        }
+
+        const auto& payload = message.payload_as<Gs1EngineMessageInventoryViewData>();
+        if (payload.storage_id == storage_id && payload.event_kind == event_kind)
+        {
+            return &message;
+        }
+    }
+
+    return nullptr;
+}
+
+const Gs1EngineMessage* find_close_ui_setup_message(
+    const std::vector<Gs1EngineMessage>& messages,
+    Gs1UiSetupId setup_id)
+{
+    for (const auto& message : messages)
+    {
+        if (message.type != GS1_ENGINE_MESSAGE_CLOSE_UI_SETUP)
+        {
+            continue;
+        }
+
+        const auto& payload = message.payload_as<Gs1EngineMessageCloseUiSetupData>();
+        if (payload.setup_id == setup_id)
         {
             return &message;
         }
@@ -937,6 +981,115 @@ int main()
             open_tasks_phone_panel_messages.front()->payload_as<Gs1EngineMessagePhonePanelData>();
         assert(payload.active_section == GS1_PHONE_PANEL_SECTION_TASKS);
     }
+
+    Gs1RuntimeCreateDesc panel_state_desc {};
+    panel_state_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
+    panel_state_desc.api_version = gs1::k_api_version;
+    panel_state_desc.fixed_step_seconds = 1.0 / 60.0;
+
+    GameRuntime panel_state_runtime {panel_state_desc};
+    run_phase1(panel_state_runtime, 0.0);
+    drain_engine_messages(panel_state_runtime);
+    assert(panel_state_runtime.handle_message(make_start_campaign_message()) == GS1_STATUS_OK);
+    const auto panel_state_site_id =
+        gs1::GameRuntimeProjectionTestAccess::campaign(panel_state_runtime)->sites.front().site_id.value;
+    assert(panel_state_runtime.handle_message(make_start_site_attempt_message(panel_state_site_id)) == GS1_STATUS_OK);
+    auto& panel_state_site_run =
+        gs1::GameRuntimeProjectionTestAccess::active_site_run(panel_state_runtime).value();
+    drain_engine_messages(panel_state_runtime);
+
+    auto open_worker_pack_event = make_storage_view_event(
+        panel_state_site_run.inventory.worker_pack_storage_id,
+        GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT);
+    Gs1Phase1Result open_worker_pack_result {};
+    assert(panel_state_runtime.submit_host_events(&open_worker_pack_event, 1U) == GS1_STATUS_OK);
+    run_phase1(panel_state_runtime, 0.0, open_worker_pack_result);
+    assert(open_worker_pack_result.processed_host_event_count == 1U);
+    assert(panel_state_site_run.inventory.worker_pack_panel_open);
+    const auto open_worker_pack_messages = drain_engine_messages(panel_state_runtime);
+    assert(find_inventory_view_message(
+               open_worker_pack_messages,
+               panel_state_site_run.inventory.worker_pack_storage_id,
+               GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT) != nullptr);
+
+    auto open_panel_storage_event = make_storage_view_event(
+        starter_storage_id(panel_state_site_run),
+        GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT);
+    Gs1Phase1Result open_panel_storage_result {};
+    assert(panel_state_runtime.submit_host_events(&open_panel_storage_event, 1U) == GS1_STATUS_OK);
+    run_phase1(panel_state_runtime, 0.0, open_panel_storage_result);
+    assert(open_panel_storage_result.processed_host_event_count == 1U);
+    assert(panel_state_site_run.inventory.opened_device_storage_id == starter_storage_id(panel_state_site_run));
+    const auto open_panel_storage_messages = drain_engine_messages(panel_state_runtime);
+    assert(find_inventory_view_message(
+               open_panel_storage_messages,
+               starter_storage_id(panel_state_site_run),
+               GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT) != nullptr);
+
+    Gs1UiAction open_phone_action {};
+    open_phone_action.type = GS1_UI_ACTION_SET_PHONE_PANEL_SECTION;
+    open_phone_action.arg0 = GS1_PHONE_PANEL_SECTION_BUY;
+    const auto open_phone_event = make_ui_action_event(open_phone_action);
+    Gs1Phase1Result open_phone_result {};
+    assert(panel_state_runtime.submit_host_events(&open_phone_event, 1U) == GS1_STATUS_OK);
+    run_phase1(panel_state_runtime, 0.0, open_phone_result);
+    assert(open_phone_result.processed_host_event_count == 1U);
+    assert(panel_state_site_run.phone_panel.open);
+    assert(!panel_state_site_run.inventory.worker_pack_panel_open);
+    assert(panel_state_site_run.inventory.opened_device_storage_id == 0U);
+    const auto open_phone_messages = drain_engine_messages(panel_state_runtime);
+    assert(find_inventory_view_message(
+               open_phone_messages,
+               panel_state_site_run.inventory.worker_pack_storage_id,
+               GS1_INVENTORY_VIEW_EVENT_CLOSE) != nullptr);
+    assert(find_inventory_view_message(
+               open_phone_messages,
+               starter_storage_id(panel_state_site_run),
+               GS1_INVENTORY_VIEW_EVENT_CLOSE) != nullptr);
+    const auto open_phone_panel_messages =
+        collect_messages_of_type(open_phone_messages, GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE);
+    assert(!open_phone_panel_messages.empty());
+    {
+        const auto& payload =
+            open_phone_panel_messages.back()->payload_as<Gs1EngineMessagePhonePanelData>();
+        assert((payload.flags & GS1_PHONE_PANEL_FLAG_OPEN) != 0U);
+        assert(payload.active_section == GS1_PHONE_PANEL_SECTION_BUY);
+    }
+
+    Gs1UiAction open_site_tech_tree_action {};
+    open_site_tech_tree_action.type = GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE;
+    const auto open_site_tech_tree_event = make_ui_action_event(open_site_tech_tree_action);
+    Gs1Phase1Result open_site_tech_tree_result {};
+    assert(panel_state_runtime.submit_host_events(&open_site_tech_tree_event, 1U) == GS1_STATUS_OK);
+    run_phase1(panel_state_runtime, 0.0, open_site_tech_tree_result);
+    assert(open_site_tech_tree_result.processed_host_event_count == 1U);
+    const auto open_site_tech_tree_messages = drain_engine_messages(panel_state_runtime);
+    assert(gs1::GameRuntimeProjectionTestAccess::campaign(panel_state_runtime)->regional_map_state.tech_tree_open);
+    assert(!panel_state_site_run.phone_panel.open);
+    const auto tech_tree_phone_panel_messages =
+        collect_messages_of_type(open_site_tech_tree_messages, GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE);
+    assert(!tech_tree_phone_panel_messages.empty());
+    {
+        const auto& payload =
+            tech_tree_phone_panel_messages.back()->payload_as<Gs1EngineMessagePhonePanelData>();
+        assert((payload.flags & GS1_PHONE_PANEL_FLAG_OPEN) == 0U);
+    }
+    assert(contains_ui_element_text(open_site_tech_tree_messages, "Prototype Tech Tree"));
+
+    assert(panel_state_runtime.submit_host_events(&open_worker_pack_event, 1U) == GS1_STATUS_OK);
+    Gs1Phase1Result reopen_worker_pack_result {};
+    run_phase1(panel_state_runtime, 0.0, reopen_worker_pack_result);
+    assert(reopen_worker_pack_result.processed_host_event_count == 1U);
+    assert(panel_state_site_run.inventory.worker_pack_panel_open);
+    assert(!gs1::GameRuntimeProjectionTestAccess::campaign(panel_state_runtime)->regional_map_state.tech_tree_open);
+    const auto reopen_worker_pack_messages = drain_engine_messages(panel_state_runtime);
+    assert(find_close_ui_setup_message(
+               reopen_worker_pack_messages,
+               GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE) != nullptr);
+    assert(find_inventory_view_message(
+               reopen_worker_pack_messages,
+               panel_state_site_run.inventory.worker_pack_storage_id,
+               GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT) != nullptr);
 
     Gs1RuntimeCreateDesc ui_desc {};
     ui_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);

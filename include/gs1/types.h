@@ -114,7 +114,8 @@ enum Gs1UiActionType : std::uint8_t
     GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE = 18,
     GS1_UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE = 19,
     GS1_UI_ACTION_CLAIM_TECHNOLOGY_NODE = 20,
-    GS1_UI_ACTION_SELECT_TECH_TREE_FACTION_TAB = 21
+    GS1_UI_ACTION_SELECT_TECH_TREE_FACTION_TAB = 21,
+    GS1_UI_ACTION_CLOSE_PHONE_PANEL = 22
 };
 
 enum Gs1SiteActionKind : std::uint8_t
@@ -720,6 +721,8 @@ struct Gs1EngineMessagePhonePanelData
     std::uint32_t cart_item_count;
     std::uint32_t flags;
 };
+
+inline constexpr std::uint32_t GS1_PHONE_PANEL_FLAG_OPEN = 1U << 0U;
 
 struct Gs1EngineMessageSiteActionData
 {

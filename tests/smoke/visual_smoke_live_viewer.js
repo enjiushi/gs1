@@ -1408,6 +1408,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return siteState.phonePanel;
     }
 
+    function isPhonePanelOpen(state) {
+        const phonePanelState = getPhonePanelState(state);
+        return !!(phonePanelState && phonePanelState.open);
+    }
+
     function getSiteTasks(state) {
         const siteState = getSiteState(state);
         if (!siteState || !siteState.tasks) {
@@ -1787,6 +1792,23 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function findWorkerPackInventoryContainer(state) {
         return getInventoryContainers(state).find((container) => container.containerKind === "WORKER_PACK") || null;
+    }
+
+    function isWorkerPackPanelOpen(state) {
+        const siteState = getSiteState(state);
+        return !!(siteState && siteState.workerPackOpen);
+    }
+
+    function postWorkerPackPanelEvent(eventKind) {
+        const workerPackContainer = latestState ? findWorkerPackInventoryContainer(latestState) : null;
+        if (!workerPackContainer || typeof workerPackContainer.storageId !== "number") {
+            return Promise.reject(new Error("Worker pack storage is unavailable."));
+        }
+
+        return postJson("/site-storage-view", {
+            storageId: workerPackContainer.storageId,
+            eventKind: eventKind
+        });
     }
 
     function slotUsesPrimaryTransferClick(state, sourceSlot) {
@@ -3237,6 +3259,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function renderSiteInventoryPanel(state, workerPackSlots) {
         setTechTreeOverlayActive(false);
+        inventoryPanelOpen = isWorkerPackPanelOpen(state);
         if (!inventoryPanelOpen) {
             selectionChip.hidden = true;
             selectionInventory.hidden = true;
@@ -3676,6 +3699,80 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             arg0: getPhonePanelSectionArg(sectionName),
             arg1: 0
         });
+    }
+
+    function postClosePhonePanel() {
+        return postJson("/ui-action", {
+            type: "CLOSE_PHONE_PANEL",
+            targetId: 0,
+            arg0: 0,
+            arg1: 0
+        });
+    }
+
+    function cancelCurrentSiteAction() {
+        const siteAction = latestState ? latestState.siteAction : null;
+        const hasActiveAction =
+            !!siteAction &&
+            typeof siteAction.actionKind === "number" &&
+            siteAction.actionKind !== 0 &&
+            typeof siteAction.flags === "number" &&
+            (siteAction.flags & 1) !== 0;
+        if (!hasActiveAction) {
+            return Promise.resolve(false);
+        }
+
+        return postSiteActionCancel({
+            actionId: typeof siteAction.actionId === "number" ? siteAction.actionId : 0,
+            flags: siteActionCancelFlags.currentAction
+        }).then(() => true).catch(() => {
+            statusChip.textContent = "Failed to cancel current action.";
+            return true;
+        });
+    }
+
+    function closeTrackedSitePanelLayer(state) {
+        if (!state || state.appState !== "SITE_ACTIVE") {
+            return Promise.resolve(false);
+        }
+
+        const techTreeSetup = getTechTreeSetup(state);
+        if (techTreeSetup) {
+            const closeAction = getTechTreeCloseAction(techTreeSetup);
+            if (closeAction) {
+                return postJson("/ui-action", closeAction).then(() => true).catch(() => {
+                    statusChip.textContent = "Failed to close tech-tree panel.";
+                    return true;
+                });
+            }
+        }
+
+        if (isPhonePanelOpen(state)) {
+            return postClosePhonePanel().then(() => true).catch(() => {
+                statusChip.textContent = "Failed to close phone panel.";
+                return true;
+            });
+        }
+
+        const openedContainer = findOpenedInventoryContainer(state);
+        if (openedContainer && typeof openedContainer.storageId === "number") {
+            return postJson("/site-storage-view", {
+                storageId: openedContainer.storageId,
+                eventKind: "CLOSE"
+            }).then(() => true).catch(() => {
+                statusChip.textContent = "Failed to close storage.";
+                return true;
+            });
+        }
+
+        if (isWorkerPackPanelOpen(state)) {
+            return postWorkerPackPanelEvent("CLOSE").then(() => true).catch(() => {
+                statusChip.textContent = "Failed to close player pack.";
+                return true;
+            });
+        }
+
+        return Promise.resolve(false);
     }
 
     function postPhoneTaskAction(type, task) {
@@ -4283,6 +4380,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function renderPhonePanel(state) {
         const isSiteActive = !!state && state.appState === "SITE_ACTIVE";
+        phonePanelOpen = isPhonePanelOpen(state);
         syncPhonePanelVisibility(isSiteActive);
         capturePhoneScrollPositions();
         phoneScreenBody.innerHTML = "";
@@ -4633,6 +4731,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 openedInventoryContainerKey = "";
                 statusChip.textContent = viewerCompatibilityWarning || "";
             }
+            inventoryPanelOpen = isWorkerPackPanelOpen(state);
+            phonePanelOpen = isPhonePanelOpen(state);
             renderSiteHudChrome(state);
             renderSiteOverlay(state);
             break;
@@ -8118,31 +8218,53 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     window.addEventListener("keydown", function (event) {
         if (event.code === "KeyF" && !event.repeat && latestState && latestState.appState === "SITE_ACTIVE") {
-            phonePanelOpen = !phonePanelOpen;
-            renderPhonePanel(latestState);
-            if (phonePanelOpen) {
-                refreshStateSnapshot();
-            }
+            const phoneIsOpen = isPhonePanelOpen(latestState);
+            const phonePanelState = getPhonePanelState(latestState);
+            const activeSection =
+                phonePanelState && typeof phonePanelState.activeSection === "string"
+                    ? phonePanelState.activeSection
+                    : "HOME";
+            const request = phoneIsOpen
+                ? postClosePhonePanel()
+                : postPhonePanelSection(activeSection);
+            request.catch(() => {
+                statusChip.textContent = phoneIsOpen
+                    ? "Failed to close phone panel."
+                    : "Failed to open phone panel.";
+            });
             event.preventDefault();
             return;
         }
         if (event.code === "KeyB" && !event.repeat && latestState && latestState.appState === "SITE_ACTIVE") {
-            inventoryPanelOpen = !inventoryPanelOpen;
-            renderSiteOverlay(latestState);
+            const packIsOpen = isWorkerPackPanelOpen(latestState);
+            postWorkerPackPanelEvent(packIsOpen ? "CLOSE" : "OPEN_SNAPSHOT").catch(() => {
+                statusChip.textContent = packIsOpen
+                    ? "Failed to close player pack."
+                    : "Failed to open player pack.";
+            });
             event.preventDefault();
             return;
         }
         if (event.code === "Escape" && latestState && latestState.appState === "SITE_ACTIVE") {
-            if (isPlacementModeActive(latestState)) {
-                cancelPlacementMode();
-                event.preventDefault();
-                return;
-            }
-            if (tileContextMenuState) {
-                closeTileContextMenu();
-                event.preventDefault();
-                return;
-            }
+            closeTrackedSitePanelLayer(latestState).then((handledPanelClose) => {
+                if (handledPanelClose) {
+                    return;
+                }
+                if (isPlacementModeActive(latestState)) {
+                    cancelPlacementMode();
+                    return;
+                }
+                cancelCurrentSiteAction().then((handledActionCancel) => {
+                    if (handledActionCancel) {
+                        return;
+                    }
+                    if (tileContextMenuState) {
+                        closeTileContextMenu();
+                    }
+                });
+            });
+            event.preventDefault();
+            return;
         }
         keys.add(event.code);
         updateMoveAxis();

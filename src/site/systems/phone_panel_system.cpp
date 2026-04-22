@@ -314,6 +314,7 @@ bool PhonePanelSystem::subscribes_to(GameMessageType type) noexcept
     {
     case GameMessageType::SiteRunStarted:
     case GameMessageType::PhonePanelSectionRequested:
+    case GameMessageType::ClosePhonePanel:
         return true;
     default:
         return false;
@@ -342,9 +343,25 @@ Gs1Status PhonePanelSystem::process_message(
             return GS1_STATUS_INVALID_ARGUMENT;
         }
 
+        if (!phone_panel.open)
+        {
+            phone_panel.open = true;
+            mark_phone_dirty(context);
+        }
         if (phone_panel.active_section != section)
         {
             phone_panel.active_section = section;
+            mark_phone_dirty(context);
+        }
+        return GS1_STATUS_OK;
+    }
+
+    case GameMessageType::ClosePhonePanel:
+    {
+        auto& phone_panel = context.world.own_phone_panel();
+        if (phone_panel.open)
+        {
+            phone_panel.open = false;
             mark_phone_dirty(context);
         }
         return GS1_STATUS_OK;
