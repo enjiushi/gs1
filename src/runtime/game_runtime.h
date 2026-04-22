@@ -170,6 +170,7 @@ private:
     void queue_site_delta_messages(std::uint64_t dirty_flags);
     void queue_site_action_update_message();
     void queue_hud_state_message();
+    void queue_campaign_resources_message();
     void queue_site_result_ready_message(
         std::uint32_t site_id,
         Gs1SiteAttemptResult result,

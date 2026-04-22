@@ -264,9 +264,7 @@ void inventory_item_use_updates_worker_and_projection()
     bootstrap_site_one(runtime);
 
     auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
-    assert(site_run.inventory.worker_pack_slots[0].occupied);
-    assert(site_run.inventory.worker_pack_slots[0].item_id.value == 1U);
-    assert(site_run.inventory.worker_pack_slots[0].item_quantity == 2U);
+    assert(!site_run.inventory.worker_pack_slots[0].occupied);
 
     drain_engine_messages(runtime);
 

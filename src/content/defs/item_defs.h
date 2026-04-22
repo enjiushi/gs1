@@ -51,7 +51,7 @@ inline constexpr std::uint32_t k_item_water_container = 1U;
 inline constexpr std::uint32_t k_item_food_pack = 2U;
 inline constexpr std::uint32_t k_item_medicine_pack = 3U;
 inline constexpr std::uint32_t k_item_wind_reed_seed_bundle = 4U;
-inline constexpr std::uint32_t k_item_saltbush_seed_bundle = 5U;
+inline constexpr std::uint32_t k_item_salt_bean_seed_bundle = 5U;
 inline constexpr std::uint32_t k_item_shade_cactus_seed_bundle = 6U;
 inline constexpr std::uint32_t k_item_sunfruit_vine_seed_bundle = 7U;
 inline constexpr std::uint32_t k_item_wood_bundle = 8U;
@@ -62,6 +62,11 @@ inline constexpr std::uint32_t k_item_workbench_kit = 12U;
 inline constexpr std::uint32_t k_item_storage_crate_kit = 13U;
 inline constexpr std::uint32_t k_item_hammer = 14U;
 inline constexpr std::uint32_t k_item_basic_straw_checkerboard = 15U;
+inline constexpr std::uint32_t k_item_root_binder_seed_bundle = 16U;
+inline constexpr std::uint32_t k_item_dew_grass_seed_bundle = 17U;
+inline constexpr std::uint32_t k_item_thorn_shrub_seed_bundle = 18U;
+inline constexpr std::uint32_t k_item_medicinal_sage_seed_bundle = 19U;
+inline constexpr std::uint32_t k_item_sand_willow_seed_bundle = 20U;
 
 [[nodiscard]] std::span<const ItemDef> all_item_defs() noexcept;
 

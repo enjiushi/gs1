@@ -1,6 +1,7 @@
 #include "campaign/systems/technology_system.h"
 
 #include <algorithm>
+#include <limits>
 
 namespace gs1
 {
@@ -39,7 +40,8 @@ FactionProgressState* find_faction_progress_mut(
 
 bool TechnologySystem::subscribes_to(GameMessageType type) noexcept
 {
-    return type == GameMessageType::CampaignReputationAwardRequested ||
+    return type == GameMessageType::CampaignCashDeltaRequested ||
+        type == GameMessageType::CampaignReputationAwardRequested ||
         type == GameMessageType::TechnologyNodeClaimRequested;
 }
 
@@ -86,12 +88,46 @@ bool TechnologySystem::tier_unlocked(
     return faction_progress->faction_reputation >= tier_def.reputation_requirement;
 }
 
-bool TechnologySystem::unlockable_available(
+bool TechnologySystem::total_reputation_tier_unlocked(
     const CampaignState& campaign,
-    const FactionUnlockableDef& unlockable_def) noexcept
+    const TotalReputationTierDef& tier_def) noexcept
 {
-    const auto* tier_def = find_technology_tier_def(unlockable_def.faction_id, unlockable_def.tier_index);
-    return tier_def != nullptr && tier_unlocked(campaign, *tier_def);
+    return campaign.technology_state.total_reputation >= tier_def.reputation_requirement;
+}
+
+bool TechnologySystem::plant_unlocked(
+    const CampaignState& campaign,
+    PlantId plant_id) noexcept
+{
+    if (plant_id.value == 0U)
+    {
+        return false;
+    }
+
+    for (const auto starter_plant_id : k_initial_unlocked_plant_ids)
+    {
+        if (starter_plant_id == plant_id)
+        {
+            return true;
+        }
+    }
+
+    for (const auto& unlock_def : k_prototype_total_reputation_unlock_defs)
+    {
+        if (unlock_def.unlock_kind != ReputationUnlockKind::Plant ||
+            unlock_def.content_id != plant_id.value)
+        {
+            continue;
+        }
+
+        const auto* tier_def = find_total_reputation_tier_def(unlock_def.tier_index);
+        if (tier_def != nullptr && total_reputation_tier_unlocked(campaign, *tier_def))
+        {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 std::int32_t TechnologySystem::available_faction_reputation(
@@ -104,14 +140,14 @@ std::int32_t TechnologySystem::available_faction_reputation(
         return 0;
     }
 
-    return std::max(0, faction_progress->faction_reputation - faction_progress->consumed_reputation);
+    return std::max(0, faction_progress->faction_reputation);
 }
 
-std::int32_t TechnologySystem::current_reputation_cost(
+std::int32_t TechnologySystem::current_cash_cost(
     const CampaignState& /*campaign*/,
     const TechnologyNodeDef& node_def) noexcept
 {
-    return std::max(0, node_def.reputation_cost);
+    return std::max(0, node_def.cash_cost);
 }
 
 bool TechnologySystem::node_claimable(
@@ -129,8 +165,7 @@ bool TechnologySystem::node_claimable(
         return false;
     }
 
-    return available_faction_reputation(campaign, node_def.faction_id) >=
-        current_reputation_cost(campaign, node_def);
+    return campaign.cash >= current_cash_cost(campaign, node_def);
 }
 
 Gs1Status TechnologySystem::process_message(
@@ -139,6 +174,20 @@ Gs1Status TechnologySystem::process_message(
 {
     switch (message.type)
     {
+    case GameMessageType::CampaignCashDeltaRequested:
+    {
+        const auto& payload = message.payload_as<CampaignCashDeltaRequestedMessage>();
+        const auto updated_cash = static_cast<std::int64_t>(context.campaign.cash) + payload.delta;
+        if (updated_cash < 0 ||
+            updated_cash > static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::max()))
+        {
+            return GS1_STATUS_INVALID_STATE;
+        }
+
+        context.campaign.cash = static_cast<std::int32_t>(updated_cash);
+        return GS1_STATUS_OK;
+    }
+
     case GameMessageType::CampaignReputationAwardRequested:
     {
         const auto& payload = message.payload_as<CampaignReputationAwardRequestedMessage>();
@@ -147,7 +196,7 @@ Gs1Status TechnologySystem::process_message(
             return GS1_STATUS_OK;
         }
 
-        context.campaign.technology_state.reputation += payload.delta;
+        context.campaign.technology_state.total_reputation += payload.delta;
         return GS1_STATUS_OK;
     }
 
@@ -171,7 +220,7 @@ Gs1Status TechnologySystem::process_message(
             return GS1_STATUS_NOT_FOUND;
         }
 
-        faction_progress->consumed_reputation += current_reputation_cost(context.campaign, *node_def);
+        context.campaign.cash -= current_cash_cost(context.campaign, *node_def);
         context.campaign.technology_state.purchased_node_ids.push_back(node_def->tech_node_id);
         return GS1_STATUS_OK;
     }

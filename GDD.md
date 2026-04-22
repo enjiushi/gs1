@@ -1676,11 +1676,11 @@ Design intent:
 The game should use the plant roster to create short-term goals, not only long-term restoration.
 
 - Starting plant access should use a fixed early-session progression, not procedural variation from site to site
-- Begin each new `Site` with only one basic starter option available, preferably `Straw Checkerboard`
-- Use early `Site Task`s, onboarding rewards, or early `Task Reward Draft`s to unlock the rest of the fixed basic plant set for that site, especially `Wind Reed` and `Root Binder`
-- After that fixed early unlock track, let further early rewards reveal `Shade Cactus`, `Dew Grass`, or `Salt Bean`, with `Salt Bean` prioritized on sites featuring meaningful salty-tile pockets
-- Put `Thorn Shrub` and `Medicinal Sage` in the mid-scope reveal band so the player starts seeing more distinct patch identities
-- Hold `Sand Willow` and `Sunfruit Vine` slightly later so they feel like tempting payoff plants rather than early traps
+- Begin the campaign with four basic plant types already available: `Straw Checkerboard`, `Wind Reed`, `Root Binder`, and `Salt Bean`
+- Use total campaign `Reputation` as a separate three-tier unlock track for the remaining six prototype plants
+- `Reputation` tier `I` should unlock `Shade Cactus` and `Dew Grass`
+- `Reputation` tier `II` should unlock `Thorn Shrub` and `Medicinal Sage`
+- `Reputation` tier `III` should unlock `Sunfruit Vine` and `Sand Willow`
 - Make at least one short-term objective in the opening phase plant-related, such as fixing a bare sand lane, establishing a windbreak, stabilizing a dry patch, or producing a first safe harvest
 
 This keeps the early site loop readable:
@@ -3012,11 +3012,9 @@ To make the game more compelling without feeling manipulative, these systems wou
 - `Reputation`: total campaign standing with the restoration program, earned progressively from official work and never spent
 - `Faction Reputation`: cumulative standing with each individual `Faction`, earned mainly from that faction's `Site Task`s, faction events, and aligned follow-through
 
-`Reputation` should function as thresholded trust, not consumable currency. `Faction Reputation` should also remain cumulative, but faction tech no longer uses a separate pick currency. Instead, each faction branch tracks how much of that faction's total reputation is already occupied by claimed tech. The available amount for new tech claims is:
+`Reputation` should function as thresholded trust, not consumable currency. `Faction Reputation` should also remain cumulative. In the prototype, `Reputation` now unlocks the three global plant tiers, `Faction Reputation` unlocks each faction's three branch tiers, and claiming faction tech spends persistent campaign cash instead of spending or occupying reputation.
 
-- available faction reputation = total `Faction Reputation` minus occupied faction reputation
-
-Claiming faction tech therefore never lowers the visible total trust value. It only increases how much of that trust budget is already committed inside that branch.
+Claiming faction tech therefore never lowers the visible total trust value. Trust unlocks access; campaign cash pays for the actual tech claim.
 
 For clarity, `Faction Reputation` from `Site Task`s should usually be a guaranteed completion payout tied to the task's publisher, with the amount scaling by task tier or level, while the task's visible reward draft should stay focused on immediate tactical rewards.
 
@@ -3258,13 +3256,14 @@ Technology should remain tied to a tiny set of progression meters:
 
 | Meter | Meaning |
 |---|---|
-| `reputation` | Campaign-wide trust that still represents broad program standing, but does not directly pay for faction tech in the current design |
-| `factionReputation[factionId]` | Total branch trust earned with one faction |
-| `occupiedFactionReputation[factionId]` | The amount of that faction's total reputation already committed to claimed branch tech |
+| `reputation` | Campaign-wide trust that unlocks the three prototype global plant tiers |
+| `factionReputation[factionId]` | Total branch trust earned with one faction and used only for faction-tier eligibility |
+| `campaignCash` | Persistent money shared across the campaign and spent on faction-tech purchases |
 
 Important rule:
 
-- available branch reputation is `factionReputation[factionId] - occupiedFactionReputation[factionId]`
+- `reputation` and `factionReputation[factionId]` unlock tier access but are never spent
+- `campaignCash` is the only prototype currency used to claim faction tech nodes
 - claimed tech state is persistent node ownership, not an unspent-pick inventory
 - the runtime impact should still come from linked content plus persistent modifier direction, not from a hidden branch bonus table
 
@@ -4392,9 +4391,9 @@ This summary should include only core runtime meters and the core plant-side val
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `reputation` | Site completion, selected task rewards, commendations, major campaign progress | Broad program trust, non-faction progression gates if used later | Campaign-wide trust meter. It should remain useful for broader campaign pacing, but it does not directly pay for faction tech in the current design. |
-| `factionReputation[factionId]` | Completed tasks from that faction, faction events, aftermath follow-through | Faction-tier eligibility, available branch budget, aftermath relief quality, faction-side event quality | Branch-specific total trust meter. It should gate faction technology depth and improve same-faction support quality. |
-| `occupiedFactionReputation[factionId]` | Claiming faction tech inside that branch | Available faction-tech budget | Tracks how much of one faction's total reputation is already committed to claimed tech. The available amount is total minus occupied. |
+| `reputation` | Site completion, selected task rewards, commendations, major campaign progress | Global plant-tier eligibility and broader program trust | Campaign-wide trust meter. In the prototype it unlocks the three global plant tiers but does not pay for faction tech. |
+| `factionReputation[factionId]` | Completed tasks from that faction, faction events, aftermath follow-through | Faction-tier eligibility, aftermath relief quality, faction-side event quality | Branch-specific total trust meter. It gates faction technology depth but is never spent. |
+| `campaignCash` | Site money rewards, buy/sell outcomes, contractor spending, unlock purchases, faction-tech claims | Site purchasing power and faction-tech claims | Persistent campaign money shared across site runs. It is the only prototype currency used to buy faction tech nodes. |
 
 Important rule:
 

@@ -1322,6 +1322,7 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
     case GameMessageType::StartNewCampaign:
         queue_close_ui_setup_if_open(GS1_UI_SETUP_MAIN_MENU);
         queue_app_state_message(app_state_);
+        queue_campaign_resources_message();
         queue_regional_map_snapshot_messages();
         queue_regional_map_menu_ui_messages();
         queue_regional_map_selection_ui_messages();
@@ -1357,9 +1358,16 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
         queue_regional_map_tech_tree_ui_messages();
         break;
 
+    case GameMessageType::CampaignCashDeltaRequested:
     case GameMessageType::CampaignReputationAwardRequested:
     case GameMessageType::FactionReputationAwardRequested:
     case GameMessageType::TechnologyNodeClaimRequested:
+        queue_campaign_resources_message();
+        if (campaign_.has_value() && active_site_run_.has_value())
+        {
+            active_site_run_->economy.money = std::max(0, campaign_->cash);
+            queue_hud_state_message();
+        }
         if (app_state_supports_technology_tree(app_state_))
         {
             queue_regional_map_menu_ui_messages();
@@ -1376,6 +1384,7 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
 
     case GameMessageType::SiteRunStarted:
         queue_site_bootstrap_messages();
+        queue_campaign_resources_message();
         queue_site_action_update_message();
         queue_hud_state_message();
         queue_log_message("Started site attempt.");
@@ -1383,6 +1392,7 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
 
     case GameMessageType::ReturnToRegionalMap:
         queue_app_state_message(app_state_);
+        queue_campaign_resources_message();
         queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_RESULT);
         queue_regional_map_snapshot_messages();
         queue_regional_map_menu_ui_messages();
@@ -1778,8 +1788,9 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
     const auto selected_faction_id = campaign_->regional_map_state.selected_tech_tree_faction_id.value != 0U
         ? campaign_->regional_map_state.selected_tech_tree_faction_id
         : FactionId {k_faction_village_committee};
-    const auto* selected_faction_def = find_faction_def(selected_faction_id);
-    std::uint32_t element_count = 2U + static_cast<std::uint32_t>(k_prototype_faction_defs.size()) + 1U;
+    std::uint32_t element_count = 5U + static_cast<std::uint32_t>(k_prototype_faction_defs.size()) + 1U;
+    element_count += static_cast<std::uint32_t>(k_total_reputation_tier_defs.size());
+    element_count += static_cast<std::uint32_t>(k_prototype_total_reputation_unlock_defs.size());
     for (const auto& tier_def : k_prototype_technology_tier_defs)
     {
         if (tier_def.faction_id != selected_faction_id)
@@ -1788,15 +1799,6 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
         }
 
         element_count += 1U;
-        for (const auto& unlockable_def : k_prototype_faction_unlockable_defs)
-        {
-            if (unlockable_def.faction_id == selected_faction_id &&
-                unlockable_def.tier_index == tier_def.tier_index)
-            {
-                element_count += 1U;
-            }
-        }
-
         for (const auto& node_def : k_prototype_technology_node_defs)
         {
             if (node_def.faction_id == selected_faction_id &&
@@ -1819,19 +1821,16 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
         GS1_UI_ELEMENT_LABEL,
         GS1_UI_ELEMENT_FLAG_NONE,
         no_action,
-        "Faction Tech Tree");
+        "Prototype Tech Tree");
 
-    char summary_text[128] {};
+    char summary_text[64] {};
     const auto* faction_progress = find_faction_progress(*campaign_, selected_faction_id);
     std::snprintf(
         summary_text,
         sizeof(summary_text),
-        "%.*s | Total %d | Consumed %d | Available %d",
-        selected_faction_def == nullptr ? 0 : static_cast<int>(selected_faction_def->display_name.size()),
-        selected_faction_def == nullptr ? "" : selected_faction_def->display_name.data(),
-        faction_progress == nullptr ? 0 : faction_progress->faction_reputation,
-        faction_progress == nullptr ? 0 : faction_progress->consumed_reputation,
-        TechnologySystem::available_faction_reputation(*campaign_, selected_faction_id));
+        "Cash $%d | Total %d",
+        campaign_->cash,
+        campaign_->technology_state.total_reputation);
     queue_ui_element_message(
         2U,
         GS1_UI_ELEMENT_LABEL,
@@ -1839,7 +1838,82 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
         no_action,
         summary_text);
 
-    std::uint32_t next_element_id = 3U;
+    char faction_text[64] {};
+    std::snprintf(
+        faction_text,
+        sizeof(faction_text),
+        "Faction Rep %d",
+        faction_progress == nullptr ? 0 : faction_progress->faction_reputation);
+    queue_ui_element_message(
+        3U,
+        GS1_UI_ELEMENT_LABEL,
+        GS1_UI_ELEMENT_FLAG_NONE,
+        no_action,
+        faction_text);
+
+    queue_ui_element_message(
+        4U,
+        GS1_UI_ELEMENT_LABEL,
+        GS1_UI_ELEMENT_FLAG_NONE,
+        no_action,
+        "Starter Plants");
+
+    queue_ui_element_message(
+        5U,
+        GS1_UI_ELEMENT_LABEL,
+        GS1_UI_ELEMENT_FLAG_NONE,
+        no_action,
+        "Checkerboard | Reed");
+
+    queue_ui_element_message(
+        6U,
+        GS1_UI_ELEMENT_LABEL,
+        GS1_UI_ELEMENT_FLAG_NONE,
+        no_action,
+        "Root Binder | Salt Bean");
+
+    std::uint32_t next_element_id = 7U;
+
+    for (const auto& tier_def : k_total_reputation_tier_defs)
+    {
+        char tier_text[64] {};
+        std::snprintf(
+            tier_text,
+            sizeof(tier_text),
+            "Global %u Need %d %s",
+            static_cast<unsigned>(tier_def.tier_index),
+            tier_def.reputation_requirement,
+            TechnologySystem::total_reputation_tier_unlocked(*campaign_, tier_def) ? "Ready" : "Locked");
+        queue_ui_element_message(
+            next_element_id++,
+            GS1_UI_ELEMENT_LABEL,
+            GS1_UI_ELEMENT_FLAG_NONE,
+            no_action,
+            tier_text);
+
+        for (const auto& unlock_def : k_prototype_total_reputation_unlock_defs)
+        {
+            if (unlock_def.tier_index != tier_def.tier_index)
+            {
+                continue;
+            }
+
+            char unlock_text[64] {};
+            std::snprintf(
+                unlock_text,
+                sizeof(unlock_text),
+                "%.*s %s",
+                static_cast<int>(unlock_def.display_name.size()),
+                unlock_def.display_name.data(),
+                TechnologySystem::total_reputation_tier_unlocked(*campaign_, tier_def) ? "Ready" : "Locked");
+            queue_ui_element_message(
+                next_element_id++,
+                GS1_UI_ELEMENT_LABEL,
+                GS1_UI_ELEMENT_FLAG_NONE,
+                no_action,
+                unlock_text);
+        }
+    }
 
     for (const auto& faction_def : k_prototype_faction_defs)
     {
@@ -1887,32 +1961,6 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
             no_action,
             tier_text);
 
-        for (const auto& unlockable_def : k_prototype_faction_unlockable_defs)
-        {
-            if (unlockable_def.faction_id != selected_faction_id ||
-                unlockable_def.tier_index != tier_def.tier_index)
-            {
-                continue;
-            }
-
-            char unlockable_text[160] {};
-            std::snprintf(
-                unlockable_text,
-                sizeof(unlockable_text),
-                "%.*s | %.*s | %s",
-                static_cast<int>(faction_unlockable_kind_display_name(unlockable_def.unlockable_kind).size()),
-                faction_unlockable_kind_display_name(unlockable_def.unlockable_kind).data(),
-                static_cast<int>(unlockable_def.display_name.size()),
-                unlockable_def.display_name.data(),
-                TechnologySystem::unlockable_available(*campaign_, unlockable_def) ? "Ready" : "Locked");
-            queue_ui_element_message(
-                next_element_id++,
-                GS1_UI_ELEMENT_LABEL,
-                GS1_UI_ELEMENT_FLAG_NONE,
-                no_action,
-                unlockable_text);
-        }
-
         for (const auto& node_def : k_prototype_technology_node_defs)
         {
             if (node_def.faction_id != selected_faction_id ||
@@ -1927,7 +1975,7 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
 
             char node_text[192] {};
             std::uint32_t flags = GS1_UI_ELEMENT_FLAG_NONE;
-            const auto reputation_cost = TechnologySystem::current_reputation_cost(*campaign_, node_def);
+            const auto cash_cost = TechnologySystem::current_cash_cost(*campaign_, node_def);
             if (TechnologySystem::node_purchased(*campaign_, node_def.tech_node_id))
             {
                 std::snprintf(
@@ -1945,10 +1993,10 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
                 std::snprintf(
                     node_text,
                     sizeof(node_text),
-                    "%.*s Cost %d Ready | %.*s",
+                    "%.*s Cost $%d Ready | %.*s",
                     static_cast<int>(technology_entry_kind_display_name(node_def.entry_kind).size()),
                     technology_entry_kind_display_name(node_def.entry_kind).data(),
-                    reputation_cost,
+                    cash_cost,
                     static_cast<int>(node_def.display_name.size()),
                     node_def.display_name.data());
                 flags |= GS1_UI_ELEMENT_FLAG_PRIMARY;
@@ -1960,7 +2008,7 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
                     std::snprintf(
                         node_text,
                         sizeof(node_text),
-                        "%.*s Need %d | %.*s",
+                        "%.*s Need Rep %d | %.*s",
                         static_cast<int>(technology_entry_kind_display_name(node_def.entry_kind).size()),
                         technology_entry_kind_display_name(node_def.entry_kind).data(),
                         tier_def.reputation_requirement,
@@ -1972,10 +2020,10 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
                     std::snprintf(
                         node_text,
                         sizeof(node_text),
-                        "%.*s Need %d | %.*s",
+                        "%.*s Need $%d | %.*s",
                         static_cast<int>(technology_entry_kind_display_name(node_def.entry_kind).size()),
                         technology_entry_kind_display_name(node_def.entry_kind).data(),
-                        reputation_cost,
+                        cash_cost,
                         static_cast<int>(node_def.display_name.size()),
                         node_def.display_name.data());
                 }
@@ -2948,6 +2996,20 @@ void GameRuntime::queue_hud_state_message()
     payload.site_completion_normalized = active_site_run_->counters.objective_progress_normalized;
     payload.warning_code = resolve_hud_warning_code(active_site_run_.value());
     engine_messages_.push_back(hud_message);
+}
+
+void GameRuntime::queue_campaign_resources_message()
+{
+    if (!campaign_.has_value())
+    {
+        return;
+    }
+
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES);
+    auto& payload = message.emplace_payload<Gs1EngineMessageCampaignResourcesData>();
+    payload.current_money = campaign_->cash;
+    payload.total_reputation = campaign_->technology_state.total_reputation;
+    engine_messages_.push_back(message);
 }
 
 void GameRuntime::queue_site_result_ready_message(

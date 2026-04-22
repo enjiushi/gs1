@@ -35,6 +35,7 @@ enum class GameMessageType : std::uint8_t
     CloseRegionalMapTechTree,
     SelectRegionalMapTechTreeFaction,
     DeploymentSiteSelectionChanged,
+    CampaignCashDeltaRequested,
     CampaignReputationAwardRequested,
     FactionReputationAwardRequested,
     TechnologyNodeClaimRequested,
@@ -193,6 +194,11 @@ struct SelectRegionalMapTechTreeFactionMessage final
 struct DeploymentSiteSelectionChangedMessage final
 {
     std::uint32_t selected_site_id;
+};
+
+struct CampaignCashDeltaRequestedMessage final
+{
+    std::int32_t delta;
 };
 
 struct CampaignReputationAwardRequestedMessage final
@@ -656,6 +662,7 @@ GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(OpenRegionalMapTechTreeMessage, 1U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(CloseRegionalMapTechTreeMessage, 1U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SelectRegionalMapTechTreeFactionMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(DeploymentSiteSelectionChangedMessage, 4U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(CampaignCashDeltaRequestedMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(CampaignReputationAwardRequestedMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(FactionReputationAwardRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TechnologyNodeClaimRequestedMessage, 4U);

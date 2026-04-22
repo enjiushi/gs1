@@ -17,10 +17,15 @@ enum class PlantHeightClass : std::uint8_t
 };
 
 inline constexpr std::uint32_t k_plant_wind_reed = 1U;
-inline constexpr std::uint32_t k_plant_saltbush = 2U;
+inline constexpr std::uint32_t k_plant_salt_bean = 2U;
 inline constexpr std::uint32_t k_plant_shade_cactus = 3U;
 inline constexpr std::uint32_t k_plant_sunfruit_vine = 4U;
 inline constexpr std::uint32_t k_plant_straw_checkerboard = 5U;
+inline constexpr std::uint32_t k_plant_root_binder = 6U;
+inline constexpr std::uint32_t k_plant_dew_grass = 7U;
+inline constexpr std::uint32_t k_plant_thorn_shrub = 8U;
+inline constexpr std::uint32_t k_plant_medicinal_sage = 9U;
+inline constexpr std::uint32_t k_plant_sand_willow = 10U;
 
 struct PlantDef final
 {

@@ -272,34 +272,67 @@ body {
   pointer-events: none;
 }
 
+.site-vitals-resources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .site-vitals-money {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  width: fit-content;
-  padding: 8px 14px 8px 10px;
-  border-radius: 999px;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 148px;
+  padding: 9px 14px;
+  border-radius: 18px;
   background: linear-gradient(180deg, rgba(72, 156, 88, 0.95), rgba(40, 103, 56, 0.94));
   border: 1px solid rgba(205, 176, 126, 0.34);
   box-shadow: 0 12px 24px rgba(17, 48, 24, 0.22);
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 700;
-  color: #d6b587;
+  color: #f7f4ec;
   text-shadow: none;
 }
 
-.site-vitals-money::before {
-  content: "$";
+.site-vitals-reputation {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
-  background: rgba(214, 181, 135, 0.18);
-  color: #d6b587;
-  font-size: 14px;
-  box-shadow: none;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 148px;
+  padding: 9px 14px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(63, 88, 140, 0.96), rgba(35, 52, 93, 0.95));
+  border: 1px solid rgba(146, 183, 245, 0.32);
+  box-shadow: 0 12px 24px rgba(18, 28, 52, 0.24);
+  font-size: 15px;
+  font-weight: 700;
+  color: #dfe9ff;
+  text-shadow: none;
+}
+
+.site-vitals-money .resource-label,
+.site-vitals-reputation .resource-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.site-vitals-money .resource-label {
+  color: #ffffff;
+}
+
+.site-vitals-reputation .resource-label {
+  color: #9fc1ff;
+}
+
+.site-vitals-money .resource-value,
+.site-vitals-reputation .resource-value {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
 }
 
 .site-vitals-bars {
@@ -2410,7 +2443,7 @@ body {
 }
 
 .stage-frame.main-menu-mode .site-vitals-panel,
-.stage-frame.regional-map-mode .site-vitals-panel {
+.stage-frame.main-menu-mode .site-vitals-panel {
   display: none;
 }
 
@@ -2792,7 +2825,16 @@ body {
           </div>
 
           <div class="site-vitals-panel" id="site-vitals-panel" hidden>
-            <div class="site-vitals-money" id="site-vitals-money">0</div>
+            <div class="site-vitals-resources">
+              <div class="site-vitals-money" id="site-vitals-money">
+                <span class="resource-label">Cash</span>
+                <span class="resource-value">0</span>
+              </div>
+              <div class="site-vitals-reputation" id="site-vitals-reputation">
+                <span class="resource-label">Reputation</span>
+                <span class="resource-value">0</span>
+              </div>
+            </div>
             <div class="site-vitals-bars" id="site-vitals-bars"></div>
           </div>
         </div>
