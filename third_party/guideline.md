@@ -9,3 +9,4 @@ Vendored external code kept in-repo for builds and tests.
 
 ## Contents
 - `flecs/`: Vendored Flecs ECS library sources and license metadata.
+- `tomlplusplus/`: Vendored `toml++` single-header parser and license files used by the TOML-backed content loader.

@@ -1,0 +1,3 @@
+starting_campaign_cash = 45
+support_quota_per_contributor = 1
+baseline_deployment_items = [{ item_id = 1, quantity = 1 }, { item_id = 15, quantity = 8 }]

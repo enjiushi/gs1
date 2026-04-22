@@ -1,0 +1,87 @@
+[[site_actions]]
+action_kind = "Plant"
+duration_minutes_per_unit = 1.0
+energy_cost_per_unit = 2.0
+hydration_cost_per_unit = 0.75
+nourishment_cost_per_unit = 0.30
+placement_occupancy_layer = "GroundCover"
+requests_placement_reservation = true
+requires_worker_approach = true
+impacts_worker_movement = true
+
+[[site_actions]]
+action_kind = "Build"
+duration_minutes_per_unit = 2.5
+energy_cost_per_unit = 2.0
+hydration_cost_per_unit = 0.75
+nourishment_cost_per_unit = 0.40
+placement_occupancy_layer = "Structure"
+requests_placement_reservation = true
+requires_worker_approach = true
+impacts_worker_movement = true
+
+[[site_actions]]
+action_kind = "Repair"
+duration_minutes_per_unit = 1.5
+energy_cost_per_unit = 0.0
+hydration_cost_per_unit = 0.0
+nourishment_cost_per_unit = 0.0
+placement_occupancy_layer = "None"
+requests_placement_reservation = false
+requires_worker_approach = true
+impacts_worker_movement = true
+
+[[site_actions]]
+action_kind = "Water"
+duration_minutes_per_unit = 0.75
+energy_cost_per_unit = 1.0
+hydration_cost_per_unit = 0.35
+nourishment_cost_per_unit = 0.0
+placement_occupancy_layer = "None"
+requests_placement_reservation = false
+requires_worker_approach = false
+impacts_worker_movement = true
+
+[[site_actions]]
+action_kind = "ClearBurial"
+duration_minutes_per_unit = 1.0
+energy_cost_per_unit = 1.5
+hydration_cost_per_unit = 0.5
+nourishment_cost_per_unit = 0.25
+placement_occupancy_layer = "None"
+requests_placement_reservation = false
+requires_worker_approach = false
+impacts_worker_movement = true
+
+[[site_actions]]
+action_kind = "Craft"
+duration_minutes_per_unit = 1.0
+energy_cost_per_unit = 1.5
+hydration_cost_per_unit = 0.5
+nourishment_cost_per_unit = 0.20
+placement_occupancy_layer = "None"
+requests_placement_reservation = false
+requires_worker_approach = true
+impacts_worker_movement = true
+
+[[site_actions]]
+action_kind = "Drink"
+duration_minutes_per_unit = 0.5
+energy_cost_per_unit = 0.0
+hydration_cost_per_unit = 0.0
+nourishment_cost_per_unit = 0.0
+placement_occupancy_layer = "None"
+requests_placement_reservation = false
+requires_worker_approach = false
+impacts_worker_movement = true
+
+[[site_actions]]
+action_kind = "Eat"
+duration_minutes_per_unit = 0.75
+energy_cost_per_unit = 0.0
+hydration_cost_per_unit = 0.0
+nourishment_cost_per_unit = 0.0
+placement_occupancy_layer = "None"
+requests_placement_reservation = false
+requires_worker_approach = false
+impacts_worker_movement = true

@@ -1,0 +1,179 @@
+[[technology_nodes]]
+faction_id = 1
+tier_index = 1
+slot_index = 0
+entry_kind = "GlobalModifier"
+cash_cost = 4
+is_todo_placeholder = true
+display_name = "TODO Relief Doctrine"
+description = "TODO global-modifier technology placeholder for Village Committee tier I."
+
+[[technology_nodes]]
+faction_id = 1
+tier_index = 1
+slot_index = 1
+entry_kind = "MechanismChange"
+cash_cost = 6
+is_todo_placeholder = true
+display_name = "TODO Queue Standard"
+description = "TODO mechanism-change technology placeholder for Village Committee tier I."
+
+[[technology_nodes]]
+faction_id = 1
+tier_index = 2
+slot_index = 0
+entry_kind = "GlobalModifier"
+cash_cost = 8
+is_todo_placeholder = true
+display_name = "TODO Kitchen Tempo"
+description = "TODO global-modifier technology placeholder for Village Committee tier II."
+
+[[technology_nodes]]
+faction_id = 1
+tier_index = 2
+slot_index = 1
+entry_kind = "MechanismChange"
+cash_cost = 10
+is_todo_placeholder = true
+display_name = "TODO Dispatch Rule"
+description = "TODO mechanism-change technology placeholder for Village Committee tier II."
+
+[[technology_nodes]]
+faction_id = 1
+tier_index = 3
+slot_index = 0
+entry_kind = "GlobalModifier"
+cash_cost = 12
+is_todo_placeholder = true
+display_name = "TODO Relief Network"
+description = "TODO global-modifier technology placeholder for Village Committee tier III."
+
+[[technology_nodes]]
+faction_id = 1
+tier_index = 3
+slot_index = 1
+entry_kind = "MechanismChange"
+cash_cost = 14
+is_todo_placeholder = true
+display_name = "TODO Convoy Logic"
+description = "TODO mechanism-change technology placeholder for Village Committee tier III."
+
+[[technology_nodes]]
+faction_id = 2
+tier_index = 1
+slot_index = 0
+entry_kind = "GlobalModifier"
+cash_cost = 4
+is_todo_placeholder = true
+display_name = "TODO Seed Vigor"
+description = "TODO global-modifier technology placeholder for Forestry Bureau tier I."
+
+[[technology_nodes]]
+faction_id = 2
+tier_index = 1
+slot_index = 1
+entry_kind = "MechanismChange"
+cash_cost = 6
+is_todo_placeholder = true
+display_name = "TODO Nursery Rule"
+description = "TODO mechanism-change technology placeholder for Forestry Bureau tier I."
+
+[[technology_nodes]]
+faction_id = 2
+tier_index = 2
+slot_index = 0
+entry_kind = "GlobalModifier"
+cash_cost = 8
+is_todo_placeholder = true
+display_name = "TODO Shelter Growth"
+description = "TODO global-modifier technology placeholder for Forestry Bureau tier II."
+
+[[technology_nodes]]
+faction_id = 2
+tier_index = 2
+slot_index = 1
+entry_kind = "MechanismChange"
+cash_cost = 10
+is_todo_placeholder = true
+display_name = "TODO Root Cycle"
+description = "TODO mechanism-change technology placeholder for Forestry Bureau tier II."
+
+[[technology_nodes]]
+faction_id = 2
+tier_index = 3
+slot_index = 0
+entry_kind = "GlobalModifier"
+cash_cost = 12
+is_todo_placeholder = true
+display_name = "TODO Habitat Buffer"
+description = "TODO global-modifier technology placeholder for Forestry Bureau tier III."
+
+[[technology_nodes]]
+faction_id = 2
+tier_index = 3
+slot_index = 1
+entry_kind = "MechanismChange"
+cash_cost = 14
+is_todo_placeholder = true
+display_name = "TODO Recovery Rule"
+description = "TODO mechanism-change technology placeholder for Forestry Bureau tier III."
+
+[[technology_nodes]]
+faction_id = 3
+tier_index = 1
+slot_index = 0
+entry_kind = "GlobalModifier"
+cash_cost = 4
+is_todo_placeholder = true
+display_name = "TODO Survey Bias"
+description = "TODO global-modifier technology placeholder for Agricultural University tier I."
+
+[[technology_nodes]]
+faction_id = 3
+tier_index = 1
+slot_index = 1
+entry_kind = "MechanismChange"
+cash_cost = 6
+is_todo_placeholder = true
+display_name = "TODO Trial Method"
+description = "TODO mechanism-change technology placeholder for Agricultural University tier I."
+
+[[technology_nodes]]
+faction_id = 3
+tier_index = 2
+slot_index = 0
+entry_kind = "GlobalModifier"
+cash_cost = 8
+is_todo_placeholder = true
+display_name = "TODO Field Precision"
+description = "TODO global-modifier technology placeholder for Agricultural University tier II."
+
+[[technology_nodes]]
+faction_id = 3
+tier_index = 2
+slot_index = 1
+entry_kind = "MechanismChange"
+cash_cost = 10
+is_todo_placeholder = true
+display_name = "TODO Relay Policy"
+description = "TODO mechanism-change technology placeholder for Agricultural University tier II."
+
+[[technology_nodes]]
+faction_id = 3
+tier_index = 3
+slot_index = 0
+entry_kind = "GlobalModifier"
+cash_cost = 12
+is_todo_placeholder = true
+display_name = "TODO Control Envelope"
+description = "TODO global-modifier technology placeholder for Agricultural University tier III."
+
+[[technology_nodes]]
+faction_id = 3
+tier_index = 3
+slot_index = 1
+entry_kind = "MechanismChange"
+cash_cost = 14
+is_todo_placeholder = true
+display_name = "TODO Systems Method"
+description = "TODO mechanism-change technology placeholder for Agricultural University tier III."

@@ -1,15 +1,16 @@
 #include "content/content_loader.h"
 
 #include "content/content_validator.h"
+#include "toml.hpp"
 
 #include <charconv>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
-#include <fstream>
 #include <limits>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 
 namespace gs1
@@ -30,7 +31,7 @@ namespace
     {
         std::fprintf(
             stderr,
-            "Failed to load content table %s: %.*s\n",
+            "Failed to load content file %s: %.*s\n",
             path.string().c_str(),
             static_cast<int>(message.size()),
             message.data());
@@ -39,7 +40,7 @@ namespace
     {
         std::fprintf(
             stderr,
-            "Failed to load content table %s:%zu: %.*s\n",
+            "Failed to load content file %s:%zu: %.*s\n",
             path.string().c_str(),
             line_number,
             static_cast<int>(message.size()),
@@ -64,12 +65,6 @@ namespace
     }
 
     return std::string {text.substr(begin, end - begin)};
-}
-
-[[nodiscard]] bool is_empty_or_comment(std::string_view line)
-{
-    const auto trimmed = trim_copy(line);
-    return trimmed.empty() || trimmed[0] == '#';
 }
 
 [[nodiscard]] std::vector<std::string> split_delimited(std::string_view line, char delimiter)
@@ -581,85 +576,297 @@ template <typename T>
     fail_load(path, line_number, "invalid reputation unlock kind");
 }
 
-[[nodiscard]] std::vector<SiteId> parse_site_id_list(
-    const std::filesystem::path& path,
-    std::size_t line_number,
-    const std::string& field)
+[[nodiscard]] std::size_t toml_line_number(const toml::node& node) noexcept
 {
-    std::vector<SiteId> values {};
-    if (field.empty())
-    {
-        return values;
-    }
-
-    for (const auto& token : split_delimited(field, ','))
-    {
-        values.push_back(SiteId {parse_unsigned<std::uint32_t>(path, line_number, token)});
-    }
-
-    return values;
+    return static_cast<std::size_t>(node.source().begin.line);
 }
 
-[[nodiscard]] std::vector<ModifierId> parse_modifier_id_list(
-    const std::filesystem::path& path,
-    std::size_t line_number,
-    const std::string& field)
+[[nodiscard]] std::size_t toml_line_number(const toml::source_region& source) noexcept
 {
-    std::vector<ModifierId> values {};
-    if (field.empty())
-    {
-        return values;
-    }
-
-    for (const auto& token : split_delimited(field, ','))
-    {
-        values.push_back(ModifierId {parse_unsigned<std::uint32_t>(path, line_number, token)});
-    }
-
-    return values;
+    return static_cast<std::size_t>(source.begin.line);
 }
 
-[[nodiscard]] std::vector<std::uint32_t> parse_u32_list(
-    const std::filesystem::path& path,
-    std::size_t line_number,
-    const std::string& field)
+[[nodiscard]] std::size_t toml_line_number(const toml::node_view<const toml::node>& node) noexcept
 {
-    std::vector<std::uint32_t> values {};
-    if (field.empty())
-    {
-        return values;
-    }
-
-    for (const auto& token : split_delimited(field, ','))
-    {
-        values.push_back(parse_unsigned<std::uint32_t>(path, line_number, token));
-    }
-
-    return values;
+    return node.node() != nullptr ? toml_line_number(*node.node()) : 0U;
 }
 
-[[nodiscard]] std::vector<PrototypeSupportItemContent> parse_support_item_list(
+[[noreturn]] void fail_missing_toml_field(
     const std::filesystem::path& path,
-    std::size_t line_number,
-    const std::string& field)
+    const toml::table& table,
+    std::string_view key)
+{
+    std::string message = "missing required field '";
+    message += key;
+    message += '\'';
+    fail_load(path, toml_line_number(table), message);
+}
+
+[[noreturn]] void fail_invalid_toml_field(
+    const std::filesystem::path& path,
+    const toml::node_view<const toml::node>& node,
+    std::string_view key,
+    std::string_view expected)
+{
+    std::string message = "field '";
+    message += key;
+    message += "' ";
+    message += expected;
+    fail_load(path, toml_line_number(node), message);
+}
+
+[[nodiscard]] toml::table load_toml_document(const std::filesystem::path& path)
+{
+#if TOML_EXCEPTIONS
+    try
+    {
+        return toml::parse_file(path.string());
+    }
+    catch (const toml::parse_error& error)
+    {
+        fail_load(path, toml_line_number(error.source()), error.description());
+    }
+#else
+    auto parse_result = toml::parse_file(path.string());
+    if (parse_result.failed())
+    {
+        fail_load(path, toml_line_number(parse_result.error().source()), parse_result.error().description());
+    }
+
+    return std::move(parse_result).table();
+#endif
+}
+
+[[nodiscard]] toml::node_view<const toml::node> require_toml_field(
+    const std::filesystem::path& path,
+    const toml::table& table,
+    std::string_view key)
+{
+    const auto field = table[key];
+    if (!field)
+    {
+        fail_missing_toml_field(path, table, key);
+    }
+
+    return field;
+}
+
+[[nodiscard]] std::string require_toml_string(
+    const std::filesystem::path& path,
+    const toml::table& table,
+    std::string_view key)
+{
+    const auto field = require_toml_field(path, table, key);
+    if (const auto value = field.value<std::string_view>())
+    {
+        return std::string {*value};
+    }
+
+    fail_invalid_toml_field(path, field, key, "must be a string");
+}
+
+template <typename T>
+[[nodiscard]] T require_toml_unsigned(
+    const std::filesystem::path& path,
+    const toml::table& table,
+    std::string_view key)
+{
+    const auto field = require_toml_field(path, table, key);
+    const auto value = field.value<std::int64_t>();
+    if (!value.has_value() || *value < 0 ||
+        static_cast<std::uint64_t>(*value) > static_cast<std::uint64_t>(std::numeric_limits<T>::max()))
+    {
+        fail_invalid_toml_field(path, field, key, "must be a non-negative integer");
+    }
+
+    return static_cast<T>(*value);
+}
+
+template <typename T>
+[[nodiscard]] T require_toml_signed(
+    const std::filesystem::path& path,
+    const toml::table& table,
+    std::string_view key)
+{
+    const auto field = require_toml_field(path, table, key);
+    const auto value = field.value<std::int64_t>();
+    if (!value.has_value() ||
+        *value < static_cast<std::int64_t>(std::numeric_limits<T>::min()) ||
+        *value > static_cast<std::int64_t>(std::numeric_limits<T>::max()))
+    {
+        fail_invalid_toml_field(path, field, key, "must be an integer");
+    }
+
+    return static_cast<T>(*value);
+}
+
+[[nodiscard]] float require_toml_float(
+    const std::filesystem::path& path,
+    const toml::table& table,
+    std::string_view key)
+{
+    const auto field = require_toml_field(path, table, key);
+    if (const auto value = field.value<double>())
+    {
+        return static_cast<float>(*value);
+    }
+    if (const auto value = field.value<std::int64_t>())
+    {
+        return static_cast<float>(*value);
+    }
+
+    fail_invalid_toml_field(path, field, key, "must be numeric");
+}
+
+[[nodiscard]] double require_toml_double(
+    const std::filesystem::path& path,
+    const toml::table& table,
+    std::string_view key)
+{
+    return static_cast<double>(require_toml_float(path, table, key));
+}
+
+[[nodiscard]] bool require_toml_bool(
+    const std::filesystem::path& path,
+    const toml::table& table,
+    std::string_view key)
+{
+    const auto field = require_toml_field(path, table, key);
+    if (const auto value = field.value<bool>())
+    {
+        return *value;
+    }
+
+    fail_invalid_toml_field(path, field, key, "must be a boolean");
+}
+
+[[nodiscard]] const toml::array& require_toml_array(
+    const std::filesystem::path& path,
+    const toml::table& table,
+    std::string_view key)
+{
+    const auto field = require_toml_field(path, table, key);
+    if (const auto* array = field.as_array())
+    {
+        return *array;
+    }
+
+    fail_invalid_toml_field(path, field, key, "must be an array");
+}
+
+[[nodiscard]] const toml::table& require_array_entry_table(
+    const std::filesystem::path& path,
+    const toml::node& node,
+    std::string_view label)
+{
+    if (const auto* table = node.as_table())
+    {
+        return *table;
+    }
+
+    std::string message = "'";
+    message += label;
+    message += "' entries must be tables";
+    fail_load(path, toml_line_number(node), message);
+}
+
+template <typename T>
+[[nodiscard]] T require_toml_array_integer(
+    const std::filesystem::path& path,
+    const toml::node& node,
+    std::string_view label)
+{
+    if (const auto value = node.value<std::int64_t>())
+    {
+        if constexpr (std::is_signed_v<T>)
+        {
+            if (*value >= static_cast<std::int64_t>(std::numeric_limits<T>::min()) &&
+                *value <= static_cast<std::int64_t>(std::numeric_limits<T>::max()))
+            {
+                return static_cast<T>(*value);
+            }
+        }
+        else if (*value >= 0 &&
+            static_cast<std::uint64_t>(*value) <= static_cast<std::uint64_t>(std::numeric_limits<T>::max()))
+        {
+            return static_cast<T>(*value);
+        }
+    }
+
+    std::string message = "'";
+    message += label;
+    message += "' entries must be integers";
+    fail_load(path, toml_line_number(node), message);
+}
+
+[[nodiscard]] PrototypeSupportItemContent parse_support_item_entry(
+    const std::filesystem::path& path,
+    const toml::table& table)
+{
+    return PrototypeSupportItemContent {
+        ItemId {require_toml_unsigned<std::uint32_t>(path, table, "item_id")},
+        require_toml_unsigned<std::uint32_t>(path, table, "quantity")};
+}
+
+[[nodiscard]] std::vector<PrototypeSupportItemContent> parse_support_item_array(
+    const std::filesystem::path& path,
+    const toml::table& table,
+    std::string_view key)
 {
     std::vector<PrototypeSupportItemContent> values {};
-    if (field.empty())
+    const auto& array = require_toml_array(path, table, key);
+    values.reserve(array.size());
+    for (const auto& node : array)
     {
-        return values;
+        values.push_back(parse_support_item_entry(path, require_array_entry_table(path, node, key)));
     }
 
-    for (const auto& token : split_delimited(field, ';'))
-    {
-        const auto parts = split_delimited(token, ':');
-        if (parts.size() != 2U)
-        {
-            fail_load(path, line_number, "invalid support item field");
-        }
+    return values;
+}
 
-        values.push_back(PrototypeSupportItemContent {
-            ItemId {parse_unsigned<std::uint32_t>(path, line_number, parts[0])},
-            parse_unsigned<std::uint32_t>(path, line_number, parts[1])});
+[[nodiscard]] std::vector<SiteId> parse_site_id_array(
+    const std::filesystem::path& path,
+    const toml::table& table,
+    std::string_view key)
+{
+    std::vector<SiteId> values {};
+    const auto& array = require_toml_array(path, table, key);
+    values.reserve(array.size());
+    for (const auto& node : array)
+    {
+        values.push_back(SiteId {require_toml_array_integer<std::uint32_t>(path, node, key)});
+    }
+
+    return values;
+}
+
+[[nodiscard]] std::vector<ModifierId> parse_modifier_id_array(
+    const std::filesystem::path& path,
+    const toml::table& table,
+    std::string_view key)
+{
+    std::vector<ModifierId> values {};
+    const auto& array = require_toml_array(path, table, key);
+    values.reserve(array.size());
+    for (const auto& node : array)
+    {
+        values.push_back(ModifierId {require_toml_array_integer<std::uint32_t>(path, node, key)});
+    }
+
+    return values;
+}
+
+[[nodiscard]] std::vector<std::uint32_t> parse_u32_array(
+    const std::filesystem::path& path,
+    const toml::table& table,
+    std::string_view key)
+{
+    std::vector<std::uint32_t> values {};
+    const auto& array = require_toml_array(path, table, key);
+    values.reserve(array.size());
+    for (const auto& node : array)
+    {
+        values.push_back(require_toml_array_integer<std::uint32_t>(path, node, key));
     }
 
     return values;
@@ -682,66 +889,58 @@ PrototypeSiteContent* find_loaded_site(
 
 void load_prototype_campaign_sites(ContentDatabase& content, const std::filesystem::path& path)
 {
-    std::ifstream stream {path};
-    if (!stream.is_open())
+    const auto document = load_toml_document(path);
+    const auto& sites = require_toml_array(path, document, "sites");
+    for (const auto& node : sites)
     {
-        fail_load(path, 0U, "unable to open file");
-    }
-
-    std::string line {};
-    std::size_t line_number = 0U;
-    bool skipped_header = false;
-    while (std::getline(stream, line))
-    {
-        ++line_number;
-        if (is_empty_or_comment(line))
-        {
-            continue;
-        }
-        if (!skipped_header)
-        {
-            skipped_header = true;
-            continue;
-        }
-
-        const auto fields = split_delimited(line, '\t');
-        if (fields.size() != 24U)
-        {
-            fail_load(path, line_number, "unexpected site column count");
-        }
+        const auto& entry = require_array_entry_table(path, node, "sites");
 
         PrototypeSiteContent site {};
-        site.site_id = SiteId {parse_unsigned<std::uint32_t>(path, line_number, fields[0])};
-        site.site_archetype_id = parse_unsigned<std::uint32_t>(path, line_number, fields[1]);
-        site.objective_type = parse_site_objective_type(path, line_number, fields[2]);
-        site.featured_faction_id = FactionId {parse_unsigned<std::uint32_t>(path, line_number, fields[3])};
-        site.initial_state = parse_site_state(path, line_number, fields[4]);
-        site.adjacent_site_ids = parse_site_id_list(path, line_number, fields[5]);
-        site.support_package_id = parse_unsigned<std::uint32_t>(path, line_number, fields[6]);
-        site.exported_support_items = parse_support_item_list(path, line_number, fields[7]);
-        site.nearby_aura_modifier_ids = parse_modifier_id_list(path, line_number, fields[8]);
-        site.site_completion_tile_threshold = parse_unsigned<std::uint32_t>(path, line_number, fields[9]);
-        site.site_time_limit_minutes = static_cast<double>(parse_float(path, line_number, fields[10]));
-        site.objective_target_edge = parse_site_objective_target_edge(path, line_number, fields[11]);
-        site.objective_target_band_width = parse_unsigned<std::uint8_t>(path, line_number, fields[12]);
-        site.highway_max_average_sand_cover = parse_float(path, line_number, fields[13]);
-        site.completion_reputation_reward = parse_signed<std::int32_t>(path, line_number, fields[14]);
-        site.completion_faction_reputation_reward = parse_signed<std::int32_t>(path, line_number, fields[15]);
-        site.camp_anchor_tile.x = parse_signed<std::int32_t>(path, line_number, fields[16]);
-        site.camp_anchor_tile.y = parse_signed<std::int32_t>(path, line_number, fields[17]);
-        site.phone_delivery_fee = parse_signed<std::int32_t>(path, line_number, fields[18]);
-        site.phone_delivery_minutes = parse_unsigned<std::uint16_t>(path, line_number, fields[19]);
-        site.initial_revealed_unlockable_ids = parse_u32_list(path, line_number, fields[20]);
-        site.initial_direct_purchase_unlockable_ids = parse_u32_list(path, line_number, fields[21]);
+        site.site_id = SiteId {require_toml_unsigned<std::uint32_t>(path, entry, "site_id")};
+        site.site_archetype_id = require_toml_unsigned<std::uint32_t>(path, entry, "site_archetype_id");
+        site.objective_type =
+            parse_site_objective_type(path, toml_line_number(entry), require_toml_string(path, entry, "objective_type"));
+        site.featured_faction_id =
+            FactionId {require_toml_unsigned<std::uint32_t>(path, entry, "featured_faction_id")};
+        site.initial_state =
+            parse_site_state(path, toml_line_number(entry), require_toml_string(path, entry, "initial_state"));
+        site.adjacent_site_ids = parse_site_id_array(path, entry, "adjacent_site_ids");
+        site.support_package_id = require_toml_unsigned<std::uint32_t>(path, entry, "support_package_id");
+        site.exported_support_items = parse_support_item_array(path, entry, "exported_support_items");
+        site.nearby_aura_modifier_ids = parse_modifier_id_array(path, entry, "nearby_aura_modifier_ids");
+        site.site_completion_tile_threshold =
+            require_toml_unsigned<std::uint32_t>(path, entry, "site_completion_tile_threshold");
+        site.site_time_limit_minutes = require_toml_double(path, entry, "site_time_limit_minutes");
+        site.objective_target_edge = parse_site_objective_target_edge(
+            path,
+            toml_line_number(entry),
+            require_toml_string(path, entry, "objective_target_edge"));
+        site.objective_target_band_width =
+            require_toml_unsigned<std::uint8_t>(path, entry, "objective_target_band_width");
+        site.highway_max_average_sand_cover =
+            require_toml_float(path, entry, "highway_max_average_sand_cover");
+        site.completion_reputation_reward =
+            require_toml_signed<std::int32_t>(path, entry, "completion_reputation_reward");
+        site.completion_faction_reputation_reward =
+            require_toml_signed<std::int32_t>(path, entry, "completion_faction_reputation_reward");
+        site.camp_anchor_tile.x = require_toml_signed<std::int32_t>(path, entry, "camp_anchor_x");
+        site.camp_anchor_tile.y = require_toml_signed<std::int32_t>(path, entry, "camp_anchor_y");
+        site.phone_delivery_fee = require_toml_signed<std::int32_t>(path, entry, "phone_delivery_fee");
+        site.phone_delivery_minutes =
+            require_toml_unsigned<std::uint16_t>(path, entry, "phone_delivery_minutes");
+        site.initial_revealed_unlockable_ids =
+            parse_u32_array(path, entry, "initial_revealed_unlockable_ids");
+        site.initial_direct_purchase_unlockable_ids =
+            parse_u32_array(path, entry, "initial_direct_purchase_unlockable_ids");
 
         content.prototype_campaign.sites.push_back(std::move(site));
 
         const auto site_id = content.prototype_campaign.sites.back().site_id;
-        if (parse_bool(path, line_number, fields[22]))
+        if (require_toml_bool(path, entry, "initially_revealed"))
         {
             content.prototype_campaign.initially_revealed_site_ids.push_back(site_id);
         }
-        if (parse_bool(path, line_number, fields[23]))
+        if (require_toml_bool(path, entry, "initially_available"))
         {
             content.prototype_campaign.initially_available_site_ids.push_back(site_id);
         }
@@ -750,326 +949,168 @@ void load_prototype_campaign_sites(ContentDatabase& content, const std::filesyst
 
 void load_prototype_campaign_setup(ContentDatabase& content, const std::filesystem::path& path)
 {
-    std::ifstream stream {path};
-    if (!stream.is_open())
-    {
-        fail_load(path, 0U, "unable to open file");
-    }
-
-    std::string line {};
-    std::size_t line_number = 0U;
-    bool skipped_header = false;
-    bool found_row = false;
-    while (std::getline(stream, line))
-    {
-        ++line_number;
-        if (is_empty_or_comment(line))
-        {
-            continue;
-        }
-        if (!skipped_header)
-        {
-            skipped_header = true;
-            continue;
-        }
-
-        const auto fields = split_delimited(line, '\t');
-        if (fields.size() != 3U)
-        {
-            fail_load(path, line_number, "unexpected campaign setup column count");
-        }
-        if (found_row)
-        {
-            fail_load(path, line_number, "campaign setup table must contain exactly one data row");
-        }
-
-        content.prototype_campaign.starting_campaign_cash =
-            parse_signed<std::int32_t>(path, line_number, fields[0]);
-        content.prototype_campaign.support_quota_per_contributor =
-            parse_unsigned<std::uint32_t>(path, line_number, fields[1]);
-        content.prototype_campaign.baseline_deployment_items =
-            parse_support_item_list(path, line_number, fields[2]);
-        found_row = true;
-    }
-
-    if (!found_row)
-    {
-        fail_load(path, 0U, "campaign setup table must contain one data row");
-    }
+    const auto document = load_toml_document(path);
+    content.prototype_campaign.starting_campaign_cash =
+        require_toml_signed<std::int32_t>(path, document, "starting_campaign_cash");
+    content.prototype_campaign.support_quota_per_contributor =
+        require_toml_unsigned<std::uint32_t>(path, document, "support_quota_per_contributor");
+    content.prototype_campaign.baseline_deployment_items =
+        parse_support_item_array(path, document, "baseline_deployment_items");
 }
 
 void load_prototype_site_phone_listings(ContentDatabase& content, const std::filesystem::path& path)
 {
-    std::ifstream stream {path};
-    if (!stream.is_open())
+    const auto document = load_toml_document(path);
+    const auto& listings = require_toml_array(path, document, "phone_listings");
+    for (const auto& node : listings)
     {
-        fail_load(path, 0U, "unable to open file");
-    }
-
-    std::string line {};
-    std::size_t line_number = 0U;
-    bool skipped_header = false;
-    while (std::getline(stream, line))
-    {
-        ++line_number;
-        if (is_empty_or_comment(line))
-        {
-            continue;
-        }
-        if (!skipped_header)
-        {
-            skipped_header = true;
-            continue;
-        }
-
-        const auto fields = split_delimited(line, '\t');
-        if (fields.size() != 6U)
-        {
-            fail_load(path, line_number, "unexpected phone listing column count");
-        }
-
-        const SiteId site_id {parse_unsigned<std::uint32_t>(path, line_number, fields[0])};
+        const auto& entry = require_array_entry_table(path, node, "phone_listings");
+        const SiteId site_id {require_toml_unsigned<std::uint32_t>(path, entry, "site_id")};
         auto* site = find_loaded_site(content.prototype_campaign, site_id);
         if (site == nullptr)
         {
-            fail_load(path, line_number, "phone listing references an unknown site id");
+            fail_load(path, toml_line_number(entry), "phone listing references an unknown site id");
         }
 
         site->seeded_phone_listings.push_back(PrototypePhoneListingContent {
-            parse_unsigned<std::uint32_t>(path, line_number, fields[1]),
-            parse_phone_listing_kind(path, line_number, fields[2]),
-            parse_unsigned<std::uint32_t>(path, line_number, fields[3]),
-            parse_signed<std::int32_t>(path, line_number, fields[4]),
-            parse_unsigned<std::uint32_t>(path, line_number, fields[5])});
+            require_toml_unsigned<std::uint32_t>(path, entry, "listing_id"),
+            parse_phone_listing_kind(
+                path,
+                toml_line_number(entry),
+                require_toml_string(path, entry, "listing_kind")),
+            require_toml_unsigned<std::uint32_t>(path, entry, "item_or_unlockable_id"),
+            require_toml_signed<std::int32_t>(path, entry, "price"),
+            require_toml_unsigned<std::uint32_t>(path, entry, "quantity")});
     }
 }
 
 void load_item_defs(ContentDatabase& content, const std::filesystem::path& path)
 {
-    std::ifstream stream {path};
-    if (!stream.is_open())
+    const auto document = load_toml_document(path);
+    const auto& items = require_toml_array(path, document, "items");
+    for (const auto& node : items)
     {
-        fail_load(path, 0U, "unable to open file");
-    }
-
-    std::string line {};
-    std::size_t line_number = 0U;
-    bool skipped_header = false;
-    while (std::getline(stream, line))
-    {
-        ++line_number;
-        if (is_empty_or_comment(line))
-        {
-            continue;
-        }
-        if (!skipped_header)
-        {
-            skipped_header = true;
-            continue;
-        }
-
-        const auto fields = split_delimited(line, '\t');
-        if (fields.size() != 14U)
-        {
-            fail_load(path, line_number, "unexpected item column count");
-        }
-
+        const auto& entry = require_array_entry_table(path, node, "items");
         content.item_defs.push_back(ItemDef {
-            ItemId {parse_unsigned<std::uint32_t>(path, line_number, fields[0])},
-            store_string_view(content, fields[1]),
-            parse_unsigned<std::uint16_t>(path, line_number, fields[2]),
-            parse_item_source_rule(path, line_number, fields[3]),
-            parse_bool(path, line_number, fields[4]),
-            parse_signed<std::int32_t>(path, line_number, fields[5]),
-            parse_signed<std::int32_t>(path, line_number, fields[6]),
-            parse_item_capabilities(path, line_number, fields[7]),
-            PlantId {parse_unsigned<std::uint32_t>(path, line_number, fields[8])},
-            StructureId {parse_unsigned<std::uint32_t>(path, line_number, fields[9])},
-            parse_float(path, line_number, fields[10]),
-            parse_float(path, line_number, fields[11]),
-            parse_float(path, line_number, fields[12]),
-            parse_float(path, line_number, fields[13])});
+            ItemId {require_toml_unsigned<std::uint32_t>(path, entry, "item_id")},
+            store_string_view(content, require_toml_string(path, entry, "display_name")),
+            require_toml_unsigned<std::uint16_t>(path, entry, "stack_size"),
+            parse_item_source_rule(
+                path,
+                toml_line_number(entry),
+                require_toml_string(path, entry, "source_rule")),
+            require_toml_bool(path, entry, "consumable"),
+            require_toml_signed<std::int32_t>(path, entry, "buy_price"),
+            require_toml_signed<std::int32_t>(path, entry, "sell_price"),
+            parse_item_capabilities(
+                path,
+                toml_line_number(entry),
+                require_toml_string(path, entry, "capabilities")),
+            PlantId {require_toml_unsigned<std::uint32_t>(path, entry, "linked_plant_id")},
+            StructureId {require_toml_unsigned<std::uint32_t>(path, entry, "linked_structure_id")},
+            require_toml_float(path, entry, "health_delta"),
+            require_toml_float(path, entry, "hydration_delta"),
+            require_toml_float(path, entry, "nourishment_delta"),
+            require_toml_float(path, entry, "energy_delta")});
     }
 }
 
 void load_task_template_defs(ContentDatabase& content, const std::filesystem::path& path)
 {
-    std::ifstream stream {path};
-    if (!stream.is_open())
+    const auto document = load_toml_document(path);
+    const auto& task_templates = require_toml_array(path, document, "task_templates");
+    for (const auto& node : task_templates)
     {
-        fail_load(path, 0U, "unable to open file");
-    }
-
-    std::string line {};
-    std::size_t line_number = 0U;
-    bool skipped_header = false;
-    while (std::getline(stream, line))
-    {
-        ++line_number;
-        if (is_empty_or_comment(line))
-        {
-            continue;
-        }
-        if (!skipped_header)
-        {
-            skipped_header = true;
-            continue;
-        }
-
-        const auto fields = split_delimited(line, '\t');
-        if (fields.size() != 8U)
-        {
-            fail_load(path, line_number, "unexpected task template column count");
-        }
-
+        const auto& entry = require_array_entry_table(path, node, "task_templates");
         content.task_template_defs.push_back(TaskTemplateDef {
-            TaskTemplateId {parse_unsigned<std::uint32_t>(path, line_number, fields[0])},
-            FactionId {parse_unsigned<std::uint32_t>(path, line_number, fields[1])},
-            parse_unsigned<std::uint32_t>(path, line_number, fields[2]),
-            parse_task_progress_kind(path, line_number, fields[3]),
-            parse_unsigned<std::uint32_t>(path, line_number, fields[4]),
-            ItemId {parse_unsigned<std::uint32_t>(path, line_number, fields[5])},
-            RecipeId {parse_unsigned<std::uint32_t>(path, line_number, fields[6])},
-            parse_signed<std::int32_t>(path, line_number, fields[7])});
+            TaskTemplateId {require_toml_unsigned<std::uint32_t>(path, entry, "task_template_id")},
+            FactionId {require_toml_unsigned<std::uint32_t>(path, entry, "publisher_faction_id")},
+            require_toml_unsigned<std::uint32_t>(path, entry, "task_tier_id"),
+            parse_task_progress_kind(
+                path,
+                toml_line_number(entry),
+                require_toml_string(path, entry, "progress_kind")),
+            require_toml_unsigned<std::uint32_t>(path, entry, "target_amount"),
+            ItemId {require_toml_unsigned<std::uint32_t>(path, entry, "item_id")},
+            RecipeId {require_toml_unsigned<std::uint32_t>(path, entry, "recipe_id")},
+            require_toml_signed<std::int32_t>(path, entry, "completion_faction_reputation_delta")});
     }
 }
 
 void load_reward_candidate_defs(ContentDatabase& content, const std::filesystem::path& path)
 {
-    std::ifstream stream {path};
-    if (!stream.is_open())
+    const auto document = load_toml_document(path);
+    const auto& reward_candidates = require_toml_array(path, document, "reward_candidates");
+    for (const auto& node : reward_candidates)
     {
-        fail_load(path, 0U, "unable to open file");
-    }
-
-    std::string line {};
-    std::size_t line_number = 0U;
-    bool skipped_header = false;
-    while (std::getline(stream, line))
-    {
-        ++line_number;
-        if (is_empty_or_comment(line))
-        {
-            continue;
-        }
-        if (!skipped_header)
-        {
-            skipped_header = true;
-            continue;
-        }
-
-        const auto fields = split_delimited(line, '\t');
-        if (fields.size() != 10U)
-        {
-            fail_load(path, line_number, "unexpected reward candidate column count");
-        }
-
+        const auto& entry = require_array_entry_table(path, node, "reward_candidates");
         content.reward_candidate_defs.push_back(RewardCandidateDef {
-            RewardCandidateId {parse_unsigned<std::uint32_t>(path, line_number, fields[0])},
-            parse_reward_effect_kind(path, line_number, fields[1]),
-            parse_signed<std::int32_t>(path, line_number, fields[2]),
-            ItemId {parse_unsigned<std::uint32_t>(path, line_number, fields[3])},
-            parse_unsigned<std::uint32_t>(path, line_number, fields[4]),
-            parse_unsigned<std::uint32_t>(path, line_number, fields[5]),
-            ModifierId {parse_unsigned<std::uint32_t>(path, line_number, fields[6])},
-            FactionId {parse_unsigned<std::uint32_t>(path, line_number, fields[7])},
-            parse_unsigned<std::uint16_t>(path, line_number, fields[8]),
-            parse_signed<std::int32_t>(path, line_number, fields[9])});
+            RewardCandidateId {require_toml_unsigned<std::uint32_t>(path, entry, "reward_candidate_id")},
+            parse_reward_effect_kind(
+                path,
+                toml_line_number(entry),
+                require_toml_string(path, entry, "effect_kind")),
+            require_toml_signed<std::int32_t>(path, entry, "money_delta"),
+            ItemId {require_toml_unsigned<std::uint32_t>(path, entry, "item_id")},
+            require_toml_unsigned<std::uint32_t>(path, entry, "quantity"),
+            require_toml_unsigned<std::uint32_t>(path, entry, "unlockable_id"),
+            ModifierId {require_toml_unsigned<std::uint32_t>(path, entry, "modifier_id")},
+            FactionId {require_toml_unsigned<std::uint32_t>(path, entry, "faction_id")},
+            require_toml_unsigned<std::uint16_t>(path, entry, "delivery_minutes"),
+            require_toml_signed<std::int32_t>(path, entry, "reputation_delta")});
     }
 }
 
 void load_site_action_defs(ContentDatabase& content, const std::filesystem::path& path)
 {
-    std::ifstream stream {path};
-    if (!stream.is_open())
+    const auto document = load_toml_document(path);
+    const auto& site_actions = require_toml_array(path, document, "site_actions");
+    for (const auto& node : site_actions)
     {
-        fail_load(path, 0U, "unable to open file");
-    }
-
-    std::string line {};
-    std::size_t line_number = 0U;
-    bool skipped_header = false;
-    while (std::getline(stream, line))
-    {
-        ++line_number;
-        if (is_empty_or_comment(line))
-        {
-            continue;
-        }
-        if (!skipped_header)
-        {
-            skipped_header = true;
-            continue;
-        }
-
-        const auto fields = split_delimited(line, '\t');
-        if (fields.size() != 9U)
-        {
-            fail_load(path, line_number, "unexpected site action column count");
-        }
-
+        const auto& entry = require_array_entry_table(path, node, "site_actions");
         content.site_action_defs.push_back(SiteActionDef {
-            parse_action_kind(path, line_number, fields[0]),
-            parse_float(path, line_number, fields[1]),
-            parse_float(path, line_number, fields[2]),
-            parse_float(path, line_number, fields[3]),
-            parse_float(path, line_number, fields[4]),
-            parse_placement_occupancy_layer(path, line_number, fields[5]),
-            parse_bool(path, line_number, fields[6]),
-            parse_bool(path, line_number, fields[7]),
-            parse_bool(path, line_number, fields[8])});
+            parse_action_kind(path, toml_line_number(entry), require_toml_string(path, entry, "action_kind")),
+            require_toml_float(path, entry, "duration_minutes_per_unit"),
+            require_toml_float(path, entry, "energy_cost_per_unit"),
+            require_toml_float(path, entry, "hydration_cost_per_unit"),
+            require_toml_float(path, entry, "nourishment_cost_per_unit"),
+            parse_placement_occupancy_layer(
+                path,
+                toml_line_number(entry),
+                require_toml_string(path, entry, "placement_occupancy_layer")),
+            require_toml_bool(path, entry, "requests_placement_reservation"),
+            require_toml_bool(path, entry, "requires_worker_approach"),
+            require_toml_bool(path, entry, "impacts_worker_movement")});
     }
 }
 
 void load_modifier_preset_defs(ContentDatabase& content, const std::filesystem::path& path)
 {
-    std::ifstream stream {path};
-    if (!stream.is_open())
+    const auto document = load_toml_document(path);
+    const auto& modifier_presets = require_toml_array(path, document, "modifier_presets");
+    for (const auto& node : modifier_presets)
     {
-        fail_load(path, 0U, "unable to open file");
-    }
-
-    std::string line {};
-    std::size_t line_number = 0U;
-    bool skipped_header = false;
-    while (std::getline(stream, line))
-    {
-        ++line_number;
-        if (is_empty_or_comment(line))
-        {
-            continue;
-        }
-        if (!skipped_header)
-        {
-            skipped_header = true;
-            continue;
-        }
-
-        const auto fields = split_delimited(line, '\t');
-        if (fields.size() != 18U)
-        {
-            fail_load(path, line_number, "unexpected modifier preset column count");
-        }
-
+        const auto& entry = require_array_entry_table(path, node, "modifier_presets");
         ModifierPresetDef preset {};
-        preset.preset_kind = parse_modifier_preset_kind(path, line_number, fields[0]);
-        preset.preset_index = parse_unsigned<std::uint32_t>(path, line_number, fields[1]);
-        preset.totals.heat = parse_float(path, line_number, fields[2]);
-        preset.totals.wind = parse_float(path, line_number, fields[3]);
-        preset.totals.dust = parse_float(path, line_number, fields[4]);
-        preset.totals.moisture = parse_float(path, line_number, fields[5]);
-        preset.totals.fertility = parse_float(path, line_number, fields[6]);
-        preset.totals.salinity = parse_float(path, line_number, fields[7]);
-        preset.totals.growth_pressure = parse_float(path, line_number, fields[8]);
-        preset.totals.salinity_density_cap = parse_float(path, line_number, fields[9]);
-        preset.totals.plant_density = parse_float(path, line_number, fields[10]);
-        preset.totals.health = parse_float(path, line_number, fields[11]);
-        preset.totals.hydration = parse_float(path, line_number, fields[12]);
-        preset.totals.nourishment = parse_float(path, line_number, fields[13]);
-        preset.totals.energy_cap = parse_float(path, line_number, fields[14]);
-        preset.totals.energy = parse_float(path, line_number, fields[15]);
-        preset.totals.morale = parse_float(path, line_number, fields[16]);
-        preset.totals.work_efficiency = parse_float(path, line_number, fields[17]);
+        preset.preset_kind =
+            parse_modifier_preset_kind(path, toml_line_number(entry), require_toml_string(path, entry, "preset_kind"));
+        preset.preset_index = require_toml_unsigned<std::uint32_t>(path, entry, "preset_index");
+        preset.totals.heat = require_toml_float(path, entry, "heat");
+        preset.totals.wind = require_toml_float(path, entry, "wind");
+        preset.totals.dust = require_toml_float(path, entry, "dust");
+        preset.totals.moisture = require_toml_float(path, entry, "moisture");
+        preset.totals.fertility = require_toml_float(path, entry, "fertility");
+        preset.totals.salinity = require_toml_float(path, entry, "salinity");
+        preset.totals.growth_pressure = require_toml_float(path, entry, "growth_pressure");
+        preset.totals.salinity_density_cap = require_toml_float(path, entry, "salinity_density_cap");
+        preset.totals.plant_density = require_toml_float(path, entry, "plant_density");
+        preset.totals.health = require_toml_float(path, entry, "health");
+        preset.totals.hydration = require_toml_float(path, entry, "hydration");
+        preset.totals.nourishment = require_toml_float(path, entry, "nourishment");
+        preset.totals.energy_cap = require_toml_float(path, entry, "energy_cap");
+        preset.totals.energy = require_toml_float(path, entry, "energy");
+        preset.totals.morale = require_toml_float(path, entry, "morale");
+        preset.totals.work_efficiency = require_toml_float(path, entry, "work_efficiency");
 
         if (preset.preset_kind == ModifierPresetKind::NearbyAura)
         {
@@ -1084,158 +1125,73 @@ void load_modifier_preset_defs(ContentDatabase& content, const std::filesystem::
 
 void load_technology_tier_defs(ContentDatabase& content, const std::filesystem::path& path)
 {
-    std::ifstream stream {path};
-    if (!stream.is_open())
+    const auto document = load_toml_document(path);
+    const auto& technology_tiers = require_toml_array(path, document, "technology_tiers");
+    for (const auto& node : technology_tiers)
     {
-        fail_load(path, 0U, "unable to open file");
-    }
-
-    std::string line {};
-    std::size_t line_number = 0U;
-    bool skipped_header = false;
-    while (std::getline(stream, line))
-    {
-        ++line_number;
-        if (is_empty_or_comment(line))
-        {
-            continue;
-        }
-        if (!skipped_header)
-        {
-            skipped_header = true;
-            continue;
-        }
-
-        const auto fields = split_delimited(line, '\t');
-        if (fields.size() != 4U)
-        {
-            fail_load(path, line_number, "unexpected technology tier column count");
-        }
-
+        const auto& entry = require_array_entry_table(path, node, "technology_tiers");
         content.technology_tier_defs.push_back(TechnologyTierDef {
-            FactionId {parse_unsigned<std::uint32_t>(path, line_number, fields[0])},
-            parse_unsigned<std::uint8_t>(path, line_number, fields[1]),
+            FactionId {require_toml_unsigned<std::uint32_t>(path, entry, "faction_id")},
+            require_toml_unsigned<std::uint8_t>(path, entry, "tier_index"),
             {0U, 0U, 0U},
-            parse_signed<std::int32_t>(path, line_number, fields[2]),
-            store_string_view(content, fields[3])});
+            require_toml_signed<std::int32_t>(path, entry, "reputation_requirement"),
+            store_string_view(content, require_toml_string(path, entry, "display_name"))});
     }
 }
 
 void load_total_reputation_tier_defs(ContentDatabase& content, const std::filesystem::path& path)
 {
-    std::ifstream stream {path};
-    if (!stream.is_open())
+    const auto document = load_toml_document(path);
+    const auto& total_reputation_tiers =
+        require_toml_array(path, document, "total_reputation_tiers");
+    for (const auto& node : total_reputation_tiers)
     {
-        fail_load(path, 0U, "unable to open file");
-    }
-
-    std::string line {};
-    std::size_t line_number = 0U;
-    bool skipped_header = false;
-    while (std::getline(stream, line))
-    {
-        ++line_number;
-        if (is_empty_or_comment(line))
-        {
-            continue;
-        }
-        if (!skipped_header)
-        {
-            skipped_header = true;
-            continue;
-        }
-
-        const auto fields = split_delimited(line, '\t');
-        if (fields.size() != 3U)
-        {
-            fail_load(path, line_number, "unexpected total reputation tier column count");
-        }
-
+        const auto& entry = require_array_entry_table(path, node, "total_reputation_tiers");
         content.total_reputation_tier_defs.push_back(TotalReputationTierDef {
-            parse_unsigned<std::uint8_t>(path, line_number, fields[0]),
+            require_toml_unsigned<std::uint8_t>(path, entry, "tier_index"),
             {0U, 0U, 0U},
-            parse_signed<std::int32_t>(path, line_number, fields[1]),
-            store_string_view(content, fields[2])});
+            require_toml_signed<std::int32_t>(path, entry, "reputation_requirement"),
+            store_string_view(content, require_toml_string(path, entry, "display_name"))});
     }
 }
 
 void load_reputation_unlock_defs(ContentDatabase& content, const std::filesystem::path& path)
 {
-    std::ifstream stream {path};
-    if (!stream.is_open())
+    const auto document = load_toml_document(path);
+    const auto& reputation_unlocks = require_toml_array(path, document, "reputation_unlocks");
+    for (const auto& node : reputation_unlocks)
     {
-        fail_load(path, 0U, "unable to open file");
-    }
-
-    std::string line {};
-    std::size_t line_number = 0U;
-    bool skipped_header = false;
-    while (std::getline(stream, line))
-    {
-        ++line_number;
-        if (is_empty_or_comment(line))
-        {
-            continue;
-        }
-        if (!skipped_header)
-        {
-            skipped_header = true;
-            continue;
-        }
-
-        const auto fields = split_delimited(line, '\t');
-        if (fields.size() != 6U)
-        {
-            fail_load(path, line_number, "unexpected reputation unlock column count");
-        }
-
-        const auto tier_index = parse_unsigned<std::uint8_t>(path, line_number, fields[0]);
-        const auto slot_index = parse_unsigned<std::uint8_t>(path, line_number, fields[1]);
+        const auto& entry = require_array_entry_table(path, node, "reputation_unlocks");
+        const auto tier_index = require_toml_unsigned<std::uint8_t>(path, entry, "tier_index");
+        const auto slot_index = require_toml_unsigned<std::uint8_t>(path, entry, "slot_index");
         content.reputation_unlock_defs.push_back(ReputationUnlockDef {
             reputation_unlock_id(tier_index, slot_index),
-            parse_reputation_unlock_kind(path, line_number, fields[2]),
+            parse_reputation_unlock_kind(
+                path,
+                toml_line_number(entry),
+                require_toml_string(path, entry, "unlock_kind")),
             tier_index,
             {0U, 0U},
-            parse_unsigned<std::uint32_t>(path, line_number, fields[3]),
-            store_string_view(content, fields[4]),
-            store_string_view(content, fields[5])});
+            require_toml_unsigned<std::uint32_t>(path, entry, "content_id"),
+            store_string_view(content, require_toml_string(path, entry, "display_name")),
+            store_string_view(content, require_toml_string(path, entry, "description"))});
     }
 }
 
 void load_technology_node_defs(ContentDatabase& content, const std::filesystem::path& path)
 {
-    std::ifstream stream {path};
-    if (!stream.is_open())
+    const auto document = load_toml_document(path);
+    const auto& technology_nodes = require_toml_array(path, document, "technology_nodes");
+    for (const auto& node : technology_nodes)
     {
-        fail_load(path, 0U, "unable to open file");
-    }
-
-    std::string line {};
-    std::size_t line_number = 0U;
-    bool skipped_header = false;
-    while (std::getline(stream, line))
-    {
-        ++line_number;
-        if (is_empty_or_comment(line))
-        {
-            continue;
-        }
-        if (!skipped_header)
-        {
-            skipped_header = true;
-            continue;
-        }
-
-        const auto fields = split_delimited(line, '\t');
-        if (fields.size() != 8U)
-        {
-            fail_load(path, line_number, "unexpected technology node column count");
-        }
-
-        const auto faction_id = FactionId {parse_unsigned<std::uint32_t>(path, line_number, fields[0])};
-        const auto tier_index = parse_unsigned<std::uint8_t>(path, line_number, fields[1]);
-        const auto slot_index = parse_unsigned<std::uint8_t>(path, line_number, fields[2]);
-        const auto entry_kind = parse_technology_entry_kind(path, line_number, fields[3]);
+        const auto& entry = require_array_entry_table(path, node, "technology_nodes");
+        const auto faction_id = FactionId {require_toml_unsigned<std::uint32_t>(path, entry, "faction_id")};
+        const auto tier_index = require_toml_unsigned<std::uint8_t>(path, entry, "tier_index");
+        const auto slot_index = require_toml_unsigned<std::uint8_t>(path, entry, "slot_index");
+        const auto entry_kind = parse_technology_entry_kind(
+            path,
+            toml_line_number(entry),
+            require_toml_string(path, entry, "entry_kind"));
         content.technology_node_defs.push_back(TechnologyNodeDef {
             TechNodeId {technology_node_id(faction_id, tier_index, slot_index)},
             faction_id,
@@ -1243,222 +1199,128 @@ void load_technology_node_defs(ContentDatabase& content, const std::filesystem::
             slot_index,
             entry_kind,
             {0U, 0U, 0U},
-            parse_signed<std::int32_t>(path, line_number, fields[4]),
+            require_toml_signed<std::int32_t>(path, entry, "cash_cost"),
             entry_kind == TechnologyEntryKind::GlobalModifier
                 ? ModifierId {technology_modifier_id(faction_id, tier_index, slot_index)}
                 : ModifierId {},
             entry_kind == TechnologyEntryKind::MechanismChange
                 ? technology_mechanism_change_id(faction_id, tier_index, slot_index)
                 : 0U,
-            parse_bool(path, line_number, fields[5]),
+            require_toml_bool(path, entry, "is_todo_placeholder"),
             {0U, 0U, 0U},
-            store_string_view(content, fields[6]),
-            store_string_view(content, fields[7])});
+            store_string_view(content, require_toml_string(path, entry, "display_name")),
+            store_string_view(content, require_toml_string(path, entry, "description"))});
     }
 }
 
 void load_initial_unlocked_plant_ids(ContentDatabase& content, const std::filesystem::path& path)
 {
-    std::ifstream stream {path};
-    if (!stream.is_open())
+    const auto document = load_toml_document(path);
+    const auto& plant_ids = require_toml_array(path, document, "plant_ids");
+    content.initial_unlocked_plant_ids.reserve(plant_ids.size());
+    for (const auto& node : plant_ids)
     {
-        fail_load(path, 0U, "unable to open file");
-    }
-
-    std::string line {};
-    std::size_t line_number = 0U;
-    bool skipped_header = false;
-    while (std::getline(stream, line))
-    {
-        ++line_number;
-        if (is_empty_or_comment(line))
-        {
-            continue;
-        }
-        if (!skipped_header)
-        {
-            skipped_header = true;
-            continue;
-        }
-
-        const auto fields = split_delimited(line, '\t');
-        if (fields.size() != 1U)
-        {
-            fail_load(path, line_number, "unexpected initial unlocked plants column count");
-        }
-
         content.initial_unlocked_plant_ids.push_back(
-            PlantId {parse_unsigned<std::uint32_t>(path, line_number, fields[0])});
+            PlantId {require_toml_array_integer<std::uint32_t>(path, node, "plant_ids")});
     }
 }
 
 void load_plant_defs(ContentDatabase& content, const std::filesystem::path& path)
 {
-    std::ifstream stream {path};
-    if (!stream.is_open())
+    const auto document = load_toml_document(path);
+    const auto& plants = require_toml_array(path, document, "plants");
+    for (const auto& node : plants)
     {
-        fail_load(path, 0U, "unable to open file");
-    }
-
-    std::string line {};
-    std::size_t line_number = 0U;
-    bool skipped_header = false;
-    while (std::getline(stream, line))
-    {
-        ++line_number;
-        if (is_empty_or_comment(line))
-        {
-            continue;
-        }
-        if (!skipped_header)
-        {
-            skipped_header = true;
-            continue;
-        }
-
-        const auto fields = split_delimited(line, '\t');
-        if (fields.size() != 22U)
-        {
-            fail_load(path, line_number, "unexpected plant column count");
-        }
-
+        const auto& entry = require_array_entry_table(path, node, "plants");
         content.plant_defs.push_back(PlantDef {
-            PlantId {parse_unsigned<std::uint32_t>(path, line_number, fields[0])},
-            store_cstring(content, fields[1]),
-            parse_plant_height_class(path, line_number, fields[2]),
-            parse_bool(path, line_number, fields[3]),
-            parse_unsigned<std::uint8_t>(path, line_number, fields[4]),
-            parse_unsigned<std::uint8_t>(path, line_number, fields[5]),
-            parse_unsigned<std::uint8_t>(path, line_number, fields[6]),
-            parse_unsigned<std::uint8_t>(path, line_number, fields[7]),
-            parse_float(path, line_number, fields[8]),
-            parse_float(path, line_number, fields[9]),
-            parse_float(path, line_number, fields[10]),
-            parse_float(path, line_number, fields[11]),
-            parse_float(path, line_number, fields[12]),
-            parse_float(path, line_number, fields[13]),
-            parse_float(path, line_number, fields[14]),
-            parse_float(path, line_number, fields[15]),
-            parse_float(path, line_number, fields[16]),
-            parse_float(path, line_number, fields[17]),
-            parse_float(path, line_number, fields[18]),
-            parse_float(path, line_number, fields[19]),
-            parse_float(path, line_number, fields[20]),
-            parse_float(path, line_number, fields[21])});
+            PlantId {require_toml_unsigned<std::uint32_t>(path, entry, "plant_id")},
+            store_cstring(content, require_toml_string(path, entry, "display_name")),
+            parse_plant_height_class(
+                path,
+                toml_line_number(entry),
+                require_toml_string(path, entry, "height_class")),
+            require_toml_bool(path, entry, "growable"),
+            require_toml_unsigned<std::uint8_t>(path, entry, "aura_size"),
+            require_toml_unsigned<std::uint8_t>(path, entry, "footprint_width"),
+            require_toml_unsigned<std::uint8_t>(path, entry, "footprint_height"),
+            require_toml_unsigned<std::uint8_t>(path, entry, "wind_protection_range"),
+            require_toml_float(path, entry, "plant_action_duration_minutes"),
+            require_toml_float(path, entry, "constant_wither_rate"),
+            require_toml_float(path, entry, "salt_tolerance"),
+            require_toml_float(path, entry, "heat_tolerance"),
+            require_toml_float(path, entry, "wind_resistance"),
+            require_toml_float(path, entry, "dust_tolerance"),
+            require_toml_float(path, entry, "wind_protection_power"),
+            require_toml_float(path, entry, "heat_protection_power"),
+            require_toml_float(path, entry, "dust_protection_power"),
+            require_toml_float(path, entry, "fertility_improve_power"),
+            require_toml_float(path, entry, "salinity_reduction_power"),
+            require_toml_float(path, entry, "spread_readiness"),
+            require_toml_float(path, entry, "spread_chance"),
+            require_toml_float(path, entry, "output_dependency")});
     }
 }
 
 void load_structure_defs(ContentDatabase& content, const std::filesystem::path& path)
 {
-    std::ifstream stream {path};
-    if (!stream.is_open())
+    const auto document = load_toml_document(path);
+    const auto& structures = require_toml_array(path, document, "structures");
+    for (const auto& node : structures)
     {
-        fail_load(path, 0U, "unable to open file");
-    }
-
-    std::string line {};
-    std::size_t line_number = 0U;
-    bool skipped_header = false;
-    while (std::getline(stream, line))
-    {
-        ++line_number;
-        if (is_empty_or_comment(line))
-        {
-            continue;
-        }
-        if (!skipped_header)
-        {
-            skipped_header = true;
-            continue;
-        }
-
-        const auto fields = split_delimited(line, '\t');
-        if (fields.size() != 16U)
-        {
-            fail_load(path, line_number, "unexpected structure column count");
-        }
-
+        const auto& entry = require_array_entry_table(path, node, "structures");
         content.structure_defs.push_back(StructureDef {
-            StructureId {parse_unsigned<std::uint32_t>(path, line_number, fields[0])},
-            store_string_view(content, fields[1]),
-            parse_float(path, line_number, fields[2]),
-            parse_unsigned<std::uint8_t>(path, line_number, fields[3]),
-            parse_float(path, line_number, fields[4]),
-            parse_unsigned<std::uint8_t>(path, line_number, fields[5]),
-            parse_float(path, line_number, fields[6]),
-            parse_float(path, line_number, fields[7]),
-            parse_float(path, line_number, fields[8]),
-            parse_float(path, line_number, fields[9]),
-            parse_float(path, line_number, fields[10]),
-            parse_unsigned<std::uint16_t>(path, line_number, fields[11]),
-            parse_crafting_station_kind(path, line_number, fields[12]),
-            parse_bool(path, line_number, fields[13]),
-            parse_unsigned<std::uint8_t>(path, line_number, fields[14]),
-            parse_unsigned<std::uint8_t>(path, line_number, fields[15])});
+            StructureId {require_toml_unsigned<std::uint32_t>(path, entry, "structure_id")},
+            store_string_view(content, require_toml_string(path, entry, "display_name")),
+            require_toml_float(path, entry, "durability"),
+            require_toml_unsigned<std::uint8_t>(path, entry, "aura_size"),
+            require_toml_float(path, entry, "wind_protection_value"),
+            require_toml_unsigned<std::uint8_t>(path, entry, "wind_protection_range"),
+            require_toml_float(path, entry, "heat_protection_value"),
+            require_toml_float(path, entry, "dust_protection_value"),
+            require_toml_float(path, entry, "fertility_improve_value"),
+            require_toml_float(path, entry, "salinity_reduction_value"),
+            require_toml_float(path, entry, "irrigation_value"),
+            require_toml_unsigned<std::uint16_t>(path, entry, "storage_slot_count"),
+            parse_crafting_station_kind(
+                path,
+                toml_line_number(entry),
+                require_toml_string(path, entry, "crafting_station_kind")),
+            require_toml_bool(path, entry, "grants_storage"),
+            require_toml_unsigned<std::uint8_t>(path, entry, "footprint_width"),
+            require_toml_unsigned<std::uint8_t>(path, entry, "footprint_height")});
     }
 }
 
 void load_craft_recipe_defs(ContentDatabase& content, const std::filesystem::path& path)
 {
-    std::ifstream stream {path};
-    if (!stream.is_open())
+    const auto document = load_toml_document(path);
+    const auto& craft_recipes = require_toml_array(path, document, "craft_recipes");
+    for (const auto& node : craft_recipes)
     {
-        fail_load(path, 0U, "unable to open file");
-    }
-
-    std::string line {};
-    std::size_t line_number = 0U;
-    bool skipped_header = false;
-    while (std::getline(stream, line))
-    {
-        ++line_number;
-        if (is_empty_or_comment(line))
-        {
-            continue;
-        }
-        if (!skipped_header)
-        {
-            skipped_header = true;
-            continue;
-        }
-
-        const auto fields = split_delimited(line, '\t');
-        if (fields.size() != 6U)
-        {
-            fail_load(path, line_number, "unexpected craft recipe column count");
-        }
-
+        const auto& entry = require_array_entry_table(path, node, "craft_recipes");
         CraftRecipeDef recipe_def {};
-        recipe_def.recipe_id = RecipeId {parse_unsigned<std::uint32_t>(path, line_number, fields[0])};
+        recipe_def.recipe_id = RecipeId {require_toml_unsigned<std::uint32_t>(path, entry, "recipe_id")};
         recipe_def.station_structure_id =
-            StructureId {parse_unsigned<std::uint32_t>(path, line_number, fields[1])};
-        recipe_def.output_item_id = ItemId {parse_unsigned<std::uint32_t>(path, line_number, fields[2])};
-        recipe_def.output_quantity = parse_unsigned<std::uint16_t>(path, line_number, fields[3]);
-        recipe_def.craft_minutes = parse_float(path, line_number, fields[4]);
+            StructureId {require_toml_unsigned<std::uint32_t>(path, entry, "station_structure_id")};
+        recipe_def.output_item_id = ItemId {require_toml_unsigned<std::uint32_t>(path, entry, "output_item_id")};
+        recipe_def.output_quantity = require_toml_unsigned<std::uint16_t>(path, entry, "output_quantity");
+        recipe_def.craft_minutes = require_toml_float(path, entry, "craft_minutes");
 
-        if (!fields[5].empty())
+        const auto& ingredients = require_toml_array(path, entry, "ingredients");
+        if (ingredients.size() > recipe_def.ingredients.size())
         {
-            const auto ingredient_tokens = split_delimited(fields[5], ';');
-            if (ingredient_tokens.size() > recipe_def.ingredients.size())
-            {
-                fail_load(path, line_number, "too many craft recipe ingredients");
-            }
-
-            for (std::size_t index = 0; index < ingredient_tokens.size(); ++index)
-            {
-                const auto parts = split_delimited(ingredient_tokens[index], ':');
-                if (parts.size() != 2U)
-                {
-                    fail_load(path, line_number, "invalid craft recipe ingredient field");
-                }
-
-                recipe_def.ingredients[index] = CraftRecipeIngredientDef {
-                    ItemId {parse_unsigned<std::uint32_t>(path, line_number, parts[0])},
-                    parse_unsigned<std::uint16_t>(path, line_number, parts[1])};
-            }
-
-            recipe_def.ingredient_count = static_cast<std::uint8_t>(ingredient_tokens.size());
+            fail_load(path, toml_line_number(entry), "too many craft recipe ingredients");
         }
+
+        for (std::size_t index = 0; index < ingredients.size(); ++index)
+        {
+            const auto& ingredient = require_array_entry_table(path, ingredients[index], "ingredients");
+            recipe_def.ingredients[index] = CraftRecipeIngredientDef {
+                ItemId {require_toml_unsigned<std::uint32_t>(path, ingredient, "item_id")},
+                require_toml_unsigned<std::uint16_t>(path, ingredient, "quantity")};
+        }
+
+        recipe_def.ingredient_count = static_cast<std::uint8_t>(ingredients.size());
 
         content.craft_recipe_defs.push_back(recipe_def);
     }
@@ -1492,22 +1354,22 @@ ContentDatabase ContentLoader::load_prototype_content()
     ContentDatabase content {};
 
     const auto root = content_table_root();
-    const auto sites_path = root / "sites.tsv";
-    const auto campaign_setup_path = root / "campaign_setup.tsv";
-    const auto phone_listings_path = root / "phone_listings.tsv";
-    const auto items_path = root / "items.tsv";
-    const auto plants_path = root / "plants.tsv";
-    const auto structures_path = root / "structures.tsv";
-    const auto craft_recipes_path = root / "craft_recipes.tsv";
-    const auto task_templates_path = root / "task_templates.tsv";
-    const auto reward_candidates_path = root / "reward_candidates.tsv";
-    const auto site_actions_path = root / "site_actions.tsv";
-    const auto modifier_presets_path = root / "modifier_presets.tsv";
-    const auto technology_tiers_path = root / "technology_tiers.tsv";
-    const auto total_reputation_tiers_path = root / "total_reputation_tiers.tsv";
-    const auto reputation_unlocks_path = root / "reputation_unlocks.tsv";
-    const auto technology_nodes_path = root / "technology_nodes.tsv";
-    const auto initial_unlocked_plants_path = root / "initial_unlocked_plants.tsv";
+    const auto sites_path = root / "sites.toml";
+    const auto campaign_setup_path = root / "campaign_setup.toml";
+    const auto phone_listings_path = root / "phone_listings.toml";
+    const auto items_path = root / "items.toml";
+    const auto plants_path = root / "plants.toml";
+    const auto structures_path = root / "structures.toml";
+    const auto craft_recipes_path = root / "craft_recipes.toml";
+    const auto task_templates_path = root / "task_templates.toml";
+    const auto reward_candidates_path = root / "reward_candidates.toml";
+    const auto site_actions_path = root / "site_actions.toml";
+    const auto modifier_presets_path = root / "modifier_presets.toml";
+    const auto technology_tiers_path = root / "technology_tiers.toml";
+    const auto total_reputation_tiers_path = root / "total_reputation_tiers.toml";
+    const auto reputation_unlocks_path = root / "reputation_unlocks.toml";
+    const auto technology_nodes_path = root / "technology_nodes.toml";
+    const auto initial_unlocked_plants_path = root / "initial_unlocked_plants.toml";
 
     load_prototype_campaign_sites(content, sites_path);
     load_prototype_campaign_setup(content, campaign_setup_path);
