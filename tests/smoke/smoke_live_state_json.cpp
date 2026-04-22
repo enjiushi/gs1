@@ -1000,6 +1000,24 @@ void append_hud_json(std::string& json, const std::optional<SmokeEngineHost::Hud
     json += '}';
 }
 
+void append_campaign_resources_json(
+    std::string& json,
+    const std::optional<SmokeEngineHost::CampaignResourcesProjection>& campaign_resources)
+{
+    if (!campaign_resources.has_value())
+    {
+        json += "null";
+        return;
+    }
+
+    const auto& resources = campaign_resources.value();
+    json += "{\"currentMoney\":";
+    json += std::to_string(resources.current_money);
+    json += ",\"totalReputation\":";
+    json += std::to_string(resources.total_reputation);
+    json += '}';
+}
+
 void append_site_action_json(
     std::string& json,
     const std::optional<SmokeEngineHost::SiteActionProjection>& site_action)
@@ -1083,6 +1101,8 @@ std::string SmokeEngineHost::build_live_state_json(const LiveStateSnapshot& live
     append_site_bootstrap_json(json, live_state.active_site_snapshot);
     json += ",\"siteState\":";
     append_site_state_json(json, live_state.active_site_snapshot);
+    json += ",\"campaignResources\":";
+    append_campaign_resources_json(json, live_state.campaign_resources);
     json += ",\"hud\":";
     append_hud_json(json, live_state.hud_state);
     json += ",\"siteAction\":";
@@ -1183,6 +1203,12 @@ std::string SmokeEngineHost::build_live_state_patch_json(
     {
         append_field("hud", [&](std::string& destination) {
             append_hud_json(destination, snapshot.hud_state);
+        });
+    }
+    if ((field_mask & LiveStatePatchField_CampaignResources) != 0U)
+    {
+        append_field("campaignResources", [&](std::string& destination) {
+            append_campaign_resources_json(destination, snapshot.campaign_resources);
         });
     }
     if ((field_mask & LiveStatePatchField_SiteAction) != 0U)

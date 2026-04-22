@@ -1,6 +1,6 @@
 # tests/system/assets/economy_phone/
 
-Asset-driven economy phone regressions around listings, purchase outcomes, and opening-cash expectations.
+Asset-driven economy phone regressions around listings, purchase outcomes, and persistent campaign-cash expectations.
 
 ## Usage
 - Read this file before scanning the folder in detail.

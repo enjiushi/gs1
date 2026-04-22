@@ -788,7 +788,7 @@ void economy_site_run_started_seeds_site_one_and_resets_other_sites(
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         EconomyPhoneSystem::process_message(other_context, started_two) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, other_site_run.economy.money == 0);
+    GS1_SYSTEM_TEST_CHECK(context, other_site_run.economy.money == 45);
     GS1_SYSTEM_TEST_CHECK(context, other_site_run.economy.available_phone_listings.empty());
 }
 
@@ -824,16 +824,17 @@ void economy_purchase_sell_hire_and_unlockable_paths_update_money(
     GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 30);
     GS1_SYSTEM_TEST_REQUIRE(context, find_listing_by_id(site_run.economy, 1U) != nullptr);
     GS1_SYSTEM_TEST_CHECK(context, find_listing_by_id(site_run.economy, 1U)->quantity == 4U);
-    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 2U);
-    GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::InventoryDeliveryBatchRequested);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 3U);
+    GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::CampaignCashDeltaRequested);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        queue.front().payload_as<gs1::InventoryDeliveryBatchRequestedMessage>().entries[0].item_id ==
+        queue[1].payload_as<gs1::InventoryDeliveryBatchRequestedMessage>().entries[0].item_id ==
             gs1::k_item_water_container);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        queue.front().payload_as<gs1::InventoryDeliveryBatchRequestedMessage>().entries[0].quantity == 2U);
-    GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameMessageType::PhoneListingPurchased);
+        queue[1].payload_as<gs1::InventoryDeliveryBatchRequestedMessage>().entries[0].quantity == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameMessageType::InventoryDeliveryBatchRequested);
+    GS1_SYSTEM_TEST_CHECK(context, queue[2].type == GameMessageType::PhoneListingPurchased);
 
     queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(
@@ -846,13 +847,14 @@ void economy_purchase_sell_hire_and_unlockable_paths_update_money(
     GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 36);
     GS1_SYSTEM_TEST_REQUIRE(context, find_listing_by_id(site_run.economy, 1001U) != nullptr);
     GS1_SYSTEM_TEST_CHECK(context, find_listing_by_id(site_run.economy, 1001U)->quantity == 0U);
-    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 2U);
-    GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::InventoryGlobalItemConsumeRequested);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 3U);
+    GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::CampaignCashDeltaRequested);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        queue.front().payload_as<gs1::InventoryGlobalItemConsumeRequestedMessage>().item_id ==
+        queue[1].payload_as<gs1::InventoryGlobalItemConsumeRequestedMessage>().item_id ==
             gs1::k_item_water_container);
-    GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameMessageType::PhoneListingSold);
+    GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameMessageType::InventoryGlobalItemConsumeRequested);
+    GS1_SYSTEM_TEST_CHECK(context, queue[2].type == GameMessageType::PhoneListingSold);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -924,13 +926,14 @@ void economy_cart_checkout_charges_delivery_fee_and_clears_cart(
     GS1_SYSTEM_TEST_CHECK(context, find_listing_by_id(site_run.economy, 2U)->quantity == 4U);
     GS1_SYSTEM_TEST_CHECK(context, find_listing_by_id(site_run.economy, 1U)->cart_quantity == 0U);
     GS1_SYSTEM_TEST_CHECK(context, find_listing_by_id(site_run.economy, 2U)->cart_quantity == 0U);
-    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 3U);
-    GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::InventoryDeliveryBatchRequested);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 4U);
+    GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::CampaignCashDeltaRequested);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        queue.front().payload_as<gs1::InventoryDeliveryBatchRequestedMessage>().entry_count == 2U);
-    GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameMessageType::PhoneListingPurchased);
+        queue[1].payload_as<gs1::InventoryDeliveryBatchRequestedMessage>().entry_count == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameMessageType::InventoryDeliveryBatchRequested);
     GS1_SYSTEM_TEST_CHECK(context, queue[2].type == GameMessageType::PhoneListingPurchased);
+    GS1_SYSTEM_TEST_CHECK(context, queue[3].type == GameMessageType::PhoneListingPurchased);
 }
 
 void economy_purchase_listing_unlockable_path_spends_money_and_removes_direct_unlockable(
@@ -1044,11 +1047,13 @@ void economy_repeated_sell_requests_do_not_oversubscribe_inventory(
                 GameMessageType::PhoneListingSaleRequested,
                 gs1::PhoneListingSaleRequestedMessage {1001U, 1U, 0U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 51);
-    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 4U);
-    GS1_SYSTEM_TEST_CHECK(context, queue[0].type == GameMessageType::InventoryGlobalItemConsumeRequested);
-    GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameMessageType::PhoneListingSold);
-    GS1_SYSTEM_TEST_CHECK(context, queue[2].type == GameMessageType::InventoryGlobalItemConsumeRequested);
-    GS1_SYSTEM_TEST_CHECK(context, queue[3].type == GameMessageType::PhoneListingSold);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 6U);
+    GS1_SYSTEM_TEST_CHECK(context, queue[0].type == GameMessageType::CampaignCashDeltaRequested);
+    GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameMessageType::InventoryGlobalItemConsumeRequested);
+    GS1_SYSTEM_TEST_CHECK(context, queue[2].type == GameMessageType::PhoneListingSold);
+    GS1_SYSTEM_TEST_CHECK(context, queue[3].type == GameMessageType::CampaignCashDeltaRequested);
+    GS1_SYSTEM_TEST_CHECK(context, queue[4].type == GameMessageType::InventoryGlobalItemConsumeRequested);
+    GS1_SYSTEM_TEST_CHECK(context, queue[5].type == GameMessageType::PhoneListingSold);
 
     while (!queue.empty())
     {

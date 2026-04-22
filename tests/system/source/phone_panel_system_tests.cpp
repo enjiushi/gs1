@@ -88,7 +88,7 @@ void phone_panel_site_run_started_seeds_home_snapshot(
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.accepted_task_count == 0U);
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.completed_task_count == 0U);
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.claimed_task_count == 0U);
-    GS1_SYSTEM_TEST_CHECK(context, phone_panel.buy_listing_count >= 9U);
+    GS1_SYSTEM_TEST_CHECK(context, phone_panel.buy_listing_count >= 8U);
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.sell_listing_count >= 1U);
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.service_listing_count >= 2U);
     GS1_SYSTEM_TEST_REQUIRE(
@@ -176,7 +176,7 @@ void phone_panel_sell_list_refreshes_when_purchase_delivery_arrives(
         PhonePanelSystem::process_message(phone_context, start_message) == GS1_STATUS_OK);
 
     const auto sell_listing_id =
-        1000U + static_cast<std::uint32_t>(gs1::k_item_saltbush_seed_bundle);
+        1000U + static_cast<std::uint32_t>(gs1::k_item_salt_bean_seed_bundle);
     GS1_SYSTEM_TEST_CHECK(
         context,
         find_phone_panel_listing(site_run.phone_panel, sell_listing_id) == nullptr);
@@ -216,7 +216,7 @@ void phone_panel_sell_list_refreshes_when_purchase_delivery_arrives(
         gs1::inventory_storage::available_item_quantity_in_container(
             site_run,
             gs1::inventory_storage::delivery_box_container(site_run),
-            gs1::ItemId {gs1::k_item_saltbush_seed_bundle}) == 1U);
+            gs1::ItemId {gs1::k_item_salt_bean_seed_bundle}) == 1U);
 }
 
 GS1_REGISTER_SOURCE_SYSTEM_TEST(

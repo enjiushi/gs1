@@ -18,7 +18,7 @@ const PrototypeCampaignContent k_content = {
             {SiteId {2}},
             1001U,
             {
-                PrototypeSupportItemContent {ItemId {k_item_saltbush_seed_bundle}, 4U},
+                PrototypeSupportItemContent {ItemId {k_item_salt_bean_seed_bundle}, 4U},
                 PrototypeSupportItemContent {ItemId {k_item_wood_bundle}, 2U},
             },
             {ModifierId {1U}},

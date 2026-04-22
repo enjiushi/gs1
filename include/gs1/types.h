@@ -288,7 +288,8 @@ enum Gs1EngineMessageType : std::uint8_t
     GS1_ENGINE_MESSAGE_HUD_STATE = 40,
     GS1_ENGINE_MESSAGE_NOTIFICATION_PUSH = 41,
     GS1_ENGINE_MESSAGE_SITE_RESULT_READY = 42,
-    GS1_ENGINE_MESSAGE_PLAY_ONE_SHOT_CUE = 43
+    GS1_ENGINE_MESSAGE_PLAY_ONE_SHOT_CUE = 43,
+    GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES = 44
 };
 
 enum Gs1RuntimeProfileSystemId : std::uint8_t
@@ -745,6 +746,12 @@ struct Gs1EngineMessageHudStateData
     Gs1SiteActionKind current_action_kind;
 };
 
+struct Gs1EngineMessageCampaignResourcesData
+{
+    std::int32_t current_money;
+    std::int32_t total_reputation;
+};
+
 struct Gs1EngineMessageNotificationData
 {
     std::uint32_t notification_code;
@@ -866,6 +873,7 @@ GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePhoneListingData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePhonePanelData, 40U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteActionData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageHudStateData, 32U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageCampaignResourcesData, 8U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageNotificationData, 56U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteResultData, 8U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageOneShotCueData, 24U);
@@ -897,6 +905,7 @@ static_assert(sizeof(Gs1EngineMessagePhoneListingData) <= GS1_MESSAGE_PAYLOAD_BY
 static_assert(sizeof(Gs1EngineMessagePhonePanelData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageSiteActionData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageHudStateData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageCampaignResourcesData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageNotificationData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageSiteResultData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageOneShotCueData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);

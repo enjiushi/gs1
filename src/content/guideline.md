@@ -18,4 +18,4 @@ Prototype content storage, indexing, validation, and config-table loading used t
 - `defs/`: Per-domain content definition structs.
 - `tables/`: External TSV authoring tables for the config-backed prototype content slices.
 - `prototype_content.h`: Prototype content package declarations, including authored site objective modes/config, regional-support seeds, site faction ownership, site-completion rewards, and tech-pick thresholds.
-- `prototype_content.cpp`: Prototype content construction and seed-data implementation, including authored site objective configs, support packages, nearby-aura seeds, faction-linked site rewards, and prototype tech-pick thresholds.
+- `prototype_content.cpp`: Prototype content construction and seed-data implementation, including authored site objective configs, support packages, nearby-aura seeds, faction-linked site rewards, and prototype campaign-support item seeds that align with the 10-plant roster.

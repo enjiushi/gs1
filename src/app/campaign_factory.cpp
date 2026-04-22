@@ -8,6 +8,8 @@ namespace gs1
 {
 namespace
 {
+constexpr std::int32_t k_prototype_starting_campaign_cash = 45;
+
 [[nodiscard]] LoadoutSlot make_support_loadout_slot(ItemId item_id, std::uint32_t quantity) noexcept
 {
     return LoadoutSlot {
@@ -26,6 +28,7 @@ CampaignState CampaignFactory::create_prototype_campaign(
 
     campaign.campaign_id = CampaignId{1U};
     campaign.campaign_seed = campaign_seed;
+    campaign.cash = k_prototype_starting_campaign_cash;
     campaign.campaign_clock_minutes_elapsed = 0.0;
     campaign.campaign_days_total = campaign_days;
     campaign.campaign_days_remaining = campaign_days;
@@ -37,7 +40,7 @@ CampaignState CampaignFactory::create_prototype_campaign(
     {
         campaign.faction_progress.push_back(FactionProgressState {faction_def.faction_id});
     }
-    campaign.technology_state.reputation = 0;
+    campaign.technology_state.total_reputation = 0;
     LoadoutPlannerSystem::initialize_campaign_state(campaign);
 
     campaign.sites.reserve(content.sites.size());

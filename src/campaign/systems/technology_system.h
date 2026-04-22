@@ -25,13 +25,16 @@ public:
     [[nodiscard]] static bool tier_unlocked(
         const CampaignState& campaign,
         const TechnologyTierDef& tier_def) noexcept;
-    [[nodiscard]] static bool unlockable_available(
+    [[nodiscard]] static bool total_reputation_tier_unlocked(
         const CampaignState& campaign,
-        const FactionUnlockableDef& unlockable_def) noexcept;
+        const TotalReputationTierDef& tier_def) noexcept;
+    [[nodiscard]] static bool plant_unlocked(
+        const CampaignState& campaign,
+        PlantId plant_id) noexcept;
     [[nodiscard]] static std::int32_t available_faction_reputation(
         const CampaignState& campaign,
         FactionId faction_id) noexcept;
-    [[nodiscard]] static std::int32_t current_reputation_cost(
+    [[nodiscard]] static std::int32_t current_cash_cost(
         const CampaignState& campaign,
         const TechnologyNodeDef& node_def) noexcept;
     [[nodiscard]] static bool node_claimable(

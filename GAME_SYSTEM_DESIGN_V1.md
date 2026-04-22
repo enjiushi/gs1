@@ -543,7 +543,6 @@ Required fields:
 ```text
 factionId
 factionReputation
-occupiedReputation
 unlockedAssistantPackage
 onboardingCompleted
 tutorialCompleted
@@ -554,15 +553,16 @@ tutorialCompleted
 Required fields:
 
 ```text
-reputation
+totalReputation
+persistentCash
 purchasedNodeIds[]
 ```
 
 Rules:
 
-- `reputation` is never spent
-- faction technology claims do not spend down total faction reputation; they occupy part of that faction's reputation budget instead
-- available faction reputation is `factionReputation - occupiedReputation`
+- `totalReputation` is never spent and unlocks the three prototype global plant tiers
+- `persistentCash` is shared across the campaign and pays for faction technology claims
+- faction technology claims do not spend down faction reputation
 - `purchasedNodeIds[]` is authoritative progression state
 
 ### 6.7 `LoadoutPlannerState`
@@ -1321,7 +1321,8 @@ Responsibilities:
 Responsibilities:
 
 - validate faction-tier claim prerequisites
-- occupy faction reputation for claimed tech without reducing total reputation
+- validate total-reputation plant-tier eligibility
+- spend persistent campaign cash when faction tech is claimed
 - mark node purchased
 - update `ContentDatabase` eligibility view for recipes, plants, and devices
 

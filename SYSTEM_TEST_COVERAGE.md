@@ -121,12 +121,11 @@ Implemented behavior coverage should verify:
 Implemented behavior coverage should verify:
 
 - Faction reputation awards never decrease a faction's lifetime total reputation.
-- Available faction reputation is total reputation minus consumed reputation from purchased faction tech.
+- Campaign-wide total reputation unlocks the three prototype plant tiers without being spent.
 - Each faction exposes three prototype tiers gated by authored reputation requirements.
-- Reaching a tier threshold immediately unlocks that tier's unlockable content without spending reputation.
+- Reaching a total-reputation tier threshold unlocks that tier's authored plant pair without spending reputation.
 - Tier technologies become claimable as soon as the tier reputation threshold is met; they do not require previous-tier purchases.
-- Prototype tier unlockables cover placeholder item, plant-seed, device, and recipe content families.
-- Prototype technologies cover placeholder global-modifier and mechanism-change effects with authored per-node costs.
+- Prototype technologies cover placeholder global-modifier and mechanism-change effects with authored per-node cash costs.
 - Purchased tech state is stored as node ownership, not as unspent pick inventory.
 
 ### `regional_support`

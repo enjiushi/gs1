@@ -42,7 +42,7 @@ These areas are defined strongly enough to start module design and runtime-struc
 - Plant roster direction, density model, growth pressure, spread, salinity, and straw checkerboard behavior
 - Contract-board concept, prototype task model, faction publishing, reward-draft direction, chain-task direction, and accepted-task-cap concept
 - Faction identities, assistants, onboarding order, and prototype four-site arc
-- Data-driven faction-technology model with shared node model and per-unlockable update families
+- Data-driven faction-technology model with three faction tiers, a separate total-reputation plant track, and cash-purchased faction tech nodes
 - Meter-relationship chapter as the current implementation-facing causal reference
 
 These areas are good enough that the next step can define code ownership, runtime structs, content-definition tables, and service boundaries without waiting for more game-loop design.

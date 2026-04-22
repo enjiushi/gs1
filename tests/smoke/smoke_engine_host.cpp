@@ -85,6 +85,8 @@ const char* message_type_name(Gs1EngineMessageType type)
         return "SITE_RESULT_READY";
     case GS1_ENGINE_MESSAGE_PLAY_ONE_SHOT_CUE:
         return "PLAY_ONE_SHOT_CUE";
+    case GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES:
+        return "CAMPAIGN_RESOURCES";
     default:
         return "NONE";
     }
@@ -448,6 +450,7 @@ SmokeEngineHost::LiveStateSnapshot SmokeEngineHost::capture_live_state_snapshot(
     snapshot.regional_map_sites = snapshot_regional_map_sites();
     snapshot.regional_map_links = snapshot_regional_map_links();
     snapshot.active_site_snapshot = active_site_snapshot_;
+    snapshot.campaign_resources = campaign_resources_;
     snapshot.hud_state = hud_state_;
     snapshot.site_action = site_action_;
     snapshot.site_result = site_result_;
@@ -822,6 +825,10 @@ void SmokeEngineHost::flush_engine_messages(const char* stage_label)
         case GS1_ENGINE_MESSAGE_HUD_STATE:
             apply_hud_state(message);
             live_state_patch_mask = LiveStatePatchField_Hud;
+            break;
+        case GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES:
+            apply_campaign_resources(message);
+            live_state_patch_mask = LiveStatePatchField_CampaignResources;
             break;
         case GS1_ENGINE_MESSAGE_SITE_ACTION_UPDATE:
             apply_site_action_update(message);
@@ -1619,6 +1626,15 @@ void SmokeEngineHost::apply_hud_state(const Gs1EngineMessage& message)
     hud_state_ = projection;
 }
 
+void SmokeEngineHost::apply_campaign_resources(const Gs1EngineMessage& message)
+{
+    const auto& payload = message.payload_as<Gs1EngineMessageCampaignResourcesData>();
+    CampaignResourcesProjection projection {};
+    projection.current_money = payload.current_money;
+    projection.total_reputation = payload.total_reputation;
+    campaign_resources_ = projection;
+}
+
 void SmokeEngineHost::apply_site_action_update(const Gs1EngineMessage& message)
 {
     const auto& payload = message.payload_as<Gs1EngineMessageSiteActionData>();
@@ -1893,6 +1909,14 @@ std::string SmokeEngineHost::describe_message(const Gs1EngineMessage& message)
         description += " energy=" + std::to_string(payload.player_energy);
         description += " morale=" + std::to_string(payload.player_morale);
         description += " completion=" + std::to_string(payload.site_completion_normalized);
+        break;
+    }
+
+    case GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES:
+    {
+        const auto& payload = message.payload_as<Gs1EngineMessageCampaignResourcesData>();
+        description += " cash=" + std::to_string(payload.current_money);
+        description += " reputation=" + std::to_string(payload.total_reputation);
         break;
     }
 

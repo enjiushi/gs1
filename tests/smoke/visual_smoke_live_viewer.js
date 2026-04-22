@@ -9,6 +9,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const hudSubtitle = document.getElementById("hud-subtitle");
     const siteVitalsPanel = document.getElementById("site-vitals-panel");
     const siteVitalsMoney = document.getElementById("site-vitals-money");
+    const siteVitalsReputation = document.getElementById("site-vitals-reputation");
     const siteVitalsBars = document.getElementById("site-vitals-bars");
     const statusChip = document.getElementById("status-chip");
     const menuPanel = document.getElementById("menu-panel");
@@ -250,7 +251,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         2: { name: "Food", shortName: "Ration", stackSize: 5, canUse: true, canPlant: false, canDeploy: false, useLabel: "Eat" },
         3: { name: "Medicine", shortName: "Med", stackSize: 3, canUse: true, canPlant: false, canDeploy: false, useLabel: "Use" },
         4: { name: "Wind Reed Seeds", shortName: "Wind Reed", stackSize: 10, canUse: false, canPlant: true, canDeploy: false },
-        5: { name: "Saltbush Seeds", shortName: "Saltbush", stackSize: 10, canUse: false, canPlant: true, canDeploy: false },
+        5: { name: "Salt Bean Seeds", shortName: "Salt Bean", stackSize: 10, canUse: false, canPlant: true, canDeploy: false },
         6: { name: "Shade Cactus Seeds", shortName: "Shade Cactus", stackSize: 10, canUse: false, canPlant: true, canDeploy: false },
         7: { name: "Sunfruit Vine Seeds", shortName: "Sunfruit Vine", stackSize: 10, canUse: false, canPlant: true, canDeploy: false },
         8: { name: "Wood", shortName: "Wood", stackSize: 20, canUse: false, canPlant: false, canDeploy: false },
@@ -1227,6 +1228,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function getHudState(state) {
         return state ? state.hud || null : null;
+    }
+
+    function getCampaignResources(state) {
+        return state ? state.campaignResources || null : null;
     }
 
     function getItemMeta(itemId) {
@@ -2589,17 +2594,18 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function renderSiteVitalsPanel(state) {
-        if (!siteVitalsPanel || !siteVitalsMoney || !siteVitalsBars) {
+        if (!siteVitalsPanel || !siteVitalsMoney || !siteVitalsReputation || !siteVitalsBars) {
             return;
         }
 
-        if (!state || state.appState !== "SITE_ACTIVE") {
+        if (!state || (state.appState !== "SITE_ACTIVE" && state.appState !== "REGIONAL_MAP")) {
             siteVitalsPanel.hidden = true;
             siteVitalsBars.innerHTML = "";
             return;
         }
 
         const hud = getHudState(state);
+        const campaignResources = getCampaignResources(state);
         const siteState = getSiteState(state);
         const worker = siteState ? siteState.worker : null;
         const health = hud && typeof hud.playerHealth === "number"
@@ -2614,11 +2620,29 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const morale = hud && typeof hud.playerMorale === "number"
             ? hud.playerMorale
             : 0;
-        const currentMoney = hud && typeof hud.currentMoney === "number" ? hud.currentMoney : 0;
+        const currentMoney =
+            campaignResources && typeof campaignResources.currentMoney === "number"
+                ? campaignResources.currentMoney
+                : (hud && typeof hud.currentMoney === "number" ? hud.currentMoney : 0);
+        const totalReputation =
+            campaignResources && typeof campaignResources.totalReputation === "number"
+                ? campaignResources.totalReputation
+                : 0;
 
         siteVitalsPanel.hidden = false;
-        siteVitalsMoney.textContent = String(currentMoney);
+        const cashValue = siteVitalsMoney.querySelector(".resource-value");
+        const reputationValue = siteVitalsReputation.querySelector(".resource-value");
+        if (cashValue) {
+            cashValue.textContent = String(currentMoney);
+        }
+        if (reputationValue) {
+            reputationValue.textContent = String(totalReputation);
+        }
         siteVitalsBars.innerHTML = "";
+
+        if (state.appState !== "SITE_ACTIVE") {
+            return;
+        }
 
         [
             { label: "Health", percent: clampMeterPercent(health), className: "health" },
@@ -3031,7 +3055,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const closeAction = getTechTreeCloseAction(techTreeSetup);
         const title = getLabelElements(techTreeSetup)[0];
         const subtitle = getLabelElements(techTreeSetup)[1];
-        const titleText = title ? title.text : "Faction Tech Tree";
+        const titleText = title ? title.text : "Prototype Tech Tree";
         const subtitleText = subtitle ? subtitle.text : "Claim nodes with available faction reputation.";
         const summaryParts = splitInfoParts(subtitleText);
 
@@ -4588,7 +4612,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             hudEyebrow.textContent = "App State";
             hudTitle.textContent = state.appState || "NONE";
             hudSubtitle.textContent = "Review the campaign survey board and choose the next deployment route.";
-            renderSiteVitalsPanel(null);
+            renderSiteVitalsPanel(state);
             inventoryPanelOpen = true;
             phonePanelOpen = false;
             selectedInventorySlotKey = "";

@@ -41,7 +41,8 @@ public:
         LiveStatePatchField_SiteStatePhone = 1U << 15,
         LiveStatePatchField_SiteStateCraftContext = 1U << 16,
         LiveStatePatchField_SiteStatePlacementPreview = 1U << 17,
-        LiveStatePatchField_SitePlacementFailure = 1U << 18
+        LiveStatePatchField_SitePlacementFailure = 1U << 18,
+        LiveStatePatchField_CampaignResources = 1U << 19
     };
 
     struct LiveStateSnapshot;
@@ -323,6 +324,12 @@ public:
         float site_completion_normalized {0.0f};
     };
 
+    struct CampaignResourcesProjection final
+    {
+        std::int32_t current_money {0};
+        std::int32_t total_reputation {0};
+    };
+
     struct SiteActionProjection final
     {
         std::uint32_t action_id {0};
@@ -354,6 +361,7 @@ public:
         std::vector<RegionalMapSiteProjection> regional_map_sites {};
         std::vector<RegionalMapLinkProjection> regional_map_links {};
         std::optional<SiteSnapshotProjection> active_site_snapshot {};
+        std::optional<CampaignResourcesProjection> campaign_resources {};
         std::optional<HudProjection> hud_state {};
         std::optional<SiteActionProjection> site_action {};
         std::optional<SiteResultProjection> site_result {};
@@ -401,6 +409,7 @@ private:
     void apply_site_phone_listing_remove(const Gs1EngineMessage& message);
     void apply_site_phone_listing_upsert(const Gs1EngineMessage& message);
     void apply_site_snapshot_end();
+    void apply_campaign_resources(const Gs1EngineMessage& message);
     void apply_hud_state(const Gs1EngineMessage& message);
     void apply_site_action_update(const Gs1EngineMessage& message);
     void apply_site_result_ready(const Gs1EngineMessage& message);
@@ -438,6 +447,7 @@ private:
     std::optional<SiteSnapshotProjection> pending_site_snapshot_ {};
     std::uint32_t pending_site_snapshot_patch_mask_ {0U};
     std::optional<SiteSnapshotProjection> active_site_snapshot_ {};
+    std::optional<CampaignResourcesProjection> campaign_resources_ {};
     std::optional<HudProjection> hud_state_ {};
     std::optional<SiteActionProjection> site_action_ {};
     std::optional<SiteResultProjection> site_result_ {};
