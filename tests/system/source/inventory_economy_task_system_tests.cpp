@@ -684,7 +684,7 @@ void inventory_item_use_drink_defers_item_and_meter_changes_until_action_complet
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.site_world->worker_conditions().hydration, 52.0f));
 }
 
-void inventory_delivery_waits_for_delivery_box_capacity_and_arrives_after_start(
+void inventory_delivery_queues_only_overflow_until_delivery_crate_space_opens(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
@@ -752,15 +752,6 @@ void inventory_delivery_waits_for_delivery_box_capacity_and_arrives_after_start(
     GS1_SYSTEM_TEST_CHECK(context, cleared_quantity == 0U);
 
     InventorySystem::run(site_context);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        site_run.inventory.pending_delivery_queue.front().state == gs1::PendingDeliveryState::InTransit);
-    GS1_SYSTEM_TEST_CHECK(context, delivery_box_slot_stack(site_run, 0U) == nullptr);
-
-    for (int step = 0; step < 6 && !site_run.inventory.pending_delivery_queue.empty(); ++step)
-    {
-        InventorySystem::run(site_context);
-    }
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.pending_delivery_queue.empty());
     GS1_SYSTEM_TEST_REQUIRE(context, delivery_box_slot_stack(site_run, 0U) != nullptr);
     GS1_SYSTEM_TEST_CHECK(
@@ -1537,7 +1528,7 @@ void task_board_claim_reward_marks_selected_and_applies_money_reward(
     GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 57);
 }
 
-void task_board_claim_reward_queues_delivery_and_marks_selected(
+void task_board_claim_reward_delivers_to_crate_immediately_and_marks_selected(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
@@ -1574,7 +1565,7 @@ void task_board_claim_reward_queues_delivery_and_marks_selected(
     GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::InventoryDeliveryRequested);
     const auto& delivery_payload =
         queue.front().payload_as<gs1::InventoryDeliveryRequestedMessage>();
-    GS1_SYSTEM_TEST_CHECK(context, delivery_payload.minutes_until_arrival == 10U);
+    GS1_SYSTEM_TEST_CHECK(context, delivery_payload.minutes_until_arrival == 0U);
     GS1_SYSTEM_TEST_CHECK(context, delivery_payload.item_id == gs1::k_item_food_pack);
     GS1_SYSTEM_TEST_CHECK(context, delivery_payload.quantity == 1U);
 
@@ -1583,15 +1574,15 @@ void task_board_claim_reward_queues_delivery_and_marks_selected(
         find_task_reward_option(site_run.task_board.visible_tasks.front(), gs1::k_reward_candidate_site1_food_delivery);
     GS1_SYSTEM_TEST_REQUIRE(context, reward_option != nullptr);
     GS1_SYSTEM_TEST_CHECK(context, reward_option->selected);
-    GS1_SYSTEM_TEST_REQUIRE(context, site_run.inventory.pending_delivery_queue.size() == 1U);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.pending_delivery_queue.front().state == gs1::PendingDeliveryState::Pending);
-    GS1_SYSTEM_TEST_REQUIRE(context, !site_run.inventory.pending_delivery_queue.front().item_stacks.empty());
     GS1_SYSTEM_TEST_CHECK(
         context,
-        site_run.inventory.pending_delivery_queue.front().item_stacks.front().item_id.value == gs1::k_item_food_pack);
+        site_run.inventory.pending_delivery_queue.empty());
     GS1_SYSTEM_TEST_CHECK(
         context,
-        site_run.inventory.pending_delivery_queue.front().item_stacks.front().item_quantity == 1U);
+        gs1::inventory_storage::available_item_quantity_in_container(
+            site_run,
+            gs1::inventory_storage::delivery_box_container(site_run),
+            gs1::ItemId {gs1::k_item_food_pack}) == 1U);
 }
 
 void task_board_claim_reward_reveals_unlockable_and_blocks_duplicate_claim(
@@ -1742,8 +1733,8 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     inventory_item_use_drink_defers_item_and_meter_changes_until_action_completion);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "inventory",
-    "delivery_waits_for_delivery_box_capacity_and_arrives_after_start",
-    inventory_delivery_waits_for_delivery_box_capacity_and_arrives_after_start);
+    "delivery_queues_only_overflow_until_delivery_crate_space_opens",
+    inventory_delivery_queues_only_overflow_until_delivery_crate_space_opens);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "economy_phone",
     "site_run_started_seeds_site_one_and_resets_other_sites",
@@ -1802,8 +1793,8 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     task_board_claim_reward_marks_selected_and_applies_money_reward);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "task_board",
-    "claim_reward_queues_delivery_and_marks_selected",
-    task_board_claim_reward_queues_delivery_and_marks_selected);
+    "claim_reward_delivers_to_crate_immediately_and_marks_selected",
+    task_board_claim_reward_delivers_to_crate_immediately_and_marks_selected);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "task_board",
     "claim_reward_reveals_unlockable_and_blocks_duplicate_claim",

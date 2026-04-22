@@ -243,6 +243,9 @@ Implemented behavior coverage should verify:
 - `SiteRunStarted` seeds the site-one starter inventory only when the inventory
   is still empty.
 - Non-site-one runs do not receive the site-one starter inventory.
+- Delivery requests try to place their stacks into the delivery crate
+  immediately and queue only the overflow that cannot fit yet.
+- Queued delivery overflow is retried as soon as delivery-crate space opens.
 - `run()` resizes slot vectors to match configured slot counts.
 - Using an item validates slot existence, occupancy, item id, and quantity.
 - Supported item uses emit `WorkerMeterDeltaRequested`.
@@ -257,6 +260,8 @@ Implemented behavior coverage should verify:
 - `SiteRunStarted` seeds site-one money, listings, and unlockables.
 - Non-site-one runs are reset to an empty/default economy state.
 - Buying from a buy listing spends money and decrements limited quantity.
+- Successful buy-item purchases route inventory through the delivery crate
+  immediately instead of waiting on a timed arrival.
 - Selling to a sell listing increases money and decrements limited quantity.
 - Contractor hire spends money and decrements available work units.
 - Unlockable purchase removes the unlockable from direct-purchase availability
@@ -289,6 +294,8 @@ Implemented behavior coverage should verify:
 - Claiming a completed-task reward marks the chosen option selected and routes
   the reward effect through the owning gameplay system for money, unlockable,
   and run-modifier prototype rewards.
+- Item-delivery task rewards route through the delivery crate immediately and
+  use the pending queue only for overflow that does not currently fit.
 - Claiming a reward moves the task into the claimed/history bucket instead of
   leaving it in the live completed list.
 

@@ -1318,9 +1318,9 @@ Container rules:
 Use these item-flow rules:
 
 - the site's initial loadout is already packed into the green delivery crate when the site session begins; it does not wait in `pendingDeliveryQueue`
-- phone purchases create a package in `pendingDeliveryQueue`
-- each purchased package should arrive at camp after `30` in-game minutes if the camp delivery point is operational
-- later delivered items enter the green delivery crate device, not `workerPack`
+- phone purchases and item-based task rewards try to enter the green delivery crate immediately
+- if the delivery crate cannot fit the full package, the remaining stacks wait in `pendingDeliveryQueue` until crate space opens
+- later delivered items always route through the green delivery crate device, not `workerPack`
 - the player can transfer items between `workerPack` and any nearby device storage through the shared inventory interaction panel
 - plant placement, repair work, and burial clearing consume from `workerPack` when they require carried items
 - deployable structure kits consume from `workerPack`
@@ -3054,7 +3054,7 @@ Loadout rules:
 - adjacency for exported support and `Nearby-Site Aura` should be checked when the player selects the target site and assembles that deployment
 - claimed exported item support should already be packed into the green delivery crate at the beginning of the site session
 - site `1`'s baseline deployment loadout is exactly `1` `Water` plus `8` `Basic Straw Checkerboard`, already packed into the green delivery crate when the site session begins
-- that site-start loadout appears instantly in the delivery crate; only later phone purchases or other later rewards use the ordinary timed delivery flow
+- that site-start loadout appears instantly in the delivery crate, and later phone purchases or item rewards also try to enter that crate immediately with overflow waiting in `pendingDeliveryQueue`
 
 In the current design, a loadout can include:
 
@@ -4405,7 +4405,7 @@ Important rule:
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `itemQuantity` | Buying, crafting, harvesting, transfers between `workerPack`, device storage, and `pendingDeliveryQueue`, planting, building, repair, consume actions, selling, hazard-side partial loss | Inventory occupancy, action availability, sale payout, `deviceStoredWater` when water is transferred | Core stack-count meter. It should always be clamped between `0` and `stackSize`, and the stack should be removed when it reaches `0`. |
+| `itemQuantity` | Buying, crafting, harvesting, transfers between `workerPack`, device storage, the delivery crate, and `pendingDeliveryQueue` overflow entries, planting, building, repair, consume actions, selling, hazard-side partial loss | Inventory occupancy, action availability, sale payout, `deviceStoredWater` when water is transferred | Core stack-count meter. It should always be clamped between `0` and `stackSize`, and the stack should be removed when it reaches `0`. |
 | `itemCondition` | Severe hazard damage on exposed stored items, authored item-damage events | Action availability, sale payout | Meaningful mainly for items whose tags imply physical integrity matters, such as `mechanical`, `repairSupply`, `buildSupply`, `fragile`, or `deployableKit`. |
 | `itemFreshness` | Severe hazard spoilage on exposed stored items, authored spoilage events | Action availability, worker recovery value, sale payout | Meaningful mainly for items with the `spoilable` tag, such as water, food, medicine, or crafted consumables. |
 

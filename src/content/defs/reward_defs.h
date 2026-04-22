@@ -62,7 +62,7 @@ inline constexpr std::array<RewardCandidateDef, 7> k_prototype_reward_candidate_
         0U,
         ModifierId {},
         FactionId {},
-        10U,
+        0U,
         0},
     RewardCandidateDef {
         RewardCandidateId {k_reward_candidate_site1_unlockable_reveal},
@@ -95,7 +95,7 @@ inline constexpr std::array<RewardCandidateDef, 7> k_prototype_reward_candidate_
         0U,
         ModifierId {},
         FactionId {},
-        10U,
+        0U,
         0},
     RewardCandidateDef {
         RewardCandidateId {k_reward_candidate_site1_second_unlockable_reveal},

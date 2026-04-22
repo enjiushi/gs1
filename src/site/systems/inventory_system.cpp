@@ -4,7 +4,6 @@
 #include "content/defs/craft_recipe_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/structure_defs.h"
-#include "runtime/runtime_clock.h"
 #include "site/craft_logic.h"
 #include "site/defs/site_action_defs.h"
 #include "site/device_interaction_logic.h"
@@ -22,7 +21,6 @@ namespace gs1
 {
 namespace
 {
-constexpr double k_default_delivery_minutes = 30.0;
 constexpr std::uint32_t k_delivery_box_storage_flags =
     inventory_storage::k_inventory_storage_flag_delivery_box |
     inventory_storage::k_inventory_storage_flag_retrieval_only;
@@ -55,21 +53,6 @@ std::vector<InventorySlot> capture_storage_projection_slots(
 {
     std::vector<InventorySlot> slots {};
     const auto container = inventory_storage::container_for_storage_id(site_run, storage_id);
-    if (!container.is_valid())
-    {
-        return slots;
-    }
-
-    slots.resize(inventory_storage::slot_count_in_container(site_run, container));
-    inventory_storage::sync_projection_slots_for_container(site_run, container, slots);
-    return slots;
-}
-
-std::vector<InventorySlot> capture_container_projection_slots(
-    SiteRunState& site_run,
-    flecs::entity container)
-{
-    std::vector<InventorySlot> slots {};
     if (!container.is_valid())
     {
         return slots;
@@ -565,84 +548,13 @@ bool delivery_has_pending_items(const PendingDelivery& delivery) noexcept
     return false;
 }
 
-bool reserve_item_stack_in_projection_slots(
-    std::vector<InventorySlot>& slots,
-    const InventorySlot& stack) noexcept
-{
-    if (!stack.occupied || stack.item_id.value == 0U || stack.item_quantity == 0U)
-    {
-        return true;
-    }
-
-    std::uint32_t remaining = stack.item_quantity;
-    const auto max_stack = inventory_storage::stack_limit(stack.item_id);
-    for (auto& slot : slots)
-    {
-        if (!slot.occupied || slot.item_id != stack.item_id || slot.item_quantity >= max_stack)
-        {
-            continue;
-        }
-
-        const auto free_capacity = max_stack - slot.item_quantity;
-        const auto transfer = std::min<std::uint32_t>(remaining, free_capacity);
-        slot.item_quantity += transfer;
-        remaining -= transfer;
-        if (remaining == 0U)
-        {
-            return true;
-        }
-    }
-
-    for (auto& slot : slots)
-    {
-        if (slot.occupied)
-        {
-            continue;
-        }
-
-        const auto transfer = std::min<std::uint32_t>(remaining, max_stack);
-        slot.item_id = stack.item_id;
-        slot.item_quantity = transfer;
-        slot.item_condition = stack.item_condition;
-        slot.item_freshness = stack.item_freshness;
-        slot.occupied = transfer > 0U;
-        remaining -= transfer;
-        if (remaining == 0U)
-        {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-bool reserve_delivery_in_projection_slots(
-    std::vector<InventorySlot>& slots,
-    const PendingDelivery& delivery) noexcept
-{
-    auto working_slots = slots;
-    for (const auto& stack : delivery.item_stacks)
-    {
-        if (!reserve_item_stack_in_projection_slots(working_slots, stack))
-        {
-            return false;
-        }
-    }
-
-    slots = std::move(working_slots);
-    return true;
-}
-
 PendingDelivery make_pending_delivery(
     DeliveryId delivery_id,
-    double minutes_until_arrival,
     const InventoryDeliveryBatchEntry* entries,
     std::uint8_t entry_count)
 {
     PendingDelivery delivery {};
     delivery.delivery_id = delivery_id;
-    delivery.minutes_until_arrival =
-        minutes_until_arrival <= 0.0 ? k_default_delivery_minutes : minutes_until_arrival;
     delivery.state = PendingDeliveryState::Pending;
     delivery.item_stacks.reserve(entry_count);
     for (std::uint8_t index = 0U; index < entry_count; ++index)
@@ -663,6 +575,42 @@ PendingDelivery make_pending_delivery(
     }
 
     return delivery;
+}
+
+void try_add_delivery_to_crate(
+    SiteSystemContext<InventorySystem>& context,
+    PendingDelivery& delivery) noexcept
+{
+    const auto delivery_box = resolve_delivery_box_container(context);
+    if (!delivery_box.is_valid())
+    {
+        return;
+    }
+
+    for (auto& stack : delivery.item_stacks)
+    {
+        if (!stack.occupied || stack.item_quantity == 0U)
+        {
+            continue;
+        }
+
+        const auto remaining_quantity = inventory_storage::add_item_to_container(
+            context.site_run,
+            delivery_box,
+            stack.item_id,
+            stack.item_quantity,
+            stack.item_condition,
+            stack.item_freshness);
+        if (remaining_quantity == 0U)
+        {
+            stack = InventorySlot {};
+        }
+        else
+        {
+            stack.item_quantity = remaining_quantity;
+            stack.occupied = remaining_quantity > 0U;
+        }
+    }
 }
 
 void seed_inventory_from_loadout(SiteSystemContext<InventorySystem>& context) noexcept
@@ -1250,76 +1198,75 @@ Gs1Status handle_inventory_delivery_requested(
     SiteSystemContext<InventorySystem>& context,
     const InventoryDeliveryRequestedMessage& payload) noexcept
 {
-    ensure_inventory_storage_initialized(context);
+    return mutate_inventory_storage(context, [&]() -> Gs1Status {
+        const ItemId item_id {payload.item_id};
+        if (find_item_def(item_id) == nullptr)
+        {
+            return GS1_STATUS_NOT_FOUND;
+        }
 
-    const ItemId item_id {payload.item_id};
-    if (find_item_def(item_id) == nullptr)
-    {
-        return GS1_STATUS_NOT_FOUND;
-    }
+        InventoryDeliveryBatchEntry entry {};
+        entry.item_id = static_cast<std::uint16_t>(item_id.value);
+        entry.quantity = static_cast<std::uint16_t>(normalize_quantity(payload.quantity));
+        PendingDelivery delivery = make_pending_delivery(
+            DeliveryId {allocate_delivery_id()},
+            &entry,
+            1U);
+        if (!delivery_has_pending_items(delivery))
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
 
-    InventoryDeliveryBatchEntry entry {};
-    entry.item_id = static_cast<std::uint16_t>(item_id.value);
-    entry.quantity = static_cast<std::uint16_t>(normalize_quantity(payload.quantity));
-    PendingDelivery delivery = make_pending_delivery(
-        DeliveryId {allocate_delivery_id()},
-        payload.minutes_until_arrival == 0U
-            ? k_default_delivery_minutes
-            : static_cast<double>(payload.minutes_until_arrival),
-        &entry,
-        1U);
-    if (!delivery_has_pending_items(delivery))
-    {
-        return GS1_STATUS_INVALID_ARGUMENT;
-    }
-    inventory_storage::sync_projection_views(context.site_run);
-    context.world.own_inventory().pending_delivery_queue.push_back(delivery);
-    return GS1_STATUS_OK;
+        try_add_delivery_to_crate(context, delivery);
+        if (delivery_has_pending_items(delivery))
+        {
+            context.world.own_inventory().pending_delivery_queue.push_back(std::move(delivery));
+        }
+        return GS1_STATUS_OK;
+    });
 }
 
 Gs1Status handle_inventory_delivery_batch_requested(
     SiteSystemContext<InventorySystem>& context,
     const InventoryDeliveryBatchRequestedMessage& payload) noexcept
 {
-    ensure_inventory_storage_initialized(context);
-
-    if (payload.entry_count == 0U || payload.entry_count > k_inventory_delivery_batch_entry_count)
-    {
-        return GS1_STATUS_INVALID_ARGUMENT;
-    }
-
-    for (std::uint8_t index = 0U; index < payload.entry_count; ++index)
-    {
-        if (payload.entries[index].item_id == 0U ||
-            payload.entries[index].quantity == 0U ||
-            find_item_def(ItemId {payload.entries[index].item_id}) == nullptr)
+    return mutate_inventory_storage(context, [&]() -> Gs1Status {
+        if (payload.entry_count == 0U || payload.entry_count > k_inventory_delivery_batch_entry_count)
         {
-            return GS1_STATUS_NOT_FOUND;
+            return GS1_STATUS_INVALID_ARGUMENT;
         }
-    }
 
-    PendingDelivery delivery = make_pending_delivery(
-        DeliveryId {allocate_delivery_id()},
-        payload.minutes_until_arrival == 0U
-            ? k_default_delivery_minutes
-            : static_cast<double>(payload.minutes_until_arrival),
-        payload.entries,
-        payload.entry_count);
-    if (!delivery_has_pending_items(delivery))
-    {
-        return GS1_STATUS_INVALID_ARGUMENT;
-    }
+        for (std::uint8_t index = 0U; index < payload.entry_count; ++index)
+        {
+            if (payload.entries[index].item_id == 0U ||
+                payload.entries[index].quantity == 0U ||
+                find_item_def(ItemId {payload.entries[index].item_id}) == nullptr)
+            {
+                return GS1_STATUS_NOT_FOUND;
+            }
+        }
 
-    inventory_storage::sync_projection_views(context.site_run);
-    context.world.own_inventory().pending_delivery_queue.push_back(delivery);
-    return GS1_STATUS_OK;
+        PendingDelivery delivery = make_pending_delivery(
+            DeliveryId {allocate_delivery_id()},
+            payload.entries,
+            payload.entry_count);
+        if (!delivery_has_pending_items(delivery))
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+
+        try_add_delivery_to_crate(context, delivery);
+        if (delivery_has_pending_items(delivery))
+        {
+            context.world.own_inventory().pending_delivery_queue.push_back(std::move(delivery));
+        }
+        return GS1_STATUS_OK;
+    });
 }
 
 void progress_pending_deliveries(SiteSystemContext<InventorySystem>& context) noexcept
 {
     ensure_inventory_storage_initialized(context);
-    const double step_minutes =
-        runtime_minutes_from_real_seconds(context.fixed_step_seconds);
     auto& inventory = context.world.own_inventory();
     if (inventory.pending_delivery_queue.empty())
     {
@@ -1330,73 +1277,10 @@ void progress_pending_deliveries(SiteSystemContext<InventorySystem>& context) no
     const auto before_opened_storage_id = inventory.opened_device_storage_id;
     const auto before_opened_storage =
         capture_storage_projection_slots(context.site_run, before_opened_storage_id);
-    const auto delivery_box = resolve_delivery_box_container(context);
-    auto reserved_slots = capture_container_projection_slots(context.site_run, delivery_box);
-
-    for (const auto& delivery : inventory.pending_delivery_queue)
-    {
-        if (delivery.state == PendingDeliveryState::InTransit)
-        {
-            (void)reserve_delivery_in_projection_slots(reserved_slots, delivery);
-        }
-    }
-
-    if (context.world.read_camp().delivery_point_operational && delivery_box.is_valid())
-    {
-        for (auto& delivery : inventory.pending_delivery_queue)
-        {
-            if (delivery.state != PendingDeliveryState::Pending)
-            {
-                continue;
-            }
-
-            if (!reserve_delivery_in_projection_slots(reserved_slots, delivery))
-            {
-                continue;
-            }
-
-            delivery.state = PendingDeliveryState::InTransit;
-        }
-    }
 
     for (auto& delivery : inventory.pending_delivery_queue)
     {
-        if (delivery.state != PendingDeliveryState::InTransit)
-        {
-            continue;
-        }
-
-        delivery.minutes_until_arrival =
-            std::max(0.0, delivery.minutes_until_arrival - step_minutes);
-        if (delivery.minutes_until_arrival > 0.0)
-        {
-            continue;
-        }
-
-        for (auto& stack : delivery.item_stacks)
-        {
-            if (!stack.occupied || stack.item_quantity == 0U)
-            {
-                continue;
-            }
-
-            const auto remaining_quantity = inventory_storage::add_item_to_container(
-                context.site_run,
-                delivery_box,
-                stack.item_id,
-                stack.item_quantity,
-                stack.item_condition,
-                stack.item_freshness);
-            if (remaining_quantity == 0U)
-            {
-                stack = InventorySlot {};
-            }
-            else
-            {
-                stack.item_quantity = remaining_quantity;
-                stack.occupied = remaining_quantity > 0U;
-            }
-        }
+        try_add_delivery_to_crate(context, delivery);
     }
 
     inventory.pending_delivery_queue.erase(

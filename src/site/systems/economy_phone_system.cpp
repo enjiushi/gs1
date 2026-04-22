@@ -16,7 +16,7 @@ namespace
 {
 constexpr std::int32_t k_site1_initial_money = 45;
 constexpr std::int32_t k_phone_delivery_fee = 5;
-constexpr std::uint16_t k_default_delivery_minutes = 30U;
+constexpr std::uint16_t k_immediate_delivery_minutes = 0U;
 constexpr std::uint32_t k_site1_water_listing_id = 1U;
 constexpr std::uint32_t k_site1_food_listing_id = 2U;
 constexpr std::uint32_t k_site1_medicine_listing_id = 3U;
@@ -262,7 +262,7 @@ bool queue_delivery_batch_message(
     GameMessage delivery_message {};
     delivery_message.type = GameMessageType::InventoryDeliveryBatchRequested;
     auto& payload = delivery_message.emplace_payload<InventoryDeliveryBatchRequestedMessage>();
-    payload.minutes_until_arrival = k_default_delivery_minutes;
+    payload.minutes_until_arrival = k_immediate_delivery_minutes;
     payload.entry_count = entry_count;
     payload.reserved0 = 0U;
     for (std::size_t index = 0; index < k_inventory_delivery_batch_entry_count; ++index)

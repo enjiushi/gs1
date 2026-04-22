@@ -204,9 +204,7 @@ void phone_panel_sell_list_refreshes_when_purchase_delivery_arrives(
     GS1_SYSTEM_TEST_REQUIRE(context, processed_delivery);
     queue.clear();
 
-    GS1_SYSTEM_TEST_REQUIRE(context, site_run.inventory.pending_delivery_queue.size() == 1U);
-    site_run.inventory.pending_delivery_queue.front().minutes_until_arrival = 0.0;
-    InventorySystem::run(inventory_context);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.pending_delivery_queue.empty());
     PhonePanelSystem::run(phone_context);
 
     const auto* sell_listing = find_phone_panel_listing(site_run.phone_panel, sell_listing_id);

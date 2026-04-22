@@ -16,7 +16,7 @@ Definition types and runtime accessors for the major authored content domains.
 - `modifier_defs.h`: Modifier definition records applied by modifier/weather flows.
 - `plant_defs.h`: Plant/ecology definition types plus runtime accessors over the loaded plant table, including authored wind-protection range/power values and the starter straw checkerboard definition with its authored `2x2` footprint plus tuned steady-wither behavior used by directional shelter resolution.
 - `recipe_defs.h`: General recipe definition records shared by authored content.
-- `reward_defs.h`: Reward definition records for grants and payouts, including the shared prototype task-reward pool, simple modifier rewards, immediate unlockable reveals, and delivery-based item bundle candidates.
+- `reward_defs.h`: Reward definition records for grants and payouts, including the shared prototype task-reward pool, simple modifier rewards, immediate unlockable reveals, and delivery-crate-routed item bundle candidates.
 - `site_content_defs.h`: Site template/content definitions for active site runs.
 - `structure_defs.h`: Structure/buildable definition types plus runtime accessors over the loaded structure table.
 - `task_defs.h`: Task board/authored task definition records, including the site-one onboarding task pool, progress-kind metadata, and lookup helpers.

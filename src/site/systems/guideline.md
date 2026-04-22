@@ -21,11 +21,11 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `ecology_system.h`: Ecology system interface.
 - `ecology_system.cpp`: Updates plants, burial, watering, broader ecology progression, and highway-target sand-cover accumulation for objective-driven site progress.
 - `economy_phone_system.h`: Economy phone system interface.
-- `economy_phone_system.cpp`: Handles phone storefront interactions, economy-driven purchases, owner-confirmed buy/sell completion messages for onboarding-task progress, and task-reward money/unlockable reveal awards routed through message handling.
+- `economy_phone_system.cpp`: Handles phone storefront interactions, economy-driven purchases, immediate delivery-crate routing for bought items, owner-confirmed buy/sell completion messages for onboarding-task progress, and task-reward money/unlockable reveal awards routed through message handling.
 - `failure_recovery_system.h`: Failure recovery system interface.
 - `failure_recovery_system.cpp`: Resolves failure fallout and recovery flow for the site.
 - `inventory_system.h`: Inventory system interface.
-- `inventory_system.cpp`: Applies item moves, uses, inventory ownership changes, site-start loadout seeding into the delivery crate, owner-confirmed transfer/use/craft completion messages for onboarding-task progress, and fixed-step-derived delivery countdown progress.
+- `inventory_system.cpp`: Applies item moves, uses, inventory ownership changes, site-start loadout seeding into the delivery crate, immediate delivery-crate insertion with queued overflow retries, and owner-confirmed transfer/use/craft completion messages for onboarding-task progress.
 - `local_weather_resolve_system.h`: Local weather resolve system interface.
 - `local_weather_resolve_system.cpp`: Resolves local weather updates into owned site state, including directional lee-side wind shelter with nonlinear range falloff plus plant-tile projection dirties when visible local wind changes.
 - `modifier_system.h`: Modifier system interface.

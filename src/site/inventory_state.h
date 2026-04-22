@@ -22,8 +22,7 @@ struct StorageContainerState final
 
 enum class PendingDeliveryState : std::uint8_t
 {
-    Pending = 0,
-    InTransit = 1
+    Pending = 0
 };
 
 struct InventorySlot final
@@ -40,7 +39,6 @@ struct PendingDelivery final
 {
     DeliveryId delivery_id {};
     std::vector<InventorySlot> item_stacks {};
-    double minutes_until_arrival {0.0};
     PendingDeliveryState state {PendingDeliveryState::Pending};
 };
 

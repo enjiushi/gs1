@@ -110,7 +110,7 @@ The current prototype implementation makes these item/storage rules explicit:
 - deployable kits are also ordinary items and point at an authored `StructureDef`
 - the site begins with a green delivery crate device placed near camp, and all on-site storage resolves through per-device storage containers with authored slot counts
 - there is no separate startup crate; the green delivery crate occupies the near-camp crate position from the first frame of the site run
-- the starting site-session loadout is seeded directly into that delivery crate on `SiteRunStarted`; only later purchases or reward deliveries use timed arrival
+- the starting site-session loadout is seeded directly into that delivery crate on `SiteRunStarted`, and later purchases or item rewards also try to enter that crate immediately
 - site `1`'s baseline loadout is `1` `Water` plus `8` `Basic Straw Checkerboard`, already inside that delivery crate on `SiteRunStarted`
 - crafting stations cache nearby item-instance ids from local storage plus the worker pack when the worker is inside the craft radius
 - crafting actions are timed site actions; on completion they resolve recipe consumption across matching stacks and place output into the acting device's own storage
@@ -763,7 +763,6 @@ Delivery entry:
 ```text
 deliveryId
 itemStacks[]
-minutesUntilArrival
 ```
 
 Rules:
@@ -771,6 +770,9 @@ Rules:
 - one slot holds one stack of one exact item
 - empty slot means `itemId = null`
 - `itemQuantity` is removed when it reaches `0`
+- purchases and item rewards try to insert into the delivery crate immediately
+- `pendingDeliveryQueue[]` stores only the overflow stacks that could not fit into the delivery crate yet
+- inventory retries queued overflow whenever delivery-crate space becomes available
 - selling reads item-instance state from the worker pack plus all device storage containers
 
 ### 6.14 `ContractorState`
@@ -1269,7 +1271,7 @@ Responsibilities:
 Responsibilities:
 
 - move items between worker pack and device storage
-- process delivery arrival
+- process immediate delivery-crate insertion plus queued-overflow retries
 - handle stack merge/split
 - seed the starting loadout directly into the delivery crate when the site run starts
 - consume carried items for actions
