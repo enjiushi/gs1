@@ -996,6 +996,34 @@ template <typename T>
     return values;
 }
 
+[[nodiscard]] PrototypeSiteStartingPlantContent parse_starting_plant_entry(
+    const std::filesystem::path& path,
+    const toml::table& table)
+{
+    PrototypeSiteStartingPlantContent plant {};
+    plant.plant_id = PlantId {require_toml_unsigned<std::uint32_t>(path, table, "plant_id")};
+    plant.anchor_tile.x = require_toml_signed<std::int32_t>(path, table, "anchor_x");
+    plant.anchor_tile.y = require_toml_signed<std::int32_t>(path, table, "anchor_y");
+    plant.initial_density = require_toml_float(path, table, "initial_density");
+    return plant;
+}
+
+[[nodiscard]] std::vector<PrototypeSiteStartingPlantContent> parse_starting_plant_array(
+    const std::filesystem::path& path,
+    const toml::table& table,
+    std::string_view key)
+{
+    std::vector<PrototypeSiteStartingPlantContent> values {};
+    const auto& array = require_toml_array(path, table, key);
+    values.reserve(array.size());
+    for (const auto& node : array)
+    {
+        values.push_back(parse_starting_plant_entry(path, require_array_entry_table(path, node, key)));
+    }
+
+    return values;
+}
+
 PrototypeSiteContent* find_loaded_site(
     PrototypeCampaignContent& campaign,
     SiteId site_id) noexcept
@@ -1049,6 +1077,12 @@ void load_prototype_campaign_sites(ContentDatabase& content, const std::filesyst
             require_toml_signed<std::int32_t>(path, entry, "completion_faction_reputation_reward");
         site.camp_anchor_tile.x = require_toml_signed<std::int32_t>(path, entry, "camp_anchor_x");
         site.camp_anchor_tile.y = require_toml_signed<std::int32_t>(path, entry, "camp_anchor_y");
+        site.default_weather_heat = require_toml_float(path, entry, "default_weather_heat");
+        site.default_weather_wind = require_toml_float(path, entry, "default_weather_wind");
+        site.default_weather_dust = require_toml_float(path, entry, "default_weather_dust");
+        site.default_weather_wind_direction_degrees =
+            require_toml_float(path, entry, "default_weather_wind_direction_degrees");
+        site.starting_plants = parse_starting_plant_array(path, entry, "starting_plants");
         site.phone_delivery_fee = require_toml_signed<std::int32_t>(path, entry, "phone_delivery_fee");
         site.phone_delivery_minutes =
             require_toml_unsigned<std::uint16_t>(path, entry, "phone_delivery_minutes");

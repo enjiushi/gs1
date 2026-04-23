@@ -44,6 +44,6 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `task_board_system.h`: Task board system interface.
 - `task_board_system.cpp`: Manages board listings, acceptance, eligibility-filtered three-faction task-generator seeding, per-instance procedural resolution of x/y/z task values from authored ranges and eligible pools, subscribed progress tracking from owner-emitted buy/sell/transfer/plant/craft/build and worker/tile/device state messages, duration accumulation over those subscribed conditions, reward-claim no-ops for the current zero-reward contract, and reset flow on dense-restoration site one.
 - `weather_event_system.h`: Weather event system interface.
-- `weather_event_system.cpp`: Applies incoming weather events to site-owned weather/event state, including start/peak/end timeline interpolation and recurring one-sided highway-protection waves.
+- `weather_event_system.cpp`: Applies site-owned weather/event state changes, including authored default-weather baselines, start/peak/end timeline interpolation for additive event pressure, and recurring one-sided highway-protection waves.
 - `worker_condition_system.h`: Worker condition system interface.
 - `worker_condition_system.cpp`: Resolves worker condition from previous-frame state plus accumulated frame deltas, recomputes derived energy-cap and work-efficiency snapshots, and applies passive environment-driven meter loss with shelter softening.

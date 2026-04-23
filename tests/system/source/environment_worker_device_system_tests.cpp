@@ -44,7 +44,41 @@ GameMessage make_message(gs1::GameMessageType type, const Payload& payload)
     return message;
 }
 
-void weather_event_site_run_started_keeps_site_one_in_normal_conditions(
+void prototype_site_run_seeds_site_one_white_thorn_patches_near_camp(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_prototype_site_run(campaign, 1U);
+
+    GS1_SYSTEM_TEST_REQUIRE(context, site_run.site_world != nullptr);
+    for (const TileCoord coord : {
+             TileCoord {12, 14},
+             TileCoord {13, 14},
+             TileCoord {12, 15},
+             TileCoord {13, 15},
+             TileCoord {12, 16},
+             TileCoord {13, 16},
+             TileCoord {12, 17},
+             TileCoord {13, 17}})
+    {
+        const auto tile = site_run.site_world->tile_at(coord);
+        GS1_SYSTEM_TEST_CHECK(context, tile.ecology.plant_id.value == gs1::k_plant_white_thorn);
+        GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.plant_density, 60.0f));
+    }
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        site_run.site_world->tile_at(site_run.camp.camp_anchor_tile).ecology.plant_id.value == 0U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        site_run.site_world->tile_at(site_run.camp.delivery_box_tile).ecology.plant_id.value == 0U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        site_run.site_world->tile_at(default_starter_workbench_tile(site_run.camp.camp_anchor_tile))
+            .ecology.plant_id.value == 0U);
+}
+
+void weather_event_site_run_started_applies_site_one_background_conditions(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
@@ -71,14 +105,16 @@ void weather_event_site_run_started_keeps_site_one_in_normal_conditions(
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_one_run.event.peak_time_minutes, 0.0));
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_one_run.event.peak_duration_minutes, 0.0));
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_one_run.event.end_time_minutes, 0.0));
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_one_run.weather.weather_heat, 0.0f));
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_one_run.weather.weather_wind, 0.0f));
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_one_run.weather.weather_dust, 0.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_one_run.weather.weather_heat, 30.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_one_run.weather.weather_wind, 20.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_one_run.weather.weather_dust, 10.0f));
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_one_run.event.event_heat_pressure, 0.0f));
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_one_run.event.event_wind_pressure, 0.0f));
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_one_run.event.event_dust_pressure, 0.0f));
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_one_run.weather.weather_wind_direction_degrees, 0.0f));
-    GS1_SYSTEM_TEST_CHECK(context, site_one_run.pending_projection_update_flags == 0U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        (site_one_run.pending_projection_update_flags & gs1::SITE_PROJECTION_UPDATE_WEATHER) != 0U);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -115,21 +151,21 @@ void weather_event_run_advances_active_event_through_full_lifecycle(
         SiteTimeSystem::run(site_time_context);
         WeatherEventSystem::run(weather_context);
     }
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.weather.weather_heat, 0.0f));
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.weather.weather_wind, 0.0f));
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.weather.weather_dust, 0.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.weather.weather_heat, 30.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.weather.weather_wind, 20.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.weather.weather_dust, 10.0f));
 
     for (int index = 0; index < 25; ++index)
     {
         SiteTimeSystem::run(site_time_context);
         WeatherEventSystem::run(weather_context);
     }
-    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_heat > 0.0f);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_heat < 15.0f);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_wind > 0.0f);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_wind < 10.0f);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_dust > 0.0f);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_dust < 5.0f);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_heat > 30.0f);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_heat < 45.0f);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_wind > 20.0f);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_wind < 30.0f);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_dust > 10.0f);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_dust < 15.0f);
 
     for (int index = 0; index < 120; ++index)
     {
@@ -137,9 +173,9 @@ void weather_event_run_advances_active_event_through_full_lifecycle(
         WeatherEventSystem::run(weather_context);
     }
     GS1_SYSTEM_TEST_CHECK(context, !site_run.event.active_event_template_id.has_value());
-    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_heat < 0.01f);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_wind < 0.01f);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_dust < 0.01f);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.weather.weather_heat, 30.0f, 0.01f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.weather.weather_wind, 20.0f, 0.01f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.weather.weather_dust, 10.0f, 0.01f));
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.event.aftermath_relief_resolved, 1.0f));
 }
 
@@ -242,9 +278,9 @@ void weather_event_timeline_ramp_down_smooths_weather_toward_lower_target(
     site_run.event.event_heat_pressure = 15.0f;
     site_run.event.event_wind_pressure = 10.0f;
     site_run.event.event_dust_pressure = 5.0f;
-    site_run.weather.weather_heat = 15.0f;
-    site_run.weather.weather_wind = 10.0f;
-    site_run.weather.weather_dust = 5.0f;
+    site_run.weather.weather_heat = 45.0f;
+    site_run.weather.weather_wind = 30.0f;
+    site_run.weather.weather_dust = 15.0f;
     site_run.weather.weather_wind_direction_degrees = 74.0f;
     site_run.clock.world_time_minutes = 6.0;
 
@@ -253,12 +289,12 @@ void weather_event_timeline_ramp_down_smooths_weather_toward_lower_target(
     GS1_SYSTEM_TEST_CHECK(context, site_run.event.event_heat_pressure < 15.0f);
     GS1_SYSTEM_TEST_CHECK(context, site_run.event.event_wind_pressure < 10.0f);
     GS1_SYSTEM_TEST_CHECK(context, site_run.event.event_dust_pressure < 5.0f);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_heat < 15.0f);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_heat > site_run.event.event_heat_pressure);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_wind < 10.0f);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_wind > site_run.event.event_wind_pressure);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_dust < 5.0f);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_dust > site_run.event.event_dust_pressure);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_heat < 45.0f);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_heat > 30.0f + site_run.event.event_heat_pressure);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_wind < 30.0f);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_wind > 20.0f + site_run.event.event_wind_pressure);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_dust < 15.0f);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_dust > 10.0f + site_run.event.event_dust_pressure);
 }
 
 void weather_event_highway_objective_schedules_repeating_waves_with_one_sided_wind(
@@ -829,9 +865,13 @@ void modifier_imports_campaign_assistant_and_technology_run_modifiers(
 }  // namespace
 
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "site_run_factory",
+    "prototype_site_run_seeds_site_one_white_thorn_patches_near_camp",
+    prototype_site_run_seeds_site_one_white_thorn_patches_near_camp);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "weather_event",
-    "site_run_started_keeps_site_one_in_normal_conditions",
-    weather_event_site_run_started_keeps_site_one_in_normal_conditions);
+    "site_run_started_applies_site_one_background_conditions",
+    weather_event_site_run_started_applies_site_one_background_conditions);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "weather_event",
     "run_advances_active_event_through_full_lifecycle",

@@ -1,5 +1,6 @@
 #include "site/systems/weather_event_system.h"
 
+#include "content/prototype_content.h"
 #include "runtime/runtime_clock.h"
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
@@ -21,6 +22,31 @@ constexpr float k_weather_epsilon = 0.0001f;
 constexpr float k_weather_transition_rate_per_second = 2.4f;
 constexpr double k_min_wave_delay_minutes = 4.0;
 constexpr double k_max_wave_delay_minutes = 8.0;
+constexpr float k_weather_meter_max = 100.0f;
+
+struct SiteBaselineWeather final
+{
+    float heat {0.0f};
+    float wind {0.0f};
+    float dust {0.0f};
+    float wind_direction_degrees {0.0f};
+};
+
+[[nodiscard]] SiteBaselineWeather resolve_site_baseline_weather(
+    std::uint32_t site_id_value) noexcept
+{
+    const auto* site_content = find_prototype_site_content(SiteId {site_id_value});
+    if (site_content == nullptr)
+    {
+        return {};
+    }
+
+    return SiteBaselineWeather {
+        site_content->default_weather_heat,
+        site_content->default_weather_wind,
+        site_content->default_weather_dust,
+        site_content->default_weather_wind_direction_degrees};
+}
 
 void apply_site_weather(
     SiteSystemContext<WeatherEventSystem>& context,
@@ -281,6 +307,7 @@ Gs1Status WeatherEventSystem::process_message(
     auto& weather = context.world.own_weather();
     auto& event = context.world.own_event();
     const auto& objective = context.world.read_objective();
+    const auto baseline_weather = resolve_site_baseline_weather(context.world.site_id_value());
     if (has_active_event(event))
     {
         return GS1_STATUS_OK;
@@ -292,17 +319,28 @@ Gs1Status WeatherEventSystem::process_message(
         weather.site_weather_bias = 0.0f;
         event.aftermath_relief_resolved = 0.0f;
         event.minutes_until_next_wave = resolve_next_wave_delay_minutes(context, event.wave_sequence_index);
+        apply_site_weather(
+            context,
+            baseline_weather.heat,
+            baseline_weather.wind,
+            baseline_weather.dust,
+            baseline_weather.wind_direction_degrees);
         return GS1_STATUS_OK;
     }
 
-    if (context.world.site_id_value() != 1U)
+    if (context.world.site_id_value() == 1U)
     {
-        return GS1_STATUS_OK;
+        weather.forecast_profile_state.forecast_profile_id = 1U;
     }
 
-    weather.forecast_profile_state.forecast_profile_id = 1U;
     weather.site_weather_bias = 0.0f;
     event.aftermath_relief_resolved = 0.0f;
+    apply_site_weather(
+        context,
+        baseline_weather.heat,
+        baseline_weather.wind,
+        baseline_weather.dust,
+        baseline_weather.wind_direction_degrees);
 
     return GS1_STATUS_OK;
 }
@@ -313,6 +351,7 @@ void WeatherEventSystem::run(SiteSystemContext<WeatherEventSystem>& context)
         runtime_minutes_from_real_seconds(context.fixed_step_seconds);
     auto& event = context.world.own_event();
     const auto& objective = context.world.read_objective();
+    const auto baseline_weather = resolve_site_baseline_weather(context.world.site_id_value());
     const double world_time_minutes = context.world.read_time().world_time_minutes;
     if (!has_active_event(event))
     {
@@ -329,7 +368,12 @@ void WeatherEventSystem::run(SiteSystemContext<WeatherEventSystem>& context)
             }
         }
 
-        smooth_site_weather_toward(context, 0.0f, 0.0f, 0.0f, 0.0f);
+        smooth_site_weather_toward(
+            context,
+            baseline_weather.heat,
+            baseline_weather.wind,
+            baseline_weather.dust,
+            baseline_weather.wind_direction_degrees);
         return;
     }
 
@@ -347,7 +391,12 @@ void WeatherEventSystem::run(SiteSystemContext<WeatherEventSystem>& context)
         }
         event.aftermath_relief_resolved = 1.0f;
         context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
-        smooth_site_weather_toward(context, 0.0f, 0.0f, 0.0f, 0.0f);
+        smooth_site_weather_toward(
+            context,
+            baseline_weather.heat,
+            baseline_weather.wind,
+            baseline_weather.dust,
+            baseline_weather.wind_direction_degrees);
         return;
     }
 
@@ -361,9 +410,9 @@ void WeatherEventSystem::run(SiteSystemContext<WeatherEventSystem>& context)
     }
     smooth_site_weather_toward(
         context,
-        event.event_heat_pressure,
-        event.event_wind_pressure,
-        event.event_dust_pressure,
+        std::clamp(baseline_weather.heat + event.event_heat_pressure, 0.0f, k_weather_meter_max),
+        std::clamp(baseline_weather.wind + event.event_wind_pressure, 0.0f, k_weather_meter_max),
+        std::clamp(baseline_weather.dust + event.event_dust_pressure, 0.0f, k_weather_meter_max),
         resolve_event_wind_direction(context));
 }
 }  // namespace gs1
