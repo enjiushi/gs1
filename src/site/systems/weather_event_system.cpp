@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 
 namespace gs1
 {
@@ -23,6 +24,36 @@ constexpr float k_weather_transition_rate_per_second = 2.4f;
 constexpr double k_min_wave_delay_minutes = 4.0;
 constexpr double k_max_wave_delay_minutes = 8.0;
 constexpr float k_weather_meter_max = 100.0f;
+
+void emit_site_one_weather_probe_log(
+    SiteSystemContext<WeatherEventSystem>& context,
+    const char* label,
+    float heat,
+    float wind,
+    float dust,
+    float wind_direction_degrees)
+{
+    if (!context.world.has_world() || context.world.site_id_value() != 1U)
+    {
+        return;
+    }
+
+    GameMessage message {};
+    PresentLogMessage payload {};
+    payload.level = GS1_LOG_LEVEL_DEBUG;
+    std::snprintf(
+        payload.text,
+        sizeof(payload.text),
+        "S1 wx %s %.0f/%.0f/%.0f dir%.0f",
+        label,
+        heat,
+        wind,
+        dust,
+        wind_direction_degrees);
+    message.type = GameMessageType::PresentLog;
+    message.set_payload(payload);
+    context.message_queue.push_back(message);
+}
 
 struct SiteBaselineWeather final
 {
@@ -325,6 +356,13 @@ Gs1Status WeatherEventSystem::process_message(
             baseline_weather.wind,
             baseline_weather.dust,
             baseline_weather.wind_direction_degrees);
+        emit_site_one_weather_probe_log(
+            context,
+            "start",
+            baseline_weather.heat,
+            baseline_weather.wind,
+            baseline_weather.dust,
+            baseline_weather.wind_direction_degrees);
         return GS1_STATUS_OK;
     }
 
@@ -337,6 +375,13 @@ Gs1Status WeatherEventSystem::process_message(
     event.aftermath_relief_resolved = 0.0f;
     apply_site_weather(
         context,
+        baseline_weather.heat,
+        baseline_weather.wind,
+        baseline_weather.dust,
+        baseline_weather.wind_direction_degrees);
+    emit_site_one_weather_probe_log(
+        context,
+        "start",
         baseline_weather.heat,
         baseline_weather.wind,
         baseline_weather.dust,

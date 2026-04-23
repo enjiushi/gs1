@@ -240,7 +240,8 @@ struct SiteAttemptEndedMessage final
 
 struct PresentLogMessage final
 {
-    char text[63];
+    Gs1LogLevel level;
+    char text[62];
 };
 
 struct SiteRunStartedMessage final

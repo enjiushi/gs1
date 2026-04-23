@@ -323,6 +323,63 @@ public:
         return world != nullptr && world->contains(coord) ? world->tile_index(coord) : 0U;
     }
 
+    [[nodiscard]] float last_reported_tile_density_or(
+        TileCoord coord,
+        float fallback) const noexcept
+    {
+        static_assert(
+            site_system_reads_component<SystemTag>(SiteComponent::TileEcology),
+            "System must declare TileEcology as readable.");
+        const auto* world = site_world_ptr();
+        if (world == nullptr || !world->contains(coord))
+        {
+            return fallback;
+        }
+
+        const auto index = world->tile_index(coord);
+        if (site_run_.last_reported_tile_density_valid.size() != world->tile_count() ||
+            site_run_.last_reported_tile_density.size() != world->tile_count() ||
+            index >= site_run_.last_reported_tile_density_valid.size() ||
+            site_run_.last_reported_tile_density_valid[index] == 0U)
+        {
+            return fallback;
+        }
+
+        return site_run_.last_reported_tile_density[index];
+    }
+
+    void set_last_reported_tile_density(TileCoord coord, float density) noexcept
+    {
+        static_assert(
+            site_system_owns_component<SystemTag>(SiteComponent::TileEcology),
+            "System must declare TileEcology as owned.");
+        auto* world = site_world_ptr();
+        if (world == nullptr || !world->contains(coord))
+        {
+            return;
+        }
+
+        const auto tile_count = world->tile_count();
+        if (site_run_.last_reported_tile_density_valid.size() != tile_count)
+        {
+            site_run_.last_reported_tile_density_valid.assign(tile_count, 0U);
+        }
+        if (site_run_.last_reported_tile_density.size() != tile_count)
+        {
+            site_run_.last_reported_tile_density.assign(tile_count, 0.0f);
+        }
+
+        const auto index = world->tile_index(coord);
+        if (index >= site_run_.last_reported_tile_density_valid.size() ||
+            index >= site_run_.last_reported_tile_density.size())
+        {
+            return;
+        }
+
+        site_run_.last_reported_tile_density[index] = density;
+        site_run_.last_reported_tile_density_valid[index] = 1U;
+    }
+
     [[nodiscard]] SiteWorld::TileEcologyData read_tile_ecology(TileCoord coord) const noexcept
     {
         static_assert(

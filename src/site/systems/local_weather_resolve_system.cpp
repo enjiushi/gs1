@@ -6,11 +6,13 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdio>
 
 namespace
 {
 constexpr std::uint32_t k_site_tile_state_changed_local_weather = 1U << 0U;
 constexpr std::uint32_t k_site_tile_state_changed_support = 1U << 1U;
+constexpr double k_site_one_probe_window_minutes = 0.25;
 
 struct BaseLocalWeather final
 {
@@ -18,6 +20,61 @@ struct BaseLocalWeather final
     float wind {0.0f};
     float dust {0.0f};
 };
+
+bool is_site_one_probe_tile(gs1::TileCoord coord) noexcept
+{
+    return (coord.x == 12 && coord.y >= 14 && coord.y <= 17) ||
+        (coord.x == 13 && coord.y >= 14 && coord.y <= 17);
+}
+
+void emit_site_one_local_weather_probe_log(
+    gs1::SiteSystemContext<gs1::LocalWeatherResolveSystem>& context,
+    gs1::TileCoord coord,
+    const BaseLocalWeather& base_weather,
+    const gs1::SiteWorld::TileLocalWeatherData& resolved_weather,
+    const gs1::SiteWorld::TileWeatherContributionData& total_contribution,
+    float plant_density)
+{
+    if (!context.world.has_world() ||
+        context.world.site_id_value() != 1U ||
+        !is_site_one_probe_tile(coord))
+    {
+        return;
+    }
+
+    gs1::GameMessage message {};
+    gs1::PresentLogMessage payload {};
+    payload.level = GS1_LOG_LEVEL_DEBUG;
+    std::snprintf(
+        payload.text,
+        sizeof(payload.text),
+        "S1 lw (%d,%d) b%.0f/%.0f/%.0f l%.0f/%.0f/%.0f d%.1f",
+        coord.x,
+        coord.y,
+        base_weather.heat,
+        base_weather.wind,
+        base_weather.dust,
+        resolved_weather.heat,
+        resolved_weather.wind,
+        resolved_weather.dust,
+        plant_density);
+    message.type = gs1::GameMessageType::PresentLog;
+    message.set_payload(payload);
+    context.message_queue.push_back(message);
+
+    payload.level = GS1_LOG_LEVEL_DEBUG;
+    std::snprintf(
+        payload.text,
+        sizeof(payload.text),
+        "S1 sup (%d,%d) w%.1f h%.1f z%.1f",
+        coord.x,
+        coord.y,
+        total_contribution.wind_protection,
+        total_contribution.heat_protection,
+        total_contribution.dust_protection);
+    message.set_payload(payload);
+    context.message_queue.push_back(message);
+}
 
 void ensure_local_weather_runtime_buffers(
     gs1::LocalWeatherResolveState& state,
@@ -179,6 +236,18 @@ void LocalWeatherResolveSystem::run(SiteSystemContext<LocalWeatherResolveSystem>
                 total_contribution,
                 emit_full_snapshot || local_weather_changed,
                 emit_full_snapshot || support_changed);
+        }
+
+        if ((emit_full_snapshot || local_weather_changed || support_changed) &&
+            context.world.read_time().world_time_minutes <= k_site_one_probe_window_minutes)
+        {
+            emit_site_one_local_weather_probe_log(
+                context,
+                coord,
+                base_weather,
+                resolved_weather,
+                total_contribution,
+                tile.ecology.plant_density);
         }
 
         if (wind_changed && ecology_has_projected_plant_visual(tile.ecology))

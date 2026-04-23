@@ -274,14 +274,20 @@ bool ui_action_matches(const Gs1UiAction& requested, const Gs1UiAction& availabl
 
 bool should_log_engine_message_to_sink(
     SmokeEngineHost::LogMode log_mode,
-    Gs1EngineMessageType type) noexcept
+    const Gs1EngineMessage& message) noexcept
 {
     if (log_mode == SmokeEngineHost::LogMode::Verbose)
     {
         return true;
     }
 
-    return type == GS1_ENGINE_MESSAGE_LOG_TEXT;
+    if (message.type != GS1_ENGINE_MESSAGE_LOG_TEXT)
+    {
+        return false;
+    }
+
+    const auto& payload = message.payload_as<Gs1EngineMessageLogTextData>();
+    return payload.level != GS1_LOG_LEVEL_DEBUG;
 }
 }  // namespace
 
@@ -857,7 +863,7 @@ void SmokeEngineHost::flush_engine_messages(const char* stage_label)
             log_entry = std::string("[ENGINE][CMD] ") + stage_label + ": " + description;
         }
 
-        if (should_log_engine_message_to_sink(log_mode_, message.type))
+        if (should_log_engine_message_to_sink(log_mode_, message))
         {
             if (message.type == GS1_ENGINE_MESSAGE_LOG_TEXT)
             {

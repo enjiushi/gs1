@@ -689,9 +689,9 @@ int main()
     {
         const auto& weather_payload =
             weather_messages.front()->payload_as<Gs1EngineMessageWeatherData>();
-        assert(weather_payload.heat == 0.0f);
-        assert(weather_payload.wind == 0.0f);
-        assert(weather_payload.dust == 0.0f);
+        assert(weather_payload.heat == 30.0f);
+        assert(weather_payload.wind == 20.0f);
+        assert(weather_payload.dust == 10.0f);
         assert(weather_payload.wind_direction_degrees == 0.0f);
         assert(weather_payload.event_template_id == 0U);
         assert(weather_payload.event_start_time_minutes == 0.0f);
@@ -833,7 +833,7 @@ int main()
         collect_messages_of_type(density_first_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(density_first_tiles.size() == 1U);
 
-    set_tile_plant_state(site_run, density_coord, gs1::PlantId {gs1::k_plant_straw_checkerboard}, 0.195f);
+    set_tile_plant_state(site_run, density_coord, gs1::PlantId {gs1::k_plant_straw_checkerboard}, 0.19f);
     gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
     const auto density_second_messages = drain_engine_messages(runtime);

@@ -11,7 +11,7 @@ External prototype content TOML files loaded by the gameplay DLL at startup.
 - `sites.toml`: Prototype campaign/site authoring content for site graph, objective config, support exports, nearby aura seeds, completion rewards, camp anchors, site default-weather baselines, authored starter-plant patches such as Site 1's harvestable near-camp starter growth, and initial reveal/availability flags.
 - `phone_listings.toml`: Seeded phone-listing content for per-site buy, unlockable, and contractor offers.
 - `items.toml`: Item authoring content for runtime item definitions and item-domain metadata, including the full prototype seed-item roster plus harvested-good items for the China-desert ten-plant set.
-- `plants.toml`: Plant authoring content for ecology, shelter, planting behavior, and per-plant harvest thresholds/output tuning across the full prototype China-desert 10-plant roster.
+- `plants.toml`: Plant authoring content for ecology, shelter, planting behavior, tuned two-specialty resistance/support roles, and per-plant harvest thresholds/output tuning across the full prototype China-desert 10-plant roster.
 - `structures.toml`: Structure authoring content for buildables, storage, crafting stations, and authored resolved-tile support channels such as wind, heat, dust, fertility, salinity, and irrigation output.
 - `craft_recipes.toml`: Craft recipe authoring content for station/output/ingredient mappings.
 - `task_templates.toml`: Authored task generator content for the balanced three-faction site-one task pool, including procedural target/threshold ranges, optional selector hints for runtime-picked item/plant/recipe/structure/action values, living-plant stability duration tasks, and the current zero-reward per-task contract.
