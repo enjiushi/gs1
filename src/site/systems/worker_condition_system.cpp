@@ -1,5 +1,6 @@
 #include "site/systems/worker_condition_system.h"
 
+#include "content/defs/gameplay_tuning_defs.h"
 #include "runtime/runtime_clock.h"
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
@@ -51,39 +52,6 @@ constexpr float kMeterMin = 0.0f;
 constexpr float kWorkEfficiencyMax = 1.0f;
 constexpr float kWorkEfficiencyMin = 0.4f;
 constexpr float kNormalizedMeterMax = 100.0f;
-
-constexpr float kHydrationBaseLossPerGameMinuteBase = 0.0100f;
-constexpr float kHeatToHydrationFactorBase = 0.06875f;
-constexpr float kNourishmentBaseLossPerGameMinuteBase = 0.004375f;
-constexpr float kWindToNourishmentFactorBase = 0.00625f;
-constexpr float kHeatToNourishmentFactorBase = 0.00500f;
-constexpr float kDustToNourishmentFactorBase = 0.00500f;
-constexpr float kEnergyBaseLossPerGameMinuteBase = 0.00500f;
-constexpr float kWindToEnergyFactorBase = 0.00375f;
-constexpr float kHeatToEnergyFactorBase = 0.00375f;
-constexpr float kDustToEnergyFactorBase = 0.00375f;
-constexpr float kMoraleDecreaseSpeedBase = 1.0f;
-constexpr float kMoraleDecreaseFactorBase = 0.00375f;
-constexpr float kHeatToHealthFactorBase = 0.00375f;
-constexpr float kWindToHealthFactorBase = 0.00250f;
-constexpr float kDustToHealthFactorBase = 0.004375f;
-
-constexpr float kHealthEnergyCapFactorBase = 1.0f;
-constexpr float kHydrationEnergyCapFactorBase = 1.0f;
-constexpr float kNourishmentEnergyCapFactorBase = 1.0f;
-constexpr float kEnergyCapFactorBase = 1.0f;
-
-constexpr float kHealthEfficiencyFactorBase = 1.0f;
-constexpr float kHydrationEfficiencyFactorBase = 1.0f;
-constexpr float kNourishmentEfficiencyFactorBase = 1.0f;
-constexpr float kMoraleEfficiencyFactorBase = 1.0f;
-constexpr float kWorkEfficiencyFactorBase = 1.0f;
-
-constexpr float kFactorWeightDefault = 1.0f;
-constexpr float kFactorBiasDefault = 0.0f;
-constexpr float kFactorMin = 0.0f;
-constexpr float kFactorMax = 4.0f;
-constexpr float kShelteredExposureScale = 0.35f;
 constexpr float kMeterChangeThreshold = 0.01f;
 
 constexpr std::uint32_t kWorkerMetersChangedInitialMask =
@@ -107,14 +75,27 @@ float normalize_meter(float value) noexcept
     return std::clamp(value / kNormalizedMeterMax, 0.0f, 1.0f);
 }
 
-float resolve_factor(
-    float base,
-    float bias = kFactorBiasDefault,
-    float weight = kFactorWeightDefault,
-    float min_value = kFactorMin,
-    float max_value = kFactorMax) noexcept
+const WorkerConditionTuning& worker_condition_tuning() noexcept
 {
-    return std::clamp((base * weight) + bias, min_value, max_value);
+    return gameplay_tuning_def().worker_condition;
+}
+
+float resolve_factor(float base) noexcept
+{
+    const auto& tuning = worker_condition_tuning();
+    return std::clamp(
+        (base * tuning.factor_weight_default) + tuning.factor_bias_default,
+        tuning.factor_min,
+        tuning.factor_max);
+}
+
+float resolve_factor(float base, float bias) noexcept
+{
+    const auto& tuning = worker_condition_tuning();
+    return std::clamp(
+        (base * tuning.factor_weight_default) + bias,
+        tuning.factor_min,
+        tuning.factor_max);
 }
 
 WorkerMeterSnapshot make_snapshot(const SiteWorld::WorkerConditionData& worker) noexcept
@@ -255,31 +236,34 @@ void accumulate_passive_deltas(
         return;
     }
 
-    const float exposure_scale = previous.is_sheltered ? kShelteredExposureScale : 1.0f;
+    const auto& tuning = worker_condition_tuning();
+    const float exposure_scale = previous.is_sheltered ? tuning.sheltered_exposure_scale : 1.0f;
     const float heat = normalize_meter(std::max(local_weather.heat, 0.0f)) * exposure_scale;
     const float wind = normalize_meter(std::max(local_weather.wind, 0.0f)) * exposure_scale;
     const float dust = normalize_meter(std::max(local_weather.dust, 0.0f)) * exposure_scale;
 
     deltas.hydration -= step_game_minutes * (
-        resolve_factor(kHydrationBaseLossPerGameMinuteBase) +
-        heat * resolve_factor(kHeatToHydrationFactorBase));
+        resolve_factor(tuning.hydration_base_loss_per_game_minute) +
+        heat * resolve_factor(tuning.heat_to_hydration_factor) +
+        wind * resolve_factor(tuning.wind_to_hydration_factor) +
+        dust * resolve_factor(tuning.dust_to_hydration_factor));
     deltas.nourishment -= step_game_minutes * (
-        resolve_factor(kNourishmentBaseLossPerGameMinuteBase) +
-        wind * resolve_factor(kWindToNourishmentFactorBase) +
-        heat * resolve_factor(kHeatToNourishmentFactorBase) +
-        dust * resolve_factor(kDustToNourishmentFactorBase));
+        resolve_factor(tuning.nourishment_base_loss_per_game_minute) +
+        wind * resolve_factor(tuning.wind_to_nourishment_factor) +
+        heat * resolve_factor(tuning.heat_to_nourishment_factor) +
+        dust * resolve_factor(tuning.dust_to_nourishment_factor));
     deltas.energy -= step_game_minutes * (
-        resolve_factor(kEnergyBaseLossPerGameMinuteBase) +
-        wind * resolve_factor(kWindToEnergyFactorBase) +
-        heat * resolve_factor(kHeatToEnergyFactorBase) +
-        dust * resolve_factor(kDustToEnergyFactorBase));
+        resolve_factor(tuning.energy_base_loss_per_game_minute) +
+        wind * resolve_factor(tuning.wind_to_energy_factor) +
+        heat * resolve_factor(tuning.heat_to_energy_factor) +
+        dust * resolve_factor(tuning.dust_to_energy_factor));
     deltas.morale -= step_game_minutes * (
-        resolve_factor(kMoraleDecreaseSpeedBase) *
-        resolve_factor(kMoraleDecreaseFactorBase));
+        resolve_factor(tuning.morale_decrease_speed) *
+        resolve_factor(tuning.morale_decrease_factor));
     deltas.health -= step_game_minutes * (
-        heat * resolve_factor(kHeatToHealthFactorBase) +
-        wind * resolve_factor(kWindToHealthFactorBase) +
-        dust * resolve_factor(kDustToHealthFactorBase));
+        heat * resolve_factor(tuning.heat_to_health_factor) +
+        wind * resolve_factor(tuning.wind_to_health_factor) +
+        dust * resolve_factor(tuning.dust_to_health_factor));
 }
 
 float resolve_energy_cap(
@@ -287,14 +271,15 @@ float resolve_energy_cap(
     const ModifierChannelTotals& modifiers,
     float direct_delta) noexcept
 {
+    const auto& tuning = worker_condition_tuning();
     const float normalized_health =
-        normalize_meter(current.health) * resolve_factor(kHealthEnergyCapFactorBase);
+        normalize_meter(current.health) * resolve_factor(tuning.health_energy_cap_factor);
     const float normalized_hydration =
-        normalize_meter(current.hydration) * resolve_factor(kHydrationEnergyCapFactorBase);
+        normalize_meter(current.hydration) * resolve_factor(tuning.hydration_energy_cap_factor);
     const float normalized_nourishment =
-        normalize_meter(current.nourishment) * resolve_factor(kNourishmentEnergyCapFactorBase);
+        normalize_meter(current.nourishment) * resolve_factor(tuning.nourishment_energy_cap_factor);
     const float energy_cap_factor =
-        resolve_factor(kEnergyCapFactorBase, modifiers.energy_cap);
+        resolve_factor(tuning.energy_cap_factor, modifiers.energy_cap);
     const float raw_cap = std::min(
                               normalized_health,
                               std::min(normalized_hydration, normalized_nourishment)) *
@@ -308,16 +293,17 @@ float resolve_work_efficiency(
     const ModifierChannelTotals& modifiers,
     float direct_delta) noexcept
 {
+    const auto& tuning = worker_condition_tuning();
     const float normalized_health =
-        normalize_meter(current.health) * resolve_factor(kHealthEfficiencyFactorBase);
+        normalize_meter(current.health) * resolve_factor(tuning.health_efficiency_factor);
     const float normalized_hydration =
-        normalize_meter(current.hydration) * resolve_factor(kHydrationEfficiencyFactorBase);
+        normalize_meter(current.hydration) * resolve_factor(tuning.hydration_efficiency_factor);
     const float normalized_nourishment =
-        normalize_meter(current.nourishment) * resolve_factor(kNourishmentEfficiencyFactorBase);
+        normalize_meter(current.nourishment) * resolve_factor(tuning.nourishment_efficiency_factor);
     const float normalized_morale =
-        normalize_meter(current.morale) * resolve_factor(kMoraleEfficiencyFactorBase);
+        normalize_meter(current.morale) * resolve_factor(tuning.morale_efficiency_factor);
     const float work_efficiency_factor =
-        resolve_factor(kWorkEfficiencyFactorBase, modifiers.work_efficiency);
+        resolve_factor(tuning.work_efficiency_factor, modifiers.work_efficiency);
     const float raw_efficiency = std::min(
                                      normalized_health,
                                      std::min(

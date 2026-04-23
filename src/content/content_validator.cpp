@@ -383,6 +383,76 @@ std::vector<ContentValidationIssue> validate_content_database(
 
     if (issues.empty())
     {
+        const auto& tuning = content.gameplay_tuning;
+        if (tuning.worker_condition.factor_max < tuning.worker_condition.factor_min)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Gameplay tuning worker-condition factor max must be greater than or equal to factor min."});
+        }
+        else if (tuning.worker_condition.sheltered_exposure_scale < 0.0f ||
+            tuning.worker_condition.sheltered_exposure_scale > 1.0f)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Gameplay tuning worker-condition sheltered exposure scale must stay in the 0-1 range."});
+        }
+        else if (tuning.modifier_system.modifier_channel_limit <= 0.0f ||
+            tuning.modifier_system.factor_weight_limit <= 0.0f ||
+            tuning.modifier_system.factor_bias_limit < 0.0f)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Gameplay tuning modifier limits must stay non-negative and use positive clamp ranges."});
+        }
+        else if (tuning.device_support.water_evaporation_base < 0.0f ||
+            tuning.device_support.heat_evaporation_multiplier < 0.0f)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Gameplay tuning device-support evaporation values must be non-negative."});
+        }
+        else if (tuning.camp_durability.durability_max <= 0.0f ||
+            tuning.camp_durability.peak_event_pressure_total <= 0.0f)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Gameplay tuning camp durability maximums and peak event pressure totals must be positive."});
+        }
+        else if (tuning.camp_durability.protection_threshold > tuning.camp_durability.durability_max ||
+            tuning.camp_durability.delivery_threshold > tuning.camp_durability.protection_threshold ||
+            tuning.camp_durability.shared_storage_threshold > tuning.camp_durability.delivery_threshold)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Gameplay tuning camp service thresholds must descend from protection to delivery to shared storage within the durability max."});
+        }
+        else if (tuning.ecology.resistance_density_influence < 0.0f ||
+            tuning.ecology.resistance_density_influence > 1.0f ||
+            tuning.ecology.salinity_cap_softening < 0.0f ||
+            tuning.ecology.salinity_cap_softening > 1.0f ||
+            tuning.ecology.salinity_cap_min_unit < 0.0f ||
+            tuning.ecology.salinity_cap_min_unit > 1.0f)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Gameplay tuning ecology normalized softening and cap values must stay in the 0-1 range."});
+        }
+        else if (tuning.ecology.density_growth_pressure_safe_threshold < 0.0f ||
+            tuning.ecology.density_growth_pressure_safe_threshold > 1.0f ||
+            tuning.ecology.density_loss_pressure_threshold < 0.0f ||
+            tuning.ecology.density_loss_pressure_threshold > 1.0f ||
+            tuning.ecology.density_growth_pressure_safe_threshold >
+                tuning.ecology.density_loss_pressure_threshold)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Gameplay tuning ecology pressure thresholds must stay in the 0-1 range and keep the safe threshold below the loss threshold."});
+        }
+    }
+
+    if (issues.empty())
+    {
         for (const auto plant_id : content.initial_unlocked_plant_ids)
         {
             if (!content.index.plant_by_id.contains(plant_id.value))

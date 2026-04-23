@@ -1,5 +1,6 @@
 #include "site/systems/device_support_system.h"
 
+#include "content/defs/gameplay_tuning_defs.h"
 #include "site/site_run_state.h"
 
 #include <algorithm>
@@ -11,8 +12,6 @@ namespace
 {
 constexpr float k_device_efficiency_epsilon = 0.0005f;
 constexpr float k_device_water_epsilon = 0.0005f;
-constexpr float k_device_water_evaporation_base = 0.0035f;
-constexpr float k_device_heat_evaporation_multiplier = 0.0075f;
 }  // namespace
 
 namespace gs1
@@ -45,6 +44,7 @@ void DeviceSupportSystem::run(SiteSystemContext<DeviceSupportSystem>& context)
         return;
     }
 
+    const auto& tuning = gameplay_tuning_def().device_support;
     const auto tile_count = context.world.tile_count();
     for (std::size_t index = 0; index < tile_count; ++index)
     {
@@ -67,7 +67,7 @@ void DeviceSupportSystem::run(SiteSystemContext<DeviceSupportSystem>& context)
         const float previous_water = tile.device.device_stored_water;
         const float clamped_heat = std::max(tile.local_weather.heat, 0.0f);
         const float evaporation_rate =
-            (k_device_water_evaporation_base + clamped_heat * k_device_heat_evaporation_multiplier) *
+            (tuning.water_evaporation_base + clamped_heat * tuning.heat_evaporation_multiplier) *
             step_seconds;
         const float next_water = std::max(0.0f, previous_water - evaporation_rate);
         const bool water_changed = std::fabs(previous_water - next_water) > k_device_water_epsilon;
