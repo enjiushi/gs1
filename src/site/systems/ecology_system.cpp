@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdio>
 
 namespace gs1
 {
@@ -25,6 +26,7 @@ const EcologyTuning& ecology_tuning() noexcept
 {
     return gameplay_tuning_def().ecology;
 }
+constexpr double k_site_one_probe_window_minutes = 0.25;
 
 bool has_tile_occupant(PlantId plant_id, std::uint32_t ground_cover_type_id) noexcept
 {
@@ -34,6 +36,22 @@ bool has_tile_occupant(PlantId plant_id, std::uint32_t ground_cover_type_id) noe
 bool is_tracked_living_plant(PlantId plant_id) noexcept
 {
     return plant_id.value != 0U && plant_id.value != k_plant_straw_checkerboard;
+}
+
+bool is_site_one_probe_tile(TileCoord coord) noexcept
+{
+    return (coord.x == 12 && coord.y >= 14 && coord.y <= 17) ||
+        (coord.x == 13 && coord.y >= 14 && coord.y <= 17);
+}
+
+bool should_emit_site_one_probe_log(
+    SiteSystemContext<EcologySystem>& context,
+    TileCoord coord) noexcept
+{
+    return context.world.has_world() &&
+        context.world.site_id_value() == 1U &&
+        is_site_one_probe_tile(coord) &&
+        context.world.read_time().world_time_minutes <= k_site_one_probe_window_minutes;
 }
 
 float unit_from_raw_meter(float value) noexcept
@@ -416,11 +434,117 @@ void emit_tile_ecology_changed(
         tile.ecology.plant_density,
         tile.ecology.sand_burial});
     context.message_queue.push_back(message);
+    if ((changed_mask & TILE_ECOLOGY_CHANGED_DENSITY) != 0U)
+    {
+        context.world.set_last_reported_tile_density(coord, tile.ecology.plant_density);
+    }
 
     if (ecology_change_affects_visible_projection(changed_mask))
     {
         context.world.mark_tile_projection_dirty(coord);
     }
+}
+
+void emit_plant_density_changed_log(
+    SiteSystemContext<EcologySystem>& context,
+    TileCoord coord,
+    PlantId plant_id,
+    float previous_density,
+    float next_density)
+{
+    if (plant_id.value == 0U ||
+        std::fabs(previous_density - next_density) <= k_density_epsilon_raw)
+    {
+        return;
+    }
+
+    const auto* plant_def = find_plant_def(plant_id);
+    const char* plant_name = plant_def != nullptr ? plant_def->display_name : "Unknown Plant";
+    GameMessage message {};
+    PresentLogMessage payload {};
+    payload.level = GS1_LOG_LEVEL_INFO;
+    std::snprintf(
+        payload.text,
+        sizeof(payload.text),
+        "PlantDensity %s (%d,%d) %.2f->%.2f",
+        plant_name,
+        coord.x,
+        coord.y,
+        previous_density,
+        next_density);
+    message.type = GameMessageType::PresentLog;
+    message.set_payload(payload);
+    context.message_queue.push_back(message);
+}
+
+void emit_site_one_startup_probe_log(
+    SiteSystemContext<EcologySystem>& context,
+    TileCoord coord,
+    const SiteWorld::TileData& tile)
+{
+    if (!context.world.has_world() ||
+        context.world.site_id_value() != 1U ||
+        !is_site_one_probe_tile(coord))
+    {
+        return;
+    }
+
+    GameMessage message {};
+    PresentLogMessage payload {};
+    payload.level = GS1_LOG_LEVEL_DEBUG;
+    std::snprintf(
+        payload.text,
+        sizeof(payload.text),
+        "S1 seed (%d,%d) p%u d%.2f",
+        coord.x,
+        coord.y,
+        tile.ecology.plant_id.value,
+        tile.ecology.plant_density);
+    message.type = GameMessageType::PresentLog;
+    message.set_payload(payload);
+    context.message_queue.push_back(message);
+}
+
+void emit_site_one_ecology_probe_log(
+    SiteSystemContext<EcologySystem>& context,
+    TileCoord coord,
+    const SiteWorld::TileData& tile,
+    float density_delta,
+    float growth_pressure,
+    float effective_wind)
+{
+    if (!should_emit_site_one_probe_log(context, coord))
+    {
+        return;
+    }
+
+    GameMessage message {};
+    PresentLogMessage payload {};
+    payload.level = GS1_LOG_LEVEL_DEBUG;
+    std::snprintf(
+        payload.text,
+        sizeof(payload.text),
+        "S1 eco (%d,%d) d%.2f dd%.3f gp%.1f w%.1f",
+        coord.x,
+        coord.y,
+        tile.ecology.plant_density,
+        density_delta,
+        growth_pressure,
+        effective_wind);
+    message.type = GameMessageType::PresentLog;
+    message.set_payload(payload);
+    context.message_queue.push_back(message);
+}
+
+bool density_crosses_report_threshold(
+    SiteSystemContext<EcologySystem>& context,
+    TileCoord coord,
+    float fallback_last_reported_density,
+    float next_density) noexcept
+{
+    const float last_reported_density =
+        context.world.last_reported_tile_density_or(coord, fallback_last_reported_density);
+    return std::fabs(next_density - last_reported_density) > k_density_epsilon_raw;
 }
 
 std::uint32_t apply_ground_cover(
@@ -481,10 +605,11 @@ std::uint32_t apply_ground_cover(
 }
 
 std::uint32_t apply_planting(
-    SiteWorldAccess<EcologySystem>& world,
+    SiteSystemContext<EcologySystem>& context,
     TileCoord coord,
     const SiteTilePlantingCompletedMessage& payload)
 {
+    auto& world = context.world;
     if (!world.tile_coord_in_bounds(coord))
     {
         return TILE_ECOLOGY_CHANGED_NONE;
@@ -511,10 +636,14 @@ std::uint32_t apply_planting(
     }
 
     const float target_density = raw_meter_from_legacy_input(payload.initial_density);
-    if (std::fabs(tile.ecology.plant_density - target_density) > k_density_epsilon_raw)
+    const float previous_density = tile.ecology.plant_density;
+    if (std::fabs(tile.ecology.plant_density - target_density) > k_density_epsilon)
     {
         tile.ecology.plant_density = target_density;
-        changed_mask |= TILE_ECOLOGY_CHANGED_DENSITY;
+        if (density_crosses_report_threshold(context, coord, previous_density, tile.ecology.plant_density))
+        {
+            changed_mask |= TILE_ECOLOGY_CHANGED_DENSITY;
+        }
         modified = true;
     }
 
@@ -533,6 +662,12 @@ std::uint32_t apply_planting(
     if (modified)
     {
         world.write_tile(coord, tile);
+        emit_plant_density_changed_log(
+            context,
+            coord,
+            requested_plant,
+            previous_density,
+            tile.ecology.plant_density);
     }
 
     return changed_mask;
@@ -619,10 +754,11 @@ std::uint32_t apply_burial_cleared(
 }
 
 std::uint32_t apply_harvest(
-    SiteWorldAccess<EcologySystem>& world,
+    SiteSystemContext<EcologySystem>& context,
     TileCoord coord,
     const SiteTileHarvestedMessage& payload)
 {
+    auto& world = context.world;
     if (!world.tile_coord_in_bounds(coord))
     {
         return TILE_ECOLOGY_CHANGED_NONE;
@@ -641,13 +777,19 @@ std::uint32_t apply_harvest(
     }
 
     const float next_density = std::max(0.0f, tile.ecology.plant_density - density_removed);
-    if (std::fabs(next_density - tile.ecology.plant_density) <= k_density_epsilon_raw)
+    if (std::fabs(next_density - tile.ecology.plant_density) <= k_density_epsilon)
     {
         return TILE_ECOLOGY_CHANGED_NONE;
     }
 
+    const PlantId previous_plant_id = tile.ecology.plant_id;
+    const float previous_density = tile.ecology.plant_density;
     tile.ecology.plant_density = next_density;
-    std::uint32_t changed_mask = TILE_ECOLOGY_CHANGED_DENSITY;
+    std::uint32_t changed_mask = TILE_ECOLOGY_CHANGED_NONE;
+    if (density_crosses_report_threshold(context, coord, previous_density, tile.ecology.plant_density))
+    {
+        changed_mask |= TILE_ECOLOGY_CHANGED_DENSITY;
+    }
     if (tile.ecology.plant_density <= k_density_epsilon_raw)
     {
         tile.ecology.plant_density = 0.0f;
@@ -659,6 +801,12 @@ std::uint32_t apply_harvest(
     }
 
     world.write_tile(coord, tile);
+    emit_plant_density_changed_log(
+        context,
+        coord,
+        previous_plant_id,
+        previous_density,
+        tile.ecology.plant_density);
     return changed_mask;
 }
 
@@ -786,6 +934,7 @@ void emit_startup_ecology_snapshots(
     {
         const auto coord = context.world.tile_coord(index);
         const auto tile = context.world.read_tile_at_index(index);
+        emit_site_one_startup_probe_log(context, coord, tile);
         emit_tile_ecology_changed(
             context,
             coord,
@@ -855,7 +1004,7 @@ Gs1Status EcologySystem::process_message(
                 emit_tile_ecology_changed(
                     context,
                     footprint_coord,
-                    apply_planting(context.world, footprint_coord, payload));
+                    apply_planting(context, footprint_coord, payload));
             });
         break;
     }
@@ -896,7 +1045,7 @@ Gs1Status EcologySystem::process_message(
                 emit_tile_ecology_changed(
                     context,
                     footprint_coord,
-                    apply_harvest(context.world, footprint_coord, payload));
+                    apply_harvest(context, footprint_coord, payload));
             });
         break;
     }
@@ -973,6 +1122,8 @@ void EcologySystem::run(SiteSystemContext<EcologySystem>& context)
 
         const auto& plant_def = resolve_occupant_def(tile);
         std::uint32_t changed_mask = TILE_ECOLOGY_CHANGED_NONE;
+        bool density_changed = false;
+        bool tile_modified = false;
         const float effective_wind =
             compute_effective_wind_exposure(context.world, coord, tile);
 
@@ -982,6 +1133,7 @@ void EcologySystem::run(SiteSystemContext<EcologySystem>& context)
         {
             tile.ecology.moisture = next_moisture;
             changed_mask |= TILE_ECOLOGY_CHANGED_MOISTURE;
+            tile_modified = true;
         }
 
         const float next_fertility =
@@ -993,6 +1145,7 @@ void EcologySystem::run(SiteSystemContext<EcologySystem>& context)
         {
             tile.ecology.soil_fertility = next_fertility;
             changed_mask |= TILE_ECOLOGY_CHANGED_FERTILITY;
+            tile_modified = true;
         }
 
         const float next_salinity =
@@ -1001,6 +1154,7 @@ void EcologySystem::run(SiteSystemContext<EcologySystem>& context)
         {
             tile.ecology.soil_salinity = next_salinity;
             changed_mask |= TILE_ECOLOGY_CHANGED_SALINITY;
+            tile_modified = true;
         }
 
         const float next_growth_pressure =
@@ -1009,25 +1163,44 @@ void EcologySystem::run(SiteSystemContext<EcologySystem>& context)
         {
             tile.ecology.growth_pressure = next_growth_pressure;
             changed_mask |= TILE_ECOLOGY_CHANGED_GROWTH_PRESSURE;
+            tile_modified = true;
         }
 
         const float salinity_cap =
             compute_salinity_density_cap(tile.ecology, plant_def, modifiers);
+        const float density_delta =
+            compute_density_delta(
+                tile,
+                plant_def,
+                modifiers,
+                next_growth_pressure,
+                salinity_cap,
+                simulation_dt_minutes);
         const float next_density = std::clamp(
             tile.ecology.plant_density +
-                compute_density_delta(
-                    tile,
-                    plant_def,
-                    modifiers,
-                    next_growth_pressure,
-                    salinity_cap,
-                    simulation_dt_minutes),
+                density_delta,
             0.0f,
             k_meter_scale);
-        if (std::fabs(next_density - tile.ecology.plant_density) > k_density_epsilon_raw)
+        emit_site_one_ecology_probe_log(
+            context,
+            coord,
+            previous_tile,
+            density_delta,
+            next_growth_pressure,
+            effective_wind);
+        if (std::fabs(next_density - tile.ecology.plant_density) > k_density_epsilon)
         {
             tile.ecology.plant_density = next_density;
-            changed_mask |= TILE_ECOLOGY_CHANGED_DENSITY;
+            tile_modified = true;
+            if (density_crosses_report_threshold(
+                    context,
+                    coord,
+                    previous_tile.ecology.plant_density,
+                    tile.ecology.plant_density))
+            {
+                changed_mask |= TILE_ECOLOGY_CHANGED_DENSITY;
+                density_changed = true;
+            }
         }
 
         if (tile.ecology.plant_density <= k_density_epsilon_raw &&
@@ -1040,11 +1213,26 @@ void EcologySystem::run(SiteSystemContext<EcologySystem>& context)
             changed_mask |= TILE_ECOLOGY_CHANGED_OCCUPANCY |
                 TILE_ECOLOGY_CHANGED_DENSITY |
                 TILE_ECOLOGY_CHANGED_GROWTH_PRESSURE;
+            density_changed = std::fabs(previous_tile.ecology.plant_density) > k_density_epsilon;
+            tile_modified = true;
+        }
+
+        if (tile_modified)
+        {
+            context.world.write_tile_at_index(index, tile);
         }
 
         if (changed_mask != TILE_ECOLOGY_CHANGED_NONE)
         {
-            context.world.write_tile_at_index(index, tile);
+            if (density_changed)
+            {
+                emit_plant_density_changed_log(
+                    context,
+                    coord,
+                    previous_tile.ecology.plant_id,
+                    previous_tile.ecology.plant_density,
+                    tile.ecology.plant_density);
+            }
             emit_tile_ecology_changed(context, coord, changed_mask);
         }
 

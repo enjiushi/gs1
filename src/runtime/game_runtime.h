@@ -108,7 +108,7 @@ private:
     };
 
     void initialize_subscription_tables();
-    void queue_log_message(const char* message);
+    void queue_log_message(const char* message, Gs1LogLevel level = GS1_LOG_LEVEL_INFO);
     void queue_app_state_message(Gs1AppState app_state);
     void queue_ui_setup_begin_message(
         Gs1UiSetupId setup_id,

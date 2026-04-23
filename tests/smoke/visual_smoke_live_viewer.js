@@ -5975,7 +5975,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     tile.plantTypeId,
                     tile.structureTypeId,
                     tile.groundCoverTypeId,
-                    Math.round((tile.plantDensity || 0) * 100),
                     Math.round((tile.sandBurial || 0) * 100),
                     Math.round((tile.moisture || 0) * 100),
                     Math.round((tile.soilFertility || 0) * 100),
@@ -5994,42 +5993,77 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         });
     }
 
-    function updateSitePlantVisualWindStrengths(cache, siteBootstrap) {
+    function buildPlantVisualRenderSpec(tileMap, plantVisual) {
+        if (!tileMap || !plantVisual || !plantVisual.userData) {
+            return null;
+        }
+
+        const anchorX = plantVisual.userData.plantAnchorX;
+        const anchorY = plantVisual.userData.plantAnchorY;
+        const footprintWidth = Math.max(1, plantVisual.userData.plantFootprintWidth || 1);
+        const footprintHeight = Math.max(1, plantVisual.userData.plantFootprintHeight || 1);
+        if (typeof anchorX !== "number" || typeof anchorY !== "number") {
+            return null;
+        }
+
+        const anchorTile = tileMap.get(buildSiteTileKey(anchorX, anchorY));
+        if (!anchorTile) {
+            return null;
+        }
+
+        const footprintTiles = [];
+        let footprintComplete = true;
+        for (let offsetY = 0; offsetY < footprintHeight; offsetY += 1) {
+            for (let offsetX = 0; offsetX < footprintWidth; offsetX += 1) {
+                const footprintTile = tileMap.get(buildSiteTileKey(anchorX + offsetX, anchorY + offsetY));
+                if (!footprintTile || footprintTile.plantTypeId !== anchorTile.plantTypeId) {
+                    footprintComplete = false;
+                    break;
+                }
+                footprintTiles.push(footprintTile);
+            }
+            if (!footprintComplete) {
+                break;
+            }
+        }
+
+        return buildPlantRenderSpec(
+            anchorTile,
+            footprintComplete ? footprintTiles : [anchorTile],
+            footprintComplete
+                ? { width: footprintWidth, height: footprintHeight }
+                : { width: 1, height: 1 }
+        );
+    }
+
+    function computePlantVisualVerticalScale(plantSpec) {
+        if (!plantSpec || !plantSpec.anchorTile) {
+            return 1.0;
+        }
+
+        const plantDensity = clamp01(plantSpec.plantDensity || 0);
+        if ((plantSpec.anchorTile.plantTypeId || 0) === 5) {
+            const plantDensityScale = smoothstep01(0.0, 1.0, plantDensity);
+            return 0.55 + plantDensityScale * 1.55 + (plantSpec.areaScale - 1.0) * 0.08;
+        }
+
+        return 0.88 + plantDensity * 0.34 + (plantSpec.areaScale - 1.0) * 0.08;
+    }
+
+    function updateSitePlantVisualEcology(cache, siteBootstrap) {
         if (!cache || !cache.plantVisuals || !siteBootstrap || !siteBootstrap.tiles) {
             return;
         }
 
         const tileMap = buildSiteTileMap(siteBootstrap.tiles);
         cache.plantVisuals.forEach((plantVisual) => {
-            if (!plantVisual || !plantVisual.userData) {
+            const plantSpec = buildPlantVisualRenderSpec(tileMap, plantVisual);
+            if (!plantSpec) {
                 return;
             }
 
-            const anchorX = plantVisual.userData.plantAnchorX;
-            const anchorY = plantVisual.userData.plantAnchorY;
-            const footprintWidth = Math.max(1, plantVisual.userData.plantFootprintWidth || 1);
-            const footprintHeight = Math.max(1, plantVisual.userData.plantFootprintHeight || 1);
-            if (typeof anchorX !== "number" || typeof anchorY !== "number") {
-                return;
-            }
-
-            let totalLocalWind = 0.0;
-            let sampledTileCount = 0;
-            for (let offsetY = 0; offsetY < footprintHeight; offsetY += 1) {
-                for (let offsetX = 0; offsetX < footprintWidth; offsetX += 1) {
-                    const tile = tileMap.get((anchorX + offsetX) + ":" + (anchorY + offsetY));
-                    if (!tile) {
-                        continue;
-                    }
-                    totalLocalWind += Math.max(0, tile.localWind || 0);
-                    sampledTileCount += 1;
-                }
-            }
-
-            setPlantVisualWindStrength(
-                plantVisual,
-                sampledTileCount > 0 ? (totalLocalWind / sampledTileCount) : 0.0
-            );
+            plantVisual.scale.y = computePlantVisualVerticalScale(plantSpec);
+            setPlantVisualWindStrength(plantVisual, plantSpec.localWind);
         });
     }
 
@@ -6485,6 +6519,24 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         cache.witherAlerts.delete(alertKey);
     }
 
+    function resolveRenderedTileHeight(cache, tile) {
+        if (cache && cache.tilePickables) {
+            for (let index = 0; index < cache.tilePickables.length; index += 1) {
+                const pickMesh = cache.tilePickables[index];
+                if (!pickMesh || !pickMesh.userData) {
+                    continue;
+                }
+                if (pickMesh.userData.tileX === tile.x && pickMesh.userData.tileY === tile.y) {
+                    return (pickMesh.position && typeof pickMesh.position.y === "number")
+                        ? Math.max(0, pickMesh.position.y - 0.025)
+                        : computeSiteTileVisualHeight(tile);
+                }
+            }
+        }
+
+        return computeSiteTileVisualHeight(tile);
+    }
+
     function attachWitheringAlert(cache, tileX, tileY, startTimeSeconds, durationSeconds) {
         if (!cache || !cache.witherAlertGroup || !cache.sourceBootstrap) {
             return;
@@ -6497,10 +6549,17 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
 
         const alertKey = buildSiteTileKey(tileX, tileY);
+        const existingAlertState =
+            cache.witherAlerts && cache.witherAlerts.has(alertKey)
+                ? cache.witherAlerts.get(alertKey)
+                : null;
+        if (existingAlertState && existingAlertState.expiresAtSeconds > startTimeSeconds) {
+            return;
+        }
         removeWitheringAlert(cache, alertKey);
 
         const mesh = createWitheringAlertMesh();
-        const tileHeight = computeSiteTileVisualHeight(tile);
+        const tileHeight = resolveRenderedTileHeight(cache, tile);
         mesh.position.set(
             tileX - cache.offsetX,
             tileHeight + witheringAlertHeightOffset,
@@ -8211,6 +8270,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const bootstrapSignature = bootstrapReferenceChanged
             ? buildSiteBootstrapSignature(siteBootstrap)
             : siteSceneCache.bootstrapSignature;
+        const densityOnlyWitheringAlerts =
+            bootstrapReferenceChanged && siteSceneCache
+                ? collectWitheringAlertTriggers(siteSceneCache.sourceBootstrap, siteBootstrap)
+                : [];
 
         const needsStaticRebuild =
             currentSceneKind !== "SITE_ACTIVE" ||
@@ -8246,7 +8309,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         if (bootstrapReferenceChanged && !needsStaticRebuild) {
             siteSceneCache.sourceBootstrap = siteBootstrap;
-            updateSitePlantVisualWindStrengths(siteSceneCache, siteBootstrap);
+            updateSitePlantVisualEcology(siteSceneCache, siteBootstrap);
+            triggerWitheringAlerts(siteSceneCache, densityOnlyWitheringAlerts, animationTimeSeconds);
         }
 
         updateSiteWorkerTargetFromState(siteState, state.frameNumber || 0);

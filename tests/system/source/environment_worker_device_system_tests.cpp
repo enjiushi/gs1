@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 #include "content/defs/technology_defs.h"
 #include "messages/game_message.h"
@@ -9,6 +10,7 @@
 #include "site/systems/device_maintenance_system.h"
 #include "site/systems/device_support_system.h"
 #include "site/systems/device_weather_contribution_system.h"
+#include "site/systems/ecology_system.h"
 #include "site/systems/local_weather_resolve_system.h"
 #include "site/systems/modifier_system.h"
 #include "site/systems/plant_weather_contribution_system.h"
@@ -25,6 +27,7 @@ using gs1::CampDurabilitySystem;
 using gs1::DeviceMaintenanceSystem;
 using gs1::DeviceSupportSystem;
 using gs1::DeviceWeatherContributionSystem;
+using gs1::EcologySystem;
 using gs1::GameMessage;
 using gs1::GameMessageQueue;
 using gs1::GameMessageType;
@@ -142,6 +145,114 @@ void weather_event_site_run_started_applies_site_one_background_conditions(
         WeatherEventSystem::process_message(site_two_context, started_two) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, !site_two_run.event.active_event_template_id.has_value());
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_two_run.weather.weather_heat, 0.0f));
+}
+
+void site_one_starting_weather_reduces_starter_plant_density(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_prototype_site_run(campaign, 1U);
+    GameMessageQueue queue {};
+    auto weather_context = make_site_context<WeatherEventSystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        WeatherEventSystem::process_message(
+            weather_context,
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1701U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    run_local_weather_pipeline(campaign, site_run, queue);
+
+    auto ecology_context = make_site_context<EcologySystem>(campaign, site_run, queue, 60.0);
+    EcologySystem::run(ecology_context);
+
+    std::uint32_t density_log_count = 0U;
+    bool logged_named_tile = false;
+    for (const auto& queued_message : queue)
+    {
+        if (queued_message.type != GameMessageType::PresentLog)
+        {
+            continue;
+        }
+
+        const auto& log_payload = queued_message.payload_as<gs1::PresentLogMessage>();
+        if (std::strstr(log_payload.text, "PlantDensity Ordos Wormwood") != nullptr)
+        {
+            ++density_log_count;
+        }
+        if (std::strstr(log_payload.text, "PlantDensity Ordos Wormwood (12,14)") != nullptr)
+        {
+            logged_named_tile = true;
+        }
+    }
+
+    for (const TileCoord coord : {
+             TileCoord {12, 14},
+             TileCoord {13, 14},
+             TileCoord {12, 15},
+             TileCoord {13, 15},
+             TileCoord {12, 16},
+             TileCoord {13, 16},
+             TileCoord {12, 17},
+             TileCoord {13, 17}})
+    {
+        const auto tile = site_run.site_world->tile_at(coord);
+        GS1_SYSTEM_TEST_CHECK(context, tile.ecology.plant_density < 60.0f);
+        GS1_SYSTEM_TEST_CHECK(context, tile.ecology.growth_pressure > 55.0f);
+    }
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        (site_run.pending_projection_update_flags & gs1::SITE_PROJECTION_UPDATE_TILES) != 0U);
+    GS1_SYSTEM_TEST_CHECK(context, density_log_count == 8U);
+    GS1_SYSTEM_TEST_CHECK(context, logged_named_tile);
+}
+
+void site_one_small_fixed_steps_accumulate_density_loss_until_reported(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_prototype_site_run(campaign, 1U);
+    GameMessageQueue queue {};
+    const auto started = make_message(
+        GameMessageType::SiteRunStarted,
+        SiteRunStartedMessage {1U, 1702U, 101U, 1U, 42ULL});
+
+    auto weather_context = make_site_context<WeatherEventSystem>(campaign, site_run, queue);
+    auto local_weather_message_context =
+        make_site_context<LocalWeatherResolveSystem>(campaign, site_run, queue);
+    auto ecology_message_context = make_site_context<EcologySystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        WeatherEventSystem::process_message(weather_context, started) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        LocalWeatherResolveSystem::process_message(local_weather_message_context, started) ==
+            GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        EcologySystem::process_message(ecology_message_context, started) == GS1_STATUS_OK);
+
+    queue.clear();
+
+    for (int index = 0; index < 4; ++index)
+    {
+        run_local_weather_pipeline(campaign, site_run, queue);
+        auto ecology_context = make_site_context<EcologySystem>(campaign, site_run, queue, 1.0 / 60.0);
+        EcologySystem::run(ecology_context);
+    }
+
+    const auto tile = site_run.site_world->tile_at(TileCoord {12, 14});
+    GS1_SYSTEM_TEST_CHECK(context, tile.ecology.plant_density < 60.0f);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        count_messages(queue, GameMessageType::TileEcologyChanged) >= 1U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        (site_run.pending_projection_update_flags & gs1::SITE_PROJECTION_UPDATE_TILES) != 0U);
 }
 
 void weather_event_run_advances_active_event_through_full_lifecycle(
@@ -947,6 +1058,14 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "weather_event",
     "site_run_started_applies_site_one_background_conditions",
     weather_event_site_run_started_applies_site_one_background_conditions);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "ecology",
+    "site_one_starting_weather_reduces_starter_plant_density",
+    site_one_starting_weather_reduces_starter_plant_density);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "ecology",
+    "site_one_small_fixed_steps_accumulate_density_loss_until_reported",
+    site_one_small_fixed_steps_accumulate_density_loss_until_reported);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "weather_event",
     "run_advances_active_event_through_full_lifecycle",

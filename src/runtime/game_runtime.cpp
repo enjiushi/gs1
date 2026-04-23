@@ -47,12 +47,28 @@ namespace gs1
 {
 namespace
 {
-constexpr float k_visible_tile_density_projection_step = 100.0f / 32.0f;
+constexpr float k_visible_tile_density_projection_step = 100.0f / 128.0f;
 constexpr float k_visible_tile_burial_projection_step = 100.0f / 64.0f;
 constexpr float k_visible_tile_local_wind_projection_step = 2.5f;
 constexpr float k_visible_tile_moisture_projection_step = 100.0f / 64.0f;
 constexpr float k_visible_tile_soil_fertility_projection_step = 100.0f / 64.0f;
 constexpr float k_visible_tile_soil_salinity_projection_step = 100.0f / 64.0f;
+constexpr double k_site_one_probe_window_minutes = 0.25;
+
+[[nodiscard]] bool is_site_one_probe_tile(TileCoord coord) noexcept
+{
+    return (coord.x == 12 && coord.y >= 14 && coord.y <= 17) ||
+        (coord.x == 13 && coord.y >= 14 && coord.y <= 17);
+}
+
+[[nodiscard]] bool should_emit_site_one_runtime_probe(
+    const SiteRunState& site_run,
+    TileCoord coord) noexcept
+{
+    return site_run.site_id.value == 1U &&
+        is_site_one_probe_tile(coord) &&
+        site_run.clock.world_time_minutes <= k_site_one_probe_window_minutes;
+}
 
 [[nodiscard]] bool app_state_supports_technology_tree(Gs1AppState app_state) noexcept
 {
@@ -1477,7 +1493,7 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
     case GameMessageType::PresentLog:
     {
         const auto& payload = message.payload_as<PresentLogMessage>();
-        queue_log_message(payload.text);
+        queue_log_message(payload.text, payload.level);
         break;
     }
 
@@ -1524,11 +1540,11 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
     }
 }
 
-void GameRuntime::queue_log_message(const char* message)
+void GameRuntime::queue_log_message(const char* message, Gs1LogLevel level)
 {
     auto engine_message = make_engine_message(GS1_ENGINE_MESSAGE_LOG_TEXT);
     auto& payload = engine_message.emplace_payload<Gs1EngineMessageLogTextData>();
-    payload.level = GS1_LOG_LEVEL_INFO;
+    payload.level = level;
     strncpy_s(
         payload.text,
         sizeof(payload.text),
@@ -2518,6 +2534,19 @@ void GameRuntime::queue_site_tile_upsert_message(std::uint32_t x, std::uint32_t 
             site_run.last_projected_tile_states[tile_index],
             projected_state))
     {
+        if (should_emit_site_one_runtime_probe(site_run, coord))
+        {
+            char log_text[64] {};
+            std::snprintf(
+                log_text,
+                sizeof(log_text),
+                "S1 pskip (%u,%u) d%.2f q%u",
+                x,
+                y,
+                tile.ecology.plant_density,
+                static_cast<unsigned>(projected_state.plant_density_quantized));
+            queue_log_message(log_text, GS1_LOG_LEVEL_DEBUG);
+        }
         return;
     }
 
@@ -2536,6 +2565,21 @@ void GameRuntime::queue_site_tile_upsert_message(std::uint32_t x, std::uint32_t 
     payload.soil_fertility = tile.ecology.soil_fertility;
     payload.soil_salinity = tile.ecology.soil_salinity;
     engine_messages_.push_back(tile_message);
+
+    if (should_emit_site_one_runtime_probe(site_run, coord))
+    {
+        char log_text[64] {};
+        std::snprintf(
+            log_text,
+            sizeof(log_text),
+            "S1 pup (%u,%u) p%u d%.2f q%u",
+            x,
+            y,
+            payload.plant_type_id,
+            payload.plant_density,
+            static_cast<unsigned>(projected_state.plant_density_quantized));
+        queue_log_message(log_text, GS1_LOG_LEVEL_DEBUG);
+    }
 
     if (tile_index < site_run.last_projected_tile_states.size())
     {
