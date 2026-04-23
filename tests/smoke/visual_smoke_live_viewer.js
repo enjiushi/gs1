@@ -93,6 +93,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const orbitMouseButtonsMask = 2;
     const orbitDragThresholdPixels = 6;
     const heatColorAddGainForVfx = 1.0;
+    const witheringAlertDurationSeconds = 2.0;
+    const witheringAlertDensityDropThreshold = 0.01;
+    const witheringAlertHeightOffset = 0.04;
+    const witheringAlertMaxOpacity = 0.72;
+    const constantWitheringPlantTypeIds = new Set([
+        5
+    ]);
     const hudWarningCodes = {
         none: 0,
         windWatch: 1,
@@ -6075,9 +6082,201 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     function buildSiteTileMap(tiles) {
         const tileMap = new Map();
         (tiles || []).forEach((tile) => {
-            tileMap.set(tile.x + ":" + tile.y, tile);
+            tileMap.set(buildSiteTileKey(tile.x, tile.y), tile);
         });
         return tileMap;
+    }
+
+    function buildSiteTileKey(tileX, tileY) {
+        return tileX + ":" + tileY;
+    }
+
+    function cloneActiveWitheringAlerts(previousCache, currentTimeSeconds) {
+        if (!previousCache || !previousCache.witherAlerts) {
+            return [];
+        }
+
+        const carriedAlerts = [];
+        previousCache.witherAlerts.forEach((alertState, alertKey) => {
+            if (!alertState || !(alertState.expiresAtSeconds > currentTimeSeconds)) {
+                return;
+            }
+
+            carriedAlerts.push({
+                key: alertKey,
+                tileX: alertState.tileX,
+                tileY: alertState.tileY,
+                startTimeSeconds: alertState.startTimeSeconds,
+                durationSeconds: alertState.durationSeconds
+            });
+        });
+        return carriedAlerts;
+    }
+
+    function collectWitheringAlertTriggers(previousBootstrap, nextBootstrap) {
+        if (!previousBootstrap ||
+            !nextBootstrap ||
+            previousBootstrap.siteId !== nextBootstrap.siteId) {
+            return [];
+        }
+
+        const previousTileMap = buildSiteTileMap(previousBootstrap.tiles);
+        const triggeredAlerts = [];
+        (nextBootstrap.tiles || []).forEach((tile) => {
+            const previousTile = previousTileMap.get(buildSiteTileKey(tile.x, tile.y));
+            if (!previousTile) {
+                return;
+            }
+
+            const previousDensity =
+                typeof previousTile.plantDensity === "number" ? previousTile.plantDensity : 0;
+            const nextDensity =
+                typeof tile.plantDensity === "number" ? tile.plantDensity : 0;
+            if (!(nextDensity < previousDensity - witheringAlertDensityDropThreshold)) {
+                return;
+            }
+
+            const previousPlantTypeId = previousTile.plantTypeId || 0;
+            const nextPlantTypeId = tile.plantTypeId || 0;
+            if (constantWitheringPlantTypeIds.has(previousPlantTypeId) ||
+                constantWitheringPlantTypeIds.has(nextPlantTypeId)) {
+                return;
+            }
+            const hadPlant = previousPlantTypeId !== 0 || previousDensity > witheringAlertDensityDropThreshold;
+            const hasPlant = nextPlantTypeId !== 0 || nextDensity > witheringAlertDensityDropThreshold;
+            if (!hadPlant && !hasPlant) {
+                return;
+            }
+
+            triggeredAlerts.push({
+                tileX: tile.x,
+                tileY: tile.y
+            });
+        });
+        return triggeredAlerts;
+    }
+
+    function createWitheringAlertMesh() {
+        const material = new THREE_NS.MeshStandardMaterial({
+            color: 0xff6b55,
+            emissive: 0xdb2414,
+            emissiveIntensity: 0.0,
+            roughness: 0.34,
+            metalness: 0.0,
+            transparent: true,
+            opacity: 0.0,
+            depthWrite: false,
+            side: THREE_NS.DoubleSide,
+            blending: THREE_NS.AdditiveBlending,
+            toneMapped: false
+        });
+        const mesh = new THREE_NS.Mesh(
+            new THREE_NS.PlaneGeometry(0.82, 0.82),
+            material
+        );
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.renderOrder = 8;
+        return mesh;
+    }
+
+    function removeWitheringAlert(cache, alertKey) {
+        if (!cache || !cache.witherAlerts || !cache.witherAlerts.has(alertKey)) {
+            return;
+        }
+
+        const alertState = cache.witherAlerts.get(alertKey);
+        if (alertState && alertState.mesh) {
+            if (alertState.mesh.parent) {
+                alertState.mesh.parent.remove(alertState.mesh);
+            }
+            disposeObject(alertState.mesh);
+        }
+        cache.witherAlerts.delete(alertKey);
+    }
+
+    function attachWitheringAlert(cache, tileX, tileY, startTimeSeconds, durationSeconds) {
+        if (!cache || !cache.witherAlertGroup || !cache.sourceBootstrap) {
+            return;
+        }
+
+        const tileMap = buildSiteTileMap(cache.sourceBootstrap.tiles);
+        const tile = tileMap.get(buildSiteTileKey(tileX, tileY));
+        if (!tile) {
+            return;
+        }
+
+        const alertKey = buildSiteTileKey(tileX, tileY);
+        removeWitheringAlert(cache, alertKey);
+
+        const mesh = createWitheringAlertMesh();
+        const tileHeight = computeSiteTileVisualHeight(tile);
+        mesh.position.set(
+            tileX - cache.offsetX,
+            tileHeight + witheringAlertHeightOffset,
+            tileY - cache.offsetZ
+        );
+        cache.witherAlertGroup.add(mesh);
+        cache.witherAlerts.set(alertKey, {
+            tileX: tileX,
+            tileY: tileY,
+            mesh: mesh,
+            startTimeSeconds: startTimeSeconds,
+            durationSeconds: durationSeconds,
+            expiresAtSeconds: startTimeSeconds + durationSeconds
+        });
+    }
+
+    function restoreWitheringAlerts(cache, carriedAlerts) {
+        (carriedAlerts || []).forEach((alertState) => {
+            attachWitheringAlert(
+                cache,
+                alertState.tileX,
+                alertState.tileY,
+                alertState.startTimeSeconds,
+                alertState.durationSeconds || witheringAlertDurationSeconds
+            );
+        });
+    }
+
+    function triggerWitheringAlerts(cache, triggeredAlerts, startTimeSeconds) {
+        (triggeredAlerts || []).forEach((alertState) => {
+            attachWitheringAlert(
+                cache,
+                alertState.tileX,
+                alertState.tileY,
+                startTimeSeconds,
+                witheringAlertDurationSeconds
+            );
+        });
+    }
+
+    function updateWitheringAlerts(cache, currentTimeSeconds) {
+        if (!cache || !cache.witherAlerts || cache.witherAlerts.size === 0) {
+            return;
+        }
+
+        const expiredAlerts = [];
+        cache.witherAlerts.forEach((alertState, alertKey) => {
+            if (!alertState || !alertState.mesh || !alertState.mesh.material) {
+                expiredAlerts.push(alertKey);
+                return;
+            }
+
+            const durationSeconds = Math.max(alertState.durationSeconds || 0, 0.0001);
+            const normalizedTime = clamp01((currentTimeSeconds - alertState.startTimeSeconds) / durationSeconds);
+            if (normalizedTime >= 1.0) {
+                expiredAlerts.push(alertKey);
+                return;
+            }
+
+            const opacity = Math.sin(normalizedTime * Math.PI) * witheringAlertMaxOpacity;
+            alertState.mesh.material.opacity = opacity;
+            alertState.mesh.material.emissiveIntensity = 0.75 + opacity * 3.1;
+        });
+
+        expiredAlerts.forEach((alertKey) => {
+            removeWitheringAlert(cache, alertKey);
+        });
     }
 
     function buildPlantRenderSpec(anchorTile, footprintTiles, footprint) {
@@ -7531,6 +7730,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function rebuildStaticSiteScene(siteBootstrap, offsetX, offsetZ, width, height, previousCache, bootstrapSignature) {
+        const carriedWitheringAlerts = cloneActiveWitheringAlerts(previousCache, animationTimeSeconds);
+        const triggeredWitheringAlerts = collectWitheringAlertTriggers(
+            previousCache ? previousCache.sourceBootstrap : null,
+            siteBootstrap
+        );
         const reusableWindField =
             previousCache &&
             previousCache.windField &&
@@ -7568,6 +7772,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         worldGroup.add(terrainVisual.group);
         const placementGridGroup = createPlacementGridVisual(siteBootstrap, offsetX, offsetZ);
         worldGroup.add(placementGridGroup);
+        const witherAlertGroup = new THREE_NS.Group();
+        worldGroup.add(witherAlertGroup);
         const tilePickables = terrainVisual.tilePickables;
         const plantVisualSpecs = collectPlantVisualSpecs(siteBootstrap.tiles);
         const plantVisuals = [];
@@ -7649,6 +7855,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             lastWorkerTargetZ: 0,
             placementGridGroup: placementGridGroup,
             placementPreviewGroup: null,
+            witherAlertGroup: witherAlertGroup,
+            witherAlerts: new Map(),
             cameraTargetX: 0,
             cameraTargetZ: 0,
             cameraOrbitGroundDistance: cameraOrbitState.groundDistance,
@@ -7656,6 +7864,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             cameraOrbitOffsetY: cameraOrbitState.offsetY,
             cameraOrbitOffsetZ: cameraOrbitState.offsetZ
         };
+
+        restoreWitheringAlerts(siteSceneCache, carriedWitheringAlerts);
+        triggerWitheringAlerts(siteSceneCache, triggeredWitheringAlerts, animationTimeSeconds);
     }
 
     function normalizeAngleRadians(angle) {
@@ -7884,6 +8095,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (siteSceneCache && siteSceneCache.windField) {
             updateWindFieldVisual(siteSceneCache, latestState, elapsed);
         }
+        updateWitheringAlerts(siteSceneCache, elapsed);
 
         updatePlantWindShaderUniforms(latestState, elapsed);
         fitRenderer();
