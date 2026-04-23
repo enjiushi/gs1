@@ -18,18 +18,19 @@ Site-owned state, ECS world support, and helper logic for active site gameplay.
 - `event_state.h`: Site event state for active/local event tracking, including absolute event timeline markers for weather interpolation.
 - `inventory_state.h`: Inventory ownership/state for items in the site run, including harvested-output insertion into the worker pack, the pending overflow queue for delivery-crate inserts that could not fit yet, and the tracked worker-pack/device-storage panel visibility state projected to hosts.
 - `inventory_storage.h`: Inventory container/storage primitives and stack helpers.
-- `local_weather_resolve_state.h`: Local weather resolution scratch/state, including cached base-weather inputs for resolved tile-contribution plus directional shelter refreshes.
+- `local_weather_resolve_state.h`: Local weather resolution runtime state, including the last aggregated per-tile contribution snapshot plus deferred full-snapshot emission on site start.
 - `modifier_state.h`: Modifier application state for site effects, including resolved generic meter channels plus resolved terrain-factor weight/bias controls.
 - `phone_panel_state.h`: Authoritative phone home/app-panel section state plus tracked open/closed visibility and projected listing/task snapshot state for the active site, including live/completed/claimed task counts.
 - `placement_preview.h`: Placement-preview state for build/placement UI flows.
 - `site_projection_update_flags.h`: Dirty/update flags for projection refresh decisions.
 - `site_objective_state.h`: Site objective mode/config state, including highway target-band metadata plus green-wall connection masks, hold countdown state, and paused main-timer tracking for objective evaluation.
 - `site_run_state.h`: Aggregate active site-run state that owns the site slice, including pending projection dirtiness plus cached last-emitted tile projection state for delta coalescing across visible tile data, local-wind-driven plant visuals, and ecology-owned counters such as living-plant stability status.
-- `site_world.h`: ECS/world wrapper declarations for the active site, including resolved per-tile contribution state alongside ecology, local weather, and device data.
-- `site_world.cpp`: ECS/world wrapper implementation and setup, including resolved contribution component storage on tile entities.
+- `site_world.h`: ECS/world wrapper declarations for the active site, including split plant-versus-device weather contribution state alongside ecology, local weather, and device data.
+- `site_world.cpp`: ECS/world wrapper implementation and setup, including owner-specific plant/device weather contribution component storage on tile entities.
 - `site_world_access.h`: Owner-scoped ECS access helpers for reading/writing site components.
 - `site_world_components.h`: ECS component structs attached to site entities.
 - `systems/`: Site system declarations and implementations, including harvest action execution, ecology harvest resolution, and worker-pack harvest insertion.
 - `task_board_state.h`: Task-board state for current site objectives and listings, including claimed-history tracking plus per-task resolved generator outputs, runtime accumulators, masks, and the task-owned mirror caches updated from owner-emitted worker/tile/device progress messages.
 - `tile_footprint.h`: Tile-footprint geometry helpers for structures and placement.
+- `weather_contribution_logic.h`: Shared local-weather helper logic for contribution falloff, directional wind-shadow sampling, and plant/device contribution accumulation helpers.
 - `weather_state.h`: Weather state tracked during the active site run.

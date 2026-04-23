@@ -78,6 +78,7 @@ add_library(gs1_game SHARED
     src/site/systems/camp_durability_system.cpp
     src/site/systems/device_maintenance_system.cpp
     src/site/systems/device_support_system.cpp
+    src/site/systems/device_weather_contribution_system.cpp
     src/site/systems/ecology_system.cpp
     src/site/systems/economy_phone_system.cpp
     src/site/systems/failure_recovery_system.cpp
@@ -86,6 +87,7 @@ add_library(gs1_game SHARED
     src/site/systems/local_weather_resolve_system.cpp
     src/site/systems/modifier_system.cpp
     src/site/systems/phone_panel_system.cpp
+    src/site/systems/plant_weather_contribution_system.cpp
     src/site/systems/placement_validation_system.cpp
     src/site/systems/site_completion_system.cpp
     src/site/systems/site_flow_system.cpp
@@ -183,6 +185,7 @@ if(GS1_BUILD_TESTS)
         src/site/systems/camp_durability_system.cpp
         src/site/systems/device_maintenance_system.cpp
         src/site/systems/device_support_system.cpp
+        src/site/systems/device_weather_contribution_system.cpp
         src/site/systems/ecology_system.cpp
         src/site/systems/economy_phone_system.cpp
         src/site/systems/failure_recovery_system.cpp
@@ -191,6 +194,7 @@ if(GS1_BUILD_TESTS)
         src/site/systems/local_weather_resolve_system.cpp
         src/site/systems/modifier_system.cpp
         src/site/systems/phone_panel_system.cpp
+        src/site/systems/plant_weather_contribution_system.cpp
         src/site/systems/placement_validation_system.cpp
         src/site/systems/site_completion_system.cpp
         src/site/systems/site_flow_system.cpp
@@ -216,6 +220,7 @@ if(GS1_BUILD_TESTS)
         src/site/systems/camp_durability_system.cpp
         src/site/systems/device_maintenance_system.cpp
         src/site/systems/device_support_system.cpp
+        src/site/systems/device_weather_contribution_system.cpp
         src/site/systems/ecology_system.cpp
         src/site/systems/economy_phone_system.cpp
         src/site/systems/failure_recovery_system.cpp
@@ -224,6 +229,7 @@ if(GS1_BUILD_TESTS)
         src/site/systems/local_weather_resolve_system.cpp
         src/site/systems/modifier_system.cpp
         src/site/systems/phone_panel_system.cpp
+        src/site/systems/plant_weather_contribution_system.cpp
         src/site/systems/placement_validation_system.cpp
         src/site/systems/site_completion_system.cpp
         src/site/systems/site_flow_system.cpp
@@ -248,6 +254,7 @@ if(GS1_BUILD_TESTS)
         src/site/systems/camp_durability_system.cpp
         src/site/systems/device_maintenance_system.cpp
         src/site/systems/device_support_system.cpp
+        src/site/systems/device_weather_contribution_system.cpp
         src/site/systems/ecology_system.cpp
         src/site/systems/economy_phone_system.cpp
         src/site/systems/failure_recovery_system.cpp
@@ -256,6 +263,7 @@ if(GS1_BUILD_TESTS)
         src/site/systems/local_weather_resolve_system.cpp
         src/site/systems/modifier_system.cpp
         src/site/systems/phone_panel_system.cpp
+        src/site/systems/plant_weather_contribution_system.cpp
         src/site/systems/placement_validation_system.cpp
         src/site/systems/site_completion_system.cpp
         src/site/systems/site_flow_system.cpp
@@ -268,7 +276,9 @@ if(GS1_BUILD_TESTS)
     add_executable(gs1_local_weather_perf_probe
         tests/runtime/local_weather_perf_probe.cpp
         ${GS1_CONTENT_RUNTIME_SOURCES}
+        src/site/systems/device_weather_contribution_system.cpp
         src/site/systems/local_weather_resolve_system.cpp
+        src/site/systems/plant_weather_contribution_system.cpp
         src/site/site_world.cpp)
 
     add_executable(gs1_runtime_performance_test
@@ -286,6 +296,7 @@ if(GS1_BUILD_TESTS)
         src/site/systems/camp_durability_system.cpp
         src/site/systems/device_maintenance_system.cpp
         src/site/systems/device_support_system.cpp
+        src/site/systems/device_weather_contribution_system.cpp
         src/site/systems/ecology_system.cpp
         src/site/systems/economy_phone_system.cpp
         src/site/systems/failure_recovery_system.cpp
@@ -294,6 +305,7 @@ if(GS1_BUILD_TESTS)
         src/site/systems/local_weather_resolve_system.cpp
         src/site/systems/modifier_system.cpp
         src/site/systems/phone_panel_system.cpp
+        src/site/systems/plant_weather_contribution_system.cpp
         src/site/systems/placement_validation_system.cpp
         src/site/systems/site_completion_system.cpp
         src/site/systems/site_flow_system.cpp

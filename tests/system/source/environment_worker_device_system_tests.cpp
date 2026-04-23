@@ -8,8 +8,10 @@
 #include "site/systems/camp_durability_system.h"
 #include "site/systems/device_maintenance_system.h"
 #include "site/systems/device_support_system.h"
+#include "site/systems/device_weather_contribution_system.h"
 #include "site/systems/local_weather_resolve_system.h"
 #include "site/systems/modifier_system.h"
+#include "site/systems/plant_weather_contribution_system.h"
 #include "site/systems/site_flow_system.h"
 #include "site/systems/site_time_system.h"
 #include "site/systems/weather_event_system.h"
@@ -22,11 +24,13 @@ namespace
 using gs1::CampDurabilitySystem;
 using gs1::DeviceMaintenanceSystem;
 using gs1::DeviceSupportSystem;
+using gs1::DeviceWeatherContributionSystem;
 using gs1::GameMessage;
 using gs1::GameMessageQueue;
 using gs1::GameMessageType;
 using gs1::LocalWeatherResolveSystem;
 using gs1::ModifierSystem;
+using gs1::PlantWeatherContributionSystem;
 using gs1::SiteFlowSystem;
 using gs1::SiteRunStartedMessage;
 using gs1::SiteTimeSystem;
@@ -42,6 +46,23 @@ GameMessage make_message(gs1::GameMessageType type, const Payload& payload)
     message.type = type;
     message.set_payload(payload);
     return message;
+}
+
+void run_local_weather_pipeline(
+    gs1::CampaignState& campaign,
+    gs1::SiteRunState& site_run,
+    GameMessageQueue& queue)
+{
+    auto plant_context =
+        make_site_context<PlantWeatherContributionSystem>(campaign, site_run, queue);
+    auto device_context =
+        make_site_context<DeviceWeatherContributionSystem>(campaign, site_run, queue);
+    auto local_weather_context =
+        make_site_context<LocalWeatherResolveSystem>(campaign, site_run, queue);
+
+    PlantWeatherContributionSystem::run(plant_context);
+    DeviceWeatherContributionSystem::run(device_context);
+    LocalWeatherResolveSystem::run(local_weather_context);
 }
 
 void prototype_site_run_seeds_site_one_white_thorn_patches_near_camp(
@@ -336,7 +357,7 @@ void weather_event_highway_objective_schedules_repeating_waves_with_one_sided_wi
         site_run.weather.weather_wind_direction_degrees > 270.0f);
 }
 
-void local_weather_resolve_spreads_full_refresh_over_multiple_runs(
+void local_weather_resolve_recomputes_full_grid_each_run(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
@@ -348,8 +369,8 @@ void local_weather_resolve_spreads_full_refresh_over_multiple_runs(
     site_run.weather.weather_wind = 5.0f;
     site_run.weather.weather_dust = 3.0f;
 
-    GS1_SYSTEM_TEST_CHECK(context, !LocalWeatherResolveSystem::subscribes_to(GameMessageType::SiteRunStarted));
-    GS1_SYSTEM_TEST_CHECK(context, LocalWeatherResolveSystem::subscribes_to(GameMessageType::TileEcologyChanged));
+    GS1_SYSTEM_TEST_CHECK(context, LocalWeatherResolveSystem::subscribes_to(GameMessageType::SiteRunStarted));
+    GS1_SYSTEM_TEST_CHECK(context, !LocalWeatherResolveSystem::subscribes_to(GameMessageType::TileEcologyChanged));
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         LocalWeatherResolveSystem::process_message(
@@ -358,71 +379,51 @@ void local_weather_resolve_spreads_full_refresh_over_multiple_runs(
                 GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
-    LocalWeatherResolveSystem::run(site_context);
+    run_local_weather_pipeline(campaign, site_run, queue);
 
     const auto first_pass_weather = site_run.site_world->tile_local_weather(TileCoord {0, 0});
-    const auto deferred_weather = site_run.site_world->tile_local_weather(TileCoord {0, 4});
+    const auto second_tile_weather = site_run.site_world->tile_local_weather(TileCoord {0, 4});
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(first_pass_weather.heat, 10.0f));
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(first_pass_weather.wind, 5.0f));
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(first_pass_weather.dust, 3.0f));
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(deferred_weather.heat, 0.0f));
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(deferred_weather.wind, 0.0f));
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(deferred_weather.dust, 0.0f));
-
-    LocalWeatherResolveSystem::run(site_context);
-    const auto second_pass_weather = site_run.site_world->tile_local_weather(TileCoord {0, 4});
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(second_pass_weather.heat, 10.0f));
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(second_pass_weather.wind, 5.0f));
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(second_pass_weather.dust, 3.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(second_tile_weather.heat, 10.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(second_tile_weather.wind, 5.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(second_tile_weather.dust, 3.0f));
 }
 
-void local_weather_resolve_refreshes_dirty_neighborhood_from_tile_ecology_changed(
+void local_weather_resolve_combines_owner_specific_contributions_each_run(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(2U, 1202U);
     GameMessageQueue queue {};
-    auto site_context = make_site_context<LocalWeatherResolveSystem>(campaign, site_run, queue);
 
     site_run.weather.weather_heat = 10.0f;
     site_run.weather.weather_wind = 5.0f;
     site_run.weather.weather_dust = 3.0f;
     site_run.weather.weather_wind_direction_degrees = 0.0f;
 
-    for (int iteration = 0; iteration < 8; ++iteration)
-    {
-        LocalWeatherResolveSystem::run(site_context);
-    }
-
     auto planted_tile = site_run.site_world->tile_at(TileCoord {3, 3});
     planted_tile.ecology.plant_id = gs1::PlantId {1U};
     planted_tile.ecology.plant_density = 50.0f;
     site_run.site_world->set_tile(TileCoord {3, 3}, planted_tile);
 
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        LocalWeatherResolveSystem::process_message(
-            site_context,
-            make_message(
-                GameMessageType::TileEcologyChanged,
-                gs1::TileEcologyChangedMessage {
-                    3,
-                    3,
-                    gs1::TILE_ECOLOGY_CHANGED_OCCUPANCY |
-                        gs1::TILE_ECOLOGY_CHANGED_DENSITY,
-                    1U,
-                    0U,
-                    50.0f,
-                    0.0f})) == GS1_STATUS_OK);
+    auto device_tile = site_run.site_world->tile_at(TileCoord {4, 3});
+    device_tile.device.structure_id = gs1::StructureId {gs1::k_structure_wind_fence};
+    device_tile.device.device_integrity = 1.0f;
+    device_tile.device.device_efficiency = 0.5f;
+    site_run.site_world->set_tile(TileCoord {4, 3}, device_tile);
 
-    LocalWeatherResolveSystem::run(site_context);
+    run_local_weather_pipeline(campaign, site_run, queue);
 
     const auto planted_weather = site_run.site_world->tile_local_weather(TileCoord {3, 3});
     const auto downwind_weather = site_run.site_world->tile_local_weather(TileCoord {4, 3});
     const auto upwind_weather = site_run.site_world->tile_local_weather(TileCoord {2, 3});
     const auto far_weather = site_run.site_world->tile_local_weather(TileCoord {7, 7});
     const auto planted_support =
-        site_run.site_world->tile_resolved_contribution(TileCoord {3, 3});
+        site_run.site_world->tile_plant_weather_contribution(TileCoord {3, 3});
+    const auto device_support =
+        site_run.site_world->tile_device_weather_contribution(TileCoord {4, 3});
     GS1_SYSTEM_TEST_CHECK(context, planted_weather.heat < 10.0f);
     GS1_SYSTEM_TEST_CHECK(context, planted_weather.wind < 5.0f);
     GS1_SYSTEM_TEST_CHECK(context, planted_weather.dust < 3.0f);
@@ -440,6 +441,7 @@ void local_weather_resolve_refreshes_dirty_neighborhood_from_tile_ecology_change
     GS1_SYSTEM_TEST_CHECK(context, planted_support.dust_protection > 0.0f);
     GS1_SYSTEM_TEST_CHECK(context, planted_support.fertility_improve > 0.0f);
     GS1_SYSTEM_TEST_CHECK(context, planted_support.salinity_reduction > 0.0f);
+    GS1_SYSTEM_TEST_CHECK(context, device_support.wind_protection > 0.0f);
 }
 
 void local_weather_resolve_applies_directional_wind_shadow_falloff_for_windbreak_plants(
@@ -448,7 +450,6 @@ void local_weather_resolve_applies_directional_wind_shadow_falloff_for_windbreak
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(2U, 1204U, 101U, 6U, 5U);
     GameMessageQueue queue {};
-    auto site_context = make_site_context<LocalWeatherResolveSystem>(campaign, site_run, queue);
 
     site_run.weather.weather_wind = 12.0f;
     site_run.weather.weather_wind_direction_degrees = 0.0f;
@@ -458,7 +459,7 @@ void local_weather_resolve_applies_directional_wind_shadow_falloff_for_windbreak
     tile.ecology.plant_density = 100.0f;
     site_run.site_world->set_tile(TileCoord {1, 2}, tile);
 
-    LocalWeatherResolveSystem::run(site_context);
+    run_local_weather_pipeline(campaign, site_run, queue);
 
     const auto own_weather = site_run.site_world->tile_local_weather(TileCoord {1, 2});
     const auto first_downwind = site_run.site_world->tile_local_weather(TileCoord {2, 2});
@@ -478,7 +479,6 @@ void local_weather_resolve_marks_projected_plant_tiles_dirty_when_wind_changes(
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(2U, 1205U, 101U, 5U, 5U);
     GameMessageQueue queue {};
-    auto site_context = make_site_context<LocalWeatherResolveSystem>(campaign, site_run, queue);
 
     auto tile = site_run.site_world->tile_at(TileCoord {2, 2});
     tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_ordos_wormwood};
@@ -487,14 +487,14 @@ void local_weather_resolve_marks_projected_plant_tiles_dirty_when_wind_changes(
 
     site_run.weather.weather_wind = 10.0f;
     site_run.weather.weather_wind_direction_degrees = 0.0f;
-    LocalWeatherResolveSystem::run(site_context);
+    run_local_weather_pipeline(campaign, site_run, queue);
 
     site_run.pending_projection_update_flags = 0U;
     site_run.pending_tile_projection_updates.clear();
     site_run.pending_tile_projection_update_mask.assign(site_run.site_world->tile_count(), 0U);
 
     site_run.weather.weather_wind = 18.0f;
-    LocalWeatherResolveSystem::run(site_context);
+    run_local_weather_pipeline(campaign, site_run, queue);
 
     GS1_SYSTEM_TEST_CHECK(
         context,
@@ -510,14 +510,13 @@ void local_weather_resolve_applies_device_wind_protection_value_and_range(
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(2U, 1203U, 101U, 5U, 5U);
     GameMessageQueue queue {};
-    auto site_context = make_site_context<LocalWeatherResolveSystem>(campaign, site_run, queue);
 
     site_run.weather.weather_heat = 10.0f;
     site_run.weather.weather_wind = 10.0f;
     site_run.weather.weather_dust = 3.0f;
     site_run.weather.weather_wind_direction_degrees = 0.0f;
 
-    LocalWeatherResolveSystem::run(site_context);
+    run_local_weather_pipeline(campaign, site_run, queue);
 
     auto tile = site_run.site_world->tile_at(TileCoord {2, 2});
     tile.device.structure_id = gs1::StructureId {gs1::k_structure_wind_fence};
@@ -525,23 +524,11 @@ void local_weather_resolve_applies_device_wind_protection_value_and_range(
     tile.device.device_efficiency = 0.5f;
     site_run.site_world->set_tile(TileCoord {2, 2}, tile);
 
-    GS1_SYSTEM_TEST_CHECK(context, LocalWeatherResolveSystem::subscribes_to(GameMessageType::SiteDevicePlaced));
-    GS1_SYSTEM_TEST_CHECK(context, LocalWeatherResolveSystem::subscribes_to(GameMessageType::SiteDeviceBroken));
-    GS1_SYSTEM_TEST_CHECK(context, LocalWeatherResolveSystem::subscribes_to(GameMessageType::SiteDeviceRepaired));
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        LocalWeatherResolveSystem::process_message(
-            site_context,
-            make_message(
-                GameMessageType::SiteDevicePlaced,
-                gs1::SiteDevicePlacedMessage {
-                    1U,
-                    2,
-                    2,
-                    gs1::k_structure_wind_fence,
-                    0U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, !LocalWeatherResolveSystem::subscribes_to(GameMessageType::SiteDevicePlaced));
+    GS1_SYSTEM_TEST_CHECK(context, !LocalWeatherResolveSystem::subscribes_to(GameMessageType::SiteDeviceBroken));
+    GS1_SYSTEM_TEST_CHECK(context, !LocalWeatherResolveSystem::subscribes_to(GameMessageType::SiteDeviceRepaired));
 
-    LocalWeatherResolveSystem::run(site_context);
+    run_local_weather_pipeline(campaign, site_run, queue);
 
     const auto own_weather = site_run.site_world->tile_local_weather(TileCoord {2, 2});
     const auto neighbor_weather = site_run.site_world->tile_local_weather(TileCoord {3, 2});
@@ -894,12 +881,12 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     weather_event_highway_objective_schedules_repeating_waves_with_one_sided_wind);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "local_weather_resolve",
-    "spreads_full_refresh_over_multiple_runs",
-    local_weather_resolve_spreads_full_refresh_over_multiple_runs);
+    "recomputes_full_grid_each_run",
+    local_weather_resolve_recomputes_full_grid_each_run);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "local_weather_resolve",
-    "refreshes_dirty_neighborhood_from_tile_ecology_changed",
-    local_weather_resolve_refreshes_dirty_neighborhood_from_tile_ecology_changed);
+    "combines_owner_specific_contributions_each_run",
+    local_weather_resolve_combines_owner_specific_contributions_each_run);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "local_weather_resolve",
     "applies_directional_wind_shadow_falloff_for_windbreak_plants",

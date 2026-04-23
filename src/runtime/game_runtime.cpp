@@ -17,6 +17,7 @@
 #include "site/systems/craft_system.h"
 #include "site/systems/device_maintenance_system.h"
 #include "site/systems/device_support_system.h"
+#include "site/systems/device_weather_contribution_system.h"
 #include "site/systems/ecology_system.h"
 #include "site/systems/economy_phone_system.h"
 #include "site/site_projection_update_flags.h"
@@ -24,6 +25,7 @@
 #include "site/systems/local_weather_resolve_system.h"
 #include "site/systems/modifier_system.h"
 #include "site/systems/phone_panel_system.h"
+#include "site/systems/plant_weather_contribution_system.h"
 #include "site/systems/placement_validation_system.h"
 #include "site/systems/failure_recovery_system.h"
 #include "site/systems/site_completion_system.h"
@@ -602,6 +604,8 @@ void GameRuntime::initialize_subscription_tables()
         WeatherEventSystem::access(),
         WorkerConditionSystem::access(),
         EcologySystem::access(),
+        PlantWeatherContributionSystem::access(),
+        DeviceWeatherContributionSystem::access(),
         TaskBoardSystem::access(),
         PlacementValidationSystem::access(),
         LocalWeatherResolveSystem::access(),
@@ -4086,6 +4090,24 @@ void GameRuntime::run_fixed_step()
 
     run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_LOCAL_WEATHER_RESOLVE, [&]()
     {
+        auto plant_weather_contribution_context =
+            make_site_system_context<PlantWeatherContributionSystem>(
+                *campaign_,
+                *active_site_run_,
+                message_queue_,
+                fixed_step_seconds_,
+                move_direction);
+        PlantWeatherContributionSystem::run(plant_weather_contribution_context);
+
+        auto device_weather_contribution_context =
+            make_site_system_context<DeviceWeatherContributionSystem>(
+                *campaign_,
+                *active_site_run_,
+                message_queue_,
+                fixed_step_seconds_,
+                move_direction);
+        DeviceWeatherContributionSystem::run(device_weather_contribution_context);
+
         auto local_weather_context = make_site_system_context<LocalWeatherResolveSystem>(
             *campaign_,
             *active_site_run_,

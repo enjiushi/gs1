@@ -22,6 +22,8 @@ enum class SiteComponent : std::uint8_t
     TileLayout,
     TileEcology,
     TileWeather,
+    TilePlantWeatherContribution,
+    TileDeviceWeatherContribution,
     DeviceCondition,
     DeviceRuntime,
     WorkerMotion,
@@ -70,6 +72,10 @@ template <typename... Components>
         return "TileEcology";
     case SiteComponent::TileWeather:
         return "TileWeather";
+    case SiteComponent::TilePlantWeatherContribution:
+        return "TilePlantWeatherContribution";
+    case SiteComponent::TileDeviceWeatherContribution:
+        return "TileDeviceWeatherContribution";
     case SiteComponent::DeviceCondition:
         return "DeviceCondition";
     case SiteComponent::DeviceRuntime:
@@ -199,6 +205,8 @@ template <typename SystemTag>
     return site_system_reads_component<SystemTag>(SiteComponent::TileLayout) ||
         site_system_reads_component<SystemTag>(SiteComponent::TileEcology) ||
         site_system_reads_component<SystemTag>(SiteComponent::TileWeather) ||
+        site_system_reads_component<SystemTag>(SiteComponent::TilePlantWeatherContribution) ||
+        site_system_reads_component<SystemTag>(SiteComponent::TileDeviceWeatherContribution) ||
         site_system_reads_component<SystemTag>(SiteComponent::DeviceCondition) ||
         site_system_reads_component<SystemTag>(SiteComponent::DeviceRuntime);
 }
@@ -208,6 +216,8 @@ template <typename SystemTag>
 {
     return site_system_owns_component<SystemTag>(SiteComponent::TileEcology) ||
         site_system_owns_component<SystemTag>(SiteComponent::TileWeather) ||
+        site_system_owns_component<SystemTag>(SiteComponent::TilePlantWeatherContribution) ||
+        site_system_owns_component<SystemTag>(SiteComponent::TileDeviceWeatherContribution) ||
         site_system_owns_component<SystemTag>(SiteComponent::DeviceCondition) ||
         site_system_owns_component<SystemTag>(SiteComponent::DeviceRuntime);
 }
@@ -373,6 +383,110 @@ public:
         if (world != nullptr)
         {
             world->set_tile_local_weather_at_index(index, data);
+        }
+    }
+
+    [[nodiscard]] SiteWorld::TileWeatherContributionData read_tile_plant_weather_contribution(
+        TileCoord coord) const noexcept
+    {
+        static_assert(
+            site_system_reads_component<SystemTag>(SiteComponent::TilePlantWeatherContribution),
+            "System must declare TilePlantWeatherContribution as readable.");
+        const auto* world = site_world_ptr();
+        return world != nullptr
+            ? world->tile_plant_weather_contribution(coord)
+            : SiteWorld::TileWeatherContributionData {};
+    }
+
+    [[nodiscard]] SiteWorld::TileWeatherContributionData read_tile_plant_weather_contribution_at_index(
+        std::size_t index) const noexcept
+    {
+        static_assert(
+            site_system_reads_component<SystemTag>(SiteComponent::TilePlantWeatherContribution),
+            "System must declare TilePlantWeatherContribution as readable.");
+        const auto* world = site_world_ptr();
+        return world != nullptr
+            ? world->tile_plant_weather_contribution_at_index(index)
+            : SiteWorld::TileWeatherContributionData {};
+    }
+
+    void write_tile_plant_weather_contribution(
+        TileCoord coord,
+        const SiteWorld::TileWeatherContributionData& data)
+    {
+        static_assert(
+            site_system_owns_component<SystemTag>(SiteComponent::TilePlantWeatherContribution),
+            "System must declare TilePlantWeatherContribution as owned.");
+        auto* world = site_world_ptr();
+        if (world != nullptr)
+        {
+            world->set_tile_plant_weather_contribution(coord, data);
+        }
+    }
+
+    void write_tile_plant_weather_contribution_at_index(
+        std::size_t index,
+        const SiteWorld::TileWeatherContributionData& data)
+    {
+        static_assert(
+            site_system_owns_component<SystemTag>(SiteComponent::TilePlantWeatherContribution),
+            "System must declare TilePlantWeatherContribution as owned.");
+        auto* world = site_world_ptr();
+        if (world != nullptr)
+        {
+            world->set_tile_plant_weather_contribution_at_index(index, data);
+        }
+    }
+
+    [[nodiscard]] SiteWorld::TileWeatherContributionData read_tile_device_weather_contribution(
+        TileCoord coord) const noexcept
+    {
+        static_assert(
+            site_system_reads_component<SystemTag>(SiteComponent::TileDeviceWeatherContribution),
+            "System must declare TileDeviceWeatherContribution as readable.");
+        const auto* world = site_world_ptr();
+        return world != nullptr
+            ? world->tile_device_weather_contribution(coord)
+            : SiteWorld::TileWeatherContributionData {};
+    }
+
+    [[nodiscard]] SiteWorld::TileWeatherContributionData read_tile_device_weather_contribution_at_index(
+        std::size_t index) const noexcept
+    {
+        static_assert(
+            site_system_reads_component<SystemTag>(SiteComponent::TileDeviceWeatherContribution),
+            "System must declare TileDeviceWeatherContribution as readable.");
+        const auto* world = site_world_ptr();
+        return world != nullptr
+            ? world->tile_device_weather_contribution_at_index(index)
+            : SiteWorld::TileWeatherContributionData {};
+    }
+
+    void write_tile_device_weather_contribution(
+        TileCoord coord,
+        const SiteWorld::TileWeatherContributionData& data)
+    {
+        static_assert(
+            site_system_owns_component<SystemTag>(SiteComponent::TileDeviceWeatherContribution),
+            "System must declare TileDeviceWeatherContribution as owned.");
+        auto* world = site_world_ptr();
+        if (world != nullptr)
+        {
+            world->set_tile_device_weather_contribution(coord, data);
+        }
+    }
+
+    void write_tile_device_weather_contribution_at_index(
+        std::size_t index,
+        const SiteWorld::TileWeatherContributionData& data)
+    {
+        static_assert(
+            site_system_owns_component<SystemTag>(SiteComponent::TileDeviceWeatherContribution),
+            "System must declare TileDeviceWeatherContribution as owned.");
+        auto* world = site_world_ptr();
+        if (world != nullptr)
+        {
+            world->set_tile_device_weather_contribution_at_index(index, data);
         }
     }
 

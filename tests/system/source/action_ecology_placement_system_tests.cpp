@@ -1740,7 +1740,7 @@ void ecology_uses_average_wind_across_multitile_plant_footprint(
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(top_left.ecology.growth_pressure, bottom_right.ecology.growth_pressure));
 }
 
-void ecology_uses_resolved_tile_contribution_state_for_terrain_updates(
+void ecology_uses_owner_specific_weather_contributions_for_terrain_updates(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
@@ -1755,13 +1755,20 @@ void ecology_uses_resolved_tile_contribution_state_for_terrain_updates(
     tile.ecology.soil_fertility = 40.0f;
     tile.ecology.soil_salinity = 20.0f;
     tile.local_weather = gs1::SiteWorld::TileLocalWeatherData {0.0f, 0.0f, 0.0f};
-    tile.resolved_contribution = gs1::SiteWorld::TileResolvedContributionData {
+    tile.plant_weather_contribution = gs1::SiteWorld::TileWeatherContributionData {
         0.0f,
         0.0f,
         0.0f,
-        4.0f,
-        4.0f,
-        4.0f};
+        2.5f,
+        2.0f,
+        1.5f};
+    tile.device_weather_contribution = gs1::SiteWorld::TileWeatherContributionData {
+        0.0f,
+        0.0f,
+        0.0f,
+        1.5f,
+        2.0f,
+        2.5f};
     site_run.site_world->set_tile(TileCoord {2, 2}, tile);
 
     EcologySystem::run(site_context);
@@ -1973,8 +1980,8 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     ecology_uses_average_wind_across_multitile_plant_footprint);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "ecology",
-    "uses_resolved_tile_contribution_state_for_terrain_updates",
-    ecology_uses_resolved_tile_contribution_state_for_terrain_updates);
+    "uses_owner_specific_weather_contributions_for_terrain_updates",
+    ecology_uses_owner_specific_weather_contributions_for_terrain_updates);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "ecology",
     "run_grows_occupied_tiles_and_updates_progress",

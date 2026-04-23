@@ -21,7 +21,7 @@ This file is a quick orientation guide for agents working in this repository.
 - `src/`: Gameplay/runtime implementation code grouped by ownership domain. Read `src/guideline.md` before drilling deeper.
 - `tests/`: Runtime, smoke, and system test code plus scripted/system-test assets. Read `tests/guideline.md` before drilling deeper.
 - `third_party/`: Vendored external dependencies. Read `third_party/guideline.md` before drilling deeper.
-- `CMakeLists.txt`: Builds the gameplay DLL plus the smoke, visual smoke, runtime-test, and system-test executables, including the campaign faction-reputation and technology sources used by runtime/UI coverage.
+- `CMakeLists.txt`: Builds the gameplay DLL plus the smoke, visual smoke, runtime-test, and system-test executables, including the campaign faction-reputation and technology sources plus the owner-specific plant/device weather contribution systems used by runtime/UI coverage.
 - `launch_visual_game.ps1`: Convenience wrapper for the visual smoke host that forwards PowerShell `-Verbose` into host-side verbose logging.
 - `include/gs1/export.h`: Public DLL export/import macros.
 - `include/gs1/game_api.h`: C ABI entry points exposed by the gameplay DLL.
@@ -33,7 +33,7 @@ This file is a quick orientation guide for agents working in this repository.
 - `src/content/`: Prototype content database, loader/validator shells, and content definition types, including authored wind-shelter plant stats, per-plant harvest-output metadata, and the neutral base-tech plus faction-enhancement progression tables.
 - `src/events/`: Translated engine feedback event types. Internal gameplay cross-system messages should use `GameMessage`, not runtime gameplay events.
 - `src/runtime/`: Core runtime loop, fixed-step runner, host-event dispatch plus transient phase-control handling, message queues, random service, and engine message emission.
-- `src/site/`: Active site-run state and site systems for dedicated site time progression, actions, weather, ecology, directional local wind shelter, inventory, economy, task board, camp durability, harvested-output flow, and completion/failure flow.
+- `src/site/`: Active site-run state and site systems for dedicated site time progression, actions, weather, owner-specific plant/device local-weather contribution passes, ecology, directional local wind shelter, inventory, economy, task board, camp durability, harvested-output flow, and completion/failure flow.
 - `src/support/`: Shared support types such as typed IDs.
 - `src/ui/`: View-model and presenter state for HUD, phone, notifications, inspection, regional map, and UI presentation.
 - `tests/smoke/`: Smoke host, runtime DLL loader, script runner, live-state JSON, live HTTP server, and visual smoke UI, including the right-click harvest action path.
