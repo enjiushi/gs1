@@ -18,8 +18,9 @@ External prototype content TOML files loaded by the gameplay DLL at startup.
 - `reward_candidates.toml`: Reward candidate content for money, deliveries, unlockable reveals, run modifiers, and reputation rewards.
 - `site_actions.toml`: Site action tuning content for action duration, worker energy/hydration/nourishment costs, placement occupancy, and reservation/approach/movement flags.
 - `modifier_presets.toml`: Modifier preset content for nearby-aura and run-modifier channel totals consumed by the site modifier system.
-- `technology_tiers.toml`: Faction technology tier content for per-faction reputation requirements and display names.
+- `technology_tiers.toml`: Neutral base-technology tier content for per-tier total-reputation requirements and display names.
+- `faction_technology_tiers.toml`: Faction enhancement tier content for per-faction reputation requirements and display names.
 - `total_reputation_tiers.toml`: Total-reputation tier content for global plant unlock thresholds and labels.
 - `reputation_unlocks.toml`: Total-reputation unlock content for post-starter plant unlocks and future non-plant unlock types.
-- `technology_nodes.toml`: Technology node content for faction tech entries, cash costs, entry kinds, and placeholder labels/descriptions.
+- `technology_nodes.toml`: Technology node content for neutral base techs plus faction-owned enhancements, cash costs, entry kinds, and placeholder labels/descriptions.
 - `initial_unlocked_plants.toml`: Starter-plant content for the plants available from campaign start before total-reputation unlocks.

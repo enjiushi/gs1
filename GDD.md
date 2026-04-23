@@ -25,7 +25,7 @@ The game combines direct on-foot play with site-scale strategy. The player is no
 | Setting | Present-day, grounded, China-inspired remote desert |
 | Narrative weight | Mostly sandbox with light contextual storytelling |
 | Replay value target | High run-to-run variety through procedural generation, task-board variation, events, and strategic progression choices |
-| Tech model | Dual-layer progression with cumulative-reputation faction tech branches plus task-revealed site unlocks and session-only modifiers |
+| Tech model | Dual-layer progression with total-reputation-gated neutral base techs, faction-reputation-gated enhancements, plus task-revealed site unlocks and session-only modifiers |
 
 ## 3. Vision And Pillars
 
@@ -54,9 +54,9 @@ These terms are stable and should be used consistently in future design and impl
 | `Contract Board` | The on-site progression system available only during an active `Site` session; it contains the current site's faction-published `Site Task` pool that drives site progression and rewards. |
 | `Field Phone` | The player's in-world access point for money-related actions during a `Site` session; it supports the on-site `Contract Board` plus buying, selling, hiring, and related field planning actions. |
 | `Reputation` | The cumulative campaign-level government standing resource earned progressively from official work; it is never spent and instead gates faction-tech tiers and broader program trust. |
-| `Persistent Tech Tree` | The long-term campaign progression layer formed by three faction tech branches plus any neutral program-wide upgrades. |
+| `Persistent Tech Tree` | The long-term campaign progression layer formed by neutral base-tech tiers plus faction-specific enhancement layers. |
 | `Faction` | One of the three institutional backers on the `Contract Board`; each `Faction` has its own play style, task bias, random events, assistant support, and tech branch. |
-| `Faction Reputation` | The cumulative standing value with one specific `Faction`, earned mainly through that faction's tasks and events; it unlocks branch nodes and improves post-event help. |
+| `Faction Reputation` | The cumulative standing value with one specific `Faction`, earned mainly through that faction's tasks and events; it unlocks that faction's enhancement tiers and improves post-event help. |
 | `Faction Assistant` | A temporary signature support package provided by a `Faction`. In the current design, each faction should expose only one clear assistant package: `Workforce Support`, `Plant-Water Support`, or `Device Upgrade Support`. |
 | `Concept Unlock` | A real progression gate used during onboarding, where a new gameplay concept becomes available only after the player has meaningfully used the previous one; this is not just a tutorial popup or hidden full system. |
 | `Learning Budget` | The maximum amount of genuinely new gameplay the player is expected to absorb from one site game's rewards and unlocks; reputation pacing should keep this budget small. |
@@ -3070,9 +3070,9 @@ To make the game more compelling without feeling manipulative, these systems wou
 - `Reputation`: total campaign standing with the restoration program, earned progressively from official work and never spent
 - `Faction Reputation`: cumulative standing with each individual `Faction`, earned mainly from that faction's `Site Task`s, faction events, and aligned follow-through
 
-`Reputation` should function as thresholded trust, not consumable currency. `Faction Reputation` should also remain cumulative. In the prototype, `Reputation` now unlocks the three global plant tiers, `Faction Reputation` unlocks each faction's three branch tiers, and claiming faction tech spends persistent campaign cash instead of spending or occupying reputation.
+`Reputation` should function as thresholded trust, not consumable currency. `Faction Reputation` should also remain cumulative. In the prototype, `Reputation` now unlocks the three global plant tiers plus the neutral base-tech tiers, `Faction Reputation` unlocks each faction's three enhancement tiers, and claiming tech always spends persistent campaign cash instead of spending or occupying reputation.
 
-Claiming faction tech therefore never lowers the visible total trust value. Trust unlocks access; campaign cash pays for the actual tech claim.
+Claiming tech therefore never lowers the visible total trust value. Trust unlocks access; campaign cash pays for the actual tech claim.
 
 For clarity, `Faction Reputation` from `Site Task`s should usually be a guaranteed completion payout tied to the task's publisher, with the amount scaling by task tier or level, while the task's visible reward draft should stay focused on immediate tactical rewards.
 
@@ -3290,23 +3290,18 @@ High replay value depends on making progression choices meaningfully different a
 
 ### Faction Technology
 
-The `Persistent Tech Tree` is the long-term campaign progression layer. In the current design, it should stay faction-first, tabbed, readable, and data-driven. The regional-map tech panel should expose three separate faction tabs, one for each branch. The currently selected faction tab owns the full visible branch slice for that panel.
+The `Persistent Tech Tree` is the long-term campaign progression layer. In the current design, it should stay readable, data-driven, and split into two visible layers: neutral base-tech tiers for the whole program, plus faction tabs that show enhancement choices for the currently selected faction.
 
 #### Technology Design Rules
 
-- the current prototype tech panel should show `3` faction tabs and no shared neutral branch lane
-- each faction branch should be divided into explicit tiers
-- each faction tier should contain exactly `3` base tech choices
-- each base tech should expose exactly `2` mutually exclusive amplification choices
-- an amplification may be purchased only after its paired base tech has already been purchased
-- once one amplification is chosen for a base tech, the sibling amplification is permanently locked out for that campaign
-- tier `1` starts unlocked
-- a later tier unlocks only after the previous tier already contains at least `1` purchased base tech and at least `1` purchased amplification
-- each tier defines its own base reputation cost, and higher tiers should start from a higher base cost than lower tiers
-- each additional purchase inside the same tier increases the next purchase cost inside that tier by a cumulative `1.2x` multiplier, regardless of whether the next purchase is a base tech or an amplification
-- faction tech claims use only that faction's available reputation budget, not global campaign reputation and not a separate pick currency
-- available faction reputation is total branch reputation minus already occupied branch reputation
-- branch identity should still come from signature content family plus amplification direction rather than bespoke code per faction
+- the current prototype tech panel should show one neutral base-tech lane plus `3` faction tabs for enhancements
+- neutral base techs should be divided into explicit tiers gated only by total `Reputation`
+- faction enhancements should also be divided into explicit tiers, but those tiers are gated only by the selected faction's `Faction Reputation`
+- an enhancement may be purchased only after its paired base tech has already been purchased
+- reaching a later tier threshold should immediately make that tier's base techs or enhancements claimable; it should not require previous-tier purchases
+- both base techs and enhancements should spend only `campaignCash`
+- `Reputation` and `Faction Reputation` unlock access but are never spent
+- branch identity should still come from signature content family plus enhancement direction rather than bespoke code per faction
 
 #### Technology Progression Meters
 
@@ -3314,14 +3309,14 @@ Technology should remain tied to a tiny set of progression meters:
 
 | Meter | Meaning |
 |---|---|
-| `reputation` | Campaign-wide trust that unlocks the three prototype global plant tiers |
-| `factionReputation[factionId]` | Total branch trust earned with one faction and used only for faction-tier eligibility |
-| `campaignCash` | Persistent money shared across the campaign and spent on faction-tech purchases |
+| `reputation` | Campaign-wide trust that unlocks the three prototype global plant tiers plus the neutral base-tech tiers |
+| `factionReputation[factionId]` | Total trust earned with one faction and used only for that faction's enhancement-tier eligibility |
+| `campaignCash` | Persistent money shared across the campaign and spent on base-tech and enhancement purchases |
 
 Important rule:
 
 - `reputation` and `factionReputation[factionId]` unlock tier access but are never spent
-- `campaignCash` is the only prototype currency used to claim faction tech nodes
+- `campaignCash` is the only prototype currency used to claim tech nodes
 - claimed tech state is persistent node ownership, not an unspent-pick inventory
 - the runtime impact should still come from linked content plus persistent modifier direction, not from a hidden branch bonus table
 
@@ -3344,13 +3339,13 @@ Delivery rule:
 
 #### Tier Structure
 
-Use this shared faction-tier structure in the current design:
+Use this shared prototype structure in the current design:
 
 | Tier element | Count | Rule |
 |---|---|---|
-| Base techs per faction tier | `3` | These are the main branch claims inside that tier. |
-| Amplifications per base tech | `2` | They are mutually exclusive and require the paired base tech first. |
-| Unlock requirement for next tier | `1` base tech + `1` amplification | Both must already be purchased in the previous tier. |
+| Base techs per neutral tier | `2` | These are the whole-program tech claims inside that tier. |
+| Enhancements per faction tier in the prototype | `2` | Each one belongs to one faction and points at one base tech from the same tier. |
+| Unlock requirement for any claim | tier threshold + cash | Base techs use total `Reputation`; enhancements use faction `Faction Reputation` plus the paired base tech purchase. |
 
 #### Per-Unlockable Update Rule
 
@@ -4400,7 +4395,7 @@ This summary should include only core runtime meters and the core plant-side val
 | Weather meters | `weatherHeat`, `weatherWind`, `weatherDust` | Site-wide ambient weather outputs after baseline site conditions and current event meters are combined. |
 | Resolved tile contribution meters | `tileHeatProtection`, `tileWindProtection`, `tileDustProtection`, `tileFertilityImprove`, `tileSalinityReduction`, `tileIrrigation` | Per-tile support result after nearby plants, devices, and shelter are accumulated. They bridge local objects and final weather or terrain computation. |
 | Resolved local weather meters | `tileHeat`, `tileWind`, `tileDust` | Per-tile weather result after site weather, local support, and shelter are combined. They bridge site weather and final terrain or plant pressure. |
-| Technology progression meters | `reputation`, `factionReputation[factionId]`, `occupiedFactionReputation[factionId]` | Campaign progression meters that gate faction tiers, determine available branch budget, and track permanent tech claims. |
+| Technology progression meters | `reputation`, `factionReputation[factionId]`, `campaignCash` | Campaign progression meters that gate neutral base-tech tiers, gate faction enhancement tiers, and pay for permanent tech claims. |
 | Worker state meters and derived values | `playerHealth`, `playerHydration`, `playerNourishment`, `playerEnergy`, `playerMorale`, derived `playerEnergyCap`, derived `playerWorkEfficiency` | Core worker survival and performance values. `playerHealth`, `playerHydration`, `playerNourishment`, `playerEnergy`, and `playerMorale` are stored worker meters, while `playerEnergyCap` and `playerWorkEfficiency` are recomputed every frame from the current worker condition. |
 | Item state meters | `itemQuantity`, `itemCondition`, `itemFreshness` | Core runtime item-stack meters. `itemQuantity` tracks how much of a stack remains, `itemCondition` tracks damage-sensitive item usability, and `itemFreshness` tracks spoilable item usability. |
 | Persistent terrain soil meters | `tileSoilFertility`, `tileMoisture`, `tileSoilSalinity` | Long-lived or short-lived land condition on plantable `Ground`. These meters determine what can grow well. |
@@ -4618,13 +4613,13 @@ effectiveActionDuration =
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `reputation` | Site completion, selected task rewards, commendations, major campaign progress | Global plant-tier eligibility and broader program trust | Campaign-wide trust meter. In the prototype it unlocks the three global plant tiers but does not pay for faction tech. |
-| `factionReputation[factionId]` | Completed tasks from that faction, faction events, aftermath follow-through | Faction-tier eligibility, aftermath relief quality, faction-side event quality | Branch-specific total trust meter. It gates faction technology depth but is never spent. |
-| `campaignCash` | Site money rewards, buy/sell outcomes, contractor spending, unlock purchases, faction-tech claims | Site purchasing power and faction-tech claims | Persistent campaign money shared across site runs. It is the only prototype currency used to buy faction tech nodes. |
+| `reputation` | Site completion, selected task rewards, commendations, major campaign progress | Global plant-tier eligibility, neutral base-tech tier eligibility, and broader program trust | Campaign-wide trust meter. In the prototype it unlocks the three global plant tiers plus neutral base-tech access but is never spent on tech. |
+| `factionReputation[factionId]` | Completed tasks from that faction, faction events, aftermath follow-through | Faction-enhancement-tier eligibility, aftermath relief quality, faction-side event quality | Branch-specific total trust meter. It gates faction enhancement depth but is never spent. |
+| `campaignCash` | Site money rewards, buy/sell outcomes, contractor spending, unlock purchases, tech claims | Site purchasing power and tech claims | Persistent campaign money shared across site runs. It is the only prototype currency used to buy base techs and enhancements. |
 
 Important rule:
 
-- claimed tech and chosen amplification state should be stored as persistent node-state booleans, not as separate meters
+- claimed tech state should be stored as persistent node-state booleans, not as separate meters
 - technology should modify content by attaching persistent `modifierBundle`s to linked recipes, plants, or devices before those rows are used in site play
 
 ### Item State Meter Relationships

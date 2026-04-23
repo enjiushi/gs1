@@ -551,6 +551,7 @@ int main()
     const auto tech_tree_messages = drain_engine_messages(runtime);
     assert(contains_ui_element_text(tech_tree_messages, "Prototype Tech Tree"));
     assert(contains_ui_element_text(tech_tree_messages, "Starter Plants"));
+    assert(contains_ui_element_text(tech_tree_messages, "Base Tech Tree"));
     assert(contains_ui_element_text(tech_tree_messages, "Peashrub | White Thorn"));
     assert(contains_ui_element_text(tech_tree_messages, "Tab: Village Committee"));
 
@@ -569,6 +570,11 @@ int main()
         40});
     assert(runtime.handle_message(faction_reputation_award) == GS1_STATUS_OK);
 
+    GameMessage total_reputation_award {};
+    total_reputation_award.type = GameMessageType::CampaignReputationAwardRequested;
+    total_reputation_award.set_payload(gs1::CampaignReputationAwardRequestedMessage {10});
+    assert(runtime.handle_message(total_reputation_award) == GS1_STATUS_OK);
+
     GameMessage select_village_tab_message {};
     select_village_tab_message.type = GameMessageType::SelectRegionalMapTechTreeFaction;
     select_village_tab_message.set_payload(gs1::SelectRegionalMapTechTreeFactionMessage {
@@ -580,7 +586,7 @@ int main()
     GameMessage claim_tech_node_message {};
     claim_tech_node_message.type = GameMessageType::TechnologyNodeClaimRequested;
     claim_tech_node_message.set_payload(gs1::TechnologyNodeClaimRequestedMessage {
-        gs1::k_tech_node_village_t1_relief_protocol});
+        gs1::k_tech_node_t1_field_briefing});
     assert(runtime.handle_message(claim_tech_node_message) == GS1_STATUS_OK);
     const auto claimed_messages = drain_engine_messages(runtime);
     assert(contains_ui_element_text(claimed_messages, "Prototype Tech Tree"));
@@ -631,6 +637,7 @@ int main()
     const auto site_tech_tree_messages = drain_engine_messages(support_runtime);
     assert(contains_ui_element_text(site_tech_tree_messages, "Prototype Tech Tree"));
     assert(contains_ui_element_text(site_tech_tree_messages, "Tab: Village Committee"));
+    assert(contains_ui_element_text(site_tech_tree_messages, "Base Tech Tree"));
 
     assert(support_runtime.handle_message(select_forestry_tab_message) == GS1_STATUS_OK);
     const auto site_forestry_messages = drain_engine_messages(support_runtime);

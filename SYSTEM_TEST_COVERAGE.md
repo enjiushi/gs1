@@ -122,10 +122,12 @@ Implemented behavior coverage should verify:
 
 - Faction reputation awards never decrease a faction's lifetime total reputation.
 - Campaign-wide total reputation unlocks the three prototype plant tiers without being spent.
-- Each faction exposes three prototype tiers gated by authored reputation requirements.
+- Neutral base-tech tiers are gated only by authored total-reputation requirements.
+- Each faction exposes three prototype enhancement tiers gated by authored faction-reputation requirements.
 - Reaching a total-reputation tier threshold unlocks that tier's authored plant pair without spending reputation.
-- Tier technologies become claimable as soon as the tier reputation threshold is met; they do not require previous-tier purchases.
-- Prototype technologies cover placeholder global-modifier and mechanism-change effects with authored per-node cash costs.
+- Base technologies become claimable as soon as the matching total-reputation tier threshold is met; they do not require previous-tier purchases.
+- Enhancements require both the paired base tech purchase and the matching faction-reputation tier.
+- Prototype technologies cover placeholder base-tech and enhancement modifier/mechanism effects with authored per-node cash costs.
 - Purchased tech state is stored as node ownership, not as unspent pick inventory.
 
 ### `regional_support`
@@ -381,7 +383,7 @@ Implemented behavior coverage should verify:
 
 - `SiteRunStarted` clears modifier state, imports nearby aura modifiers from the
   campaign loadout planner, imports unlocked assistant packages plus purchased
-  technology amplification modifiers, and resolves totals.
+  base-tech or enhancement modifiers, and resolves totals.
 - `run()` recomputes totals from nearby auras, run modifiers, and camp comfort.
 - Channel totals clamp to the configured range.
 - Projection dirty flags are raised when resolved totals change.

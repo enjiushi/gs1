@@ -177,6 +177,11 @@ std::span<const TechnologyTierDef> all_technology_tier_defs() noexcept
     return prototype_content_database().technology_tier_defs;
 }
 
+std::span<const FactionTechnologyTierDef> all_faction_technology_tier_defs() noexcept
+{
+    return prototype_content_database().faction_technology_tier_defs;
+}
+
 std::span<const TotalReputationTierDef> all_total_reputation_tier_defs() noexcept
 {
     return prototype_content_database().total_reputation_tier_defs;
@@ -197,11 +202,24 @@ std::span<const PlantId> all_initial_unlocked_plant_ids() noexcept
     return prototype_content_database().initial_unlocked_plant_ids;
 }
 
-const TechnologyTierDef* find_technology_tier_def(
+const TechnologyTierDef* find_technology_tier_def(std::uint8_t tier_index) noexcept
+{
+    for (const auto& tier_def : all_technology_tier_defs())
+    {
+        if (tier_def.tier_index == tier_index)
+        {
+            return &tier_def;
+        }
+    }
+
+    return nullptr;
+}
+
+const FactionTechnologyTierDef* find_faction_technology_tier_def(
     FactionId faction_id,
     std::uint8_t tier_index) noexcept
 {
-    for (const auto& tier_def : all_technology_tier_defs())
+    for (const auto& tier_def : all_faction_technology_tier_defs())
     {
         if (tier_def.faction_id == faction_id && tier_def.tier_index == tier_index)
         {

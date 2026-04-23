@@ -18,13 +18,12 @@ public:
     [[nodiscard]] static bool node_purchased(
         const CampaignState& campaign,
         TechNodeId tech_node_id) noexcept;
-    [[nodiscard]] static std::uint32_t purchased_count_in_tier(
-        const CampaignState& campaign,
-        FactionId faction_id,
-        std::uint8_t tier_index) noexcept;
-    [[nodiscard]] static bool tier_unlocked(
+    [[nodiscard]] static bool technology_tier_unlocked(
         const CampaignState& campaign,
         const TechnologyTierDef& tier_def) noexcept;
+    [[nodiscard]] static bool faction_tier_unlocked(
+        const CampaignState& campaign,
+        const FactionTechnologyTierDef& tier_def) noexcept;
     [[nodiscard]] static bool total_reputation_tier_unlocked(
         const CampaignState& campaign,
         const TotalReputationTierDef& tier_def) noexcept;

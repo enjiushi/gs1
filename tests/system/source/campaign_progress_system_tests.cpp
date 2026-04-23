@@ -893,12 +893,32 @@ void technology_total_reputation_tiers_unlock_plants(
     GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_saxaul}));
 }
 
-void technology_claim_spends_campaign_cash_and_records_purchase(
+void technology_base_tiers_unlock_from_total_reputation(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    const auto* tier_one = gs1::find_technology_tier_def(1U);
+    const auto* tier_two = gs1::find_technology_tier_def(2U);
+
+    GS1_SYSTEM_TEST_REQUIRE(context, tier_one != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(context, tier_two != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, !TechnologySystem::technology_tier_unlocked(campaign, *tier_one));
+    GS1_SYSTEM_TEST_CHECK(context, !TechnologySystem::technology_tier_unlocked(campaign, *tier_two));
+
+    campaign.technology_state.total_reputation = 10;
+    GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::technology_tier_unlocked(campaign, *tier_one));
+    GS1_SYSTEM_TEST_CHECK(context, !TechnologySystem::technology_tier_unlocked(campaign, *tier_two));
+
+    campaign.technology_state.total_reputation = 25;
+    GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::technology_tier_unlocked(campaign, *tier_two));
+}
+
+void technology_base_claim_spends_campaign_cash_and_records_purchase(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
     auto campaign_context = make_campaign_context(campaign);
-    campaign.faction_progress[0].faction_reputation = 40;
+    campaign.technology_state.total_reputation = 10;
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -907,26 +927,27 @@ void technology_claim_spends_campaign_cash_and_records_purchase(
             make_message(
                 GameMessageType::TechnologyNodeClaimRequested,
                 gs1::TechnologyNodeClaimRequestedMessage {
-                    gs1::k_tech_node_village_t1_relief_protocol})) == GS1_STATUS_OK);
+                    gs1::k_tech_node_t1_field_briefing})) == GS1_STATUS_OK);
 
     GS1_SYSTEM_TEST_CHECK(context, campaign.cash == 41);
     GS1_SYSTEM_TEST_CHECK(
         context,
         TechnologySystem::available_faction_reputation(campaign, gs1::FactionId {gs1::k_faction_village_committee}) ==
-            40);
+            0);
     GS1_SYSTEM_TEST_CHECK(
         context,
         TechnologySystem::node_purchased(
             campaign,
-            gs1::TechNodeId {gs1::k_tech_node_village_t1_relief_protocol}));
+            gs1::TechNodeId {gs1::k_tech_node_t1_field_briefing}));
 }
 
-void technology_later_tier_requires_reputation_but_not_previous_purchases(
+void technology_enhancement_requires_purchased_base_and_faction_reputation(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
     auto campaign_context = make_campaign_context(campaign);
-    campaign.faction_progress[0].faction_reputation = 24;
+    campaign.technology_state.total_reputation = 10;
+    campaign.faction_progress[0].faction_reputation = 9;
 
     GS1_SYSTEM_TEST_CHECK(
         context,
@@ -935,14 +956,7 @@ void technology_later_tier_requires_reputation_but_not_previous_purchases(
             make_message(
                 GameMessageType::TechnologyNodeClaimRequested,
                 gs1::TechnologyNodeClaimRequestedMessage {
-                    gs1::k_tech_node_village_t2_kitchen_standards})) == GS1_STATUS_INVALID_STATE);
-
-    campaign.faction_progress[0].faction_reputation = 25;
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        !TechnologySystem::node_purchased(
-            campaign,
-            gs1::TechNodeId {gs1::k_tech_node_village_t1_relief_protocol}));
+                    gs1::k_tech_node_village_t1_field_briefing_enhancement})) == GS1_STATUS_INVALID_STATE);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -951,13 +965,71 @@ void technology_later_tier_requires_reputation_but_not_previous_purchases(
             make_message(
                 GameMessageType::TechnologyNodeClaimRequested,
                 gs1::TechnologyNodeClaimRequestedMessage {
-                    gs1::k_tech_node_village_t2_kitchen_standards})) == GS1_STATUS_OK);
+                    gs1::k_tech_node_t1_field_briefing})) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::process_message(
+            campaign_context,
+            make_message(
+                GameMessageType::TechnologyNodeClaimRequested,
+                gs1::TechnologyNodeClaimRequestedMessage {
+                    gs1::k_tech_node_village_t1_field_briefing_enhancement})) == GS1_STATUS_INVALID_STATE);
+
+    campaign.faction_progress[0].faction_reputation = 10;
+    const auto cash_before_enhancement = campaign.cash;
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TechnologySystem::process_message(
+            campaign_context,
+            make_message(
+                GameMessageType::TechnologyNodeClaimRequested,
+                gs1::TechnologyNodeClaimRequestedMessage {
+                    gs1::k_tech_node_village_t1_field_briefing_enhancement})) == GS1_STATUS_OK);
 
     GS1_SYSTEM_TEST_CHECK(
         context,
         TechnologySystem::node_purchased(
             campaign,
-            gs1::TechNodeId {gs1::k_tech_node_village_t2_kitchen_standards}));
+            gs1::TechNodeId {gs1::k_tech_node_village_t1_field_briefing_enhancement}));
+    GS1_SYSTEM_TEST_CHECK(context, campaign.cash == cash_before_enhancement - 4);
+}
+
+void technology_later_base_tier_requires_total_reputation_but_not_previous_purchases(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto campaign_context = make_campaign_context(campaign);
+    campaign.technology_state.total_reputation = 24;
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::process_message(
+            campaign_context,
+            make_message(
+                GameMessageType::TechnologyNodeClaimRequested,
+                gs1::TechnologyNodeClaimRequestedMessage {
+                    gs1::k_tech_node_t2_meal_rotation})) == GS1_STATUS_INVALID_STATE);
+
+    campaign.technology_state.total_reputation = 25;
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        !TechnologySystem::node_purchased(campaign, gs1::TechNodeId {gs1::k_tech_node_t1_field_briefing}));
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TechnologySystem::process_message(
+            campaign_context,
+            make_message(
+                GameMessageType::TechnologyNodeClaimRequested,
+                gs1::TechnologyNodeClaimRequestedMessage {
+                    gs1::k_tech_node_t2_meal_rotation})) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::node_purchased(campaign, gs1::TechNodeId {gs1::k_tech_node_t2_meal_rotation}));
     GS1_SYSTEM_TEST_CHECK(context, campaign.cash == 37);
 }
 
@@ -966,20 +1038,21 @@ void technology_uses_authored_cash_costs_per_node(
 {
     auto campaign = make_campaign();
     auto campaign_context = make_campaign_context(campaign);
+    campaign.technology_state.total_reputation = 100;
     campaign.faction_progress[0].faction_reputation = 100;
 
     const auto* tier_one_modifier =
-        gs1::find_technology_node_def(gs1::TechNodeId {gs1::k_tech_node_village_t1_relief_protocol});
-    const auto* tier_one_mechanism =
-        gs1::find_technology_node_def(gs1::TechNodeId {gs1::k_tech_node_village_t1_supply_routing});
+        gs1::find_technology_node_def(gs1::TechNodeId {gs1::k_tech_node_t1_field_briefing});
+    const auto* tier_one_enhancement =
+        gs1::find_technology_node_def(gs1::TechNodeId {gs1::k_tech_node_village_t1_field_briefing_enhancement});
     const auto* tier_two_modifier =
-        gs1::find_technology_node_def(gs1::TechNodeId {gs1::k_tech_node_village_t2_kitchen_standards});
+        gs1::find_technology_node_def(gs1::TechNodeId {gs1::k_tech_node_t2_meal_rotation});
 
     GS1_SYSTEM_TEST_REQUIRE(context, tier_one_modifier != nullptr);
-    GS1_SYSTEM_TEST_REQUIRE(context, tier_one_mechanism != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(context, tier_one_enhancement != nullptr);
     GS1_SYSTEM_TEST_REQUIRE(context, tier_two_modifier != nullptr);
     GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::current_cash_cost(campaign, *tier_one_modifier) == 4);
-    GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::current_cash_cost(campaign, *tier_one_mechanism) == 6);
+    GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::current_cash_cost(campaign, *tier_one_enhancement) == 4);
     GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::current_cash_cost(campaign, *tier_two_modifier) == 8);
 
     GS1_SYSTEM_TEST_REQUIRE(
@@ -989,11 +1062,11 @@ void technology_uses_authored_cash_costs_per_node(
             make_message(
                 GameMessageType::TechnologyNodeClaimRequested,
                 gs1::TechnologyNodeClaimRequestedMessage {
-                    gs1::k_tech_node_village_t1_relief_protocol})) == GS1_STATUS_OK);
+                    gs1::k_tech_node_t1_field_briefing})) == GS1_STATUS_OK);
 
     GS1_SYSTEM_TEST_CHECK(
         context,
-        TechnologySystem::current_cash_cost(campaign, *tier_one_mechanism) == 6);
+        TechnologySystem::current_cash_cost(campaign, *tier_one_enhancement) == 4);
     GS1_SYSTEM_TEST_CHECK(context, campaign.cash == 41);
 }
 
@@ -1090,16 +1163,24 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     faction_reputation_awards_do_not_reduce_total_reputation);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "technology",
+    "base_tiers_unlock_from_total_reputation",
+    technology_base_tiers_unlock_from_total_reputation);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "technology",
+    "base_claim_spends_campaign_cash_and_records_purchase",
+    technology_base_claim_spends_campaign_cash_and_records_purchase);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "technology",
+    "enhancement_requires_purchased_base_and_faction_reputation",
+    technology_enhancement_requires_purchased_base_and_faction_reputation);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "technology",
+    "later_base_tier_requires_total_reputation_but_not_previous_purchases",
+    technology_later_base_tier_requires_total_reputation_but_not_previous_purchases);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "technology",
     "total_reputation_tiers_unlock_plants",
     technology_total_reputation_tiers_unlock_plants);
-GS1_REGISTER_SOURCE_SYSTEM_TEST(
-    "technology",
-    "claim_spends_campaign_cash_and_records_purchase",
-    technology_claim_spends_campaign_cash_and_records_purchase);
-GS1_REGISTER_SOURCE_SYSTEM_TEST(
-    "technology",
-    "later_tier_requires_reputation_but_not_previous_purchases",
-    technology_later_tier_requires_reputation_but_not_previous_purchases);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "technology",
     "uses_authored_cash_costs_per_node",

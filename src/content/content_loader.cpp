@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <limits>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -639,6 +640,23 @@ template <typename T>
     fail_load(path, line_number, "invalid technology entry kind");
 }
 
+[[nodiscard]] TechnologyNodeKind parse_technology_node_kind(
+    const std::filesystem::path& path,
+    std::size_t line_number,
+    const std::string& field)
+{
+    if (field == "BaseTech")
+    {
+        return TechnologyNodeKind::BaseTech;
+    }
+    if (field == "Enhancement")
+    {
+        return TechnologyNodeKind::Enhancement;
+    }
+
+    fail_load(path, line_number, "invalid technology node kind");
+}
+
 [[nodiscard]] ReputationUnlockKind parse_reputation_unlock_kind(
     const std::filesystem::path& path,
     std::size_t line_number,
@@ -779,6 +797,28 @@ template <typename T>
         *value > static_cast<std::int64_t>(std::numeric_limits<T>::max()))
     {
         fail_invalid_toml_field(path, field, key, "must be an integer");
+    }
+
+    return static_cast<T>(*value);
+}
+
+template <typename T>
+[[nodiscard]] std::optional<T> optional_toml_unsigned(
+    const std::filesystem::path& path,
+    const toml::table& table,
+    std::string_view key)
+{
+    const auto field = table[key];
+    if (!field)
+    {
+        return std::nullopt;
+    }
+
+    const auto value = field.value<std::int64_t>();
+    if (!value.has_value() || *value < 0 ||
+        static_cast<std::uint64_t>(*value) > static_cast<std::uint64_t>(std::numeric_limits<T>::max()))
+    {
+        fail_invalid_toml_field(path, field, key, "must be a non-negative integer");
     }
 
     return static_cast<T>(*value);
@@ -1228,6 +1268,21 @@ void load_technology_tier_defs(ContentDatabase& content, const std::filesystem::
     {
         const auto& entry = require_array_entry_table(path, node, "technology_tiers");
         content.technology_tier_defs.push_back(TechnologyTierDef {
+            require_toml_unsigned<std::uint8_t>(path, entry, "tier_index"),
+            {0U, 0U, 0U},
+            require_toml_signed<std::int32_t>(path, entry, "reputation_requirement"),
+            store_string_view(content, require_toml_string(path, entry, "display_name"))});
+    }
+}
+
+void load_faction_technology_tier_defs(ContentDatabase& content, const std::filesystem::path& path)
+{
+    const auto document = load_toml_document(path);
+    const auto& technology_tiers = require_toml_array(path, document, "faction_technology_tiers");
+    for (const auto& node : technology_tiers)
+    {
+        const auto& entry = require_array_entry_table(path, node, "faction_technology_tiers");
+        content.faction_technology_tier_defs.push_back(FactionTechnologyTierDef {
             FactionId {require_toml_unsigned<std::uint32_t>(path, entry, "faction_id")},
             require_toml_unsigned<std::uint8_t>(path, entry, "tier_index"),
             {0U, 0U, 0U},
@@ -1282,26 +1337,45 @@ void load_technology_node_defs(ContentDatabase& content, const std::filesystem::
     for (const auto& node : technology_nodes)
     {
         const auto& entry = require_array_entry_table(path, node, "technology_nodes");
-        const auto faction_id = FactionId {require_toml_unsigned<std::uint32_t>(path, entry, "faction_id")};
+        const auto node_kind = parse_technology_node_kind(
+            path,
+            toml_line_number(entry),
+            require_toml_string(path, entry, "node_kind"));
         const auto tier_index = require_toml_unsigned<std::uint8_t>(path, entry, "tier_index");
         const auto slot_index = require_toml_unsigned<std::uint8_t>(path, entry, "slot_index");
+        const auto base_tech_slot_index =
+            node_kind == TechnologyNodeKind::BaseTech
+            ? slot_index
+            : optional_toml_unsigned<std::uint8_t>(path, entry, "base_tech_slot_index").value_or(slot_index);
+        const auto faction_id = FactionId {
+            optional_toml_unsigned<std::uint32_t>(path, entry, "faction_id").value_or(0U)};
         const auto entry_kind = parse_technology_entry_kind(
             path,
             toml_line_number(entry),
             require_toml_string(path, entry, "entry_kind"));
+        const auto tech_node_id = node_kind == TechnologyNodeKind::BaseTech
+            ? TechNodeId {technology_base_node_id(tier_index, slot_index)}
+            : TechNodeId {technology_enhancement_node_id(
+                faction_id,
+                tier_index,
+                base_tech_slot_index,
+                slot_index)};
         content.technology_node_defs.push_back(TechnologyNodeDef {
-            TechNodeId {technology_node_id(faction_id, tier_index, slot_index)},
+            tech_node_id,
+            node_kind,
             faction_id,
             tier_index,
             slot_index,
+            base_tech_slot_index,
+            0U,
             entry_kind,
             {0U, 0U, 0U},
             require_toml_signed<std::int32_t>(path, entry, "cash_cost"),
             entry_kind == TechnologyEntryKind::GlobalModifier
-                ? ModifierId {technology_modifier_id(faction_id, tier_index, slot_index)}
+                ? ModifierId {technology_modifier_id(tech_node_id)}
                 : ModifierId {},
             entry_kind == TechnologyEntryKind::MechanismChange
-                ? technology_mechanism_change_id(faction_id, tier_index, slot_index)
+                ? technology_mechanism_change_id(tech_node_id)
                 : 0U,
             require_toml_bool(path, entry, "is_todo_placeholder"),
             {0U, 0U, 0U},
@@ -1463,6 +1537,7 @@ ContentDatabase ContentLoader::load_prototype_content()
     const auto site_actions_path = root / "site_actions.toml";
     const auto modifier_presets_path = root / "modifier_presets.toml";
     const auto technology_tiers_path = root / "technology_tiers.toml";
+    const auto faction_technology_tiers_path = root / "faction_technology_tiers.toml";
     const auto total_reputation_tiers_path = root / "total_reputation_tiers.toml";
     const auto reputation_unlocks_path = root / "reputation_unlocks.toml";
     const auto technology_nodes_path = root / "technology_nodes.toml";
@@ -1480,6 +1555,7 @@ ContentDatabase ContentLoader::load_prototype_content()
     load_site_action_defs(content, site_actions_path);
     load_modifier_preset_defs(content, modifier_presets_path);
     load_technology_tier_defs(content, technology_tiers_path);
+    load_faction_technology_tier_defs(content, faction_technology_tiers_path);
     load_total_reputation_tier_defs(content, total_reputation_tiers_path);
     load_reputation_unlock_defs(content, reputation_unlocks_path);
     load_technology_node_defs(content, technology_nodes_path);
