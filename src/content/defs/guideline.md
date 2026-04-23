@@ -12,9 +12,9 @@ Definition types and runtime accessors for the major authored content domains.
 - `faction_defs.h`: Prototype faction identity and assistant unlock definition records.
 - `craft_recipe_defs.h`: Crafting recipe definition types plus runtime accessors over the loaded recipe table.
 - `event_defs.h`: Authored event definitions used by event/state systems.
-- `item_defs.h`: Item definition types plus runtime accessors over the loaded item table, including the authored starter checkerboard item and the full prototype 10-plant seed roster.
+- `item_defs.h`: Item definition types plus runtime accessors over the loaded item table, including the authored starter checkerboard item, the full prototype 10-plant seed roster, and the harvested-good item roster tied back to source plants.
 - `modifier_defs.h`: Modifier preset definition records and runtime accessors applied by modifier/weather flows.
-- `plant_defs.h`: Plant/ecology definition types plus runtime accessors over the loaded plant table, including the full China-desert 10-plant prototype roster, authored wind-protection range/power values, and the starter straw checkerboard definition with its authored `2x2` footprint plus tuned steady-wither behavior used by directional shelter resolution.
+- `plant_defs.h`: Plant/ecology definition types plus runtime accessors over the loaded plant table, including the full China-desert 10-plant prototype roster, authored wind-protection range/power values, per-plant harvest output metadata, and the starter straw checkerboard definition with its authored `2x2` footprint plus tuned steady-wither behavior used by directional shelter resolution.
 - `recipe_defs.h`: General recipe definition records shared by authored content.
 - `reward_defs.h`: Reward definition records and runtime accessors for grants and payouts, including the shared prototype task-reward pool, simple modifier rewards, immediate unlockable reveals, and delivery-crate-routed item bundle candidates.
 - `site_content_defs.h`: Site template/content definitions for active site runs.

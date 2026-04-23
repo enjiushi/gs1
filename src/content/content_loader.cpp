@@ -581,6 +581,10 @@ template <typename T>
     {
         return ActionKind::Eat;
     }
+    if (field == "Harvest")
+    {
+        return ActionKind::Harvest;
+    }
 
     fail_load(path, line_number, "invalid site action kind");
 }
@@ -1428,7 +1432,13 @@ void load_plant_defs(ContentDatabase& content, const std::filesystem::path& path
             require_toml_float(path, entry, "salinity_reduction_power"),
             require_toml_float(path, entry, "spread_readiness"),
             require_toml_float(path, entry, "spread_chance"),
-            require_toml_float(path, entry, "output_dependency")});
+            require_toml_float(path, entry, "output_dependency"),
+            ItemId {require_toml_unsigned<std::uint32_t>(path, entry, "harvest_item_id")},
+            require_toml_unsigned<std::uint16_t>(path, entry, "harvest_quantity"),
+            0U,
+            require_toml_float(path, entry, "harvest_action_duration_minutes"),
+            require_toml_float(path, entry, "harvest_density_required"),
+            require_toml_float(path, entry, "harvest_density_removed")});
     }
 }
 

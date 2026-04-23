@@ -26,6 +26,7 @@ namespace
 constexpr double k_minimum_action_duration_minutes = 0.25;
 constexpr float k_repair_integrity_full = 1.0f;
 constexpr float k_repair_integrity_epsilon = 0.0001f;
+constexpr float k_harvest_density_epsilon_raw = 0.01f;
 constexpr float k_minimum_action_efficiency = 0.4f;
 constexpr float k_maximum_action_efficiency = 1.0f;
 
@@ -34,6 +35,20 @@ ItemId repair_tool_item_id(std::uint32_t requested_item_id) noexcept
     return requested_item_id == 0U || requested_item_id == k_item_hammer
         ? ItemId {k_item_hammer}
         : ItemId {};
+}
+
+bool plant_def_is_harvestable(const PlantDef& plant_def) noexcept
+{
+    return plant_def.harvest_item_id.value != 0U &&
+        plant_def.harvest_quantity > 0U &&
+        plant_def.harvest_action_duration_minutes > 0.0f &&
+        plant_def.harvest_density_required >= 0.0f &&
+        plant_def.harvest_density_removed > 0.0f;
+}
+
+bool harvest_awards_item(const PlantDef& plant_def, float plant_density) noexcept
+{
+    return plant_density > (plant_def.harvest_density_required + k_harvest_density_epsilon_raw);
 }
 
 ActionKind to_action_kind(Gs1SiteActionKind kind) noexcept
@@ -56,6 +71,8 @@ ActionKind to_action_kind(Gs1SiteActionKind kind) noexcept
         return ActionKind::Drink;
     case GS1_SITE_ACTION_EAT:
         return ActionKind::Eat;
+    case GS1_SITE_ACTION_HARVEST:
+        return ActionKind::Harvest;
     default:
         return ActionKind::None;
     }
@@ -81,6 +98,8 @@ Gs1SiteActionKind to_gs1_action_kind(ActionKind kind) noexcept
         return GS1_SITE_ACTION_DRINK;
     case ActionKind::Eat:
         return GS1_SITE_ACTION_EAT;
+    case ActionKind::Harvest:
+        return GS1_SITE_ACTION_HARVEST;
     default:
         return GS1_SITE_ACTION_NONE;
     }
@@ -119,7 +138,7 @@ float action_nourishment_cost(ActionKind kind, std::uint16_t quantity) noexcept
 
 double action_unit_duration_minutes(ActionKind kind, std::uint32_t item_id) noexcept
 {
-    if (kind == ActionKind::Plant && item_id != 0U)
+    if ((kind == ActionKind::Plant || kind == ActionKind::Harvest) && item_id != 0U)
     {
         const auto* item_def = find_item_def(ItemId {item_id});
         if (item_def != nullptr && item_def->linked_plant_id.value != 0U)
@@ -127,8 +146,12 @@ double action_unit_duration_minutes(ActionKind kind, std::uint32_t item_id) noex
             const auto* plant_def = find_plant_def(item_def->linked_plant_id);
             if (plant_def != nullptr)
             {
+                const double authored_duration =
+                    kind == ActionKind::Harvest
+                    ? static_cast<double>(plant_def->harvest_action_duration_minutes)
+                    : static_cast<double>(plant_def->plant_action_duration_minutes);
                 return std::max(
-                    static_cast<double>(plant_def->plant_action_duration_minutes),
+                    authored_duration,
                     k_minimum_action_duration_minutes);
             }
         }
@@ -646,6 +669,51 @@ SiteActionFailureReason validate_repair_target(
     if (tile.device.device_integrity >= (k_repair_integrity_full - k_repair_integrity_epsilon))
     {
         return SiteActionFailureReason::InvalidState;
+    }
+
+    return SiteActionFailureReason::None;
+}
+
+SiteActionFailureReason validate_harvest_target(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    TileCoord target_tile,
+    const PlantDef** out_plant_def = nullptr) noexcept
+{
+    if (!context.world.tile_coord_in_bounds(target_tile))
+    {
+        return SiteActionFailureReason::InvalidTarget;
+    }
+
+    const auto tile = context.world.read_tile(target_tile);
+    if (tile.ecology.plant_id.value == 0U)
+    {
+        return SiteActionFailureReason::InvalidTarget;
+    }
+
+    const auto* plant_def = find_plant_def(tile.ecology.plant_id);
+    if (plant_def == nullptr || !plant_def_is_harvestable(*plant_def))
+    {
+        return SiteActionFailureReason::InvalidTarget;
+    }
+
+    const bool awards_item = harvest_awards_item(*plant_def, tile.ecology.plant_density);
+    if (awards_item)
+    {
+        const auto worker_pack = inventory_storage::worker_pack_container(context.site_run);
+        if (!worker_pack.is_valid() ||
+            !inventory_storage::can_fit_item_in_container(
+                context.site_run,
+                worker_pack,
+                plant_def->harvest_item_id,
+                static_cast<std::uint32_t>(plant_def->harvest_quantity)))
+        {
+            return SiteActionFailureReason::InvalidState;
+        }
+    }
+
+    if (out_plant_def != nullptr)
+    {
+        *out_plant_def = plant_def;
     }
 
     return SiteActionFailureReason::None;
@@ -1184,6 +1252,42 @@ void emit_action_fact_messages(GameMessageQueue& queue, const ActionState& actio
                 flags});
         break;
 
+    case ActionKind::Harvest:
+        if (const auto* plant_def = find_plant_def(PlantId {action_state.primary_subject_id});
+            plant_def != nullptr && plant_def_is_harvestable(*plant_def))
+        {
+            const bool awards_item =
+                harvest_awards_item(
+                    *plant_def,
+                    action_state.secondary_subject_id == 0U
+                        ? 0.0f
+                        : (static_cast<float>(action_state.secondary_subject_id) * 0.01f));
+            const std::uint16_t item_quantity = awards_item ? plant_def->harvest_quantity : 0U;
+            if (item_quantity > 0U)
+            {
+                enqueue_message(
+                    queue,
+                    GameMessageType::InventoryWorkerPackInsertRequested,
+                    InventoryWorkerPackInsertRequestedMessage {
+                        plant_def->harvest_item_id.value,
+                        item_quantity,
+                        0U});
+            }
+            enqueue_message(
+                queue,
+                GameMessageType::SiteTileHarvested,
+                SiteTileHarvestedMessage {
+                    action_id,
+                    target_tile.x,
+                    target_tile.y,
+                    plant_def->plant_id.value,
+                    plant_def->harvest_item_id.value,
+                    item_quantity,
+                    0U,
+                    plant_def->harvest_density_removed});
+        }
+        break;
+
     case ActionKind::None:
     default:
         break;
@@ -1253,6 +1357,18 @@ SiteActionFailureReason validate_repair_completion(
     }
 
     return validate_repair_target(context, *action_state.target_tile);
+}
+
+SiteActionFailureReason validate_harvest_completion(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    const ActionState& action_state)
+{
+    if (!action_state.target_tile.has_value())
+    {
+        return SiteActionFailureReason::InvalidState;
+    }
+
+    return validate_harvest_target(context, *action_state.target_tile);
 }
 
 }  // namespace
@@ -1519,6 +1635,32 @@ Gs1Status ActionExecutionSystem::process_message(
                     primary_subject_id,
                     secondary_subject_id);
                 return GS1_STATUS_OK;
+            }
+        }
+
+        const PlantDef* harvest_plant_def = nullptr;
+        if (action_kind == ActionKind::Harvest)
+        {
+            const auto harvest_failure_reason =
+                validate_harvest_target(context, target_tile, &harvest_plant_def);
+            if (harvest_failure_reason != SiteActionFailureReason::None)
+            {
+                emit_site_action_failed(
+                    context.message_queue,
+                    0U,
+                    action_kind,
+                    harvest_failure_reason,
+                    request_flags,
+                    target_tile,
+                    primary_subject_id,
+                    secondary_subject_id);
+                return GS1_STATUS_OK;
+            }
+
+            if (harvest_plant_def != nullptr)
+            {
+                primary_subject_id = harvest_plant_def->plant_id.value;
+                item_id = harvest_plant_def->harvest_item_id.value;
             }
         }
 
@@ -1841,6 +1983,33 @@ void ActionExecutionSystem::run(SiteSystemContext<ActionExecutionSystem>& contex
             context.world.mark_projection_dirty(
                 SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
             return;
+        }
+    }
+    else if (action_state.action_kind == ActionKind::Harvest)
+    {
+        const auto failure_reason = validate_harvest_completion(context, action_state);
+        if (failure_reason != SiteActionFailureReason::None)
+        {
+            emit_site_action_failed(
+                context.message_queue,
+                action_id_value(action_state),
+                action_state.action_kind,
+                failure_reason,
+                action_state.request_flags,
+                action_target_tile(action_state),
+                action_state.primary_subject_id,
+                action_state.secondary_subject_id);
+            emit_placement_reservation_released(context.message_queue, action_state);
+            clear_action_state(action_state);
+            context.world.mark_projection_dirty(
+                SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
+            return;
+        }
+
+        if (action_state.target_tile.has_value())
+        {
+            action_state.secondary_subject_id = static_cast<std::uint32_t>(std::lround(
+                context.world.read_tile(*action_state.target_tile).ecology.plant_density * 100.0f));
         }
     }
 

@@ -8,15 +8,15 @@ Site-owned state, ECS world support, and helper logic for active site gameplay.
 - When files or folders in this directory change, update this file in the same change.
 
 ## Contents
-- `action_state.h`: Site action queue/state owned by action execution flows, including deferred-placement mode tracking plus follow-up plant-mode reactivation after successful item-based planting when inventory remains.
+- `action_state.h`: Site action queue/state owned by action execution flows, including deferred-placement mode tracking, harvest action state, plus follow-up plant-mode reactivation after successful item-based planting when inventory remains.
 - `contractor_state.h`: Contractor/worker assignment state for the site run.
 - `craft_logic.h`: Shared crafting rules/helpers used by craft-related systems.
 - `craft_state.h`: Crafting queue/progress state for the active site.
-- `defs/`: Site-specific authored definition helpers.
+- `defs/`: Site-specific authored definition helpers, including harvest-capable site action metadata access.
 - `device_interaction_logic.h`: Helper rules for device interaction behavior.
 - `economy_state.h`: Site-local economy/shop/finance state, including content-authored phone delivery settings plus revealed/direct-purchase unlockable tracking.
 - `event_state.h`: Site event state for active/local event tracking, including absolute event timeline markers for weather interpolation.
-- `inventory_state.h`: Inventory ownership/state for items in the site run, including the pending overflow queue for delivery-crate inserts that could not fit yet and the tracked worker-pack/device-storage panel visibility state projected to hosts.
+- `inventory_state.h`: Inventory ownership/state for items in the site run, including harvested-output insertion into the worker pack, the pending overflow queue for delivery-crate inserts that could not fit yet, and the tracked worker-pack/device-storage panel visibility state projected to hosts.
 - `inventory_storage.h`: Inventory container/storage primitives and stack helpers.
 - `local_weather_resolve_state.h`: Local weather resolution scratch/state, including cached base-weather inputs for resolved tile-contribution plus directional shelter refreshes.
 - `modifier_state.h`: Modifier application state for site effects, including resolved generic meter channels plus resolved terrain-factor weight/bias controls.
@@ -29,7 +29,7 @@ Site-owned state, ECS world support, and helper logic for active site gameplay.
 - `site_world.cpp`: ECS/world wrapper implementation and setup, including resolved contribution component storage on tile entities.
 - `site_world_access.h`: Owner-scoped ECS access helpers for reading/writing site components.
 - `site_world_components.h`: ECS component structs attached to site entities.
-- `systems/`: Site system declarations and implementations.
+- `systems/`: Site system declarations and implementations, including harvest action execution, ecology harvest resolution, and worker-pack harvest insertion.
 - `task_board_state.h`: Task-board state for current site objectives and listings, including claimed-history tracking plus per-task resolved generator outputs, runtime accumulators, and masks used by procedural, duration, and multi-structure tasks.
 - `tile_footprint.h`: Tile-footprint geometry helpers for structures and placement.
 - `weather_state.h`: Weather state tracked during the active site run.

@@ -26,17 +26,17 @@ This file is a quick orientation guide for agents working in this repository.
 - `include/gs1/export.h`: Public DLL export/import macros.
 - `include/gs1/game_api.h`: C ABI entry points exposed by the gameplay DLL.
 - `include/gs1/status.h`: Public status/result codes.
-- `include/gs1/types.h`: Public API data types, message/event payload structs, runtime-facing enums, claimed-task/phone-panel transport fields, and site-weather event timeline transport fields.
+- `include/gs1/types.h`: Public API data types, message/event payload structs, runtime-facing enums, claimed-task/phone-panel transport fields, site-weather event timeline transport fields, and harvest-action plus harvested-output transport payloads.
 - `src/app/`: Runtime bootstrap, API glue, scene coordination, and campaign/site factory entry points.
 - `src/campaign/`: Campaign state and campaign-level systems such as flow, dedicated campaign time progression, loadout planning, regional support, and the neutral-tech plus faction-enhancement progression model.
 - `src/messages/`: Internal game message IDs, payloads, handlers, and dispatcher.
-- `src/content/`: Prototype content database, loader/validator shells, and content definition types, including authored wind-shelter plant stats plus the neutral base-tech and faction-enhancement progression tables.
+- `src/content/`: Prototype content database, loader/validator shells, and content definition types, including authored wind-shelter plant stats, per-plant harvest-output metadata, and the neutral base-tech plus faction-enhancement progression tables.
 - `src/events/`: Translated engine feedback event types. Internal gameplay cross-system messages should use `GameMessage`, not runtime gameplay events.
 - `src/runtime/`: Core runtime loop, fixed-step runner, host-event dispatch plus transient phase-control handling, message queues, random service, and engine message emission.
-- `src/site/`: Active site-run state and site systems for dedicated site time progression, actions, weather, ecology, directional local wind shelter, inventory, economy, task board, camp durability, and completion/failure flow.
+- `src/site/`: Active site-run state and site systems for dedicated site time progression, actions, weather, ecology, directional local wind shelter, inventory, economy, task board, camp durability, harvested-output flow, and completion/failure flow.
 - `src/support/`: Shared support types such as typed IDs.
 - `src/ui/`: View-model and presenter state for HUD, phone, notifications, inspection, regional map, and UI presentation.
-- `tests/smoke/`: Smoke host, runtime DLL loader, script runner, live-state JSON, live HTTP server, and visual smoke UI.
+- `tests/smoke/`: Smoke host, runtime DLL loader, script runner, live-state JSON, live HTTP server, and visual smoke UI, including the right-click harvest action path.
 - `tests/smoke/scripts/`: Scripted smoke-test scenarios.
 - `scripts/`: PowerShell build and smoke-test helpers.
 - `GDD.md`: Game design document, including the directional wind-shadow and plant-footprint shelter rules, the current profile-based harsh-weather/runtime weather-event contract with start/peak/peak-duration/end timing direction, the worker meter-relationship chapter with the unified `prevState -> resolve frame deltas -> currentState` computation model plus derived `Energy Cap` and derived `Work Efficiency`, the resolved tile contribution plus terrain-factor computation notes in the meter-relationship chapter, the site-one onboarding task-pool direction, the single near-camp delivery-crate direction that starts with site-one's `1` water plus `8` straw-checkerboard loadout already packed inside, the immediate-delivery-crate insertion plus overflow-queue direction for later purchases and item rewards, phone-based claimed-task history direction, the staged four-mode site-objective direction, the neutral base-tech plus faction-enhancement tech-tree direction, the straw-checkerboard special-plant `2x2` tile-occupancy rule, the site-result-panel `OK` return contract, and the 30-real-minute in-game day timing contract.

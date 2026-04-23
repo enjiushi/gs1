@@ -128,7 +128,8 @@ enum Gs1SiteActionKind : std::uint8_t
     GS1_SITE_ACTION_CLEAR_BURIAL = 5,
     GS1_SITE_ACTION_CRAFT = 6,
     GS1_SITE_ACTION_DRINK = 7,
-    GS1_SITE_ACTION_EAT = 8
+    GS1_SITE_ACTION_EAT = 8,
+    GS1_SITE_ACTION_HARVEST = 9
 };
 
 enum Gs1SiteActionRequestFlags : std::uint8_t

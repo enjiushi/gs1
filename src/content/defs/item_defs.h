@@ -67,6 +67,14 @@ inline constexpr std::uint32_t k_item_jiji_grass_seed_bundle = 17U;
 inline constexpr std::uint32_t k_item_sea_buckthorn_seed_bundle = 18U;
 inline constexpr std::uint32_t k_item_desert_ephedra_seed_bundle = 19U;
 inline constexpr std::uint32_t k_item_saxaul_seed_bundle = 20U;
+inline constexpr std::uint32_t k_item_white_thorn_berries = 21U;
+inline constexpr std::uint32_t k_item_red_tamarisk_bark = 22U;
+inline constexpr std::uint32_t k_item_ningxia_wolfberries = 23U;
+inline constexpr std::uint32_t k_item_korshinsk_peashrub_pods = 24U;
+inline constexpr std::uint32_t k_item_jiji_grass_fiber = 25U;
+inline constexpr std::uint32_t k_item_sea_buckthorn_berries = 26U;
+inline constexpr std::uint32_t k_item_desert_ephedra_sprigs = 27U;
+inline constexpr std::uint32_t k_item_saxaul_fuelwood = 28U;
 
 [[nodiscard]] std::span<const ItemDef> all_item_defs() noexcept;
 

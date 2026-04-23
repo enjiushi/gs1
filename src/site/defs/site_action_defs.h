@@ -43,6 +43,8 @@ struct SiteActionDef final
         return ActionKind::Drink;
     case GS1_SITE_ACTION_EAT:
         return ActionKind::Eat;
+    case GS1_SITE_ACTION_HARVEST:
+        return ActionKind::Harvest;
     default:
         return ActionKind::None;
     }

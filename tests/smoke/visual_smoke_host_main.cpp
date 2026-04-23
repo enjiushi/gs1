@@ -265,6 +265,10 @@ std::optional<Gs1SiteActionKind> parse_site_action_kind(const std::string& value
     {
         return GS1_SITE_ACTION_EAT;
     }
+    if (value == "HARVEST")
+    {
+        return GS1_SITE_ACTION_HARVEST;
+    }
 
     return std::nullopt;
 }

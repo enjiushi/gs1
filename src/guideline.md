@@ -10,11 +10,11 @@ Gameplay/runtime implementation grouped by ownership domain and integration boun
 ## Contents
 - `app/`: Bootstrap, API glue, scene coordination, and factory entry points.
 - `campaign/`: Campaign-owned state and campaign-level systems.
-- `content/`: Prototype content database, indexing, and definition types.
+- `content/`: Prototype content database, indexing, and definition types, including per-plant harvest-output authoring.
 - `events/`: Engine feedback event translation types.
 - `messages/`: Internal gameplay message contracts and dispatch helpers.
 - `runtime/`: Core runtime loop, queues, clocks, and execution services.
-- `site/`: Active site-run state, ECS world helpers, and site-owned systems.
+- `site/`: Active site-run state, ECS world helpers, and site-owned systems, including harvest action execution plus worker-pack harvest output routing.
 - `support/`: Shared lightweight support types such as IDs.
 - `testing/`: Runtime-side helpers that back the system-test framework.
 - `ui/`: View-model and presenter state projected for the frontend/runtime host.

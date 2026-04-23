@@ -3,6 +3,7 @@
 #include "site/site_world_access.h"
 #include "site/systems/action_execution_system.h"
 #include "site/systems/ecology_system.h"
+#include "site/systems/inventory_system.h"
 #include "site/systems/placement_validation_system.h"
 #include "site/systems/site_flow_system.h"
 #include "testing/system_test_registry.h"
@@ -19,6 +20,8 @@ using gs1::GameMessage;
 using gs1::GameMessageQueue;
 using gs1::GameMessageType;
 using gs1::InventoryItemConsumeRequestedMessage;
+using gs1::InventorySystem;
+using gs1::InventoryWorkerPackInsertRequestedMessage;
 using gs1::PlacementOccupancyLayer;
 using gs1::PlacementReservationAcceptedMessage;
 using gs1::PlacementReservationRejectedMessage;
@@ -36,6 +39,7 @@ using gs1::SiteGroundCoverPlacedMessage;
 using gs1::SiteMoveDirectionInput;
 using gs1::SiteFlowSystem;
 using gs1::SiteTileBurialClearedMessage;
+using gs1::SiteTileHarvestedMessage;
 using gs1::SiteTilePlantingCompletedMessage;
 using gs1::SiteTileWateredMessage;
 using gs1::TileCoord;
@@ -611,7 +615,7 @@ void action_execution_run_completes_actions_and_emits_fact_messages(
             queue,
             GameMessageType::SiteTileBurialCleared);
     GS1_SYSTEM_TEST_REQUIRE(context, burial_cleared != nullptr);
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(burial_cleared->cleared_amount, 0.7f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(burial_cleared->cleared_amount, 70.0f));
 }
 
 void action_execution_plant_completion_emits_ground_cover_after_reservation(
@@ -654,6 +658,176 @@ void action_execution_plant_completion_emits_ground_cover_after_reservation(
     GS1_SYSTEM_TEST_CHECK(context, ground_cover->ground_cover_type_id == 9U);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(ground_cover->initial_density, 50.0f));
     GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.current_action_id.has_value());
+}
+
+void action_execution_harvest_completion_emits_worker_pack_insert_and_tile_harvested(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 5071U);
+    GameMessageQueue queue {};
+    auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue, 60.0);
+
+    for (const auto coord : {TileCoord {2, 2}, TileCoord {3, 2}, TileCoord {2, 3}, TileCoord {3, 3}})
+    {
+        auto tile = site_run.site_world->tile_at(coord);
+        tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_white_thorn};
+        tile.ecology.plant_density = 85.0f;
+        site_run.site_world->set_tile(coord, tile);
+    }
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            site_context,
+            make_start_action_message(GS1_SITE_ACTION_HARVEST, TileCoord {2, 2}, 1U, 0U, 0U)) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(context, site_run.site_action.current_action_id.has_value());
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.action_kind == ActionKind::Harvest);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.primary_subject_id == gs1::k_plant_white_thorn);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.item_id == gs1::k_item_white_thorn_berries);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.started_at_world_minute.has_value());
+
+    queue.clear();
+    ActionExecutionSystem::run(site_context);
+    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::SiteActionCompleted) == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::InventoryWorkerPackInsertRequested) == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::SiteTileHarvested) == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::PlacementReservationReleased) == 1U);
+
+    const auto* insert =
+        first_message_payload<InventoryWorkerPackInsertRequestedMessage>(
+            queue,
+            GameMessageType::InventoryWorkerPackInsertRequested);
+    GS1_SYSTEM_TEST_REQUIRE(context, insert != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, insert->item_id == gs1::k_item_white_thorn_berries);
+    GS1_SYSTEM_TEST_CHECK(context, insert->quantity == 1U);
+
+    const auto* harvested =
+        first_message_payload<SiteTileHarvestedMessage>(
+            queue,
+            GameMessageType::SiteTileHarvested);
+    GS1_SYSTEM_TEST_REQUIRE(context, harvested != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, harvested->plant_type_id == gs1::k_plant_white_thorn);
+    GS1_SYSTEM_TEST_CHECK(context, harvested->item_id == gs1::k_item_white_thorn_berries);
+    GS1_SYSTEM_TEST_CHECK(context, harvested->item_quantity == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(harvested->density_removed, 25.0f));
+}
+
+void harvest_flow_inserts_output_and_reduces_multitile_density(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 5072U);
+    GameMessageQueue queue {};
+    auto action_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue, 60.0);
+    auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue, 60.0);
+    auto ecology_context = make_site_context<EcologySystem>(campaign, site_run, queue, 60.0);
+
+    for (const auto coord : {TileCoord {2, 2}, TileCoord {3, 2}, TileCoord {2, 3}, TileCoord {3, 3}})
+    {
+        auto tile = site_run.site_world->tile_at(coord);
+        tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_white_thorn};
+        tile.ecology.plant_density = 85.0f;
+        site_run.site_world->set_tile(coord, tile);
+    }
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            action_context,
+            make_start_action_message(GS1_SITE_ACTION_HARVEST, TileCoord {2, 2}, 1U, 0U, 0U)) == GS1_STATUS_OK);
+
+    queue.clear();
+    ActionExecutionSystem::run(action_context);
+
+    while (!queue.empty())
+    {
+        const auto message = queue.front();
+        queue.pop_front();
+        GS1_SYSTEM_TEST_CHECK(
+            context,
+            InventorySystem::process_message(inventory_context, message) == GS1_STATUS_OK);
+        GS1_SYSTEM_TEST_CHECK(
+            context,
+            EcologySystem::process_message(ecology_context, message) == GS1_STATUS_OK);
+    }
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        gs1::inventory_storage::available_item_quantity_in_container(
+            site_run,
+            gs1::inventory_storage::worker_pack_container(site_run),
+            gs1::ItemId {gs1::k_item_white_thorn_berries}) == 1U);
+
+    for (const auto coord : {TileCoord {2, 2}, TileCoord {3, 2}, TileCoord {2, 3}, TileCoord {3, 3}})
+    {
+        const auto tile = site_run.site_world->tile_at(coord);
+        GS1_SYSTEM_TEST_CHECK(context, tile.ecology.plant_id.value == gs1::k_plant_white_thorn);
+        GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.plant_density, 60.0f));
+    }
+}
+
+void harvest_last_cut_kills_low_density_plant_without_loot(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 5073U);
+    GameMessageQueue queue {};
+    auto action_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue, 60.0);
+    auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue, 60.0);
+    auto ecology_context = make_site_context<EcologySystem>(campaign, site_run, queue, 60.0);
+
+    for (const auto coord : {TileCoord {2, 2}, TileCoord {3, 2}, TileCoord {2, 3}, TileCoord {3, 3}})
+    {
+        auto tile = site_run.site_world->tile_at(coord);
+        tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_ordos_wormwood};
+        tile.ecology.plant_density = 25.0f;
+        site_run.site_world->set_tile(coord, tile);
+    }
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            action_context,
+            make_start_action_message(GS1_SITE_ACTION_HARVEST, TileCoord {2, 2}, 1U, 0U, 0U)) == GS1_STATUS_OK);
+
+    queue.clear();
+    ActionExecutionSystem::run(action_context);
+    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::InventoryWorkerPackInsertRequested) == 0U);
+    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::SiteTileHarvested) == 1U);
+
+    const auto* harvested =
+        first_message_payload<SiteTileHarvestedMessage>(
+            queue,
+            GameMessageType::SiteTileHarvested);
+    GS1_SYSTEM_TEST_REQUIRE(context, harvested != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, harvested->item_quantity == 0U);
+
+    while (!queue.empty())
+    {
+        const auto message = queue.front();
+        queue.pop_front();
+        GS1_SYSTEM_TEST_CHECK(
+            context,
+            InventorySystem::process_message(inventory_context, message) == GS1_STATUS_OK);
+        GS1_SYSTEM_TEST_CHECK(
+            context,
+            EcologySystem::process_message(ecology_context, message) == GS1_STATUS_OK);
+    }
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        gs1::inventory_storage::available_item_quantity_in_container(
+            site_run,
+            gs1::inventory_storage::worker_pack_container(site_run),
+            gs1::ItemId {gs1::k_item_wormwood_bundle}) == 0U);
+
+    for (const auto coord : {TileCoord {2, 2}, TileCoord {3, 2}, TileCoord {2, 3}, TileCoord {3, 3}})
+    {
+        const auto tile = site_run.site_world->tile_at(coord);
+        GS1_SYSTEM_TEST_CHECK(context, tile.ecology.plant_id.value == 0U);
+        GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.plant_density, 0.0f));
+    }
 }
 
 void action_execution_item_based_plant_completion_consumes_seed_and_emits_planting(
@@ -1739,6 +1913,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     action_execution_plant_completion_emits_ground_cover_after_reservation);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "action_execution",
+    "harvest_completion_emits_worker_pack_insert_and_tile_harvested",
+    action_execution_harvest_completion_emits_worker_pack_insert_and_tile_harvested);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "action_execution",
     "item_based_plant_completion_consumes_seed_and_emits_planting",
     action_execution_item_based_plant_completion_consumes_seed_and_emits_planting);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
@@ -1805,3 +1983,11 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "ecology",
     "highway_target_tiles_accumulate_cover_and_clear_via_burial_action",
     ecology_highway_target_tiles_accumulate_cover_and_clear_via_burial_action);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "ecology",
+    "harvest_flow_inserts_output_and_reduces_multitile_density",
+    harvest_flow_inserts_output_and_reduces_multitile_density);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "ecology",
+    "harvest_last_cut_kills_low_density_plant_without_loot",
+    harvest_last_cut_kills_low_density_plant_without_loot);
