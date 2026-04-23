@@ -26,6 +26,13 @@ struct PrototypePhoneListingContent final
     std::uint32_t quantity {0};
 };
 
+struct PrototypeSiteStartingPlantContent final
+{
+    PlantId plant_id {};
+    TileCoord anchor_tile {};
+    float initial_density {0.0f};
+};
+
 struct PrototypeSiteContent final
 {
     SiteId site_id {};
@@ -45,6 +52,11 @@ struct PrototypeSiteContent final
     std::int32_t completion_reputation_reward {0};
     std::int32_t completion_faction_reputation_reward {0};
     TileCoord camp_anchor_tile {};
+    float default_weather_heat {0.0f};
+    float default_weather_wind {0.0f};
+    float default_weather_dust {0.0f};
+    float default_weather_wind_direction_degrees {0.0f};
+    std::vector<PrototypeSiteStartingPlantContent> starting_plants {};
     std::int32_t phone_delivery_fee {0};
     std::uint16_t phone_delivery_minutes {0};
     std::vector<std::uint32_t> initial_revealed_unlockable_ids {};

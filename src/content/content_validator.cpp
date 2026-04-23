@@ -11,6 +11,23 @@ namespace
     return value != 0U && (value & static_cast<std::uint8_t>(value - 1U)) == 0U;
 }
 
+[[nodiscard]] bool is_axis_aligned_to_span(std::int32_t coord, std::uint8_t span) noexcept
+{
+    const std::int32_t normalized_span =
+        static_cast<std::int32_t>(span == 0U ? 1U : span);
+    return (coord % normalized_span) == 0;
+}
+
+[[nodiscard]] bool is_density_meter_in_range(float value) noexcept
+{
+    return value >= 0.0f && value <= 100.0f;
+}
+
+[[nodiscard]] bool is_weather_meter_in_range(float value) noexcept
+{
+    return value >= 0.0f && value <= 100.0f;
+}
+
 [[nodiscard]] bool modifier_preset_indices_are_unique_and_contiguous(
     std::span<const ModifierPresetDef> presets) noexcept
 {
@@ -637,6 +654,51 @@ std::vector<ContentValidationIssue> validate_content_database(
             issues.push_back(ContentValidationIssue {
                 ContentValidationSeverity::Error,
                 "Prototype site content uses a negative phone delivery fee."});
+            break;
+        }
+
+        if (!is_weather_meter_in_range(site_def.default_weather_heat) ||
+            !is_weather_meter_in_range(site_def.default_weather_wind) ||
+            !is_weather_meter_in_range(site_def.default_weather_dust))
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Prototype site default weather values must stay in the 0-100 range."});
+            break;
+        }
+
+        for (const auto& starting_plant : site_def.starting_plants)
+        {
+            const auto plant_it = content.index.plant_by_id.find(starting_plant.plant_id.value);
+            if (plant_it == content.index.plant_by_id.end())
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Prototype site starting plants must reference known plant ids."});
+                break;
+            }
+
+            const auto& plant_def = content.plant_defs[plant_it->second];
+
+            if (!is_density_meter_in_range(starting_plant.initial_density))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Prototype site starting plants must use an initial density in the 0-100 range."});
+                break;
+            }
+
+            if (!is_axis_aligned_to_span(starting_plant.anchor_tile.x, plant_def.footprint_width) ||
+                !is_axis_aligned_to_span(starting_plant.anchor_tile.y, plant_def.footprint_height))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Prototype site starting plant anchors must align to the authored plant footprint."});
+                break;
+            }
+        }
+        if (!issues.empty() && issues.back().severity == ContentValidationSeverity::Error)
+        {
             break;
         }
 

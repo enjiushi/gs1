@@ -1,11 +1,14 @@
 #include "app/site_run_factory.h"
 
+#include "content/defs/plant_defs.h"
 #include "content/defs/structure_defs.h"
 #include "content/prototype_content.h"
 #include "site/inventory_storage.h"
 #include "site/site_world.h"
+#include "site/tile_footprint.h"
 #include "support/site_objective_types.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 
@@ -110,6 +113,38 @@ void apply_highway_objective_layout(SiteRunState& run)
         run.objective.target_tile_mask[index] = 1U;
     }
 }
+
+void seed_starting_plants(
+    SiteRunState& run,
+    const PrototypeSiteContent& site_content)
+{
+    if (run.site_world == nullptr)
+    {
+        return;
+    }
+
+    for (const auto& starting_plant : site_content.starting_plants)
+    {
+        const auto footprint = resolve_plant_tile_footprint(starting_plant.plant_id);
+        const float initial_density = std::clamp(starting_plant.initial_density, 0.0f, 100.0f);
+        for_each_tile_in_footprint(
+            starting_plant.anchor_tile,
+            footprint,
+            [&](TileCoord coord) {
+                if (!run.site_world->contains(coord))
+                {
+                    return;
+                }
+
+                auto tile = run.site_world->tile_at(coord);
+                tile.ecology.plant_id = starting_plant.plant_id;
+                tile.ecology.ground_cover_type_id = 0U;
+                tile.ecology.plant_density = initial_density;
+                tile.ecology.growth_pressure = 0.0f;
+                run.site_world->set_tile(coord, tile);
+            });
+    }
+}
 }
 
 SiteRunState SiteRunFactory::create_site_run(
@@ -163,6 +198,10 @@ SiteRunState SiteRunFactory::create_site_run(
             100.0f,
             1.0f,
             false});
+    if (site_content != nullptr)
+    {
+        seed_starting_plants(run, *site_content);
+    }
     apply_highway_objective_layout(run);
     if (run.site_world->contains(run.camp.delivery_box_tile))
     {

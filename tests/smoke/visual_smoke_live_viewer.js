@@ -50,10 +50,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     let latestState = null;
     let stateStream = null;
-    let siteControlSendInFlight = false;
     let mapPickables = [];
     let latestPresentationSignature = "";
-    let lastSentSiteControlSignature = "0";
     let currentSceneKind = "";
     let siteSceneCache = null;
     let selectedInventorySlotKey = "";
@@ -6111,6 +6109,18 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         camera.lookAt(focusX, siteCameraDefaults.lookHeight, focusZ);
     }
 
+    function applySiteCameraBootstrapTransform(siteBootstrap, siteState, width, height, offsetX, offsetZ, previousCache) {
+        const cameraOrbitState = buildSiteCameraOrbitState(siteBootstrap, width, height, previousCache);
+        const worker = siteState && siteState.worker ? siteState.worker : null;
+        const focusX = worker ? worker.tileX - offsetX : 0.0;
+        const focusZ = worker ? worker.tileY - offsetZ : 0.0;
+        camera.position.set(
+            focusX + cameraOrbitState.offsetX,
+            cameraOrbitState.offsetY,
+            focusZ + cameraOrbitState.offsetZ);
+        camera.lookAt(focusX, siteCameraDefaults.lookHeight, focusZ);
+    }
+
     function stopCameraOrbitDrag(pointerId) {
         if (cameraOrbitDragPointerId == null) {
             return;
@@ -6217,7 +6227,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
 
         rotateSiteCameraOrbit(siteSceneCache, -deltaX * siteCameraDefaults.rotateRadiansPerPixel);
-        sendSiteControlState();
     }
 
     function tryRequestCameraPointerLock() {
@@ -8111,6 +8120,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             (bootstrapReferenceChanged && siteSceneCache.bootstrapSignature !== bootstrapSignature);
 
         if (needsStaticRebuild) {
+            applySiteCameraBootstrapTransform(
+                siteBootstrap,
+                siteState,
+                width,
+                height,
+                offsetX,
+                offsetZ,
+                previousSiteSceneCache);
+            sendSiteControlState();
             rebuildStaticSiteScene(
                 siteBootstrap,
                 offsetX,
@@ -8194,6 +8212,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const deltaSeconds = Math.min(animationClock.getDelta(), 0.1);
         animationTimeSeconds += deltaSeconds;
         const elapsed = animationTimeSeconds;
+        sendSiteControlState();
         updateSmoothedWeatherVisualResponse(latestState, deltaSeconds);
         worldGroup.traverse((node) => {
             if (node.userData.spinY) {
@@ -8581,32 +8600,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function sendSiteControlState() {
-        if (siteControlSendInFlight) {
+        if (!latestState || latestState.appState !== "SITE_ACTIVE") {
             return;
         }
 
         const siteControlState = computeSiteControlState();
-        const signature = siteControlState.hasMoveInput !== 0
-            ? [
-                "1",
-                siteControlState.worldMoveX.toFixed(6),
-                siteControlState.worldMoveY.toFixed(6),
-                siteControlState.worldMoveZ.toFixed(6)
-            ].join(":")
-            : "0";
-        if (signature === lastSentSiteControlSignature) {
-            return;
-        }
-
-        siteControlSendInFlight = true;
-        postJson("/site-control", siteControlState)
-            .then(() => {
-                lastSentSiteControlSignature = signature;
-            })
-            .catch(() => {})
-            .finally(() => {
-                siteControlSendInFlight = false;
-            });
+        postJson("/site-control", siteControlState).catch(() => {});
     }
 
     window.addEventListener("keydown", function (event) {
@@ -8661,13 +8660,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
         keys.add(event.code);
         updateMoveAxis();
-        sendSiteControlState();
     });
 
     window.addEventListener("keyup", function (event) {
         keys.delete(event.code);
         updateMoveAxis();
-        sendSiteControlState();
     });
 
     window.addEventListener("contextmenu", function (event) {
@@ -8990,5 +8987,4 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     });
     animate();
     connectStateStream();
-    window.setInterval(sendSiteControlState, 16);
 })();
