@@ -618,6 +618,50 @@ std::uint32_t apply_burial_cleared(
     return TILE_ECOLOGY_CHANGED_SAND_BURIAL;
 }
 
+std::uint32_t apply_harvest(
+    SiteWorldAccess<EcologySystem>& world,
+    TileCoord coord,
+    const SiteTileHarvestedMessage& payload)
+{
+    if (!world.tile_coord_in_bounds(coord))
+    {
+        return TILE_ECOLOGY_CHANGED_NONE;
+    }
+
+    auto tile = world.read_tile(coord);
+    if (tile.ecology.plant_id.value != payload.plant_type_id)
+    {
+        return TILE_ECOLOGY_CHANGED_NONE;
+    }
+
+    const float density_removed = raw_meter_from_legacy_input(payload.density_removed);
+    if (density_removed <= k_density_epsilon_raw)
+    {
+        return TILE_ECOLOGY_CHANGED_NONE;
+    }
+
+    const float next_density = std::max(0.0f, tile.ecology.plant_density - density_removed);
+    if (std::fabs(next_density - tile.ecology.plant_density) <= k_density_epsilon_raw)
+    {
+        return TILE_ECOLOGY_CHANGED_NONE;
+    }
+
+    tile.ecology.plant_density = next_density;
+    std::uint32_t changed_mask = TILE_ECOLOGY_CHANGED_DENSITY;
+    if (tile.ecology.plant_density <= k_density_epsilon_raw)
+    {
+        tile.ecology.plant_density = 0.0f;
+        tile.ecology.plant_id = PlantId {};
+        tile.ecology.ground_cover_type_id = 0U;
+        tile.ecology.growth_pressure = 0.0f;
+        changed_mask |= TILE_ECOLOGY_CHANGED_OCCUPANCY |
+            TILE_ECOLOGY_CHANGED_GROWTH_PRESSURE;
+    }
+
+    world.write_tile(coord, tile);
+    return changed_mask;
+}
+
 void update_restoration_progress(
     SiteSystemContext<EcologySystem>& context,
     std::uint32_t new_count)
@@ -772,6 +816,7 @@ bool EcologySystem::subscribes_to(GameMessageType type) noexcept
     case GameMessageType::SiteTilePlantingCompleted:
     case GameMessageType::SiteTileWatered:
     case GameMessageType::SiteTileBurialCleared:
+    case GameMessageType::SiteTileHarvested:
         return true;
     default:
         return false;
@@ -833,6 +878,25 @@ Gs1Status EcologySystem::process_message(
             context,
             coord,
             apply_burial_cleared(context, coord, payload));
+        break;
+    }
+
+    case GameMessageType::SiteTileHarvested:
+    {
+        const auto& payload = message.payload_as<SiteTileHarvestedMessage>();
+        const TileCoord coord {payload.target_tile_x, payload.target_tile_y};
+        const TileFootprint footprint =
+            resolve_plant_tile_footprint(PlantId {payload.plant_type_id});
+        const TileCoord anchor = align_tile_anchor_to_footprint(coord, footprint);
+        for_each_tile_in_footprint(
+            anchor,
+            footprint,
+            [&](TileCoord footprint_coord) {
+                emit_tile_ecology_changed(
+                    context,
+                    footprint_coord,
+                    apply_harvest(context.world, footprint_coord, payload));
+            });
         break;
     }
 

@@ -1280,6 +1280,39 @@ Gs1Status handle_inventory_delivery_batch_requested(
     });
 }
 
+Gs1Status handle_inventory_worker_pack_insert_requested(
+    SiteSystemContext<InventorySystem>& context,
+    const InventoryWorkerPackInsertRequestedMessage& payload) noexcept
+{
+    return mutate_inventory_storage(context, [&]() -> Gs1Status {
+        const ItemId item_id {payload.item_id};
+        const std::uint32_t quantity = normalize_quantity(payload.quantity);
+        if (item_id.value == 0U || find_item_def(item_id) == nullptr)
+        {
+            return GS1_STATUS_NOT_FOUND;
+        }
+
+        const auto worker_pack = inventory_storage::worker_pack_container(context.site_run);
+        if (!worker_pack.is_valid() ||
+            !inventory_storage::can_fit_item_in_container(
+                context.site_run,
+                worker_pack,
+                item_id,
+                quantity))
+        {
+            return GS1_STATUS_INVALID_STATE;
+        }
+
+        return inventory_storage::add_item_to_container(
+                   context.site_run,
+                   worker_pack,
+                   item_id,
+                   quantity) == 0U
+            ? GS1_STATUS_OK
+            : GS1_STATUS_INVALID_STATE;
+    });
+}
+
 void progress_pending_deliveries(SiteSystemContext<InventorySystem>& context) noexcept
 {
     ensure_inventory_storage_initialized(context);
@@ -1327,6 +1360,7 @@ bool InventorySystem::subscribes_to(GameMessageType type) noexcept
     case GameMessageType::SiteDeviceBroken:
     case GameMessageType::InventoryDeliveryRequested:
     case GameMessageType::InventoryDeliveryBatchRequested:
+    case GameMessageType::InventoryWorkerPackInsertRequested:
     case GameMessageType::InventoryItemUseRequested:
     case GameMessageType::InventoryItemConsumeRequested:
     case GameMessageType::InventoryGlobalItemConsumeRequested:
@@ -1376,6 +1410,11 @@ Gs1Status InventorySystem::process_message(
         return handle_inventory_delivery_batch_requested(
             context,
             message.payload_as<InventoryDeliveryBatchRequestedMessage>());
+
+    case GameMessageType::InventoryWorkerPackInsertRequested:
+        return handle_inventory_worker_pack_insert_requested(
+            context,
+            message.payload_as<InventoryWorkerPackInsertRequestedMessage>());
 
     case GameMessageType::InventoryItemUseRequested:
         return handle_inventory_item_use(

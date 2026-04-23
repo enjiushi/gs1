@@ -9,7 +9,7 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 
 ## Contents
 - `action_execution_system.h`: Action execution system interface.
-- `action_execution_system.cpp`: Executes queued site actions using the canonical real-seconds-to-action-minutes conversion, derives action duration plus instant worker action costs from the previous-frame work-efficiency snapshot, emits follow-up gameplay messages, and re-arms plant placement mode after successful item-based planting when matching seeds remain in the worker pack.
+- `action_execution_system.cpp`: Executes queued site actions using the canonical real-seconds-to-action-minutes conversion, derives action duration plus instant worker action costs from the previous-frame work-efficiency snapshot, emits follow-up gameplay messages, supports harvest actions for density-ready plants, and re-arms plant placement mode after successful item-based planting when matching seeds remain in the worker pack.
 - `camp_durability_system.h`: Camp durability system interface.
 - `camp_durability_system.cpp`: Applies camp wear/failure effects to camp durability state.
 - `craft_system.h`: Craft system interface.
@@ -19,13 +19,13 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `device_support_system.h`: Device support system interface.
 - `device_support_system.cpp`: Resolves support effects and dependencies for site devices.
 - `ecology_system.h`: Ecology system interface.
-- `ecology_system.cpp`: Updates plants, burial, watering, broader ecology progression, and highway-target sand-cover accumulation for objective-driven site progress, including the factor/weight/bias-based terrain meter computation that reads resolved tile contribution state and owner-emitted living-plant stability messages for task tracking.
+- `ecology_system.cpp`: Updates plants, burial, watering, harvest-density setbacks, broader ecology progression, and highway-target sand-cover accumulation for objective-driven site progress, including the factor/weight/bias-based terrain meter computation that reads resolved tile contribution state and owner-emitted living-plant stability messages for task tracking.
 - `economy_phone_system.h`: Economy phone system interface.
 - `economy_phone_system.cpp`: Handles phone storefront interactions using content-authored seeded listings and delivery settings, persistent-campaign-cash-backed purchases, plant-listing availability based on the starter-plus-total-reputation unlock track, immediate delivery-crate routing for bought items, owner-confirmed buy/sell completion messages for onboarding-task progress, and task-reward money/unlockable reveal awards routed through message handling.
 - `failure_recovery_system.h`: Failure recovery system interface.
 - `failure_recovery_system.cpp`: Resolves failure fallout and recovery flow for the site.
 - `inventory_system.h`: Inventory system interface.
-- `inventory_system.cpp`: Applies item moves, uses, inventory ownership changes, site-start loadout seeding into the delivery crate, immediate delivery-crate insertion with queued overflow retries, tracked worker-pack/device-storage panel open-close requests, and owner-confirmed transfer/use/craft completion messages for onboarding-task progress.
+- `inventory_system.cpp`: Applies item moves, uses, inventory ownership changes, site-start loadout seeding into the delivery crate, harvested-output insertion into the worker pack, immediate delivery-crate insertion with queued overflow retries, tracked worker-pack/device-storage panel open-close requests, and owner-confirmed transfer/use/craft completion messages for onboarding-task progress.
 - `local_weather_resolve_system.h`: Local weather resolve system interface.
 - `local_weather_resolve_system.cpp`: Resolves local weather updates into owned site state, including resolved per-tile support channels for heat/wind/dust/fertility/salinity/irrigation, directional lee-side wind shelter with nonlinear range falloff, plant-tile projection dirties when visible local wind changes, and owner-emitted startup plus live tile state-change messages for task tracking.
 - `modifier_system.h`: Modifier system interface.

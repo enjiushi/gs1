@@ -57,6 +57,7 @@ enum class GameMessageType : std::uint8_t
     SiteTilePlantingCompleted,
     SiteTileWatered,
     SiteTileBurialCleared,
+    SiteTileHarvested,
     SiteDevicePlaced,
     SiteDeviceBroken,
     SiteDeviceRepaired,
@@ -86,6 +87,7 @@ enum class GameMessageType : std::uint8_t
     ClosePhonePanel,
     InventoryDeliveryRequested,
     InventoryDeliveryBatchRequested,
+    InventoryWorkerPackInsertRequested,
     InventoryItemUseRequested,
     InventoryItemConsumeRequested,
     InventoryGlobalItemConsumeRequested,
@@ -376,6 +378,18 @@ struct SiteTileBurialClearedMessage final
     std::uint32_t flags;
 };
 
+struct SiteTileHarvestedMessage final
+{
+    std::uint32_t action_id;
+    std::int32_t target_tile_x;
+    std::int32_t target_tile_y;
+    std::uint32_t plant_type_id;
+    std::uint32_t item_id;
+    std::uint16_t item_quantity;
+    std::uint16_t reserved0;
+    float density_removed;
+};
+
 struct SiteDevicePlacedMessage final
 {
     std::uint32_t action_id;
@@ -612,6 +626,13 @@ struct InventoryDeliveryBatchRequestedMessage final
     InventoryDeliveryBatchEntry entries[k_inventory_delivery_batch_entry_count];
 };
 
+struct InventoryWorkerPackInsertRequestedMessage final
+{
+    std::uint32_t item_id;
+    std::uint16_t quantity;
+    std::uint16_t reserved0;
+};
+
 struct InventoryItemUseRequestedMessage final
 {
     std::uint32_t item_id;
@@ -729,6 +750,7 @@ GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteGroundCoverPlacedMessage, 24U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteTilePlantingCompletedMessage, 24U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteTileWateredMessage, 20U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteTileBurialClearedMessage, 20U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteTileHarvestedMessage, 28U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteDevicePlacedMessage, 20U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteDeviceBrokenMessage, 24U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteDeviceRepairedMessage, 16U);
@@ -759,6 +781,7 @@ GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(ClosePhonePanelMessage, 1U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryDeliveryRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryDeliveryBatchEntry, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryDeliveryBatchRequestedMessage, 44U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryWorkerPackInsertRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryItemUseRequestedMessage, 12U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryItemConsumeRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryGlobalItemConsumeRequestedMessage, 8U);

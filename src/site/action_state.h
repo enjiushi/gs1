@@ -18,7 +18,8 @@ enum class ActionKind : std::uint32_t
     ClearBurial = 5,
     Craft = 6,
     Drink = 7,
-    Eat = 8
+    Eat = 8,
+    Harvest = 9
 };
 
 struct ReservedItemStack final

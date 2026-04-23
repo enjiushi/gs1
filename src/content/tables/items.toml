@@ -144,12 +144,12 @@ energy_delta = 0.0
 
 [[items]]
 item_id = 10
-display_name = "Wormwood Bundle"
-stack_size = 20
+display_name = "Dried Grass"
+stack_size = 10
 source_rule = "HarvestOnly"
 consumable = false
-buy_price = 1
-sell_price = 1
+buy_price = 0
+sell_price = 2
 capabilities = "Sell"
 linked_plant_id = 0
 linked_structure_id = 0
@@ -312,6 +312,70 @@ buy_price = 12
 sell_price = 6
 capabilities = "Plant,Sell"
 linked_plant_id = 10
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 21
+display_name = "White Thorn Berries"
+stack_size = 10
+source_rule = "HarvestOnly"
+consumable = false
+buy_price = 0
+sell_price = 3
+capabilities = "Sell"
+linked_plant_id = 2
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 22
+display_name = "Red Tamarisk Bark"
+stack_size = 10
+source_rule = "HarvestOnly"
+consumable = false
+buy_price = 0
+sell_price = 3
+capabilities = "Sell"
+linked_plant_id = 3
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 23
+display_name = "Ningxia Wolfberries"
+stack_size = 10
+source_rule = "HarvestOnly"
+consumable = false
+buy_price = 0
+sell_price = 5
+capabilities = "Sell"
+linked_plant_id = 4
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 26
+display_name = "Sea Buckthorn Berries"
+stack_size = 10
+source_rule = "HarvestOnly"
+consumable = false
+buy_price = 0
+sell_price = 4
+capabilities = "Sell"
+linked_plant_id = 8
 linked_structure_id = 0
 health_delta = 0.0
 hydration_delta = 0.0

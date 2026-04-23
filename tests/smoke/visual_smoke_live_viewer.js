@@ -111,7 +111,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         "Move with WASD and drag with the right mouse button to orbit the camera around the worker.",
         "Press B to open the player pack, then click a carried item to use it or move it into opened storage.",
         "Press F to raise the phone for the market, delivery crate flow, and task board information.",
-        "Short right-click any tile to open context actions such as gather, water, repair, plant, or build.",
+        "Short right-click any tile to open context actions such as harvest, water, repair, plant, or build.",
         "Planting and deployment enter placement mode first, so confirm with a left-click and cancel with Esc or a short right-click.",
         "Carry plantables such as seeds or straw checkerboard in the pack before you deploy so the right-click tile menu can arm planting actions.",
         "Open crates, benches, and other devices from the map to move items one click at a time through the pack.",
@@ -262,12 +262,21 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         7: { name: "Ningxia Wolfberry Seeds", shortName: "Ningxia Wolfberry", stackSize: 10, canUse: false, canPlant: true, canDeploy: false },
         8: { name: "Wood", shortName: "Wood", stackSize: 20, canUse: false, canPlant: false, canDeploy: false },
         9: { name: "Iron", shortName: "Iron", stackSize: 20, canUse: false, canPlant: false, canDeploy: false },
-        10: { name: "Wormwood Bundle", shortName: "Fiber", stackSize: 20, canUse: false, canPlant: false, canDeploy: false },
+        10: { name: "Dried Grass", shortName: "Grass", stackSize: 10, canUse: false, canPlant: false, canDeploy: false },
         11: { name: "Camp Stove Kit", shortName: "Stove Kit", stackSize: 1, canUse: false, canPlant: false, canDeploy: true, deployStructureId: 201 },
         12: { name: "Workbench Kit", shortName: "Bench Kit", stackSize: 1, canUse: false, canPlant: false, canDeploy: true, deployStructureId: 202 },
         13: { name: "Storage Crate Kit", shortName: "Crate Kit", stackSize: 1, canUse: false, canPlant: false, canDeploy: true, deployStructureId: 203 },
         14: { name: "Hammer", shortName: "Hammer", stackSize: 1, canUse: false, canPlant: false, canDeploy: false },
-        15: { name: "Basic Straw Checkerboard", shortName: "Checkerboard", stackSize: 10, canUse: false, canPlant: true, canDeploy: false }
+        15: { name: "Basic Straw Checkerboard", shortName: "Checkerboard", stackSize: 10, canUse: false, canPlant: true, canDeploy: false },
+        16: { name: "Korshinsk Peashrub Seeds", shortName: "Peashrub", stackSize: 10, canUse: false, canPlant: true, canDeploy: false },
+        17: { name: "Jiji Grass Seeds", shortName: "Jiji Grass", stackSize: 10, canUse: false, canPlant: true, canDeploy: false },
+        18: { name: "Sea Buckthorn Seeds", shortName: "Sea Buckthorn", stackSize: 10, canUse: false, canPlant: true, canDeploy: false },
+        19: { name: "Desert Ephedra Seeds", shortName: "Ephedra", stackSize: 10, canUse: false, canPlant: true, canDeploy: false },
+        20: { name: "Saxaul Seeds", shortName: "Saxaul", stackSize: 10, canUse: false, canPlant: true, canDeploy: false },
+        21: { name: "White Thorn Berries", shortName: "White Thorn", stackSize: 10, canUse: false, canPlant: false, canDeploy: false },
+        22: { name: "Red Tamarisk Bark", shortName: "Bark", stackSize: 10, canUse: false, canPlant: false, canDeploy: false },
+        23: { name: "Ningxia Wolfberries", shortName: "Wolfberries", stackSize: 10, canUse: false, canPlant: false, canDeploy: false },
+        26: { name: "Sea Buckthorn Berries", shortName: "Buckthorn", stackSize: 10, canUse: false, canPlant: false, canDeploy: false }
     };
     const itemVisuals = {
         1: { iconKey: "water", light: "#5d8eb3", dark: "#33546f" },
@@ -284,7 +293,16 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         12: { iconKey: "hammer", light: "#b2966c", dark: "#6b5437" },
         13: { iconKey: "box", light: "#af8c63", dark: "#694d2c" },
         14: { iconKey: "hammer", light: "#9ea9b7", dark: "#5c6775" },
-        15: { iconKey: "grid", light: "#c8a46a", dark: "#7d5c31" }
+        15: { iconKey: "grid", light: "#c8a46a", dark: "#7d5c31" },
+        16: { iconKey: "shrub", light: "#87a46a", dark: "#4c6843" },
+        17: { iconKey: "reed", light: "#b0b86d", dark: "#676f3a" },
+        18: { iconKey: "vine", light: "#c08b42", dark: "#7d5526" },
+        19: { iconKey: "cactus", light: "#8ea277", dark: "#526442" },
+        20: { iconKey: "wood", light: "#9c8259", dark: "#604a2d" },
+        21: { iconKey: "vine", light: "#c9a255", dark: "#7c5628" },
+        22: { iconKey: "wood", light: "#b57f58", dark: "#73472a" },
+        23: { iconKey: "vine", light: "#c45d4b", dark: "#7b3127" },
+        26: { iconKey: "vine", light: "#d08935", dark: "#844c22" }
     };
     const uiIconMarkup = {
         water: [
@@ -443,7 +461,23 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         2: { width: 2, height: 2 },
         3: { width: 2, height: 2 },
         4: { width: 2, height: 2 },
-        5: { width: 2, height: 2 }
+        5: { width: 2, height: 2 },
+        6: { width: 2, height: 2 },
+        7: { width: 2, height: 2 },
+        8: { width: 2, height: 2 },
+        9: { width: 2, height: 2 },
+        10: { width: 2, height: 2 }
+    });
+    const harvestablePlantCatalog = Object.freeze({
+        1: { itemId: 10, lootDensityThreshold: 0.25 },
+        2: { itemId: 21, lootDensityThreshold: 0.25 },
+        3: { itemId: 22, lootDensityThreshold: 0.25 },
+        4: { itemId: 23, lootDensityThreshold: 0.25 },
+        6: { itemId: 10, lootDensityThreshold: 0.25 },
+        7: { itemId: 10, lootDensityThreshold: 0.25 },
+        8: { itemId: 26, lootDensityThreshold: 0.25 },
+        9: { itemId: 10, lootDensityThreshold: 0.25 },
+        10: { itemId: 10, lootDensityThreshold: 0.25 }
     });
     const plantWindShaderUniforms = {
         uPlantTime: { value: 0.0 },
@@ -1360,6 +1394,38 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return siteBootstrap.tiles.find((tile) => tile.x === tileX && tile.y === tileY) || null;
     }
 
+    function getHarvestablePlantMeta(plantTypeId) {
+        return harvestablePlantCatalog[plantTypeId] || null;
+    }
+
+    function getHarvestOptionForTile(state, tileX, tileY) {
+        const tile = getTileSnapshot(state, tileX, tileY);
+        if (!tile || !tile.plantTypeId) {
+            return null;
+        }
+
+        const harvestMeta = getHarvestablePlantMeta(tile.plantTypeId);
+        if (!harvestMeta) {
+            return null;
+        }
+
+        const itemMeta = getItemMeta(harvestMeta.itemId);
+        const visual = getItemVisual(harvestMeta.itemId);
+        const density = typeof tile.plantDensity === "number" ? tile.plantDensity : 0;
+        return {
+            plantTypeId: tile.plantTypeId || 0,
+            itemId: harvestMeta.itemId,
+            itemLabel: itemMeta ? itemMeta.name : ("Item " + harvestMeta.itemId),
+            shortLabel: itemMeta ? itemMeta.shortName : ("Item " + harvestMeta.itemId),
+            iconKey: visual.iconKey,
+            iconLight: visual.light,
+            iconDark: visual.dark,
+            density: density,
+            lootDensityThreshold: harvestMeta.lootDensityThreshold,
+            yieldsItem: density > (harvestMeta.lootDensityThreshold + 0.0001)
+        };
+    }
+
     function getAllInventorySlots(state) {
         return inventoryCache.slots.slice();
     }
@@ -2003,6 +2069,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (actionKind === 8) {
             return "Eat";
         }
+        if (actionKind === 9) {
+            return "Harvest";
+        }
         return "Idle";
     }
 
@@ -2186,6 +2255,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const carriedSeeds = getCarriedSeedOptions(state);
         const carriedDeployables = getCarriedDeployableOptions(state);
         const carriedHammerCount = getCarriedItemQuantity(state, 14);
+        const harvestOption = getHarvestOptionForTile(state, tileX, tileY);
         const rootItems = [];
         const tileHasStructure = structureId !== 0;
 
@@ -2314,6 +2384,37 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                         itemId: 14
                     }).catch(() => {
                         statusChip.textContent = "Failed to send repair action.";
+                    });
+                    closeTileContextMenu();
+                }
+            });
+        }
+
+        if (harvestOption) {
+            rootItems.push({
+                id: "harvest",
+                label: "Harvest",
+                meta: harvestOption.yieldsItem
+                    ? ("Loot: " + harvestOption.itemLabel)
+                    : ("No loot at " + Math.round(harvestOption.density * 100) + "% density; this cut will only reduce or remove the plant"),
+                iconKey: harvestOption.iconKey,
+                iconLight: harvestOption.iconLight,
+                iconDark: harvestOption.iconDark,
+                onSelect: function () {
+                    statusChip.textContent =
+                        "Moving to (" + tileX + "," + tileY + ") to harvest " +
+                        harvestOption.shortLabel + ".";
+                    postSiteAction({
+                        actionKind: "HARVEST",
+                        flags: 0,
+                        quantity: 1,
+                        targetTileX: tileX,
+                        targetTileY: tileY,
+                        primarySubjectId: 0,
+                        secondarySubjectId: 0,
+                        itemId: 0
+                    }).catch(() => {
+                        statusChip.textContent = "Failed to send harvest action.";
                     });
                     closeTileContextMenu();
                 }
@@ -5794,7 +5895,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         );
 
         const plantingBlend =
-            (currentActionKind === 1 || currentActionKind === 2 || currentActionKind === 6)
+            (currentActionKind === 1 || currentActionKind === 2 || currentActionKind === 6 || currentActionKind === 9)
                 ? clamp01(1.0 - locomotionAmount * 1.8)
                 : 0.0;
         if (plantingBlend > 0.0) {

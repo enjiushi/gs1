@@ -8,4 +8,4 @@ Small site-specific definition types that support site systems and actions.
 - When files or folders in this directory change, update this file in the same change.
 
 ## Contents
-- `site_action_defs.h`: Site action definition records plus runtime accessors for loaded action metadata and authored action parameters, including per-action nourishment cost tuning alongside duration, energy, and hydration costs.
+- `site_action_defs.h`: Site action definition records plus runtime accessors for loaded action metadata and authored action parameters, including per-action nourishment cost tuning alongside duration, energy, hydration, and harvest-action parameters.

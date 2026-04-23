@@ -58,6 +58,55 @@ std::vector<ContentValidationIssue> validate_content_database(
                 "Plant footprints must use power-of-two tile sizes."});
             break;
         }
+
+        if (plant_def.harvest_item_id.value == 0U)
+        {
+            if (plant_def.harvest_quantity != 0U ||
+                plant_def.harvest_action_duration_minutes != 0.0f ||
+                plant_def.harvest_density_required != 0.0f ||
+                plant_def.harvest_density_removed != 0.0f)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Plants without harvest output must keep harvest tuning at zero."});
+                break;
+            }
+
+            continue;
+        }
+
+        if (!content.index.item_by_id.contains(plant_def.harvest_item_id.value))
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Plant harvest metadata references an unknown item id."});
+            break;
+        }
+
+        const auto& harvest_item =
+            content.item_defs.at(content.index.item_by_id.at(plant_def.harvest_item_id.value));
+        if (harvest_item.source_rule != ItemSourceRule::HarvestOnly ||
+            (harvest_item.linked_plant_id.value != 0U &&
+                harvest_item.linked_plant_id != plant_def.plant_id))
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Harvest plants must point at harvest-only items linked back to the same plant or to the shared generic harvest item."});
+            break;
+        }
+
+        if (plant_def.harvest_quantity == 0U ||
+            plant_def.harvest_action_duration_minutes <= 0.0f ||
+            plant_def.harvest_density_required <= 0.0f ||
+            plant_def.harvest_density_required > 100.0f ||
+            plant_def.harvest_density_removed <= 0.0f ||
+            plant_def.harvest_density_removed > 100.0f)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Harvest plants must author valid harvest quantity, timing, and density thresholds."});
+            break;
+        }
     }
 
     for (const auto& structure_def : content.structure_defs)
