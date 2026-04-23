@@ -2865,7 +2865,7 @@ void GameRuntime::queue_pending_site_inventory_slot_upsert_messages()
         {
             queue_site_inventory_view_state_message(previous_storage_id, GS1_INVENTORY_VIEW_EVENT_CLOSE);
         }
-        if (current_storage_id != 0U)
+        if (current_storage_id != 0U && current_storage_id != previous_storage_id)
         {
             const auto* storage_state =
                 inventory_storage::storage_container_state_for_storage_id(site_run, current_storage_id);
