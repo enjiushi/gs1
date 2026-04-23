@@ -1005,20 +1005,6 @@ int main()
         gs1::GameRuntimeProjectionTestAccess::active_site_run(panel_state_runtime).value();
     drain_engine_messages(panel_state_runtime);
 
-    auto open_worker_pack_event = make_storage_view_event(
-        panel_state_site_run.inventory.worker_pack_storage_id,
-        GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT);
-    Gs1Phase1Result open_worker_pack_result {};
-    assert(panel_state_runtime.submit_host_events(&open_worker_pack_event, 1U) == GS1_STATUS_OK);
-    run_phase1(panel_state_runtime, 0.0, open_worker_pack_result);
-    assert(open_worker_pack_result.processed_host_event_count == 1U);
-    assert(panel_state_site_run.inventory.worker_pack_panel_open);
-    const auto open_worker_pack_messages = drain_engine_messages(panel_state_runtime);
-    assert(find_inventory_view_message(
-               open_worker_pack_messages,
-               panel_state_site_run.inventory.worker_pack_storage_id,
-               GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT) != nullptr);
-
     auto open_panel_storage_event = make_storage_view_event(
         starter_storage_id(panel_state_site_run),
         GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT);
@@ -1032,6 +1018,25 @@ int main()
                open_panel_storage_messages,
                starter_storage_id(panel_state_site_run),
                GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT) != nullptr);
+
+    auto open_worker_pack_event = make_storage_view_event(
+        panel_state_site_run.inventory.worker_pack_storage_id,
+        GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT);
+    Gs1Phase1Result open_worker_pack_result {};
+    assert(panel_state_runtime.submit_host_events(&open_worker_pack_event, 1U) == GS1_STATUS_OK);
+    run_phase1(panel_state_runtime, 0.0, open_worker_pack_result);
+    assert(open_worker_pack_result.processed_host_event_count == 1U);
+    assert(panel_state_site_run.inventory.worker_pack_panel_open);
+    assert(panel_state_site_run.inventory.opened_device_storage_id == starter_storage_id(panel_state_site_run));
+    const auto open_worker_pack_messages = drain_engine_messages(panel_state_runtime);
+    assert(find_inventory_view_message(
+               open_worker_pack_messages,
+               panel_state_site_run.inventory.worker_pack_storage_id,
+               GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT) != nullptr);
+    assert(find_inventory_view_message(
+               open_worker_pack_messages,
+               starter_storage_id(panel_state_site_run),
+               GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT) == nullptr);
 
     Gs1UiAction open_phone_action {};
     open_phone_action.type = GS1_UI_ACTION_SET_PHONE_PANEL_SECTION;
