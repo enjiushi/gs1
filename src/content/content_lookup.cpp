@@ -1,4 +1,5 @@
 #include "content/defs/craft_recipe_defs.h"
+#include "content/defs/gameplay_tuning_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/modifier_defs.h"
 #include "content/defs/plant_defs.h"
@@ -11,6 +12,11 @@
 
 namespace gs1
 {
+const GameplayTuningDef& gameplay_tuning_def() noexcept
+{
+    return prototype_content_database().gameplay_tuning;
+}
+
 std::span<const ItemDef> all_item_defs() noexcept
 {
     return prototype_content_database().item_defs;

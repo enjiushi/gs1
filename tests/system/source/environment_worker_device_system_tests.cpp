@@ -701,6 +701,94 @@ void worker_condition_run_softens_environmental_decay_when_sheltered(
     GS1_SYSTEM_TEST_CHECK(context, sheltered_queue.size() == 1U);
 }
 
+void worker_condition_run_matches_requested_weather_decay_timings(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+
+    auto heat_health_run = make_test_site_run(1U, 1305U);
+    GameMessageQueue heat_health_queue {};
+    auto heat_health_context =
+        make_site_context<WorkerConditionSystem>(campaign, heat_health_run, heat_health_queue, 600.0);
+    auto heat_health_tile = heat_health_run.site_world->tile_at(TileCoord {2, 2});
+    heat_health_tile.local_weather.heat = 100.0f;
+    heat_health_run.site_world->set_tile(TileCoord {2, 2}, heat_health_tile);
+
+    WorkerConditionSystem::run(heat_health_context);
+
+    const auto heat_health = gs1::site_world_access::worker_conditions(heat_health_run);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(heat_health.health, 0.0f, 0.01f));
+
+    auto heat_hydration_run = make_test_site_run(1U, 1306U);
+    GameMessageQueue heat_hydration_queue {};
+    auto heat_hydration_context = make_site_context<WorkerConditionSystem>(
+        campaign,
+        heat_hydration_run,
+        heat_hydration_queue,
+        300.0);
+    auto heat_hydration_tile = heat_hydration_run.site_world->tile_at(TileCoord {2, 2});
+    heat_hydration_tile.local_weather.heat = 100.0f;
+    heat_hydration_run.site_world->set_tile(TileCoord {2, 2}, heat_hydration_tile);
+
+    WorkerConditionSystem::run(heat_hydration_context);
+
+    const auto heat_hydration = gs1::site_world_access::worker_conditions(heat_hydration_run);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(heat_hydration.hydration, 0.0f, 0.01f));
+
+    auto wind_health_run = make_test_site_run(1U, 1307U);
+    GameMessageQueue wind_health_queue {};
+    auto wind_health_context =
+        make_site_context<WorkerConditionSystem>(campaign, wind_health_run, wind_health_queue, 600.0);
+    auto wind_health_tile = wind_health_run.site_world->tile_at(TileCoord {2, 2});
+    wind_health_tile.local_weather.wind = 100.0f;
+    wind_health_run.site_world->set_tile(TileCoord {2, 2}, wind_health_tile);
+
+    WorkerConditionSystem::run(wind_health_context);
+
+    const auto wind_health = gs1::site_world_access::worker_conditions(wind_health_run);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(wind_health.health, 0.0f, 0.01f));
+}
+
+void worker_condition_run_uses_requested_weather_decay_ratios(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    std::uint32_t next_site_run_id = 1310U;
+    const auto run_sample = [&](float heat, float wind, float dust) {
+        auto site_run = make_test_site_run(1U, next_site_run_id++);
+        GameMessageQueue queue {};
+        auto site_context =
+            make_site_context<WorkerConditionSystem>(campaign, site_run, queue, 60.0);
+        auto tile = site_run.site_world->tile_at(TileCoord {2, 2});
+        tile.local_weather.heat = heat;
+        tile.local_weather.wind = wind;
+        tile.local_weather.dust = dust;
+        site_run.site_world->set_tile(TileCoord {2, 2}, tile);
+        WorkerConditionSystem::run(site_context);
+        return gs1::site_world_access::worker_conditions(site_run);
+    };
+
+    const auto neutral = run_sample(0.0f, 0.0f, 0.0f);
+    const auto heat_only = run_sample(100.0f, 0.0f, 0.0f);
+    const auto wind_only = run_sample(0.0f, 100.0f, 0.0f);
+    const auto dust_only = run_sample(0.0f, 0.0f, 100.0f);
+
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(neutral.hydration, 99.52f, 0.01f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(neutral.nourishment, 99.88f, 0.01f));
+
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(heat_only.health, 90.0f, 0.01f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(wind_only.health, 90.0f, 0.01f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(dust_only.health, 95.0f, 0.01f));
+
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(heat_only.hydration, 80.0f, 0.01f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(wind_only.hydration, 97.08f, 0.01f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(dust_only.hydration, 97.08f, 0.01f));
+
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(heat_only.nourishment, 99.784f, 0.01f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(wind_only.nourishment, 99.544f, 0.01f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(dust_only.nourishment, 99.832f, 0.01f));
+}
+
 void device_support_updates_efficiency_and_water_from_heat(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -924,6 +1012,14 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "worker_condition",
     "run_softens_environmental_decay_when_sheltered",
     worker_condition_run_softens_environmental_decay_when_sheltered);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "worker_condition",
+    "run_matches_requested_weather_decay_timings",
+    worker_condition_run_matches_requested_weather_decay_timings);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "worker_condition",
+    "run_uses_requested_weather_decay_ratios",
+    worker_condition_run_uses_requested_weather_decay_ratios);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "device_support",
     "updates_efficiency_and_water_from_heat",

@@ -872,6 +872,20 @@ template <typename T>
     fail_invalid_toml_field(path, field, key, "must be a boolean");
 }
 
+[[nodiscard]] const toml::table& require_toml_table(
+    const std::filesystem::path& path,
+    const toml::table& table,
+    std::string_view key)
+{
+    const auto field = require_toml_field(path, table, key);
+    if (const auto* value = field.as_table())
+    {
+        return *value;
+    }
+
+    fail_invalid_toml_field(path, field, key, "must be a table");
+}
+
 [[nodiscard]] const toml::array& require_toml_array(
     const std::filesystem::path& path,
     const toml::table& table,
@@ -1302,6 +1316,202 @@ void load_modifier_preset_defs(ContentDatabase& content, const std::filesystem::
     }
 }
 
+void load_gameplay_tuning_def(ContentDatabase& content, const std::filesystem::path& path)
+{
+    const auto document = load_toml_document(path);
+    auto& tuning = content.gameplay_tuning;
+
+    const auto& worker_condition = require_toml_table(path, document, "worker_condition");
+    tuning.worker_condition.hydration_base_loss_per_game_minute =
+        require_toml_float(path, worker_condition, "hydration_base_loss_per_game_minute");
+    tuning.worker_condition.heat_to_hydration_factor =
+        require_toml_float(path, worker_condition, "heat_to_hydration_factor");
+    tuning.worker_condition.wind_to_hydration_factor =
+        require_toml_float(path, worker_condition, "wind_to_hydration_factor");
+    tuning.worker_condition.dust_to_hydration_factor =
+        require_toml_float(path, worker_condition, "dust_to_hydration_factor");
+    tuning.worker_condition.nourishment_base_loss_per_game_minute =
+        require_toml_float(path, worker_condition, "nourishment_base_loss_per_game_minute");
+    tuning.worker_condition.wind_to_nourishment_factor =
+        require_toml_float(path, worker_condition, "wind_to_nourishment_factor");
+    tuning.worker_condition.heat_to_nourishment_factor =
+        require_toml_float(path, worker_condition, "heat_to_nourishment_factor");
+    tuning.worker_condition.dust_to_nourishment_factor =
+        require_toml_float(path, worker_condition, "dust_to_nourishment_factor");
+    tuning.worker_condition.energy_base_loss_per_game_minute =
+        require_toml_float(path, worker_condition, "energy_base_loss_per_game_minute");
+    tuning.worker_condition.wind_to_energy_factor =
+        require_toml_float(path, worker_condition, "wind_to_energy_factor");
+    tuning.worker_condition.heat_to_energy_factor =
+        require_toml_float(path, worker_condition, "heat_to_energy_factor");
+    tuning.worker_condition.dust_to_energy_factor =
+        require_toml_float(path, worker_condition, "dust_to_energy_factor");
+    tuning.worker_condition.morale_decrease_speed =
+        require_toml_float(path, worker_condition, "morale_decrease_speed");
+    tuning.worker_condition.morale_decrease_factor =
+        require_toml_float(path, worker_condition, "morale_decrease_factor");
+    tuning.worker_condition.heat_to_health_factor =
+        require_toml_float(path, worker_condition, "heat_to_health_factor");
+    tuning.worker_condition.wind_to_health_factor =
+        require_toml_float(path, worker_condition, "wind_to_health_factor");
+    tuning.worker_condition.dust_to_health_factor =
+        require_toml_float(path, worker_condition, "dust_to_health_factor");
+    tuning.worker_condition.health_energy_cap_factor =
+        require_toml_float(path, worker_condition, "health_energy_cap_factor");
+    tuning.worker_condition.hydration_energy_cap_factor =
+        require_toml_float(path, worker_condition, "hydration_energy_cap_factor");
+    tuning.worker_condition.nourishment_energy_cap_factor =
+        require_toml_float(path, worker_condition, "nourishment_energy_cap_factor");
+    tuning.worker_condition.energy_cap_factor =
+        require_toml_float(path, worker_condition, "energy_cap_factor");
+    tuning.worker_condition.health_efficiency_factor =
+        require_toml_float(path, worker_condition, "health_efficiency_factor");
+    tuning.worker_condition.hydration_efficiency_factor =
+        require_toml_float(path, worker_condition, "hydration_efficiency_factor");
+    tuning.worker_condition.nourishment_efficiency_factor =
+        require_toml_float(path, worker_condition, "nourishment_efficiency_factor");
+    tuning.worker_condition.morale_efficiency_factor =
+        require_toml_float(path, worker_condition, "morale_efficiency_factor");
+    tuning.worker_condition.work_efficiency_factor =
+        require_toml_float(path, worker_condition, "work_efficiency_factor");
+    tuning.worker_condition.factor_weight_default =
+        require_toml_float(path, worker_condition, "factor_weight_default");
+    tuning.worker_condition.factor_bias_default =
+        require_toml_float(path, worker_condition, "factor_bias_default");
+    tuning.worker_condition.factor_min =
+        require_toml_float(path, worker_condition, "factor_min");
+    tuning.worker_condition.factor_max =
+        require_toml_float(path, worker_condition, "factor_max");
+    tuning.worker_condition.sheltered_exposure_scale =
+        require_toml_float(path, worker_condition, "sheltered_exposure_scale");
+
+    const auto& ecology = require_toml_table(path, document, "ecology");
+    tuning.ecology.moisture_gain_per_water_unit =
+        require_toml_float(path, ecology, "moisture_gain_per_water_unit");
+    tuning.ecology.fertility_to_moisture_cap_factor =
+        require_toml_float(path, ecology, "fertility_to_moisture_cap_factor");
+    tuning.ecology.salinity_to_fertility_cap_factor =
+        require_toml_float(path, ecology, "salinity_to_fertility_cap_factor");
+    tuning.ecology.moisture_factor =
+        require_toml_float(path, ecology, "moisture_factor");
+    tuning.ecology.heat_to_moisture_factor =
+        require_toml_float(path, ecology, "heat_to_moisture_factor");
+    tuning.ecology.wind_to_moisture_factor =
+        require_toml_float(path, ecology, "wind_to_moisture_factor");
+    tuning.ecology.fertility_factor =
+        require_toml_float(path, ecology, "fertility_factor");
+    tuning.ecology.wind_to_fertility_factor =
+        require_toml_float(path, ecology, "wind_to_fertility_factor");
+    tuning.ecology.dust_to_fertility_factor =
+        require_toml_float(path, ecology, "dust_to_fertility_factor");
+    tuning.ecology.salinity_factor =
+        require_toml_float(path, ecology, "salinity_factor");
+    tuning.ecology.salinity_source =
+        require_toml_float(path, ecology, "salinity_source");
+    tuning.ecology.growth_relief_from_moisture =
+        require_toml_float(path, ecology, "growth_relief_from_moisture");
+    tuning.ecology.growth_relief_from_fertility =
+        require_toml_float(path, ecology, "growth_relief_from_fertility");
+    tuning.ecology.growth_pressure_heat_scale =
+        require_toml_float(path, ecology, "growth_pressure_heat_scale");
+    tuning.ecology.growth_pressure_wind_scale =
+        require_toml_float(path, ecology, "growth_pressure_wind_scale");
+    tuning.ecology.growth_pressure_dust_scale =
+        require_toml_float(path, ecology, "growth_pressure_dust_scale");
+    tuning.ecology.growth_pressure_base =
+        require_toml_float(path, ecology, "growth_pressure_base");
+    tuning.ecology.growth_pressure_heat_weight =
+        require_toml_float(path, ecology, "growth_pressure_heat_weight");
+    tuning.ecology.growth_pressure_wind_weight =
+        require_toml_float(path, ecology, "growth_pressure_wind_weight");
+    tuning.ecology.growth_pressure_dust_weight =
+        require_toml_float(path, ecology, "growth_pressure_dust_weight");
+    tuning.ecology.growth_pressure_burial_weight =
+        require_toml_float(path, ecology, "growth_pressure_burial_weight");
+    tuning.ecology.growth_pressure_salinity_weight =
+        require_toml_float(path, ecology, "growth_pressure_salinity_weight");
+    tuning.ecology.growth_pressure_dust_burial_scale =
+        require_toml_float(path, ecology, "growth_pressure_dust_burial_scale");
+    tuning.ecology.growth_pressure_modifier_influence =
+        require_toml_float(path, ecology, "growth_pressure_modifier_influence");
+    tuning.ecology.growth_gain_scale =
+        require_toml_float(path, ecology, "growth_gain_scale");
+    tuning.ecology.growth_loss_scale =
+        require_toml_float(path, ecology, "growth_loss_scale");
+    tuning.ecology.growth_gain_moisture_bonus_scale =
+        require_toml_float(path, ecology, "growth_gain_moisture_bonus_scale");
+    tuning.ecology.growth_gain_fertility_bonus_scale =
+        require_toml_float(path, ecology, "growth_gain_fertility_bonus_scale");
+    tuning.ecology.salinity_cap_softening =
+        require_toml_float(path, ecology, "salinity_cap_softening");
+    tuning.ecology.salinity_cap_min_unit =
+        require_toml_float(path, ecology, "salinity_cap_min_unit");
+    tuning.ecology.salinity_density_cap_modifier_influence =
+        require_toml_float(path, ecology, "salinity_density_cap_modifier_influence");
+    tuning.ecology.resistance_density_influence =
+        require_toml_float(path, ecology, "resistance_density_influence");
+    tuning.ecology.tolerance_percent_scale =
+        require_toml_float(path, ecology, "tolerance_percent_scale");
+    tuning.ecology.density_establishment_threshold =
+        require_toml_float(path, ecology, "density_establishment_threshold");
+    tuning.ecology.density_establishment_bonus =
+        require_toml_float(path, ecology, "density_establishment_bonus");
+    tuning.ecology.density_fragility_base =
+        require_toml_float(path, ecology, "density_fragility_base");
+    tuning.ecology.density_fragility_density_scale =
+        require_toml_float(path, ecology, "density_fragility_density_scale");
+    tuning.ecology.density_growth_pressure_safe_threshold =
+        require_toml_float(path, ecology, "density_growth_pressure_safe_threshold");
+    tuning.ecology.density_loss_pressure_threshold =
+        require_toml_float(path, ecology, "density_loss_pressure_threshold");
+    tuning.ecology.density_salinity_overcap_loss_scale =
+        require_toml_float(path, ecology, "density_salinity_overcap_loss_scale");
+    tuning.ecology.density_modifier_influence =
+        require_toml_float(path, ecology, "density_modifier_influence");
+    tuning.ecology.constant_wither_rate_scale =
+        require_toml_float(path, ecology, "constant_wither_rate_scale");
+    tuning.ecology.highway_cover_gain_wind_scale =
+        require_toml_float(path, ecology, "highway_cover_gain_wind_scale");
+    tuning.ecology.highway_cover_gain_dust_scale =
+        require_toml_float(path, ecology, "highway_cover_gain_dust_scale");
+
+    const auto& modifier_system = require_toml_table(path, document, "modifier_system");
+    tuning.modifier_system.modifier_channel_limit =
+        require_toml_float(path, modifier_system, "modifier_channel_limit");
+    tuning.modifier_system.factor_weight_limit =
+        require_toml_float(path, modifier_system, "factor_weight_limit");
+    tuning.modifier_system.factor_bias_limit =
+        require_toml_float(path, modifier_system, "factor_bias_limit");
+    tuning.modifier_system.camp_comfort_morale_scale =
+        require_toml_float(path, modifier_system, "camp_comfort_morale_scale");
+    tuning.modifier_system.camp_comfort_work_efficiency_scale =
+        require_toml_float(path, modifier_system, "camp_comfort_work_efficiency_scale");
+
+    const auto& device_support = require_toml_table(path, document, "device_support");
+    tuning.device_support.water_evaporation_base =
+        require_toml_float(path, device_support, "water_evaporation_base");
+    tuning.device_support.heat_evaporation_multiplier =
+        require_toml_float(path, device_support, "heat_evaporation_multiplier");
+
+    const auto& camp_durability = require_toml_table(path, document, "camp_durability");
+    tuning.camp_durability.durability_max =
+        require_toml_float(path, camp_durability, "durability_max");
+    tuning.camp_durability.base_wear_per_second =
+        require_toml_float(path, camp_durability, "base_wear_per_second");
+    tuning.camp_durability.weather_wear_scale =
+        require_toml_float(path, camp_durability, "weather_wear_scale");
+    tuning.camp_durability.event_timeline_wear_per_second =
+        require_toml_float(path, camp_durability, "event_timeline_wear_per_second");
+    tuning.camp_durability.peak_event_pressure_total =
+        require_toml_float(path, camp_durability, "peak_event_pressure_total");
+    tuning.camp_durability.protection_threshold =
+        require_toml_float(path, camp_durability, "protection_threshold");
+    tuning.camp_durability.delivery_threshold =
+        require_toml_float(path, camp_durability, "delivery_threshold");
+    tuning.camp_durability.shared_storage_threshold =
+        require_toml_float(path, camp_durability, "shared_storage_threshold");
+}
+
 void load_technology_tier_defs(ContentDatabase& content, const std::filesystem::path& path)
 {
     const auto document = load_toml_document(path);
@@ -1584,6 +1794,7 @@ ContentDatabase ContentLoader::load_prototype_content()
     const auto reward_candidates_path = root / "reward_candidates.toml";
     const auto site_actions_path = root / "site_actions.toml";
     const auto modifier_presets_path = root / "modifier_presets.toml";
+    const auto gameplay_tuning_path = root / "gameplay_tuning.toml";
     const auto technology_tiers_path = root / "technology_tiers.toml";
     const auto faction_technology_tiers_path = root / "faction_technology_tiers.toml";
     const auto total_reputation_tiers_path = root / "total_reputation_tiers.toml";
@@ -1602,6 +1813,7 @@ ContentDatabase ContentLoader::load_prototype_content()
     load_reward_candidate_defs(content, reward_candidates_path);
     load_site_action_defs(content, site_actions_path);
     load_modifier_preset_defs(content, modifier_presets_path);
+    load_gameplay_tuning_def(content, gameplay_tuning_path);
     load_technology_tier_defs(content, technology_tiers_path);
     load_faction_technology_tier_defs(content, faction_technology_tiers_path);
     load_total_reputation_tier_defs(content, total_reputation_tiers_path);

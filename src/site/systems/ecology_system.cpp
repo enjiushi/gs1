@@ -1,5 +1,6 @@
 #include "site/systems/ecology_system.h"
 
+#include "content/defs/gameplay_tuning_defs.h"
 #include "content/defs/plant_defs.h"
 #include "runtime/runtime_clock.h"
 #include "site/site_projection_update_flags.h"
@@ -18,46 +19,11 @@ constexpr float k_density_epsilon = 0.0001f;
 constexpr float k_density_epsilon_raw = 0.01f;
 constexpr float k_meter_scale = 100.0f;
 constexpr float k_inverse_meter_scale = 0.01f;
-constexpr float k_moisture_gain_per_water_unit = 22.0f;
-constexpr float k_fertility_to_moisture_cap_factor = 1.0f;
-constexpr float k_fertility_to_moisture_cap_weight = 1.0f;
-constexpr float k_fertility_to_moisture_cap_bias = 0.0f;
-constexpr float k_salinity_to_fertility_cap_factor = 1.0f;
-constexpr float k_salinity_to_fertility_cap_weight = 1.0f;
-constexpr float k_salinity_to_fertility_cap_bias = 0.0f;
-constexpr float k_moisture_factor = 0.02f;
-constexpr float k_moisture_weight = 1.0f;
-constexpr float k_moisture_bias = 0.0f;
-constexpr float k_heat_to_moisture_factor = 0.00025f;
-constexpr float k_heat_to_moisture_weight = 1.0f;
-constexpr float k_heat_to_moisture_bias = 0.0f;
-constexpr float k_wind_to_moisture_factor = 0.00018f;
-constexpr float k_wind_to_moisture_weight = 1.0f;
-constexpr float k_wind_to_moisture_bias = 0.0f;
-constexpr float k_fertility_factor = 0.015f;
-constexpr float k_fertility_weight = 1.0f;
-constexpr float k_fertility_bias = 0.0f;
-constexpr float k_wind_to_fertility_factor = 0.00008f;
-constexpr float k_wind_to_fertility_weight = 1.0f;
-constexpr float k_wind_to_fertility_bias = 0.0f;
-constexpr float k_dust_to_fertility_factor = 0.00006f;
-constexpr float k_dust_to_fertility_weight = 1.0f;
-constexpr float k_dust_to_fertility_bias = 0.0f;
-constexpr float k_salinity_factor = 0.012f;
-constexpr float k_salinity_weight = 1.0f;
-constexpr float k_salinity_bias = 0.0f;
-constexpr float k_salinity_source = 0.0f;
-constexpr float k_growth_relief_from_moisture = 0.55f;
-constexpr float k_growth_relief_from_fertility = 0.35f;
-constexpr float k_growth_pressure_heat_scale = 0.04f;
-constexpr float k_growth_pressure_wind_scale = 0.04f;
-constexpr float k_growth_pressure_dust_scale = 0.04f;
-constexpr float k_growth_gain_scale = 0.0012f;
-constexpr float k_growth_loss_scale = 0.0024f;
-constexpr float k_salinity_cap_softening = 0.75f;
-constexpr float k_resistance_density_influence = 0.35f;
-constexpr float k_highway_cover_gain_wind_scale = 0.00028f;
-constexpr float k_highway_cover_gain_dust_scale = 0.00045f;
+
+const EcologyTuning& ecology_tuning() noexcept
+{
+    return gameplay_tuning_def().ecology;
+}
 
 bool has_tile_occupant(PlantId plant_id, std::uint32_t ground_cover_type_id) noexcept
 {
@@ -119,8 +85,10 @@ const PlantDef& resolve_occupant_def(const SiteWorld::TileData& tile) noexcept
 
 float resolve_density_scaled_resistance(float max_value, float density) noexcept
 {
+    const auto& tuning = ecology_tuning();
     const float clamped_density = unit_from_raw_meter(density);
-    const float floor_scale = 1.0f - std::clamp(k_resistance_density_influence, 0.0f, 1.0f);
+    const float floor_scale =
+        1.0f - std::clamp(tuning.resistance_density_influence, 0.0f, 1.0f);
     const float min_value = max_value * floor_scale;
     return std::lerp(min_value, max_value, clamped_density);
 }
@@ -135,15 +103,16 @@ float compute_salinity_density_cap(
     const PlantDef& plant_def,
     const ModifierChannelTotals& modifiers) noexcept
 {
+    const auto& tuning = ecology_tuning();
     const float density = ecology.plant_density;
     const float effective_salt_tolerance =
         resolve_density_scaled_resistance(plant_def.salt_tolerance, density);
     const float salinity_penalty =
         unit_from_raw_meter(ecology.soil_salinity) *
-        std::max(0.0f, 1.0f - (effective_salt_tolerance * 0.01f));
-    float salinity_cap = 1.0f - (salinity_penalty * k_salinity_cap_softening);
-    salinity_cap *= 1.0f + (modifiers.salinity_density_cap * 0.35f);
-    return raw_from_unit_meter(std::clamp(salinity_cap, 0.15f, 1.0f));
+        std::max(0.0f, 1.0f - (effective_salt_tolerance * tuning.tolerance_percent_scale));
+    float salinity_cap = 1.0f - (salinity_penalty * tuning.salinity_cap_softening);
+    salinity_cap *= 1.0f + (modifiers.salinity_density_cap * tuning.salinity_density_cap_modifier_influence);
+    return raw_from_unit_meter(std::clamp(salinity_cap, tuning.salinity_cap_min_unit, 1.0f));
 }
 
 float compute_growth_pressure(
@@ -152,6 +121,7 @@ float compute_growth_pressure(
     const ModifierChannelTotals& modifiers,
     float effective_wind) noexcept
 {
+    const auto& tuning = ecology_tuning();
     if (!has_tile_occupant(tile.ecology.plant_id, tile.ecology.ground_cover_type_id))
     {
         return 0.0f;
@@ -167,39 +137,41 @@ float compute_growth_pressure(
     const float effective_salt_tolerance =
         resolve_density_scaled_resistance(plant_def.salt_tolerance, density);
     const float heat_term = std::clamp(
-        (tile.local_weather.heat * k_growth_pressure_heat_scale) -
-            (effective_heat_tolerance * 0.01f),
+        (tile.local_weather.heat * tuning.growth_pressure_heat_scale) -
+            (effective_heat_tolerance * tuning.tolerance_percent_scale),
         0.0f,
         1.0f);
     const float wind_term = std::clamp(
-        (effective_wind * k_growth_pressure_wind_scale) -
-            (effective_wind_resistance * 0.01f),
+        (effective_wind * tuning.growth_pressure_wind_scale) -
+            (effective_wind_resistance * tuning.tolerance_percent_scale),
         0.0f,
         1.0f);
     const float dust_term = std::clamp(
-        ((tile.local_weather.dust + unit_from_raw_meter(tile.ecology.sand_burial) * 12.0f) * k_growth_pressure_dust_scale) -
-            (effective_dust_tolerance * 0.01f),
+        ((tile.local_weather.dust +
+             unit_from_raw_meter(tile.ecology.sand_burial) * tuning.growth_pressure_dust_burial_scale) *
+            tuning.growth_pressure_dust_scale) -
+            (effective_dust_tolerance * tuning.tolerance_percent_scale),
         0.0f,
         1.0f);
     const float salinity_term =
         unit_from_raw_meter(tile.ecology.soil_salinity) *
-        std::max(0.0f, 1.0f - (effective_salt_tolerance * 0.01f)) *
-        0.45f;
+        std::max(0.0f, 1.0f - (effective_salt_tolerance * tuning.tolerance_percent_scale)) *
+        tuning.growth_pressure_salinity_weight;
     const float moisture_relief =
-        unit_from_raw_meter(tile.ecology.moisture) * k_growth_relief_from_moisture;
+        unit_from_raw_meter(tile.ecology.moisture) * tuning.growth_relief_from_moisture;
     const float fertility_relief =
-        unit_from_raw_meter(tile.ecology.soil_fertility) * k_growth_relief_from_fertility;
+        unit_from_raw_meter(tile.ecology.soil_fertility) * tuning.growth_relief_from_fertility;
 
     float pressure =
-        0.2f +
-        heat_term * 0.9f +
-        wind_term * 0.75f +
-        dust_term * 0.65f +
-        unit_from_raw_meter(tile.ecology.sand_burial) * 0.55f +
+        tuning.growth_pressure_base +
+        heat_term * tuning.growth_pressure_heat_weight +
+        wind_term * tuning.growth_pressure_wind_weight +
+        dust_term * tuning.growth_pressure_dust_weight +
+        unit_from_raw_meter(tile.ecology.sand_burial) * tuning.growth_pressure_burial_weight +
         salinity_term -
         moisture_relief -
         fertility_relief;
-    pressure += modifiers.growth_pressure * 0.35f;
+    pressure += modifiers.growth_pressure * tuning.growth_pressure_modifier_influence;
     return raw_from_unit_meter(std::clamp(pressure, 0.0f, 1.0f));
 }
 
@@ -208,20 +180,21 @@ float compute_next_moisture(
     const TerrainFactorModifierState& factor_modifiers,
     float simulation_dt_minutes) noexcept
 {
+    const auto& tuning = ecology_tuning();
     const float fertility_to_moisture_cap = resolve_tunable_factor(
-        k_fertility_to_moisture_cap_factor,
+        tuning.fertility_to_moisture_cap_factor,
         factor_modifiers.fertility_to_moisture_cap_weight,
         factor_modifiers.fertility_to_moisture_cap_bias);
     const float moisture_factor = resolve_tunable_factor(
-        k_moisture_factor,
+        tuning.moisture_factor,
         factor_modifiers.moisture_weight,
         factor_modifiers.moisture_bias);
     const float heat_to_moisture_factor = resolve_tunable_factor(
-        k_heat_to_moisture_factor,
+        tuning.heat_to_moisture_factor,
         factor_modifiers.heat_to_moisture_weight,
         factor_modifiers.heat_to_moisture_bias);
     const float wind_to_moisture_factor = resolve_tunable_factor(
-        k_wind_to_moisture_factor,
+        tuning.wind_to_moisture_factor,
         factor_modifiers.wind_to_moisture_weight,
         factor_modifiers.wind_to_moisture_bias);
     const float moisture_top = std::clamp(
@@ -244,20 +217,21 @@ float compute_next_fertility(
     const TerrainFactorModifierState& factor_modifiers,
     float simulation_dt_minutes) noexcept
 {
+    const auto& tuning = ecology_tuning();
     const float salinity_to_fertility_cap = resolve_tunable_factor(
-        k_salinity_to_fertility_cap_factor,
+        tuning.salinity_to_fertility_cap_factor,
         factor_modifiers.salinity_to_fertility_cap_weight,
         factor_modifiers.salinity_to_fertility_cap_bias);
     const float fertility_factor = resolve_tunable_factor(
-        k_fertility_factor,
+        tuning.fertility_factor,
         factor_modifiers.fertility_weight,
         factor_modifiers.fertility_bias);
     const float wind_to_fertility_factor = resolve_tunable_factor(
-        k_wind_to_fertility_factor,
+        tuning.wind_to_fertility_factor,
         factor_modifiers.wind_to_fertility_weight,
         factor_modifiers.wind_to_fertility_bias);
     const float dust_to_fertility_factor = resolve_tunable_factor(
-        k_dust_to_fertility_factor,
+        tuning.dust_to_fertility_factor,
         factor_modifiers.dust_to_fertility_weight,
         factor_modifiers.dust_to_fertility_bias);
     const float fertility_top = std::clamp(
@@ -280,8 +254,9 @@ float compute_next_salinity(
     const TerrainFactorModifierState& factor_modifiers,
     float simulation_dt_minutes) noexcept
 {
+    const auto& tuning = ecology_tuning();
     const float salinity_source_factor = resolve_tunable_factor(
-        k_salinity_factor,
+        tuning.salinity_factor,
         factor_modifiers.salinity_source_weight,
         factor_modifiers.salinity_source_bias);
     const float salinity_reduction_factor = resolve_tunable_factor(
@@ -289,7 +264,7 @@ float compute_next_salinity(
         factor_modifiers.salinity_reduction_weight,
         factor_modifiers.salinity_reduction_bias);
     const float salinity_rate =
-        (k_salinity_source * salinity_source_factor) -
+        (tuning.salinity_source * salinity_source_factor) -
         (tile.resolved_contribution.salinity_reduction * salinity_reduction_factor);
     return raw_meter_clamp(std::clamp(
         tile.ecology.soil_salinity + (salinity_rate * simulation_dt_minutes),
@@ -305,49 +280,60 @@ float compute_density_delta(
     float salinity_cap,
     float simulation_dt_minutes) noexcept
 {
+    const auto& tuning = ecology_tuning();
     const float density = unit_from_raw_meter(tile.ecology.plant_density);
     const float growth_pressure_unit = unit_from_raw_meter(growth_pressure);
     const float salinity_cap_unit = unit_from_raw_meter(salinity_cap);
     const float delta_minutes = std::max(simulation_dt_minutes, 0.0f);
 
     float density_gain = 0.0f;
-    if (plant_def.growable && growth_pressure_unit < 0.45f && density < 1.0f - k_density_epsilon)
+    if (plant_def.growable &&
+        growth_pressure_unit < tuning.density_growth_pressure_safe_threshold &&
+        density < 1.0f - k_density_epsilon)
     {
-        const float growth_headroom = (0.45f - growth_pressure_unit) / 0.45f;
-        const float establishment_bonus = density < 0.3f ? 1.15f : 1.0f;
+        const float growth_headroom =
+            (tuning.density_growth_pressure_safe_threshold - growth_pressure_unit) /
+            tuning.density_growth_pressure_safe_threshold;
+        const float establishment_bonus =
+            density < tuning.density_establishment_threshold
+            ? tuning.density_establishment_bonus
+            : 1.0f;
         density_gain =
             growth_headroom *
-            (k_growth_gain_scale +
-                unit_from_raw_meter(tile.ecology.moisture) * 0.0008f +
-                unit_from_raw_meter(tile.ecology.soil_fertility) * 0.0006f) *
+            (tuning.growth_gain_scale +
+                unit_from_raw_meter(tile.ecology.moisture) * tuning.growth_gain_moisture_bonus_scale +
+                unit_from_raw_meter(tile.ecology.soil_fertility) * tuning.growth_gain_fertility_bonus_scale) *
             establishment_bonus *
             delta_minutes;
     }
 
-    const float fragility = 1.25f - density * 0.5f;
+    const float fragility =
+        tuning.density_fragility_base - density * tuning.density_fragility_density_scale;
     float density_loss = 0.0f;
-    if (growth_pressure_unit > 0.55f)
+    if (growth_pressure_unit > tuning.density_loss_pressure_threshold)
     {
         density_loss +=
-            ((growth_pressure_unit - 0.55f) / 0.45f) *
-            k_growth_loss_scale *
+            ((growth_pressure_unit - tuning.density_loss_pressure_threshold) /
+                (1.0f - tuning.density_loss_pressure_threshold)) *
+            tuning.growth_loss_scale *
             fragility *
             delta_minutes;
     }
 
     if (density > salinity_cap_unit + k_density_epsilon)
     {
-        density_loss += (density - salinity_cap_unit) * 1.8f * delta_minutes;
+        density_loss +=
+            (density - salinity_cap_unit) * tuning.density_salinity_overcap_loss_scale * delta_minutes;
     }
 
     if (plant_def.constant_wither_rate > 0.0f)
     {
         density_loss +=
-            (plant_def.constant_wither_rate / 100.0f) * 0.08f * delta_minutes;
+            (plant_def.constant_wither_rate / 100.0f) * tuning.constant_wither_rate_scale * delta_minutes;
     }
 
     float net_delta = density_gain - density_loss;
-    net_delta *= 1.0f + (modifiers.plant_density * 0.35f);
+    net_delta *= 1.0f + (modifiers.plant_density * tuning.density_modifier_influence);
     return net_delta * k_meter_scale;
 }
 
@@ -544,6 +530,7 @@ std::uint32_t apply_watering(
     TileCoord coord,
     const SiteTileWateredMessage& payload)
 {
+    const auto& tuning = ecology_tuning();
     if (!world.tile_coord_in_bounds(coord))
     {
         return TILE_ECOLOGY_CHANGED_NONE;
@@ -562,7 +549,7 @@ std::uint32_t apply_watering(
     }
 
     const float next_moisture = std::clamp(
-        tile.ecology.moisture + amount * k_moisture_gain_per_water_unit,
+        tile.ecology.moisture + amount * tuning.moisture_gain_per_water_unit,
         0.0f,
         k_meter_scale);
     if (std::fabs(next_moisture - tile.ecology.moisture) <= k_density_epsilon_raw)
@@ -697,9 +684,10 @@ float compute_highway_sand_cover_delta(
     const SiteWorld::TileData& tile,
     float simulation_dt_minutes) noexcept
 {
+    const auto& tuning = ecology_tuning();
     return raw_from_unit_meter(
-        (std::max(tile.local_weather.wind, 0.0f) * k_highway_cover_gain_wind_scale +
-            std::max(tile.local_weather.dust, 0.0f) * k_highway_cover_gain_dust_scale) *
+        (std::max(tile.local_weather.wind, 0.0f) * tuning.highway_cover_gain_wind_scale +
+            std::max(tile.local_weather.dust, 0.0f) * tuning.highway_cover_gain_dust_scale) *
         std::max(simulation_dt_minutes, 0.0f));
 }
 

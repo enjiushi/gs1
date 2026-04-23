@@ -11,15 +11,15 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `action_execution_system.h`: Action execution system interface.
 - `action_execution_system.cpp`: Executes queued site actions using the canonical real-seconds-to-action-minutes conversion, derives action duration plus instant worker action costs from the previous-frame work-efficiency snapshot, emits follow-up gameplay messages, supports harvest actions for density-ready plants, and re-arms plant placement mode after successful item-based planting when matching seeds remain in the worker pack.
 - `camp_durability_system.h`: Camp durability system interface.
-- `camp_durability_system.cpp`: Applies camp wear/failure effects to camp durability state.
+- `camp_durability_system.cpp`: Applies camp wear/failure effects to camp durability state using content-authored wear-rate and service-threshold tuning.
 - `craft_system.h`: Craft system interface.
 - `craft_system.cpp`: Handles crafting progress, completion, and crafting-related state updates.
 - `device_maintenance_system.h`: Device maintenance system interface.
 - `device_maintenance_system.cpp`: Applies repair/maintenance behavior for site devices and emits device-condition change messages when integrity or occupancy changes, including startup snapshots for task-tracking subscribers.
 - `device_support_system.h`: Device support system interface.
-- `device_support_system.cpp`: Resolves support effects and dependencies for site devices.
+- `device_support_system.cpp`: Resolves support effects and dependencies for site devices using content-authored evaporation tuning.
 - `ecology_system.h`: Ecology system interface.
-- `ecology_system.cpp`: Updates plants, burial, watering, harvest-density setbacks, broader ecology progression, and highway-target sand-cover accumulation for objective-driven site progress, including the factor/weight/bias-based terrain meter computation that reads resolved tile contribution state and owner-emitted living-plant stability messages for task tracking.
+- `ecology_system.cpp`: Updates plants, burial, watering, harvest-density setbacks, broader ecology progression, and highway-target sand-cover accumulation for objective-driven site progress, including the content-authored factor/weight/bias-based terrain meter computation that reads resolved tile contribution state and owner-emitted living-plant stability messages for task tracking.
 - `economy_phone_system.h`: Economy phone system interface.
 - `economy_phone_system.cpp`: Handles phone storefront interactions using content-authored seeded listings and delivery settings, persistent-campaign-cash-backed purchases, plant-listing availability based on the starter-plus-total-reputation unlock track, immediate delivery-crate routing for bought items, owner-confirmed buy/sell completion messages for onboarding-task progress, and task-reward money/unlockable reveal awards routed through message handling.
 - `failure_recovery_system.h`: Failure recovery system interface.
@@ -29,7 +29,7 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `local_weather_resolve_system.h`: Local weather resolve system interface.
 - `local_weather_resolve_system.cpp`: Resolves local weather updates into owned site state, including resolved per-tile support channels for heat/wind/dust/fertility/salinity/irrigation, directional lee-side wind shelter with nonlinear range falloff, plant-tile projection dirties when visible local wind changes, and owner-emitted startup plus live tile state-change messages for task tracking.
 - `modifier_system.h`: Modifier system interface.
-- `modifier_system.cpp`: Applies and expires site modifiers/effects using content-authored nearby-aura and run-modifier preset tables, including task-reward run-modifier awards plus imported campaign assistant/global-modifier technology effects routed through message handling, and resolves terrain factor weights/biases from the active modifier totals.
+- `modifier_system.cpp`: Applies and expires site modifiers/effects using content-authored nearby-aura and run-modifier preset tables, including task-reward run-modifier awards plus imported campaign assistant/global-modifier technology effects routed through message handling, and resolves terrain factor weights/biases from the active modifier totals with content-authored clamp and camp-comfort tuning.
 - `phone_panel_system.h`: Phone panel system interface.
 - `phone_panel_system.cpp`: Owns phone home/app-panel section state plus tracked phone open-close visibility and authoritative projected phone listings/task counts for the adapter, including completed and claimed history counts.
 - `placement_validation_system.h`: Placement validation system interface.
@@ -46,4 +46,4 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `weather_event_system.h`: Weather event system interface.
 - `weather_event_system.cpp`: Applies site-owned weather/event state changes, including authored default-weather baselines, start/peak/end timeline interpolation for additive event pressure, and recurring one-sided highway-protection waves.
 - `worker_condition_system.h`: Worker condition system interface.
-- `worker_condition_system.cpp`: Resolves worker condition from previous-frame state plus accumulated frame deltas, recomputes derived energy-cap and work-efficiency snapshots, applies passive environment-driven meter loss with shelter softening, and emits startup worker-meter snapshots for task tracking.
+- `worker_condition_system.cpp`: Resolves worker condition from previous-frame state plus accumulated frame deltas, recomputes derived energy-cap and work-efficiency snapshots, applies content-authored passive environment-driven meter loss with shelter softening across the requested health, hydration, and nourishment heat-wind-dust ratios, and emits startup worker-meter snapshots for task tracking.

@@ -1,6 +1,7 @@
 #include "site/systems/modifier_system.h"
 
 #include "campaign/campaign_state.h"
+#include "content/defs/gameplay_tuning_defs.h"
 #include "content/defs/modifier_defs.h"
 #include "content/defs/technology_defs.h"
 #include "site/site_projection_update_flags.h"
@@ -13,10 +14,12 @@ namespace gs1
 {
 namespace
 {
-constexpr float k_modifier_channel_limit = 1.0f;
 constexpr float k_modifier_change_epsilon = 1e-4f;
-constexpr float k_factor_weight_limit = 2.5f;
-constexpr float k_factor_bias_limit = 2.0f;
+
+const ModifierSystemTuning& modifier_system_tuning() noexcept
+{
+    return gameplay_tuning_def().modifier_system;
+}
 
 void accumulate_totals(
     ModifierChannelTotals& destination,
@@ -42,39 +45,39 @@ void accumulate_totals(
 
 ModifierChannelTotals clamp_totals(ModifierChannelTotals totals) noexcept
 {
-    totals.heat = std::clamp(totals.heat, -k_modifier_channel_limit, k_modifier_channel_limit);
-    totals.wind = std::clamp(totals.wind, -k_modifier_channel_limit, k_modifier_channel_limit);
-    totals.dust = std::clamp(totals.dust, -k_modifier_channel_limit, k_modifier_channel_limit);
-    totals.moisture = std::clamp(totals.moisture, -k_modifier_channel_limit, k_modifier_channel_limit);
-    totals.fertility = std::clamp(totals.fertility, -k_modifier_channel_limit, k_modifier_channel_limit);
-    totals.salinity = std::clamp(totals.salinity, -k_modifier_channel_limit, k_modifier_channel_limit);
+    const auto& tuning = modifier_system_tuning();
+    const float limit = tuning.modifier_channel_limit;
+    totals.heat = std::clamp(totals.heat, -limit, limit);
+    totals.wind = std::clamp(totals.wind, -limit, limit);
+    totals.dust = std::clamp(totals.dust, -limit, limit);
+    totals.moisture = std::clamp(totals.moisture, -limit, limit);
+    totals.fertility = std::clamp(totals.fertility, -limit, limit);
+    totals.salinity = std::clamp(totals.salinity, -limit, limit);
     totals.growth_pressure =
-        std::clamp(totals.growth_pressure, -k_modifier_channel_limit, k_modifier_channel_limit);
+        std::clamp(totals.growth_pressure, -limit, limit);
     totals.salinity_density_cap =
-        std::clamp(totals.salinity_density_cap, -k_modifier_channel_limit, k_modifier_channel_limit);
-    totals.plant_density =
-        std::clamp(totals.plant_density, -k_modifier_channel_limit, k_modifier_channel_limit);
-    totals.health = std::clamp(totals.health, -k_modifier_channel_limit, k_modifier_channel_limit);
-    totals.hydration = std::clamp(totals.hydration, -k_modifier_channel_limit, k_modifier_channel_limit);
-    totals.nourishment =
-        std::clamp(totals.nourishment, -k_modifier_channel_limit, k_modifier_channel_limit);
-    totals.energy_cap =
-        std::clamp(totals.energy_cap, -k_modifier_channel_limit, k_modifier_channel_limit);
-    totals.energy = std::clamp(totals.energy, -k_modifier_channel_limit, k_modifier_channel_limit);
-    totals.morale = std::clamp(totals.morale, -k_modifier_channel_limit, k_modifier_channel_limit);
+        std::clamp(totals.salinity_density_cap, -limit, limit);
+    totals.plant_density = std::clamp(totals.plant_density, -limit, limit);
+    totals.health = std::clamp(totals.health, -limit, limit);
+    totals.hydration = std::clamp(totals.hydration, -limit, limit);
+    totals.nourishment = std::clamp(totals.nourishment, -limit, limit);
+    totals.energy_cap = std::clamp(totals.energy_cap, -limit, limit);
+    totals.energy = std::clamp(totals.energy, -limit, limit);
+    totals.morale = std::clamp(totals.morale, -limit, limit);
     totals.work_efficiency =
-        std::clamp(totals.work_efficiency, -k_modifier_channel_limit, k_modifier_channel_limit);
+        std::clamp(totals.work_efficiency, -limit, limit);
     return totals;
 }
 
 ModifierChannelTotals camp_comfort_bias(const CampState& camp) noexcept
 {
+    const auto& tuning = modifier_system_tuning();
     const float clamped_durability = std::clamp(camp.camp_durability, 0.0f, 100.0f);
     const float normalized = (clamped_durability * 0.01f * 2.0f) - 1.0f;
 
     ModifierChannelTotals totals {};
-    totals.morale = normalized * 0.12f;
-    totals.work_efficiency = normalized * 0.06f;
+    totals.morale = normalized * tuning.camp_comfort_morale_scale;
+    totals.work_efficiency = normalized * tuning.camp_comfort_work_efficiency_scale;
     return totals;
 }
 
@@ -101,39 +104,40 @@ bool totals_match(const ModifierChannelTotals& lhs, const ModifierChannelTotals&
 TerrainFactorModifierState resolve_terrain_factor_modifiers(
     const ModifierChannelTotals& totals) noexcept
 {
+    const auto& tuning = modifier_system_tuning();
     TerrainFactorModifierState factors {};
 
     factors.fertility_to_moisture_cap_weight =
-        std::clamp(1.0f + totals.moisture, 0.0f, k_factor_weight_limit);
+        std::clamp(1.0f + totals.moisture, 0.0f, tuning.factor_weight_limit);
     factors.moisture_weight =
-        std::clamp(1.0f + totals.moisture, 0.0f, k_factor_weight_limit);
+        std::clamp(1.0f + totals.moisture, 0.0f, tuning.factor_weight_limit);
     factors.heat_to_moisture_weight =
-        std::clamp(1.0f - totals.moisture, 0.0f, k_factor_weight_limit);
+        std::clamp(1.0f - totals.moisture, 0.0f, tuning.factor_weight_limit);
     factors.wind_to_moisture_weight =
-        std::clamp(1.0f - totals.moisture, 0.0f, k_factor_weight_limit);
+        std::clamp(1.0f - totals.moisture, 0.0f, tuning.factor_weight_limit);
 
     factors.salinity_to_fertility_cap_weight =
-        std::clamp(1.0f - totals.salinity, 0.0f, k_factor_weight_limit);
+        std::clamp(1.0f - totals.salinity, 0.0f, tuning.factor_weight_limit);
     factors.fertility_weight =
-        std::clamp(1.0f + totals.fertility, 0.0f, k_factor_weight_limit);
+        std::clamp(1.0f + totals.fertility, 0.0f, tuning.factor_weight_limit);
     factors.wind_to_fertility_weight =
-        std::clamp(1.0f - totals.fertility, 0.0f, k_factor_weight_limit);
+        std::clamp(1.0f - totals.fertility, 0.0f, tuning.factor_weight_limit);
     factors.dust_to_fertility_weight =
-        std::clamp(1.0f - totals.fertility, 0.0f, k_factor_weight_limit);
+        std::clamp(1.0f - totals.fertility, 0.0f, tuning.factor_weight_limit);
 
     factors.salinity_source_weight =
-        std::clamp(1.0f - totals.salinity, 0.0f, k_factor_weight_limit);
+        std::clamp(1.0f - totals.salinity, 0.0f, tuning.factor_weight_limit);
     factors.salinity_reduction_weight =
-        std::clamp(1.0f + totals.salinity, 0.0f, k_factor_weight_limit);
+        std::clamp(1.0f + totals.salinity, 0.0f, tuning.factor_weight_limit);
 
     factors.moisture_bias =
-        std::clamp(totals.moisture, -k_factor_bias_limit, k_factor_bias_limit);
+        std::clamp(totals.moisture, -tuning.factor_bias_limit, tuning.factor_bias_limit);
     factors.fertility_bias =
-        std::clamp(totals.fertility, -k_factor_bias_limit, k_factor_bias_limit);
+        std::clamp(totals.fertility, -tuning.factor_bias_limit, tuning.factor_bias_limit);
     factors.salinity_reduction_bias =
-        std::clamp(totals.salinity, -k_factor_bias_limit, k_factor_bias_limit);
+        std::clamp(totals.salinity, -tuning.factor_bias_limit, tuning.factor_bias_limit);
     factors.salinity_source_bias =
-        std::clamp(-totals.salinity, -k_factor_bias_limit, k_factor_bias_limit);
+        std::clamp(-totals.salinity, -tuning.factor_bias_limit, tuning.factor_bias_limit);
 
     return factors;
 }

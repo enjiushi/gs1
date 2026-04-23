@@ -1,6 +1,7 @@
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
 #include "site/systems/camp_durability_system.h"
+#include "content/defs/gameplay_tuning_defs.h"
 
 #include <algorithm>
 #include <cmath>
@@ -19,18 +20,14 @@ struct CampDurabilityMemory final
     bool last_shared_storage_access_enabled {true};
 };
 
-constexpr float k_camp_durability_max = 100.0f;
-constexpr float k_base_wear_per_second = 0.01f;
-constexpr float k_weather_wear_scale = 0.00075f;
-constexpr float k_event_timeline_wear_per_second = 0.04f;
-constexpr float k_peak_event_pressure_total = 30.0f;
 constexpr float k_durability_dirty_threshold = 0.25f;
 
-constexpr float k_protection_threshold = 70.0f;
-constexpr float k_delivery_threshold = 50.0f;
-constexpr float k_shared_storage_threshold = 30.0f;
-
 CampDurabilityMemory g_camp_durability_memory {};
+
+const CampDurabilityTuning& camp_durability_tuning() noexcept
+{
+    return gameplay_tuning_def().camp_durability;
+}
 
 float compute_weather_intensity(const WeatherState& weather) noexcept
 {
@@ -39,11 +36,12 @@ float compute_weather_intensity(const WeatherState& weather) noexcept
 
 float compute_event_pressure_ratio(const EventState& event) noexcept
 {
+    const auto& tuning = camp_durability_tuning();
     const float total_pressure =
         std::max(event.event_heat_pressure, 0.0f) +
         std::max(event.event_wind_pressure, 0.0f) +
         std::max(event.event_dust_pressure, 0.0f);
-    return std::clamp(total_pressure / k_peak_event_pressure_total, 0.0f, 1.0f);
+    return std::clamp(total_pressure / tuning.peak_event_pressure_total, 0.0f, 1.0f);
 }
 
 void refresh_memory_with_current_state(SiteSystemContext<CampDurabilitySystem>& context)
@@ -110,7 +108,7 @@ Gs1Status CampDurabilitySystem::process_message(
     }
 
     auto& camp = context.world.own_camp();
-    camp.camp_durability = k_camp_durability_max;
+    camp.camp_durability = camp_durability_tuning().durability_max;
     camp.camp_protection_resolved = true;
     camp.delivery_point_operational = true;
     camp.shared_storage_access_enabled = true;
@@ -127,21 +125,22 @@ void CampDurabilitySystem::run(SiteSystemContext<CampDurabilitySystem>& context)
     }
 
     auto& camp = context.world.own_camp();
+    const auto& tuning = camp_durability_tuning();
     const auto step_seconds = static_cast<float>(context.fixed_step_seconds);
     const float wear_rate_per_second =
-        k_base_wear_per_second +
-        compute_weather_intensity(context.world.read_weather()) * k_weather_wear_scale +
-        (k_event_timeline_wear_per_second *
+        tuning.base_wear_per_second +
+        compute_weather_intensity(context.world.read_weather()) * tuning.weather_wear_scale +
+        (tuning.event_timeline_wear_per_second *
             compute_event_pressure_ratio(context.world.read_event()));
     const float wear_amount = wear_rate_per_second * step_seconds;
     const float previous = camp.camp_durability;
     camp.camp_durability =
-        std::clamp(previous - wear_amount, 0.0f, k_camp_durability_max);
+        std::clamp(previous - wear_amount, 0.0f, tuning.durability_max);
 
     const float durability = camp.camp_durability;
-    const bool protection_resolved = durability >= k_protection_threshold;
-    const bool delivery_operational = durability >= k_delivery_threshold;
-    const bool shared_storage_access_enabled = durability >= k_shared_storage_threshold;
+    const bool protection_resolved = durability >= tuning.protection_threshold;
+    const bool delivery_operational = durability >= tuning.delivery_threshold;
+    const bool shared_storage_access_enabled = durability >= tuning.shared_storage_threshold;
 
     camp.camp_protection_resolved = protection_resolved;
     camp.delivery_point_operational = delivery_operational;

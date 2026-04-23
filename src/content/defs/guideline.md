@@ -12,6 +12,7 @@ Definition types and runtime accessors for the major authored content domains.
 - `faction_defs.h`: Prototype faction identity and assistant unlock definition records.
 - `craft_recipe_defs.h`: Crafting recipe definition types plus runtime accessors over the loaded recipe table.
 - `event_defs.h`: Authored event definitions used by event/state systems.
+- `gameplay_tuning_defs.h`: Shared gameplay-tuning definition records and lookup for authored numeric factors consumed by worker-condition, ecology, modifier, device-support, and camp-durability systems.
 - `item_defs.h`: Item definition types plus runtime accessors over the loaded item table, including the authored starter checkerboard item, the full prototype 10-plant seed roster, and the harvested-good item roster tied back to source plants.
 - `modifier_defs.h`: Modifier preset definition records and runtime accessors applied by modifier/weather flows.
 - `plant_defs.h`: Plant/ecology definition types plus runtime accessors over the loaded plant table, including the full China-desert 10-plant prototype roster, authored wind-protection range/power values, per-plant harvest output metadata, and the starter straw checkerboard definition with its authored `2x2` footprint plus tuned steady-wither behavior used by directional shelter resolution.

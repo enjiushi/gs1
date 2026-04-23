@@ -1,0 +1,99 @@
+[worker_condition]
+hydration_base_loss_per_game_minute = 0.0100
+heat_to_hydration_factor = 0.40666667
+wind_to_hydration_factor = 0.05083333
+dust_to_hydration_factor = 0.05083333
+nourishment_base_loss_per_game_minute = 0.00250
+wind_to_nourishment_factor = 0.00700
+heat_to_nourishment_factor = 0.00200
+dust_to_nourishment_factor = 0.00100
+energy_base_loss_per_game_minute = 0.00500
+wind_to_energy_factor = 0.00375
+heat_to_energy_factor = 0.00375
+dust_to_energy_factor = 0.00375
+morale_decrease_speed = 1.0
+morale_decrease_factor = 0.00375
+heat_to_health_factor = 0.20833333
+wind_to_health_factor = 0.20833333
+dust_to_health_factor = 0.10416667
+health_energy_cap_factor = 1.0
+hydration_energy_cap_factor = 1.0
+nourishment_energy_cap_factor = 1.0
+energy_cap_factor = 1.0
+health_efficiency_factor = 1.0
+hydration_efficiency_factor = 1.0
+nourishment_efficiency_factor = 1.0
+morale_efficiency_factor = 1.0
+work_efficiency_factor = 1.0
+factor_weight_default = 1.0
+factor_bias_default = 0.0
+factor_min = 0.0
+factor_max = 4.0
+sheltered_exposure_scale = 0.35
+
+[ecology]
+moisture_gain_per_water_unit = 22.0
+fertility_to_moisture_cap_factor = 1.0
+salinity_to_fertility_cap_factor = 1.0
+moisture_factor = 0.02
+heat_to_moisture_factor = 0.00025
+wind_to_moisture_factor = 0.00018
+fertility_factor = 0.015
+wind_to_fertility_factor = 0.00008
+dust_to_fertility_factor = 0.00006
+salinity_factor = 0.012
+salinity_source = 0.0
+growth_relief_from_moisture = 0.55
+growth_relief_from_fertility = 0.35
+growth_pressure_heat_scale = 0.04
+growth_pressure_wind_scale = 0.04
+growth_pressure_dust_scale = 0.04
+growth_pressure_base = 0.2
+growth_pressure_heat_weight = 0.9
+growth_pressure_wind_weight = 0.75
+growth_pressure_dust_weight = 0.65
+growth_pressure_burial_weight = 0.55
+growth_pressure_salinity_weight = 0.45
+growth_pressure_dust_burial_scale = 12.0
+growth_pressure_modifier_influence = 0.35
+growth_gain_scale = 0.0012
+growth_loss_scale = 0.0024
+growth_gain_moisture_bonus_scale = 0.0008
+growth_gain_fertility_bonus_scale = 0.0006
+salinity_cap_softening = 0.75
+salinity_cap_min_unit = 0.15
+salinity_density_cap_modifier_influence = 0.35
+resistance_density_influence = 0.35
+tolerance_percent_scale = 0.01
+density_establishment_threshold = 0.3
+density_establishment_bonus = 1.15
+density_fragility_base = 1.25
+density_fragility_density_scale = 0.5
+density_growth_pressure_safe_threshold = 0.45
+density_loss_pressure_threshold = 0.55
+density_salinity_overcap_loss_scale = 1.8
+density_modifier_influence = 0.35
+constant_wither_rate_scale = 0.08
+highway_cover_gain_wind_scale = 0.00028
+highway_cover_gain_dust_scale = 0.00045
+
+[modifier_system]
+modifier_channel_limit = 1.0
+factor_weight_limit = 2.5
+factor_bias_limit = 2.0
+camp_comfort_morale_scale = 0.12
+camp_comfort_work_efficiency_scale = 0.06
+
+[device_support]
+water_evaporation_base = 0.0035
+heat_evaporation_multiplier = 0.0075
+
+[camp_durability]
+durability_max = 100.0
+base_wear_per_second = 0.01
+weather_wear_scale = 0.00075
+event_timeline_wear_per_second = 0.04
+peak_event_pressure_total = 30.0
+protection_threshold = 70.0
+delivery_threshold = 50.0
+shared_storage_threshold = 30.0

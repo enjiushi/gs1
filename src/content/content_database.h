@@ -1,5 +1,6 @@
 #pragma once
 
+#include "content/defs/gameplay_tuning_defs.h"
 #include "content/defs/craft_recipe_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/modifier_defs.h"
@@ -21,6 +22,7 @@ namespace gs1
 struct ContentDatabase final
 {
     PrototypeCampaignContent prototype_campaign {};
+    GameplayTuningDef gameplay_tuning {};
     std::vector<ItemDef> item_defs {};
     std::vector<PlantDef> plant_defs {};
     std::vector<StructureDef> structure_defs {};
