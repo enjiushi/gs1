@@ -5,11 +5,13 @@
 #include "content/defs/task_defs.h"
 #include "site/systems/action_execution_system.h"
 #include "site/systems/device_maintenance_system.h"
+#include "site/systems/device_weather_contribution_system.h"
 #include "site/systems/ecology_system.h"
 #include "site/systems/economy_phone_system.h"
 #include "site/systems/inventory_system.h"
 #include "site/systems/local_weather_resolve_system.h"
 #include "site/systems/modifier_system.h"
+#include "site/systems/plant_weather_contribution_system.h"
 #include "site/systems/task_board_system.h"
 #include "site/systems/worker_condition_system.h"
 #include "testing/system_test_registry.h"
@@ -19,6 +21,7 @@ namespace
 {
 using gs1::ActionExecutionSystem;
 using gs1::DeviceMaintenanceSystem;
+using gs1::DeviceWeatherContributionSystem;
 using gs1::EcologySystem;
 using gs1::EconomyPhoneSystem;
 using gs1::GameMessage;
@@ -27,6 +30,7 @@ using gs1::GameMessageType;
 using gs1::InventorySystem;
 using gs1::LocalWeatherResolveSystem;
 using gs1::PhoneListingKind;
+using gs1::PlantWeatherContributionSystem;
 using gs1::SiteRunStartedMessage;
 using gs1::TaskBoardSystem;
 using gs1::TaskRuntimeListKind;
@@ -40,6 +44,23 @@ GameMessage make_message(gs1::GameMessageType type, const Payload& payload)
     message.type = type;
     message.set_payload(payload);
     return message;
+}
+
+void run_local_weather_pipeline(
+    gs1::CampaignState& campaign,
+    gs1::SiteRunState& site_run,
+    GameMessageQueue& queue)
+{
+    auto plant_context =
+        make_site_context<PlantWeatherContributionSystem>(campaign, site_run, queue);
+    auto device_context =
+        make_site_context<DeviceWeatherContributionSystem>(campaign, site_run, queue);
+    auto local_weather_context =
+        make_site_context<LocalWeatherResolveSystem>(campaign, site_run, queue);
+
+    PlantWeatherContributionSystem::run(plant_context);
+    DeviceWeatherContributionSystem::run(device_context);
+    LocalWeatherResolveSystem::run(local_weather_context);
 }
 
 gs1::PhoneListingState* find_listing_by_id(gs1::EconomyState& economy, std::uint32_t listing_id)
@@ -1199,6 +1220,8 @@ void start_task_board_with_owner_snapshots(
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         WorkerConditionSystem::process_message(worker_context, start_message) == GS1_STATUS_OK);
+
+    run_local_weather_pipeline(campaign, site_run, queue);
 
     while (!queue.empty())
     {

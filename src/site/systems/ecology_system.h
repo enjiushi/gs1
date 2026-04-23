@@ -16,6 +16,8 @@ public:
                 SiteComponent::TileLayout,
                 SiteComponent::TileEcology,
                 SiteComponent::TileWeather,
+                SiteComponent::TilePlantWeatherContribution,
+                SiteComponent::TileDeviceWeatherContribution,
                 SiteComponent::Modifier,
                 SiteComponent::Counters,
                 SiteComponent::Objective),

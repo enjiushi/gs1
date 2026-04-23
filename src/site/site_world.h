@@ -44,7 +44,7 @@ public:
         float dust;
     };
 
-    struct TileResolvedContributionData final
+    struct TileWeatherContributionData final
     {
         float heat_protection;
         float wind_protection;
@@ -67,7 +67,8 @@ public:
         TileStaticData static_data;
         TileEcologyData ecology;
         TileLocalWeatherData local_weather;
-        TileResolvedContributionData resolved_contribution;
+        TileWeatherContributionData plant_weather_contribution;
+        TileWeatherContributionData device_weather_contribution;
         TileDeviceData device;
     };
 
@@ -147,10 +148,19 @@ public:
     [[nodiscard]] TileLocalWeatherData tile_local_weather_at_index(std::size_t index) const noexcept;
     void set_tile_local_weather(TileCoord coord, const TileLocalWeatherData& data);
     void set_tile_local_weather_at_index(std::size_t index, const TileLocalWeatherData& data);
-    [[nodiscard]] TileResolvedContributionData tile_resolved_contribution(TileCoord coord) const noexcept;
-    [[nodiscard]] TileResolvedContributionData tile_resolved_contribution_at_index(std::size_t index) const noexcept;
-    void set_tile_resolved_contribution(TileCoord coord, const TileResolvedContributionData& data);
-    void set_tile_resolved_contribution_at_index(std::size_t index, const TileResolvedContributionData& data);
+    [[nodiscard]] TileWeatherContributionData tile_plant_weather_contribution(TileCoord coord) const noexcept;
+    [[nodiscard]] TileWeatherContributionData tile_plant_weather_contribution_at_index(
+        std::size_t index) const noexcept;
+    void set_tile_plant_weather_contribution(TileCoord coord, const TileWeatherContributionData& data);
+    void set_tile_plant_weather_contribution_at_index(std::size_t index, const TileWeatherContributionData& data);
+    [[nodiscard]] TileWeatherContributionData tile_device_weather_contribution(TileCoord coord) const noexcept;
+    [[nodiscard]] TileWeatherContributionData tile_device_weather_contribution_at_index(
+        std::size_t index) const noexcept;
+    void set_tile_device_weather_contribution(TileCoord coord, const TileWeatherContributionData& data);
+    void set_tile_device_weather_contribution_at_index(std::size_t index, const TileWeatherContributionData& data);
+    [[nodiscard]] TileWeatherContributionData tile_total_weather_contribution(TileCoord coord) const noexcept;
+    [[nodiscard]] TileWeatherContributionData tile_total_weather_contribution_at_index(
+        std::size_t index) const noexcept;
     [[nodiscard]] TileDeviceData tile_device(TileCoord coord) const noexcept;
     [[nodiscard]] TileDeviceData tile_device_at_index(std::size_t index) const noexcept;
     void set_tile_device(TileCoord coord, const TileDeviceData& data);
@@ -178,7 +188,7 @@ private:
 GS1_REQUIRE_TRIVIAL(SiteWorld::TileStaticData);
 GS1_REQUIRE_TRIVIAL(SiteWorld::TileEcologyData);
 GS1_REQUIRE_TRIVIAL(SiteWorld::TileLocalWeatherData);
-GS1_REQUIRE_TRIVIAL(SiteWorld::TileResolvedContributionData);
+GS1_REQUIRE_TRIVIAL(SiteWorld::TileWeatherContributionData);
 GS1_REQUIRE_TRIVIAL(SiteWorld::TileDeviceData);
 GS1_REQUIRE_TRIVIAL(SiteWorld::TileData);
 GS1_REQUIRE_TRIVIAL(SiteWorld::WorkerPositionData);

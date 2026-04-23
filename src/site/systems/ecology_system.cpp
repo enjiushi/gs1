@@ -5,6 +5,7 @@
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
 #include "site/tile_footprint.h"
+#include "site/weather_contribution_logic.h"
 
 #include <algorithm>
 #include <cmath>
@@ -130,6 +131,15 @@ float resolve_tunable_factor(float factor, float weight, float bias) noexcept
     return factor * weight + bias;
 }
 
+SiteWorld::TileWeatherContributionData total_weather_contribution(
+    const SiteWorld::TileData& tile) noexcept
+{
+    return clamp_weather_contribution(
+        sum_weather_contributions(
+            tile.plant_weather_contribution,
+            tile.device_weather_contribution));
+}
+
 float compute_salinity_density_cap(
     const SiteWorld::TileEcologyData& ecology,
     const PlantDef& plant_def,
@@ -208,6 +218,7 @@ float compute_next_moisture(
     const TerrainFactorModifierState& factor_modifiers,
     float simulation_dt_minutes) noexcept
 {
+    const auto contribution = total_weather_contribution(tile);
     const float fertility_to_moisture_cap = resolve_tunable_factor(
         k_fertility_to_moisture_cap_factor,
         factor_modifiers.fertility_to_moisture_cap_weight,
@@ -230,7 +241,7 @@ float compute_next_moisture(
         k_meter_scale);
     const float moisture_rate =
         moisture_factor *
-        (tile.resolved_contribution.irrigation -
+        (contribution.irrigation -
             tile.local_weather.heat * heat_to_moisture_factor -
             tile.local_weather.wind * wind_to_moisture_factor);
     return raw_meter_clamp(std::clamp(
@@ -244,6 +255,7 @@ float compute_next_fertility(
     const TerrainFactorModifierState& factor_modifiers,
     float simulation_dt_minutes) noexcept
 {
+    const auto contribution = total_weather_contribution(tile);
     const float salinity_to_fertility_cap = resolve_tunable_factor(
         k_salinity_to_fertility_cap_factor,
         factor_modifiers.salinity_to_fertility_cap_weight,
@@ -266,7 +278,7 @@ float compute_next_fertility(
         k_meter_scale);
     const float fertility_rate =
         fertility_factor *
-        (tile.resolved_contribution.fertility_improve -
+        (contribution.fertility_improve -
             tile.local_weather.wind * wind_to_fertility_factor -
             tile.local_weather.dust * dust_to_fertility_factor);
     return raw_meter_clamp(std::clamp(
@@ -280,6 +292,7 @@ float compute_next_salinity(
     const TerrainFactorModifierState& factor_modifiers,
     float simulation_dt_minutes) noexcept
 {
+    const auto contribution = total_weather_contribution(tile);
     const float salinity_source_factor = resolve_tunable_factor(
         k_salinity_factor,
         factor_modifiers.salinity_source_weight,
@@ -290,7 +303,7 @@ float compute_next_salinity(
         factor_modifiers.salinity_reduction_bias);
     const float salinity_rate =
         (k_salinity_source * salinity_source_factor) -
-        (tile.resolved_contribution.salinity_reduction * salinity_reduction_factor);
+        (contribution.salinity_reduction * salinity_reduction_factor);
     return raw_meter_clamp(std::clamp(
         tile.ecology.soil_salinity + (salinity_rate * simulation_dt_minutes),
         0.0f,

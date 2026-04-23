@@ -2,7 +2,9 @@
 #include "messages/game_message.h"
 #include "site/site_run_state.h"
 #include "site/site_world.h"
+#include "site/systems/device_weather_contribution_system.h"
 #include "site/systems/local_weather_resolve_system.h"
+#include "site/systems/plant_weather_contribution_system.h"
 #include "site/systems/site_system_context.h"
 
 #include <chrono>
@@ -17,10 +19,6 @@ constexpr std::uint32_t kSiteWidth = 32U;
 constexpr std::uint32_t kSiteHeight = 32U;
 constexpr std::size_t kTileCount =
     static_cast<std::size_t>(kSiteWidth) * static_cast<std::size_t>(kSiteHeight);
-constexpr std::size_t kManhattanRadiusTwoCellCount = 13U;
-constexpr std::size_t kTileReadsPerTile = 1U + kManhattanRadiusTwoCellCount;
-constexpr std::size_t kComponentGetsPerTileRead = 15U;
-constexpr std::size_t kComponentSetsPerTileWrite = 15U;
 constexpr double kFixedStepSeconds = 1.0 / 60.0;
 constexpr int kInitialPassIterations = 200;
 constexpr int kSteadyStateIterations = 1000;
@@ -70,6 +68,35 @@ void seed_dense_cover(gs1::SiteRunState& site_run)
     }
 }
 
+void run_local_weather_pipeline(
+    gs1::CampaignState& campaign,
+    gs1::SiteRunState& site_run,
+    gs1::GameMessageQueue& message_queue)
+{
+    auto plant_context = gs1::make_site_system_context<gs1::PlantWeatherContributionSystem>(
+        campaign,
+        site_run,
+        message_queue,
+        kFixedStepSeconds,
+        {});
+    auto device_context = gs1::make_site_system_context<gs1::DeviceWeatherContributionSystem>(
+        campaign,
+        site_run,
+        message_queue,
+        kFixedStepSeconds,
+        {});
+    auto local_weather_context = gs1::make_site_system_context<gs1::LocalWeatherResolveSystem>(
+        campaign,
+        site_run,
+        message_queue,
+        kFixedStepSeconds,
+        {});
+
+    gs1::PlantWeatherContributionSystem::run(plant_context);
+    gs1::DeviceWeatherContributionSystem::run(device_context);
+    gs1::LocalWeatherResolveSystem::run(local_weather_context);
+}
+
 double measure_initial_pass_ms()
 {
     gs1::CampaignState campaign {};
@@ -80,16 +107,10 @@ double measure_initial_pass_ms()
     {
         auto site_run = make_site_run();
         seed_dense_cover(site_run);
-        auto context = gs1::make_site_system_context<gs1::LocalWeatherResolveSystem>(
-            campaign,
-            site_run,
-            message_queue,
-            kFixedStepSeconds,
-            {});
         message_queue.clear();
 
         const auto started = std::chrono::steady_clock::now();
-        gs1::LocalWeatherResolveSystem::run(context);
+        run_local_weather_pipeline(campaign, site_run, message_queue);
         const auto ended = std::chrono::steady_clock::now();
         total_ms +=
             std::chrono::duration<double, std::milli>(ended - started).count();
@@ -104,19 +125,13 @@ double measure_steady_state_pass_ms()
     gs1::GameMessageQueue message_queue {};
     auto site_run = make_site_run();
     seed_dense_cover(site_run);
-    auto context = gs1::make_site_system_context<gs1::LocalWeatherResolveSystem>(
-        campaign,
-        site_run,
-        message_queue,
-        kFixedStepSeconds,
-        {});
 
-    gs1::LocalWeatherResolveSystem::run(context);
+    run_local_weather_pipeline(campaign, site_run, message_queue);
 
     const auto started = std::chrono::steady_clock::now();
     for (int iteration = 0; iteration < kSteadyStateIterations; ++iteration)
     {
-        gs1::LocalWeatherResolveSystem::run(context);
+        run_local_weather_pipeline(campaign, site_run, message_queue);
     }
     const auto ended = std::chrono::steady_clock::now();
 
@@ -127,10 +142,6 @@ double measure_steady_state_pass_ms()
 
 int main()
 {
-    const auto component_gets_per_pass =
-        kTileCount * kTileReadsPerTile * kComponentGetsPerTileRead;
-    const auto component_sets_per_full_write_pass =
-        kTileCount * kComponentSetsPerTileWrite;
     const double initial_pass_ms = measure_initial_pass_ms();
     const double steady_state_pass_ms = measure_steady_state_pass_ms();
     constexpr double kFrameBudgetMs = 1000.0 / 60.0;
@@ -138,10 +149,7 @@ int main()
     std::cout << std::fixed << std::setprecision(3);
     std::cout << "Local weather perf probe\n";
     std::cout << "grid: " << kSiteWidth << "x" << kSiteHeight << " (" << kTileCount << " tiles)\n";
-    std::cout << "estimated full-tile reads per pass: " << (kTileCount * kTileReadsPerTile) << "\n";
-    std::cout << "estimated ECS component gets per pass: " << component_gets_per_pass << "\n";
-    std::cout << "estimated ECS component sets on full rewrite pass: "
-              << component_sets_per_full_write_pass << "\n";
+    std::cout << "pipeline: plant contribution -> device contribution -> local weather resolve\n";
     std::cout << "initial pass avg ms (" << kInitialPassIterations << " runs): "
               << initial_pass_ms << "\n";
     std::cout << "steady-state avg ms (" << kSteadyStateIterations << " runs): "

@@ -18,8 +18,10 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `device_maintenance_system.cpp`: Applies repair/maintenance behavior for site devices and emits device-condition change messages when integrity or occupancy changes, including startup snapshots for task-tracking subscribers.
 - `device_support_system.h`: Device support system interface.
 - `device_support_system.cpp`: Resolves support effects and dependencies for site devices.
+- `device_weather_contribution_system.h`: Device weather contribution system interface.
+- `device_weather_contribution_system.cpp`: Recomputes owner-specific per-tile device weather contributions each frame by iterating sparse device sources and pushing aura plus directional shelter effects onto affected tiles.
 - `ecology_system.h`: Ecology system interface.
-- `ecology_system.cpp`: Updates plants, burial, watering, harvest-density setbacks, broader ecology progression, and highway-target sand-cover accumulation for objective-driven site progress, including the factor/weight/bias-based terrain meter computation that reads resolved tile contribution state and owner-emitted living-plant stability messages for task tracking.
+- `ecology_system.cpp`: Updates plants, burial, watering, harvest-density setbacks, broader ecology progression, and highway-target sand-cover accumulation for objective-driven site progress, including the factor/weight/bias-based terrain meter computation that reads summed plant-plus-device weather contribution state and owner-emitted living-plant stability messages for task tracking.
 - `economy_phone_system.h`: Economy phone system interface.
 - `economy_phone_system.cpp`: Handles phone storefront interactions using content-authored seeded listings and delivery settings, persistent-campaign-cash-backed purchases, plant-listing availability based on the starter-plus-total-reputation unlock track, immediate delivery-crate routing for bought items, owner-confirmed buy/sell completion messages for onboarding-task progress, and task-reward money/unlockable reveal awards routed through message handling.
 - `failure_recovery_system.h`: Failure recovery system interface.
@@ -27,11 +29,13 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `inventory_system.h`: Inventory system interface.
 - `inventory_system.cpp`: Applies item moves, uses, inventory ownership changes, site-start loadout seeding into the delivery crate, harvested-output insertion into the worker pack, immediate delivery-crate insertion with queued overflow retries, tracked worker-pack/device-storage panel open-close requests, and owner-confirmed transfer/use/craft completion messages for onboarding-task progress.
 - `local_weather_resolve_system.h`: Local weather resolve system interface.
-- `local_weather_resolve_system.cpp`: Resolves local weather updates into owned site state, including resolved per-tile support channels for heat/wind/dust/fertility/salinity/irrigation, directional lee-side wind shelter with nonlinear range falloff, plant-tile projection dirties when visible local wind changes, and owner-emitted startup plus live tile state-change messages for task tracking.
+- `local_weather_resolve_system.cpp`: Resolves final local weather each frame from base weather plus owner-specific plant/device contribution channels, marks projected plant tiles dirty when visible wind changes, and emits startup plus live tile state-change messages for task tracking.
 - `modifier_system.h`: Modifier system interface.
 - `modifier_system.cpp`: Applies and expires site modifiers/effects using content-authored nearby-aura and run-modifier preset tables, including task-reward run-modifier awards plus imported campaign assistant/global-modifier technology effects routed through message handling, and resolves terrain factor weights/biases from the active modifier totals.
 - `phone_panel_system.h`: Phone panel system interface.
 - `phone_panel_system.cpp`: Owns phone home/app-panel section state plus tracked phone open-close visibility and authoritative projected phone listings/task counts for the adapter, including completed and claimed history counts.
+- `plant_weather_contribution_system.h`: Plant weather contribution system interface.
+- `plant_weather_contribution_system.cpp`: Recomputes owner-specific per-tile plant weather contributions each frame by iterating sparse plant/ground-cover sources and pushing aura plus directional shelter effects onto affected tiles.
 - `placement_validation_system.h`: Placement validation system interface.
 - `placement_validation_system.cpp`: Validates structure placement requests against tile/world constraints.
 - `site_completion_system.h`: Site completion system interface.

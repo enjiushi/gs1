@@ -71,12 +71,8 @@ void register_site_world_types(flecs::world& world)
     register_component<TileHeat>(world);
     register_component<TileWind>(world);
     register_component<TileDust>(world);
-    register_component<TileHeatProtection>(world);
-    register_component<TileWindProtection>(world);
-    register_component<TileDustProtection>(world);
-    register_component<TileFertilityImprove>(world);
-    register_component<TileSalinityReduction>(world);
-    register_component<TileIrrigation>(world);
+    register_component<TilePlantWeatherContribution>(world);
+    register_component<TileDeviceWeatherContribution>(world);
     register_component<TilePlantSlot>(world);
     register_component<TileGroundCoverSlot>(world);
     register_component<TilePlantDensity>(world);
@@ -158,22 +154,30 @@ SiteWorld::TileLocalWeatherData tile_local_weather_from_entity(flecs::entity ent
         dust.value};
 }
 
-SiteWorld::TileResolvedContributionData tile_resolved_contribution_from_entity(flecs::entity entity)
+SiteWorld::TileWeatherContributionData tile_plant_weather_contribution_from_entity(flecs::entity entity)
 {
-    const auto heat = entity.get<TileHeatProtection>();
-    const auto wind = entity.get<TileWindProtection>();
-    const auto dust = entity.get<TileDustProtection>();
-    const auto fertility = entity.get<TileFertilityImprove>();
-    const auto salinity = entity.get<TileSalinityReduction>();
-    const auto irrigation = entity.get<TileIrrigation>();
+    const auto contribution = entity.get<TilePlantWeatherContribution>();
 
-    return SiteWorld::TileResolvedContributionData {
-        heat.value,
-        wind.value,
-        dust.value,
-        fertility.value,
-        salinity.value,
-        irrigation.value};
+    return SiteWorld::TileWeatherContributionData {
+        contribution.heat_protection,
+        contribution.wind_protection,
+        contribution.dust_protection,
+        contribution.fertility_improve,
+        contribution.salinity_reduction,
+        contribution.irrigation};
+}
+
+SiteWorld::TileWeatherContributionData tile_device_weather_contribution_from_entity(flecs::entity entity)
+{
+    const auto contribution = entity.get<TileDeviceWeatherContribution>();
+
+    return SiteWorld::TileWeatherContributionData {
+        contribution.heat_protection,
+        contribution.wind_protection,
+        contribution.dust_protection,
+        contribution.fertility_improve,
+        contribution.salinity_reduction,
+        contribution.irrigation};
 }
 
 SiteWorld::TileDeviceData tile_device_from_entity(flecs::entity entity)
@@ -196,7 +200,8 @@ SiteWorld::TileData tile_data_from_entity(flecs::entity entity)
         tile_static_from_entity(entity),
         tile_ecology_from_entity(entity),
         tile_local_weather_from_entity(entity),
-        tile_resolved_contribution_from_entity(entity),
+        tile_plant_weather_contribution_from_entity(entity),
+        tile_device_weather_contribution_from_entity(entity),
         SiteWorld::TileDeviceData {StructureId {}, 1.0f, 1.0f, 0.0f}};
 }
 
@@ -206,7 +211,8 @@ SiteWorld::TileData default_tile_data() noexcept
         SiteWorld::TileStaticData {0U, true, true, false},
         SiteWorld::TileEcologyData {50.0f, 50.0f, 0.0f, 0.0f, PlantId {}, 0U, 0.0f, 0.0f},
         SiteWorld::TileLocalWeatherData {0.0f, 0.0f, 0.0f},
-        SiteWorld::TileResolvedContributionData {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f},
+        SiteWorld::TileWeatherContributionData {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f},
+        SiteWorld::TileWeatherContributionData {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f},
         SiteWorld::TileDeviceData {StructureId {}, 1.0f, 1.0f, 0.0f}};
 }
 
@@ -249,17 +255,30 @@ void apply_tile_local_weather_to_entity(
         .set<TileDust>({data.dust});
 }
 
-void apply_tile_resolved_contribution_to_entity(
+void apply_tile_plant_weather_contribution_to_entity(
     flecs::entity entity,
-    const SiteWorld::TileResolvedContributionData& data)
+    const SiteWorld::TileWeatherContributionData& data)
 {
-    entity
-        .set<TileHeatProtection>({data.heat_protection})
-        .set<TileWindProtection>({data.wind_protection})
-        .set<TileDustProtection>({data.dust_protection})
-        .set<TileFertilityImprove>({data.fertility_improve})
-        .set<TileSalinityReduction>({data.salinity_reduction})
-        .set<TileIrrigation>({data.irrigation});
+    entity.set<TilePlantWeatherContribution>({
+        data.heat_protection,
+        data.wind_protection,
+        data.dust_protection,
+        data.fertility_improve,
+        data.salinity_reduction,
+        data.irrigation});
+}
+
+void apply_tile_device_weather_contribution_to_entity(
+    flecs::entity entity,
+    const SiteWorld::TileWeatherContributionData& data)
+{
+    entity.set<TileDeviceWeatherContribution>({
+        data.heat_protection,
+        data.wind_protection,
+        data.dust_protection,
+        data.fertility_improve,
+        data.salinity_reduction,
+        data.irrigation});
 }
 
 void apply_device_to_entity(flecs::entity entity, const SiteWorld::TileDeviceData& data)
@@ -393,12 +412,20 @@ void SiteWorld::initialize(const CreateDesc& desc)
             .set<TileHeat>({initial_tile.local_weather.heat})
             .set<TileWind>({initial_tile.local_weather.wind})
             .set<TileDust>({initial_tile.local_weather.dust})
-            .set<TileHeatProtection>({initial_tile.resolved_contribution.heat_protection})
-            .set<TileWindProtection>({initial_tile.resolved_contribution.wind_protection})
-            .set<TileDustProtection>({initial_tile.resolved_contribution.dust_protection})
-            .set<TileFertilityImprove>({initial_tile.resolved_contribution.fertility_improve})
-            .set<TileSalinityReduction>({initial_tile.resolved_contribution.salinity_reduction})
-            .set<TileIrrigation>({initial_tile.resolved_contribution.irrigation})
+            .set<TilePlantWeatherContribution>({
+                initial_tile.plant_weather_contribution.heat_protection,
+                initial_tile.plant_weather_contribution.wind_protection,
+                initial_tile.plant_weather_contribution.dust_protection,
+                initial_tile.plant_weather_contribution.fertility_improve,
+                initial_tile.plant_weather_contribution.salinity_reduction,
+                initial_tile.plant_weather_contribution.irrigation})
+            .set<TileDeviceWeatherContribution>({
+                initial_tile.device_weather_contribution.heat_protection,
+                initial_tile.device_weather_contribution.wind_protection,
+                initial_tile.device_weather_contribution.dust_protection,
+                initial_tile.device_weather_contribution.fertility_improve,
+                initial_tile.device_weather_contribution.salinity_reduction,
+                initial_tile.device_weather_contribution.irrigation})
             .set<TilePlantSlot>({initial_tile.ecology.plant_id})
             .set<TileGroundCoverSlot>({initial_tile.ecology.ground_cover_type_id})
             .set<TilePlantDensity>({initial_tile.ecology.plant_density})
@@ -638,47 +665,132 @@ void SiteWorld::set_tile_local_weather_at_index(std::size_t index, const TileLoc
         data);
 }
 
-SiteWorld::TileResolvedContributionData SiteWorld::tile_resolved_contribution(TileCoord coord) const noexcept
+SiteWorld::TileWeatherContributionData SiteWorld::tile_plant_weather_contribution(
+    TileCoord coord) const noexcept
 {
     if (!contains(coord))
     {
         return {};
     }
 
-    return tile_resolved_contribution_at_index(tile_index(coord));
+    return tile_plant_weather_contribution_at_index(tile_index(coord));
 }
 
-SiteWorld::TileResolvedContributionData SiteWorld::tile_resolved_contribution_at_index(std::size_t index) const noexcept
+SiteWorld::TileWeatherContributionData SiteWorld::tile_plant_weather_contribution_at_index(
+    std::size_t index) const noexcept
 {
     if (impl_ == nullptr || index >= tile_count())
     {
         return {};
     }
 
-    return tile_resolved_contribution_from_entity(
+    return tile_plant_weather_contribution_from_entity(
         impl_->world.entity(impl_->tile_entity_base + static_cast<flecs::entity_t>(index)));
 }
 
-void SiteWorld::set_tile_resolved_contribution(TileCoord coord, const TileResolvedContributionData& data)
+void SiteWorld::set_tile_plant_weather_contribution(
+    TileCoord coord,
+    const TileWeatherContributionData& data)
 {
     if (!contains(coord))
     {
         return;
     }
 
-    set_tile_resolved_contribution_at_index(tile_index(coord), data);
+    set_tile_plant_weather_contribution_at_index(tile_index(coord), data);
 }
 
-void SiteWorld::set_tile_resolved_contribution_at_index(std::size_t index, const TileResolvedContributionData& data)
+void SiteWorld::set_tile_plant_weather_contribution_at_index(
+    std::size_t index,
+    const TileWeatherContributionData& data)
 {
     if (impl_ == nullptr || index >= tile_count())
     {
         return;
     }
 
-    apply_tile_resolved_contribution_to_entity(
+    apply_tile_plant_weather_contribution_to_entity(
         impl_->world.entity(impl_->tile_entity_base + static_cast<flecs::entity_t>(index)),
         data);
+}
+
+SiteWorld::TileWeatherContributionData SiteWorld::tile_device_weather_contribution(
+    TileCoord coord) const noexcept
+{
+    if (!contains(coord))
+    {
+        return {};
+    }
+
+    return tile_device_weather_contribution_at_index(tile_index(coord));
+}
+
+SiteWorld::TileWeatherContributionData SiteWorld::tile_device_weather_contribution_at_index(
+    std::size_t index) const noexcept
+{
+    if (impl_ == nullptr || index >= tile_count())
+    {
+        return {};
+    }
+
+    return tile_device_weather_contribution_from_entity(
+        impl_->world.entity(impl_->tile_entity_base + static_cast<flecs::entity_t>(index)));
+}
+
+void SiteWorld::set_tile_device_weather_contribution(
+    TileCoord coord,
+    const TileWeatherContributionData& data)
+{
+    if (!contains(coord))
+    {
+        return;
+    }
+
+    set_tile_device_weather_contribution_at_index(tile_index(coord), data);
+}
+
+void SiteWorld::set_tile_device_weather_contribution_at_index(
+    std::size_t index,
+    const TileWeatherContributionData& data)
+{
+    if (impl_ == nullptr || index >= tile_count())
+    {
+        return;
+    }
+
+    apply_tile_device_weather_contribution_to_entity(
+        impl_->world.entity(impl_->tile_entity_base + static_cast<flecs::entity_t>(index)),
+        data);
+}
+
+SiteWorld::TileWeatherContributionData SiteWorld::tile_total_weather_contribution(
+    TileCoord coord) const noexcept
+{
+    if (!contains(coord))
+    {
+        return {};
+    }
+
+    return tile_total_weather_contribution_at_index(tile_index(coord));
+}
+
+SiteWorld::TileWeatherContributionData SiteWorld::tile_total_weather_contribution_at_index(
+    std::size_t index) const noexcept
+{
+    if (impl_ == nullptr || index >= tile_count())
+    {
+        return {};
+    }
+
+    const auto plant = tile_plant_weather_contribution_at_index(index);
+    const auto device = tile_device_weather_contribution_at_index(index);
+    return TileWeatherContributionData {
+        plant.heat_protection + device.heat_protection,
+        plant.wind_protection + device.wind_protection,
+        plant.dust_protection + device.dust_protection,
+        plant.fertility_improve + device.fertility_improve,
+        plant.salinity_reduction + device.salinity_reduction,
+        plant.irrigation + device.irrigation};
 }
 
 SiteWorld::TileDeviceData SiteWorld::tile_device(TileCoord coord) const noexcept
@@ -794,7 +906,8 @@ void SiteWorld::set_tile_at_index(std::size_t index, const TileData& data)
     apply_tile_static_to_entity(entity, data.static_data);
     apply_tile_ecology_to_entity(entity, data.ecology);
     apply_tile_local_weather_to_entity(entity, data.local_weather);
-    apply_tile_resolved_contribution_to_entity(entity, data.resolved_contribution);
+    apply_tile_plant_weather_contribution_to_entity(entity, data.plant_weather_contribution);
+    apply_tile_device_weather_contribution_to_entity(entity, data.device_weather_contribution);
     set_tile_device_at_index(index, data.device);
 }
 
