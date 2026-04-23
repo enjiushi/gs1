@@ -1208,6 +1208,12 @@ body {
   gap: 10px;
 }
 
+.tech-tree-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 .tech-tree-tab {
   border: 1px solid rgba(108, 80, 44, 0.16);
   background: linear-gradient(180deg, rgba(255, 251, 243, 0.94), rgba(231, 216, 193, 0.78));
@@ -1230,9 +1236,239 @@ body {
 }
 
 .tech-tree-tier-stack {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 14px;
+}
+
+.unlock-tier-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(108, 80, 44, 0.16);
+  background:
+    radial-gradient(circle at top left, rgba(255,255,255,0.32), transparent 44%),
+    linear-gradient(180deg, rgba(252, 245, 232, 0.96), rgba(227, 208, 179, 0.9));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.68),
+    0 14px 24px rgba(55, 35, 14, 0.08);
+}
+
+.unlock-tier-card.unlocked {
+  border-color: rgba(94, 123, 80, 0.24);
+  background:
+    radial-gradient(circle at top left, rgba(255,255,255,0.34), transparent 44%),
+    linear-gradient(180deg, rgba(247, 250, 240, 0.98), rgba(220, 232, 205, 0.9));
+}
+
+.unlock-tier-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+}
+
+.unlock-tier-card.locked .unlock-tier-content {
+  opacity: 0.82;
+  filter: saturate(0.74);
+}
+
+.unlock-tier-header,
+.unlockable-entry {
+  position: relative;
+  z-index: 3;
+}
+
+.unlock-tier-header {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.unlock-tier-badge {
+  position: relative;
+  width: 72px;
+  min-width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  border-radius: 24px;
+  border: 1px solid rgba(108, 80, 44, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 251, 244, 0.98), rgba(233, 214, 188, 0.82));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.7),
+    0 10px 18px rgba(55, 35, 14, 0.08);
+}
+
+.unlock-tier-card.unlocked .unlock-tier-badge {
+  border-color: rgba(94, 123, 80, 0.22);
+  background:
+    linear-gradient(180deg, rgba(248, 252, 241, 0.98), rgba(225, 236, 210, 0.82));
+}
+
+.unlock-tier-number {
+  position: relative;
+  z-index: 2;
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  color: rgba(81, 56, 28, 0.92);
+}
+
+.unlock-tier-badge-lock {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: rgba(62, 38, 18, 0.14);
+  color: rgba(255, 246, 234, 0.4);
+}
+
+.unlock-tier-badge-lock .ui-icon-svg {
+  width: 62%;
+  height: 62%;
+}
+
+.unlock-tier-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.unlock-tier-title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(77, 53, 26, 0.88);
+}
+
+.unlock-tier-meta {
+  font-size: 11px;
+  line-height: 1.45;
+  color: rgba(100, 72, 38, 0.76);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.unlockable-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.unlockable-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  text-align: center;
+  padding: 12px 10px;
+  border: 1px solid rgba(108, 80, 44, 0.12);
+  background: rgba(255, 249, 239, 0.58);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.54);
+}
+
+.unlock-tier-card.unlocked .unlockable-entry {
+  border-color: rgba(94, 123, 80, 0.18);
+  background: rgba(246, 251, 240, 0.72);
+}
+
+.unlockable-icon {
+  position: relative;
+  width: 62px;
+  height: 62px;
+  display: grid;
+  place-items: center;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 30% 24%, rgba(255,255,255,0.28), transparent 42%),
+    linear-gradient(180deg, var(--unlock-icon-light, rgba(141, 107, 63, 0.94)), var(--unlock-icon-dark, rgba(82, 57, 31, 0.96)));
+  color: rgba(252, 245, 232, 0.96);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.18),
+    0 10px 18px rgba(55, 35, 14, 0.14);
+}
+
+.unlockable-icon .ui-icon-svg {
+  width: 58%;
+  height: 58%;
+}
+
+.unlockable-lock {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(53, 32, 14, 0.18);
+  backdrop-filter: blur(1px);
+  color: rgba(255, 245, 232, 0.62);
+}
+
+.unlockable-lock .ui-icon-svg {
+  width: 56%;
+  height: 56%;
+}
+
+.unlockable-name {
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 700;
+  color: rgba(76, 53, 27, 0.9);
+}
+
+.unlock-tier-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background:
+    linear-gradient(180deg, rgba(36, 24, 14, 0.18), rgba(23, 15, 10, 0.38));
+  pointer-events: none;
+}
+
+.tech-tree-empty-state {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 24px 20px;
+  border: 1px dashed rgba(104, 77, 43, 0.2);
+  background:
+    linear-gradient(180deg, rgba(255, 250, 241, 0.72), rgba(240, 227, 204, 0.52));
+  color: rgba(82, 58, 29, 0.86);
+}
+
+.tech-tree-empty-kicker {
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(101, 70, 35, 0.58);
+}
+
+.tech-tree-empty-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(63, 40, 18, 0.92);
+}
+
+.tech-tree-empty-copy {
+  font-size: 12px;
+  line-height: 1.55;
+  color: rgba(93, 67, 35, 0.74);
 }
 
 .tech-tier-card {
