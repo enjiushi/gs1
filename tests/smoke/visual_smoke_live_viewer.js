@@ -60,6 +60,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let openedInventoryContainerKey = "";
     let inventoryPanelOpen = true;
     let phonePanelOpen = false;
+    let activeTechTreePanelTabId = "unlockables";
     let phoneBodyScrollTop = 0;
     const phoneSectionScrollTops = {};
     let phonePointerInteractionActive = false;
@@ -414,6 +415,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         compass: [
             '<circle cx="12" cy="12" r="7"></circle>',
             '<path d="m10 14 1.7-4.7L16.5 7.5 14.7 12.3 10 14Z"></path>'
+        ].join(""),
+        lock: [
+            '<rect x="6.5" y="10.5" width="11" height="9.5" rx="2.5"></rect>',
+            '<path d="M9 10.5V8.9a3 3 0 0 1 6 0v1.6"></path>',
+            '<path d="M12 14.3v2.4"></path>'
         ].join("")
     };
     const phoneAppVisuals = {
@@ -2988,6 +2994,240 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return { iconKey: "compass", light: "#8d6b3f", dark: "#52391f" };
     }
 
+    function unlockableIconPresentation(unlockableName) {
+        const name = String(unlockableName || "").toLowerCase();
+        if (name.includes("checkerboard")) {
+            return { iconKey: "grid", light: "#c7a66d", dark: "#7c5c34" };
+        }
+        if (name.includes("wormwood")) {
+            return { iconKey: "reed", light: "#7fa569", dark: "#4b6d41" };
+        }
+        if (name.includes("white thorn")) {
+            return { iconKey: "shrub", light: "#8ca766", dark: "#546b3f" };
+        }
+        if (name.includes("red tamarisk")) {
+            return { iconKey: "cactus", light: "#7a9a72", dark: "#49614b" };
+        }
+        if (name.includes("jiji grass")) {
+            return { iconKey: "reed", light: "#9ab36f", dark: "#617744" };
+        }
+        if (name.includes("sea buckthorn")) {
+            return { iconKey: "shrub", light: "#b59a57", dark: "#745b2f" };
+        }
+        if (name.includes("desert ephedra")) {
+            return { iconKey: "sprout", light: "#88a56f", dark: "#536a47" };
+        }
+        if (name.includes("wolfberry")) {
+            return { iconKey: "vine", light: "#99784d", dark: "#61472b" };
+        }
+        if (name.includes("saxaul")) {
+            return { iconKey: "wood", light: "#b28958", dark: "#714d2e" };
+        }
+        return { iconKey: "sprout", light: "#90a86f", dark: "#596b45" };
+    }
+
+    function parseTechTreeUnlockableTiers(techTreeSetup) {
+        const tiers = [];
+        let parsingUnlockables = false;
+        let activeTier = null;
+
+        (techTreeSetup.elements || []).forEach((element) => {
+            if (!element) {
+                return;
+            }
+
+            const text = String(element.text || "").trim();
+            if (!text) {
+                return;
+            }
+
+            if (text === "Total Reputation Unlocks") {
+                parsingUnlockables = true;
+                activeTier = null;
+                return;
+            }
+
+            if (!parsingUnlockables) {
+                return;
+            }
+
+            if (element.action && element.action.type === "SELECT_TECH_TREE_FACTION_TAB") {
+                parsingUnlockables = false;
+                activeTier = null;
+                return;
+            }
+
+            if (/^Starter Plants$/i.test(text) ||
+                /^Base Tier\b/i.test(text) ||
+                /^Faction Tier\b/i.test(text))
+            {
+                parsingUnlockables = false;
+                activeTier = null;
+                return;
+            }
+
+            if (/^(Base Tech Tree)$/i.test(text) || /^Enhancements\b/i.test(text)) {
+                return;
+            }
+
+            const tierMatch = text.match(/^Global\s+(\d+)\s+Need\s+(-?\d+)\s+(Ready|Locked)$/i);
+            if (tierMatch) {
+                activeTier = {
+                    tierNumber: Number(tierMatch[1]),
+                    requirement: Number(tierMatch[2]),
+                    isUnlocked: /^ready$/i.test(tierMatch[3]),
+                    unlockables: []
+                };
+                tiers.push(activeTier);
+                return;
+            }
+
+            const hasNoAction = !element.action || element.action.type === "NONE";
+            if (!hasNoAction || !activeTier) {
+                return;
+            }
+
+            const unlockableMatch = text.match(/^(.*?)\s+(Ready|Locked)$/i);
+            if (!unlockableMatch) {
+                return;
+            }
+
+            activeTier.unlockables.push({
+                name: unlockableMatch[1].trim(),
+                isUnlocked: /^ready$/i.test(unlockableMatch[2])
+            });
+        });
+
+        return tiers;
+    }
+
+    function renderUnlockablesTabContent(container, unlockableTiers) {
+        const tierStack = document.createElement("div");
+        tierStack.className = "tech-tree-tier-stack";
+        container.appendChild(tierStack);
+
+        if (unlockableTiers.length === 0) {
+            const emptyState = document.createElement("div");
+            emptyState.className = "tech-tree-empty-state";
+
+            const emptyTitle = document.createElement("div");
+            emptyTitle.className = "tech-tree-empty-title";
+            emptyTitle.textContent = "No unlockables projected";
+            emptyState.appendChild(emptyTitle);
+
+            const emptyCopy = document.createElement("div");
+            emptyCopy.className = "tech-tree-empty-copy";
+            emptyCopy.textContent = "Reputation tiers will appear here once the runtime sends them.";
+            emptyState.appendChild(emptyCopy);
+
+            tierStack.appendChild(emptyState);
+            return;
+        }
+
+        unlockableTiers.forEach((tier) => {
+            const tierCard = document.createElement("section");
+            tierCard.className = "unlock-tier-card";
+            tierCard.classList.add(tier.isUnlocked ? "unlocked" : "locked");
+            tierStack.appendChild(tierCard);
+
+            const tierContent = document.createElement("div");
+            tierContent.className = "unlock-tier-content";
+            tierCard.appendChild(tierContent);
+
+            const header = document.createElement("div");
+            header.className = "unlock-tier-header";
+            tierContent.appendChild(header);
+
+            const badge = document.createElement("div");
+            badge.className = "unlock-tier-badge";
+            header.appendChild(badge);
+
+            const badgeNumber = document.createElement("div");
+            badgeNumber.className = "unlock-tier-number";
+            badgeNumber.textContent = String(tier.tierNumber);
+            badge.appendChild(badgeNumber);
+
+            if (!tier.isUnlocked) {
+                const badgeLock = document.createElement("div");
+                badgeLock.className = "unlock-tier-badge-lock";
+                appendUiIcon(badgeLock, "lock");
+                badge.appendChild(badgeLock);
+            }
+
+            const headerCopy = document.createElement("div");
+            headerCopy.className = "unlock-tier-copy";
+            header.appendChild(headerCopy);
+
+            const title = document.createElement("div");
+            title.className = "unlock-tier-title";
+            title.textContent = "Reputation Tier " + tier.tierNumber;
+            headerCopy.appendChild(title);
+
+            const subtitle = document.createElement("div");
+            subtitle.className = "unlock-tier-meta";
+            subtitle.textContent = "Need Total Reputation " + tier.requirement;
+            headerCopy.appendChild(subtitle);
+
+            const unlockableGrid = document.createElement("div");
+            unlockableGrid.className = "unlockable-grid";
+            tierContent.appendChild(unlockableGrid);
+
+            tier.unlockables.forEach((unlockable) => {
+                const entry = document.createElement("article");
+                entry.className = "unlockable-entry";
+                unlockableGrid.appendChild(entry);
+
+                const iconFrame = document.createElement("div");
+                iconFrame.className = "unlockable-icon";
+                const iconPresentation = unlockableIconPresentation(unlockable.name);
+                iconFrame.style.setProperty("--unlock-icon-light", iconPresentation.light);
+                iconFrame.style.setProperty("--unlock-icon-dark", iconPresentation.dark);
+                appendUiIcon(iconFrame, iconPresentation.iconKey);
+                entry.appendChild(iconFrame);
+
+                if (!tier.isUnlocked) {
+                    const iconLock = document.createElement("div");
+                    iconLock.className = "unlockable-lock";
+                    appendUiIcon(iconLock, "lock");
+                    iconFrame.appendChild(iconLock);
+                }
+
+                const entryLabel = document.createElement("div");
+                entryLabel.className = "unlockable-name";
+                entryLabel.textContent = unlockable.name;
+                entry.appendChild(entryLabel);
+            });
+
+            if (!tier.isUnlocked) {
+                const overlay = document.createElement("div");
+                overlay.className = "unlock-tier-overlay";
+                tierCard.appendChild(overlay);
+            }
+        });
+    }
+
+    function renderTechTreeEmptyState(container) {
+        const emptyState = document.createElement("div");
+        emptyState.className = "tech-tree-empty-state";
+        container.appendChild(emptyState);
+
+        const emptyKicker = document.createElement("div");
+        emptyKicker.className = "tech-tree-empty-kicker";
+        emptyKicker.textContent = "Design Pending";
+        emptyState.appendChild(emptyKicker);
+
+        const emptyTitle = document.createElement("div");
+        emptyTitle.className = "tech-tree-empty-title";
+        emptyTitle.textContent = "Tech tree layout coming later";
+        emptyState.appendChild(emptyTitle);
+
+        const emptyCopy = document.createElement("div");
+        emptyCopy.className = "tech-tree-empty-copy";
+        emptyCopy.textContent =
+            "This tab is intentionally empty for now while the structure and interaction design are still being defined.";
+        emptyState.appendChild(emptyCopy);
+    }
+
     function parseTechTreeActionElement(element) {
         if (!element || !element.action) {
             return null;
@@ -3075,11 +3315,20 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         const panelOptions = options || {};
         const closeAction = getTechTreeCloseAction(techTreeSetup);
-        const title = getLabelElements(techTreeSetup)[0];
-        const subtitle = getLabelElements(techTreeSetup)[1];
+        const labelElements = getLabelElements(techTreeSetup);
+        const title = labelElements[0];
+        const subtitle = labelElements[1];
+        const factionSummary = labelElements[2];
         const titleText = title ? title.text : "Prototype Tech Tree";
         const subtitleText = subtitle ? subtitle.text : "Claim nodes with available faction reputation.";
         const summaryParts = splitInfoParts(subtitleText);
+        if (factionSummary && factionSummary.text) {
+            summaryParts.push(factionSummary.text);
+        }
+        const unlockableTiers = parseTechTreeUnlockableTiers(techTreeSetup);
+        if (activeTechTreePanelTabId !== "unlockables" && activeTechTreePanelTabId !== "tech-tree") {
+            activeTechTreePanelTabId = "unlockables";
+        }
 
         setTechTreeOverlayActive(true);
         selectionInventory.hidden = false;
@@ -3089,7 +3338,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         section.className = "inventory-section tech-tree-panel";
         selectionInventory.appendChild(section);
 
-        const actions = getVisibleActionElements(techTreeSetup);
         const header = document.createElement("div");
         header.className = "tech-tree-header";
         section.appendChild(header);
@@ -3124,115 +3372,48 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             summaryRow.className = "tech-tree-summary-row";
             section.appendChild(summaryRow);
 
-            summaryParts.forEach((part, index) => {
+            summaryParts.forEach((part) => {
                 const chip = document.createElement("div");
-                chip.className = "tech-tree-summary-chip" + (index === 0 ? " active-faction" : "");
+                chip.className = "tech-tree-summary-chip";
+                if (/Faction/i.test(part)) {
+                    chip.classList.add("active-faction");
+                }
                 chip.textContent = part;
                 summaryRow.appendChild(chip);
             });
         }
 
-        const tabButtons = actions.filter((element) => element.action && element.action.type === "SELECT_TECH_TREE_FACTION_TAB");
-        if (tabButtons.length > 0) {
-            const tabRow = document.createElement("div");
-            tabRow.className = "tech-tree-tabs";
-            section.appendChild(tabRow);
+        const tabRow = document.createElement("div");
+        tabRow.className = "tech-tree-tabs";
+        section.appendChild(tabRow);
 
-            tabButtons.forEach((element) => {
-                const button = document.createElement("button");
-                button.type = "button";
-                button.className = "tech-tree-tab";
-                if ((element.flags & 1) !== 0) {
-                    button.classList.add("active");
-                }
-                button.textContent = (element.text || "").replace(/^Tab:\s*/, "");
-                bindReliablePrimaryPress(button, function () {
-                    postJson("/ui-action", element.action).catch(() => {
-                        statusChip.textContent = "Failed to switch tech-tree faction.";
-                    });
-                });
-                tabRow.appendChild(button);
+        [
+            { id: "unlockables", label: "Unlockables" },
+            { id: "tech-tree", label: "Tech Tree" }
+        ].forEach((tab) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "tech-tree-tab";
+            if (tab.id === activeTechTreePanelTabId) {
+                button.classList.add("active");
+            }
+            button.textContent = tab.label;
+            bindReliablePrimaryPress(button, function () {
+                activeTechTreePanelTabId = tab.id;
+                renderTechTreePanel(techTreeSetup, panelOptions);
             });
+            tabRow.appendChild(button);
+        });
+
+        const panelBody = document.createElement("div");
+        panelBody.className = "tech-tree-body";
+        section.appendChild(panelBody);
+
+        if (activeTechTreePanelTabId === "unlockables") {
+            renderUnlockablesTabContent(panelBody, unlockableTiers);
+        } else {
+            renderTechTreeEmptyState(panelBody);
         }
-
-        const tierStack = document.createElement("div");
-        tierStack.className = "tech-tree-tier-stack";
-        section.appendChild(tierStack);
-
-        const tierElements = [];
-        let activeTier = null;
-        techTreeSetup.elements.forEach((element) => {
-            if (!element) {
-                return;
-            }
-            if (element.action && element.action.type === "SELECT_TECH_TREE_FACTION_TAB") {
-                return;
-            }
-            if (element.text === titleText || element.text === subtitleText) {
-                return;
-            }
-            if (!element.action || element.action.type === "NONE") {
-                if (/^Tier\s+\d+/i.test(String(element.text || ""))) {
-                    activeTier = {
-                        label: element.text || "Tier",
-                        unlockables: [],
-                        nodes: []
-                    };
-                    tierElements.push(activeTier);
-                } else if (activeTier) {
-                    activeTier.unlockables.push(element.text || "");
-                }
-                return;
-            }
-            if (activeTier) {
-                activeTier.nodes.push(element);
-            }
-        });
-
-        tierElements.forEach((tierElement) => {
-            const tierCard = document.createElement("section");
-            tierCard.className = "tech-tier-card";
-            tierStack.appendChild(tierCard);
-
-            const tierParts = (tierElement.label || "").split("|").map((part) => part.trim()).filter(Boolean);
-            const tierTitle = document.createElement("div");
-            tierTitle.className = "tech-tier-title";
-            tierTitle.textContent = tierParts.length > 0 ? tierParts[0] : "Tier";
-            tierCard.appendChild(tierTitle);
-
-            if (tierParts.length > 1) {
-                const tierMeta = document.createElement("div");
-                tierMeta.className = "tech-tier-meta";
-                tierMeta.textContent = tierParts.slice(1).join("  |  ");
-                tierCard.appendChild(tierMeta);
-            }
-
-            if (tierElement.unlockables.length > 0) {
-                const unlockableList = document.createElement("div");
-                unlockableList.className = "tech-tier-meta";
-                unlockableList.textContent = tierElement.unlockables.join("  |  ");
-                tierCard.appendChild(unlockableList);
-            }
-
-            const tierGrid = document.createElement("div");
-            tierGrid.className = "tech-tier-grid";
-            tierCard.appendChild(tierGrid);
-
-            tierElement.nodes.forEach((element) => {
-                const nodeModel = parseTechTreeActionElement(element);
-                if (!nodeModel) {
-                    return;
-                }
-                tierGrid.appendChild(buildTechTreeNodeButton(nodeModel, "tech-base-card"));
-            });
-
-            if (tierElement.nodes.length === 0) {
-                const placeholder = document.createElement("div");
-                placeholder.className = "tech-base-card tech-placeholder";
-                placeholder.textContent = "No tech nodes";
-                tierGrid.appendChild(placeholder);
-            }
-        });
 
         return true;
     }
