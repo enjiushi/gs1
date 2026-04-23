@@ -14,7 +14,7 @@ External prototype content TOML files loaded by the gameplay DLL at startup.
 - `plants.toml`: Plant authoring content for ecology, shelter, and planting behavior across the full prototype China-desert 10-plant roster.
 - `structures.toml`: Structure authoring content for buildables, storage, crafting stations, and authored resolved-tile support channels such as wind, heat, dust, fertility, salinity, and irrigation output.
 - `craft_recipes.toml`: Craft recipe authoring content for station/output/ingredient mappings.
-- `task_templates.toml`: Authored task generator content for the balanced three-faction site-one task pool, including procedural target/threshold ranges, optional selector hints for runtime-picked item/plant/recipe/structure/action values, and the current zero-reward per-task contract.
+- `task_templates.toml`: Authored task generator content for the balanced three-faction site-one task pool, including procedural target/threshold ranges, optional selector hints for runtime-picked item/plant/recipe/structure/action values, living-plant stability duration tasks, and the current zero-reward per-task contract.
 - `reward_candidates.toml`: Reward candidate content for money, deliveries, unlockable reveals, run modifiers, and reputation rewards.
 - `site_actions.toml`: Site action tuning content for action duration, worker energy/hydration/nourishment costs, placement occupancy, and reservation/approach/movement flags.
 - `modifier_presets.toml`: Modifier preset content for nearby-aura and run-modifier channel totals consumed by the site modifier system.

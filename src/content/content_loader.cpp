@@ -474,6 +474,10 @@ template <typename T>
     {
         return TaskProgressKind::NearbyPopulatedPlantTilesAtLeast;
     }
+    if (field == "KeepAllLivingPlantsNotWitheringForDuration")
+    {
+        return TaskProgressKind::KeepAllLivingPlantsNotWitheringForDuration;
+    }
 
     fail_load(path, line_number, "invalid task progress kind");
 }

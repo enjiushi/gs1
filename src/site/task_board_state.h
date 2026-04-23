@@ -23,6 +23,33 @@ struct TaskRewardDraftOption final
     bool selected {false};
 };
 
+struct TaskTrackedTileState final
+{
+    std::uint32_t plant_type_id {0};
+    std::uint32_t ground_cover_type_id {0};
+    std::uint32_t device_structure_id {0};
+    float plant_density {0.0f};
+    float moisture {0.0f};
+    float heat {0.0f};
+    float dust {0.0f};
+    float wind_protection {0.0f};
+    float heat_protection {0.0f};
+    float dust_protection {0.0f};
+    float device_integrity {0.0f};
+    std::uint8_t populated_neighbor_count {0U};
+    bool populated_by_plant {false};
+};
+
+struct TaskTrackedWorkerState final
+{
+    float health {0.0f};
+    float hydration {0.0f};
+    float nourishment {0.0f};
+    float energy {0.0f};
+    float morale {0.0f};
+    bool valid {false};
+};
+
 struct TaskInstanceState final
 {
     TaskInstanceId task_instance_id {};
@@ -63,12 +90,20 @@ struct TaskChainState final
 struct TaskBoardState final
 {
     std::vector<TaskInstanceState> visible_tasks {};
+    std::vector<TaskTrackedTileState> tracked_tiles {};
     std::vector<TaskInstanceId> accepted_task_ids {};
     std::vector<TaskInstanceId> completed_task_ids {};
     std::vector<TaskInstanceId> claimed_task_ids {};
     std::optional<TaskChainState> active_chain_state {};
     std::uint32_t task_pool_size {0};
     std::uint32_t accepted_task_cap {0};
+    std::uint32_t tracked_tile_width {0};
+    std::uint32_t tracked_tile_height {0};
+    std::uint32_t fully_grown_tile_count {0};
+    std::uint32_t site_completion_tile_threshold {0};
+    std::uint32_t tracked_living_plant_count {0};
     double minutes_until_next_refresh {0.0};
+    TaskTrackedWorkerState worker {};
+    bool all_tracked_living_plants_stable {false};
 };
 }  // namespace gs1

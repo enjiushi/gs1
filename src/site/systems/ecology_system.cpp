@@ -64,6 +64,11 @@ bool has_tile_occupant(PlantId plant_id, std::uint32_t ground_cover_type_id) noe
     return plant_id.value != 0U || ground_cover_type_id != 0U;
 }
 
+bool is_tracked_living_plant(PlantId plant_id) noexcept
+{
+    return plant_id.value != 0U && plant_id.value != k_plant_straw_checkerboard;
+}
+
 float unit_from_raw_meter(float value) noexcept
 {
     return std::clamp(value * k_inverse_meter_scale, 0.0f, 1.0f);
@@ -685,12 +690,84 @@ void update_highway_protection_progress(
     counters.objective_progress_normalized = normalized_progress;
     context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_HUD);
 }
+
+void update_living_plant_stability(
+    SiteSystemContext<EcologySystem>& context,
+    std::uint32_t tracked_living_plant_count,
+    bool any_tracked_plant_withering)
+{
+    auto& counters = context.world.own_counters();
+    const bool all_tracked_plants_stable =
+        tracked_living_plant_count > 0U && !any_tracked_plant_withering;
+    if (counters.tracked_living_plant_count == tracked_living_plant_count &&
+        counters.all_tracked_living_plants_stable == all_tracked_plants_stable)
+    {
+        return;
+    }
+
+    counters.tracked_living_plant_count = tracked_living_plant_count;
+    counters.all_tracked_living_plants_stable = all_tracked_plants_stable;
+
+    std::uint32_t status_flags = LIVING_PLANT_STABILITY_NONE;
+    if (all_tracked_plants_stable)
+    {
+        status_flags |= LIVING_PLANT_STABILITY_ALL_TRACKED_PLANTS_STABLE;
+    }
+    else if (tracked_living_plant_count > 0U && any_tracked_plant_withering)
+    {
+        status_flags |= LIVING_PLANT_STABILITY_ANY_TRACKED_PLANT_WITHERING;
+    }
+
+    GameMessage message {};
+    message.type = GameMessageType::LivingPlantStabilityChanged;
+    message.set_payload(LivingPlantStabilityChangedMessage {
+        tracked_living_plant_count,
+        status_flags});
+    context.message_queue.push_back(message);
+}
+
+void emit_startup_ecology_snapshots(
+    SiteSystemContext<EcologySystem>& context) noexcept
+{
+    if (!context.world.has_world())
+    {
+        return;
+    }
+
+    std::uint32_t fully_grown_count = 0U;
+    std::uint32_t tracked_living_plant_count = 0U;
+    const auto tile_count = context.world.tile_count();
+    for (std::size_t index = 0U; index < tile_count; ++index)
+    {
+        const auto coord = context.world.tile_coord(index);
+        const auto tile = context.world.read_tile_at_index(index);
+        emit_tile_ecology_changed(
+            context,
+            coord,
+            TILE_ECOLOGY_CHANGED_OCCUPANCY |
+                TILE_ECOLOGY_CHANGED_DENSITY |
+                TILE_ECOLOGY_CHANGED_SAND_BURIAL);
+        if (has_tile_occupant(tile.ecology.plant_id, tile.ecology.ground_cover_type_id) &&
+            tile.ecology.plant_density >= k_meter_scale - k_density_epsilon_raw)
+        {
+            ++fully_grown_count;
+        }
+        if (is_tracked_living_plant(tile.ecology.plant_id))
+        {
+            ++tracked_living_plant_count;
+        }
+    }
+
+    update_living_plant_stability(context, tracked_living_plant_count, false);
+    update_restoration_progress(context, fully_grown_count);
+}
 }  // namespace
 
 bool EcologySystem::subscribes_to(GameMessageType type) noexcept
 {
     switch (type)
     {
+    case GameMessageType::SiteRunStarted:
     case GameMessageType::SiteGroundCoverPlaced:
     case GameMessageType::SiteTilePlantingCompleted:
     case GameMessageType::SiteTileWatered:
@@ -707,6 +784,9 @@ Gs1Status EcologySystem::process_message(
 {
     switch (message.type)
     {
+    case GameMessageType::SiteRunStarted:
+        emit_startup_ecology_snapshots(context);
+        break;
     case GameMessageType::SiteGroundCoverPlaced:
     {
         const auto& payload = message.payload_as<SiteGroundCoverPlacedMessage>();
@@ -777,6 +857,8 @@ void EcologySystem::run(SiteSystemContext<EcologySystem>& context)
     const float simulation_dt_minutes = static_cast<float>(
         runtime_minutes_from_real_seconds(context.fixed_step_seconds));
     std::uint32_t fully_grown_count = 0U;
+    std::uint32_t tracked_living_plant_count = 0U;
+    bool any_tracked_plant_withering = false;
     float highway_cover_sum = 0.0f;
     std::uint32_t highway_tile_count = 0U;
 
@@ -784,6 +866,7 @@ void EcologySystem::run(SiteSystemContext<EcologySystem>& context)
     for (std::size_t index = 0; index < tile_count; ++index)
     {
         auto tile = context.world.read_tile_at_index(index);
+        const auto previous_tile = tile;
         const auto coord = context.world.tile_coord(index);
         const bool is_highway_target =
             objective.type == SiteObjectiveType::HighwayProtection &&
@@ -900,6 +983,21 @@ void EcologySystem::run(SiteSystemContext<EcologySystem>& context)
             emit_tile_ecology_changed(context, coord, changed_mask);
         }
 
+        if (is_tracked_living_plant(previous_tile.ecology.plant_id))
+        {
+            if (!is_tracked_living_plant(tile.ecology.plant_id) ||
+                tile.ecology.plant_id != previous_tile.ecology.plant_id ||
+                tile.ecology.plant_density < previous_tile.ecology.plant_density - k_density_epsilon_raw)
+            {
+                any_tracked_plant_withering = true;
+            }
+        }
+
+        if (is_tracked_living_plant(tile.ecology.plant_id))
+        {
+            ++tracked_living_plant_count;
+        }
+
         if (has_tile_occupant(tile.ecology.plant_id, tile.ecology.ground_cover_type_id) &&
             tile.ecology.plant_density >= k_meter_scale - k_density_epsilon_raw)
         {
@@ -913,10 +1011,18 @@ void EcologySystem::run(SiteSystemContext<EcologySystem>& context)
             highway_tile_count == 0U
             ? 0.0f
             : (highway_cover_sum / static_cast<float>(highway_tile_count));
+        update_living_plant_stability(
+            context,
+            tracked_living_plant_count,
+            any_tracked_plant_withering);
         update_highway_protection_progress(context, average_cover);
         return;
     }
 
+    update_living_plant_stability(
+        context,
+        tracked_living_plant_count,
+        any_tracked_plant_withering);
     update_restoration_progress(context, fully_grown_count);
 }
 }  // namespace gs1

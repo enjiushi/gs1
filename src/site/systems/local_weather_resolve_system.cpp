@@ -591,7 +591,8 @@ namespace gs1
 {
 bool LocalWeatherResolveSystem::subscribes_to(GameMessageType type) noexcept
 {
-    return type == GameMessageType::TileEcologyChanged ||
+    return type == GameMessageType::SiteRunStarted ||
+        type == GameMessageType::TileEcologyChanged ||
         type == GameMessageType::SiteDevicePlaced ||
         type == GameMessageType::SiteDeviceBroken ||
         type == GameMessageType::SiteDeviceRepaired;
@@ -608,6 +609,18 @@ Gs1Status LocalWeatherResolveSystem::process_message(
 
     auto& runtime = context.world.own_local_weather_runtime();
     ensure_local_weather_runtime_buffers(runtime, context.world.tile_count());
+
+    if (message.type == GameMessageType::SiteRunStarted)
+    {
+        const auto tile_count = context.world.tile_count();
+        for (std::size_t index = 0U; index < tile_count; ++index)
+        {
+            const auto coord = context.world.tile_coord(index);
+            const auto tile = context.world.read_tile_at_index(index);
+            emit_site_tile_state_changed(context, coord, tile, true, true);
+        }
+        return GS1_STATUS_OK;
+    }
 
     if (message.type == GameMessageType::TileEcologyChanged)
     {

@@ -14,15 +14,9 @@ public:
             "TaskBoardSystem",
             site_component_mask_of(
                 SiteComponent::TaskBoard,
-                SiteComponent::TileEcology,
-                SiteComponent::TileWeather,
-                SiteComponent::DeviceCondition,
-                SiteComponent::DeviceRuntime,
-                SiteComponent::WorkerNeeds,
+                SiteComponent::TileLayout,
                 SiteComponent::Counters,
-                SiteComponent::Objective,
-                SiteComponent::Economy,
-                SiteComponent::Modifier),
+                SiteComponent::Objective),
             site_component_mask_of(SiteComponent::TaskBoard)};
     }
 

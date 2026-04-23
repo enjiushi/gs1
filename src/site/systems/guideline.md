@@ -15,11 +15,11 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `craft_system.h`: Craft system interface.
 - `craft_system.cpp`: Handles crafting progress, completion, and crafting-related state updates.
 - `device_maintenance_system.h`: Device maintenance system interface.
-- `device_maintenance_system.cpp`: Applies repair/maintenance behavior for site devices and emits device-condition change messages when integrity or occupancy changes.
+- `device_maintenance_system.cpp`: Applies repair/maintenance behavior for site devices and emits device-condition change messages when integrity or occupancy changes, including startup snapshots for task-tracking subscribers.
 - `device_support_system.h`: Device support system interface.
 - `device_support_system.cpp`: Resolves support effects and dependencies for site devices.
 - `ecology_system.h`: Ecology system interface.
-- `ecology_system.cpp`: Updates plants, burial, watering, broader ecology progression, and highway-target sand-cover accumulation for objective-driven site progress, including the factor/weight/bias-based terrain meter computation that reads resolved tile contribution state.
+- `ecology_system.cpp`: Updates plants, burial, watering, broader ecology progression, and highway-target sand-cover accumulation for objective-driven site progress, including the factor/weight/bias-based terrain meter computation that reads resolved tile contribution state and owner-emitted living-plant stability messages for task tracking.
 - `economy_phone_system.h`: Economy phone system interface.
 - `economy_phone_system.cpp`: Handles phone storefront interactions using content-authored seeded listings and delivery settings, persistent-campaign-cash-backed purchases, plant-listing availability based on the starter-plus-total-reputation unlock track, immediate delivery-crate routing for bought items, owner-confirmed buy/sell completion messages for onboarding-task progress, and task-reward money/unlockable reveal awards routed through message handling.
 - `failure_recovery_system.h`: Failure recovery system interface.
@@ -27,7 +27,7 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `inventory_system.h`: Inventory system interface.
 - `inventory_system.cpp`: Applies item moves, uses, inventory ownership changes, site-start loadout seeding into the delivery crate, immediate delivery-crate insertion with queued overflow retries, tracked worker-pack/device-storage panel open-close requests, and owner-confirmed transfer/use/craft completion messages for onboarding-task progress.
 - `local_weather_resolve_system.h`: Local weather resolve system interface.
-- `local_weather_resolve_system.cpp`: Resolves local weather updates into owned site state, including resolved per-tile support channels for heat/wind/dust/fertility/salinity/irrigation, directional lee-side wind shelter with nonlinear range falloff, plant-tile projection dirties when visible local wind changes, and owner-emitted tile state-change messages for task tracking.
+- `local_weather_resolve_system.cpp`: Resolves local weather updates into owned site state, including resolved per-tile support channels for heat/wind/dust/fertility/salinity/irrigation, directional lee-side wind shelter with nonlinear range falloff, plant-tile projection dirties when visible local wind changes, and owner-emitted startup plus live tile state-change messages for task tracking.
 - `modifier_system.h`: Modifier system interface.
 - `modifier_system.cpp`: Applies and expires site modifiers/effects using content-authored nearby-aura and run-modifier preset tables, including task-reward run-modifier awards plus imported campaign assistant/global-modifier technology effects routed through message handling, and resolves terrain factor weights/biases from the active modifier totals.
 - `phone_panel_system.h`: Phone panel system interface.
@@ -42,8 +42,8 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `site_time_system.cpp`: Owns fixed-step-derived site clock, day index, and day-phase advancement.
 - `site_system_context.h`: Shared dependency bundle passed into site systems.
 - `task_board_system.h`: Task board system interface.
-- `task_board_system.cpp`: Manages board listings, acceptance, eligibility-filtered three-faction task-generator seeding, per-instance procedural resolution of x/y/z task values from authored ranges and eligible pools, subscribed progress tracking from owner-emitted buy/sell/transfer/plant/craft/build and worker/tile/device state messages, duration accumulation over those subscribed conditions, reward-claim no-ops for the current zero-reward contract, and reset flow on dense-restoration site one.
+- `task_board_system.cpp`: Manages board listings, acceptance, eligibility-filtered three-faction task-generator seeding, per-instance procedural resolution of x/y/z task values from authored ranges and eligible pools, task-owned mirror caches fed only by owner-emitted buy/sell/transfer/plant/craft/build and worker/tile/device/living-plant-stability state messages, duration accumulation over those subscribed conditions, message-driven living-plant non-withering checks, reward-claim no-ops for the current zero-reward contract, and reset flow on dense-restoration site one.
 - `weather_event_system.h`: Weather event system interface.
 - `weather_event_system.cpp`: Applies site-owned weather/event state changes, including authored default-weather baselines, start/peak/end timeline interpolation for additive event pressure, and recurring one-sided highway-protection waves.
 - `worker_condition_system.h`: Worker condition system interface.
-- `worker_condition_system.cpp`: Resolves worker condition from previous-frame state plus accumulated frame deltas, recomputes derived energy-cap and work-efficiency snapshots, and applies passive environment-driven meter loss with shelter softening.
+- `worker_condition_system.cpp`: Resolves worker condition from previous-frame state plus accumulated frame deltas, recomputes derived energy-cap and work-efficiency snapshots, applies passive environment-driven meter loss with shelter softening, and emits startup worker-meter snapshots for task tracking.

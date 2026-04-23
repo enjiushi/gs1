@@ -70,8 +70,10 @@ struct SiteCounters final
 {
     std::uint32_t fully_grown_tile_count {0};
     std::uint32_t site_completion_tile_threshold {0};
+    std::uint32_t tracked_living_plant_count {0};
     float objective_progress_normalized {0.0f};
     float highway_average_sand_cover {0.0f};
+    bool all_tracked_living_plants_stable {false};
 };
 
 struct ProjectedSiteTileState final

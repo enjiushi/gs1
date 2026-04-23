@@ -350,13 +350,20 @@ SiteWorld::WorkerConditionData resolve_worker_conditions(
 
 bool WorkerConditionSystem::subscribes_to(GameMessageType type) noexcept
 {
-    return type == GameMessageType::WorkerMeterDeltaRequested;
+    return type == GameMessageType::SiteRunStarted ||
+        type == GameMessageType::WorkerMeterDeltaRequested;
 }
 
 Gs1Status WorkerConditionSystem::process_message(
     SiteSystemContext<WorkerConditionSystem>& context,
     const GameMessage& message)
 {
+    if (message.type == GameMessageType::SiteRunStarted)
+    {
+        emit_worker_meters_changed_if_needed(context);
+        return GS1_STATUS_OK;
+    }
+
     if (message.type != GameMessageType::WorkerMeterDeltaRequested)
     {
         return GS1_STATUS_OK;

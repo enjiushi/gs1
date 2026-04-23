@@ -1,10 +1,14 @@
 #include "messages/game_message.h"
+#include "content/defs/plant_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/faction_defs.h"
 #include "content/defs/task_defs.h"
 #include "site/systems/action_execution_system.h"
+#include "site/systems/device_maintenance_system.h"
+#include "site/systems/ecology_system.h"
 #include "site/systems/economy_phone_system.h"
 #include "site/systems/inventory_system.h"
+#include "site/systems/local_weather_resolve_system.h"
 #include "site/systems/modifier_system.h"
 #include "site/systems/task_board_system.h"
 #include "site/systems/worker_condition_system.h"
@@ -14,11 +18,14 @@
 namespace
 {
 using gs1::ActionExecutionSystem;
+using gs1::DeviceMaintenanceSystem;
+using gs1::EcologySystem;
 using gs1::EconomyPhoneSystem;
 using gs1::GameMessage;
 using gs1::GameMessageQueue;
 using gs1::GameMessageType;
 using gs1::InventorySystem;
+using gs1::LocalWeatherResolveSystem;
 using gs1::PhoneListingKind;
 using gs1::SiteRunStartedMessage;
 using gs1::TaskBoardSystem;
@@ -1163,6 +1170,49 @@ void complete_seeded_task(
                     1.0f})) == GS1_STATUS_OK);
 }
 
+void start_task_board_with_owner_snapshots(
+    gs1::testing::SystemTestExecutionContext& context,
+    gs1::CampaignState& campaign,
+    gs1::SiteRunState& site_run,
+    GameMessageQueue& queue,
+    gs1::SiteSystemContext<gs1::TaskBoardSystem>& task_context)
+{
+    auto ecology_context = make_site_context<EcologySystem>(campaign, site_run, queue);
+    auto local_weather_context = make_site_context<LocalWeatherResolveSystem>(campaign, site_run, queue);
+    auto device_context = make_site_context<DeviceMaintenanceSystem>(campaign, site_run, queue);
+    auto worker_context = make_site_context<WorkerConditionSystem>(campaign, site_run, queue);
+
+    const auto start_message =
+        make_message(GameMessageType::SiteRunStarted, SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_message(task_context, start_message) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        EcologySystem::process_message(ecology_context, start_message) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        LocalWeatherResolveSystem::process_message(local_weather_context, start_message) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        DeviceMaintenanceSystem::process_message(device_context, start_message) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        WorkerConditionSystem::process_message(worker_context, start_message) == GS1_STATUS_OK);
+
+    while (!queue.empty())
+    {
+        const auto message = queue.front();
+        queue.pop_front();
+        if (TaskBoardSystem::subscribes_to(message.type))
+        {
+            GS1_SYSTEM_TEST_REQUIRE(
+                context,
+                TaskBoardSystem::process_message(task_context, message) == GS1_STATUS_OK);
+        }
+    }
+}
+
 void task_board_site_run_started_seeds_site_one_board(gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
@@ -1171,27 +1221,32 @@ void task_board_site_run_started_seeds_site_one_board(gs1::testing::SystemTestEx
     auto site_context = make_site_context<TaskBoardSystem>(campaign, site_run, queue);
 
     site_run.counters.site_completion_tile_threshold = 5U;
-    site_run.counters.fully_grown_tile_count = 2U;
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        TaskBoardSystem::process_message(
-            site_context,
-            make_message(
-                GameMessageType::SiteRunStarted,
-                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+    auto grown_tile_a = site_run.site_world->tile_at({2, 2});
+    grown_tile_a.ecology.plant_id = gs1::PlantId {gs1::k_plant_ordos_wormwood};
+    grown_tile_a.ecology.plant_density = 100.0f;
+    site_run.site_world->set_tile({2, 2}, grown_tile_a);
 
-    GS1_SYSTEM_TEST_REQUIRE(context, site_run.task_board.visible_tasks.size() == 25U);
-    const auto& task = site_run.task_board.visible_tasks.front();
-    GS1_SYSTEM_TEST_CHECK(context, task.target_amount == 5U);
-    GS1_SYSTEM_TEST_CHECK(context, task.current_progress_amount == 2U);
-    GS1_SYSTEM_TEST_CHECK(context, task.runtime_list_kind == TaskRuntimeListKind::Visible);
-    GS1_SYSTEM_TEST_CHECK(context, task.reward_draft_options.empty());
+    auto grown_tile_b = site_run.site_world->tile_at({3, 2});
+    grown_tile_b.ecology.plant_id = gs1::PlantId {gs1::k_plant_white_thorn};
+    grown_tile_b.ecology.plant_density = 100.0f;
+    site_run.site_world->set_tile({3, 2}, grown_tile_b);
+
+    start_task_board_with_owner_snapshots(context, campaign, site_run, queue, site_context);
+
+    GS1_SYSTEM_TEST_REQUIRE(context, site_run.task_board.visible_tasks.size() == 26U);
+    auto* task =
+        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_restore_patch);
+    GS1_SYSTEM_TEST_REQUIRE(context, task != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, task->target_amount == 5U);
+    GS1_SYSTEM_TEST_CHECK(context, task->current_progress_amount == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, task->runtime_list_kind == TaskRuntimeListKind::Visible);
+    GS1_SYSTEM_TEST_CHECK(context, task->reward_draft_options.empty());
     GS1_SYSTEM_TEST_CHECK(
         context,
         count_tasks_by_faction(site_run.task_board, gs1::k_faction_village_committee) == 8U);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        count_tasks_by_faction(site_run.task_board, gs1::k_faction_forestry_bureau) == 9U);
+        count_tasks_by_faction(site_run.task_board, gs1::k_faction_forestry_bureau) == 10U);
     GS1_SYSTEM_TEST_CHECK(
         context,
         count_tasks_by_faction(site_run.task_board, gs1::k_faction_agricultural_university) == 8U);
@@ -1238,13 +1293,7 @@ void task_board_accept_respects_cap_and_list_kind(gs1::testing::SystemTestExecut
     GameMessageQueue queue {};
     auto site_context = make_site_context<TaskBoardSystem>(campaign, site_run, queue);
 
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        TaskBoardSystem::process_message(
-            site_context,
-            make_message(
-                GameMessageType::SiteRunStarted,
-                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+    start_task_board_with_owner_snapshots(context, campaign, site_run, queue, site_context);
 
     const auto task_id = site_run.task_board.visible_tasks.front().task_instance_id.value;
     GS1_SYSTEM_TEST_REQUIRE(
@@ -1279,13 +1328,7 @@ void task_board_completion_does_not_queue_faction_reputation(
     auto site_context = make_site_context<TaskBoardSystem>(campaign, site_run, queue);
 
     site_run.counters.site_completion_tile_threshold = 2U;
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        TaskBoardSystem::process_message(
-            site_context,
-            make_message(
-                GameMessageType::SiteRunStarted,
-                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+    start_task_board_with_owner_snapshots(context, campaign, site_run, queue, site_context);
 
     const auto task_id = site_run.task_board.visible_tasks.front().task_instance_id.value;
     complete_seeded_task(context, site_context, site_run, queue);
@@ -1326,9 +1369,7 @@ void task_board_buy_task_completes_from_successful_purchase(
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         EconomyPhoneSystem::process_message(economy_context, start_message) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        TaskBoardSystem::process_message(task_context, start_message) == GS1_STATUS_OK);
+    start_task_board_with_owner_snapshots(context, campaign, site_run, queue, task_context);
 
     auto* buy_task =
         find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_buy_water);
@@ -1393,9 +1434,7 @@ void task_board_transfer_task_completes_from_successful_transfer(
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         InventorySystem::process_message(inventory_context, start_message) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        TaskBoardSystem::process_message(task_context, start_message) == GS1_STATUS_OK);
+    start_task_board_with_owner_snapshots(context, campaign, site_run, queue, task_context);
 
     auto* transfer_task =
         find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_transfer_seeds);
@@ -1471,11 +1510,7 @@ void task_board_build_task_completes_from_device_placement(
     GameMessageQueue queue {};
     auto task_context = make_site_context<TaskBoardSystem>(campaign, site_run, queue);
 
-    const auto start_message =
-        make_message(GameMessageType::SiteRunStarted, SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        TaskBoardSystem::process_message(task_context, start_message) == GS1_STATUS_OK);
+    start_task_board_with_owner_snapshots(context, campaign, site_run, queue, task_context);
 
     auto* build_task =
         find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_build_camp_stove);
@@ -1519,11 +1554,7 @@ void task_board_worker_meter_duration_task_tracks_time_and_resets(
     GameMessageQueue queue {};
     auto task_context = make_site_context<TaskBoardSystem>(campaign, site_run, queue);
 
-    const auto start_message =
-        make_message(GameMessageType::SiteRunStarted, SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        TaskBoardSystem::process_message(task_context, start_message) == GS1_STATUS_OK);
+    start_task_board_with_owner_snapshots(context, campaign, site_run, queue, task_context);
 
     auto* meter_task =
         find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_keep_worker_meters_high);
@@ -1600,6 +1631,120 @@ void task_board_worker_meter_duration_task_tracks_time_and_resets(
     GS1_SYSTEM_TEST_CHECK(context, meter_task->runtime_list_kind == TaskRuntimeListKind::Completed);
 }
 
+void task_board_living_plant_duration_task_ignores_straw_and_resets_on_density_drop(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 1009U);
+    GameMessageQueue queue {};
+    auto task_context = make_site_context<TaskBoardSystem>(campaign, site_run, queue);
+    auto ecology_context = make_site_context<EcologySystem>(campaign, site_run, queue);
+
+    start_task_board_with_owner_snapshots(context, campaign, site_run, queue, task_context);
+
+    auto* plant_task =
+        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_keep_living_plants_stable);
+    GS1_SYSTEM_TEST_REQUIRE(context, plant_task != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_message(
+            task_context,
+            make_message(
+                GameMessageType::TaskAcceptRequested,
+                gs1::TaskAcceptRequestedMessage {plant_task->task_instance_id.value})) == GS1_STATUS_OK);
+
+    auto first_tile = site_run.site_world->tile_at({2, 2});
+    first_tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_ordos_wormwood};
+    first_tile.ecology.plant_density = 36.0f;
+    first_tile.ecology.moisture = 100.0f;
+    first_tile.ecology.soil_fertility = 100.0f;
+    first_tile.ecology.soil_salinity = 0.0f;
+    site_run.site_world->set_tile({2, 2}, first_tile);
+
+    auto second_tile = site_run.site_world->tile_at({3, 2});
+    second_tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_white_thorn};
+    second_tile.ecology.plant_density = 34.0f;
+    second_tile.ecology.moisture = 100.0f;
+    second_tile.ecology.soil_fertility = 100.0f;
+    second_tile.ecology.soil_salinity = 0.0f;
+    site_run.site_world->set_tile({3, 2}, second_tile);
+
+    auto straw_tile = site_run.site_world->tile_at({4, 2});
+    straw_tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_straw_checkerboard};
+    straw_tile.ecology.plant_density = 100.0f;
+    straw_tile.ecology.moisture = 100.0f;
+    straw_tile.ecology.soil_fertility = 100.0f;
+    site_run.site_world->set_tile({4, 2}, straw_tile);
+
+    auto drain_task_messages = [&]() {
+        while (!queue.empty())
+        {
+            const auto message = queue.front();
+            queue.pop_front();
+            if (TaskBoardSystem::subscribes_to(message.type))
+            {
+                GS1_SYSTEM_TEST_REQUIRE(
+                    context,
+                    TaskBoardSystem::process_message(task_context, message) == GS1_STATUS_OK);
+            }
+        }
+    };
+
+    for (std::uint32_t index = 0U; index < 3U; ++index)
+    {
+        EcologySystem::run(ecology_context);
+        drain_task_messages();
+        TaskBoardSystem::run(task_context);
+    }
+
+    plant_task =
+        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_keep_living_plants_stable);
+    GS1_SYSTEM_TEST_REQUIRE(context, plant_task != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, plant_task->current_progress_amount >= 1U);
+    GS1_SYSTEM_TEST_CHECK(context, plant_task->runtime_list_kind == TaskRuntimeListKind::Accepted);
+
+    first_tile = site_run.site_world->tile_at({2, 2});
+    first_tile.ecology.moisture = 0.0f;
+    first_tile.ecology.soil_fertility = 0.0f;
+    first_tile.local_weather.heat = 100.0f;
+    first_tile.local_weather.wind = 100.0f;
+    first_tile.local_weather.dust = 100.0f;
+    site_run.site_world->set_tile({2, 2}, first_tile);
+    EcologySystem::run(ecology_context);
+    drain_task_messages();
+    TaskBoardSystem::run(task_context);
+
+    plant_task =
+        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_keep_living_plants_stable);
+    GS1_SYSTEM_TEST_REQUIRE(context, plant_task != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, plant_task->current_progress_amount == 0U);
+    GS1_SYSTEM_TEST_CHECK(context, plant_task->runtime_list_kind == TaskRuntimeListKind::Accepted);
+
+    first_tile = site_run.site_world->tile_at({2, 2});
+    first_tile.ecology.moisture = 100.0f;
+    first_tile.ecology.soil_fertility = 100.0f;
+    first_tile.local_weather.heat = 0.0f;
+    first_tile.local_weather.wind = 0.0f;
+    first_tile.local_weather.dust = 0.0f;
+    site_run.site_world->set_tile({2, 2}, first_tile);
+
+    straw_tile = site_run.site_world->tile_at({4, 2});
+    straw_tile.ecology.plant_density = 92.0f;
+    site_run.site_world->set_tile({4, 2}, straw_tile);
+
+    for (std::uint32_t index = 0U; index < plant_task->target_amount + 1U; ++index)
+    {
+        EcologySystem::run(ecology_context);
+        drain_task_messages();
+        TaskBoardSystem::run(task_context);
+    }
+
+    plant_task =
+        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_keep_living_plants_stable);
+    GS1_SYSTEM_TEST_REQUIRE(context, plant_task != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, plant_task->runtime_list_kind == TaskRuntimeListKind::Completed);
+}
+
 void task_board_reward_claim_is_ignored_without_draft_options(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -1608,11 +1753,7 @@ void task_board_reward_claim_is_ignored_without_draft_options(
     GameMessageQueue queue {};
     auto task_context = make_site_context<TaskBoardSystem>(campaign, site_run, queue);
 
-    const auto start_message =
-        make_message(GameMessageType::SiteRunStarted, SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        TaskBoardSystem::process_message(task_context, start_message) == GS1_STATUS_OK);
+    start_task_board_with_owner_snapshots(context, campaign, site_run, queue, task_context);
 
     const auto task_id = site_run.task_board.visible_tasks.front().task_instance_id.value;
     complete_seeded_task(context, task_context, site_run, queue);
@@ -1727,6 +1868,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "task_board",
     "worker_meter_duration_task_tracks_time_and_resets",
     task_board_worker_meter_duration_task_tracks_time_and_resets);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "task_board",
+    "living_plant_duration_task_ignores_straw_and_resets_on_density_drop",
+    task_board_living_plant_duration_task_ignores_straw_and_resets_on_density_drop);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "task_board",
     "reward_claim_is_ignored_without_draft_options",

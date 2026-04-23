@@ -40,7 +40,8 @@ enum class TaskProgressKind : std::uint32_t
     PlantHeatProtectionAtLeast = 24,
     PlantDustProtectionAtLeast = 25,
     KeepAllDevicesIntegrityAboveForDuration = 26,
-    NearbyPopulatedPlantTilesAtLeast = 27
+    NearbyPopulatedPlantTilesAtLeast = 27,
+    KeepAllLivingPlantsNotWitheringForDuration = 28
 };
 
 struct TaskTemplateDef final
@@ -75,6 +76,7 @@ inline constexpr std::uint32_t k_task_template_site1_consume_supply = 7U;
 inline constexpr std::uint32_t k_task_template_site1_build_camp_stove = 34U;
 inline constexpr std::uint32_t k_task_template_site1_keep_worker_meters_high = 22U;
 inline constexpr std::uint32_t k_task_template_site1_keep_devices_healthy = 38U;
+inline constexpr std::uint32_t k_task_template_site1_keep_living_plants_stable = 39U;
 
 [[nodiscard]] std::span<const TaskTemplateDef> all_task_template_defs() noexcept;
 [[nodiscard]] const TaskTemplateDef* find_task_template_def(TaskTemplateId task_template_id) noexcept;

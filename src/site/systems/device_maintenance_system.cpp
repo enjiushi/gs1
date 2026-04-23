@@ -52,7 +52,8 @@ void emit_device_condition_changed_message(
 
 bool DeviceMaintenanceSystem::subscribes_to(GameMessageType type) noexcept
 {
-    return type == GameMessageType::SiteDevicePlaced ||
+    return type == GameMessageType::SiteRunStarted ||
+        type == GameMessageType::SiteDevicePlaced ||
         type == GameMessageType::SiteDeviceRepaired;
 }
 
@@ -60,6 +61,26 @@ Gs1Status DeviceMaintenanceSystem::process_message(
     SiteSystemContext<DeviceMaintenanceSystem>& context,
     const GameMessage& message)
 {
+    if (message.type == GameMessageType::SiteRunStarted)
+    {
+        const auto tile_count = context.world.tile_count();
+        for (std::size_t index = 0U; index < tile_count; ++index)
+        {
+            const auto tile = context.world.read_tile_at_index(index);
+            if (tile.device.structure_id.value == 0U)
+            {
+                continue;
+            }
+
+            emit_device_condition_changed_message(
+                context.message_queue,
+                context.world.tile_coord(index),
+                tile.device.structure_id,
+                tile.device.device_integrity);
+        }
+        return GS1_STATUS_OK;
+    }
+
     if (message.type == GameMessageType::SiteDeviceRepaired)
     {
         const auto& payload = message.payload_as<SiteDeviceRepairedMessage>();

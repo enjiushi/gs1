@@ -498,3 +498,23 @@ threshold_value_min = 50.0
 threshold_value_max = 80.0
 completion_faction_reputation_delta = 0
 
+[[task_templates]]
+task_template_id = 39
+publisher_faction_id = 2
+task_tier_id = 2
+progress_kind = "KeepAllLivingPlantsNotWitheringForDuration"
+target_amount_min = 4
+target_amount_max = 4
+required_count_min = 2
+required_count_max = 2
+item_id = 0
+plant_id = 0
+recipe_id = 0
+structure_id = 0
+secondary_structure_id = 0
+tertiary_structure_id = 0
+action_kind = "None"
+threshold_value_min = 0.0
+threshold_value_max = 0.0
+completion_faction_reputation_delta = 0
+

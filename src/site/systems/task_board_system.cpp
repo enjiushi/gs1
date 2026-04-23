@@ -29,6 +29,22 @@ enum class PlantProtectionChannel : std::uint8_t
 
 constexpr double k_progress_epsilon = 0.0001;
 
+struct NeighborVisit final
+{
+    int dx;
+    int dy;
+};
+
+constexpr NeighborVisit k_neighbor_visits[] {
+    {-1, -1},
+    {0, -1},
+    {1, -1},
+    {-1, 0},
+    {1, 0},
+    {-1, 1},
+    {0, 1},
+    {1, 1}};
+
 std::uint64_t mix_seed(
     std::uint64_t base_seed,
     std::uint32_t a,
@@ -138,6 +154,104 @@ PlantId resolved_task_plant_id(const TaskTemplateDef& task_template_def) noexcep
 bool tile_has_plant(const SiteWorld::TileData& tile) noexcept
 {
     return tile.ecology.plant_id.value != 0U;
+}
+
+bool tracked_tile_has_plant(const TaskTrackedTileState& tile) noexcept
+{
+    return tile.populated_by_plant;
+}
+
+bool tracked_tile_coord_in_bounds(
+    const TaskBoardState& board,
+    TileCoord coord) noexcept
+{
+    return coord.x >= 0 &&
+        coord.y >= 0 &&
+        static_cast<std::uint32_t>(coord.x) < board.tracked_tile_width &&
+        static_cast<std::uint32_t>(coord.y) < board.tracked_tile_height;
+}
+
+std::size_t tracked_tile_index(
+    const TaskBoardState& board,
+    TileCoord coord) noexcept
+{
+    return static_cast<std::size_t>(coord.y) * board.tracked_tile_width +
+        static_cast<std::size_t>(coord.x);
+}
+
+TaskTrackedTileState* tracked_tile_state(
+    TaskBoardState& board,
+    TileCoord coord) noexcept
+{
+    if (!tracked_tile_coord_in_bounds(board, coord))
+    {
+        return nullptr;
+    }
+
+    const auto index = tracked_tile_index(board, coord);
+    return index < board.tracked_tiles.size() ? &board.tracked_tiles[index] : nullptr;
+}
+
+const TaskTrackedTileState* tracked_tile_state(
+    const TaskBoardState& board,
+    TileCoord coord) noexcept
+{
+    if (!tracked_tile_coord_in_bounds(board, coord))
+    {
+        return nullptr;
+    }
+
+    const auto index = tracked_tile_index(board, coord);
+    return index < board.tracked_tiles.size() ? &board.tracked_tiles[index] : nullptr;
+}
+
+void update_populated_neighbor_counts(
+    TaskBoardState& board,
+    TileCoord center,
+    bool previously_populated,
+    bool now_populated) noexcept
+{
+    if (previously_populated == now_populated)
+    {
+        return;
+    }
+
+    const int delta = now_populated ? 1 : -1;
+    for (const auto visit : k_neighbor_visits)
+    {
+        const TileCoord neighbor {center.x + visit.dx, center.y + visit.dy};
+        TaskTrackedTileState* neighbor_state = tracked_tile_state(board, neighbor);
+        if (neighbor_state == nullptr)
+        {
+            continue;
+        }
+
+        const int next_count =
+            static_cast<int>(neighbor_state->populated_neighbor_count) + delta;
+        neighbor_state->populated_neighbor_count =
+            static_cast<std::uint8_t>(std::clamp(next_count, 0, 8));
+    }
+}
+
+void apply_tracked_plant_state(
+    TaskBoardState& board,
+    TileCoord coord,
+    std::uint32_t plant_type_id,
+    std::uint32_t ground_cover_type_id,
+    float plant_density) noexcept
+{
+    TaskTrackedTileState* tracked = tracked_tile_state(board, coord);
+    if (tracked == nullptr)
+    {
+        return;
+    }
+
+    const bool previously_populated = tracked->populated_by_plant;
+    tracked->plant_type_id = plant_type_id;
+    tracked->ground_cover_type_id = ground_cover_type_id;
+    tracked->plant_density = plant_density;
+    tracked->populated_by_plant = plant_type_id != 0U;
+    update_populated_neighbor_counts(board, coord, previously_populated, tracked->populated_by_plant);
 }
 
 bool item_is_crafted(ItemId item_id) noexcept
@@ -464,6 +578,7 @@ bool task_template_is_eligible(
     case TaskProgressKind::PlantDustProtectionAtLeast:
     case TaskProgressKind::KeepAllDevicesIntegrityAboveForDuration:
     case TaskProgressKind::NearbyPopulatedPlantTilesAtLeast:
+    case TaskProgressKind::KeepAllLivingPlantsNotWitheringForDuration:
         return true;
     default:
         return false;
@@ -513,6 +628,11 @@ TaskInstanceState make_task_instance(
         choose_candidate(
             collect_plant_candidates(context, task_template_def),
             mix_seed(task_seed, 3U, 0U));
+    if (task_template_def.progress_kind == TaskProgressKind::KeepAllLivingPlantsNotWitheringForDuration &&
+        task_template_def.plant_id.value == 0U)
+    {
+        task.plant_id = PlantId {};
+    }
     if (task.item_id.value == 0U && task.plant_id.value != 0U)
     {
         for (const auto& item_def : all_item_defs())
@@ -590,12 +710,31 @@ TaskInstanceState make_task_instance(
 void reset_task_board(TaskBoardState& board) noexcept
 {
     board.visible_tasks.clear();
+    board.tracked_tiles.clear();
     board.accepted_task_ids.clear();
     board.completed_task_ids.clear();
     board.claimed_task_ids.clear();
     board.active_chain_state.reset();
     board.task_pool_size = 0U;
+    board.tracked_tile_width = 0U;
+    board.tracked_tile_height = 0U;
+    board.fully_grown_tile_count = 0U;
+    board.site_completion_tile_threshold = 0U;
+    board.tracked_living_plant_count = 0U;
     board.minutes_until_next_refresh = 0.0;
+    board.worker = TaskTrackedWorkerState {};
+    board.all_tracked_living_plants_stable = false;
+}
+
+void initialize_task_tracking_cache(
+    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardState& board) noexcept
+{
+    board.tracked_tile_width = context.world.tile_width();
+    board.tracked_tile_height = context.world.tile_height();
+    const auto tile_count = context.world.tile_count();
+    board.tracked_tiles.assign(tile_count, TaskTrackedTileState {});
+    board.site_completion_tile_threshold = context.world.read_counters().site_completion_tile_threshold;
 }
 
 TaskInstanceState* find_task_instance(TaskBoardState& board, TaskInstanceId id) noexcept
@@ -912,6 +1051,7 @@ bool is_duration_progress_kind(TaskProgressKind progress_kind) noexcept
     case TaskProgressKind::KeepTileHeatAtMostForDuration:
     case TaskProgressKind::KeepTileDustAtMostForDuration:
     case TaskProgressKind::KeepAllDevicesIntegrityAboveForDuration:
+    case TaskProgressKind::KeepAllLivingPlantsNotWitheringForDuration:
         return true;
     default:
         return false;
@@ -936,15 +1076,14 @@ bool matches_density_task_filter(
 }
 
 std::uint32_t count_plants_with_density_at_least(
-    SiteSystemContext<TaskBoardSystem>& context,
+    const TaskBoardState& board,
     const TaskInstanceState& task) noexcept
 {
     std::uint32_t count = 0U;
-    for (std::size_t index = 0U; index < context.world.tile_count(); ++index)
+    for (const auto& tile : board.tracked_tiles)
     {
-        const auto tile = context.world.read_tile_at_index(index);
-        if (!matches_density_task_filter(task, tile.ecology.plant_id) ||
-            tile.ecology.plant_density < task.threshold_value)
+        if (!matches_density_task_filter(task, PlantId {tile.plant_type_id}) ||
+            tile.plant_density < task.threshold_value)
         {
             continue;
         }
@@ -956,20 +1095,19 @@ std::uint32_t count_plants_with_density_at_least(
 }
 
 std::uint32_t count_plants_with_protection_at_least(
-    SiteSystemContext<TaskBoardSystem>& context,
+    const TaskBoardState& board,
     const TaskInstanceState& task,
     PlantProtectionChannel channel) noexcept
 {
     std::uint32_t count = 0U;
-    for (std::size_t index = 0U; index < context.world.tile_count(); ++index)
+    for (const auto& tile : board.tracked_tiles)
     {
-        const auto tile = context.world.read_tile_at_index(index);
-        if (!tile_has_plant(tile))
+        if (!tracked_tile_has_plant(tile))
         {
             continue;
         }
 
-        if (task.plant_id.value != 0U && tile.ecology.plant_id != task.plant_id)
+        if (task.plant_id.value != 0U && tile.plant_type_id != task.plant_id.value)
         {
             continue;
         }
@@ -978,13 +1116,13 @@ std::uint32_t count_plants_with_protection_at_least(
         switch (channel)
         {
         case PlantProtectionChannel::Wind:
-            protection = tile.resolved_contribution.wind_protection;
+            protection = tile.wind_protection;
             break;
         case PlantProtectionChannel::Heat:
-            protection = tile.resolved_contribution.heat_protection;
+            protection = tile.heat_protection;
             break;
         case PlantProtectionChannel::Dust:
-            protection = tile.resolved_contribution.dust_protection;
+            protection = tile.dust_protection;
             break;
         default:
             break;
@@ -1000,44 +1138,17 @@ std::uint32_t count_plants_with_protection_at_least(
 }
 
 std::uint32_t count_nearby_populated_plant_tiles(
-    SiteSystemContext<TaskBoardSystem>& context) noexcept
+    const TaskBoardState& board) noexcept
 {
     std::uint32_t count = 0U;
-    for (std::size_t index = 0U; index < context.world.tile_count(); ++index)
+    for (const auto& tile : board.tracked_tiles)
     {
-        const auto coord = context.world.tile_coord(index);
-        const auto tile = context.world.read_tile_at_index(index);
-        if (!tile_has_plant(tile))
+        if (!tracked_tile_has_plant(tile))
         {
             continue;
         }
 
-        bool has_neighbor = false;
-        for (int dy = -1; dy <= 1 && !has_neighbor; ++dy)
-        {
-            for (int dx = -1; dx <= 1; ++dx)
-            {
-                if (dx == 0 && dy == 0)
-                {
-                    continue;
-                }
-
-                const TileCoord neighbor_coord {coord.x + dx, coord.y + dy};
-                if (!context.world.tile_coord_in_bounds(neighbor_coord))
-                {
-                    continue;
-                }
-
-                const auto neighbor_tile = context.world.read_tile(neighbor_coord);
-                if (tile_has_plant(neighbor_tile))
-                {
-                    has_neighbor = true;
-                    break;
-                }
-            }
-        }
-
-        if (has_neighbor)
+        if (tile.populated_neighbor_count > 0U)
         {
             ++count;
         }
@@ -1051,63 +1162,62 @@ std::uint32_t calculate_snapshot_progress(
     const TaskTemplateDef& task_template_def,
     const TaskInstanceState& task) noexcept
 {
+    const auto& board = context.world.read_task_board();
     switch (task_template_def.progress_kind)
     {
     case TaskProgressKind::RestorationTiles:
-        return context.world.read_counters().fully_grown_tile_count;
+        return board.fully_grown_tile_count;
     case TaskProgressKind::PlantCountAtDensity:
     case TaskProgressKind::AnyPlantDensityAtLeast:
-        return count_plants_with_density_at_least(context, task);
+        return count_plants_with_density_at_least(board, task);
     case TaskProgressKind::PlantWindProtectionAtLeast:
         return count_plants_with_protection_at_least(
-            context,
+            board,
             task,
             PlantProtectionChannel::Wind);
     case TaskProgressKind::PlantHeatProtectionAtLeast:
         return count_plants_with_protection_at_least(
-            context,
+            board,
             task,
             PlantProtectionChannel::Heat);
     case TaskProgressKind::PlantDustProtectionAtLeast:
         return count_plants_with_protection_at_least(
-            context,
+            board,
             task,
             PlantProtectionChannel::Dust);
     case TaskProgressKind::NearbyPopulatedPlantTilesAtLeast:
-        return count_nearby_populated_plant_tiles(context);
+        return count_nearby_populated_plant_tiles(board);
     default:
         return 0U;
     }
 }
 
 bool all_worker_meters_at_least(
-    SiteSystemContext<TaskBoardSystem>& context,
+    const TaskBoardState& board,
     float threshold) noexcept
 {
-    const auto worker = context.world.read_worker();
-    const auto& conditions = worker.conditions;
-    return conditions.health >= threshold &&
-        conditions.hydration >= threshold &&
-        conditions.nourishment >= threshold &&
-        conditions.energy >= threshold &&
-        conditions.morale >= threshold;
+    return board.worker.valid &&
+        board.worker.health >= threshold &&
+        board.worker.hydration >= threshold &&
+        board.worker.nourishment >= threshold &&
+        board.worker.energy >= threshold &&
+        board.worker.morale >= threshold;
 }
 
 bool all_devices_integrity_at_least(
-    SiteSystemContext<TaskBoardSystem>& context,
+    const TaskBoardState& board,
     float threshold) noexcept
 {
     bool found_device = false;
-    for (std::size_t index = 0U; index < context.world.tile_count(); ++index)
+    for (const auto& tile : board.tracked_tiles)
     {
-        const auto tile = context.world.read_tile_at_index(index);
-        if (tile.device.structure_id.value == 0U)
+        if (tile.device_structure_id == 0U)
         {
             continue;
         }
 
         found_device = true;
-        if ((tile.device.device_integrity * 100.0f) < threshold)
+        if ((tile.device_integrity * 100.0f) < threshold)
         {
             return false;
         }
@@ -1117,13 +1227,13 @@ bool all_devices_integrity_at_least(
 }
 
 std::uint32_t count_tiles_moisture_at_least(
-    SiteSystemContext<TaskBoardSystem>& context,
+    const TaskBoardState& board,
     float threshold) noexcept
 {
     std::uint32_t count = 0U;
-    for (std::size_t index = 0U; index < context.world.tile_count(); ++index)
+    for (const auto& tile : board.tracked_tiles)
     {
-        if (context.world.read_tile_at_index(index).ecology.moisture >= threshold)
+        if (tile.moisture >= threshold)
         {
             ++count;
         }
@@ -1133,13 +1243,13 @@ std::uint32_t count_tiles_moisture_at_least(
 }
 
 std::uint32_t count_tiles_heat_at_most(
-    SiteSystemContext<TaskBoardSystem>& context,
+    const TaskBoardState& board,
     float threshold) noexcept
 {
     std::uint32_t count = 0U;
-    for (std::size_t index = 0U; index < context.world.tile_count(); ++index)
+    for (const auto& tile : board.tracked_tiles)
     {
-        if (context.world.read_tile_at_index(index).local_weather.heat <= threshold)
+        if (tile.heat <= threshold)
         {
             ++count;
         }
@@ -1149,13 +1259,13 @@ std::uint32_t count_tiles_heat_at_most(
 }
 
 std::uint32_t count_tiles_dust_at_most(
-    SiteSystemContext<TaskBoardSystem>& context,
+    const TaskBoardState& board,
     float threshold) noexcept
 {
     std::uint32_t count = 0U;
-    for (std::size_t index = 0U; index < context.world.tile_count(); ++index)
+    for (const auto& tile : board.tracked_tiles)
     {
-        if (context.world.read_tile_at_index(index).local_weather.dust <= threshold)
+        if (tile.dust <= threshold)
         {
             ++count;
         }
@@ -1164,25 +1274,34 @@ std::uint32_t count_tiles_dust_at_most(
     return count;
 }
 
+bool living_plant_duration_condition_met(
+    const TaskInstanceState& task,
+    const LivingPlantStabilityChangedMessage& payload) noexcept
+{
+    return (payload.status_flags & LIVING_PLANT_STABILITY_ALL_TRACKED_PLANTS_STABLE) != 0U &&
+        payload.tracked_living_plant_count >= normalized_required_count(task.required_count);
+}
+
 bool duration_condition_met(
     SiteSystemContext<TaskBoardSystem>& context,
     const TaskTemplateDef& task_template_def,
-    const TaskInstanceState& task) noexcept
+    TaskInstanceState& task) noexcept
 {
+    const auto& board = context.world.read_task_board();
     switch (task_template_def.progress_kind)
     {
     case TaskProgressKind::KeepAllWorkerMetersAboveForDuration:
-        return all_worker_meters_at_least(context, task.threshold_value);
+        return all_worker_meters_at_least(board, task.threshold_value);
     case TaskProgressKind::KeepAllDevicesIntegrityAboveForDuration:
-        return all_devices_integrity_at_least(context, task.threshold_value);
+        return all_devices_integrity_at_least(board, task.threshold_value);
     case TaskProgressKind::KeepTileMoistureAtLeastForDuration:
-        return count_tiles_moisture_at_least(context, task.threshold_value) >=
+        return count_tiles_moisture_at_least(board, task.threshold_value) >=
             normalized_required_count(task.required_count);
     case TaskProgressKind::KeepTileHeatAtMostForDuration:
-        return count_tiles_heat_at_most(context, task.threshold_value) >=
+        return count_tiles_heat_at_most(board, task.threshold_value) >=
             normalized_required_count(task.required_count);
     case TaskProgressKind::KeepTileDustAtMostForDuration:
-        return count_tiles_dust_at_most(context, task.threshold_value) >=
+        return count_tiles_dust_at_most(board, task.threshold_value) >=
             normalized_required_count(task.required_count);
     default:
         return false;
@@ -1330,6 +1449,11 @@ bool update_duration_tasks(
             continue;
         }
 
+        if (task_template_def->progress_kind != TaskProgressKind::KeepAllLivingPlantsNotWitheringForDuration)
+        {
+            (void)refresh_duration_task_condition(context, task);
+        }
+
         const bool satisfied = task.requirement_mask != 0U;
         const double next_accumulator = satisfied
             ? std::min<double>(static_cast<double>(task.target_amount), task.progress_accumulator + step_minutes)
@@ -1366,6 +1490,7 @@ void handle_site_run_started(
 {
     auto& board = context.world.own_task_board();
     reset_task_board(board);
+    initialize_task_tracking_cache(context, board);
 
     if (payload.site_id != 1U ||
         context.world.read_objective().type != SiteObjectiveType::DenseRestoration)
@@ -1391,7 +1516,7 @@ void handle_site_run_started(
 
     board.task_pool_size = static_cast<std::uint32_t>(board.visible_tasks.size());
     board.minutes_until_next_refresh = 0.0;
-    if (refresh_snapshot_tasks(context) || !board.visible_tasks.empty())
+    if (!board.visible_tasks.empty())
     {
         mark_task_projection_dirty(context);
     }
@@ -1425,7 +1550,20 @@ void handle_task_accept_requested(
     }
     else if (task_template_def != nullptr && is_duration_progress_kind(task_template_def->progress_kind))
     {
-        (void)refresh_duration_task_condition(context, *task);
+        if (task_template_def->progress_kind == TaskProgressKind::KeepAllLivingPlantsNotWitheringForDuration)
+        {
+            const auto& board_state = context.world.read_task_board();
+            task->requirement_mask =
+                (board_state.all_tracked_living_plants_stable &&
+                    board_state.tracked_living_plant_count >=
+                        normalized_required_count(task->required_count))
+                ? 1U
+                : 0U;
+        }
+        else
+        {
+            (void)refresh_duration_task_condition(context, *task);
+        }
     }
     else if (task->current_progress_amount >= std::max<std::uint32_t>(1U, task->target_amount))
     {
@@ -1475,6 +1613,8 @@ void handle_restoration_progress(
     const RestorationProgressChangedMessage& payload)
 {
     auto& board = context.world.own_task_board();
+    board.fully_grown_tile_count = payload.fully_grown_tile_count;
+    board.site_completion_tile_threshold = payload.site_completion_tile_threshold;
     bool mutated = false;
 
     for (auto& task : board.visible_tasks)
@@ -1518,16 +1658,19 @@ void handle_tile_ecology_changed(
     SiteSystemContext<TaskBoardSystem>& context,
     const TileEcologyChangedMessage& payload)
 {
-    (void)payload;
+    auto& board = context.world.own_task_board();
+    apply_tracked_plant_state(
+        board,
+        TileCoord {payload.target_tile_x, payload.target_tile_y},
+        payload.plant_type_id,
+        payload.ground_cover_type_id,
+        payload.plant_density);
     const bool snapshot_changed = refresh_snapshot_tasks_if(context, [](const TaskTemplateDef& task_template_def) {
         return task_template_def.progress_kind == TaskProgressKind::PlantCountAtDensity ||
             task_template_def.progress_kind == TaskProgressKind::AnyPlantDensityAtLeast ||
             task_template_def.progress_kind == TaskProgressKind::NearbyPopulatedPlantTilesAtLeast;
     });
-    const bool duration_changed = refresh_duration_task_conditions_if(context, [](const TaskTemplateDef& task_template_def) {
-        return task_template_def.progress_kind == TaskProgressKind::KeepTileMoistureAtLeastForDuration;
-    });
-    if (snapshot_changed || duration_changed)
+    if (snapshot_changed)
     {
         mark_task_projection_dirty(context);
     }
@@ -1537,7 +1680,25 @@ void handle_site_tile_state_changed(
     SiteSystemContext<TaskBoardSystem>& context,
     const SiteTileStateChangedMessage& payload)
 {
-    (void)payload;
+    auto& board = context.world.own_task_board();
+    apply_tracked_plant_state(
+        board,
+        TileCoord {payload.target_tile_x, payload.target_tile_y},
+        payload.plant_type_id,
+        0U,
+        payload.plant_density);
+    TaskTrackedTileState* tracked = tracked_tile_state(
+        board,
+        TileCoord {payload.target_tile_x, payload.target_tile_y});
+    if (tracked != nullptr)
+    {
+        tracked->moisture = payload.moisture;
+        tracked->heat = payload.heat;
+        tracked->dust = payload.dust;
+        tracked->wind_protection = payload.wind_protection;
+        tracked->heat_protection = payload.heat_protection;
+        tracked->dust_protection = payload.dust_protection;
+    }
     const bool snapshot_changed = refresh_snapshot_tasks_if(context, [](const TaskTemplateDef& task_template_def) {
         return task_template_def.progress_kind == TaskProgressKind::PlantWindProtectionAtLeast ||
             task_template_def.progress_kind == TaskProgressKind::PlantHeatProtectionAtLeast ||
@@ -1558,6 +1719,12 @@ void handle_worker_meters_changed(
     const WorkerMetersChangedMessage& payload)
 {
     auto& board = context.world.own_task_board();
+    board.worker.health = payload.player_health;
+    board.worker.hydration = payload.player_hydration;
+    board.worker.nourishment = payload.player_nourishment;
+    board.worker.energy = payload.player_energy;
+    board.worker.morale = payload.player_morale;
+    board.worker.valid = true;
     bool mutated = false;
     for (auto& task : board.visible_tasks)
     {
@@ -1598,10 +1765,57 @@ void handle_site_device_condition_changed(
     SiteSystemContext<TaskBoardSystem>& context,
     const SiteDeviceConditionChangedMessage& payload)
 {
-    (void)payload;
+    auto& board = context.world.own_task_board();
+    TaskTrackedTileState* tracked = tracked_tile_state(
+        board,
+        TileCoord {payload.target_tile_x, payload.target_tile_y});
+    if (tracked != nullptr)
+    {
+        tracked->device_structure_id = payload.structure_id;
+        tracked->device_integrity = payload.device_integrity;
+    }
     if (refresh_duration_task_conditions_if(context, [](const TaskTemplateDef& task_template_def) {
             return task_template_def.progress_kind == TaskProgressKind::KeepAllDevicesIntegrityAboveForDuration;
         }))
+    {
+        mark_task_projection_dirty(context);
+    }
+}
+
+void handle_living_plant_stability_changed(
+    SiteSystemContext<TaskBoardSystem>& context,
+    const LivingPlantStabilityChangedMessage& payload)
+{
+    auto& board = context.world.own_task_board();
+    board.tracked_living_plant_count = payload.tracked_living_plant_count;
+    board.all_tracked_living_plants_stable =
+        (payload.status_flags & LIVING_PLANT_STABILITY_ALL_TRACKED_PLANTS_STABLE) != 0U;
+    bool mutated = false;
+    for (auto& task : board.visible_tasks)
+    {
+        if (task.runtime_list_kind != TaskRuntimeListKind::Accepted)
+        {
+            continue;
+        }
+
+        const auto* task_template_def = find_task_template_def(task.task_template_id);
+        if (task_template_def == nullptr ||
+            task_template_def->progress_kind !=
+                TaskProgressKind::KeepAllLivingPlantsNotWitheringForDuration)
+        {
+            continue;
+        }
+
+        const std::uint8_t next_mask =
+            living_plant_duration_condition_met(task, payload) ? 1U : 0U;
+        if (task.requirement_mask != next_mask)
+        {
+            task.requirement_mask = next_mask;
+            mutated = true;
+        }
+    }
+
+    if (mutated)
     {
         mark_task_projection_dirty(context);
     }
@@ -1813,6 +2027,7 @@ bool TaskBoardSystem::subscribes_to(GameMessageType type) noexcept
     case GameMessageType::TaskRewardClaimRequested:
     case GameMessageType::RestorationProgressChanged:
     case GameMessageType::TileEcologyChanged:
+    case GameMessageType::LivingPlantStabilityChanged:
     case GameMessageType::SiteTileStateChanged:
     case GameMessageType::WorkerMetersChanged:
     case GameMessageType::PhoneListingPurchased:
@@ -1853,6 +2068,11 @@ Gs1Status TaskBoardSystem::process_message(
         break;
     case GameMessageType::TileEcologyChanged:
         handle_tile_ecology_changed(context, message.payload_as<TileEcologyChangedMessage>());
+        break;
+    case GameMessageType::LivingPlantStabilityChanged:
+        handle_living_plant_stability_changed(
+            context,
+            message.payload_as<LivingPlantStabilityChangedMessage>());
         break;
     case GameMessageType::SiteTileStateChanged:
         handle_site_tile_state_changed(context, message.payload_as<SiteTileStateChangedMessage>());

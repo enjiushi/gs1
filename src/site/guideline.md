@@ -24,12 +24,12 @@ Site-owned state, ECS world support, and helper logic for active site gameplay.
 - `placement_preview.h`: Placement-preview state for build/placement UI flows.
 - `site_projection_update_flags.h`: Dirty/update flags for projection refresh decisions.
 - `site_objective_state.h`: Site objective mode/config state, including highway target-band metadata plus green-wall connection masks, hold countdown state, and paused main-timer tracking for objective evaluation.
-- `site_run_state.h`: Aggregate active site-run state that owns the site slice, including pending projection dirtiness plus cached last-emitted tile projection state for delta coalescing across visible tile data, ecology-driven terrain visuals, and local-wind-driven plant visuals.
+- `site_run_state.h`: Aggregate active site-run state that owns the site slice, including pending projection dirtiness plus cached last-emitted tile projection state for delta coalescing across visible tile data, local-wind-driven plant visuals, and ecology-owned counters such as living-plant stability status.
 - `site_world.h`: ECS/world wrapper declarations for the active site, including resolved per-tile contribution state alongside ecology, local weather, and device data.
 - `site_world.cpp`: ECS/world wrapper implementation and setup, including resolved contribution component storage on tile entities.
 - `site_world_access.h`: Owner-scoped ECS access helpers for reading/writing site components.
 - `site_world_components.h`: ECS component structs attached to site entities.
 - `systems/`: Site system declarations and implementations.
-- `task_board_state.h`: Task-board state for current site objectives and listings, including claimed-history tracking plus per-task resolved generator outputs, runtime accumulators, and masks used by procedural, duration, and multi-structure tasks.
+- `task_board_state.h`: Task-board state for current site objectives and listings, including claimed-history tracking plus per-task resolved generator outputs, runtime accumulators, masks, and the task-owned mirror caches updated from owner-emitted worker/tile/device progress messages.
 - `tile_footprint.h`: Tile-footprint geometry helpers for structures and placement.
 - `weather_state.h`: Weather state tracked during the active site run.
