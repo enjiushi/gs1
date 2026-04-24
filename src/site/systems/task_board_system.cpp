@@ -69,70 +69,28 @@ std::uint32_t normalized_required_count(std::uint32_t requested_count) noexcept
     return requested_count == 0U ? 1U : requested_count;
 }
 
-std::uint32_t normalize_range_min(std::uint32_t min_value, std::uint32_t max_value) noexcept
-{
-    if (min_value == 0U && max_value == 0U)
-    {
-        return 0U;
-    }
-
-    return std::min(min_value == 0U ? max_value : min_value, max_value == 0U ? min_value : max_value);
-}
-
-std::uint32_t normalize_range_max(std::uint32_t min_value, std::uint32_t max_value) noexcept
-{
-    return std::max(min_value, max_value);
-}
-
-std::uint32_t roll_u32_in_range(
-    std::uint32_t min_value,
-    std::uint32_t max_value,
-    std::uint64_t seed) noexcept
-{
-    const auto normalized_min = normalize_range_min(min_value, max_value);
-    const auto normalized_max = normalize_range_max(min_value, max_value);
-    if (normalized_min == normalized_max)
-    {
-        return normalized_min;
-    }
-
-    const auto span = normalized_max - normalized_min + 1U;
-    return normalized_min + static_cast<std::uint32_t>(seed % span);
-}
-
-float roll_float_in_range(
-    float min_value,
-    float max_value,
-    std::uint64_t seed) noexcept
-{
-    const float normalized_min = std::min(min_value, max_value);
-    const float normalized_max = std::max(min_value, max_value);
-    if (std::fabs(normalized_max - normalized_min) <= 0.0001f)
-    {
-        return normalized_min;
-    }
-
-    constexpr double k_u32_max = 4294967295.0;
-    const float t = static_cast<float>(static_cast<double>(seed & 0xffffffffULL) / k_u32_max);
-    return std::round(normalized_min + ((normalized_max - normalized_min) * t));
-}
-
 std::uint32_t resolved_task_target_amount(
     const TaskTemplateDef& task_template_def,
-    const SiteCounters& counters,
-    std::uint64_t seed) noexcept
+    const SiteCounters& counters) noexcept
 {
-    if (task_template_def.target_amount_min == 0U &&
-        task_template_def.target_amount_max == 0U)
+    if (task_template_def.target_amount != 0U)
     {
-        return normalized_task_target(counters.site_completion_tile_threshold);
+        return normalized_task_target(task_template_def.target_amount);
     }
 
-    return normalized_task_target(
-        roll_u32_in_range(
-            task_template_def.target_amount_min,
-            task_template_def.target_amount_max,
-            seed));
+    return normalized_task_target(counters.site_completion_tile_threshold);
+}
+
+std::uint32_t resolved_task_required_count(const TaskTemplateDef& task_template_def) noexcept
+{
+    return task_template_def.required_count == 0U
+        ? 0U
+        : normalized_required_count(task_template_def.required_count);
+}
+
+float resolved_task_threshold_value(const TaskTemplateDef& task_template_def) noexcept
+{
+    return task_template_def.threshold_value;
 }
 
 PlantId resolved_task_plant_id(const TaskTemplateDef& task_template_def) noexcept
@@ -588,19 +546,28 @@ bool task_template_is_eligible(
 std::vector<TaskRewardDraftOption> make_reward_draft_options(
     SiteSystemContext<TaskBoardSystem>& context,
     TaskInstanceId task_instance_id,
-    const TaskTemplateDef& task_template_def)
+    const TaskTemplateDef& task_template_def,
+    const SiteOnboardingTaskSeedDef* onboarding_seed)
 {
     (void)context;
     (void)task_instance_id;
     (void)task_template_def;
-    return {};
+    if (onboarding_seed == nullptr ||
+        onboarding_seed->reward_candidate_id.value == 0U ||
+        find_reward_candidate_def(onboarding_seed->reward_candidate_id) == nullptr)
+    {
+        return {};
+    }
+
+    return {TaskRewardDraftOption {onboarding_seed->reward_candidate_id, false}};
 }
 
 TaskInstanceState make_task_instance(
     SiteSystemContext<TaskBoardSystem>& context,
     TaskInstanceId task_instance_id,
     const TaskTemplateDef& task_template_def,
-    const SiteCounters& counters)
+    const SiteCounters& counters,
+    const SiteOnboardingTaskSeedDef* onboarding_seed = nullptr)
 {
     const auto task_seed = mix_seed(
         context.world.site_attempt_seed(),
@@ -611,23 +578,26 @@ TaskInstanceState make_task_instance(
     task.task_template_id = task_template_def.task_template_id;
     task.publisher_faction_id = task_template_def.publisher_faction_id;
     task.task_tier_id = task_template_def.task_tier_id;
-    task.target_amount = resolved_task_target_amount(task_template_def, counters, task_seed);
+    task.target_amount =
+        (onboarding_seed != nullptr && onboarding_seed->target_amount != 0U)
+        ? normalized_task_target(onboarding_seed->target_amount)
+        : resolved_task_target_amount(task_template_def, counters);
     task.required_count =
-        (task_template_def.required_count_min == 0U && task_template_def.required_count_max == 0U)
-        ? 0U
-        : normalized_required_count(
-              roll_u32_in_range(
-                  task_template_def.required_count_min,
-                  task_template_def.required_count_max,
-                  mix_seed(task_seed, 1U, 0U)));
+        (onboarding_seed != nullptr && onboarding_seed->required_count != 0U)
+        ? normalized_required_count(onboarding_seed->required_count)
+        : resolved_task_required_count(task_template_def);
     task.item_id =
-        choose_candidate(
-            collect_item_candidates(context, task_template_def),
-            mix_seed(task_seed, 2U, 0U));
+        (onboarding_seed != nullptr && onboarding_seed->item_id.value != 0U)
+        ? onboarding_seed->item_id
+        : choose_candidate(
+              collect_item_candidates(context, task_template_def),
+              mix_seed(task_seed, 2U, 0U));
     task.plant_id =
-        choose_candidate(
-            collect_plant_candidates(context, task_template_def),
-            mix_seed(task_seed, 3U, 0U));
+        (onboarding_seed != nullptr && onboarding_seed->plant_id.value != 0U)
+        ? onboarding_seed->plant_id
+        : choose_candidate(
+              collect_plant_candidates(context, task_template_def),
+              mix_seed(task_seed, 3U, 0U));
     if (task_template_def.progress_kind == TaskProgressKind::KeepAllLivingPlantsNotWitheringForDuration &&
         task_template_def.plant_id.value == 0U)
     {
@@ -654,15 +624,25 @@ TaskInstanceState make_task_instance(
         }
     }
     task.recipe_id =
-        choose_candidate(
-            collect_recipe_candidates(task_template_def),
-            mix_seed(task_seed, 4U, 0U));
+        (onboarding_seed != nullptr && onboarding_seed->recipe_id.value != 0U)
+        ? onboarding_seed->recipe_id
+        : choose_candidate(
+              collect_recipe_candidates(task_template_def),
+              mix_seed(task_seed, 4U, 0U));
     task.structure_id =
-        choose_candidate(
-            collect_structure_candidates(context, task_template_def.structure_id),
-            mix_seed(task_seed, 5U, 0U));
-    task.secondary_structure_id = task_template_def.secondary_structure_id;
-    task.tertiary_structure_id = task_template_def.tertiary_structure_id;
+        (onboarding_seed != nullptr && onboarding_seed->structure_id.value != 0U)
+        ? onboarding_seed->structure_id
+        : choose_candidate(
+              collect_structure_candidates(context, task_template_def.structure_id),
+              mix_seed(task_seed, 5U, 0U));
+    task.secondary_structure_id =
+        (onboarding_seed != nullptr && onboarding_seed->secondary_structure_id.value != 0U)
+        ? onboarding_seed->secondary_structure_id
+        : task_template_def.secondary_structure_id;
+    task.tertiary_structure_id =
+        (onboarding_seed != nullptr && onboarding_seed->tertiary_structure_id.value != 0U)
+        ? onboarding_seed->tertiary_structure_id
+        : task_template_def.tertiary_structure_id;
     if (task_template_def.progress_kind == TaskProgressKind::BuildStructureSet)
     {
         auto candidates = collect_structure_candidates(context, StructureId {});
@@ -692,17 +672,18 @@ TaskInstanceState make_task_instance(
         }
     }
     task.action_kind =
-        choose_candidate(
-            collect_action_candidates(task_template_def),
-            mix_seed(task_seed, 8U, 0U));
+        (onboarding_seed != nullptr && onboarding_seed->action_kind != ActionKind::None)
+        ? onboarding_seed->action_kind
+        : choose_candidate(
+              collect_action_candidates(task_template_def),
+              mix_seed(task_seed, 8U, 0U));
     task.threshold_value =
-        roll_float_in_range(
-            task_template_def.threshold_value_min,
-            task_template_def.threshold_value_max,
-            mix_seed(task_seed, 9U, 0U));
+        (onboarding_seed != nullptr && std::fabs(onboarding_seed->threshold_value) > 0.0001f)
+        ? onboarding_seed->threshold_value
+        : resolved_task_threshold_value(task_template_def);
     task.current_progress_amount = 0U;
     task.reward_draft_options =
-        make_reward_draft_options(context, task_instance_id, task_template_def);
+        make_reward_draft_options(context, task_instance_id, task_template_def, onboarding_seed);
     task.runtime_list_kind = TaskRuntimeListKind::Visible;
     return task;
 }
@@ -1492,17 +1473,17 @@ void handle_site_run_started(
     reset_task_board(board);
     initialize_task_tracking_cache(context, board);
 
-    if (payload.site_id != 1U ||
-        context.world.read_objective().type != SiteObjectiveType::DenseRestoration)
-    {
-        return;
-    }
-
     std::uint32_t next_task_instance_id = 1U;
-    for (const auto& task_template_def : all_task_template_defs())
+    for (const auto& seed_def : all_site_onboarding_task_seed_defs())
     {
-        if (task_template_def.task_template_id.value == 0U ||
-            !task_template_is_eligible(context, task_template_def))
+        if (seed_def.site_id.value != payload.site_id ||
+            seed_def.task_template_id.value == 0U)
+        {
+            continue;
+        }
+
+        const auto* task_template_def = find_task_template_def(seed_def.task_template_id);
+        if (task_template_def == nullptr)
         {
             continue;
         }
@@ -1510,8 +1491,9 @@ void handle_site_run_started(
         board.visible_tasks.push_back(make_task_instance(
             context,
             TaskInstanceId {next_task_instance_id++},
-            task_template_def,
-            context.world.read_counters()));
+            *task_template_def,
+            context.world.read_counters(),
+            &seed_def));
     }
 
     board.task_pool_size = static_cast<std::uint32_t>(board.visible_tasks.size());

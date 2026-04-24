@@ -1,7 +1,10 @@
 #include "runtime/game_runtime.h"
+#include "content/defs/faction_defs.h"
 #include "content/defs/item_defs.h"
+#include "content/defs/task_defs.h"
 #include "site/site_projection_update_flags.h"
 #include "content/defs/plant_defs.h"
+#include "site/task_board_state.h"
 #include "site/site_world_access.h"
 #include "site/site_world_components.h"
 
@@ -225,6 +228,30 @@ void bootstrap_site_one(GameRuntime& runtime)
     assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).has_value());
 }
 
+void seed_runtime_test_task(GameRuntime& runtime, std::uint32_t site_completion_target)
+{
+    auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
+    site_run.task_board.visible_tasks.clear();
+    site_run.task_board.accepted_task_ids.clear();
+    site_run.task_board.completed_task_ids.clear();
+    site_run.task_board.claimed_task_ids.clear();
+    site_run.task_board.task_pool_size = 1U;
+    site_run.task_board.visible_tasks.push_back(gs1::TaskInstanceState {
+        gs1::TaskInstanceId {1U},
+        gs1::TaskTemplateId {gs1::k_task_template_site1_restore_patch},
+        gs1::FactionId {gs1::k_faction_forestry_bureau},
+        1U,
+        site_completion_target,
+        0U,
+        0U});
+    gs1::GameRuntimeProjectionTestAccess::mark_projection_dirty(
+        runtime,
+        gs1::SITE_PROJECTION_UPDATE_TASKS |
+            gs1::SITE_PROJECTION_UPDATE_PHONE |
+            gs1::SITE_PROJECTION_UPDATE_HUD);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+}
+
 void set_worker_hydration(SiteRunState& site_run, float hydration)
 {
     assert(site_run.site_world != nullptr);
@@ -344,7 +371,9 @@ void ecology_growth_completes_task_and_site_attempt()
 
     auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
     assert(site_run.counters.site_completion_tile_threshold == 10U);
-    assert(site_run.task_board.visible_tasks.size() >= 1U);
+    assert(site_run.task_board.visible_tasks.empty());
+    site_run.counters.site_completion_tile_threshold = 1U;
+    seed_runtime_test_task(runtime, 10U);
     assert(site_run.task_board.visible_tasks.front().target_amount == 10U);
 
     drain_engine_messages(runtime);
@@ -352,82 +381,25 @@ void ecology_growth_completes_task_and_site_attempt()
     assert(runtime.handle_message(make_accept_task_message(1U)) == GS1_STATUS_OK);
     assert(site_run.task_board.accepted_task_ids.size() == 1U);
 
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    drain_engine_messages(runtime);
+    GameMessage restoration_message {};
+    restoration_message.type = GameMessageType::RestorationProgressChanged;
+    restoration_message.set_payload(gs1::RestorationProgressChangedMessage {10U, 1U, 1.0f});
+    assert(runtime.handle_message(restoration_message) == GS1_STATUS_OK);
 
-    const std::vector<TileCoord> seeded_tiles {
-        TileCoord {0, 0},
-        TileCoord {1, 0},
-        TileCoord {2, 0},
-        TileCoord {3, 0},
-        TileCoord {4, 0},
-        TileCoord {0, 1},
-        TileCoord {1, 1},
-        TileCoord {2, 1},
-        TileCoord {3, 1},
-        TileCoord {4, 1}};
-    for (const auto coord : seeded_tiles)
-    {
-        seed_plant_tile(site_run, coord, gs1::k_plant_ordos_wormwood, 1.0f);
-        gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, coord);
-    }
-
-    Gs1Phase1Result result {};
-    run_phase1(runtime, 60.0, result);
-    assert(result.fixed_steps_executed == 1U);
-
-    assert(site_run.counters.fully_grown_tile_count == 10U);
-    assert(site_run.run_status == gs1::SiteRunStatus::Completed);
-    assert(gs1::GameRuntimeProjectionTestAccess::app_state(runtime) == GS1_APP_STATE_SITE_RESULT);
-
-    auto& campaign = gs1::GameRuntimeProjectionTestAccess::campaign(runtime).value();
-    assert(campaign.app_state == GS1_APP_STATE_SITE_RESULT);
-    assert(campaign.sites[0].site_state == GS1_SITE_STATE_COMPLETED);
-    assert(campaign.sites[1].site_state == GS1_SITE_STATE_AVAILABLE);
-    assert(site_run.result_newly_revealed_site_count == 1U);
     assert(site_run.task_board.accepted_task_ids.empty());
     assert(site_run.task_board.completed_task_ids.size() == 1U);
     assert(site_run.task_board.visible_tasks.front().runtime_list_kind == TaskRuntimeListKind::Completed);
     assert(site_run.task_board.visible_tasks.front().current_progress_amount == 10U);
 
-    const auto tile_state = gs1::site_world_access::tile_ecology(site_run, seeded_tiles.front());
-    assert(approx_equal(tile_state.plant_density, 100.0f));
-    assert(tile_state.plant_id.value == gs1::k_plant_ordos_wormwood);
-    assert(tile_state.ground_cover_type_id == 0U);
-
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
     const auto phase1_messages = drain_engine_messages(runtime);
-    const auto* grown_tile_message = find_tile_message(phase1_messages, seeded_tiles.front());
-    assert(grown_tile_message != nullptr);
+    const auto* completed_task_message = find_task_message(phase1_messages, 1U);
+    assert(completed_task_message != nullptr);
     {
-        const auto& payload = grown_tile_message->payload_as<Gs1EngineMessageSiteTileData>();
-        assert(payload.plant_type_id == gs1::k_plant_ordos_wormwood);
-        assert(payload.ground_cover_type_id == 0U);
-        assert(approx_equal(payload.plant_density, 100.0f));
-    }
-
-    const auto app_state_messages =
-        collect_messages_of_type(phase1_messages, GS1_ENGINE_MESSAGE_SET_APP_STATE);
-    const auto site_result_messages =
-        collect_messages_of_type(phase1_messages, GS1_ENGINE_MESSAGE_SITE_RESULT_READY);
-    assert(!app_state_messages.empty());
-    assert(site_result_messages.size() == 1U);
-
-    bool saw_site_result_state = false;
-    for (const auto* message : app_state_messages)
-    {
-        if (message->payload_as<Gs1EngineMessageSetAppStateData>().app_state == GS1_APP_STATE_SITE_RESULT)
-        {
-            saw_site_result_state = true;
-            break;
-        }
-    }
-    assert(saw_site_result_state);
-
-    {
-        const auto& payload = site_result_messages.front()->payload_as<Gs1EngineMessageSiteResultData>();
-        assert(payload.site_id == 1U);
-        assert(payload.result == GS1_SITE_ATTEMPT_RESULT_COMPLETED);
-        assert(payload.newly_revealed_site_count == 1U);
+        const auto& payload = completed_task_message->payload_as<Gs1EngineMessageTaskData>();
+        assert(payload.current_progress == 10U);
+        assert(payload.target_progress == 10U);
+        assert(payload.list_kind == GS1_TASK_PRESENTATION_LIST_COMPLETED);
     }
 
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);

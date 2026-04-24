@@ -116,6 +116,11 @@ const TaskTemplateDef* find_task_template_def(TaskTemplateId task_template_id) n
         : &content.task_template_defs[it->second];
 }
 
+std::span<const SiteOnboardingTaskSeedDef> all_site_onboarding_task_seed_defs() noexcept
+{
+    return prototype_content_database().site_onboarding_task_seed_defs;
+}
+
 std::span<const RewardCandidateDef> all_reward_candidate_defs() noexcept
 {
     return prototype_content_database().reward_candidate_defs;
