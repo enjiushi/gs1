@@ -2,8 +2,11 @@
 #include "runtime/runtime_clock.h"
 #include "content/defs/faction_defs.h"
 #include "content/defs/item_defs.h"
+#include "content/defs/task_defs.h"
 #include "content/defs/technology_defs.h"
 #include "site/inventory_storage.h"
+#include "site/site_projection_update_flags.h"
+#include "site/task_board_state.h"
 #include "site/site_world_access.h"
 
 #include <algorithm>
@@ -66,6 +69,11 @@ struct GameRuntimeProjectionTestAccess
         runtime.flush_site_presentation_if_dirty();
     }
 
+    static void mark_projection_dirty(GameRuntime& runtime, std::uint64_t dirty_flags)
+    {
+        runtime.mark_site_projection_update_dirty(dirty_flags);
+    }
+
 };
 }  // namespace gs1
 
@@ -86,6 +94,30 @@ GameMessage make_start_site_attempt_message(std::uint32_t site_id)
     message.type = GameMessageType::StartSiteAttempt;
     message.set_payload(StartSiteAttemptMessage {site_id});
     return message;
+}
+
+void seed_runtime_test_task(GameRuntime& runtime, std::uint32_t site_completion_target)
+{
+    auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
+    site_run.task_board.visible_tasks.clear();
+    site_run.task_board.accepted_task_ids.clear();
+    site_run.task_board.completed_task_ids.clear();
+    site_run.task_board.claimed_task_ids.clear();
+    site_run.task_board.task_pool_size = 1U;
+    site_run.task_board.visible_tasks.push_back(gs1::TaskInstanceState {
+        gs1::TaskInstanceId {1U},
+        gs1::TaskTemplateId {gs1::k_task_template_site1_restore_patch},
+        gs1::FactionId {gs1::k_faction_forestry_bureau},
+        1U,
+        site_completion_target,
+        0U,
+        0U});
+    gs1::GameRuntimeProjectionTestAccess::mark_projection_dirty(
+        runtime,
+        gs1::SITE_PROJECTION_UPDATE_TASKS |
+            gs1::SITE_PROJECTION_UPDATE_PHONE |
+            gs1::SITE_PROJECTION_UPDATE_HUD);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
 }
 
 GameMessage make_select_site_message(std::uint32_t site_id)
@@ -660,7 +692,7 @@ int main()
                bootstrap_site_run,
                gs1::inventory_storage::starter_storage_container(bootstrap_site_run),
                gs1::ItemId {gs1::k_item_basic_straw_checkerboard}) == 8U);
-    assert(bootstrap_site_run.task_board.visible_tasks.size() >= 1U);
+    assert(bootstrap_site_run.task_board.visible_tasks.empty());
     assert(bootstrap_site_run.economy.money == 41);
     assert(bootstrap_site_run.economy.available_phone_listings.size() >= 11U);
 
@@ -672,7 +704,7 @@ int main()
     assert(!collect_messages_of_type(bootstrap_messages, GS1_ENGINE_MESSAGE_SITE_INVENTORY_SLOT_UPSERT).empty());
     assert(storage_messages.size() == 3U);
     assert(weather_messages.size() == 1U);
-    assert(!collect_messages_of_type(bootstrap_messages, GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT).empty());
+    assert(collect_messages_of_type(bootstrap_messages, GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT).empty());
     const auto bootstrap_phone_panel_messages =
         collect_messages_of_type(bootstrap_messages, GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE);
     assert(!bootstrap_phone_panel_messages.empty());
@@ -681,7 +713,7 @@ int main()
         const auto& phone_panel_payload =
             bootstrap_phone_panel_messages.front()->payload_as<Gs1EngineMessagePhonePanelData>();
         assert(phone_panel_payload.active_section == GS1_PHONE_PANEL_SECTION_HOME);
-        assert(phone_panel_payload.visible_task_count >= 1U);
+        assert(phone_panel_payload.visible_task_count == 0U);
         assert(phone_panel_payload.completed_task_count == 0U);
         assert(phone_panel_payload.claimed_task_count == 0U);
         assert(phone_panel_payload.buy_listing_count >= 9U);
@@ -727,6 +759,10 @@ int main()
                static_cast<std::uint32_t>(bootstrap_site_run.site_world->device_entity_id(workbench_tile)));
         assert(workbench_payload.slot_count == 8U);
     }
+
+    seed_runtime_test_task(runtime, bootstrap_site_run.counters.site_completion_tile_threshold);
+    const auto seeded_task_messages = drain_engine_messages(runtime);
+    assert(!collect_messages_of_type(seeded_task_messages, GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT).empty());
 
     GameMessage accept_task {};
     accept_task.type = GameMessageType::TaskAcceptRequested;

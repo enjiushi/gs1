@@ -249,27 +249,89 @@ std::vector<ContentValidationIssue> validate_content_database(
                 break;
             }
 
-            if (task_template_def.target_amount_max < task_template_def.target_amount_min)
+        }
+    }
+
+    if (issues.empty())
+    {
+        for (const auto& seed_def : content.site_onboarding_task_seed_defs)
+        {
+            if (!content.index.site_by_id.contains(seed_def.site_id.value))
             {
                 issues.push_back(ContentValidationIssue {
                     ContentValidationSeverity::Error,
-                    "Task template target amount max must be greater than or equal to the min."});
+                    "Site onboarding task seed references an unknown site id."});
                 break;
             }
 
-            if (task_template_def.required_count_max < task_template_def.required_count_min)
+            if (!content.index.task_template_by_id.contains(seed_def.task_template_id.value))
             {
                 issues.push_back(ContentValidationIssue {
                     ContentValidationSeverity::Error,
-                    "Task template required-count max must be greater than or equal to the min."});
+                    "Site onboarding task seed references an unknown task template id."});
                 break;
             }
 
-            if (task_template_def.threshold_value_max < task_template_def.threshold_value_min)
+            if (seed_def.item_id.value != 0U &&
+                !content.index.item_by_id.contains(seed_def.item_id.value))
             {
                 issues.push_back(ContentValidationIssue {
                     ContentValidationSeverity::Error,
-                    "Task template threshold max must be greater than or equal to the min."});
+                    "Site onboarding task seed references an unknown item id."});
+                break;
+            }
+
+            if (seed_def.plant_id.value != 0U &&
+                !content.index.plant_by_id.contains(seed_def.plant_id.value))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Site onboarding task seed references an unknown plant id."});
+                break;
+            }
+
+            if (seed_def.recipe_id.value != 0U &&
+                !content.index.craft_recipe_by_id.contains(seed_def.recipe_id.value))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Site onboarding task seed references an unknown recipe id."});
+                break;
+            }
+
+            if (seed_def.structure_id.value != 0U &&
+                !content.index.structure_by_id.contains(seed_def.structure_id.value))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Site onboarding task seed references an unknown primary structure id."});
+                break;
+            }
+
+            if (seed_def.secondary_structure_id.value != 0U &&
+                !content.index.structure_by_id.contains(seed_def.secondary_structure_id.value))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Site onboarding task seed references an unknown secondary structure id."});
+                break;
+            }
+
+            if (seed_def.tertiary_structure_id.value != 0U &&
+                !content.index.structure_by_id.contains(seed_def.tertiary_structure_id.value))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Site onboarding task seed references an unknown tertiary structure id."});
+                break;
+            }
+
+            if (seed_def.reward_candidate_id.value != 0U &&
+                !content.index.reward_candidate_by_id.contains(seed_def.reward_candidate_id.value))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Site onboarding task seed references an unknown reward candidate id."});
                 break;
             }
         }

@@ -496,47 +496,6 @@ void task_board_regression_runner(
         return;
     }
 
-    if (scenario == "accept_and_complete_site_one")
-    {
-        GS1_SYSTEM_TEST_REQUIRE(
-            context,
-            TaskBoardSystem::process_message(
-                site_context,
-                make_message(
-                    GameMessageType::SiteRunStarted,
-                    SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
-        GS1_SYSTEM_TEST_REQUIRE(context, !site_run.task_board.visible_tasks.empty());
-        const auto task_id = site_run.task_board.visible_tasks.front().task_instance_id.value;
-        GS1_SYSTEM_TEST_REQUIRE(
-            context,
-            TaskBoardSystem::process_message(
-                site_context,
-                make_message(
-                    GameMessageType::TaskAcceptRequested,
-                    gs1::TaskAcceptRequestedMessage {task_id})) == GS1_STATUS_OK);
-        GS1_SYSTEM_TEST_REQUIRE(
-            context,
-            TaskBoardSystem::process_message(
-                site_context,
-                make_message(
-                    GameMessageType::RestorationProgressChanged,
-                    gs1::RestorationProgressChangedMessage {
-                        site_run.task_board.visible_tasks.front().target_amount,
-                        site_run.task_board.visible_tasks.front().target_amount,
-                        1.0f})) == GS1_STATUS_OK);
-        GS1_SYSTEM_TEST_CHECK(
-            context,
-            site_run.task_board.visible_tasks.front().runtime_list_kind ==
-                (parse_bool(values, "expect_completed_runtime_list", true)
-                    ? TaskRuntimeListKind::Completed
-                    : TaskRuntimeListKind::Accepted));
-        GS1_SYSTEM_TEST_CHECK(
-            context,
-            site_run.task_board.completed_task_ids.size() ==
-                parse_u32(context, values, "expect_completed_count", 1U));
-        return;
-    }
-
     GS1_SYSTEM_TEST_FAIL(context, "Unknown task_board asset regression scenario.");
 }
 

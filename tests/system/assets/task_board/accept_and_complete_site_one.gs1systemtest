@@ -1,8 +1,0 @@
-system = task_board
-name = accept_and_complete_site_one
-runner = task_board_regression
-description = Starts the site-one onboarding board, accepts the first cleanup task, then completes it from a burial-cleared action.
----
-scenario = accept_and_complete_site_one
-expect_completed_runtime_list = true
-expect_completed_count = 1
