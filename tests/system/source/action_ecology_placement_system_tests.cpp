@@ -187,6 +187,46 @@ void action_execution_water_starts_immediately_and_emits_cost(
             -10.0f));
 }
 
+void action_execution_weather_scales_worker_meter_costs_from_current_local_weather(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 5035U);
+    GameMessageQueue queue {};
+    auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue);
+
+    const auto worker = site_run.site_world->worker();
+    auto worker_tile = site_run.site_world->tile_at(worker.position.tile_coord);
+    worker_tile.local_weather.heat = 100.0f;
+    worker_tile.local_weather.wind = 100.0f;
+    worker_tile.local_weather.dust = 100.0f;
+    site_run.site_world->set_tile(worker.position.tile_coord, worker_tile);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            site_context,
+            make_start_action_message(GS1_SITE_ACTION_WATER, TileCoord {2, 3}, 1U, 7U)) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameMessageType::WorkerMeterDeltaRequested);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            queue[1].payload_as<gs1::WorkerMeterDeltaRequestedMessage>().hydration_delta,
+            -8.1f));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            queue[1].payload_as<gs1::WorkerMeterDeltaRequestedMessage>().nourishment_delta,
+            -1.7f));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            queue[1].payload_as<gs1::WorkerMeterDeltaRequestedMessage>().energy_delta,
+            -13.5f));
+}
+
 void action_execution_craft_uses_recipe_authored_duration_and_cost(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -1960,6 +2000,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "action_execution",
     "water_starts_immediately_and_emits_cost",
     action_execution_water_starts_immediately_and_emits_cost);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "action_execution",
+    "weather_scales_worker_meter_costs_from_current_local_weather",
+    action_execution_weather_scales_worker_meter_costs_from_current_local_weather);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "action_execution",
     "craft_uses_recipe_authored_duration_and_cost",

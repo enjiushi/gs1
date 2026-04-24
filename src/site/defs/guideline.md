@@ -8,4 +8,4 @@ Small site-specific definition types that support site systems and actions.
 - When files or folders in this directory change, update this file in the same change.
 
 ## Contents
-- `site_action_defs.h`: Site action definition records plus runtime accessors for loaded action metadata and authored shared action parameters, including non-craft duration plus worker meter tuning alongside placement and harvest-action parameters.
+- `site_action_defs.h`: Site action definition records plus runtime accessors for loaded action metadata and authored shared action parameters, including non-craft duration, worker meter tuning, per-weather action-cost coefficients, and placement plus harvest-action parameters.

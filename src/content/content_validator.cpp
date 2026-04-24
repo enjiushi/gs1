@@ -336,6 +336,32 @@ std::vector<ContentValidationIssue> validate_content_database(
                 break;
             }
 
+            if (action_def.energy_cost_per_unit < 0.0f ||
+                action_def.hydration_cost_per_unit < 0.0f ||
+                action_def.nourishment_cost_per_unit < 0.0f)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Site action definitions cannot use negative worker meter costs."});
+                break;
+            }
+
+            if (action_def.heat_to_energy_cost < 0.0f ||
+                action_def.wind_to_energy_cost < 0.0f ||
+                action_def.dust_to_energy_cost < 0.0f ||
+                action_def.heat_to_hydration_cost < 0.0f ||
+                action_def.wind_to_hydration_cost < 0.0f ||
+                action_def.dust_to_hydration_cost < 0.0f ||
+                action_def.heat_to_nourishment_cost < 0.0f ||
+                action_def.wind_to_nourishment_cost < 0.0f ||
+                action_def.dust_to_nourishment_cost < 0.0f)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Site action weather-to-meter cost coefficients must be non-negative."});
+                break;
+            }
+
             for (std::size_t previous = 0U; previous < index; ++previous)
             {
                 if (content.site_action_defs[previous].action_kind == action_def.action_kind)
