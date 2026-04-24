@@ -22,6 +22,9 @@ struct CraftRecipeDef final
     ItemId output_item_id {};
     std::uint16_t output_quantity {1U};
     float craft_minutes {1.0f};
+    float energy_cost {0.0f};
+    float hydration_cost {0.0f};
+    float nourishment_cost {0.0f};
     std::array<CraftRecipeIngredientDef, 4> ingredients {};
     std::uint8_t ingredient_count {0U};
 };

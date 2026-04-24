@@ -158,6 +158,22 @@ std::vector<ContentValidationIssue> validate_content_database(
                 "Craft recipe references an unknown output item id."});
             break;
         }
+        if (recipe_def.craft_minutes <= 0.0f)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Craft recipe definitions must use positive craft duration values."});
+            break;
+        }
+        if (recipe_def.energy_cost < 0.0f ||
+            recipe_def.hydration_cost < 0.0f ||
+            recipe_def.nourishment_cost < 0.0f)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Craft recipe definitions cannot use negative worker meter costs."});
+            break;
+        }
         if (recipe_def.ingredient_count > recipe_def.ingredients.size())
         {
             issues.push_back(ContentValidationIssue {

@@ -10,7 +10,7 @@ Definition types and runtime accessors for the major authored content domains.
 ## Contents
 - `campaign_content_defs.h`: Campaign-level authored content records.
 - `faction_defs.h`: Prototype faction identity and assistant unlock definition records.
-- `craft_recipe_defs.h`: Crafting recipe definition types plus runtime accessors over the loaded recipe table.
+- `craft_recipe_defs.h`: Crafting recipe definition types plus runtime accessors over the loaded recipe table, including recipe-authored craft duration and worker energy/hydration/nourishment costs.
 - `event_defs.h`: Authored event definitions used by event/state systems.
 - `gameplay_tuning_defs.h`: Shared gameplay-tuning definition records and lookup for authored numeric factors consumed by worker-condition, ecology, modifier, device-support, and camp-durability systems.
 - `item_defs.h`: Item definition types plus runtime accessors over the loaded item table, including the authored starter checkerboard item, the full prototype 10-plant seed roster, and the harvested-good item roster tied back to source plants.

@@ -115,29 +115,63 @@ double base_duration_minutes(ActionKind kind) noexcept
             k_minimum_action_duration_minutes);
 }
 
-float action_energy_cost(ActionKind kind, std::uint16_t quantity) noexcept
+float action_energy_cost(
+    ActionKind kind,
+    std::uint16_t quantity,
+    const CraftRecipeDef* craft_recipe = nullptr) noexcept
 {
     const float scale = static_cast<float>(quantity == 0U ? 1U : quantity);
+    if (kind == ActionKind::Craft && craft_recipe != nullptr)
+    {
+        return craft_recipe->energy_cost * scale;
+    }
+
     const auto* action_def = find_site_action_def(kind);
     return action_def == nullptr ? 0.0f : action_def->energy_cost_per_unit * scale;
 }
 
-float action_hydration_cost(ActionKind kind, std::uint16_t quantity) noexcept
+float action_hydration_cost(
+    ActionKind kind,
+    std::uint16_t quantity,
+    const CraftRecipeDef* craft_recipe = nullptr) noexcept
 {
     const float scale = static_cast<float>(quantity == 0U ? 1U : quantity);
+    if (kind == ActionKind::Craft && craft_recipe != nullptr)
+    {
+        return craft_recipe->hydration_cost * scale;
+    }
+
     const auto* action_def = find_site_action_def(kind);
     return action_def == nullptr ? 0.0f : action_def->hydration_cost_per_unit * scale;
 }
 
-float action_nourishment_cost(ActionKind kind, std::uint16_t quantity) noexcept
+float action_nourishment_cost(
+    ActionKind kind,
+    std::uint16_t quantity,
+    const CraftRecipeDef* craft_recipe = nullptr) noexcept
 {
     const float scale = static_cast<float>(quantity == 0U ? 1U : quantity);
+    if (kind == ActionKind::Craft && craft_recipe != nullptr)
+    {
+        return craft_recipe->nourishment_cost * scale;
+    }
+
     const auto* action_def = find_site_action_def(kind);
     return action_def == nullptr ? 0.0f : action_def->nourishment_cost_per_unit * scale;
 }
 
-double action_unit_duration_minutes(ActionKind kind, std::uint32_t item_id) noexcept
+double action_unit_duration_minutes(
+    ActionKind kind,
+    std::uint32_t item_id,
+    const CraftRecipeDef* craft_recipe = nullptr) noexcept
 {
+    if (kind == ActionKind::Craft && craft_recipe != nullptr)
+    {
+        return std::max(
+            static_cast<double>(craft_recipe->craft_minutes),
+            k_minimum_action_duration_minutes);
+    }
+
     if ((kind == ActionKind::Plant || kind == ActionKind::Harvest) && item_id != 0U)
     {
         const auto* item_def = find_item_def(ItemId {item_id});
@@ -171,10 +205,12 @@ double compute_duration_minutes(
     SiteSystemContext<ActionExecutionSystem>& context,
     ActionKind kind,
     std::uint16_t quantity,
-    std::uint32_t item_id) noexcept
+    std::uint32_t item_id,
+    const CraftRecipeDef* craft_recipe = nullptr) noexcept
 {
     const std::uint16_t safe_quantity = quantity == 0U ? 1U : quantity;
-    const double duration = action_unit_duration_minutes(kind, item_id) * static_cast<double>(safe_quantity);
+    const double duration =
+        action_unit_duration_minutes(kind, item_id, craft_recipe) * static_cast<double>(safe_quantity);
     return std::max(
         k_minimum_action_duration_minutes,
         duration * static_cast<double>(resolve_action_cost_multiplier(context.world.read_worker().conditions)));
@@ -319,13 +355,14 @@ void emit_worker_meter_cost_request(
     SiteSystemContext<ActionExecutionSystem>& context,
     std::uint32_t action_id,
     ActionKind action_kind,
-    std::uint16_t quantity)
+    std::uint16_t quantity,
+    const CraftRecipeDef* craft_recipe = nullptr)
 {
     const float action_multiplier =
         resolve_action_cost_multiplier(context.world.read_worker().conditions);
-    const float hydration_cost = action_hydration_cost(action_kind, quantity);
-    const float nourishment_cost = action_nourishment_cost(action_kind, quantity);
-    const float energy_cost = action_energy_cost(action_kind, quantity) * action_multiplier;
+    const float hydration_cost = action_hydration_cost(action_kind, quantity, craft_recipe);
+    const float nourishment_cost = action_nourishment_cost(action_kind, quantity, craft_recipe);
+    const float energy_cost = action_energy_cost(action_kind, quantity, craft_recipe) * action_multiplier;
     if (hydration_cost == 0.0f && nourishment_cost == 0.0f && energy_cost == 0.0f)
     {
         return;
@@ -907,11 +944,16 @@ void begin_action_execution(
         action_target_tile(action_state),
         action_state.primary_subject_id,
         static_cast<float>(action_state.remaining_action_minutes));
+    const auto* craft_recipe =
+        action_state.action_kind == ActionKind::Craft && action_state.secondary_subject_id != 0U
+        ? find_craft_recipe_def(RecipeId {action_state.secondary_subject_id})
+        : nullptr;
     emit_worker_meter_cost_request(
         context,
         action_state.current_action_id->value,
         action_state.action_kind,
-        action_state.quantity);
+        action_state.quantity,
+        craft_recipe);
     context.world.mark_projection_dirty(
         SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
 }
@@ -1706,15 +1748,12 @@ Gs1Status ActionExecutionSystem::process_message(
             }
         }
 
-        const double duration_minutes = action_kind == ActionKind::Craft && craft_recipe != nullptr
-            ? std::max(
-                  static_cast<double>(craft_recipe->craft_minutes),
-                  k_minimum_action_duration_minutes)
-            : compute_duration_minutes(
-                  context,
-                  action_kind,
-                  requested_quantity,
-                  item_id);
+        const double duration_minutes = compute_duration_minutes(
+            context,
+            action_kind,
+            requested_quantity,
+            item_id,
+            craft_recipe);
         const RuntimeActionId action_id = allocate_runtime_action_id();
 
         action_state.current_action_id = action_id;

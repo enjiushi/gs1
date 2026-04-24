@@ -1,5 +1,7 @@
 #include "messages/game_message.h"
+#include "content/defs/craft_recipe_defs.h"
 #include "content/defs/item_defs.h"
+#include "site/inventory_storage.h"
 #include "site/site_world_access.h"
 #include "site/systems/action_execution_system.h"
 #include "site/systems/ecology_system.h"
@@ -167,22 +169,83 @@ void action_execution_water_starts_immediately_and_emits_cost(
         context,
         approx_equal(
             queue[0].payload_as<SiteActionStartedMessage>().duration_minutes,
-            1.5f));
+            20.0f));
     GS1_SYSTEM_TEST_CHECK(
         context,
         approx_equal(
             queue[1].payload_as<gs1::WorkerMeterDeltaRequestedMessage>().hydration_delta,
-            -0.7f));
+            -6.0f));
     GS1_SYSTEM_TEST_CHECK(
         context,
         approx_equal(
             queue[1].payload_as<gs1::WorkerMeterDeltaRequestedMessage>().nourishment_delta,
-            0.0f));
+            -2.0f));
     GS1_SYSTEM_TEST_CHECK(
         context,
         approx_equal(
             queue[1].payload_as<gs1::WorkerMeterDeltaRequestedMessage>().energy_delta,
-            -2.0f));
+            -10.0f));
+}
+
+void action_execution_craft_uses_recipe_authored_duration_and_cost(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 5034U);
+    GameMessageQueue queue {};
+    auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue);
+
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        gs1::inventory_storage::worker_pack_container(site_run),
+        gs1::ItemId {gs1::k_item_wood_bundle},
+        5U);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        gs1::inventory_storage::worker_pack_container(site_run),
+        gs1::ItemId {gs1::k_item_iron_bundle},
+        3U);
+
+    const auto workbench_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            site_context,
+            make_start_action_message(
+                GS1_SITE_ACTION_CRAFT,
+                workbench_tile,
+                1U,
+                0U,
+                gs1::k_item_workbench_kit)) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_REQUIRE(context, site_run.site_action.current_action_id.has_value());
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.action_kind == ActionKind::Craft);
+    GS1_SYSTEM_TEST_CHECK(context, queue.size() == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, queue[0].type == GameMessageType::SiteActionStarted);
+    GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameMessageType::WorkerMeterDeltaRequested);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        site_run.site_action.secondary_subject_id == gs1::k_recipe_craft_workbench);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            queue[0].payload_as<SiteActionStartedMessage>().duration_minutes,
+            2.0f));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            queue[1].payload_as<gs1::WorkerMeterDeltaRequestedMessage>().hydration_delta,
+            -0.5f));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            queue[1].payload_as<gs1::WorkerMeterDeltaRequestedMessage>().nourishment_delta,
+            -0.2f));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            queue[1].payload_as<gs1::WorkerMeterDeltaRequestedMessage>().energy_delta,
+            -1.5f));
 }
 
 void action_execution_progress_slows_with_lower_previous_work_efficiency(
@@ -586,7 +649,12 @@ void action_execution_run_completes_actions_and_emits_fact_messages(
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.started_at_world_minute.has_value());
 
     queue.clear();
-    ActionExecutionSystem::run(site_context);
+    for (std::uint32_t step = 0U;
+         step < 16U && site_run.site_action.current_action_id.has_value();
+         ++step)
+    {
+        ActionExecutionSystem::run(site_context);
+    }
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::SiteActionCompleted) == 1U);
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::SiteTileWatered) == 1U);
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::PlacementReservationReleased) == 1U);
@@ -606,7 +674,12 @@ void action_execution_run_completes_actions_and_emits_fact_messages(
             make_start_action_message(GS1_SITE_ACTION_CLEAR_BURIAL, TileCoord {1, 1}, 2U)) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.started_at_world_minute.has_value());
     queue.clear();
-    ActionExecutionSystem::run(site_context);
+    for (std::uint32_t step = 0U;
+         step < 16U && site_run.site_action.current_action_id.has_value();
+         ++step)
+    {
+        ActionExecutionSystem::run(site_context);
+    }
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::SiteActionCompleted) == 1U);
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::SiteTileBurialCleared) == 1U);
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::PlacementReservationReleased) == 1U);
@@ -646,7 +719,12 @@ void action_execution_plant_completion_emits_ground_cover_after_reservation(
     GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.awaiting_placement_reservation);
 
     queue.clear();
-    ActionExecutionSystem::run(site_context);
+    for (std::uint32_t step = 0U;
+         step < 16U && site_run.site_action.current_action_id.has_value();
+         ++step)
+    {
+        ActionExecutionSystem::run(site_context);
+    }
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::SiteActionCompleted) == 1U);
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::SiteGroundCoverPlaced) == 1U);
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::PlacementReservationReleased) == 1U);
@@ -1882,6 +1960,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "action_execution",
     "water_starts_immediately_and_emits_cost",
     action_execution_water_starts_immediately_and_emits_cost);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "action_execution",
+    "craft_uses_recipe_authored_duration_and_cost",
+    action_execution_craft_uses_recipe_authored_duration_and_cost);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "action_execution",
     "progress_slows_with_lower_previous_work_efficiency",

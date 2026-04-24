@@ -4,6 +4,9 @@ station_structure_id = 201
 output_item_id = 2
 output_quantity = 1
 craft_minutes = 1.0
+energy_cost = 1.5
+hydration_cost = 0.5
+nourishment_cost = 0.2
 ingredients = [{ item_id = 1, quantity = 1 }, { item_id = 10, quantity = 2 }]
 
 [[craft_recipes]]
@@ -12,6 +15,9 @@ station_structure_id = 202
 output_item_id = 11
 output_quantity = 1
 craft_minutes = 1.5
+energy_cost = 1.5
+hydration_cost = 0.5
+nourishment_cost = 0.2
 ingredients = [{ item_id = 8, quantity = 4 }, { item_id = 9, quantity = 2 }]
 
 [[craft_recipes]]
@@ -20,6 +26,9 @@ station_structure_id = 202
 output_item_id = 12
 output_quantity = 1
 craft_minutes = 2.0
+energy_cost = 1.5
+hydration_cost = 0.5
+nourishment_cost = 0.2
 ingredients = [{ item_id = 8, quantity = 5 }, { item_id = 9, quantity = 3 }]
 
 [[craft_recipes]]
@@ -28,6 +37,9 @@ station_structure_id = 202
 output_item_id = 13
 output_quantity = 1
 craft_minutes = 1.0
+energy_cost = 1.5
+hydration_cost = 0.5
+nourishment_cost = 0.2
 ingredients = [{ item_id = 8, quantity = 3 }, { item_id = 9, quantity = 2 }]
 
 [[craft_recipes]]
@@ -36,4 +48,7 @@ station_structure_id = 202
 output_item_id = 14
 output_quantity = 1
 craft_minutes = 1.0
+energy_cost = 1.5
+hydration_cost = 0.5
+nourishment_cost = 0.2
 ingredients = [{ item_id = 8, quantity = 2 }, { item_id = 9, quantity = 1 }]

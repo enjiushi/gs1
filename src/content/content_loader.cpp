@@ -1734,6 +1734,9 @@ void load_craft_recipe_defs(ContentDatabase& content, const std::filesystem::pat
         recipe_def.output_item_id = ItemId {require_toml_unsigned<std::uint32_t>(path, entry, "output_item_id")};
         recipe_def.output_quantity = require_toml_unsigned<std::uint16_t>(path, entry, "output_quantity");
         recipe_def.craft_minutes = require_toml_float(path, entry, "craft_minutes");
+        recipe_def.energy_cost = require_toml_float(path, entry, "energy_cost");
+        recipe_def.hydration_cost = require_toml_float(path, entry, "hydration_cost");
+        recipe_def.nourishment_cost = require_toml_float(path, entry, "nourishment_cost");
 
         const auto& ingredients = require_toml_array(path, entry, "ingredients");
         if (ingredients.size() > recipe_def.ingredients.size())
