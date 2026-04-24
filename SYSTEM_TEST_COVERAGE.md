@@ -192,6 +192,8 @@ Implemented behavior coverage should verify:
 - Starting a new action while another action is active fails with `Busy`.
 - Water and burial-clear actions begin immediately, emit `SiteActionStarted`,
   emit worker meter costs, and populate action state.
+- Action worker meter costs scale from the worker's current local heat, wind,
+  and dust using the authored weather-to-meter action coefficients.
 - Plant actions request a placement reservation first instead of starting
   immediately.
 - `PlacementReservationAccepted` transitions a waiting plant action into active

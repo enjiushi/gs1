@@ -201,6 +201,26 @@ float resolve_action_cost_multiplier(const SiteWorld::WorkerConditionData& worke
     return 2.0f - clamped_efficiency;
 }
 
+float resolve_weather_scaled_action_cost(
+    float base_cost,
+    const SiteWorld::TileLocalWeatherData& local_weather,
+    float heat_to_cost,
+    float wind_to_cost,
+    float dust_to_cost) noexcept
+{
+    if (base_cost == 0.0f)
+    {
+        return 0.0f;
+    }
+
+    const float weather_multiplier =
+        1.0f +
+        std::max(local_weather.heat, 0.0f) * heat_to_cost +
+        std::max(local_weather.wind, 0.0f) * wind_to_cost +
+        std::max(local_weather.dust, 0.0f) * dust_to_cost;
+    return base_cost * weather_multiplier;
+}
+
 double compute_duration_minutes(
     SiteSystemContext<ActionExecutionSystem>& context,
     ActionKind kind,
@@ -358,11 +378,35 @@ void emit_worker_meter_cost_request(
     std::uint16_t quantity,
     const CraftRecipeDef* craft_recipe = nullptr)
 {
+    const auto worker = context.world.read_worker();
+    const auto local_weather = context.world.read_tile_local_weather(worker.position.tile_coord);
+    const auto* action_def = find_site_action_def(action_kind);
     const float action_multiplier =
         resolve_action_cost_multiplier(context.world.read_worker().conditions);
-    const float hydration_cost = action_hydration_cost(action_kind, quantity, craft_recipe);
-    const float nourishment_cost = action_nourishment_cost(action_kind, quantity, craft_recipe);
-    const float energy_cost = action_energy_cost(action_kind, quantity, craft_recipe) * action_multiplier;
+    const float hydration_cost = action_def == nullptr
+        ? action_hydration_cost(action_kind, quantity, craft_recipe)
+        : resolve_weather_scaled_action_cost(
+            action_hydration_cost(action_kind, quantity, craft_recipe),
+            local_weather,
+            action_def->heat_to_hydration_cost,
+            action_def->wind_to_hydration_cost,
+            action_def->dust_to_hydration_cost);
+    const float nourishment_cost = action_def == nullptr
+        ? action_nourishment_cost(action_kind, quantity, craft_recipe)
+        : resolve_weather_scaled_action_cost(
+            action_nourishment_cost(action_kind, quantity, craft_recipe),
+            local_weather,
+            action_def->heat_to_nourishment_cost,
+            action_def->wind_to_nourishment_cost,
+            action_def->dust_to_nourishment_cost);
+    const float energy_cost = (action_def == nullptr
+        ? action_energy_cost(action_kind, quantity, craft_recipe)
+        : resolve_weather_scaled_action_cost(
+            action_energy_cost(action_kind, quantity, craft_recipe),
+            local_weather,
+            action_def->heat_to_energy_cost,
+            action_def->wind_to_energy_cost,
+            action_def->dust_to_energy_cost)) * action_multiplier;
     if (hydration_cost == 0.0f && nourishment_cost == 0.0f && energy_cost == 0.0f)
     {
         return;

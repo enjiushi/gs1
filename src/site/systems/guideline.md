@@ -9,7 +9,7 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 
 ## Contents
 - `action_execution_system.h`: Action execution system interface.
-- `action_execution_system.cpp`: Executes queued site actions using the canonical real-seconds-to-action-minutes conversion, derives action duration plus instant worker action costs from the previous-frame work-efficiency snapshot, reads recipe-authored craft duration and worker meter costs, emits follow-up gameplay messages, supports harvest actions for density-ready plants, and re-arms plant placement mode after successful item-based planting when matching seeds remain in the worker pack.
+- `action_execution_system.cpp`: Executes queued site actions using the canonical real-seconds-to-action-minutes conversion, derives action duration plus instant worker action costs from the previous-frame work-efficiency snapshot, scales authored worker meter costs from the worker tile's current local weather when the action starts, reads recipe-authored craft duration and worker meter costs, emits follow-up gameplay messages, supports harvest actions for density-ready plants, and re-arms plant placement mode after successful item-based planting when matching seeds remain in the worker pack.
 - `camp_durability_system.h`: Camp durability system interface.
 - `camp_durability_system.cpp`: Applies camp wear/failure effects to camp durability state using content-authored wear-rate and service-threshold tuning.
 - `craft_system.h`: Craft system interface.
@@ -46,7 +46,7 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `site_time_system.cpp`: Owns fixed-step-derived site clock, day index, and day-phase advancement.
 - `site_system_context.h`: Shared dependency bundle passed into site systems.
 - `task_board_system.h`: Task board system interface.
-- `task_board_system.cpp`: Manages board listings, acceptance, eligibility-filtered three-faction task-generator seeding, per-instance procedural resolution of x/y/z task values from authored ranges and eligible pools, task-owned mirror caches fed only by owner-emitted buy/sell/transfer/plant/craft/build and worker/tile/device/living-plant-stability state messages, duration accumulation over those subscribed conditions, message-driven living-plant non-withering checks, reward-claim no-ops for the current zero-reward contract, and reset flow on dense-restoration site one.
+- `task_board_system.cpp`: Manages board listings, acceptance, task-instance resolution from single-value template fields with `0`/`None` procedural sentinels, site-keyed onboarding-task seeding on site start, task-owned mirror caches fed only by owner-emitted buy/sell/transfer/plant/craft/build and worker/tile/device/living-plant-stability state messages, duration accumulation over those subscribed conditions, message-driven living-plant non-withering checks, fixed single-option onboarding reward drafts, and site-start board reset plus tracking-cache initialization.
 - `weather_event_system.h`: Weather event system interface.
 - `weather_event_system.cpp`: Applies site-owned weather/event state changes, including authored default-weather baselines, temporary Site 1 startup weather probe logs tagged at debug level for verbose-only smoke output, start/peak/end timeline interpolation for additive event pressure, and recurring one-sided highway-protection waves.
 - `worker_condition_system.h`: Worker condition system interface.

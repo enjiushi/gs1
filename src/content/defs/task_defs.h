@@ -50,10 +50,8 @@ struct TaskTemplateDef final
     FactionId publisher_faction_id {};
     std::uint32_t task_tier_id {0};
     TaskProgressKind progress_kind {TaskProgressKind::None};
-    std::uint32_t target_amount_min {0};
-    std::uint32_t target_amount_max {0};
-    std::uint32_t required_count_min {0};
-    std::uint32_t required_count_max {0};
+    std::uint32_t target_amount {0};
+    std::uint32_t required_count {0};
     ItemId item_id {};
     PlantId plant_id {};
     RecipeId recipe_id {};
@@ -61,9 +59,25 @@ struct TaskTemplateDef final
     StructureId secondary_structure_id {};
     StructureId tertiary_structure_id {};
     ActionKind action_kind {ActionKind::None};
-    float threshold_value_min {0.0f};
-    float threshold_value_max {0.0f};
+    float threshold_value {0.0f};
     std::int32_t completion_faction_reputation_delta {0};
+};
+
+struct SiteOnboardingTaskSeedDef final
+{
+    SiteId site_id {};
+    TaskTemplateId task_template_id {};
+    std::uint32_t target_amount {0};
+    std::uint32_t required_count {0};
+    ItemId item_id {};
+    PlantId plant_id {};
+    RecipeId recipe_id {};
+    StructureId structure_id {};
+    StructureId secondary_structure_id {};
+    StructureId tertiary_structure_id {};
+    ActionKind action_kind {ActionKind::None};
+    float threshold_value {0.0f};
+    RewardCandidateId reward_candidate_id {};
 };
 
 inline constexpr std::uint32_t k_task_template_site1_restore_patch = 1U;
@@ -80,4 +94,5 @@ inline constexpr std::uint32_t k_task_template_site1_keep_living_plants_stable =
 
 [[nodiscard]] std::span<const TaskTemplateDef> all_task_template_defs() noexcept;
 [[nodiscard]] const TaskTemplateDef* find_task_template_def(TaskTemplateId task_template_id) noexcept;
+[[nodiscard]] std::span<const SiteOnboardingTaskSeedDef> all_site_onboarding_task_seed_defs() noexcept;
 }  // namespace gs1

@@ -4448,6 +4448,7 @@ Use these rules:
 
 - passive frame loss, action costs, and item-consumption deltas should be accumulated into one delta bucket per worker meter before clamping
 - action duration and action energy cost for the current frame should use `playerWorkEfficiency` from the previous frame to avoid circular dependency
+- when an action execution actually starts, its worker meter costs should sample the worker tile's current resolved `tileHeat`, `tileWind`, and `tileDust` once and scale each authored action-cost meter by the matching weather-to-meter coefficients
 - resolve current-frame `playerHealth`, `playerHydration`, `playerNourishment`, and `playerMorale` first
 - resolve current-frame derived `playerEnergyCap` from the current-frame `playerHealth`, `playerHydration`, and `playerNourishment`
 - resolve current-frame `playerEnergy` next and clamp it against the current-frame derived `playerEnergyCap`
@@ -4589,8 +4590,35 @@ Action-cost and duration rule:
 ```text
 actionMultiplier = 2 - playerWorkEfficiencyPrev
 
+actionHydrationWeatherMultiplier =
+  1 +
+  tileHeatAtActionStart * heatToHydrationCost +
+  tileWindAtActionStart * windToHydrationCost +
+  tileDustAtActionStart * dustToHydrationCost
+
+actionNourishmentWeatherMultiplier =
+  1 +
+  tileHeatAtActionStart * heatToNourishmentCost +
+  tileWindAtActionStart * windToNourishmentCost +
+  tileDustAtActionStart * dustToNourishmentCost
+
+actionEnergyWeatherMultiplier =
+  1 +
+  tileHeatAtActionStart * heatToEnergyCost +
+  tileWindAtActionStart * windToEnergyCost +
+  tileDustAtActionStart * dustToEnergyCost
+
+effectiveActionHydrationCost =
+  baseActionHydrationCost *
+  actionHydrationWeatherMultiplier
+
+effectiveActionNourishmentCost =
+  baseActionNourishmentCost *
+  actionNourishmentWeatherMultiplier
+
 effectiveActionEnergyCost =
   baseActionEnergyCost *
+  actionEnergyWeatherMultiplier *
   actionMultiplier *
   resolvedActionEnergyCostFactor
 
@@ -4598,6 +4626,13 @@ effectiveActionDuration =
   baseActionDuration *
   actionMultiplier
 ```
+
+Prototype authoring note:
+
+- the current prototype uses a per-weather/per-meter matrix instead of one shared weather multiplier:
+- `heat -> hydration = 0.01`, `heat -> energy = 0.005`, `heat -> nourishment = 0.0`
+- `wind -> hydration = 0.005`, `wind -> energy = 0.01`, `wind -> nourishment = 0.005`
+- `dust -> hydration = 0.002`, `dust -> energy = 0.002`, `dust -> nourishment = 0.002`
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
@@ -4769,7 +4804,7 @@ Use this loop as the core mental model:
 2. Event state updates `eventHeatPressure`, `eventWindPressure`, and `eventDustPressure`.
 3. Weather updates `weatherHeat`, `weatherWind`, and `weatherDust` from baseline site conditions plus current event meters.
 4. Site weather plus active `Per-Site Modifier`s, local plants, `Straw Checkerboard`, protective structures, and terrain shelter resolve `tileHeat`, `tileWind`, and `tileDust`.
-5. Worker state resolves from previous-frame worker condition plus current-frame passive weather loss, action deltas, and valid item-use deltas such as `drink`, `eat`, or `useMedicine`, then derives current-frame `playerEnergyCap` from `playerHealth`, `playerHydration`, and `playerNourishment`, and finally derives current-frame `playerWorkEfficiency`.
+5. Worker state resolves from previous-frame worker condition plus current-frame passive weather loss, weather-scaled action deltas sampled when an action starts, and valid item-use deltas such as `drink`, `eat`, or `useMedicine`, then derives current-frame `playerEnergyCap` from `playerHealth`, `playerHydration`, and `playerNourishment`, and finally derives current-frame `playerWorkEfficiency`.
 6. Item state updates `itemQuantity`, `itemCondition`, and `itemFreshness` from use, transfers, harvest gain, sales, and hazard-side damage or spoilage on exposed stored items.
 7. Resolved local weather, active `Per-Site Modifier`s, irrigation, and plant contribution values update terrain pressure: moisture drain, burial, fertility change, and salinity change.
 8. Terrain state plus resolved local weather and plant resistance values feed `growthPressure`.

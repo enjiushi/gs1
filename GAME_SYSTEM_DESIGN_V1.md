@@ -819,6 +819,7 @@ Rules:
 - reserved input items are not permanently consumed until successful action completion unless the action definition explicitly spends on start
 - interruption clears the active action and releases unspent reserved inputs
 - item-based planting resolves `totalActionMinutes` from the linked `PlantDef.plantActionDurationMinutes`; other prototype site actions may still use action-definition defaults
+- when an action execution actually starts, the runtime samples the worker tile's current local heat, wind, and dust once and scales the authored hydration, nourishment, and energy action costs through per-action weather-to-meter coefficients
 
 ### 6.16 `WeatherState`
 
@@ -1194,6 +1195,7 @@ Responsibilities:
 
 - hold one active manual action for the worker
 - derive action duration and instant worker action-cost deltas from the previous-frame `workEfficiency` snapshot
+- scale authored hydration, nourishment, and energy action costs from the worker tile's current local weather using per-action weather-to-meter coefficients when the action actually starts
 - check action completion against elapsed action time
 - on completion, emit domain messages that mutate inventory, tiles, or devices
 - apply interruption rules during severe hazards or cancellation

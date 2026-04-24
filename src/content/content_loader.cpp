@@ -1210,10 +1210,8 @@ void load_task_template_defs(ContentDatabase& content, const std::filesystem::pa
                 path,
                 toml_line_number(entry),
                 require_toml_string(path, entry, "progress_kind")),
-            require_toml_unsigned<std::uint32_t>(path, entry, "target_amount_min"),
-            require_toml_unsigned<std::uint32_t>(path, entry, "target_amount_max"),
-            require_toml_unsigned<std::uint32_t>(path, entry, "required_count_min"),
-            require_toml_unsigned<std::uint32_t>(path, entry, "required_count_max"),
+            require_toml_unsigned<std::uint32_t>(path, entry, "target_amount"),
+            require_toml_unsigned<std::uint32_t>(path, entry, "required_count"),
             ItemId {require_toml_unsigned<std::uint32_t>(path, entry, "item_id")},
             PlantId {require_toml_unsigned<std::uint32_t>(path, entry, "plant_id")},
             RecipeId {require_toml_unsigned<std::uint32_t>(path, entry, "recipe_id")},
@@ -1224,9 +1222,35 @@ void load_task_template_defs(ContentDatabase& content, const std::filesystem::pa
                 path,
                 toml_line_number(entry),
                 require_toml_string(path, entry, "action_kind")),
-            require_toml_float(path, entry, "threshold_value_min"),
-            require_toml_float(path, entry, "threshold_value_max"),
+            require_toml_float(path, entry, "threshold_value"),
             require_toml_signed<std::int32_t>(path, entry, "completion_faction_reputation_delta")});
+    }
+}
+
+void load_site_onboarding_task_seed_defs(ContentDatabase& content, const std::filesystem::path& path)
+{
+    const auto document = load_toml_document(path);
+    const auto& task_seeds = require_toml_array(path, document, "site_onboarding_task_seeds");
+    for (const auto& node : task_seeds)
+    {
+        const auto& entry = require_array_entry_table(path, node, "site_onboarding_task_seeds");
+        content.site_onboarding_task_seed_defs.push_back(SiteOnboardingTaskSeedDef {
+            SiteId {require_toml_unsigned<std::uint32_t>(path, entry, "site_id")},
+            TaskTemplateId {require_toml_unsigned<std::uint32_t>(path, entry, "task_template_id")},
+            require_toml_unsigned<std::uint32_t>(path, entry, "target_amount"),
+            require_toml_unsigned<std::uint32_t>(path, entry, "required_count"),
+            ItemId {require_toml_unsigned<std::uint32_t>(path, entry, "item_id")},
+            PlantId {require_toml_unsigned<std::uint32_t>(path, entry, "plant_id")},
+            RecipeId {require_toml_unsigned<std::uint32_t>(path, entry, "recipe_id")},
+            StructureId {require_toml_unsigned<std::uint32_t>(path, entry, "structure_id")},
+            StructureId {require_toml_unsigned<std::uint32_t>(path, entry, "secondary_structure_id")},
+            StructureId {require_toml_unsigned<std::uint32_t>(path, entry, "tertiary_structure_id")},
+            parse_action_kind(
+                path,
+                toml_line_number(entry),
+                require_toml_string(path, entry, "action_kind")),
+            require_toml_float(path, entry, "threshold_value"),
+            RewardCandidateId {require_toml_unsigned<std::uint32_t>(path, entry, "reward_candidate_id")}});
     }
 }
 
@@ -1267,6 +1291,15 @@ void load_site_action_defs(ContentDatabase& content, const std::filesystem::path
             require_toml_float(path, entry, "energy_cost_per_unit"),
             require_toml_float(path, entry, "hydration_cost_per_unit"),
             require_toml_float(path, entry, "nourishment_cost_per_unit"),
+            require_toml_float(path, entry, "heat_to_energy_cost"),
+            require_toml_float(path, entry, "wind_to_energy_cost"),
+            require_toml_float(path, entry, "dust_to_energy_cost"),
+            require_toml_float(path, entry, "heat_to_hydration_cost"),
+            require_toml_float(path, entry, "wind_to_hydration_cost"),
+            require_toml_float(path, entry, "dust_to_hydration_cost"),
+            require_toml_float(path, entry, "heat_to_nourishment_cost"),
+            require_toml_float(path, entry, "wind_to_nourishment_cost"),
+            require_toml_float(path, entry, "dust_to_nourishment_cost"),
             parse_placement_occupancy_layer(
                 path,
                 toml_line_number(entry),
@@ -1794,6 +1827,7 @@ ContentDatabase ContentLoader::load_prototype_content()
     const auto structures_path = root / "structures.toml";
     const auto craft_recipes_path = root / "craft_recipes.toml";
     const auto task_templates_path = root / "task_templates.toml";
+    const auto site_onboarding_task_seeds_path = root / "site_onboarding_task_seeds.toml";
     const auto reward_candidates_path = root / "reward_candidates.toml";
     const auto site_actions_path = root / "site_actions.toml";
     const auto modifier_presets_path = root / "modifier_presets.toml";
@@ -1813,6 +1847,7 @@ ContentDatabase ContentLoader::load_prototype_content()
     load_structure_defs(content, structures_path);
     load_craft_recipe_defs(content, craft_recipes_path);
     load_task_template_defs(content, task_templates_path);
+    load_site_onboarding_task_seed_defs(content, site_onboarding_task_seeds_path);
     load_reward_candidate_defs(content, reward_candidates_path);
     load_site_action_defs(content, site_actions_path);
     load_modifier_preset_defs(content, modifier_presets_path);

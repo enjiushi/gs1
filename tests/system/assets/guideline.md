@@ -13,4 +13,4 @@ Asset-authored `.gs1systemtest` packs grouped by gameplay system or regression a
 - `economy_phone/`: Economy phone/shop regression assets.
 - `inventory/`: Inventory use and transfer regression assets.
 - `placement_validation/`: Placement validation acceptance/rejection regression assets.
-- `task_board/`: Task board completion/reset regression assets.
+- `task_board/`: Task board reset regression assets.

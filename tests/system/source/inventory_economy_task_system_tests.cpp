@@ -2,6 +2,7 @@
 #include "content/defs/plant_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/faction_defs.h"
+#include "content/defs/structure_defs.h"
 #include "content/defs/task_defs.h"
 #include "site/systems/action_execution_system.h"
 #include "site/systems/device_maintenance_system.h"
@@ -1130,6 +1131,119 @@ gs1::TaskInstanceState* find_task_by_template_id(
     return nullptr;
 }
 
+void seed_placeholder_task_board_for_tests(gs1::SiteRunState& site_run)
+{
+    auto& board = site_run.task_board;
+    board.visible_tasks.clear();
+    board.accepted_task_ids.clear();
+    board.completed_task_ids.clear();
+    board.claimed_task_ids.clear();
+
+    auto add_task = [&](gs1::TaskInstanceState task) {
+        board.visible_tasks.push_back(task);
+    };
+
+    add_task(gs1::TaskInstanceState {
+        gs1::TaskInstanceId {1U},
+        gs1::TaskTemplateId {gs1::k_task_template_site1_restore_patch},
+        gs1::FactionId {gs1::k_faction_forestry_bureau},
+        1U,
+        site_run.counters.site_completion_tile_threshold,
+        0U,
+        0U,
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        gs1::ActionKind::None,
+        0.0f});
+    add_task(gs1::TaskInstanceState {
+        gs1::TaskInstanceId {2U},
+        gs1::TaskTemplateId {gs1::k_task_template_site1_buy_water},
+        gs1::FactionId {gs1::k_faction_village_committee},
+        1U,
+        1U,
+        0U,
+        0U,
+        gs1::ItemId {gs1::k_item_water_container},
+        {},
+        {},
+        {},
+        {},
+        {},
+        gs1::ActionKind::None,
+        0.0f});
+    add_task(gs1::TaskInstanceState {
+        gs1::TaskInstanceId {3U},
+        gs1::TaskTemplateId {gs1::k_task_template_site1_transfer_seeds},
+        gs1::FactionId {gs1::k_faction_village_committee},
+        1U,
+        2U,
+        0U,
+        0U,
+        gs1::ItemId {gs1::k_item_basic_straw_checkerboard},
+        {},
+        {},
+        {},
+        {},
+        {},
+        gs1::ActionKind::None,
+        0.0f});
+    add_task(gs1::TaskInstanceState {
+        gs1::TaskInstanceId {4U},
+        gs1::TaskTemplateId {gs1::k_task_template_site1_build_camp_stove},
+        gs1::FactionId {gs1::k_faction_agricultural_university},
+        1U,
+        1U,
+        0U,
+        0U,
+        {},
+        {},
+        {},
+        gs1::StructureId {gs1::k_structure_camp_stove},
+        {},
+        {},
+        gs1::ActionKind::None,
+        0.0f});
+    add_task(gs1::TaskInstanceState {
+        gs1::TaskInstanceId {5U},
+        gs1::TaskTemplateId {gs1::k_task_template_site1_keep_worker_meters_high},
+        gs1::FactionId {gs1::k_faction_village_committee},
+        2U,
+        4U,
+        0U,
+        0U,
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        gs1::ActionKind::None,
+        85.0f});
+    add_task(gs1::TaskInstanceState {
+        gs1::TaskInstanceId {6U},
+        gs1::TaskTemplateId {gs1::k_task_template_site1_keep_living_plants_stable},
+        gs1::FactionId {gs1::k_faction_forestry_bureau},
+        2U,
+        4U,
+        2U,
+        0U,
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        gs1::ActionKind::None,
+        0.0f});
+
+    board.task_pool_size = static_cast<std::uint32_t>(board.visible_tasks.size());
+    board.minutes_until_next_refresh = 0.0;
+}
+
 std::size_t count_queued_messages(
     const GameMessageQueue& queue,
     GameMessageType type)
@@ -1138,22 +1252,6 @@ std::size_t count_queued_messages(
     for (const auto& message : queue)
     {
         if (message.type == type)
-        {
-            count += 1U;
-        }
-    }
-
-    return count;
-}
-
-std::size_t count_tasks_by_faction(
-    const gs1::TaskBoardState& task_board,
-    std::uint32_t faction_id)
-{
-    std::size_t count = 0U;
-    for (const auto& task : task_board.visible_tasks)
-    {
-        if (task.publisher_faction_id.value == faction_id)
         {
             count += 1U;
         }
@@ -1208,6 +1306,7 @@ void start_task_board_with_owner_snapshots(
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         TaskBoardSystem::process_message(task_context, start_message) == GS1_STATUS_OK);
+    seed_placeholder_task_board_for_tests(site_run);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         EcologySystem::process_message(ecology_context, start_message) == GS1_STATUS_OK);
@@ -1236,7 +1335,8 @@ void start_task_board_with_owner_snapshots(
     }
 }
 
-void task_board_site_run_started_seeds_site_one_board(gs1::testing::SystemTestExecutionContext& context)
+void task_board_site_run_started_leaves_board_empty_until_tasks_are_authored(
+    gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(1U, 1001U);
@@ -1244,35 +1344,23 @@ void task_board_site_run_started_seeds_site_one_board(gs1::testing::SystemTestEx
     auto site_context = make_site_context<TaskBoardSystem>(campaign, site_run, queue);
 
     site_run.counters.site_completion_tile_threshold = 5U;
-    auto grown_tile_a = site_run.site_world->tile_at({2, 2});
-    grown_tile_a.ecology.plant_id = gs1::PlantId {gs1::k_plant_ordos_wormwood};
-    grown_tile_a.ecology.plant_density = 100.0f;
-    site_run.site_world->set_tile({2, 2}, grown_tile_a);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_message(
+            site_context,
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
-    auto grown_tile_b = site_run.site_world->tile_at({3, 2});
-    grown_tile_b.ecology.plant_id = gs1::PlantId {gs1::k_plant_white_thorn};
-    grown_tile_b.ecology.plant_density = 100.0f;
-    site_run.site_world->set_tile({3, 2}, grown_tile_b);
-
-    start_task_board_with_owner_snapshots(context, campaign, site_run, queue, site_context);
-
-    GS1_SYSTEM_TEST_REQUIRE(context, site_run.task_board.visible_tasks.size() == 26U);
-    auto* task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_restore_patch);
-    GS1_SYSTEM_TEST_REQUIRE(context, task != nullptr);
-    GS1_SYSTEM_TEST_CHECK(context, task->target_amount == 5U);
-    GS1_SYSTEM_TEST_CHECK(context, task->current_progress_amount == 2U);
-    GS1_SYSTEM_TEST_CHECK(context, task->runtime_list_kind == TaskRuntimeListKind::Visible);
-    GS1_SYSTEM_TEST_CHECK(context, task->reward_draft_options.empty());
+    GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.visible_tasks.empty());
+    GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.task_pool_size == 0U);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.task_board.minutes_until_next_refresh, 0.0));
     GS1_SYSTEM_TEST_CHECK(
         context,
-        count_tasks_by_faction(site_run.task_board, gs1::k_faction_village_committee) == 8U);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        count_tasks_by_faction(site_run.task_board, gs1::k_faction_forestry_bureau) == 10U);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        count_tasks_by_faction(site_run.task_board, gs1::k_faction_agricultural_university) == 8U);
+        site_run.task_board.tracked_tiles.size() ==
+            static_cast<std::size_t>(site_run.task_board.tracked_tile_width) *
+                static_cast<std::size_t>(site_run.task_board.tracked_tile_height));
+    GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.site_completion_tile_threshold == 5U);
 }
 
 void task_board_non_site_run_started_clears_existing_board_state(
@@ -1861,8 +1949,8 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     economy_repeated_cart_add_requests_clamp_without_failure);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "task_board",
-    "site_run_started_seeds_site_one_board",
-    task_board_site_run_started_seeds_site_one_board);
+    "site_run_started_leaves_board_empty_until_tasks_are_authored",
+    task_board_site_run_started_leaves_board_empty_until_tasks_are_authored);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "task_board",
     "non_site_run_started_clears_existing_board_state",
