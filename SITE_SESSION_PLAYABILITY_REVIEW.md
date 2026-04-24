@@ -251,7 +251,7 @@ Purpose: freeze the shared message meanings before splitting work across multipl
 | `InventorySystem` | Worker pack slots, device-backed storage slots, pending deliveries, item reservations | Economy purchases, action needs, task rewards, hazard facts | `InventorySlotChanged`, `InventoryItemsReserved`, `InventoryReservationFailed`, `InventoryDeliveryArrived` |
 | `EconomyPhoneSystem` | Money, phone listings, site unlockable availability | Task reward grants, inventory sale requests, site run start | `MoneyChanged`, `PhoneListingChanged`, `PhoneListingPurchased`, `PhoneListingRejected`, item/contractor grant requests |
 | `TaskBoardSystem` | Visible, accepted, completed, and chain task runtime state | Action result facts, inventory facts, restoration progress, weather milestones | `TaskAccepted`, `TaskProgressChanged`, `TaskCompleted`, `TaskRewardClaimed`, reward grant requests |
-| `ModifierSystem` | Active run modifiers, nearby-site aura modifiers, resolved modifier channel totals | Site run start, task rewards, aftermath relief, technology state | `ModifierTotalsChanged`, `ModifierExpired` |
+| `ModifierSystem` | Active run modifiers, nearby-site aura modifiers, resolved modifier channel totals | Site run start, task rewards, post-event support, technology state | `ModifierTotalsChanged`, `ModifierExpired` |
 | `FailureRecoverySystem` | Failure transition decision | Worker/camp failure facts, run status | Existing `SiteAttemptEnded` with `FAILED` |
 | `SiteCompletionSystem` | Completion transition decision | Restoration progress, run status | Existing `SiteAttemptEnded` with `COMPLETED` |
 
@@ -363,7 +363,7 @@ Weather, local weather, and harsh events:
 | `WeatherEventPhaseChanged` | Event template id, phase, phase minutes remaining, pressure channels | `WeatherEventSystem` | Worker condition, ecology, camp, devices, task board, projection |
 | `WeatherPressureChanged` | Site heat, wind, dust, event template id, phase | `WeatherEventSystem` | `LocalWeatherResolveSystem`, HUD/weather projection |
 | `LocalWeatherThresholdChanged` | Tile or area id plus heat/wind/dust threshold bands | `LocalWeatherResolveSystem` | Worker condition, ecology, task board |
-| `AftermathReliefOffered` | Event template id, faction id, relief offer id | Weather/event or task/economy integration | Economy, task board, inventory, modifiers |
+| `PostEventReliefOffered` | Event template id, faction id, relief offer id | Weather/event or task/economy integration | Economy, task board, inventory, modifiers |
 
 Ecology and restoration:
 
@@ -421,8 +421,8 @@ Task board and rewards:
 | `TaskCompleted` | Task instance id, template id, faction id | `TaskBoardSystem` | Projection, reward availability, faction reputation |
 | `TaskRewardClaimRequested` | Task instance id and selected reward candidate id | UI action | `TaskBoardSystem` |
 | `TaskRewardClaimed` | Task instance id and selected reward candidate id | `TaskBoardSystem` | Economy, inventory, modifiers, faction reputation, projection |
-| `FactionReputationDeltaRequested` | Faction id, amount, reason code | Task board, aftermath flow | Future faction reputation system |
-| `RunModifierGrantRequested` | Modifier id, source id, duration rule | Task rewards, site unlockables, aftermath relief | `ModifierSystem` |
+| `FactionReputationDeltaRequested` | Faction id, amount, reason code | Task board, post-event follow-through | Future faction reputation system |
+| `RunModifierGrantRequested` | Modifier id, source id, duration rule | Task rewards, site unlockables, post-event support | `ModifierSystem` |
 
 Devices, camp, and modifiers:
 

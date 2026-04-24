@@ -1291,6 +1291,7 @@ void load_site_action_defs(ContentDatabase& content, const std::filesystem::path
             require_toml_float(path, entry, "energy_cost_per_unit"),
             require_toml_float(path, entry, "hydration_cost_per_unit"),
             require_toml_float(path, entry, "nourishment_cost_per_unit"),
+            require_toml_float(path, entry, "morale_cost_per_unit"),
             require_toml_float(path, entry, "heat_to_energy_cost"),
             require_toml_float(path, entry, "wind_to_energy_cost"),
             require_toml_float(path, entry, "dust_to_energy_cost"),
@@ -1300,6 +1301,9 @@ void load_site_action_defs(ContentDatabase& content, const std::filesystem::path
             require_toml_float(path, entry, "heat_to_nourishment_cost"),
             require_toml_float(path, entry, "wind_to_nourishment_cost"),
             require_toml_float(path, entry, "dust_to_nourishment_cost"),
+            require_toml_float(path, entry, "heat_to_morale_cost"),
+            require_toml_float(path, entry, "wind_to_morale_cost"),
+            require_toml_float(path, entry, "dust_to_morale_cost"),
             parse_placement_occupancy_layer(
                 path,
                 toml_line_number(entry),
@@ -1379,10 +1383,12 @@ void load_gameplay_tuning_def(ContentDatabase& content, const std::filesystem::p
         require_toml_float(path, worker_condition, "heat_to_energy_factor");
     tuning.worker_condition.dust_to_energy_factor =
         require_toml_float(path, worker_condition, "dust_to_energy_factor");
-    tuning.worker_condition.morale_decrease_speed =
-        require_toml_float(path, worker_condition, "morale_decrease_speed");
-    tuning.worker_condition.morale_decrease_factor =
-        require_toml_float(path, worker_condition, "morale_decrease_factor");
+    tuning.worker_condition.morale_background_increase_real_minutes =
+        require_toml_float(path, worker_condition, "morale_background_increase_real_minutes");
+    tuning.worker_condition.morale_background_decrease_real_minutes =
+        require_toml_float(path, worker_condition, "morale_background_decrease_real_minutes");
+    tuning.worker_condition.morale_support_real_minutes =
+        require_toml_float(path, worker_condition, "morale_support_real_minutes");
     tuning.worker_condition.heat_to_health_factor =
         require_toml_float(path, worker_condition, "heat_to_health_factor");
     tuning.worker_condition.wind_to_health_factor =

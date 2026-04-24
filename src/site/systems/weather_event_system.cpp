@@ -315,7 +315,6 @@ void start_next_wave(SiteSystemContext<WeatherEventSystem>& context)
     event.end_time_minutes =
         event.peak_time_minutes + event.peak_duration_minutes + k_event_ramp_down_minutes;
     event.minutes_until_next_wave = 0.0;
-    event.aftermath_relief_resolved = 0.0f;
     event.wave_sequence_index += 1U;
     context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
 }
@@ -348,7 +347,6 @@ Gs1Status WeatherEventSystem::process_message(
     {
         weather.forecast_profile_state.forecast_profile_id = 2U;
         weather.site_weather_bias = 0.0f;
-        event.aftermath_relief_resolved = 0.0f;
         event.minutes_until_next_wave = resolve_next_wave_delay_minutes(context, event.wave_sequence_index);
         apply_site_weather(
             context,
@@ -372,7 +370,6 @@ Gs1Status WeatherEventSystem::process_message(
     }
 
     weather.site_weather_bias = 0.0f;
-    event.aftermath_relief_resolved = 0.0f;
     apply_site_weather(
         context,
         baseline_weather.heat,
@@ -434,7 +431,6 @@ void WeatherEventSystem::run(SiteSystemContext<WeatherEventSystem>& context)
             event.minutes_until_next_wave =
                 resolve_next_wave_delay_minutes(context, event.wave_sequence_index);
         }
-        event.aftermath_relief_resolved = 1.0f;
         context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
         smooth_site_weather_toward(
             context,

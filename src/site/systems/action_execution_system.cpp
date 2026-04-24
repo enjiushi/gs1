@@ -160,6 +160,21 @@ float action_nourishment_cost(
     return action_def == nullptr ? 0.0f : action_def->nourishment_cost_per_unit * scale;
 }
 
+float action_morale_cost(
+    ActionKind kind,
+    std::uint16_t quantity,
+    const CraftRecipeDef* craft_recipe = nullptr) noexcept
+{
+    const float scale = static_cast<float>(quantity == 0U ? 1U : quantity);
+    if (kind == ActionKind::Craft && craft_recipe != nullptr)
+    {
+        (void)craft_recipe;
+    }
+
+    const auto* action_def = find_site_action_def(kind);
+    return action_def == nullptr ? 0.0f : action_def->morale_cost_per_unit * scale;
+}
+
 double action_unit_duration_minutes(
     ActionKind kind,
     std::uint32_t item_id,
@@ -219,6 +234,26 @@ float resolve_weather_scaled_action_cost(
         std::max(local_weather.wind, 0.0f) * wind_to_cost +
         std::max(local_weather.dust, 0.0f) * dust_to_cost;
     return base_cost * weather_multiplier;
+}
+
+float resolve_weather_scaled_morale_cost(
+    float base_cost,
+    const SiteWorld::TileLocalWeatherData& local_weather,
+    float heat_to_cost,
+    float wind_to_cost,
+    float dust_to_cost) noexcept
+{
+    if (base_cost == 0.0f)
+    {
+        return 0.0f;
+    }
+
+    const float weather_fraction = std::max(
+        std::max(local_weather.heat, 0.0f) * heat_to_cost,
+        std::max(
+            std::max(local_weather.wind, 0.0f) * wind_to_cost,
+            std::max(local_weather.dust, 0.0f) * dust_to_cost));
+    return base_cost * weather_fraction;
 }
 
 double compute_duration_minutes(
@@ -407,9 +442,38 @@ void emit_worker_meter_cost_request(
             action_def->heat_to_energy_cost,
             action_def->wind_to_energy_cost,
             action_def->dust_to_energy_cost)) * action_multiplier;
-    if (hydration_cost == 0.0f && nourishment_cost == 0.0f && energy_cost == 0.0f)
+    const float morale_cost = action_def == nullptr
+        ? action_morale_cost(action_kind, quantity, craft_recipe)
+        : resolve_weather_scaled_morale_cost(
+            action_morale_cost(action_kind, quantity, craft_recipe),
+            local_weather,
+            action_def->heat_to_morale_cost,
+            action_def->wind_to_morale_cost,
+            action_def->dust_to_morale_cost);
+    if (hydration_cost == 0.0f &&
+        nourishment_cost == 0.0f &&
+        energy_cost == 0.0f &&
+        morale_cost == 0.0f)
     {
         return;
+    }
+
+    std::uint32_t changed_mask = WORKER_METER_CHANGED_NONE;
+    if (hydration_cost != 0.0f)
+    {
+        changed_mask |= WORKER_METER_CHANGED_HYDRATION;
+    }
+    if (nourishment_cost != 0.0f)
+    {
+        changed_mask |= WORKER_METER_CHANGED_NOURISHMENT;
+    }
+    if (energy_cost != 0.0f)
+    {
+        changed_mask |= WORKER_METER_CHANGED_ENERGY;
+    }
+    if (morale_cost != 0.0f)
+    {
+        changed_mask |= WORKER_METER_CHANGED_MORALE;
     }
 
     enqueue_message(
@@ -417,15 +481,13 @@ void emit_worker_meter_cost_request(
         GameMessageType::WorkerMeterDeltaRequested,
         WorkerMeterDeltaRequestedMessage {
             action_id,
-            WORKER_METER_CHANGED_HYDRATION |
-                WORKER_METER_CHANGED_NOURISHMENT |
-                WORKER_METER_CHANGED_ENERGY,
+            changed_mask,
             0.0f,
             -hydration_cost,
             -nourishment_cost,
             0.0f,
             -energy_cost,
-            0.0f,
+            -morale_cost,
             0.0f});
 }
 

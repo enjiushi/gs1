@@ -846,7 +846,6 @@ endTimeMinutes
 eventHeatPressure
 eventWindPressure
 eventDustPressure
-aftermathReliefResolved
 ```
 
 ### 6.18 `TaskBoardState`

@@ -85,7 +85,7 @@ These terms are stable and should be used consistently in future design and impl
 | `Nearby-Site Aura` | A passive `Per-Site Modifier` package projected from adjacent stabilized sites into the current site session before deployment. It should be weaker and steadier than a claimed `Run Modifier`, usually focuses on one support channel or one linked pair of meters, and should never grant full hazard immunity. |
 | `Camp Support` | The light support infrastructure on a `Site`, including shelter, `Container`s, service devices, and hired labor access. |
 | `Player Condition` | The worker's physical and mental state, represented by survival and output meters such as health, hydration, nourishment, energy cap, energy, morale, and work efficiency. |
-| `Aftermath Relief Offer` | A faction support offer that can appear after a harsh event fully resolves and the site enters recovery; its strength depends on current `Faction Reputation` and site damage. |
+| `Post-Event Relief Offer` | A faction support offer that can appear after a harsh event fully resolves and the site enters recovery; its strength depends on current `Faction Reputation` and site damage. |
 | `Wind Protection` | The total local wind-erosion shielding on a tile or patch from plant adjacency, terrain shelter, and devices; higher protection reduces exposure damage and fertility loss. |
 | `Plant Density` | The current strength and maturity of living cover or plant-derived starter cover on a tile or cluster; higher density means stronger traits, better survival, and possible natural spread for living plants, while lower density means weaker effects and higher hazard vulnerability. |
 | `Plant Trend` | The derived direction of plant density on a tile, shown as `Growing`, `Holding`, or `Withering`, based on whether the patch is gaining or losing density. |
@@ -134,7 +134,7 @@ The long-term replay goal is for players to finish a campaign and immediately im
 7. Watch weak low-density zones for density loss, erosion, burial, and other degeneration before they spread.
 8. Balance personal survival against site growth, repairs, task commitments, and the pressure to finish current tasks so new opportunities can enter the pool.
 9. Use the `Field Phone` to spend money on revealed `Site Unlockables`, supplies, harsh-event response, or contractors when needed.
-10. Use normal field work such as burial clearing, watering, and repair under harsh-event pressure when needed to protect planted regions or rescue failing utility lines; sometimes sacrifice one fringe area to save a core patch, then evaluate any `Aftermath Relief Offer`s once the event breaks.
+10. Use normal field work such as burial clearing, watering, and repair under harsh-event pressure when needed to protect planted regions or rescue failing utility lines; sometimes sacrifice one fringe area to save a core patch, then evaluate any `Post-Event Relief Offer`s once the event breaks.
 11. Convert surviving short-term gains into denser self-sustaining cover and the next safer expansion.
 
 ### Strategic Pressure Loop
@@ -331,7 +331,7 @@ Core UI rules:
 - `Main Menu` should stay minimal: start campaign, continue, settings, and quit
 - the `Regional Map` should be the single campaign-planning hub for site selection, selected-site summary, nearby-site support review, `Loadout` assembly, `Nearby-Site Aura` preview, available `Persistent Tech Tree` picks, and deployment
 - the `Field Phone` should be the single on-site management hub for `Contract Board` tasks, buying, selling, hiring, revealed `Site Unlockables`, and current faction-status review
-- site reward-claim flow and `Aftermath Relief Offer` choice should appear through the same phone flow or the same shared modal family, not as separate large systems
+- site reward-claim flow and `Post-Event Relief Offer` choice should appear through the same phone flow or the same shared modal family, not as separate large systems
 - claimed tasks should move into a separate phone-facing claimed/history presentation instead of staying mixed into the active completion list
 - site-play HUD should stay compact and always visible, covering current `Hydration`, `Energy`, money, time of day, `Heat`, `Wind`, `Dust`, current event state when relevant, and simple site-completion progress
 - accepted tasks should have a compact always-available tracker during normal site play so the player does not need to reopen the phone for every progress check
@@ -835,7 +835,6 @@ Use these runtime fields:
 | `eventDustPressure` | Continuous `0-100` | Current event-side dust pressure that feeds `weatherDust` |
 | `minutesUntilNextWave` | Continuous | Countdown to the next highway-protection wave while no event is active |
 | `eventWaveSequenceIndex` | Integer | Number of highway-protection waves already started in the current site run |
-| `aftermathReliefResolved` | Continuous `0-1` | Recovery-ready flag set once the active event fully ends |
 
 Core rule:
 
@@ -919,7 +918,7 @@ Current prototype timings:
 - `peakDuration`: fixed `5` in-game minutes
 - `peakTime + peakDuration -> endTime`: fixed `5` in-game minutes
 - for `Highway Protection`, once a wave fully ends the next wave is seeded after a random `4-8` in-game minute delay if the objective timer is still running
-- recovery and relief logic should key off the cleared event timeline plus `aftermathReliefResolved`, not a separate weather-phase enum
+- recovery and relief logic should key off the cleared event timeline and current site state, not a separate weather-phase enum
 
 #### Forecast Contract
 
@@ -941,7 +940,7 @@ Prototype presentation note:
 - the latest smoke-viewer work includes temporary wind-focused presentation scaffolding, including stronger visual normalization for low runtime wind values and fade-out retention of the last event wind heading
 - that smoke/test presentation code should not be treated as the gameplay startup weather contract; the gameplay/runtime contract for site 1 still starts calm until a real event or other weather-driving system changes it
 
-#### Runtime Pressure And Aftermath Rules
+#### Runtime Pressure And Post-Event Recovery
 
 Weather should pressure more than one system at once.
 
@@ -972,15 +971,15 @@ Those extreme weather values should then be what actually causes:
 - `tileSandBurial` gain
 - `deviceEfficiency` loss
 
-Once `worldTimeMinutes` reaches `endTimeMinutes`, direct event pressure should drop back toward `0`, site-wide weather should smooth toward calm conditions, and `aftermathReliefResolved` should flip to `1`. The event should then leave behind recoverable problems:
+Once `worldTimeMinutes` reaches `endTimeMinutes`, direct event pressure should drop back toward `0` and site-wide weather should smooth toward calm conditions. The event can still leave behind recoverable problems:
 
 - extra `tileSandBurial`
 - reduced `deviceEfficiency` from burial or damage
 - possible starter-storage or placed-device storage disruption if the camp was exposed
 - lower short-term worker morale until the site feels under control again
-- possible `Aftermath Relief Offer`s from high-reputation factions, giving the player a recovery choice rather than automatic rescue
+- possible post-event relief or support choices from high-reputation factions, giving the player a recovery choice rather than automatic rescue
 
-There is no separate runtime `Aftermath` enum in the current prototype; recovery is inferred from the cleared event timeline plus the relief-ready flag. Strong reputation should improve relief speed, package quality, and subsidy level, but it should never erase the event's damage for free.
+There is no separate runtime post-event stage or relief-ready flag in the current prototype. Recovery is inferred from the cleared event timeline plus the remaining site damage and worker condition. Strong reputation should improve relief speed, package quality, and subsidy level, but it should never erase the event's damage for free.
 
 ### Extreme Hazard Events
 
@@ -3533,9 +3532,9 @@ After a harsh event fully ends and recovery becomes available, factions should e
 
 Rules:
 
-- each of the three factions rolls separately for a possible `Aftermath Relief Offer`
+- each of the three factions rolls separately for a possible `Post-Event Relief Offer`
 - higher `Faction Reputation` improves offer chance, response speed, package strength, and subsidy level
-- relief should be a strategic choice, not an automatic bailout; accepting one offer can weaken or lock out another during the same aftermath window
+- relief should be a strategic choice, not an automatic bailout; accepting one offer can weaken or lock out another during the same post-event recovery window
 - relief should solve part of the recovery knot, not erase it
 
 Relief directions:
@@ -3907,7 +3906,7 @@ The minimum playable prototype should be a short authored `4`-site sequence in f
 
 1. `Site 1`: survive the opening minutes, complete the `Village Committee` onboarding task, unlock the `Contract Board`, and learn labor-first task play under a light harsh-environment warning
 2. Finish `Site 1`, earn a small tech unlock, and enter `Site 2` with a visible difference in capability
-3. `Site 2`: unlock the `Forestry Bureau of Autonomous Region`, learn plant-water task play, and face a stronger harsh event with meaningful aftermath
+3. `Site 2`: unlock the `Forestry Bureau of Autonomous Region`, learn plant-water task play, and face a stronger harsh event with meaningful post-event recovery pressure
 4. Recover from the event, receive faction relief based on reputation, finish the site, and buy another small unlock
 5. `Site 3`: unlock the `Autonomous Region Agricultural University`, keep the board focused on university-style work, and learn the device / forecast side of play under another higher-severity hazard
 6. Finish `Site 3`, buy another small unlock, and enter `Site 4`
@@ -4033,14 +4032,14 @@ The university must exist in play, but it does not need a full technical sandbox
 - do not implement a separate `Emergency Field Action` system in the prototype
 - harsh-environment severity should scale by site:
 - `Site 1`: low severity introduction
-- `Site 2`: medium severity event with real aftermath
+- `Site 2`: medium severity event with real post-event recovery pressure
 - `Site 3`: higher severity event that pressures the new university devices and forecast advantages
 - `Site 4`: `2-3` escalating waves, each harder than the last
 - each major event or wave must still include:
 - warning time
 - visible peak danger
 - partial damage
-- a real aftermath recovery problem
+- a real post-event recovery problem
 
 The prototype does not need a huge event catalog. It needs a readable escalation ladder.
 
@@ -4419,7 +4418,7 @@ This summary should include only core runtime meters and the core plant-side val
 |---|---|---|---|
 | `weatherHeat` | `eventHeatPressure`, smoothing toward current target, future `siteWeatherBias` work | `tileHeat` | Site-wide heat should resolve into local heat before it affects terrain, plants, or worker meters. The current prototype relaxes this back toward `0` when no event is active. |
 | `weatherWind` | `eventWindPressure`, smoothing toward current target, future `siteWeatherBias` work | `tileWind` | Site-wide wind should resolve into local wind before it affects terrain, plants, or worker meters. |
-| `weatherDust` | `eventDustPressure`, smoothing toward current target, future `siteWeatherBias` work | `tileDust` | Site-wide dust pressure should resolve into local dust before it affects terrain, plants, or worker meters. The current prototype does not yet add a separate aftermath-dust layer. |
+| `weatherDust` | `eventDustPressure`, smoothing toward current target, future `siteWeatherBias` work | `tileDust` | Site-wide dust pressure should resolve into local dust before it affects terrain, plants, or worker meters. The current prototype does not yet add a separate post-event dust layer. |
 
 ### Resolved Tile Contribution Meter Relationships
 
@@ -4491,11 +4490,19 @@ playerEnergyDeltaPassive =
     Td * resolvedDustToEnergyFactor
   )
 
-playerMoraleDeltaPassive =
-  -dt * (
-    resolvedMoraleDecreaseSpeed *
-    resolvedMoraleDecreaseFactor
-  )
+maxWeatherAtWorker = max(tileHeat, tileWind, tileDust)
+playerMoraleBackgroundFactor = clamp((50 - maxWeatherAtWorker) / 50, -1, 1)
+
+if playerMoraleBackgroundFactor >= 0:
+  playerMoraleDeltaPassive =
+    realDtSeconds *
+    playerMoraleBackgroundFactor *
+    (100 / (moraleBackgroundIncreaseRealMinutes * 60))
+else:
+  playerMoraleDeltaPassive =
+    realDtSeconds *
+    playerMoraleBackgroundFactor *
+    (100 / (moraleBackgroundDecreaseRealMinutes * 60))
 
 playerHealthDeltaPassive =
   -dt * (
@@ -4608,6 +4615,13 @@ actionEnergyWeatherMultiplier =
   tileWindAtActionStart * windToEnergyCost +
   tileDustAtActionStart * dustToEnergyCost
 
+actionMoraleWeatherFactor =
+  max(
+    tileHeatAtActionStart * heatToMoraleCost,
+    tileWindAtActionStart * windToMoraleCost,
+    tileDustAtActionStart * dustToMoraleCost
+  )
+
 effectiveActionHydrationCost =
   baseActionHydrationCost *
   actionHydrationWeatherMultiplier
@@ -4621,6 +4635,10 @@ effectiveActionEnergyCost =
   actionEnergyWeatherMultiplier *
   actionMultiplier *
   resolvedActionEnergyCostFactor
+
+effectiveActionMoraleCost =
+  baseActionMoraleCost *
+  actionMoraleWeatherFactor
 
 effectiveActionDuration =
   baseActionDuration *
@@ -4641,7 +4659,7 @@ Prototype authoring note:
 | `playerNourishment` | Eating actions, items with `eat` capability, time, `tileWind`, `tileHeat`, `tileDust`, outdoor work | derived `playerEnergyCap`, derived `playerWorkEfficiency` | Slower-moving worker support meter for sustained efficiency and recovery. It should mainly limit the usable energy ceiling and the next frame's work efficiency instead of acting as a separate direct failure timer. |
 | derived `playerEnergyCap` | current-frame `playerHealth`, current-frame `playerHydration`, current-frame `playerNourishment`, `energy-cap` factor modifiers | `playerEnergy` | Current usable energy ceiling. It is derived each frame rather than stored as an authored meter, and current-frame `playerEnergy` must always clamp against it. |
 | `playerEnergy` | Work actions, rest recovery, time, `tileHeat`, `tileWind`, `tileDust`, current-frame derived `playerEnergyCap` | None | Main short-term work-capacity meter and end-consumption meter. It should always clamp to the current-frame derived `playerEnergyCap`. |
-| `playerMorale` | Safe rest, dense-cover recovery pockets, harsh-event aftermath, current site setbacks and recovery progress | derived `playerWorkEfficiency` | Worker comfort and psychological stability meter. Low morale should make routine work slower and more energy-expensive rather than directly lowering the derived energy cap. |
+| `playerMorale` | Safe rest, dense-cover recovery pockets, post-event site recovery, current site setbacks and recovery progress | derived `playerWorkEfficiency` | Worker comfort and psychological stability meter. Low morale should make routine work slower and more energy-expensive rather than directly lowering the derived energy cap. |
 | derived `playerWorkEfficiency` | current-frame `playerHealth`, current-frame `playerHydration`, current-frame `playerNourishment`, current-frame `playerMorale`, `work-efficiency` factor modifiers | Action energy cost, action duration for the next frame | Derived worker-output value. It should be recomputed after current-frame condition resolution, then used as the previous-frame efficiency input for the next frame's action duration and action energy cost. |
 
 ### Technology Progression Meter Relationships
@@ -4649,7 +4667,7 @@ Prototype authoring note:
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
 | `reputation` | Site completion, selected task rewards, commendations, major campaign progress | Global plant-tier eligibility, neutral base-tech tier eligibility, and broader program trust | Campaign-wide trust meter. In the prototype it unlocks the three global plant tiers plus neutral base-tech access but is never spent on tech. |
-| `factionReputation[factionId]` | Completed tasks from that faction, faction events, aftermath follow-through | Faction-enhancement-tier eligibility, aftermath relief quality, faction-side event quality | Branch-specific total trust meter. It gates faction enhancement depth but is never spent. |
+| `factionReputation[factionId]` | Completed tasks from that faction, faction events, post-event follow-through | Faction-enhancement-tier eligibility, post-event relief quality, faction-side event quality | Branch-specific total trust meter. It gates faction enhancement depth but is never spent. |
 | `campaignCash` | Site money rewards, buy/sell outcomes, contractor spending, unlock purchases, tech claims | Site purchasing power and tech claims | Persistent campaign money shared across site runs. It is the only prototype currency used to buy base techs and enhancements. |
 
 Important rule:

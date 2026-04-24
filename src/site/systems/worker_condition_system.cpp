@@ -53,6 +53,8 @@ constexpr float kWorkEfficiencyMax = 1.0f;
 constexpr float kWorkEfficiencyMin = 0.4f;
 constexpr float kNormalizedMeterMax = 100.0f;
 constexpr float kMeterChangeThreshold = 0.01f;
+constexpr float kMoraleWeatherNeutralPoint = 50.0f;
+constexpr float kMoraleWeatherHalfBand = 50.0f;
 
 constexpr std::uint32_t kWorkerMetersChangedInitialMask =
     WORKER_METER_CHANGED_HEALTH |
@@ -225,13 +227,22 @@ WorkerMeterDeltas deltas_from_message(const WorkerMeterDeltaRequestedMessage& pa
         payload.work_efficiency_delta};
 }
 
+float resolve_morale_units_per_real_second(float full_change_real_minutes) noexcept
+{
+    return full_change_real_minutes <= 0.0f
+        ? 0.0f
+        : kNormalizedMeterMax / (full_change_real_minutes * 60.0f);
+}
+
 void accumulate_passive_deltas(
     WorkerMeterDeltas& deltas,
     const SiteWorld::WorkerConditionData& previous,
     const SiteWorld::TileLocalWeatherData& local_weather,
-    float step_game_minutes) noexcept
+    const ModifierChannelTotals& modifiers,
+    float step_game_minutes,
+    float step_real_seconds) noexcept
 {
-    if (step_game_minutes <= 0.0f)
+    if (step_game_minutes <= 0.0f && step_real_seconds <= 0.0f)
     {
         return;
     }
@@ -241,6 +252,10 @@ void accumulate_passive_deltas(
     const float heat = normalize_meter(std::max(local_weather.heat, 0.0f)) * exposure_scale;
     const float wind = normalize_meter(std::max(local_weather.wind, 0.0f)) * exposure_scale;
     const float dust = normalize_meter(std::max(local_weather.dust, 0.0f)) * exposure_scale;
+    const float max_weather =
+        std::max(
+            std::max(std::max(local_weather.heat, 0.0f), std::max(local_weather.wind, 0.0f)),
+            std::max(local_weather.dust, 0.0f)) * exposure_scale;
 
     deltas.hydration -= step_game_minutes * (
         resolve_factor(tuning.hydration_base_loss_per_game_minute) +
@@ -257,9 +272,23 @@ void accumulate_passive_deltas(
         wind * resolve_factor(tuning.wind_to_energy_factor) +
         heat * resolve_factor(tuning.heat_to_energy_factor) +
         dust * resolve_factor(tuning.dust_to_energy_factor));
-    deltas.morale -= step_game_minutes * (
-        resolve_factor(tuning.morale_decrease_speed) *
-        resolve_factor(tuning.morale_decrease_factor));
+    const float morale_weather_factor = std::clamp(
+        (kMoraleWeatherNeutralPoint - max_weather) / kMoraleWeatherHalfBand,
+        -1.0f,
+        1.0f);
+    const float morale_increase_per_real_second =
+        resolve_morale_units_per_real_second(tuning.morale_background_increase_real_minutes);
+    const float morale_decrease_per_real_second =
+        resolve_morale_units_per_real_second(tuning.morale_background_decrease_real_minutes);
+    const float morale_support_per_real_second =
+        resolve_morale_units_per_real_second(tuning.morale_support_real_minutes);
+    deltas.morale += step_real_seconds *
+        (morale_weather_factor >= 0.0f
+            ? morale_weather_factor * morale_increase_per_real_second
+            : morale_weather_factor * morale_decrease_per_real_second);
+    deltas.morale += step_real_seconds *
+        std::clamp(modifiers.morale, -1.0f, 1.0f) *
+        morale_support_per_real_second;
     deltas.health -= step_game_minutes * (
         heat * resolve_factor(tuning.heat_to_health_factor) +
         wind * resolve_factor(tuning.wind_to_health_factor) +
@@ -390,7 +419,9 @@ void WorkerConditionSystem::run(SiteSystemContext<WorkerConditionSystem>& contex
         deltas,
         previous,
         context.world.read_tile_local_weather(worker.position.tile_coord),
-        static_cast<float>(runtime_minutes_from_real_seconds(context.fixed_step_seconds)));
+        context.world.read_modifier().resolved_channel_totals,
+        static_cast<float>(runtime_minutes_from_real_seconds(context.fixed_step_seconds)),
+        static_cast<float>(std::max(0.0, context.fixed_step_seconds)));
     worker.conditions = resolve_worker_conditions(
         previous,
         deltas,

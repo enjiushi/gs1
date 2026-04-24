@@ -34,7 +34,7 @@ These areas are defined strongly enough to start module design and runtime-struc
 - Multiple site objective modes, with dense-restoration and highway-protection runtime paths ready to formalize first and green-wall/pure-survival behavior design-locked for later implementation
 - Tile model, occupancy model, tile layers, placement, and sharing rules
 - Terrain meters and plant meters
-- Weather, hazard, harsh-event, and aftermath model
+- Weather, hazard, harsh-event, and post-event recovery model
 - Worker condition model
 - Player base, containers, water handling, and contractor direction
 - Data-driven item model with runtime item meters

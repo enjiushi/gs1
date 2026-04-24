@@ -15,7 +15,7 @@ Site-owned state, ECS world support, and helper logic for active site gameplay.
 - `defs/`: Site-specific authored definition helpers, including harvest-capable site action metadata access.
 - `device_interaction_logic.h`: Helper rules for device interaction behavior.
 - `economy_state.h`: Site-local economy/shop/finance state, including content-authored phone delivery settings plus revealed/direct-purchase unlockable tracking.
-- `event_state.h`: Site event state for active/local event tracking, including absolute event timeline markers for weather interpolation.
+- `event_state.h`: Site event state for active/local event tracking, including absolute event timeline markers and active pressure channels for weather interpolation.
 - `inventory_state.h`: Inventory ownership/state for items in the site run, including harvested-output insertion into the worker pack, the pending overflow queue for delivery-crate inserts that could not fit yet, and the tracked worker-pack/device-storage panel visibility state projected to hosts.
 - `inventory_storage.h`: Inventory container/storage primitives and stack helpers.
 - `local_weather_resolve_state.h`: Local weather resolution runtime state, including the last aggregated per-tile contribution snapshot plus deferred full-snapshot emission on site start.

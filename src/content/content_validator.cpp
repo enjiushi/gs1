@@ -400,7 +400,8 @@ std::vector<ContentValidationIssue> validate_content_database(
 
             if (action_def.energy_cost_per_unit < 0.0f ||
                 action_def.hydration_cost_per_unit < 0.0f ||
-                action_def.nourishment_cost_per_unit < 0.0f)
+                action_def.nourishment_cost_per_unit < 0.0f ||
+                action_def.morale_cost_per_unit < 0.0f)
             {
                 issues.push_back(ContentValidationIssue {
                     ContentValidationSeverity::Error,
@@ -416,7 +417,10 @@ std::vector<ContentValidationIssue> validate_content_database(
                 action_def.dust_to_hydration_cost < 0.0f ||
                 action_def.heat_to_nourishment_cost < 0.0f ||
                 action_def.wind_to_nourishment_cost < 0.0f ||
-                action_def.dust_to_nourishment_cost < 0.0f)
+                action_def.dust_to_nourishment_cost < 0.0f ||
+                action_def.heat_to_morale_cost < 0.0f ||
+                action_def.wind_to_morale_cost < 0.0f ||
+                action_def.dust_to_morale_cost < 0.0f)
             {
                 issues.push_back(ContentValidationIssue {
                     ContentValidationSeverity::Error,
@@ -493,6 +497,14 @@ std::vector<ContentValidationIssue> validate_content_database(
             issues.push_back(ContentValidationIssue {
                 ContentValidationSeverity::Error,
                 "Gameplay tuning worker-condition factor max must be greater than or equal to factor min."});
+        }
+        else if (tuning.worker_condition.morale_background_increase_real_minutes <= 0.0f ||
+            tuning.worker_condition.morale_background_decrease_real_minutes <= 0.0f ||
+            tuning.worker_condition.morale_support_real_minutes <= 0.0f)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Gameplay tuning worker-condition morale background and support real-minute speeds must stay positive."});
         }
         else if (tuning.worker_condition.sheltered_exposure_scale < 0.0f ||
             tuning.worker_condition.sheltered_exposure_scale > 1.0f)

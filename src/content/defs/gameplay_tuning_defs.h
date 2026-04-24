@@ -16,8 +16,9 @@ struct WorkerConditionTuning final
     float wind_to_energy_factor {0.00375f};
     float heat_to_energy_factor {0.00375f};
     float dust_to_energy_factor {0.00375f};
-    float morale_decrease_speed {1.0f};
-    float morale_decrease_factor {0.00375f};
+    float morale_background_increase_real_minutes {3.0f};
+    float morale_background_decrease_real_minutes {3.0f};
+    float morale_support_real_minutes {2.0f};
     float heat_to_health_factor {0.20833333f};
     float wind_to_health_factor {0.20833333f};
     float dust_to_health_factor {0.10416667f};

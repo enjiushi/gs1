@@ -193,7 +193,9 @@ Implemented behavior coverage should verify:
 - Water and burial-clear actions begin immediately, emit `SiteActionStarted`,
   emit worker meter costs, and populate action state.
 - Action worker meter costs scale from the worker's current local heat, wind,
-  and dust using the authored weather-to-meter action coefficients.
+  and dust using the authored weather-to-meter action coefficients, including
+  zero-baseline morale scaling that uses the strongest weather channel instead
+  of summing all three.
 - Plant actions request a placement reservation first instead of starting
   immediately.
 - `PlacementReservationAccepted` transitions a waiting plant action into active
@@ -311,8 +313,8 @@ Implemented behavior coverage should verify:
 - Other sites or already-active event states are ignored.
 - `run()` interpolates event pressure from `startTime` to `peakTime`, holds for
   `peakDuration`, and then interpolates back down to `endTime`.
-- Passing `endTime` clears the active event, zeroes pressures, resolves
-  aftermath relief, and resets site weather.
+- Passing `endTime` clears the active event, zeroes pressures, and returns site
+  weather to its baseline track.
 - Projection dirty flags are raised when the weather/event state changes.
 
 ### `local_weather_resolve`
@@ -335,7 +337,10 @@ Implemented behavior coverage should verify:
 - The system subscribes only to `WorkerMeterDeltaRequested`.
 - The first observed worker update emits a full-mask `WorkerMetersChanged`.
 - Requested meter deltas are applied with clamping.
-- Passive `run()` drains hydration, nourishment, energy, and morale over time.
+- Passive `run()` drains hydration, nourishment, and energy over time, and
+  moves morale up or down from the current max local-weather pressure.
+- Positive resolved morale support should add to the final background morale
+  speed after the weather-driven morale result is computed.
 - Zero hydration or nourishment starts health decay.
 - When nothing changes, no message is emitted.
 - Projection dirty flags are raised when a worker update is emitted.

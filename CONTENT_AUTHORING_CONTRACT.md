@@ -357,8 +357,6 @@ Required fields:
 | `peakDurationMax` | positive number | Maximum `Peak` duration. |
 | `decayDurationMin` | positive number | Minimum `Decay` duration. |
 | `decayDurationMax` | positive number | Maximum `Decay` duration. |
-| `aftermathDurationMin` | positive number | Minimum `Aftermath` duration. |
-| `aftermathDurationMax` | positive number | Maximum `Aftermath` duration. |
 | `warningHeatPressure` | non-negative number | Event-side pressure contribution during `Warning`. |
 | `warningWindPressure` | non-negative number | Event-side pressure contribution during `Warning`. |
 | `warningDustPressure` | non-negative number | Event-side pressure contribution during `Warning`. |
@@ -371,9 +369,6 @@ Required fields:
 | `decayHeatPressure` | non-negative number | Event-side pressure contribution during `Decay`. |
 | `decayWindPressure` | non-negative number | Event-side pressure contribution during `Decay`. |
 | `decayDustPressure` | non-negative number | Event-side pressure contribution during `Decay`. |
-| `aftermathHeatPressure` | non-negative number | Event-side pressure contribution during `Aftermath`. |
-| `aftermathWindPressure` | non-negative number | Event-side pressure contribution during `Aftermath`. |
-| `aftermathDustPressure` | non-negative number | Event-side pressure contribution during `Aftermath`. |
 
 Rules:
 

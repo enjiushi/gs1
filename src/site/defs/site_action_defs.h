@@ -16,6 +16,7 @@ struct SiteActionDef final
     float energy_cost_per_unit;
     float hydration_cost_per_unit;
     float nourishment_cost_per_unit;
+    float morale_cost_per_unit;
     float heat_to_energy_cost;
     float wind_to_energy_cost;
     float dust_to_energy_cost;
@@ -25,6 +26,9 @@ struct SiteActionDef final
     float heat_to_nourishment_cost;
     float wind_to_nourishment_cost;
     float dust_to_nourishment_cost;
+    float heat_to_morale_cost;
+    float wind_to_morale_cost;
+    float dust_to_morale_cost;
     PlacementOccupancyLayer placement_occupancy_layer;
     bool requests_placement_reservation;
     bool requires_worker_approach;

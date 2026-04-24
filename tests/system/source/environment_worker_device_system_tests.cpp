@@ -308,7 +308,6 @@ void weather_event_run_advances_active_event_through_full_lifecycle(
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.weather.weather_heat, 30.0f, 0.01f));
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.weather.weather_wind, 20.0f, 0.01f));
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.weather.weather_dust, 10.0f, 0.01f));
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.event.aftermath_relief_resolved, 1.0f));
 }
 
 void weather_event_does_not_reseed_when_event_is_already_active(
@@ -739,6 +738,58 @@ void worker_condition_run_applies_passive_decay_and_derived_value_floors(
     GS1_SYSTEM_TEST_CHECK(context, queue.size() == 1U);
 }
 
+void worker_condition_run_recovers_morale_in_calm_weather(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 13021U);
+    GameMessageQueue queue {};
+    auto site_context = make_site_context<WorkerConditionSystem>(campaign, site_run, queue, 10.0);
+
+    auto worker = gs1::site_world_access::worker_conditions(site_run);
+    worker.morale = 40.0f;
+    gs1::site_world_access::set_worker_conditions(site_run, worker);
+
+    auto tile = site_run.site_world->tile_at(TileCoord {2, 2});
+    tile.local_weather.heat = 0.0f;
+    tile.local_weather.wind = 0.0f;
+    tile.local_weather.dust = 0.0f;
+    site_run.site_world->set_tile(TileCoord {2, 2}, tile);
+
+    WorkerConditionSystem::run(site_context);
+
+    const auto updated = gs1::site_world_access::worker_conditions(site_run);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(updated.morale, 45.55556f, 0.01f));
+    GS1_SYSTEM_TEST_CHECK(context, queue.size() == 1U);
+}
+
+void worker_condition_run_applies_morale_support_to_background_resolution(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 13022U);
+    GameMessageQueue queue {};
+    auto site_context = make_site_context<WorkerConditionSystem>(campaign, site_run, queue, 10.0);
+
+    auto worker = gs1::site_world_access::worker_conditions(site_run);
+    worker.morale = 40.0f;
+    gs1::site_world_access::set_worker_conditions(site_run, worker);
+
+    auto tile = site_run.site_world->tile_at(TileCoord {2, 2});
+    tile.local_weather.heat = 0.0f;
+    tile.local_weather.wind = 0.0f;
+    tile.local_weather.dust = 0.0f;
+    site_run.site_world->set_tile(TileCoord {2, 2}, tile);
+
+    site_run.modifier.resolved_channel_totals.morale = 1.0f;
+
+    WorkerConditionSystem::run(site_context);
+
+    const auto updated = gs1::site_world_access::worker_conditions(site_run);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(updated.morale, 53.88889f, 0.01f));
+    GS1_SYSTEM_TEST_CHECK(context, queue.size() == 1U);
+}
+
 void worker_condition_run_softens_environmental_decay_when_sheltered(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -795,6 +846,8 @@ void worker_condition_run_softens_environmental_decay_when_sheltered(
     GS1_SYSTEM_TEST_CHECK(context, exposed.nourishment < sheltered.nourishment);
     GS1_SYSTEM_TEST_CHECK(context, exposed.health < sheltered.health);
     GS1_SYSTEM_TEST_CHECK(context, exposed.energy < sheltered.energy);
+    GS1_SYSTEM_TEST_CHECK(context, sheltered.morale > 70.0f);
+    GS1_SYSTEM_TEST_CHECK(context, exposed.morale < sheltered.morale);
     GS1_SYSTEM_TEST_CHECK(context, exposed_queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, sheltered_queue.size() == 1U);
 }
@@ -1114,6 +1167,14 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "worker_condition",
     "run_applies_passive_decay_and_derived_value_floors",
     worker_condition_run_applies_passive_decay_and_derived_value_floors);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "worker_condition",
+    "run_recovers_morale_in_calm_weather",
+    worker_condition_run_recovers_morale_in_calm_weather);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "worker_condition",
+    "run_applies_morale_support_to_background_resolution",
+    worker_condition_run_applies_morale_support_to_background_resolution);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "worker_condition",
     "run_softens_environmental_decay_when_sheltered",
