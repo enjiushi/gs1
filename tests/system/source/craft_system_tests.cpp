@@ -257,6 +257,35 @@ void craft_cache_tracks_worker_pack_membership_by_distance(
                 GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
+    const auto item_defs = gs1::all_item_defs();
+    GS1_SYSTEM_TEST_REQUIRE(context, !item_defs.empty());
+    const auto test_item_id = item_defs.front().item_id;
+    const auto worker_pack = gs1::inventory_storage::worker_pack_container(site_run);
+    const auto worker_pack_ids_before_add =
+        gs1::inventory_storage::collect_item_instance_ids_in_container(site_run, worker_pack);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        gs1::inventory_storage::add_item_to_container(
+            site_run,
+            worker_pack,
+            test_item_id,
+            1U) == 0U);
+    const auto worker_pack_ids_after_add =
+        gs1::inventory_storage::collect_item_instance_ids_in_container(site_run, worker_pack);
+    std::uint32_t worker_pack_item_instance_id = 0U;
+    for (const auto item_instance_id : worker_pack_ids_after_add)
+    {
+        if (std::find(
+                worker_pack_ids_before_add.begin(),
+                worker_pack_ids_before_add.end(),
+                item_instance_id) == worker_pack_ids_before_add.end())
+        {
+            worker_pack_item_instance_id = item_instance_id;
+            break;
+        }
+    }
+    GS1_SYSTEM_TEST_REQUIRE(context, worker_pack_item_instance_id != 0U);
+
     CraftSystem::run(craft_context);
     const auto workbench_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);
     const auto workbench_entity_id = site_run.site_world->device_entity_id(workbench_tile);
@@ -265,10 +294,10 @@ void craft_cache_tracks_worker_pack_membership_by_distance(
     GS1_SYSTEM_TEST_CHECK(context, initial_cache->worker_pack_included);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        gs1::craft_logic::available_cached_item_quantity(
-            site_run,
-            initial_cache->nearby_item_instance_ids,
-            gs1::ItemId {gs1::k_item_water_container}) == 2U);
+        std::find(
+            initial_cache->nearby_item_instance_ids.begin(),
+            initial_cache->nearby_item_instance_ids.end(),
+            worker_pack_item_instance_id) != initial_cache->nearby_item_instance_ids.end());
 
     auto worker = gs1::site_world_access::worker_position(site_run);
     worker.tile_coord = TileCoord {15, 15};
@@ -282,10 +311,10 @@ void craft_cache_tracks_worker_pack_membership_by_distance(
     GS1_SYSTEM_TEST_CHECK(context, !far_cache->worker_pack_included);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        gs1::craft_logic::available_cached_item_quantity(
-            site_run,
-            far_cache->nearby_item_instance_ids,
-            gs1::ItemId {gs1::k_item_water_container}) == 0U);
+        std::find(
+            far_cache->nearby_item_instance_ids.begin(),
+            far_cache->nearby_item_instance_ids.end(),
+            worker_pack_item_instance_id) == far_cache->nearby_item_instance_ids.end());
 }
 
 void dynamically_placed_storage_device_reuses_single_inventory_container(
