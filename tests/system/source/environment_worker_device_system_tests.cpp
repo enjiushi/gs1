@@ -1066,8 +1066,11 @@ void modifier_imports_campaign_assistant_and_technology_run_modifiers(
     auto campaign = make_campaign();
     campaign.faction_progress[0].has_unlocked_assistant_package = true;
     campaign.faction_progress[0].unlocked_assistant_package_id = 1001U;
-    campaign.technology_state.purchased_node_ids.push_back(
-        gs1::TechNodeId {gs1::k_tech_node_t1_field_briefing});
+    campaign.technology_state.purchased_nodes.push_back(
+        gs1::TechnologyPurchaseRecord {
+            gs1::TechNodeId {gs1::k_tech_node_t1_field_briefing},
+            gs1::FactionId {gs1::k_faction_village_committee},
+            10});
     auto site_run = make_test_site_run(1U, 1602U);
     GameMessageQueue queue {};
     auto site_context = make_site_context<ModifierSystem>(campaign, site_run, queue);

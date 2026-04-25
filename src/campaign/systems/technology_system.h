@@ -18,25 +18,29 @@ public:
     [[nodiscard]] static bool node_purchased(
         const CampaignState& campaign,
         TechNodeId tech_node_id) noexcept;
-    [[nodiscard]] static bool technology_tier_unlocked(
+    [[nodiscard]] static const TechnologyPurchaseRecord* find_purchase_record(
         const CampaignState& campaign,
-        const TechnologyTierDef& tier_def) noexcept;
-    [[nodiscard]] static bool faction_tier_unlocked(
+        TechNodeId tech_node_id) noexcept;
+    [[nodiscard]] static bool technology_tier_visible(
         const CampaignState& campaign,
-        const FactionTechnologyTierDef& tier_def) noexcept;
-    [[nodiscard]] static bool total_reputation_tier_unlocked(
-        const CampaignState& campaign,
-        const TotalReputationTierDef& tier_def) noexcept;
+        const TechnologyNodeDef& node_def) noexcept;
     [[nodiscard]] static bool plant_unlocked(
         const CampaignState& campaign,
         PlantId plant_id) noexcept;
     [[nodiscard]] static std::int32_t available_faction_reputation(
         const CampaignState& campaign,
         FactionId faction_id) noexcept;
+    [[nodiscard]] static std::int32_t current_reputation_cost(
+        const TechnologyNodeDef& node_def,
+        FactionId reputation_faction_id) noexcept;
     [[nodiscard]] static std::int32_t current_cash_cost(
         const CampaignState& campaign,
         const TechnologyNodeDef& node_def) noexcept;
     [[nodiscard]] static bool node_claimable(
+        const CampaignState& campaign,
+        const TechnologyNodeDef& node_def,
+        FactionId reputation_faction_id) noexcept;
+    [[nodiscard]] static bool node_refundable(
         const CampaignState& campaign,
         const TechnologyNodeDef& node_def) noexcept;
 };

@@ -20,9 +20,7 @@ External prototype content TOML files loaded by the gameplay DLL at startup.
 - `site_actions.toml`: Site action tuning content for shared action duration and worker energy/hydration/nourishment/morale costs, authored local-weather-to-meter cost coefficients, placement occupancy, and reservation/approach/movement flags, with craft duration and worker meter costs authored per recipe and the shared harvest action profile still loaded here.
 - `modifier_presets.toml`: Modifier preset content for nearby-aura and run-modifier channel totals consumed by the site modifier system.
 - `gameplay_tuning.toml`: Shared numeric gameplay-tuning table for worker-condition, ecology, modifier, device-support, and camp-durability factors that should remain data-authored instead of hardcoded.
-- `technology_tiers.toml`: Neutral base-technology tier content for per-tier total-reputation requirements and display names.
-- `faction_technology_tiers.toml`: Faction enhancement tier content for per-faction reputation requirements and display names.
-- `total_reputation_tiers.toml`: Total-reputation tier content for global plant unlock thresholds and labels.
-- `reputation_unlocks.toml`: Total-reputation unlock content for post-starter plant unlocks and future non-plant unlock types.
-- `technology_nodes.toml`: Technology node content for neutral base techs plus faction-owned enhancements, cash costs, entry kinds, and placeholder labels/descriptions.
-- `initial_unlocked_plants.toml`: Starter-plant content for the plants available from campaign start before total-reputation unlocks.
+- `technology_tiers.toml`: Faction tech-tree tier content for tier ordering and display names.
+- `reputation_unlocks.toml`: Total-reputation unlock content for one-by-one post-starter plant unlocks and future non-plant unlock types.
+- `technology_nodes.toml`: Technology node content for one faction-owned tech per tier branch, authored reputation plus cash costs, entry kinds, and placeholder labels/descriptions.
+- `initial_unlocked_plants.toml`: Starter-plant content for the two plants available from campaign start before later reputation unlocks.

@@ -21,46 +21,92 @@ const FactionProgressState* find_faction_progress(
 
     return nullptr;
 }
+
+FactionId selected_reputation_faction_id(const CampaignState& campaign) noexcept
+{
+    return campaign.regional_map_state.selected_tech_tree_faction_id.value != 0U
+        ? campaign.regional_map_state.selected_tech_tree_faction_id
+        : FactionId {k_faction_village_committee};
+}
+
+std::int32_t committed_reputation_for_faction(
+    const CampaignState& campaign,
+    FactionId faction_id) noexcept
+{
+    std::int32_t committed_reputation = 0;
+    for (const auto& purchase : campaign.technology_state.purchased_nodes)
+    {
+        if (purchase.reputation_faction_id == faction_id)
+        {
+            committed_reputation += std::max(0, purchase.reputation_spent);
+        }
+    }
+
+    return committed_reputation;
+}
+
+std::uint8_t highest_purchased_tier_for_faction(
+    const CampaignState& campaign,
+    FactionId faction_id) noexcept
+{
+    std::uint8_t highest_tier = 0U;
+    for (const auto& purchase : campaign.technology_state.purchased_nodes)
+    {
+        const auto* node_def = find_technology_node_def(purchase.tech_node_id);
+        if (node_def == nullptr || node_def->faction_id != faction_id)
+        {
+            continue;
+        }
+
+        highest_tier = std::max(highest_tier, node_def->tier_index);
+    }
+
+    return highest_tier;
+}
 }  // namespace
 
 bool TechnologySystem::subscribes_to(GameMessageType type) noexcept
 {
     return type == GameMessageType::CampaignCashDeltaRequested ||
         type == GameMessageType::CampaignReputationAwardRequested ||
-        type == GameMessageType::TechnologyNodeClaimRequested;
+        type == GameMessageType::TechnologyNodeClaimRequested ||
+        type == GameMessageType::TechnologyNodeRefundRequested;
 }
 
 bool TechnologySystem::node_purchased(
     const CampaignState& campaign,
     TechNodeId tech_node_id) noexcept
 {
-    return std::find(
-               campaign.technology_state.purchased_node_ids.begin(),
-               campaign.technology_state.purchased_node_ids.end(),
-               tech_node_id) != campaign.technology_state.purchased_node_ids.end();
+    return find_purchase_record(campaign, tech_node_id) != nullptr;
 }
 
-bool TechnologySystem::technology_tier_unlocked(
+const TechnologyPurchaseRecord* TechnologySystem::find_purchase_record(
     const CampaignState& campaign,
-    const TechnologyTierDef& tier_def) noexcept
+    TechNodeId tech_node_id) noexcept
 {
-    return campaign.technology_state.total_reputation >= tier_def.reputation_requirement;
+    for (const auto& purchase : campaign.technology_state.purchased_nodes)
+    {
+        if (purchase.tech_node_id == tech_node_id)
+        {
+            return &purchase;
+        }
+    }
+
+    return nullptr;
 }
 
-bool TechnologySystem::faction_tier_unlocked(
+bool TechnologySystem::technology_tier_visible(
     const CampaignState& campaign,
-    const FactionTechnologyTierDef& tier_def) noexcept
+    const TechnologyNodeDef& node_def) noexcept
 {
-    const auto* faction_progress = find_faction_progress(campaign, tier_def.faction_id);
-    return faction_progress != nullptr &&
-        faction_progress->faction_reputation >= tier_def.reputation_requirement;
-}
+    if (node_def.tier_index <= 1U)
+    {
+        return true;
+    }
 
-bool TechnologySystem::total_reputation_tier_unlocked(
-    const CampaignState& campaign,
-    const TotalReputationTierDef& tier_def) noexcept
-{
-    return campaign.technology_state.total_reputation >= tier_def.reputation_requirement;
+    return node_purchased(
+        campaign,
+        previous_faction_technology_node_id(node_def.faction_id, node_def.tier_index));
 }
 
 bool TechnologySystem::plant_unlocked(
@@ -88,8 +134,7 @@ bool TechnologySystem::plant_unlocked(
             continue;
         }
 
-        const auto* tier_def = find_total_reputation_tier_def(unlock_def.tier_index);
-        if (tier_def != nullptr && total_reputation_tier_unlocked(campaign, *tier_def))
+        if (campaign.technology_state.total_reputation >= unlock_def.reputation_requirement)
         {
             return true;
         }
@@ -108,7 +153,27 @@ std::int32_t TechnologySystem::available_faction_reputation(
         return 0;
     }
 
-    return std::max(0, faction_progress->faction_reputation);
+    return std::max(
+        0,
+        faction_progress->faction_reputation - committed_reputation_for_faction(campaign, faction_id));
+}
+
+std::int32_t TechnologySystem::current_reputation_cost(
+    const TechnologyNodeDef& node_def,
+    FactionId reputation_faction_id) noexcept
+{
+    const auto base_cost = std::max(0, node_def.reputation_cost);
+    if (reputation_faction_id.value == 0U)
+    {
+        return std::numeric_limits<std::int32_t>::max();
+    }
+
+    if (reputation_faction_id == node_def.faction_id)
+    {
+        return base_cost;
+    }
+
+    return base_cost + (base_cost + 1) / 2;
 }
 
 std::int32_t TechnologySystem::current_cash_cost(
@@ -120,9 +185,15 @@ std::int32_t TechnologySystem::current_cash_cost(
 
 bool TechnologySystem::node_claimable(
     const CampaignState& campaign,
-    const TechnologyNodeDef& node_def) noexcept
+    const TechnologyNodeDef& node_def,
+    FactionId reputation_faction_id) noexcept
 {
     if (node_purchased(campaign, node_def.tech_node_id))
+    {
+        return false;
+    }
+
+    if (reputation_faction_id.value == 0U)
     {
         return false;
     }
@@ -132,22 +203,26 @@ bool TechnologySystem::node_claimable(
         return false;
     }
 
-    if (node_def.node_kind == TechnologyNodeKind::BaseTech)
-    {
-        const auto* tier_def = find_technology_tier_def(node_def.tier_index);
-        return tier_def != nullptr && technology_tier_unlocked(campaign, *tier_def);
-    }
-
-    const auto* faction_tier_def =
-        find_faction_technology_tier_def(node_def.faction_id, node_def.tier_index);
-    if (faction_tier_def == nullptr || !faction_tier_unlocked(campaign, *faction_tier_def))
+    if (!technology_tier_visible(campaign, node_def))
     {
         return false;
     }
 
-    return node_purchased(
-        campaign,
-        technology_parent_base_node_id(node_def.tier_index, node_def.base_tech_slot_index));
+    return available_faction_reputation(campaign, reputation_faction_id) >=
+        current_reputation_cost(node_def, reputation_faction_id);
+}
+
+bool TechnologySystem::node_refundable(
+    const CampaignState& campaign,
+    const TechnologyNodeDef& node_def) noexcept
+{
+    const auto* purchase = find_purchase_record(campaign, node_def.tech_node_id);
+    if (purchase == nullptr)
+    {
+        return false;
+    }
+
+    return highest_purchased_tier_for_faction(campaign, node_def.faction_id) == node_def.tier_index;
 }
 
 Gs1Status TechnologySystem::process_message(
@@ -191,13 +266,50 @@ Gs1Status TechnologySystem::process_message(
             return GS1_STATUS_NOT_FOUND;
         }
 
-        if (!node_claimable(context.campaign, *node_def))
+        const auto reputation_faction_id = FactionId {
+            payload.reputation_faction_id == 0U
+                ? selected_reputation_faction_id(context.campaign).value
+                : payload.reputation_faction_id};
+        if (!node_claimable(context.campaign, *node_def, reputation_faction_id))
         {
             return GS1_STATUS_INVALID_STATE;
         }
 
         context.campaign.cash -= current_cash_cost(context.campaign, *node_def);
-        context.campaign.technology_state.purchased_node_ids.push_back(node_def->tech_node_id);
+        context.campaign.technology_state.purchased_nodes.push_back(TechnologyPurchaseRecord {
+            node_def->tech_node_id,
+            reputation_faction_id,
+            current_reputation_cost(*node_def, reputation_faction_id)});
+        return GS1_STATUS_OK;
+    }
+
+    case GameMessageType::TechnologyNodeRefundRequested:
+    {
+        const auto& payload = message.payload_as<TechnologyNodeRefundRequestedMessage>();
+        const auto* node_def = find_technology_node_def(TechNodeId {payload.tech_node_id});
+        if (node_def == nullptr)
+        {
+            return GS1_STATUS_NOT_FOUND;
+        }
+
+        if (!node_refundable(context.campaign, *node_def))
+        {
+            return GS1_STATUS_INVALID_STATE;
+        }
+
+        auto& purchases = context.campaign.technology_state.purchased_nodes;
+        const auto it = std::find_if(
+            purchases.begin(),
+            purchases.end(),
+            [node_def](const TechnologyPurchaseRecord& purchase) {
+                return purchase.tech_node_id == node_def->tech_node_id;
+            });
+        if (it == purchases.end())
+        {
+            return GS1_STATUS_INVALID_STATE;
+        }
+
+        purchases.erase(it);
         return GS1_STATUS_OK;
     }
 

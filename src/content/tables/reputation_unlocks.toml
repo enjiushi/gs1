@@ -1,47 +1,63 @@
 [[reputation_unlocks]]
-tier_index = 1
-slot_index = 0
+unlock_id = 5001
 unlock_kind = "Plant"
+reputation_requirement = 4
+content_id = 2
+display_name = "White Thorn"
+description = "Unlocks the first salinity-taming shrub for stabilizing rough starter tiles."
+
+[[reputation_unlocks]]
+unlock_id = 5002
+unlock_kind = "Plant"
+reputation_requirement = 8
+content_id = 6
+display_name = "Korshinsk Peashrub"
+description = "Unlocks an early wind-tough support plant that helps extend the starter footprint."
+
+[[reputation_unlocks]]
+unlock_id = 5003
+unlock_kind = "Plant"
+reputation_requirement = 12
 content_id = 3
 display_name = "Red Tamarisk"
-description = "Unlocks the first heat-buffer specialist for safer camp-edge pockets."
+description = "Unlocks a heat-buffer specialist for building safer hot-edge pockets."
 
 [[reputation_unlocks]]
-tier_index = 1
-slot_index = 1
+unlock_id = 5004
 unlock_kind = "Plant"
+reputation_requirement = 16
 content_id = 7
 display_name = "Jiji Grass"
-description = "Unlocks a dryland bridge plant that adds soft moisture and fertility support."
+description = "Unlocks a bridge plant that adds soft moisture and fertility support."
 
 [[reputation_unlocks]]
-tier_index = 2
-slot_index = 0
+unlock_id = 5005
 unlock_kind = "Plant"
+reputation_requirement = 22
 content_id = 8
 display_name = "Sea Buckthorn"
 description = "Unlocks a tougher productive perimeter plant for harsher edges."
 
 [[reputation_unlocks]]
-tier_index = 2
-slot_index = 1
+unlock_id = 5006
 unlock_kind = "Plant"
+reputation_requirement = 28
 content_id = 9
 display_name = "Desert Ephedra"
 description = "Unlocks a support-economy plant that rewards stable safe pockets."
 
 [[reputation_unlocks]]
-tier_index = 3
-slot_index = 0
+unlock_id = 5007
 unlock_kind = "Plant"
+reputation_requirement = 36
 content_id = 4
 display_name = "Ningxia Wolfberry"
 description = "Unlocks a fragile high-payoff crop that depends on established support."
 
 [[reputation_unlocks]]
-tier_index = 3
-slot_index = 1
+unlock_id = 5008
 unlock_kind = "Plant"
+reputation_requirement = 44
 content_id = 10
 display_name = "Saxaul"
 description = "Unlocks the late anchor canopy plant for turning a zone into a refuge core."

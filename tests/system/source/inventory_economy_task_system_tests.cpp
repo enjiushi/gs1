@@ -777,7 +777,7 @@ void economy_site_run_started_seeds_site_one_and_resets_other_sites(
         context,
         EconomyPhoneSystem::process_message(site_one_context, started_one) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, site_one_run.economy.money == 45);
-    GS1_SYSTEM_TEST_CHECK(context, site_one_run.economy.available_phone_listings.size() >= 11U);
+    GS1_SYSTEM_TEST_CHECK(context, site_one_run.economy.available_phone_listings.size() >= 9U);
     GS1_SYSTEM_TEST_CHECK(context, site_one_run.economy.direct_purchase_unlockable_ids.size() == 1U);
 
     GS1_SYSTEM_TEST_REQUIRE(

@@ -26,11 +26,11 @@ This file is a quick orientation guide for agents working in this repository.
 - `include/gs1/export.h`: Public DLL export/import macros.
 - `include/gs1/game_api.h`: C ABI entry points exposed by the gameplay DLL.
 - `include/gs1/status.h`: Public status/result codes.
-- `include/gs1/types.h`: Public API data types, message/event payload structs, runtime-facing enums, claimed-task/phone-panel transport fields, site-weather event timeline transport fields, and harvest-action plus harvested-output transport payloads.
+- `include/gs1/types.h`: Public API data types, message/event payload structs, runtime-facing enums, claimed-task/phone-panel transport fields, site-weather event timeline transport fields, tech-tree claim/refund action identifiers, and harvest-action plus harvested-output transport payloads.
 - `src/app/`: Runtime bootstrap, API glue, scene coordination, and campaign/site factory entry points.
-- `src/campaign/`: Campaign state and campaign-level systems such as flow, dedicated campaign time progression, loadout planning, regional support, and the neutral-tech plus faction-enhancement progression model.
+- `src/campaign/`: Campaign state and campaign-level systems such as flow, dedicated campaign time progression, loadout planning, regional support, and the faction-branch tech progression model with remembered reputation spend plus top-down refunds.
 - `src/messages/`: Internal game message IDs, payloads, handlers, and dispatcher.
-- `src/content/`: Prototype content database, loader/validator shells, and content definition types, including authored wind-shelter plant stats, per-plant harvest-output metadata, and the neutral base-tech plus faction-enhancement progression tables.
+- `src/content/`: Prototype content database, loader/validator shells, and content definition types, including authored wind-shelter plant stats, per-plant harvest-output metadata, one-by-one plant reputation unlock thresholds, and faction-branch tech progression tables.
 - `src/events/`: Translated engine feedback event types. Internal gameplay cross-system messages should use `GameMessage`, not runtime gameplay events.
 - `src/runtime/`: Core runtime loop, fixed-step runner, host-event dispatch plus transient phase-control handling, message queues, random service, and engine message emission.
 - `src/site/`: Active site-run state and site systems for dedicated site time progression, actions, weather, owner-specific plant/device local-weather contribution passes, ecology, directional local wind shelter, inventory, economy, task board, camp durability, harvested-output flow, and completion/failure flow.
