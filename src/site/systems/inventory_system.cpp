@@ -11,6 +11,16 @@
 #include "site/inventory_storage.h"
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
+#include "site/site_world_components.h"
+
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4127)
+#endif
+#include <flecs.h>
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 #include <algorithm>
 #include <cstddef>
@@ -218,41 +228,47 @@ bool ensure_device_storage_containers(SiteSystemContext<InventorySystem>& contex
     }
 
     bool created_any = false;
-    const auto tile_count = context.world.tile_count();
-    for (std::size_t index = 0; index < tile_count; ++index)
-    {
-        const auto coord = context.world.tile_coord(index);
-        const auto tile = context.world.read_tile_at_index(index);
-        const auto* structure_def = find_structure_def(tile.device.structure_id);
-        if (structure_def == nullptr || !structure_def->grants_storage || structure_def->storage_slot_count == 0U)
-        {
-            continue;
-        }
+    auto source_query =
+        context.site_run.site_world->ecs_world()
+            .query_builder<
+                const site_ecs::TileCoordComponent,
+                const site_ecs::DeviceStructureId>()
+            .with<site_ecs::DeviceTag>()
+            .build();
 
-        const auto device_entity_id = context.site_run.site_world->device_entity_id(coord);
-        if (device_entity_id == 0U)
-        {
-            continue;
-        }
+    source_query.each(
+        [&](flecs::entity device_entity,
+            const site_ecs::TileCoordComponent& coord_component,
+            const site_ecs::DeviceStructureId& structure_component) {
+            const auto* structure_def = find_structure_def(structure_component.structure_id);
+            if (structure_def == nullptr ||
+                !structure_def->grants_storage ||
+                structure_def->storage_slot_count == 0U)
+            {
+                return;
+            }
 
-        const auto existing =
-            inventory_storage::find_device_storage_container(context.site_run, device_entity_id);
-        const std::uint32_t storage_flags =
-            (coord.x == context.world.read_camp().delivery_box_tile.x &&
-                coord.y == context.world.read_camp().delivery_box_tile.y)
-                ? k_delivery_box_storage_flags
-                : 0U;
-        (void)inventory_storage::ensure_device_storage_container(
-            context.site_run,
-            device_entity_id,
-            coord,
-            structure_def->storage_slot_count,
-            storage_flags);
-        if (!existing.is_valid())
-        {
-            created_any = true;
-        }
-    }
+            const auto coord = coord_component.value;
+            const auto existing =
+                inventory_storage::find_device_storage_container(
+                    context.site_run,
+                    device_entity.id());
+            const std::uint32_t storage_flags =
+                (coord.x == context.world.read_camp().delivery_box_tile.x &&
+                    coord.y == context.world.read_camp().delivery_box_tile.y)
+                    ? k_delivery_box_storage_flags
+                    : 0U;
+            (void)inventory_storage::ensure_device_storage_container(
+                context.site_run,
+                device_entity.id(),
+                coord,
+                structure_def->storage_slot_count,
+                storage_flags);
+            if (!existing.is_valid())
+            {
+                created_any = true;
+            }
+        });
 
     if (created_any)
     {
