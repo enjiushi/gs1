@@ -398,6 +398,30 @@ public:
         return world != nullptr ? world->tile_ecology_at_index(index) : SiteWorld::TileEcologyData {};
     }
 
+    void write_tile_ecology(TileCoord coord, const SiteWorld::TileEcologyData& data)
+    {
+        static_assert(
+            site_system_owns_component<SystemTag>(SiteComponent::TileEcology),
+            "System must declare TileEcology as owned.");
+        auto* world = site_world_ptr();
+        if (world != nullptr)
+        {
+            world->set_tile_ecology(coord, data);
+        }
+    }
+
+    void write_tile_ecology_at_index(std::size_t index, const SiteWorld::TileEcologyData& data)
+    {
+        static_assert(
+            site_system_owns_component<SystemTag>(SiteComponent::TileEcology),
+            "System must declare TileEcology as owned.");
+        auto* world = site_world_ptr();
+        if (world != nullptr)
+        {
+            world->set_tile_ecology_at_index(index, data);
+        }
+    }
+
     [[nodiscard]] SiteWorld::TileLocalWeatherData read_tile_local_weather(TileCoord coord) const noexcept
     {
         static_assert(
