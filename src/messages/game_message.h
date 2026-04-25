@@ -88,6 +88,9 @@ enum class GameMessageType : std::uint8_t
     PhoneCartCheckoutRequested,
     PhonePanelSectionRequested,
     ClosePhonePanel,
+    OpenSiteProtectionSelector,
+    CloseSiteProtectionUi,
+    SetSiteProtectionOverlayMode,
     InventoryDeliveryRequested,
     InventoryDeliveryBatchRequested,
     InventoryWorkerPackInsertRequested,
@@ -640,6 +643,20 @@ struct ClosePhonePanelMessage final
 {
 };
 
+struct OpenSiteProtectionSelectorMessage final
+{
+};
+
+struct CloseSiteProtectionUiMessage final
+{
+};
+
+struct SetSiteProtectionOverlayModeMessage final
+{
+    Gs1SiteProtectionOverlayMode mode;
+    std::uint8_t reserved0[3];
+};
+
 struct InventoryDeliveryRequestedMessage final
 {
     std::uint32_t item_id;
@@ -826,6 +843,9 @@ GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingCartRemoveRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneCartCheckoutRequestedMessage, 1U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhonePanelSectionRequestedMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(ClosePhonePanelMessage, 1U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(OpenSiteProtectionSelectorMessage, 1U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(CloseSiteProtectionUiMessage, 1U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SetSiteProtectionOverlayModeMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryDeliveryRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryDeliveryBatchEntry, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryDeliveryBatchRequestedMessage, 44U);

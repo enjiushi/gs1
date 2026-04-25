@@ -95,6 +95,15 @@ constexpr std::int32_t k_regional_map_tile_spacing = 160;
 [[nodiscard]] ProjectedSiteTileState capture_projected_tile_state(
     const SiteWorld::TileData& tile) noexcept
 {
+    const float wind_protection =
+        tile.plant_weather_contribution.wind_protection +
+        tile.device_weather_contribution.wind_protection;
+    const float heat_protection =
+        tile.plant_weather_contribution.heat_protection +
+        tile.device_weather_contribution.heat_protection;
+    const float dust_protection =
+        tile.plant_weather_contribution.dust_protection +
+        tile.device_weather_contribution.dust_protection;
     return ProjectedSiteTileState {
         tile.static_data.terrain_type_id,
         tile.ecology.plant_id.value,
@@ -110,6 +119,18 @@ constexpr std::int32_t k_regional_map_tile_spacing = 160;
             k_visible_tile_burial_projection_step),
         quantize_projected_tile_channel(
             tile.local_weather.wind,
+            100.0f,
+            k_visible_tile_local_wind_projection_step),
+        quantize_projected_tile_channel(
+            wind_protection,
+            100.0f,
+            k_visible_tile_local_wind_projection_step),
+        quantize_projected_tile_channel(
+            heat_protection,
+            100.0f,
+            k_visible_tile_local_wind_projection_step),
+        quantize_projected_tile_channel(
+            dust_protection,
             100.0f,
             k_visible_tile_local_wind_projection_step),
         quantize_projected_tile_channel(
@@ -139,6 +160,9 @@ constexpr std::int32_t k_regional_map_tile_spacing = 160;
         lhs.plant_density_quantized == rhs.plant_density_quantized &&
         lhs.sand_burial_quantized == rhs.sand_burial_quantized &&
         lhs.local_wind_quantized == rhs.local_wind_quantized &&
+        lhs.wind_protection_quantized == rhs.wind_protection_quantized &&
+        lhs.heat_protection_quantized == rhs.heat_protection_quantized &&
+        lhs.dust_protection_quantized == rhs.dust_protection_quantized &&
         lhs.moisture_quantized == rhs.moisture_quantized &&
         lhs.soil_fertility_quantized == rhs.soil_fertility_quantized &&
         lhs.soil_salinity_quantized == rhs.soil_salinity_quantized;
@@ -1434,6 +1458,16 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
         break;
 
     case GameMessageType::OpenRegionalMapTechTree:
+        if (site_protection_selector_open_)
+        {
+            site_protection_selector_open_ = false;
+            queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
+        }
+        if (site_protection_overlay_mode_ != GS1_SITE_PROTECTION_OVERLAY_NONE)
+        {
+            site_protection_overlay_mode_ = GS1_SITE_PROTECTION_OVERLAY_NONE;
+            queue_site_protection_overlay_state_message();
+        }
         queue_close_site_inventory_panels_if_open();
         queue_close_site_phone_panel_if_open();
         queue_regional_map_menu_ui_messages();
@@ -1469,6 +1503,16 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
         break;
 
     case GameMessageType::PhonePanelSectionRequested:
+        if (site_protection_selector_open_)
+        {
+            site_protection_selector_open_ = false;
+            queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
+        }
+        if (site_protection_overlay_mode_ != GS1_SITE_PROTECTION_OVERLAY_NONE)
+        {
+            site_protection_overlay_mode_ = GS1_SITE_PROTECTION_OVERLAY_NONE;
+            queue_site_protection_overlay_state_message();
+        }
         queue_close_site_inventory_panels_if_open();
         if (campaign_.has_value() &&
             app_state_supports_technology_tree(app_state_) &&
@@ -1489,6 +1533,16 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
         const auto& payload = message.payload_as<InventoryStorageViewRequestMessage>();
         if (payload.event_kind == GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT)
         {
+            if (site_protection_selector_open_)
+            {
+                site_protection_selector_open_ = false;
+                queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
+            }
+            if (site_protection_overlay_mode_ != GS1_SITE_PROTECTION_OVERLAY_NONE)
+            {
+                site_protection_overlay_mode_ = GS1_SITE_PROTECTION_OVERLAY_NONE;
+                queue_site_protection_overlay_state_message();
+            }
             queue_close_site_phone_panel_if_open();
             if (campaign_.has_value() &&
                 app_state_supports_technology_tree(app_state_) &&
@@ -1504,6 +1558,8 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
     }
 
     case GameMessageType::StartSiteAttempt:
+        close_site_protection_ui();
+        queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
         queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_SELECTION);
         queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_MENU);
         queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE);
@@ -1511,6 +1567,7 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
         break;
 
     case GameMessageType::SiteRunStarted:
+        close_site_protection_ui();
         queue_site_bootstrap_messages();
         queue_campaign_resources_message();
         queue_site_action_update_message();
@@ -1519,6 +1576,8 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
         break;
 
     case GameMessageType::ReturnToRegionalMap:
+        close_site_protection_ui();
+        queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
         queue_app_state_message(app_state_);
         queue_campaign_resources_message();
         queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_RESULT);
@@ -1532,6 +1591,8 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
         const auto& payload = message.payload_as<SiteAttemptEndedMessage>();
         const auto newly_revealed_site_count =
             active_site_run_.has_value() ? active_site_run_->result_newly_revealed_site_count : 0U;
+        close_site_protection_ui();
+        queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
         queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE);
         queue_app_state_message(app_state_);
         queue_site_result_ui_messages(payload.site_id, payload.result);
@@ -1558,6 +1619,60 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
     case GameMessageType::PlacementModeCommitRejected:
         queue_site_placement_failure_message(
             message.payload_as<PlacementModeCommitRejectedMessage>());
+        break;
+
+    case GameMessageType::OpenSiteProtectionSelector:
+        if (!active_site_run_.has_value() ||
+            app_state_ != GS1_APP_STATE_SITE_ACTIVE ||
+            active_site_run_->site_action.placement_mode.active)
+        {
+            break;
+        }
+        queue_close_site_inventory_panels_if_open();
+        queue_close_site_phone_panel_if_open();
+        if (campaign_.has_value() &&
+            app_state_supports_technology_tree(app_state_) &&
+            campaign_->regional_map_state.tech_tree_open)
+        {
+            GameMessage close_tech_tree {};
+            close_tech_tree.type = GameMessageType::CloseRegionalMapTechTree;
+            close_tech_tree.set_payload(CloseRegionalMapTechTreeMessage {});
+            message_queue_.push_back(close_tech_tree);
+        }
+        if (site_protection_overlay_mode_ != GS1_SITE_PROTECTION_OVERLAY_NONE)
+        {
+            site_protection_overlay_mode_ = GS1_SITE_PROTECTION_OVERLAY_NONE;
+            queue_site_protection_overlay_state_message();
+        }
+        site_protection_selector_open_ = true;
+        queue_site_protection_selector_ui_messages();
+        break;
+
+    case GameMessageType::CloseSiteProtectionUi:
+        if (site_protection_selector_open_)
+        {
+            site_protection_selector_open_ = false;
+            queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
+        }
+        else if (site_protection_overlay_mode_ != GS1_SITE_PROTECTION_OVERLAY_NONE)
+        {
+            site_protection_overlay_mode_ = GS1_SITE_PROTECTION_OVERLAY_NONE;
+            queue_site_protection_overlay_state_message();
+        }
+        break;
+
+    case GameMessageType::SetSiteProtectionOverlayMode:
+        if (!active_site_run_.has_value() ||
+            app_state_ != GS1_APP_STATE_SITE_ACTIVE ||
+            active_site_run_->site_action.placement_mode.active)
+        {
+            break;
+        }
+        site_protection_selector_open_ = false;
+        queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
+        site_protection_overlay_mode_ =
+            message.payload_as<SetSiteProtectionOverlayModeMessage>().mode;
+        queue_site_protection_overlay_state_message();
         break;
 
     case GameMessageType::DeploymentSiteSelectionChanged:
@@ -1591,6 +1706,13 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
     case GameMessageType::ContractorHireRequested:
     case GameMessageType::SiteUnlockablePurchaseRequested:
     default:
+        if (active_site_run_.has_value() &&
+            active_site_run_->site_action.placement_mode.active &&
+            site_protection_overlay_mode_ != GS1_SITE_PROTECTION_OVERLAY_NONE)
+        {
+            site_protection_overlay_mode_ = GS1_SITE_PROTECTION_OVERLAY_NONE;
+            queue_site_protection_overlay_state_message();
+        }
         break;
     }
 }
@@ -2295,6 +2417,70 @@ void GameRuntime::queue_site_result_ui_messages(std::uint32_t site_id, Gs1SiteAt
     queue_ui_setup_end_message();
 }
 
+void GameRuntime::queue_site_protection_selector_ui_messages()
+{
+    if (!active_site_run_.has_value() || app_state_ != GS1_APP_STATE_SITE_ACTIVE)
+    {
+        return;
+    }
+
+    queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
+    queue_ui_setup_begin_message(
+        GS1_UI_SETUP_SITE_PROTECTION_SELECTOR,
+        GS1_UI_SETUP_PRESENTATION_OVERLAY,
+        5U,
+        active_site_run_->site_id.value);
+
+    Gs1UiAction no_action {};
+    queue_ui_element_message(
+        1U,
+        GS1_UI_ELEMENT_LABEL,
+        GS1_UI_ELEMENT_FLAG_NONE,
+        no_action,
+        "Protection Overlay");
+
+    Gs1UiAction wind_action {};
+    wind_action.type = GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE;
+    wind_action.arg0 = GS1_SITE_PROTECTION_OVERLAY_WIND;
+    queue_ui_element_message(
+        2U,
+        GS1_UI_ELEMENT_BUTTON,
+        GS1_UI_ELEMENT_FLAG_PRIMARY,
+        wind_action,
+        "Wind Protection");
+
+    Gs1UiAction heat_action {};
+    heat_action.type = GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE;
+    heat_action.arg0 = GS1_SITE_PROTECTION_OVERLAY_HEAT;
+    queue_ui_element_message(
+        3U,
+        GS1_UI_ELEMENT_BUTTON,
+        GS1_UI_ELEMENT_FLAG_PRIMARY,
+        heat_action,
+        "Heat Protection");
+
+    Gs1UiAction dust_action {};
+    dust_action.type = GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE;
+    dust_action.arg0 = GS1_SITE_PROTECTION_OVERLAY_DUST;
+    queue_ui_element_message(
+        4U,
+        GS1_UI_ELEMENT_BUTTON,
+        GS1_UI_ELEMENT_FLAG_PRIMARY,
+        dust_action,
+        "Dust Protection");
+
+    Gs1UiAction close_action {};
+    close_action.type = GS1_UI_ACTION_CLOSE_SITE_PROTECTION_UI;
+    queue_ui_element_message(
+        5U,
+        GS1_UI_ELEMENT_BUTTON,
+        GS1_UI_ELEMENT_FLAG_BACKGROUND_CLICK,
+        close_action,
+        "");
+
+    queue_ui_setup_end_message();
+}
+
 void GameRuntime::queue_regional_map_snapshot_messages()
 {
     if (!campaign_.has_value())
@@ -2411,6 +2597,7 @@ void GameRuntime::queue_site_tile_upsert_message(std::uint32_t x, std::uint32_t 
     }
 
     const auto tile = site_run.site_world->tile_at(coord);
+    const auto total_protection = site_run.site_world->tile_total_weather_contribution(coord);
     const auto projected_state = capture_projected_tile_state(tile);
     const auto tile_index = site_world_access::tile_index(site_run, coord);
     if (tile_index >= site_run.last_projected_tile_states.size())
@@ -2450,6 +2637,9 @@ void GameRuntime::queue_site_tile_upsert_message(std::uint32_t x, std::uint32_t 
     payload.plant_density = tile.ecology.plant_density;
     payload.sand_burial = tile.ecology.sand_burial;
     payload.local_wind = tile.local_weather.wind;
+    payload.wind_protection = total_protection.wind_protection;
+    payload.heat_protection = total_protection.heat_protection;
+    payload.dust_protection = total_protection.dust_protection;
     payload.moisture = tile.ecology.moisture;
     payload.soil_fertility = tile.ecology.soil_fertility;
     payload.soil_salinity = tile.ecology.soil_salinity;
@@ -3036,6 +3226,22 @@ void GameRuntime::queue_site_phone_panel_state_message()
     engine_messages_.push_back(message);
 }
 
+void GameRuntime::queue_site_protection_overlay_state_message()
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
+
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE);
+    auto& payload = message.emplace_payload<Gs1EngineMessageSiteProtectionOverlayData>();
+    payload.mode = site_protection_overlay_mode_;
+    payload.reserved0[0] = 0U;
+    payload.reserved0[1] = 0U;
+    payload.reserved0[2] = 0U;
+    engine_messages_.push_back(message);
+}
+
 void GameRuntime::queue_site_phone_listing_remove_message(std::uint32_t listing_id)
 {
     if (!active_site_run_.has_value() || listing_id == 0U)
@@ -3104,6 +3310,7 @@ void GameRuntime::queue_site_bootstrap_messages()
     queue_all_site_task_upsert_messages();
     queue_site_phone_panel_state_message();
     queue_all_site_phone_listing_upsert_messages();
+    queue_site_protection_overlay_state_message();
     queue_site_snapshot_end_message();
 
     active_site_run_->pending_projection_update_flags = 0U;
@@ -3270,6 +3477,12 @@ void GameRuntime::queue_site_result_ready_message(
     payload.result = result;
     payload.newly_revealed_site_count = static_cast<std::uint16_t>(newly_revealed_site_count);
     engine_messages_.push_back(message);
+}
+
+void GameRuntime::close_site_protection_ui() noexcept
+{
+    site_protection_selector_open_ = false;
+    site_protection_overlay_mode_ = GS1_SITE_PROTECTION_OVERLAY_NONE;
 }
 
 void GameRuntime::mark_site_projection_update_dirty(std::uint64_t dirty_flags) noexcept
@@ -3592,6 +3805,27 @@ Gs1Status GameRuntime::translate_ui_action_to_message(const Gs1UiAction& action,
     case GS1_UI_ACTION_CLOSE_PHONE_PANEL:
         out_message.type = GameMessageType::ClosePhonePanel;
         out_message.set_payload(ClosePhonePanelMessage {});
+        return GS1_STATUS_OK;
+
+    case GS1_UI_ACTION_OPEN_SITE_PROTECTION_SELECTOR:
+        out_message.type = GameMessageType::OpenSiteProtectionSelector;
+        out_message.set_payload(OpenSiteProtectionSelectorMessage {});
+        return GS1_STATUS_OK;
+
+    case GS1_UI_ACTION_CLOSE_SITE_PROTECTION_UI:
+        out_message.type = GameMessageType::CloseSiteProtectionUi;
+        out_message.set_payload(CloseSiteProtectionUiMessage {});
+        return GS1_STATUS_OK;
+
+    case GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE:
+        if (action.arg0 > static_cast<std::uint64_t>(GS1_SITE_PROTECTION_OVERLAY_DUST))
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        out_message.type = GameMessageType::SetSiteProtectionOverlayMode;
+        out_message.set_payload(SetSiteProtectionOverlayModeMessage {
+            static_cast<Gs1SiteProtectionOverlayMode>(action.arg0),
+            {0U, 0U, 0U}});
         return GS1_STATUS_OK;
 
     case GS1_UI_ACTION_SELL_PHONE_LISTING:
