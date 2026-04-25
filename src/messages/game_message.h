@@ -73,6 +73,7 @@ enum class GameMessageType : std::uint8_t
     PhoneListingPurchased,
     PhoneListingSold,
     InventoryTransferCompleted,
+    InventoryItemSubmitted,
     InventoryItemUseCompleted,
     InventoryCraftCompleted,
     EconomyMoneyAwardRequested,
@@ -92,6 +93,7 @@ enum class GameMessageType : std::uint8_t
     InventoryItemConsumeRequested,
     InventoryGlobalItemConsumeRequested,
     InventoryTransferRequested,
+    InventoryItemSubmitRequested,
     InventoryStorageViewRequest,
     InventoryCraftContextRequested,
     PlacementModeCursorMoved,
@@ -532,6 +534,13 @@ struct InventoryTransferCompletedMessage final
     std::uint16_t flags;
 };
 
+struct InventoryItemSubmittedMessage final
+{
+    std::uint32_t item_id;
+    std::uint16_t quantity;
+    std::uint16_t flags;
+};
+
 struct InventoryItemUseCompletedMessage final
 {
     std::uint32_t item_id;
@@ -672,6 +681,13 @@ struct InventoryTransferRequestedMessage final
     std::uint8_t reserved0;
 };
 
+struct InventoryItemSubmitRequestedMessage final
+{
+    std::uint32_t source_storage_id;
+    std::uint16_t source_slot_index;
+    std::uint16_t quantity;
+};
+
 struct InventoryStorageViewRequestMessage final
 {
     std::uint32_t storage_id;
@@ -767,6 +783,7 @@ GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TaskRewardClaimRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingPurchasedMessage, 12U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingSoldMessage, 12U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryTransferCompletedMessage, 16U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryItemSubmittedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryItemUseCompletedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryCraftCompletedMessage, 12U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(EconomyMoneyAwardRequestedMessage, 4U);
@@ -787,6 +804,7 @@ GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryItemUseRequestedMessage, 12U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryItemConsumeRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryGlobalItemConsumeRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryTransferRequestedMessage, 16U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryItemSubmitRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryStorageViewRequestMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(CraftContextRequestedMessage, 12U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PlacementModeCursorMovedMessage, 12U);

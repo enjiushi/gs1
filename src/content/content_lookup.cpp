@@ -35,6 +35,12 @@ std::uint32_t item_stack_size(ItemId item_id) noexcept
     return item_def == nullptr ? 1U : static_cast<std::uint32_t>(item_def->stack_size);
 }
 
+std::uint32_t item_internal_price_cash_points(ItemId item_id) noexcept
+{
+    const auto* item_def = find_item_def(item_id);
+    return item_def == nullptr ? 0U : item_def->internal_price_cash_points;
+}
+
 std::span<const PlantDef> all_plant_defs() noexcept
 {
     return prototype_content_database().plant_defs;

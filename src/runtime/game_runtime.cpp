@@ -1524,6 +1524,7 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
     case GameMessageType::PhoneListingPurchased:
     case GameMessageType::PhoneListingSold:
     case GameMessageType::InventoryTransferCompleted:
+    case GameMessageType::InventoryItemSubmitted:
     case GameMessageType::InventoryItemUseCompleted:
     case GameMessageType::InventoryCraftCompleted:
     case GameMessageType::PhoneListingPurchaseRequested:
@@ -1532,6 +1533,7 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
     case GameMessageType::InventoryItemUseRequested:
     case GameMessageType::InventoryItemConsumeRequested:
     case GameMessageType::InventoryTransferRequested:
+    case GameMessageType::InventoryItemSubmitRequested:
     case GameMessageType::InventoryCraftContextRequested:
     case GameMessageType::ContractorHireRequested:
     case GameMessageType::SiteUnlockablePurchaseRequested:

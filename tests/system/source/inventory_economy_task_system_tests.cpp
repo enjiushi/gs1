@@ -1239,6 +1239,22 @@ void seed_placeholder_task_board_for_tests(gs1::SiteRunState& site_run)
         {},
         gs1::ActionKind::None,
         0.0f});
+    add_task(gs1::TaskInstanceState {
+        gs1::TaskInstanceId {7U},
+        gs1::TaskTemplateId {gs1::k_task_template_site1_submit_water},
+        gs1::FactionId {gs1::k_faction_village_committee},
+        1U,
+        2U,
+        0U,
+        0U,
+        gs1::ItemId {gs1::k_item_water_container},
+        {},
+        {},
+        {},
+        {},
+        {},
+        gs1::ActionKind::None,
+        0.0f});
 
     board.task_pool_size = static_cast<std::uint32_t>(board.visible_tasks.size());
     board.minutes_until_next_refresh = 0.0;
@@ -1885,6 +1901,99 @@ void task_board_reward_claim_is_ignored_without_draft_options(
         site_run.task_board.visible_tasks.front().runtime_list_kind == TaskRuntimeListKind::Completed);
     GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.claimed_task_ids.empty());
 }
+
+void task_board_content_tuning_exposes_internal_prices_and_task_scoring_inputs(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    const auto* water = gs1::find_item_def(gs1::ItemId {gs1::k_item_water_container});
+    GS1_SYSTEM_TEST_REQUIRE(context, water != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(water->hydration_delta, 20.0f));
+    GS1_SYSTEM_TEST_CHECK(context, water->internal_price_cash_points == 200U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        gs1::item_internal_price_cash_points(gs1::ItemId {gs1::k_item_water_container}) == 200U);
+
+    const auto* food = gs1::find_item_def(gs1::ItemId {gs1::k_item_food_pack});
+    GS1_SYSTEM_TEST_REQUIRE(context, food != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(food->nourishment_delta, 15.0f));
+    GS1_SYSTEM_TEST_CHECK(context, food->internal_price_cash_points == 500U);
+
+    const auto* submit_task =
+        gs1::find_task_template_def(gs1::TaskTemplateId {gs1::k_task_template_site1_submit_water});
+    GS1_SYSTEM_TEST_REQUIRE(context, submit_task != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, submit_task->progress_kind == gs1::TaskProgressKind::SubmitItem);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(submit_task->expected_task_hours_in_game, 0.5f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(submit_task->risk_multiplier, 0.05f));
+}
+
+void task_board_submit_task_completes_from_successful_submission(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 1010U);
+    GameMessageQueue queue {};
+    auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
+    auto task_context = make_site_context<TaskBoardSystem>(campaign, site_run, queue);
+
+    const auto start_message =
+        make_message(GameMessageType::SiteRunStarted, SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_message(inventory_context, start_message) == GS1_STATUS_OK);
+    start_task_board_with_owner_snapshots(context, campaign, site_run, queue, task_context);
+
+    auto* submit_task =
+        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_submit_water);
+    GS1_SYSTEM_TEST_REQUIRE(context, submit_task != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_message(
+            task_context,
+            make_message(
+                GameMessageType::TaskAcceptRequested,
+                gs1::TaskAcceptRequestedMessage {submit_task->task_instance_id.value})) == GS1_STATUS_OK);
+
+    const auto worker_pack = gs1::inventory_storage::worker_pack_container(site_run);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        worker_pack,
+        submit_task->item_id,
+        submit_task->target_amount);
+    const auto worker_slot_index =
+        find_container_slot_with_item(site_run, worker_pack, submit_task->item_id);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        worker_slot_index < gs1::inventory_storage::slot_count_in_container(site_run, worker_pack));
+
+    queue.clear();
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_message(
+            inventory_context,
+            make_message(
+                GameMessageType::InventoryItemSubmitRequested,
+                gs1::InventoryItemSubmitRequestedMessage {
+                    site_run.inventory.worker_pack_storage_id,
+                    static_cast<std::uint16_t>(worker_slot_index),
+                    static_cast<std::uint16_t>(submit_task->target_amount)})) == GS1_STATUS_OK);
+
+    while (!queue.empty())
+    {
+        const auto message = queue.front();
+        queue.pop_front();
+        if (message.type == GameMessageType::InventoryItemSubmitted)
+        {
+            GS1_SYSTEM_TEST_REQUIRE(
+                context,
+                TaskBoardSystem::process_message(task_context, message) == GS1_STATUS_OK);
+        }
+    }
+
+    submit_task =
+        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_submit_water);
+    GS1_SYSTEM_TEST_REQUIRE(context, submit_task != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, submit_task->runtime_list_kind == TaskRuntimeListKind::Completed);
+}
 }  // namespace
 
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
@@ -1987,3 +2096,11 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "task_board",
     "reward_claim_is_ignored_without_draft_options",
     task_board_reward_claim_is_ignored_without_draft_options);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "task_board",
+    "content_tuning_exposes_internal_prices_and_task_scoring_inputs",
+    task_board_content_tuning_exposes_internal_prices_and_task_scoring_inputs);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "task_board",
+    "submit_task_completes_from_successful_submission",
+    task_board_submit_task_completes_from_successful_submission);

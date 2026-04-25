@@ -38,6 +38,7 @@ struct ItemDef final
     bool consumable {false};
     std::int32_t buy_price {0};
     std::int32_t sell_price {0};
+    std::uint32_t internal_price_cash_points {0U};
     std::uint32_t capability_flags {ITEM_CAPABILITY_NONE};
     PlantId linked_plant_id {};
     StructureId linked_structure_id {};
@@ -87,4 +88,5 @@ inline constexpr std::uint32_t k_item_saxaul_fuelwood = 28U;
 
 [[nodiscard]] const ItemDef* find_item_def(ItemId item_id) noexcept;
 [[nodiscard]] std::uint32_t item_stack_size(ItemId item_id) noexcept;
+[[nodiscard]] std::uint32_t item_internal_price_cash_points(ItemId item_id) noexcept;
 }  // namespace gs1

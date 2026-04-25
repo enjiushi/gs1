@@ -67,6 +67,13 @@ struct TaskInstanceState final
     StructureId tertiary_structure_id {};
     ActionKind action_kind {ActionKind::None};
     float threshold_value {0.0f};
+    float expected_task_hours_in_game {0.0f};
+    float risk_multiplier {0.0f};
+    std::uint32_t direct_cost_cash_points {0U};
+    std::uint32_t time_cost_cash_points {0U};
+    std::uint32_t risk_cost_cash_points {0U};
+    std::uint32_t difficulty_cash_points {0U};
+    std::uint32_t reward_budget_cash_points {0U};
     std::vector<TaskRewardDraftOption> reward_draft_options {};
     TaskRuntimeListKind runtime_list_kind {TaskRuntimeListKind::Visible};
     std::uint32_t chain_id {0};
