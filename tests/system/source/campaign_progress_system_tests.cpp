@@ -595,7 +595,7 @@ void site_completion_highway_protection_fails_when_average_cover_reaches_target(
         12.0,
         0.5f);
     mark_objective_target_tile(site_run, TileCoord {7, 2});
-    site_run.counters.highway_average_sand_cover = 0.5f;
+    site_run.counters.highway_average_sand_cover = 50.0f;
     site_run.counters.objective_progress_normalized = 0.0f;
 
     auto site_context = make_site_context<SiteCompletionSystem>(campaign, site_run, queue);

@@ -43,9 +43,6 @@ struct PlantDef final
     float heat_tolerance;
     float wind_resistance;
     float dust_tolerance;
-    float wind_protection_power;
-    float heat_protection_power;
-    float dust_protection_power;
     float fertility_improve_power;
     float salinity_reduction_power;
     float spread_readiness;
@@ -74,9 +71,6 @@ inline constexpr PlantDef k_generic_living_plant_def {
     40.0f,
     40.0f,
     40.0f,
-    18.0f,
-    18.0f,
-    18.0f,
     12.0f,
     8.0f,
     35.0f,
@@ -104,9 +98,6 @@ inline constexpr PlantDef k_generic_ground_cover_def {
     100.0f,
     100.0f,
     100.0f,
-    24.0f,
-    16.0f,
-    26.0f,
     20.0f,
     0.0f,
     0.0f,

@@ -51,9 +51,9 @@ struct EcologyTuning final
     float salinity_source {0.0f};
     float growth_relief_from_moisture {0.55f};
     float growth_relief_from_fertility {0.35f};
-    float growth_pressure_heat_scale {0.04f};
-    float growth_pressure_wind_scale {0.04f};
-    float growth_pressure_dust_scale {0.04f};
+    float growth_pressure_heat_scale {0.01f};
+    float growth_pressure_wind_scale {0.01f};
+    float growth_pressure_dust_scale {0.01f};
     float growth_pressure_base {0.2f};
     float growth_pressure_heat_weight {0.9f};
     float growth_pressure_wind_weight {0.75f};

@@ -163,6 +163,11 @@ float compute_growth_pressure(
         return 0.0f;
     }
 
+    if (!plant_def.growable)
+    {
+        return 0.0f;
+    }
+
     const float density = ecology.plant_density;
     const float effective_heat_tolerance =
         resolve_density_scaled_resistance(plant_def.heat_tolerance, density);
