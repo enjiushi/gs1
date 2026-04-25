@@ -8,7 +8,7 @@ External prototype content TOML files loaded by the gameplay DLL at startup.
 
 ## Contents
 - `campaign_setup.toml`: Prototype campaign setup content for starting cash, support quota per contributor, and baseline deployment items.
-- `sites.toml`: Prototype campaign/site authoring content for site graph, objective config, support exports, nearby aura seeds, completion rewards, camp anchors, site default-weather baselines, authored starter-plant patches such as Site 1's harvestable near-camp starter growth, and initial reveal/availability flags.
+- `sites.toml`: Prototype campaign/site authoring content for regional-map tile placement, objective config, support exports, nearby aura seeds, completion rewards, camp anchors, site default-weather baselines, authored starter-plant patches such as Site 1's harvestable near-camp starter growth, and initial reveal/availability flags.
 - `phone_listings.toml`: Seeded phone-listing content for per-site buy, unlockable, and contractor offers, including internal cash-point valuation for direct-purchase unlockables that converts to player-facing cash.
 - `items.toml`: Item authoring content for runtime item definitions and item-domain metadata, including consumable meter deltas, internal cash-point valuation used by task/reward scoring, the full prototype seed-item roster, and harvested-good items for the China-desert ten-plant set.
 - `plants.toml`: Plant authoring content for ecology, shelter, planting behavior, tuned two-specialty resistance/support roles, and per-plant harvest thresholds/output tuning across the full prototype China-desert 10-plant roster.

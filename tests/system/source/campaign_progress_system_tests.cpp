@@ -140,6 +140,43 @@ void campaign_flow_start_new_campaign_initializes_state(gs1::testing::SystemTest
     GS1_SYSTEM_TEST_CHECK(context, queue.empty());
 }
 
+bool has_adjacent_site(const gs1::SiteMetaState& site, gs1::SiteId adjacent_site_id)
+{
+    return std::find(site.adjacent_site_ids.begin(), site.adjacent_site_ids.end(), adjacent_site_id) !=
+        site.adjacent_site_ids.end();
+}
+
+void campaign_flow_derives_regional_map_tile_adjacency(gs1::testing::SystemTestExecutionContext& context)
+{
+    const auto campaign = make_campaign();
+    const auto* site_one = find_site_meta(campaign, 1U);
+    const auto* site_two = find_site_meta(campaign, 2U);
+    const auto* site_three = find_site_meta(campaign, 3U);
+    const auto* site_four = find_site_meta(campaign, 4U);
+    GS1_SYSTEM_TEST_REQUIRE(context, site_one != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(context, site_two != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(context, site_three != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(context, site_four != nullptr);
+
+    GS1_SYSTEM_TEST_CHECK(context, site_one->regional_map_tile.x == 0);
+    GS1_SYSTEM_TEST_CHECK(context, site_one->regional_map_tile.y == 0);
+    GS1_SYSTEM_TEST_CHECK(context, site_two->regional_map_tile.x == 1);
+    GS1_SYSTEM_TEST_CHECK(context, site_two->regional_map_tile.y == 0);
+    GS1_SYSTEM_TEST_CHECK(context, site_three->regional_map_tile.x == 2);
+    GS1_SYSTEM_TEST_CHECK(context, site_three->regional_map_tile.y == 1);
+    GS1_SYSTEM_TEST_CHECK(context, site_four->regional_map_tile.x == 3);
+    GS1_SYSTEM_TEST_CHECK(context, site_four->regional_map_tile.y == 1);
+
+    GS1_SYSTEM_TEST_CHECK(context, has_adjacent_site(*site_one, SiteId {2U}));
+    GS1_SYSTEM_TEST_CHECK(context, has_adjacent_site(*site_two, SiteId {1U}));
+    GS1_SYSTEM_TEST_CHECK(context, has_adjacent_site(*site_two, SiteId {3U}));
+    GS1_SYSTEM_TEST_CHECK(context, has_adjacent_site(*site_three, SiteId {2U}));
+    GS1_SYSTEM_TEST_CHECK(context, has_adjacent_site(*site_three, SiteId {4U}));
+    GS1_SYSTEM_TEST_CHECK(context, has_adjacent_site(*site_four, SiteId {3U}));
+    GS1_SYSTEM_TEST_CHECK(context, !has_adjacent_site(*site_one, SiteId {3U}));
+    GS1_SYSTEM_TEST_CHECK(context, !has_adjacent_site(*site_two, SiteId {4U}));
+}
+
 void campaign_flow_selection_paths_update_selection_and_queue(gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign_value = make_campaign();
@@ -1117,6 +1154,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "campaign_flow",
     "start_new_campaign_initializes_state",
     campaign_flow_start_new_campaign_initializes_state);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "campaign_flow",
+    "derives_regional_map_tile_adjacency",
+    campaign_flow_derives_regional_map_tile_adjacency);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "campaign_flow",
     "selection_paths_update_selection_and_queue",

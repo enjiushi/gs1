@@ -41,7 +41,7 @@ struct PrototypeSiteContent final
     SiteObjectiveType objective_type {SiteObjectiveType::DenseRestoration};
     FactionId featured_faction_id {};
     Gs1SiteState initial_state {GS1_SITE_STATE_LOCKED};
-    std::vector<SiteId> adjacent_site_ids {};
+    TileCoord regional_map_tile {};
     std::uint32_t support_package_id {0};
     std::vector<PrototypeSupportItemContent> exported_support_items {};
     std::vector<ModifierId> nearby_aura_modifier_ids {};

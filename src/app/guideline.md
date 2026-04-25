@@ -10,7 +10,7 @@ Application-facing glue that assembles campaign/site state and exposes the gamep
 ## Contents
 - `app_state_machine.h`: High-level scene/app state transitions across menus, campaign, and site play.
 - `campaign_factory.h`: Factory declarations for creating and wiring campaign state.
-- `campaign_factory.cpp`: Campaign factory implementation and initialization wiring.
+- `campaign_factory.cpp`: Campaign factory implementation and initialization wiring, including derived 8-neighbor regional-map adjacency from authored site tile coordinates.
 - `game_api.cpp`: Exported C API implementation that bridges hosts into the runtime/app layer.
 - `game_app.h`: Top-level gameplay app container that owns runtime-facing state.
 - `game_bootstrap.h`: Startup/bootstrap helpers for constructing the app and initial scene state.

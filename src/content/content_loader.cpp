@@ -958,22 +958,6 @@ template <typename T>
     return values;
 }
 
-[[nodiscard]] std::vector<SiteId> parse_site_id_array(
-    const std::filesystem::path& path,
-    const toml::table& table,
-    std::string_view key)
-{
-    std::vector<SiteId> values {};
-    const auto& array = require_toml_array(path, table, key);
-    values.reserve(array.size());
-    for (const auto& node : array)
-    {
-        values.push_back(SiteId {require_toml_array_integer<std::uint32_t>(path, node, key)});
-    }
-
-    return values;
-}
-
 [[nodiscard]] std::vector<ModifierId> parse_modifier_id_array(
     const std::filesystem::path& path,
     const toml::table& table,
@@ -1066,7 +1050,8 @@ void load_prototype_campaign_sites(ContentDatabase& content, const std::filesyst
             FactionId {require_toml_unsigned<std::uint32_t>(path, entry, "featured_faction_id")};
         site.initial_state =
             parse_site_state(path, toml_line_number(entry), require_toml_string(path, entry, "initial_state"));
-        site.adjacent_site_ids = parse_site_id_array(path, entry, "adjacent_site_ids");
+        site.regional_map_tile.x = require_toml_signed<std::int32_t>(path, entry, "regional_map_tile_x");
+        site.regional_map_tile.y = require_toml_signed<std::int32_t>(path, entry, "regional_map_tile_y");
         site.support_package_id = require_toml_unsigned<std::uint32_t>(path, entry, "support_package_id");
         site.exported_support_items = parse_support_item_array(path, entry, "exported_support_items");
         site.nearby_aura_modifier_ids = parse_modifier_id_array(path, entry, "nearby_aura_modifier_ids");

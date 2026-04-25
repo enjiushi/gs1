@@ -5180,9 +5180,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         worldGroup.add(northMarker);
 
         const positions = new Map();
+        const mapTileSourceSpacing = 160;
         const scale = 0.03;
+        const tileSpacing = mapTileSourceSpacing * scale;
         const rawPositions = state.regionalMap.sites.map((site) => ({
             siteId: site.siteId,
+            tileX: Math.round(site.mapX / mapTileSourceSpacing),
+            tileY: Math.round(site.mapY / mapTileSourceSpacing),
             rawX: site.mapX * scale,
             rawZ: -site.mapY * scale
         }));
@@ -5196,27 +5200,46 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             const maxRawZ = Math.max.apply(null, rawZs);
             const rawCenterX = (minRawX + maxRawX) * 0.5;
             const rawCenterZ = (minRawZ + maxRawZ) * 0.5;
-            const useCurvedFallback = (maxRawZ - minRawZ) < 0.4;
 
-            if (useCurvedFallback) {
-                const orderedSites = rawPositions.slice().sort((left, right) => left.rawX - right.rawX);
-                const lastIndex = Math.max(orderedSites.length - 1, 1);
+            rawPositions.forEach((entry) => {
+                positions.set(entry.siteId, {
+                    x: entry.rawX - rawCenterX,
+                    z: entry.rawZ - rawCenterZ
+                });
+            });
 
-                orderedSites.forEach((entry, index) => {
-                    const normalized = index / lastIndex;
-                    const centered = normalized - 0.5;
-                    positions.set(entry.siteId, {
-                        x: centered * 14.0,
-                        z: Math.sin(normalized * Math.PI) * 3.2 - 1.6 + Math.cos(normalized * Math.PI * 2.0) * 0.45
-                    });
-                });
-            } else {
-                rawPositions.forEach((entry) => {
-                    positions.set(entry.siteId, {
-                        x: entry.rawX - rawCenterX,
-                        z: entry.rawZ - rawCenterZ
-                    });
-                });
+            const tileXs = rawPositions.map((entry) => entry.tileX);
+            const tileYs = rawPositions.map((entry) => entry.tileY);
+            const minTileX = Math.min.apply(null, tileXs) - 1;
+            const maxTileX = Math.max.apply(null, tileXs) + 1;
+            const minTileY = Math.min.apply(null, tileYs) - 1;
+            const maxTileY = Math.max.apply(null, tileYs) + 1;
+
+            for (let tileY = minTileY; tileY <= maxTileY; tileY += 1) {
+                for (let tileX = minTileX; tileX <= maxTileX; tileX += 1) {
+                    const occupied = rawPositions.some((entry) => entry.tileX === tileX && entry.tileY === tileY);
+                    const tile = new THREE_NS.Mesh(
+                        new THREE_NS.BoxGeometry(tileSpacing * 0.86, 0.06, tileSpacing * 0.86),
+                        new THREE_NS.MeshStandardMaterial({
+                            color: occupied ? 0xcfa66e : 0xdbbd8c,
+                            roughness: occupied ? 0.92 : 0.97,
+                            metalness: 0.01
+                        })
+                    );
+                    tile.position.set(tileX * tileSpacing - rawCenterX, 0.1, -(tileY * tileSpacing) - rawCenterZ);
+                    worldGroup.add(tile);
+
+                    const tileOutline = new THREE_NS.Mesh(
+                        new THREE_NS.BoxGeometry(tileSpacing * 0.92, 0.01, tileSpacing * 0.92),
+                        new THREE_NS.MeshStandardMaterial({
+                            color: occupied ? 0x8e6639 : 0xb98d5b,
+                            roughness: 1.0,
+                            metalness: 0.0
+                        })
+                    );
+                    tileOutline.position.set(tile.position.x, 0.135, tile.position.z);
+                    worldGroup.add(tileOutline);
+                }
             }
         }
 

@@ -54,6 +54,7 @@ constexpr float k_visible_tile_moisture_projection_step = 100.0f / 64.0f;
 constexpr float k_visible_tile_soil_fertility_projection_step = 100.0f / 64.0f;
 constexpr float k_visible_tile_soil_salinity_projection_step = 100.0f / 64.0f;
 constexpr double k_site_one_probe_window_minutes = 0.25;
+constexpr std::int32_t k_regional_map_tile_spacing = 160;
 
 [[nodiscard]] bool is_site_one_probe_tile(TileCoord coord) noexcept
 {
@@ -2308,17 +2309,8 @@ void GameRuntime::queue_regional_map_site_upsert_message(const SiteMetaState& si
         ? 1U
         : 0U;
 
-    std::size_t map_index = 0;
-    for (; map_index < campaign_->sites.size(); ++map_index)
-    {
-        if (campaign_->sites[map_index].site_id == site.site_id)
-        {
-            break;
-        }
-    }
-
-    payload.map_x = static_cast<std::int32_t>(map_index * 160);
-    payload.map_y = 0;
+    payload.map_x = site.regional_map_tile.x * k_regional_map_tile_spacing;
+    payload.map_y = site.regional_map_tile.y * k_regional_map_tile_spacing;
     payload.support_package_id =
         site.has_support_package_id ? site.support_package_id : 0U;
     payload.support_preview_mask =

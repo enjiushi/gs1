@@ -15,6 +15,7 @@ struct SiteMetaState final
 {
     SiteId site_id {};
     Gs1SiteState site_state {GS1_SITE_STATE_LOCKED};
+    TileCoord regional_map_tile {};
     std::vector<SiteId> adjacent_site_ids {};
     std::uint32_t site_archetype_id {0};
     FactionId featured_faction_id {};

@@ -803,13 +803,19 @@ std::vector<ContentValidationIssue> validate_content_database(
             break;
         }
 
-        for (const auto adjacent_site_id : site_def.adjacent_site_ids)
+        for (const auto& other_site_def : content.prototype_campaign.sites)
         {
-            if (!content.index.site_by_id.contains(adjacent_site_id.value))
+            if (other_site_def.site_id == site_def.site_id)
+            {
+                continue;
+            }
+
+            if (other_site_def.regional_map_tile.x == site_def.regional_map_tile.x &&
+                other_site_def.regional_map_tile.y == site_def.regional_map_tile.y)
             {
                 issues.push_back(ContentValidationIssue {
                     ContentValidationSeverity::Error,
-                    "Prototype site content references an unknown adjacent site id."});
+                    "Prototype regional-map site tiles must stay unique."});
                 break;
             }
         }

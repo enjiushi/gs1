@@ -554,6 +554,22 @@ const Gs1EngineMessage* find_regional_map_site_message(
     return nullptr;
 }
 
+bool contains_regional_map_link(
+    const std::vector<Gs1EngineMessage>& messages,
+    std::uint32_t from_site_id,
+    std::uint32_t to_site_id)
+{
+    return std::any_of(messages.begin(), messages.end(), [&](const Gs1EngineMessage& message) {
+        if (message.type != GS1_ENGINE_MESSAGE_REGIONAL_MAP_LINK_UPSERT)
+        {
+            return false;
+        }
+
+        const auto& payload = message.payload_as<Gs1EngineMessageRegionalMapLinkData>();
+        return payload.from_site_id == from_site_id && payload.to_site_id == to_site_id;
+    });
+}
+
 }  // namespace
 
 int main()
@@ -567,9 +583,30 @@ int main()
 
     assert(runtime.handle_message(make_start_campaign_message()) == GS1_STATUS_OK);
     assert(gs1::GameRuntimeProjectionTestAccess::campaign(runtime).has_value());
+    const auto initial_map_messages = drain_engine_messages(runtime);
+    {
+        const auto* site_one_message = find_regional_map_site_message(initial_map_messages, 1U);
+        const auto* site_two_message = find_regional_map_site_message(initial_map_messages, 2U);
+        const auto* site_three_message = find_regional_map_site_message(initial_map_messages, 3U);
+        const auto* site_four_message = find_regional_map_site_message(initial_map_messages, 4U);
+        assert(site_one_message != nullptr);
+        assert(site_two_message != nullptr);
+        assert(site_three_message != nullptr);
+        assert(site_four_message != nullptr);
+        assert(site_one_message->payload_as<Gs1EngineMessageRegionalMapSiteData>().map_x == 0);
+        assert(site_one_message->payload_as<Gs1EngineMessageRegionalMapSiteData>().map_y == 0);
+        assert(site_two_message->payload_as<Gs1EngineMessageRegionalMapSiteData>().map_x == 160);
+        assert(site_two_message->payload_as<Gs1EngineMessageRegionalMapSiteData>().map_y == 0);
+        assert(site_three_message->payload_as<Gs1EngineMessageRegionalMapSiteData>().map_x == 320);
+        assert(site_three_message->payload_as<Gs1EngineMessageRegionalMapSiteData>().map_y == 160);
+        assert(site_four_message->payload_as<Gs1EngineMessageRegionalMapSiteData>().map_x == 480);
+        assert(site_four_message->payload_as<Gs1EngineMessageRegionalMapSiteData>().map_y == 160);
+        assert(contains_regional_map_link(initial_map_messages, 1U, 2U));
+        assert(contains_regional_map_link(initial_map_messages, 2U, 3U));
+        assert(contains_regional_map_link(initial_map_messages, 3U, 4U));
+    }
 
     const auto campaign_site_id = gs1::GameRuntimeProjectionTestAccess::campaign(runtime)->sites.front().site_id.value;
-    drain_engine_messages(runtime);
     assert(runtime.handle_message(make_select_site_message(campaign_site_id)) == GS1_STATUS_OK);
     const auto loadout_ui_messages = drain_engine_messages(runtime);
     assert(contains_ui_element_text(loadout_ui_messages, "Water x1"));

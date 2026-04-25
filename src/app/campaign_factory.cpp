@@ -4,6 +4,8 @@
 #include "content/defs/faction_defs.h"
 #include "content/prototype_content.h"
 
+#include <cstdlib>
+
 namespace gs1
 {
 namespace
@@ -14,6 +16,39 @@ namespace
         item_id,
         quantity,
         item_id.value != 0U && quantity > 0U};
+}
+
+[[nodiscard]] bool are_regional_map_tiles_adjacent(
+    const TileCoord& left,
+    const TileCoord& right) noexcept
+{
+    const auto delta_x = std::abs(left.x - right.x);
+    const auto delta_y = std::abs(left.y - right.y);
+    return (delta_x > 0 || delta_y > 0) && delta_x <= 1 && delta_y <= 1;
+}
+
+void rebuild_regional_map_adjacency(CampaignState& campaign)
+{
+    for (auto& site : campaign.sites)
+    {
+        site.adjacent_site_ids.clear();
+    }
+
+    for (std::size_t left_index = 0; left_index < campaign.sites.size(); ++left_index)
+    {
+        for (std::size_t right_index = left_index + 1U; right_index < campaign.sites.size(); ++right_index)
+        {
+            auto& left = campaign.sites[left_index];
+            auto& right = campaign.sites[right_index];
+            if (!are_regional_map_tiles_adjacent(left.regional_map_tile, right.regional_map_tile))
+            {
+                continue;
+            }
+
+            left.adjacent_site_ids.push_back(right.site_id);
+            right.adjacent_site_ids.push_back(left.site_id);
+        }
+    }
 }
 }  // namespace
 
@@ -47,7 +82,7 @@ CampaignState CampaignFactory::create_prototype_campaign(
         SiteMetaState site {};
         site.site_id = site_content.site_id;
         site.site_state = site_content.initial_state;
-        site.adjacent_site_ids = site_content.adjacent_site_ids;
+        site.regional_map_tile = site_content.regional_map_tile;
         site.site_archetype_id = site_content.site_archetype_id;
         site.featured_faction_id = site_content.featured_faction_id;
         site.support_package_id = site_content.support_package_id;
@@ -64,6 +99,7 @@ CampaignState CampaignFactory::create_prototype_campaign(
         campaign.sites.push_back(site);
     }
 
+    rebuild_regional_map_adjacency(campaign);
     campaign.regional_map_state.revealed_site_ids = content.initially_revealed_site_ids;
 
     return campaign;
