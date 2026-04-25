@@ -412,6 +412,27 @@ inline std::size_t count_messages(
     return count;
 }
 
+inline std::size_t count_tile_ecology_entries(
+    const GameMessageQueue& message_queue) noexcept
+{
+    std::size_t count = 0U;
+    for (const auto& message : message_queue)
+    {
+        if (message.type == GameMessageType::TileEcologyChanged)
+        {
+            count += 1U;
+            continue;
+        }
+
+        if (message.type == GameMessageType::TileEcologyBatchChanged)
+        {
+            count += message.payload_as<TileEcologyBatchChangedMessage>().entry_count;
+        }
+    }
+
+    return count;
+}
+
 inline const GameMessage* first_message(
     const GameMessageQueue& message_queue,
     GameMessageType type) noexcept

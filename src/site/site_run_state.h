@@ -3,12 +3,14 @@
 #include "site/action_state.h"
 #include "site/contractor_state.h"
 #include "site/craft_state.h"
+#include "site/device_weather_contribution_state.h"
 #include "site/economy_state.h"
 #include "site/event_state.h"
 #include "site/inventory_state.h"
 #include "site/local_weather_resolve_state.h"
 #include "site/modifier_state.h"
 #include "site/phone_panel_state.h"
+#include "site/plant_weather_contribution_state.h"
 #include "site/site_objective_state.h"
 #include "site/task_board_state.h"
 #include "site/weather_state.h"
@@ -115,13 +117,13 @@ struct SiteRunState final
     SiteCounters counters {};
     SiteObjectiveState objective {};
     LocalWeatherResolveState local_weather_resolve {};
+    PlantWeatherContributionState plant_weather_contribution {};
+    DeviceWeatherContributionState device_weather_contribution {};
     std::uint32_t result_newly_revealed_site_count {0};
     std::uint64_t pending_projection_update_flags {0};
     bool pending_full_tile_projection_update {false};
     std::vector<TileCoord> pending_tile_projection_updates {};
     std::vector<std::uint8_t> pending_tile_projection_update_mask {};
-    std::vector<float> last_reported_tile_density {};
-    std::vector<std::uint8_t> last_reported_tile_density_valid {};
     std::vector<ProjectedSiteTileState> last_projected_tile_states {};
     bool pending_full_inventory_projection_update {false};
     std::vector<std::uint32_t> pending_worker_pack_inventory_projection_updates {};

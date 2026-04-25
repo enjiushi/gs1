@@ -16,8 +16,11 @@ public:
                 SiteComponent::TileLayout,
                 SiteComponent::TileEcology,
                 SiteComponent::TilePlantWeatherContribution,
-                SiteComponent::Weather),
-            site_component_mask_of(SiteComponent::TilePlantWeatherContribution)};
+                SiteComponent::Weather,
+                SiteComponent::PlantWeatherRuntime),
+            site_component_mask_of(
+                SiteComponent::TilePlantWeatherContribution,
+                SiteComponent::PlantWeatherRuntime)};
     }
 
     [[nodiscard]] static bool subscribes_to(GameMessageType type) noexcept;

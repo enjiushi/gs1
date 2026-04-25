@@ -13,6 +13,7 @@ inline constexpr float k_weather_contribution_density_epsilon_raw = 0.01f;
 inline constexpr float k_inverse_meter_scale = 0.01f;
 inline constexpr float k_own_tile_contribution_scale = 0.04f;
 inline constexpr float k_neighbor_contribution_scale = 0.018f;
+inline constexpr std::uint8_t k_weather_contribution_wind_direction_sector_count = 16U;
 inline constexpr float k_wind_shadow_alignment_exponent = 2.0f;
 inline constexpr float k_wind_shadow_falloff_exponent = 3.0f;
 inline constexpr float k_wind_shadow_falloff_strength = 2.0f;
@@ -66,6 +67,21 @@ inline constexpr std::array<WeatherContributionSample, 13> k_weather_contributio
         normalize_wind_direction_degrees(wind_direction_degrees) *
         (3.14159265358979323846f / 180.0f);
     return WeatherUnitVector {std::cos(radians), std::sin(radians)};
+}
+
+[[nodiscard]] inline std::uint8_t quantize_wind_direction_sector(
+    float wind_direction_degrees,
+    std::uint8_t sector_count = k_weather_contribution_wind_direction_sector_count) noexcept
+{
+    if (sector_count == 0U)
+    {
+        return 0U;
+    }
+
+    const float normalized = normalize_wind_direction_degrees(wind_direction_degrees);
+    const float sector_size = 360.0f / static_cast<float>(sector_count);
+    const auto raw_sector = static_cast<std::uint32_t>(normalized / sector_size);
+    return static_cast<std::uint8_t>(raw_sector % sector_count);
 }
 
 [[nodiscard]] inline float compute_directional_wind_shadow_scale(

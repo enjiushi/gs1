@@ -250,6 +250,11 @@ void apply_tracked_plant_state(
     update_populated_neighbor_counts(board, coord, previously_populated, tracked->populated_by_plant);
 }
 
+float density_from_centi(std::uint16_t plant_density_centi) noexcept
+{
+    return static_cast<float>(plant_density_centi) * 0.01f;
+}
+
 bool item_is_crafted(ItemId item_id) noexcept
 {
     const auto* item_def = find_item_def(item_id);
@@ -1809,6 +1814,12 @@ void handle_tile_ecology_changed(
     SiteSystemContext<TaskBoardSystem>& context,
     const TileEcologyChangedMessage& payload)
 {
+    if ((payload.changed_mask &
+            (TILE_ECOLOGY_CHANGED_OCCUPANCY | TILE_ECOLOGY_CHANGED_DENSITY)) == 0U)
+    {
+        return;
+    }
+
     auto& board = context.world.own_task_board();
     apply_tracked_plant_state(
         board,
@@ -1816,6 +1827,50 @@ void handle_tile_ecology_changed(
         payload.plant_type_id,
         payload.ground_cover_type_id,
         payload.plant_density);
+    const bool snapshot_changed = refresh_snapshot_tasks_if(context, [](const TaskTemplateDef& task_template_def) {
+        return task_template_def.progress_kind == TaskProgressKind::PlantCountAtDensity ||
+            task_template_def.progress_kind == TaskProgressKind::AnyPlantDensityAtLeast ||
+            task_template_def.progress_kind == TaskProgressKind::NearbyPopulatedPlantTilesAtLeast;
+    });
+    if (snapshot_changed)
+    {
+        mark_task_projection_dirty(context);
+    }
+}
+
+void handle_tile_ecology_batch_changed(
+    SiteSystemContext<TaskBoardSystem>& context,
+    const TileEcologyBatchChangedMessage& payload)
+{
+    auto& board = context.world.own_task_board();
+    bool any_relevant_entry = false;
+    for (std::size_t index = 0U;
+         index < payload.entry_count && index < k_tile_ecology_batch_entry_count;
+         ++index)
+    {
+        const auto& entry = payload.entries[index];
+        if ((entry.changed_mask &
+                (TILE_ECOLOGY_CHANGED_OCCUPANCY | TILE_ECOLOGY_CHANGED_DENSITY)) == 0U)
+        {
+            continue;
+        }
+
+        any_relevant_entry = true;
+        apply_tracked_plant_state(
+            board,
+            TileCoord {
+                static_cast<std::int32_t>(entry.target_tile_x),
+                static_cast<std::int32_t>(entry.target_tile_y)},
+            entry.plant_type_id,
+            entry.ground_cover_type_id,
+            density_from_centi(entry.plant_density_centi));
+    }
+
+    if (!any_relevant_entry)
+    {
+        return;
+    }
+
     const bool snapshot_changed = refresh_snapshot_tasks_if(context, [](const TaskTemplateDef& task_template_def) {
         return task_template_def.progress_kind == TaskProgressKind::PlantCountAtDensity ||
             task_template_def.progress_kind == TaskProgressKind::AnyPlantDensityAtLeast ||
@@ -2191,6 +2246,7 @@ bool TaskBoardSystem::subscribes_to(GameMessageType type) noexcept
     case GameMessageType::TaskRewardClaimRequested:
     case GameMessageType::RestorationProgressChanged:
     case GameMessageType::TileEcologyChanged:
+    case GameMessageType::TileEcologyBatchChanged:
     case GameMessageType::LivingPlantStabilityChanged:
     case GameMessageType::SiteTileStateChanged:
     case GameMessageType::WorkerMetersChanged:
@@ -2233,6 +2289,11 @@ Gs1Status TaskBoardSystem::process_message(
         break;
     case GameMessageType::TileEcologyChanged:
         handle_tile_ecology_changed(context, message.payload_as<TileEcologyChangedMessage>());
+        break;
+    case GameMessageType::TileEcologyBatchChanged:
+        handle_tile_ecology_batch_changed(
+            context,
+            message.payload_as<TileEcologyBatchChangedMessage>());
         break;
     case GameMessageType::LivingPlantStabilityChanged:
         handle_living_plant_stability_changed(

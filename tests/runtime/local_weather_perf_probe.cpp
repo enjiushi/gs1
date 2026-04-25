@@ -23,6 +23,14 @@ constexpr double kFixedStepSeconds = 1.0 / 60.0;
 constexpr int kInitialPassIterations = 200;
 constexpr int kSteadyStateIterations = 1000;
 
+struct PipelineTimings final
+{
+    double plant_ms {0.0};
+    double device_ms {0.0};
+    double resolve_ms {0.0};
+    double total_ms {0.0};
+};
+
 gs1::SiteRunState make_site_run()
 {
     gs1::SiteRunState site_run {};
@@ -68,7 +76,7 @@ void seed_dense_cover(gs1::SiteRunState& site_run)
     }
 }
 
-void run_local_weather_pipeline(
+PipelineTimings run_local_weather_pipeline(
     gs1::CampaignState& campaign,
     gs1::SiteRunState& site_run,
     gs1::GameMessageQueue& message_queue)
@@ -92,16 +100,46 @@ void run_local_weather_pipeline(
         kFixedStepSeconds,
         {});
 
+    const auto total_started = std::chrono::steady_clock::now();
+
+    const auto plant_started = std::chrono::steady_clock::now();
     gs1::PlantWeatherContributionSystem::run(plant_context);
+    const auto device_started = std::chrono::steady_clock::now();
     gs1::DeviceWeatherContributionSystem::run(device_context);
+    const auto resolve_started = std::chrono::steady_clock::now();
     gs1::LocalWeatherResolveSystem::run(local_weather_context);
+    const auto total_ended = std::chrono::steady_clock::now();
+
+    return PipelineTimings {
+        std::chrono::duration<double, std::milli>(device_started - plant_started).count(),
+        std::chrono::duration<double, std::milli>(resolve_started - device_started).count(),
+        std::chrono::duration<double, std::milli>(total_ended - resolve_started).count(),
+        std::chrono::duration<double, std::milli>(total_ended - total_started).count()};
 }
 
-double measure_initial_pass_ms()
+PipelineTimings average_timings(const PipelineTimings& totals, int iterations)
+{
+    const double divisor = iterations > 0 ? static_cast<double>(iterations) : 1.0;
+    return PipelineTimings {
+        totals.plant_ms / divisor,
+        totals.device_ms / divisor,
+        totals.resolve_ms / divisor,
+        totals.total_ms / divisor};
+}
+
+void accumulate_timings(PipelineTimings& totals, const PipelineTimings& delta)
+{
+    totals.plant_ms += delta.plant_ms;
+    totals.device_ms += delta.device_ms;
+    totals.resolve_ms += delta.resolve_ms;
+    totals.total_ms += delta.total_ms;
+}
+
+PipelineTimings measure_initial_pass_ms()
 {
     gs1::CampaignState campaign {};
     gs1::GameMessageQueue message_queue {};
-    double total_ms = 0.0;
+    PipelineTimings totals {};
 
     for (int iteration = 0; iteration < kInitialPassIterations; ++iteration)
     {
@@ -109,17 +147,13 @@ double measure_initial_pass_ms()
         seed_dense_cover(site_run);
         message_queue.clear();
 
-        const auto started = std::chrono::steady_clock::now();
-        run_local_weather_pipeline(campaign, site_run, message_queue);
-        const auto ended = std::chrono::steady_clock::now();
-        total_ms +=
-            std::chrono::duration<double, std::milli>(ended - started).count();
+        accumulate_timings(totals, run_local_weather_pipeline(campaign, site_run, message_queue));
     }
 
-    return total_ms / static_cast<double>(kInitialPassIterations);
+    return average_timings(totals, kInitialPassIterations);
 }
 
-double measure_steady_state_pass_ms()
+PipelineTimings measure_steady_state_pass_ms()
 {
     gs1::CampaignState campaign {};
     gs1::GameMessageQueue message_queue {};
@@ -128,33 +162,37 @@ double measure_steady_state_pass_ms()
 
     run_local_weather_pipeline(campaign, site_run, message_queue);
 
-    const auto started = std::chrono::steady_clock::now();
+    PipelineTimings totals {};
     for (int iteration = 0; iteration < kSteadyStateIterations; ++iteration)
     {
-        run_local_weather_pipeline(campaign, site_run, message_queue);
+        accumulate_timings(totals, run_local_weather_pipeline(campaign, site_run, message_queue));
     }
-    const auto ended = std::chrono::steady_clock::now();
 
-    return std::chrono::duration<double, std::milli>(ended - started).count() /
-        static_cast<double>(kSteadyStateIterations);
+    return average_timings(totals, kSteadyStateIterations);
+}
+
+void print_stage_timings(const char* label, int iterations, const PipelineTimings& timings)
+{
+    std::cout << label << " avg ms (" << iterations << " runs): " << timings.total_ms << "\n";
+    std::cout << "  plant contribution: " << timings.plant_ms << "\n";
+    std::cout << "  device contribution: " << timings.device_ms << "\n";
+    std::cout << "  local weather resolve: " << timings.resolve_ms << "\n";
 }
 }  // namespace
 
 int main()
 {
-    const double initial_pass_ms = measure_initial_pass_ms();
-    const double steady_state_pass_ms = measure_steady_state_pass_ms();
+    const PipelineTimings initial_pass = measure_initial_pass_ms();
+    const PipelineTimings steady_state_pass = measure_steady_state_pass_ms();
     constexpr double kFrameBudgetMs = 1000.0 / 60.0;
 
     std::cout << std::fixed << std::setprecision(3);
     std::cout << "Local weather perf probe\n";
     std::cout << "grid: " << kSiteWidth << "x" << kSiteHeight << " (" << kTileCount << " tiles)\n";
     std::cout << "pipeline: plant contribution -> device contribution -> local weather resolve\n";
-    std::cout << "initial pass avg ms (" << kInitialPassIterations << " runs): "
-              << initial_pass_ms << "\n";
-    std::cout << "steady-state avg ms (" << kSteadyStateIterations << " runs): "
-              << steady_state_pass_ms << "\n";
+    print_stage_timings("initial pass", kInitialPassIterations, initial_pass);
+    print_stage_timings("steady-state", kSteadyStateIterations, steady_state_pass);
     std::cout << "steady-state share of 60 FPS frame budget: "
-              << ((steady_state_pass_ms / kFrameBudgetMs) * 100.0) << "%\n";
+              << ((steady_state_pass.total_ms / kFrameBudgetMs) * 100.0) << "%\n";
     return 0;
 }

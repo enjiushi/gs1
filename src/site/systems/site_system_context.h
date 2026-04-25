@@ -24,6 +24,8 @@ enum class SiteComponent : std::uint8_t
     TileWeather,
     TilePlantWeatherContribution,
     TileDeviceWeatherContribution,
+    PlantWeatherRuntime,
+    DeviceWeatherRuntime,
     DeviceCondition,
     DeviceRuntime,
     WorkerMotion,
@@ -76,6 +78,10 @@ template <typename... Components>
         return "TilePlantWeatherContribution";
     case SiteComponent::TileDeviceWeatherContribution:
         return "TileDeviceWeatherContribution";
+    case SiteComponent::PlantWeatherRuntime:
+        return "PlantWeatherRuntime";
+    case SiteComponent::DeviceWeatherRuntime:
+        return "DeviceWeatherRuntime";
     case SiteComponent::DeviceCondition:
         return "DeviceCondition";
     case SiteComponent::DeviceRuntime:
@@ -321,63 +327,6 @@ public:
             "System must declare a tile-grid component as readable.");
         const auto* world = site_world_ptr();
         return world != nullptr && world->contains(coord) ? world->tile_index(coord) : 0U;
-    }
-
-    [[nodiscard]] float last_reported_tile_density_or(
-        TileCoord coord,
-        float fallback) const noexcept
-    {
-        static_assert(
-            site_system_reads_component<SystemTag>(SiteComponent::TileEcology),
-            "System must declare TileEcology as readable.");
-        const auto* world = site_world_ptr();
-        if (world == nullptr || !world->contains(coord))
-        {
-            return fallback;
-        }
-
-        const auto index = world->tile_index(coord);
-        if (site_run_.last_reported_tile_density_valid.size() != world->tile_count() ||
-            site_run_.last_reported_tile_density.size() != world->tile_count() ||
-            index >= site_run_.last_reported_tile_density_valid.size() ||
-            site_run_.last_reported_tile_density_valid[index] == 0U)
-        {
-            return fallback;
-        }
-
-        return site_run_.last_reported_tile_density[index];
-    }
-
-    void set_last_reported_tile_density(TileCoord coord, float density) noexcept
-    {
-        static_assert(
-            site_system_owns_component<SystemTag>(SiteComponent::TileEcology),
-            "System must declare TileEcology as owned.");
-        auto* world = site_world_ptr();
-        if (world == nullptr || !world->contains(coord))
-        {
-            return;
-        }
-
-        const auto tile_count = world->tile_count();
-        if (site_run_.last_reported_tile_density_valid.size() != tile_count)
-        {
-            site_run_.last_reported_tile_density_valid.assign(tile_count, 0U);
-        }
-        if (site_run_.last_reported_tile_density.size() != tile_count)
-        {
-            site_run_.last_reported_tile_density.assign(tile_count, 0.0f);
-        }
-
-        const auto index = world->tile_index(coord);
-        if (index >= site_run_.last_reported_tile_density_valid.size() ||
-            index >= site_run_.last_reported_tile_density.size())
-        {
-            return;
-        }
-
-        site_run_.last_reported_tile_density[index] = density;
-        site_run_.last_reported_tile_density_valid[index] = 1U;
     }
 
     [[nodiscard]] SiteWorld::TileEcologyData read_tile_ecology(TileCoord coord) const noexcept
@@ -654,6 +603,26 @@ public:
     [[nodiscard]] LocalWeatherResolveState& own_local_weather_runtime() noexcept
     {
         return site_run_.local_weather_resolve;
+    }
+
+    [[nodiscard]] const PlantWeatherContributionState& read_plant_weather_runtime() const noexcept
+    {
+        return site_run_.plant_weather_contribution;
+    }
+
+    [[nodiscard]] PlantWeatherContributionState& own_plant_weather_runtime() noexcept
+    {
+        return site_run_.plant_weather_contribution;
+    }
+
+    [[nodiscard]] const DeviceWeatherContributionState& read_device_weather_runtime() const noexcept
+    {
+        return site_run_.device_weather_contribution;
+    }
+
+    [[nodiscard]] DeviceWeatherContributionState& own_device_weather_runtime() noexcept
+    {
+        return site_run_.device_weather_contribution;
     }
 
     [[nodiscard]] const EventState& read_event() const noexcept { return site_run_.event; }
