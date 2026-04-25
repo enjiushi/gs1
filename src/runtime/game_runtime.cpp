@@ -700,6 +700,16 @@ void GameRuntime::initialize_subscription_tables()
             subscribers.push_back(MessageSubscriberId::Ecology);
         }
 
+        if (PlantWeatherContributionSystem::subscribes_to(type))
+        {
+            subscribers.push_back(MessageSubscriberId::PlantWeatherContribution);
+        }
+
+        if (DeviceWeatherContributionSystem::subscribes_to(type))
+        {
+            subscribers.push_back(MessageSubscriberId::DeviceWeatherContribution);
+        }
+
         if (TaskBoardSystem::subscribes_to(type))
         {
             subscribers.push_back(MessageSubscriberId::TaskBoard);
@@ -1109,6 +1119,46 @@ Gs1Status GameRuntime::dispatch_subscribed_message(const GameMessage& message)
                 [&]() -> Gs1Status {
                     return dispatch_site_system_message<TaskBoardSystem>(
                         TaskBoardSystem::process_message,
+                        message,
+                        campaign_,
+                        active_site_run_,
+                        message_queue_,
+                        fixed_step_seconds_);
+                });
+            if (status != GS1_STATUS_OK)
+            {
+                return status;
+            }
+            break;
+        }
+
+        case MessageSubscriberId::PlantWeatherContribution:
+        {
+            const auto status = dispatch_profiled_message(
+                GS1_RUNTIME_PROFILE_SYSTEM_LOCAL_WEATHER_RESOLVE,
+                [&]() -> Gs1Status {
+                    return dispatch_site_system_message<PlantWeatherContributionSystem>(
+                        PlantWeatherContributionSystem::process_message,
+                        message,
+                        campaign_,
+                        active_site_run_,
+                        message_queue_,
+                        fixed_step_seconds_);
+                });
+            if (status != GS1_STATUS_OK)
+            {
+                return status;
+            }
+            break;
+        }
+
+        case MessageSubscriberId::DeviceWeatherContribution:
+        {
+            const auto status = dispatch_profiled_message(
+                GS1_RUNTIME_PROFILE_SYSTEM_LOCAL_WEATHER_RESOLVE,
+                [&]() -> Gs1Status {
+                    return dispatch_site_system_message<DeviceWeatherContributionSystem>(
+                        DeviceWeatherContributionSystem::process_message,
                         message,
                         campaign_,
                         active_site_run_,

@@ -71,17 +71,19 @@ private:
         WeatherEvent = 5,
         WorkerCondition = 6,
         Ecology = 7,
-        TaskBoard = 8,
-        PlacementValidation = 9,
-        LocalWeatherResolve = 10,
-        Inventory = 11,
-        Craft = 12,
-        EconomyPhone = 13,
-        PhonePanel = 14,
-        CampDurability = 15,
-        DeviceSupport = 16,
-        DeviceMaintenance = 17,
-        Modifier = 18
+        PlantWeatherContribution = 8,
+        DeviceWeatherContribution = 9,
+        TaskBoard = 10,
+        PlacementValidation = 11,
+        LocalWeatherResolve = 12,
+        Inventory = 13,
+        Craft = 14,
+        EconomyPhone = 15,
+        PhonePanel = 16,
+        CampDurability = 17,
+        DeviceSupport = 18,
+        DeviceMaintenance = 19,
+        Modifier = 20
     };
 
     enum class FeedbackEventSubscriberId : std::uint8_t

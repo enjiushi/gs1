@@ -24,6 +24,8 @@ enum class SiteComponent : std::uint8_t
     TileWeather,
     TilePlantWeatherContribution,
     TileDeviceWeatherContribution,
+    PlantWeatherRuntime,
+    DeviceWeatherRuntime,
     DeviceCondition,
     DeviceRuntime,
     WorkerMotion,
@@ -76,6 +78,10 @@ template <typename... Components>
         return "TilePlantWeatherContribution";
     case SiteComponent::TileDeviceWeatherContribution:
         return "TileDeviceWeatherContribution";
+    case SiteComponent::PlantWeatherRuntime:
+        return "PlantWeatherRuntime";
+    case SiteComponent::DeviceWeatherRuntime:
+        return "DeviceWeatherRuntime";
     case SiteComponent::DeviceCondition:
         return "DeviceCondition";
     case SiteComponent::DeviceRuntime:
@@ -654,6 +660,26 @@ public:
     [[nodiscard]] LocalWeatherResolveState& own_local_weather_runtime() noexcept
     {
         return site_run_.local_weather_resolve;
+    }
+
+    [[nodiscard]] const PlantWeatherContributionState& read_plant_weather_runtime() const noexcept
+    {
+        return site_run_.plant_weather_contribution;
+    }
+
+    [[nodiscard]] PlantWeatherContributionState& own_plant_weather_runtime() noexcept
+    {
+        return site_run_.plant_weather_contribution;
+    }
+
+    [[nodiscard]] const DeviceWeatherContributionState& read_device_weather_runtime() const noexcept
+    {
+        return site_run_.device_weather_contribution;
+    }
+
+    [[nodiscard]] DeviceWeatherContributionState& own_device_weather_runtime() noexcept
+    {
+        return site_run_.device_weather_contribution;
     }
 
     [[nodiscard]] const EventState& read_event() const noexcept { return site_run_.event; }

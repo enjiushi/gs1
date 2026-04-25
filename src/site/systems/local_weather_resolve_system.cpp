@@ -1,7 +1,14 @@
 #include "site/systems/local_weather_resolve_system.h"
 
 #include "site/site_run_state.h"
+#include "site/site_world_components.h"
 #include "site/weather_contribution_logic.h"
+
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4127)
+#endif
+#include <flecs.h>
 
 #include <algorithm>
 #include <cmath>
@@ -88,16 +95,34 @@ void ensure_local_weather_runtime_buffers(
     state.last_total_weather_contributions.assign(tile_count, gs1::zero_weather_contribution());
 }
 
-bool ecology_has_projected_plant_visual(const gs1::SiteWorld::TileEcologyData& ecology) noexcept
+bool ecology_has_projected_plant_visual(
+    gs1::PlantId plant_id,
+    float plant_density) noexcept
 {
-    return ecology.plant_id.value != 0U ||
-        ecology.plant_density > gs1::k_weather_contribution_density_epsilon_raw;
+    return plant_id.value != 0U ||
+        plant_density > gs1::k_weather_contribution_density_epsilon_raw;
+}
+
+template <typename ContributionComponent>
+gs1::SiteWorld::TileWeatherContributionData weather_contribution_from_component(
+    const ContributionComponent& component) noexcept
+{
+    return gs1::SiteWorld::TileWeatherContributionData {
+        component.heat_protection,
+        component.wind_protection,
+        component.dust_protection,
+        component.fertility_improve,
+        component.salinity_reduction,
+        component.irrigation};
 }
 
 void emit_site_tile_state_changed(
     gs1::SiteSystemContext<gs1::LocalWeatherResolveSystem>& context,
     gs1::TileCoord coord,
-    const gs1::SiteWorld::TileData& tile,
+    gs1::PlantId plant_id,
+    float plant_density,
+    float moisture,
+    const gs1::SiteWorld::TileLocalWeatherData& local_weather,
     const gs1::SiteWorld::TileWeatherContributionData& total_contribution,
     bool local_weather_changed,
     bool support_changed)
@@ -122,11 +147,11 @@ void emit_site_tile_state_changed(
         coord.x,
         coord.y,
         changed_mask,
-        tile.ecology.plant_id.value,
-        tile.ecology.plant_density,
-        tile.ecology.moisture,
-        tile.local_weather.heat,
-        tile.local_weather.dust,
+        plant_id.value,
+        plant_density,
+        moisture,
+        local_weather.heat,
+        local_weather.dust,
         total_contribution.wind_protection,
         total_contribution.heat_protection,
         total_contribution.dust_protection});
@@ -193,69 +218,113 @@ void LocalWeatherResolveSystem::run(SiteSystemContext<LocalWeatherResolveSystem>
     runtime.emit_full_snapshot_on_next_run = false;
 
     const auto base_weather = compute_base_local_weather(context);
-    const auto tile_count = context.world.tile_count();
-    for (std::size_t index = 0U; index < tile_count; ++index)
-    {
-        auto tile = context.world.read_tile_at_index(index);
-        const TileCoord coord = context.world.tile_coord(index);
+    auto& ecs_world = context.site_run.site_world->ecs_world();
+    auto tile_query =
+        ecs_world.query_builder<
+            const site_ecs::TileIndex,
+            const site_ecs::TileCoordComponent,
+            const site_ecs::TilePlantSlot,
+            const site_ecs::TilePlantDensity,
+            const site_ecs::TileMoisture,
+            site_ecs::TileHeat,
+            site_ecs::TileWind,
+            site_ecs::TileDust,
+            const site_ecs::TilePlantWeatherContribution,
+            const site_ecs::TileDeviceWeatherContribution>()
+            .with<site_ecs::TileTag>()
+            .build();
 
-        const auto total_contribution = clamp_weather_contribution(
-            sum_weather_contributions(
-                tile.plant_weather_contribution,
-                tile.device_weather_contribution));
-        const auto resolved_weather = resolve_local_weather(base_weather, total_contribution);
-        const auto previous_total_contribution = runtime.last_total_weather_contributions[index];
-
-        const bool heat_changed =
-            std::fabs(tile.local_weather.heat - resolved_weather.heat) > k_weather_contribution_epsilon;
-        const bool wind_changed =
-            std::fabs(tile.local_weather.wind - resolved_weather.wind) > k_weather_contribution_epsilon;
-        const bool dust_changed =
-            std::fabs(tile.local_weather.dust - resolved_weather.dust) > k_weather_contribution_epsilon;
-        const bool local_weather_changed = heat_changed || wind_changed || dust_changed;
-        const bool support_changed =
-            weather_contribution_changed(previous_total_contribution, total_contribution);
-
-        if (local_weather_changed)
-        {
-            tile.local_weather = resolved_weather;
-            context.world.write_tile_local_weather_at_index(index, tile.local_weather);
-        }
-
-        if ((emit_full_snapshot || local_weather_changed || support_changed))
-        {
-            if (local_weather_changed)
+    // Query only the components this system actually reads or owns.
+    tile_query.each(
+        [&](flecs::entity,
+            const site_ecs::TileIndex& index_component,
+            const site_ecs::TileCoordComponent& coord_component,
+            const site_ecs::TilePlantSlot& plant_slot,
+            const site_ecs::TilePlantDensity& density_component,
+            const site_ecs::TileMoisture& moisture_component,
+            site_ecs::TileHeat& heat_component,
+            site_ecs::TileWind& wind_component,
+            site_ecs::TileDust& dust_component,
+            const site_ecs::TilePlantWeatherContribution& plant_contribution_component,
+            const site_ecs::TileDeviceWeatherContribution& device_contribution_component) {
+            const std::size_t index = index_component.value;
+            if (index >= runtime.last_total_weather_contributions.size())
             {
-                tile.local_weather = resolved_weather;
+                return;
             }
 
-            emit_site_tile_state_changed(
-                context,
-                coord,
-                tile,
-                total_contribution,
-                emit_full_snapshot || local_weather_changed,
-                emit_full_snapshot || support_changed);
-        }
+            const auto total_contribution = clamp_weather_contribution(
+                sum_weather_contributions(
+                    weather_contribution_from_component(plant_contribution_component),
+                    weather_contribution_from_component(device_contribution_component)));
+            const auto resolved_weather = resolve_local_weather(base_weather, total_contribution);
+            const auto previous_total_contribution = runtime.last_total_weather_contributions[index];
+            const SiteWorld::TileLocalWeatherData previous_local_weather {
+                heat_component.value,
+                wind_component.value,
+                dust_component.value};
 
-        if ((emit_full_snapshot || local_weather_changed || support_changed) &&
-            context.world.read_time().world_time_minutes <= k_site_one_probe_window_minutes)
-        {
-            emit_site_one_local_weather_probe_log(
-                context,
-                coord,
-                base_weather,
-                resolved_weather,
-                total_contribution,
-                tile.ecology.plant_density);
-        }
+            const bool heat_changed =
+                std::fabs(previous_local_weather.heat - resolved_weather.heat) >
+                k_weather_contribution_epsilon;
+            const bool wind_changed =
+                std::fabs(previous_local_weather.wind - resolved_weather.wind) >
+                k_weather_contribution_epsilon;
+            const bool dust_changed =
+                std::fabs(previous_local_weather.dust - resolved_weather.dust) >
+                k_weather_contribution_epsilon;
+            const bool local_weather_changed = heat_changed || wind_changed || dust_changed;
+            const bool support_changed =
+                weather_contribution_changed(previous_total_contribution, total_contribution);
 
-        if (wind_changed && ecology_has_projected_plant_visual(tile.ecology))
-        {
-            context.world.mark_tile_projection_dirty(coord);
-        }
+            if (local_weather_changed)
+            {
+                heat_component.value = resolved_weather.heat;
+                wind_component.value = resolved_weather.wind;
+                dust_component.value = resolved_weather.dust;
+            }
 
-        runtime.last_total_weather_contributions[index] = total_contribution;
-    }
+            if ((emit_full_snapshot || local_weather_changed || support_changed))
+            {
+                const SiteWorld::TileLocalWeatherData emitted_local_weather = local_weather_changed
+                    ? resolved_weather
+                    : previous_local_weather;
+
+                emit_site_tile_state_changed(
+                    context,
+                    coord_component.value,
+                    plant_slot.plant_id,
+                    density_component.value,
+                    moisture_component.value,
+                    emitted_local_weather,
+                    total_contribution,
+                    emit_full_snapshot || local_weather_changed,
+                    emit_full_snapshot || support_changed);
+            }
+
+            if ((emit_full_snapshot || local_weather_changed || support_changed) &&
+                context.world.read_time().world_time_minutes <= k_site_one_probe_window_minutes)
+            {
+                emit_site_one_local_weather_probe_log(
+                    context,
+                    coord_component.value,
+                    base_weather,
+                    resolved_weather,
+                    total_contribution,
+                    density_component.value);
+            }
+
+            if (wind_changed &&
+                ecology_has_projected_plant_visual(plant_slot.plant_id, density_component.value))
+            {
+                context.world.mark_tile_projection_dirty(coord_component.value);
+            }
+
+            runtime.last_total_weather_contributions[index] = total_contribution;
+        });
 }
 }  // namespace gs1
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif

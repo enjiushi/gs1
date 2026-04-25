@@ -3,12 +3,14 @@
 #include "site/action_state.h"
 #include "site/contractor_state.h"
 #include "site/craft_state.h"
+#include "site/device_weather_contribution_state.h"
 #include "site/economy_state.h"
 #include "site/event_state.h"
 #include "site/inventory_state.h"
 #include "site/local_weather_resolve_state.h"
 #include "site/modifier_state.h"
 #include "site/phone_panel_state.h"
+#include "site/plant_weather_contribution_state.h"
 #include "site/site_objective_state.h"
 #include "site/task_board_state.h"
 #include "site/weather_state.h"
@@ -115,6 +117,8 @@ struct SiteRunState final
     SiteCounters counters {};
     SiteObjectiveState objective {};
     LocalWeatherResolveState local_weather_resolve {};
+    PlantWeatherContributionState plant_weather_contribution {};
+    DeviceWeatherContributionState device_weather_contribution {};
     std::uint32_t result_newly_revealed_site_count {0};
     std::uint64_t pending_projection_update_flags {0};
     bool pending_full_tile_projection_update {false};

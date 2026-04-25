@@ -17,8 +17,11 @@ public:
                 SiteComponent::TileDeviceWeatherContribution,
                 SiteComponent::DeviceCondition,
                 SiteComponent::DeviceRuntime,
-                SiteComponent::Weather),
-            site_component_mask_of(SiteComponent::TileDeviceWeatherContribution)};
+                SiteComponent::Weather,
+                SiteComponent::DeviceWeatherRuntime),
+            site_component_mask_of(
+                SiteComponent::TileDeviceWeatherContribution,
+                SiteComponent::DeviceWeatherRuntime)};
     }
 
     [[nodiscard]] static bool subscribes_to(GameMessageType type) noexcept;
