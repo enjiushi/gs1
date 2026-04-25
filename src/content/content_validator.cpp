@@ -123,6 +123,14 @@ std::vector<ContentValidationIssue> validate_content_database(
 
     for (const auto& item_def : content.item_defs)
     {
+        if (item_def.internal_price_cash_points == 0U)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Item definitions must author a positive internal cash-point value."});
+            break;
+        }
+
         if (item_def.linked_plant_id.value != 0U &&
             !content.index.plant_by_id.contains(item_def.linked_plant_id.value))
         {
@@ -262,6 +270,22 @@ std::vector<ContentValidationIssue> validate_content_database(
                 issues.push_back(ContentValidationIssue {
                     ContentValidationSeverity::Error,
                     "Task template references an unknown tertiary structure id."});
+                break;
+            }
+
+            if (task_template_def.expected_task_hours_in_game < 0.0f)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Task templates cannot use negative expected in-game hours."});
+                break;
+            }
+
+            if (task_template_def.risk_multiplier < 0.0f)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Task templates cannot use negative risk multipliers."});
                 break;
             }
 

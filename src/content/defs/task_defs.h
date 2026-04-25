@@ -41,7 +41,8 @@ enum class TaskProgressKind : std::uint32_t
     PlantDustProtectionAtLeast = 25,
     KeepAllDevicesIntegrityAboveForDuration = 26,
     NearbyPopulatedPlantTilesAtLeast = 27,
-    KeepAllLivingPlantsNotWitheringForDuration = 28
+    KeepAllLivingPlantsNotWitheringForDuration = 28,
+    SubmitItem = 29
 };
 
 struct TaskTemplateDef final
@@ -61,6 +62,8 @@ struct TaskTemplateDef final
     ActionKind action_kind {ActionKind::None};
     float threshold_value {0.0f};
     std::int32_t completion_faction_reputation_delta {0};
+    float expected_task_hours_in_game {0.0f};
+    float risk_multiplier {0.0f};
 };
 
 struct SiteOnboardingTaskSeedDef final
@@ -91,6 +94,7 @@ inline constexpr std::uint32_t k_task_template_site1_build_camp_stove = 34U;
 inline constexpr std::uint32_t k_task_template_site1_keep_worker_meters_high = 22U;
 inline constexpr std::uint32_t k_task_template_site1_keep_devices_healthy = 38U;
 inline constexpr std::uint32_t k_task_template_site1_keep_living_plants_stable = 39U;
+inline constexpr std::uint32_t k_task_template_site1_submit_water = 40U;
 
 [[nodiscard]] std::span<const TaskTemplateDef> all_task_template_defs() noexcept;
 [[nodiscard]] const TaskTemplateDef* find_task_template_def(TaskTemplateId task_template_id) noexcept;

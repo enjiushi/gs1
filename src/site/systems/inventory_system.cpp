@@ -1129,6 +1129,76 @@ Gs1Status handle_inventory_transfer(
     });
 }
 
+Gs1Status handle_inventory_item_submit(
+    SiteSystemContext<InventorySystem>& context,
+    const InventoryItemSubmitRequestedMessage& payload) noexcept
+{
+    return mutate_inventory_storage(context, [&]() -> Gs1Status {
+        const auto* source_storage = storage_state_for_transfer(context.site_run, payload.source_storage_id);
+        if (source_storage == nullptr)
+        {
+            return GS1_STATUS_INVALID_STATE;
+        }
+
+        const bool source_is_worker_pack =
+            source_storage->container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK;
+        const bool source_is_device_storage =
+            source_storage->container_kind == GS1_INVENTORY_CONTAINER_DEVICE_STORAGE;
+        if (!source_is_worker_pack && !source_is_device_storage)
+        {
+            return GS1_STATUS_INVALID_STATE;
+        }
+
+        const auto source_container =
+            inventory_storage::container_for_storage_id(context.site_run, payload.source_storage_id);
+        const auto source_item = inventory_storage::item_entity_for_slot(
+            context.site_run,
+            source_container,
+            payload.source_slot_index);
+        const auto* source_stack = inventory_storage::stack_data(context.site_run, source_item);
+        if (source_stack == nullptr || source_stack->quantity == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+
+        const auto requested_quantity =
+            std::min<std::uint32_t>(normalize_quantity(payload.quantity), source_stack->quantity);
+        const auto source_reserved = reserved_item_quantity_in_container(
+            context.world.read_action(),
+            source_storage->container_kind,
+            source_stack->item_id);
+        if (source_reserved > 0U)
+        {
+            const auto source_available = inventory_storage::available_item_quantity_in_container_kind(
+                context.site_run,
+                source_storage->container_kind,
+                source_stack->item_id);
+            if (source_available < requested_quantity ||
+                source_available - requested_quantity < source_reserved)
+            {
+                return GS1_STATUS_INVALID_STATE;
+            }
+        }
+
+        if (!inventory_storage::consume_quantity_from_item_entity(
+                context.site_run,
+                source_item,
+                requested_quantity))
+        {
+            return GS1_STATUS_INVALID_STATE;
+        }
+
+        GameMessage completed_message {};
+        completed_message.type = GameMessageType::InventoryItemSubmitted;
+        completed_message.set_payload(InventoryItemSubmittedMessage {
+            source_stack->item_id.value,
+            static_cast<std::uint16_t>(requested_quantity),
+            0U});
+        context.message_queue.push_back(completed_message);
+        return GS1_STATUS_OK;
+    });
+}
+
 Gs1Status handle_inventory_storage_view_request(
     SiteSystemContext<InventorySystem>& context,
     const InventoryStorageViewRequestMessage& payload) noexcept
@@ -1365,6 +1435,7 @@ bool InventorySystem::subscribes_to(GameMessageType type) noexcept
     case GameMessageType::InventoryItemConsumeRequested:
     case GameMessageType::InventoryGlobalItemConsumeRequested:
     case GameMessageType::InventoryTransferRequested:
+    case GameMessageType::InventoryItemSubmitRequested:
     case GameMessageType::InventoryStorageViewRequest:
     case GameMessageType::InventoryCraftCommitRequested:
         return true;
@@ -1435,6 +1506,11 @@ Gs1Status InventorySystem::process_message(
         return handle_inventory_transfer(
             context,
             message.payload_as<InventoryTransferRequestedMessage>());
+
+    case GameMessageType::InventoryItemSubmitRequested:
+        return handle_inventory_item_submit(
+            context,
+            message.payload_as<InventoryItemSubmitRequestedMessage>());
 
     case GameMessageType::InventoryStorageViewRequest:
         return handle_inventory_storage_view_request(

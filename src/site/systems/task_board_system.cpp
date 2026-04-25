@@ -28,6 +28,8 @@ enum class PlantProtectionChannel : std::uint8_t
 };
 
 constexpr double k_progress_epsilon = 0.0001;
+constexpr std::uint32_t k_cash_points_per_in_game_hour = 25U;
+constexpr std::uint32_t k_reward_budget_multiplier_percent = 115U;
 
 struct NeighborVisit final
 {
@@ -69,6 +71,32 @@ std::uint32_t normalized_required_count(std::uint32_t requested_count) noexcept
     return requested_count == 0U ? 1U : requested_count;
 }
 
+std::uint32_t round_to_cash_points(double value) noexcept
+{
+    return value <= 0.0
+        ? 0U
+        : static_cast<std::uint32_t>(std::lround(value));
+}
+
+std::uint32_t scale_cash_points_by_percent(
+    std::uint32_t cash_points,
+    std::uint32_t percent) noexcept
+{
+    return percent == 0U
+        ? 0U
+        : round_to_cash_points(
+              static_cast<double>(cash_points) * static_cast<double>(percent) / 100.0);
+}
+
+std::uint32_t scale_cash_points_by_multiplier(
+    std::uint32_t cash_points,
+    float multiplier) noexcept
+{
+    return multiplier <= 0.0f
+        ? 0U
+        : round_to_cash_points(static_cast<double>(cash_points) * static_cast<double>(multiplier));
+}
+
 std::uint32_t resolved_task_target_amount(
     const TaskTemplateDef& task_template_def,
     const SiteCounters& counters) noexcept
@@ -91,6 +119,16 @@ std::uint32_t resolved_task_required_count(const TaskTemplateDef& task_template_
 float resolved_task_threshold_value(const TaskTemplateDef& task_template_def) noexcept
 {
     return task_template_def.threshold_value;
+}
+
+double resolved_expected_task_hours_in_game(const TaskTemplateDef& task_template_def) noexcept
+{
+    return static_cast<double>(std::max(task_template_def.expected_task_hours_in_game, 0.0f));
+}
+
+float resolved_task_risk_multiplier(const TaskTemplateDef& task_template_def) noexcept
+{
+    return std::max(task_template_def.risk_multiplier, 0.0f);
 }
 
 PlantId resolved_task_plant_id(const TaskTemplateDef& task_template_def) noexcept
@@ -216,6 +254,118 @@ bool item_is_crafted(ItemId item_id) noexcept
 {
     const auto* item_def = find_item_def(item_id);
     return item_def != nullptr && item_def->source_rule == ItemSourceRule::CraftOnly;
+}
+
+ItemId find_structure_linked_item(StructureId structure_id) noexcept
+{
+    for (const auto& item_def : all_item_defs())
+    {
+        if (item_def.linked_structure_id == structure_id)
+        {
+            return item_def.item_id;
+        }
+    }
+
+    return {};
+}
+
+std::uint32_t item_value_cash_points(
+    ItemId item_id,
+    std::uint32_t quantity = 1U) noexcept
+{
+    const auto item_cash_points = item_internal_price_cash_points(item_id);
+    return quantity == 0U
+        ? 0U
+        : round_to_cash_points(
+              static_cast<double>(item_cash_points) * static_cast<double>(quantity));
+}
+
+std::uint32_t structure_value_cash_points(StructureId structure_id) noexcept
+{
+    return item_value_cash_points(find_structure_linked_item(structure_id));
+}
+
+std::uint32_t resolved_task_direct_cost_cash_points(
+    const TaskTemplateDef& task_template_def,
+    const TaskInstanceState& task) noexcept
+{
+    switch (task_template_def.progress_kind)
+    {
+    case TaskProgressKind::BuyItem:
+        return scale_cash_points_by_percent(
+            item_value_cash_points(task.item_id, task.target_amount),
+            35U);
+
+    case TaskProgressKind::SellItem:
+    case TaskProgressKind::SubmitItem:
+    case TaskProgressKind::ConsumeItem:
+        return item_value_cash_points(task.item_id, task.target_amount);
+
+    case TaskProgressKind::TransferItem:
+        return 0U;
+
+    case TaskProgressKind::PlantItem:
+        return scale_cash_points_by_percent(
+            item_value_cash_points(task.item_id, task.target_amount),
+            40U);
+
+    case TaskProgressKind::CraftRecipe:
+    {
+        const auto* recipe_def = find_craft_recipe_def(task.recipe_id);
+        if (recipe_def == nullptr)
+        {
+            return 0U;
+        }
+
+        return scale_cash_points_by_percent(
+            item_value_cash_points(recipe_def->output_item_id, task.target_amount),
+            50U);
+    }
+
+    case TaskProgressKind::CraftItem:
+    case TaskProgressKind::CraftAnyItem:
+        return scale_cash_points_by_percent(
+            item_value_cash_points(task.item_id, task.target_amount),
+            50U);
+
+    case TaskProgressKind::BuildStructure:
+    case TaskProgressKind::BuildAnyStructure:
+        return scale_cash_points_by_percent(
+            round_to_cash_points(
+                static_cast<double>(structure_value_cash_points(task.structure_id)) *
+                static_cast<double>(std::max(task.target_amount, 1U))),
+            45U);
+
+    case TaskProgressKind::BuildStructureSet:
+        return scale_cash_points_by_percent(
+            structure_value_cash_points(task.structure_id) +
+                structure_value_cash_points(task.secondary_structure_id) +
+                structure_value_cash_points(task.tertiary_structure_id),
+            45U);
+
+    case TaskProgressKind::SellCraftedItem:
+        return item_value_cash_points(task.item_id, task.target_amount);
+
+    default:
+        return 0U;
+    }
+}
+
+std::uint32_t resolved_task_time_cost_cash_points(const TaskTemplateDef& task_template_def) noexcept
+{
+    return round_to_cash_points(
+        resolved_expected_task_hours_in_game(task_template_def) *
+        static_cast<double>(k_cash_points_per_in_game_hour));
+}
+
+std::uint32_t resolved_task_risk_cost_cash_points(
+    const TaskTemplateDef& task_template_def,
+    std::uint32_t direct_cost_cash_points,
+    std::uint32_t time_cost_cash_points) noexcept
+{
+    return scale_cash_points_by_multiplier(
+        direct_cost_cash_points + time_cost_cash_points,
+        resolved_task_risk_multiplier(task_template_def));
 }
 
 bool item_is_accessible_for_task(
@@ -345,6 +495,9 @@ std::vector<ItemId> collect_item_candidates(
             }
             break;
         case TaskProgressKind::TransferItem:
+            candidates.push_back(item_def.item_id);
+            break;
+        case TaskProgressKind::SubmitItem:
             candidates.push_back(item_def.item_id);
             break;
         case TaskProgressKind::ConsumeItem:
@@ -487,6 +640,7 @@ bool task_template_is_eligible(
     case TaskProgressKind::BuyItem:
     case TaskProgressKind::SellItem:
     case TaskProgressKind::TransferItem:
+    case TaskProgressKind::SubmitItem:
     case TaskProgressKind::ConsumeItem:
     case TaskProgressKind::CraftItem:
         return !collect_item_candidates(context, task_template_def).empty();
@@ -681,6 +835,21 @@ TaskInstanceState make_task_instance(
         (onboarding_seed != nullptr && std::fabs(onboarding_seed->threshold_value) > 0.0001f)
         ? onboarding_seed->threshold_value
         : resolved_task_threshold_value(task_template_def);
+    task.expected_task_hours_in_game = static_cast<float>(resolved_expected_task_hours_in_game(task_template_def));
+    task.risk_multiplier = resolved_task_risk_multiplier(task_template_def);
+    task.direct_cost_cash_points = resolved_task_direct_cost_cash_points(task_template_def, task);
+    task.time_cost_cash_points = resolved_task_time_cost_cash_points(task_template_def);
+    task.risk_cost_cash_points = resolved_task_risk_cost_cash_points(
+        task_template_def,
+        task.direct_cost_cash_points,
+        task.time_cost_cash_points);
+    task.difficulty_cash_points =
+        task.direct_cost_cash_points +
+        task.time_cost_cash_points +
+        task.risk_cost_cash_points;
+    task.reward_budget_cash_points = scale_cash_points_by_percent(
+        task.difficulty_cash_points,
+        k_reward_budget_multiplier_percent);
     task.current_progress_amount = 0U;
     task.reward_draft_options =
         make_reward_draft_options(context, task_instance_id, task_template_def, onboarding_seed);
@@ -1866,6 +2035,19 @@ void handle_inventory_transfer_completed(
         });
 }
 
+void handle_inventory_item_submitted(
+    SiteSystemContext<TaskBoardSystem>& context,
+    const InventoryItemSubmittedMessage& payload)
+{
+    advance_matching_accepted_tasks(
+        context,
+        payload.quantity == 0U ? 1U : payload.quantity,
+        [&](const TaskTemplateDef& task_template_def, const TaskInstanceState& task) {
+            return task_template_def.progress_kind == TaskProgressKind::SubmitItem &&
+                item_matches_task(task, ItemId {payload.item_id});
+        });
+}
+
 void handle_site_tile_planting_completed(
     SiteSystemContext<TaskBoardSystem>& context,
     const SiteTilePlantingCompletedMessage& payload)
@@ -2015,6 +2197,7 @@ bool TaskBoardSystem::subscribes_to(GameMessageType type) noexcept
     case GameMessageType::PhoneListingPurchased:
     case GameMessageType::PhoneListingSold:
     case GameMessageType::InventoryTransferCompleted:
+    case GameMessageType::InventoryItemSubmitted:
     case GameMessageType::InventoryItemUseCompleted:
     case GameMessageType::InventoryCraftCompleted:
     case GameMessageType::SiteTilePlantingCompleted:
@@ -2072,6 +2255,11 @@ Gs1Status TaskBoardSystem::process_message(
         handle_inventory_transfer_completed(
             context,
             message.payload_as<InventoryTransferCompletedMessage>());
+        break;
+    case GameMessageType::InventoryItemSubmitted:
+        handle_inventory_item_submitted(
+            context,
+            message.payload_as<InventoryItemSubmittedMessage>());
         break;
     case GameMessageType::InventoryItemUseCompleted:
         handle_inventory_item_use_completed(

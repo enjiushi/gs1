@@ -382,6 +382,10 @@ template <typename T>
     {
         return TaskProgressKind::TransferItem;
     }
+    if (field == "SubmitItem")
+    {
+        return TaskProgressKind::SubmitItem;
+    }
     if (field == "PlantItem")
     {
         return TaskProgressKind::PlantItem;
@@ -1182,6 +1186,7 @@ void load_item_defs(ContentDatabase& content, const std::filesystem::path& path)
             require_toml_bool(path, entry, "consumable"),
             require_toml_signed<std::int32_t>(path, entry, "buy_price"),
             require_toml_signed<std::int32_t>(path, entry, "sell_price"),
+            require_toml_unsigned<std::uint32_t>(path, entry, "internal_price_cash_points"),
             parse_item_capabilities(
                 path,
                 toml_line_number(entry),
@@ -1223,7 +1228,9 @@ void load_task_template_defs(ContentDatabase& content, const std::filesystem::pa
                 toml_line_number(entry),
                 require_toml_string(path, entry, "action_kind")),
             require_toml_float(path, entry, "threshold_value"),
-            require_toml_signed<std::int32_t>(path, entry, "completion_faction_reputation_delta")});
+            require_toml_signed<std::int32_t>(path, entry, "completion_faction_reputation_delta"),
+            require_toml_float(path, entry, "expected_task_hours_in_game"),
+            require_toml_float(path, entry, "risk_multiplier")});
     }
 }
 
