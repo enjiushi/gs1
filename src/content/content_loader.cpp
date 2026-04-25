@@ -1,6 +1,7 @@
 #include "content/content_loader.h"
 
 #include "content/content_validator.h"
+#include "support/currency.h"
 #include "toml.hpp"
 
 #include <charconv>
@@ -1139,14 +1140,43 @@ void load_prototype_site_phone_listings(ContentDatabase& content, const std::fil
             fail_load(path, toml_line_number(entry), "phone listing references an unknown site id");
         }
 
+        const auto kind = parse_phone_listing_kind(
+            path,
+            toml_line_number(entry),
+            require_toml_string(path, entry, "listing_kind"));
+        const auto internal_price_cash_points =
+            optional_toml_unsigned<std::uint32_t>(path, entry, "internal_price_cash_points").value_or(0U);
+        std::int32_t price = 0;
+        if (kind == PhoneListingKind::PurchaseUnlockable)
+        {
+            if (internal_price_cash_points == 0U)
+            {
+                fail_load(
+                    path,
+                    toml_line_number(entry),
+                    "purchase-unlockable listings must author internal_price_cash_points");
+            }
+            if (!cash_points_are_cash_aligned(internal_price_cash_points))
+            {
+                fail_load(
+                    path,
+                    toml_line_number(entry),
+                    "purchase-unlockable listing internal_price_cash_points must be divisible by 100");
+            }
+
+            price = cash_from_cash_points(internal_price_cash_points);
+        }
+        else
+        {
+            price = require_toml_signed<std::int32_t>(path, entry, "price");
+        }
+
         site->seeded_phone_listings.push_back(PrototypePhoneListingContent {
             require_toml_unsigned<std::uint32_t>(path, entry, "listing_id"),
-            parse_phone_listing_kind(
-                path,
-                toml_line_number(entry),
-                require_toml_string(path, entry, "listing_kind")),
+            kind,
             require_toml_unsigned<std::uint32_t>(path, entry, "item_or_unlockable_id"),
-            require_toml_signed<std::int32_t>(path, entry, "price"),
+            price,
+            internal_price_cash_points,
             require_toml_unsigned<std::uint32_t>(path, entry, "quantity")});
     }
 }
@@ -1595,7 +1625,7 @@ void load_technology_node_defs(ContentDatabase& content, const std::filesystem::
             entry_kind,
             {0U, 0U, 0U},
             require_toml_signed<std::int32_t>(path, entry, "reputation_cost"),
-            require_toml_signed<std::int32_t>(path, entry, "cash_cost"),
+            require_toml_unsigned<std::uint32_t>(path, entry, "internal_cost_cash_points"),
             entry_kind == TechnologyEntryKind::GlobalModifier
                 ? ModifierId {technology_modifier_id(tech_node_id)}
                 : ModifierId {},

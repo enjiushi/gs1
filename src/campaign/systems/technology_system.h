@@ -33,6 +33,8 @@ public:
     [[nodiscard]] static std::int32_t current_reputation_cost(
         const TechnologyNodeDef& node_def,
         FactionId reputation_faction_id) noexcept;
+    [[nodiscard]] static std::uint32_t current_internal_cost_cash_points(
+        const TechnologyNodeDef& node_def) noexcept;
     [[nodiscard]] static std::int32_t current_cash_cost(
         const CampaignState& campaign,
         const TechnologyNodeDef& node_def) noexcept;

@@ -1,6 +1,7 @@
 #include "content/content_validator.h"
 
 #include "content/defs/faction_defs.h"
+#include "support/currency.h"
 
 namespace gs1
 {
@@ -719,11 +720,19 @@ std::vector<ContentValidationIssue> validate_content_database(
                 break;
             }
 
-            if (node_def.reputation_cost < 0 || node_def.cash_cost < 0)
+            if (node_def.reputation_cost < 0 || node_def.internal_cost_cash_points == 0U)
             {
                 issues.push_back(ContentValidationIssue {
                     ContentValidationSeverity::Error,
-                    "Technology node definitions must use non-negative reputation and cash costs."});
+                    "Technology node definitions must use non-negative reputation cost and positive internal cash-point value."});
+                break;
+            }
+
+            if (!cash_points_are_cash_aligned(node_def.internal_cost_cash_points))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Technology node internal cash-point values must be divisible by 100 so player-facing cash stays whole."});
                 break;
             }
 
@@ -941,11 +950,13 @@ std::vector<ContentValidationIssue> validate_content_database(
                 break;
 
             case PhoneListingKind::PurchaseUnlockable:
-                if (listing.item_or_unlockable_id == 0U || listing.price < 0 || listing.quantity == 0U)
+                if (listing.item_or_unlockable_id == 0U || listing.quantity == 0U ||
+                    listing.internal_price_cash_points == 0U ||
+                    !cash_points_are_cash_aligned(listing.internal_price_cash_points))
                 {
                     issues.push_back(ContentValidationIssue {
                         ContentValidationSeverity::Error,
-                        "Prototype site unlockable listings must have a non-zero unlockable id and quantity."});
+                        "Prototype site unlockable listings must have a non-zero unlockable id, quantity, and 100-aligned internal cash-point value."});
                 }
                 break;
 

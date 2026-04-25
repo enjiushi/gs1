@@ -4,6 +4,7 @@
 #include "content/defs/faction_defs.h"
 #include "content/defs/structure_defs.h"
 #include "content/defs/task_defs.h"
+#include "content/prototype_content.h"
 #include "site/systems/action_execution_system.h"
 #include "site/systems/device_maintenance_system.h"
 #include "site/systems/device_weather_contribution_system.h"
@@ -2020,6 +2021,23 @@ void task_board_content_tuning_exposes_internal_prices_and_task_scoring_inputs(
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(food->nourishment_delta, 15.0f));
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(food->energy_delta, 0.0f));
     GS1_SYSTEM_TEST_CHECK(context, food->internal_price_cash_points == 420U);
+
+    const auto* site_content = gs1::find_prototype_site_content(gs1::SiteId {1U});
+    GS1_SYSTEM_TEST_REQUIRE(context, site_content != nullptr);
+    bool found_unlockable_listing = false;
+    for (const auto& listing : site_content->seeded_phone_listings)
+    {
+        if (listing.listing_id != 11U)
+        {
+            continue;
+        }
+
+        found_unlockable_listing = true;
+        GS1_SYSTEM_TEST_CHECK(context, listing.kind == gs1::PhoneListingKind::PurchaseUnlockable);
+        GS1_SYSTEM_TEST_CHECK(context, listing.internal_price_cash_points == 2000U);
+        GS1_SYSTEM_TEST_CHECK(context, listing.price == 20);
+    }
+    GS1_SYSTEM_TEST_CHECK(context, found_unlockable_listing);
 
     const auto* submit_task =
         gs1::find_task_template_def(gs1::TaskTemplateId {gs1::k_task_template_site1_submit_water});

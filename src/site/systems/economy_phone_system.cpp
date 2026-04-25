@@ -6,6 +6,7 @@
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
 #include "site/systems/economy_phone_system.h"
+#include "support/currency.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -780,7 +781,9 @@ void append_seed_phone_listing(
             listing_content.kind,
             ItemId {listing_content.item_or_unlockable_id},
             listing_content.listing_id,
-            listing_content.price,
+            listing_content.kind == PhoneListingKind::PurchaseUnlockable
+                ? cash_from_cash_points(listing_content.internal_price_cash_points)
+                : listing_content.price,
             listing_content.quantity,
             0U,
             true});

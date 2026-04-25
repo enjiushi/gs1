@@ -23,6 +23,7 @@ struct PrototypePhoneListingContent final
     PhoneListingKind kind {PhoneListingKind::BuyItem};
     std::uint32_t item_or_unlockable_id {0};
     std::int32_t price {0};
+    std::uint32_t internal_price_cash_points {0U};
     std::uint32_t quantity {0};
 };
 
