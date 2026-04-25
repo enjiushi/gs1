@@ -247,6 +247,26 @@ const char* site_attempt_result_name(Gs1SiteAttemptResult result)
     }
 }
 
+const char* one_shot_cue_name(Gs1OneShotCueKind cue_kind)
+{
+    switch (cue_kind)
+    {
+    case GS1_ONE_SHOT_CUE_ACTION_COMPLETED:
+        return "ACTION_COMPLETED";
+    case GS1_ONE_SHOT_CUE_ACTION_FAILED:
+        return "ACTION_FAILED";
+    case GS1_ONE_SHOT_CUE_HAZARD_PEAK:
+        return "HAZARD_PEAK";
+    case GS1_ONE_SHOT_CUE_SITE_COMPLETED:
+        return "SITE_COMPLETED";
+    case GS1_ONE_SHOT_CUE_SITE_FAILED:
+        return "SITE_FAILED";
+    case GS1_ONE_SHOT_CUE_NONE:
+    default:
+        return "NONE";
+    }
+}
+
 bool ui_action_matches(const Gs1UiAction& requested, const Gs1UiAction& available)
 {
     if (requested.type != available.type)
@@ -509,6 +529,7 @@ SmokeEngineHost::LiveStateSnapshot SmokeEngineHost::capture_frame_live_state_sna
     snapshot.hud_state = hud_state_;
     snapshot.site_action = site_action_;
     snapshot.site_result = site_result_;
+    snapshot.recent_one_shot_cues = recent_one_shot_cues_;
     return snapshot;
 }
 
@@ -907,6 +928,10 @@ void SmokeEngineHost::flush_engine_messages(const char* stage_label)
         case GS1_ENGINE_MESSAGE_SITE_RESULT_READY:
             apply_site_result_ready(message);
             live_state_patch_mask = LiveStatePatchField_SiteResult;
+            break;
+        case GS1_ENGINE_MESSAGE_PLAY_ONE_SHOT_CUE:
+            apply_one_shot_cue(message);
+            live_state_patch_mask = LiveStatePatchField_AudioCues;
             break;
 
         default:
@@ -1755,6 +1780,32 @@ void SmokeEngineHost::apply_site_result_ready(const Gs1EngineMessage& message)
     site_result_ = projection;
 }
 
+void SmokeEngineHost::apply_one_shot_cue(const Gs1EngineMessage& message)
+{
+    const auto& payload = message.payload_as<Gs1EngineMessageOneShotCueData>();
+    OneShotCueProjection projection {};
+    projection.sequence_id = next_one_shot_cue_sequence_id_;
+    next_one_shot_cue_sequence_id_ += 1U;
+    projection.frame_number = frame_number_;
+    projection.subject_id = payload.subject_id;
+    projection.arg0 = payload.arg0;
+    projection.arg1 = payload.arg1;
+    projection.world_x = payload.world_x;
+    projection.world_y = payload.world_y;
+    projection.cue_kind = payload.cue_kind;
+    recent_one_shot_cues_.push_back(projection);
+
+    constexpr std::size_t k_max_recent_one_shot_cues = 16U;
+    if (recent_one_shot_cues_.size() > k_max_recent_one_shot_cues)
+    {
+        const auto overflow_count = static_cast<std::vector<OneShotCueProjection>::difference_type>(
+            recent_one_shot_cues_.size() - k_max_recent_one_shot_cues);
+        recent_one_shot_cues_.erase(
+            recent_one_shot_cues_.begin(),
+            recent_one_shot_cues_.begin() + overflow_count);
+    }
+}
+
 void SmokeEngineHost::queue_live_state_patch(std::uint32_t field_mask)
 {
     if (field_mask == LiveStatePatchField_None)
@@ -2016,6 +2067,19 @@ std::string SmokeEngineHost::describe_message(const Gs1EngineMessage& message)
         description += " result=";
         description += site_attempt_result_name(payload.result);
         description += " revealed=" + std::to_string(payload.newly_revealed_site_count);
+        break;
+    }
+
+    case GS1_ENGINE_MESSAGE_PLAY_ONE_SHOT_CUE:
+    {
+        const auto& payload = message.payload_as<Gs1EngineMessageOneShotCueData>();
+        description += " cue=";
+        description += one_shot_cue_name(payload.cue_kind);
+        description += " subject=" + std::to_string(payload.subject_id);
+        description += " pos=(" + std::to_string(payload.world_x);
+        description += "," + std::to_string(payload.world_y) + ")";
+        description += " arg0=" + std::to_string(payload.arg0);
+        description += " arg1=" + std::to_string(payload.arg1);
         break;
     }
 

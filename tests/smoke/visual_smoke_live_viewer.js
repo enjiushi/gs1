@@ -47,6 +47,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const inventoryTooltipTitle = document.getElementById("inventory-tooltip-title");
     const inventoryTooltipMeta = document.getElementById("inventory-tooltip-meta");
     const tileContextMenu = document.getElementById("tile-context-menu");
+    const audioToggle = document.getElementById("audio-toggle");
 
     let latestState = null;
     let stateStream = null;
@@ -83,6 +84,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         windLevel: 0,
         windDirectionDegrees: 0
     };
+    let lastProcessedOneShotCueSequenceId = -1;
     let cameraOrbitDragPointerId = null;
     let cameraOrbitDragButton = -1;
     let cameraOrbitDragLastClientX = 0;
@@ -119,6 +121,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         sandblast: 4
     };
     const highwayTerrainTypeId = 9001;
+    const audioWarningHazardLevels = {
+        0: 0.0,
+        1: 0.35,
+        2: 0.58,
+        3: 0.82,
+        4: 1.0
+    };
     const siteTutorialTips = [
         "Move with WASD and drag with the right mouse button to orbit the camera around the worker.",
         "Press B to open the player pack, then click a carried item to use it or move it into opened storage.",
@@ -547,6 +556,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             }
         ]
     };
+    const audioManager = createAudioManagerState();
 
     const renderer = new THREE_NS.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -1289,6 +1299,435 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function getCampaignResources(state) {
         return state ? state.campaignResources || null : null;
+    }
+
+    function createAudioManagerState() {
+        return {
+            enabled: false,
+            context: null,
+            masterGain: null,
+            ambienceBus: null,
+            musicBus: null,
+            cuesBus: null,
+            noiseBuffer: null,
+            windLayer: null,
+            gritLayer: null,
+            menuPadLow: null,
+            menuPadHigh: null,
+            oasisPadLow: null,
+            oasisPadHigh: null,
+            tensionDroneLow: null,
+            tensionDroneHigh: null
+        };
+    }
+
+    function updateAudioToggleButton() {
+        if (!audioToggle) {
+            return;
+        }
+
+        let label = "Audio Off";
+        if (audioManager.enabled) {
+            if (audioManager.context && audioManager.context.state === "running") {
+                label = "Audio On";
+            } else {
+                label = "Audio Tap To Resume";
+            }
+        }
+
+        audioToggle.textContent = label;
+        audioToggle.setAttribute("data-audio-enabled", audioManager.enabled ? "true" : "false");
+    }
+
+    function createAudioNoiseBuffer(audioContext) {
+        const sampleRate = audioContext.sampleRate;
+        const durationSeconds = 2.0;
+        const frameCount = Math.max(1, Math.floor(sampleRate * durationSeconds));
+        const buffer = audioContext.createBuffer(1, frameCount, sampleRate);
+        const channelData = buffer.getChannelData(0);
+        for (let index = 0; index < frameCount; index += 1) {
+            channelData[index] = Math.random() * 2.0 - 1.0;
+        }
+        return buffer;
+    }
+
+    function createNoiseLayer(audioContext, noiseBuffer, filterType, filterFrequency, qValue, destination) {
+        const source = audioContext.createBufferSource();
+        source.buffer = noiseBuffer;
+        source.loop = true;
+
+        const filter = audioContext.createBiquadFilter();
+        filter.type = filterType;
+        filter.frequency.value = filterFrequency;
+        filter.Q.value = qValue;
+
+        const gain = audioContext.createGain();
+        gain.gain.value = 0.0;
+
+        source.connect(filter);
+        filter.connect(gain);
+        gain.connect(destination);
+        source.start();
+
+        return {
+            source: source,
+            filter: filter,
+            gain: gain
+        };
+    }
+
+    function createOscillatorLayer(audioContext, type, frequency, destination) {
+        const oscillator = audioContext.createOscillator();
+        oscillator.type = type;
+        oscillator.frequency.value = frequency;
+
+        const gain = audioContext.createGain();
+        gain.gain.value = 0.0;
+
+        oscillator.connect(gain);
+        gain.connect(destination);
+        oscillator.start();
+
+        return {
+            oscillator: oscillator,
+            gain: gain
+        };
+    }
+
+    function ensureAudioGraph() {
+        const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextCtor) {
+            if (audioToggle) {
+                audioToggle.disabled = true;
+                audioToggle.textContent = "Audio Unsupported";
+            }
+            return null;
+        }
+
+        if (audioManager.context) {
+            return audioManager.context;
+        }
+
+        const audioContext = new AudioContextCtor();
+        const masterGain = audioContext.createGain();
+        const ambienceBus = audioContext.createGain();
+        const musicBus = audioContext.createGain();
+        const cuesBus = audioContext.createGain();
+        masterGain.gain.value = 0.0;
+        ambienceBus.gain.value = 0.9;
+        musicBus.gain.value = 0.55;
+        cuesBus.gain.value = 0.9;
+        ambienceBus.connect(masterGain);
+        musicBus.connect(masterGain);
+        cuesBus.connect(masterGain);
+        masterGain.connect(audioContext.destination);
+
+        const noiseBuffer = createAudioNoiseBuffer(audioContext);
+
+        audioManager.context = audioContext;
+        audioManager.masterGain = masterGain;
+        audioManager.ambienceBus = ambienceBus;
+        audioManager.musicBus = musicBus;
+        audioManager.cuesBus = cuesBus;
+        audioManager.noiseBuffer = noiseBuffer;
+        audioManager.windLayer = createNoiseLayer(audioContext, noiseBuffer, "bandpass", 420.0, 0.6, ambienceBus);
+        audioManager.gritLayer = createNoiseLayer(audioContext, noiseBuffer, "highpass", 1800.0, 0.25, ambienceBus);
+        audioManager.menuPadLow = createOscillatorLayer(audioContext, "sine", 196.0, musicBus);
+        audioManager.menuPadHigh = createOscillatorLayer(audioContext, "triangle", 293.66, musicBus);
+        audioManager.oasisPadLow = createOscillatorLayer(audioContext, "sine", 261.63, musicBus);
+        audioManager.oasisPadHigh = createOscillatorLayer(audioContext, "triangle", 392.0, musicBus);
+        audioManager.tensionDroneLow = createOscillatorLayer(audioContext, "sawtooth", 55.0, musicBus);
+        audioManager.tensionDroneHigh = createOscillatorLayer(audioContext, "triangle", 82.41, musicBus);
+        updateAudioToggleButton();
+        return audioContext;
+    }
+
+    function resumeAudioGraphIfNeeded() {
+        const audioContext = ensureAudioGraph();
+        if (!audioContext) {
+            return Promise.resolve(false);
+        }
+
+        if (audioContext.state === "running") {
+            updateAudioToggleButton();
+            return Promise.resolve(true);
+        }
+
+        return audioContext.resume()
+            .then(function () {
+                updateAudioToggleButton();
+                return true;
+            })
+            .catch(function () {
+                updateAudioToggleButton();
+                return false;
+            });
+    }
+
+    function getApproximateLocalPlantDensity(state) {
+        const siteBootstrap = getSiteBootstrap(state);
+        const siteState = getSiteState(state);
+        const worker = siteState ? siteState.worker : null;
+        const tiles = siteBootstrap && Array.isArray(siteBootstrap.tiles) ? siteBootstrap.tiles : null;
+        if (!worker || !tiles || tiles.length === 0) {
+            return 0.0;
+        }
+
+        const workerTileX = typeof worker.tileX === "number" ? worker.tileX : 0.0;
+        const workerTileY = typeof worker.tileY === "number" ? worker.tileY : 0.0;
+        let totalWeight = 0.0;
+        let weightedDensity = 0.0;
+
+        tiles.forEach((tile) => {
+            if (!tile || typeof tile.x !== "number" || typeof tile.y !== "number") {
+                return;
+            }
+            const dx = tile.x - workerTileX;
+            const dy = tile.y - workerTileY;
+            const distance = Math.hypot(dx, dy);
+            if (distance > 2.6) {
+                return;
+            }
+
+            const weight = 1.0 / (1.0 + distance);
+            const density = clamp01(typeof tile.plantDensity === "number" ? tile.plantDensity : 0.0);
+            totalWeight += weight;
+            weightedDensity += density * weight;
+        });
+
+        if (!(totalWeight > 0.0)) {
+            return 0.0;
+        }
+
+        return clamp01(weightedDensity / totalWeight);
+    }
+
+    function getAudioHazardLevel(state) {
+        const siteState = getSiteState(state);
+        const weather = siteState ? siteState.weather : null;
+        const hud = getHudState(state);
+        const warningCode = hud && typeof hud.warningCode === "number" ? hud.warningCode : 0;
+        const warningHazard = Object.prototype.hasOwnProperty.call(audioWarningHazardLevels, warningCode)
+            ? audioWarningHazardLevels[warningCode]
+            : 0.0;
+        const windHazard = weather ? clamp01((weather.wind || 0) / 10.0) : 0.0;
+        const dustHazard = weather ? clamp01((weather.dust || 0) / 100.0) : 0.0;
+        const eventHazard = weather && weather.eventTemplateId ? 0.18 : 0.0;
+        return clamp01(Math.max(warningHazard, windHazard, dustHazard, eventHazard));
+    }
+
+    function buildAudioMixState(state) {
+        const mix = {
+            master: 0.0,
+            wind: 0.0,
+            windFilterHz: 420.0,
+            grit: 0.0,
+            gritFilterHz: 1800.0,
+            menuPad: 0.0,
+            oasisPad: 0.0,
+            tensionPad: 0.0
+        };
+
+        if (!state || !state.appState) {
+            return mix;
+        }
+
+        if (state.appState === "MAIN_MENU") {
+            mix.master = 0.48;
+            mix.wind = 0.016;
+            mix.windFilterHz = 320.0;
+            mix.menuPad = 0.072;
+            return mix;
+        }
+
+        if (state.appState === "REGIONAL_MAP") {
+            mix.master = 0.52;
+            mix.menuPad = 0.048;
+            mix.oasisPad = 0.028;
+            return mix;
+        }
+
+        if (state.appState === "SITE_RESULT") {
+            const siteResult = getSiteResult(state);
+            mix.master = 0.58;
+            if (siteResult && siteResult.result === "COMPLETED") {
+                mix.wind = 0.014;
+                mix.oasisPad = 0.11;
+            } else {
+                mix.wind = 0.038;
+                mix.grit = 0.032;
+                mix.tensionPad = 0.09;
+            }
+            return mix;
+        }
+
+        if (state.appState !== "SITE_ACTIVE") {
+            return mix;
+        }
+
+        const weatherVisualResponse = getWeatherVisualResponse();
+        const localDensity = getApproximateLocalPlantDensity(state);
+        const hazardLevel = getAudioHazardLevel(state);
+        const shelteredFactor = clamp01(localDensity * 1.1 - hazardLevel * 0.35);
+        mix.master = 0.62;
+        mix.wind = 0.018 + weatherVisualResponse.windLevel * 0.14 + (1.0 - shelteredFactor) * 0.035;
+        mix.windFilterHz = 240.0 + weatherVisualResponse.windLevel * 520.0 - shelteredFactor * 80.0;
+        mix.grit = weatherVisualResponse.dustLevel * 0.11 + hazardLevel * 0.09;
+        mix.gritFilterHz = 1400.0 + hazardLevel * 1800.0;
+        mix.oasisPad = shelteredFactor * (1.0 - hazardLevel) * 0.095;
+        mix.tensionPad = Math.max(0.0, hazardLevel - 0.18) * 0.18;
+        return mix;
+    }
+
+    function setAudioParamTarget(audioParam, value, timeConstant) {
+        if (!audioParam) {
+            return;
+        }
+        const audioContext = audioManager.context;
+        if (!audioContext) {
+            return;
+        }
+        audioParam.setTargetAtTime(value, audioContext.currentTime, timeConstant);
+    }
+
+    function updateAudioMix(state) {
+        if (!audioManager.enabled) {
+            if (audioManager.masterGain && audioManager.context) {
+                setAudioParamTarget(audioManager.masterGain.gain, 0.0, 0.05);
+            }
+            updateAudioToggleButton();
+            return;
+        }
+
+        const audioContext = ensureAudioGraph();
+        if (!audioContext) {
+            return;
+        }
+
+        if (audioContext.state !== "running") {
+            updateAudioToggleButton();
+            return;
+        }
+
+        const mix = buildAudioMixState(state);
+        setAudioParamTarget(audioManager.masterGain.gain, mix.master, 0.18);
+        setAudioParamTarget(audioManager.windLayer.gain.gain, mix.wind, 0.22);
+        setAudioParamTarget(audioManager.windLayer.filter.frequency, mix.windFilterHz, 0.24);
+        setAudioParamTarget(audioManager.gritLayer.gain.gain, mix.grit, 0.14);
+        setAudioParamTarget(audioManager.gritLayer.filter.frequency, mix.gritFilterHz, 0.18);
+        setAudioParamTarget(audioManager.menuPadLow.gain.gain, mix.menuPad * 0.72, 0.32);
+        setAudioParamTarget(audioManager.menuPadHigh.gain.gain, mix.menuPad * 0.54, 0.32);
+        setAudioParamTarget(audioManager.oasisPadLow.gain.gain, mix.oasisPad * 0.65, 0.28);
+        setAudioParamTarget(audioManager.oasisPadHigh.gain.gain, mix.oasisPad * 0.42, 0.28);
+        setAudioParamTarget(audioManager.tensionDroneLow.gain.gain, mix.tensionPad * 0.7, 0.16);
+        setAudioParamTarget(audioManager.tensionDroneHigh.gain.gain, mix.tensionPad * 0.26, 0.16);
+        updateAudioToggleButton();
+    }
+
+    function scheduleToneBurst(options) {
+        const audioContext = audioManager.context;
+        if (!audioContext || !audioManager.cuesBus || audioContext.state !== "running") {
+            return;
+        }
+
+        const now = audioContext.currentTime;
+        const oscillator = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        oscillator.type = options.type || "sine";
+        oscillator.frequency.setValueAtTime(options.startFrequency || 440.0, now);
+        if (typeof options.endFrequency === "number") {
+            oscillator.frequency.exponentialRampToValueAtTime(
+                Math.max(20.0, options.endFrequency),
+                now + Math.max(0.02, options.duration || 0.18));
+        }
+
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, options.peakGain || 0.06), now + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + Math.max(0.06, options.duration || 0.18));
+        oscillator.connect(gain);
+        gain.connect(audioManager.cuesBus);
+        oscillator.start(now);
+        oscillator.stop(now + Math.max(0.08, options.duration || 0.18) + 0.04);
+        oscillator.onended = function () {
+            oscillator.disconnect();
+            gain.disconnect();
+        };
+    }
+
+    function scheduleNoiseBurst(options) {
+        const audioContext = audioManager.context;
+        if (!audioContext || !audioManager.cuesBus || !audioManager.noiseBuffer || audioContext.state !== "running") {
+            return;
+        }
+
+        const now = audioContext.currentTime;
+        const source = audioContext.createBufferSource();
+        source.buffer = audioManager.noiseBuffer;
+
+        const filter = audioContext.createBiquadFilter();
+        filter.type = options.filterType || "highpass";
+        filter.frequency.value = options.filterFrequency || 1600.0;
+        filter.Q.value = options.qValue || 0.3;
+
+        const gain = audioContext.createGain();
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, options.peakGain || 0.05), now + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + Math.max(0.05, options.duration || 0.16));
+
+        source.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioManager.cuesBus);
+        source.start(now);
+        source.stop(now + Math.max(0.08, options.duration || 0.16) + 0.03);
+        source.onended = function () {
+            source.disconnect();
+            filter.disconnect();
+            gain.disconnect();
+        };
+    }
+
+    function playOneShotCue(cue) {
+        if (!audioManager.enabled || !cue || !cue.cueKind) {
+            return;
+        }
+
+        switch (cue.cueKind) {
+        case "ACTION_COMPLETED":
+            scheduleToneBurst({ type: "triangle", startFrequency: 460.0, endFrequency: 620.0, duration: 0.18, peakGain: 0.035 });
+            scheduleToneBurst({ type: "sine", startFrequency: 620.0, endFrequency: 780.0, duration: 0.14, peakGain: 0.022 });
+            break;
+        case "ACTION_FAILED":
+            scheduleToneBurst({ type: "square", startFrequency: 280.0, endFrequency: 150.0, duration: 0.2, peakGain: 0.045 });
+            break;
+        case "HAZARD_PEAK":
+            scheduleNoiseBurst({ filterType: "highpass", filterFrequency: 2100.0, duration: 0.3, peakGain: 0.06 });
+            scheduleToneBurst({ type: "sawtooth", startFrequency: 120.0, endFrequency: 68.0, duration: 0.36, peakGain: 0.04 });
+            break;
+        case "SITE_COMPLETED":
+            scheduleToneBurst({ type: "sine", startFrequency: 392.0, endFrequency: 523.25, duration: 0.45, peakGain: 0.04 });
+            scheduleToneBurst({ type: "triangle", startFrequency: 523.25, endFrequency: 659.25, duration: 0.52, peakGain: 0.028 });
+            break;
+        case "SITE_FAILED":
+            scheduleToneBurst({ type: "sawtooth", startFrequency: 164.81, endFrequency: 82.41, duration: 0.55, peakGain: 0.05 });
+            scheduleNoiseBurst({ filterType: "bandpass", filterFrequency: 420.0, duration: 0.24, peakGain: 0.03, qValue: 0.7 });
+            break;
+        default:
+            break;
+        }
+    }
+
+    function processRecentOneShotCues(state) {
+        const recentOneShotCues = state && Array.isArray(state.recentOneShotCues)
+            ? state.recentOneShotCues
+            : [];
+        recentOneShotCues.forEach((cue) => {
+            const sequenceId = typeof cue.sequenceId === "number" ? cue.sequenceId : -1;
+            if (sequenceId <= lastProcessedOneShotCueSequenceId) {
+                return;
+            }
+            lastProcessedOneShotCueSequenceId = sequenceId;
+            playOneShotCue(cue);
+        });
     }
 
     function getItemMeta(itemId) {
@@ -8430,6 +8869,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const elapsed = animationTimeSeconds;
         sendSiteControlState();
         updateSmoothedWeatherVisualResponse(latestState, deltaSeconds);
+        updateAudioMix(latestState);
         worldGroup.traverse((node) => {
             if (node.userData.spinY) {
                 node.rotation.y += node.userData.spinY * 0.01;
@@ -8532,6 +8972,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (typeof state.siteAction === "undefined") {
             state.siteAction = null;
         }
+        if (!Array.isArray(state.recentOneShotCues)) {
+            state.recentOneShotCues = [];
+        }
         return state;
     }
 
@@ -8561,7 +9004,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             hud: false,
             siteAction: false,
             placementPreview: false,
-            placementFailure: false
+            placementFailure: false,
+            audioCues: false
         };
 
         for (const field of patchFields) {
@@ -8571,6 +9015,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             }
             if (field === "siteAction") {
                 lightweightParts.siteAction = true;
+                continue;
+            }
+            if (field === "recentOneShotCues") {
+                lightweightParts.audioCues = true;
                 continue;
             }
 
@@ -8605,7 +9053,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             !lightweightParts.hud &&
             !lightweightParts.siteAction &&
             !lightweightParts.placementPreview &&
-            !lightweightParts.placementFailure) {
+            !lightweightParts.placementFailure &&
+            !lightweightParts.audioCues) {
             return null;
         }
 
@@ -8636,6 +9085,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             viewerCompatibilityWarning = getVisualSmokeCompatibilityWarning(normalizedState);
             rebuildInventoryCache(normalizedState);
             syncPlacementFailureToast(normalizedState);
+            processRecentOneShotCues(normalizedState);
             const previousState = latestState;
             syncLocalActionProgress(normalizedState);
             const lightweightPatchParts =
@@ -8687,6 +9137,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     }
                 }
                 renderActionProgressBar(normalizedState);
+                if (lightweightPatchParts.audioCues) {
+                    updateAudioMix(normalizedState);
+                }
                 return;
             }
 
@@ -8718,6 +9171,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     "\nSelected Site: " + (normalizedState.selectedSiteId == null ? "none" : normalizedState.selectedSiteId);
             }
             renderActionProgressBar(normalizedState);
+            updateAudioMix(normalizedState);
         } catch (error) {
             reportViewerError("handleIncomingState", error);
             throw error;
@@ -9197,6 +9651,33 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         reportViewerError("window.unhandledrejection", event.reason || "Unhandled rejection");
     });
 
+    if (audioToggle) {
+        audioToggle.addEventListener("click", function () {
+            audioManager.enabled = !audioManager.enabled;
+            if (!audioManager.enabled && audioManager.masterGain) {
+                setAudioParamTarget(audioManager.masterGain.gain, 0.0, 0.05);
+                updateAudioToggleButton();
+                return;
+            }
+
+            resumeAudioGraphIfNeeded().then(function () {
+                updateAudioMix(latestState);
+            });
+        });
+    }
+
+    document.addEventListener("pointerdown", function () {
+        if (!audioManager.enabled) {
+            return;
+        }
+        if (!audioManager.context || audioManager.context.state !== "running") {
+            resumeAudioGraphIfNeeded().then(function () {
+                updateAudioMix(latestState);
+            });
+        }
+    }, { passive: true });
+
+    updateAudioToggleButton();
     fitRenderer();
     storagePanelClose.addEventListener("click", function () {
         closeOpenedInventoryContainer();

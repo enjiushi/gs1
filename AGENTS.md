@@ -45,6 +45,7 @@ This file is a quick orientation guide for agents working in this repository.
 - `SYSTEM_DESIGN_STATUS.md`: Current system status and implementation tracking, including site-objective readiness notes, the current weather/post-event recovery model summary, the total-reputation plant track, and the neutral base-tech plus faction-enhancement purchase direction.
 - `SYSTEM_TEST_COVERAGE.md`: Per-system automated coverage expectations, including placeholder-versus-implemented test scope for campaign, site, and runtime behavior plus total-reputation plant-tier coverage, neutral base-tech and faction-enhancement purchase coverage with internal cash-point-derived prices, immediate delivery-crate insertion with overflow-queue regressions, direct local-weather-to-action-cost action-execution coverage, and worker background energy-recovery expectations.
 - `CONTENT_AUTHORING_CONTRACT.md`: Content authoring contract and data expectations, including the current simplified harsh-weather timeline fields.
+- `AUDIO_ASSET_PLAN.md`: Audio sourcing and integration plan covering recommended ambience, SFX, and prototype music libraries, budget paths, and host-side playback parameter guidance aligned with the current density-based desert soundscape direction.
 - `MISSING_DEFINITION_DESCRIPTIONS.md`: Notes for definitions that still need descriptions.
 - `TASK_BOARD_OPEN_QUESTIONS.md`: Follow-up product-contract questions for task-board reward presentation, claim lifetime, reward delivery semantics, and prototype board scope.
 

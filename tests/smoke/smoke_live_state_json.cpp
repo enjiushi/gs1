@@ -161,6 +161,26 @@ const char* site_attempt_result_name(Gs1SiteAttemptResult result)
     }
 }
 
+const char* one_shot_cue_name(Gs1OneShotCueKind cue_kind)
+{
+    switch (cue_kind)
+    {
+    case GS1_ONE_SHOT_CUE_ACTION_COMPLETED:
+        return "ACTION_COMPLETED";
+    case GS1_ONE_SHOT_CUE_ACTION_FAILED:
+        return "ACTION_FAILED";
+    case GS1_ONE_SHOT_CUE_HAZARD_PEAK:
+        return "HAZARD_PEAK";
+    case GS1_ONE_SHOT_CUE_SITE_COMPLETED:
+        return "SITE_COMPLETED";
+    case GS1_ONE_SHOT_CUE_SITE_FAILED:
+        return "SITE_FAILED";
+    case GS1_ONE_SHOT_CUE_NONE:
+    default:
+        return "NONE";
+    }
+}
+
 const char* inventory_container_name(Gs1InventoryContainerKind kind)
 {
     switch (kind)
@@ -1077,6 +1097,40 @@ void append_site_result_json(std::string& json, const std::optional<SmokeEngineH
     json += '}';
 }
 
+void append_recent_one_shot_cues_json(
+    std::string& json,
+    const std::vector<SmokeEngineHost::OneShotCueProjection>& recent_one_shot_cues)
+{
+    json += '[';
+    for (std::size_t index = 0; index < recent_one_shot_cues.size(); ++index)
+    {
+        const auto& cue = recent_one_shot_cues[index];
+        if (index > 0U)
+        {
+            json.push_back(',');
+        }
+
+        json += "{\"sequenceId\":";
+        json += std::to_string(cue.sequence_id);
+        json += ",\"frameNumber\":";
+        json += std::to_string(cue.frame_number);
+        json += ",\"cueKind\":";
+        append_json_string(json, one_shot_cue_name(cue.cue_kind));
+        json += ",\"subjectId\":";
+        json += std::to_string(cue.subject_id);
+        json += ",\"arg0\":";
+        json += std::to_string(cue.arg0);
+        json += ",\"arg1\":";
+        json += std::to_string(cue.arg1);
+        json += ",\"worldX\":";
+        json += std::to_string(cue.world_x);
+        json += ",\"worldY\":";
+        json += std::to_string(cue.world_y);
+        json += '}';
+    }
+    json += ']';
+}
+
 }  // namespace
 
 void SmokeEngineHost::write_json_string(std::string& destination, std::string_view value)
@@ -1122,6 +1176,8 @@ std::string SmokeEngineHost::build_live_state_json(const LiveStateSnapshot& live
     append_site_action_json(json, live_state.site_action);
     json += ",\"siteResult\":";
     append_site_result_json(json, live_state.site_result);
+    json += ",\"recentOneShotCues\":";
+    append_recent_one_shot_cues_json(json, live_state.recent_one_shot_cues);
     json += "}";
     return json;
 }
@@ -1234,6 +1290,12 @@ std::string SmokeEngineHost::build_live_state_patch_json(
     {
         append_field("siteResult", [&](std::string& destination) {
             append_site_result_json(destination, snapshot.site_result);
+        });
+    }
+    if ((field_mask & LiveStatePatchField_AudioCues) != 0U)
+    {
+        append_field("recentOneShotCues", [&](std::string& destination) {
+            append_recent_one_shot_cues_json(destination, snapshot.recent_one_shot_cues);
         });
     }
 

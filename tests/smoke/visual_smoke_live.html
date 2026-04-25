@@ -209,9 +209,17 @@ body {
   min-width: 0;
 }
 
+.status-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-end;
+}
+
 .hud-chip,
 .status-chip,
-.selection-chip {
+.selection-chip,
+.audio-toggle {
   pointer-events: auto;
   backdrop-filter: blur(14px);
   background: var(--panel);
@@ -252,6 +260,30 @@ body {
   font-size: 13px;
   color: var(--muted);
   white-space: pre-line;
+}
+
+.audio-toggle {
+  min-width: 200px;
+  text-align: right;
+  font: inherit;
+  font-size: 13px;
+  color: var(--accent-dark);
+  cursor: pointer;
+}
+
+.audio-toggle[data-audio-enabled="true"] {
+  background: rgba(226, 233, 220, 0.94);
+  border-color: rgba(90, 121, 81, 0.28);
+  color: #2e4a2d;
+}
+
+.audio-toggle[data-audio-enabled="false"] {
+  background: rgba(238, 230, 217, 0.9);
+}
+
+.audio-toggle:disabled {
+  cursor: wait;
+  opacity: 0.75;
 }
 
 .status-chip:empty,
@@ -3075,8 +3107,13 @@ body {
           </div>
         </div>
 
-        <div class="status-chip" id="status-chip">
-          Connecting...
+        <div class="status-stack">
+          <button class="audio-toggle" id="audio-toggle" type="button" data-audio-enabled="false">
+            Audio Off
+          </button>
+          <div class="status-chip" id="status-chip">
+            Connecting...
+          </div>
         </div>
       </div>
 

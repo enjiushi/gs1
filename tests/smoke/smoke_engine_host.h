@@ -43,7 +43,8 @@ public:
         LiveStatePatchField_SiteStateCraftContext = 1U << 16,
         LiveStatePatchField_SiteStatePlacementPreview = 1U << 17,
         LiveStatePatchField_SitePlacementFailure = 1U << 18,
-        LiveStatePatchField_CampaignResources = 1U << 19
+        LiveStatePatchField_CampaignResources = 1U << 19,
+        LiveStatePatchField_AudioCues = 1U << 20
     };
 
     struct LiveStateSnapshot;
@@ -350,6 +351,18 @@ public:
         std::uint32_t newly_revealed_site_count {0};
     };
 
+    struct OneShotCueProjection final
+    {
+        std::uint64_t sequence_id {0};
+        std::uint64_t frame_number {0};
+        std::uint32_t subject_id {0};
+        std::uint32_t arg0 {0};
+        std::uint32_t arg1 {0};
+        float world_x {0.0f};
+        float world_y {0.0f};
+        Gs1OneShotCueKind cue_kind {GS1_ONE_SHOT_CUE_NONE};
+    };
+
 public:
     struct LiveStateSnapshot final
     {
@@ -367,6 +380,7 @@ public:
         std::optional<HudProjection> hud_state {};
         std::optional<SiteActionProjection> site_action {};
         std::optional<SiteResultProjection> site_result {};
+        std::vector<OneShotCueProjection> recent_one_shot_cues {};
     };
 
 private:
@@ -416,6 +430,7 @@ private:
     void apply_hud_state(const Gs1EngineMessage& message);
     void apply_site_action_update(const Gs1EngineMessage& message);
     void apply_site_result_ready(const Gs1EngineMessage& message);
+    void apply_one_shot_cue(const Gs1EngineMessage& message);
     void publish_live_state_snapshot();
     void queue_live_state_patch(std::uint32_t field_mask);
     [[nodiscard]] LiveStateSnapshot capture_frame_live_state_snapshot() const;
@@ -462,6 +477,8 @@ private:
     std::optional<HudProjection> hud_state_ {};
     std::optional<SiteActionProjection> site_action_ {};
     std::optional<SiteResultProjection> site_result_ {};
+    std::vector<OneShotCueProjection> recent_one_shot_cues_ {};
+    std::uint64_t next_one_shot_cue_sequence_id_ {0};
     std::uint32_t phase1_fixed_steps_executed_ {0};
     std::uint32_t phase1_processed_host_event_count_ {0};
     std::uint32_t phase2_processed_host_event_count_ {0};
