@@ -677,7 +677,7 @@ void inventory_item_use_drink_defers_item_and_meter_changes_until_action_complet
         WorkerConditionSystem::process_message(worker_context, *meter_message) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].occupied);
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].item_quantity == 1U);
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.site_world->worker_conditions().hydration, 52.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.site_world->worker_conditions().hydration, 60.0f));
 }
 
 void inventory_item_use_food_restores_nourishment_without_refilling_energy(

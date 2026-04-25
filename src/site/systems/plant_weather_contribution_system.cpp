@@ -2,6 +2,7 @@
 
 #include "content/defs/plant_defs.h"
 #include "site/site_world_components.h"
+#include "site/tile_footprint.h"
 #include "site/weather_contribution_logic.h"
 
 #ifdef _MSC_VER
@@ -114,6 +115,47 @@ void mark_tiles_affected_by_source(
     }
 }
 
+bool source_and_target_share_occupant_instance(
+    gs1::SiteSystemContext<gs1::PlantWeatherContributionSystem>& context,
+    flecs::world& ecs_world,
+    gs1::TileCoord source_coord,
+    gs1::TileCoord target_coord,
+    gs1::PlantId source_plant_id) noexcept
+{
+    if (source_coord.x == target_coord.x && source_coord.y == target_coord.y)
+    {
+        return true;
+    }
+
+    if (source_plant_id.value == 0U || !context.world.tile_coord_in_bounds(target_coord))
+    {
+        return false;
+    }
+
+    const auto target_entity_id = context.site_run.site_world->tile_entity_id(target_coord);
+    if (target_entity_id == 0U)
+    {
+        return false;
+    }
+
+    const auto target_entity = ecs_world.entity(target_entity_id);
+    if (!target_entity.has<gs1::site_ecs::TileOccupantTag>())
+    {
+        return false;
+    }
+
+    const auto target_plant_slot = target_entity.get<gs1::site_ecs::TilePlantSlot>();
+    if (target_plant_slot.plant_id != source_plant_id)
+    {
+        return false;
+    }
+
+    const auto footprint = gs1::resolve_plant_tile_footprint(source_plant_id);
+    const gs1::TileCoord source_anchor = gs1::align_tile_anchor_to_footprint(source_coord, footprint);
+    const gs1::TileCoord target_anchor = gs1::align_tile_anchor_to_footprint(target_coord, footprint);
+    return source_anchor.x == target_anchor.x && source_anchor.y == target_anchor.y;
+}
+
 gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
     gs1::SiteSystemContext<gs1::PlantWeatherContributionSystem>& context,
     const gs1::WeatherUnitVector& wind_direction,
@@ -154,6 +196,13 @@ gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
         const auto ground_cover_slot = source_entity.get<gs1::site_ecs::TileGroundCoverSlot>();
         const auto& plant_def =
             resolve_occupant_def(plant_slot.plant_id, ground_cover_slot.ground_cover_type_id);
+        const bool same_occupant_instance =
+            source_and_target_share_occupant_instance(
+                context,
+                ecs_world,
+                source_coord,
+                target_coord,
+                plant_slot.plant_id);
 
         gs1::SiteWorld::TileWeatherContributionData delta = gs1::zero_weather_contribution();
         const float contribution_scale = gs1::resolve_contribution_scale(sample.manhattan_distance);
@@ -162,22 +211,23 @@ gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
             sample.manhattan_distance <= static_cast<int>(plant_def.aura_size);
         if (within_shared_aura)
         {
-            delta.heat_protection =
-                plant_def.heat_protection_power * density * contribution_scale;
-            delta.dust_protection =
-                plant_def.dust_protection_power * density * contribution_scale;
             delta.fertility_improve =
                 plant_def.fertility_improve_power * density * contribution_scale;
             delta.salinity_reduction =
                 plant_def.salinity_reduction_power * density * contribution_scale;
+
+            if (!same_occupant_instance)
+            {
+                delta.heat_protection =
+                    plant_def.heat_tolerance * density * contribution_scale;
+                delta.dust_protection =
+                    plant_def.dust_tolerance * density * contribution_scale;
+            }
         }
 
-        if (sample.manhattan_distance == 0)
-        {
-            delta.wind_protection =
-                plant_def.wind_protection_power * density * contribution_scale;
-        }
-        else if (sample.manhattan_distance <= static_cast<int>(plant_def.wind_protection_range))
+        if (!same_occupant_instance &&
+            sample.manhattan_distance > 0 &&
+            sample.manhattan_distance <= static_cast<int>(plant_def.wind_protection_range))
         {
             const float shadow_scale = gs1::compute_directional_wind_shadow_scale(
                 source_coord.x,
@@ -189,7 +239,7 @@ gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
             if (shadow_scale > gs1::k_weather_contribution_epsilon)
             {
                 delta.wind_protection =
-                    plant_def.wind_protection_power *
+                    plant_def.wind_resistance *
                     density *
                     contribution_scale *
                     shadow_scale;

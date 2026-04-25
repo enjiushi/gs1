@@ -60,6 +60,26 @@ std::vector<ContentValidationIssue> validate_content_database(
             break;
         }
 
+        if (!is_weather_meter_in_range(plant_def.salt_tolerance) ||
+            !is_weather_meter_in_range(plant_def.heat_tolerance) ||
+            !is_weather_meter_in_range(plant_def.wind_resistance) ||
+            !is_weather_meter_in_range(plant_def.dust_tolerance))
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Plant resistance and tolerance values must stay in the 0-100 range."});
+            break;
+        }
+
+        if (plant_def.fertility_improve_power < 0.0f ||
+            plant_def.salinity_reduction_power < 0.0f)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Plant terrain-support values must be non-negative."});
+            break;
+        }
+
         if (plant_def.harvest_item_id.value == 0U)
         {
             if (plant_def.harvest_quantity != 0U ||

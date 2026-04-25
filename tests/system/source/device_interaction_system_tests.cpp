@@ -277,6 +277,21 @@ void craft_action_waits_for_worker_to_reach_device_range_before_starting(
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     const auto workbench_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);
+    const auto workbench_entity_id = site_run.site_world->device_entity_id(workbench_tile);
+    const auto workbench_storage =
+        gs1::inventory_storage::find_device_storage_container(site_run, workbench_entity_id);
+    GS1_SYSTEM_TEST_REQUIRE(context, workbench_storage.is_valid());
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        workbench_storage,
+        gs1::ItemId {gs1::k_item_wood_bundle},
+        5U);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        workbench_storage,
+        gs1::ItemId {gs1::k_item_iron_bundle},
+        3U);
+
     queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -292,7 +307,7 @@ void craft_action_waits_for_worker_to_reach_device_range_before_starting(
                     workbench_tile.y,
                     0U,
                     0U,
-                    gs1::k_item_storage_crate_kit})) == GS1_STATUS_OK);
+                    gs1::k_item_workbench_kit})) == GS1_STATUS_OK);
 
     GS1_SYSTEM_TEST_REQUIRE(context, site_run.site_action.current_action_id.has_value());
     GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.started_at_world_minute.has_value());

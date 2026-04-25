@@ -579,7 +579,7 @@ void storage_device_breakage_destroys_owned_storage_and_items(
     site_run.inventory.opened_device_storage_id = storage_id;
 
     auto tile = site_run.site_world->tile_at(storage_tile);
-    tile.ecology.sand_burial = 1.0f;
+    tile.ecology.sand_burial = 100.0f;
     tile.device.device_integrity = 0.01f;
     site_run.site_world->set_tile(storage_tile, tile);
 
