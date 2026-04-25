@@ -13,7 +13,7 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `camp_durability_system.h`: Camp durability system interface.
 - `camp_durability_system.cpp`: Applies camp wear/failure effects to camp durability state using content-authored wear-rate and service-threshold tuning.
 - `craft_system.h`: Craft system interface.
-- `craft_system.cpp`: Handles crafting progress, completion, and crafting-related state updates.
+- `craft_system.cpp`: Handles crafting progress, completion, and crafting-related state updates, including on-demand craft-context option projection plus idle-gated cached nearby-item refreshes for crafting stations.
 - `device_maintenance_system.h`: Device maintenance system interface.
 - `device_maintenance_system.cpp`: Applies repair/maintenance behavior for site devices and emits device-condition change messages when integrity or occupancy changes, including startup snapshots for task-tracking subscribers, now using sparse device-entity iteration instead of dense full-tile scans for per-frame wear updates.
 - `device_support_system.h`: Device support system interface.
