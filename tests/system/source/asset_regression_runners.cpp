@@ -659,7 +659,7 @@ void ecology_regression_runner(
         }
         GS1_SYSTEM_TEST_CHECK(
             context,
-            count_messages(queue, GameMessageType::TileEcologyChanged) ==
+            count_tile_ecology_entries(queue) ==
                 parse_u32(context, values, "expect_tile_ecology_changed_count", 1U));
         return;
     }
@@ -686,7 +686,7 @@ void ecology_regression_runner(
                 raw_meter_from_asset_value(parse_float(context, values, "expect_sand_burial"))));
         GS1_SYSTEM_TEST_CHECK(
             context,
-            count_messages(queue, GameMessageType::TileEcologyChanged) ==
+            count_tile_ecology_entries(queue) ==
                 parse_u32(context, values, "expect_tile_ecology_changed_count", 1U));
         return;
     }

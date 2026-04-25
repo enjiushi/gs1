@@ -120,8 +120,6 @@ struct SiteRunState final
     bool pending_full_tile_projection_update {false};
     std::vector<TileCoord> pending_tile_projection_updates {};
     std::vector<std::uint8_t> pending_tile_projection_update_mask {};
-    std::vector<float> last_reported_tile_density {};
-    std::vector<std::uint8_t> last_reported_tile_density_valid {};
     std::vector<ProjectedSiteTileState> last_projected_tile_states {};
     bool pending_full_inventory_projection_update {false};
     std::vector<std::uint32_t> pending_worker_pack_inventory_projection_updates {};
