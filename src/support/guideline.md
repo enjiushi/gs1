@@ -8,5 +8,6 @@ Shared lightweight support types reused across runtime and system code.
 - When files or folders in this directory change, update this file in the same change.
 
 ## Contents
+- `currency.h`: Shared cash-point conversion constants and helpers that keep internal valuation aligned with player-facing cash.
 - `id_types.h`: Strongly typed ID wrappers and helper aliases used across gameplay state.
 - `site_objective_types.h`: Shared enums for site objective modes and target edges used by content, site setup, and objective evaluation.

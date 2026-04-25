@@ -50,6 +50,7 @@ All authored content rows in this document should follow these shared rules:
 | Optional fields | Optional fields should be absent or null when unused, not filled with fake placeholder ids. |
 | Positive authored counts | `targetAmount`, fixed reward amounts, duration mins, duration maxes, and authored export counts must all be positive when present. |
 | Reference validity | Any referenced `factionId`, `itemId`, `unlockableId`, `modifierId`, `taskTemplateId`, `eventArchetypeId`, or tech id must resolve to a real row. |
+| Internal cash points | Any authored row that uses hidden valuation should author `internalCashPoint`-style values in whole `100`-point steps so player-facing cash stays integral. |
 | Onboarding separation | Authored onboarding-only content must be explicitly flagged so the normal generator cannot surface it in the repeatable runtime pools. |
 | Prototype-first simplicity | If a row can be expressed through one existing shared content family, do not add a new one-off schema just for one prototype case. |
 
@@ -85,6 +86,12 @@ Required item authoring rules:
 - deployable kits are ordinary items with a linked authored `StructureDef`
 - authored item source rules should distinguish at least `BuyOnly`, `CraftOnly`, `BuyOrCraft`, and `HarvestOnly`
 - authored stack size is the hard cap for one runtime item stack
+- item-level internal cash-point values remain the hidden valuation source for reward and task scoring even when the player only sees normal cash prices
+
+Economy valuation clarification:
+
+- long-term tech rows and direct-purchase unlockable offers should author internal cash-point values as their source of truth
+- player-facing cash prices should be derived from those internal values using `100` cash points = `1` cash
 
 Required structure authoring rules:
 

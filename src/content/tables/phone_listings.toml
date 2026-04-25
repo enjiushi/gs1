@@ -83,7 +83,7 @@ site_id = 1
 listing_id = 11
 listing_kind = "PurchaseUnlockable"
 item_or_unlockable_id = 101
-price = 20
+internal_price_cash_points = 2000
 quantity = 1
 
 [[phone_listings]]

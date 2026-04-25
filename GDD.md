@@ -3071,7 +3071,7 @@ To make the game more compelling without feeling manipulative, these systems wou
 
 `Reputation` should function as thresholded trust, not consumable currency. `Faction Reputation` should also remain cumulative. In the prototype, `Reputation` now unlocks the three global plant tiers plus the neutral base-tech tiers, `Faction Reputation` unlocks each faction's three enhancement tiers, and claiming tech always spends persistent campaign cash instead of spending or occupying reputation.
 
-Claiming tech therefore never lowers the visible total trust value. Trust unlocks access; campaign cash pays for the actual tech claim.
+Claiming tech therefore never lowers the visible total trust value. Trust unlocks access; campaign cash pays for the actual tech claim. Tech pricing should be authored internally in cash points, with `100` cash points equal to `1` displayed cash, so balancing can stay granular while the player still sees normal whole-cash costs.
 
 For clarity, `Faction Reputation` from `Site Task`s should usually be a guaranteed completion payout tied to the task's publisher, with the amount scaling by task tier or level, while the task's visible reward draft should stay focused on immediate tactical rewards.
 
@@ -3299,6 +3299,7 @@ The `Persistent Tech Tree` is the long-term campaign progression layer. In the c
 - an enhancement may be purchased only after its paired base tech has already been purchased
 - reaching a later tier threshold should immediately make that tier's base techs or enhancements claimable; it should not require previous-tier purchases
 - both base techs and enhancements should spend only `campaignCash`
+- base-tech and enhancement rows should author internal cash-point values and convert them to player-facing cash at `100` points per `1` cash
 - `Reputation` and `Faction Reputation` unlock access but are never spent
 - branch identity should still come from signature content family plus enhancement direction rather than bespoke code per faction
 
@@ -3316,6 +3317,7 @@ Important rule:
 
 - `reputation` and `factionReputation[factionId]` unlock tier access but are never spent
 - `campaignCash` is the only prototype currency used to claim tech nodes
+- tech-node internal valuation should use cash points, with the displayed/spent cash price derived from `100` cash points = `1` cash
 - claimed tech state is persistent node ownership, not an unspent-pick inventory
 - the runtime impact should still come from linked content plus persistent modifier direction, not from a hidden branch bonus table
 
@@ -3389,7 +3391,7 @@ This is enough to show:
 
 This system should work like a curated random reward pool, not a fully fixed tree and not pure chaos. Each site should offer a different subset of plants, devices, field actions, and other temporary options, which means the player's short-term priorities and local build style naturally change from site to site.
 
-The main acquisition path should be task rewards, but task rewards should not be the only path. If the player wants a specific local unlockable and the relevant task drafts do not offer it, the site should also expose a limited direct-purchase fallback for tech-eligible unlockables at very high money cost.
+The main acquisition path should be task rewards, but task rewards should not be the only path. If the player wants a specific local unlockable and the relevant task drafts do not offer it, the site should also expose a limited direct-purchase fallback for tech-eligible unlockables at very high money cost. Those direct-purchase offers should also author internal cash-point valuation and convert to displayed cash using the same `100`-points-per-`1`-cash rule.
 
 Faction tech choices should bias these local offers rather than replacing them. A `Forestry Bureau of Autonomous Region` build should surface more plant options, an `Autonomous Region Agricultural University` build should surface more device and precision options, and a `Village Committee` build should broaden permanent crafting-recipe options while still biasing the board toward labor and tempo support.
 

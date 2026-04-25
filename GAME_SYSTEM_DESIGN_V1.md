@@ -562,6 +562,7 @@ Rules:
 
 - `totalReputation` is never spent and unlocks the three prototype global plant tiers
 - `persistentCash` is shared across the campaign and pays for both neutral base-tech and faction-enhancement claims
+- tech rows should author internal cash-point valuation and derive player-facing cash cost from `100` cash points = `1` cash
 - technology claims do not spend down total reputation or faction reputation
 - `purchasedNodeIds[]` is authoritative progression state
 
@@ -1344,7 +1345,7 @@ Responsibilities:
 
 - validate neutral base-tech tier or faction-enhancement tier prerequisites
 - validate total-reputation plant-tier eligibility
-- spend persistent campaign cash when a tech node is claimed
+- convert authored internal cash-point valuation into player-facing cash and spend persistent campaign cash when a tech node is claimed
 - mark node purchased
 - update `ContentDatabase` eligibility view for recipes, plants, and devices
 
@@ -1378,6 +1379,8 @@ Gameplay code reads only:
 - `getEligibleEventTemplates(siteRun, campaignState)`
 - `getEligibleSiteUnlockables(siteRun, campaignState)`
 - `getEligibleDirectPurchaseUnlockables(siteRun, campaignState)`
+
+Direct-purchase unlockable offers should author internal cash-point values and derive displayed/spent cash from the same `100` cash points = `1` cash rule used by tech claims.
 
 These are query helpers over validated content plus current progression state. They are not the generator themselves.
 

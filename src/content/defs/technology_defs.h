@@ -50,7 +50,7 @@ struct TechnologyNodeDef final
     TechnologyEntryKind entry_kind {TechnologyEntryKind::GlobalModifier};
     std::uint8_t reserved1[3] {};
     std::int32_t reputation_cost {0};
-    std::int32_t cash_cost {0};
+    std::uint32_t internal_cost_cash_points {0U};
     ModifierId linked_modifier_id {};
     std::uint32_t mechanism_change_id {0};
     bool is_todo_placeholder {true};

@@ -1070,7 +1070,7 @@ void technology_refund_requires_highest_tier_in_that_faction_branch(
             60);
 }
 
-void technology_uses_authored_cash_and_reputation_costs(
+void technology_uses_authored_internal_cash_points_and_reputation_costs(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
@@ -1081,6 +1081,9 @@ void technology_uses_authored_cash_and_reputation_costs(
 
     GS1_SYSTEM_TEST_REQUIRE(context, village_tier_one != nullptr);
     GS1_SYSTEM_TEST_REQUIRE(context, forestry_tier_two != nullptr);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::current_internal_cost_cash_points(*village_tier_one) == 400U);
     GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::current_cash_cost(campaign, *village_tier_one) == 4);
     GS1_SYSTEM_TEST_CHECK(
         context,
@@ -1092,6 +1095,9 @@ void technology_uses_authored_cash_and_reputation_costs(
         TechnologySystem::current_reputation_cost(
             *village_tier_one,
             gs1::FactionId {gs1::k_faction_agricultural_university}) == 15);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::current_internal_cost_cash_points(*forestry_tier_two) == 800U);
     GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::current_cash_cost(campaign, *forestry_tier_two) == 8);
     GS1_SYSTEM_TEST_CHECK(
         context,
@@ -1213,8 +1219,8 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     technology_total_reputation_unlocks_plants_one_by_one);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "technology",
-    "uses_authored_cash_and_reputation_costs",
-    technology_uses_authored_cash_and_reputation_costs);
+    "uses_authored_internal_cash_points_and_reputation_costs",
+    technology_uses_authored_internal_cash_points_and_reputation_costs);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "regional_support",
     "placeholder_test_plan_is_recorded",

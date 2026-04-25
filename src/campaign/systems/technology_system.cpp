@@ -1,5 +1,7 @@
 #include "campaign/systems/technology_system.h"
 
+#include "support/currency.h"
+
 #include <algorithm>
 #include <limits>
 
@@ -176,11 +178,17 @@ std::int32_t TechnologySystem::current_reputation_cost(
     return base_cost + (base_cost + 1) / 2;
 }
 
+std::uint32_t TechnologySystem::current_internal_cost_cash_points(
+    const TechnologyNodeDef& node_def) noexcept
+{
+    return node_def.internal_cost_cash_points;
+}
+
 std::int32_t TechnologySystem::current_cash_cost(
     const CampaignState& /*campaign*/,
     const TechnologyNodeDef& node_def) noexcept
 {
-    return std::max(0, node_def.cash_cost);
+    return cash_from_cash_points(current_internal_cost_cash_points(node_def));
 }
 
 bool TechnologySystem::node_claimable(

@@ -127,7 +127,7 @@ Implemented behavior coverage should verify:
 - Reaching a total-reputation tier threshold unlocks that tier's authored plant pair without spending reputation.
 - Base technologies become claimable as soon as the matching total-reputation tier threshold is met; they do not require previous-tier purchases.
 - Enhancements require both the paired base tech purchase and the matching faction-reputation tier.
-- Prototype technologies cover placeholder base-tech and enhancement modifier/mechanism effects with authored per-node cash costs.
+- Prototype technologies cover placeholder base-tech and enhancement modifier/mechanism effects with authored per-node internal cash-point values that convert to player-facing cash costs.
 - Purchased tech state is stored as node ownership, not as unspent pick inventory.
 
 ### `regional_support`
@@ -271,6 +271,7 @@ Implemented behavior coverage should verify:
 - Contractor hire spends money and decrements available work units.
 - Unlockable purchase removes the unlockable from direct-purchase availability
   and reveals it in the owned list.
+- Direct-purchase unlockable listings derive their displayed/spent cash price from authored internal cash-point values.
 - Missing listings return `NOT_FOUND`.
 - Wrong listing kinds or insufficient funds/quantity return invalid-state
   failures.
