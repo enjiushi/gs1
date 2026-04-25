@@ -137,6 +137,7 @@ private:
     void queue_regional_map_selection_ui_messages();
     void queue_regional_map_tech_tree_ui_messages();
     void queue_site_result_ui_messages(std::uint32_t site_id, Gs1SiteAttemptResult result);
+    void queue_site_protection_selector_ui_messages();
     void queue_regional_map_snapshot_messages();
     void queue_regional_map_site_upsert_message(const SiteMetaState& site);
     void queue_site_snapshot_begin_message(Gs1ProjectionMode mode);
@@ -167,6 +168,7 @@ private:
     void queue_site_task_upsert_message(std::size_t task_index);
     void queue_all_site_task_upsert_messages();
     void queue_site_phone_panel_state_message();
+    void queue_site_protection_overlay_state_message();
     void queue_site_phone_listing_remove_message(std::uint32_t listing_id);
     void queue_site_phone_listing_upsert_message(std::size_t listing_index);
     void queue_all_site_phone_listing_upsert_messages();
@@ -179,6 +181,7 @@ private:
         std::uint32_t site_id,
         Gs1SiteAttemptResult result,
         std::uint32_t newly_revealed_site_count);
+    void close_site_protection_ui() noexcept;
     void mark_site_projection_update_dirty(std::uint64_t dirty_flags) noexcept;
     void mark_site_tile_projection_dirty(TileCoord coord) noexcept;
     void clear_pending_site_tile_projection_updates() noexcept;
@@ -231,6 +234,8 @@ private:
         profiled_systems_ {};
     std::map<Gs1UiSetupId, Gs1UiSetupPresentationType> active_ui_setups_ {};
     std::optional<Gs1UiSetupId> active_normal_ui_setup_ {};
+    bool site_protection_selector_open_ {false};
+    Gs1SiteProtectionOverlayMode site_protection_overlay_mode_ {GS1_SITE_PROTECTION_OVERLAY_NONE};
     std::optional<Gs1AppState> last_emitted_app_state_ {};
     std::vector<std::uint32_t> last_emitted_phone_listing_ids_ {};
     bool boot_initialized_ {false};

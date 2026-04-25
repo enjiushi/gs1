@@ -74,6 +74,16 @@ struct GameRuntimeProjectionTestAccess
         runtime.mark_site_projection_update_dirty(dirty_flags);
     }
 
+    static bool site_protection_selector_open(const GameRuntime& runtime)
+    {
+        return runtime.site_protection_selector_open_;
+    }
+
+    static Gs1SiteProtectionOverlayMode site_protection_overlay_mode(const GameRuntime& runtime)
+    {
+        return runtime.site_protection_overlay_mode_;
+    }
+
 };
 }  // namespace gs1
 
@@ -300,6 +310,32 @@ void set_tile_soil_visual_state(
     ecology.soil_fertility = raw_meter_test_value(soil_fertility);
     ecology.soil_salinity = raw_meter_test_value(soil_salinity);
     gs1::site_world_access::set_tile_ecology(site_run, coord, ecology);
+}
+
+void set_tile_protection_visual_state(
+    gs1::SiteRunState& site_run,
+    TileCoord coord,
+    float wind_protection,
+    float heat_protection,
+    float dust_protection)
+{
+    auto contribution = site_run.site_world->tile_plant_weather_contribution(coord);
+    contribution.wind_protection = raw_meter_test_value(wind_protection);
+    contribution.heat_protection = raw_meter_test_value(heat_protection);
+    contribution.dust_protection = raw_meter_test_value(dust_protection);
+    contribution.fertility_improve = 0.0f;
+    contribution.salinity_reduction = 0.0f;
+    contribution.irrigation = 0.0f;
+    site_run.site_world->set_tile_plant_weather_contribution(coord, contribution);
+
+    auto device_contribution = site_run.site_world->tile_device_weather_contribution(coord);
+    device_contribution.wind_protection = 0.0f;
+    device_contribution.heat_protection = 0.0f;
+    device_contribution.dust_protection = 0.0f;
+    device_contribution.fertility_improve = 0.0f;
+    device_contribution.salinity_reduction = 0.0f;
+    device_contribution.irrigation = 0.0f;
+    site_run.site_world->set_tile_device_weather_contribution(coord, device_contribution);
 }
 
 std::vector<Gs1EngineMessage> flush_tile_delta_for(
@@ -962,6 +998,42 @@ int main()
         assert(approx_equal(payload.local_wind, 18.0f));
     }
 
+    set_tile_protection_visual_state(site_run, density_coord, 14.0f, 32.0f, 48.0f);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+    const auto protection_first_messages = drain_engine_messages(runtime);
+    const auto protection_first_tiles =
+        collect_messages_of_type(protection_first_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
+    assert(protection_first_tiles.size() == 1U);
+    {
+        const auto& payload = protection_first_tiles.front()->payload_as<Gs1EngineMessageSiteTileData>();
+        assert(approx_equal(payload.wind_protection, 14.0f));
+        assert(approx_equal(payload.heat_protection, 32.0f));
+        assert(approx_equal(payload.dust_protection, 48.0f));
+    }
+
+    set_tile_protection_visual_state(site_run, density_coord, 15.0f, 32.4f, 48.4f);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+    const auto protection_second_messages = drain_engine_messages(runtime);
+    const auto protection_second_tiles =
+        collect_messages_of_type(protection_second_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
+    assert(protection_second_tiles.empty());
+
+    set_tile_protection_visual_state(site_run, density_coord, 18.0f, 36.0f, 52.0f);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+    const auto protection_third_messages = drain_engine_messages(runtime);
+    const auto protection_third_tiles =
+        collect_messages_of_type(protection_third_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
+    assert(protection_third_tiles.size() == 1U);
+    {
+        const auto& payload = protection_third_tiles.front()->payload_as<Gs1EngineMessageSiteTileData>();
+        assert(approx_equal(payload.wind_protection, 18.0f));
+        assert(approx_equal(payload.heat_protection, 36.0f));
+        assert(approx_equal(payload.dust_protection, 52.0f));
+    }
+
     set_tile_soil_visual_state(site_run, density_coord, 0.25f, 0.125f, 0.375f);
     gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
@@ -1176,6 +1248,67 @@ int main()
                reopen_worker_pack_messages,
                panel_state_site_run.inventory.worker_pack_storage_id,
                GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT) != nullptr);
+
+    Gs1UiAction open_protection_selector_action {};
+    open_protection_selector_action.type = GS1_UI_ACTION_OPEN_SITE_PROTECTION_SELECTOR;
+    const auto open_protection_selector_event = make_ui_action_event(open_protection_selector_action);
+    Gs1Phase1Result open_protection_selector_result {};
+    assert(panel_state_runtime.submit_host_events(&open_protection_selector_event, 1U) == GS1_STATUS_OK);
+    run_phase1(panel_state_runtime, 0.0, open_protection_selector_result);
+    assert(open_protection_selector_result.processed_host_event_count == 1U);
+    assert(gs1::GameRuntimeProjectionTestAccess::site_protection_selector_open(panel_state_runtime));
+    assert(
+        gs1::GameRuntimeProjectionTestAccess::site_protection_overlay_mode(panel_state_runtime) ==
+        GS1_SITE_PROTECTION_OVERLAY_NONE);
+    const auto open_protection_selector_messages = drain_engine_messages(panel_state_runtime);
+    assert(find_inventory_view_message(
+               open_protection_selector_messages,
+               panel_state_site_run.inventory.worker_pack_storage_id,
+               GS1_INVENTORY_VIEW_EVENT_CLOSE) != nullptr);
+    assert(contains_ui_element_text(open_protection_selector_messages, "Protection Overlay"));
+    assert(contains_ui_element_text(open_protection_selector_messages, "Wind Protection"));
+    assert(contains_ui_element_text(open_protection_selector_messages, "Heat Protection"));
+    assert(contains_ui_element_text(open_protection_selector_messages, "Dust Protection"));
+
+    Gs1UiAction select_heat_overlay_action {};
+    select_heat_overlay_action.type = GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE;
+    select_heat_overlay_action.arg0 = GS1_SITE_PROTECTION_OVERLAY_HEAT;
+    const auto select_heat_overlay_event = make_ui_action_event(select_heat_overlay_action);
+    Gs1Phase1Result select_heat_overlay_result {};
+    assert(panel_state_runtime.submit_host_events(&select_heat_overlay_event, 1U) == GS1_STATUS_OK);
+    run_phase1(panel_state_runtime, 0.0, select_heat_overlay_result);
+    assert(select_heat_overlay_result.processed_host_event_count == 1U);
+    assert(!gs1::GameRuntimeProjectionTestAccess::site_protection_selector_open(panel_state_runtime));
+    assert(
+        gs1::GameRuntimeProjectionTestAccess::site_protection_overlay_mode(panel_state_runtime) ==
+        GS1_SITE_PROTECTION_OVERLAY_HEAT);
+    const auto select_heat_overlay_messages = drain_engine_messages(panel_state_runtime);
+    assert(find_close_ui_setup_message(
+               select_heat_overlay_messages,
+               GS1_UI_SETUP_SITE_PROTECTION_SELECTOR) != nullptr);
+    const auto protection_overlay_messages =
+        collect_messages_of_type(select_heat_overlay_messages, GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE);
+    assert(protection_overlay_messages.size() == 1U);
+    {
+        const auto& payload =
+            protection_overlay_messages.front()->payload_as<Gs1EngineMessageSiteProtectionOverlayData>();
+        assert(payload.mode == GS1_SITE_PROTECTION_OVERLAY_HEAT);
+    }
+
+    assert(panel_state_runtime.submit_host_events(&open_phone_event, 1U) == GS1_STATUS_OK);
+    Gs1Phase1Result reopen_phone_result {};
+    run_phase1(panel_state_runtime, 0.0, reopen_phone_result);
+    assert(reopen_phone_result.processed_host_event_count == 1U);
+    const auto reopen_phone_messages = drain_engine_messages(panel_state_runtime);
+    const auto cleared_overlay_messages =
+        collect_messages_of_type(reopen_phone_messages, GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE);
+    assert(cleared_overlay_messages.size() == 1U);
+    {
+        const auto& payload =
+            cleared_overlay_messages.front()->payload_as<Gs1EngineMessageSiteProtectionOverlayData>();
+        assert(payload.mode == GS1_SITE_PROTECTION_OVERLAY_NONE);
+    }
+    assert(panel_state_site_run.phone_panel.open);
 
     Gs1RuntimeCreateDesc ui_desc {};
     ui_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);

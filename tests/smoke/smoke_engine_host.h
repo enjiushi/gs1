@@ -43,7 +43,8 @@ public:
         LiveStatePatchField_SiteStateCraftContext = 1U << 16,
         LiveStatePatchField_SiteStatePlacementPreview = 1U << 17,
         LiveStatePatchField_SitePlacementFailure = 1U << 18,
-        LiveStatePatchField_CampaignResources = 1U << 19
+        LiveStatePatchField_CampaignResources = 1U << 19,
+        LiveStatePatchField_SiteStateProtectionOverlay = 1U << 20
     };
 
     struct LiveStateSnapshot;
@@ -145,6 +146,9 @@ public:
         float plant_density {0.0f};
         float sand_burial {0.0f};
         float local_wind {0.0f};
+        float wind_protection {0.0f};
+        float heat_protection {0.0f};
+        float dust_protection {0.0f};
         float moisture {0.0f};
         float soil_fertility {0.0f};
         float soil_salinity {0.0f};
@@ -291,6 +295,11 @@ public:
         std::uint32_t flags {0};
     };
 
+    struct SiteProtectionOverlayProjection final
+    {
+        Gs1SiteProtectionOverlayMode mode {GS1_SITE_PROTECTION_OVERLAY_NONE};
+    };
+
     struct SiteSnapshotProjection final
     {
         std::uint32_t site_id {0};
@@ -304,6 +313,7 @@ public:
         std::vector<SitePhoneListingProjection> phone_listings {};
         bool worker_pack_open {false};
         SitePhonePanelProjection phone_panel {};
+        SiteProtectionOverlayProjection protection_overlay {};
         std::optional<SiteInventoryViewProjection> opened_storage {};
         std::optional<SiteCraftContextProjection> craft_context {};
         std::optional<SitePlacementPreviewProjection> placement_preview {};
@@ -409,6 +419,7 @@ private:
     void apply_site_placement_failure(const Gs1EngineMessage& message);
     void apply_site_task_upsert(const Gs1EngineMessage& message);
     void apply_site_phone_panel_state(const Gs1EngineMessage& message);
+    void apply_site_protection_overlay_state(const Gs1EngineMessage& message);
     void apply_site_phone_listing_remove(const Gs1EngineMessage& message);
     void apply_site_phone_listing_upsert(const Gs1EngineMessage& message);
     void apply_site_snapshot_end();

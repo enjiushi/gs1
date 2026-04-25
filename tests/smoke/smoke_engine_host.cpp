@@ -77,6 +77,8 @@ const char* message_type_name(Gs1EngineMessageType type)
         return "SITE_PLACEMENT_FAILURE";
     case GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE:
         return "SITE_PHONE_PANEL_STATE";
+    case GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE:
+        return "SITE_PROTECTION_OVERLAY_STATE";
     case GS1_ENGINE_MESSAGE_HUD_STATE:
         return "HUD_STATE";
     case GS1_ENGINE_MESSAGE_NOTIFICATION_PUSH:
@@ -133,6 +135,8 @@ const char* ui_setup_name(Gs1UiSetupId setup_id)
         return "REGIONAL_MAP_MENU";
     case GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE:
         return "REGIONAL_MAP_TECH_TREE";
+    case GS1_UI_SETUP_SITE_PROTECTION_SELECTOR:
+        return "SITE_PROTECTION_SELECTOR";
     default:
         return "NONE";
     }
@@ -184,6 +188,12 @@ const char* ui_action_name(Gs1UiActionType action_type)
         return "SET_PHONE_PANEL_SECTION";
     case GS1_UI_ACTION_CLOSE_PHONE_PANEL:
         return "CLOSE_PHONE_PANEL";
+    case GS1_UI_ACTION_OPEN_SITE_PROTECTION_SELECTOR:
+        return "OPEN_SITE_PROTECTION_SELECTOR";
+    case GS1_UI_ACTION_CLOSE_SITE_PROTECTION_UI:
+        return "CLOSE_SITE_PROTECTION_UI";
+    case GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE:
+        return "SET_SITE_PROTECTION_OVERLAY_MODE";
     case GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE:
         return "OPEN_REGIONAL_MAP_TECH_TREE";
     case GS1_UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE:
@@ -200,6 +210,22 @@ const char* ui_action_name(Gs1UiActionType action_type)
         return "HIRE_CONTRACTOR";
     case GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE:
         return "PURCHASE_SITE_UNLOCKABLE";
+    default:
+        return "NONE";
+    }
+}
+
+const char* site_protection_overlay_mode_name(Gs1SiteProtectionOverlayMode mode)
+{
+    switch (mode)
+    {
+    case GS1_SITE_PROTECTION_OVERLAY_WIND:
+        return "WIND";
+    case GS1_SITE_PROTECTION_OVERLAY_HEAT:
+        return "HEAT";
+    case GS1_SITE_PROTECTION_OVERLAY_DUST:
+        return "DUST";
+    case GS1_SITE_PROTECTION_OVERLAY_NONE:
     default:
         return "NONE";
     }
@@ -880,6 +906,10 @@ void SmokeEngineHost::flush_engine_messages(const char* stage_label)
         case GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE:
             apply_site_phone_panel_state(message);
             break;
+        case GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE:
+            apply_site_protection_overlay_state(message);
+            live_state_patch_mask = LiveStatePatchField_SiteStateProtectionOverlay;
+            break;
         case GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_REMOVE:
             apply_site_phone_listing_remove(message);
             break;
@@ -1201,6 +1231,7 @@ void SmokeEngineHost::apply_site_snapshot_begin(const Gs1EngineMessage& message)
         pending_site_snapshot_->tasks.clear();
         pending_site_snapshot_->phone_listings.clear();
         pending_site_snapshot_->phone_panel = SitePhonePanelProjection {};
+        pending_site_snapshot_->protection_overlay = SiteProtectionOverlayProjection {};
         pending_site_snapshot_->opened_storage.reset();
         pending_site_snapshot_->craft_context.reset();
         pending_site_snapshot_->placement_preview.reset();
@@ -1229,6 +1260,9 @@ void SmokeEngineHost::apply_site_tile_upsert(const Gs1EngineMessage& message)
     projection.plant_density = payload.plant_density;
     projection.sand_burial = payload.sand_burial;
     projection.local_wind = payload.local_wind;
+    projection.wind_protection = payload.wind_protection;
+    projection.heat_protection = payload.heat_protection;
+    projection.dust_protection = payload.dust_protection;
     projection.moisture = payload.moisture;
     projection.soil_fertility = payload.soil_fertility;
     projection.soil_salinity = payload.soil_salinity;
@@ -1594,6 +1628,20 @@ void SmokeEngineHost::apply_site_phone_panel_state(const Gs1EngineMessage& messa
         payload.cart_item_count,
         payload.flags};
     pending_site_snapshot_patch_mask_ |= LiveStatePatchField_SiteStatePhone;
+}
+
+void SmokeEngineHost::apply_site_protection_overlay_state(const Gs1EngineMessage& message)
+{
+    auto* snapshot = pending_site_snapshot_.has_value()
+        ? &pending_site_snapshot_.value()
+        : (active_site_snapshot_.has_value() ? &active_site_snapshot_.value() : nullptr);
+    if (snapshot == nullptr)
+    {
+        return;
+    }
+
+    const auto& payload = message.payload_as<Gs1EngineMessageSiteProtectionOverlayData>();
+    snapshot->protection_overlay = SiteProtectionOverlayProjection {payload.mode};
 }
 
 void SmokeEngineHost::apply_site_phone_listing_upsert(const Gs1EngineMessage& message)
@@ -1987,6 +2035,14 @@ std::string SmokeEngineHost::describe_message(const Gs1EngineMessage& message)
         description += " target=(" + std::to_string(payload.target_tile_x);
         description += "," + std::to_string(payload.target_tile_y) + ")";
         description += " duration=" + std::to_string(payload.duration_minutes);
+        break;
+    }
+
+    case GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE:
+    {
+        const auto& payload = message.payload_as<Gs1EngineMessageSiteProtectionOverlayData>();
+        description += " mode=";
+        description += site_protection_overlay_mode_name(payload.mode);
         break;
     }
 

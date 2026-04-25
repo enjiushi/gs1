@@ -46,6 +46,8 @@ const char* ui_setup_name(Gs1UiSetupId setup_id)
         return "REGIONAL_MAP_MENU";
     case GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE:
         return "REGIONAL_MAP_TECH_TREE";
+    case GS1_UI_SETUP_SITE_PROTECTION_SELECTOR:
+        return "SITE_PROTECTION_SELECTOR";
     default:
         return "NONE";
     }
@@ -111,6 +113,12 @@ const char* ui_action_name(Gs1UiActionType action_type)
         return "SET_PHONE_PANEL_SECTION";
     case GS1_UI_ACTION_CLOSE_PHONE_PANEL:
         return "CLOSE_PHONE_PANEL";
+    case GS1_UI_ACTION_OPEN_SITE_PROTECTION_SELECTOR:
+        return "OPEN_SITE_PROTECTION_SELECTOR";
+    case GS1_UI_ACTION_CLOSE_SITE_PROTECTION_UI:
+        return "CLOSE_SITE_PROTECTION_UI";
+    case GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE:
+        return "SET_SITE_PROTECTION_OVERLAY_MODE";
     case GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE:
         return "OPEN_REGIONAL_MAP_TECH_TREE";
     case GS1_UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE:
@@ -127,6 +135,22 @@ const char* ui_action_name(Gs1UiActionType action_type)
         return "HIRE_CONTRACTOR";
     case GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE:
         return "PURCHASE_SITE_UNLOCKABLE";
+    default:
+        return "NONE";
+    }
+}
+
+const char* site_protection_overlay_mode_name(Gs1SiteProtectionOverlayMode mode)
+{
+    switch (mode)
+    {
+    case GS1_SITE_PROTECTION_OVERLAY_WIND:
+        return "WIND";
+    case GS1_SITE_PROTECTION_OVERLAY_HEAT:
+        return "HEAT";
+    case GS1_SITE_PROTECTION_OVERLAY_DUST:
+        return "DUST";
+    case GS1_SITE_PROTECTION_OVERLAY_NONE:
     default:
         return "NONE";
     }
@@ -473,6 +497,12 @@ void append_site_bootstrap_json(std::string& json, const std::optional<SmokeEngi
         json += std::to_string(tile.sand_burial);
         json += ",\"localWind\":";
         json += std::to_string(tile.local_wind);
+        json += ",\"windProtection\":";
+        json += std::to_string(tile.wind_protection);
+        json += ",\"heatProtection\":";
+        json += std::to_string(tile.heat_protection);
+        json += ",\"dustProtection\":";
+        json += std::to_string(tile.dust_protection);
         json += ",\"moisture\":";
         json += std::to_string(tile.moisture);
         json += ",\"soilFertility\":";
@@ -870,6 +900,17 @@ void append_site_phone_panel_json(std::string& json, const SmokeEngineHost::Site
     json += "}";
 }
 
+void append_site_protection_overlay_json(
+    std::string& json,
+    const SmokeEngineHost::SiteSnapshotProjection& site_snapshot)
+{
+    json += "\"protectionOverlay\":{\"mode\":";
+    append_json_string(
+        json,
+        site_protection_overlay_mode_name(site_snapshot.protection_overlay.mode));
+    json += "}";
+}
+
 void append_worker_pack_panel_json(std::string& json, const SmokeEngineHost::SiteSnapshotProjection& site_snapshot)
 {
     json += "\"workerPackOpen\":";
@@ -911,6 +952,8 @@ void append_site_state_json(std::string& json, const std::optional<SmokeEngineHo
     append_site_tasks_json(json, site_snapshot);
     json += ",";
     append_site_phone_panel_json(json, site_snapshot);
+    json += ",";
+    append_site_protection_overlay_json(json, site_snapshot);
     json += ",";
     append_site_phone_listings_json(json, site_snapshot);
     json += '}';
@@ -978,6 +1021,10 @@ void append_site_state_patch_json(
     {
         append_field([&]() { append_site_phone_panel_json(json, site_snapshot); });
         append_field([&]() { append_site_phone_listings_json(json, site_snapshot); });
+    }
+    if ((field_mask & SmokeEngineHost::LiveStatePatchField_SiteStateProtectionOverlay) != 0U)
+    {
+        append_field([&]() { append_site_protection_overlay_json(json, site_snapshot); });
     }
 
     json += '}';
@@ -1139,7 +1186,8 @@ std::string SmokeEngineHost::build_live_state_patch_json(
         LiveStatePatchField_SiteStatePlacementPreview |
         LiveStatePatchField_SitePlacementFailure |
         LiveStatePatchField_SiteStateTasks |
-        LiveStatePatchField_SiteStatePhone;
+        LiveStatePatchField_SiteStatePhone |
+        LiveStatePatchField_SiteStateProtectionOverlay;
 
     std::string json {};
     json.reserve(4096);

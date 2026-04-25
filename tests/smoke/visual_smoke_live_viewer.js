@@ -118,6 +118,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         severeGale: 3,
         sandblast: 4
     };
+    const protectionOverlayModes = {
+        none: 0,
+        wind: 1,
+        heat: 2,
+        dust: 3
+    };
     const highwayTerrainTypeId = 9001;
     const siteTutorialTips = [
         "Move with WASD and drag with the right mouse button to orbit the camera around the worker.",
@@ -1105,6 +1111,20 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         };
     }
 
+    function postOpenSiteProtectionSelector() {
+        return postJson("/ui-action", makeUiAction("OPEN_SITE_PROTECTION_SELECTOR", 0, 0, 0));
+    }
+
+    function postCloseSiteProtectionUi() {
+        return postJson("/ui-action", makeUiAction("CLOSE_SITE_PROTECTION_UI", 0, 0, 0));
+    }
+
+    function postSetSiteProtectionOverlayMode(mode) {
+        return postJson(
+            "/ui-action",
+            makeUiAction("SET_SITE_PROTECTION_OVERLAY_MODE", 0, mode, 0));
+    }
+
     function splitInfoParts(text) {
         return String(text || "")
             .split("|")
@@ -1124,6 +1144,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return getSetup(state, "REGIONAL_MAP_TECH_TREE");
     }
 
+    function getSiteProtectionSelectorSetup(state) {
+        return getSetup(state, "SITE_PROTECTION_SELECTOR");
+    }
+
     function getSiteBootstrap(state) {
         return state.siteBootstrap || null;
     }
@@ -1134,6 +1158,19 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function getSiteResult(state) {
         return state.siteResult || null;
+    }
+
+    function getProtectionOverlayState(state) {
+        const siteState = getSiteState(state);
+        if (!siteState || !siteState.protectionOverlay) {
+            return { mode: "NONE" };
+        }
+        return siteState.protectionOverlay;
+    }
+
+    function isProtectionOverlayActive(state) {
+        const protectionOverlay = getProtectionOverlayState(state);
+        return !!protectionOverlay && protectionOverlay.mode && protectionOverlay.mode !== "NONE";
     }
 
     function getActiveSiteName(state) {
@@ -2001,6 +2038,16 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             flags: siteActionCancelFlags.placementMode
         }).catch(() => {
             statusChip.textContent = "Failed to cancel placement mode.";
+        });
+    }
+
+    function cancelProtectionOverlay() {
+        if (!isProtectionOverlayActive(latestState)) {
+            return Promise.resolve();
+        }
+
+        return postCloseSiteProtectionUi().catch(() => {
+            statusChip.textContent = "Failed to close protection overlay.";
         });
     }
 
@@ -4035,6 +4082,14 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return Promise.resolve(false);
         }
 
+        const protectionSelectorSetup = getSiteProtectionSelectorSetup(state);
+        if (protectionSelectorSetup) {
+            return postCloseSiteProtectionUi().then(() => true).catch(() => {
+                statusChip.textContent = "Failed to close protection selector.";
+                return true;
+            });
+        }
+
         const techTreeSetup = getTechTreeSetup(state);
         if (techTreeSetup) {
             const closeAction = getTechTreeCloseAction(techTreeSetup);
@@ -4948,7 +5003,86 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         });
     }
 
+    function protectionOverlayPresentation(modeName) {
+        switch (modeName) {
+        case "WIND":
+            return { title: "Wind Protection", iconKey: "wind" };
+        case "HEAT":
+            return { title: "Heat Protection", iconKey: "flame" };
+        case "DUST":
+            return { title: "Dust Protection", iconKey: "grid" };
+        default:
+            return { title: "Protection", iconKey: "compass" };
+        }
+    }
+
+    function renderProtectionSelectorPanel(setup) {
+        const selectorActions = getVisibleActionElements(setup);
+        selectionChip.hidden = false;
+        selectionInventory.hidden = false;
+        selectionInventory.innerHTML = "";
+        contextActions.innerHTML = "";
+
+        const panel = document.createElement("section");
+        panel.className = "protection-selector-panel";
+        selectionInventory.appendChild(panel);
+
+        const title = document.createElement("div");
+        title.className = "protection-selector-title";
+        title.textContent = "Protection Overlay";
+        panel.appendChild(title);
+
+        const copy = document.createElement("div");
+        copy.className = "protection-selector-copy";
+        copy.textContent = "Pick one channel to paint every tile from red to green by protection strength.";
+        panel.appendChild(copy);
+
+        const grid = document.createElement("div");
+        grid.className = "protection-selector-grid";
+        panel.appendChild(grid);
+
+        selectorActions.forEach((element) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "protection-selector-button";
+
+            const modeName =
+                element.action && typeof element.action.arg0 === "number"
+                    ? (
+                        element.action.arg0 === protectionOverlayModes.wind ? "WIND" :
+                        element.action.arg0 === protectionOverlayModes.heat ? "HEAT" :
+                        element.action.arg0 === protectionOverlayModes.dust ? "DUST" :
+                        "NONE")
+                    : "NONE";
+            const presentation = protectionOverlayPresentation(modeName);
+
+            bindReliablePrimaryPress(button, function () {
+                postJson("/ui-action", element.action).catch(() => {
+                    statusChip.textContent = "Failed to enter protection overlay.";
+                });
+            });
+
+            const icon = document.createElement("div");
+            icon.className = "protection-selector-icon";
+            appendUiIcon(icon, presentation.iconKey);
+            button.appendChild(icon);
+
+            const titleElement = document.createElement("div");
+            titleElement.className = "protection-selector-button-title";
+            titleElement.textContent = presentation.title;
+            button.appendChild(titleElement);
+
+            const subtitle = document.createElement("div");
+            subtitle.className = "protection-selector-button-subtitle";
+            subtitle.textContent = "0 red  100 green";
+            button.appendChild(subtitle);
+
+            grid.appendChild(button);
+        });
+    }
+
     function renderSiteOverlay(state) {
+        const protectionSelectorSetup = getSiteProtectionSelectorSetup(state);
         const techTreeSetup = getTechTreeSetup(state);
         const workerPackSlots = getInventorySlotsByKind(state, "WORKER_PACK");
 
@@ -4957,6 +5091,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         contextActions.innerHTML = "";
         clearSelectedInventorySlotIfInvalid(state);
         clearOpenedInventoryContainerIfInvalid(state);
+
+        if (protectionSelectorSetup) {
+            selectionEyebrow.textContent = "Site Analysis";
+            selectionText.hidden = true;
+            selectionText.textContent = "";
+            renderProtectionSelectorPanel(protectionSelectorSetup);
+            renderStoragePanel(null, null);
+            return;
+        }
 
         if (techTreeSetup) {
             selectionEyebrow.textContent = "Campaign Research";
@@ -4987,6 +5130,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         stageFrame.classList.toggle("site-active-mode", state.appState === "SITE_ACTIVE");
         stageFrame.classList.toggle("site-result-mode", state.appState === "SITE_RESULT");
         setTechTreeOverlayActive(false);
+        stageFrame.classList.toggle("protection-selector-active", !!getSiteProtectionSelectorSetup(state));
         const appStateChanged = lastOverlayAppState !== state.appState;
 
         switch (state.appState) {
@@ -7766,6 +7910,23 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return clamp01(tile && typeof tile[key] === "number" ? tile[key] : 0);
     }
 
+    function readTileProtectionValue(tile, modeName) {
+        if (!tile) {
+            return 0;
+        }
+
+        if (modeName === "WIND") {
+            return typeof tile.windProtection === "number" ? tile.windProtection : 0;
+        }
+        if (modeName === "HEAT") {
+            return typeof tile.heatProtection === "number" ? tile.heatProtection : 0;
+        }
+        if (modeName === "DUST") {
+            return typeof tile.dustProtection === "number" ? tile.dustProtection : 0;
+        }
+        return 0;
+    }
+
     function applyTerrainSurfaceShader(material) {
         material.onBeforeCompile = function (shader) {
             shader.vertexShader = shader.vertexShader.replace(
@@ -8068,6 +8229,24 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         cache.placementPreviewGroup = null;
     }
 
+    function disposeProtectionOverlayGroup(cache) {
+        if (!cache || !cache.protectionOverlayGroup) {
+            return;
+        }
+
+        const overlayGroup = cache.protectionOverlayGroup;
+        worldGroup.remove(overlayGroup);
+        overlayGroup.traverse((node) => {
+            if (node.geometry && typeof node.geometry.dispose === "function") {
+                node.geometry.dispose();
+            }
+            if (node.material && typeof node.material.dispose === "function") {
+                node.material.dispose();
+            }
+        });
+        cache.protectionOverlayGroup = null;
+    }
+
     function updateSitePlacementPreviewVisual(state) {
         if (!siteSceneCache || !worldGroup) {
             return;
@@ -8128,6 +8307,71 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         worldGroup.add(previewGroup);
         siteSceneCache.placementPreviewGroup = previewGroup;
+    }
+
+    function updateSiteProtectionOverlayVisual(state) {
+        if (!siteSceneCache || !worldGroup) {
+            return;
+        }
+
+        disposeProtectionOverlayGroup(siteSceneCache);
+
+        const protectionOverlay = getProtectionOverlayState(state);
+        const modeName = protectionOverlay && typeof protectionOverlay.mode === "string"
+            ? protectionOverlay.mode
+            : "NONE";
+        const overlayActive = modeName !== "NONE";
+
+        if (siteSceneCache.placementGridGroup) {
+            siteSceneCache.placementGridGroup.visible =
+                overlayActive || !!(getPlacementPreview(state) && (getPlacementPreview(state).flags & 1) !== 0);
+        }
+        if (!overlayActive) {
+            return;
+        }
+
+        const overlayGroup = new THREE_NS.Group();
+        const lowColor = new THREE_NS.Color(0xc95649);
+        const highColor = new THREE_NS.Color(0x59b36c);
+        const tileMap = buildSiteTileMap(getSiteBootstrap(state).tiles || []);
+        const scratchColor = new THREE_NS.Color();
+
+        (getSiteBootstrap(state).tiles || []).forEach((tile) => {
+            const tileSnapshot = getSiteTileByCoord(
+                tileMap,
+                siteSceneCache.width,
+                siteSceneCache.height,
+                tile.x,
+                tile.y
+            );
+            const normalizedProtection = clamp01(readTileProtectionValue(tileSnapshot, modeName) / 100.0);
+            scratchColor.copy(lowColor).lerp(highColor, normalizedProtection);
+
+            const tileHeight = computeSiteTileVisualHeight(tileSnapshot);
+            const mesh = new THREE_NS.Mesh(
+                new THREE_NS.PlaneGeometry(0.92, 0.92),
+                new THREE_NS.MeshStandardMaterial({
+                    color: scratchColor.clone(),
+                    emissive: scratchColor.clone().multiplyScalar(0.3),
+                    emissiveIntensity: 0.5,
+                    roughness: 0.34,
+                    metalness: 0.02,
+                    transparent: true,
+                    opacity: 0.62,
+                    side: THREE_NS.DoubleSide
+                })
+            );
+            mesh.rotation.x = -Math.PI / 2;
+            mesh.position.set(
+                tile.x - siteSceneCache.offsetX,
+                tileHeight + 0.055,
+                tile.y - siteSceneCache.offsetZ
+            );
+            overlayGroup.add(mesh);
+        });
+
+        worldGroup.add(overlayGroup);
+        siteSceneCache.protectionOverlayGroup = overlayGroup;
     }
 
     function rebuildStaticSiteScene(siteBootstrap, offsetX, offsetZ, width, height, previousCache, bootstrapSignature) {
@@ -8256,6 +8500,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             lastWorkerTargetZ: 0,
             placementGridGroup: placementGridGroup,
             placementPreviewGroup: null,
+            protectionOverlayGroup: null,
             witherAlertGroup: witherAlertGroup,
             witherAlerts: new Map(),
             cameraTargetX: 0,
@@ -8366,6 +8611,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         updateSiteWorkerTargetFromState(siteState, state.frameNumber || 0);
         updateSitePlacementPreviewVisual(state);
+        updateSiteProtectionOverlayVisual(state);
 
         if (needsStaticRebuild) {
             applySiteCameraTransform(
@@ -8401,7 +8647,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             updateOverlay(state, options);
             applyWindOverlay(state);
             rebuildWorld(state);
-            if (state.appState === "SITE_ACTIVE" && tileContextMenuState) {
+            if (state.appState === "SITE_ACTIVE" &&
+                tileContextMenuState &&
+                !getSiteProtectionSelectorSetup(state) &&
+                !isProtectionOverlayActive(state) &&
+                !isPlacementModeActive(state)) {
                 renderTileContextMenu();
             } else if (tileContextMenuState) {
                 closeTileContextMenu();
@@ -8561,7 +8811,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             hud: false,
             siteAction: false,
             placementPreview: false,
-            placementFailure: false
+            placementFailure: false,
+            protectionOverlay: false
         };
 
         for (const field of patchFields) {
@@ -8596,6 +8847,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     lightweightParts.placementFailure = true;
                     continue;
                 }
+                if (siteField === "protectionOverlay") {
+                    lightweightParts.protectionOverlay = true;
+                    continue;
+                }
                 return null;
             }
         }
@@ -8605,7 +8860,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             !lightweightParts.hud &&
             !lightweightParts.siteAction &&
             !lightweightParts.placementPreview &&
-            !lightweightParts.placementFailure) {
+            !lightweightParts.placementFailure &&
+            !lightweightParts.protectionOverlay) {
             return null;
         }
 
@@ -8656,6 +8912,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 if (lightweightPatchParts.placementFailure) {
                     renderPlacementFailureToast();
                 }
+                if (lightweightPatchParts.protectionOverlay) {
+                    if (isProtectionOverlayActive(normalizedState)) {
+                        closeTileContextMenu();
+                    }
+                    updateSiteProtectionOverlayVisual(normalizedState);
+                }
 
                 const previousActionKind =
                     previousState && previousState.siteState && previousState.siteState.worker
@@ -8669,12 +8931,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     lightweightPatchParts.siteAction ||
                     lightweightPatchParts.placementPreview ||
                     lightweightPatchParts.placementFailure ||
+                    lightweightPatchParts.protectionOverlay ||
                     lightweightPatchParts.weather ||
                     previousActionKind !== nextActionKind) {
                     renderSiteHudChrome(normalizedState);
                 }
                 if (lightweightPatchParts.hud) {
-                    if (getTechTreeSetup(normalizedState)) {
+                    if (getTechTreeSetup(normalizedState) || getSiteProtectionSelectorSetup(normalizedState)) {
                         renderSiteOverlay(normalizedState);
                     } else {
                         renderSiteInventoryPanel(
@@ -8825,6 +9088,24 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     window.addEventListener("keydown", function (event) {
+        if ((event.code === "AltLeft" || event.code === "AltRight") &&
+            !event.repeat &&
+            latestState &&
+            latestState.appState === "SITE_ACTIVE") {
+            const protectionSelectorSetup = getSiteProtectionSelectorSetup(latestState);
+            const request =
+                protectionSelectorSetup || isProtectionOverlayActive(latestState)
+                    ? postCloseSiteProtectionUi()
+                    : postOpenSiteProtectionSelector();
+            request.catch(() => {
+                statusChip.textContent =
+                    protectionSelectorSetup || isProtectionOverlayActive(latestState)
+                        ? "Failed to close protection selector."
+                        : "Failed to open protection selector.";
+            });
+            event.preventDefault();
+            return;
+        }
         if (event.code === "KeyF" && !event.repeat && latestState && latestState.appState === "SITE_ACTIVE") {
             const phoneIsOpen = isPhonePanelOpen(latestState);
             const phonePanelState = getPhonePanelState(latestState);
@@ -8856,6 +9137,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (event.code === "Escape" && latestState && latestState.appState === "SITE_ACTIVE") {
             closeTrackedSitePanelLayer(latestState).then((handledPanelClose) => {
                 if (handledPanelClose) {
+                    return;
+                }
+                if (isProtectionOverlayActive(latestState)) {
+                    cancelProtectionOverlay();
                     return;
                 }
                 if (isPlacementModeActive(latestState)) {
@@ -9035,7 +9320,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         stopCameraOrbitDrag(event.pointerId);
         clearPendingSiteOrbitGesture(event.pointerId);
         if (!wasDragging && isSiteActiveView()) {
-            if (isPlacementModeActive(latestState)) {
+            if (isProtectionOverlayActive(latestState)) {
+                cancelProtectionOverlay();
+            } else if (isPlacementModeActive(latestState)) {
                 cancelPlacementMode();
             } else {
                 const tileData = pickSiteTileAtClientPosition(releaseClientX, releaseClientY);
