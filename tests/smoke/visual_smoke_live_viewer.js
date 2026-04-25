@@ -96,6 +96,18 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const witheringAlertDensityDropThreshold = 0.01;
     const witheringAlertHeightOffset = 0.04;
     const witheringAlertMaxOpacity = 0.72;
+    const densityDecreaseAlertStyle = {
+        colorHex: 0xff6b55,
+        emissiveHex: 0xdb2414,
+        emissiveBaseIntensity: 0.75,
+        emissiveBoostIntensity: 3.1
+    };
+    const densityIncreaseAlertStyle = {
+        colorHex: 0x61d97a,
+        emissiveHex: 0x1e8e3e,
+        emissiveBaseIntensity: 0.55,
+        emissiveBoostIntensity: 2.6
+    };
     const constantWitheringPlantTypeIds = new Set([
         5
     ]);
@@ -6432,10 +6444,17 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 tileX: alertState.tileX,
                 tileY: alertState.tileY,
                 startTimeSeconds: alertState.startTimeSeconds,
-                durationSeconds: alertState.durationSeconds
+                durationSeconds: alertState.durationSeconds,
+                style: alertState.style || densityDecreaseAlertStyle
             });
         });
         return carriedAlerts;
+    }
+
+    function resolveDensityAlertStyle(densityDelta) {
+        return densityDelta >= 0
+            ? densityIncreaseAlertStyle
+            : densityDecreaseAlertStyle;
     }
 
     function collectWitheringAlertTriggers(previousBootstrap, nextBootstrap) {
@@ -6457,7 +6476,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 typeof previousTile.plantDensity === "number" ? previousTile.plantDensity : 0;
             const nextDensity =
                 typeof tile.plantDensity === "number" ? tile.plantDensity : 0;
-            if (!(nextDensity < previousDensity - witheringAlertDensityDropThreshold)) {
+            const densityDelta = nextDensity - previousDensity;
+            if (Math.abs(densityDelta) <= witheringAlertDensityDropThreshold) {
                 return;
             }
 
@@ -6475,16 +6495,18 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
             triggeredAlerts.push({
                 tileX: tile.x,
-                tileY: tile.y
+                tileY: tile.y,
+                style: resolveDensityAlertStyle(densityDelta)
             });
         });
         return triggeredAlerts;
     }
 
-    function createWitheringAlertMesh() {
+    function createWitheringAlertMesh(style) {
+        const resolvedStyle = style || densityDecreaseAlertStyle;
         const material = new THREE_NS.MeshStandardMaterial({
-            color: 0xff6b55,
-            emissive: 0xdb2414,
+            color: resolvedStyle.colorHex,
+            emissive: resolvedStyle.emissiveHex,
             emissiveIntensity: 0.0,
             roughness: 0.34,
             metalness: 0.0,
@@ -6537,7 +6559,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return computeSiteTileVisualHeight(tile);
     }
 
-    function attachWitheringAlert(cache, tileX, tileY, startTimeSeconds, durationSeconds) {
+    function attachWitheringAlert(cache, tileX, tileY, startTimeSeconds, durationSeconds, style) {
         if (!cache || !cache.witherAlertGroup || !cache.sourceBootstrap) {
             return;
         }
@@ -6558,7 +6580,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
         removeWitheringAlert(cache, alertKey);
 
-        const mesh = createWitheringAlertMesh();
+        const resolvedStyle = style || densityDecreaseAlertStyle;
+        const mesh = createWitheringAlertMesh(resolvedStyle);
         const tileHeight = resolveRenderedTileHeight(cache, tile);
         mesh.position.set(
             tileX - cache.offsetX,
@@ -6572,7 +6595,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             mesh: mesh,
             startTimeSeconds: startTimeSeconds,
             durationSeconds: durationSeconds,
-            expiresAtSeconds: startTimeSeconds + durationSeconds
+            expiresAtSeconds: startTimeSeconds + durationSeconds,
+            style: resolvedStyle
         });
     }
 
@@ -6583,7 +6607,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 alertState.tileX,
                 alertState.tileY,
                 alertState.startTimeSeconds,
-                alertState.durationSeconds || witheringAlertDurationSeconds
+                alertState.durationSeconds || witheringAlertDurationSeconds,
+                alertState.style
             );
         });
     }
@@ -6595,7 +6620,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 alertState.tileX,
                 alertState.tileY,
                 startTimeSeconds,
-                witheringAlertDurationSeconds
+                witheringAlertDurationSeconds,
+                alertState.style
             );
         });
     }
@@ -6620,8 +6646,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             }
 
             const opacity = Math.sin(normalizedTime * Math.PI) * witheringAlertMaxOpacity;
+            const style = alertState.style || densityDecreaseAlertStyle;
             alertState.mesh.material.opacity = opacity;
-            alertState.mesh.material.emissiveIntensity = 0.75 + opacity * 3.1;
+            alertState.mesh.material.emissiveIntensity =
+                style.emissiveBaseIntensity + opacity * style.emissiveBoostIntensity;
         });
 
         expiredAlerts.forEach((alertKey) => {
