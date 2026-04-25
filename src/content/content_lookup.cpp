@@ -194,16 +194,6 @@ std::span<const TechnologyTierDef> all_technology_tier_defs() noexcept
     return prototype_content_database().technology_tier_defs;
 }
 
-std::span<const FactionTechnologyTierDef> all_faction_technology_tier_defs() noexcept
-{
-    return prototype_content_database().faction_technology_tier_defs;
-}
-
-std::span<const TotalReputationTierDef> all_total_reputation_tier_defs() noexcept
-{
-    return prototype_content_database().total_reputation_tier_defs;
-}
-
 std::span<const ReputationUnlockDef> all_reputation_unlock_defs() noexcept
 {
     return prototype_content_database().reputation_unlock_defs;
@@ -232,34 +222,6 @@ const TechnologyTierDef* find_technology_tier_def(std::uint8_t tier_index) noexc
     return nullptr;
 }
 
-const FactionTechnologyTierDef* find_faction_technology_tier_def(
-    FactionId faction_id,
-    std::uint8_t tier_index) noexcept
-{
-    for (const auto& tier_def : all_faction_technology_tier_defs())
-    {
-        if (tier_def.faction_id == faction_id && tier_def.tier_index == tier_index)
-        {
-            return &tier_def;
-        }
-    }
-
-    return nullptr;
-}
-
-const TotalReputationTierDef* find_total_reputation_tier_def(std::uint8_t tier_index) noexcept
-{
-    for (const auto& tier_def : all_total_reputation_tier_defs())
-    {
-        if (tier_def.tier_index == tier_index)
-        {
-            return &tier_def;
-        }
-    }
-
-    return nullptr;
-}
-
 const ReputationUnlockDef* find_reputation_unlock_def(std::uint32_t unlock_id) noexcept
 {
     for (const auto& unlock_def : all_reputation_unlock_defs())
@@ -278,6 +240,21 @@ const TechnologyNodeDef* find_technology_node_def(TechNodeId tech_node_id) noexc
     for (const auto& node_def : all_technology_node_defs())
     {
         if (node_def.tech_node_id == tech_node_id)
+        {
+            return &node_def;
+        }
+    }
+
+    return nullptr;
+}
+
+const TechnologyNodeDef* find_faction_technology_node_def(
+    FactionId faction_id,
+    std::uint8_t tier_index) noexcept
+{
+    for (const auto& node_def : all_technology_node_defs())
+    {
+        if (node_def.faction_id == faction_id && node_def.tier_index == tier_index)
         {
             return &node_def;
         }

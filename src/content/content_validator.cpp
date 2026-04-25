@@ -638,86 +638,14 @@ std::vector<ContentValidationIssue> validate_content_database(
 
     if (issues.empty())
     {
-        for (std::size_t index = 0U; index < content.faction_technology_tier_defs.size(); ++index)
-        {
-            const auto& tier_def = content.faction_technology_tier_defs[index];
-            if (find_faction_def(tier_def.faction_id) == nullptr || tier_def.tier_index == 0U)
-            {
-                issues.push_back(ContentValidationIssue {
-                    ContentValidationSeverity::Error,
-                    "Faction technology tier definitions must use valid faction ids and non-zero tier indices."});
-                break;
-            }
-
-            for (std::size_t previous = 0U; previous < index; ++previous)
-            {
-                if (content.faction_technology_tier_defs[previous].faction_id == tier_def.faction_id &&
-                    content.faction_technology_tier_defs[previous].tier_index == tier_def.tier_index)
-                {
-                    issues.push_back(ContentValidationIssue {
-                        ContentValidationSeverity::Error,
-                        "Faction technology tier definitions must be unique per faction and tier index."});
-                    break;
-                }
-            }
-
-            if (!issues.empty() && issues.back().severity == ContentValidationSeverity::Error)
-            {
-                break;
-            }
-        }
-    }
-
-    if (issues.empty())
-    {
-        for (std::size_t index = 0U; index < content.total_reputation_tier_defs.size(); ++index)
-        {
-            const auto& tier_def = content.total_reputation_tier_defs[index];
-            if (tier_def.tier_index == 0U)
-            {
-                issues.push_back(ContentValidationIssue {
-                    ContentValidationSeverity::Error,
-                    "Total reputation tier definitions must use non-zero tier indices."});
-                break;
-            }
-
-            for (std::size_t previous = 0U; previous < index; ++previous)
-            {
-                if (content.total_reputation_tier_defs[previous].tier_index == tier_def.tier_index)
-                {
-                    issues.push_back(ContentValidationIssue {
-                        ContentValidationSeverity::Error,
-                        "Total reputation tier definitions must use unique tier indices."});
-                    break;
-                }
-            }
-
-            if (!issues.empty() && issues.back().severity == ContentValidationSeverity::Error)
-            {
-                break;
-            }
-        }
-    }
-
-    if (issues.empty())
-    {
         for (std::size_t index = 0U; index < content.reputation_unlock_defs.size(); ++index)
         {
             const auto& unlock_def = content.reputation_unlock_defs[index];
-            bool tier_exists = false;
-            for (const auto& tier_def : content.total_reputation_tier_defs)
-            {
-                if (tier_def.tier_index == unlock_def.tier_index)
-                {
-                    tier_exists = true;
-                    break;
-                }
-            }
-            if (!tier_exists)
+            if (unlock_def.reputation_requirement < 0)
             {
                 issues.push_back(ContentValidationIssue {
                     ContentValidationSeverity::Error,
-                    "Reputation unlock definitions must reference an existing total reputation tier."});
+                    "Reputation unlock definitions must use non-negative reputation requirements."});
                 break;
             }
 
@@ -766,58 +694,24 @@ std::vector<ContentValidationIssue> validate_content_database(
             {
                 issues.push_back(ContentValidationIssue {
                     ContentValidationSeverity::Error,
-                    "Technology node definitions must reference an existing base technology tier."});
+                    "Technology node definitions must reference an existing technology tier."});
                 break;
             }
 
-            if (node_def.node_kind == TechnologyNodeKind::BaseTech)
+            if (find_faction_def(node_def.faction_id) == nullptr)
             {
-                if (node_def.faction_id.value != 0U || node_def.base_tech_slot_index != node_def.slot_index)
-                {
-                    issues.push_back(ContentValidationIssue {
-                        ContentValidationSeverity::Error,
-                        "Base technology nodes must be faction-free and self-aligned to their own slot."});
-                    break;
-                }
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Technology node definitions must reference valid faction ids."});
+                break;
             }
-            else
-            {
-                bool faction_tier_exists = false;
-                for (const auto& tier_def : content.faction_technology_tier_defs)
-                {
-                    if (tier_def.faction_id == node_def.faction_id &&
-                        tier_def.tier_index == node_def.tier_index)
-                    {
-                        faction_tier_exists = true;
-                        break;
-                    }
-                }
-                if (!faction_tier_exists)
-                {
-                    issues.push_back(ContentValidationIssue {
-                        ContentValidationSeverity::Error,
-                        "Technology enhancement nodes must reference an existing faction tier."});
-                    break;
-                }
 
-                bool base_node_exists = false;
-                for (const auto& candidate : content.technology_node_defs)
-                {
-                    if (candidate.node_kind == TechnologyNodeKind::BaseTech &&
-                        candidate.tier_index == node_def.tier_index &&
-                        candidate.slot_index == node_def.base_tech_slot_index)
-                    {
-                        base_node_exists = true;
-                        break;
-                    }
-                }
-                if (!base_node_exists)
-                {
-                    issues.push_back(ContentValidationIssue {
-                        ContentValidationSeverity::Error,
-                        "Technology enhancement nodes must reference an existing base-tech slot in the same tier."});
-                    break;
-                }
+            if (node_def.reputation_cost < 0 || node_def.cash_cost < 0)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Technology node definitions must use non-negative reputation and cash costs."});
+                break;
             }
 
             for (std::size_t previous = 0U; previous < index; ++previous)
@@ -827,6 +721,15 @@ std::vector<ContentValidationIssue> validate_content_database(
                     issues.push_back(ContentValidationIssue {
                         ContentValidationSeverity::Error,
                         "Technology node definitions must use unique technology node ids."});
+                    break;
+                }
+
+                if (content.technology_node_defs[previous].faction_id == node_def.faction_id &&
+                    content.technology_node_defs[previous].tier_index == node_def.tier_index)
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Technology node definitions must use only one node per faction and tier."});
                     break;
                 }
             }

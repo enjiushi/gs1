@@ -220,9 +220,9 @@ void import_campaign_run_modifiers(
             ModifierId {faction_progress.unlocked_assistant_package_id});
     }
 
-    for (const auto tech_node_id : campaign.technology_state.purchased_node_ids)
+    for (const auto& purchase : campaign.technology_state.purchased_nodes)
     {
-        const auto* node_def = find_technology_node_def(tech_node_id);
+        const auto* node_def = find_technology_node_def(purchase.tech_node_id);
         if (node_def == nullptr ||
             node_def->entry_kind != TechnologyEntryKind::GlobalModifier)
         {

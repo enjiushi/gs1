@@ -1,275 +1,89 @@
 [[technology_nodes]]
-node_kind = "BaseTech"
+faction_id = 1
 tier_index = 1
-slot_index = 0
 entry_kind = "GlobalModifier"
+reputation_cost = 10
 cash_cost = 4
 is_todo_placeholder = true
-display_name = "TODO Field Briefing"
-description = "TODO neutral base-tech placeholder for tier I."
+display_name = "Field Briefing"
+description = "Village Committee tier-one field protocol package."
 
 [[technology_nodes]]
-node_kind = "BaseTech"
+faction_id = 2
 tier_index = 1
-slot_index = 1
-entry_kind = "MechanismChange"
-cash_cost = 6
-is_todo_placeholder = true
-display_name = "TODO Supply Standards"
-description = "TODO neutral base-tech placeholder for tier I."
-
-[[technology_nodes]]
-node_kind = "BaseTech"
-tier_index = 2
-slot_index = 0
 entry_kind = "GlobalModifier"
-cash_cost = 8
-is_todo_placeholder = true
-display_name = "TODO Meal Rotation"
-description = "TODO neutral base-tech placeholder for tier II."
-
-[[technology_nodes]]
-node_kind = "BaseTech"
-tier_index = 2
-slot_index = 1
-entry_kind = "MechanismChange"
-cash_cost = 10
-is_todo_placeholder = true
-display_name = "TODO Field Logistics"
-description = "TODO neutral base-tech placeholder for tier II."
-
-[[technology_nodes]]
-node_kind = "BaseTech"
-tier_index = 3
-slot_index = 0
-entry_kind = "GlobalModifier"
-cash_cost = 12
-is_todo_placeholder = true
-display_name = "TODO Site Network"
-description = "TODO neutral base-tech placeholder for tier III."
-
-[[technology_nodes]]
-node_kind = "BaseTech"
-tier_index = 3
-slot_index = 1
-entry_kind = "MechanismChange"
-cash_cost = 14
-is_todo_placeholder = true
-display_name = "TODO Regional Coordination"
-description = "TODO neutral base-tech placeholder for tier III."
-
-[[technology_nodes]]
-node_kind = "Enhancement"
-faction_id = 1
-tier_index = 1
-slot_index = 0
-base_tech_slot_index = 0
-entry_kind = "GlobalModifier"
+reputation_cost = 10
 cash_cost = 4
 is_todo_placeholder = true
-display_name = "TODO Relief Doctrine"
-description = "TODO Village Committee enhancement placeholder for Field Briefing."
+display_name = "Seed Vigor"
+description = "Forestry Bureau tier-one establishment package."
 
 [[technology_nodes]]
-node_kind = "Enhancement"
-faction_id = 1
+faction_id = 3
 tier_index = 1
-slot_index = 0
-base_tech_slot_index = 1
-entry_kind = "MechanismChange"
-cash_cost = 6
-is_todo_placeholder = true
-display_name = "TODO Queue Standard"
-description = "TODO Village Committee enhancement placeholder for Supply Standards."
-
-[[technology_nodes]]
-node_kind = "Enhancement"
-faction_id = 1
-tier_index = 2
-slot_index = 0
-base_tech_slot_index = 0
 entry_kind = "GlobalModifier"
-cash_cost = 8
-is_todo_placeholder = true
-display_name = "TODO Kitchen Tempo"
-description = "TODO Village Committee enhancement placeholder for Meal Rotation."
-
-[[technology_nodes]]
-node_kind = "Enhancement"
-faction_id = 1
-tier_index = 2
-slot_index = 0
-base_tech_slot_index = 1
-entry_kind = "MechanismChange"
-cash_cost = 10
-is_todo_placeholder = true
-display_name = "TODO Dispatch Rule"
-description = "TODO Village Committee enhancement placeholder for Field Logistics."
-
-[[technology_nodes]]
-node_kind = "Enhancement"
-faction_id = 1
-tier_index = 3
-slot_index = 0
-base_tech_slot_index = 0
-entry_kind = "GlobalModifier"
-cash_cost = 12
-is_todo_placeholder = true
-display_name = "TODO Relief Network"
-description = "TODO Village Committee enhancement placeholder for Site Network."
-
-[[technology_nodes]]
-node_kind = "Enhancement"
-faction_id = 1
-tier_index = 3
-slot_index = 0
-base_tech_slot_index = 1
-entry_kind = "MechanismChange"
-cash_cost = 14
-is_todo_placeholder = true
-display_name = "TODO Convoy Logic"
-description = "TODO Village Committee enhancement placeholder for Regional Coordination."
-
-[[technology_nodes]]
-node_kind = "Enhancement"
-faction_id = 2
-tier_index = 1
-slot_index = 0
-base_tech_slot_index = 0
-entry_kind = "GlobalModifier"
+reputation_cost = 10
 cash_cost = 4
 is_todo_placeholder = true
-display_name = "TODO Seed Vigor"
-description = "TODO Forestry Bureau enhancement placeholder for Field Briefing."
+display_name = "Survey Bias"
+description = "Agricultural University tier-one field research package."
 
 [[technology_nodes]]
-node_kind = "Enhancement"
-faction_id = 2
-tier_index = 1
-slot_index = 0
-base_tech_slot_index = 1
-entry_kind = "MechanismChange"
-cash_cost = 6
-is_todo_placeholder = true
-display_name = "TODO Nursery Rule"
-description = "TODO Forestry Bureau enhancement placeholder for Supply Standards."
-
-[[technology_nodes]]
-node_kind = "Enhancement"
-faction_id = 2
+faction_id = 1
 tier_index = 2
-slot_index = 0
-base_tech_slot_index = 0
-entry_kind = "GlobalModifier"
+entry_kind = "MechanismChange"
+reputation_cost = 16
 cash_cost = 8
 is_todo_placeholder = true
-display_name = "TODO Shelter Growth"
-description = "TODO Forestry Bureau enhancement placeholder for Meal Rotation."
+display_name = "Field Logistics"
+description = "Village Committee tier-two operational logistics package."
 
 [[technology_nodes]]
-node_kind = "Enhancement"
 faction_id = 2
 tier_index = 2
-slot_index = 0
-base_tech_slot_index = 1
-entry_kind = "MechanismChange"
-cash_cost = 10
-is_todo_placeholder = true
-display_name = "TODO Root Cycle"
-description = "TODO Forestry Bureau enhancement placeholder for Field Logistics."
-
-[[technology_nodes]]
-node_kind = "Enhancement"
-faction_id = 2
-tier_index = 3
-slot_index = 0
-base_tech_slot_index = 0
 entry_kind = "GlobalModifier"
-cash_cost = 12
-is_todo_placeholder = true
-display_name = "TODO Habitat Buffer"
-description = "TODO Forestry Bureau enhancement placeholder for Site Network."
-
-[[technology_nodes]]
-node_kind = "Enhancement"
-faction_id = 2
-tier_index = 3
-slot_index = 0
-base_tech_slot_index = 1
-entry_kind = "MechanismChange"
-cash_cost = 14
-is_todo_placeholder = true
-display_name = "TODO Recovery Rule"
-description = "TODO Forestry Bureau enhancement placeholder for Regional Coordination."
-
-[[technology_nodes]]
-node_kind = "Enhancement"
-faction_id = 3
-tier_index = 1
-slot_index = 0
-base_tech_slot_index = 0
-entry_kind = "GlobalModifier"
-cash_cost = 4
-is_todo_placeholder = true
-display_name = "TODO Survey Bias"
-description = "TODO University enhancement placeholder for Field Briefing."
-
-[[technology_nodes]]
-node_kind = "Enhancement"
-faction_id = 3
-tier_index = 1
-slot_index = 0
-base_tech_slot_index = 1
-entry_kind = "MechanismChange"
-cash_cost = 6
-is_todo_placeholder = true
-display_name = "TODO Trial Method"
-description = "TODO University enhancement placeholder for Supply Standards."
-
-[[technology_nodes]]
-node_kind = "Enhancement"
-faction_id = 3
-tier_index = 2
-slot_index = 0
-base_tech_slot_index = 0
-entry_kind = "GlobalModifier"
+reputation_cost = 16
 cash_cost = 8
 is_todo_placeholder = true
-display_name = "TODO Field Precision"
-description = "TODO University enhancement placeholder for Meal Rotation."
+display_name = "Shelter Growth"
+description = "Forestry Bureau tier-two shelter network package."
 
 [[technology_nodes]]
-node_kind = "Enhancement"
 faction_id = 3
 tier_index = 2
-slot_index = 0
-base_tech_slot_index = 1
 entry_kind = "MechanismChange"
-cash_cost = 10
+reputation_cost = 16
+cash_cost = 8
 is_todo_placeholder = true
-display_name = "TODO Relay Policy"
-description = "TODO University enhancement placeholder for Field Logistics."
+display_name = "Field Precision"
+description = "Agricultural University tier-two optimization package."
 
 [[technology_nodes]]
-node_kind = "Enhancement"
-faction_id = 3
+faction_id = 1
 tier_index = 3
-slot_index = 0
-base_tech_slot_index = 0
-entry_kind = "GlobalModifier"
+entry_kind = "MechanismChange"
+reputation_cost = 24
 cash_cost = 12
 is_todo_placeholder = true
-display_name = "TODO Control Envelope"
-description = "TODO University enhancement placeholder for Site Network."
+display_name = "Regional Coordination"
+description = "Village Committee tier-three coordination package."
 
 [[technology_nodes]]
-node_kind = "Enhancement"
+faction_id = 2
+tier_index = 3
+entry_kind = "GlobalModifier"
+reputation_cost = 24
+cash_cost = 12
+is_todo_placeholder = true
+display_name = "Habitat Buffer"
+description = "Forestry Bureau tier-three refuge-building package."
+
+[[technology_nodes]]
 faction_id = 3
 tier_index = 3
-slot_index = 0
-base_tech_slot_index = 1
 entry_kind = "MechanismChange"
-cash_cost = 14
+reputation_cost = 24
+cash_cost = 12
 is_todo_placeholder = true
-display_name = "TODO Systems Method"
-description = "TODO University enhancement placeholder for Regional Coordination."
+display_name = "Systems Method"
+description = "Agricultural University tier-three systems package."

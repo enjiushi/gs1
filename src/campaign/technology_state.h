@@ -7,9 +7,16 @@
 
 namespace gs1
 {
+struct TechnologyPurchaseRecord final
+{
+    TechNodeId tech_node_id {};
+    FactionId reputation_faction_id {};
+    std::int32_t reputation_spent {0};
+};
+
 struct TechnologyState final
 {
     std::int32_t total_reputation {0};
-    std::vector<TechNodeId> purchased_node_ids {};
+    std::vector<TechnologyPurchaseRecord> purchased_nodes {};
 };
 }  // namespace gs1

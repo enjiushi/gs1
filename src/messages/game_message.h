@@ -39,6 +39,7 @@ enum class GameMessageType : std::uint8_t
     CampaignReputationAwardRequested,
     FactionReputationAwardRequested,
     TechnologyNodeClaimRequested,
+    TechnologyNodeRefundRequested,
     StartSiteAttempt,
     ReturnToRegionalMap,
     SiteAttemptEnded,
@@ -221,6 +222,12 @@ struct FactionReputationAwardRequestedMessage final
 };
 
 struct TechnologyNodeClaimRequestedMessage final
+{
+    std::uint32_t tech_node_id;
+    std::uint32_t reputation_faction_id;
+};
+
+struct TechnologyNodeRefundRequestedMessage final
 {
     std::uint32_t tech_node_id;
 };
@@ -748,7 +755,8 @@ GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(DeploymentSiteSelectionChangedMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(CampaignCashDeltaRequestedMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(CampaignReputationAwardRequestedMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(FactionReputationAwardRequestedMessage, 8U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TechnologyNodeClaimRequestedMessage, 4U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TechnologyNodeClaimRequestedMessage, 8U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TechnologyNodeRefundRequestedMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(StartSiteAttemptMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(ReturnToRegionalMapMessage, 1U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteAttemptEndedMessage, 8U);

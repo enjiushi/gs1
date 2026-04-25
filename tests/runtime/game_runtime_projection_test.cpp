@@ -583,8 +583,8 @@ int main()
     const auto tech_tree_messages = drain_engine_messages(runtime);
     assert(contains_ui_element_text(tech_tree_messages, "Prototype Tech Tree"));
     assert(contains_ui_element_text(tech_tree_messages, "Starter Plants"));
-    assert(contains_ui_element_text(tech_tree_messages, "Base Tech Tree"));
-    assert(contains_ui_element_text(tech_tree_messages, "Peashrub | White Thorn"));
+    assert(contains_ui_element_text(tech_tree_messages, "Faction Tech Tree"));
+    assert(contains_ui_element_text(tech_tree_messages, "Checkerboard | Wormwood"));
     assert(contains_ui_element_text(tech_tree_messages, "Tab: Village Committee"));
 
     GameMessage select_forestry_tab_message {};
@@ -618,7 +618,8 @@ int main()
     GameMessage claim_tech_node_message {};
     claim_tech_node_message.type = GameMessageType::TechnologyNodeClaimRequested;
     claim_tech_node_message.set_payload(gs1::TechnologyNodeClaimRequestedMessage {
-        gs1::k_tech_node_t1_field_briefing});
+        gs1::k_tech_node_t1_field_briefing,
+        gs1::k_faction_village_committee});
     assert(runtime.handle_message(claim_tech_node_message) == GS1_STATUS_OK);
     const auto claimed_messages = drain_engine_messages(runtime);
     assert(contains_ui_element_text(claimed_messages, "Prototype Tech Tree"));
@@ -669,7 +670,7 @@ int main()
     const auto site_tech_tree_messages = drain_engine_messages(support_runtime);
     assert(contains_ui_element_text(site_tech_tree_messages, "Prototype Tech Tree"));
     assert(contains_ui_element_text(site_tech_tree_messages, "Tab: Village Committee"));
-    assert(contains_ui_element_text(site_tech_tree_messages, "Base Tech Tree"));
+    assert(contains_ui_element_text(site_tech_tree_messages, "Faction Tech Tree"));
 
     assert(support_runtime.handle_message(select_forestry_tab_message) == GS1_STATUS_OK);
     const auto site_forestry_messages = drain_engine_messages(support_runtime);
@@ -985,7 +986,7 @@ int main()
 
     GameMessage buy_sellable_listing {};
     buy_sellable_listing.type = GameMessageType::PhoneListingPurchaseRequested;
-    buy_sellable_listing.set_payload(PhoneListingPurchaseRequestedMessage {5U, 1U, 0U});
+    buy_sellable_listing.set_payload(PhoneListingPurchaseRequestedMessage {4U, 1U, 0U});
     assert(phone_panel_runtime.handle_message(buy_sellable_listing) == GS1_STATUS_OK);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(phone_panel_runtime);
     drain_engine_messages(phone_panel_runtime);
@@ -994,7 +995,7 @@ int main()
     run_phase1(phone_panel_runtime, k_default_delivery_real_seconds, phone_panel_delivery_result);
     const auto delivered_sellable_slot_index = find_delivery_box_slot_index(
         phone_panel_site_run,
-        gs1::ItemId {gs1::k_item_white_thorn_seed_bundle},
+        gs1::ItemId {gs1::k_item_ordos_wormwood_seed_bundle},
         1U);
     assert(delivered_sellable_slot_index != std::numeric_limits<std::uint16_t>::max());
     gs1::GameRuntimeProjectionTestAccess::flush_projection(phone_panel_runtime);
@@ -1002,7 +1003,7 @@ int main()
     assert(contains_phone_listing_message(
         phone_panel_delivery_messages,
         GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_UPSERT,
-        1000U + gs1::k_item_white_thorn_seed_bundle));
+        1000U + gs1::k_item_ordos_wormwood_seed_bundle));
     assert(!collect_messages_of_type(
         phone_panel_delivery_messages,
         GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE).empty());

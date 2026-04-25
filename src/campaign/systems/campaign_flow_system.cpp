@@ -86,6 +86,7 @@ bool CampaignFlowSystem::subscribes_to(GameMessageType type) noexcept
     case GameMessageType::CampaignReputationAwardRequested:
     case GameMessageType::FactionReputationAwardRequested:
     case GameMessageType::TechnologyNodeClaimRequested:
+    case GameMessageType::TechnologyNodeRefundRequested:
     case GameMessageType::PresentLog:
     default:
         return false;
@@ -329,6 +330,7 @@ Gs1Status CampaignFlowSystem::process_message(
     case GameMessageType::CampaignReputationAwardRequested:
     case GameMessageType::FactionReputationAwardRequested:
     case GameMessageType::TechnologyNodeClaimRequested:
+    case GameMessageType::TechnologyNodeRefundRequested:
     case GameMessageType::PresentLog:
     default:
         return GS1_STATUS_OK;

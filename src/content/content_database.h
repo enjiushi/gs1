@@ -34,8 +34,6 @@ struct ContentDatabase final
     std::vector<RewardCandidateDef> reward_candidate_defs {};
     std::vector<SiteActionDef> site_action_defs {};
     std::vector<TechnologyTierDef> technology_tier_defs {};
-    std::vector<FactionTechnologyTierDef> faction_technology_tier_defs {};
-    std::vector<TotalReputationTierDef> total_reputation_tier_defs {};
     std::vector<ReputationUnlockDef> reputation_unlock_defs {};
     std::vector<TechnologyNodeDef> technology_node_defs {};
     std::vector<PlantId> initial_unlocked_plant_ids {};
