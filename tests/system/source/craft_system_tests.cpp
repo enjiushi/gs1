@@ -317,6 +317,56 @@ void craft_cache_tracks_worker_pack_membership_by_distance(
             worker_pack_item_instance_id) == far_cache->nearby_item_instance_ids.end());
 }
 
+void craft_cache_skips_refresh_while_idle(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 1508U);
+    GameMessageQueue queue {};
+    auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
+    auto craft_context = make_site_context<CraftSystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_message(
+            inventory_context,
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    CraftSystem::run(craft_context);
+    const auto workbench_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);
+    const auto workbench_entity_id = site_run.site_world->device_entity_id(workbench_tile);
+    auto* cache = gs1::craft_logic::find_device_cache(site_run.craft, workbench_entity_id);
+    GS1_SYSTEM_TEST_REQUIRE(context, cache != nullptr);
+
+    constexpr std::uint32_t k_sentinel_item_instance_id = 0xFFFFFFFFU;
+    cache->nearby_item_instance_ids.push_back(k_sentinel_item_instance_id);
+    const auto expected_membership_revision =
+        site_run.craft.device_cache_source_membership_revision;
+    const auto expected_worker_tile = site_run.craft.device_cache_worker_tile;
+
+    CraftSystem::run(craft_context);
+
+    const auto* idle_cache =
+        gs1::craft_logic::find_device_cache(site_run.craft, workbench_entity_id);
+    GS1_SYSTEM_TEST_REQUIRE(context, idle_cache != nullptr);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        std::find(
+            idle_cache->nearby_item_instance_ids.begin(),
+            idle_cache->nearby_item_instance_ids.end(),
+            k_sentinel_item_instance_id) != idle_cache->nearby_item_instance_ids.end());
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        site_run.craft.device_cache_source_membership_revision ==
+            expected_membership_revision);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        site_run.craft.device_cache_worker_tile.x == expected_worker_tile.x &&
+            site_run.craft.device_cache_worker_tile.y == expected_worker_tile.y);
+}
+
 void dynamically_placed_storage_device_reuses_single_inventory_container(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -570,6 +620,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "craft",
     "cache_tracks_worker_pack_membership_by_distance",
     craft_cache_tracks_worker_pack_membership_by_distance);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "craft",
+    "cache_skips_refresh_while_idle",
+    craft_cache_skips_refresh_while_idle);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "inventory",
     "dynamically_placed_storage_device_reuses_single_inventory_container",

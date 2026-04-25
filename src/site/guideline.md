@@ -11,7 +11,7 @@ Site-owned state, ECS world support, and helper logic for active site gameplay.
 - `action_state.h`: Site action queue/state owned by action execution flows, including deferred-placement mode tracking, harvest action state, plus follow-up plant-mode reactivation after successful item-based planting when inventory remains.
 - `contractor_state.h`: Contractor/worker assignment state for the site run.
 - `craft_logic.h`: Shared crafting rules/helpers used by craft-related systems.
-- `craft_state.h`: Crafting queue/progress state for the active site.
+- `craft_state.h`: Crafting queue/progress state for the active site, including cached nearby-item snapshots for crafting stations plus the last inventory/worker inputs used to refresh them.
 - `defs/`: Site-specific authored definition helpers, including harvest-capable site action metadata access.
 - `device_interaction_logic.h`: Helper rules for device interaction behavior.
 - `economy_state.h`: Site-local economy/shop/finance state, including content-authored phone delivery settings plus revealed/direct-purchase unlockable tracking.

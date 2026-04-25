@@ -39,5 +39,8 @@ struct CraftState final
     std::vector<CraftDeviceCacheState> device_caches {};
     PhoneInventoryCacheState phone_cache {};
     CraftContextPresentationState context_presentation {};
+    std::uint64_t device_cache_source_membership_revision {0U};
+    TileCoord device_cache_worker_tile {};
+    bool device_caches_dirty {true};
 };
 }  // namespace gs1
