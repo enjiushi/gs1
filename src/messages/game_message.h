@@ -66,6 +66,7 @@ enum class GameMessageType : std::uint8_t
     WorkerMeterDeltaRequested,
     WorkerMetersChanged,
     TileEcologyChanged,
+    TileEcologyBatchChanged,
     LivingPlantStabilityChanged,
     SiteTileStateChanged,
     RestorationProgressChanged,
@@ -470,6 +471,25 @@ struct TileEcologyChangedMessage final
     float sand_burial;
 };
 
+struct TileEcologyBatchEntry final
+{
+    std::int16_t target_tile_x;
+    std::int16_t target_tile_y;
+    std::uint16_t changed_mask;
+    std::uint16_t plant_density_centi;
+    std::uint32_t plant_type_id;
+    std::uint32_t ground_cover_type_id;
+};
+
+inline constexpr std::size_t k_tile_ecology_batch_entry_count = 3U;
+
+struct TileEcologyBatchChangedMessage final
+{
+    std::uint8_t entry_count;
+    std::uint8_t reserved0[3];
+    TileEcologyBatchEntry entries[k_tile_ecology_batch_entry_count];
+};
+
 enum LivingPlantStabilityFlags : std::uint32_t
 {
     LIVING_PLANT_STABILITY_NONE = 0,
@@ -783,6 +803,8 @@ GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteDeviceConditionChangedMessage, 20U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(WorkerMeterDeltaRequestedMessage, 36U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(WorkerMetersChangedMessage, 32U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TileEcologyChangedMessage, 28U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TileEcologyBatchEntry, 16U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TileEcologyBatchChangedMessage, 52U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(LivingPlantStabilityChangedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteTileStateChangedMessage, 44U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(RestorationProgressChangedMessage, 12U);

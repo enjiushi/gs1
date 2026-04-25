@@ -15,6 +15,14 @@ struct TileOccupantTag final
 {
 };
 
+struct ActiveEcologyTag final
+{
+};
+
+struct DirtyEcologyTag final
+{
+};
+
 struct DeviceTag final
 {
 };
@@ -175,6 +183,18 @@ struct TileGrowthPressure final
     float value;
 };
 
+struct DirtyEcologyMask final
+{
+    std::uint32_t value;
+};
+
+struct TileEcologyReportState final
+{
+    float last_reported_density;
+    std::uint8_t valid;
+    std::uint8_t reserved0[3];
+};
+
 struct DeviceStructureId final
 {
     StructureId structure_id;
@@ -225,6 +245,8 @@ struct WorkerVitals final
 
 GS1_REQUIRE_TRIVIAL(TileTag);
 GS1_REQUIRE_TRIVIAL(TileOccupantTag);
+GS1_REQUIRE_TRIVIAL(ActiveEcologyTag);
+GS1_REQUIRE_TRIVIAL(DirtyEcologyTag);
 GS1_REQUIRE_TRIVIAL(DeviceTag);
 GS1_REQUIRE_TRIVIAL(WorkerTag);
 GS1_REQUIRE_TRIVIAL(StorageContainerTag);
@@ -254,6 +276,8 @@ GS1_REQUIRE_TRIVIAL(TilePlantSlot);
 GS1_REQUIRE_TRIVIAL(TileGroundCoverSlot);
 GS1_REQUIRE_TRIVIAL(TilePlantDensity);
 GS1_REQUIRE_TRIVIAL(TileGrowthPressure);
+GS1_REQUIRE_TRIVIAL(DirtyEcologyMask);
+GS1_REQUIRE_TRIVIAL(TileEcologyReportState);
 GS1_REQUIRE_TRIVIAL(DeviceStructureId);
 GS1_REQUIRE_TRIVIAL(DeviceIntegrity);
 GS1_REQUIRE_TRIVIAL(DeviceEfficiency);

@@ -45,7 +45,7 @@ using gs1::SiteTileHarvestedMessage;
 using gs1::SiteTilePlantingCompletedMessage;
 using gs1::SiteTileWateredMessage;
 using gs1::TileCoord;
-using gs1::TileEcologyChangedMessage;
+using gs1::TileEcologyBatchChangedMessage;
 using namespace gs1::testing::fixtures;
 
 template <typename Payload>
@@ -1776,10 +1776,10 @@ void ecology_ground_cover_and_planting_update_tile_state(
     GS1_SYSTEM_TEST_CHECK(context, tile.ecology.plant_id.value == 0U);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.plant_density, 40.0f));
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
-    GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::TileEcologyChanged);
+    GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::TileEcologyBatchChanged);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        (queue.front().payload_as<TileEcologyChangedMessage>().changed_mask &
+        (queue.front().payload_as<TileEcologyBatchChangedMessage>().entries[0].changed_mask &
             gs1::TILE_ECOLOGY_CHANGED_OCCUPANCY) != 0U);
 
     queue.clear();
@@ -1803,7 +1803,7 @@ void ecology_ground_cover_and_planting_update_tile_state(
         GS1_SYSTEM_TEST_CHECK(context, tile.ecology.ground_cover_type_id == 0U);
         GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.plant_density, 60.0f));
     }
-    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::TileEcologyChanged) == 4U);
+    GS1_SYSTEM_TEST_CHECK(context, count_tile_ecology_entries(queue) == 4U);
 }
 
 void ecology_watering_and_burial_clear_require_valid_targets(
@@ -1842,7 +1842,7 @@ void ecology_watering_and_burial_clear_require_valid_targets(
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        queue.front().payload_as<TileEcologyChangedMessage>().changed_mask ==
+        queue.front().payload_as<TileEcologyBatchChangedMessage>().entries[0].changed_mask ==
             gs1::TILE_ECOLOGY_CHANGED_MOISTURE);
 
     queue.clear();
@@ -1857,7 +1857,7 @@ void ecology_watering_and_burial_clear_require_valid_targets(
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.sand_burial, 50.0f));
     GS1_SYSTEM_TEST_CHECK(
         context,
-        queue.front().payload_as<TileEcologyChangedMessage>().changed_mask ==
+        queue.front().payload_as<TileEcologyBatchChangedMessage>().entries[0].changed_mask ==
             gs1::TILE_ECOLOGY_CHANGED_SAND_BURIAL);
 }
 
@@ -1963,7 +1963,7 @@ void ecology_run_grows_occupied_tiles_and_updates_progress(
     occupied = site_run.site_world->tile_at(TileCoord {2, 2});
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(occupied.ecology.plant_density, 100.0f));
     GS1_SYSTEM_TEST_CHECK(context, site_run.counters.fully_grown_tile_count == 2U);
-    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::TileEcologyChanged) >= 1U);
+    GS1_SYSTEM_TEST_CHECK(context, count_tile_ecology_entries(queue) >= 1U);
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::RestorationProgressChanged) == 1U);
     const auto* progress =
         first_message_payload<gs1::RestorationProgressChangedMessage>(

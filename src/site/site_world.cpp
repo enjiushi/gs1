@@ -46,6 +46,8 @@ void register_site_world_types(flecs::world& world)
 {
     register_component<TileTag>(world);
     register_component<TileOccupantTag>(world);
+    register_component<ActiveEcologyTag>(world);
+    register_component<DirtyEcologyTag>(world);
     register_component<DeviceTag>(world);
     register_component<WorkerTag>(world);
     register_component<StorageContainerTag>(world);
@@ -77,6 +79,8 @@ void register_site_world_types(flecs::world& world)
     register_component<TileGroundCoverSlot>(world);
     register_component<TilePlantDensity>(world);
     register_component<TileGrowthPressure>(world);
+    register_component<DirtyEcologyMask>(world);
+    register_component<TileEcologyReportState>(world);
     register_component<DeviceStructureId>(world);
     register_component<DeviceIntegrity>(world);
     register_component<DeviceEfficiency>(world);
@@ -103,6 +107,27 @@ void sync_tile_occupant_tag(
     else
     {
         entity.remove<TileOccupantTag>();
+    }
+}
+
+void sync_active_ecology_state(
+    flecs::entity entity,
+    PlantId plant_id,
+    std::uint32_t ground_cover_type_id,
+    float plant_density)
+{
+    if (has_tile_occupant(plant_id, ground_cover_type_id))
+    {
+        entity.add<ActiveEcologyTag>();
+        if (!entity.has<TileEcologyReportState>())
+        {
+            entity.set<TileEcologyReportState>({plant_density, 0U, {0U, 0U, 0U}});
+        }
+    }
+    else
+    {
+        entity.remove<ActiveEcologyTag>();
+        entity.remove<TileEcologyReportState>();
     }
 }
 
@@ -243,6 +268,7 @@ void apply_tile_ecology_to_entity(flecs::entity entity, const SiteWorld::TileEco
         .set<TileGrowthPressure>({data.growth_pressure});
 
     sync_tile_occupant_tag(entity, data.plant_id, data.ground_cover_type_id);
+    sync_active_ecology_state(entity, data.plant_id, data.ground_cover_type_id, data.plant_density);
 }
 
 void apply_tile_local_weather_to_entity(

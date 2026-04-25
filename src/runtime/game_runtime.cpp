@@ -1569,6 +1569,7 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
     case GameMessageType::WorkerMeterDeltaRequested:
     case GameMessageType::WorkerMetersChanged:
     case GameMessageType::TileEcologyChanged:
+    case GameMessageType::TileEcologyBatchChanged:
     case GameMessageType::RestorationProgressChanged:
     case GameMessageType::TaskAcceptRequested:
     case GameMessageType::TaskRewardClaimRequested:

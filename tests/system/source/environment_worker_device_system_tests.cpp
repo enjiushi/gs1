@@ -249,7 +249,7 @@ void site_one_small_fixed_steps_accumulate_density_loss_until_reported(
     GS1_SYSTEM_TEST_CHECK(context, tile.ecology.plant_density < 60.0f);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        count_messages(queue, GameMessageType::TileEcologyChanged) >= 1U);
+        count_tile_ecology_entries(queue) >= 1U);
     GS1_SYSTEM_TEST_CHECK(
         context,
         (site_run.pending_projection_update_flags & gs1::SITE_PROJECTION_UPDATE_TILES) != 0U);
@@ -480,7 +480,7 @@ void local_weather_resolve_recomputes_full_grid_each_run(
     site_run.weather.weather_dust = 3.0f;
 
     GS1_SYSTEM_TEST_CHECK(context, LocalWeatherResolveSystem::subscribes_to(GameMessageType::SiteRunStarted));
-    GS1_SYSTEM_TEST_CHECK(context, !LocalWeatherResolveSystem::subscribes_to(GameMessageType::TileEcologyChanged));
+    GS1_SYSTEM_TEST_CHECK(context, !LocalWeatherResolveSystem::subscribes_to(GameMessageType::TileEcologyBatchChanged));
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         LocalWeatherResolveSystem::process_message(
