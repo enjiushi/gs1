@@ -1228,8 +1228,9 @@ Responsibilities:
 Responsibilities:
 
 - resolve worker condition as `prevState -> resolve frame deltas -> currentState`
-- accumulate passive frame loss plus discrete action or item deltas into one bucket per worker meter before clamping
+- accumulate passive frame loss plus discrete action or item deltas into one bucket per non-energy meter before clamping
 - resolve current-frame `health`, `hydration`, `nourishment`, and `morale` first
+- resolve current-frame passive `energy` recovery from the lower of current-frame `hydration` and `nourishment`, scaling linearly from `20%` to `100%` of a full `0 -> 100` refill over `30` real-life seconds
 - derive current-frame `energyCap` from current-frame `health`, `hydration`, and `nourishment` before clamping `energy`
 - derive current-frame `workEfficiency` from current-frame `health`, `hydration`, `nourishment`, and `morale` after `energy` is resolved
 - clamp all worker meters and derived worker values

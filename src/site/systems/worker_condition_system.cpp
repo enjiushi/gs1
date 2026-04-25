@@ -227,11 +227,39 @@ WorkerMeterDeltas deltas_from_message(const WorkerMeterDeltaRequestedMessage& pa
         payload.work_efficiency_delta};
 }
 
-float resolve_morale_units_per_real_second(float full_change_real_minutes) noexcept
+float resolve_meter_units_per_real_second(float full_change_real_minutes) noexcept
 {
     return full_change_real_minutes <= 0.0f
         ? 0.0f
         : kNormalizedMeterMax / (full_change_real_minutes * 60.0f);
+}
+
+float resolve_energy_background_speed_factor(
+    const SiteWorld::WorkerConditionData& current) noexcept
+{
+    const auto& tuning = worker_condition_tuning();
+    const float minimum_support =
+        std::min(normalize_meter(current.hydration), normalize_meter(current.nourishment));
+    const float minimum_speed = tuning.energy_background_min_speed_factor;
+    return std::clamp(
+        minimum_speed + ((1.0f - minimum_speed) * minimum_support),
+        minimum_speed,
+        1.0f);
+}
+
+float resolve_energy_background_delta(
+    const SiteWorld::WorkerConditionData& current,
+    float step_real_seconds) noexcept
+{
+    if (step_real_seconds <= 0.0f)
+    {
+        return 0.0f;
+    }
+
+    return step_real_seconds *
+        resolve_energy_background_speed_factor(current) *
+        resolve_meter_units_per_real_second(
+            worker_condition_tuning().energy_background_increase_real_minutes);
 }
 
 void accumulate_passive_deltas(
@@ -267,21 +295,16 @@ void accumulate_passive_deltas(
         wind * resolve_factor(tuning.wind_to_nourishment_factor) +
         heat * resolve_factor(tuning.heat_to_nourishment_factor) +
         dust * resolve_factor(tuning.dust_to_nourishment_factor));
-    deltas.energy -= step_game_minutes * (
-        resolve_factor(tuning.energy_base_loss_per_game_minute) +
-        wind * resolve_factor(tuning.wind_to_energy_factor) +
-        heat * resolve_factor(tuning.heat_to_energy_factor) +
-        dust * resolve_factor(tuning.dust_to_energy_factor));
     const float morale_weather_factor = std::clamp(
         (kMoraleWeatherNeutralPoint - max_weather) / kMoraleWeatherHalfBand,
         -1.0f,
         1.0f);
     const float morale_increase_per_real_second =
-        resolve_morale_units_per_real_second(tuning.morale_background_increase_real_minutes);
+        resolve_meter_units_per_real_second(tuning.morale_background_increase_real_minutes);
     const float morale_decrease_per_real_second =
-        resolve_morale_units_per_real_second(tuning.morale_background_decrease_real_minutes);
+        resolve_meter_units_per_real_second(tuning.morale_background_decrease_real_minutes);
     const float morale_support_per_real_second =
-        resolve_morale_units_per_real_second(tuning.morale_support_real_minutes);
+        resolve_meter_units_per_real_second(tuning.morale_support_real_minutes);
     deltas.morale += step_real_seconds *
         (morale_weather_factor >= 0.0f
             ? morale_weather_factor * morale_increase_per_real_second
@@ -345,7 +368,8 @@ float resolve_work_efficiency(
 SiteWorld::WorkerConditionData resolve_worker_conditions(
     const SiteWorld::WorkerConditionData& previous,
     const WorkerMeterDeltas& deltas,
-    const ModifierChannelTotals& modifiers) noexcept
+    const ModifierChannelTotals& modifiers,
+    float passive_energy_step_real_seconds) noexcept
 {
     SiteWorld::WorkerConditionData current = previous;
     current.health = clamp_meter(previous.health + deltas.health, kHealthMax);
@@ -353,8 +377,10 @@ SiteWorld::WorkerConditionData resolve_worker_conditions(
     current.nourishment = clamp_meter(previous.nourishment + deltas.nourishment, kNourishmentMax);
     current.morale = clamp_meter(previous.morale + deltas.morale, kMoraleMax);
     current.energy_cap = resolve_energy_cap(current, modifiers, deltas.energy_cap);
+    const float passive_energy_delta =
+        resolve_energy_background_delta(current, passive_energy_step_real_seconds);
     current.energy = std::clamp(
-        previous.energy + deltas.energy,
+        previous.energy + deltas.energy + passive_energy_delta,
         kMeterMin,
         current.energy_cap);
     current.work_efficiency =
@@ -395,7 +421,8 @@ Gs1Status WorkerConditionSystem::process_message(
     worker.conditions = resolve_worker_conditions(
         previous,
         deltas,
-        context.world.read_modifier().resolved_channel_totals);
+        context.world.read_modifier().resolved_channel_totals,
+        0.0f);
     const bool modified = worker_conditions_changed(previous, worker.conditions);
     if (modified)
     {
@@ -415,17 +442,19 @@ void WorkerConditionSystem::run(SiteSystemContext<WorkerConditionSystem>& contex
     auto worker = context.world.read_worker();
     const auto previous = worker.conditions;
     WorkerMeterDeltas deltas {};
+    const float step_real_seconds = static_cast<float>(std::max(0.0, context.fixed_step_seconds));
     accumulate_passive_deltas(
         deltas,
         previous,
         context.world.read_tile_local_weather(worker.position.tile_coord),
         context.world.read_modifier().resolved_channel_totals,
         static_cast<float>(runtime_minutes_from_real_seconds(context.fixed_step_seconds)),
-        static_cast<float>(std::max(0.0, context.fixed_step_seconds)));
+        step_real_seconds);
     worker.conditions = resolve_worker_conditions(
         previous,
         deltas,
-        context.world.read_modifier().resolved_channel_totals);
+        context.world.read_modifier().resolved_channel_totals,
+        step_real_seconds);
     const bool modified = worker_conditions_changed(previous, worker.conditions);
     if (modified)
     {

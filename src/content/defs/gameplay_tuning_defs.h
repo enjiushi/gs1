@@ -12,10 +12,8 @@ struct WorkerConditionTuning final
     float wind_to_nourishment_factor {0.00700f};
     float heat_to_nourishment_factor {0.00200f};
     float dust_to_nourishment_factor {0.00100f};
-    float energy_base_loss_per_game_minute {0.00500f};
-    float wind_to_energy_factor {0.00375f};
-    float heat_to_energy_factor {0.00375f};
-    float dust_to_energy_factor {0.00375f};
+    float energy_background_increase_real_minutes {0.5f};
+    float energy_background_min_speed_factor {0.2f};
     float morale_background_increase_real_minutes {3.0f};
     float morale_background_decrease_real_minutes {3.0f};
     float morale_support_real_minutes {2.0f};

@@ -337,8 +337,13 @@ Implemented behavior coverage should verify:
 - The system subscribes only to `WorkerMeterDeltaRequested`.
 - The first observed worker update emits a full-mask `WorkerMetersChanged`.
 - Requested meter deltas are applied with clamping.
-- Passive `run()` drains hydration, nourishment, and energy over time, and
-  moves morale up or down from the current max local-weather pressure.
+- Passive `run()` drains hydration and nourishment over time, resolves
+  background energy recovery from the current lower of hydration or
+  nourishment, and moves morale up or down from the current max
+  local-weather pressure.
+- Passive energy recovery should refill `0 -> 100` over `30` real-life
+  seconds at full hydration and nourishment, and floor at `20%` of that base
+  speed when the lower of the two meters is empty.
 - Positive resolved morale support should add to the final background morale
   speed after the weather-driven morale result is computed.
 - Zero hydration or nourishment starts health decay.

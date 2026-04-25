@@ -1365,14 +1365,10 @@ void load_gameplay_tuning_def(ContentDatabase& content, const std::filesystem::p
         require_toml_float(path, worker_condition, "heat_to_nourishment_factor");
     tuning.worker_condition.dust_to_nourishment_factor =
         require_toml_float(path, worker_condition, "dust_to_nourishment_factor");
-    tuning.worker_condition.energy_base_loss_per_game_minute =
-        require_toml_float(path, worker_condition, "energy_base_loss_per_game_minute");
-    tuning.worker_condition.wind_to_energy_factor =
-        require_toml_float(path, worker_condition, "wind_to_energy_factor");
-    tuning.worker_condition.heat_to_energy_factor =
-        require_toml_float(path, worker_condition, "heat_to_energy_factor");
-    tuning.worker_condition.dust_to_energy_factor =
-        require_toml_float(path, worker_condition, "dust_to_energy_factor");
+    tuning.worker_condition.energy_background_increase_real_minutes =
+        require_toml_float(path, worker_condition, "energy_background_increase_real_minutes");
+    tuning.worker_condition.energy_background_min_speed_factor =
+        require_toml_float(path, worker_condition, "energy_background_min_speed_factor");
     tuning.worker_condition.morale_background_increase_real_minutes =
         require_toml_float(path, worker_condition, "morale_background_increase_real_minutes");
     tuning.worker_condition.morale_background_decrease_real_minutes =

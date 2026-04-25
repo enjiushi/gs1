@@ -19,7 +19,7 @@ External prototype content TOML files loaded by the gameplay DLL at startup.
 - `reward_candidates.toml`: Reward candidate content for money, deliveries, unlockable reveals, run modifiers, and reputation rewards.
 - `site_actions.toml`: Site action tuning content for shared action duration and worker energy/hydration/nourishment/morale costs, authored local-weather-to-meter cost coefficients, placement occupancy, and reservation/approach/movement flags, with craft duration and worker meter costs authored per recipe and the shared harvest action profile still loaded here.
 - `modifier_presets.toml`: Modifier preset content for nearby-aura and run-modifier channel totals consumed by the site modifier system.
-- `gameplay_tuning.toml`: Shared numeric gameplay-tuning table for worker-condition, ecology, modifier, device-support, and camp-durability factors that should remain data-authored instead of hardcoded.
+- `gameplay_tuning.toml`: Shared numeric gameplay-tuning table for worker-condition, ecology, modifier, device-support, and camp-durability factors, including worker background energy-recovery tuning that should remain data-authored instead of hardcoded.
 - `technology_tiers.toml`: Faction tech-tree tier content for tier ordering and display names.
 - `reputation_unlocks.toml`: Total-reputation unlock content for one-by-one post-starter plant unlocks and future non-plant unlock types.
 - `technology_nodes.toml`: Technology node content for one faction-owned tech per tier branch, authored reputation plus cash costs, entry kinds, and placeholder labels/descriptions.

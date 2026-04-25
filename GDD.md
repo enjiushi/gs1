@@ -710,7 +710,7 @@ The player has explicit, separate meters:
 
 These are the core `Player Condition` values. They are always relevant, but not all decline at the same speed or for the same reasons.
 
-Health is the slower physical-condition meter. It reflects injury, illness risk, and bodily wear from repeated harsh exposure or risky field work. Hydration is the most urgent meter in hot conditions. `Nourishment` is slower, but important for sustained efficiency and recovery. `Energy Cap` is the current derived usable ceiling on `Energy`, mainly limited by health, thirst, and hunger rather than stored as its own independent meter. Energy limits daily work output and pushes rest timing, but it should not be fully usable when `Energy Cap` is low. Morale reflects comfort, momentum, and psychological strain under isolation and repeated setbacks. `Work Efficiency` is the derived worker-output value that turns current condition into action time and action energy cost.
+Health is the slower physical-condition meter. It reflects injury, illness risk, and bodily wear from repeated harsh exposure or risky field work. Hydration is the most urgent meter in hot conditions. `Nourishment` is slower, but important for sustained efficiency and recovery. `Energy Cap` is the current derived usable ceiling on `Energy`, mainly limited by health, thirst, and hunger rather than stored as its own independent meter. Energy limits daily work output and pushes rest timing, but it should not be fully usable when `Energy Cap` is low. In the current design `Energy` recovers in the background instead of draining passively, with a full `0 -> 100` refill taking `30` real-life seconds at full hydration and nourishment and only `20%` of that base speed when the lower of hydration or nourishment is empty. Morale reflects comfort, momentum, and psychological strain under isolation and repeated setbacks. `Work Efficiency` is the derived worker-output value that turns current condition into action time and action energy cost.
 
 Current gameplay effect for `Health`:
 
@@ -4482,14 +4482,6 @@ playerNourishmentDeltaPassive =
     Td * resolvedDustToNourishmentFactor
   )
 
-playerEnergyDeltaPassive =
-  -dt * (
-    resolvedEnergyBaseLoss +
-    Tw * resolvedWindToEnergyFactor +
-    Th * resolvedHeatToEnergyFactor +
-    Td * resolvedDustToEnergyFactor
-  )
-
 maxWeatherAtWorker = max(tileHeat, tileWind, tileDust)
 playerMoraleBackgroundFactor = clamp((50 - maxWeatherAtWorker) / 50, -1, 1)
 
@@ -4525,8 +4517,7 @@ playerNourishmentDeltaFrame =
   actionNourishmentDelta +
   itemNourishmentDelta
 
-playerEnergyDeltaFrame =
-  playerEnergyDeltaPassive +
+playerEnergyDeltaDirectFrame =
   actionEnergyDelta +
   itemEnergyDelta
 
@@ -4550,6 +4541,22 @@ playerNourishmentCurrent = clamp01(playerNourishmentPrev + playerNourishmentDelt
 playerMoraleCurrent = clamp01(playerMoralePrev + playerMoraleDeltaFrame)
 ```
 
+Background energy recovery after current-frame hydration and nourishment resolve:
+
+```text
+playerEnergyBackgroundSpeedFactor =
+  lerp(
+    0.2,
+    1.0,
+    min(playerHydrationCurrent, playerNourishmentCurrent)
+  )
+
+playerEnergyDeltaPassive =
+  realDtSeconds *
+  playerEnergyBackgroundSpeedFactor *
+  (100 / (energyBackgroundIncreaseRealMinutes * 60))
+```
+
 Derived current-frame energy cap:
 
 ```text
@@ -4570,7 +4577,9 @@ Current-frame energy:
 ```text
 playerEnergyCurrent =
   clamp(
-    playerEnergyPrev + playerEnergyDeltaFrame,
+    playerEnergyPrev +
+      playerEnergyDeltaDirectFrame +
+      playerEnergyDeltaPassive,
     0,
     playerEnergyCapCurrent
   )

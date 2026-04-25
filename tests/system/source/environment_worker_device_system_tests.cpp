@@ -790,6 +790,47 @@ void worker_condition_run_applies_morale_support_to_background_resolution(
     GS1_SYSTEM_TEST_CHECK(context, queue.size() == 1U);
 }
 
+void worker_condition_run_scales_background_energy_recovery_from_hydration_and_nourishment(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    std::uint32_t next_site_run_id = 13023U;
+    const auto run_sample = [&](float hydration, float nourishment) {
+        auto site_run = make_test_site_run(1U, next_site_run_id++);
+        GameMessageQueue queue {};
+        auto site_context =
+            make_site_context<WorkerConditionSystem>(campaign, site_run, queue, 10.0);
+
+        auto worker = gs1::site_world_access::worker_conditions(site_run);
+        worker.health = 100.0f;
+        worker.hydration = hydration;
+        worker.nourishment = nourishment;
+        worker.energy = 0.0f;
+        gs1::site_world_access::set_worker_conditions(site_run, worker);
+
+        auto tile = site_run.site_world->tile_at(TileCoord {2, 2});
+        tile.local_weather.heat = 0.0f;
+        tile.local_weather.wind = 0.0f;
+        tile.local_weather.dust = 0.0f;
+        site_run.site_world->set_tile(TileCoord {2, 2}, tile);
+
+        WorkerConditionSystem::run(site_context);
+
+        GS1_SYSTEM_TEST_CHECK(context, queue.size() == 1U);
+        return gs1::site_world_access::worker_conditions(site_run);
+    };
+
+    const auto full_support = run_sample(100.0f, 100.0f);
+    const auto medium_support = run_sample(50.0f, 80.0f);
+    const auto no_support = run_sample(0.0f, 100.0f);
+
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(full_support.energy, 33.312f, 0.02f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(medium_support.energy, 19.97867f, 0.02f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(no_support.energy, 6.66667f, 0.02f));
+    GS1_SYSTEM_TEST_CHECK(context, full_support.energy > medium_support.energy);
+    GS1_SYSTEM_TEST_CHECK(context, medium_support.energy > no_support.energy);
+}
+
 void worker_condition_run_softens_environmental_decay_when_sheltered(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -1178,6 +1219,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "worker_condition",
     "run_applies_morale_support_to_background_resolution",
     worker_condition_run_applies_morale_support_to_background_resolution);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "worker_condition",
+    "run_scales_background_energy_recovery_from_hydration_and_nourishment",
+    worker_condition_run_scales_background_energy_recovery_from_hydration_and_nourishment);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "worker_condition",
     "run_softens_environmental_decay_when_sheltered",

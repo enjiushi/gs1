@@ -522,6 +522,19 @@ std::vector<ContentValidationIssue> validate_content_database(
                 ContentValidationSeverity::Error,
                 "Gameplay tuning worker-condition factor max must be greater than or equal to factor min."});
         }
+        else if (tuning.worker_condition.energy_background_increase_real_minutes <= 0.0f)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Gameplay tuning worker-condition energy background increase real-minute speed must stay positive."});
+        }
+        else if (tuning.worker_condition.energy_background_min_speed_factor < 0.0f ||
+            tuning.worker_condition.energy_background_min_speed_factor > 1.0f)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Gameplay tuning worker-condition energy background minimum speed factor must stay in the 0-1 range."});
+        }
         else if (tuning.worker_condition.morale_background_increase_real_minutes <= 0.0f ||
             tuning.worker_condition.morale_background_decrease_real_minutes <= 0.0f ||
             tuning.worker_condition.morale_support_real_minutes <= 0.0f)
