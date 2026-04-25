@@ -17,7 +17,7 @@ Site-owned systems that subscribe to messages/events and mutate only the state t
 - `device_maintenance_system.h`: Device maintenance system interface.
 - `device_maintenance_system.cpp`: Applies repair/maintenance behavior for site devices and emits device-condition change messages when integrity or occupancy changes, including startup snapshots for task-tracking subscribers.
 - `device_support_system.h`: Device support system interface.
-- `device_support_system.cpp`: Resolves support effects and dependencies for site devices using content-authored evaporation tuning.
+- `device_support_system.cpp`: Resolves support effects and dependencies for site devices using content-authored evaporation tuning, now by iterating sparse device entities instead of scanning the full tile grid.
 - `device_weather_contribution_system.h`: Device weather contribution system interface.
 - `device_weather_contribution_system.cpp`: Recomputes owner-specific per-tile device weather contributions each frame by iterating sparse device sources and pushing aura plus directional shelter effects onto affected tiles.
 - `ecology_system.h`: Ecology system interface.
