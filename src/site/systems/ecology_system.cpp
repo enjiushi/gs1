@@ -87,11 +87,11 @@ bool ecology_change_affects_visible_projection(std::uint32_t changed_mask) noexc
             TILE_ECOLOGY_CHANGED_SAND_BURIAL)) != 0U;
 }
 
-const PlantDef& resolve_occupant_def(const SiteWorld::TileData& tile) noexcept
+const PlantDef& resolve_occupant_def(const SiteWorld::TileEcologyData& ecology) noexcept
 {
-    if (tile.ecology.plant_id.value != 0U)
+    if (ecology.plant_id.value != 0U)
     {
-        const auto* plant_def = find_plant_def(tile.ecology.plant_id);
+        const auto* plant_def = find_plant_def(ecology.plant_id);
         if (plant_def != nullptr)
         {
             return *plant_def;
@@ -118,12 +118,11 @@ float resolve_tunable_factor(float factor, float weight, float bias) noexcept
 }
 
 SiteWorld::TileWeatherContributionData total_weather_contribution(
-    const SiteWorld::TileData& tile) noexcept
+    const SiteWorld::TileWeatherContributionData& plant_contribution,
+    const SiteWorld::TileWeatherContributionData& device_contribution) noexcept
 {
     return clamp_weather_contribution(
-        sum_weather_contributions(
-            tile.plant_weather_contribution,
-            tile.device_weather_contribution));
+        sum_weather_contributions(plant_contribution, device_contribution));
 }
 
 float compute_salinity_density_cap(
@@ -144,18 +143,19 @@ float compute_salinity_density_cap(
 }
 
 float compute_growth_pressure(
-    const SiteWorld::TileData& tile,
+    const SiteWorld::TileEcologyData& ecology,
+    const SiteWorld::TileLocalWeatherData& local_weather,
     const PlantDef& plant_def,
     const ModifierChannelTotals& modifiers,
     float effective_wind) noexcept
 {
     const auto& tuning = ecology_tuning();
-    if (!has_tile_occupant(tile.ecology.plant_id, tile.ecology.ground_cover_type_id))
+    if (!has_tile_occupant(ecology.plant_id, ecology.ground_cover_type_id))
     {
         return 0.0f;
     }
 
-    const float density = tile.ecology.plant_density;
+    const float density = ecology.plant_density;
     const float effective_heat_tolerance =
         resolve_density_scaled_resistance(plant_def.heat_tolerance, density);
     const float effective_wind_resistance =
@@ -165,7 +165,7 @@ float compute_growth_pressure(
     const float effective_salt_tolerance =
         resolve_density_scaled_resistance(plant_def.salt_tolerance, density);
     const float heat_term = std::clamp(
-        (tile.local_weather.heat * tuning.growth_pressure_heat_scale) -
+        (local_weather.heat * tuning.growth_pressure_heat_scale) -
             (effective_heat_tolerance * tuning.tolerance_percent_scale),
         0.0f,
         1.0f);
@@ -175,27 +175,26 @@ float compute_growth_pressure(
         0.0f,
         1.0f);
     const float dust_term = std::clamp(
-        ((tile.local_weather.dust +
-             unit_from_raw_meter(tile.ecology.sand_burial) * tuning.growth_pressure_dust_burial_scale) *
+        ((local_weather.dust +
+             unit_from_raw_meter(ecology.sand_burial) * tuning.growth_pressure_dust_burial_scale) *
             tuning.growth_pressure_dust_scale) -
             (effective_dust_tolerance * tuning.tolerance_percent_scale),
         0.0f,
         1.0f);
     const float salinity_term =
-        unit_from_raw_meter(tile.ecology.soil_salinity) *
+        unit_from_raw_meter(ecology.soil_salinity) *
         std::max(0.0f, 1.0f - (effective_salt_tolerance * tuning.tolerance_percent_scale)) *
         tuning.growth_pressure_salinity_weight;
-    const float moisture_relief =
-        unit_from_raw_meter(tile.ecology.moisture) * tuning.growth_relief_from_moisture;
+    const float moisture_relief = unit_from_raw_meter(ecology.moisture) * tuning.growth_relief_from_moisture;
     const float fertility_relief =
-        unit_from_raw_meter(tile.ecology.soil_fertility) * tuning.growth_relief_from_fertility;
+        unit_from_raw_meter(ecology.soil_fertility) * tuning.growth_relief_from_fertility;
 
     float pressure =
         tuning.growth_pressure_base +
         heat_term * tuning.growth_pressure_heat_weight +
         wind_term * tuning.growth_pressure_wind_weight +
         dust_term * tuning.growth_pressure_dust_weight +
-        unit_from_raw_meter(tile.ecology.sand_burial) * tuning.growth_pressure_burial_weight +
+        unit_from_raw_meter(ecology.sand_burial) * tuning.growth_pressure_burial_weight +
         salinity_term -
         moisture_relief -
         fertility_relief;
@@ -204,12 +203,15 @@ float compute_growth_pressure(
 }
 
 float compute_next_moisture(
-    const SiteWorld::TileData& tile,
+    const SiteWorld::TileEcologyData& ecology,
+    const SiteWorld::TileLocalWeatherData& local_weather,
+    const SiteWorld::TileWeatherContributionData& plant_contribution,
+    const SiteWorld::TileWeatherContributionData& device_contribution,
     const TerrainFactorModifierState& factor_modifiers,
     float simulation_dt_minutes) noexcept
 {
     const auto& tuning = ecology_tuning();
-    const auto contribution = total_weather_contribution(tile);
+    const auto contribution = total_weather_contribution(plant_contribution, device_contribution);
     const float fertility_to_moisture_cap = resolve_tunable_factor(
         tuning.fertility_to_moisture_cap_factor,
         factor_modifiers.fertility_to_moisture_cap_weight,
@@ -227,27 +229,30 @@ float compute_next_moisture(
         factor_modifiers.wind_to_moisture_weight,
         factor_modifiers.wind_to_moisture_bias);
     const float moisture_top = std::clamp(
-        tile.ecology.soil_fertility * fertility_to_moisture_cap,
+        ecology.soil_fertility * fertility_to_moisture_cap,
         0.0f,
         k_meter_scale);
     const float moisture_rate =
         moisture_factor *
         (contribution.irrigation -
-            tile.local_weather.heat * heat_to_moisture_factor -
-            tile.local_weather.wind * wind_to_moisture_factor);
+            local_weather.heat * heat_to_moisture_factor -
+            local_weather.wind * wind_to_moisture_factor);
     return raw_meter_clamp(std::clamp(
-        tile.ecology.moisture + (moisture_rate * simulation_dt_minutes),
+        ecology.moisture + (moisture_rate * simulation_dt_minutes),
         0.0f,
         moisture_top));
 }
 
 float compute_next_fertility(
-    const SiteWorld::TileData& tile,
+    const SiteWorld::TileEcologyData& ecology,
+    const SiteWorld::TileLocalWeatherData& local_weather,
+    const SiteWorld::TileWeatherContributionData& plant_contribution,
+    const SiteWorld::TileWeatherContributionData& device_contribution,
     const TerrainFactorModifierState& factor_modifiers,
     float simulation_dt_minutes) noexcept
 {
     const auto& tuning = ecology_tuning();
-    const auto contribution = total_weather_contribution(tile);
+    const auto contribution = total_weather_contribution(plant_contribution, device_contribution);
     const float salinity_to_fertility_cap = resolve_tunable_factor(
         tuning.salinity_to_fertility_cap_factor,
         factor_modifiers.salinity_to_fertility_cap_weight,
@@ -265,27 +270,29 @@ float compute_next_fertility(
         factor_modifiers.dust_to_fertility_weight,
         factor_modifiers.dust_to_fertility_bias);
     const float fertility_top = std::clamp(
-        k_meter_scale - (tile.ecology.soil_salinity * salinity_to_fertility_cap),
+        k_meter_scale - (ecology.soil_salinity * salinity_to_fertility_cap),
         0.0f,
         k_meter_scale);
     const float fertility_rate =
         fertility_factor *
         (contribution.fertility_improve -
-            tile.local_weather.wind * wind_to_fertility_factor -
-            tile.local_weather.dust * dust_to_fertility_factor);
+            local_weather.wind * wind_to_fertility_factor -
+            local_weather.dust * dust_to_fertility_factor);
     return raw_meter_clamp(std::clamp(
-        tile.ecology.soil_fertility + (fertility_rate * simulation_dt_minutes),
+        ecology.soil_fertility + (fertility_rate * simulation_dt_minutes),
         0.0f,
         fertility_top));
 }
 
 float compute_next_salinity(
-    const SiteWorld::TileData& tile,
+    const SiteWorld::TileEcologyData& ecology,
+    const SiteWorld::TileWeatherContributionData& plant_contribution,
+    const SiteWorld::TileWeatherContributionData& device_contribution,
     const TerrainFactorModifierState& factor_modifiers,
     float simulation_dt_minutes) noexcept
 {
     const auto& tuning = ecology_tuning();
-    const auto contribution = total_weather_contribution(tile);
+    const auto contribution = total_weather_contribution(plant_contribution, device_contribution);
     const float salinity_source_factor = resolve_tunable_factor(
         tuning.salinity_factor,
         factor_modifiers.salinity_source_weight,
@@ -298,13 +305,13 @@ float compute_next_salinity(
         (tuning.salinity_source * salinity_source_factor) -
         (contribution.salinity_reduction * salinity_reduction_factor);
     return raw_meter_clamp(std::clamp(
-        tile.ecology.soil_salinity + (salinity_rate * simulation_dt_minutes),
+        ecology.soil_salinity + (salinity_rate * simulation_dt_minutes),
         0.0f,
         k_meter_scale));
 }
 
 float compute_density_delta(
-    const SiteWorld::TileData& tile,
+    const SiteWorld::TileEcologyData& ecology,
     const PlantDef& plant_def,
     const ModifierChannelTotals& modifiers,
     float growth_pressure,
@@ -312,7 +319,7 @@ float compute_density_delta(
     float simulation_dt_minutes) noexcept
 {
     const auto& tuning = ecology_tuning();
-    const float density = unit_from_raw_meter(tile.ecology.plant_density);
+    const float density = unit_from_raw_meter(ecology.plant_density);
     const float growth_pressure_unit = unit_from_raw_meter(growth_pressure);
     const float salinity_cap_unit = unit_from_raw_meter(salinity_cap);
     const float delta_minutes = std::max(simulation_dt_minutes, 0.0f);
@@ -332,8 +339,8 @@ float compute_density_delta(
         density_gain =
             growth_headroom *
             (tuning.growth_gain_scale +
-                unit_from_raw_meter(tile.ecology.moisture) * tuning.growth_gain_moisture_bonus_scale +
-                unit_from_raw_meter(tile.ecology.soil_fertility) * tuning.growth_gain_fertility_bonus_scale) *
+                unit_from_raw_meter(ecology.moisture) * tuning.growth_gain_moisture_bonus_scale +
+                unit_from_raw_meter(ecology.soil_fertility) * tuning.growth_gain_fertility_bonus_scale) *
             establishment_bonus *
             delta_minutes;
     }
@@ -371,14 +378,15 @@ float compute_density_delta(
 float compute_effective_wind_exposure(
     SiteWorldAccess<EcologySystem>& world,
     TileCoord coord,
-    const SiteWorld::TileData& tile) noexcept
+    const SiteWorld::TileEcologyData& ecology,
+    const SiteWorld::TileLocalWeatherData& local_weather) noexcept
 {
-    if (tile.ecology.plant_id.value == 0U)
+    if (ecology.plant_id.value == 0U)
     {
-        return tile.local_weather.wind;
+        return local_weather.wind;
     }
 
-    const TileFootprint footprint = resolve_plant_tile_footprint(tile.ecology.plant_id);
+    const TileFootprint footprint = resolve_plant_tile_footprint(ecology.plant_id);
     const TileCoord anchor = align_tile_anchor_to_footprint(coord, footprint);
 
     float total_wind = 0.0f;
@@ -392,25 +400,26 @@ float compute_effective_wind_exposure(
                 return;
             }
 
-            const auto footprint_tile = world.read_tile(footprint_coord);
-            if (footprint_tile.ecology.plant_id != tile.ecology.plant_id)
+            const auto footprint_ecology = world.read_tile_ecology(footprint_coord);
+            if (footprint_ecology.plant_id != ecology.plant_id)
             {
                 return;
             }
 
-            total_wind += footprint_tile.local_weather.wind;
+            total_wind += world.read_tile_local_weather(footprint_coord).wind;
             ++sample_count;
         });
 
     return sample_count == 0U
-        ? tile.local_weather.wind
+        ? local_weather.wind
         : (total_wind / static_cast<float>(sample_count));
 }
 
 void emit_tile_ecology_changed(
     SiteSystemContext<EcologySystem>& context,
     TileCoord coord,
-    std::uint32_t changed_mask)
+    std::uint32_t changed_mask,
+    const SiteWorld::TileEcologyData& ecology)
 {
     if (changed_mask == TILE_ECOLOGY_CHANGED_NONE)
     {
@@ -422,21 +431,20 @@ void emit_tile_ecology_changed(
         return;
     }
 
-    const auto tile = context.world.read_tile(coord);
     GameMessage message {};
     message.type = GameMessageType::TileEcologyChanged;
     message.set_payload(TileEcologyChangedMessage {
         coord.x,
         coord.y,
         changed_mask,
-        tile.ecology.plant_id.value,
-        tile.ecology.ground_cover_type_id,
-        tile.ecology.plant_density,
-        tile.ecology.sand_burial});
+        ecology.plant_id.value,
+        ecology.ground_cover_type_id,
+        ecology.plant_density,
+        ecology.sand_burial});
     context.message_queue.push_back(message);
     if ((changed_mask & TILE_ECOLOGY_CHANGED_DENSITY) != 0U)
     {
-        context.world.set_last_reported_tile_density(coord, tile.ecology.plant_density);
+        context.world.set_last_reported_tile_density(coord, ecology.plant_density);
     }
 
     if (ecology_change_affects_visible_projection(changed_mask))
@@ -480,7 +488,7 @@ void emit_plant_density_changed_log(
 void emit_site_one_startup_probe_log(
     SiteSystemContext<EcologySystem>& context,
     TileCoord coord,
-    const SiteWorld::TileData& tile)
+    const SiteWorld::TileEcologyData& ecology)
 {
     if (!context.world.has_world() ||
         context.world.site_id_value() != 1U ||
@@ -498,8 +506,8 @@ void emit_site_one_startup_probe_log(
         "S1 seed (%d,%d) p%u d%.2f",
         coord.x,
         coord.y,
-        tile.ecology.plant_id.value,
-        tile.ecology.plant_density);
+        ecology.plant_id.value,
+        ecology.plant_density);
     message.type = GameMessageType::PresentLog;
     message.set_payload(payload);
     context.message_queue.push_back(message);
@@ -508,7 +516,7 @@ void emit_site_one_startup_probe_log(
 void emit_site_one_ecology_probe_log(
     SiteSystemContext<EcologySystem>& context,
     TileCoord coord,
-    const SiteWorld::TileData& tile,
+    const SiteWorld::TileEcologyData& ecology,
     float density_delta,
     float growth_pressure,
     float effective_wind)
@@ -527,7 +535,7 @@ void emit_site_one_ecology_probe_log(
         "S1 eco (%d,%d) d%.2f dd%.3f gp%.1f w%.1f",
         coord.x,
         coord.y,
-        tile.ecology.plant_density,
+        ecology.plant_density,
         density_delta,
         growth_pressure,
         effective_wind);
@@ -557,36 +565,36 @@ std::uint32_t apply_ground_cover(
         return TILE_ECOLOGY_CHANGED_NONE;
     }
 
-    auto tile = world.read_tile(coord);
+    auto ecology = world.read_tile_ecology(coord);
     std::uint32_t changed_mask = TILE_ECOLOGY_CHANGED_NONE;
     bool modified = false;
     bool occupancy_changed = false;
 
-    if (tile.ecology.ground_cover_type_id != payload.ground_cover_type_id)
+    if (ecology.ground_cover_type_id != payload.ground_cover_type_id)
     {
-        tile.ecology.ground_cover_type_id = payload.ground_cover_type_id;
+        ecology.ground_cover_type_id = payload.ground_cover_type_id;
         occupancy_changed = true;
         modified = true;
     }
 
-    if (tile.ecology.plant_id.value != 0U)
+    if (ecology.plant_id.value != 0U)
     {
-        tile.ecology.plant_id = PlantId {};
+        ecology.plant_id = PlantId {};
         occupancy_changed = true;
         modified = true;
     }
 
     const float target_density = raw_meter_from_legacy_input(payload.initial_density);
-    if (std::fabs(tile.ecology.plant_density - target_density) > k_density_epsilon_raw)
+    if (std::fabs(ecology.plant_density - target_density) > k_density_epsilon_raw)
     {
-        tile.ecology.plant_density = target_density;
+        ecology.plant_density = target_density;
         changed_mask |= TILE_ECOLOGY_CHANGED_DENSITY;
         modified = true;
     }
 
-    if (std::fabs(tile.ecology.growth_pressure) > k_density_epsilon_raw)
+    if (std::fabs(ecology.growth_pressure) > k_density_epsilon_raw)
     {
-        tile.ecology.growth_pressure = 0.0f;
+        ecology.growth_pressure = 0.0f;
         changed_mask |= TILE_ECOLOGY_CHANGED_GROWTH_PRESSURE;
         modified = true;
     }
@@ -598,7 +606,7 @@ std::uint32_t apply_ground_cover(
 
     if (modified)
     {
-        world.write_tile(coord, tile);
+        world.write_tile_ecology(coord, ecology);
     }
 
     return changed_mask;
@@ -615,41 +623,41 @@ std::uint32_t apply_planting(
         return TILE_ECOLOGY_CHANGED_NONE;
     }
 
-    auto tile = world.read_tile(coord);
+    auto ecology = world.read_tile_ecology(coord);
     std::uint32_t changed_mask = TILE_ECOLOGY_CHANGED_NONE;
     bool modified = false;
     bool occupancy_changed = false;
 
     const PlantId requested_plant {payload.plant_type_id};
-    if (tile.ecology.plant_id.value != requested_plant.value)
+    if (ecology.plant_id.value != requested_plant.value)
     {
-        tile.ecology.plant_id = requested_plant;
+        ecology.plant_id = requested_plant;
         occupancy_changed = true;
         modified = true;
     }
 
-    if (tile.ecology.ground_cover_type_id != 0U)
+    if (ecology.ground_cover_type_id != 0U)
     {
-        tile.ecology.ground_cover_type_id = 0U;
+        ecology.ground_cover_type_id = 0U;
         occupancy_changed = true;
         modified = true;
     }
 
     const float target_density = raw_meter_from_legacy_input(payload.initial_density);
-    const float previous_density = tile.ecology.plant_density;
-    if (std::fabs(tile.ecology.plant_density - target_density) > k_density_epsilon)
+    const float previous_density = ecology.plant_density;
+    if (std::fabs(ecology.plant_density - target_density) > k_density_epsilon)
     {
-        tile.ecology.plant_density = target_density;
-        if (density_crosses_report_threshold(context, coord, previous_density, tile.ecology.plant_density))
+        ecology.plant_density = target_density;
+        if (density_crosses_report_threshold(context, coord, previous_density, ecology.plant_density))
         {
             changed_mask |= TILE_ECOLOGY_CHANGED_DENSITY;
         }
         modified = true;
     }
 
-    if (std::fabs(tile.ecology.growth_pressure) > k_density_epsilon_raw)
+    if (std::fabs(ecology.growth_pressure) > k_density_epsilon_raw)
     {
-        tile.ecology.growth_pressure = 0.0f;
+        ecology.growth_pressure = 0.0f;
         changed_mask |= TILE_ECOLOGY_CHANGED_GROWTH_PRESSURE;
         modified = true;
     }
@@ -661,13 +669,13 @@ std::uint32_t apply_planting(
 
     if (modified)
     {
-        world.write_tile(coord, tile);
+        world.write_tile_ecology(coord, ecology);
         emit_plant_density_changed_log(
             context,
             coord,
             requested_plant,
             previous_density,
-            tile.ecology.plant_density);
+            ecology.plant_density);
     }
 
     return changed_mask;
@@ -690,23 +698,23 @@ std::uint32_t apply_watering(
         return TILE_ECOLOGY_CHANGED_NONE;
     }
 
-    auto tile = world.read_tile(coord);
-    if (!has_tile_occupant(tile.ecology.plant_id, tile.ecology.ground_cover_type_id))
+    auto ecology = world.read_tile_ecology(coord);
+    if (!has_tile_occupant(ecology.plant_id, ecology.ground_cover_type_id))
     {
         return TILE_ECOLOGY_CHANGED_NONE;
     }
 
     const float next_moisture = std::clamp(
-        tile.ecology.moisture + amount * tuning.moisture_gain_per_water_unit,
+        ecology.moisture + amount * tuning.moisture_gain_per_water_unit,
         0.0f,
         k_meter_scale);
-    if (std::fabs(next_moisture - tile.ecology.moisture) <= k_density_epsilon_raw)
+    if (std::fabs(next_moisture - ecology.moisture) <= k_density_epsilon_raw)
     {
         return TILE_ECOLOGY_CHANGED_NONE;
     }
 
-    tile.ecology.moisture = next_moisture;
-    world.write_tile(coord, tile);
+    ecology.moisture = next_moisture;
+    world.write_tile_ecology(coord, ecology);
     return TILE_ECOLOGY_CHANGED_MOISTURE;
 }
 
@@ -721,7 +729,7 @@ std::uint32_t apply_burial_cleared(
         return TILE_ECOLOGY_CHANGED_NONE;
     }
 
-    auto tile = world.read_tile(coord);
+    auto ecology = world.read_tile_ecology(coord);
     const float reduction = raw_meter_from_legacy_input(payload.cleared_amount);
     const auto tile_index = world.tile_index(coord);
     const auto& objective = world.read_objective();
@@ -731,25 +739,25 @@ std::uint32_t apply_burial_cleared(
         objective.target_tile_mask[tile_index] != 0U;
     if (is_highway_target)
     {
-        const float next_cover = std::max(0.0f, tile.ecology.soil_fertility - reduction);
-        if (std::fabs(tile.ecology.soil_fertility - next_cover) <= k_density_epsilon_raw)
+        const float next_cover = std::max(0.0f, ecology.soil_fertility - reduction);
+        if (std::fabs(ecology.soil_fertility - next_cover) <= k_density_epsilon_raw)
         {
             return TILE_ECOLOGY_CHANGED_NONE;
         }
 
-        tile.ecology.soil_fertility = next_cover;
-        world.write_tile(coord, tile);
+        ecology.soil_fertility = next_cover;
+        world.write_tile_ecology(coord, ecology);
         return TILE_ECOLOGY_CHANGED_FERTILITY;
     }
 
-    const float next_burial = std::max(0.0f, tile.ecology.sand_burial - reduction);
-    if (std::fabs(tile.ecology.sand_burial - next_burial) <= k_density_epsilon_raw)
+    const float next_burial = std::max(0.0f, ecology.sand_burial - reduction);
+    if (std::fabs(ecology.sand_burial - next_burial) <= k_density_epsilon_raw)
     {
         return TILE_ECOLOGY_CHANGED_NONE;
     }
 
-    tile.ecology.sand_burial = next_burial;
-    world.write_tile(coord, tile);
+    ecology.sand_burial = next_burial;
+    world.write_tile_ecology(coord, ecology);
     return TILE_ECOLOGY_CHANGED_SAND_BURIAL;
 }
 
@@ -764,8 +772,8 @@ std::uint32_t apply_harvest(
         return TILE_ECOLOGY_CHANGED_NONE;
     }
 
-    auto tile = world.read_tile(coord);
-    if (tile.ecology.plant_id.value != payload.plant_type_id)
+    auto ecology = world.read_tile_ecology(coord);
+    if (ecology.plant_id.value != payload.plant_type_id)
     {
         return TILE_ECOLOGY_CHANGED_NONE;
     }
@@ -776,37 +784,37 @@ std::uint32_t apply_harvest(
         return TILE_ECOLOGY_CHANGED_NONE;
     }
 
-    const float next_density = std::max(0.0f, tile.ecology.plant_density - density_removed);
-    if (std::fabs(next_density - tile.ecology.plant_density) <= k_density_epsilon)
+    const float next_density = std::max(0.0f, ecology.plant_density - density_removed);
+    if (std::fabs(next_density - ecology.plant_density) <= k_density_epsilon)
     {
         return TILE_ECOLOGY_CHANGED_NONE;
     }
 
-    const PlantId previous_plant_id = tile.ecology.plant_id;
-    const float previous_density = tile.ecology.plant_density;
-    tile.ecology.plant_density = next_density;
+    const PlantId previous_plant_id = ecology.plant_id;
+    const float previous_density = ecology.plant_density;
+    ecology.plant_density = next_density;
     std::uint32_t changed_mask = TILE_ECOLOGY_CHANGED_NONE;
-    if (density_crosses_report_threshold(context, coord, previous_density, tile.ecology.plant_density))
+    if (density_crosses_report_threshold(context, coord, previous_density, ecology.plant_density))
     {
         changed_mask |= TILE_ECOLOGY_CHANGED_DENSITY;
     }
-    if (tile.ecology.plant_density <= k_density_epsilon_raw)
+    if (ecology.plant_density <= k_density_epsilon_raw)
     {
-        tile.ecology.plant_density = 0.0f;
-        tile.ecology.plant_id = PlantId {};
-        tile.ecology.ground_cover_type_id = 0U;
-        tile.ecology.growth_pressure = 0.0f;
+        ecology.plant_density = 0.0f;
+        ecology.plant_id = PlantId {};
+        ecology.ground_cover_type_id = 0U;
+        ecology.growth_pressure = 0.0f;
         changed_mask |= TILE_ECOLOGY_CHANGED_OCCUPANCY |
             TILE_ECOLOGY_CHANGED_GROWTH_PRESSURE;
     }
 
-    world.write_tile(coord, tile);
+    world.write_tile_ecology(coord, ecology);
     emit_plant_density_changed_log(
         context,
         coord,
         previous_plant_id,
         previous_density,
-        tile.ecology.plant_density);
+        ecology.plant_density);
     return changed_mask;
 }
 
@@ -842,13 +850,13 @@ void update_restoration_progress(
 }
 
 float compute_highway_sand_cover_delta(
-    const SiteWorld::TileData& tile,
+    const SiteWorld::TileLocalWeatherData& local_weather,
     float simulation_dt_minutes) noexcept
 {
     const auto& tuning = ecology_tuning();
     return raw_from_unit_meter(
-        (std::max(tile.local_weather.wind, 0.0f) * tuning.highway_cover_gain_wind_scale +
-            std::max(tile.local_weather.dust, 0.0f) * tuning.highway_cover_gain_dust_scale) *
+        (std::max(local_weather.wind, 0.0f) * tuning.highway_cover_gain_wind_scale +
+            std::max(local_weather.dust, 0.0f) * tuning.highway_cover_gain_dust_scale) *
         std::max(simulation_dt_minutes, 0.0f));
 }
 
@@ -933,20 +941,21 @@ void emit_startup_ecology_snapshots(
     for (std::size_t index = 0U; index < tile_count; ++index)
     {
         const auto coord = context.world.tile_coord(index);
-        const auto tile = context.world.read_tile_at_index(index);
-        emit_site_one_startup_probe_log(context, coord, tile);
+        const auto ecology = context.world.read_tile_ecology_at_index(index);
+        emit_site_one_startup_probe_log(context, coord, ecology);
         emit_tile_ecology_changed(
             context,
             coord,
             TILE_ECOLOGY_CHANGED_OCCUPANCY |
                 TILE_ECOLOGY_CHANGED_DENSITY |
-                TILE_ECOLOGY_CHANGED_SAND_BURIAL);
-        if (has_tile_occupant(tile.ecology.plant_id, tile.ecology.ground_cover_type_id) &&
-            tile.ecology.plant_density >= k_meter_scale - k_density_epsilon_raw)
+                TILE_ECOLOGY_CHANGED_SAND_BURIAL,
+            ecology);
+        if (has_tile_occupant(ecology.plant_id, ecology.ground_cover_type_id) &&
+            ecology.plant_density >= k_meter_scale - k_density_epsilon_raw)
         {
             ++fully_grown_count;
         }
-        if (is_tracked_living_plant(tile.ecology.plant_id))
+        if (is_tracked_living_plant(ecology.plant_id))
         {
             ++tracked_living_plant_count;
         }
@@ -986,10 +995,15 @@ Gs1Status EcologySystem::process_message(
     {
         const auto& payload = message.payload_as<SiteGroundCoverPlacedMessage>();
         const TileCoord coord {payload.target_tile_x, payload.target_tile_y};
-        emit_tile_ecology_changed(
-            context,
-            coord,
-            apply_ground_cover(context.world, coord, payload));
+        const std::uint32_t changed_mask = apply_ground_cover(context.world, coord, payload);
+        if (changed_mask != TILE_ECOLOGY_CHANGED_NONE)
+        {
+            emit_tile_ecology_changed(
+                context,
+                coord,
+                changed_mask,
+                context.world.read_tile_ecology(coord));
+        }
         break;
     }
 
@@ -1001,10 +1015,15 @@ Gs1Status EcologySystem::process_message(
             coord,
             resolve_plant_tile_footprint(PlantId {payload.plant_type_id}),
             [&](TileCoord footprint_coord) {
-                emit_tile_ecology_changed(
-                    context,
-                    footprint_coord,
-                    apply_planting(context, footprint_coord, payload));
+                const std::uint32_t changed_mask = apply_planting(context, footprint_coord, payload);
+                if (changed_mask != TILE_ECOLOGY_CHANGED_NONE)
+                {
+                    emit_tile_ecology_changed(
+                        context,
+                        footprint_coord,
+                        changed_mask,
+                        context.world.read_tile_ecology(footprint_coord));
+                }
             });
         break;
     }
@@ -1013,10 +1032,15 @@ Gs1Status EcologySystem::process_message(
     {
         const auto& payload = message.payload_as<SiteTileWateredMessage>();
         const TileCoord coord {payload.target_tile_x, payload.target_tile_y};
-        emit_tile_ecology_changed(
-            context,
-            coord,
-            apply_watering(context.world, coord, payload));
+        const std::uint32_t changed_mask = apply_watering(context.world, coord, payload);
+        if (changed_mask != TILE_ECOLOGY_CHANGED_NONE)
+        {
+            emit_tile_ecology_changed(
+                context,
+                coord,
+                changed_mask,
+                context.world.read_tile_ecology(coord));
+        }
         break;
     }
 
@@ -1024,10 +1048,15 @@ Gs1Status EcologySystem::process_message(
     {
         const auto& payload = message.payload_as<SiteTileBurialClearedMessage>();
         const TileCoord coord {payload.target_tile_x, payload.target_tile_y};
-        emit_tile_ecology_changed(
-            context,
-            coord,
-            apply_burial_cleared(context, coord, payload));
+        const std::uint32_t changed_mask = apply_burial_cleared(context, coord, payload);
+        if (changed_mask != TILE_ECOLOGY_CHANGED_NONE)
+        {
+            emit_tile_ecology_changed(
+                context,
+                coord,
+                changed_mask,
+                context.world.read_tile_ecology(coord));
+        }
         break;
     }
 
@@ -1042,10 +1071,15 @@ Gs1Status EcologySystem::process_message(
             anchor,
             footprint,
             [&](TileCoord footprint_coord) {
-                emit_tile_ecology_changed(
-                    context,
-                    footprint_coord,
-                    apply_harvest(context, footprint_coord, payload));
+                const std::uint32_t changed_mask = apply_harvest(context, footprint_coord, payload);
+                if (changed_mask != TILE_ECOLOGY_CHANGED_NONE)
+                {
+                    emit_tile_ecology_changed(
+                        context,
+                        footprint_coord,
+                        changed_mask,
+                        context.world.read_tile_ecology(footprint_coord));
+                }
             });
         break;
     }
@@ -1079,8 +1113,13 @@ void EcologySystem::run(SiteSystemContext<EcologySystem>& context)
     const auto tile_count = context.world.tile_count();
     for (std::size_t index = 0; index < tile_count; ++index)
     {
-        auto tile = context.world.read_tile_at_index(index);
-        const auto previous_tile = tile;
+        auto ecology = context.world.read_tile_ecology_at_index(index);
+        const auto previous_ecology = ecology;
+        const auto local_weather = context.world.read_tile_local_weather_at_index(index);
+        const auto plant_weather_contribution =
+            context.world.read_tile_plant_weather_contribution_at_index(index);
+        const auto device_weather_contribution =
+            context.world.read_tile_device_weather_contribution_at_index(index);
         const auto coord = context.world.tile_coord(index);
         const bool is_highway_target =
             objective.type == SiteObjectiveType::HighwayProtection &&
@@ -1090,136 +1129,151 @@ void EcologySystem::run(SiteSystemContext<EcologySystem>& context)
         if (is_highway_target)
         {
             const float next_cover = std::clamp(
-                tile.ecology.soil_fertility +
-                    compute_highway_sand_cover_delta(tile, simulation_dt_minutes),
+                ecology.soil_fertility +
+                    compute_highway_sand_cover_delta(local_weather, simulation_dt_minutes),
                 0.0f,
                 k_meter_scale);
-            if (std::fabs(next_cover - tile.ecology.soil_fertility) > k_density_epsilon_raw)
+            if (std::fabs(next_cover - ecology.soil_fertility) > k_density_epsilon_raw)
             {
-                tile.ecology.soil_fertility = next_cover;
-                context.world.write_tile_at_index(index, tile);
-                emit_tile_ecology_changed(context, coord, TILE_ECOLOGY_CHANGED_FERTILITY);
+                ecology.soil_fertility = next_cover;
+                context.world.write_tile_ecology_at_index(index, ecology);
+                emit_tile_ecology_changed(context, coord, TILE_ECOLOGY_CHANGED_FERTILITY, ecology);
             }
 
-            highway_cover_sum += tile.ecology.soil_fertility;
+            highway_cover_sum += ecology.soil_fertility;
             highway_tile_count += 1U;
             continue;
         }
 
-        if (!has_tile_occupant(tile.ecology.plant_id, tile.ecology.ground_cover_type_id))
+        if (!has_tile_occupant(ecology.plant_id, ecology.ground_cover_type_id))
         {
-            if (std::fabs(tile.ecology.growth_pressure) > k_density_epsilon_raw)
+            if (std::fabs(ecology.growth_pressure) > k_density_epsilon_raw)
             {
-                tile.ecology.growth_pressure = 0.0f;
-                context.world.write_tile_at_index(index, tile);
+                ecology.growth_pressure = 0.0f;
+                context.world.write_tile_ecology_at_index(index, ecology);
                 emit_tile_ecology_changed(
                     context,
                     coord,
-                    TILE_ECOLOGY_CHANGED_GROWTH_PRESSURE);
+                    TILE_ECOLOGY_CHANGED_GROWTH_PRESSURE,
+                    ecology);
             }
             continue;
         }
 
-        const auto& plant_def = resolve_occupant_def(tile);
+        const auto& plant_def = resolve_occupant_def(ecology);
         std::uint32_t changed_mask = TILE_ECOLOGY_CHANGED_NONE;
         bool density_changed = false;
         bool tile_modified = false;
         const float effective_wind =
-            compute_effective_wind_exposure(context.world, coord, tile);
+            compute_effective_wind_exposure(context.world, coord, ecology, local_weather);
 
         const float next_moisture =
-            compute_next_moisture(tile, terrain_factor_modifiers, simulation_dt_minutes);
-        if (std::fabs(next_moisture - tile.ecology.moisture) > k_density_epsilon_raw)
+            compute_next_moisture(
+                ecology,
+                local_weather,
+                plant_weather_contribution,
+                device_weather_contribution,
+                terrain_factor_modifiers,
+                simulation_dt_minutes);
+        if (std::fabs(next_moisture - ecology.moisture) > k_density_epsilon_raw)
         {
-            tile.ecology.moisture = next_moisture;
+            ecology.moisture = next_moisture;
             changed_mask |= TILE_ECOLOGY_CHANGED_MOISTURE;
             tile_modified = true;
         }
 
         const float next_fertility =
             compute_next_fertility(
-                tile,
+                ecology,
+                local_weather,
+                plant_weather_contribution,
+                device_weather_contribution,
                 terrain_factor_modifiers,
                 simulation_dt_minutes);
-        if (std::fabs(next_fertility - tile.ecology.soil_fertility) > k_density_epsilon_raw)
+        if (std::fabs(next_fertility - ecology.soil_fertility) > k_density_epsilon_raw)
         {
-            tile.ecology.soil_fertility = next_fertility;
+            ecology.soil_fertility = next_fertility;
             changed_mask |= TILE_ECOLOGY_CHANGED_FERTILITY;
             tile_modified = true;
         }
 
         const float next_salinity =
-            compute_next_salinity(tile, terrain_factor_modifiers, simulation_dt_minutes);
-        if (std::fabs(next_salinity - tile.ecology.soil_salinity) > k_density_epsilon_raw)
+            compute_next_salinity(
+                ecology,
+                plant_weather_contribution,
+                device_weather_contribution,
+                terrain_factor_modifiers,
+                simulation_dt_minutes);
+        if (std::fabs(next_salinity - ecology.soil_salinity) > k_density_epsilon_raw)
         {
-            tile.ecology.soil_salinity = next_salinity;
+            ecology.soil_salinity = next_salinity;
             changed_mask |= TILE_ECOLOGY_CHANGED_SALINITY;
             tile_modified = true;
         }
 
         const float next_growth_pressure =
-            compute_growth_pressure(tile, plant_def, modifiers, effective_wind);
-        if (std::fabs(next_growth_pressure - tile.ecology.growth_pressure) > k_density_epsilon_raw)
+            compute_growth_pressure(ecology, local_weather, plant_def, modifiers, effective_wind);
+        if (std::fabs(next_growth_pressure - ecology.growth_pressure) > k_density_epsilon_raw)
         {
-            tile.ecology.growth_pressure = next_growth_pressure;
+            ecology.growth_pressure = next_growth_pressure;
             changed_mask |= TILE_ECOLOGY_CHANGED_GROWTH_PRESSURE;
             tile_modified = true;
         }
 
         const float salinity_cap =
-            compute_salinity_density_cap(tile.ecology, plant_def, modifiers);
+            compute_salinity_density_cap(ecology, plant_def, modifiers);
         const float density_delta =
             compute_density_delta(
-                tile,
+                ecology,
                 plant_def,
                 modifiers,
                 next_growth_pressure,
                 salinity_cap,
                 simulation_dt_minutes);
         const float next_density = std::clamp(
-            tile.ecology.plant_density +
+            ecology.plant_density +
                 density_delta,
             0.0f,
             k_meter_scale);
         emit_site_one_ecology_probe_log(
             context,
             coord,
-            previous_tile,
+            previous_ecology,
             density_delta,
             next_growth_pressure,
             effective_wind);
-        if (std::fabs(next_density - tile.ecology.plant_density) > k_density_epsilon)
+        if (std::fabs(next_density - ecology.plant_density) > k_density_epsilon)
         {
-            tile.ecology.plant_density = next_density;
+            ecology.plant_density = next_density;
             tile_modified = true;
             if (density_crosses_report_threshold(
                     context,
                     coord,
-                    previous_tile.ecology.plant_density,
-                    tile.ecology.plant_density))
+                    previous_ecology.plant_density,
+                    ecology.plant_density))
             {
                 changed_mask |= TILE_ECOLOGY_CHANGED_DENSITY;
                 density_changed = true;
             }
         }
 
-        if (tile.ecology.plant_density <= k_density_epsilon_raw &&
-            has_tile_occupant(tile.ecology.plant_id, tile.ecology.ground_cover_type_id))
+        if (ecology.plant_density <= k_density_epsilon_raw &&
+            has_tile_occupant(ecology.plant_id, ecology.ground_cover_type_id))
         {
-            tile.ecology.plant_density = 0.0f;
-            tile.ecology.plant_id = PlantId {};
-            tile.ecology.ground_cover_type_id = 0U;
-            tile.ecology.growth_pressure = 0.0f;
+            ecology.plant_density = 0.0f;
+            ecology.plant_id = PlantId {};
+            ecology.ground_cover_type_id = 0U;
+            ecology.growth_pressure = 0.0f;
             changed_mask |= TILE_ECOLOGY_CHANGED_OCCUPANCY |
                 TILE_ECOLOGY_CHANGED_DENSITY |
                 TILE_ECOLOGY_CHANGED_GROWTH_PRESSURE;
-            density_changed = std::fabs(previous_tile.ecology.plant_density) > k_density_epsilon;
+            density_changed = std::fabs(previous_ecology.plant_density) > k_density_epsilon;
             tile_modified = true;
         }
 
         if (tile_modified)
         {
-            context.world.write_tile_at_index(index, tile);
+            context.world.write_tile_ecology_at_index(index, ecology);
         }
 
         if (changed_mask != TILE_ECOLOGY_CHANGED_NONE)
@@ -1229,30 +1283,30 @@ void EcologySystem::run(SiteSystemContext<EcologySystem>& context)
                 emit_plant_density_changed_log(
                     context,
                     coord,
-                    previous_tile.ecology.plant_id,
-                    previous_tile.ecology.plant_density,
-                    tile.ecology.plant_density);
+                    previous_ecology.plant_id,
+                    previous_ecology.plant_density,
+                    ecology.plant_density);
             }
-            emit_tile_ecology_changed(context, coord, changed_mask);
+            emit_tile_ecology_changed(context, coord, changed_mask, ecology);
         }
 
-        if (is_tracked_living_plant(previous_tile.ecology.plant_id))
+        if (is_tracked_living_plant(previous_ecology.plant_id))
         {
-            if (!is_tracked_living_plant(tile.ecology.plant_id) ||
-                tile.ecology.plant_id != previous_tile.ecology.plant_id ||
-                tile.ecology.plant_density < previous_tile.ecology.plant_density - k_density_epsilon_raw)
+            if (!is_tracked_living_plant(ecology.plant_id) ||
+                ecology.plant_id != previous_ecology.plant_id ||
+                ecology.plant_density < previous_ecology.plant_density - k_density_epsilon_raw)
             {
                 any_tracked_plant_withering = true;
             }
         }
 
-        if (is_tracked_living_plant(tile.ecology.plant_id))
+        if (is_tracked_living_plant(ecology.plant_id))
         {
             ++tracked_living_plant_count;
         }
 
-        if (has_tile_occupant(tile.ecology.plant_id, tile.ecology.ground_cover_type_id) &&
-            tile.ecology.plant_density >= k_meter_scale - k_density_epsilon_raw)
+        if (has_tile_occupant(ecology.plant_id, ecology.ground_cover_type_id) &&
+            ecology.plant_density >= k_meter_scale - k_density_epsilon_raw)
         {
             ++fully_grown_count;
         }
