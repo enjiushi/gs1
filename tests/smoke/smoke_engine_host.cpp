@@ -299,21 +299,49 @@ SmokeEngineHost::SmokeEngineHost(
     , runtime_(runtime)
     , log_mode_(log_mode)
 {
+    publish_live_state_snapshot();
     smoke_log::infof("[ENGINE][BOOT] smoke host ready\n");
 }
 
 void SmokeEngineHost::queue_feedback_event(const Gs1FeedbackEvent& event)
 {
-    pending_feedback_events_.push_back(event);
+    std::scoped_lock lock {incoming_commands_mutex_};
+    incoming_feedback_events_.push_back(event);
+}
+
+void SmokeEngineHost::drain_incoming_commands()
+{
+    std::scoped_lock lock {incoming_commands_mutex_};
+
+    if (!incoming_pre_phase1_host_events_.empty())
+    {
+        frame_pre_phase1_host_events_.insert(
+            frame_pre_phase1_host_events_.end(),
+            incoming_pre_phase1_host_events_.begin(),
+            incoming_pre_phase1_host_events_.end());
+        incoming_pre_phase1_host_events_.clear();
+    }
+
+    if (!incoming_feedback_events_.empty())
+    {
+        frame_feedback_events_.insert(
+            frame_feedback_events_.end(),
+            incoming_feedback_events_.begin(),
+            incoming_feedback_events_.end());
+        incoming_feedback_events_.clear();
+    }
 }
 
 void SmokeEngineHost::update(double delta_seconds)
 {
     frame_number_ += 1U;
     current_frame_message_entries_.clear();
+    frame_live_state_patches_.clear();
+
+    drain_incoming_commands();
 
     apply_inflight_script_directive();
-    submit_host_events(pending_pre_phase1_host_events_, "pre_phase1");
+    submit_host_events(frame_pre_phase1_host_events_, "pre_phase1");
 
     Gs1Phase1Request phase1_request {};
     phase1_request.struct_size = sizeof(Gs1Phase1Request);
@@ -340,21 +368,21 @@ void SmokeEngineHost::update(double delta_seconds)
     queue_between_phase_ui_action_if_ready();
     submit_host_events(pending_between_phase_host_events_, "between_phases");
 
-    if (!pending_feedback_events_.empty())
+    if (!frame_feedback_events_.empty())
     {
         const auto status = api_->submit_feedback_events(
             runtime_,
-            pending_feedback_events_.data(),
-            static_cast<std::uint32_t>(pending_feedback_events_.size()));
+            frame_feedback_events_.data(),
+            static_cast<std::uint32_t>(frame_feedback_events_.size()));
         assert(status == GS1_STATUS_OK);
         if (log_mode_ == LogMode::Verbose)
         {
             smoke_log::infof("[ENGINE][FRAME %llu] submit_feedback_events status=%u count=%u\n",
                 static_cast<unsigned long long>(frame_number_),
                 static_cast<unsigned>(status),
-                static_cast<unsigned>(pending_feedback_events_.size()));
+                static_cast<unsigned>(frame_feedback_events_.size()));
         }
-        pending_feedback_events_.clear();
+        frame_feedback_events_.clear();
     }
 
     Gs1Phase2Request phase2_request {};
@@ -377,11 +405,13 @@ void SmokeEngineHost::update(double delta_seconds)
 
     flush_engine_messages("phase2");
     resolve_inflight_script_directive();
+    publish_live_state_snapshot();
 }
 
 void SmokeEngineHost::queue_ui_action(const Gs1UiAction& action)
 {
-    pending_pre_phase1_host_events_.push_back(make_ui_action_event(action));
+    std::scoped_lock lock {incoming_commands_mutex_};
+    incoming_pre_phase1_host_events_.push_back(make_ui_action_event(action));
 }
 
 void SmokeEngineHost::queue_site_action_request(const Gs1HostEventSiteActionRequestData& action)
@@ -389,7 +419,8 @@ void SmokeEngineHost::queue_site_action_request(const Gs1HostEventSiteActionRequ
     Gs1HostEvent event {};
     event.type = GS1_HOST_EVENT_SITE_ACTION_REQUEST;
     event.payload.site_action_request = action;
-    pending_pre_phase1_host_events_.push_back(event);
+    std::scoped_lock lock {incoming_commands_mutex_};
+    incoming_pre_phase1_host_events_.push_back(event);
 }
 
 void SmokeEngineHost::queue_site_action_cancel(const Gs1HostEventSiteActionCancelData& action)
@@ -397,7 +428,8 @@ void SmokeEngineHost::queue_site_action_cancel(const Gs1HostEventSiteActionCance
     Gs1HostEvent event {};
     event.type = GS1_HOST_EVENT_SITE_ACTION_CANCEL;
     event.payload.site_action_cancel = action;
-    pending_pre_phase1_host_events_.push_back(event);
+    std::scoped_lock lock {incoming_commands_mutex_};
+    incoming_pre_phase1_host_events_.push_back(event);
 }
 
 void SmokeEngineHost::queue_site_storage_view(const Gs1HostEventSiteStorageViewData& request)
@@ -405,7 +437,8 @@ void SmokeEngineHost::queue_site_storage_view(const Gs1HostEventSiteStorageViewD
     Gs1HostEvent event {};
     event.type = GS1_HOST_EVENT_SITE_STORAGE_VIEW;
     event.payload.site_storage_view = request;
-    pending_pre_phase1_host_events_.push_back(event);
+    std::scoped_lock lock {incoming_commands_mutex_};
+    incoming_pre_phase1_host_events_.push_back(event);
 }
 
 void SmokeEngineHost::queue_site_context_request(const Gs1HostEventSiteContextRequestData& request)
@@ -413,19 +446,26 @@ void SmokeEngineHost::queue_site_context_request(const Gs1HostEventSiteContextRe
     Gs1HostEvent event {};
     event.type = GS1_HOST_EVENT_SITE_CONTEXT_REQUEST;
     event.payload.site_context_request = request;
-    pending_pre_phase1_host_events_.push_back(event);
+    std::scoped_lock lock {incoming_commands_mutex_};
+    incoming_pre_phase1_host_events_.push_back(event);
 }
 
 void SmokeEngineHost::queue_site_move_direction(float world_move_x, float world_move_y, float world_move_z)
 {
+    std::scoped_lock lock {incoming_commands_mutex_};
     const auto duplicate = std::find_if(
-        pending_pre_phase1_host_events_.begin(),
-        pending_pre_phase1_host_events_.end(),
+        incoming_pre_phase1_host_events_.begin(),
+        incoming_pre_phase1_host_events_.end(),
         [](const Gs1HostEvent& event) {
             return event.type == GS1_HOST_EVENT_SITE_MOVE_DIRECTION;
         });
-    assert(duplicate == pending_pre_phase1_host_events_.end());
-    pending_pre_phase1_host_events_.push_back(make_site_move_direction_event(
+    if (duplicate != incoming_pre_phase1_host_events_.end())
+    {
+        *duplicate = make_site_move_direction_event(world_move_x, world_move_y, world_move_z);
+        return;
+    }
+
+    incoming_pre_phase1_host_events_.push_back(make_site_move_direction_event(
         world_move_x,
         world_move_y,
         world_move_z));
@@ -433,12 +473,19 @@ void SmokeEngineHost::queue_site_move_direction(float world_move_x, float world_
 
 std::vector<std::string> SmokeEngineHost::consume_pending_live_state_patches()
 {
-    auto patches = std::move(pending_live_state_patches_);
-    pending_live_state_patches_.clear();
+    std::scoped_lock lock {published_state_mutex_};
+    auto patches = std::move(published_live_state_patches_);
+    published_live_state_patches_.clear();
     return patches;
 }
 
 SmokeEngineHost::LiveStateSnapshot SmokeEngineHost::capture_live_state_snapshot() const
+{
+    std::scoped_lock lock {published_state_mutex_};
+    return published_live_state_snapshot_;
+}
+
+SmokeEngineHost::LiveStateSnapshot SmokeEngineHost::capture_frame_live_state_snapshot() const
 {
     LiveStateSnapshot snapshot {};
     snapshot.frame_number = frame_number_;
@@ -463,6 +510,21 @@ SmokeEngineHost::LiveStateSnapshot SmokeEngineHost::capture_live_state_snapshot(
     snapshot.site_action = site_action_;
     snapshot.site_result = site_result_;
     return snapshot;
+}
+
+void SmokeEngineHost::publish_live_state_snapshot()
+{
+    LiveStateSnapshot snapshot = capture_frame_live_state_snapshot();
+    std::scoped_lock lock {published_state_mutex_};
+    published_live_state_snapshot_ = std::move(snapshot);
+    if (!frame_live_state_patches_.empty())
+    {
+        published_live_state_patches_.insert(
+            published_live_state_patches_.end(),
+            frame_live_state_patches_.begin(),
+            frame_live_state_patches_.end());
+        frame_live_state_patches_.clear();
+    }
 }
 
 bool SmokeEngineHost::set_inflight_script_directive(SmokeScriptDirective directive)
@@ -497,7 +559,7 @@ bool SmokeEngineHost::saw_message(Gs1EngineMessageType type) const noexcept
 
 void SmokeEngineHost::queue_pre_phase1_ui_action_if_ready()
 {
-    (void)try_queue_ui_action_from_directive(pending_pre_phase1_host_events_);
+    (void)try_queue_ui_action_from_directive(frame_pre_phase1_host_events_);
 }
 
 void SmokeEngineHost::queue_between_phase_ui_action_if_ready()
@@ -1700,10 +1762,10 @@ void SmokeEngineHost::queue_live_state_patch(std::uint32_t field_mask)
         return;
     }
 
-    const auto patch = build_live_state_patch_json(capture_live_state_snapshot(), field_mask);
+    const auto patch = build_live_state_patch_json(capture_frame_live_state_snapshot(), field_mask);
     if (!patch.empty())
     {
-        pending_live_state_patches_.push_back(patch);
+        frame_live_state_patches_.push_back(patch);
     }
 }
 

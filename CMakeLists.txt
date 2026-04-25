@@ -316,6 +316,13 @@ if(GS1_BUILD_TESTS)
         src/site/site_world.cpp
         src/runtime/game_runtime.cpp)
 
+    add_executable(gs1_smoke_engine_host_threading_test
+        tests/runtime/smoke_engine_host_threading_test.cpp
+        tests/smoke/smoke_engine_host.cpp
+        tests/smoke/smoke_live_state_json.cpp
+        tests/smoke/smoke_log.cpp
+        ${GS1_CONTENT_RUNTIME_SOURCES})
+
     # The smoke hosts consume the public SDK plus internal content definitions
     # used to enrich live snapshot JSON for manual adapter verification.
     target_include_directories(gs1_smoke_host PRIVATE
@@ -346,6 +353,11 @@ if(GS1_BUILD_TESTS)
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${GS1_TOMLPLUSPLUS_INCLUDE_DIR})
+    target_include_directories(gs1_smoke_engine_host_threading_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/smoke
+        ${GS1_TOMLPLUSPLUS_INCLUDE_DIR})
     target_include_directories(gs1_system_test_host PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -370,6 +382,7 @@ if(GS1_BUILD_TESTS)
         target_compile_options(gs1_site_system_message_flow_test PRIVATE /W4 /permissive-)
         target_compile_options(gs1_local_weather_perf_probe PRIVATE /W4 /permissive-)
         target_compile_options(gs1_runtime_performance_test PRIVATE /W4 /permissive-)
+        target_compile_options(gs1_smoke_engine_host_threading_test PRIVATE /W4 /permissive-)
     else()
         target_compile_options(gs1_system_test_host PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(gs1_runtime_projection_test PRIVATE -Wall -Wextra -Wpedantic)
@@ -377,6 +390,7 @@ if(GS1_BUILD_TESTS)
         target_compile_options(gs1_site_system_message_flow_test PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(gs1_local_weather_perf_probe PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(gs1_runtime_performance_test PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(gs1_smoke_engine_host_threading_test PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 
     # Run the smoke host with the built DLL path and the default smoke script.
@@ -397,6 +411,10 @@ if(GS1_BUILD_TESTS)
     add_test(
         NAME gs1_site_system_message_flow_test
         COMMAND gs1_site_system_message_flow_test)
+
+    add_test(
+        NAME gs1_smoke_engine_host_threading_test
+        COMMAND gs1_smoke_engine_host_threading_test)
 
     set(GS1_SYSTEM_TEST_HOST_COMMAND
         gs1_system_test_host
@@ -421,6 +439,8 @@ if(GS1_BUILD_TESTS)
     set_tests_properties(gs1_runtime_message_chain_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(gs1_site_system_message_flow_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(gs1_smoke_engine_host_threading_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(gs1_system_test_host PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}

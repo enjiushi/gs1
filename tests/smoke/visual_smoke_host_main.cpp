@@ -38,7 +38,6 @@ struct LiveSession final
 
     SmokeEngineHost host;
     SiteControlState site_control {};
-    std::mutex host_mutex {};
     std::mutex site_control_mutex {};
 };
 
@@ -301,12 +300,7 @@ void run_live_mode(
     SmokeLiveHttpServer server {
         repo_root,
         [&session]() {
-            SmokeEngineHost::LiveStateSnapshot snapshot {};
-            {
-                std::scoped_lock lock {session.host_mutex};
-                snapshot = session.host.capture_live_state_snapshot();
-            }
-            return SmokeEngineHost::build_live_state_json(snapshot);
+            return session.host.build_live_state_json();
         },
         [&session](const std::string& body) {
             const auto action_type_name = extract_string_field(body, "type");
@@ -327,7 +321,6 @@ void run_live_mode(
             action.arg0 = extract_number_field<std::uint64_t>(body, "arg0").value_or(0ULL);
             action.arg1 = extract_number_field<std::uint64_t>(body, "arg1").value_or(0ULL);
 
-            std::scoped_lock lock {session.host_mutex};
             session.host.queue_ui_action(action);
         },
         [&session](const std::string& body) {
@@ -357,7 +350,6 @@ void run_live_mode(
                 extract_number_field<std::uint32_t>(body, "secondarySubjectId").value_or(0U);
             action.item_id = extract_number_field<std::uint32_t>(body, "itemId").value_or(0U);
 
-            std::scoped_lock lock {session.host_mutex};
             session.host.queue_site_action_request(action);
         },
         [&session](const std::string& body) {
@@ -365,7 +357,6 @@ void run_live_mode(
             action.action_id = extract_number_field<std::uint32_t>(body, "actionId").value_or(0U);
             action.flags = extract_number_field<std::uint32_t>(body, "flags").value_or(0U);
 
-            std::scoped_lock lock {session.host_mutex};
             session.host.queue_site_action_cancel(action);
         },
         [&session](const std::string& body) {
@@ -385,7 +376,6 @@ void run_live_mode(
             request.storage_id = extract_number_field<std::uint32_t>(body, "storageId").value_or(0U);
             request.event_kind = event_kind.value();
 
-            std::scoped_lock lock {session.host_mutex};
             session.host.queue_site_storage_view(request);
         },
         [&session](const std::string& body) {
@@ -394,7 +384,6 @@ void run_live_mode(
             request.tile_y = extract_number_field<std::int32_t>(body, "tileY").value_or(0);
             request.flags = extract_number_field<std::uint32_t>(body, "flags").value_or(0U);
 
-            std::scoped_lock lock {session.host_mutex};
             session.host.queue_site_context_request(request);
         },
         [&session](const std::string& body) {
@@ -440,18 +429,15 @@ void run_live_mode(
         }
 
         std::vector<std::string> pending_patches {};
+        if (site_control_snapshot.has_move_input)
         {
-            std::scoped_lock lock {session.host_mutex};
-            if (site_control_snapshot.has_move_input)
-            {
-                session.host.queue_site_move_direction(
-                    site_control_snapshot.world_move_x,
-                    site_control_snapshot.world_move_y,
-                    site_control_snapshot.world_move_z);
-            }
-            session.host.update(k_frame_delta_seconds);
-            pending_patches = session.host.consume_pending_live_state_patches();
+            session.host.queue_site_move_direction(
+                site_control_snapshot.world_move_x,
+                site_control_snapshot.world_move_y,
+                site_control_snapshot.world_move_z);
         }
+        session.host.update(k_frame_delta_seconds);
+        pending_patches = session.host.consume_pending_live_state_patches();
 
         for (const auto& patch : pending_patches)
         {

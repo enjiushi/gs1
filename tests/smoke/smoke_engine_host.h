@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <map>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -369,6 +370,7 @@ public:
     };
 
 private:
+    void drain_incoming_commands();
     void queue_pre_phase1_ui_action_if_ready();
     void queue_between_phase_ui_action_if_ready();
     void submit_host_events(
@@ -414,7 +416,9 @@ private:
     void apply_hud_state(const Gs1EngineMessage& message);
     void apply_site_action_update(const Gs1EngineMessage& message);
     void apply_site_result_ready(const Gs1EngineMessage& message);
+    void publish_live_state_snapshot();
     void queue_live_state_patch(std::uint32_t field_mask);
+    [[nodiscard]] LiveStateSnapshot capture_frame_live_state_snapshot() const;
     static void write_json_string(std::string& destination, std::string_view value);
     [[nodiscard]] std::vector<ActiveUiSetup> snapshot_active_ui_setups() const;
     [[nodiscard]] std::vector<RegionalMapSiteProjection> snapshot_regional_map_sites() const;
@@ -433,12 +437,18 @@ private:
     const Gs1RuntimeApi* api_ {nullptr};
     Gs1RuntimeHandle* runtime_ {nullptr};
     LogMode log_mode_ {LogMode::Verbose};
-    std::vector<Gs1HostEvent> pending_pre_phase1_host_events_ {};
+    mutable std::mutex incoming_commands_mutex_ {};
+    std::vector<Gs1HostEvent> incoming_pre_phase1_host_events_ {};
+    std::vector<Gs1FeedbackEvent> incoming_feedback_events_ {};
+    mutable std::mutex published_state_mutex_ {};
+    LiveStateSnapshot published_live_state_snapshot_ {};
+    std::vector<std::string> published_live_state_patches_ {};
+    std::vector<Gs1HostEvent> frame_pre_phase1_host_events_ {};
     std::vector<Gs1HostEvent> pending_between_phase_host_events_ {};
-    std::vector<Gs1FeedbackEvent> pending_feedback_events_ {};
+    std::vector<Gs1FeedbackEvent> frame_feedback_events_ {};
     std::vector<std::string> message_logs_ {};
     std::vector<std::string> current_frame_message_entries_ {};
-    std::vector<std::string> pending_live_state_patches_ {};
+    std::vector<std::string> frame_live_state_patches_ {};
     std::vector<Gs1EngineMessageType> seen_messages_ {};
     std::map<Gs1UiSetupId, ActiveUiSetup> active_ui_setups_ {};
     std::optional<PendingUiSetup> pending_ui_setup_ {};
