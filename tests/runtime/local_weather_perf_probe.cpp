@@ -1,6 +1,8 @@
 #include "campaign/campaign_state.h"
+#include "content/defs/plant_defs.h"
 #include "messages/game_message.h"
 #include "site/site_run_state.h"
+#include "site/tile_footprint.h"
 #include "site/site_world.h"
 #include "site/systems/device_weather_contribution_system.h"
 #include "site/systems/local_weather_resolve_system.h"
@@ -29,6 +31,36 @@ struct PipelineTimings final
     double device_ms {0.0};
     double resolve_ms {0.0};
     double total_ms {0.0};
+};
+
+struct SeededPlant final
+{
+    gs1::PlantId plant_id {};
+    gs1::TileCoord anchor {};
+    float density {0.0f};
+};
+
+constexpr SeededPlant kPerfSeededPlants[] {
+    {gs1::PlantId {gs1::k_plant_straw_checkerboard}, gs1::TileCoord {2, 2}, 58.0f},
+    {gs1::PlantId {gs1::k_plant_ordos_wormwood}, gs1::TileCoord {6, 2}, 64.0f},
+    {gs1::PlantId {gs1::k_plant_white_thorn}, gs1::TileCoord {10, 2}, 62.0f},
+    {gs1::PlantId {gs1::k_plant_red_tamarisk}, gs1::TileCoord {20, 2}, 66.0f},
+    {gs1::PlantId {gs1::k_plant_ningxia_wolfberry}, gs1::TileCoord {24, 2}, 60.0f},
+    {gs1::PlantId {gs1::k_plant_korshinsk_peashrub}, gs1::TileCoord {2, 6}, 63.0f},
+    {gs1::PlantId {gs1::k_plant_jiji_grass}, gs1::TileCoord {6, 6}, 57.0f},
+    {gs1::PlantId {gs1::k_plant_sea_buckthorn}, gs1::TileCoord {10, 6}, 68.0f},
+    {gs1::PlantId {gs1::k_plant_desert_ephedra}, gs1::TileCoord {20, 6}, 59.0f},
+    {gs1::PlantId {gs1::k_plant_saxaul}, gs1::TileCoord {24, 6}, 72.0f},
+    {gs1::PlantId {gs1::k_plant_ordos_wormwood}, gs1::TileCoord {2, 22}, 61.0f},
+    {gs1::PlantId {gs1::k_plant_white_thorn}, gs1::TileCoord {6, 22}, 65.0f},
+    {gs1::PlantId {gs1::k_plant_red_tamarisk}, gs1::TileCoord {10, 22}, 67.0f},
+    {gs1::PlantId {gs1::k_plant_ningxia_wolfberry}, gs1::TileCoord {20, 22}, 56.0f},
+    {gs1::PlantId {gs1::k_plant_straw_checkerboard}, gs1::TileCoord {24, 22}, 55.0f},
+    {gs1::PlantId {gs1::k_plant_korshinsk_peashrub}, gs1::TileCoord {2, 26}, 64.0f},
+    {gs1::PlantId {gs1::k_plant_jiji_grass}, gs1::TileCoord {6, 26}, 58.0f},
+    {gs1::PlantId {gs1::k_plant_sea_buckthorn}, gs1::TileCoord {10, 26}, 69.0f},
+    {gs1::PlantId {gs1::k_plant_desert_ephedra}, gs1::TileCoord {20, 26}, 60.0f},
+    {gs1::PlantId {gs1::k_plant_saxaul}, gs1::TileCoord {24, 26}, 74.0f},
 };
 
 gs1::SiteRunState make_site_run()
@@ -73,6 +105,30 @@ void seed_dense_cover(gs1::SiteRunState& site_run)
         tile.ecology.plant_density = 0.35f + (static_cast<float>(index % 5U) * 0.1f);
         tile.ecology.sand_burial = static_cast<float>(index % 4U) * 0.15f;
         site_run.site_world->set_tile_at_index(index, tile);
+    }
+}
+
+void seed_perf_plants(gs1::SiteRunState& site_run)
+{
+    for (const auto& seeded_plant : kPerfSeededPlants)
+    {
+        const auto footprint = gs1::resolve_plant_tile_footprint(seeded_plant.plant_id);
+        gs1::for_each_tile_in_footprint(
+            seeded_plant.anchor,
+            footprint,
+            [&](gs1::TileCoord coord) {
+                if (!site_run.site_world->contains(coord))
+                {
+                    return;
+                }
+
+                auto tile = site_run.site_world->tile_at(coord);
+                tile.ecology.plant_id = seeded_plant.plant_id;
+                tile.ecology.ground_cover_type_id = 0U;
+                tile.ecology.plant_density = seeded_plant.density;
+                tile.ecology.growth_pressure = 0.0f;
+                site_run.site_world->set_tile(coord, tile);
+            });
     }
 }
 
@@ -145,6 +201,7 @@ PipelineTimings measure_initial_pass_ms()
     {
         auto site_run = make_site_run();
         seed_dense_cover(site_run);
+        seed_perf_plants(site_run);
         message_queue.clear();
 
         accumulate_timings(totals, run_local_weather_pipeline(campaign, site_run, message_queue));
@@ -159,6 +216,7 @@ PipelineTimings measure_steady_state_pass_ms()
     gs1::GameMessageQueue message_queue {};
     auto site_run = make_site_run();
     seed_dense_cover(site_run);
+    seed_perf_plants(site_run);
 
     run_local_weather_pipeline(campaign, site_run, message_queue);
 
@@ -190,6 +248,7 @@ int main()
     std::cout << "Local weather perf probe\n";
     std::cout << "grid: " << kSiteWidth << "x" << kSiteHeight << " (" << kTileCount << " tiles)\n";
     std::cout << "pipeline: plant contribution -> device contribution -> local weather resolve\n";
+    std::cout << "seeded_plants: " << std::size(kPerfSeededPlants) << " mixed authored placements\n";
     print_stage_timings("initial pass", kInitialPassIterations, initial_pass);
     print_stage_timings("steady-state", kSteadyStateIterations, steady_state_pass);
     std::cout << "steady-state share of 60 FPS frame budget: "

@@ -1,5 +1,6 @@
+#include "content/defs/plant_defs.h"
 #include "runtime/game_runtime.h"
-#include "site/site_world_access.h"
+#include "site/tile_footprint.h"
 
 #include <algorithm>
 #include <cassert>
@@ -124,6 +125,36 @@ struct ScenarioResult final
     Gs1RuntimeProfilingSnapshot profiling {};
 };
 
+struct SeededPlant final
+{
+    gs1::PlantId plant_id {};
+    TileCoord anchor {};
+    float density {0.0f};
+};
+
+constexpr SeededPlant kPerfSeededPlants[] {
+    {gs1::PlantId {gs1::k_plant_straw_checkerboard}, TileCoord {2, 2}, 58.0f},
+    {gs1::PlantId {gs1::k_plant_ordos_wormwood}, TileCoord {6, 2}, 64.0f},
+    {gs1::PlantId {gs1::k_plant_white_thorn}, TileCoord {10, 2}, 62.0f},
+    {gs1::PlantId {gs1::k_plant_red_tamarisk}, TileCoord {20, 2}, 66.0f},
+    {gs1::PlantId {gs1::k_plant_ningxia_wolfberry}, TileCoord {24, 2}, 60.0f},
+    {gs1::PlantId {gs1::k_plant_korshinsk_peashrub}, TileCoord {2, 6}, 63.0f},
+    {gs1::PlantId {gs1::k_plant_jiji_grass}, TileCoord {6, 6}, 57.0f},
+    {gs1::PlantId {gs1::k_plant_sea_buckthorn}, TileCoord {10, 6}, 68.0f},
+    {gs1::PlantId {gs1::k_plant_desert_ephedra}, TileCoord {20, 6}, 59.0f},
+    {gs1::PlantId {gs1::k_plant_saxaul}, TileCoord {24, 6}, 72.0f},
+    {gs1::PlantId {gs1::k_plant_ordos_wormwood}, TileCoord {2, 22}, 61.0f},
+    {gs1::PlantId {gs1::k_plant_white_thorn}, TileCoord {6, 22}, 65.0f},
+    {gs1::PlantId {gs1::k_plant_red_tamarisk}, TileCoord {10, 22}, 67.0f},
+    {gs1::PlantId {gs1::k_plant_ningxia_wolfberry}, TileCoord {20, 22}, 56.0f},
+    {gs1::PlantId {gs1::k_plant_straw_checkerboard}, TileCoord {24, 22}, 55.0f},
+    {gs1::PlantId {gs1::k_plant_korshinsk_peashrub}, TileCoord {2, 26}, 64.0f},
+    {gs1::PlantId {gs1::k_plant_jiji_grass}, TileCoord {6, 26}, 58.0f},
+    {gs1::PlantId {gs1::k_plant_sea_buckthorn}, TileCoord {10, 26}, 69.0f},
+    {gs1::PlantId {gs1::k_plant_desert_ephedra}, TileCoord {20, 26}, 60.0f},
+    {gs1::PlantId {gs1::k_plant_saxaul}, TileCoord {24, 26}, 74.0f},
+};
+
 GameMessage make_start_campaign_message()
 {
     GameMessage message {};
@@ -192,6 +223,31 @@ void seed_dense_cover(SiteRunState& site_run)
     }
 }
 
+void seed_perf_plants(SiteRunState& site_run)
+{
+    require(site_run.site_world != nullptr, "site run has no site world");
+    for (const auto& seeded_plant : kPerfSeededPlants)
+    {
+        const auto footprint = gs1::resolve_plant_tile_footprint(seeded_plant.plant_id);
+        gs1::for_each_tile_in_footprint(
+            seeded_plant.anchor,
+            footprint,
+            [&](TileCoord coord) {
+                if (!site_run.site_world->contains(coord))
+                {
+                    return;
+                }
+
+                auto tile = site_run.site_world->tile_at(coord);
+                tile.ecology.plant_id = seeded_plant.plant_id;
+                tile.ecology.ground_cover_type_id = 0U;
+                tile.ecology.plant_density = seeded_plant.density;
+                tile.ecology.growth_pressure = 0.0f;
+                site_run.site_world->set_tile(coord, tile);
+            });
+    }
+}
+
 const NamedSystem* find_named_system(std::string_view name)
 {
     const auto it = std::find_if(
@@ -235,6 +291,7 @@ ScenarioResult run_scenario(const ScenarioConfig& config)
     require(active_site_run.has_value(), "active site run missing after bootstrap");
     auto& site_run = active_site_run.value();
     seed_dense_cover(site_run);
+    seed_perf_plants(site_run);
     drain_engine_messages(runtime);
 
     for (const auto system_id : config.disabled_systems)
@@ -451,6 +508,7 @@ int main(int argc, char** argv)
     std::cout << "GS1 runtime performance test\n";
     std::cout << "  fixed_step_seconds=" << std::fixed << std::setprecision(6) << kFixedStepSeconds << "\n";
     std::cout << "  note=local weather resolution is enabled in normal builds\n";
+    std::cout << "  seeded_plants=" << std::size(kPerfSeededPlants) << " mixed authored placements\n";
 
     for (const auto& scenario : scenarios)
     {
