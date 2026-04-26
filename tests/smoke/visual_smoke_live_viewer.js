@@ -5751,30 +5751,29 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         worldGroup.add(line);
     }
 
-    function renderRegionalMapScene(state) {
-        currentSceneKind = "REGIONAL_MAP";
-        scene.background = new THREE_NS.Color(0xe6cfac);
+    function createRegionalMapBoardVisual() {
+        const boardGroup = new THREE_NS.Group();
 
         const board = new THREE_NS.Mesh(
             new THREE_NS.BoxGeometry(34.0, 0.72, 22.0),
             new THREE_NS.MeshStandardMaterial({ color: 0x6c4b2d, roughness: 0.95, metalness: 0.04 })
         );
         board.position.set(0, -0.48, 0);
-        worldGroup.add(board);
+        boardGroup.add(board);
 
         const mapSheet = new THREE_NS.Mesh(
             new THREE_NS.BoxGeometry(31.0, 0.16, 18.8),
             new THREE_NS.MeshStandardMaterial({ color: 0xd9bf90, roughness: 0.98, metalness: 0.01 })
         );
         mapSheet.position.set(0, -0.03, 0);
-        worldGroup.add(mapSheet);
+        boardGroup.add(mapSheet);
 
         const mapInset = new THREE_NS.Mesh(
             new THREE_NS.BoxGeometry(29.8, 0.04, 17.6),
             new THREE_NS.MeshStandardMaterial({ color: 0xcfae78, roughness: 1.0, metalness: 0.0 })
         );
         mapInset.position.set(0, 0.06, 0);
-        worldGroup.add(mapInset);
+        boardGroup.add(mapInset);
 
         const northMarker = new THREE_NS.Mesh(
             new THREE_NS.ConeGeometry(0.18, 0.6, 3),
@@ -5782,7 +5781,113 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         );
         northMarker.rotation.x = Math.PI;
         northMarker.position.set(13.5, 0.28, -7.6);
-        worldGroup.add(northMarker);
+        boardGroup.add(northMarker);
+
+        return collapseStaticMeshHierarchy(boardGroup);
+    }
+
+    function createRegionalMapTileVisual(tileSpacing, occupied, positionX, positionZ) {
+        const tileGroup = new THREE_NS.Group();
+
+        const tile = new THREE_NS.Mesh(
+            new THREE_NS.BoxGeometry(tileSpacing * 0.86, 0.06, tileSpacing * 0.86),
+            new THREE_NS.MeshStandardMaterial({
+                color: occupied ? 0xcfa66e : 0xdbbd8c,
+                roughness: occupied ? 0.92 : 0.97,
+                metalness: 0.01
+            })
+        );
+        tile.position.set(positionX, 0.1, positionZ);
+        tileGroup.add(tile);
+
+        const tileOutline = new THREE_NS.Mesh(
+            new THREE_NS.BoxGeometry(tileSpacing * 0.92, 0.01, tileSpacing * 0.92),
+            new THREE_NS.MeshStandardMaterial({
+                color: occupied ? 0x8e6639 : 0xb98d5b,
+                roughness: 1.0,
+                metalness: 0.0
+            })
+        );
+        tileOutline.position.set(positionX, 0.135, positionZ);
+        tileGroup.add(tileOutline);
+
+        return collapseStaticMeshHierarchy(tileGroup);
+    }
+
+    function createRegionalMapMarkerVisual(site, isSelected) {
+        const markerGroup = new THREE_NS.Group();
+        const palette =
+            site.siteState === "AVAILABLE"
+                ? { plinth: 0x816346, badge: 0x6f8756, cloth: 0x99ad74 }
+                : site.siteState === "COMPLETED"
+                    ? { plinth: 0x785736, badge: 0xb18755, cloth: 0xcab47b }
+                    : { plinth: 0x6d6156, badge: 0x918474, cloth: 0x918474 };
+
+        const plinth = new THREE_NS.Mesh(
+            new THREE_NS.CylinderGeometry(0.72, 0.82, 0.18, 24),
+            new THREE_NS.MeshStandardMaterial({ color: palette.plinth, roughness: 0.9, metalness: 0.05 })
+        );
+        plinth.position.y = 0.12;
+        markerGroup.add(plinth);
+
+        const badge = new THREE_NS.Mesh(
+            new THREE_NS.CylinderGeometry(0.44, 0.5, 0.12, 18),
+            new THREE_NS.MeshStandardMaterial({ color: palette.badge, roughness: 0.82, metalness: 0.06 })
+        );
+        badge.position.y = 0.27;
+        markerGroup.add(badge);
+
+        const post = new THREE_NS.Mesh(
+            new THREE_NS.CylinderGeometry(0.04, 0.04, 0.4, 8),
+            new THREE_NS.MeshStandardMaterial({ color: 0x3f2c18, roughness: 0.88, metalness: 0.04 })
+        );
+        post.position.y = 0.5;
+        markerGroup.add(post);
+
+        if (site.siteState !== "LOCKED") {
+            const pennant = new THREE_NS.Mesh(
+                new THREE_NS.BoxGeometry(0.12, 0.28, 0.02),
+                new THREE_NS.MeshStandardMaterial({ color: palette.cloth, roughness: 0.82, metalness: 0.02 })
+            );
+            pennant.position.set(0.13, 0.64, 0.0);
+            pennant.rotation.z = -0.18;
+            markerGroup.add(pennant);
+        }
+
+        if (isSelected) {
+            const selectedRing = new THREE_NS.Mesh(
+                new THREE_NS.TorusGeometry(1.04, 0.05, 10, 48),
+                new THREE_NS.MeshStandardMaterial({ color: 0xcfb07a, roughness: 0.72, metalness: 0.18 })
+            );
+            selectedRing.rotation.x = Math.PI / 2;
+            selectedRing.position.y = 0.16;
+            markerGroup.add(selectedRing);
+
+            [
+                { x: -0.84, z: -0.84 },
+                { x: 0.84, z: -0.84 },
+                { x: -0.84, z: 0.84 },
+                { x: 0.84, z: 0.84 }
+            ].forEach((corner) => {
+                const marker = new THREE_NS.Mesh(
+                    new THREE_NS.BoxGeometry(0.18, 0.06, 0.42),
+                    new THREE_NS.MeshStandardMaterial({ color: 0x5a4126, roughness: 0.88, metalness: 0.04 })
+                );
+                marker.position.set(corner.x, 0.15, corner.z);
+                marker.rotation.y = Math.atan2(corner.x, corner.z);
+                markerGroup.add(marker);
+            });
+        }
+
+        markerGroup.userData = { siteId: site.siteId, siteState: site.siteState };
+        return collapseStaticMeshHierarchy(markerGroup);
+    }
+
+    function renderRegionalMapScene(state) {
+        currentSceneKind = "REGIONAL_MAP";
+        scene.background = new THREE_NS.Color(0xe6cfac);
+
+        worldGroup.add(createRegionalMapBoardVisual());
 
         const positions = new Map();
         const mapTileSourceSpacing = 160;
@@ -5823,27 +5928,14 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             for (let tileY = minTileY; tileY <= maxTileY; tileY += 1) {
                 for (let tileX = minTileX; tileX <= maxTileX; tileX += 1) {
                     const occupied = rawPositions.some((entry) => entry.tileX === tileX && entry.tileY === tileY);
-                    const tile = new THREE_NS.Mesh(
-                        new THREE_NS.BoxGeometry(tileSpacing * 0.86, 0.06, tileSpacing * 0.86),
-                        new THREE_NS.MeshStandardMaterial({
-                            color: occupied ? 0xcfa66e : 0xdbbd8c,
-                            roughness: occupied ? 0.92 : 0.97,
-                            metalness: 0.01
-                        })
+                    worldGroup.add(
+                        createRegionalMapTileVisual(
+                            tileSpacing,
+                            occupied,
+                            tileX * tileSpacing - rawCenterX,
+                            -(tileY * tileSpacing) - rawCenterZ
+                        )
                     );
-                    tile.position.set(tileX * tileSpacing - rawCenterX, 0.1, -(tileY * tileSpacing) - rawCenterZ);
-                    worldGroup.add(tile);
-
-                    const tileOutline = new THREE_NS.Mesh(
-                        new THREE_NS.BoxGeometry(tileSpacing * 0.92, 0.01, tileSpacing * 0.92),
-                        new THREE_NS.MeshStandardMaterial({
-                            color: occupied ? 0x8e6639 : 0xb98d5b,
-                            roughness: 1.0,
-                            metalness: 0.0
-                        })
-                    );
-                    tileOutline.position.set(tile.position.x, 0.135, tile.position.z);
-                    worldGroup.add(tileOutline);
                 }
             }
         }
@@ -5945,80 +6037,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             if (!position) {
                 return;
             }
-
-            const markerGroup = new THREE_NS.Group();
-            markerGroup.position.set(position.x, 0.0, position.z);
-
-            const palette =
-                site.siteState === "AVAILABLE"
-                    ? { plinth: 0x816346, badge: 0x6f8756, cloth: 0x99ad74 }
-                    : site.siteState === "COMPLETED"
-                        ? { plinth: 0x785736, badge: 0xb18755, cloth: 0xcab47b }
-                        : { plinth: 0x6d6156, badge: 0x918474, cloth: 0x918474 };
-
-            const plinth = new THREE_NS.Mesh(
-                new THREE_NS.CylinderGeometry(0.72, 0.82, 0.18, 24),
-                new THREE_NS.MeshStandardMaterial({ color: palette.plinth, roughness: 0.9, metalness: 0.05 })
-            );
-            plinth.position.y = 0.12;
-            plinth.userData = { siteId: site.siteId, siteState: site.siteState };
-            markerGroup.add(plinth);
-
-            const badge = new THREE_NS.Mesh(
-                new THREE_NS.CylinderGeometry(0.44, 0.5, 0.12, 18),
-                new THREE_NS.MeshStandardMaterial({ color: palette.badge, roughness: 0.82, metalness: 0.06 })
-            );
-            badge.position.y = 0.27;
-            markerGroup.add(badge);
-
-            const post = new THREE_NS.Mesh(
-                new THREE_NS.CylinderGeometry(0.04, 0.04, 0.4, 8),
-                new THREE_NS.MeshStandardMaterial({ color: 0x3f2c18, roughness: 0.88, metalness: 0.04 })
-            );
-            post.position.y = 0.5;
-            markerGroup.add(post);
-
-            if (site.siteState !== "LOCKED") {
-                const pennant = new THREE_NS.Mesh(
-                    new THREE_NS.BoxGeometry(0.12, 0.28, 0.02),
-                    new THREE_NS.MeshStandardMaterial({ color: palette.cloth, roughness: 0.82, metalness: 0.02 })
-                );
-                pennant.position.set(0.13, 0.64, 0.0);
-                pennant.rotation.z = -0.18;
-                markerGroup.add(pennant);
-            }
-
-            if (site.siteState === "AVAILABLE") {
-                mapPickables.push(plinth);
-            }
-
             const isSelected = state.selectedSiteId === site.siteId || (site.flags & 1) !== 0;
-            if (isSelected) {
-                const selectedRing = new THREE_NS.Mesh(
-                    new THREE_NS.TorusGeometry(1.04, 0.05, 10, 48),
-                    new THREE_NS.MeshStandardMaterial({ color: 0xcfb07a, roughness: 0.72, metalness: 0.18 })
-                );
-                selectedRing.rotation.x = Math.PI / 2;
-                selectedRing.position.y = 0.16;
-                markerGroup.add(selectedRing);
-
-                [
-                    { x: -0.84, z: -0.84 },
-                    { x: 0.84, z: -0.84 },
-                    { x: -0.84, z: 0.84 },
-                    { x: 0.84, z: 0.84 }
-                ].forEach((corner) => {
-                    const marker = new THREE_NS.Mesh(
-                        new THREE_NS.BoxGeometry(0.18, 0.06, 0.42),
-                        new THREE_NS.MeshStandardMaterial({ color: 0x5a4126, roughness: 0.88, metalness: 0.04 })
-                    );
-                    marker.position.set(corner.x, 0.15, corner.z);
-                    marker.rotation.y = Math.atan2(corner.x, corner.z);
-                    markerGroup.add(marker);
-                });
+            const markerVisual = createRegionalMapMarkerVisual(site, isSelected);
+            markerVisual.position.set(position.x, 0.0, position.z);
+            if (site.siteState === "AVAILABLE") {
+                mapPickables.push(markerVisual);
             }
-
-            worldGroup.add(markerGroup);
+            worldGroup.add(markerVisual);
         });
 
         if (state.regionalMap.sites.length > 0) {
@@ -6040,6 +6065,253 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function lerp(left, right, amount) {
         return left + (right - left) * amount;
+    }
+
+    function tagMergeableMaterial(material, traits) {
+        if (!material) {
+            return material;
+        }
+        material.userData = material.userData || {};
+        if (traits) {
+            Object.assign(material.userData, traits);
+        }
+        return material;
+    }
+
+    function getMergeableMaterialSignature(material) {
+        if (!material) {
+            return "";
+        }
+        const userData = material.userData || {};
+        return JSON.stringify({
+            type: material.type || "Material",
+            color:
+                material.color && typeof material.color.getHex === "function"
+                    ? material.color.getHex()
+                    : null,
+            roughness:
+                typeof material.roughness === "number"
+                    ? Number(material.roughness.toFixed(4))
+                    : null,
+            metalness:
+                typeof material.metalness === "number"
+                    ? Number(material.metalness.toFixed(4))
+                    : null,
+            emissive:
+                material.emissive && typeof material.emissive.getHex === "function"
+                    ? material.emissive.getHex()
+                    : null,
+            emissiveIntensity:
+                typeof material.emissiveIntensity === "number"
+                    ? Number(material.emissiveIntensity.toFixed(4))
+                    : null,
+            transparent: material.transparent === true,
+            opacity:
+                typeof material.opacity === "number"
+                    ? Number(material.opacity.toFixed(4))
+                    : 1,
+            depthWrite: material.depthWrite !== false,
+            side:
+                typeof material.side === "number"
+                    ? material.side
+                    : THREE_NS.FrontSide,
+            windReactive: userData.windReactive === true,
+            windFlexibility:
+                typeof userData.windFlexibility === "number"
+                    ? Number(userData.windFlexibility.toFixed(4))
+                    : null
+        });
+    }
+
+    function mergeGeometryAttributes(attributes) {
+        if (!attributes || attributes.length === 0) {
+            return null;
+        }
+
+        const first = attributes[0];
+        const TypedArray = first.array.constructor;
+        const itemSize = first.itemSize;
+        const normalized = first.normalized;
+        let totalLength = 0;
+
+        for (let index = 0; index < attributes.length; index += 1) {
+            const attribute = attributes[index];
+            if (!attribute ||
+                attribute.array.constructor !== TypedArray ||
+                attribute.itemSize !== itemSize ||
+                attribute.normalized !== normalized) {
+                return null;
+            }
+            totalLength += attribute.array.length;
+        }
+
+        const mergedArray = new TypedArray(totalLength);
+        let offset = 0;
+        for (let index = 0; index < attributes.length; index += 1) {
+            const attribute = attributes[index];
+            mergedArray.set(attribute.array, offset);
+            offset += attribute.array.length;
+        }
+
+        return new THREE_NS.BufferAttribute(mergedArray, itemSize, normalized);
+    }
+
+    function mergeCompatibleGeometries(geometries, useGroups) {
+        if (!geometries || geometries.length === 0) {
+            return null;
+        }
+
+        const first = geometries[0];
+        const attributeNames = Object.keys(first.attributes);
+        const mergedGeometry = new THREE_NS.BufferGeometry();
+        const firstHasIndex = first.index !== null;
+        let groupOffset = 0;
+
+        for (let geometryIndex = 0; geometryIndex < geometries.length; geometryIndex += 1) {
+            const geometry = geometries[geometryIndex];
+            if (!geometry || (geometry.index !== null) !== firstHasIndex) {
+                return null;
+            }
+
+            const geometryAttributeNames = Object.keys(geometry.attributes);
+            if (geometryAttributeNames.length !== attributeNames.length) {
+                return null;
+            }
+
+            for (let attributeIndex = 0; attributeIndex < attributeNames.length; attributeIndex += 1) {
+                const attributeName = attributeNames[attributeIndex];
+                if (!geometry.getAttribute(attributeName)) {
+                    return null;
+                }
+            }
+
+            if (useGroups) {
+                const positionAttribute = geometry.getAttribute("position");
+                if (!positionAttribute) {
+                    return null;
+                }
+                const drawCount = firstHasIndex ? geometry.index.count : positionAttribute.count;
+                mergedGeometry.addGroup(groupOffset, drawCount, geometryIndex);
+                groupOffset += drawCount;
+            }
+        }
+
+        if (firstHasIndex) {
+            const mergedIndex = [];
+            let vertexOffset = 0;
+            for (let geometryIndex = 0; geometryIndex < geometries.length; geometryIndex += 1) {
+                const geometry = geometries[geometryIndex];
+                const positionAttribute = geometry.getAttribute("position");
+                for (let indexOffset = 0; indexOffset < geometry.index.count; indexOffset += 1) {
+                    mergedIndex.push(geometry.index.getX(indexOffset) + vertexOffset);
+                }
+                vertexOffset += positionAttribute.count;
+            }
+            mergedGeometry.setIndex(mergedIndex);
+        }
+
+        for (let attributeIndex = 0; attributeIndex < attributeNames.length; attributeIndex += 1) {
+            const attributeName = attributeNames[attributeIndex];
+            const mergedAttribute = mergeGeometryAttributes(
+                geometries.map((geometry) => geometry.getAttribute(attributeName))
+            );
+            if (!mergedAttribute) {
+                return null;
+            }
+            mergedGeometry.setAttribute(attributeName, mergedAttribute);
+        }
+
+        return mergedGeometry;
+    }
+
+    function collapseStaticMeshHierarchy(root) {
+        if (!root || root.isMesh) {
+            return root;
+        }
+
+        const meshEntries = [];
+        let unsupportedContent = false;
+        root.updateMatrixWorld(true);
+        const inverseRootWorld = new THREE_NS.Matrix4().copy(root.matrixWorld).invert();
+
+        root.traverse((node) => {
+            if (node === root) {
+                return;
+            }
+            if (node.isMesh) {
+                if (!node.geometry || !node.material || Array.isArray(node.material)) {
+                    unsupportedContent = true;
+                    return;
+                }
+                const geometry = node.geometry.index ? node.geometry.toNonIndexed() : node.geometry.clone();
+                const localMatrix = new THREE_NS.Matrix4().multiplyMatrices(
+                    inverseRootWorld,
+                    node.matrixWorld
+                );
+                geometry.applyMatrix4(localMatrix);
+                meshEntries.push({
+                    geometry: geometry,
+                    material: node.material,
+                    materialSignature: getMergeableMaterialSignature(node.material)
+                });
+                return;
+            }
+            if (!node.isGroup && node.type !== "Object3D") {
+                unsupportedContent = true;
+            }
+        });
+
+        if (unsupportedContent || meshEntries.length <= 1) {
+            return root;
+        }
+
+        const geometryBatches = new Map();
+        meshEntries.forEach((entry) => {
+            if (!geometryBatches.has(entry.materialSignature)) {
+                geometryBatches.set(entry.materialSignature, {
+                    material: entry.material,
+                    geometries: []
+                });
+            }
+            geometryBatches.get(entry.materialSignature).geometries.push(entry.geometry);
+        });
+
+        const mergedGeometries = [];
+        const mergedMaterials = [];
+        for (const batch of geometryBatches.values()) {
+            const mergedGeometry =
+                batch.geometries.length === 1
+                    ? batch.geometries[0]
+                    : mergeCompatibleGeometries(batch.geometries, false);
+            if (!mergedGeometry) {
+                return root;
+            }
+            mergedGeometries.push(mergedGeometry);
+            mergedMaterials.push(batch.material);
+        }
+
+        const finalGeometry =
+            mergedGeometries.length === 1
+                ? mergedGeometries[0]
+                : mergeCompatibleGeometries(mergedGeometries, true);
+        if (!finalGeometry) {
+            return root;
+        }
+
+        const mergedMesh = new THREE_NS.Mesh(
+            finalGeometry,
+            mergedMaterials.length === 1 ? mergedMaterials[0] : mergedMaterials
+        );
+        mergedMesh.position.copy(root.position);
+        mergedMesh.quaternion.copy(root.quaternion);
+        mergedMesh.scale.copy(root.scale);
+        mergedMesh.rotation.order = root.rotation.order;
+        mergedMesh.visible = root.visible;
+        mergedMesh.renderOrder = root.renderOrder;
+        mergedMesh.frustumCulled = root.frustumCulled;
+        mergedMesh.matrixAutoUpdate = root.matrixAutoUpdate;
+        mergedMesh.userData = Object.assign({}, root.userData);
+        return mergedMesh;
     }
 
     function createCapsulePart(radius, totalLength, material, capSegments, radialSegments) {
@@ -7451,21 +7723,26 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function createPlantMaterial(color, roughness, emissive, emissiveIntensity, options) {
-        const material = new THREE_NS.MeshStandardMaterial({
-            color: color,
-            roughness: roughness == null ? 0.84 : roughness,
-            metalness: 0.01,
-            emissive: emissive == null ? 0x000000 : emissive,
-            emissiveIntensity: emissiveIntensity == null ? 0.0 : emissiveIntensity
-        });
         const windReactive = !options || options.windReactive !== false;
+        const windFlexibility =
+            options && typeof options.windFlexibility === "number"
+                ? options.windFlexibility
+                : 1.0;
+        const material = tagMergeableMaterial(
+            new THREE_NS.MeshStandardMaterial({
+                color: color,
+                roughness: roughness == null ? 0.84 : roughness,
+                metalness: 0.01,
+                emissive: emissive == null ? 0x000000 : emissive,
+                emissiveIntensity: emissiveIntensity == null ? 0.0 : emissiveIntensity
+            }),
+            {
+                windReactive: windReactive,
+                windFlexibility: windReactive ? windFlexibility : null
+            }
+        );
         if (windReactive) {
-            applyPlantWindShader(
-                material,
-                options && typeof options.windFlexibility === "number"
-                    ? options.windFlexibility
-                    : 1.0
-            );
+            applyPlantWindShader(material, windFlexibility);
         }
         return material;
     }
@@ -8223,41 +8500,39 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 1.0
             );
             addStrawCheckerboardPlant(plantGroup, plantSpec, palette);
-            setPlantVisualWindStrength(plantGroup, plantSpec.localWind);
-            return plantGroup;
-        }
-
-        plantGroup.rotation.y = deterministicNoise01(tile.x, tile.y, tile.plantTypeId + 161) * Math.PI * 2;
-        plantGroup.scale.set(
-            1.0,
-            0.88 + plantDensity * 0.34 + (plantSpec.areaScale - 1.0) * 0.08,
-            1.0
-        );
-
-        if (tile.plantTypeId === 1) {
-            addOrdosWormwoodPlant(plantGroup, plantSpec);
-        } else if (tile.plantTypeId === 2) {
-            addWhiteThornPlant(plantGroup, plantSpec);
-        } else if (tile.plantTypeId === 3) {
-            addRedTamariskPlant(plantGroup, plantSpec);
-        } else if (tile.plantTypeId === 4) {
-            addNingxiaWolfberryPlant(plantGroup, plantSpec);
-        } else if (tile.plantTypeId === 6) {
-            addKorshinskPeashrubPlant(plantGroup, plantSpec);
-        } else if (tile.plantTypeId === 7) {
-            addJijiGrassPlant(plantGroup, plantSpec);
-        } else if (tile.plantTypeId === 8) {
-            addSeaBuckthornPlant(plantGroup, plantSpec);
-        } else if (tile.plantTypeId === 9) {
-            addDesertEphedraPlant(plantGroup, plantSpec);
-        } else if (tile.plantTypeId === 10) {
-            addSaxaulPlant(plantGroup, plantSpec);
         } else {
-            addGenericPlant(plantGroup, plantSpec);
-        }
+            plantGroup.rotation.y = deterministicNoise01(tile.x, tile.y, tile.plantTypeId + 161) * Math.PI * 2;
+            plantGroup.scale.set(
+                1.0,
+                0.88 + plantDensity * 0.34 + (plantSpec.areaScale - 1.0) * 0.08,
+                1.0
+            );
 
-        setPlantVisualWindStrength(plantGroup, plantSpec.localWind);
-        return plantGroup;
+            if (tile.plantTypeId === 1) {
+                addOrdosWormwoodPlant(plantGroup, plantSpec);
+            } else if (tile.plantTypeId === 2) {
+                addWhiteThornPlant(plantGroup, plantSpec);
+            } else if (tile.plantTypeId === 3) {
+                addRedTamariskPlant(plantGroup, plantSpec);
+            } else if (tile.plantTypeId === 4) {
+                addNingxiaWolfberryPlant(plantGroup, plantSpec);
+            } else if (tile.plantTypeId === 6) {
+                addKorshinskPeashrubPlant(plantGroup, plantSpec);
+            } else if (tile.plantTypeId === 7) {
+                addJijiGrassPlant(plantGroup, plantSpec);
+            } else if (tile.plantTypeId === 8) {
+                addSeaBuckthornPlant(plantGroup, plantSpec);
+            } else if (tile.plantTypeId === 9) {
+                addDesertEphedraPlant(plantGroup, plantSpec);
+            } else if (tile.plantTypeId === 10) {
+                addSaxaulPlant(plantGroup, plantSpec);
+            } else {
+                addGenericPlant(plantGroup, plantSpec);
+            }
+        }
+        const mergedPlantVisual = collapseStaticMeshHierarchy(plantGroup);
+        setPlantVisualWindStrength(mergedPlantVisual, plantSpec.localWind);
+        return mergedPlantVisual;
     }
 
     function createStructureVisual(tile, tileHeight) {
@@ -8337,7 +8612,28 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             structureGroup.add(fallback);
         }
 
-        return structureGroup;
+        return collapseStaticMeshHierarchy(structureGroup);
+    }
+
+    function createCampVisual() {
+        const campGroup = new THREE_NS.Group();
+
+        const campPad = new THREE_NS.Mesh(
+            new THREE_NS.CylinderGeometry(0.56, 0.66, 0.12, 18),
+            new THREE_NS.MeshStandardMaterial({ color: 0x866341, roughness: 0.9, metalness: 0.03 })
+        );
+        campPad.position.set(0, 0.12, 0);
+        campGroup.add(campPad);
+
+        const tent = new THREE_NS.Mesh(
+            new THREE_NS.ConeGeometry(0.38, 0.6, 4),
+            new THREE_NS.MeshStandardMaterial({ color: 0xd8d1bf, roughness: 0.85, metalness: 0.02 })
+        );
+        tent.position.set(0, 0.48, 0);
+        tent.rotation.y = Math.PI * 0.25;
+        campGroup.add(tent);
+
+        return collapseStaticMeshHierarchy(campGroup);
     }
 
     function computeSiteTileVisualHeight(tile) {
@@ -8917,21 +9213,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (siteBootstrap.camp) {
             const campX = siteBootstrap.camp.tileX - offsetX;
             const campZ = siteBootstrap.camp.tileY - offsetZ;
-
-            const campPad = new THREE_NS.Mesh(
-                new THREE_NS.CylinderGeometry(0.56, 0.66, 0.12, 18),
-                new THREE_NS.MeshStandardMaterial({ color: 0x866341, roughness: 0.9, metalness: 0.03 })
-            );
-            campPad.position.set(campX, 0.12, campZ);
-            worldGroup.add(campPad);
-
-            const tent = new THREE_NS.Mesh(
-                new THREE_NS.ConeGeometry(0.38, 0.6, 4),
-                new THREE_NS.MeshStandardMaterial({ color: 0xd8d1bf, roughness: 0.85, metalness: 0.02 })
-            );
-            tent.position.set(campX, 0.48, campZ);
-            tent.rotation.y = Math.PI * 0.25;
-            worldGroup.add(tent);
+            const campVisual = createCampVisual();
+            campVisual.position.set(campX, 0.0, campZ);
+            worldGroup.add(campVisual);
         }
 
         const workerVisual = createHumanoidWorker();
