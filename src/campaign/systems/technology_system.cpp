@@ -24,35 +24,63 @@ const FactionProgressState* find_faction_progress(
     return nullptr;
 }
 
-std::uint8_t highest_purchased_tier(const CampaignState& campaign) noexcept
+[[nodiscard]] TechNodeId paired_base_tech_node_id(const TechnologyNodeDef& node_def) noexcept
 {
-    std::uint8_t highest_tier = 0U;
+    return TechNodeId {base_technology_node_id(node_def.faction_id, node_def.tier_index)};
+}
+
+[[nodiscard]] bool paired_base_node_purchased(
+    const CampaignState& campaign,
+    const TechnologyNodeDef& node_def) noexcept
+{
+    if (node_def.node_kind != TechnologyNodeKind::Enhancement)
+    {
+        return true;
+    }
+
+    return TechnologySystem::node_purchased(campaign, paired_base_tech_node_id(node_def));
+}
+
+[[nodiscard]] bool sibling_enhancement_purchased(
+    const CampaignState& campaign,
+    const TechnologyNodeDef& node_def) noexcept
+{
+    if (node_def.node_kind != TechnologyNodeKind::Enhancement)
+    {
+        return false;
+    }
+
+    for (const auto& purchase : campaign.technology_state.purchased_nodes)
+    {
+        const auto* purchased_node_def = find_technology_node_def(purchase.tech_node_id);
+        if (purchased_node_def == nullptr ||
+            purchased_node_def->node_kind != TechnologyNodeKind::Enhancement ||
+            purchased_node_def->faction_id != node_def.faction_id ||
+            purchased_node_def->tier_index != node_def.tier_index ||
+            purchased_node_def->tech_node_id == node_def.tech_node_id)
+        {
+            continue;
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
+[[nodiscard]] std::int32_t highest_purchased_reputation_requirement(const CampaignState& campaign) noexcept
+{
+    std::int32_t highest_requirement = 0;
     for (const auto& purchase : campaign.technology_state.purchased_nodes)
     {
         const auto* node_def = find_technology_node_def(purchase.tech_node_id);
         if (node_def != nullptr)
         {
-            highest_tier = std::max(highest_tier, node_def->tier_index);
+            highest_requirement = std::max(highest_requirement, std::max(0, node_def->reputation_requirement));
         }
     }
 
-    return highest_tier;
-}
-
-bool tier_has_purchase(
-    const CampaignState& campaign,
-    std::uint8_t tier_index) noexcept
-{
-    for (const auto& purchase : campaign.technology_state.purchased_nodes)
-    {
-        const auto* node_def = find_technology_node_def(purchase.tech_node_id);
-        if (node_def != nullptr && node_def->tier_index == tier_index)
-        {
-            return true;
-        }
-    }
-
-    return false;
+    return highest_requirement;
 }
 }  // namespace
 
@@ -90,12 +118,9 @@ bool TechnologySystem::technology_tier_visible(
     const CampaignState& campaign,
     const TechnologyNodeDef& node_def) noexcept
 {
-    if (node_def.tier_index <= 1U)
-    {
-        return true;
-    }
-
-    return tier_has_purchase(campaign, static_cast<std::uint8_t>(node_def.tier_index - 1U));
+    (void)campaign;
+    (void)node_def;
+    return true;
 }
 
 bool TechnologySystem::plant_unlocked(
@@ -181,6 +206,12 @@ bool TechnologySystem::node_claimable(
         return false;
     }
 
+    if (node_def.node_kind == TechnologyNodeKind::Enhancement &&
+        find_technology_node_def(paired_base_tech_node_id(node_def)) == nullptr)
+    {
+        return false;
+    }
+
     if (campaign.cash < current_cash_cost(campaign, node_def))
     {
         return false;
@@ -191,7 +222,12 @@ bool TechnologySystem::node_claimable(
         return false;
     }
 
-    if (tier_has_purchase(campaign, node_def.tier_index))
+    if (!paired_base_node_purchased(campaign, node_def))
+    {
+        return false;
+    }
+
+    if (sibling_enhancement_purchased(campaign, node_def))
     {
         return false;
     }
@@ -209,7 +245,8 @@ bool TechnologySystem::node_refundable(
         return false;
     }
 
-    return highest_purchased_tier(campaign) == node_def.tier_index;
+    return highest_purchased_reputation_requirement(campaign) ==
+        current_reputation_requirement(node_def);
 }
 
 Gs1Status TechnologySystem::process_message(

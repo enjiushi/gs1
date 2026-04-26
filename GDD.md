@@ -25,7 +25,7 @@ The game combines direct on-foot play with site-scale strategy. The player is no
 | Setting | Present-day, grounded, China-inspired remote desert |
 | Narrative weight | Mostly sandbox with light contextual storytelling |
 | Replay value target | High run-to-run variety through procedural generation, task-board variation, events, and strategic progression choices |
-| Tech model | Dual-layer progression with total-reputation-gated neutral base techs, faction-reputation-gated enhancements, plus task-revealed site unlocks and session-only modifiers |
+| Tech model | Per-faction progression with `8` faction-reputation-gated base tech tiers, `2` exclusive enhancements per base tech unlocked across faction-reputation tiers `9-16`, plus task-revealed site unlocks and session-only modifiers |
 
 ## 3. Vision And Pillars
 
@@ -54,7 +54,7 @@ These terms are stable and should be used consistently in future design and impl
 | `Contract Board` | The on-site progression system available only during an active `Site` session; it contains the current site's faction-published `Site Task` pool that drives site progression and rewards. |
 | `Field Phone` | The player's in-world access point for money-related actions during a `Site` session; it supports the on-site `Contract Board` plus buying, selling, hiring, and related field planning actions. |
 | `Reputation` | The cumulative campaign-level government standing resource earned progressively from official work; it is never spent and instead gates faction-tech tiers and broader program trust. |
-| `Persistent Tech Tree` | The long-term campaign progression layer formed by neutral base-tech tiers plus faction-specific enhancement layers. |
+| `Persistent Tech Tree` | The long-term campaign progression layer formed by three faction branches, each with `8` base tech tiers and `2` mutually exclusive enhancements per base tech. |
 | `Faction` | One of the three institutional backers on the `Contract Board`; each `Faction` has its own play style, task bias, random events, assistant support, and tech branch. |
 | `Faction Reputation` | The cumulative standing value with one specific `Faction`, earned mainly through that faction's tasks and events; it unlocks that faction's enhancement tiers and improves post-event help. |
 | `Faction Assistant` | A temporary signature support package provided by a `Faction`. In the current design, each faction should expose only one clear assistant package: `Workforce Support`, `Plant-Water Support`, or `Device Upgrade Support`. |
@@ -3069,7 +3069,7 @@ To make the game more compelling without feeling manipulative, these systems wou
 - `Reputation`: total campaign standing with the restoration program, earned progressively from official work and never spent
 - `Faction Reputation`: cumulative standing with each individual `Faction`, earned mainly from that faction's `Site Task`s, faction events, and aligned follow-through
 
-`Reputation` should function as thresholded trust, not consumable currency. `Faction Reputation` should also remain cumulative. In the prototype, `Reputation` now unlocks the three global plant tiers plus the neutral base-tech tiers, `Faction Reputation` unlocks each faction's three enhancement tiers, and claiming tech always spends persistent campaign cash instead of spending or occupying reputation.
+`Reputation` should function as thresholded trust, not consumable currency. `Faction Reputation` should also remain cumulative. In the prototype, `Reputation` still unlocks the three global plant tiers, while each faction's long-term tech branch is gated by that faction's `Faction Reputation`: tiers `1-8` unlock the branch's base techs, tiers `9-16` unlock the paired enhancement bands, and claiming tech always spends persistent campaign cash instead of spending or occupying reputation.
 
 Claiming tech therefore never lowers the visible total trust value. Trust unlocks access; campaign cash pays for the actual tech claim. Tech pricing should be authored internally in cash points, with `100` cash points equal to `1` displayed cash, so balancing can stay granular while the player still sees normal whole-cash costs.
 
@@ -3289,19 +3289,20 @@ High replay value depends on making progression choices meaningfully different a
 
 ### Faction Technology
 
-The `Persistent Tech Tree` is the long-term campaign progression layer. In the current design, it should stay readable, data-driven, and split into two visible layers: neutral base-tech tiers for the whole program, plus faction tabs that show enhancement choices for the currently selected faction.
+The `Persistent Tech Tree` is the long-term campaign progression layer. In the current design, it should stay readable, data-driven, and split by faction tab. Each faction tab should show `8` base-tech tiers, and each base tech should expose `2` mutually exclusive enhancement choices in the higher faction-reputation band.
 
 #### Technology Design Rules
 
-- the current prototype tech panel should show one neutral base-tech lane plus `3` faction tabs for enhancements
-- neutral base techs should be divided into explicit tiers gated only by total `Reputation`
-- faction enhancements should also be divided into explicit tiers, but those tiers are gated only by the selected faction's `Faction Reputation`
+- the current prototype tech panel should show `3` faction tabs, one for each faction branch
+- each faction branch should contain `8` base tech tiers gated by that faction's `Faction Reputation` tiers `1-8`
+- each base tech should expose `2` exclusive enhancements gated by that faction's `Faction Reputation` tiers `9-16`
 - an enhancement may be purchased only after its paired base tech has already been purchased
 - reaching a later tier threshold should immediately make that tier's base techs or enhancements claimable; it should not require previous-tier purchases
 - both base techs and enhancements should spend only `campaignCash`
 - base-tech and enhancement rows should author internal cash-point values and convert them to player-facing cash at `100` points per `1` cash
 - `Reputation` and `Faction Reputation` unlock access but are never spent
 - branch identity should still come from signature content family plus enhancement direction rather than bespoke code per faction
+- a tech node may carry one or more authored payloads such as a modifier, a mechanism change, an unlockable item/plant/structure, or a recipe unlock
 
 #### Technology Progression Meters
 
@@ -3309,8 +3310,8 @@ Technology should remain tied to a tiny set of progression meters:
 
 | Meter | Meaning |
 |---|---|
-| `reputation` | Campaign-wide trust that unlocks the three prototype global plant tiers plus the neutral base-tech tiers |
-| `factionReputation[factionId]` | Total trust earned with one faction and used only for that faction's enhancement-tier eligibility |
+| `reputation` | Campaign-wide trust that unlocks the three prototype global plant tiers |
+| `factionReputation[factionId]` | Total trust earned with one faction and used for that faction branch's base-tech tiers `1-8` plus enhancement tiers `9-16` |
 | `campaignCash` | Persistent money shared across the campaign and spent on base-tech and enhancement purchases |
 
 Important rule:
@@ -3344,9 +3345,9 @@ Use this shared prototype structure in the current design:
 
 | Tier element | Count | Rule |
 |---|---|---|
-| Base techs per neutral tier | `2` | These are the whole-program tech claims inside that tier. |
-| Enhancements per faction tier in the prototype | `2` | Each one belongs to one faction and points at one base tech from the same tier. |
-| Unlock requirement for any claim | tier threshold + cash | Base techs use total `Reputation`; enhancements use faction `Faction Reputation` plus the paired base tech purchase. |
+| Base techs per faction tier | `1` | Each faction tier owns one base tech claim. |
+| Enhancements per base tech in the prototype | `2` | Each one belongs to the same faction+tier and forms an exclusive pair around that base tech. |
+| Unlock requirement for any claim | tier threshold + cash | Base techs use faction `Faction Reputation` tiers `1-8`; enhancements use faction `Faction Reputation` tiers `9-16` plus the paired base tech purchase. |
 
 #### Per-Unlockable Update Rule
 
@@ -3384,6 +3385,49 @@ This is enough to show:
 - that tier order matters
 - that amplification choice meaningfully specializes one claimed base tech
 - that technology modifies existing meters instead of inventing a parallel stat game
+
+#### Starter Technology Map
+
+Use the current authored roster as the first tuning target. The table below is not final balance, but it is the concrete mechanic map we should tune against before adding more breadth.
+
+##### `Village Committee`
+
+| Tier | Base tech | Primary mechanic targets | Enhancement A | Primary mechanic targets | Enhancement B | Primary mechanic targets |
+|---|---|---|---|---|---|---|
+| `1` | `Field Ration Drills` | lower action `energy` cost on repeated field work, smoother `energy` pacing | `Measured Footwork` | lower `energy` cost on move / plant / build loops | `Shade Break Whistles` | reduce heat-linked `morale` and `energy` losses |
+| `2` | `Community Meal Prep` | unlock `Food Pack`, improve food-side `hydration`, `nourishment`, `energy` refill | `Fortified Broth Pots` | stronger food `nourishment` and `energy` refill | `Salt Tea Rotation` | stronger food `hydration` refill and lower hot-weather recovery burden |
+| `3` | `Camp Care Circles` | faster background `energy` recovery, steadier `energyCap`, steadier `morale` | `Night Watch Handovers` | smoother between-action `energy` recovery | `Quiet Recovery Tents` | better `morale` protection during long or rough runs |
+| `4` | `Supply Relay Board` | steadier refill timing after camp-side recovery actions | `Hot Meal Priority Route` | unlock `Camp Stove Kit`, accelerate cooking access and survival-refill cadence | `Clinic Rounds` | better refill timing after `eat` / `drink` / recovery actions |
+| `5` | `Work Song Cadence` | lower repeated action drain, better long-chain `workEfficiency` sustain | `Shared Tool Borrowing` | lower build / repair / craft action costs | `Kitchen Line Harmony` | stronger value per meal and better refill efficiency |
+| `6` | `Village Rest Ledger` | more reliable post-task recovery, less collapse after stressful streaks | `Repair Volunteer Teams` | lower maintenance-chain strain and recovery lag | `Festival Kitchen Fires` | larger refill surges from prepared food and restock breaks |
+| `7` | `Route Steward Network` | reduce passive meter wear during extended field plans | `Escort Hand-Offs` | lower traversal / hauling / planting fatigue | `Grant Clerk Promises` | stronger `morale` retention when the board is crowded |
+| `8` | `Regional Relief Backbone` | broad late-game worker-meter sustain under pressure | `Emergency Kitchens` | maximum cooked-food refill payoff | `Shelter Registry` | lower all-around `hydration`, `energy`, and `morale` losses under sustained site pressure |
+
+##### `Forestry Bureau Of Autonomous Region`
+
+| Tier | Base tech | Primary mechanic targets | Enhancement A | Primary mechanic targets | Enhancement B | Primary mechanic targets |
+|---|---|---|---|---|---|---|
+| `1` | `Seed Selection Nursery` | lower early-plant `growthPressure`, faster establishment, cleaner first density gains | `Rooting Powder Coats` | higher early `tilePlantDensity` gain | `Dormant Reserve Packing` | better seedling survival under sudden exposure spikes |
+| `2` | `Windline Shelter Belts` | stronger plant-made shelter, earlier local-weather shaping | `Staggered Fence Shrubs` | longer / cleaner `windProtectionRange` lanes | `Leeward Dust Traps` | stronger dust buffering and lower burial pressure |
+| `3` | `Nurse Crop Pairing` | unlock `Sea Buckthorn`, encourage companion planting and support rows | `Shade Nurse Pattern` | lower seedling `growthPressure` beside support plants | `Moisture Catch Basins` | better moisture retention and mixed-patch survival |
+| `4` | `Salt Edge Rootstock` | better salty-ground survival and density retention | `Mycorrhiza Threading` | stronger `fertilityImprovePower` and slower collapse on stressed soil | `Capillary Break Ridges` | lower `tileSoilSalinity` pressure and stronger `salinityDensityCap` behavior |
+| `5` | `Canopy Ladder Program` | layered shelter stacks and mixed-height infrastructure patches | `Mixed Height Windbreaks` | unlock `Wind Fence`, stronger combined plant+structure shelter corridors | `Pollinator Verge Pockets` | stronger spread-side patch continuity and productive planted edges |
+| `6` | `Burial Recovery Groves` | faster rebound after sand cover and gust cycles | `Dune Pin Root Nets` | stronger anti-burial holding power | `Self-Pruning Fans` | faster recovery after exposure-driven density loss |
+| `7` | `Succession Patch Planning` | patch-to-patch continuity and smoother expansion from one stable zone to the next | `Corridor Stitching` | unlock `Desert Ephedra`, build linked shelter corridors | `Seed Rain Timing` | stronger `spreadReadiness`, spread timing, and follow-on growth behavior |
+| `8` | `Regional Living Matrix` | capstone plant-modifier package for field-wide resilience | `Watershed Green Lanes` | stronger moisture capture and terrain rehab corridors | `Keystone Habitat Weave` | extra companion effects, patch durability, and plant-side mechanism hooks |
+
+##### `Autonomous Region Agricultural University`
+
+| Tier | Base tech | Primary mechanic targets | Enhancement A | Primary mechanic targets | Enhancement B | Primary mechanic targets |
+|---|---|---|---|---|---|---|
+| `1` | `Survey Benchmark Course` | unlock `Workbench`, better technical setup and device output discipline | `Probe Calibration Sheets` | higher `deviceEfficiency` and cleaner support output | `Variance Log Books` | steadier technical outcomes and lower timing variance |
+| `2` | `Action Timing Study` | lower technical overhead around real site actions | `Mesh Sampling Routes` | cheaper setup for build / inspect / placement-heavy actions | `Windowed Dispatch` | less wasted effort from mistimed action windows |
+| `3` | `Brackish Water Protocols` | make well-water use less punishing on salty ground | `Settling Drum Notes` | lower salinity burden from stored or pumped well water | `Filter Media Swaps` | stronger treatment cycles and cleaner device-side water handling |
+| `4` | `Sensor Sweep Rig` | denser instrument coverage and broader decision support | `Telemetry Filters` | better device tracking and less wasted support output | `Failure Budget Spares` | unlock `Workbench Kit`, stronger redundancy and faster technical recovery |
+| `5` | `Control Loop Theory` | let devices actively reduce repeated job cost | `Pump Assist Governors` | stronger water-device performance under heat | `Task Helper Rigs` | unlock `Hammer` recipe, support build / harvest / repair / craft action families |
+| `6` | `Adaptive Trial Beds` | flexible technical loadouts that respond to local conditions | `Pilot Arrays` | safer first deployments and faster iteration | `Stress Table Safeguards` | stronger device durability and lower technical losses under pressure |
+| `7` | `Shared Model Exchange` | compound forecasting and support logic across sites | `Simulation Library` | better weather reads and pre-action planning | `Case Transfer Kits` | stronger recovery after task failure or improvised fixes |
+| `8` | `Autonomous Response Grid` | late-game full-site device coordination | `Forecast Solver Stack` | proactive support for the hardest timing windows | `Field Signal Archive` | resilient device coordination and faster technical resets after disruption |
 
 ### Site Unlockables And Run Modifiers
 
@@ -4396,7 +4440,7 @@ This summary should include only core runtime meters and the core plant-side val
 | Weather meters | `weatherHeat`, `weatherWind`, `weatherDust` | Site-wide ambient weather outputs after baseline site conditions and current event meters are combined. |
 | Resolved tile contribution meters | `tileHeatProtection`, `tileWindProtection`, `tileDustProtection`, `tileFertilityImprove`, `tileSalinityReduction`, `tileIrrigation` | Per-tile support result after nearby plants, devices, and shelter are accumulated. They bridge local objects and final weather or terrain computation. |
 | Resolved local weather meters | `tileHeat`, `tileWind`, `tileDust` | Per-tile weather result after site weather, local support, and shelter are combined. They bridge site weather and final terrain or plant pressure. |
-| Technology progression meters | `reputation`, `factionReputation[factionId]`, `campaignCash` | Campaign progression meters that gate neutral base-tech tiers, gate faction enhancement tiers, and pay for permanent tech claims. |
+| Technology progression meters | `reputation`, `factionReputation[factionId]`, `campaignCash` | Campaign progression meters that unlock global plant tiers, gate each faction branch's base and enhancement bands, and pay for permanent tech claims. |
 | Worker state meters and derived values | `playerHealth`, `playerHydration`, `playerNourishment`, `playerEnergy`, `playerMorale`, derived `playerEnergyCap`, derived `playerWorkEfficiency` | Core worker survival and performance values. `playerHealth`, `playerHydration`, `playerNourishment`, `playerEnergy`, and `playerMorale` are stored worker meters, while `playerEnergyCap` and `playerWorkEfficiency` are recomputed every frame from the current worker condition. |
 | Item state meters | `itemQuantity`, `itemCondition`, `itemFreshness` | Core runtime item-stack meters. `itemQuantity` tracks how much of a stack remains, `itemCondition` tracks damage-sensitive item usability, and `itemFreshness` tracks spoilable item usability. |
 | Persistent terrain soil meters | `tileSoilFertility`, `tileMoisture`, `tileSoilSalinity` | Long-lived or short-lived land condition on plantable `Ground`. These meters determine what can grow well. |
@@ -4677,8 +4721,8 @@ Prototype authoring note:
 
 | Meter | Impacted by | Impact to | Notes |
 |---|---|---|---|
-| `reputation` | Site completion, selected task rewards, commendations, major campaign progress | Global plant-tier eligibility, neutral base-tech tier eligibility, and broader program trust | Campaign-wide trust meter. In the prototype it unlocks the three global plant tiers plus neutral base-tech access but is never spent on tech. |
-| `factionReputation[factionId]` | Completed tasks from that faction, faction events, post-event follow-through | Faction-enhancement-tier eligibility, post-event relief quality, faction-side event quality | Branch-specific total trust meter. It gates faction enhancement depth but is never spent. |
+| `reputation` | Site completion, selected task rewards, commendations, major campaign progress | Global plant-tier eligibility and broader program trust | Campaign-wide trust meter. In the prototype it unlocks the three global plant tiers and is never spent on tech. |
+| `factionReputation[factionId]` | Completed tasks from that faction, faction events, post-event follow-through | Faction base-tech tiers `1-8`, faction-enhancement tiers `9-16`, post-event relief quality, faction-side event quality | Branch-specific total trust meter. It gates a faction branch's full tech depth but is never spent. |
 | `campaignCash` | Site money rewards, buy/sell outcomes, contractor spending, unlock purchases, tech claims | Site purchasing power and tech claims | Persistent campaign money shared across site runs. It is the only prototype currency used to buy base techs and enhancements. |
 
 Important rule:

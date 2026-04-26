@@ -658,7 +658,8 @@ int main()
     assert(contains_ui_element_text(tech_tree_messages, "Starter Plants"));
     assert(contains_ui_element_text(tech_tree_messages, "Tier Tech Tree"));
     assert(contains_ui_element_text(tech_tree_messages, "Checkerboard | Wormwood"));
-    assert(contains_ui_element_text(tech_tree_messages, "Tab: Village Committee"));
+    assert(contains_ui_element_text(tech_tree_messages, "Tab: Village"));
+    assert(contains_ui_element_text(tech_tree_messages, "Tab: University"));
 
     GameMessage select_forestry_tab_message {};
     select_forestry_tab_message.type = GameMessageType::SelectRegionalMapTechTreeFaction;
@@ -666,7 +667,15 @@ int main()
         gs1::k_faction_forestry_bureau});
     assert(runtime.handle_message(select_forestry_tab_message) == GS1_STATUS_OK);
     const auto forestry_messages = drain_engine_messages(runtime);
-    assert(contains_ui_element_text(forestry_messages, "Tab: Forestry Bureau"));
+    assert(contains_ui_element_text(forestry_messages, "Tab: Forestry"));
+
+    GameMessage select_university_tab_message {};
+    select_university_tab_message.type = GameMessageType::SelectRegionalMapTechTreeFaction;
+    select_university_tab_message.set_payload(gs1::SelectRegionalMapTechTreeFactionMessage {
+        gs1::k_faction_agricultural_university});
+    assert(runtime.handle_message(select_university_tab_message) == GS1_STATUS_OK);
+    const auto university_messages = drain_engine_messages(runtime);
+    assert(contains_ui_element_text(university_messages, "Tab: University"));
 
     GameMessage faction_reputation_award {};
     faction_reputation_award.type = GameMessageType::FactionReputationAwardRequested;
@@ -686,7 +695,7 @@ int main()
         gs1::k_faction_village_committee});
     assert(runtime.handle_message(select_village_tab_message) == GS1_STATUS_OK);
     const auto awarded_messages = drain_engine_messages(runtime);
-    assert(contains_ui_element_text(awarded_messages, "Tab: Village Committee"));
+    assert(contains_ui_element_text(awarded_messages, "Tab: Village"));
 
     GameMessage claim_tech_node_message {};
     claim_tech_node_message.type = GameMessageType::TechnologyNodeClaimRequested;
@@ -742,12 +751,12 @@ int main()
     assert(support_runtime.handle_message(open_tech_tree_message) == GS1_STATUS_OK);
     const auto site_tech_tree_messages = drain_engine_messages(support_runtime);
     assert(contains_ui_element_text(site_tech_tree_messages, "Prototype Tech Tree"));
-    assert(contains_ui_element_text(site_tech_tree_messages, "Tab: Village Committee"));
+    assert(contains_ui_element_text(site_tech_tree_messages, "Tab: Village"));
     assert(contains_ui_element_text(site_tech_tree_messages, "Tier Tech Tree"));
 
     assert(support_runtime.handle_message(select_forestry_tab_message) == GS1_STATUS_OK);
     const auto site_forestry_messages = drain_engine_messages(support_runtime);
-    assert(contains_ui_element_text(site_forestry_messages, "Tab: Forestry Bureau"));
+    assert(contains_ui_element_text(site_forestry_messages, "Tab: Forestry"));
 
     const auto first_site_id = campaign_site_id;
     assert(runtime.handle_message(make_start_site_attempt_message(first_site_id)) == GS1_STATUS_OK);

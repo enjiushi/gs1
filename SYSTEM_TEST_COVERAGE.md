@@ -122,12 +122,12 @@ Implemented behavior coverage should verify:
 
 - Faction reputation awards never decrease a faction's lifetime total reputation.
 - Campaign-wide total reputation unlocks the three prototype plant tiers without being spent.
-- Neutral base-tech tiers are gated only by authored total-reputation requirements.
-- Each faction exposes three prototype enhancement tiers gated by authored faction-reputation requirements.
+- Each faction exposes `8` prototype base-tech tiers gated by authored faction-reputation requirements `1-8`.
+- Each faction base tech exposes `2` mutually exclusive enhancements gated by authored faction-reputation requirements `9-16`.
 - Reaching a total-reputation tier threshold unlocks that tier's authored plant pair without spending reputation.
-- Base technologies become claimable as soon as the matching total-reputation tier threshold is met; they do not require previous-tier purchases.
+- Base technologies become claimable as soon as the matching faction-reputation tier threshold is met; they do not require previous-tier purchases.
 - Enhancements require both the paired base tech purchase and the matching faction-reputation tier.
-- Prototype technologies cover placeholder base-tech and enhancement modifier/mechanism effects with authored per-node internal cash-point values that convert to player-facing cash costs.
+- Prototype technologies cover placeholder base-tech and enhancement modifier/mechanism effects plus optional item/plant/structure/recipe grant payloads, all with authored per-node internal cash-point values that convert to player-facing cash costs.
 - Purchased tech state is stored as node ownership, not as unspent pick inventory.
 
 ### `regional_support`

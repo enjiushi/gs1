@@ -254,7 +254,9 @@ const TechnologyNodeDef* find_faction_technology_node_def(
 {
     for (const auto& node_def : all_technology_node_defs())
     {
-        if (node_def.faction_id == faction_id && node_def.tier_index == tier_index)
+        if (node_def.faction_id == faction_id &&
+            node_def.tier_index == tier_index &&
+            node_def.node_kind == TechnologyNodeKind::BaseTech)
         {
             return &node_def;
         }
