@@ -620,16 +620,11 @@ std::vector<ContentValidationIssue> validate_content_database(
                 ContentValidationSeverity::Error,
                 "Gameplay tuning ecology normalized softening and cap values must stay in the 0-1 range."});
         }
-        else if (tuning.ecology.density_growth_pressure_safe_threshold < 0.0f ||
-            tuning.ecology.density_growth_pressure_safe_threshold > 1.0f ||
-            tuning.ecology.density_loss_pressure_threshold < 0.0f ||
-            tuning.ecology.density_loss_pressure_threshold > 1.0f ||
-            tuning.ecology.density_growth_pressure_safe_threshold >
-                tuning.ecology.density_loss_pressure_threshold)
+        else if (tuning.ecology.density_full_range_real_minutes <= 0.0f)
         {
             issues.push_back(ContentValidationIssue {
                 ContentValidationSeverity::Error,
-                "Gameplay tuning ecology pressure thresholds must stay in the 0-1 range and keep the safe threshold below the loss threshold."});
+                "Gameplay tuning ecology density full-range real minutes must stay above zero."});
         }
     }
 

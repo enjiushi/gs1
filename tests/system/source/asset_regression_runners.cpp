@@ -621,6 +621,9 @@ void ecology_regression_runner(
             raw_meter_from_asset_value(parse_float(context, values, "tile_density", tile.ecology.plant_density));
         tile.ecology.moisture =
             raw_meter_from_asset_value(parse_float(context, values, "tile_moisture", tile.ecology.moisture));
+        tile.ecology.soil_fertility =
+            raw_meter_from_asset_value(
+                parse_float(context, values, "tile_soil_fertility", tile.ecology.soil_fertility));
         tile.ecology.sand_burial =
             raw_meter_from_asset_value(parse_float(context, values, "tile_sand_burial", tile.ecology.sand_burial));
         site_run.site_world->set_tile(coord, tile);

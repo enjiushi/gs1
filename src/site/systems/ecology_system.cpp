@@ -336,54 +336,36 @@ float compute_density_delta(
     const float growth_pressure_unit = unit_from_raw_meter(growth_pressure);
     const float salinity_cap_unit = unit_from_raw_meter(salinity_cap);
     const float delta_minutes = std::max(simulation_dt_minutes, 0.0f);
+    const float full_range_runtime_minutes = static_cast<float>(
+        runtime_minutes_from_real_seconds(
+            static_cast<double>(tuning.density_full_range_real_minutes) * 60.0));
+    const float max_density_change_per_runtime_minute =
+        full_range_runtime_minutes > k_density_epsilon
+        ? (1.0f / full_range_runtime_minutes)
+        : 0.0f;
 
-    float density_gain = 0.0f;
-    if (plant_def.growable &&
-        growth_pressure_unit < tuning.density_growth_pressure_safe_threshold &&
-        density < 1.0f - k_density_epsilon)
+    float density_delta = 0.0f;
+    if (plant_def.growable)
     {
-        const float growth_headroom =
-            (tuning.density_growth_pressure_safe_threshold - growth_pressure_unit) /
-            tuning.density_growth_pressure_safe_threshold;
-        const float establishment_bonus =
-            density < tuning.density_establishment_threshold
-            ? tuning.density_establishment_bonus
-            : 1.0f;
-        density_gain =
-            growth_headroom *
-            (tuning.growth_gain_scale +
-                unit_from_raw_meter(ecology.moisture) * tuning.growth_gain_moisture_bonus_scale +
-                unit_from_raw_meter(ecology.soil_fertility) * tuning.growth_gain_fertility_bonus_scale) *
-            establishment_bonus *
-            delta_minutes;
+        const float pressure_factor = std::clamp((0.5f - growth_pressure_unit) / 0.5f, -1.0f, 1.0f);
+        density_delta = max_density_change_per_runtime_minute * pressure_factor * delta_minutes;
     }
 
-    const float fragility =
-        tuning.density_fragility_base - density * tuning.density_fragility_density_scale;
-    float density_loss = 0.0f;
-    if (growth_pressure_unit > tuning.density_loss_pressure_threshold)
-    {
-        density_loss +=
-            ((growth_pressure_unit - tuning.density_loss_pressure_threshold) /
-                (1.0f - tuning.density_loss_pressure_threshold)) *
-            tuning.growth_loss_scale *
-            fragility *
-            delta_minutes;
-    }
+    float additional_density_loss = 0.0f;
 
     if (density > salinity_cap_unit + k_density_epsilon)
     {
-        density_loss +=
+        additional_density_loss +=
             (density - salinity_cap_unit) * tuning.density_salinity_overcap_loss_scale * delta_minutes;
     }
 
     if (plant_def.constant_wither_rate > 0.0f)
     {
-        density_loss +=
+        additional_density_loss +=
             (plant_def.constant_wither_rate / 100.0f) * tuning.constant_wither_rate_scale * delta_minutes;
     }
 
-    float net_delta = density_gain - density_loss;
+    float net_delta = density_delta - additional_density_loss;
     net_delta *= 1.0f + (modifiers.plant_density * tuning.density_modifier_influence);
     return net_delta * k_meter_scale;
 }

@@ -179,8 +179,7 @@ void site_one_starting_weather_keeps_starter_plant_density_stable(
              TileCoord {13, 17}})
     {
         const auto tile = site_run.site_world->tile_at(coord);
-        GS1_SYSTEM_TEST_CHECK(context, tile.ecology.plant_density >= 60.0f);
-        GS1_SYSTEM_TEST_CHECK(context, tile.ecology.growth_pressure < 55.0f);
+        GS1_SYSTEM_TEST_CHECK(context, tile.ecology.plant_density >= 55.0f);
     }
 
     GS1_SYSTEM_TEST_CHECK(
@@ -224,8 +223,7 @@ void site_one_small_fixed_steps_keep_density_stable_without_density_reports(
     }
 
     const auto tile = site_run.site_world->tile_at(TileCoord {12, 14});
-    GS1_SYSTEM_TEST_CHECK(context, tile.ecology.plant_density >= 60.0f);
-    GS1_SYSTEM_TEST_CHECK(context, tile.ecology.growth_pressure < 55.0f);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.plant_density, 60.0f, 0.05f));
 }
 
 void weather_event_run_advances_active_event_through_full_lifecycle(
@@ -792,6 +790,72 @@ void ecology_non_growable_checkerboard_ignores_weather_pressure_and_uses_constan
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(calm.ecology.plant_density, harsh.ecology.plant_density, 0.01f));
 }
 
+void ecology_density_change_speed_follows_linear_growth_pressure_curve(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto grow_run = make_test_site_run(2U, 1705U, 101U, 6U, 6U);
+    auto hold_run = make_test_site_run(2U, 1706U, 101U, 6U, 6U);
+    auto wither_run = make_test_site_run(2U, 1707U, 101U, 6U, 6U);
+    GameMessageQueue grow_queue {};
+    GameMessageQueue hold_queue {};
+    GameMessageQueue wither_queue {};
+    auto grow_context = make_site_context<EcologySystem>(campaign, grow_run, grow_queue, 60.0);
+    auto hold_context = make_site_context<EcologySystem>(campaign, hold_run, hold_queue, 60.0);
+    auto wither_context = make_site_context<EcologySystem>(campaign, wither_run, wither_queue, 60.0);
+
+    auto grow_tile = grow_run.site_world->tile_at(TileCoord {2, 2});
+    grow_tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_ordos_wormwood};
+    grow_tile.ecology.plant_density = 50.0f;
+    grow_tile.ecology.moisture = 100.0f;
+    grow_tile.ecology.soil_fertility = 100.0f;
+    grow_tile.ecology.soil_salinity = 0.0f;
+    grow_tile.ecology.sand_burial = 0.0f;
+    grow_tile.local_weather.heat = 0.0f;
+    grow_tile.local_weather.wind = 0.0f;
+    grow_tile.local_weather.dust = 0.0f;
+    grow_run.site_world->set_tile(TileCoord {2, 2}, grow_tile);
+
+    auto hold_tile = hold_run.site_world->tile_at(TileCoord {2, 2});
+    hold_tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_ordos_wormwood};
+    hold_tile.ecology.plant_density = 50.0f;
+    hold_tile.ecology.moisture = 0.0f;
+    hold_tile.ecology.soil_fertility = 0.0f;
+    hold_tile.ecology.soil_salinity = 0.0f;
+    hold_tile.ecology.sand_burial = 0.0f;
+    hold_tile.local_weather.heat = 0.0f;
+    hold_tile.local_weather.wind = 0.0f;
+    hold_tile.local_weather.dust = 0.0f;
+    hold_run.site_world->set_tile(TileCoord {2, 2}, hold_tile);
+
+    auto wither_tile = wither_run.site_world->tile_at(TileCoord {2, 2});
+    wither_tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_ningxia_wolfberry};
+    wither_tile.ecology.plant_density = 50.0f;
+    wither_tile.ecology.moisture = 0.0f;
+    wither_tile.ecology.soil_fertility = 0.0f;
+    wither_tile.ecology.soil_salinity = 0.0f;
+    wither_tile.ecology.sand_burial = 100.0f;
+    wither_tile.local_weather.heat = 100.0f;
+    wither_tile.local_weather.wind = 100.0f;
+    wither_tile.local_weather.dust = 100.0f;
+    wither_run.site_world->set_tile(TileCoord {2, 2}, wither_tile);
+
+    EcologySystem::run(grow_context);
+    EcologySystem::run(hold_context);
+    EcologySystem::run(wither_context);
+
+    grow_tile = grow_run.site_world->tile_at(TileCoord {2, 2});
+    hold_tile = hold_run.site_world->tile_at(TileCoord {2, 2});
+    wither_tile = wither_run.site_world->tile_at(TileCoord {2, 2});
+
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(grow_tile.ecology.growth_pressure, 0.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(hold_tile.ecology.growth_pressure, 50.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(wither_tile.ecology.growth_pressure, 100.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(grow_tile.ecology.plant_density, 60.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(hold_tile.ecology.plant_density, 50.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(wither_tile.ecology.plant_density, 40.0f));
+}
+
 void worker_condition_requested_delta_recomputes_cap_and_clamps_energy(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -1307,6 +1371,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "ecology",
     "non_growable_checkerboard_ignores_weather_pressure_and_uses_constant_wither_only",
     ecology_non_growable_checkerboard_ignores_weather_pressure_and_uses_constant_wither_only);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "ecology",
+    "density_change_speed_follows_linear_growth_pressure_curve",
+    ecology_density_change_speed_follows_linear_growth_pressure_curve);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "weather_event",
     "run_advances_active_event_through_full_lifecycle",

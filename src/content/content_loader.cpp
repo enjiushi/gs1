@@ -1474,14 +1474,8 @@ void load_gameplay_tuning_def(ContentDatabase& content, const std::filesystem::p
         require_toml_float(path, ecology, "growth_pressure_dust_burial_scale");
     tuning.ecology.growth_pressure_modifier_influence =
         require_toml_float(path, ecology, "growth_pressure_modifier_influence");
-    tuning.ecology.growth_gain_scale =
-        require_toml_float(path, ecology, "growth_gain_scale");
-    tuning.ecology.growth_loss_scale =
-        require_toml_float(path, ecology, "growth_loss_scale");
-    tuning.ecology.growth_gain_moisture_bonus_scale =
-        require_toml_float(path, ecology, "growth_gain_moisture_bonus_scale");
-    tuning.ecology.growth_gain_fertility_bonus_scale =
-        require_toml_float(path, ecology, "growth_gain_fertility_bonus_scale");
+    tuning.ecology.density_full_range_real_minutes =
+        require_toml_float(path, ecology, "density_full_range_real_minutes");
     tuning.ecology.salinity_cap_softening =
         require_toml_float(path, ecology, "salinity_cap_softening");
     tuning.ecology.salinity_cap_min_unit =
@@ -1492,18 +1486,6 @@ void load_gameplay_tuning_def(ContentDatabase& content, const std::filesystem::p
         require_toml_float(path, ecology, "resistance_density_influence");
     tuning.ecology.tolerance_percent_scale =
         require_toml_float(path, ecology, "tolerance_percent_scale");
-    tuning.ecology.density_establishment_threshold =
-        require_toml_float(path, ecology, "density_establishment_threshold");
-    tuning.ecology.density_establishment_bonus =
-        require_toml_float(path, ecology, "density_establishment_bonus");
-    tuning.ecology.density_fragility_base =
-        require_toml_float(path, ecology, "density_fragility_base");
-    tuning.ecology.density_fragility_density_scale =
-        require_toml_float(path, ecology, "density_fragility_density_scale");
-    tuning.ecology.density_growth_pressure_safe_threshold =
-        require_toml_float(path, ecology, "density_growth_pressure_safe_threshold");
-    tuning.ecology.density_loss_pressure_threshold =
-        require_toml_float(path, ecology, "density_loss_pressure_threshold");
     tuning.ecology.density_salinity_overcap_loss_scale =
         require_toml_float(path, ecology, "density_salinity_overcap_loss_scale");
     tuning.ecology.density_modifier_influence =

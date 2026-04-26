@@ -9,6 +9,6 @@ Asset-driven ecology regressions focused on density changes and passive growth b
 
 ## Contents
 - `clear_burial_clamps_to_zero.gs1systemtest`: Verifies burial clearing does not underflow below zero.
-- `run_growth_updates_progress.gs1systemtest`: Verifies ecology growth advancement updates progress as expected.
+- `run_growth_updates_progress.gs1systemtest`: Verifies ecology growth advancement updates progress as expected when tile moisture and fertility lower plant pressure enough to drive the linear density-growth curve.
 - `water_clamps_density_to_max.gs1systemtest`: Verifies watering cannot push density above its maximum.
 - `water_without_occupant_no_change.gs1systemtest`: Verifies watering an empty target does not mutate ecology state.
