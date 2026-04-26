@@ -395,10 +395,30 @@ Required fields in addition to the existing plant ecology fields:
 
 | Field | Type | Notes |
 |---|---|---|
+| `focus` | enum | One of `Setup`, `Protection`, `OutputWorkerSupport`, `SalinityOutput`, `SoilSupport`, `ProtectionOutput`, `SoilSupportSalinity`, `ProtectionWorkerSupport`, `Output`, or `ProtectionSoilSupport`. |
+| `auraSize` | integer `0-3` | Shared non-wind reach for plant-side heat, dust, fertility, and focus-derived salinity support. |
+| `windProtectionRange` | integer `0-3` | Directional lee-side wind reach. |
+| `protectionRatio` | number `0-1` | Multiplier on outward heat, wind, and dust protection only. |
+| `saltTolerance` | number `0-100` | Salinity resistance value and, for support-focused plants, the source value for plant-side salinity rehabilitation. |
+| `heatTolerance` | number `0-100` | Heat resistance and outward heat-shelter source. |
+| `windResistance` | number `0-100` | Wind resistance and outward wind-shelter source. |
+| `dustTolerance` | number `0-100` | Dust resistance and outward dust-shelter source. |
+| `fertilityImprovePower` | number `0-100` | Plant-side fertility support meter. |
+| `outputPower` | number `0-100` | Plant-side output share of the authored roster pool; should stay aligned with the linked harvest item's internal cash-point value. |
 | `plantActionDurationMinutes` | positive number | Per-seed planting duration used when a `Plant` site action starts from an inventory seed item linked to this plant. |
 
 Rules:
 
+- plant rows no longer author a separate `salinityReductionPower`; runtime derives plant-side salinity rehabilitation from `saltTolerance` plus `focus`
+- the authored plant meter pool is `saltTolerance + heatTolerance + windResistance + dustTolerance + fertilityImprovePower + outputPower`
+- starter plants must use total pool `90`
+- each later plant unlock step must add `10` more total pool than the previous unlock step
+- only protection-focused or support-focused plants may use non-zero `auraSize`
+- only protection-focused plants may use non-zero `windProtectionRange`
+- `Support` plants must keep `protectionRatio = 0` and `windProtectionRange = 0`
+- `Output` and `Self` plants must keep `auraSize = 0`, `windProtectionRange = 0`, and `protectionRatio = 0`
+- plants without harvest output must keep `outputPower = 0`
+- plants with harvest output must use positive `outputPower` and keep it within the allowed band for the linked harvest item's internal cash-point value
 - `plantActionDurationMinutes` must be positive
 - item-based planting must resolve its action duration from the linked plant row, not from a hardcoded per-item switch
 - adapter progress bars should treat this authored value as total action duration and animate locally after the start message arrives
@@ -455,6 +475,7 @@ Content tools should reject invalid authored content before runtime. At minimum,
 - every event template uses valid non-negative durations and pressure values
 - every event template has at least one meaningful hazardous pressure channel in build or peak
 - every plant definition uses a positive `plantActionDurationMinutes`
+- every plant definition satisfies the authored meter-pool ladder and focus/range rules above
 - every support package references a real source site and real exported content rows
 
 Validation should happen in content tools, spreadsheet import, or build-time data compilation. Runtime should not be the first place where broken content is discovered.

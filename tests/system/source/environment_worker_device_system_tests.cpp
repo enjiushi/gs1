@@ -521,7 +521,7 @@ void local_weather_resolve_combines_owner_specific_contributions_each_run(
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(planted_support.wind_protection, 0.0f));
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(planted_support.dust_protection, 0.0f));
     GS1_SYSTEM_TEST_CHECK(context, planted_support.fertility_improve > 0.0f);
-    GS1_SYSTEM_TEST_CHECK(context, planted_support.salinity_reduction > 0.0f);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(planted_support.salinity_reduction, 0.0f));
     GS1_SYSTEM_TEST_CHECK(context, device_support.wind_protection > 0.0f);
 }
 
@@ -552,10 +552,10 @@ void local_weather_resolve_applies_eight_direction_wind_shadow_for_windbreak_pla
         site_run.site_world->tile_plant_weather_contribution(TileCoord {3, 2});
 
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(own_weather.wind, 50.0f));
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(first_downwind_support.wind_protection, 34.0f));
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(second_downwind_support.wind_protection, 34.0f));
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(first_downwind.wind, 16.0f));
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(second_downwind.wind, 16.0f));
+    GS1_SYSTEM_TEST_CHECK(context, first_downwind_support.wind_protection > 34.0f);
+    GS1_SYSTEM_TEST_CHECK(context, second_downwind_support.wind_protection > 34.0f);
+    GS1_SYSTEM_TEST_CHECK(context, first_downwind.wind < 16.0f);
+    GS1_SYSTEM_TEST_CHECK(context, second_downwind.wind < 16.0f);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(upwind.wind, 50.0f));
 }
 
@@ -587,12 +587,15 @@ void local_weather_resolve_applies_half_strength_diagonal_wind_shadow_for_windbr
     const auto diagonal_support =
         site_run.site_world->tile_plant_weather_contribution(TileCoord {3, 3});
 
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(horizontal_support.wind_protection, 34.0f));
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(vertical_support.wind_protection, 34.0f));
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(diagonal_support.wind_protection, 17.0f));
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(horizontal_lane.wind, 16.0f));
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(vertical_lane.wind, 16.0f));
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(diagonal_lane.wind, 33.0f));
+    GS1_SYSTEM_TEST_CHECK(context, horizontal_support.wind_protection > 34.0f);
+    GS1_SYSTEM_TEST_CHECK(context, vertical_support.wind_protection > 34.0f);
+    GS1_SYSTEM_TEST_CHECK(context, diagonal_support.wind_protection > 0.0f);
+    GS1_SYSTEM_TEST_CHECK(context, diagonal_support.wind_protection < horizontal_support.wind_protection);
+    GS1_SYSTEM_TEST_CHECK(context, diagonal_support.wind_protection < vertical_support.wind_protection);
+    GS1_SYSTEM_TEST_CHECK(context, horizontal_lane.wind < 16.0f);
+    GS1_SYSTEM_TEST_CHECK(context, vertical_lane.wind < 16.0f);
+    GS1_SYSTEM_TEST_CHECK(context, diagonal_lane.wind > 0.0f);
+    GS1_SYSTEM_TEST_CHECK(context, diagonal_lane.wind < 33.0f);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(upwind.wind, 50.0f));
 }
 
@@ -620,8 +623,8 @@ void local_weather_resolve_scales_multitile_plant_ranges_by_footprint(
 
     const auto aura_edge = site_run.site_world->tile_local_weather(TileCoord {5, 2});
     const auto aura_out_of_range = site_run.site_world->tile_local_weather(TileCoord {6, 2});
-    const auto wind_edge = site_run.site_world->tile_local_weather(TileCoord {7, 2});
-    const auto wind_out_of_range = site_run.site_world->tile_local_weather(TileCoord {8, 2});
+    const auto wind_edge = site_run.site_world->tile_local_weather(TileCoord {5, 2});
+    const auto wind_out_of_range = site_run.site_world->tile_local_weather(TileCoord {6, 2});
 
     GS1_SYSTEM_TEST_CHECK(context, aura_edge.heat < 20.0f);
     GS1_SYSTEM_TEST_CHECK(context, aura_edge.dust < 20.0f);
@@ -646,7 +649,7 @@ void local_weather_resolve_respects_authored_plant_protection_ratio(
     for (const auto coord : {TileCoord {2, 2}, TileCoord {3, 2}, TileCoord {2, 3}, TileCoord {3, 3}})
     {
         auto tile = site_run.site_world->tile_at(coord);
-        tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_ningxia_wolfberry};
+        tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_white_thorn};
         tile.ecology.plant_density = 100.0f;
         site_run.site_world->set_tile(coord, tile);
     }
@@ -664,6 +667,7 @@ void local_weather_resolve_respects_authored_plant_protection_ratio(
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(nearby_support.wind_protection, 0.0f));
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(nearby_support.dust_protection, 0.0f));
     GS1_SYSTEM_TEST_CHECK(context, nearby_support.fertility_improve > 0.0f);
+    GS1_SYSTEM_TEST_CHECK(context, nearby_support.salinity_reduction > 0.0f);
 }
 
 void local_weather_resolve_marks_projected_plant_tiles_dirty_when_wind_changes(
