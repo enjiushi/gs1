@@ -266,6 +266,59 @@ template <typename T>
     fail_load(path, line_number, "invalid plant height class");
 }
 
+[[nodiscard]] PlantFocus parse_plant_focus(
+    const std::filesystem::path& path,
+    std::size_t line_number,
+    const std::string& field)
+{
+    if (field == "SetupProtection")
+    {
+        return PlantFocus::Setup;
+    }
+    if (field == "Setup")
+    {
+        return PlantFocus::Setup;
+    }
+    if (field == "Protection")
+    {
+        return PlantFocus::Protection;
+    }
+    if (field == "OutputWorkerSupport")
+    {
+        return PlantFocus::OutputWorkerSupport;
+    }
+    if (field == "SalinityOutput")
+    {
+        return PlantFocus::SalinityOutput;
+    }
+    if (field == "SoilSupport")
+    {
+        return PlantFocus::SoilSupport;
+    }
+    if (field == "Output")
+    {
+        return PlantFocus::Output;
+    }
+    if (field == "SoilSupportSalinity")
+    {
+        return PlantFocus::SoilSupportSalinity;
+    }
+    if (field == "ProtectionOutput")
+    {
+        return PlantFocus::ProtectionOutput;
+    }
+    if (field == "ProtectionWorkerSupport")
+    {
+        return PlantFocus::ProtectionWorkerSupport;
+    }
+    if (field == "ProtectionSoilSupport")
+    {
+        return PlantFocus::ProtectionSoilSupport;
+    }
+
+    fail_load(path, line_number, "invalid plant focus");
+}
+
 [[nodiscard]] CraftingStationKind parse_crafting_station_kind(
     const std::filesystem::path& path,
     std::size_t line_number,
@@ -1634,6 +1687,10 @@ void load_plant_defs(ContentDatabase& content, const std::filesystem::path& path
                 path,
                 toml_line_number(entry),
                 require_toml_string(path, entry, "height_class")),
+            parse_plant_focus(
+                path,
+                toml_line_number(entry),
+                require_toml_string(path, entry, "focus")),
             require_toml_bool(path, entry, "growable"),
             require_toml_unsigned<std::uint8_t>(path, entry, "aura_size"),
             require_toml_unsigned<std::uint8_t>(path, entry, "footprint_width"),
@@ -1647,7 +1704,7 @@ void load_plant_defs(ContentDatabase& content, const std::filesystem::path& path
             require_toml_float(path, entry, "wind_resistance"),
             require_toml_float(path, entry, "dust_tolerance"),
             require_toml_float(path, entry, "fertility_improve_power"),
-            require_toml_float(path, entry, "salinity_reduction_power"),
+            require_toml_float(path, entry, "output_power"),
             require_toml_float(path, entry, "spread_readiness"),
             require_toml_float(path, entry, "spread_chance"),
             require_toml_float(path, entry, "output_dependency"),

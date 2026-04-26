@@ -2,49 +2,49 @@
 unlock_id = 5001
 unlock_kind = "Plant"
 reputation_requirement = 4
-content_id = 2
-display_name = "White Thorn"
-description = "Unlocks the first salinity-taming shrub for stabilizing rough starter tiles."
+content_id = 1
+display_name = "Ordos Wormwood"
+description = "Unlocks the first dedicated windbreak plant for stabilizing exposed lanes."
 
 [[reputation_unlocks]]
 unlock_id = 5002
 unlock_kind = "Plant"
 reputation_requirement = 8
-content_id = 6
-display_name = "Korshinsk Peashrub"
-description = "Unlocks an early wind-tough support plant that helps extend the starter footprint."
+content_id = 2
+display_name = "White Thorn"
+description = "Unlocks the first explicit salinity-and-output shrub for difficult starter patches."
 
 [[reputation_unlocks]]
 unlock_id = 5003
 unlock_kind = "Plant"
 reputation_requirement = 12
-content_id = 3
-display_name = "Red Tamarisk"
-description = "Unlocks a heat-buffer specialist for building safer hot-edge pockets."
+content_id = 7
+display_name = "Jiji Grass"
+description = "Unlocks the first pure soil-support grass for fertility-led expansion."
 
 [[reputation_unlocks]]
 unlock_id = 5004
 unlock_kind = "Plant"
 reputation_requirement = 16
-content_id = 7
-display_name = "Jiji Grass"
-description = "Unlocks a bridge plant that adds soft moisture and fertility support."
+content_id = 8
+display_name = "Sea Buckthorn"
+description = "Unlocks a productive perimeter plant that mixes output with real protection."
 
 [[reputation_unlocks]]
 unlock_id = 5005
 unlock_kind = "Plant"
 reputation_requirement = 22
-content_id = 8
-display_name = "Sea Buckthorn"
-description = "Unlocks a tougher productive perimeter plant for harsher edges."
+content_id = 6
+display_name = "Korshinsk Peashrub"
+description = "Unlocks a deep soil-rehab specialist for long salty-ground conversion work."
 
 [[reputation_unlocks]]
 unlock_id = 5006
 unlock_kind = "Plant"
 reputation_requirement = 28
-content_id = 9
-display_name = "Desert Ephedra"
-description = "Unlocks a support-economy plant that rewards stable safe pockets."
+content_id = 3
+display_name = "Red Tamarisk"
+description = "Unlocks a heat-pocket protection plant that also improves worker-side recovery feel."
 
 [[reputation_unlocks]]
 unlock_id = 5007

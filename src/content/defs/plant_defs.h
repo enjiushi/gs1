@@ -16,6 +16,20 @@ enum class PlantHeightClass : std::uint8_t
     Tall = 3
 };
 
+enum class PlantFocus : std::uint8_t
+{
+    Setup = 0,
+    Protection = 1,
+    OutputWorkerSupport = 2,
+    SalinityOutput = 3,
+    SoilSupport = 4,
+    ProtectionOutput = 5,
+    SoilSupportSalinity = 6,
+    ProtectionWorkerSupport = 7,
+    Output = 8,
+    ProtectionSoilSupport = 9
+};
+
 inline constexpr std::uint32_t k_plant_ordos_wormwood = 1U;
 inline constexpr std::uint32_t k_plant_white_thorn = 2U;
 inline constexpr std::uint32_t k_plant_red_tamarisk = 3U;
@@ -32,6 +46,7 @@ struct PlantDef final
     PlantId plant_id;
     const char* display_name;
     PlantHeightClass height_class;
+    PlantFocus focus;
     bool growable;
     std::uint8_t aura_size;
     std::uint8_t footprint_width;
@@ -45,7 +60,7 @@ struct PlantDef final
     float wind_resistance;
     float dust_tolerance;
     float fertility_improve_power;
-    float salinity_reduction_power;
+    float output_power;
     float spread_readiness;
     float spread_chance;
     float output_dependency;
@@ -57,10 +72,89 @@ struct PlantDef final
     float harvest_density_removed;
 };
 
+[[nodiscard]] inline constexpr bool plant_focus_has_aura(PlantFocus focus) noexcept
+{
+    switch (focus)
+    {
+    case PlantFocus::Setup:
+    case PlantFocus::Protection:
+    case PlantFocus::SalinityOutput:
+    case PlantFocus::SoilSupport:
+    case PlantFocus::ProtectionOutput:
+    case PlantFocus::SoilSupportSalinity:
+    case PlantFocus::ProtectionWorkerSupport:
+    case PlantFocus::ProtectionSoilSupport:
+        return true;
+    case PlantFocus::OutputWorkerSupport:
+    case PlantFocus::Output:
+    default:
+        return false;
+    }
+}
+
+[[nodiscard]] inline constexpr bool plant_focus_has_wind_projection(PlantFocus focus) noexcept
+{
+    switch (focus)
+    {
+    case PlantFocus::Setup:
+    case PlantFocus::Protection:
+    case PlantFocus::ProtectionOutput:
+    case PlantFocus::ProtectionWorkerSupport:
+    case PlantFocus::ProtectionSoilSupport:
+        return true;
+    case PlantFocus::OutputWorkerSupport:
+    case PlantFocus::SalinityOutput:
+    case PlantFocus::SoilSupport:
+    case PlantFocus::SoilSupportSalinity:
+    case PlantFocus::Output:
+    default:
+        return false;
+    }
+}
+
+[[nodiscard]] inline constexpr float plant_focus_salinity_ratio(PlantFocus focus) noexcept
+{
+    switch (focus)
+    {
+    case PlantFocus::SalinityOutput:
+        return 1.0f;
+    case PlantFocus::SoilSupportSalinity:
+        return 0.75f;
+    case PlantFocus::Setup:
+    case PlantFocus::Protection:
+    case PlantFocus::OutputWorkerSupport:
+    case PlantFocus::SoilSupport:
+    case PlantFocus::Output:
+    case PlantFocus::ProtectionOutput:
+    case PlantFocus::ProtectionWorkerSupport:
+    case PlantFocus::ProtectionSoilSupport:
+    default:
+        return 0.0f;
+    }
+}
+
+[[nodiscard]] inline constexpr float derived_plant_salinity_reduction_power(
+    const PlantDef& plant_def) noexcept
+{
+    return plant_def.salt_tolerance * plant_focus_salinity_ratio(plant_def.focus);
+}
+
+[[nodiscard]] inline constexpr float plant_total_meter_pool(
+    const PlantDef& plant_def) noexcept
+{
+    return plant_def.salt_tolerance +
+        plant_def.heat_tolerance +
+        plant_def.wind_resistance +
+        plant_def.dust_tolerance +
+        plant_def.fertility_improve_power +
+        plant_def.output_power;
+}
+
 inline constexpr PlantDef k_generic_living_plant_def {
     PlantId {},
     "Generic Plant",
     PlantHeightClass::Low,
+    PlantFocus::Protection,
     true,
     0U,
     1U,
@@ -89,6 +183,7 @@ inline constexpr PlantDef k_generic_ground_cover_def {
     PlantId {},
     "Generic Ground Cover",
     PlantHeightClass::None,
+    PlantFocus::Setup,
     false,
     0U,
     1U,

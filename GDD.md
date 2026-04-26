@@ -1585,24 +1585,24 @@ To keep the first playable understandable:
 
 The following plants are temporary placeholders for the current build. Their names, values, visuals, and real-world grounding should be refined later. Right now the goal is to verify the concept with a small, mixed-role set.
 
-| Plant | Role Mix | Effect Ceiling (Temp) | Work Demand (Temp) | Own Tile Effect | Neighbor Tile Effect | Use |
-|---|---|---|---|---|---|---|
-| `Straw Checkerboard` | Protection + Fertility setup | Medium | Low | Plant-derived `2x2` straw grid placed on bare sand; it starts with strong near-surface wind and sand reduction across its occupied footprint, while its shared contribution powers scale down as density decays over time | Downwind tiles gain early erosion relief, slightly better establishment odds, and a temporary protection buffer while the checkerboard is still fresh | Critical opener for least fertile or pure sand tiles; makes hostile sand workable for later living plants |
-| `Ordos Wormwood` | Protection + Anti-dehydration | Medium | Low | Cheap early shrub that cuts wind exposure and slows dehydration on its own tile | Downwind tiles behind the wormwood line gain a readable lee-side wind shadow that stays strong near the plant and fades sharply near the range edge | First safety plant; teaches line placement and perimeter thinking |
-| `Red Tamarisk` | Anti-dehydration + Worker support | Medium | Low | Deep-rooted desert shrub that creates strong local heat relief with modest upkeep | Adjacent tiles lose water more slowly; nearby work zones feel safer during hot periods | Teaches oasis pockets, camp-edge defense, and local survival planning |
-| `Korshinsk Peashrub` | Fertilize + Protection | Medium | Medium | Hardy legume that stabilizes soil, reduces erosion, and slowly improves difficult ground on its own tile | Adjacent tiles gain fertility and mild erosion resistance, helping surrounding salty tiles recover over time | Teaches groundwork and setup before high-value planting |
-| `White Thorn` | Output + Fertilize | Medium | Medium | Salt-tolerant berry shrub that produces modest yield if the tile is stable enough while also serving as the main early salt-rehab crop | Adjacent tiles gain a small fertility bonus and light salinity-recovery support that helps future crops | Teaches low-risk output and the value of mixed production rows on difficult land |
-| `Ningxia Wolfberry` | Output + Anti-dehydration synergy | High | High | Valuable berry crop with high payoff but weak exposed survivability | Adjacent shaded or fertilized tiles improve its performance; it also gives small output synergy to nearby output plants | Teaches greedy high-reward planting that depends on support plants |
-| `Jiji Grass` | Anti-dehydration + Fertilize | Medium | Low | Tufted dryland grass that captures trace moisture and softens local dryness on poor or mildly salty soil | Adjacent tiles gain slight moisture retention, a small fertility bump, and weak salinity-rehab support | Gentle bridge plant for expanding from safe patches into dry but not fully dead land |
-| `Sea Buckthorn` | Protection + Output | Medium | Medium | Thorny productive shrub that creates a sturdier barrier and a modest berry or fiber yield | Adjacent tiles gain minor wind buffering and a little protection against density loss | Teaches productive perimeter building instead of pure defense |
-| `Desert Ephedra` | Output + Worker support | Medium | Medium | Medicinal shrub that produces a modest herb yield and improves comfort in its immediate area | Adjacent tiles slightly improve short-rest efficiency and morale feel when conditions are stable | Teaches support-economy patches and non-food output value |
-| `Saxaul` | Protection + Anti-dehydration anchor | High | High | Large anchor shrub-tree that creates strong local shelter and heat relief when sustained | Adjacent tiles gain one of the strongest protection and dehydration-relief effects in the current set | Late anchor plant for turning one hard-earned zone into a true refuge core |
+| Plant | Focus | Unlock | Meter Pool | Key meters | Outward reach | Use |
+|---|---|---|---:|---|---|---|
+| `Straw Checkerboard` | Setup | Starter | `90` | `wind 60`, `fert 30` | `aura 1`, `wind 1` | Bare-sand opener that buys time for later living plants. |
+| `Desert Ephedra` | Output + Worker Support | Starter | `90` | `heat 28`, `dust 24`, `output 12` | `aura 0`, `wind 0` | Early stable-pocket economy and recovery plant. |
+| `Ordos Wormwood` | Protection | Rep `4` | `100` | `wind 56`, `dust 18` | `aura 1`, `wind 1` | First clear windbreak line. |
+| `White Thorn` | Salinity + Output | Rep `8` | `110` | `salt 42`, `output 24` | `aura 1`, `wind 0` | Explicit salt-economy shrub. |
+| `Jiji Grass` | Soil Support | Rep `12` | `120` | `fert 80` | `aura 1`, `wind 0` | Pure soil bridge plant. |
+| `Sea Buckthorn` | Protection + Output | Rep `16` | `130` | `wind 40`, `output 30` | `aura 1`, `wind 1` | Productive perimeter plant. |
+| `Korshinsk Peashrub` | Soil Support + Salinity | Rep `22` | `140` | `salt 44`, `fert 62` | `aura 1`, `wind 0` | Deep soil-rehab specialist. |
+| `Red Tamarisk` | Protection + Worker Support | Rep `28` | `150` | `heat 60`, `wind 44` | `aura 1`, `wind 1` | Heat-pocket protector with worker-side comfort value. |
+| `Ningxia Wolfberry` | Output | Rep `36` | `160` | `heat 58`, `output 56` | `aura 0`, `wind 0` | Premium greedy output line. |
+| `Saxaul` | Protection + Soil Support | Rep `44` | `170` | `wind 74`, `fert 20` | `aura 2`, `wind 2` | Late refuge-core anchor and main high-tier range-2 protector. |
 
 `Straw Checkerboard` is inspired by the real Chinese straw checkerboard dune-control method, abstracted here into a special non-growable plant occupant for sand fixation and land preparation.
 
 The living prototype roster should now read as northwestern China desert and desert-steppe restoration flora: `Ordos Wormwood` (`Artemisia ordosica`), `White Thorn` (`Nitraria tangutorum`), `Red Tamarisk` (`Tamarix ramosissima`), `Ningxia Wolfberry` (`Lycium barbarum`), `Korshinsk Peashrub` (`Caragana korshinskii`), `Jiji Grass` (`Achnatherum splendens`), `Sea Buckthorn` (`Hippophae rhamnoides`), `Desert Ephedra` (`Ephedra przewalskii`), and `Saxaul` (`Haloxylon ammodendron`).
 
-`Effect Ceiling` is the rough maximum payoff of a dense healthy tile. `Work Demand` is the rough amount of setup, maintenance, and rescue attention the plant usually asks for before it feels dependable. Both are temporary tuning tags for iteration, not locked balance values.
+The current meter-pool method is explicit: `saltTolerance + heatTolerance + windResistance + dustTolerance + fertilityImprovePower + outputPower` must equal `90` for starter plants and then rise by `10` for each later plant unlock step. Only protection-focused or support-focused plants should project non-zero `auraSize` or `windProtectionRange`. Plant-side salinity rehabilitation is no longer authored as a separate plant meter; runtime derives it from `saltTolerance` for support-focused plants only.
 
 ### Trait Tags And Values (Temp Design)
 
@@ -1677,11 +1677,9 @@ Design intent:
 The game should use the plant roster to create short-term goals, not only long-term restoration.
 
 - Starting plant access should use a fixed early-session progression, not procedural variation from site to site
-- Begin the campaign with four basic plant types already available: `Straw Checkerboard`, `Ordos Wormwood`, `Korshinsk Peashrub`, and `White Thorn`
-- Use total campaign `Reputation` as a separate three-tier unlock track for the remaining six prototype plants
-- `Reputation` tier `I` should unlock `Red Tamarisk` and `Jiji Grass`
-- `Reputation` tier `II` should unlock `Sea Buckthorn` and `Desert Ephedra`
-- `Reputation` tier `III` should unlock `Ningxia Wolfberry` and `Saxaul`
+- Begin the campaign with two starter plants already available: `Straw Checkerboard` and `Desert Ephedra`
+- Use total campaign `Reputation` as a one-by-one plant unlock track after those starters
+- Current unlock order should be `Ordos Wormwood`, `White Thorn`, `Jiji Grass`, `Sea Buckthorn`, `Korshinsk Peashrub`, `Red Tamarisk`, `Ningxia Wolfberry`, then `Saxaul`
 - Make at least one short-term objective in the opening phase plant-related, such as fixing a bare sand lane, establishing a windbreak, stabilizing a dry patch, or producing a first safe harvest
 
 This keeps the early site loop readable:
@@ -1959,6 +1957,7 @@ Behavior profile:
 |---|---|---|
 | `growable` | Boolean | Whether favorable conditions are allowed to increase `tilePlantDensity` |
 | `constantWitherRate` | `0-100` | Fixed density-loss rate applied every fixed simulation step; normal plants use `0`, while `Straw Checkerboard` uses a positive value |
+| `plantFocus` | enum | Primary authored role that gates whether the plant may project outward support/protection and how `saltTolerance` maps into salinity rehabilitation |
 
 Resistance profile:
 
@@ -1973,15 +1972,15 @@ Ecological contribution profile:
 
 | Field | Range | Meaning |
 |---|---|---|
-| `auraSize` | Small integer `0-2` | Maximum Manhattan-distance reach of this object's shared non-wind contribution values; `0` means own tile only |
-| `windProtectionRange` | Small integer `0-2` | Maximum downwind reach in tile units of this object's directional wind shelter; `0` means own tile only |
+| `auraSize` | Small integer `0-3` | Maximum Manhattan-distance reach of this object's shared non-wind contribution values; `0` means own tile only |
+| `windProtectionRange` | Small integer `0-3` | Maximum downwind reach in tile units of this object's directional wind shelter; `0` means own tile only |
 | `heatTolerance` | `0-100` | How strongly this plant resists heat pressure on its own footprint and how much outward nearby heat shelter it can project |
 | `windResistance` | `0-100` | How strongly this plant resists wind pressure on its own footprint and how much outward downwind wind shelter it can project |
 | `dustTolerance` | `0-100` | How strongly this plant resists dust pressure on its own footprint and how much outward nearby dust shelter it can project |
 | `fertilityImprovePower` | `0-100` | How strongly this plant or device raises nearby `tileFertilityImprove` during the resolved-tile pass |
-| `salinityReductionPower` | `0-100` | How strongly this plant or device raises nearby `tileSalinityReduction` during the resolved-tile pass |
+| `outputPower` | `0-100` | How much harvest value this plant contributes to the roster meter pool; it should stay aligned with the linked harvest item's internal cash-point value |
 
-For plants, these weather-facing traits no longer split into separate local-weather protection-power fields. Runtime should use authored `heatTolerance`, `windResistance`, and `dustTolerance` as the outward shelter source for other tiles while still using those same values for the plant's own pressure resistance. Plant-side outward shelter should scale linearly with `tilePlantDensity`, but the plant's own occupied footprint should not receive extra self-fed local-weather reduction from that same plant. `windResistance` uses `windProtectionRange`, `auraSize` continues to control the shared heat/dust/fertility/salinity reach, and wind shelter should snap to 8 readable tile directions: the 4 orthogonal winds protect the straight lee lane across the full authored range, while the 4 diagonal winds protect the two direct lee-side orthogonal lanes at full strength plus the immediately diagonal lee tile at half strength. In the growth-pressure formula, local weather and effective resistance should both convert through the same `0.01` comparison scale so the weather-versus-protection relationship stays readable.
+For plants, these weather-facing traits no longer split into separate local-weather protection-power fields. Runtime should use authored `heatTolerance`, `windResistance`, and `dustTolerance` as the outward shelter source for other tiles while still using those same values for the plant's own pressure resistance. Plant-side outward shelter should scale linearly with `tilePlantDensity`, but the plant's own occupied footprint should not receive extra self-fed local-weather reduction from that same plant. `windResistance` uses `windProtectionRange`, `auraSize` continues to control the shared heat/dust/fertility reach, and support-focused plants derive plant-side salinity rehabilitation from `saltTolerance` instead of a separate authored salinity-support meter. Wind shelter should snap to 8 readable tile directions: the 4 orthogonal winds protect the straight lee lane across the full authored range, while the 4 diagonal winds protect the two direct lee-side orthogonal lanes at full strength plus the immediately diagonal lee tile at half strength. In the growth-pressure formula, local weather and effective resistance should both convert through the same `0.01` comparison scale so the weather-versus-protection relationship stays readable.
 
 Expansion and output profile:
 
@@ -1989,13 +1988,14 @@ Expansion and output profile:
 |---|---|---|
 | `spreadReadiness` | `0-100` | Minimum low-pressure readiness needed before this plant may spread reliably |
 | `spreadChance` | `0-100` | Relative chance to create one new starter tile during an ecology pulse |
+| `outputPower` | `0-100` | Authored output share of the plant's roster meter pool; it should track the harvest item's internal cash-point tier |
 | `outputDependency` | `0-100` | How badly output collapses as `tilePlantDensity` falls |
 
 Note:
 
 - the current set tables can keep using design language such as `Low`, `Medium`, and `High`
 
-Ground-cover definitions should not define a separate trait family. In the current design, `Straw Checkerboard` should use the same trait fields as plants, especially non-zero `windResistance`, `dustTolerance`, and `fertilityImprovePower`, set `growable = false`, set `constantWitherRate` to a positive value, set `windProtectionRange` and `auraSize` as needed for local setup support, set spread-related fields to `0`, and use the shared runtime meter `tilePlantDensity`, which starts full and steadily loses density while present.
+Ground-cover definitions should not define a separate trait family. In the current design, `Straw Checkerboard` should use the same trait fields as plants, but only for wind setup and fertility support: it should use non-zero `windResistance` plus `fertilityImprovePower`, keep `saltTolerance`, `heatTolerance`, `dustTolerance`, and `outputPower` at `0`, set `growable = false`, set `constantWitherRate` to a positive value, set `windProtectionRange` and `auraSize` as needed for local setup support, set spread-related fields to `0`, and use the shared runtime meter `tilePlantDensity`, which starts full and steadily loses density while present.
 
 #### Object Contribution And Resolved Local Weather Build Rules
 
@@ -2269,7 +2269,7 @@ Simple runtime rule:
 
 Beneficial-change rule:
 
-- healthy established plants with `salinityReductionPower` should gradually reduce `tileSoilSalinity` over time on their own tile and on nearby tiles inside their contribution reach
+- healthy established support-focused plants should gradually reduce `tileSoilSalinity` over time from `saltTolerance` on their own tile and on nearby tiles inside their contribution reach
 - badly stressed or collapsing plants should not rehabilitate salinity effectively
 - `tileSoilSalinity` should stay within its normal meter range
 
@@ -3359,7 +3359,7 @@ Every base tech should use its `2` amplification choices to push that base tech 
 | `Village Committee` | `recipe` | `Comfort Blend` | `playerMorale`, `itemFreshness` | Make crafted goods better at maintaining morale and staying usable for longer. |
 | `Forestry Bureau of Autonomous Region` | `plant` | `Establishment Update` | `growthPressure`, `plantDensityModifier`, `salinityDensityCap` | Help a new plant establish on difficult land and hold density sooner. |
 | `Forestry Bureau of Autonomous Region` | `plant` | `Protection Update` | `windResistance`, `windProtectionRange`, `heatTolerance`, `dustTolerance`, `auraSize` | Make the plant provide stronger outward shelter once it is established without changing the no-self-shield rule on its own footprint. |
-| `Forestry Bureau of Autonomous Region` | `plant` | `Rehab Update` | `fertilityImprovePower`, `salinityReductionPower` | Make the plant better at long-term land recovery and soil rehabilitation. |
+| `Forestry Bureau of Autonomous Region` | `plant` | `Rehab Update` | `fertilityImprovePower`, `saltTolerance` | Make the plant better at long-term land recovery and salt rehabilitation without adding a separate plant salinity-support meter. |
 | `Autonomous Region Agricultural University` | `device` | `Calibration Update` | `deviceEfficiency`, linked device primary output values | Make the device perform its main job more efficiently once deployed. |
 | `Autonomous Region Agricultural University` | `device` | `Hardening Update` | `deviceIntegrity`, `burialSensitivity` | Make the device more durable and less vulnerable to harsh conditions. |
 | `Autonomous Region Agricultural University` | `device` | `Field Envelope Update` | `windProtectionPower`, `windProtectionRange`, linked device support values | Make the device shape a stronger local protection or support pocket around itself. |
@@ -3741,12 +3741,11 @@ The design target is setbacks rather than total campaign reset. The player shoul
 | Role | Purpose | Current Placeholder |
 |---|---|---|
 | Sand-fix starter | Makes bare sand workable for later restoration | `Straw Checkerboard` |
-| Protection | Shields tiles, young plants, or work zones | `Ordos Wormwood`, `Korshinsk Peashrub`, `Sea Buckthorn`, `Saxaul` |
-| Anti-dehydration | Slows water loss and lowers local heat stress | `Ordos Wormwood`, `Red Tamarisk`, `Jiji Grass`, `Ningxia Wolfberry`, `Saxaul` |
-| Fertilize | Improves soil quality and future plant performance | `Korshinsk Peashrub`, `White Thorn`, `Jiji Grass`, `Straw Checkerboard` setup support |
-| Salinity rehab | Reduces salty-tile density caps over time so later plants can use the tile better | `White Thorn`, `Korshinsk Peashrub`, `Jiji Grass`, `Saxaul` |
-| Output | Provides food or limited sellable yield | `White Thorn`, `Ningxia Wolfberry`, `Sea Buckthorn`, `Desert Ephedra` |
-| Worker support | Improves comfort, recovery feel, or safe rest value | `Red Tamarisk`, `Desert Ephedra`, `Saxaul` dense pocket support |
+| Protection | Shields tiles, young plants, or work zones | `Ordos Wormwood`, `Sea Buckthorn`, `Red Tamarisk`, `Saxaul` |
+| Soil support | Improves fertility and transition-ground recovery | `Jiji Grass`, `Korshinsk Peashrub`, `Saxaul`, `Straw Checkerboard` setup support |
+| Salinity rehab | Reduces salty-tile density caps over time so later plants can use the tile better | `White Thorn`, `Korshinsk Peashrub` |
+| Output | Provides food or limited sellable yield | `Desert Ephedra`, `White Thorn`, `Sea Buckthorn`, `Ningxia Wolfberry` |
+| Worker support | Improves comfort, recovery feel, or safe rest value | `Desert Ephedra`, `Red Tamarisk` |
 
 Section 11's current plant set is the current working content target. The game should stay at a hand-picked 10-entry roster, including one plant-derived starter material, until combo readability, progression fun, and role overlap are proven in playtests.
 
@@ -4404,7 +4403,7 @@ This summary should include only core runtime meters and the core plant-side val
 | Plant meters | `tilePlantDensity`, `growthPressure`, `salinityDensityCap` | Shared plant-side runtime meters. `tilePlantDensity` tracks current plant presence, `growthPressure` governs growth-capable plants, and `salinityDensityCap` is the plant-side density ceiling created by salty ground. |
 | Plant behavior values | `growable`, `constantWitherRate` | Core plant-side behavior values. `growable` decides whether favorable conditions may increase density, and `constantWitherRate` applies steady density loss to plant density when defined. |
 | Plant resistance values | `saltTolerance`, `heatTolerance`, `windResistance`, `dustTolerance` | Plant-definition values that turn salinity, heat, wind, and dust pressure into species-specific density limits and pressure resistance, and for heat/wind/dust also define the plant's outward shelter strength for other tiles. |
-| Object contribution meters | `auraSize`, `windProtectionRange`, plant `heatTolerance` / `windResistance` / `dustTolerance`, device `windProtectionPower` / `heatProtectionPower` / `dustProtectionPower`, `fertilityImprovePower`, `salinityReductionPower`, `irrigationPower` | Shared local contribution values and meters. Plants feed weather shelter through their resistance/tolerance values plus density-scaled reach, while authored devices may still feed any authored subset of the explicit support channels. |
+| Object contribution meters | `auraSize`, `windProtectionRange`, plant `heatTolerance` / `windResistance` / `dustTolerance`, plant `saltTolerance` with `plantFocus`, device `windProtectionPower` / `heatProtectionPower` / `dustProtectionPower`, `fertilityImprovePower`, `salinityReductionPower`, `irrigationPower` | Shared local contribution values and meters. Plants feed weather shelter through their resistance/tolerance values plus density-scaled reach, derive plant-side salinity rehabilitation from `saltTolerance` only when their focus allows it, and devices may still feed any authored subset of the explicit support channels. |
 
 ### Event Meter Relationships
 
@@ -4430,7 +4429,7 @@ This summary should include only core runtime meters and the core plant-side val
 | `tileWindProtection` | Nearby plant `windResistance`, `tilePlantDensity`, device `windProtectionPower`, `deviceEfficiency`, `windProtectionRange`, wind direction | `tileWind` | Shared resolved local wind-protection state for one tile. Wind shelter should stay directional and non-linear downwind, and a plant should not feed this channel back into its own occupied footprint. |
 | `tileDustProtection` | Nearby plant `dustTolerance`, `tilePlantDensity`, device `dustProtectionPower`, `deviceEfficiency`, `auraSize` | `tileDust` | Shared resolved local dust-protection state for one tile. A plant should not feed this channel back into its own occupied footprint. |
 | `tileFertilityImprove` | Nearby `fertilityImprovePower`, `tilePlantDensity`, `deviceEfficiency`, `auraSize` | `tileSoilFertility` | Shared resolved local fertility-improvement state for one tile. |
-| `tileSalinityReduction` | Nearby `salinityReductionPower`, `tilePlantDensity`, `deviceEfficiency`, `auraSize` | `tileSoilSalinity` | Shared resolved local salinity-reduction state for one tile. |
+| `tileSalinityReduction` | Nearby plant `saltTolerance`, `plantFocus`, `tilePlantDensity`, device `salinityReductionPower`, `deviceEfficiency`, `auraSize` | `tileSoilSalinity` | Shared resolved local salinity-reduction state for one tile. Plants derive this from `saltTolerance` only when their focus allows outward support. |
 | `tileIrrigation` | Nearby `irrigationPower`, `deviceEfficiency`, `auraSize` | `tileMoisture` | Shared resolved local irrigation state for one tile. |
 
 ### Resolved Local Weather Meter Relationships
@@ -4705,7 +4704,7 @@ Technology content updates are not separate runtime meters. They are persistent 
 | `Village Committee` | `Comfort Blend` | `playerMorale`, `itemFreshness` | Lets field food stay useful longer and support comfort. |
 | `Forestry Bureau of Autonomous Region` | `Establishment Update` | `growthPressure`, `plantDensityModifier`, `salinityDensityCap` | Applies to the linked plant definition. |
 | `Forestry Bureau of Autonomous Region` | `Protection Update` | `windResistance`, `windProtectionRange`, `heatTolerance`, `dustTolerance`, `auraSize` | Applies to the linked plant definition. |
-| `Forestry Bureau of Autonomous Region` | `Rehab Update` | `fertilityImprovePower`, `salinityReductionPower` | Applies to the linked plant definition. |
+| `Forestry Bureau of Autonomous Region` | `Rehab Update` | `fertilityImprovePower`, `saltTolerance` | Applies to the linked plant definition. |
 | `Autonomous Region Agricultural University` | `Calibration Update` | `deviceEfficiency`, linked device primary output values | Applies to the linked device definition. |
 | `Autonomous Region Agricultural University` | `Hardening Update` | `deviceIntegrity`, `burialSensitivity` | Applies to the linked device definition and harsh-event durability behavior. |
 | `Autonomous Region Agricultural University` | `Field Envelope Update` | `windProtectionPower`, `windProtectionRange`, linked device support values | Applies only to the support values present on the linked device row. |
@@ -4725,17 +4724,17 @@ Technology content updates are not separate runtime meters. They are persistent 
 |---|---|---|---|
 | `growable` | Plant definition only | `tilePlantDensity` | Allows favorable conditions to create density gain. If `false`, low `growthPressure` does not produce positive growth. |
 | `constantWitherRate` | Plant definition only | `tilePlantDensity` | Applies steady density loss every fixed simulation step. |
-| `auraSize` | Object definition only | Reach of plant `heatTolerance` / `dustTolerance` shelter plus `fertilityImprovePower`, `salinityReductionPower`, and `irrigationPower` | Shared non-wind contribution reach value. `0` means own tile only, and larger values extend contribution reach by Manhattan distance. |
+| `auraSize` | Object definition only | Reach of plant `heatTolerance` / `dustTolerance` shelter plus `fertilityImprovePower`, focus-derived salinity rehabilitation, and `irrigationPower` | Shared non-wind contribution reach value. `0` means own tile only, and larger values extend contribution reach by Manhattan distance. |
 | `windProtectionRange` | Object definition only | Reach of plant `windResistance` shelter or device `windProtectionPower` | Wind-specific contribution reach value. `0` means own tile only, and larger values extend directional downwind shelter farther behind the source. |
 | `fertilityImprovePower` | Object definition only, `tilePlantDensity`, `auraSize` | `tileSoilFertility` | Shared local soil-building meter. Plant density scales plant-side output while `auraSize` controls reach. |
-| `salinityReductionPower` | Object definition only, `tilePlantDensity`, `auraSize` | `tileSoilSalinity` | Shared local salinity-reduction meter. Plant density scales plant-side output while `auraSize` controls reach. |
-| `saltTolerance` | Plant definition only | `salinityDensityCap` | Preserves usable density on salty ground. |
+| `outputPower` | Plant definition only | plant roster pool, harvest-value identity | Explicit output share of the plant's authored roster budget. It should stay aligned with the linked harvest item's internal cash-point tier. |
+| `saltTolerance` | Plant definition only, `plantFocus`, `tilePlantDensity`, `auraSize` | `salinityDensityCap`, nearby `tileSalinityReduction` | Preserves usable density on salty ground and, for support-focused plants, also defines plant-side salinity rehabilitation strength. |
 | `heatTolerance` | Plant definition only, `tilePlantDensity`, `auraSize` | `growthPressure`, nearby `tileHeatProtection` | Lowers heat-side growth pressure on the plant's own footprint and sets outward nearby heat shelter strength for other tiles. |
 | `windResistance` | Plant definition only, `tilePlantDensity`, `windProtectionRange` | `growthPressure`, nearby `tileWindProtection` | Lowers wind-side growth pressure on the plant's own footprint and sets outward downwind wind shelter strength for other tiles. |
 | `dustTolerance` | Plant definition only, `tilePlantDensity`, `auraSize` | `growthPressure`, nearby `tileDustProtection` | Covers dust exposure and burial-side pressure on the plant's own footprint and sets outward nearby dust shelter strength for other tiles. |
 | `growthPressure` | `tileMoisture`, `tileSoilFertility`, `tileSandBurial`, `tileHeat`, `tileWind`, `tileDust`, `heatTolerance`, `windResistance`, `dustTolerance` | `tilePlantDensity` | Final plant pressure meter for growth-capable plants. Local weather and effective resistance should compare on the same `0.01` scale, and non-growable setup plants should keep this meter at `0`. |
 | `salinityDensityCap` | `tileSoilSalinity`, `saltTolerance` | `tilePlantDensity` | Plant-side density ceiling on salty ground. |
-| `tilePlantDensity` | `growthPressure`, `salinityDensityCap`, `growable`, `constantWitherRate` | outward `heatTolerance`, `windResistance`, `dustTolerance`, `fertilityImprovePower`, `salinityReductionPower` support | Current plant strength and effect scale. Higher density strengthens the plant-fed share of the shared object contribution meters for other tiles, while `windProtectionRange` controls plant-side wind reach and `auraSize` controls the other shared plant-side contribution reach. |
+| `tilePlantDensity` | `growthPressure`, `salinityDensityCap`, `growable`, `constantWitherRate` | outward `heatTolerance`, `windResistance`, `dustTolerance`, `fertilityImprovePower`, and focus-derived salinity support | Current plant strength and effect scale. Higher density strengthens the plant-fed share of the shared object contribution meters for other tiles, while `windProtectionRange` controls plant-side wind reach and `auraSize` controls the other shared plant-side contribution reach. |
 
 `Straw Checkerboard` should be authored through the same shared plant rows: start it at maximum `tilePlantDensity`, set `growable = false`, set a positive `constantWitherRate`, set `windProtectionRange` and `auraSize` as needed for setup reach, keep `growthPressure` at `0`, and rely on resistance-driven outward shelter plus normal shared contribution values such as `fertilityImprovePower`.
 

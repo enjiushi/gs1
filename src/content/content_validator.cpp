@@ -3,10 +3,17 @@
 #include "content/defs/faction_defs.h"
 #include "support/currency.h"
 
+#include <algorithm>
+#include <cmath>
+#include <unordered_map>
+
 namespace gs1
 {
 namespace
 {
+inline constexpr float k_starter_plant_pool = 90.0f;
+inline constexpr float k_unlock_step_plant_pool = 10.0f;
+
 [[nodiscard]] bool is_power_of_two(std::uint8_t value) noexcept
 {
     return value != 0U && (value & static_cast<std::uint8_t>(value - 1U)) == 0U;
@@ -41,6 +48,53 @@ namespace
     }
 
     return true;
+}
+
+[[nodiscard]] float max_output_power_for_item_value(std::uint32_t internal_cash_points) noexcept
+{
+    return static_cast<float>(internal_cash_points) * 0.125f;
+}
+
+[[nodiscard]] std::unordered_map<std::uint32_t, float> build_expected_plant_pool_targets(
+    const ContentDatabase& content)
+{
+    std::unordered_map<std::uint32_t, float> targets {};
+    for (const auto plant_id : content.initial_unlocked_plant_ids)
+    {
+        targets.insert_or_assign(plant_id.value, k_starter_plant_pool);
+    }
+
+    std::vector<const ReputationUnlockDef*> plant_unlocks {};
+    plant_unlocks.reserve(content.reputation_unlock_defs.size());
+    for (const auto& unlock_def : content.reputation_unlock_defs)
+    {
+        if (unlock_def.unlock_kind == ReputationUnlockKind::Plant)
+        {
+            plant_unlocks.push_back(&unlock_def);
+        }
+    }
+
+    std::sort(
+        plant_unlocks.begin(),
+        plant_unlocks.end(),
+        [](const ReputationUnlockDef* lhs, const ReputationUnlockDef* rhs)
+        {
+            if (lhs->reputation_requirement != rhs->reputation_requirement)
+            {
+                return lhs->reputation_requirement < rhs->reputation_requirement;
+            }
+
+            return lhs->content_id < rhs->content_id;
+        });
+
+    for (std::size_t index = 0U; index < plant_unlocks.size(); ++index)
+    {
+        targets.insert_or_assign(
+            plant_unlocks[index]->content_id,
+            k_starter_plant_pool + (k_unlock_step_plant_pool * static_cast<float>(index + 1U)));
+    }
+
+    return targets;
 }
 }  // namespace
 
@@ -79,25 +133,69 @@ std::vector<ContentValidationIssue> validate_content_database(
             break;
         }
 
-        if (plant_def.fertility_improve_power < 0.0f ||
-            plant_def.salinity_reduction_power < 0.0f)
+        if (plant_def.aura_size > 3U || plant_def.wind_protection_range > 3U)
         {
             issues.push_back(ContentValidationIssue {
                 ContentValidationSeverity::Error,
-                "Plant terrain-support values must be non-negative."});
+                "Plant aura and wind-protection ranges must stay in the authored 0-3 range."});
+            break;
+        }
+
+        if (plant_def.fertility_improve_power < 0.0f ||
+            plant_def.output_power < 0.0f)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Plant fertility and output meters must be non-negative."});
+            break;
+        }
+
+        if (!plant_focus_has_aura(plant_def.focus) && plant_def.aura_size != 0U)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Only protection or support focused plants may project a non-zero aura range."});
+            break;
+        }
+
+        if (!plant_focus_has_wind_projection(plant_def.focus) &&
+            plant_def.wind_protection_range != 0U)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Only protection-focused plants may project a non-zero wind-protection range."});
+            break;
+        }
+
+        if (!plant_focus_has_wind_projection(plant_def.focus) &&
+            plant_def.protection_ratio != 0.0f)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Non-protection plant roles must keep outward protection ratio at zero."});
+            break;
+        }
+
+        if (plant_focus_has_wind_projection(plant_def.focus) &&
+            plant_def.protection_ratio <= 0.0f)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Protection-focused plants must keep a positive protection ratio."});
             break;
         }
 
         if (plant_def.harvest_item_id.value == 0U)
         {
-            if (plant_def.harvest_quantity != 0U ||
+            if (plant_def.output_power != 0.0f ||
+                plant_def.harvest_quantity != 0U ||
                 plant_def.harvest_action_duration_minutes != 0.0f ||
                 plant_def.harvest_density_required != 0.0f ||
                 plant_def.harvest_density_removed != 0.0f)
             {
                 issues.push_back(ContentValidationIssue {
                     ContentValidationSeverity::Error,
-                    "Plants without harvest output must keep harvest tuning at zero."});
+                    "Plants without harvest output must keep output power and harvest tuning at zero."});
                 break;
             }
 
@@ -124,6 +222,16 @@ std::vector<ContentValidationIssue> validate_content_database(
             break;
         }
 
+        if (plant_def.output_power <= 0.0f ||
+            plant_def.output_power >
+                max_output_power_for_item_value(harvest_item.internal_price_cash_points))
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Harvest plants must author a positive output meter that stays within the allowed band for the linked harvest item's internal cash-point value."});
+            break;
+        }
+
         if (plant_def.harvest_quantity == 0U ||
             plant_def.harvest_action_duration_minutes <= 0.0f ||
             plant_def.harvest_density_required <= 0.0f ||
@@ -135,6 +243,30 @@ std::vector<ContentValidationIssue> validate_content_database(
                 ContentValidationSeverity::Error,
                 "Harvest plants must author valid harvest quantity, timing, and density thresholds."});
             break;
+        }
+    }
+
+    if (issues.empty())
+    {
+        const auto expected_pool_targets = build_expected_plant_pool_targets(content);
+        for (const auto& plant_def : content.plant_defs)
+        {
+            const auto it = expected_pool_targets.find(plant_def.plant_id.value);
+            if (it == expected_pool_targets.end())
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Every authored plant must be accounted for by either the starter unlock list or the reputation unlock table."});
+                break;
+            }
+
+            if (std::fabs(plant_total_meter_pool(plant_def) - it->second) > 0.001f)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Plant meter pools must match the authored roster ladder of 90 for starters plus 10 per unlock step."});
+                break;
+            }
         }
     }
 

@@ -266,7 +266,7 @@ gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
             delta.fertility_improve =
                 plant_def.fertility_improve_power * density * contribution_scale;
             delta.salinity_reduction =
-                plant_def.salinity_reduction_power * density * contribution_scale;
+                derived_plant_salinity_reduction_power(plant_def) * density * contribution_scale;
 
             if (!same_occupant_instance)
             {
