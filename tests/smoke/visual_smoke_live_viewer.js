@@ -3312,9 +3312,28 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
 
         const warning = getHudWarningPresentation(state);
+        const protectionOverlay = getProtectionOverlayState(state);
+        const overlayModeName =
+            protectionOverlay && typeof protectionOverlay.mode === "string"
+                ? protectionOverlay.mode
+                : "NONE";
         hudEyebrow.textContent = warning.code !== hudWarningCodes.none ? warning.headline : "Site Active";
         hudTitle.textContent = getActiveSiteName(state);
-        hudSubtitle.textContent = getActiveSiteTip();
+        if (overlayModeName !== "NONE") {
+            const overlayPresentation = protectionOverlayPresentation(overlayModeName);
+            const siteBootstrap = getSiteBootstrap(state);
+            const siteTiles = siteBootstrap && Array.isArray(siteBootstrap.tiles)
+                ? siteBootstrap.tiles
+                : [];
+            const peakValue = resolveProtectionOverlayPeakValue(siteTiles, overlayModeName);
+            hudSubtitle.textContent =
+                overlayPresentation.title +
+                " overlay: strongest current final shelter is " +
+                peakValue.toFixed(1) +
+                " on the 0-100 scale.";
+        } else {
+            hudSubtitle.textContent = getActiveSiteTip();
+        }
         renderSiteVitalsPanel(state);
     }
 
@@ -5476,7 +5495,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         const copy = document.createElement("div");
         copy.className = "protection-selector-copy";
-        copy.textContent = "Pick one channel to paint every tile from red to green by protection strength.";
+        copy.textContent = "Pick one channel to compare final per-tile shelter on a strict 0-100 scale.";
         panel.appendChild(copy);
 
         const grid = document.createElement("div");
@@ -8369,6 +8388,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return 0;
     }
 
+    function resolveProtectionOverlayPeakValue(tiles, modeName) {
+        return (tiles || []).reduce(function (peakValue, tile) {
+            return Math.max(peakValue, readTileProtectionValue(tile, modeName));
+        }, 0);
+    }
+
     function applyTerrainSurfaceShader(material) {
         material.onBeforeCompile = function (shader) {
             shader.vertexShader = shader.vertexShader.replace(
@@ -8775,10 +8800,14 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const overlayGroup = new THREE_NS.Group();
         const lowColor = new THREE_NS.Color(0xc95649);
         const highColor = new THREE_NS.Color(0x59b36c);
-        const tileMap = buildSiteTileMap(getSiteBootstrap(state).tiles || []);
+        const siteBootstrap = getSiteBootstrap(state);
+        const siteTiles = siteBootstrap && Array.isArray(siteBootstrap.tiles)
+            ? siteBootstrap.tiles
+            : [];
+        const tileMap = buildSiteTileMap(siteTiles);
         const scratchColor = new THREE_NS.Color();
 
-        (getSiteBootstrap(state).tiles || []).forEach((tile) => {
+        siteTiles.forEach((tile) => {
             const tileSnapshot = getSiteTileByCoord(
                 tileMap,
                 siteSceneCache.width,
@@ -8786,7 +8815,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 tile.x,
                 tile.y
             );
-            const normalizedProtection = clamp01(readTileProtectionValue(tileSnapshot, modeName) / 100.0);
+            const normalizedProtection =
+                clamp01(readTileProtectionValue(tileSnapshot, modeName) / 100.0);
             scratchColor.copy(lowColor).lerp(highColor, normalizedProtection);
 
             const tileHeight = computeSiteTileVisualHeight(tileSnapshot);

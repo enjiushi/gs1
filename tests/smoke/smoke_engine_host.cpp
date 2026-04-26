@@ -1,12 +1,48 @@
 #include "smoke_engine_host.h"
 #include "smoke_log.h"
 
+#include "content/defs/gameplay_tuning_defs.h"
+#include "content/defs/plant_defs.h"
+
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <utility>
 
 namespace
 {
+float unit_from_raw_meter(float value) noexcept
+{
+    return std::clamp(value * 0.01f, 0.0f, 1.0f);
+}
+
+float resolve_density_scaled_resistance(float max_value, float density) noexcept
+{
+    const auto& tuning = gs1::gameplay_tuning_def().ecology;
+    const float clamped_density = unit_from_raw_meter(density);
+    const float floor_scale =
+        1.0f - std::clamp(tuning.resistance_density_influence, 0.0f, 1.0f);
+    const float min_value = max_value * floor_scale;
+    return std::lerp(min_value, max_value, clamped_density);
+}
+
+float resolve_final_overlay_protection_value(
+    std::uint32_t plant_type_id,
+    float plant_density,
+    float projected_protection,
+    float gs1::PlantDef::*self_channel) noexcept
+{
+    const auto* plant_def = gs1::find_plant_def(gs1::PlantId {plant_type_id});
+    if (plant_def == nullptr)
+    {
+        return std::clamp(projected_protection, 0.0f, 100.0f);
+    }
+
+    const float self_resistance =
+        resolve_density_scaled_resistance(plant_def->*self_channel, plant_density);
+    return std::clamp(projected_protection + self_resistance, 0.0f, 100.0f);
+}
+
 const char* message_type_name(Gs1EngineMessageType type)
 {
     switch (type)
@@ -1285,9 +1321,24 @@ void SmokeEngineHost::apply_site_tile_upsert(const Gs1EngineMessage& message)
     projection.plant_density = payload.plant_density;
     projection.sand_burial = payload.sand_burial;
     projection.local_wind = payload.local_wind;
-    projection.wind_protection = payload.wind_protection;
-    projection.heat_protection = payload.heat_protection;
-    projection.dust_protection = payload.dust_protection;
+    projection.wind_protection =
+        resolve_final_overlay_protection_value(
+            projection.plant_type_id,
+            projection.plant_density,
+            payload.wind_protection,
+            &gs1::PlantDef::wind_resistance);
+    projection.heat_protection =
+        resolve_final_overlay_protection_value(
+            projection.plant_type_id,
+            projection.plant_density,
+            payload.heat_protection,
+            &gs1::PlantDef::heat_tolerance);
+    projection.dust_protection =
+        resolve_final_overlay_protection_value(
+            projection.plant_type_id,
+            projection.plant_density,
+            payload.dust_protection,
+            &gs1::PlantDef::dust_tolerance);
     projection.moisture = payload.moisture;
     projection.soil_fertility = payload.soil_fertility;
     projection.soil_salinity = payload.soil_salinity;
