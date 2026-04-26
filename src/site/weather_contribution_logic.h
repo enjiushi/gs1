@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdlib>
 #include <cmath>
 
 namespace gs1
@@ -13,10 +14,7 @@ inline constexpr float k_weather_contribution_density_epsilon_raw = 0.01f;
 inline constexpr float k_inverse_meter_scale = 0.01f;
 inline constexpr float k_own_tile_contribution_scale = 0.04f;
 inline constexpr float k_neighbor_contribution_scale = 0.018f;
-inline constexpr std::uint8_t k_weather_contribution_wind_direction_sector_count = 16U;
-inline constexpr float k_wind_shadow_alignment_exponent = 2.0f;
-inline constexpr float k_wind_shadow_falloff_exponent = 3.0f;
-inline constexpr float k_wind_shadow_falloff_strength = 2.0f;
+inline constexpr std::uint8_t k_weather_contribution_wind_direction_sector_count = 8U;
 
 struct WeatherContributionSample final
 {
@@ -25,10 +23,10 @@ struct WeatherContributionSample final
     int manhattan_distance;
 };
 
-struct WeatherUnitVector final
+struct WeatherDirectionStep final
 {
-    float x {1.0f};
-    float y {0.0f};
+    int x {1};
+    int y {0};
 };
 
 inline constexpr std::array<WeatherContributionSample, 13> k_weather_contribution_samples {{
@@ -60,15 +58,6 @@ inline constexpr std::array<WeatherContributionSample, 13> k_weather_contributio
     return wrapped < 0.0f ? wrapped + 360.0f : wrapped;
 }
 
-[[nodiscard]] inline WeatherUnitVector resolve_wind_direction_unit_vector(
-    float wind_direction_degrees) noexcept
-{
-    const float radians =
-        normalize_wind_direction_degrees(wind_direction_degrees) *
-        (3.14159265358979323846f / 180.0f);
-    return WeatherUnitVector {std::cos(radians), std::sin(radians)};
-}
-
 [[nodiscard]] inline std::uint8_t quantize_wind_direction_sector(
     float wind_direction_degrees,
     std::uint8_t sector_count = k_weather_contribution_wind_direction_sector_count) noexcept
@@ -80,8 +69,33 @@ inline constexpr std::array<WeatherContributionSample, 13> k_weather_contributio
 
     const float normalized = normalize_wind_direction_degrees(wind_direction_degrees);
     const float sector_size = 360.0f / static_cast<float>(sector_count);
-    const auto raw_sector = static_cast<std::uint32_t>(normalized / sector_size);
+    const auto raw_sector = static_cast<std::uint32_t>(
+        (normalized + (sector_size * 0.5f)) / sector_size);
     return static_cast<std::uint8_t>(raw_sector % sector_count);
+}
+
+[[nodiscard]] inline WeatherDirectionStep resolve_wind_direction_step(
+    float wind_direction_degrees) noexcept
+{
+    switch (quantize_wind_direction_sector(wind_direction_degrees))
+    {
+    case 0U:
+        return WeatherDirectionStep {1, 0};
+    case 1U:
+        return WeatherDirectionStep {1, 1};
+    case 2U:
+        return WeatherDirectionStep {0, 1};
+    case 3U:
+        return WeatherDirectionStep {-1, 1};
+    case 4U:
+        return WeatherDirectionStep {-1, 0};
+    case 5U:
+        return WeatherDirectionStep {-1, -1};
+    case 6U:
+        return WeatherDirectionStep {0, -1};
+    default:
+        return WeatherDirectionStep {1, -1};
+    }
 }
 
 [[nodiscard]] inline float compute_directional_wind_shadow_scale(
@@ -90,45 +104,57 @@ inline constexpr std::array<WeatherContributionSample, 13> k_weather_contributio
     int target_x,
     int target_y,
     std::uint8_t protection_range,
-    WeatherUnitVector wind_direction) noexcept
+    WeatherDirectionStep wind_direction) noexcept
 {
     if (protection_range == 0U)
     {
         return 0.0f;
     }
 
-    const float offset_x = static_cast<float>(target_x - source_x);
-    const float offset_y = static_cast<float>(target_y - source_y);
-    const float distance = std::sqrt(offset_x * offset_x + offset_y * offset_y);
-    if (distance <= k_weather_contribution_epsilon ||
-        distance > static_cast<float>(protection_range) + k_weather_contribution_epsilon)
+    const int offset_x = target_x - source_x;
+    const int offset_y = target_y - source_y;
+    const int manhattan_distance = std::abs(offset_x) + std::abs(offset_y);
+    if (manhattan_distance == 0 || manhattan_distance > static_cast<int>(protection_range))
     {
         return 0.0f;
     }
 
-    const float alignment =
-        ((offset_x / distance) * wind_direction.x) +
-        ((offset_y / distance) * wind_direction.y);
-    if (alignment <= k_weather_contribution_epsilon)
+    const auto matches_signed_axis = [](int component, int direction_component) noexcept -> bool
     {
+        if (direction_component == 0)
+        {
+            return component == 0;
+        }
+
+        return component != 0 && ((component > 0) == (direction_component > 0));
+    };
+
+    if (wind_direction.x == 0 || wind_direction.y == 0)
+    {
+        if (matches_signed_axis(offset_x, wind_direction.x) &&
+            matches_signed_axis(offset_y, wind_direction.y))
+        {
+            return 1.0f;
+        }
+
         return 0.0f;
     }
 
-    const float alignment_scale =
-        std::pow(std::clamp(alignment, 0.0f, 1.0f), k_wind_shadow_alignment_exponent);
-    const float normalized_progress =
-        protection_range <= 1U
-        ? 0.0f
-        : std::clamp(
-              (distance - 1.0f) /
-                  static_cast<float>(protection_range - 1U),
-              0.0f,
-              1.0f);
-    const float distance_scale =
-        std::exp(
-            -k_wind_shadow_falloff_strength *
-            std::pow(normalized_progress, k_wind_shadow_falloff_exponent));
-    return alignment_scale * distance_scale;
+    const bool on_horizontal_lane =
+        matches_signed_axis(offset_x, wind_direction.x) && offset_y == 0;
+    const bool on_vertical_lane =
+        matches_signed_axis(offset_y, wind_direction.y) && offset_x == 0;
+    if (on_horizontal_lane || on_vertical_lane)
+    {
+        return 1.0f;
+    }
+
+    if (offset_x == wind_direction.x && offset_y == wind_direction.y)
+    {
+        return 0.5f;
+    }
+
+    return 0.0f;
 }
 
 [[nodiscard]] inline SiteWorld::TileWeatherContributionData zero_weather_contribution() noexcept

@@ -527,14 +527,14 @@ void local_weather_resolve_combines_owner_specific_contributions_each_run(
     GS1_SYSTEM_TEST_CHECK(context, device_support.wind_protection > 0.0f);
 }
 
-void local_weather_resolve_applies_directional_wind_shadow_falloff_for_windbreak_plants(
+void local_weather_resolve_applies_eight_direction_wind_shadow_for_windbreak_plants(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(2U, 1204U, 101U, 6U, 5U);
     GameMessageQueue queue {};
 
-    site_run.weather.weather_wind = 12.0f;
+    site_run.weather.weather_wind = 50.0f;
     site_run.weather.weather_wind_direction_degrees = 0.0f;
 
     auto tile = site_run.site_world->tile_at(TileCoord {1, 2});
@@ -548,12 +548,54 @@ void local_weather_resolve_applies_directional_wind_shadow_falloff_for_windbreak
     const auto first_downwind = site_run.site_world->tile_local_weather(TileCoord {2, 2});
     const auto second_downwind = site_run.site_world->tile_local_weather(TileCoord {3, 2});
     const auto upwind = site_run.site_world->tile_local_weather(TileCoord {0, 2});
+    const auto first_downwind_support =
+        site_run.site_world->tile_plant_weather_contribution(TileCoord {2, 2});
+    const auto second_downwind_support =
+        site_run.site_world->tile_plant_weather_contribution(TileCoord {3, 2});
 
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(own_weather.wind, 12.0f));
-    GS1_SYSTEM_TEST_CHECK(context, first_downwind.wind < 12.0f);
-    GS1_SYSTEM_TEST_CHECK(context, second_downwind.wind < 12.0f);
-    GS1_SYSTEM_TEST_CHECK(context, first_downwind.wind < second_downwind.wind);
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(upwind.wind, 12.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(own_weather.wind, 50.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(first_downwind_support.wind_protection, 34.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(second_downwind_support.wind_protection, 34.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(first_downwind.wind, 16.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(second_downwind.wind, 16.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(upwind.wind, 50.0f));
+}
+
+void local_weather_resolve_applies_half_strength_diagonal_wind_shadow_for_windbreak_plants(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(2U, 1206U, 101U, 6U, 6U);
+    GameMessageQueue queue {};
+
+    site_run.weather.weather_wind = 50.0f;
+    site_run.weather.weather_wind_direction_degrees = 45.0f;
+
+    auto tile = site_run.site_world->tile_at(TileCoord {2, 2});
+    tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_ordos_wormwood};
+    tile.ecology.plant_density = 100.0f;
+    site_run.site_world->set_tile(TileCoord {2, 2}, tile);
+
+    run_local_weather_pipeline(campaign, site_run, queue);
+
+    const auto horizontal_lane = site_run.site_world->tile_local_weather(TileCoord {3, 2});
+    const auto vertical_lane = site_run.site_world->tile_local_weather(TileCoord {2, 3});
+    const auto diagonal_lane = site_run.site_world->tile_local_weather(TileCoord {3, 3});
+    const auto upwind = site_run.site_world->tile_local_weather(TileCoord {1, 2});
+    const auto horizontal_support =
+        site_run.site_world->tile_plant_weather_contribution(TileCoord {3, 2});
+    const auto vertical_support =
+        site_run.site_world->tile_plant_weather_contribution(TileCoord {2, 3});
+    const auto diagonal_support =
+        site_run.site_world->tile_plant_weather_contribution(TileCoord {3, 3});
+
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(horizontal_support.wind_protection, 34.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(vertical_support.wind_protection, 34.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(diagonal_support.wind_protection, 17.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(horizontal_lane.wind, 16.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(vertical_lane.wind, 16.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(diagonal_lane.wind, 33.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(upwind.wind, 50.0f));
 }
 
 void local_weather_resolve_marks_projected_plant_tiles_dirty_when_wind_changes(
@@ -630,8 +672,8 @@ void local_weather_resolve_applies_device_wind_protection_value_and_range(
     const auto neighbor_weather = site_run.site_world->tile_local_weather(TileCoord {3, 2});
     const auto upwind_weather = site_run.site_world->tile_local_weather(TileCoord {1, 2});
     const auto out_of_range_weather = site_run.site_world->tile_local_weather(TileCoord {4, 2});
-    GS1_SYSTEM_TEST_CHECK(context, own_weather.wind < 10.0f);
-    GS1_SYSTEM_TEST_CHECK(context, neighbor_weather.wind < 10.0f);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(own_weather.wind, 0.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(neighbor_weather.wind, 0.0f));
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(upwind_weather.wind, 10.0f));
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(neighbor_weather.heat, 10.0f));
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(neighbor_weather.dust, 3.0f));
@@ -1225,8 +1267,12 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     local_weather_resolve_combines_owner_specific_contributions_each_run);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "local_weather_resolve",
-    "applies_directional_wind_shadow_falloff_for_windbreak_plants",
-    local_weather_resolve_applies_directional_wind_shadow_falloff_for_windbreak_plants);
+    "applies_eight_direction_wind_shadow_for_windbreak_plants",
+    local_weather_resolve_applies_eight_direction_wind_shadow_for_windbreak_plants);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "local_weather_resolve",
+    "applies_half_strength_diagonal_wind_shadow_for_windbreak_plants",
+    local_weather_resolve_applies_half_strength_diagonal_wind_shadow_for_windbreak_plants);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "local_weather_resolve",
     "marks_projected_plant_tiles_dirty_when_wind_changes",

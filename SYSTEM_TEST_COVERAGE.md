@@ -328,6 +328,8 @@ Implemented behavior coverage should verify:
   through `process_message()`.
 - `run()` writes per-tile local heat, wind, and dust from site weather plus
   occupant-density/cover adjustments.
+- Wind shelter snaps to 8 directions, with full orthogonal lee lanes and
+  half-strength immediately diagonal shelter for diagonal winds.
 - Covered tiles reduce wind and dust relative to exposed tiles.
 - Exposed tiles receive the exposed dust bias.
 

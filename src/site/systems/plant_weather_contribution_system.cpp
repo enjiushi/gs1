@@ -158,7 +158,7 @@ bool source_and_target_share_occupant_instance(
 
 gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
     gs1::SiteSystemContext<gs1::PlantWeatherContributionSystem>& context,
-    const gs1::WeatherUnitVector& wind_direction,
+    const gs1::WeatherDirectionStep& wind_direction,
     gs1::TileCoord target_coord)
 {
     auto& ecs_world = context.site_run.site_world->ecs_world();
@@ -241,7 +241,6 @@ gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
                 delta.wind_protection =
                     plant_def.wind_resistance *
                     density *
-                    contribution_scale *
                     shadow_scale;
             }
         }
@@ -352,8 +351,8 @@ void PlantWeatherContributionSystem::run(SiteSystemContext<PlantWeatherContribut
         return;
     }
 
-    const WeatherUnitVector wind_direction =
-        resolve_wind_direction_unit_vector(context.world.read_weather().weather_wind_direction_degrees);
+    const WeatherDirectionStep wind_direction =
+        resolve_wind_direction_step(context.world.read_weather().weather_wind_direction_degrees);
     for (const std::uint32_t tile_index : runtime.dirty_tile_indices)
     {
         const TileCoord target_coord = context.world.tile_coord(tile_index);

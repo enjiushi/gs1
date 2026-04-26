@@ -107,7 +107,7 @@ void mark_tiles_affected_by_source(
 
 gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
     gs1::SiteSystemContext<gs1::DeviceWeatherContributionSystem>& context,
-    const gs1::WeatherUnitVector& wind_direction,
+    const gs1::WeatherDirectionStep& wind_direction,
     gs1::TileCoord target_coord)
 {
     auto& ecs_world = context.site_run.site_world->ecs_world();
@@ -170,7 +170,7 @@ gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
         if (sample.manhattan_distance == 0)
         {
             delta.wind_protection =
-                structure_def->wind_protection_value * efficiency * contribution_scale;
+                structure_def->wind_protection_value * efficiency;
         }
         else if (sample.manhattan_distance <= static_cast<int>(structure_def->wind_protection_range))
         {
@@ -186,7 +186,6 @@ gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
                 delta.wind_protection =
                     structure_def->wind_protection_value *
                     efficiency *
-                    contribution_scale *
                     shadow_scale;
             }
         }
@@ -325,8 +324,8 @@ void DeviceWeatherContributionSystem::run(SiteSystemContext<DeviceWeatherContrib
         return;
     }
 
-    const WeatherUnitVector wind_direction =
-        resolve_wind_direction_unit_vector(context.world.read_weather().weather_wind_direction_degrees);
+    const WeatherDirectionStep wind_direction =
+        resolve_wind_direction_step(context.world.read_weather().weather_wind_direction_degrees);
     for (const std::uint32_t tile_index : runtime.dirty_tile_indices)
     {
         const TileCoord target_coord = context.world.tile_coord(tile_index);

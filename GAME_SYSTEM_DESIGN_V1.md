@@ -1221,7 +1221,7 @@ Responsibilities:
 - recompute resolved tile contribution states `tileHeatProtection`, `tileWindProtection`, `tileDustProtection`, `tileFertilityImprove`, `tileSalinityReduction`, and `tileIrrigation` every step
 - recompute `tileHeat`, `tileWind`, `tileDust` every step
 - combine site weather, event pressure, nearby support, local plant support, structure support, terrain shelter, and modifier channels
-- treat wind shelter as directional lee-side support driven by `weatherWindDirectionDegrees`, with nonlinear falloff across the authored wind-protection range
+- treat wind shelter as directional lee-side support driven by `weatherWindDirectionDegrees`, snapped to 8 readable tile directions with full orthogonal lee lanes and half-strength diagonal shelter
 - keep device support on the same resolved tile contribution channels as plant support instead of special-case weather-only device logic
 
 ### 10.5 `WorkerConditionSystem`
