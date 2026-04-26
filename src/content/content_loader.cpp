@@ -1655,6 +1655,7 @@ void load_plant_defs(ContentDatabase& content, const std::filesystem::path& path
             require_toml_unsigned<std::uint8_t>(path, entry, "footprint_width"),
             require_toml_unsigned<std::uint8_t>(path, entry, "footprint_height"),
             require_toml_unsigned<std::uint8_t>(path, entry, "wind_protection_range"),
+            require_toml_float(path, entry, "protection_ratio"),
             require_toml_float(path, entry, "plant_action_duration_minutes"),
             require_toml_float(path, entry, "constant_wither_rate"),
             require_toml_float(path, entry, "salt_tolerance"),

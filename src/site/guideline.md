@@ -33,6 +33,6 @@ Site-owned state, ECS world support, and helper logic for active site gameplay.
 - `site_world_components.h`: ECS component structs attached to site entities, including sparse `ActiveEcologyTag`, `DirtyEcologyTag`, dirty-mask, and ecology report-state data for occupied-tile iteration and batched ecology output.
 - `systems/`: Site system declarations and implementations, including harvest action execution, ecology harvest resolution, and worker-pack harvest insertion.
 - `task_board_state.h`: Task-board state for current site objectives and listings, including claimed-history tracking plus per-task resolved generator outputs, stored difficulty/reward cash-point valuation fields, runtime accumulators, masks, and the task-owned mirror caches updated from owner-emitted worker/tile/device progress messages.
-- `tile_footprint.h`: Tile-footprint geometry helpers for structures and placement.
+- `tile_footprint.h`: Tile-footprint geometry helpers for structures, placement, and footprint-scaled contribution distance helpers.
 - `weather_contribution_logic.h`: Shared local-weather helper logic for contribution falloff, snapped 8-direction wind-shadow sampling with full-lane plus half-diagonal lee shelter, wind-direction sector quantization, and plant/device contribution accumulation helpers.
 - `weather_state.h`: Weather state tracked during the active site run.

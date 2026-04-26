@@ -598,6 +598,76 @@ void local_weather_resolve_applies_half_strength_diagonal_wind_shadow_for_windbr
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(upwind.wind, 50.0f));
 }
 
+void local_weather_resolve_scales_multitile_plant_ranges_by_footprint(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(2U, 1206U, 101U, 10U, 8U);
+    GameMessageQueue queue {};
+
+    site_run.weather.weather_heat = 20.0f;
+    site_run.weather.weather_wind = 20.0f;
+    site_run.weather.weather_dust = 20.0f;
+    site_run.weather.weather_wind_direction_degrees = 0.0f;
+
+    for (const auto coord : {TileCoord {2, 2}, TileCoord {3, 2}, TileCoord {2, 3}, TileCoord {3, 3}})
+    {
+        auto tile = site_run.site_world->tile_at(coord);
+        tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_ordos_wormwood};
+        tile.ecology.plant_density = 100.0f;
+        site_run.site_world->set_tile(coord, tile);
+    }
+
+    run_local_weather_pipeline(campaign, site_run, queue);
+
+    const auto aura_edge = site_run.site_world->tile_local_weather(TileCoord {5, 2});
+    const auto aura_out_of_range = site_run.site_world->tile_local_weather(TileCoord {6, 2});
+    const auto wind_edge = site_run.site_world->tile_local_weather(TileCoord {7, 2});
+    const auto wind_out_of_range = site_run.site_world->tile_local_weather(TileCoord {8, 2});
+
+    GS1_SYSTEM_TEST_CHECK(context, aura_edge.heat < 20.0f);
+    GS1_SYSTEM_TEST_CHECK(context, aura_edge.dust < 20.0f);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(aura_out_of_range.heat, 20.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(aura_out_of_range.dust, 20.0f));
+    GS1_SYSTEM_TEST_CHECK(context, wind_edge.wind < 20.0f);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(wind_out_of_range.wind, 20.0f));
+}
+
+void local_weather_resolve_respects_authored_plant_protection_ratio(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(2U, 1207U, 101U, 8U, 8U);
+    GameMessageQueue queue {};
+
+    site_run.weather.weather_heat = 20.0f;
+    site_run.weather.weather_wind = 20.0f;
+    site_run.weather.weather_dust = 20.0f;
+    site_run.weather.weather_wind_direction_degrees = 0.0f;
+
+    for (const auto coord : {TileCoord {2, 2}, TileCoord {3, 2}, TileCoord {2, 3}, TileCoord {3, 3}})
+    {
+        auto tile = site_run.site_world->tile_at(coord);
+        tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_ningxia_wolfberry};
+        tile.ecology.plant_density = 100.0f;
+        site_run.site_world->set_tile(coord, tile);
+    }
+
+    run_local_weather_pipeline(campaign, site_run, queue);
+
+    const auto nearby_weather = site_run.site_world->tile_local_weather(TileCoord {5, 2});
+    const auto nearby_support =
+        site_run.site_world->tile_plant_weather_contribution(TileCoord {5, 2});
+
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(nearby_weather.heat, 20.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(nearby_weather.wind, 20.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(nearby_weather.dust, 20.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(nearby_support.heat_protection, 0.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(nearby_support.wind_protection, 0.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(nearby_support.dust_protection, 0.0f));
+    GS1_SYSTEM_TEST_CHECK(context, nearby_support.fertility_improve > 0.0f);
+}
+
 void local_weather_resolve_marks_projected_plant_tiles_dirty_when_wind_changes(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -1273,6 +1343,14 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "local_weather_resolve",
     "applies_half_strength_diagonal_wind_shadow_for_windbreak_plants",
     local_weather_resolve_applies_half_strength_diagonal_wind_shadow_for_windbreak_plants);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "local_weather_resolve",
+    "scales_multitile_plant_ranges_by_footprint",
+    local_weather_resolve_scales_multitile_plant_ranges_by_footprint);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "local_weather_resolve",
+    "respects_authored_plant_protection_ratio",
+    local_weather_resolve_respects_authored_plant_protection_ratio);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "local_weather_resolve",
     "marks_projected_plant_tiles_dirty_when_wind_changes",

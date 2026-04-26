@@ -68,6 +68,25 @@ struct TileFootprint final
     return aligned_anchor.x == anchor.x && aligned_anchor.y == anchor.y;
 }
 
+[[nodiscard]] inline constexpr std::uint8_t resolve_tile_footprint_distance_scale(
+    TileFootprint footprint) noexcept
+{
+    const TileFootprint normalized = normalize_tile_footprint(footprint);
+    return normalized.width >= normalized.height ? normalized.width : normalized.height;
+}
+
+[[nodiscard]] inline constexpr std::uint8_t scale_tile_distance_by_footprint_multiple(
+    std::uint8_t authored_distance,
+    TileFootprint footprint) noexcept
+{
+    const std::uint16_t scaled_distance =
+        static_cast<std::uint16_t>(authored_distance) *
+        static_cast<std::uint16_t>(resolve_tile_footprint_distance_scale(footprint));
+    return scaled_distance >= 0xffU
+        ? 0xffU
+        : static_cast<std::uint8_t>(scaled_distance);
+}
+
 template <typename Func>
 inline void for_each_tile_in_footprint(
     TileCoord anchor,

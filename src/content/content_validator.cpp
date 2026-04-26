@@ -71,6 +71,14 @@ std::vector<ContentValidationIssue> validate_content_database(
             break;
         }
 
+        if (plant_def.protection_ratio < 0.0f || plant_def.protection_ratio > 1.0f)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Plant protection ratios must stay in the 0-1 range."});
+            break;
+        }
+
         if (plant_def.fertility_improve_power < 0.0f ||
             plant_def.salinity_reduction_power < 0.0f)
         {
