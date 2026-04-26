@@ -1932,10 +1932,10 @@ void GameRuntime::queue_regional_map_menu_ui_messages()
     std::snprintf(
         summary_text,
         sizeof(summary_text),
-        "%.*s Available Rep %d",
+        "%.*s Rep %d",
         selected_faction_def == nullptr ? 0 : static_cast<int>(selected_faction_def->display_name.size()),
         selected_faction_def == nullptr ? "" : selected_faction_def->display_name.data(),
-        TechnologySystem::available_faction_reputation(*campaign_, selected_faction_id));
+        TechnologySystem::faction_reputation(*campaign_, selected_faction_id));
     queue_ui_element_message(
         1U,
         GS1_UI_ELEMENT_LABEL,
@@ -2134,10 +2134,10 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
     std::snprintf(
         faction_text,
         sizeof(faction_text),
-        "Spend Rep From %.*s | Available %d",
+        "%.*s Rep %d | Techs scale with faction rep",
         static_cast<int>(selected_faction_def == nullptr ? 0U : selected_faction_def->display_name.size()),
         selected_faction_def == nullptr ? "" : selected_faction_def->display_name.data(),
-        TechnologySystem::available_faction_reputation(*campaign_, selected_faction_id));
+        TechnologySystem::faction_reputation(*campaign_, selected_faction_id));
     queue_ui_element_message(
         3U,
         GS1_UI_ELEMENT_LABEL,
@@ -2171,14 +2171,14 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
         GS1_UI_ELEMENT_LABEL,
         GS1_UI_ELEMENT_FLAG_NONE,
         no_action,
-        "Faction Tech Tree");
+        "Tier Tech Tree");
 
     queue_ui_element_message(
         8U,
         GS1_UI_ELEMENT_LABEL,
         GS1_UI_ELEMENT_FLAG_NONE,
         no_action,
-        "Off-branch purchases cost 1.5x reputation.");
+        "Each tier allows one tech; faction reputation gates and strengthens it.");
 
     std::uint32_t next_element_id = 9U;
 
@@ -2250,13 +2250,16 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
             }
 
             const auto* node_faction_def = find_faction_def(node_def.faction_id);
-            const auto reputation_cost =
-                TechnologySystem::current_reputation_cost(node_def, selected_faction_id);
+            const auto reputation_requirement =
+                TechnologySystem::current_reputation_requirement(node_def);
             const auto cash_cost = TechnologySystem::current_cash_cost(*campaign_, node_def);
+            const auto effect_parameter = TechnologySystem::current_effect_parameter(*campaign_, node_def);
+            const auto node_faction_reputation =
+                TechnologySystem::faction_reputation(*campaign_, node_def.faction_id);
 
             Gs1UiAction action {};
             action.target_id = node_def.tech_node_id.value;
-            action.arg0 = static_cast<std::uint64_t>(selected_faction_id.value);
+            action.arg0 = 0U;
 
             char node_text[192] {};
             std::uint32_t flags = GS1_UI_ELEMENT_FLAG_NONE;
@@ -2264,20 +2267,18 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
                     TechnologySystem::find_purchase_record(*campaign_, node_def.tech_node_id);
                 purchase != nullptr)
             {
-                const auto* spending_faction_def = find_faction_def(purchase->reputation_faction_id);
                 if (TechnologySystem::node_refundable(*campaign_, node_def))
                 {
                     action.type = GS1_UI_ACTION_REFUND_TECHNOLOGY_NODE;
                     std::snprintf(
                         node_text,
                         sizeof(node_text),
-                        "Refund %.*s T%u +%d %.*s rep | %.*s",
+                        "Refund %.*s T%u +$%d | Param %.2f | %.*s",
                         static_cast<int>(node_faction_def == nullptr ? 0U : node_faction_def->display_name.size()),
                         node_faction_def == nullptr ? "" : node_faction_def->display_name.data(),
                         static_cast<unsigned>(node_def.tier_index),
-                        purchase->reputation_spent,
-                        static_cast<int>(spending_faction_def == nullptr ? 0U : spending_faction_def->display_name.size()),
-                        spending_faction_def == nullptr ? "" : spending_faction_def->display_name.data(),
+                        cash_cost,
+                        static_cast<double>(effect_parameter),
                         static_cast<int>(node_def.display_name.size()),
                         node_def.display_name.data());
                     flags |= GS1_UI_ELEMENT_FLAG_PRIMARY;
@@ -2287,30 +2288,29 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
                     std::snprintf(
                         node_text,
                         sizeof(node_text),
-                        "%.*s T%u Claimed via %.*s %d rep | %.*s",
+                        "%.*s T%u Claimed | Param %.2f | %.*s",
                         static_cast<int>(node_faction_def == nullptr ? 0U : node_faction_def->display_name.size()),
                         node_faction_def == nullptr ? "" : node_faction_def->display_name.data(),
                         static_cast<unsigned>(node_def.tier_index),
-                        static_cast<int>(spending_faction_def == nullptr ? 0U : spending_faction_def->display_name.size()),
-                        spending_faction_def == nullptr ? "" : spending_faction_def->display_name.data(),
-                        purchase->reputation_spent,
+                        static_cast<double>(effect_parameter),
                         static_cast<int>(node_def.display_name.size()),
                         node_def.display_name.data());
                     flags |= GS1_UI_ELEMENT_FLAG_DISABLED;
                 }
             }
-            else if (TechnologySystem::node_claimable(*campaign_, node_def, selected_faction_id))
+            else if (TechnologySystem::node_claimable(*campaign_, node_def))
             {
                 action.type = GS1_UI_ACTION_CLAIM_TECHNOLOGY_NODE;
                 std::snprintf(
                     node_text,
                     sizeof(node_text),
-                    "%.*s T%u Cost %d rep + $%d | %.*s",
+                    "%.*s T%u Need %d rep + $%d | Param %.2f | %.*s",
                     static_cast<int>(node_faction_def == nullptr ? 0U : node_faction_def->display_name.size()),
                     node_faction_def == nullptr ? "" : node_faction_def->display_name.data(),
                     static_cast<unsigned>(node_def.tier_index),
-                    reputation_cost,
+                    reputation_requirement,
                     cash_cost,
+                    static_cast<double>(effect_parameter),
                     static_cast<int>(node_def.display_name.size()),
                     node_def.display_name.data());
                 flags |= GS1_UI_ELEMENT_FLAG_PRIMARY;
@@ -2323,10 +2323,11 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
                     std::snprintf(
                         node_text,
                         sizeof(node_text),
-                        "%.*s T%u Need prior branch tech | %.*s",
+                        "%.*s T%u Need a tier-%u pick first | %.*s",
                         static_cast<int>(node_faction_def == nullptr ? 0U : node_faction_def->display_name.size()),
                         node_faction_def == nullptr ? "" : node_faction_def->display_name.data(),
                         static_cast<unsigned>(node_def.tier_index),
+                        static_cast<unsigned>(node_def.tier_index - 1U),
                         static_cast<int>(node_def.display_name.size()),
                         node_def.display_name.data());
                 }
@@ -2343,18 +2344,30 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
                         static_cast<int>(node_def.display_name.size()),
                         node_def.display_name.data());
                 }
+                else if (node_faction_reputation < reputation_requirement)
+                {
+                    std::snprintf(
+                        node_text,
+                        sizeof(node_text),
+                        "%.*s T%u Need %d rep in %.*s | %.*s",
+                        static_cast<int>(node_faction_def == nullptr ? 0U : node_faction_def->display_name.size()),
+                        node_faction_def == nullptr ? "" : node_faction_def->display_name.data(),
+                        static_cast<unsigned>(node_def.tier_index),
+                        reputation_requirement,
+                        static_cast<int>(node_faction_def == nullptr ? 0U : node_faction_def->display_name.size()),
+                        node_faction_def == nullptr ? "" : node_faction_def->display_name.data(),
+                        static_cast<int>(node_def.display_name.size()),
+                        node_def.display_name.data());
+                }
                 else
                 {
                     std::snprintf(
                         node_text,
                         sizeof(node_text),
-                        "%.*s T%u Need %d rep from %.*s | %.*s",
+                        "%.*s T%u Tier already locked by another pick | %.*s",
                         static_cast<int>(node_faction_def == nullptr ? 0U : node_faction_def->display_name.size()),
                         node_faction_def == nullptr ? "" : node_faction_def->display_name.data(),
                         static_cast<unsigned>(node_def.tier_index),
-                        reputation_cost,
-                        static_cast<int>(selected_faction_def == nullptr ? 0U : selected_faction_def->display_name.size()),
-                        selected_faction_def == nullptr ? "" : selected_faction_def->display_name.data(),
                         static_cast<int>(node_def.display_name.size()),
                         node_def.display_name.data());
                 }

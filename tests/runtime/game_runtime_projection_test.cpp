@@ -656,7 +656,7 @@ int main()
     const auto tech_tree_messages = drain_engine_messages(runtime);
     assert(contains_ui_element_text(tech_tree_messages, "Prototype Tech Tree"));
     assert(contains_ui_element_text(tech_tree_messages, "Starter Plants"));
-    assert(contains_ui_element_text(tech_tree_messages, "Faction Tech Tree"));
+    assert(contains_ui_element_text(tech_tree_messages, "Tier Tech Tree"));
     assert(contains_ui_element_text(tech_tree_messages, "Checkerboard | Wormwood"));
     assert(contains_ui_element_text(tech_tree_messages, "Tab: Village Committee"));
 
@@ -743,7 +743,7 @@ int main()
     const auto site_tech_tree_messages = drain_engine_messages(support_runtime);
     assert(contains_ui_element_text(site_tech_tree_messages, "Prototype Tech Tree"));
     assert(contains_ui_element_text(site_tech_tree_messages, "Tab: Village Committee"));
-    assert(contains_ui_element_text(site_tech_tree_messages, "Faction Tech Tree"));
+    assert(contains_ui_element_text(site_tech_tree_messages, "Tier Tech Tree"));
 
     assert(support_runtime.handle_message(select_forestry_tab_message) == GS1_STATUS_OK);
     const auto site_forestry_messages = drain_engine_messages(support_runtime);

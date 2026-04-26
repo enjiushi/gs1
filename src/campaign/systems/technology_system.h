@@ -1,10 +1,10 @@
 #pragma once
 
 #include "campaign/campaign_state.h"
-#include "content/defs/technology_defs.h"
 #include "campaign/systems/campaign_system_context.h"
-#include "messages/game_message.h"
+#include "content/defs/technology_defs.h"
 #include "gs1/status.h"
+#include "messages/game_message.h"
 
 namespace gs1
 {
@@ -27,21 +27,22 @@ public:
     [[nodiscard]] static bool plant_unlocked(
         const CampaignState& campaign,
         PlantId plant_id) noexcept;
-    [[nodiscard]] static std::int32_t available_faction_reputation(
+    [[nodiscard]] static std::int32_t faction_reputation(
         const CampaignState& campaign,
         FactionId faction_id) noexcept;
-    [[nodiscard]] static std::int32_t current_reputation_cost(
-        const TechnologyNodeDef& node_def,
-        FactionId reputation_faction_id) noexcept;
+    [[nodiscard]] static std::int32_t current_reputation_requirement(
+        const TechnologyNodeDef& node_def) noexcept;
     [[nodiscard]] static std::uint32_t current_internal_cost_cash_points(
         const TechnologyNodeDef& node_def) noexcept;
     [[nodiscard]] static std::int32_t current_cash_cost(
         const CampaignState& campaign,
         const TechnologyNodeDef& node_def) noexcept;
+    [[nodiscard]] static float current_effect_parameter(
+        const CampaignState& campaign,
+        const TechnologyNodeDef& node_def) noexcept;
     [[nodiscard]] static bool node_claimable(
         const CampaignState& campaign,
-        const TechnologyNodeDef& node_def,
-        FactionId reputation_faction_id) noexcept;
+        const TechnologyNodeDef& node_def) noexcept;
     [[nodiscard]] static bool node_refundable(
         const CampaignState& campaign,
         const TechnologyNodeDef& node_def) noexcept;

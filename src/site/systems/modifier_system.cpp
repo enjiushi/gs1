@@ -1,6 +1,7 @@
 #include "site/systems/modifier_system.h"
 
 #include "campaign/campaign_state.h"
+#include "campaign/systems/technology_system.h"
 #include "content/defs/gameplay_tuning_defs.h"
 #include "content/defs/modifier_defs.h"
 #include "content/defs/technology_defs.h"
@@ -67,6 +68,30 @@ ModifierChannelTotals clamp_totals(ModifierChannelTotals totals) noexcept
     totals.work_efficiency =
         std::clamp(totals.work_efficiency, -limit, limit);
     return totals;
+}
+
+ModifierChannelTotals scale_totals(
+    const ModifierChannelTotals& totals,
+    float scale) noexcept
+{
+    ModifierChannelTotals scaled = totals;
+    scaled.heat *= scale;
+    scaled.wind *= scale;
+    scaled.dust *= scale;
+    scaled.moisture *= scale;
+    scaled.fertility *= scale;
+    scaled.salinity *= scale;
+    scaled.growth_pressure *= scale;
+    scaled.salinity_density_cap *= scale;
+    scaled.plant_density *= scale;
+    scaled.health *= scale;
+    scaled.hydration *= scale;
+    scaled.nourishment *= scale;
+    scaled.energy_cap *= scale;
+    scaled.energy *= scale;
+    scaled.morale *= scale;
+    scaled.work_efficiency *= scale;
+    return scaled;
 }
 
 ModifierChannelTotals camp_comfort_bias(const CampState& camp) noexcept
@@ -219,7 +244,12 @@ void import_campaign_run_modifiers(
             modifier_state.active_run_modifier_ids,
             ModifierId {faction_progress.unlocked_assistant_package_id});
     }
+}
 
+void accumulate_campaign_technology_modifier_totals(
+    const CampaignState& campaign,
+    ModifierChannelTotals& totals) noexcept
+{
     for (const auto& purchase : campaign.technology_state.purchased_nodes)
     {
         const auto* node_def = find_technology_node_def(purchase.tech_node_id);
@@ -229,13 +259,16 @@ void import_campaign_run_modifiers(
             continue;
         }
 
-        append_modifier_if_present(
-            modifier_state.active_run_modifier_ids,
-            node_def->linked_modifier_id);
+        accumulate_totals(
+            totals,
+            scale_totals(
+                resolve_run_modifier_preset(node_def->linked_modifier_id),
+                TechnologySystem::current_effect_parameter(campaign, *node_def)));
     }
 }
 
 ModifierChannelTotals resolve_owned_totals(
+    const CampaignState& campaign,
     const ModifierState& modifier_state,
     const CampState& camp) noexcept
 {
@@ -251,6 +284,7 @@ ModifierChannelTotals resolve_owned_totals(
         accumulate_totals(totals, resolve_run_modifier_preset(modifier_id));
     }
 
+    accumulate_campaign_technology_modifier_totals(campaign, totals);
     accumulate_totals(totals, camp_comfort_bias(camp));
     return clamp_totals(totals);
 }
@@ -258,7 +292,7 @@ ModifierChannelTotals resolve_owned_totals(
 void resolve_modifier_totals(SiteSystemContext<ModifierSystem>& context)
 {
     const auto next_totals =
-        resolve_owned_totals(context.world.read_modifier(), context.world.read_camp());
+        resolve_owned_totals(context.campaign, context.world.read_modifier(), context.world.read_camp());
     auto& current_totals = context.world.own_modifier().resolved_channel_totals;
     const auto next_terrain_factors = resolve_terrain_factor_modifiers(next_totals);
     auto& current_terrain_factors = context.world.own_modifier().resolved_terrain_factor_modifiers;

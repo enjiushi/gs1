@@ -10,8 +10,6 @@ namespace gs1
 struct TechnologyPurchaseRecord final
 {
     TechNodeId tech_node_id {};
-    FactionId reputation_faction_id {};
-    std::int32_t reputation_spent {0};
 };
 
 struct TechnologyState final

@@ -1305,17 +1305,16 @@ void modifier_imports_campaign_aura_and_reacts_to_camp_changes(
         (site_run.pending_projection_update_flags & gs1::SITE_PROJECTION_UPDATE_HUD) != 0U);
 }
 
-void modifier_imports_campaign_assistant_and_technology_run_modifiers(
+void modifier_imports_campaign_assistant_and_scales_technology_run_modifiers_with_reputation(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
     campaign.faction_progress[0].has_unlocked_assistant_package = true;
     campaign.faction_progress[0].unlocked_assistant_package_id = 1001U;
+    campaign.faction_progress[0].faction_reputation = 10;
     campaign.technology_state.purchased_nodes.push_back(
         gs1::TechnologyPurchaseRecord {
-            gs1::TechNodeId {gs1::k_tech_node_t1_field_briefing},
-            gs1::FactionId {gs1::k_faction_village_committee},
-            10});
+            gs1::TechNodeId {gs1::k_tech_node_t1_field_briefing}});
     auto site_run = make_test_site_run(1U, 1602U);
     GameMessageQueue queue {};
     auto site_context = make_site_context<ModifierSystem>(campaign, site_run, queue);
@@ -1337,12 +1336,16 @@ void modifier_imports_campaign_assistant_and_technology_run_modifiers(
             site_run.modifier.active_run_modifier_ids.begin(),
             site_run.modifier.active_run_modifier_ids.end(),
             gs1::ModifierId {1001U}) != site_run.modifier.active_run_modifier_ids.end());
+    const auto initial_hydration = site_run.modifier.resolved_channel_totals.hydration;
+    const auto initial_work_efficiency = site_run.modifier.resolved_channel_totals.work_efficiency;
+
+    campaign.faction_progress[0].faction_reputation = 20;
+    ModifierSystem::run(site_context);
+
+    GS1_SYSTEM_TEST_CHECK(context, site_run.modifier.resolved_channel_totals.hydration > initial_hydration);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        std::find(
-            site_run.modifier.active_run_modifier_ids.begin(),
-            site_run.modifier.active_run_modifier_ids.end(),
-            imported_modifier->linked_modifier_id) != site_run.modifier.active_run_modifier_ids.end());
+        site_run.modifier.resolved_channel_totals.work_efficiency > initial_work_efficiency);
     GS1_SYSTEM_TEST_CHECK(
         context,
         std::fabs(site_run.modifier.resolved_channel_totals.nourishment) > 0.0001f ||
@@ -1477,5 +1480,5 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     modifier_imports_campaign_aura_and_reacts_to_camp_changes);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "modifier",
-    "imports_campaign_assistant_and_technology_run_modifiers",
-    modifier_imports_campaign_assistant_and_technology_run_modifiers);
+    "imports_campaign_assistant_and_scales_technology_run_modifiers_with_reputation",
+    modifier_imports_campaign_assistant_and_scales_technology_run_modifiers_with_reputation);

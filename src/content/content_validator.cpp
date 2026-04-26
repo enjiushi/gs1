@@ -743,11 +743,20 @@ std::vector<ContentValidationIssue> validate_content_database(
                 break;
             }
 
-            if (node_def.reputation_cost < 0 || node_def.internal_cost_cash_points == 0U)
+            if (node_def.reputation_requirement < 0 || node_def.internal_cost_cash_points == 0U)
             {
                 issues.push_back(ContentValidationIssue {
                     ContentValidationSeverity::Error,
-                    "Technology node definitions must use non-negative reputation cost and positive internal cash-point value."});
+                    "Technology node definitions must use non-negative reputation requirements and positive internal cash-point values."});
+                break;
+            }
+
+            if (node_def.unlock_effect_parameter < 0.0f ||
+                node_def.effect_parameter_per_bonus_reputation < 0.0f)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Technology node definitions must use non-negative unlock and bonus reputation effect parameters."});
                 break;
             }
 

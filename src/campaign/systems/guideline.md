@@ -19,4 +19,4 @@ Campaign-level systems that react to gameplay messages and mutate only campaign-
 - `loadout_planner_system.cpp`: Loadout planner system implementation, including the content-authored baseline deployment package and content-authored per-contributor support quota.
 - `regional_support_system.h`: Regional support system interface for campaign support updates.
 - `technology_system.h`: Technology system interface for research/unlock progression.
-- `technology_system.cpp`: Technology system implementation for per-plant total-reputation unlock thresholds, faction-branch tech purchases that spend remembered faction reputation plus player-facing cash derived from authored internal cash-point values, same-faction previous-tier gating, top-down per-branch refunds, and faction-tab query helpers.
+- `technology_system.cpp`: Technology system implementation for per-plant total-reputation unlock thresholds, tier-row tech purchases gated by each node's faction reputation plus player-facing cash derived from authored internal cash-point values, one-pick-per-tier exclusivity, top-down money refunds, and reputation-scaled tech-effect parameter helpers.

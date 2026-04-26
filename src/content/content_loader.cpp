@@ -1591,8 +1591,10 @@ void load_technology_node_defs(ContentDatabase& content, const std::filesystem::
             {0U, 0U, 0U},
             entry_kind,
             {0U, 0U, 0U},
-            require_toml_signed<std::int32_t>(path, entry, "reputation_cost"),
+            require_toml_signed<std::int32_t>(path, entry, "reputation_requirement"),
             require_toml_unsigned<std::uint32_t>(path, entry, "internal_cost_cash_points"),
+            require_toml_float(path, entry, "unlock_effect_parameter"),
+            require_toml_float(path, entry, "effect_parameter_per_bonus_reputation"),
             entry_kind == TechnologyEntryKind::GlobalModifier
                 ? ModifierId {technology_modifier_id(tech_node_id)}
                 : ModifierId {},

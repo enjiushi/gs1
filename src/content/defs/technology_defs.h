@@ -49,8 +49,10 @@ struct TechnologyNodeDef final
     std::uint8_t reserved0[3] {};
     TechnologyEntryKind entry_kind {TechnologyEntryKind::GlobalModifier};
     std::uint8_t reserved1[3] {};
-    std::int32_t reputation_cost {0};
+    std::int32_t reputation_requirement {0};
     std::uint32_t internal_cost_cash_points {0U};
+    float unlock_effect_parameter {1.0f};
+    float effect_parameter_per_bonus_reputation {0.0f};
     ModifierId linked_modifier_id {};
     std::uint32_t mechanism_change_id {0};
     bool is_todo_placeholder {true};
@@ -59,7 +61,7 @@ struct TechnologyNodeDef final
     std::string_view description {};
 };
 
-inline constexpr std::uint8_t k_faction_tech_tier_count = 3U;
+inline constexpr std::uint8_t k_faction_tech_tier_count = 8U;
 inline constexpr std::uint8_t k_initial_unlocked_plant_count = 2U;
 
 [[nodiscard]] constexpr std::uint32_t technology_modifier_id(TechNodeId tech_node_id) noexcept
@@ -79,13 +81,6 @@ inline constexpr std::uint8_t k_initial_unlocked_plant_count = 2U;
     return 1000U +
         static_cast<std::uint32_t>(faction_id.value) * 100U +
         static_cast<std::uint32_t>(tier_index);
-}
-
-[[nodiscard]] constexpr TechNodeId previous_faction_technology_node_id(
-    FactionId faction_id,
-    std::uint8_t tier_index) noexcept
-{
-    return TechNodeId {technology_node_id(faction_id, static_cast<std::uint8_t>(tier_index - 1U))};
 }
 
 inline constexpr std::uint32_t k_tech_node_village_t1_field_briefing =
