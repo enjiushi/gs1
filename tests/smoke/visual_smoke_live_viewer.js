@@ -51,6 +51,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const audioToggle = document.getElementById("audio-toggle");
 
     let latestState = null;
+    let technologyCatalog = null;
+    let technologyCatalogPromise = null;
     let stateStream = null;
     let mapPickables = [];
     let latestPresentationSignature = "";
@@ -3854,18 +3856,240 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         emptyState.appendChild(emptyCopy);
     }
 
+    function normalizeTechFactionName(name) {
+        const normalized = String(name || "").trim().toLowerCase();
+        if (normalized.includes("village")) {
+            return "village committee";
+        }
+        if (normalized.includes("forestry")) {
+            return "forestry bureau";
+        }
+        if (normalized.includes("university")) {
+            return "agricultural university";
+        }
+        return normalized;
+    }
+
+    function expandCompactTechStatus(statusText) {
+        const compactStatus = String(statusText || "").trim();
+        if (!compactStatus.length) {
+            return "";
+        }
+
+        let match = compactStatus.match(/^Need\s+(\d+)r\+\$(\d+)$/i);
+        if (match) {
+            return "Need " + match[1] + " rep + $" + match[2];
+        }
+
+        match = compactStatus.match(/^Need\s+(\d+)r$/i);
+        if (match) {
+            return "Need " + match[1] + " rep";
+        }
+
+        if (/^Need prev$/i.test(compactStatus)) {
+            return "Need previous tier";
+        }
+
+        if (/^Taken$/i.test(compactStatus)) {
+            return "Tier already claimed";
+        }
+
+        return compactStatus;
+    }
+
+    function technologyNodeIdFromParts(factionId, tierIndex) {
+        return 1000 + factionId * 100 + tierIndex;
+    }
+
+    function parseSimpleTomlValue(rawValue) {
+        const value = String(rawValue || "").trim();
+        if (!value.length) {
+            return "";
+        }
+        if (value[0] === '"' && value[value.length - 1] === '"') {
+            return value.slice(1, value.length - 1).replace(/\\"/g, '"');
+        }
+        const parsedNumber = Number(value);
+        if (Number.isFinite(parsedNumber)) {
+            return parsedNumber;
+        }
+        if (/^(true|false)$/i.test(value)) {
+            return /^true$/i.test(value);
+        }
+        return value;
+    }
+
+    function parseTomlTableArray(tomlText, tableName) {
+        const marker = "[[" + tableName + "]]";
+        const lines = String(tomlText || "").split(/\r?\n/);
+        const rows = [];
+        let currentRow = null;
+        lines.forEach((line) => {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed[0] === "#") {
+                return;
+            }
+            if (trimmed === marker) {
+                if (currentRow) {
+                    rows.push(currentRow);
+                }
+                currentRow = {};
+                return;
+            }
+            if (!currentRow) {
+                return;
+            }
+            const equalsIndex = trimmed.indexOf("=");
+            if (equalsIndex <= 0) {
+                return;
+            }
+            const key = trimmed.slice(0, equalsIndex).trim();
+            const value = trimmed.slice(equalsIndex + 1).trim();
+            currentRow[key] = parseSimpleTomlValue(value);
+        });
+        if (currentRow) {
+            rows.push(currentRow);
+        }
+        return rows;
+    }
+
+    function buildTechnologyCatalog(nodeTomlText, tierTomlText) {
+        const catalog = {
+            nodesById: new Map(),
+            tiersByIndex: new Map()
+        };
+        parseTomlTableArray(tierTomlText, "technology_tiers").forEach((row) => {
+            const tierIndex = Number(row.tier_index || 0);
+            if (tierIndex > 0) {
+                catalog.tiersByIndex.set(tierIndex, {
+                    tierIndex: tierIndex,
+                    displayName: String(row.display_name || ("Tier " + tierIndex))
+                });
+            }
+        });
+        parseTomlTableArray(nodeTomlText, "technology_nodes").forEach((row) => {
+            const factionId = Number(row.faction_id || 0);
+            const tierIndex = Number(row.tier_index || 0);
+            const nodeId = technologyNodeIdFromParts(factionId, tierIndex);
+            catalog.nodesById.set(nodeId, {
+                nodeId: nodeId,
+                factionId: factionId,
+                tierIndex: tierIndex,
+                entryKind: String(row.entry_kind || ""),
+                displayName: String(row.display_name || ""),
+                description: String(row.description || ""),
+                internalCostCashPoints: Number(row.internal_cost_cash_points || 0),
+                reputationRequirement: Number(row.reputation_requirement || 0)
+            });
+        });
+        return catalog;
+    }
+
+    function ensureTechnologyCatalog() {
+        if (technologyCatalog) {
+            return Promise.resolve(technologyCatalog);
+        }
+        if (technologyCatalogPromise) {
+            return technologyCatalogPromise;
+        }
+        technologyCatalogPromise = Promise.all([
+            fetch("/content/technology_nodes.toml", { cache: "no-store" }).then((response) => response.text()),
+            fetch("/content/technology_tiers.toml", { cache: "no-store" }).then((response) => response.text())
+        ]).then((results) => {
+            technologyCatalog = buildTechnologyCatalog(results[0], results[1]);
+            technologyCatalogPromise = null;
+            if (latestState) {
+                renderState(latestState, {});
+            }
+            return technologyCatalog;
+        }).catch((error) => {
+            technologyCatalogPromise = null;
+            reportViewerError("ensureTechnologyCatalog", error);
+            throw error;
+        });
+        return technologyCatalogPromise;
+    }
+
+    function isPotentialTechnologyNodeElement(element) {
+        if (!element || element.elementType !== "BUTTON" || (element.flags & 4) !== 0) {
+            return false;
+        }
+
+        const text = String(element.text || "").trim();
+        if (!text) {
+            return false;
+        }
+
+        if (/^Tab:\s+/i.test(text)) {
+            return false;
+        }
+
+        return /^TECHNODE\|/i.test(text) || /\bT\d+\b/i.test(text);
+    }
+
     function parseTechTreeActionElement(element) {
-        if (!element || !element.action) {
+        if (!element) {
             return null;
         }
 
-        const text = element.text || "";
+        const text = String(element.text || "").trim();
+        if (/^TECHNODE\|/i.test(text)) {
+            const fields = {};
+            text.split("|").slice(1).forEach((part) => {
+                const separatorIndex = part.indexOf("=");
+                if (separatorIndex <= 0) {
+                    return;
+                }
+                const key = part.slice(0, separatorIndex).trim().toLowerCase();
+                const value = part.slice(separatorIndex + 1).trim();
+                fields[key] = value;
+            });
+            const targetId = element.action && typeof element.action.targetId === "number" ? element.action.targetId : 0;
+            const catalogNode =
+                technologyCatalog && targetId ? technologyCatalog.nodesById.get(targetId) : null;
+            const compactStatusText = fields.status || fields.s || "";
+            const resolvedStatusText = expandCompactTechStatus(compactStatusText) || compactStatusText;
+            return {
+                element: element,
+                titleText: (catalogNode && catalogNode.displayName) || text,
+                kindText: catalogNode && catalogNode.entryKind === "MechanismChange" ? "Mechanism" : "Modifier",
+                factionText:
+                    (catalogNode
+                        ? ({
+                            1: "Village Committee",
+                            2: "Forestry Bureau",
+                            3: "Agricultural University"
+                        }[catalogNode.factionId] || "")
+                        : ""),
+                tierNumber: catalogNode ? catalogNode.tierIndex : 0,
+                descriptionText: (catalogNode && catalogNode.description) || "",
+                statusText: resolvedStatusText,
+                costText: (() => {
+                    const matchedCash = resolvedStatusText.match(/\$\d+/);
+                    const matchedRep = resolvedStatusText.match(/Need\s+(\d+)\s+rep/i);
+                    if (matchedCash) {
+                        return matchedCash[0];
+                    }
+                    if (matchedRep && matchedRep[1]) {
+                        return "Rep " + matchedRep[1];
+                    }
+                    return catalogNode ? ("T" + String(catalogNode.tierIndex || "")) : "";
+                })(),
+                isClaimable: (element.flags & 1) !== 0,
+                isDisabled: (element.flags & 2) !== 0,
+                isClaimed: /Claimed/i.test(resolvedStatusText),
+                isLocked: /Locked|Need|Taken/i.test(resolvedStatusText)
+            };
+        }
+
         const parts = text.split("|").map((part) => part.trim());
         const leftText = parts[0] || "";
         const titleText = parts.length > 1 ? parts.slice(1).join(" | ") : leftText;
-        const leftMatch = leftText.match(/^(Modifier|Mechanism)\s+(.*)$/i);
-        const kindText = leftMatch ? leftMatch[1] : "Tech";
-        const statusText = leftMatch ? leftMatch[2] : leftText;
+        const leftMatch = leftText.match(/^(.*?)\s+T(\d+)\s+(.*)$/i);
+        const factionText = leftMatch ? leftMatch[1].trim() : "";
+        const tierNumber = leftMatch ? Number(leftMatch[2]) : 0;
+        const statusText = leftMatch ? leftMatch[3] : leftText;
+        const kindText = "Tech";
         const costMatch = statusText.match(/(?:Cost|Need)\s+(\d+)/);
         const costText = costMatch ? ("Rep " + costMatch[1]) : statusText;
 
@@ -3873,6 +4097,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             element: element,
             titleText: titleText,
             kindText: kindText,
+            factionText: factionText,
+            tierNumber: tierNumber,
+            descriptionText: "",
             statusText: statusText,
             costText: costText,
             isClaimable: (element.flags & 1) !== 0,
@@ -3898,11 +4125,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         } else if (nodeModel.isLocked) {
             nodeButton.classList.add("locked");
         }
-        bindReliablePrimaryPress(nodeButton, function () {
-            postJson("/ui-action", nodeModel.element.action).catch(() => {
-                statusChip.textContent = "Failed to send tech-tree action.";
+        if (nodeModel.element.action && nodeModel.element.action.type !== "NONE" && !nodeModel.isDisabled) {
+            bindReliablePrimaryPress(nodeButton, function () {
+                postJson("/ui-action", nodeModel.element.action).catch(() => {
+                    statusChip.textContent = "Failed to send tech-tree action.";
+                });
             });
-        });
+        }
 
         const nodeTop = document.createElement("div");
         nodeTop.className = "tech-node-top";
@@ -3926,12 +4155,166 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         nodeTitle.textContent = nodeModel.titleText;
         nodeButton.appendChild(nodeTitle);
 
+        if (nodeModel.descriptionText) {
+            const nodeDescription = document.createElement("div");
+            nodeDescription.className = "tech-node-description";
+            nodeDescription.textContent = nodeModel.descriptionText;
+            nodeButton.appendChild(nodeDescription);
+        }
+
         const nodeState = document.createElement("div");
         nodeState.className = "tech-node-state";
         nodeState.textContent = nodeModel.statusText;
         nodeButton.appendChild(nodeState);
 
         return nodeButton;
+    }
+
+    function parseTechTreeStructure(techTreeSetup) {
+        const parsed = {
+            factionTabs: [],
+            tiers: []
+        };
+        if (!techTreeSetup || !Array.isArray(techTreeSetup.elements)) {
+            return parsed;
+        }
+
+        let activeTier = null;
+        techTreeSetup.elements.forEach((element) => {
+            if (!element) {
+                return;
+            }
+
+            const text = String(element.text || "").trim();
+            const actionType = element.action ? element.action.type : "NONE";
+            if (!text || (element.flags & 4) !== 0) {
+                return;
+            }
+
+            if (actionType === "SELECT_TECH_TREE_FACTION_TAB") {
+                parsed.factionTabs.push({
+                    label: text.replace(/^Tab:\s*/i, "").trim()
+                });
+                activeTier = null;
+                return;
+            }
+
+            const tierMatch = text.match(/^Tier\s+(\d+)\s+\|\s+(.*)$/i);
+            if (element.elementType === "LABEL" || !element.action) {
+                if (tierMatch) {
+                    activeTier = {
+                        tierNumber: Number(tierMatch[1]),
+                        titleText: tierMatch[2].trim(),
+                        nodes: []
+                    };
+                    parsed.tiers.push(activeTier);
+                }
+                return;
+            }
+
+            if (!activeTier || !isPotentialTechnologyNodeElement(element)) {
+                return;
+            }
+
+            const nodeModel = parseTechTreeActionElement(element);
+            if (nodeModel) {
+                activeTier.nodes.push(nodeModel);
+            }
+        });
+
+        return parsed;
+    }
+
+    function makeTechPlaceholder(labelText, className) {
+        const placeholder = document.createElement("div");
+        placeholder.className = className + " tech-placeholder";
+        placeholder.textContent = labelText;
+        return placeholder;
+    }
+
+    function renderTechTreeTabContent(container, parsedTree) {
+        const tierStack = document.createElement("div");
+        tierStack.className = "tech-tree-tier-stack";
+        container.appendChild(tierStack);
+
+        if (!technologyCatalog) {
+            ensureTechnologyCatalog().catch(() => {});
+            const emptyState = document.createElement("div");
+            emptyState.className = "tech-tree-empty-state";
+            container.appendChild(emptyState);
+            const emptyTitle = document.createElement("div");
+            emptyTitle.className = "tech-tree-empty-title";
+            emptyTitle.textContent = "Loading technology catalog";
+            emptyState.appendChild(emptyTitle);
+            const emptyCopy = document.createElement("div");
+            emptyCopy.className = "tech-tree-empty-copy";
+            emptyCopy.textContent = "Waiting for authored technology data from the local smoke host.";
+            emptyState.appendChild(emptyCopy);
+            return;
+        }
+
+        if (!parsedTree || !Array.isArray(parsedTree.tiers) || parsedTree.tiers.length === 0) {
+            renderTechTreeEmptyState(container);
+            return;
+        }
+
+        const factionOrder =
+            parsedTree && Array.isArray(parsedTree.factionTabs) && parsedTree.factionTabs.length > 0
+                ? parsedTree.factionTabs.map((tabModel) => tabModel.label)
+                : ["Village", "Forestry", "University"];
+
+        parsedTree.tiers.forEach((tierModel) => {
+            const tierNodes = tierModel.nodes.slice();
+            if (tierNodes.length === 0) {
+                return;
+            }
+
+            const tierCard = document.createElement("section");
+            tierCard.className = "tech-tier-card";
+            tierStack.appendChild(tierCard);
+
+            const tierTitle = document.createElement("div");
+            tierTitle.className = "tech-tier-title";
+            const catalogTier = technologyCatalog.tiersByIndex.get(tierModel.tierNumber);
+            tierTitle.textContent =
+                "Tier " + tierModel.tierNumber + " | " +
+                (catalogTier && catalogTier.displayName ? catalogTier.displayName : tierModel.titleText);
+            tierCard.appendChild(tierTitle);
+
+            const tierMeta = document.createElement("div");
+            tierMeta.className = "tech-tier-meta";
+            tierMeta.textContent = "Each tier row shows faction techs side by side.";
+            tierCard.appendChild(tierMeta);
+
+            const tierGrid = document.createElement("div");
+            tierGrid.className = "tech-tier-grid";
+            tierCard.appendChild(tierGrid);
+
+            factionOrder.forEach((factionName) => {
+                const normalizedFactionName = normalizeTechFactionName(factionName);
+                const columnNode = tierNodes.find((nodeModel) => {
+                    return normalizeTechFactionName(nodeModel.factionText) === normalizedFactionName;
+                });
+
+                const column = document.createElement("div");
+                column.className = "tech-column";
+                tierGrid.appendChild(column);
+
+                const factionLabel = document.createElement("div");
+                factionLabel.className = "tech-tier-meta";
+                factionLabel.textContent = factionName;
+                column.appendChild(factionLabel);
+
+                column.appendChild(
+                    columnNode
+                        ? buildTechTreeNodeButton(columnNode, "tech-base-card")
+                        : makeTechPlaceholder("No Tech", "tech-base-card"));
+            });
+        });
+
+        if (!tierStack.children.length) {
+            renderTechTreeEmptyState(container);
+        }
     }
 
     function renderTechTreePanel(techTreeSetup, options) {
@@ -3952,6 +4335,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             summaryParts.push(factionSummary.text);
         }
         const unlockableTiers = parseTechTreeUnlockableTiers(techTreeSetup);
+        const parsedTree = parseTechTreeStructure(techTreeSetup);
         if (activeTechTreePanelTabId !== "unlockables" && activeTechTreePanelTabId !== "tech-tree") {
             activeTechTreePanelTabId = "unlockables";
         }
@@ -4038,7 +4422,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (activeTechTreePanelTabId === "unlockables") {
             renderUnlockablesTabContent(panelBody, unlockableTiers);
         } else {
-            renderTechTreeEmptyState(panelBody);
+            renderTechTreeTabContent(panelBody, parsedTree);
         }
 
         return true;
