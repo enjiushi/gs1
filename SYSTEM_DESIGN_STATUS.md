@@ -42,7 +42,7 @@ These areas are defined strongly enough to start module design and runtime-struc
 - China-desert plant roster direction, density model, growth pressure, spread, salinity, and straw checkerboard behavior
 - Contract-board concept, prototype task model, faction publishing, reward-draft direction, chain-task direction, and accepted-task-cap concept
 - Faction identities, assistants, onboarding order, and prototype four-site arc
-- Data-driven technology model with neutral base-tech tiers, faction-specific enhancement tiers, a separate total-reputation plant track, and cash-purchased tech nodes
+- Data-driven technology model with per-faction base-tech tiers `1-8`, paired faction-enhancement tiers `9-16`, optional tech-granted item/plant/structure/recipe payloads, a separate total-reputation plant track, and cash-purchased tech nodes
 - Meter-relationship chapter as the current implementation-facing causal reference
 
 These areas are good enough that the next step can define code ownership, runtime structs, content-definition tables, and service boundaries without waiting for more game-loop design.
@@ -67,7 +67,7 @@ These areas are the main missing formal sections if we want a safe full-game arc
 | Inventory and item runtime | `Ready` | Shared item model, item meters, storage flow, and hazard interaction are already explicit. |
 | Device runtime | `Ready` | Device roster is small and the behavior contract is defined well enough for data tables and instance state. |
 | Crafting and device storage runtime | `Ready` | Crafting now assumes authored item materials, per-device storage, nearby-item caching, timed craft actions, and global sell visibility. |
-| Faction reputation and tech | `Ready` | Neutral base-tech gating, faction-enhancement gating, node ownership, and the content-update model are already strong enough for persistent-state design. |
+| Faction reputation and tech | `Ready` | Faction base-tech gating, paired-enhancement gating, node ownership, tech-granted content payloads, and the content-update model are already strong enough for persistent-state design. |
 | Contract board runtime | `Ready` | Prototype task data shape, completion, reward-generation, and chain rules are now defined strongly enough for system design. |
 | Economy runtime | `Ready` | Economic flow, buy/sell directions, and relative value hierarchy are clear enough for system design; exact prices stay as later tuning tables. |
 | Campaign meta and nearby-site support | `Ready` | Reveal rules, static adjacency, route choice, campaign-time behavior, authored support packages, export timing, and the single-site-output-modifier rule are now defined strongly enough for system design. |

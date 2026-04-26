@@ -883,6 +883,52 @@ std::vector<ContentValidationIssue> validate_content_database(
                 break;
             }
 
+            if (node_def.node_kind == TechnologyNodeKind::BaseTech)
+            {
+                if (node_def.enhancement_choice_index != 0U ||
+                    node_def.reputation_requirement == 0 ||
+                    node_def.reputation_requirement > k_faction_tech_tier_count)
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Base technology nodes must use enhancement choice 0 and faction-reputation requirements inside the 1-8 basic-tech band."});
+                    break;
+                }
+            }
+            else
+            {
+                if (node_def.enhancement_choice_index == 0U ||
+                    node_def.enhancement_choice_index > k_technology_enhancement_choice_count ||
+                    node_def.reputation_requirement <= k_faction_tech_tier_count ||
+                    node_def.reputation_requirement > k_faction_reputation_tier_count)
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Enhancement technology nodes must use enhancement choices 1-2 and faction-reputation requirements inside the 9-16 enhancement band."});
+                    break;
+                }
+
+                bool paired_base_exists = false;
+                for (const auto& candidate : content.technology_node_defs)
+                {
+                    if (candidate.faction_id == node_def.faction_id &&
+                        candidate.tier_index == node_def.tier_index &&
+                        candidate.node_kind == TechnologyNodeKind::BaseTech)
+                    {
+                        paired_base_exists = true;
+                        break;
+                    }
+                }
+
+                if (!paired_base_exists)
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Enhancement technology nodes must pair to a base technology in the same faction and tier."});
+                    break;
+                }
+            }
+
             if (node_def.unlock_effect_parameter < 0.0f ||
                 node_def.effect_parameter_per_bonus_reputation < 0.0f)
             {
@@ -900,6 +946,57 @@ std::vector<ContentValidationIssue> validate_content_database(
                 break;
             }
 
+            if (node_def.granted_content_kind == TechnologyGrantedContentKind::None)
+            {
+                if (node_def.granted_content_id != 0U)
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Technology node definitions without a granted-content kind must leave granted content id at zero."});
+                    break;
+                }
+            }
+            else if (node_def.granted_content_kind == TechnologyGrantedContentKind::Item)
+            {
+                if (!content.index.item_by_id.contains(node_def.granted_content_id))
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Technology node granted item ids must reference known item definitions."});
+                    break;
+                }
+            }
+            else if (node_def.granted_content_kind == TechnologyGrantedContentKind::Plant)
+            {
+                if (!content.index.plant_by_id.contains(node_def.granted_content_id))
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Technology node granted plant ids must reference known plant definitions."});
+                    break;
+                }
+            }
+            else if (node_def.granted_content_kind == TechnologyGrantedContentKind::Structure)
+            {
+                if (!content.index.structure_by_id.contains(node_def.granted_content_id))
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Technology node granted structure ids must reference known structure definitions."});
+                    break;
+                }
+            }
+            else if (node_def.granted_content_kind == TechnologyGrantedContentKind::Recipe)
+            {
+                if (!content.index.craft_recipe_by_id.contains(node_def.granted_content_id))
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Technology node granted recipe ids must reference known recipe definitions."});
+                    break;
+                }
+            }
+
             for (std::size_t previous = 0U; previous < index; ++previous)
             {
                 if (content.technology_node_defs[previous].tech_node_id == node_def.tech_node_id)
@@ -911,11 +1008,13 @@ std::vector<ContentValidationIssue> validate_content_database(
                 }
 
                 if (content.technology_node_defs[previous].faction_id == node_def.faction_id &&
-                    content.technology_node_defs[previous].tier_index == node_def.tier_index)
+                    content.technology_node_defs[previous].tier_index == node_def.tier_index &&
+                    content.technology_node_defs[previous].enhancement_choice_index ==
+                        node_def.enhancement_choice_index)
                 {
                     issues.push_back(ContentValidationIssue {
                         ContentValidationSeverity::Error,
-                        "Technology node definitions must use only one node per faction and tier."});
+                        "Technology node definitions must use unique enhancement-choice slots per faction and tier."});
                     break;
                 }
             }

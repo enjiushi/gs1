@@ -2204,7 +2204,7 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
         GS1_UI_ELEMENT_LABEL,
         GS1_UI_ELEMENT_FLAG_NONE,
         no_action,
-        "Each tier allows one tech; faction reputation gates and strengthens it.");
+        "Base + 2 enhancements");
 
     std::uint32_t next_element_id = 9U;
 
@@ -2279,12 +2279,37 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
             const auto cash_cost = TechnologySystem::current_cash_cost(*campaign_, node_def);
             const auto node_faction_reputation =
                 TechnologySystem::faction_reputation(*campaign_, node_def.faction_id);
+            const auto paired_base_purchased =
+                node_def.node_kind != TechnologyNodeKind::Enhancement ||
+                TechnologySystem::node_purchased(
+                    *campaign_,
+                    TechNodeId {base_technology_node_id(node_def.faction_id, node_def.tier_index)});
+            bool sibling_enhancement_purchased = false;
+            if (node_def.node_kind == TechnologyNodeKind::Enhancement)
+            {
+                for (const auto& sibling_node_def : technology_node_defs)
+                {
+                    if (sibling_node_def.node_kind != TechnologyNodeKind::Enhancement ||
+                        sibling_node_def.faction_id != node_def.faction_id ||
+                        sibling_node_def.tier_index != node_def.tier_index ||
+                        sibling_node_def.tech_node_id == node_def.tech_node_id)
+                    {
+                        continue;
+                    }
+
+                    if (TechnologySystem::node_purchased(*campaign_, sibling_node_def.tech_node_id))
+                    {
+                        sibling_enhancement_purchased = true;
+                        break;
+                    }
+                }
+            }
 
             Gs1UiAction action {};
             action.target_id = node_def.tech_node_id.value;
             action.arg0 = 0U;
 
-            char node_text[192] {};
+            char node_text[512] {};
             std::uint32_t flags = GS1_UI_ELEMENT_FLAG_NONE;
             if (const auto* purchase =
                     TechnologySystem::find_purchase_record(*campaign_, node_def.tech_node_id);
@@ -2315,7 +2340,7 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
                 std::snprintf(
                     node_text,
                     sizeof(node_text),
-                    "TECHNODE|s=Need %dr+$%d",
+                    "TECHNODE|s=Need %dr +$%d",
                     reputation_requirement,
                     cash_cost);
                 flags |= GS1_UI_ELEMENT_FLAG_PRIMARY;
@@ -2323,14 +2348,7 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
             else
             {
                 flags |= GS1_UI_ELEMENT_FLAG_DISABLED;
-                if (!TechnologySystem::technology_tier_visible(*campaign_, node_def))
-                {
-                    std::snprintf(
-                        node_text,
-                        sizeof(node_text),
-                        "TECHNODE|s=Need prev");
-                }
-                else if (campaign_->cash < cash_cost)
+                if (campaign_->cash < cash_cost)
                 {
                     std::snprintf(
                         node_text,
@@ -2346,12 +2364,26 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
                         "TECHNODE|s=Need %dr",
                         reputation_requirement);
                 }
+                else if (!paired_base_purchased)
+                {
+                    std::snprintf(
+                        node_text,
+                        sizeof(node_text),
+                        "TECHNODE|s=Need base");
+                }
+                else if (sibling_enhancement_purchased)
+                {
+                    std::snprintf(
+                        node_text,
+                        sizeof(node_text),
+                        "TECHNODE|s=Other choice");
+                }
                 else
                 {
                     std::snprintf(
                         node_text,
                         sizeof(node_text),
-                        "TECHNODE|s=Taken");
+                        "TECHNODE|s=Locked");
                 }
             }
 

@@ -706,6 +706,23 @@ template <typename T>
     fail_load(path, line_number, "invalid technology entry kind");
 }
 
+[[nodiscard]] TechnologyNodeKind parse_technology_node_kind(
+    const std::filesystem::path& path,
+    std::size_t line_number,
+    const std::string& field)
+{
+    if (field == "BaseTech")
+    {
+        return TechnologyNodeKind::BaseTech;
+    }
+    if (field == "Enhancement")
+    {
+        return TechnologyNodeKind::Enhancement;
+    }
+
+    fail_load(path, line_number, "invalid technology node kind");
+}
+
 [[nodiscard]] ReputationUnlockKind parse_reputation_unlock_kind(
     const std::filesystem::path& path,
     std::size_t line_number,
@@ -725,6 +742,35 @@ template <typename T>
     }
 
     fail_load(path, line_number, "invalid reputation unlock kind");
+}
+
+[[nodiscard]] TechnologyGrantedContentKind parse_technology_granted_content_kind(
+    const std::filesystem::path& path,
+    std::size_t line_number,
+    const std::string& field)
+{
+    if (field == "None")
+    {
+        return TechnologyGrantedContentKind::None;
+    }
+    if (field == "Item")
+    {
+        return TechnologyGrantedContentKind::Item;
+    }
+    if (field == "Plant")
+    {
+        return TechnologyGrantedContentKind::Plant;
+    }
+    if (field == "Structure")
+    {
+        return TechnologyGrantedContentKind::Structure;
+    }
+    if (field == "Recipe")
+    {
+        return TechnologyGrantedContentKind::Recipe;
+    }
+
+    fail_load(path, line_number, "invalid technology granted content kind");
 }
 
 [[nodiscard]] std::size_t toml_line_number(const toml::node& node) noexcept
@@ -871,6 +917,25 @@ template <typename T>
     }
 
     return static_cast<T>(*value);
+}
+
+[[nodiscard]] std::optional<std::string> optional_toml_string(
+    const std::filesystem::path& path,
+    const toml::table& table,
+    std::string_view key)
+{
+    const auto field = table[key];
+    if (!field)
+    {
+        return std::nullopt;
+    }
+
+    if (const auto value = field.value<std::string_view>())
+    {
+        return std::string {*value};
+    }
+
+    fail_invalid_toml_field(path, field, key, "must be a string");
 }
 
 [[nodiscard]] float require_toml_float(
@@ -1632,16 +1697,31 @@ void load_technology_node_defs(ContentDatabase& content, const std::filesystem::
         const auto tier_index = require_toml_unsigned<std::uint8_t>(path, entry, "tier_index");
         const auto faction_id = FactionId {
             require_toml_unsigned<std::uint32_t>(path, entry, "faction_id")};
+        const auto node_kind = parse_technology_node_kind(
+            path,
+            toml_line_number(entry),
+            require_toml_string(path, entry, "node_kind"));
+        const auto enhancement_choice_index =
+            require_toml_unsigned<std::uint8_t>(path, entry, "enhancement_choice_index");
         const auto entry_kind = parse_technology_entry_kind(
             path,
             toml_line_number(entry),
             require_toml_string(path, entry, "entry_kind"));
-        const auto tech_node_id = TechNodeId {technology_node_id(faction_id, tier_index)};
+        const auto granted_content_kind = parse_technology_granted_content_kind(
+            path,
+            toml_line_number(entry),
+            optional_toml_string(path, entry, "granted_content_kind").value_or("None"));
+        const auto granted_content_id =
+            optional_toml_unsigned<std::uint32_t>(path, entry, "granted_content_id").value_or(0U);
+        const auto tech_node_id = TechNodeId {
+            technology_node_id(faction_id, tier_index, enhancement_choice_index)};
         content.technology_node_defs.push_back(TechnologyNodeDef {
             tech_node_id,
             faction_id,
             tier_index,
-            {0U, 0U, 0U},
+            node_kind,
+            enhancement_choice_index,
+            {0U},
             entry_kind,
             {0U, 0U, 0U},
             require_toml_signed<std::int32_t>(path, entry, "reputation_requirement"),
@@ -1654,6 +1734,9 @@ void load_technology_node_defs(ContentDatabase& content, const std::filesystem::
             entry_kind == TechnologyEntryKind::MechanismChange
                 ? technology_mechanism_change_id(tech_node_id)
                 : 0U,
+            granted_content_kind,
+            {0U, 0U, 0U},
+            granted_content_id,
             require_toml_bool(path, entry, "is_todo_placeholder"),
             {0U, 0U, 0U},
             store_string_view(content, require_toml_string(path, entry, "display_name")),

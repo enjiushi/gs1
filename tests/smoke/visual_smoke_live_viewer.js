@@ -3856,6 +3856,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         emptyState.appendChild(emptyCopy);
     }
 
+    function isTechnologyNodeActionType(actionType) {
+        return actionType === "CLAIM_TECHNOLOGY_NODE" || actionType === "REFUND_TECHNOLOGY_NODE";
+    }
+
     function normalizeTechFactionName(name) {
         const normalized = String(name || "").trim().toLowerCase();
         if (normalized.includes("village")) {
@@ -3876,9 +3880,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return "";
         }
 
-        let match = compactStatus.match(/^Need\s+(\d+)r\+\$(\d+)$/i);
+        let match = compactStatus.match(/^Need\s+(\d+)r\s+\+(\$\d+)$/i);
         if (match) {
-            return "Need " + match[1] + " rep + $" + match[2];
+            return "Need " + match[1] + " rep + " + match[2];
         }
 
         match = compactStatus.match(/^Need\s+(\d+)r$/i);
@@ -3886,19 +3890,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return "Need " + match[1] + " rep";
         }
 
-        if (/^Need prev$/i.test(compactStatus)) {
-            return "Need previous tier";
-        }
-
-        if (/^Taken$/i.test(compactStatus)) {
-            return "Tier already claimed";
-        }
-
         return compactStatus;
     }
 
-    function technologyNodeIdFromParts(factionId, tierIndex) {
-        return 1000 + factionId * 100 + tierIndex;
+    function technologyNodeIdFromParts(factionId, tierIndex, enhancementChoiceIndex) {
+        return 1000 + factionId * 1000 + tierIndex * 10 + enhancementChoiceIndex;
     }
 
     function parseSimpleTomlValue(rawValue) {
@@ -3970,16 +3966,20 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         parseTomlTableArray(nodeTomlText, "technology_nodes").forEach((row) => {
             const factionId = Number(row.faction_id || 0);
             const tierIndex = Number(row.tier_index || 0);
-            const nodeId = technologyNodeIdFromParts(factionId, tierIndex);
+            const enhancementChoiceIndex = Number(row.enhancement_choice_index || 0);
+            const nodeId = technologyNodeIdFromParts(factionId, tierIndex, enhancementChoiceIndex);
             catalog.nodesById.set(nodeId, {
                 nodeId: nodeId,
                 factionId: factionId,
                 tierIndex: tierIndex,
-                entryKind: String(row.entry_kind || ""),
+                enhancementChoiceIndex: enhancementChoiceIndex,
+                nodeKind: String(row.node_kind || ""),
                 displayName: String(row.display_name || ""),
                 description: String(row.description || ""),
                 internalCostCashPoints: Number(row.internal_cost_cash_points || 0),
-                reputationRequirement: Number(row.reputation_requirement || 0)
+                reputationRequirement: Number(row.reputation_requirement || 0),
+                grantedContentKind: String(row.granted_content_kind || ""),
+                grantedContentId: Number(row.granted_content_id || 0)
             });
         });
         return catalog;
@@ -4024,7 +4024,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return false;
         }
 
-        return /^TECHNODE\|/i.test(text) || /\bT\d+\b/i.test(text);
+        return /^TECHNODE\|/i.test(text) || /\b(Base|Enh\s+\d+)\s+T\d+\b/i.test(text) || /\bRefund\b/i.test(text);
     }
 
     function parseTechTreeActionElement(element) {
@@ -4044,15 +4044,30 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 const value = part.slice(separatorIndex + 1).trim();
                 fields[key] = value;
             });
+            const parsedTierNumber = Number(fields.tier || 0);
             const targetId = element.action && typeof element.action.targetId === "number" ? element.action.targetId : 0;
             const catalogNode =
                 technologyCatalog && targetId ? technologyCatalog.nodesById.get(targetId) : null;
             const compactStatusText = fields.status || fields.s || "";
-            const resolvedStatusText = expandCompactTechStatus(compactStatusText) || compactStatusText;
+            const statusTextFromAction = (() => {
+                if (element.action && element.action.type === "REFUND_TECHNOLOGY_NODE") {
+                    return "Refund";
+                }
+                if (element.action && element.action.type === "CLAIM_TECHNOLOGY_NODE") {
+                    const repRequirement = catalogNode ? catalogNode.reputationRequirement : 0;
+                    const cashCost = catalogNode ? Math.round((catalogNode.internalCostCashPoints || 0) / 100) : 0;
+                    return "Need " + repRequirement + " rep + $" + cashCost;
+                }
+                return (element.flags & 2) !== 0 ? "Locked" : "Unavailable";
+            })();
+            const resolvedStatusText = expandCompactTechStatus(compactStatusText) || statusTextFromAction;
             return {
                 element: element,
-                titleText: (catalogNode && catalogNode.displayName) || text,
-                kindText: catalogNode && catalogNode.entryKind === "MechanismChange" ? "Mechanism" : "Modifier",
+                titleText: (catalogNode && catalogNode.displayName) || fields.title || text,
+                kindText:
+                    (catalogNode
+                        ? (catalogNode.enhancementChoiceIndex === 0 ? "Base" : ("Enh " + catalogNode.enhancementChoiceIndex))
+                        : (fields.kind || "Tech")),
                 factionText:
                     (catalogNode
                         ? ({
@@ -4060,38 +4075,65 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                             2: "Forestry Bureau",
                             3: "Agricultural University"
                         }[catalogNode.factionId] || "")
-                        : ""),
-                tierNumber: catalogNode ? catalogNode.tierIndex : 0,
-                descriptionText: (catalogNode && catalogNode.description) || "",
+                        : (fields.faction || "")),
+                tierNumber:
+                    (catalogNode && catalogNode.tierIndex) ||
+                    (Number.isFinite(parsedTierNumber) ? parsedTierNumber : 0),
+                descriptionText: (catalogNode && catalogNode.description) || fields.desc || "",
                 statusText: resolvedStatusText,
                 costText: (() => {
-                    const matchedCash = resolvedStatusText.match(/\$\d+/);
-                    const matchedRep = resolvedStatusText.match(/Need\s+(\d+)\s+rep/i);
+                    const effectiveStatus = resolvedStatusText;
+                    const matchedCash = effectiveStatus.match(/\$\d+/);
+                    const matchedRep = effectiveStatus.match(/Need\s+(\d+)\s+rep/i);
                     if (matchedCash) {
                         return matchedCash[0];
                     }
                     if (matchedRep && matchedRep[1]) {
                         return "Rep " + matchedRep[1];
                     }
-                    return catalogNode ? ("T" + String(catalogNode.tierIndex || "")) : "";
+                    return catalogNode ? ("T" + String(catalogNode.tierIndex || "")) : ("T" + String(fields.tier || ""));
                 })(),
                 isClaimable: (element.flags & 1) !== 0,
                 isDisabled: (element.flags & 2) !== 0,
                 isClaimed: /Claimed/i.test(resolvedStatusText),
-                isLocked: /Locked|Need|Taken/i.test(resolvedStatusText)
+                isLocked: /Locked|Unavailable|Need/i.test(resolvedStatusText)
             };
         }
 
-        const parts = text.split("|").map((part) => part.trim());
+        const parts = text
+            .split("|")
+            .map((part) => part.trim())
+            .filter(Boolean);
         const leftText = parts[0] || "";
-        const titleText = parts.length > 1 ? parts.slice(1).join(" | ") : leftText;
-        const leftMatch = leftText.match(/^(.*?)\s+T(\d+)\s+(.*)$/i);
+        const detailParts = parts.length > 1 ? parts.slice(1) : [];
+        const leftMatch = leftText.match(/^(.*?)\s+(Base|Enh\s+\d+)\s+T(\d+)(?:\s+(.*))?$/i);
         const factionText = leftMatch ? leftMatch[1].trim() : "";
-        const tierNumber = leftMatch ? Number(leftMatch[2]) : 0;
-        const statusText = leftMatch ? leftMatch[3] : leftText;
-        const kindText = "Tech";
-        const costMatch = statusText.match(/(?:Cost|Need)\s+(\d+)/);
-        const costText = costMatch ? ("Rep " + costMatch[1]) : statusText;
+        const kindText = leftMatch ? leftMatch[2].trim() : "Tech";
+        const tierNumber = leftMatch ? Number(leftMatch[3]) : 0;
+        const primaryStatusText = leftMatch && leftMatch[4] ? leftMatch[4].trim() : leftText;
+        let titleText = "";
+        let descriptionText = "";
+        const filteredDetailParts = [];
+        detailParts.forEach((part) => {
+            if (/^About\s+/i.test(part)) {
+                descriptionText = part.replace(/^About\s+/i, "").trim();
+            } else if (!titleText &&
+                !/^(Param|Unlock|Need|Claimed|Refund|\+\$|Unavailable|Other enhancement|Need paired)/i.test(part))
+            {
+                titleText = part.trim();
+            } else {
+                filteredDetailParts.push(part);
+            }
+        });
+        if (!titleText) {
+            titleText = leftText;
+        }
+        const statusText = [primaryStatusText].concat(filteredDetailParts).filter(Boolean).join(" | ");
+        const costCashMatch = statusText.match(/\$\d+/);
+        const costRepMatch = statusText.match(/Need\s+(\d+)\s+rep/i);
+        const costText = costCashMatch
+            ? costCashMatch[0]
+            : (costRepMatch ? ("Rep " + costRepMatch[1]) : ("T" + String(tierNumber || "")));
 
         return {
             element: element,
@@ -4099,7 +4141,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             kindText: kindText,
             factionText: factionText,
             tierNumber: tierNumber,
-            descriptionText: "",
+            descriptionText: descriptionText,
             statusText: statusText,
             costText: costText,
             isClaimable: (element.flags & 1) !== 0,
@@ -4144,6 +4186,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         nodeIcon.style.setProperty("--tech-icon-dark", iconPresentation.dark);
         appendUiIcon(nodeIcon, iconPresentation.iconKey);
         nodeTop.appendChild(nodeIcon);
+        if (/^Enh/i.test(nodeModel.kindText)) {
+            nodeIcon.classList.add("amp");
+        }
 
         const nodeCost = document.createElement("div");
         nodeCost.className = "tech-node-cost";
@@ -4173,7 +4218,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     function parseTechTreeStructure(techTreeSetup) {
         const parsed = {
             factionTabs: [],
-            tiers: []
+            tiers: [],
+            selectedFactionName: ""
         };
         if (!techTreeSetup || !Array.isArray(techTreeSetup.elements)) {
             return parsed;
@@ -4192,9 +4238,16 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             }
 
             if (actionType === "SELECT_TECH_TREE_FACTION_TAB") {
-                parsed.factionTabs.push({
-                    label: text.replace(/^Tab:\s*/i, "").trim()
-                });
+                const label = text.replace(/^Tab:\s*/i, "").trim();
+                const tabModel = {
+                    element: element,
+                    label: label,
+                    isActive: (element.flags & 1) !== 0
+                };
+                parsed.factionTabs.push(tabModel);
+                if (tabModel.isActive && label) {
+                    parsed.selectedFactionName = label;
+                }
                 activeTier = null;
                 return;
             }
@@ -4222,6 +4275,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             }
         });
 
+        if (!parsed.selectedFactionName && parsed.factionTabs.length > 0) {
+            parsed.selectedFactionName = parsed.factionTabs[0].label;
+        }
         return parsed;
     }
 
@@ -4258,14 +4314,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return;
         }
 
-        const factionOrder =
-            parsedTree && Array.isArray(parsedTree.factionTabs) && parsedTree.factionTabs.length > 0
-                ? parsedTree.factionTabs.map((tabModel) => tabModel.label)
-                : ["Village", "Forestry", "University"];
+        const factionTabs = parsedTree && Array.isArray(parsedTree.factionTabs) ? parsedTree.factionTabs : [];
 
         parsedTree.tiers.forEach((tierModel) => {
-            const tierNodes = tierModel.nodes.slice();
-            if (tierNodes.length === 0) {
+            const factionNodes = tierModel.nodes.slice();
+            if (factionNodes.length === 0) {
                 return;
             }
 
@@ -4283,16 +4336,21 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
             const tierMeta = document.createElement("div");
             tierMeta.className = "tech-tier-meta";
-            tierMeta.textContent = "Each tier row shows faction techs side by side.";
+            tierMeta.textContent = "Each tier row shows 3 faction techs side by side, with 2 exclusive enhancements below each base tech.";
             tierCard.appendChild(tierMeta);
 
             const tierGrid = document.createElement("div");
             tierGrid.className = "tech-tier-grid";
             tierCard.appendChild(tierGrid);
 
+            const factionOrder =
+                factionTabs.length > 0
+                    ? factionTabs.map((tabModel) => tabModel.label)
+                    : Array.from(new Set(factionNodes.map((nodeModel) => nodeModel.factionText)));
+
             factionOrder.forEach((factionName) => {
                 const normalizedFactionName = normalizeTechFactionName(factionName);
-                const columnNode = tierNodes.find((nodeModel) => {
+                const columnNodes = factionNodes.filter((nodeModel) => {
                     return normalizeTechFactionName(nodeModel.factionText) === normalizedFactionName;
                 });
 
@@ -4305,10 +4363,26 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 factionLabel.textContent = factionName;
                 column.appendChild(factionLabel);
 
-                column.appendChild(
-                    columnNode
-                        ? buildTechTreeNodeButton(columnNode, "tech-base-card")
-                        : makeTechPlaceholder("No Tech", "tech-base-card"));
+                const baseNode = columnNodes.find((nodeModel) => /^Base$/i.test(nodeModel.kindText));
+                if (baseNode) {
+                    column.appendChild(buildTechTreeNodeButton(baseNode, "tech-base-card"));
+                } else {
+                    column.appendChild(makeTechPlaceholder("No Base Tech", "tech-base-card"));
+                }
+
+                const enhancementRow = document.createElement("div");
+                enhancementRow.className = "tech-amp-row";
+                column.appendChild(enhancementRow);
+
+                [1, 2].forEach((enhIndex) => {
+                    const enhancementNode = columnNodes.find((nodeModel) => {
+                        return new RegExp("^Enh\\s+" + String(enhIndex) + "$", "i").test(nodeModel.kindText);
+                    });
+                    enhancementRow.appendChild(
+                        enhancementNode
+                            ? buildTechTreeNodeButton(enhancementNode, "tech-amp-card")
+                            : makeTechPlaceholder("No Enhancement", "tech-amp-card"));
+                });
             });
         });
 

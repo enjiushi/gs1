@@ -93,6 +93,13 @@ Economy valuation clarification:
 - long-term tech rows and direct-purchase unlockable offers should author internal cash-point values as their source of truth
 - player-facing cash prices should be derived from those internal values using `100` cash points = `1` cash
 
+Technology authoring clarification:
+
+- each faction tech row should author whether it is a base tech or an enhancement plus its `enhancementChoiceIndex`
+- faction base techs use faction-reputation tiers `1-8`; paired enhancements use faction-reputation tiers `9-16`
+- an enhancement row must pair to the base tech in the same faction+tier and use one of the two exclusive enhancement choice slots
+- a tech row may optionally author a granted content payload such as an `ItemDef`, `PlantDef`, `StructureDef`, or `CraftRecipeDef` id in addition to any modifier or mechanism effect metadata
+
 Required structure authoring rules:
 
 - a structure that grants local storage must author its slot count directly on `StructureDef`
