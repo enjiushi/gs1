@@ -262,6 +262,14 @@ body {
   white-space: pre-line;
 }
 
+.fps-chip {
+  min-width: 132px;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--accent-dark);
+}
+
 .audio-toggle {
   min-width: 200px;
   text-align: right;
@@ -3230,6 +3238,9 @@ body {
           <button class="audio-toggle" id="audio-toggle" type="button" data-audio-enabled="false">
             Audio Off
           </button>
+          <div class="status-chip fps-chip" id="fps-chip" aria-live="off">Viewer Perf
+FPS --
+Frame -- ms</div>
           <div class="status-chip" id="status-chip">
             Connecting...
           </div>

@@ -9,5 +9,5 @@ Automated test coverage split into runtime tests, smoke flows, and broader syste
 
 ## Contents
 - `runtime/`: Runtime-focused unit/integration-style tests and probes.
-- `smoke/`: DLL-loading smoke host, scripted smoke flows, and visual smoke assets, including the browser-side site renderer, RMB harvest context actions, and tuned low-profile straw checkerboard presentation.
+- `smoke/`: DLL-loading smoke host, scripted smoke flows, and visual smoke assets, including the browser-side site renderer, the viewer-side FPS readout, RMB harvest context actions, and tuned low-profile straw checkerboard presentation.
 - `system/`: Standalone system-test framework, source tests, and asset-driven regressions, including harvest-action and harvest-output coverage.

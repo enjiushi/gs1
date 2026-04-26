@@ -11,6 +11,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const siteVitalsMoney = document.getElementById("site-vitals-money");
     const siteVitalsReputation = document.getElementById("site-vitals-reputation");
     const siteVitalsBars = document.getElementById("site-vitals-bars");
+    const fpsChip = document.getElementById("fps-chip");
     const statusChip = document.getElementById("status-chip");
     const menuPanel = document.getElementById("menu-panel");
     const menuEyebrow = document.getElementById("menu-eyebrow");
@@ -75,6 +76,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let placementCursorSendInFlight = false;
     let lastSentPlacementCursorSignature = "";
     let animationTimeSeconds = 0;
+    let fpsSampleFrameCount = 0;
+    let fpsSampleElapsedSeconds = 0;
     let rendererWidth = 0;
     let rendererHeight = 0;
     let weatherPostProcess = null;
@@ -9111,10 +9114,40 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         });
     }
 
+    function updateFpsChip(frameDeltaSeconds) {
+        if (!fpsChip || !Number.isFinite(frameDeltaSeconds) || frameDeltaSeconds <= 0.0) {
+            return;
+        }
+
+        // Ignore long tab stalls so the readout keeps reflecting active rendering performance.
+        if (frameDeltaSeconds > 0.5) {
+            fpsSampleFrameCount = 0;
+            fpsSampleElapsedSeconds = 0.0;
+            fpsChip.textContent = "Viewer Perf\nFPS --\nFrame -- ms";
+            return;
+        }
+
+        fpsSampleFrameCount += 1;
+        fpsSampleElapsedSeconds += frameDeltaSeconds;
+        if (fpsSampleElapsedSeconds < 0.25) {
+            return;
+        }
+
+        const fps = fpsSampleFrameCount / fpsSampleElapsedSeconds;
+        const frameMs = (fpsSampleElapsedSeconds * 1000.0) / fpsSampleFrameCount;
+        fpsChip.textContent =
+            "Viewer Perf\nFPS " + Math.round(fps) +
+            "\nFrame " + frameMs.toFixed(1) + " ms";
+        fpsSampleFrameCount = 0;
+        fpsSampleElapsedSeconds = 0.0;
+    }
+
     function animate() {
         requestAnimationFrame(animate);
 
-        const deltaSeconds = Math.min(animationClock.getDelta(), 0.1);
+        const rawDeltaSeconds = animationClock.getDelta();
+        const deltaSeconds = Math.min(rawDeltaSeconds, 0.1);
+        updateFpsChip(rawDeltaSeconds);
         animationTimeSeconds += deltaSeconds;
         const elapsed = animationTimeSeconds;
         sendSiteControlState();
