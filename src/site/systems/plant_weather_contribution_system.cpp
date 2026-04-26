@@ -12,10 +12,57 @@
 #include <flecs.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 
 namespace
 {
+template <typename Func>
+void for_each_contribution_sample(std::uint8_t max_distance, Func&& func)
+{
+    for (int dy = -static_cast<int>(max_distance); dy <= static_cast<int>(max_distance); ++dy)
+    {
+        for (int dx = -static_cast<int>(max_distance); dx <= static_cast<int>(max_distance); ++dx)
+        {
+            const int manhattan_distance = std::abs(dx) + std::abs(dy);
+            if (manhattan_distance > static_cast<int>(max_distance))
+            {
+                continue;
+            }
+
+            func(gs1::WeatherContributionSample {dx, dy, manhattan_distance});
+        }
+    }
+}
+
+[[nodiscard]] std::uint8_t resolve_effective_aura_distance(
+    const gs1::PlantDef& plant_def) noexcept
+{
+    return gs1::scale_tile_distance_by_footprint_multiple(
+        plant_def.aura_size,
+        gs1::TileFootprint {plant_def.footprint_width, plant_def.footprint_height});
+}
+
+[[nodiscard]] std::uint8_t resolve_effective_wind_distance(
+    const gs1::PlantDef& plant_def) noexcept
+{
+    return gs1::scale_tile_distance_by_footprint_multiple(
+        plant_def.wind_protection_range,
+        gs1::TileFootprint {plant_def.footprint_width, plant_def.footprint_height});
+}
+
+[[nodiscard]] std::uint8_t resolve_max_plant_contribution_distance() noexcept
+{
+    std::uint8_t max_distance = 0U;
+    for (const auto& plant_def : gs1::all_plant_defs())
+    {
+        max_distance =
+            std::max(max_distance, std::max(resolve_effective_aura_distance(plant_def), resolve_effective_wind_distance(plant_def)));
+    }
+
+    return max_distance;
+}
+
 const gs1::PlantDef& resolve_occupant_def(
     gs1::PlantId plant_id,
     std::uint32_t ground_cover_type_id) noexcept
@@ -103,16 +150,17 @@ void mark_tiles_affected_by_source(
         return;
     }
 
-    for (const auto sample : gs1::k_weather_contribution_samples)
+    const std::uint8_t max_distance = resolve_max_plant_contribution_distance();
+    for_each_contribution_sample(max_distance, [&](const gs1::WeatherContributionSample& sample)
     {
         const gs1::TileCoord target_coord {source_coord.x + sample.dx, source_coord.y + sample.dy};
         if (!context.world.tile_coord_in_bounds(target_coord))
         {
-            continue;
+            return;
         }
 
         mark_tile_dirty(state, context.world.tile_index(target_coord));
-    }
+    });
 }
 
 bool source_and_target_share_occupant_instance(
@@ -159,29 +207,30 @@ bool source_and_target_share_occupant_instance(
 gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
     gs1::SiteSystemContext<gs1::PlantWeatherContributionSystem>& context,
     const gs1::WeatherUnitVector& wind_direction,
+    std::uint8_t max_distance,
     gs1::TileCoord target_coord)
 {
     auto& ecs_world = context.site_run.site_world->ecs_world();
     gs1::SiteWorld::TileWeatherContributionData total = gs1::zero_weather_contribution();
 
-    for (const auto sample : gs1::k_weather_contribution_samples)
+    for_each_contribution_sample(max_distance, [&](const gs1::WeatherContributionSample& sample)
     {
         const gs1::TileCoord source_coord {target_coord.x - sample.dx, target_coord.y - sample.dy};
         if (!context.world.tile_coord_in_bounds(source_coord))
         {
-            continue;
+            return;
         }
 
         const auto source_entity_id = context.site_run.site_world->tile_entity_id(source_coord);
         if (source_entity_id == 0U)
         {
-            continue;
+            return;
         }
 
         auto source_entity = ecs_world.entity(source_entity_id);
         if (!source_entity.has<gs1::site_ecs::TileOccupantTag>())
         {
-            continue;
+            return;
         }
 
         const auto density_component = source_entity.get<gs1::site_ecs::TilePlantDensity>();
@@ -189,7 +238,7 @@ gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
             std::clamp(density_component.value * gs1::k_inverse_meter_scale, 0.0f, 1.0f);
         if (density <= gs1::k_weather_contribution_epsilon)
         {
-            continue;
+            return;
         }
 
         const auto plant_slot = source_entity.get<gs1::site_ecs::TilePlantSlot>();
@@ -203,12 +252,15 @@ gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
                 source_coord,
                 target_coord,
                 plant_slot.plant_id);
+        const std::uint8_t effective_aura_distance = resolve_effective_aura_distance(plant_def);
+        const std::uint8_t effective_wind_distance = resolve_effective_wind_distance(plant_def);
+        const float protection_ratio = std::clamp(plant_def.protection_ratio, 0.0f, 1.0f);
 
         gs1::SiteWorld::TileWeatherContributionData delta = gs1::zero_weather_contribution();
         const float contribution_scale = gs1::resolve_contribution_scale(sample.manhattan_distance);
         const bool within_shared_aura =
             sample.manhattan_distance == 0 ||
-            sample.manhattan_distance <= static_cast<int>(plant_def.aura_size);
+            sample.manhattan_distance <= static_cast<int>(effective_aura_distance);
         if (within_shared_aura)
         {
             delta.fertility_improve =
@@ -219,27 +271,28 @@ gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
             if (!same_occupant_instance)
             {
                 delta.heat_protection =
-                    plant_def.heat_tolerance * density * contribution_scale;
+                    plant_def.heat_tolerance * protection_ratio * density * contribution_scale;
                 delta.dust_protection =
-                    plant_def.dust_tolerance * density * contribution_scale;
+                    plant_def.dust_tolerance * protection_ratio * density * contribution_scale;
             }
         }
 
         if (!same_occupant_instance &&
             sample.manhattan_distance > 0 &&
-            sample.manhattan_distance <= static_cast<int>(plant_def.wind_protection_range))
+            sample.manhattan_distance <= static_cast<int>(effective_wind_distance))
         {
             const float shadow_scale = gs1::compute_directional_wind_shadow_scale(
                 source_coord.x,
                 source_coord.y,
                 target_coord.x,
                 target_coord.y,
-                plant_def.wind_protection_range,
+                effective_wind_distance,
                 wind_direction);
             if (shadow_scale > gs1::k_weather_contribution_epsilon)
             {
                 delta.wind_protection =
                     plant_def.wind_resistance *
+                    protection_ratio *
                     density *
                     contribution_scale *
                     shadow_scale;
@@ -247,7 +300,7 @@ gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
         }
 
         gs1::accumulate_weather_contribution(total, delta);
-    }
+    });
 
     return total;
 }
@@ -354,13 +407,14 @@ void PlantWeatherContributionSystem::run(SiteSystemContext<PlantWeatherContribut
 
     const WeatherUnitVector wind_direction =
         resolve_wind_direction_unit_vector(context.world.read_weather().weather_wind_direction_degrees);
+    const std::uint8_t max_distance = resolve_max_plant_contribution_distance();
     for (const std::uint32_t tile_index : runtime.dirty_tile_indices)
     {
         const TileCoord target_coord = context.world.tile_coord(tile_index);
         write_tile_contribution(
             context,
             tile_index,
-            recompute_tile_contribution(context, wind_direction, target_coord));
+            recompute_tile_contribution(context, wind_direction, max_distance, target_coord));
     }
 
     clear_dirty_tiles(runtime);

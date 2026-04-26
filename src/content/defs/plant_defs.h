@@ -37,6 +37,7 @@ struct PlantDef final
     std::uint8_t footprint_width;
     std::uint8_t footprint_height;
     std::uint8_t wind_protection_range;
+    float protection_ratio;
     float plant_action_duration_minutes;
     float constant_wither_rate;
     float salt_tolerance;
@@ -66,6 +67,7 @@ inline constexpr PlantDef k_generic_living_plant_def {
     1U,
     0U,
     1.0f,
+    1.0f,
     0.0f,
     40.0f,
     40.0f,
@@ -92,6 +94,7 @@ inline constexpr PlantDef k_generic_ground_cover_def {
     1U,
     1U,
     0U,
+    1.0f,
     1.0f,
     0.0f,
     100.0f,
