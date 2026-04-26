@@ -234,7 +234,7 @@ SiteWorld::TileData default_tile_data() noexcept
 {
     return SiteWorld::TileData {
         SiteWorld::TileStaticData {0U, true, true, false},
-        SiteWorld::TileEcologyData {50.0f, 50.0f, 0.0f, 0.0f, PlantId {}, 0U, 0.0f, 0.0f},
+        SiteWorld::TileEcologyData {20.0f, 20.0f, 0.0f, 0.0f, PlantId {}, 0U, 0.0f, 0.0f},
         SiteWorld::TileLocalWeatherData {0.0f, 0.0f, 0.0f},
         SiteWorld::TileWeatherContributionData {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f},
         SiteWorld::TileWeatherContributionData {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f},
