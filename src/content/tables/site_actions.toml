@@ -168,7 +168,7 @@ impacts_worker_movement = true
 
 [[site_actions]]
 action_kind = "Excavate"
-duration_minutes_per_unit = 1.6
+duration_minutes_per_unit = 30.0
 energy_cost_per_unit = 30.0
 hydration_cost_per_unit = 8.0
 nourishment_cost_per_unit = 4.0
