@@ -2,9 +2,9 @@
 
 #include "site/site_run_state.h"
 #include "site/site_world.h"
-#include "site/site_world_components.h"
 
-#include <flecs.h>
+#include <cstddef>
+#include <cstdint>
 
 namespace gs1::site_world_access
 {

@@ -9,6 +9,6 @@ Runtime-side helpers that register, locate, and load system-test assets.
 
 ## Contents
 - `system_test_asset.h`: System-test asset data structures and load helpers.
-- `system_test_asset.cpp`: System-test asset parsing/loading implementation.
+- `system_test_asset.cpp`: System-test asset parsing/loading implementation shared by the exported DLL hooks and the standalone system-test host.
 - `system_test_registry.h`: Registry declarations for source-authored and asset-driven tests.
-- `system_test_registry.cpp`: Registry implementation and test registration wiring.
+- `system_test_registry.cpp`: Registry implementation and test registration wiring shared by the exported DLL hooks and the standalone system-test host.
