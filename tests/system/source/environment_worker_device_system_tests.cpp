@@ -1075,6 +1075,40 @@ void worker_condition_run_scales_background_energy_recovery_from_hydration_and_n
     GS1_SYSTEM_TEST_CHECK(context, medium_support.energy > no_support.energy);
 }
 
+void worker_condition_run_pauses_background_energy_recovery_while_action_executes(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 13024U);
+    GameMessageQueue queue {};
+    auto site_context = make_site_context<WorkerConditionSystem>(campaign, site_run, queue, 10.0);
+
+    auto worker = gs1::site_world_access::worker_conditions(site_run);
+    worker.health = 100.0f;
+    worker.hydration = 100.0f;
+    worker.nourishment = 100.0f;
+    worker.energy = 20.0f;
+    gs1::site_world_access::set_worker_conditions(site_run, worker);
+
+    auto tile = site_run.site_world->tile_at(TileCoord {2, 2});
+    tile.local_weather.heat = 0.0f;
+    tile.local_weather.wind = 0.0f;
+    tile.local_weather.dust = 0.0f;
+    site_run.site_world->set_tile(TileCoord {2, 2}, tile);
+
+    site_run.site_action.current_action_id = gs1::RuntimeActionId {77U};
+    site_run.site_action.started_at_world_minute = 12.0;
+
+    WorkerConditionSystem::run(site_context);
+
+    const auto updated = gs1::site_world_access::worker_conditions(site_run);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(updated.energy, 20.0f, 0.01f));
+    GS1_SYSTEM_TEST_CHECK(context, updated.hydration < 100.0f);
+    GS1_SYSTEM_TEST_CHECK(context, updated.nourishment < 100.0f);
+    GS1_SYSTEM_TEST_CHECK(context, updated.energy_cap > updated.energy);
+    GS1_SYSTEM_TEST_CHECK(context, queue.size() == 1U);
+}
+
 void worker_condition_run_softens_environmental_decay_when_sheltered(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -1494,6 +1528,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "worker_condition",
     "run_scales_background_energy_recovery_from_hydration_and_nourishment",
     worker_condition_run_scales_background_energy_recovery_from_hydration_and_nourishment);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "worker_condition",
+    "run_pauses_background_energy_recovery_while_action_executes",
+    worker_condition_run_pauses_background_energy_recovery_while_action_executes);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "worker_condition",
     "run_softens_environmental_decay_when_sheltered",

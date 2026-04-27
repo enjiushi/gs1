@@ -126,6 +126,12 @@ bool worker_conditions_changed(
         previous.is_sheltered != current.is_sheltered;
 }
 
+bool action_is_executing(const ActionState& action_state) noexcept
+{
+    return action_state.current_action_id.has_value() &&
+        action_state.started_at_world_minute.has_value();
+}
+
 std::uint32_t compute_change_mask(
     const WorkerMeterSnapshot& previous,
     const WorkerMeterSnapshot& current) noexcept
@@ -450,11 +456,13 @@ void WorkerConditionSystem::run(SiteSystemContext<WorkerConditionSystem>& contex
         context.world.read_modifier().resolved_channel_totals,
         static_cast<float>(runtime_minutes_from_real_seconds(context.fixed_step_seconds)),
         step_real_seconds);
+    const float passive_energy_step_real_seconds =
+        action_is_executing(context.world.read_action()) ? 0.0f : step_real_seconds;
     worker.conditions = resolve_worker_conditions(
         previous,
         deltas,
         context.world.read_modifier().resolved_channel_totals,
-        step_real_seconds);
+        passive_energy_step_real_seconds);
     const bool modified = worker_conditions_changed(previous, worker.conditions);
     if (modified)
     {

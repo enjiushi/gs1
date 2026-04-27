@@ -46,6 +46,18 @@ struct PlacementModeState final
     std::uint64_t blocked_mask {0ULL};
 };
 
+struct DeferredWorkerMeterDelta final
+{
+    std::uint32_t flags {0U};
+    float health_delta {0.0f};
+    float hydration_delta {0.0f};
+    float nourishment_delta {0.0f};
+    float energy_cap_delta {0.0f};
+    float energy_delta {0.0f};
+    float morale_delta {0.0f};
+    float work_efficiency_delta {0.0f};
+};
+
 struct ActionState final
 {
     std::optional<RuntimeActionId> current_action_id {};
@@ -63,6 +75,7 @@ struct ActionState final
     double total_action_minutes {0.0};
     double remaining_action_minutes {0.0};
     std::vector<ReservedItemStack> reserved_input_item_stacks {};
+    DeferredWorkerMeterDelta deferred_meter_delta {};
     std::optional<double> started_at_world_minute {};
     PlacementModeState placement_mode {};
 };

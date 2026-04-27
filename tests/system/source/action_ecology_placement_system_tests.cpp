@@ -125,26 +125,26 @@ void action_execution_rejects_new_request_while_busy(
             site_context,
             make_start_action_message(GS1_SITE_ACTION_WATER, TileCoord {1, 1}, 1U)) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, site_run.site_action.current_action_id.has_value());
-    GS1_SYSTEM_TEST_CHECK(context, queue.size() == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, queue.size() == 1U);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         ActionExecutionSystem::process_message(
             site_context,
             make_start_action_message(GS1_SITE_ACTION_CLEAR_BURIAL, TileCoord {1, 2}, 1U)) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, queue.size() == 3U);
+    GS1_SYSTEM_TEST_CHECK(context, queue.size() == 2U);
     GS1_SYSTEM_TEST_CHECK(
         context,
         queue.back().payload_as<SiteActionFailedMessage>().reason == SiteActionFailureReason::Busy);
 }
 
-void action_execution_water_starts_immediately_and_emits_cost(
+void action_execution_water_starts_immediately_and_defers_cost_until_completion(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(1U, 503U);
     GameMessageQueue queue {};
-    auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue);
+    auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue, 60.0);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -159,9 +159,8 @@ void action_execution_water_starts_immediately_and_emits_cost(
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.target_tile->x == 2);
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.target_tile->y == 3);
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.primary_subject_id == 7U);
-    GS1_SYSTEM_TEST_CHECK(context, queue.size() == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue[0].type == GameMessageType::SiteActionStarted);
-    GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameMessageType::WorkerMeterDeltaRequested);
     GS1_SYSTEM_TEST_CHECK(
         context,
         queue[0].payload_as<SiteActionStartedMessage>().primary_subject_id == 7U);
@@ -170,25 +169,33 @@ void action_execution_water_starts_immediately_and_emits_cost(
         approx_equal(
             queue[0].payload_as<SiteActionStartedMessage>().duration_minutes,
             20.0f));
+
+    queue.clear();
+    ActionExecutionSystem::run(site_context);
+    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::SiteActionCompleted) == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::WorkerMeterDeltaRequested) == 1U);
+    const auto* meter_message =
+        first_message(queue, GameMessageType::WorkerMeterDeltaRequested);
+    GS1_SYSTEM_TEST_REQUIRE(context, meter_message != nullptr);
     GS1_SYSTEM_TEST_CHECK(
         context,
         approx_equal(
-            queue[1].payload_as<gs1::WorkerMeterDeltaRequestedMessage>().hydration_delta,
+            meter_message->payload_as<gs1::WorkerMeterDeltaRequestedMessage>().hydration_delta,
             -6.0f));
     GS1_SYSTEM_TEST_CHECK(
         context,
         approx_equal(
-            queue[1].payload_as<gs1::WorkerMeterDeltaRequestedMessage>().nourishment_delta,
+            meter_message->payload_as<gs1::WorkerMeterDeltaRequestedMessage>().nourishment_delta,
             -2.0f));
     GS1_SYSTEM_TEST_CHECK(
         context,
         approx_equal(
-            queue[1].payload_as<gs1::WorkerMeterDeltaRequestedMessage>().energy_delta,
+            meter_message->payload_as<gs1::WorkerMeterDeltaRequestedMessage>().energy_delta,
             -10.0f));
     GS1_SYSTEM_TEST_CHECK(
         context,
         approx_equal(
-            queue[1].payload_as<gs1::WorkerMeterDeltaRequestedMessage>().morale_delta,
+            meter_message->payload_as<gs1::WorkerMeterDeltaRequestedMessage>().morale_delta,
             0.0f));
 }
 
@@ -198,7 +205,7 @@ void action_execution_weather_scales_worker_meter_costs_from_current_local_weath
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(1U, 5035U);
     GameMessageQueue queue {};
-    auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue);
+    auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue, 60.0);
 
     const auto worker = site_run.site_world->worker();
     auto worker_tile = site_run.site_world->tile_at(worker.position.tile_coord);
@@ -213,27 +220,32 @@ void action_execution_weather_scales_worker_meter_costs_from_current_local_weath
             site_context,
             make_start_action_message(GS1_SITE_ACTION_WATER, TileCoord {2, 3}, 1U, 7U)) == GS1_STATUS_OK);
 
-    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 2U);
-    GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameMessageType::WorkerMeterDeltaRequested);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
+    queue.clear();
+    ActionExecutionSystem::run(site_context);
+    GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::WorkerMeterDeltaRequested) == 1U);
+    const auto* meter_message =
+        first_message(queue, GameMessageType::WorkerMeterDeltaRequested);
+    GS1_SYSTEM_TEST_REQUIRE(context, meter_message != nullptr);
     GS1_SYSTEM_TEST_CHECK(
         context,
         approx_equal(
-            queue[1].payload_as<gs1::WorkerMeterDeltaRequestedMessage>().hydration_delta,
+            meter_message->payload_as<gs1::WorkerMeterDeltaRequestedMessage>().hydration_delta,
             -8.1f));
     GS1_SYSTEM_TEST_CHECK(
         context,
         approx_equal(
-            queue[1].payload_as<gs1::WorkerMeterDeltaRequestedMessage>().nourishment_delta,
+            meter_message->payload_as<gs1::WorkerMeterDeltaRequestedMessage>().nourishment_delta,
             -1.7f));
     GS1_SYSTEM_TEST_CHECK(
         context,
         approx_equal(
-            queue[1].payload_as<gs1::WorkerMeterDeltaRequestedMessage>().energy_delta,
+            meter_message->payload_as<gs1::WorkerMeterDeltaRequestedMessage>().energy_delta,
             -13.5f));
     GS1_SYSTEM_TEST_CHECK(
         context,
         approx_equal(
-            queue[1].payload_as<gs1::WorkerMeterDeltaRequestedMessage>().morale_delta,
+            meter_message->payload_as<gs1::WorkerMeterDeltaRequestedMessage>().morale_delta,
             -10.0f));
 }
 
@@ -243,7 +255,7 @@ void action_execution_morale_cost_reaches_full_authored_value_at_single_weather_
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(1U, 5036U);
     GameMessageQueue queue {};
-    auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue);
+    auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue, 60.0);
 
     const auto worker = site_run.site_world->worker();
     auto worker_tile = site_run.site_world->tile_at(worker.position.tile_coord);
@@ -258,12 +270,17 @@ void action_execution_morale_cost_reaches_full_authored_value_at_single_weather_
             site_context,
             make_start_action_message(GS1_SITE_ACTION_WATER, TileCoord {2, 3}, 1U, 7U)) == GS1_STATUS_OK);
 
-    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 2U);
-    GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameMessageType::WorkerMeterDeltaRequested);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
+    queue.clear();
+    ActionExecutionSystem::run(site_context);
+    GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::WorkerMeterDeltaRequested) == 1U);
+    const auto* meter_message =
+        first_message(queue, GameMessageType::WorkerMeterDeltaRequested);
+    GS1_SYSTEM_TEST_REQUIRE(context, meter_message != nullptr);
     GS1_SYSTEM_TEST_CHECK(
         context,
         approx_equal(
-            queue[1].payload_as<gs1::WorkerMeterDeltaRequestedMessage>().morale_delta,
+            meter_message->payload_as<gs1::WorkerMeterDeltaRequestedMessage>().morale_delta,
             -10.0f));
 }
 
@@ -273,7 +290,7 @@ void action_execution_craft_uses_recipe_authored_duration_and_cost(
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(1U, 5034U);
     GameMessageQueue queue {};
-    auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue);
+    auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue, 60.0);
 
     (void)gs1::inventory_storage::add_item_to_container(
         site_run,
@@ -300,9 +317,8 @@ void action_execution_craft_uses_recipe_authored_duration_and_cost(
 
     GS1_SYSTEM_TEST_REQUIRE(context, site_run.site_action.current_action_id.has_value());
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.action_kind == ActionKind::Craft);
-    GS1_SYSTEM_TEST_CHECK(context, queue.size() == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue[0].type == GameMessageType::SiteActionStarted);
-    GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameMessageType::WorkerMeterDeltaRequested);
     GS1_SYSTEM_TEST_CHECK(
         context,
         site_run.site_action.secondary_subject_id == gs1::k_recipe_craft_workbench);
@@ -311,20 +327,27 @@ void action_execution_craft_uses_recipe_authored_duration_and_cost(
         approx_equal(
             queue[0].payload_as<SiteActionStartedMessage>().duration_minutes,
             2.0f));
+
+    queue.clear();
+    ActionExecutionSystem::run(site_context);
+    GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::WorkerMeterDeltaRequested) == 1U);
+    const auto* meter_message =
+        first_message(queue, GameMessageType::WorkerMeterDeltaRequested);
+    GS1_SYSTEM_TEST_REQUIRE(context, meter_message != nullptr);
     GS1_SYSTEM_TEST_CHECK(
         context,
         approx_equal(
-            queue[1].payload_as<gs1::WorkerMeterDeltaRequestedMessage>().hydration_delta,
+            meter_message->payload_as<gs1::WorkerMeterDeltaRequestedMessage>().hydration_delta,
             -0.5f));
     GS1_SYSTEM_TEST_CHECK(
         context,
         approx_equal(
-            queue[1].payload_as<gs1::WorkerMeterDeltaRequestedMessage>().nourishment_delta,
+            meter_message->payload_as<gs1::WorkerMeterDeltaRequestedMessage>().nourishment_delta,
             -0.2f));
     GS1_SYSTEM_TEST_CHECK(
         context,
         approx_equal(
-            queue[1].payload_as<gs1::WorkerMeterDeltaRequestedMessage>().energy_delta,
+            meter_message->payload_as<gs1::WorkerMeterDeltaRequestedMessage>().energy_delta,
             -1.5f));
 }
 
@@ -465,9 +488,8 @@ void planting_auto_move_reaches_tile_before_action_starts(
 
     queue.clear();
     ActionExecutionSystem::run(action_context);
-    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 2U);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue[0].type == GameMessageType::SiteActionStarted);
-    GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameMessageType::WorkerMeterDeltaRequested);
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.started_at_world_minute.has_value());
 }
 
@@ -708,6 +730,7 @@ void action_execution_rejection_and_cancel_clear_action_state(
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 2U);
     GS1_SYSTEM_TEST_CHECK(context, queue[0].type == GameMessageType::PlacementReservationReleased);
     GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameMessageType::SiteActionFailed);
+    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::WorkerMeterDeltaRequested) == 0U);
     GS1_SYSTEM_TEST_CHECK(
         context,
         queue[1].payload_as<SiteActionFailedMessage>().reason == SiteActionFailureReason::Cancelled);
@@ -736,8 +759,17 @@ void action_execution_run_completes_actions_and_emits_fact_messages(
         ActionExecutionSystem::run(site_context);
     }
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::SiteActionCompleted) == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::WorkerMeterDeltaRequested) == 1U);
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::SiteTileWatered) == 1U);
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::PlacementReservationReleased) == 1U);
+    const auto* watered_meter =
+        first_message(queue, GameMessageType::WorkerMeterDeltaRequested);
+    GS1_SYSTEM_TEST_REQUIRE(context, watered_meter != nullptr);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            watered_meter->payload_as<gs1::WorkerMeterDeltaRequestedMessage>().hydration_delta,
+            -9.0f));
     const auto* watered =
         first_message_payload<SiteTileWateredMessage>(
             queue,
@@ -761,6 +793,7 @@ void action_execution_run_completes_actions_and_emits_fact_messages(
         ActionExecutionSystem::run(site_context);
     }
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::SiteActionCompleted) == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::WorkerMeterDeltaRequested) == 1U);
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::SiteTileBurialCleared) == 1U);
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::PlacementReservationReleased) == 1U);
     const auto* burial_cleared =
@@ -1315,7 +1348,7 @@ void action_execution_plant_progress_tracks_fixed_step_duration(
             make_message(
                 GameMessageType::PlacementReservationAccepted,
                 PlacementReservationAcceptedMessage {action_id, 2, 2, 90U})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 2U);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue[0].type == GameMessageType::SiteActionStarted);
     GS1_SYSTEM_TEST_CHECK(
         context,
@@ -1388,7 +1421,7 @@ void action_execution_plant_duration_respects_small_fixed_steps(
             make_message(
                 GameMessageType::PlacementReservationAccepted,
                 PlacementReservationAcceptedMessage {action_id, 2, 2, 91U})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 2U);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     queue.clear();
 
     for (int step = 0; step < 4; ++step)
@@ -2038,8 +2071,8 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     action_execution_rejects_new_request_while_busy);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "action_execution",
-    "water_starts_immediately_and_emits_cost",
-    action_execution_water_starts_immediately_and_emits_cost);
+    "water_starts_immediately_and_defers_cost_until_completion",
+    action_execution_water_starts_immediately_and_defers_cost_until_completion);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "action_execution",
     "weather_scales_worker_meter_costs_from_current_local_weather",

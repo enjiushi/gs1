@@ -303,6 +303,7 @@ void clear_action_state(ActionState& action_state) noexcept
     action_state.total_action_minutes = 0.0;
     action_state.remaining_action_minutes = 0.0;
     action_state.reserved_input_item_stacks.clear();
+    action_state.deferred_meter_delta = {};
     action_state.started_at_world_minute.reset();
 }
 
@@ -406,9 +407,8 @@ void emit_site_action_completed(GameMessageQueue& queue, const ActionState& acti
             action_state.secondary_subject_id});
 }
 
-void emit_worker_meter_cost_request(
+DeferredWorkerMeterDelta resolve_worker_meter_cost_delta(
     SiteSystemContext<ActionExecutionSystem>& context,
-    std::uint32_t action_id,
     ActionKind action_kind,
     std::uint16_t quantity,
     const CraftRecipeDef* craft_recipe = nullptr)
@@ -455,40 +455,57 @@ void emit_worker_meter_cost_request(
         energy_cost == 0.0f &&
         morale_cost == 0.0f)
     {
-        return;
+        return {};
     }
 
-    std::uint32_t changed_mask = WORKER_METER_CHANGED_NONE;
+    DeferredWorkerMeterDelta meter_delta {};
     if (hydration_cost != 0.0f)
     {
-        changed_mask |= WORKER_METER_CHANGED_HYDRATION;
+        meter_delta.flags |= WORKER_METER_CHANGED_HYDRATION;
     }
     if (nourishment_cost != 0.0f)
     {
-        changed_mask |= WORKER_METER_CHANGED_NOURISHMENT;
+        meter_delta.flags |= WORKER_METER_CHANGED_NOURISHMENT;
     }
     if (energy_cost != 0.0f)
     {
-        changed_mask |= WORKER_METER_CHANGED_ENERGY;
+        meter_delta.flags |= WORKER_METER_CHANGED_ENERGY;
     }
     if (morale_cost != 0.0f)
     {
-        changed_mask |= WORKER_METER_CHANGED_MORALE;
+        meter_delta.flags |= WORKER_METER_CHANGED_MORALE;
+    }
+
+    meter_delta.hydration_delta = -hydration_cost;
+    meter_delta.nourishment_delta = -nourishment_cost;
+    meter_delta.energy_delta = -energy_cost;
+    meter_delta.morale_delta = -morale_cost;
+    return meter_delta;
+}
+
+void emit_deferred_worker_meter_cost_request(
+    GameMessageQueue& queue,
+    const ActionState& action_state)
+{
+    if (!action_state.current_action_id.has_value() ||
+        action_state.deferred_meter_delta.flags == 0U)
+    {
+        return;
     }
 
     enqueue_message(
-        context.message_queue,
+        queue,
         GameMessageType::WorkerMeterDeltaRequested,
         WorkerMeterDeltaRequestedMessage {
-            action_id,
-            changed_mask,
-            0.0f,
-            -hydration_cost,
-            -nourishment_cost,
-            0.0f,
-            -energy_cost,
-            -morale_cost,
-            0.0f});
+            action_state.current_action_id->value,
+            action_state.deferred_meter_delta.flags,
+            action_state.deferred_meter_delta.health_delta,
+            action_state.deferred_meter_delta.hydration_delta,
+            action_state.deferred_meter_delta.nourishment_delta,
+            action_state.deferred_meter_delta.energy_cap_delta,
+            action_state.deferred_meter_delta.energy_delta,
+            action_state.deferred_meter_delta.morale_delta,
+            action_state.deferred_meter_delta.work_efficiency_delta});
 }
 
 void emit_site_action_failed(
@@ -1054,9 +1071,8 @@ void begin_action_execution(
         action_state.action_kind == ActionKind::Craft && action_state.secondary_subject_id != 0U
         ? find_craft_recipe_def(RecipeId {action_state.secondary_subject_id})
         : nullptr;
-    emit_worker_meter_cost_request(
+    action_state.deferred_meter_delta = resolve_worker_meter_cost_delta(
         context,
-        action_state.current_action_id->value,
         action_state.action_kind,
         action_state.quantity,
         craft_recipe);
@@ -2178,6 +2194,7 @@ void ActionExecutionSystem::run(SiteSystemContext<ActionExecutionSystem>& contex
     }
 
     emit_site_action_completed(context.message_queue, action_state);
+    emit_deferred_worker_meter_cost_request(context.message_queue, action_state);
     emit_action_fact_messages(context.message_queue, action_state);
     emit_placement_reservation_released(context.message_queue, action_state);
     const bool reactivated_placement_mode =
