@@ -275,6 +275,17 @@ Implemented behavior coverage should verify:
 - Missing listings return `NOT_FOUND`.
 - Wrong listing kinds or insufficient funds/quantity return invalid-state
   failures.
+- Contractor hire backend coverage stays in place even while the current phone-panel projection hides contractor listings from the player-facing UI.
+
+### `phone_panel`
+
+Implemented behavior coverage should verify:
+
+- `SiteRunStarted` seeds the home snapshot counts and listings for the current site.
+- Projected phone listings omit frozen contractor offers while still surfacing direct-purchase unlockables and dynamic sell listings.
+- Section requests switch authoritative phone app state for the existing home, task, buy, sell, service, and cart surfaces.
+- Invalid section requests return `INVALID_ARGUMENT`.
+- Projection refresh picks up newly sellable inventory after delivery-crate insertions.
 
 ### `task_board`
 

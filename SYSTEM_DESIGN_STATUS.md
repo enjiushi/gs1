@@ -36,7 +36,7 @@ These areas are defined strongly enough to start module design and runtime-struc
 - Terrain meters and plant meters
 - Weather, hazard, harsh-event, and post-event recovery model
 - Worker condition model
-- Player base, containers, water handling, and contractor direction
+- Player base, containers, water handling, and contractor direction, with contractor hiring intentionally hidden in the current phone UI until the assignment/work-pool design is revisited
 - Data-driven item model with runtime item meters
 - Small device roster and device behavior contract
 - China-desert plant roster direction, density model, growth pressure, spread, salinity, and straw checkerboard behavior

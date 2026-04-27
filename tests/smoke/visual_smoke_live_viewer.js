@@ -481,7 +481,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         Tasks: { iconKey: "checklist", light: "#7e8e61", dark: "#4f6140" },
         Buy: { iconKey: "cart", light: "#6d8ea1", dark: "#3f5c6a" },
         Sell: { iconKey: "coins", light: "#b98f58", dark: "#7a592d" },
-        Hire: { iconKey: "userPlus", light: "#a37c93", dark: "#694d60" }
+        Services: { iconKey: "userPlus", light: "#a37c93", dark: "#694d60" }
     };
     const structureCatalog = {
         201: { name: "Camp Stove", shortName: "Stove", slotCount: 6 },
@@ -5500,7 +5500,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             setPhoneHeader("Sell", "");
             break;
         case "HIRE":
-            setPhoneHeader("Hire", "");
+            setPhoneHeader("Services", "");
             break;
         case "CART":
             setPhoneHeader("Cart", "Review the delivery order before checkout. Back returns to Buy.");
@@ -5547,7 +5547,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         );
         appGrid.appendChild(
             makePhoneAppLauncher(
-                "Hire",
+                "Services",
                 function () {
                     postPhonePanelSection("HIRE").catch(() => {
                         statusChip.textContent = "Failed to switch phone panel section.";
@@ -5623,7 +5623,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         );
     }
 
-    function appendPhoneHirePanel(container, state, specialListings, serviceListingCount) {
+    function appendPhoneServicePanel(container, state, specialListings, serviceListingCount) {
         appendPhonePanelToolbar(container, [makePhoneBackButton("HOME")]);
         appendPhoneListingSection(
             container,
@@ -5703,7 +5703,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             appendPhoneSellPanel(phoneScreenBody, state, sellListings, sellListingCount);
             break;
         case "HIRE":
-            appendPhoneHirePanel(phoneScreenBody, state, specialListings, serviceListingCount);
+            appendPhoneServicePanel(phoneScreenBody, state, specialListings, serviceListingCount);
             break;
         case "CART":
             appendPhoneCartPanel(phoneScreenBody, state);

@@ -153,7 +153,8 @@ void build_projected_listings(
 
     for (const auto& listing : economy.available_phone_listings)
     {
-        if (listing.kind == PhoneListingKind::SellItem)
+        if (listing.kind == PhoneListingKind::SellItem ||
+            listing.kind == PhoneListingKind::HireContractor)
         {
             continue;
         }
