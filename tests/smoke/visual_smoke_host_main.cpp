@@ -3,11 +3,14 @@
 #include "smoke_live_http_server.h"
 #include "smoke_log.h"
 
+#include <algorithm>
 #include <cassert>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
+#include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <Windows.h>
 #include <mmsystem.h>
 #include <mutex>
@@ -62,6 +65,25 @@ private:
     UINT period_milliseconds_ {0U};
     bool active_ {false};
 };
+
+double duration_milliseconds(std::chrono::steady_clock::duration duration) noexcept
+{
+    return std::chrono::duration<double, std::milli>(duration).count();
+}
+
+std::string build_frame_perf_json(
+    std::uint64_t frame_number,
+    double visual_host_ms,
+    double gameplay_dll_ms)
+{
+    std::ostringstream stream {};
+    stream << std::fixed << std::setprecision(3);
+    stream << "{\"frameNumber\":" << frame_number
+           << ",\"visualHostMs\":" << visual_host_ms
+           << ",\"gameplayDllMs\":" << gameplay_dll_ms
+           << "}";
+    return stream.str();
+}
 
 std::optional<std::string> extract_string_field(const std::string& body, const char* key)
 {
@@ -449,12 +471,26 @@ void run_live_mode(
                 site_control_snapshot.world_move_z);
         }
         session.host.update(k_frame_delta_seconds);
+        const auto frame_active_end = std::chrono::steady_clock::now();
+        const auto frame_timing = session.host.last_frame_timing();
+        const double gameplay_dll_ms =
+            std::chrono::duration<double, std::milli>(std::chrono::duration<double>(
+                frame_timing.gameplay_dll_seconds))
+                .count();
+        const double frame_active_ms = duration_milliseconds(frame_active_end - frame_start);
+        const double visual_host_ms =
+            frame_active_ms > gameplay_dll_ms ? (frame_active_ms - gameplay_dll_ms) : 0.0;
+        const auto perf_event = build_frame_perf_json(
+            session.host.frame_number(),
+            visual_host_ms,
+            gameplay_dll_ms);
         pending_patches = session.host.consume_pending_live_state_patches();
 
         for (const auto& patch : pending_patches)
         {
             server.publish_event("state-patch", patch);
         }
+        server.publish_event("frame-perf", perf_event);
 
         std::this_thread::sleep_until(frame_start + k_frame_time);
     }

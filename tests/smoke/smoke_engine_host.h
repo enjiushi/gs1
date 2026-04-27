@@ -21,6 +21,13 @@ public:
         ActivityOnly = 1
     };
 
+    struct FrameTimingSnapshot final
+    {
+        double total_update_seconds {0.0};
+        double host_update_seconds {0.0};
+        double gameplay_dll_seconds {0.0};
+    };
+
     enum LiveStatePatchField : std::uint32_t
     {
         LiveStatePatchField_None = 0U,
@@ -86,6 +93,7 @@ public:
         return phase2_processed_host_event_count_;
     }
     [[nodiscard]] std::uint64_t frame_number() const noexcept { return frame_number_; }
+    [[nodiscard]] FrameTimingSnapshot last_frame_timing() const noexcept { return last_frame_timing_; }
     [[nodiscard]] std::optional<Gs1AppState> current_app_state() const noexcept { return current_app_state_; }
     [[nodiscard]] std::optional<std::uint32_t> selected_site_id() const noexcept { return selected_site_id_; }
 
@@ -494,6 +502,8 @@ private:
     std::uint32_t phase1_processed_host_event_count_ {0};
     std::uint32_t phase2_processed_host_event_count_ {0};
     std::uint64_t frame_number_ {0};
+    double current_frame_gameplay_dll_seconds_ {0.0};
+    FrameTimingSnapshot last_frame_timing_ {};
     std::optional<Gs1AppState> current_app_state_ {};
     std::optional<std::uint32_t> selected_site_id_ {};
     std::optional<SmokeScriptDirective> inflight_script_directive_ {};
