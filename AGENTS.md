@@ -21,7 +21,7 @@ This file is a quick orientation guide for agents working in this repository.
 - `src/`: Gameplay/runtime implementation code grouped by ownership domain. Read `src/guideline.md` before drilling deeper.
 - `tests/`: Runtime, smoke, and system test code plus scripted/system-test assets, including the visual smoke viewer-side FPS readout. Read `tests/guideline.md` before drilling deeper.
 - `third_party/`: Vendored external dependencies. Read `third_party/guideline.md` before drilling deeper.
-- `CMakeLists.txt`: Builds the gameplay DLL plus the smoke, visual smoke, smoke-host threading regression, runtime-test, and system-test executables, including the campaign faction-reputation and technology sources plus the owner-specific plant/device weather contribution systems used by runtime/UI coverage.
+- `CMakeLists.txt`: Builds the gameplay DLL plus the smoke, visual smoke, smoke-host threading regression, runtime-test, and system-test executables, now centralizing shared runtime and smoke compilation in reusable static libraries with an internal precompiled-header path so Flecs/content-heavy code is compiled once and reused across targets, while the standalone system-test host links source-authored system tests directly instead of compiling them into the normal gameplay DLL build, all while still including the campaign faction-reputation and technology sources plus the owner-specific plant/device weather contribution systems used by runtime/UI coverage.
 - `launch_visual_game.ps1`: Convenience wrapper for the visual smoke host that forwards PowerShell `-Verbose` into host-side verbose logging.
 - `include/gs1/export.h`: Public DLL export/import macros.
 - `include/gs1/game_api.h`: C ABI entry points exposed by the gameplay DLL.

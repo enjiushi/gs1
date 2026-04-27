@@ -15,7 +15,6 @@ param(
 $repoRoot = Get-RepoRoot
 $buildPath = Resolve-RepoPath -Path $BuildDir -RepoRoot $repoRoot
 $hostExePath = Join-Path $buildPath "$Configuration\gs1_system_test_host.exe"
-$dllPath = Join-Path $buildPath "$Configuration\gs1_game.dll"
 $resolvedAssetDir = Resolve-RepoPath -Path $AssetDir -RepoRoot $repoRoot
 
 if ($BuildFirst) {
@@ -33,11 +32,7 @@ if (!(Test-Path $hostExePath)) {
     throw "System test host executable not found: $hostExePath"
 }
 
-if (!(Test-Path $dllPath)) {
-    throw "Gameplay DLL not found: $dllPath"
-}
-
-$arguments = @($dllPath, "--asset-dir", $resolvedAssetDir)
+$arguments = @("--asset-dir", $resolvedAssetDir)
 
 if ($List) {
     $arguments += "--list"

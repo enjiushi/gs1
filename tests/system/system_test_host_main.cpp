@@ -1,5 +1,5 @@
-#include "runtime_dll_loader.h"
 #include "testing/system_test_asset.h"
+#include "testing/system_test_registry.h"
 
 #include <filesystem>
 #include <iostream>
@@ -30,8 +30,8 @@ struct DiscoveredSystemTestCase final
 
 struct HostOptions final
 {
-    std::filesystem::path dll_path {};
     std::filesystem::path asset_dir {};
+    std::filesystem::path legacy_dll_path {};
     std::vector<std::string> system_filters {};
     std::vector<std::filesystem::path> explicit_assets {};
     bool list_only {false};
@@ -104,7 +104,7 @@ const char* status_text(Gs1Status status)
 void print_usage()
 {
     std::cout
-        << "Usage: gs1_system_test_host [dll_path] [options]\n"
+        << "Usage: gs1_system_test_host [options]\n"
         << "Options:\n"
         << "  --list                 List discovered system tests without running them.\n"
         << "  --all                  Run all discovered tests (default).\n"
@@ -120,10 +120,9 @@ bool parse_arguments(int argc, char** argv, HostOptions& out_options, std::strin
     out_error.clear();
 
     const std::filesystem::path repo_root = std::filesystem::current_path();
-    out_options.dll_path = repo_root / "build" / "Debug" / "gs1_game.dll";
     out_options.asset_dir = repo_root / "tests" / "system" / "assets";
 
-    bool saw_dll_path = false;
+    bool saw_legacy_dll_path = false;
 
     for (int index = 1; index < argc; ++index)
     {
@@ -177,14 +176,14 @@ bool parse_arguments(int argc, char** argv, HostOptions& out_options, std::strin
             return false;
         }
 
-        if (saw_dll_path)
+        if (saw_legacy_dll_path)
         {
-            out_error = "Only one positional DLL path is supported.";
+            out_error = "Only one positional legacy DLL path is supported.";
             return false;
         }
 
-        out_options.dll_path = std::filesystem::path(argument);
-        saw_dll_path = true;
+        out_options.legacy_dll_path = std::filesystem::path(argument);
+        saw_legacy_dll_path = true;
     }
 
     return true;
@@ -209,35 +208,23 @@ bool matches_filters(const HostOptions& options, const DiscoveredSystemTestCase&
     return false;
 }
 
-std::vector<DiscoveredSystemTestCase> discover_source_system_tests(
-    const Gs1RuntimeApi& api,
-    std::vector<std::string>& out_errors)
+std::vector<DiscoveredSystemTestCase> discover_source_system_tests()
 {
     std::vector<DiscoveredSystemTestCase> discovered {};
-    out_errors.clear();
+    const auto tests = gs1::testing::registered_source_system_tests();
+    discovered.reserve(tests.size());
 
-    const std::uint32_t test_count = api.get_system_test_case_count();
-    for (std::uint32_t index = 0U; index < test_count; ++index)
+    for (std::uint32_t index = 0U; index < tests.size(); ++index)
     {
-        Gs1SystemTestCaseInfo info {};
-        info.struct_size = sizeof(Gs1SystemTestCaseInfo);
-
-        const Gs1Status status = api.get_system_test_case_info(index, &info);
-        if (status != GS1_STATUS_OK)
-        {
-            out_errors.push_back(
-                "Failed to query source system test case index " + std::to_string(index) +
-                ": " + status_text(status));
-            continue;
-        }
-
+        const auto& registered = tests[index];
         DiscoveredSystemTestCase test_case {};
         test_case.kind = DiscoveredSystemTestKind::SourceCode;
-        test_case.system_name = info.system_name != nullptr ? info.system_name : "";
-        test_case.test_name = info.test_name != nullptr ? info.test_name : "";
+        test_case.system_name = registered.system_name != nullptr ? registered.system_name : "";
+        test_case.test_name = registered.test_name != nullptr ? registered.test_name : "";
         test_case.source_index = index;
         test_case.origin_text =
-            std::string(info.source_path != nullptr ? info.source_path : "") + ":" + std::to_string(info.source_line);
+            std::string(registered.source_path != nullptr ? registered.source_path : "") +
+            ":" + std::to_string(registered.source_line);
         discovered.push_back(std::move(test_case));
     }
 
@@ -348,38 +335,18 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    RuntimeDllLoader loader {};
-    if (!loader.load(options.dll_path.c_str()))
-    {
-        std::cerr << loader.last_error() << "\n";
-        return 1;
-    }
-
-    const auto& api = loader.api();
-    if (api.get_system_test_api_version() != 1U)
-    {
-        std::cerr << "Unsupported system test API version: " << api.get_system_test_api_version() << "\n";
-        return 1;
-    }
-
-    std::vector<std::string> source_errors {};
     std::vector<std::string> asset_errors {};
-    std::vector<DiscoveredSystemTestCase> discovered = discover_source_system_tests(api, source_errors);
+    std::vector<DiscoveredSystemTestCase> discovered = discover_source_system_tests();
 
     std::vector<DiscoveredSystemTestCase> asset_tests = discover_asset_system_tests(options, asset_errors);
     discovered.insert(discovered.end(), asset_tests.begin(), asset_tests.end());
-
-    for (const std::string& error : source_errors)
-    {
-        std::cerr << error << "\n";
-    }
 
     for (const std::string& error : asset_errors)
     {
         std::cerr << error << "\n";
     }
 
-    if (!source_errors.empty() || !asset_errors.empty())
+    if (!asset_errors.empty())
     {
         return 1;
     }
@@ -425,12 +392,12 @@ int main(int argc, char** argv)
         Gs1Status status = GS1_STATUS_INTERNAL_ERROR;
         if (test_case.kind == DiscoveredSystemTestKind::SourceCode)
         {
-            status = api.run_system_test_case(test_case.source_index, &result);
+            status = gs1::testing::run_registered_source_system_test_case(test_case.source_index, result);
         }
         else
         {
             const std::string asset_path_utf8 = utf8_from_path(test_case.asset_path);
-            status = api.run_system_test_asset_file(asset_path_utf8.c_str(), &result);
+            status = gs1::testing::run_system_test_asset_file(asset_path_utf8.c_str(), result);
         }
 
         if (status != GS1_STATUS_OK)
