@@ -132,12 +132,11 @@ bool same_listing_vector(
 
 PhoneListingState make_sell_listing(ItemId item_id, std::uint32_t quantity) noexcept
 {
-    const auto* item_def = find_item_def(item_id);
     return PhoneListingState {
         PhoneListingKind::SellItem,
         item_id,
         make_sell_listing_id(item_id),
-        item_def == nullptr ? 0 : item_def->sell_price,
+        static_cast<std::int32_t>(item_sell_price_cash_points(item_id)),
         quantity,
         0U,
         true};

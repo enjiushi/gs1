@@ -60,6 +60,34 @@ inline constexpr float k_unlock_step_plant_pool = 10.0f;
     return static_cast<float>(internal_cash_points) * 0.125f;
 }
 
+[[nodiscard]] bool item_has_player_meter_valuation(const ItemDef& item_def) noexcept
+{
+    return item_def.health_delta != 0.0f ||
+        item_def.hydration_delta != 0.0f ||
+        item_def.nourishment_delta != 0.0f ||
+        item_def.energy_delta != 0.0f ||
+        item_def.morale_delta != 0.0f;
+}
+
+[[nodiscard]] std::uint32_t resolved_item_cash_points_for_validation(
+    const ContentDatabase& content,
+    const ItemDef& item_def) noexcept
+{
+    const auto& meter_cash_points = content.gameplay_tuning.player_meter_cash_points;
+    const double derived_value =
+        static_cast<double>(item_def.health_delta) * static_cast<double>(meter_cash_points.health_per_point) +
+        static_cast<double>(item_def.hydration_delta) * static_cast<double>(meter_cash_points.hydration_per_point) +
+        static_cast<double>(item_def.nourishment_delta) * static_cast<double>(meter_cash_points.nourishment_per_point) +
+        static_cast<double>(item_def.energy_delta) * static_cast<double>(meter_cash_points.energy_per_point) +
+        static_cast<double>(item_def.morale_delta) * static_cast<double>(meter_cash_points.morale_per_point);
+    if (derived_value > 0.0)
+    {
+        return static_cast<std::uint32_t>(std::lround(derived_value));
+    }
+
+    return item_def.internal_price_cash_points;
+}
+
 [[nodiscard]] std::unordered_map<std::uint32_t, float> build_expected_plant_pool_targets(
     const ContentDatabase& content)
 {
@@ -217,6 +245,8 @@ std::vector<ContentValidationIssue> validate_content_database(
 
         const auto& harvest_item =
             content.item_defs.at(content.index.item_by_id.at(plant_def.harvest_item_id.value));
+        const auto harvest_item_cash_points =
+            resolved_item_cash_points_for_validation(content, harvest_item);
         if (harvest_item.source_rule != ItemSourceRule::HarvestOnly ||
             (harvest_item.linked_plant_id.value != 0U &&
                 harvest_item.linked_plant_id != plant_def.plant_id))
@@ -229,7 +259,7 @@ std::vector<ContentValidationIssue> validate_content_database(
 
         if (plant_def.output_power <= 0.0f ||
             plant_def.output_power >
-                max_output_power_for_item_value(harvest_item.internal_price_cash_points))
+                max_output_power_for_item_value(harvest_item_cash_points))
         {
             issues.push_back(ContentValidationIssue {
                 ContentValidationSeverity::Error,
@@ -289,11 +319,13 @@ std::vector<ContentValidationIssue> validate_content_database(
 
     for (const auto& item_def : content.item_defs)
     {
-        if (item_def.internal_price_cash_points == 0U)
+        const auto resolved_cash_points =
+            resolved_item_cash_points_for_validation(content, item_def);
+        if (resolved_cash_points == 0U)
         {
             issues.push_back(ContentValidationIssue {
                 ContentValidationSeverity::Error,
-                "Item definitions must author a positive internal cash-point value."});
+                "Item definitions must resolve to a positive internal cash-point value through authored fallback pricing or shared player-meter valuation."});
             break;
         }
 
@@ -327,6 +359,24 @@ std::vector<ContentValidationIssue> validate_content_database(
                     "Excavation-only items must remain non-consumable sell-only merchandise with no linked plant or structure."});
                 break;
             }
+        }
+
+        if (item_has_player_meter_valuation(item_def) &&
+            item_def.internal_price_cash_points != 0U)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Meter-valued item definitions should omit fallback internal cash-point authoring and derive value from the shared player-meter cash-point tuning instead."});
+            break;
+        }
+
+        if (!item_has_player_meter_valuation(item_def) &&
+            item_def.internal_price_cash_points == 0U)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Items without player-meter valuation must author internal_price_cash_points so item buy/sell pricing can derive from a single internal value."});
+            break;
         }
     }
 
@@ -832,6 +882,18 @@ std::vector<ContentValidationIssue> validate_content_database(
             issues.push_back(ContentValidationIssue {
                 ContentValidationSeverity::Error,
                 "Gameplay tuning worker-condition sheltered exposure scale must stay in the 0-1 range."});
+        }
+        else if (tuning.player_meter_cash_points.health_per_point <= 0.0f ||
+            tuning.player_meter_cash_points.hydration_per_point <= 0.0f ||
+            tuning.player_meter_cash_points.nourishment_per_point <= 0.0f ||
+            tuning.player_meter_cash_points.energy_per_point <= 0.0f ||
+            tuning.player_meter_cash_points.morale_per_point <= 0.0f ||
+            tuning.player_meter_cash_points.buy_price_multiplier <= 0.0f ||
+            tuning.player_meter_cash_points.sell_price_multiplier <= 0.0f)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Gameplay tuning player-meter internal cash-point values and item buy/sell multipliers must stay positive."});
         }
         else if (tuning.modifier_system.modifier_channel_limit <= 0.0f ||
             tuning.modifier_system.factor_weight_limit <= 0.0f ||

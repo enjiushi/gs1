@@ -53,13 +53,15 @@ PhoneListingState make_item_listing(
     std::uint32_t quantity) noexcept
 {
     const auto* item_def = find_item_def(item_id);
+    const auto item_price_cash_points =
+        kind == PhoneListingKind::SellItem
+        ? item_sell_price_cash_points(item_id)
+        : item_buy_price_cash_points(item_id);
     return PhoneListingState {
         kind,
         item_id,
         listing_id,
-        item_def == nullptr
-            ? 0
-            : (kind == PhoneListingKind::SellItem ? item_def->sell_price : item_def->buy_price),
+        item_def == nullptr ? 0 : static_cast<std::int32_t>(item_price_cash_points),
         quantity,
         0U,
         true};
@@ -782,7 +784,7 @@ void append_seed_phone_listing(
             ItemId {listing_content.item_or_unlockable_id},
             listing_content.listing_id,
             listing_content.kind == PhoneListingKind::PurchaseUnlockable
-                ? cash_from_cash_points(listing_content.internal_price_cash_points)
+                ? static_cast<std::int32_t>(listing_content.internal_price_cash_points)
                 : listing_content.price,
             listing_content.quantity,
             0U,

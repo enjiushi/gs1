@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 namespace gs1
 {
 struct WorkerConditionTuning final
@@ -34,6 +36,17 @@ struct WorkerConditionTuning final
     float factor_min {0.0f};
     float factor_max {4.0f};
     float sheltered_exposure_scale {0.35f};
+};
+
+struct PlayerMeterCashPointTuning final
+{
+    float health_per_point {50.0f};
+    float hydration_per_point {10.0f};
+    float nourishment_per_point {25.0f};
+    float energy_per_point {1.0f};
+    float morale_per_point {35.0f};
+    float buy_price_multiplier {1.1f};
+    float sell_price_multiplier {0.9f};
 };
 
 struct EcologyTuning final
@@ -105,6 +118,7 @@ struct CampDurabilityTuning final
 struct GameplayTuningDef final
 {
     WorkerConditionTuning worker_condition {};
+    PlayerMeterCashPointTuning player_meter_cash_points {};
     EcologyTuning ecology {};
     ModifierSystemTuning modifier_system {};
     DeviceSupportTuning device_support {};
@@ -112,4 +126,22 @@ struct GameplayTuningDef final
 };
 
 [[nodiscard]] const GameplayTuningDef& gameplay_tuning_def() noexcept;
+[[nodiscard]] double player_meter_cash_point_value(
+    float health_delta,
+    float hydration_delta,
+    float nourishment_delta,
+    float energy_delta,
+    float morale_delta) noexcept;
+[[nodiscard]] std::uint32_t player_meter_gain_internal_cash_points(
+    float health_delta,
+    float hydration_delta,
+    float nourishment_delta,
+    float energy_delta,
+    float morale_delta) noexcept;
+[[nodiscard]] std::uint32_t player_meter_cost_internal_cash_points(
+    float health_cost,
+    float hydration_cost,
+    float nourishment_cost,
+    float energy_cost,
+    float morale_cost) noexcept;
 }  // namespace gs1

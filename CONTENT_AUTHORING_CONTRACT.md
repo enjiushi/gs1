@@ -50,7 +50,7 @@ All authored content rows in this document should follow these shared rules:
 | Optional fields | Optional fields should be absent or null when unused, not filled with fake placeholder ids. |
 | Positive authored counts | `targetAmount`, fixed reward amounts, duration mins, duration maxes, and authored export counts must all be positive when present. |
 | Reference validity | Any referenced `factionId`, `itemId`, `unlockableId`, `modifierId`, `taskTemplateId`, `eventArchetypeId`, or tech id must resolve to a real row. |
-| Internal cash points | Any authored row that uses hidden valuation should author `internalCashPoint`-style values in whole `100`-point steps so player-facing cash stays integral. |
+| Internal cash points | Any authored row that uses hidden valuation should either author `internalCashPoint`-style values directly or derive them from shared authored meter cash-point tuning; rows that still surface player-facing cash should keep that visible cash integral where required. |
 | Onboarding separation | Authored onboarding-only content must be explicitly flagged so the normal generator cannot surface it in the repeatable runtime pools. |
 | Prototype-first simplicity | If a row can be expressed through one existing shared content family, do not add a new one-off schema just for one prototype case. |
 
@@ -87,6 +87,8 @@ Required item authoring rules:
 - authored item source rules should distinguish at least `BuyOnly`, `CraftOnly`, `BuyOrCraft`, `HarvestOnly`, and `ExcavationOnly`
 - authored stack size is the hard cap for one runtime item stack
 - item-level internal cash-point values remain the hidden valuation source for reward and task scoring even when the player only sees normal cash prices
+- consumable item rows with player-meter refill should derive that hidden valuation from shared authored player-meter cash-point tuning instead of duplicating per-item internal cash-point authoring
+- non-meter goods may still author fallback internal cash-point values when no player-meter-derived valuation path exists yet
 
 Economy valuation clarification:
 

@@ -23,7 +23,7 @@ struct RewardCandidateDef final
 {
     RewardCandidateId reward_candidate_id {};
     RewardEffectKind effect_kind {RewardEffectKind::None};
-    std::int32_t money_delta {0};
+    std::int32_t money_delta_cash_points {0};
     ItemId item_id {};
     std::uint32_t quantity {0};
     std::uint32_t unlockable_id {0};

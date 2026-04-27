@@ -33,6 +33,7 @@ struct HostOptions final
     std::filesystem::path asset_dir {};
     std::filesystem::path legacy_dll_path {};
     std::vector<std::string> system_filters {};
+    std::vector<std::string> name_filters {};
     std::vector<std::filesystem::path> explicit_assets {};
     bool list_only {false};
     bool help_requested {false};
@@ -109,6 +110,7 @@ void print_usage()
         << "  --list                 List discovered system tests without running them.\n"
         << "  --all                  Run all discovered tests (default).\n"
         << "  --system <name>        Limit execution to one system. Repeat to include more systems.\n"
+        << "  --name <text>          Limit execution to tests whose full label contains the text.\n"
         << "  --asset-dir <path>     Override the default asset discovery directory.\n"
         << "  --asset <path>         Include a specific asset test file. Repeat as needed.\n"
         << "  --help                 Print this message.\n";
@@ -145,7 +147,7 @@ bool parse_arguments(int argc, char** argv, HostOptions& out_options, std::strin
             continue;
         }
 
-        if (argument == "--system" || argument == "--asset-dir" || argument == "--asset")
+        if (argument == "--system" || argument == "--name" || argument == "--asset-dir" || argument == "--asset")
         {
             if (index + 1 >= argc)
             {
@@ -157,6 +159,10 @@ bool parse_arguments(int argc, char** argv, HostOptions& out_options, std::strin
             if (argument == "--system")
             {
                 out_options.system_filters.push_back(lowercase_ascii_copy(value));
+            }
+            else if (argument == "--name")
+            {
+                out_options.name_filters.push_back(lowercase_ascii_copy(value));
             }
             else if (argument == "--asset-dir")
             {
@@ -191,21 +197,45 @@ bool parse_arguments(int argc, char** argv, HostOptions& out_options, std::strin
 
 bool matches_filters(const HostOptions& options, const DiscoveredSystemTestCase& test_case)
 {
-    if (options.system_filters.empty())
+    if (!options.system_filters.empty())
     {
-        return true;
-    }
-
-    const std::string normalized_system_name = lowercase_ascii_copy(test_case.system_name);
-    for (const std::string& filter : options.system_filters)
-    {
-        if (filter == normalized_system_name)
+        const std::string normalized_system_name = lowercase_ascii_copy(test_case.system_name);
+        bool matched_system = false;
+        for (const std::string& filter : options.system_filters)
         {
-            return true;
+            if (filter == normalized_system_name)
+            {
+                matched_system = true;
+                break;
+            }
+        }
+
+        if (!matched_system)
+        {
+            return false;
         }
     }
 
-    return false;
+    if (!options.name_filters.empty())
+    {
+        const std::string normalized_label = lowercase_ascii_copy(system_test_label(test_case));
+        bool matched_name = false;
+        for (const std::string& filter : options.name_filters)
+        {
+            if (normalized_label.find(filter) != std::string::npos)
+            {
+                matched_name = true;
+                break;
+            }
+        }
+
+        if (!matched_name)
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 std::vector<DiscoveredSystemTestCase> discover_source_system_tests()
@@ -368,7 +398,7 @@ int main(int argc, char** argv)
 
     if (selected.empty())
     {
-        if (!options.system_filters.empty() || !options.explicit_assets.empty())
+        if (!options.system_filters.empty() || !options.name_filters.empty() || !options.explicit_assets.empty())
         {
             std::cerr << "No system tests matched the requested filters.\n";
             return 1;
@@ -384,7 +414,7 @@ int main(int argc, char** argv)
 
     for (const auto& test_case : selected)
     {
-        std::cout << "RUN  " << system_test_label(test_case) << " [" << kind_text(test_case.kind) << "]\n";
+        std::cout << "RUN  " << system_test_label(test_case) << " [" << kind_text(test_case.kind) << "]\n" << std::flush;
 
         Gs1SystemTestRunResult result {};
         result.struct_size = sizeof(Gs1SystemTestRunResult);
@@ -408,7 +438,7 @@ int main(int argc, char** argv)
             {
                 std::cout << "  " << result.message;
             }
-            std::cout << "\n";
+            std::cout << "\n" << std::flush;
             continue;
         }
 
@@ -422,21 +452,21 @@ int main(int argc, char** argv)
             {
                 std::cout << "  " << result.message;
             }
-            std::cout << "\n";
+            std::cout << "\n" << std::flush;
             continue;
         }
 
         passed_count += 1U;
         std::cout << "PASS " << system_test_label(test_case)
                   << " assertions=" << result.assertion_count
-                  << " elapsed_ms=" << result.elapsed_milliseconds << "\n";
+                  << " elapsed_ms=" << result.elapsed_milliseconds << "\n" << std::flush;
     }
 
     std::cout << "\nExecuted " << selected.size()
               << " system test(s): "
               << passed_count << " passed, "
               << failed_count << " failed, "
-              << error_count << " errors.\n";
+              << error_count << " errors.\n" << std::flush;
 
     return (failed_count == 0U && error_count == 0U) ? 0 : 1;
 }

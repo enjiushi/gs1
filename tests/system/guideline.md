@@ -11,4 +11,4 @@ Standalone system-test framework that mixes source-authored tests and asset-auth
 - `README.md`: Overview of the system-test framework layout and entry points.
 - `assets/`: Asset-authored `.gs1systemtest` regression packs discovered at runtime.
 - `source/`: Source-authored system tests compiled directly into the standalone host, including harvest-action, harvested-output, and excavation-action regressions plus faction-tech base/enhancement progression coverage.
-- `system_test_host_main.cpp`: Standalone system-test host entry point that discovers and runs linked source tests plus asset-driven regressions without routing through the gameplay DLL.
+- `system_test_host_main.cpp`: Standalone system-test host entry point that discovers and runs linked source tests plus asset-driven regressions without routing through the gameplay DLL, now supporting both `--system` and substring-based `--name` filters for narrower verification runs.

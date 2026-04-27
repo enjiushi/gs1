@@ -3,7 +3,6 @@ site_id = 1
 listing_id = 1
 listing_kind = "BuyItem"
 item_or_unlockable_id = 1
-price = 0
 quantity = 6
 
 [[phone_listings]]
@@ -11,7 +10,6 @@ site_id = 1
 listing_id = 2
 listing_kind = "BuyItem"
 item_or_unlockable_id = 2
-price = 0
 quantity = 5
 
 [[phone_listings]]
@@ -19,7 +17,6 @@ site_id = 1
 listing_id = 3
 listing_kind = "BuyItem"
 item_or_unlockable_id = 3
-price = 0
 quantity = 4
 
 [[phone_listings]]
@@ -27,7 +24,6 @@ site_id = 1
 listing_id = 4
 listing_kind = "BuyItem"
 item_or_unlockable_id = 4
-price = 0
 quantity = 10
 
 [[phone_listings]]
@@ -35,7 +31,6 @@ site_id = 1
 listing_id = 5
 listing_kind = "BuyItem"
 item_or_unlockable_id = 5
-price = 0
 quantity = 8
 
 [[phone_listings]]
@@ -43,7 +38,6 @@ site_id = 1
 listing_id = 6
 listing_kind = "BuyItem"
 item_or_unlockable_id = 6
-price = 0
 quantity = 8
 
 [[phone_listings]]
@@ -51,7 +45,6 @@ site_id = 1
 listing_id = 7
 listing_kind = "BuyItem"
 item_or_unlockable_id = 7
-price = 0
 quantity = 6
 
 [[phone_listings]]
@@ -59,7 +52,6 @@ site_id = 1
 listing_id = 8
 listing_kind = "BuyItem"
 item_or_unlockable_id = 8
-price = 0
 quantity = 12
 
 [[phone_listings]]
@@ -67,7 +59,6 @@ site_id = 1
 listing_id = 9
 listing_kind = "BuyItem"
 item_or_unlockable_id = 9
-price = 0
 quantity = 10
 
 [[phone_listings]]
@@ -91,7 +82,6 @@ site_id = 1
 listing_id = 12
 listing_kind = "BuyItem"
 item_or_unlockable_id = 16
-price = 0
 quantity = 8
 
 [[phone_listings]]
@@ -99,7 +89,6 @@ site_id = 1
 listing_id = 13
 listing_kind = "BuyItem"
 item_or_unlockable_id = 17
-price = 0
 quantity = 8
 
 [[phone_listings]]
@@ -107,7 +96,6 @@ site_id = 1
 listing_id = 14
 listing_kind = "BuyItem"
 item_or_unlockable_id = 18
-price = 0
 quantity = 6
 
 [[phone_listings]]
@@ -115,7 +103,6 @@ site_id = 1
 listing_id = 15
 listing_kind = "BuyItem"
 item_or_unlockable_id = 19
-price = 0
 quantity = 6
 
 [[phone_listings]]
@@ -123,7 +110,6 @@ site_id = 1
 listing_id = 16
 listing_kind = "BuyItem"
 item_or_unlockable_id = 20
-price = 0
 quantity = 4
 
 [[phone_listings]]
@@ -131,5 +117,4 @@ site_id = 1
 listing_id = 17
 listing_kind = "BuyItem"
 item_or_unlockable_id = 15
-price = 0
 quantity = 8

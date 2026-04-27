@@ -1,4 +1,5 @@
 #include "messages/game_message.h"
+#include "content/defs/gameplay_tuning_defs.h"
 #include "content/defs/plant_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/faction_defs.h"
@@ -16,6 +17,7 @@
 #include "site/systems/plant_weather_contribution_system.h"
 #include "site/systems/task_board_system.h"
 #include "site/systems/worker_condition_system.h"
+#include "support/currency.h"
 #include "testing/system_test_registry.h"
 #include "system_test_fixtures.h"
 
@@ -879,14 +881,14 @@ void economy_site_run_started_seeds_site_one_and_resets_other_sites(
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         EconomyPhoneSystem::process_message(site_one_context, started_one) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, site_one_run.economy.money == 45);
+    GS1_SYSTEM_TEST_CHECK(context, site_one_run.economy.money == gs1::cash_points_from_cash(45));
     GS1_SYSTEM_TEST_CHECK(context, site_one_run.economy.available_phone_listings.size() >= 9U);
     GS1_SYSTEM_TEST_CHECK(context, site_one_run.economy.direct_purchase_unlockable_ids.size() == 1U);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         EconomyPhoneSystem::process_message(other_context, started_two) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, other_site_run.economy.money == 45);
+    GS1_SYSTEM_TEST_CHECK(context, other_site_run.economy.money == gs1::cash_points_from_cash(45));
     GS1_SYSTEM_TEST_CHECK(context, other_site_run.economy.available_phone_listings.empty());
 }
 
@@ -919,7 +921,7 @@ void economy_purchase_sell_hire_and_unlockable_paths_update_money(
             make_message(
                 GameMessageType::PhoneListingPurchaseRequested,
                 gs1::PhoneListingPurchaseRequestedMessage {1U, 2U, 0U})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 30);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 3560);
     GS1_SYSTEM_TEST_REQUIRE(context, find_listing_by_id(site_run.economy, 1U) != nullptr);
     GS1_SYSTEM_TEST_CHECK(context, find_listing_by_id(site_run.economy, 1U)->quantity == 4U);
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 3U);
@@ -942,7 +944,7 @@ void economy_purchase_sell_hire_and_unlockable_paths_update_money(
             make_message(
                 GameMessageType::PhoneListingSaleRequested,
                 gs1::PhoneListingSaleRequestedMessage {1001U, 2U, 0U})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 36);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 3920);
     GS1_SYSTEM_TEST_REQUIRE(context, find_listing_by_id(site_run.economy, 1001U) != nullptr);
     GS1_SYSTEM_TEST_CHECK(context, find_listing_by_id(site_run.economy, 1001U)->quantity == 0U);
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 3U);
@@ -961,7 +963,7 @@ void economy_purchase_sell_hire_and_unlockable_paths_update_money(
             make_message(
                 GameMessageType::ContractorHireRequested,
                 gs1::ContractorHireRequestedMessage {10U, 1U})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 28);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 3120);
     GS1_SYSTEM_TEST_REQUIRE(context, find_listing_by_id(site_run.economy, 10U) != nullptr);
     GS1_SYSTEM_TEST_CHECK(context, find_listing_by_id(site_run.economy, 10U)->quantity == 2U);
 
@@ -972,7 +974,7 @@ void economy_purchase_sell_hire_and_unlockable_paths_update_money(
             make_message(
                 GameMessageType::SiteUnlockablePurchaseRequested,
                 gs1::SiteUnlockablePurchaseRequestedMessage {101U})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 8);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 1120);
     GS1_SYSTEM_TEST_CHECK(context, site_run.economy.direct_purchase_unlockable_ids.empty());
     GS1_SYSTEM_TEST_CHECK(context, site_run.economy.revealed_site_unlockable_ids.size() == 1U);
 }
@@ -1019,7 +1021,7 @@ void economy_cart_checkout_charges_delivery_fee_and_clears_cart(
                 GameMessageType::PhoneCartCheckoutRequested,
                 gs1::PhoneCartCheckoutRequestedMessage {})) == GS1_STATUS_OK);
 
-    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 26);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 3148);
     GS1_SYSTEM_TEST_CHECK(context, find_listing_by_id(site_run.economy, 1U)->quantity == 4U);
     GS1_SYSTEM_TEST_CHECK(context, find_listing_by_id(site_run.economy, 2U)->quantity == 4U);
     GS1_SYSTEM_TEST_CHECK(context, find_listing_by_id(site_run.economy, 1U)->cart_quantity == 0U);
@@ -1057,7 +1059,7 @@ void economy_purchase_listing_unlockable_path_spends_money_and_removes_direct_un
             make_message(
                 GameMessageType::PhoneListingPurchaseRequested,
                 gs1::PhoneListingPurchaseRequestedMessage {11U, 1U, 0U})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 25);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 2500);
     GS1_SYSTEM_TEST_CHECK(context, site_run.economy.direct_purchase_unlockable_ids.empty());
     GS1_SYSTEM_TEST_CHECK(context, site_run.economy.revealed_site_unlockable_ids.size() == 1U);
 }
@@ -1144,7 +1146,7 @@ void economy_repeated_sell_requests_do_not_oversubscribe_inventory(
             make_message(
                 GameMessageType::PhoneListingSaleRequested,
                 gs1::PhoneListingSaleRequestedMessage {1001U, 1U, 0U})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 51);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 4860);
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 6U);
     GS1_SYSTEM_TEST_CHECK(context, queue[0].type == GameMessageType::CampaignCashDeltaRequested);
     GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameMessageType::InventoryGlobalItemConsumeRequested);
@@ -1179,7 +1181,7 @@ void economy_repeated_sell_requests_do_not_oversubscribe_inventory(
             make_message(
                 GameMessageType::PhoneListingSaleRequested,
                 gs1::PhoneListingSaleRequestedMessage {1001U, 1U, 0U})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 51);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 4860);
 }
 
 void economy_repeated_cart_add_requests_clamp_without_failure(
@@ -2011,7 +2013,7 @@ void task_board_content_tuning_exposes_internal_prices_and_task_scoring_inputs(
     const auto* water = gs1::find_item_def(gs1::ItemId {gs1::k_item_water_container});
     GS1_SYSTEM_TEST_REQUIRE(context, water != nullptr);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(water->hydration_delta, 20.0f));
-    GS1_SYSTEM_TEST_CHECK(context, water->internal_price_cash_points == 200U);
+    GS1_SYSTEM_TEST_CHECK(context, water->internal_price_cash_points == 0U);
     GS1_SYSTEM_TEST_CHECK(
         context,
         gs1::item_internal_price_cash_points(gs1::ItemId {gs1::k_item_water_container}) == 200U);
@@ -2020,7 +2022,33 @@ void task_board_content_tuning_exposes_internal_prices_and_task_scoring_inputs(
     GS1_SYSTEM_TEST_REQUIRE(context, food != nullptr);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(food->nourishment_delta, 15.0f));
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(food->energy_delta, 0.0f));
-    GS1_SYSTEM_TEST_CHECK(context, food->internal_price_cash_points == 420U);
+    GS1_SYSTEM_TEST_CHECK(context, food->internal_price_cash_points == 0U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        gs1::item_internal_price_cash_points(gs1::ItemId {gs1::k_item_food_pack}) == 375U);
+
+    const auto* medicine = gs1::find_item_def(gs1::ItemId {gs1::k_item_medicine_pack});
+    GS1_SYSTEM_TEST_REQUIRE(context, medicine != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(medicine->health_delta, 18.0f));
+    GS1_SYSTEM_TEST_CHECK(context, medicine->internal_price_cash_points == 0U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        gs1::item_internal_price_cash_points(gs1::ItemId {gs1::k_item_medicine_pack}) == 900U);
+
+    const auto& meter_cash_points = gs1::gameplay_tuning_def().player_meter_cash_points;
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(meter_cash_points.health_per_point, 50.0f, 0.001f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(meter_cash_points.hydration_per_point, 10.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(meter_cash_points.nourishment_per_point, 25.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(meter_cash_points.energy_per_point, 1.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(meter_cash_points.morale_per_point, 35.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(meter_cash_points.buy_price_multiplier, 1.1f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(meter_cash_points.sell_price_multiplier, 0.9f));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        gs1::item_buy_price_cash_points(gs1::ItemId {gs1::k_item_water_container}) == 220U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        gs1::item_sell_price_cash_points(gs1::ItemId {gs1::k_item_water_container}) == 180U);
 
     const auto* site_content = gs1::find_prototype_site_content(gs1::SiteId {1U});
     GS1_SYSTEM_TEST_REQUIRE(context, site_content != nullptr);
@@ -2035,7 +2063,7 @@ void task_board_content_tuning_exposes_internal_prices_and_task_scoring_inputs(
         found_unlockable_listing = true;
         GS1_SYSTEM_TEST_CHECK(context, listing.kind == gs1::PhoneListingKind::PurchaseUnlockable);
         GS1_SYSTEM_TEST_CHECK(context, listing.internal_price_cash_points == 2000U);
-        GS1_SYSTEM_TEST_CHECK(context, listing.price == 20);
+        GS1_SYSTEM_TEST_CHECK(context, listing.price == 2000);
     }
     GS1_SYSTEM_TEST_CHECK(context, found_unlockable_listing);
 

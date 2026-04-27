@@ -1,6 +1,7 @@
 #include "site/systems/task_board_system.h"
 
 #include "campaign/systems/technology_system.h"
+#include "content/defs/gameplay_tuning_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/plant_defs.h"
 #include "content/defs/reward_defs.h"
@@ -290,6 +291,25 @@ std::uint32_t structure_value_cash_points(StructureId structure_id) noexcept
     return item_value_cash_points(find_structure_linked_item(structure_id));
 }
 
+std::uint32_t action_direct_cost_cash_points(
+    ActionKind action_kind,
+    std::uint32_t quantity) noexcept
+{
+    const auto* action_def = find_site_action_def(action_kind);
+    if (action_def == nullptr)
+    {
+        return 0U;
+    }
+
+    const float scale = static_cast<float>(quantity == 0U ? 1U : quantity);
+    return player_meter_cost_internal_cash_points(
+        0.0f,
+        action_def->hydration_cost_per_unit * scale,
+        action_def->nourishment_cost_per_unit * scale,
+        action_def->energy_cost_per_unit * scale,
+        action_def->morale_cost_per_unit * scale);
+}
+
 std::uint32_t resolved_task_direct_cost_cash_points(
     const TaskTemplateDef& task_template_def,
     const TaskInstanceState& task) noexcept
@@ -308,6 +328,9 @@ std::uint32_t resolved_task_direct_cost_cash_points(
 
     case TaskProgressKind::TransferItem:
         return 0U;
+
+    case TaskProgressKind::PerformAction:
+        return action_direct_cost_cash_points(task.action_kind, task.target_amount);
 
     case TaskProgressKind::PlantItem:
         return scale_cash_points_by_percent(
@@ -488,7 +511,7 @@ std::vector<ItemId> collect_item_candidates(
         switch (task_template_def.progress_kind)
         {
         case TaskProgressKind::BuyItem:
-            if (item_def.buy_price > 0)
+            if (item_buy_price_cash_points(item_def.item_id) > 0U)
             {
                 candidates.push_back(item_def.item_id);
             }
@@ -960,13 +983,13 @@ bool queue_reward_message(
     switch (reward_candidate_def.effect_kind)
     {
     case RewardEffectKind::Money:
-        if (reward_candidate_def.money_delta == 0)
+        if (reward_candidate_def.money_delta_cash_points == 0)
         {
             return false;
         }
         reward_message.type = GameMessageType::EconomyMoneyAwardRequested;
         reward_message.set_payload(EconomyMoneyAwardRequestedMessage {
-            reward_candidate_def.money_delta});
+            reward_candidate_def.money_delta_cash_points});
         break;
 
     case RewardEffectKind::ItemDelivery:
@@ -2064,12 +2087,12 @@ void handle_phone_listing_sold(
             });
     }
 
-    const auto* item_def = find_item_def(ItemId {payload.item_id});
-    if (item_def != nullptr && item_def->sell_price > 0)
+    const auto sell_price_cash_points = item_sell_price_cash_points(ItemId {payload.item_id});
+    if (sell_price_cash_points > 0U)
     {
         advance_matching_accepted_tasks(
             context,
-            static_cast<std::uint32_t>(item_def->sell_price) * quantity,
+            sell_price_cash_points * quantity,
             [&](const TaskTemplateDef& task_template_def, const TaskInstanceState& task) {
                 (void)task;
                 return task_template_def.progress_kind == TaskProgressKind::EarnMoney;

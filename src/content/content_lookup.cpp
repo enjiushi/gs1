@@ -11,11 +11,77 @@
 #include "content/content_loader.h"
 #include "site/defs/site_action_defs.h"
 
+#include <cmath>
+
 namespace gs1
 {
+namespace
+{
+std::uint32_t round_to_cash_points(double value) noexcept
+{
+    return value <= 0.0
+        ? 0U
+        : static_cast<std::uint32_t>(std::lround(value));
+}
+
+std::uint32_t truncate_to_cash_points(double value) noexcept
+{
+    return value <= 0.0
+        ? 0U
+        : static_cast<std::uint32_t>(std::floor(value + 0.0001));
+}
+}  // namespace
+
 const GameplayTuningDef& gameplay_tuning_def() noexcept
 {
     return prototype_content_database().gameplay_tuning;
+}
+
+double player_meter_cash_point_value(
+    float health_delta,
+    float hydration_delta,
+    float nourishment_delta,
+    float energy_delta,
+    float morale_delta) noexcept
+{
+    const auto& tuning = gameplay_tuning_def().player_meter_cash_points;
+    return static_cast<double>(health_delta) * static_cast<double>(tuning.health_per_point) +
+        static_cast<double>(hydration_delta) * static_cast<double>(tuning.hydration_per_point) +
+        static_cast<double>(nourishment_delta) * static_cast<double>(tuning.nourishment_per_point) +
+        static_cast<double>(energy_delta) * static_cast<double>(tuning.energy_per_point) +
+        static_cast<double>(morale_delta) * static_cast<double>(tuning.morale_per_point);
+}
+
+std::uint32_t player_meter_gain_internal_cash_points(
+    float health_delta,
+    float hydration_delta,
+    float nourishment_delta,
+    float energy_delta,
+    float morale_delta) noexcept
+{
+    return round_to_cash_points(
+        player_meter_cash_point_value(
+            health_delta,
+            hydration_delta,
+            nourishment_delta,
+            energy_delta,
+            morale_delta));
+}
+
+std::uint32_t player_meter_cost_internal_cash_points(
+    float health_cost,
+    float hydration_cost,
+    float nourishment_cost,
+    float energy_cost,
+    float morale_cost) noexcept
+{
+    return round_to_cash_points(
+        player_meter_cash_point_value(
+            health_cost,
+            hydration_cost,
+            nourishment_cost,
+            energy_cost,
+            morale_cost));
 }
 
 std::span<const ItemDef> all_item_defs() noexcept
@@ -39,7 +105,52 @@ std::uint32_t item_stack_size(ItemId item_id) noexcept
 std::uint32_t item_internal_price_cash_points(ItemId item_id) noexcept
 {
     const auto* item_def = find_item_def(item_id);
-    return item_def == nullptr ? 0U : item_def->internal_price_cash_points;
+    if (item_def == nullptr)
+    {
+        return 0U;
+    }
+
+    const auto derived_cash_points = player_meter_gain_internal_cash_points(
+        item_def->health_delta,
+        item_def->hydration_delta,
+        item_def->nourishment_delta,
+        item_def->energy_delta,
+        item_def->morale_delta);
+    return derived_cash_points != 0U ? derived_cash_points : item_def->internal_price_cash_points;
+}
+
+std::uint32_t item_buy_price_cash_points(ItemId item_id) noexcept
+{
+    const auto* item_def = find_item_def(item_id);
+    if (item_def == nullptr)
+    {
+        return 0U;
+    }
+
+    if (item_def->source_rule != ItemSourceRule::BuyOnly &&
+        item_def->source_rule != ItemSourceRule::BuyOrCraft)
+    {
+        return 0U;
+    }
+
+    const auto base_cash_points = item_internal_price_cash_points(item_id);
+    const auto multiplier =
+        static_cast<double>(gameplay_tuning_def().player_meter_cash_points.buy_price_multiplier);
+    return truncate_to_cash_points(static_cast<double>(base_cash_points) * multiplier);
+}
+
+std::uint32_t item_sell_price_cash_points(ItemId item_id) noexcept
+{
+    const auto* item_def = find_item_def(item_id);
+    if (item_def == nullptr || !item_has_capability(*item_def, ITEM_CAPABILITY_SELL))
+    {
+        return 0U;
+    }
+
+    const auto base_cash_points = item_internal_price_cash_points(item_id);
+    const auto multiplier =
+        static_cast<double>(gameplay_tuning_def().player_meter_cash_points.sell_price_multiplier);
+    return truncate_to_cash_points(static_cast<double>(base_cash_points) * multiplier);
 }
 
 std::span<const PlantDef> all_plant_defs() noexcept

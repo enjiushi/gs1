@@ -212,7 +212,7 @@ bool TechnologySystem::node_claimable(
         return false;
     }
 
-    if (campaign.cash < current_cash_cost(campaign, node_def))
+    if (campaign.cash < static_cast<std::int32_t>(current_internal_cost_cash_points(node_def)))
     {
         return false;
     }
@@ -295,7 +295,7 @@ Gs1Status TechnologySystem::process_message(
             return GS1_STATUS_INVALID_STATE;
         }
 
-        context.campaign.cash -= current_cash_cost(context.campaign, *node_def);
+        context.campaign.cash -= static_cast<std::int32_t>(current_internal_cost_cash_points(*node_def));
         context.campaign.technology_state.purchased_nodes.push_back(TechnologyPurchaseRecord {
             node_def->tech_node_id});
         return GS1_STATUS_OK;
@@ -327,7 +327,8 @@ Gs1Status TechnologySystem::process_message(
             return GS1_STATUS_INVALID_STATE;
         }
 
-        const auto refunded_cash = current_cash_cost(context.campaign, *node_def);
+        const auto refunded_cash =
+            static_cast<std::int32_t>(current_internal_cost_cash_points(*node_def));
         const auto updated_cash = static_cast<std::int64_t>(context.campaign.cash) + refunded_cash;
         if (updated_cash > static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::max()))
         {

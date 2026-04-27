@@ -37,8 +37,6 @@ struct ItemDef final
     std::uint16_t stack_size {1};
     ItemSourceRule source_rule {ItemSourceRule::None};
     bool consumable {false};
-    std::int32_t buy_price {0};
-    std::int32_t sell_price {0};
     std::uint32_t internal_price_cash_points {0U};
     std::uint32_t capability_flags {ITEM_CAPABILITY_NONE};
     PlantId linked_plant_id {};
@@ -47,6 +45,7 @@ struct ItemDef final
     float hydration_delta {0.0f};
     float nourishment_delta {0.0f};
     float energy_delta {0.0f};
+    float morale_delta {0.0f};
 };
 
 inline constexpr std::uint32_t k_item_water_container = 1U;
@@ -98,4 +97,6 @@ inline constexpr std::uint32_t k_item_hetian_jade_pebble = 36U;
 [[nodiscard]] const ItemDef* find_item_def(ItemId item_id) noexcept;
 [[nodiscard]] std::uint32_t item_stack_size(ItemId item_id) noexcept;
 [[nodiscard]] std::uint32_t item_internal_price_cash_points(ItemId item_id) noexcept;
+[[nodiscard]] std::uint32_t item_buy_price_cash_points(ItemId item_id) noexcept;
+[[nodiscard]] std::uint32_t item_sell_price_cash_points(ItemId item_id) noexcept;
 }  // namespace gs1

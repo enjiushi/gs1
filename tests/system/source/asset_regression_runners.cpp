@@ -4,6 +4,7 @@
 #include "site/systems/inventory_system.h"
 #include "site/systems/placement_validation_system.h"
 #include "site/systems/task_board_system.h"
+#include "support/currency.h"
 #include "testing/system_test_registry.h"
 #include "system_test_fixtures.h"
 
@@ -409,7 +410,11 @@ void economy_phone_regression_runner(
                     static_cast<std::uint16_t>(parse_u32(context, values, "quantity", 1U)),
                     0U}));
         GS1_SYSTEM_TEST_CHECK(context, status == GS1_STATUS_OK);
-        GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == static_cast<std::int32_t>(parse_u32(context, values, "expect_money")));
+        const auto expected_money =
+            values.contains("expect_money")
+            ? gs1::cash_points_from_cash(static_cast<std::int32_t>(parse_u32(context, values, "expect_money")))
+            : site_run.economy.money;
+        GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == expected_money);
         GS1_SYSTEM_TEST_CHECK(
             context,
             site_run.economy.direct_purchase_unlockable_ids.size() ==
@@ -428,9 +433,13 @@ void economy_phone_regression_runner(
                     static_cast<std::uint16_t>(parse_u32(context, values, "quantity", 1U)),
                     0U}));
         GS1_SYSTEM_TEST_CHECK(context, status == parse_status(values, "expect_status", GS1_STATUS_OK));
+        const auto expected_money =
+            values.contains("expect_money")
+            ? gs1::cash_points_from_cash(static_cast<std::int32_t>(parse_u32(context, values, "expect_money")))
+            : site_run.economy.money;
         GS1_SYSTEM_TEST_CHECK(
             context,
-            site_run.economy.money == static_cast<std::int32_t>(parse_u32(context, values, "expect_money", static_cast<std::uint32_t>(site_run.economy.money))));
+            site_run.economy.money == expected_money);
         return;
     }
 
@@ -438,7 +447,8 @@ void economy_phone_regression_runner(
     {
         if (values.contains("override_money"))
         {
-            site_run.economy.money = static_cast<std::int32_t>(parse_u32(context, values, "override_money"));
+            site_run.economy.money =
+                gs1::cash_points_from_cash(static_cast<std::int32_t>(parse_u32(context, values, "override_money")));
         }
 
         const auto status = EconomyPhoneSystem::process_message(
@@ -449,9 +459,13 @@ void economy_phone_regression_runner(
                     parse_u32(context, values, "listing_id"),
                     parse_u32(context, values, "work_units", 1U)}));
         GS1_SYSTEM_TEST_CHECK(context, status == parse_status(values, "expect_status", GS1_STATUS_OK));
+        const auto expected_money =
+            values.contains("expect_money")
+            ? gs1::cash_points_from_cash(static_cast<std::int32_t>(parse_u32(context, values, "expect_money")))
+            : site_run.economy.money;
         GS1_SYSTEM_TEST_CHECK(
             context,
-            site_run.economy.money == static_cast<std::int32_t>(parse_u32(context, values, "expect_money", static_cast<std::uint32_t>(site_run.economy.money))));
+            site_run.economy.money == expected_money);
         return;
     }
 

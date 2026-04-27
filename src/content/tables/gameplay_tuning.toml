@@ -30,6 +30,15 @@ factor_min = 0.0
 factor_max = 4.0
 sheltered_exposure_scale = 0.35
 
+[player_meter_cash_points]
+health_per_point = 50.0
+hydration_per_point = 10.0
+nourishment_per_point = 25.0
+energy_per_point = 1.0
+morale_per_point = 35.0
+buy_price_multiplier = 1.1
+sell_price_multiplier = 0.9
+
 [ecology]
 moisture_gain_per_water_unit = 22.0
 fertility_to_moisture_cap_factor = 1.0

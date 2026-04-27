@@ -288,7 +288,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         deliveryBox: 1,
         retrievalOnly: 2
     };
-    const phoneDeliveryFee = 5;
+    const phoneDeliveryFee = 5.0;
+    function formatMoney(value) {
+        const normalized = Number.isFinite(value) ? value : 0;
+        return normalized.toFixed(2);
+    }
     let inventoryCache = createEmptyInventoryCache();
     const itemCatalog = {
         1: { name: "Water", shortName: "H2O", stackSize: 5, canUse: true, canPlant: false, canDeploy: false, useLabel: "Drink" },
@@ -3402,7 +3406,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const cashValue = siteVitalsMoney.querySelector(".resource-value");
         const reputationValue = siteVitalsReputation.querySelector(".resource-value");
         if (cashValue) {
-            cashValue.textContent = String(currentMoney);
+            cashValue.textContent = formatMoney(currentMoney);
         }
         if (reputationValue) {
             reputationValue.textContent = String(totalReputation);
@@ -4012,7 +4016,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return "";
         }
 
-        let match = compactStatus.match(/^Need\s+(\d+)r\s+\+(\$\d+)$/i);
+        let match = compactStatus.match(/^Need\s+(\d+)r\s+\+(\$\d+(?:\.\d{2})?)$/i);
         if (match) {
             return "Need " + match[1] + " rep + " + match[2];
         }
@@ -4187,7 +4191,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 }
                 if (element.action && element.action.type === "CLAIM_TECHNOLOGY_NODE") {
                     const repRequirement = catalogNode ? catalogNode.reputationRequirement : 0;
-                    const cashCost = catalogNode ? Math.round((catalogNode.internalCostCashPoints || 0) / 100) : 0;
+                    const cashCost =
+                        catalogNode ? formatMoney((catalogNode.internalCostCashPoints || 0) / 100) : "0.00";
                     return "Need " + repRequirement + " rep + $" + cashCost;
                 }
                 return (element.flags & 2) !== 0 ? "Locked" : "Unavailable";
@@ -4215,7 +4220,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 statusText: resolvedStatusText,
                 costText: (() => {
                     const effectiveStatus = resolvedStatusText;
-                    const matchedCash = effectiveStatus.match(/\$\d+/);
+                    const matchedCash = effectiveStatus.match(/\$\d+(?:\.\d{2})?/);
                     const matchedRep = effectiveStatus.match(/Need\s+(\d+)\s+rep/i);
                     if (matchedCash) {
                         return matchedCash[0];
@@ -4261,7 +4266,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             titleText = leftText;
         }
         const statusText = [primaryStatusText].concat(filteredDetailParts).filter(Boolean).join(" | ");
-        const costCashMatch = statusText.match(/\$\d+/);
+        const costCashMatch = statusText.match(/\$\d+(?:\.\d{2})?/);
         const costRepMatch = statusText.match(/Need\s+(\d+)\s+rep/i);
         const costText = costCashMatch
             ? costCashMatch[0]
@@ -4969,7 +4974,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function getPhoneListingMetaText(listing, affordable) {
-        const parts = ["$" + listing.price];
+        const parts = ["$" + formatMoney(listing.price)];
         if (listing.listingKind === "SELL_ITEM") {
             parts.push("available x" + listing.quantity);
         } else if (listing.listingKind === "HIRE_CONTRACTOR") {
@@ -4992,14 +4997,14 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     function getPhoneListingActionLabel(listing) {
         switch (listing.listingKind) {
         case "SELL_ITEM":
-            return "Sell For $" + listing.price;
+            return "Sell For $" + formatMoney(listing.price);
         case "HIRE_CONTRACTOR":
-            return "Hire For $" + listing.price;
+            return "Hire For $" + formatMoney(listing.price);
         case "PURCHASE_UNLOCKABLE":
-            return "Unlock For $" + listing.price;
+            return "Unlock For $" + formatMoney(listing.price);
         case "BUY_ITEM":
         default:
-            return "Buy For $" + listing.price;
+            return "Buy For $" + formatMoney(listing.price);
         }
     }
 
@@ -5388,7 +5393,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const section = makePhoneSection(
             "Cart",
             cartItemCount > 0
-                ? ("Items " + cartItemCount + "  |  Goods $" + subtotal + "  |  Total $" + totalCost)
+                ? ("Items " + cartItemCount + "  |  Goods $" + formatMoney(subtotal) + "  |  Total $" + formatMoney(totalCost))
                 : "Your cart is empty."
         );
 
@@ -5426,9 +5431,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             const metaElement = document.createElement("div");
             metaElement.className = "phone-list-meta";
             metaElement.textContent =
-                "$" + listing.price +
+                "$" + formatMoney(listing.price) +
                 "  |  qty x" + (listing.cartQuantity || 0) +
-                "  |  line $" + ((listing.price || 0) * (listing.cartQuantity || 0));
+                "  |  line $" + formatMoney((listing.price || 0) * (listing.cartQuantity || 0));
             card.appendChild(metaElement);
 
             appendPhoneBuyControls(card, listing);
@@ -5440,12 +5445,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         const fee = document.createElement("div");
         fee.className = "phone-cart-fee";
-        fee.textContent = "Delivery Fee $" + phoneDeliveryFee + "  |  Total $" + totalCost;
+        fee.textContent = "Delivery Fee $" + formatMoney(phoneDeliveryFee) + "  |  Total $" + formatMoney(totalCost);
         footer.appendChild(fee);
 
         footer.appendChild(
             makePhoneActionButton(
-                "Buy For $" + totalCost,
+                "Buy For $" + formatMoney(totalCost),
                 function () {
                     postPhoneCartCheckout().catch(() => {
                         statusChip.textContent = "Failed to submit the cart checkout.";

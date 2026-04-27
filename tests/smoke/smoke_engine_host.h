@@ -284,7 +284,7 @@ public:
     {
         std::uint32_t listing_id {0};
         std::uint32_t item_or_unlockable_id {0};
-        std::int32_t price {0};
+        float price {0.0f};
         std::uint32_t related_site_id {0};
         std::uint32_t quantity {0};
         std::uint32_t cart_quantity {0};
@@ -340,7 +340,7 @@ public:
         float player_hydration {0.0f};
         float player_energy {0.0f};
         float player_morale {0.0f};
-        std::int32_t current_money {0};
+        float current_money {0.0f};
         std::uint32_t active_task_count {0};
         std::uint32_t warning_code {0};
         std::uint32_t current_action_kind {0};
@@ -349,7 +349,7 @@ public:
 
     struct CampaignResourcesProjection final
     {
-        std::int32_t current_money {0};
+        float current_money {0.0f};
         std::int32_t total_reputation {0};
     };
 

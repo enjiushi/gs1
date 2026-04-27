@@ -15,6 +15,7 @@
 #include "site/systems/failure_recovery_system.h"
 #include "site/systems/site_completion_system.h"
 #include "site/systems/site_flow_system.h"
+#include "support/currency.h"
 #include "site/systems/site_time_system.h"
 #include "testing/system_test_registry.h"
 #include "system_test_fixtures.h"
@@ -949,7 +950,7 @@ void technology_first_basic_tier_claim_spends_cash_with_faction_requirement(
                     gs1::k_tech_node_village_t1_field_briefing,
                     gs1::k_faction_village_committee})) == GS1_STATUS_OK);
 
-    GS1_SYSTEM_TEST_CHECK(context, campaign.cash == 41);
+    GS1_SYSTEM_TEST_CHECK(context, campaign.cash == 4100);
     GS1_SYSTEM_TEST_CHECK(
         context,
         TechnologySystem::faction_reputation(campaign, gs1::FactionId {gs1::k_faction_village_committee}) == 1);
@@ -995,7 +996,7 @@ void technology_claim_uses_node_faction_reputation_not_selected_tab(
                     gs1::k_tech_node_village_t1_field_briefing,
                     gs1::k_faction_agricultural_university})) == GS1_STATUS_OK);
 
-    GS1_SYSTEM_TEST_CHECK(context, campaign.cash == 41);
+    GS1_SYSTEM_TEST_CHECK(context, campaign.cash == 4100);
     GS1_SYSTEM_TEST_CHECK(
         context,
         TechnologySystem::faction_reputation(campaign, gs1::FactionId {gs1::k_faction_agricultural_university}) ==
@@ -1146,7 +1147,7 @@ void technology_refund_uses_highest_reputation_band_and_restores_cash(
                 GameMessageType::TechnologyNodeRefundRequested,
                 gs1::TechnologyNodeRefundRequestedMessage {
                     gs1::k_tech_node_village_t1_field_briefing_choice_a})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, campaign.cash == 41);
+    GS1_SYSTEM_TEST_CHECK(context, campaign.cash == 4100);
     GS1_SYSTEM_TEST_CHECK(
         context,
         !TechnologySystem::node_purchased(
@@ -1161,7 +1162,7 @@ void technology_refund_uses_highest_reputation_band_and_restores_cash(
                 GameMessageType::TechnologyNodeRefundRequested,
                 gs1::TechnologyNodeRefundRequestedMessage {
                     gs1::k_tech_node_village_t1_field_briefing})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, campaign.cash == 45);
+    GS1_SYSTEM_TEST_CHECK(context, campaign.cash == gs1::cash_points_from_cash(45));
     GS1_SYSTEM_TEST_CHECK(
         context,
         !TechnologySystem::node_purchased(campaign, gs1::TechNodeId {gs1::k_tech_node_village_t1_field_briefing}));

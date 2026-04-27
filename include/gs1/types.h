@@ -721,7 +721,7 @@ struct Gs1EngineMessagePhoneListingData
 {
     std::uint32_t listing_id;
     std::uint32_t item_or_unlockable_id;
-    std::int32_t price;
+    float price;
     std::uint32_t related_site_id;
     std::uint16_t quantity;
     std::uint16_t cart_quantity;
@@ -770,7 +770,7 @@ struct Gs1EngineMessageHudStateData
     float player_hydration;
     float player_energy;
     float player_morale;
-    std::int32_t current_money;
+    float current_money;
     float site_completion_normalized;
     std::uint16_t active_task_count;
     std::uint16_t warning_code;
@@ -779,7 +779,7 @@ struct Gs1EngineMessageHudStateData
 
 struct Gs1EngineMessageCampaignResourcesData
 {
-    std::int32_t current_money;
+    float current_money;
     std::int32_t total_reputation;
 };
 

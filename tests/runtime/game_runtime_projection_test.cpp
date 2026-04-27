@@ -786,7 +786,7 @@ int main()
                gs1::inventory_storage::starter_storage_container(bootstrap_site_run),
                gs1::ItemId {gs1::k_item_basic_straw_checkerboard}) == 8U);
     assert(bootstrap_site_run.task_board.visible_tasks.empty());
-    assert(bootstrap_site_run.economy.money == 41);
+    assert(bootstrap_site_run.economy.money == 4100);
     assert(bootstrap_site_run.economy.available_phone_listings.size() >= 11U);
 
     const auto bootstrap_messages = drain_engine_messages(runtime);
@@ -887,7 +887,7 @@ int main()
     buy_listing.type = GameMessageType::PhoneListingPurchaseRequested;
     buy_listing.set_payload(PhoneListingPurchaseRequestedMessage {1U, 1U, 0U});
     assert(runtime.handle_message(buy_listing) == GS1_STATUS_OK);
-    assert(bootstrap_site_run.economy.money == 31);
+    assert(bootstrap_site_run.economy.money == 3380);
     assert(bootstrap_site_run.economy.available_phone_listings[0].quantity == 5U);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
     drain_engine_messages(runtime);

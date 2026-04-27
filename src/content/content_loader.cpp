@@ -1004,6 +1004,29 @@ template <typename T>
     fail_invalid_toml_field(path, field, key, "must be a string");
 }
 
+[[nodiscard]] std::optional<float> optional_toml_float(
+    const std::filesystem::path& path,
+    const toml::table& table,
+    std::string_view key)
+{
+    const auto field = table[key];
+    if (!field)
+    {
+        return std::nullopt;
+    }
+
+    if (const auto value = field.value<double>())
+    {
+        return static_cast<float>(*value);
+    }
+    if (const auto value = field.value<std::int64_t>())
+    {
+        return static_cast<float>(*value);
+    }
+
+    fail_invalid_toml_field(path, field, key, "must be numeric");
+}
+
 [[nodiscard]] float require_toml_float(
     const std::filesystem::path& path,
     const toml::table& table,
@@ -1262,7 +1285,8 @@ void load_prototype_campaign_sites(ContentDatabase& content, const std::filesyst
         site.default_weather_wind_direction_degrees =
             require_toml_float(path, entry, "default_weather_wind_direction_degrees");
         site.starting_plants = parse_starting_plant_array(path, entry, "starting_plants");
-        site.phone_delivery_fee = require_toml_signed<std::int32_t>(path, entry, "phone_delivery_fee");
+        site.phone_delivery_fee =
+            cash_points_from_cash(require_toml_signed<std::int32_t>(path, entry, "phone_delivery_fee"));
         site.phone_delivery_minutes =
             require_toml_unsigned<std::uint16_t>(path, entry, "phone_delivery_minutes");
         site.initial_revealed_unlockable_ids =
@@ -1288,7 +1312,7 @@ void load_prototype_campaign_setup(ContentDatabase& content, const std::filesyst
 {
     const auto document = load_toml_document(path);
     content.prototype_campaign.starting_campaign_cash =
-        require_toml_signed<std::int32_t>(path, document, "starting_campaign_cash");
+        cash_points_from_cash(require_toml_signed<std::int32_t>(path, document, "starting_campaign_cash"));
     content.prototype_campaign.support_quota_per_contributor =
         require_toml_unsigned<std::uint32_t>(path, document, "support_quota_per_contributor");
     content.prototype_campaign.baseline_deployment_items =
@@ -1333,11 +1357,14 @@ void load_prototype_site_phone_listings(ContentDatabase& content, const std::fil
                     "purchase-unlockable listing internal_price_cash_points must be divisible by 100");
             }
 
-            price = cash_from_cash_points(internal_price_cash_points);
+            price = static_cast<std::int32_t>(internal_price_cash_points);
         }
         else
         {
-            price = require_toml_signed<std::int32_t>(path, entry, "price");
+            price =
+                kind == PhoneListingKind::HireContractor
+                ? cash_points_from_cash(require_toml_signed<std::int32_t>(path, entry, "price"))
+                : 0;
         }
 
         site->seeded_phone_listings.push_back(PrototypePhoneListingContent {
@@ -1366,9 +1393,7 @@ void load_item_defs(ContentDatabase& content, const std::filesystem::path& path)
                 toml_line_number(entry),
                 require_toml_string(path, entry, "source_rule")),
             require_toml_bool(path, entry, "consumable"),
-            require_toml_signed<std::int32_t>(path, entry, "buy_price"),
-            require_toml_signed<std::int32_t>(path, entry, "sell_price"),
-            require_toml_unsigned<std::uint32_t>(path, entry, "internal_price_cash_points"),
+            optional_toml_unsigned<std::uint32_t>(path, entry, "internal_price_cash_points").value_or(0U),
             parse_item_capabilities(
                 path,
                 toml_line_number(entry),
@@ -1378,7 +1403,8 @@ void load_item_defs(ContentDatabase& content, const std::filesystem::path& path)
             require_toml_float(path, entry, "health_delta"),
             require_toml_float(path, entry, "hydration_delta"),
             require_toml_float(path, entry, "nourishment_delta"),
-            require_toml_float(path, entry, "energy_delta")});
+            require_toml_float(path, entry, "energy_delta"),
+            optional_toml_float(path, entry, "morale_delta").value_or(0.0f)});
     }
 }
 
@@ -1456,7 +1482,7 @@ void load_reward_candidate_defs(ContentDatabase& content, const std::filesystem:
                 path,
                 toml_line_number(entry),
                 require_toml_string(path, entry, "effect_kind")),
-            require_toml_signed<std::int32_t>(path, entry, "money_delta"),
+            cash_points_from_cash(require_toml_signed<std::int32_t>(path, entry, "money_delta")),
             ItemId {require_toml_unsigned<std::uint32_t>(path, entry, "item_id")},
             require_toml_unsigned<std::uint32_t>(path, entry, "quantity"),
             require_toml_unsigned<std::uint32_t>(path, entry, "unlockable_id"),
@@ -1643,6 +1669,22 @@ void load_gameplay_tuning_def(ContentDatabase& content, const std::filesystem::p
         require_toml_float(path, worker_condition, "factor_max");
     tuning.worker_condition.sheltered_exposure_scale =
         require_toml_float(path, worker_condition, "sheltered_exposure_scale");
+
+    const auto& player_meter_cash_points = require_toml_table(path, document, "player_meter_cash_points");
+    tuning.player_meter_cash_points.health_per_point =
+        require_toml_float(path, player_meter_cash_points, "health_per_point");
+    tuning.player_meter_cash_points.hydration_per_point =
+        require_toml_float(path, player_meter_cash_points, "hydration_per_point");
+    tuning.player_meter_cash_points.nourishment_per_point =
+        require_toml_float(path, player_meter_cash_points, "nourishment_per_point");
+    tuning.player_meter_cash_points.energy_per_point =
+        require_toml_float(path, player_meter_cash_points, "energy_per_point");
+    tuning.player_meter_cash_points.morale_per_point =
+        require_toml_float(path, player_meter_cash_points, "morale_per_point");
+    tuning.player_meter_cash_points.buy_price_multiplier =
+        require_toml_float(path, player_meter_cash_points, "buy_price_multiplier");
+    tuning.player_meter_cash_points.sell_price_multiplier =
+        require_toml_float(path, player_meter_cash_points, "sell_price_multiplier");
 
     const auto& ecology = require_toml_table(path, document, "ecology");
     tuning.ecology.moisture_gain_per_water_unit =

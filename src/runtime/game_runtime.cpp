@@ -34,6 +34,7 @@
 #include "site/systems/task_board_system.h"
 #include "site/systems/weather_event_system.h"
 #include "site/systems/worker_condition_system.h"
+#include "support/currency.h"
 
 #include <algorithm>
 #include <cassert>
@@ -2287,7 +2288,9 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
 
             const auto reputation_requirement =
                 TechnologySystem::current_reputation_requirement(node_def);
-            const auto cash_cost = TechnologySystem::current_cash_cost(*campaign_, node_def);
+            const auto internal_cash_cost =
+                static_cast<std::int32_t>(TechnologySystem::current_internal_cost_cash_points(node_def));
+            const auto display_cash_cost = cash_value_from_cash_points(internal_cash_cost);
             const auto node_faction_reputation =
                 TechnologySystem::faction_reputation(*campaign_, node_def.faction_id);
             const auto paired_base_purchased =
@@ -2332,8 +2335,8 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
                     std::snprintf(
                         node_text,
                         sizeof(node_text),
-                        "TECHNODE|s=Refund +$%d",
-                        cash_cost);
+                        "TECHNODE|s=Refund +$%.2f",
+                        display_cash_cost);
                     flags |= GS1_UI_ELEMENT_FLAG_PRIMARY;
                 }
                 else
@@ -2351,21 +2354,21 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
                 std::snprintf(
                     node_text,
                     sizeof(node_text),
-                    "TECHNODE|s=Need %dr +$%d",
+                    "TECHNODE|s=Need %dr +$%.2f",
                     reputation_requirement,
-                    cash_cost);
+                    display_cash_cost);
                 flags |= GS1_UI_ELEMENT_FLAG_PRIMARY;
             }
             else
             {
                 flags |= GS1_UI_ELEMENT_FLAG_DISABLED;
-                if (campaign_->cash < cash_cost)
+                if (campaign_->cash < internal_cash_cost)
                 {
                     std::snprintf(
                         node_text,
                         sizeof(node_text),
-                        "TECHNODE|s=Need $%d",
-                        cash_cost);
+                        "TECHNODE|s=Need $%.2f",
+                        display_cash_cost);
                 }
                 else if (node_faction_reputation < reputation_requirement)
                 {
@@ -3233,7 +3236,7 @@ void GameRuntime::queue_site_phone_listing_upsert_message(std::size_t listing_in
     auto& payload = message.emplace_payload<Gs1EngineMessagePhoneListingData>();
     payload.listing_id = listing.listing_id;
     payload.item_or_unlockable_id = listing.item_id.value;
-    payload.price = listing.price;
+    payload.price = cash_value_from_cash_points(listing.price);
     payload.related_site_id = active_site_run_->site_id.value;
     payload.quantity = static_cast<std::uint16_t>(std::min<std::uint32_t>(listing.quantity, 65535U));
     payload.cart_quantity = static_cast<std::uint16_t>(std::min<std::uint32_t>(listing.cart_quantity, 65535U));
@@ -3484,7 +3487,7 @@ void GameRuntime::queue_hud_state_message()
     payload.player_hydration = worker_conditions.hydration;
     payload.player_energy = worker_conditions.energy;
     payload.player_morale = worker_conditions.morale;
-    payload.current_money = active_site_run_->economy.money;
+    payload.current_money = cash_value_from_cash_points(active_site_run_->economy.money);
     payload.active_task_count =
         static_cast<std::uint16_t>(active_site_run_->task_board.accepted_task_ids.size());
     payload.current_action_kind =
@@ -3503,7 +3506,7 @@ void GameRuntime::queue_campaign_resources_message()
 
     auto message = make_engine_message(GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES);
     auto& payload = message.emplace_payload<Gs1EngineMessageCampaignResourcesData>();
-    payload.current_money = campaign_->cash;
+    payload.current_money = cash_value_from_cash_points(campaign_->cash);
     payload.total_reputation = campaign_->technology_state.total_reputation;
     engine_messages_.push_back(message);
 }

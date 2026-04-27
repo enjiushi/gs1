@@ -890,6 +890,11 @@ void emit_item_meter_delta_request(
         meter_delta.flags |= WORKER_METER_CHANGED_ENERGY;
         meter_delta.energy_delta = item_def.energy_delta * static_cast<float>(quantity);
     }
+    if (item_def.morale_delta != 0.0f)
+    {
+        meter_delta.flags |= WORKER_METER_CHANGED_MORALE;
+        meter_delta.morale_delta = item_def.morale_delta * static_cast<float>(quantity);
+    }
 
     if (meter_delta.flags == WORKER_METER_CHANGED_NONE)
     {
