@@ -1418,6 +1418,10 @@ This keeps completion bookkeeping readable and concrete.
 
 ### Contractors
 
+Prototype note:
+
+- contractor design remains documented here, but the current prototype intentionally hides contractor hiring in the phone UI until the contractor work-pool flow is redesigned well enough to reactivate
+
 Contractors are optional paid help, not a permanent workforce. In the current design, hiring contractors should create a paid contractor work pool rather than a fragile per-call estimate. That work pool can be assigned to valid in-progress tasks such as planting, building, or hauling whenever the player wants.
 
 This system keeps hired labor useful but simple:

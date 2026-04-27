@@ -90,12 +90,14 @@ void phone_panel_site_run_started_seeds_home_snapshot(
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.claimed_task_count == 0U);
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.buy_listing_count >= 7U);
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.sell_listing_count >= 1U);
-    GS1_SYSTEM_TEST_CHECK(context, phone_panel.service_listing_count >= 2U);
+    GS1_SYSTEM_TEST_CHECK(context, phone_panel.service_listing_count == 1U);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         find_phone_panel_listing(
             phone_panel,
             1000U + static_cast<std::uint32_t>(gs1::k_item_water_container)) != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, find_phone_panel_listing(phone_panel, 10U) == nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(context, find_phone_panel_listing(phone_panel, 11U) != nullptr);
 }
 
 void phone_panel_section_request_switches_authoritative_section(
