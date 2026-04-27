@@ -346,6 +346,14 @@ float resolve_weather_scaled_morale_cost(
     return base_cost * weather_fraction;
 }
 
+float apply_action_cost_modifier(
+    float base_cost,
+    float weight_delta,
+    float bias) noexcept
+{
+    return std::max(0.0f, (base_cost * (1.0f + weight_delta)) + bias);
+}
+
 double compute_duration_minutes(
     SiteSystemContext<ActionExecutionSystem>& context,
     ActionKind kind,
@@ -506,41 +514,54 @@ DeferredWorkerMeterDelta resolve_worker_meter_cost_delta(
 {
     const auto worker = context.world.read_worker();
     const auto local_weather = context.world.read_tile_local_weather(worker.position.tile_coord);
+    const auto& action_cost_modifiers = context.world.read_modifier().resolved_action_cost_modifiers;
     const auto* action_def = find_site_action_def(action_kind);
     const float action_multiplier =
         resolve_action_cost_multiplier(context.world.read_worker().conditions);
-    const float hydration_cost = action_def == nullptr
-        ? action_hydration_cost(action_kind, quantity, craft_recipe)
-        : resolve_weather_scaled_action_cost(
-            action_hydration_cost(action_kind, quantity, craft_recipe),
-            local_weather,
-            action_def->heat_to_hydration_cost,
-            action_def->wind_to_hydration_cost,
-            action_def->dust_to_hydration_cost);
-    const float nourishment_cost = action_def == nullptr
-        ? action_nourishment_cost(action_kind, quantity, craft_recipe)
-        : resolve_weather_scaled_action_cost(
-            action_nourishment_cost(action_kind, quantity, craft_recipe),
-            local_weather,
-            action_def->heat_to_nourishment_cost,
-            action_def->wind_to_nourishment_cost,
-            action_def->dust_to_nourishment_cost);
-    const float energy_cost = (action_def == nullptr
-        ? action_energy_cost(action_kind, quantity, primary_subject_id, craft_recipe)
-        : resolve_weather_scaled_action_cost(
-            action_energy_cost(action_kind, quantity, primary_subject_id, craft_recipe),
-            local_weather,
-            action_def->heat_to_energy_cost,
-            action_def->wind_to_energy_cost,
-            action_def->dust_to_energy_cost)) * action_multiplier;
-    const float morale_cost = action_def == nullptr
-        ? action_morale_cost(action_kind, quantity, craft_recipe)
-        : resolve_weather_scaled_morale_cost(
-            action_morale_cost(action_kind, quantity, craft_recipe),
-            local_weather,
-            action_def->heat_to_morale_cost,
-            action_def->wind_to_morale_cost,
-            action_def->dust_to_morale_cost);
+    const float hydration_cost = apply_action_cost_modifier(
+        action_def == nullptr
+            ? action_hydration_cost(action_kind, quantity, craft_recipe)
+            : resolve_weather_scaled_action_cost(
+                action_hydration_cost(action_kind, quantity, craft_recipe),
+                local_weather,
+                action_def->heat_to_hydration_cost,
+                action_def->wind_to_hydration_cost,
+                action_def->dust_to_hydration_cost),
+        action_cost_modifiers.hydration_weight_delta,
+        action_cost_modifiers.hydration_bias);
+    const float nourishment_cost = apply_action_cost_modifier(
+        action_def == nullptr
+            ? action_nourishment_cost(action_kind, quantity, craft_recipe)
+            : resolve_weather_scaled_action_cost(
+                action_nourishment_cost(action_kind, quantity, craft_recipe),
+                local_weather,
+                action_def->heat_to_nourishment_cost,
+                action_def->wind_to_nourishment_cost,
+                action_def->dust_to_nourishment_cost),
+        action_cost_modifiers.nourishment_weight_delta,
+        action_cost_modifiers.nourishment_bias);
+    const float energy_cost = apply_action_cost_modifier(
+        (action_def == nullptr
+            ? action_energy_cost(action_kind, quantity, primary_subject_id, craft_recipe)
+            : resolve_weather_scaled_action_cost(
+                action_energy_cost(action_kind, quantity, primary_subject_id, craft_recipe),
+                local_weather,
+                action_def->heat_to_energy_cost,
+                action_def->wind_to_energy_cost,
+                action_def->dust_to_energy_cost)) * action_multiplier,
+        action_cost_modifiers.energy_weight_delta,
+        action_cost_modifiers.energy_bias);
+    const float morale_cost = apply_action_cost_modifier(
+        action_def == nullptr
+            ? action_morale_cost(action_kind, quantity, craft_recipe)
+            : resolve_weather_scaled_morale_cost(
+                action_morale_cost(action_kind, quantity, craft_recipe),
+                local_weather,
+                action_def->heat_to_morale_cost,
+                action_def->wind_to_morale_cost,
+                action_def->dust_to_morale_cost),
+        action_cost_modifiers.morale_weight_delta,
+        action_cost_modifiers.morale_bias);
     if (hydration_cost == 0.0f &&
         nourishment_cost == 0.0f &&
         energy_cost == 0.0f &&
@@ -860,51 +881,6 @@ SiteActionFailureReason validate_reserved_item_completion(
     }
 
     return SiteActionFailureReason::None;
-}
-
-void emit_item_meter_delta_request(
-    GameMessageQueue& queue,
-    const ItemDef& item_def,
-    std::uint16_t quantity)
-{
-    WorkerMeterDeltaRequestedMessage meter_delta {};
-    meter_delta.source_id = item_def.item_id.value;
-
-    if (item_def.health_delta != 0.0f)
-    {
-        meter_delta.flags |= WORKER_METER_CHANGED_HEALTH;
-        meter_delta.health_delta = item_def.health_delta * static_cast<float>(quantity);
-    }
-    if (item_def.hydration_delta != 0.0f)
-    {
-        meter_delta.flags |= WORKER_METER_CHANGED_HYDRATION;
-        meter_delta.hydration_delta = item_def.hydration_delta * static_cast<float>(quantity);
-    }
-    if (item_def.nourishment_delta != 0.0f)
-    {
-        meter_delta.flags |= WORKER_METER_CHANGED_NOURISHMENT;
-        meter_delta.nourishment_delta = item_def.nourishment_delta * static_cast<float>(quantity);
-    }
-    if (item_def.energy_delta != 0.0f)
-    {
-        meter_delta.flags |= WORKER_METER_CHANGED_ENERGY;
-        meter_delta.energy_delta = item_def.energy_delta * static_cast<float>(quantity);
-    }
-    if (item_def.morale_delta != 0.0f)
-    {
-        meter_delta.flags |= WORKER_METER_CHANGED_MORALE;
-        meter_delta.morale_delta = item_def.morale_delta * static_cast<float>(quantity);
-    }
-
-    if (meter_delta.flags == WORKER_METER_CHANGED_NONE)
-    {
-        return;
-    }
-
-    enqueue_message(
-        queue,
-        GameMessageType::WorkerMeterDeltaRequested,
-        meter_delta);
 }
 
 SiteActionFailureReason validate_repair_target(
@@ -1660,7 +1636,6 @@ void emit_action_fact_messages(
                     safe_quantity,
                     reserved_item_container_kind(action_state),
                     k_inventory_item_consume_flag_ignore_action_reservations});
-            emit_item_meter_delta_request(queue, *item_def, safe_quantity);
         }
         break;
 

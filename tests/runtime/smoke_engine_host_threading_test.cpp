@@ -140,6 +140,59 @@ Gs1EngineMessage make_log_text_message(Gs1LogLevel level, const char* text)
     return message;
 }
 
+Gs1EngineMessage make_begin_site_snapshot_message(
+    std::uint32_t site_id,
+    std::uint32_t site_archetype_id,
+    std::uint16_t width,
+    std::uint16_t height,
+    Gs1ProjectionMode mode)
+{
+    Gs1EngineMessage message {};
+    message.type = GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT;
+    auto& payload = message.emplace_payload<Gs1EngineMessageSiteSnapshotData>();
+    payload.site_id = site_id;
+    payload.site_archetype_id = site_archetype_id;
+    payload.width = width;
+    payload.height = height;
+    payload.mode = mode;
+    return message;
+}
+
+Gs1EngineMessage make_site_modifier_list_begin_message(
+    Gs1ProjectionMode mode,
+    std::uint16_t modifier_count)
+{
+    Gs1EngineMessage message {};
+    message.type = GS1_ENGINE_MESSAGE_SITE_MODIFIER_LIST_BEGIN;
+    auto& payload = message.emplace_payload<Gs1EngineMessageSiteModifierListData>();
+    payload.mode = mode;
+    payload.reserved0 = 0U;
+    payload.modifier_count = modifier_count;
+    return message;
+}
+
+Gs1EngineMessage make_site_modifier_upsert_message(
+    std::uint32_t modifier_id,
+    std::uint16_t remaining_game_hours,
+    std::uint8_t flags)
+{
+    Gs1EngineMessage message {};
+    message.type = GS1_ENGINE_MESSAGE_SITE_MODIFIER_UPSERT;
+    auto& payload = message.emplace_payload<Gs1EngineMessageSiteModifierData>();
+    payload.modifier_id = modifier_id;
+    payload.remaining_game_hours = remaining_game_hours;
+    payload.flags = flags;
+    payload.reserved0 = 0U;
+    return message;
+}
+
+Gs1EngineMessage make_end_site_snapshot_message()
+{
+    Gs1EngineMessage message {};
+    message.type = GS1_ENGINE_MESSAGE_END_SITE_SNAPSHOT;
+    return message;
+}
+
 void queued_commands_only_publish_after_update()
 {
     FakeRuntimeState runtime_state {};
@@ -237,6 +290,51 @@ void update_records_frame_timing_breakdown()
     const double reconstructed_total = timing.host_update_seconds + timing.gameplay_dll_seconds;
     assert(std::abs(reconstructed_total - timing.total_update_seconds) < 0.01);
 }
+
+void modifier_patch_publishes_remaining_game_hours()
+{
+    FakeRuntimeState runtime_state {};
+    runtime_state.engine_messages.push_back(
+        make_begin_site_snapshot_message(1U, 101U, 32U, 32U, GS1_PROJECTION_MODE_SNAPSHOT));
+    runtime_state.engine_messages.push_back(
+        make_site_modifier_list_begin_message(GS1_PROJECTION_MODE_SNAPSHOT, 1U));
+    runtime_state.engine_messages.push_back(
+        make_site_modifier_upsert_message(3003U, 8U, GS1_SITE_MODIFIER_FLAG_TIMED));
+    runtime_state.engine_messages.push_back(make_end_site_snapshot_message());
+
+    const auto api = make_fake_api();
+    auto* runtime = reinterpret_cast<Gs1RuntimeHandle*>(&runtime_state);
+    SmokeEngineHost host {api, runtime, SmokeEngineHost::LogMode::ActivityOnly};
+
+    host.update(0.0);
+    const auto initial_snapshot = host.capture_live_state_snapshot();
+    assert(initial_snapshot.active_site_snapshot.has_value());
+    assert(initial_snapshot.active_site_snapshot->active_modifiers.size() == 1U);
+    assert(initial_snapshot.active_site_snapshot->active_modifiers.front().modifier_id == 3003U);
+    assert(initial_snapshot.active_site_snapshot->active_modifiers.front().remaining_game_hours == 8U);
+    (void)host.consume_pending_live_state_patches();
+
+    runtime_state.engine_messages.push_back(
+        make_begin_site_snapshot_message(1U, 101U, 32U, 32U, GS1_PROJECTION_MODE_DELTA));
+    runtime_state.engine_messages.push_back(
+        make_site_modifier_list_begin_message(GS1_PROJECTION_MODE_DELTA, 1U));
+    runtime_state.engine_messages.push_back(
+        make_site_modifier_upsert_message(3003U, 7U, GS1_SITE_MODIFIER_FLAG_TIMED));
+    runtime_state.engine_messages.push_back(make_end_site_snapshot_message());
+
+    host.update(0.0);
+    const auto updated_snapshot = host.capture_live_state_snapshot();
+    assert(updated_snapshot.active_site_snapshot.has_value());
+    assert(updated_snapshot.active_site_snapshot->active_modifiers.size() == 1U);
+    assert(updated_snapshot.active_site_snapshot->active_modifiers.front().remaining_game_hours == 7U);
+
+    const auto patches = host.consume_pending_live_state_patches();
+    assert(patches.size() == 1U);
+    assert(patches.front().find("\"siteStatePatch\"") != std::string::npos);
+    assert(patches.front().find("\"activeModifiers\":[") != std::string::npos);
+    assert(patches.front().find("\"modifierId\":3003") != std::string::npos);
+    assert(patches.front().find("\"remainingGameHours\":7") != std::string::npos);
+}
 }  // namespace
 
 int main()
@@ -244,5 +342,6 @@ int main()
     queued_commands_only_publish_after_update();
     move_direction_commands_coalesce_before_the_frame_drains_them();
     update_records_frame_timing_breakdown();
+    modifier_patch_publishes_remaining_game_hours();
     return 0;
 }

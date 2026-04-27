@@ -1,7 +1,10 @@
 #include "smoke_engine_host.h"
 #include "content/defs/item_defs.h"
+#include "content/defs/modifier_defs.h"
 
+#include <cmath>
 #include <string>
+#include <vector>
 
 namespace
 {
@@ -135,6 +138,8 @@ const char* ui_action_name(Gs1UiActionType action_type)
         return "HIRE_CONTRACTOR";
     case GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE:
         return "PURCHASE_SITE_UNLOCKABLE";
+    case GS1_UI_ACTION_END_SITE_MODIFIER:
+        return "END_SITE_MODIFIER";
     default:
         return "NONE";
     }
@@ -267,6 +272,113 @@ const char* phone_panel_section_name(Gs1PhonePanelSection section)
     default:
         return "HOME";
     }
+}
+
+std::string format_signed_percent(float value)
+{
+    const auto rounded_percent = static_cast<int>(std::lround(static_cast<double>(value) * 100.0));
+    return (rounded_percent >= 0 ? "+" : "") + std::to_string(rounded_percent) + "%";
+}
+
+void append_modifier_effect_part(
+    std::vector<std::string>& parts,
+    std::string_view label,
+    float value)
+{
+    if (std::fabs(value) <= 1e-4f)
+    {
+        return;
+    }
+
+    parts.push_back(std::string(label) + " " + format_signed_percent(value));
+}
+
+std::string build_modifier_summary(const gs1::ModifierDef& modifier_def)
+{
+    std::vector<std::string> parts {};
+    parts.reserve(24);
+    append_modifier_effect_part(parts, "Heat", modifier_def.totals.heat);
+    append_modifier_effect_part(parts, "Wind", modifier_def.totals.wind);
+    append_modifier_effect_part(parts, "Dust", modifier_def.totals.dust);
+    append_modifier_effect_part(parts, "Moisture", modifier_def.totals.moisture);
+    append_modifier_effect_part(parts, "Fertility", modifier_def.totals.fertility);
+    append_modifier_effect_part(parts, "Salinity", modifier_def.totals.salinity);
+    append_modifier_effect_part(parts, "Growth Pressure", modifier_def.totals.growth_pressure);
+    append_modifier_effect_part(parts, "Salinity Density Cap", modifier_def.totals.salinity_density_cap);
+    append_modifier_effect_part(parts, "Plant Density", modifier_def.totals.plant_density);
+    append_modifier_effect_part(parts, "Health", modifier_def.totals.health);
+    append_modifier_effect_part(parts, "Hydration", modifier_def.totals.hydration);
+    append_modifier_effect_part(parts, "Nourishment", modifier_def.totals.nourishment);
+    append_modifier_effect_part(parts, "Energy Cap", modifier_def.totals.energy_cap);
+    append_modifier_effect_part(parts, "Energy", modifier_def.totals.energy);
+    append_modifier_effect_part(parts, "Morale", modifier_def.totals.morale);
+    append_modifier_effect_part(parts, "Work Efficiency", modifier_def.totals.work_efficiency);
+    append_modifier_effect_part(
+        parts,
+        "Hydration Action Cost",
+        modifier_def.action_cost_modifiers.hydration_weight_delta);
+    append_modifier_effect_part(
+        parts,
+        "Nourishment Action Cost",
+        modifier_def.action_cost_modifiers.nourishment_weight_delta);
+    append_modifier_effect_part(
+        parts,
+        "Energy Action Cost",
+        modifier_def.action_cost_modifiers.energy_weight_delta);
+    append_modifier_effect_part(
+        parts,
+        "Morale Action Cost",
+        modifier_def.action_cost_modifiers.morale_weight_delta);
+
+    if (parts.empty())
+    {
+        return modifier_def.duration_eight_hour_blocks == 0U
+            ? "Permanent modifier."
+            : "Temporary modifier.";
+    }
+
+    std::string summary {};
+    for (std::size_t index = 0U; index < parts.size(); ++index)
+    {
+        if (index > 0U)
+        {
+            summary += "; ";
+        }
+        summary += parts[index];
+    }
+    return summary;
+}
+
+std::string modifier_display_name(const SmokeEngineHost::SiteModifierProjection& modifier)
+{
+    const auto* modifier_def = gs1::find_modifier_def(gs1::ModifierId {modifier.modifier_id});
+    if (modifier_def != nullptr && !modifier_def->display_name.empty())
+    {
+        return std::string {modifier_def->display_name};
+    }
+
+    const bool timed = (modifier.flags & GS1_SITE_MODIFIER_FLAG_TIMED) != 0U;
+    return timed
+        ? "Timed Modifier " + std::to_string(modifier.modifier_id)
+        : "Modifier " + std::to_string(modifier.modifier_id);
+}
+
+std::string modifier_description(const SmokeEngineHost::SiteModifierProjection& modifier)
+{
+    const auto* modifier_def = gs1::find_modifier_def(gs1::ModifierId {modifier.modifier_id});
+    if (modifier_def == nullptr)
+    {
+        return (modifier.flags & GS1_SITE_MODIFIER_FLAG_TIMED) != 0U
+            ? "Temporary modifier."
+            : "Permanent modifier.";
+    }
+
+    if (!modifier_def->description.empty())
+    {
+        return std::string {modifier_def->description};
+    }
+
+    return build_modifier_summary(*modifier_def);
 }
 
 void append_json_string(std::string& json, std::string_view value)
@@ -941,6 +1053,36 @@ void append_worker_pack_panel_json(std::string& json, const SmokeEngineHost::Sit
     append_bool_json(json, site_snapshot.worker_pack_open);
 }
 
+void append_site_modifiers_json(std::string& json, const SmokeEngineHost::SiteSnapshotProjection& site_snapshot)
+{
+    json += "\"activeModifiers\":[";
+    for (std::size_t index = 0U; index < site_snapshot.active_modifiers.size(); ++index)
+    {
+        const auto& modifier = site_snapshot.active_modifiers[index];
+        if (index > 0U)
+        {
+            json.push_back(',');
+        }
+
+        json += "{\"modifierId\":";
+        json += std::to_string(modifier.modifier_id);
+        json += ",\"timed\":";
+        append_bool_json(json, (modifier.flags & GS1_SITE_MODIFIER_FLAG_TIMED) != 0U);
+        json += ",\"removable\":";
+        append_bool_json(json, (modifier.flags & GS1_SITE_MODIFIER_FLAG_TIMED) != 0U);
+        json += ",\"remainingGameHours\":";
+        json += std::to_string(modifier.remaining_game_hours);
+        json += ",\"name\":";
+        append_json_string(json, modifier_display_name(modifier));
+        json += ",\"description\":";
+        append_json_string(json, modifier_description(modifier));
+        json += ",\"flags\":";
+        json += std::to_string(modifier.flags);
+        json += '}';
+    }
+    json += "]";
+}
+
 void append_site_state_json(std::string& json, const std::optional<SmokeEngineHost::SiteSnapshotProjection>& snapshot)
 {
     if (!snapshot.has_value())
@@ -974,6 +1116,8 @@ void append_site_state_json(std::string& json, const std::optional<SmokeEngineHo
     append_placement_failure_json(json, site_snapshot);
     json += ",";
     append_site_tasks_json(json, site_snapshot);
+    json += ",";
+    append_site_modifiers_json(json, site_snapshot);
     json += ",";
     append_site_phone_panel_json(json, site_snapshot);
     json += ",";
@@ -1040,6 +1184,10 @@ void append_site_state_patch_json(
     if ((field_mask & SmokeEngineHost::LiveStatePatchField_SiteStateTasks) != 0U)
     {
         append_field([&]() { append_site_tasks_json(json, site_snapshot); });
+    }
+    if ((field_mask & SmokeEngineHost::LiveStatePatchField_SiteStateModifiers) != 0U)
+    {
+        append_field([&]() { append_site_modifiers_json(json, site_snapshot); });
     }
     if ((field_mask & SmokeEngineHost::LiveStatePatchField_SiteStatePhone) != 0U)
     {
@@ -1246,6 +1394,7 @@ std::string SmokeEngineHost::build_live_state_patch_json(
         LiveStatePatchField_SiteStatePlacementPreview |
         LiveStatePatchField_SitePlacementFailure |
         LiveStatePatchField_SiteStateTasks |
+        LiveStatePatchField_SiteStateModifiers |
         LiveStatePatchField_SiteStatePhone |
         LiveStatePatchField_SiteStateProtectionOverlay;
 

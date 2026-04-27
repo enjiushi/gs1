@@ -47,6 +47,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const inventoryTooltip = document.getElementById("inventory-tooltip");
     const inventoryTooltipTitle = document.getElementById("inventory-tooltip-title");
     const inventoryTooltipMeta = document.getElementById("inventory-tooltip-meta");
+    const modifierTooltip = document.getElementById("modifier-tooltip");
+    const modifierTooltipTitle = document.getElementById("modifier-tooltip-title");
+    const modifierTooltipMeta = document.getElementById("modifier-tooltip-meta");
+    const buffModifierStrip = document.getElementById("buff-modifier-strip");
+    const normalModifierStrip = document.getElementById("normal-modifier-strip");
     const tileContextMenu = document.getElementById("tile-context-menu");
     const audioToggle = document.getElementById("audio-toggle");
 
@@ -1166,6 +1171,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             makeUiAction("SET_SITE_PROTECTION_OVERLAY_MODE", 0, mode, 0));
     }
 
+    function postEndSiteModifier(modifierId) {
+        return postJson(
+            "/ui-action",
+            makeUiAction("END_SITE_MODIFIER", modifierId, 0, 0));
+    }
+
     function splitInfoParts(text) {
         return String(text || "")
             .split("|")
@@ -1195,6 +1206,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function getSiteState(state) {
         return state.siteState || null;
+    }
+
+    function getActiveModifiers(state) {
+        const siteState = getSiteState(state);
+        return siteState && Array.isArray(siteState.activeModifiers)
+            ? siteState.activeModifiers
+            : [];
     }
 
     function getSiteAction(state) {
@@ -3318,6 +3336,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         inventoryTooltip.hidden = true;
     }
 
+    function hideModifierTooltip() {
+        if (modifierTooltip) {
+            modifierTooltip.hidden = true;
+        }
+    }
+
     function moveInventoryTooltip(clientX, clientY) {
         const tooltipWidth = 220;
         const tooltipHeight = 90;
@@ -3354,12 +3378,145 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         moveInventoryTooltip(clientX, clientY);
     }
 
+    function moveModifierTooltip(clientX, clientY) {
+        if (!modifierTooltip) {
+            return;
+        }
+
+        const tooltipWidth = 260;
+        const tooltipHeight = 120;
+        const left = Math.min(clientX + 18, Math.max(12, window.innerWidth - tooltipWidth - 16));
+        const top = Math.min(clientY + 18, Math.max(12, window.innerHeight - tooltipHeight - 16));
+        modifierTooltip.style.left = left + "px";
+        modifierTooltip.style.top = top + "px";
+    }
+
+    function showModifierTooltip(modifier, clientX, clientY) {
+        if (!modifierTooltip || !modifier) {
+            hideModifierTooltip();
+            return;
+        }
+
+        modifierTooltipTitle.textContent = modifier.name || "Modifier";
+        modifierTooltipMeta.textContent = buildModifierTooltipMeta(modifier);
+        modifierTooltip.hidden = false;
+        moveModifierTooltip(clientX, clientY);
+    }
+
+    function modifierRemainingHours(modifier) {
+        if (!modifier || typeof modifier.remainingGameHours !== "number") {
+            return 0;
+        }
+        return Math.max(0, Math.ceil(modifier.remainingGameHours));
+    }
+
+    function formatModifierRemainingHours(totalHours) {
+        return Math.max(0, Math.ceil(totalHours)) + "h";
+    }
+
+    function buildModifierTooltipMeta(modifier) {
+        const description = modifier && modifier.description ? modifier.description : "No details.";
+        if (modifier && modifier.timed) {
+            return description + " Remaining: " +
+                formatModifierRemainingHours(modifierRemainingHours(modifier)) + ".";
+        }
+        return description;
+    }
+
+    function modifierBadgeLabel(modifier) {
+        const words = String(modifier && modifier.name ? modifier.name : "Modifier")
+            .split(/[^A-Za-z0-9]+/)
+            .filter(Boolean);
+        if (words.length >= 2) {
+            return (words[0][0] + words[1][0]).toUpperCase();
+        }
+        if (words.length === 1) {
+            return words[0].slice(0, 2).toUpperCase();
+        }
+        return "MD";
+    }
+
+    function renderModifierStrip(container, modifiers, timed) {
+        if (!container) {
+            return;
+        }
+
+        container.innerHTML = "";
+        container.hidden = modifiers.length === 0;
+        modifiers.forEach((modifier) => {
+            const badge = document.createElement("button");
+            badge.type = "button";
+            badge.className = "modifier-badge " + (timed ? "timed" : "permanent");
+            badge.setAttribute(
+                "aria-label",
+                timed
+                    ? ((modifier.name || "Modifier") + ", " +
+                        formatModifierRemainingHours(modifierRemainingHours(modifier)) + " remaining")
+                    : (modifier.name || "Modifier"));
+
+            const label = document.createElement("span");
+            label.className = "modifier-badge-label";
+            label.textContent = modifierBadgeLabel(modifier);
+            badge.appendChild(label);
+
+            const type = document.createElement("span");
+            type.className = "modifier-badge-type" + (timed ? " timed-remaining" : "");
+            type.textContent = timed
+                ? formatModifierRemainingHours(modifierRemainingHours(modifier))
+                : "Mod";
+            badge.appendChild(type);
+
+            badge.addEventListener("mouseenter", function (event) {
+                showModifierTooltip(modifier, event.clientX, event.clientY);
+            });
+            badge.addEventListener("mousemove", function (event) {
+                showModifierTooltip(modifier, event.clientX, event.clientY);
+            });
+            badge.addEventListener("mouseleave", function () {
+                hideModifierTooltip();
+            });
+            if (timed && modifier.removable && typeof modifier.modifierId === "number") {
+                badge.addEventListener("contextmenu", function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    postEndSiteModifier(modifier.modifierId).catch(() => {
+                        statusChip.textContent = "Failed to end modifier.";
+                    });
+                });
+            }
+
+            container.appendChild(badge);
+        });
+    }
+
+    function renderSiteModifiers(state) {
+        if (!state || state.appState !== "SITE_ACTIVE") {
+            if (buffModifierStrip) {
+                buffModifierStrip.hidden = true;
+                buffModifierStrip.innerHTML = "";
+            }
+            if (normalModifierStrip) {
+                normalModifierStrip.hidden = true;
+                normalModifierStrip.innerHTML = "";
+            }
+            hideModifierTooltip();
+            return;
+        }
+
+        const modifiers = getActiveModifiers(state);
+        const timedModifiers = modifiers.filter((modifier) => !!modifier && modifier.timed);
+        const normalModifiers = modifiers.filter((modifier) => !!modifier && !modifier.timed);
+        renderModifierStrip(buffModifierStrip, timedModifiers, true);
+        renderModifierStrip(normalModifierStrip, normalModifiers, false);
+    }
+
     function clearSelectionInventory() {
         selectionInventory.classList.remove("site-result-actions");
         setTechTreeOverlayActive(false);
         selectionInventory.hidden = true;
         selectionInventory.innerHTML = "";
         hideInventoryTooltip();
+        hideModifierTooltip();
     }
 
     function clampMeterPercent(value) {
@@ -3374,6 +3531,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (!state || (state.appState !== "SITE_ACTIVE" && state.appState !== "REGIONAL_MAP")) {
             siteVitalsPanel.hidden = true;
             siteVitalsBars.innerHTML = "";
+            renderSiteModifiers(null);
             return;
         }
 
@@ -3414,6 +3572,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         siteVitalsBars.innerHTML = "";
 
         if (state.appState !== "SITE_ACTIVE") {
+            renderSiteModifiers(null);
             return;
         }
 
@@ -3441,6 +3600,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             bar.appendChild(content);
             siteVitalsBars.appendChild(bar);
         });
+
+        renderSiteModifiers(state);
     }
 
     function renderSiteHudChrome(state) {
@@ -10474,6 +10635,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             placementPreview: false,
             placementFailure: false,
             protectionOverlay: false,
+            modifiers: false,
             audioCues: false
         };
 
@@ -10517,6 +10679,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     lightweightParts.protectionOverlay = true;
                     continue;
                 }
+                if (siteField === "activeModifiers") {
+                    lightweightParts.modifiers = true;
+                    continue;
+                }
                 return null;
             }
         }
@@ -10528,6 +10694,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             !lightweightParts.placementPreview &&
             !lightweightParts.placementFailure &&
             !lightweightParts.protectionOverlay &&
+            !lightweightParts.modifiers &&
             !lightweightParts.audioCues) {
             return null;
         }
@@ -10606,6 +10773,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     lightweightPatchParts.placementPreview ||
                     lightweightPatchParts.placementFailure ||
                     lightweightPatchParts.protectionOverlay ||
+                    lightweightPatchParts.modifiers ||
                     lightweightPatchParts.weather ||
                     previousActionKind !== nextActionKind) {
                     renderSiteHudChrome(normalizedState);

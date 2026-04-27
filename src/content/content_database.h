@@ -30,8 +30,7 @@ struct ContentDatabase final
     std::vector<CraftRecipeDef> craft_recipe_defs {};
     std::vector<ExcavationDepthDef> excavation_depth_defs {};
     std::vector<ExcavationLootEntryDef> excavation_loot_entry_defs {};
-    std::vector<ModifierPresetDef> nearby_aura_modifier_presets {};
-    std::vector<ModifierPresetDef> run_modifier_presets {};
+    std::vector<ModifierDef> modifier_defs {};
     std::vector<TaskTemplateDef> task_template_defs {};
     std::vector<SiteOnboardingTaskSeedDef> site_onboarding_task_seed_defs {};
     std::vector<RewardCandidateDef> reward_candidate_defs {};

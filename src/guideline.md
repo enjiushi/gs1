@@ -14,7 +14,7 @@ Gameplay/runtime implementation grouped by ownership domain and integration boun
 - `events/`: Engine feedback event translation types.
 - `gs1_pch.h`: Stable internal precompiled-header umbrella for common STL and Flecs includes shared across heavy C++ build targets.
 - `messages/`: Internal gameplay message contracts and dispatch helpers.
-- `runtime/`: Core runtime loop, queues, clocks, and execution services.
+- `runtime/`: Core runtime loop, queues, clocks, and execution services, including timed-modifier remaining-game-hour projection for smoke/viewer consumers.
 - `site/`: Active site-run state, ECS world helpers, and site-owned systems, including harvest action execution plus worker-pack harvest output routing.
 - `support/`: Shared lightweight support types such as IDs.
 - `testing/`: Runtime-side helpers that back the system-test framework.

@@ -482,49 +482,18 @@ std::uint32_t total_reserved_item_quantity(
     return reserved_quantity;
 }
 
-void emit_item_use_effect(
+void emit_item_use_completed(
     SiteSystemContext<InventorySystem>& context,
-    const ItemDef& item_def,
+    ItemId item_id,
     std::uint32_t quantity) noexcept
 {
-    WorkerMeterDeltaRequestedMessage meter_delta {};
-    meter_delta.source_id = item_def.item_id.value;
-
-    if (item_def.health_delta != 0.0f)
-    {
-        meter_delta.flags |= WORKER_METER_CHANGED_HEALTH;
-        meter_delta.health_delta = item_def.health_delta * static_cast<float>(quantity);
-    }
-    if (item_def.hydration_delta != 0.0f)
-    {
-        meter_delta.flags |= WORKER_METER_CHANGED_HYDRATION;
-        meter_delta.hydration_delta = item_def.hydration_delta * static_cast<float>(quantity);
-    }
-    if (item_def.nourishment_delta != 0.0f)
-    {
-        meter_delta.flags |= WORKER_METER_CHANGED_NOURISHMENT;
-        meter_delta.nourishment_delta = item_def.nourishment_delta * static_cast<float>(quantity);
-    }
-    if (item_def.energy_delta != 0.0f)
-    {
-        meter_delta.flags |= WORKER_METER_CHANGED_ENERGY;
-        meter_delta.energy_delta = item_def.energy_delta * static_cast<float>(quantity);
-    }
-    if (item_def.morale_delta != 0.0f)
-    {
-        meter_delta.flags |= WORKER_METER_CHANGED_MORALE;
-        meter_delta.morale_delta = item_def.morale_delta * static_cast<float>(quantity);
-    }
-
-    if (meter_delta.flags == WORKER_METER_CHANGED_NONE)
-    {
-        return;
-    }
-
-    GameMessage message {};
-    message.type = GameMessageType::WorkerMeterDeltaRequested;
-    message.set_payload(meter_delta);
-    context.message_queue.push_back(message);
+    GameMessage completed_message {};
+    completed_message.type = GameMessageType::InventoryItemUseCompleted;
+    completed_message.set_payload(InventoryItemUseCompletedMessage {
+        item_id.value,
+        static_cast<std::uint16_t>(std::min<std::uint32_t>(quantity, 65535U)),
+        0U});
+    context.message_queue.push_back(completed_message);
 }
 
 void emit_item_use_action_request(
@@ -725,7 +694,6 @@ Gs1Status handle_inventory_item_use(
             return GS1_STATUS_OK;
         }
 
-        emit_item_use_effect(context, *item_def, requested_quantity);
         if (!inventory_storage::consume_quantity_from_item_entity(
                 context.site_run,
                 item_entity,
@@ -734,13 +702,7 @@ Gs1Status handle_inventory_item_use(
             return GS1_STATUS_INVALID_STATE;
         }
 
-        GameMessage completed_message {};
-        completed_message.type = GameMessageType::InventoryItemUseCompleted;
-        completed_message.set_payload(InventoryItemUseCompletedMessage {
-            stack->item_id.value,
-            static_cast<std::uint16_t>(requested_quantity),
-            0U});
-        context.message_queue.push_back(completed_message);
+        emit_item_use_completed(context, stack->item_id, requested_quantity);
         context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_HUD);
         return GS1_STATUS_OK;
     });
@@ -779,7 +741,18 @@ Gs1Status handle_inventory_item_consume(
             inventory_storage::container_for_kind(context.site_run, payload.container_kind),
             item_id,
             quantity);
-        return remaining == 0U ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
+        if (remaining != 0U)
+        {
+            return GS1_STATUS_INVALID_STATE;
+        }
+
+        const auto* item_def = find_item_def(item_id);
+        if (item_def != nullptr && item_is_directly_usable(*item_def))
+        {
+            emit_item_use_completed(context, item_id, quantity);
+            context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_HUD);
+        }
+        return GS1_STATUS_OK;
     });
 }
 

@@ -23,7 +23,7 @@ Site-owned state, ECS world support, and helper logic for active site gameplay.
 - `inventory_storage.h`: Inventory container/storage primitive/helper declarations shared across runtime and tests.
 - `inventory_storage.cpp`: Inventory container/storage primitive/helper implementation kept out of headers to narrow incremental rebuilds.
 - `local_weather_resolve_state.h`: Local weather resolution runtime state, including the last aggregated per-tile contribution snapshot plus deferred full-snapshot emission on site start.
-- `modifier_state.h`: Modifier application state for site effects, including resolved generic meter channels plus resolved terrain-factor weight/bias controls.
+- `modifier_state.h`: Modifier application state for site effects, including resolved generic meter channels with timed-buff-cap bias support, resolved terrain-factor weight/bias controls, resolved worker action-cost modifiers, plus a shared active site-modifier list keyed only by `modifier_id` where permanent effects use `0` duration and timed effects retain authored duration plus remaining world minutes internally for hour-bucket projection.
 - `phone_panel_state.h`: Authoritative phone home/app-panel section state plus tracked open/closed visibility and projected listing/task snapshot state for the active site, including live/completed/claimed task counts.
 - `plant_weather_contribution_state.h`: Plant weather-contribution runtime state, including retained dirty-target tracking plus cached wind-direction sector invalidation.
 - `placement_preview.h`: Placement-preview state for build/placement UI flows.

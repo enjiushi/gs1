@@ -1,5 +1,6 @@
 #pragma once
 
+#include "content/defs/modifier_defs.h"
 #include "content/defs/plant_defs.h"
 #include "content/defs/structure_defs.h"
 
@@ -46,6 +47,7 @@ struct ItemDef final
     float nourishment_delta {0.0f};
     float energy_delta {0.0f};
     float morale_delta {0.0f};
+    ModifierId modifier_id {};
 };
 
 inline constexpr std::uint32_t k_item_water_container = 1U;
@@ -84,6 +86,9 @@ inline constexpr std::uint32_t k_item_alxa_agate = 33U;
 inline constexpr std::uint32_t k_item_turquoise_vein_fragment = 34U;
 inline constexpr std::uint32_t k_item_golden_silk_jade = 35U;
 inline constexpr std::uint32_t k_item_hetian_jade_pebble = 36U;
+inline constexpr std::uint32_t k_item_field_tea = 37U;
+inline constexpr std::uint32_t k_item_spiced_stew = 38U;
+inline constexpr std::uint32_t k_item_focus_tonic = 39U;
 
 [[nodiscard]] std::span<const ItemDef> all_item_defs() noexcept;
 

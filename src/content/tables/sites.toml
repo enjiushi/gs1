@@ -107,7 +107,7 @@ regional_map_tile_x = 3
 regional_map_tile_y = 1
 support_package_id = 1004
 exported_support_items = [{ item_id = 3, quantity = 1 }, { item_id = 13, quantity = 1 }]
-nearby_aura_modifier_ids = [4]
+nearby_aura_modifier_ids = [104]
 site_completion_tile_threshold = 16
 site_time_limit_minutes = 0.0
 objective_target_edge = "East"

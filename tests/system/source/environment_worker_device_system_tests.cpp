@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstring>
 
+#include "content/defs/modifier_defs.h"
 #include "content/prototype_content.h"
 #include "content/defs/technology_defs.h"
 #include "messages/game_message.h"
@@ -50,6 +51,20 @@ GameMessage make_message(gs1::GameMessageType type, const Payload& payload)
     message.type = type;
     message.set_payload(payload);
     return message;
+}
+
+const gs1::ActiveSiteModifierState* find_active_run_modifier(
+    const gs1::SiteRunState& site_run,
+    gs1::ModifierId modifier_id)
+{
+    const auto it = std::find_if(
+        site_run.modifier.active_site_modifiers.begin(),
+        site_run.modifier.active_site_modifiers.end(),
+        [&](const gs1::ActiveSiteModifierState& modifier) {
+            return modifier.duration_world_minutes <= 0.0 &&
+                modifier.modifier_id == modifier_id;
+        });
+    return it == site_run.modifier.active_site_modifiers.end() ? nullptr : &(*it);
 }
 
 const gs1::PrototypeSiteContent& require_site_content(
@@ -1389,15 +1404,31 @@ void modifier_imports_campaign_aura_and_reacts_to_camp_changes(
     GS1_SYSTEM_TEST_CHECK(context, site_run.modifier.active_nearby_aura_modifier_ids.size() == 2U);
     const auto initial_morale = site_run.modifier.resolved_channel_totals.morale;
 
-    site_run.camp.camp_durability = 0.0f;
-    site_run.modifier.active_run_modifier_ids.push_back(gs1::ModifierId {4U});
     site_run.pending_projection_update_flags = 0U;
+    site_run.camp.camp_durability = 0.0f;
     ModifierSystem::run(site_context);
 
     GS1_SYSTEM_TEST_CHECK(context, site_run.modifier.resolved_channel_totals.morale < initial_morale);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        (site_run.pending_projection_update_flags & gs1::SITE_PROJECTION_UPDATE_HUD) != 0U);
+}
+
+void modifier_lookup_uses_explicit_ids_instead_of_bucket_fallback(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    const auto missing_nearby = gs1::resolve_nearby_aura_modifier_preset(gs1::ModifierId {9999U});
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(missing_nearby.heat, 0.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(missing_nearby.moisture, 0.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(missing_nearby.morale, 0.0f));
+
+    const auto missing_run = gs1::resolve_run_modifier_preset(gs1::ModifierId {9999U});
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(missing_run.hydration, 0.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(missing_run.energy_cap, 0.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(missing_run.work_efficiency, 0.0f));
+
+    const auto assistant = gs1::resolve_run_modifier_preset(gs1::ModifierId {1001U});
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(assistant.hydration, 0.2f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(assistant.nourishment, 0.05f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(assistant.morale, 0.12f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(assistant.work_efficiency, 0.3f));
 }
 
 void modifier_imports_campaign_assistant_and_scales_technology_run_modifiers_with_reputation(
@@ -1427,10 +1458,7 @@ void modifier_imports_campaign_assistant_and_scales_technology_run_modifiers_wit
     GS1_SYSTEM_TEST_REQUIRE(context, imported_modifier != nullptr);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        std::find(
-            site_run.modifier.active_run_modifier_ids.begin(),
-            site_run.modifier.active_run_modifier_ids.end(),
-            gs1::ModifierId {1001U}) != site_run.modifier.active_run_modifier_ids.end());
+        find_active_run_modifier(site_run, gs1::ModifierId {1001U}) != nullptr);
     const auto initial_hydration = site_run.modifier.resolved_channel_totals.hydration;
     const auto initial_work_efficiency = site_run.modifier.resolved_channel_totals.work_efficiency;
 
@@ -1579,6 +1607,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "modifier",
     "imports_campaign_aura_and_reacts_to_camp_changes",
     modifier_imports_campaign_aura_and_reacts_to_camp_changes);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "modifier",
+    "lookup_uses_explicit_ids_instead_of_bucket_fallback",
+    modifier_lookup_uses_explicit_ids_instead_of_bucket_fallback);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "modifier",
     "imports_campaign_assistant_and_scales_technology_run_modifiers_with_reputation",

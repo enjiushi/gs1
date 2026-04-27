@@ -17,6 +17,8 @@ namespace gs1
 {
 namespace
 {
+constexpr std::uint32_t k_timed_buff_internal_cash_points = 200U;
+
 std::uint32_t round_to_cash_points(double value) noexcept
 {
     return value <= 0.0
@@ -116,7 +118,12 @@ std::uint32_t item_internal_price_cash_points(ItemId item_id) noexcept
         item_def->nourishment_delta,
         item_def->energy_delta,
         item_def->morale_delta);
-    return derived_cash_points != 0U ? derived_cash_points : item_def->internal_price_cash_points;
+    const auto base_cash_points =
+        derived_cash_points != 0U ? derived_cash_points : item_def->internal_price_cash_points;
+    const auto* modifier_def = find_modifier_def(item_def->modifier_id);
+    return modifier_def == nullptr || modifier_def->duration_eight_hour_blocks == 0U
+        ? base_cash_points
+        : base_cash_points + k_timed_buff_internal_cash_points;
 }
 
 std::uint32_t item_buy_price_cash_points(ItemId item_id) noexcept
@@ -290,38 +297,42 @@ const SiteActionDef* find_site_action_def(ActionKind action_kind) noexcept
         : &content.site_action_defs[it->second];
 }
 
-std::span<const ModifierPresetDef> all_nearby_aura_modifier_presets() noexcept
+std::span<const ModifierDef> all_modifier_defs() noexcept
 {
-    return prototype_content_database().nearby_aura_modifier_presets;
+    return prototype_content_database().modifier_defs;
 }
 
-std::span<const ModifierPresetDef> all_run_modifier_presets() noexcept
+const ModifierDef* find_modifier_def(ModifierId id) noexcept
 {
-    return prototype_content_database().run_modifier_presets;
+    const auto& content = prototype_content_database();
+    const auto it = content.index.modifier_by_id.find(id.value);
+    return it == content.index.modifier_by_id.end()
+        ? nullptr
+        : &content.modifier_defs[it->second];
 }
 
 ModifierChannelTotals resolve_nearby_aura_modifier_preset(ModifierId id) noexcept
 {
-    const auto presets = all_nearby_aura_modifier_presets();
-    if (id.value == 0U || presets.empty())
+    const auto* modifier_def = find_modifier_def(id);
+    if (modifier_def == nullptr ||
+        modifier_def->preset_kind != ModifierPresetKind::NearbyAura)
     {
         return {};
     }
 
-    const auto bucket = static_cast<std::size_t>(id.value) % presets.size();
-    return presets[bucket].totals;
+    return modifier_def->totals;
 }
 
 ModifierChannelTotals resolve_run_modifier_preset(ModifierId id) noexcept
 {
-    const auto presets = all_run_modifier_presets();
-    if (id.value == 0U || presets.empty())
+    const auto* modifier_def = find_modifier_def(id);
+    if (modifier_def == nullptr ||
+        modifier_def->preset_kind != ModifierPresetKind::RunModifier)
     {
         return {};
     }
 
-    const auto bucket = static_cast<std::size_t>(id.value) % presets.size();
-    return presets[bucket].totals;
+    return modifier_def->totals;
 }
 
 std::span<const TechnologyTierDef> all_technology_tier_defs() noexcept

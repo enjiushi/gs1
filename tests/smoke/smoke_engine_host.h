@@ -52,7 +52,8 @@ public:
         LiveStatePatchField_SitePlacementFailure = 1U << 18,
         LiveStatePatchField_CampaignResources = 1U << 19,
         LiveStatePatchField_SiteStateProtectionOverlay = 1U << 20,
-        LiveStatePatchField_AudioCues = 1U << 21
+        LiveStatePatchField_SiteStateModifiers = 1U << 21,
+        LiveStatePatchField_AudioCues = 1U << 22
     };
 
     struct LiveStateSnapshot;
@@ -311,6 +312,13 @@ public:
         Gs1SiteProtectionOverlayMode mode {GS1_SITE_PROTECTION_OVERLAY_NONE};
     };
 
+    struct SiteModifierProjection final
+    {
+        std::uint32_t modifier_id {0};
+        std::uint16_t remaining_game_hours {0};
+        std::uint32_t flags {0};
+    };
+
     struct SiteSnapshotProjection final
     {
         std::uint32_t site_id {0};
@@ -321,6 +329,7 @@ public:
         std::vector<SiteInventoryStorageProjection> inventory_storages {};
         std::vector<SiteInventorySlotProjection> worker_pack_slots {};
         std::vector<SiteTaskProjection> tasks {};
+        std::vector<SiteModifierProjection> active_modifiers {};
         std::vector<SitePhoneListingProjection> phone_listings {};
         bool worker_pack_open {false};
         SitePhonePanelProjection phone_panel {};
@@ -442,6 +451,8 @@ private:
     void apply_site_placement_preview(const Gs1EngineMessage& message);
     void apply_site_placement_failure(const Gs1EngineMessage& message);
     void apply_site_task_upsert(const Gs1EngineMessage& message);
+    void apply_site_modifier_list_begin(const Gs1EngineMessage& message);
+    void apply_site_modifier_upsert(const Gs1EngineMessage& message);
     void apply_site_phone_panel_state(const Gs1EngineMessage& message);
     void apply_site_protection_overlay_state(const Gs1EngineMessage& message);
     void apply_site_phone_listing_remove(const Gs1EngineMessage& message);

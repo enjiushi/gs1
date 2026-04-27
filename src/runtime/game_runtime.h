@@ -167,6 +167,9 @@ private:
     void queue_site_placement_failure_message(const PlacementModeCommitRejectedMessage& payload);
     void queue_site_task_upsert_message(std::size_t task_index);
     void queue_all_site_task_upsert_messages();
+    void queue_site_modifier_list_begin_message(Gs1ProjectionMode mode);
+    void queue_site_modifier_upsert_message(std::size_t modifier_index);
+    void queue_all_site_modifier_upsert_messages(Gs1ProjectionMode mode);
     void queue_site_phone_panel_state_message();
     void queue_site_protection_overlay_state_message();
     void queue_site_phone_listing_remove_message(std::uint32_t listing_id);

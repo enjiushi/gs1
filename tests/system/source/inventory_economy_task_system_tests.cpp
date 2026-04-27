@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "messages/game_message.h"
 #include "content/defs/gameplay_tuning_defs.h"
 #include "content/defs/excavation_defs.h"
@@ -35,6 +37,7 @@ using gs1::GameMessageQueue;
 using gs1::GameMessageType;
 using gs1::InventorySystem;
 using gs1::LocalWeatherResolveSystem;
+using gs1::ModifierSystem;
 using gs1::PhoneListingKind;
 using gs1::PlantWeatherContributionSystem;
 using gs1::SiteRunStartedMessage;
@@ -50,6 +53,40 @@ GameMessage make_message(gs1::GameMessageType type, const Payload& payload)
     message.type = type;
     message.set_payload(payload);
     return message;
+}
+
+std::uint32_t count_active_timed_buffs(const gs1::SiteRunState& site_run)
+{
+    return static_cast<std::uint32_t>(std::count_if(
+        site_run.modifier.active_site_modifiers.begin(),
+        site_run.modifier.active_site_modifiers.end(),
+        [](const gs1::ActiveSiteModifierState& modifier) {
+            return modifier.duration_world_minutes > 0.0;
+        }));
+}
+
+const gs1::ActiveSiteModifierState* find_active_timed_buff(
+    const gs1::SiteRunState& site_run,
+    gs1::ModifierId modifier_id)
+{
+    const auto it = std::find_if(
+        site_run.modifier.active_site_modifiers.begin(),
+        site_run.modifier.active_site_modifiers.end(),
+        [&](const gs1::ActiveSiteModifierState& modifier) {
+            return modifier.duration_world_minutes > 0.0 &&
+                modifier.modifier_id == modifier_id;
+        });
+    return it == site_run.modifier.active_site_modifiers.end() ? nullptr : &(*it);
+}
+
+gs1::ActiveSiteModifierState make_manual_timed_buff_state(
+    gs1::ModifierId modifier_id)
+{
+    gs1::ActiveSiteModifierState modifier {};
+    modifier.modifier_id = modifier_id;
+    modifier.duration_world_minutes = 480.0;
+    modifier.remaining_world_minutes = 480.0;
+    return modifier;
 }
 
 void run_local_weather_pipeline(
@@ -249,12 +286,13 @@ void inventory_non_site_seed_and_run_resize_slots(gs1::testing::SystemTestExecut
             gs1::ItemId {gs1::k_item_basic_straw_checkerboard}) == 8U);
 }
 
-void inventory_item_use_validates_and_emits_meter_delta(gs1::testing::SystemTestExecutionContext& context)
+void inventory_item_use_validates_and_emits_completion(gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(1U, 803U);
     GameMessageQueue queue {};
     auto site_context = make_site_context<InventorySystem>(campaign, site_run, queue);
+    auto worker_context = make_site_context<WorkerConditionSystem>(campaign, site_run, queue);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -282,6 +320,9 @@ void inventory_item_use_validates_and_emits_meter_delta(gs1::testing::SystemTest
         gs1::inventory_storage::worker_pack_container(site_run),
         gs1::ItemId {gs1::k_item_medicine_pack},
         1U);
+    auto worker_conditions = site_run.site_world->worker_conditions();
+    worker_conditions.health = 70.0f;
+    site_run.site_world->set_worker_conditions(worker_conditions);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -295,14 +336,22 @@ void inventory_item_use_validates_and_emits_meter_delta(gs1::testing::SystemTest
                     1U,
                     0U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, !site_run.inventory.worker_pack_slots[0].occupied);
-    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 2U);
-    GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::WorkerMeterDeltaRequested);
-    GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameMessageType::InventoryItemUseCompleted);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::InventoryItemUseCompleted);
     GS1_SYSTEM_TEST_CHECK(
         context,
         approx_equal(
-            queue.front().payload_as<gs1::WorkerMeterDeltaRequestedMessage>().health_delta,
-            18.0f));
+            site_run.site_world->worker_conditions().health,
+            70.0f));
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        WorkerConditionSystem::process_message(worker_context, queue.front()) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            site_run.site_world->worker_conditions().health,
+            88.0f));
 }
 
 void inventory_transfer_moves_and_merges_stacks(gs1::testing::SystemTestExecutionContext& context)
@@ -662,23 +711,23 @@ void inventory_item_use_drink_defers_item_and_meter_changes_until_action_complet
     ActionExecutionSystem::run(action_context);
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::SiteActionCompleted) == 1U);
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::InventoryItemConsumeRequested) == 1U);
-    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::WorkerMeterDeltaRequested) == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::InventoryItemUseCompleted) == 0U);
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].item_quantity == 2U);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.site_world->worker_conditions().hydration, 40.0f));
 
     const auto* consume_message =
         first_message(queue, GameMessageType::InventoryItemConsumeRequested);
-    const auto* meter_message =
-        first_message(queue, GameMessageType::WorkerMeterDeltaRequested);
     GS1_SYSTEM_TEST_REQUIRE(context, consume_message != nullptr);
-    GS1_SYSTEM_TEST_REQUIRE(context, meter_message != nullptr);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         InventorySystem::process_message(inventory_context, *consume_message) == GS1_STATUS_OK);
+    const auto* completed_message =
+        first_message(queue, GameMessageType::InventoryItemUseCompleted);
+    GS1_SYSTEM_TEST_REQUIRE(context, completed_message != nullptr);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        WorkerConditionSystem::process_message(worker_context, *meter_message) == GS1_STATUS_OK);
+        WorkerConditionSystem::process_message(worker_context, *completed_message) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].occupied);
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].item_quantity == 1U);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.site_world->worker_conditions().hydration, 60.0f));
@@ -748,42 +797,396 @@ void inventory_item_use_food_restores_nourishment_without_refilling_energy(
     ActionExecutionSystem::run(action_context);
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::SiteActionCompleted) == 1U);
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::InventoryItemConsumeRequested) == 1U);
-    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::WorkerMeterDeltaRequested) == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::InventoryItemUseCompleted) == 0U);
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].item_quantity == 2U);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.site_world->worker_conditions().nourishment, 35.0f));
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.site_world->worker_conditions().energy, 20.0f));
 
     const auto* consume_message =
         first_message(queue, GameMessageType::InventoryItemConsumeRequested);
-    const auto* meter_message =
-        first_message(queue, GameMessageType::WorkerMeterDeltaRequested);
     GS1_SYSTEM_TEST_REQUIRE(context, consume_message != nullptr);
-    GS1_SYSTEM_TEST_REQUIRE(context, meter_message != nullptr);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        meter_message->payload_as<gs1::WorkerMeterDeltaRequestedMessage>().flags ==
-            gs1::WORKER_METER_CHANGED_NOURISHMENT);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        approx_equal(
-            meter_message->payload_as<gs1::WorkerMeterDeltaRequestedMessage>().nourishment_delta,
-            15.0f));
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        approx_equal(
-            meter_message->payload_as<gs1::WorkerMeterDeltaRequestedMessage>().energy_delta,
-            0.0f));
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         InventorySystem::process_message(inventory_context, *consume_message) == GS1_STATUS_OK);
+    const auto* completed_message =
+        first_message(queue, GameMessageType::InventoryItemUseCompleted);
+    GS1_SYSTEM_TEST_REQUIRE(context, completed_message != nullptr);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        completed_message->payload_as<gs1::InventoryItemUseCompletedMessage>().item_id ==
+            gs1::k_item_food_pack);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        completed_message->payload_as<gs1::InventoryItemUseCompletedMessage>().quantity == 1U);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        WorkerConditionSystem::process_message(worker_context, *meter_message) == GS1_STATUS_OK);
+        WorkerConditionSystem::process_message(worker_context, *completed_message) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].occupied);
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[0].item_quantity == 1U);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.site_world->worker_conditions().nourishment, 50.0f));
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.site_world->worker_conditions().energy, 20.0f));
+}
+
+void focus_tonic_use_activates_timed_buff_and_adds_flat_buff_cash_points(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 808U);
+    GameMessageQueue queue {};
+    auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
+    auto worker_context = make_site_context<WorkerConditionSystem>(campaign, site_run, queue);
+    auto modifier_context = make_site_context<ModifierSystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_message(
+            inventory_context,
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ModifierSystem::process_message(
+            modifier_context,
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+    queue.clear();
+
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        gs1::inventory_storage::worker_pack_container(site_run),
+        gs1::ItemId {gs1::k_item_focus_tonic},
+        1U);
+    auto worker_conditions = site_run.site_world->worker_conditions();
+    worker_conditions.energy = 20.0f;
+    worker_conditions.morale = 40.0f;
+    site_run.site_world->set_worker_conditions(worker_conditions);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_message(
+            inventory_context,
+            make_message(
+                GameMessageType::InventoryItemUseRequested,
+                gs1::InventoryItemUseRequestedMessage {
+                    gs1::k_item_focus_tonic,
+                    site_run.inventory.worker_pack_storage_id,
+                    1U,
+                    0U})) == GS1_STATUS_OK);
+
+    const auto* completed_message =
+        first_message(queue, GameMessageType::InventoryItemUseCompleted);
+    GS1_SYSTEM_TEST_REQUIRE(context, completed_message != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        WorkerConditionSystem::process_message(worker_context, *completed_message) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ModifierSystem::process_message(modifier_context, *completed_message) == GS1_STATUS_OK);
+
+    const auto* active_buff = find_active_timed_buff(site_run, gs1::ModifierId {3003U});
+    GS1_SYSTEM_TEST_REQUIRE(context, active_buff != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, count_active_timed_buffs(site_run) == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, active_buff->modifier_id.value == 3003U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(site_run.site_world->worker_conditions().energy, 30.0f));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(site_run.site_world->worker_conditions().morale, 45.0f));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            site_run.modifier.resolved_action_cost_modifiers.energy_weight_delta,
+            -0.25f));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        gs1::item_internal_price_cash_points(gs1::ItemId {gs1::k_item_focus_tonic}) == 385U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        gs1::item_buy_price_cash_points(gs1::ItemId {gs1::k_item_focus_tonic}) == 423U);
+}
+
+void timed_modifiers_refresh_duplicate_id_and_expire_by_game_time(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 809U);
+    GameMessageQueue queue {};
+    auto modifier_context = make_site_context<ModifierSystem>(campaign, site_run, queue, 300.0);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ModifierSystem::process_message(
+            modifier_context,
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    const auto tea_completed = make_message(
+        GameMessageType::InventoryItemUseCompleted,
+        gs1::InventoryItemUseCompletedMessage {
+            gs1::k_item_field_tea,
+            1U,
+            0U});
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ModifierSystem::process_message(modifier_context, tea_completed) == GS1_STATUS_OK);
+    const auto* tea_buff = find_active_timed_buff(site_run, gs1::ModifierId {3001U});
+    GS1_SYSTEM_TEST_REQUIRE(context, tea_buff != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(context, count_active_timed_buffs(site_run) == 1U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            static_cast<float>(tea_buff->remaining_world_minutes),
+            480.0f));
+
+    ModifierSystem::run(modifier_context);
+    tea_buff = find_active_timed_buff(site_run, gs1::ModifierId {3001U});
+    GS1_SYSTEM_TEST_REQUIRE(context, tea_buff != nullptr);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            static_cast<float>(tea_buff->remaining_world_minutes),
+            240.0f));
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ModifierSystem::process_message(modifier_context, tea_completed) == GS1_STATUS_OK);
+    tea_buff = find_active_timed_buff(site_run, gs1::ModifierId {3001U});
+    GS1_SYSTEM_TEST_REQUIRE(context, tea_buff != nullptr);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            static_cast<float>(tea_buff->remaining_world_minutes),
+            480.0f));
+
+    const auto tonic_completed = make_message(
+        GameMessageType::InventoryItemUseCompleted,
+        gs1::InventoryItemUseCompletedMessage {
+            gs1::k_item_focus_tonic,
+            1U,
+            0U});
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ModifierSystem::process_message(modifier_context, tonic_completed) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(context, count_active_timed_buffs(site_run) == 2U);
+    GS1_SYSTEM_TEST_REQUIRE(context, find_active_timed_buff(site_run, gs1::ModifierId {3001U}) != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(context, find_active_timed_buff(site_run, gs1::ModifierId {3003U}) != nullptr);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ModifierSystem::process_message(modifier_context, tea_completed) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(context, count_active_timed_buffs(site_run) == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, find_active_timed_buff(site_run, gs1::ModifierId {3001U}) != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, find_active_timed_buff(site_run, gs1::ModifierId {3003U}) != nullptr);
+
+    auto expire_context = make_site_context<ModifierSystem>(campaign, site_run, queue, 1200.0);
+    ModifierSystem::run(expire_context);
+    GS1_SYSTEM_TEST_CHECK(context, count_active_timed_buffs(site_run) == 0U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            site_run.modifier.resolved_action_cost_modifiers.energy_weight_delta,
+            0.0f));
+}
+
+void timed_buff_action_cost_modifier_reduces_action_energy_cost(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto baseline_site_run = make_test_site_run(1U, 810U);
+    auto buffed_site_run = make_test_site_run(1U, 811U);
+    GameMessageQueue baseline_queue {};
+    GameMessageQueue buffed_queue {};
+    auto baseline_action_context =
+        make_site_context<ActionExecutionSystem>(campaign, baseline_site_run, baseline_queue, 60.0);
+    auto buffed_action_context =
+        make_site_context<ActionExecutionSystem>(campaign, buffed_site_run, buffed_queue, 60.0);
+    auto buffed_modifier_context =
+        make_site_context<ModifierSystem>(campaign, buffed_site_run, buffed_queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ModifierSystem::process_message(
+            buffed_modifier_context,
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ModifierSystem::process_message(
+            buffed_modifier_context,
+            make_message(
+                GameMessageType::InventoryItemUseCompleted,
+                gs1::InventoryItemUseCompletedMessage {
+                    gs1::k_item_focus_tonic,
+                    1U,
+                    0U})) == GS1_STATUS_OK);
+
+    const auto start_water_action = make_message(
+        GameMessageType::StartSiteAction,
+        gs1::StartSiteActionMessage {
+            GS1_SITE_ACTION_WATER,
+            0U,
+            1U,
+            0,
+            0,
+            0U,
+            0U,
+            0U});
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(baseline_action_context, start_water_action) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(buffed_action_context, start_water_action) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        baseline_site_run.site_action.deferred_meter_delta.energy_delta <
+            buffed_site_run.site_action.deferred_meter_delta.energy_delta);
+}
+
+void timed_modifier_can_be_manually_ended_without_touching_permanent_modifier(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 812U);
+    GameMessageQueue queue {};
+    auto modifier_context = make_site_context<ModifierSystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ModifierSystem::process_message(
+            modifier_context,
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    const auto baseline_totals = site_run.modifier.resolved_channel_totals;
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ModifierSystem::process_message(
+            modifier_context,
+            make_message(
+                GameMessageType::RunModifierAwardRequested,
+                gs1::RunModifierAwardRequestedMessage {4U})) == GS1_STATUS_OK);
+    const auto run_modifier_totals = site_run.modifier.resolved_channel_totals;
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        !approx_equal(run_modifier_totals.energy_cap, baseline_totals.energy_cap) ||
+            !approx_equal(run_modifier_totals.morale, baseline_totals.morale) ||
+            !approx_equal(run_modifier_totals.work_efficiency, baseline_totals.work_efficiency));
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ModifierSystem::process_message(
+            modifier_context,
+            make_message(
+                GameMessageType::InventoryItemUseCompleted,
+                gs1::InventoryItemUseCompletedMessage {
+                    gs1::k_item_focus_tonic,
+                    1U,
+                    0U})) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_CHECK(context, site_run.modifier.active_site_modifiers.size() == 2U);
+    GS1_SYSTEM_TEST_REQUIRE(context, count_active_timed_buffs(site_run) == 1U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(site_run.modifier.resolved_action_cost_modifiers.energy_weight_delta, -0.25f));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        site_run.modifier.resolved_channel_totals.morale > run_modifier_totals.morale);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ModifierSystem::process_message(
+            modifier_context,
+            make_message(
+                GameMessageType::SiteModifierEndRequested,
+                gs1::SiteModifierEndRequestedMessage {3003U})) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_CHECK(context, count_active_timed_buffs(site_run) == 0U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.modifier.active_site_modifiers.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(site_run.modifier.resolved_action_cost_modifiers.energy_weight_delta, 0.0f));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(site_run.modifier.resolved_channel_totals.energy_cap, run_modifier_totals.energy_cap));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(site_run.modifier.resolved_channel_totals.morale, run_modifier_totals.morale));
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ModifierSystem::process_message(
+            modifier_context,
+            make_message(
+                GameMessageType::SiteModifierEndRequested,
+                gs1::SiteModifierEndRequestedMessage {4U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.modifier.active_site_modifiers.size() == 1U);
+}
+
+void timed_buff_cap_blocks_distinct_buffs_and_bias_can_expand_limit(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 813U);
+    GameMessageQueue queue {};
+    auto modifier_context = make_site_context<ModifierSystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        gs1::gameplay_tuning_def().modifier_system.active_timed_buff_cap == 3U);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ModifierSystem::process_message(
+            modifier_context,
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    site_run.modifier.active_site_modifiers.push_back(
+        make_manual_timed_buff_state(gs1::ModifierId {3002U}));
+    site_run.modifier.active_site_modifiers.push_back(
+        make_manual_timed_buff_state(gs1::ModifierId {3011U}));
+    site_run.modifier.active_site_modifiers.push_back(
+        make_manual_timed_buff_state(gs1::ModifierId {3012U}));
+
+    const auto stew_completed = make_message(
+        GameMessageType::InventoryItemUseCompleted,
+        gs1::InventoryItemUseCompletedMessage {
+            gs1::k_item_spiced_stew,
+            1U,
+            0U});
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ModifierSystem::process_message(modifier_context, stew_completed) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, count_active_timed_buffs(site_run) == 3U);
+    GS1_SYSTEM_TEST_REQUIRE(context, find_active_timed_buff(site_run, gs1::ModifierId {3002U}) != nullptr);
+
+    const auto tea_completed = make_message(
+        GameMessageType::InventoryItemUseCompleted,
+        gs1::InventoryItemUseCompletedMessage {
+            gs1::k_item_field_tea,
+            1U,
+            0U});
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ModifierSystem::process_message(modifier_context, tea_completed) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, count_active_timed_buffs(site_run) == 3U);
+    GS1_SYSTEM_TEST_CHECK(context, find_active_timed_buff(site_run, gs1::ModifierId {3001U}) == nullptr);
+
+    site_run.modifier.resolved_channel_totals.timed_buff_cap_bias = 1.0f;
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ModifierSystem::process_message(modifier_context, tea_completed) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, count_active_timed_buffs(site_run) == 4U);
+    GS1_SYSTEM_TEST_REQUIRE(context, find_active_timed_buff(site_run, gs1::ModifierId {3001U}) != nullptr);
 }
 
 void inventory_delivery_queues_only_overflow_until_delivery_crate_space_opens(
@@ -2297,8 +2700,8 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     inventory_non_site_seed_and_run_resize_slots);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "inventory",
-    "item_use_validates_and_emits_meter_delta",
-    inventory_item_use_validates_and_emits_meter_delta);
+    "item_use_validates_and_emits_completion",
+    inventory_item_use_validates_and_emits_completion);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "inventory",
     "transfer_moves_and_merges_stacks",
@@ -2319,6 +2722,26 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "inventory",
     "item_use_food_restores_nourishment_without_refilling_energy",
     inventory_item_use_food_restores_nourishment_without_refilling_energy);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "inventory",
+    "focus_tonic_use_activates_timed_buff_and_adds_flat_buff_cash_points",
+    focus_tonic_use_activates_timed_buff_and_adds_flat_buff_cash_points);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "inventory",
+    "timed_modifiers_refresh_duplicate_id_and_expire_by_game_time",
+    timed_modifiers_refresh_duplicate_id_and_expire_by_game_time);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "inventory",
+    "timed_buff_action_cost_modifier_reduces_action_energy_cost",
+    timed_buff_action_cost_modifier_reduces_action_energy_cost);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "inventory",
+    "timed_modifier_can_be_manually_ended_without_touching_permanent_modifier",
+    timed_modifier_can_be_manually_ended_without_touching_permanent_modifier);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "inventory",
+    "timed_buff_cap_blocks_distinct_buffs_and_bias_can_expand_limit",
+    timed_buff_cap_blocks_distinct_buffs_and_bias_can_expand_limit);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "inventory",
     "delivery_queues_only_overflow_until_delivery_crate_space_opens",

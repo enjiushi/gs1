@@ -1,5 +1,6 @@
 #include "site/systems/worker_condition_system.h"
 
+#include "content/defs/item_defs.h"
 #include "content/defs/gameplay_tuning_defs.h"
 #include "runtime/runtime_clock.h"
 #include "site/site_projection_update_flags.h"
@@ -233,6 +234,26 @@ WorkerMeterDeltas deltas_from_message(const WorkerMeterDeltaRequestedMessage& pa
         payload.work_efficiency_delta};
 }
 
+WorkerMeterDeltas deltas_from_item_use_completed(
+    const InventoryItemUseCompletedMessage& payload) noexcept
+{
+    const auto* item_def = find_item_def(ItemId {payload.item_id});
+    if (item_def == nullptr)
+    {
+        return {};
+    }
+
+    const float quantity = static_cast<float>(payload.quantity == 0U ? 1U : payload.quantity);
+    return WorkerMeterDeltas {
+        item_def->health_delta * quantity,
+        item_def->hydration_delta * quantity,
+        item_def->nourishment_delta * quantity,
+        0.0f,
+        item_def->energy_delta * quantity,
+        item_def->morale_delta * quantity,
+        0.0f};
+}
+
 float resolve_meter_units_per_real_second(float full_change_real_minutes) noexcept
 {
     return full_change_real_minutes <= 0.0f
@@ -398,7 +419,8 @@ SiteWorld::WorkerConditionData resolve_worker_conditions(
 bool WorkerConditionSystem::subscribes_to(GameMessageType type) noexcept
 {
     return type == GameMessageType::SiteRunStarted ||
-        type == GameMessageType::WorkerMeterDeltaRequested;
+        type == GameMessageType::WorkerMeterDeltaRequested ||
+        type == GameMessageType::InventoryItemUseCompleted;
 }
 
 Gs1Status WorkerConditionSystem::process_message(
@@ -411,7 +433,8 @@ Gs1Status WorkerConditionSystem::process_message(
         return GS1_STATUS_OK;
     }
 
-    if (message.type != GameMessageType::WorkerMeterDeltaRequested)
+    if (message.type != GameMessageType::WorkerMeterDeltaRequested &&
+        message.type != GameMessageType::InventoryItemUseCompleted)
     {
         return GS1_STATUS_OK;
     }
@@ -423,7 +446,10 @@ Gs1Status WorkerConditionSystem::process_message(
 
     auto worker = context.world.read_worker();
     const auto previous = worker.conditions;
-    const auto deltas = deltas_from_message(message.payload_as<WorkerMeterDeltaRequestedMessage>());
+    const auto deltas =
+        message.type == GameMessageType::WorkerMeterDeltaRequested
+        ? deltas_from_message(message.payload_as<WorkerMeterDeltaRequestedMessage>())
+        : deltas_from_item_use_completed(message.payload_as<InventoryItemUseCompletedMessage>());
     worker.conditions = resolve_worker_conditions(
         previous,
         deltas,

@@ -246,6 +246,9 @@ if(GS1_BUILD_TESTS)
     add_executable(gs1_runtime_message_chain_test
         tests/runtime/game_runtime_message_chain_test.cpp)
 
+    add_executable(gs1_timed_modifier_projection_test
+        tests/runtime/timed_modifier_projection_test.cpp)
+
     add_executable(gs1_site_system_message_flow_test
         tests/runtime/site_system_message_flow_test.cpp)
 
@@ -262,6 +265,7 @@ if(GS1_BUILD_TESTS)
     target_link_libraries(gs1_visual_smoke_host PRIVATE gs1_smoke_support ws2_32 winmm)
     target_link_libraries(gs1_runtime_projection_test PRIVATE gs1_gameplay_core)
     target_link_libraries(gs1_runtime_message_chain_test PRIVATE gs1_gameplay_core)
+    target_link_libraries(gs1_timed_modifier_projection_test PRIVATE gs1_gameplay_core)
     target_link_libraries(gs1_site_system_message_flow_test PRIVATE gs1_gameplay_core)
     target_link_libraries(gs1_local_weather_perf_probe PRIVATE gs1_gameplay_core)
     target_link_libraries(gs1_runtime_performance_test PRIVATE gs1_gameplay_core)
@@ -276,6 +280,7 @@ if(GS1_BUILD_TESTS)
     gs1_enable_strict_warnings(gs1_system_test_host)
     gs1_enable_strict_warnings(gs1_runtime_projection_test)
     gs1_enable_strict_warnings(gs1_runtime_message_chain_test)
+    gs1_enable_strict_warnings(gs1_timed_modifier_projection_test)
     gs1_enable_strict_warnings(gs1_site_system_message_flow_test)
     gs1_enable_strict_warnings(gs1_local_weather_perf_probe)
     gs1_enable_strict_warnings(gs1_runtime_performance_test)
@@ -295,6 +300,10 @@ if(GS1_BUILD_TESTS)
     add_test(
         NAME gs1_runtime_message_chain_test
         COMMAND gs1_runtime_message_chain_test)
+
+    add_test(
+        NAME gs1_timed_modifier_projection_test
+        COMMAND gs1_timed_modifier_projection_test)
 
     add_test(
         NAME gs1_site_system_message_flow_test

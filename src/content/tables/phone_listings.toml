@@ -118,3 +118,10 @@ listing_id = 17
 listing_kind = "BuyItem"
 item_or_unlockable_id = 15
 quantity = 8
+
+[[phone_listings]]
+site_id = 1
+listing_id = 18
+listing_kind = "BuyItem"
+item_or_unlockable_id = 39
+quantity = 3

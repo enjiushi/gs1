@@ -123,6 +123,10 @@ const char* message_type_name(Gs1EngineMessageType type)
         return "SITE_PHONE_PANEL_STATE";
     case GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE:
         return "SITE_PROTECTION_OVERLAY_STATE";
+    case GS1_ENGINE_MESSAGE_SITE_MODIFIER_LIST_BEGIN:
+        return "SITE_MODIFIER_LIST_BEGIN";
+    case GS1_ENGINE_MESSAGE_SITE_MODIFIER_UPSERT:
+        return "SITE_MODIFIER_UPSERT";
     case GS1_ENGINE_MESSAGE_HUD_STATE:
         return "HUD_STATE";
     case GS1_ENGINE_MESSAGE_NOTIFICATION_PUSH:
@@ -254,6 +258,8 @@ const char* ui_action_name(Gs1UiActionType action_type)
         return "HIRE_CONTRACTOR";
     case GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE:
         return "PURCHASE_SITE_UNLOCKABLE";
+    case GS1_UI_ACTION_END_SITE_MODIFIER:
+        return "END_SITE_MODIFIER";
     default:
         return "NONE";
     }
@@ -994,6 +1000,12 @@ void SmokeEngineHost::flush_engine_messages(const char* stage_label)
             break;
         case GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT:
             apply_site_task_upsert(message);
+            break;
+        case GS1_ENGINE_MESSAGE_SITE_MODIFIER_LIST_BEGIN:
+            apply_site_modifier_list_begin(message);
+            break;
+        case GS1_ENGINE_MESSAGE_SITE_MODIFIER_UPSERT:
+            apply_site_modifier_upsert(message);
             break;
         case GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE:
             apply_site_phone_panel_state(message);
@@ -1743,6 +1755,35 @@ void SmokeEngineHost::apply_site_phone_panel_state(const Gs1EngineMessage& messa
     pending_site_snapshot_patch_mask_ |= LiveStatePatchField_SiteStatePhone;
 }
 
+void SmokeEngineHost::apply_site_modifier_list_begin(const Gs1EngineMessage& message)
+{
+    if (!pending_site_snapshot_.has_value())
+    {
+        return;
+    }
+
+    const auto& payload = message.payload_as<Gs1EngineMessageSiteModifierListData>();
+    pending_site_snapshot_->active_modifiers.clear();
+    pending_site_snapshot_->active_modifiers.reserve(payload.modifier_count);
+    pending_site_snapshot_patch_mask_ |= LiveStatePatchField_SiteStateModifiers;
+}
+
+void SmokeEngineHost::apply_site_modifier_upsert(const Gs1EngineMessage& message)
+{
+    if (!pending_site_snapshot_.has_value())
+    {
+        return;
+    }
+
+    const auto& payload = message.payload_as<Gs1EngineMessageSiteModifierData>();
+    pending_site_snapshot_->active_modifiers.push_back(
+        SiteModifierProjection {
+            payload.modifier_id,
+            payload.remaining_game_hours,
+            payload.flags});
+    pending_site_snapshot_patch_mask_ |= LiveStatePatchField_SiteStateModifiers;
+}
+
 void SmokeEngineHost::apply_site_protection_overlay_state(const Gs1EngineMessage& message)
 {
     auto* snapshot = pending_site_snapshot_.has_value()
@@ -1851,6 +1892,17 @@ void SmokeEngineHost::apply_site_snapshot_end()
     std::sort(tasks.begin(), tasks.end(), [](const SiteTaskProjection& lhs, const SiteTaskProjection& rhs) {
         return lhs.task_instance_id < rhs.task_instance_id;
     });
+    auto& active_modifiers = pending_site_snapshot_->active_modifiers;
+    std::sort(
+        active_modifiers.begin(),
+        active_modifiers.end(),
+        [](const SiteModifierProjection& lhs, const SiteModifierProjection& rhs) {
+            if ((lhs.flags & GS1_SITE_MODIFIER_FLAG_TIMED) != (rhs.flags & GS1_SITE_MODIFIER_FLAG_TIMED))
+            {
+                return (lhs.flags & GS1_SITE_MODIFIER_FLAG_TIMED) != 0U;
+            }
+            return lhs.modifier_id < rhs.modifier_id;
+        });
     auto& phone_listings = pending_site_snapshot_->phone_listings;
     std::sort(phone_listings.begin(), phone_listings.end(), [](const SitePhoneListingProjection& lhs, const SitePhoneListingProjection& rhs) {
         return lhs.listing_id < rhs.listing_id;

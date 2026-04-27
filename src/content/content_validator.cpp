@@ -41,20 +41,6 @@ inline constexpr float k_unlock_step_plant_pool = 10.0f;
     return std::fabs(value - 100.0f) <= 0.001f;
 }
 
-[[nodiscard]] bool modifier_preset_indices_are_unique_and_contiguous(
-    std::span<const ModifierPresetDef> presets) noexcept
-{
-    for (std::size_t index = 0U; index < presets.size(); ++index)
-    {
-        if (presets[index].preset_index != index)
-        {
-            return false;
-        }
-    }
-
-    return true;
-}
-
 [[nodiscard]] float max_output_power_for_item_value(std::uint32_t internal_cash_points) noexcept
 {
     return static_cast<float>(internal_cash_points) * 0.125f;
@@ -69,10 +55,26 @@ inline constexpr float k_unlock_step_plant_pool = 10.0f;
         item_def.morale_delta != 0.0f;
 }
 
+[[nodiscard]] const ModifierDef* find_content_modifier_def(
+    const ContentDatabase& content,
+    ModifierId modifier_id) noexcept
+{
+    const auto it = content.index.modifier_by_id.find(modifier_id.value);
+    return it == content.index.modifier_by_id.end()
+        ? nullptr
+        : &content.modifier_defs[it->second];
+}
+
 [[nodiscard]] std::uint32_t resolved_item_cash_points_for_validation(
     const ContentDatabase& content,
     const ItemDef& item_def) noexcept
 {
+    constexpr std::uint32_t k_timed_buff_internal_cash_points = 200U;
+    const auto modifier_it = content.index.modifier_by_id.find(item_def.modifier_id.value);
+    const ModifierDef* modifier_def =
+        modifier_it == content.index.modifier_by_id.end()
+            ? nullptr
+            : &content.modifier_defs[modifier_it->second];
     const auto& meter_cash_points = content.gameplay_tuning.player_meter_cash_points;
     const double derived_value =
         static_cast<double>(item_def.health_delta) * static_cast<double>(meter_cash_points.health_per_point) +
@@ -82,10 +84,16 @@ inline constexpr float k_unlock_step_plant_pool = 10.0f;
         static_cast<double>(item_def.morale_delta) * static_cast<double>(meter_cash_points.morale_per_point);
     if (derived_value > 0.0)
     {
-        return static_cast<std::uint32_t>(std::lround(derived_value));
+        return static_cast<std::uint32_t>(std::lround(derived_value)) +
+            (modifier_def == nullptr || modifier_def->duration_eight_hour_blocks == 0U
+                    ? 0U
+                    : k_timed_buff_internal_cash_points);
     }
 
-    return item_def.internal_price_cash_points;
+    return item_def.internal_price_cash_points +
+        (modifier_def == nullptr || modifier_def->duration_eight_hour_blocks == 0U
+                ? 0U
+                : k_timed_buff_internal_cash_points);
 }
 
 [[nodiscard]] std::unordered_map<std::uint32_t, float> build_expected_plant_pool_targets(
@@ -377,6 +385,19 @@ std::vector<ContentValidationIssue> validate_content_database(
                 ContentValidationSeverity::Error,
                 "Items without player-meter valuation must author internal_price_cash_points so item buy/sell pricing can derive from a single internal value."});
             break;
+        }
+
+        if (item_def.modifier_id.value != 0U)
+        {
+            const auto* modifier_def = find_content_modifier_def(content, item_def.modifier_id);
+            if (modifier_def == nullptr ||
+                modifier_def->preset_kind != ModifierPresetKind::RunModifier)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Item definition modifier_id must reference a known run modifier definition."});
+                break;
+            }
         }
     }
 
@@ -865,19 +886,133 @@ std::vector<ContentValidationIssue> validate_content_database(
 
     if (issues.empty())
     {
-        if (content.nearby_aura_modifier_presets.empty() ||
-            content.run_modifier_presets.empty())
+        bool saw_nearby_aura = false;
+        bool saw_run_modifier = false;
+        for (const auto& modifier_def : content.modifier_defs)
+        {
+            if (modifier_def.preset_kind == ModifierPresetKind::NearbyAura)
+            {
+                saw_nearby_aura = true;
+            }
+            else if (modifier_def.preset_kind == ModifierPresetKind::RunModifier)
+            {
+                saw_run_modifier = true;
+            }
+        }
+
+        if (!saw_nearby_aura || !saw_run_modifier)
         {
             issues.push_back(ContentValidationIssue {
                 ContentValidationSeverity::Error,
                 "Modifier preset content must define at least one nearby-aura preset and one run-modifier preset."});
         }
-        else if (!modifier_preset_indices_are_unique_and_contiguous(content.nearby_aura_modifier_presets) ||
-            !modifier_preset_indices_are_unique_and_contiguous(content.run_modifier_presets))
+
+        for (const auto& modifier_def : content.modifier_defs)
         {
-            issues.push_back(ContentValidationIssue {
-                ContentValidationSeverity::Error,
-                "Modifier preset indices must be unique and contiguous starting at zero within each preset kind."});
+            if (modifier_def.modifier_id.value == 0U)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Modifier definitions must use non-zero modifier ids."});
+                break;
+            }
+
+            if (modifier_def.preset_kind == ModifierPresetKind::NearbyAura &&
+                modifier_def.duration_eight_hour_blocks != 0U)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Nearby-aura modifier definitions must use duration_eight_hour_blocks = 0."});
+                break;
+            }
+
+            const auto& action_modifiers = modifier_def.action_cost_modifiers;
+            if (action_modifiers.hydration_weight_delta <= -1.0f ||
+                action_modifiers.nourishment_weight_delta <= -1.0f ||
+                action_modifiers.energy_weight_delta <= -1.0f ||
+                action_modifiers.morale_weight_delta <= -1.0f)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Modifier action-cost weight deltas must stay above -1 so final costs cannot go negative before bias."});
+                break;
+            }
+        }
+    }
+
+    if (issues.empty())
+    {
+        for (const auto& site : content.prototype_campaign.sites)
+        {
+            for (const auto modifier_id : site.nearby_aura_modifier_ids)
+            {
+                const auto* modifier_def = find_content_modifier_def(content, modifier_id);
+                if (modifier_def == nullptr ||
+                    modifier_def->preset_kind != ModifierPresetKind::NearbyAura)
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Site nearby_aura_modifier_ids must reference known nearby-aura modifier ids."});
+                    break;
+                }
+            }
+
+            if (!issues.empty())
+            {
+                break;
+            }
+        }
+    }
+
+    if (issues.empty())
+    {
+        for (const auto& reward_candidate_def : content.reward_candidate_defs)
+        {
+            const auto* modifier_def = find_content_modifier_def(content, reward_candidate_def.modifier_id);
+            if (reward_candidate_def.effect_kind == RewardEffectKind::RunModifier &&
+                (modifier_def == nullptr ||
+                    modifier_def->preset_kind != ModifierPresetKind::RunModifier))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Run-modifier reward candidates must reference known run modifier ids."});
+                break;
+            }
+        }
+    }
+
+    if (issues.empty())
+    {
+        for (const auto& faction_def : k_prototype_faction_defs)
+        {
+            const auto* modifier_def =
+                find_content_modifier_def(content, ModifierId {faction_def.assistant_package_id});
+            if (faction_def.assistant_package_id != 0U &&
+                (modifier_def == nullptr ||
+                    modifier_def->preset_kind != ModifierPresetKind::RunModifier))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Faction assistant package ids must reference known run modifier ids."});
+                break;
+            }
+        }
+    }
+
+    if (issues.empty())
+    {
+        for (const auto& node_def : content.technology_node_defs)
+        {
+            const auto* modifier_def = find_content_modifier_def(content, node_def.linked_modifier_id);
+            if (node_def.entry_kind == TechnologyEntryKind::GlobalModifier &&
+                (modifier_def == nullptr ||
+                    modifier_def->preset_kind != ModifierPresetKind::RunModifier))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Global-modifier technology nodes must reference known run modifier ids."});
+                break;
+            }
         }
     }
 

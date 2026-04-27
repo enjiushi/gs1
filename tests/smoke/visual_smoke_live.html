@@ -381,6 +381,70 @@ body {
   gap: 7px;
 }
 
+.modifier-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.normal-modifier-strip {
+  justify-content: flex-end;
+  max-width: min(320px, calc(100vw - 40px));
+}
+
+.modifier-badge {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  border: 1px solid rgba(77, 58, 35, 0.24);
+  box-shadow: 0 12px 24px rgba(34, 23, 12, 0.18);
+  color: #f8f2e6;
+  cursor: default;
+  user-select: none;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.modifier-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 28px rgba(34, 23, 12, 0.22);
+}
+
+.modifier-badge.timed {
+  background: linear-gradient(180deg, rgba(53, 104, 92, 0.98), rgba(24, 63, 56, 0.96));
+  border-color: rgba(153, 217, 198, 0.22);
+}
+
+.modifier-badge.permanent {
+  background: linear-gradient(180deg, rgba(121, 93, 48, 0.98), rgba(72, 51, 24, 0.96));
+  border-color: rgba(224, 194, 143, 0.24);
+}
+
+.modifier-badge-label {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.modifier-badge-type {
+  font-size: 8px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(248, 242, 230, 0.7);
+}
+
+.modifier-badge-type.timed-remaining {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: rgba(232, 255, 247, 0.88);
+}
+
 .site-vitals-bar {
   position: relative;
   overflow: hidden;
@@ -1922,6 +1986,42 @@ body {
   white-space: pre-line;
 }
 
+.modifier-tooltip {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 60;
+  max-width: 260px;
+  padding: 10px 12px;
+  border: 1px solid rgba(196, 167, 126, 0.26);
+  background:
+    linear-gradient(180deg, rgba(44, 33, 24, 0.96), rgba(27, 20, 14, 0.98));
+  color: rgba(245, 236, 220, 0.94);
+  pointer-events: none;
+  box-shadow:
+    0 16px 34px rgba(8, 6, 4, 0.28),
+    inset 0 1px 0 rgba(255, 245, 228, 0.06);
+}
+
+.modifier-tooltip[hidden] {
+  display: none;
+}
+
+.modifier-tooltip-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.modifier-tooltip-meta {
+  margin-top: 4px;
+  font-size: 11px;
+  color: rgba(228, 211, 185, 0.72);
+  line-height: 1.45;
+  white-space: pre-line;
+}
+
 .tile-context-menu {
   position: fixed;
   inset: 0;
@@ -3091,6 +3191,11 @@ body {
     text-align: left;
   }
 
+  .normal-modifier-strip {
+    justify-content: flex-start;
+    max-width: none;
+  }
+
   .action-bar {
     justify-content: flex-start;
   }
@@ -3252,6 +3357,7 @@ body {
               </div>
             </div>
             <div class="site-vitals-bars" id="site-vitals-bars"></div>
+            <div class="modifier-strip" id="buff-modifier-strip" hidden></div>
           </div>
         </div>
 
@@ -3267,6 +3373,7 @@ DLL -- ms</div>
           <div class="status-chip" id="status-chip">
             Connecting...
           </div>
+          <div class="modifier-strip normal-modifier-strip" id="normal-modifier-strip" hidden></div>
         </div>
       </div>
 
@@ -3371,6 +3478,10 @@ DLL -- ms</div>
 <div class="inventory-tooltip" id="inventory-tooltip" hidden>
   <div class="inventory-tooltip-title" id="inventory-tooltip-title">Item</div>
   <div class="inventory-tooltip-meta" id="inventory-tooltip-meta">Details</div>
+</div>
+<div class="modifier-tooltip" id="modifier-tooltip" hidden>
+  <div class="modifier-tooltip-title" id="modifier-tooltip-title">Modifier</div>
+  <div class="modifier-tooltip-meta" id="modifier-tooltip-meta">Details</div>
 </div>
 <div class="tile-context-menu" id="tile-context-menu" hidden></div>
 

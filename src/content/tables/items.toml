@@ -474,3 +474,51 @@ health_delta = 0.0
 hydration_delta = 0.0
 nourishment_delta = 0.0
 energy_delta = 0.0
+
+[[items]]
+item_id = 37
+display_name = "Field Tea"
+stack_size = 3
+source_rule = "CraftOnly"
+consumable = true
+capabilities = "Drink,Sell"
+linked_plant_id = 0
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 8.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+morale_delta = 2.0
+modifier_id = 3001
+
+[[items]]
+item_id = 38
+display_name = "Spiced Stew"
+stack_size = 3
+source_rule = "CraftOnly"
+consumable = true
+capabilities = "Eat,Sell"
+linked_plant_id = 0
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 12.0
+energy_delta = 0.0
+morale_delta = 3.0
+modifier_id = 3002
+
+[[items]]
+item_id = 39
+display_name = "Focus Tonic"
+stack_size = 2
+source_rule = "BuyOnly"
+consumable = true
+capabilities = "UseMedicine,Sell"
+linked_plant_id = 0
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 10.0
+morale_delta = 5.0
+modifier_id = 3003

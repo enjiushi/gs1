@@ -57,6 +57,19 @@ constexpr float k_visible_tile_soil_salinity_projection_step = 100.0f / 64.0f;
 constexpr double k_site_one_probe_window_minutes = 0.25;
 constexpr std::int32_t k_regional_map_tile_spacing = 160;
 
+[[nodiscard]] std::uint16_t projected_remaining_game_hours(double remaining_world_minutes) noexcept
+{
+    if (remaining_world_minutes <= 0.0)
+    {
+        return 0U;
+    }
+
+    const auto projected_hours = static_cast<std::uint32_t>(std::ceil(remaining_world_minutes / 60.0));
+    return static_cast<std::uint16_t>(std::min<std::uint32_t>(
+        projected_hours,
+        std::numeric_limits<std::uint16_t>::max()));
+}
+
 [[nodiscard]] bool is_site_one_probe_tile(TileCoord coord) noexcept
 {
     return (coord.x == 12 && coord.y >= 14 && coord.y <= 17) ||
@@ -274,21 +287,34 @@ enum RegionalSupportPreviewBits : std::uint16_t
 
     for (const auto modifier_id : site.nearby_aura_modifier_ids)
     {
-        if (modifier_id.value == 0U)
+        const auto* modifier_def = find_modifier_def(modifier_id);
+        if (modifier_def == nullptr)
         {
             continue;
         }
 
-        const auto bucket = modifier_id.value % 3U;
-        if (bucket == 1U)
+        const auto& totals = modifier_def->totals;
+        if (std::fabs(totals.wind) > 1e-4f ||
+            std::fabs(totals.heat) > 1e-4f ||
+            std::fabs(totals.dust) > 1e-4f)
         {
             mask |= REGIONAL_SUPPORT_PREVIEW_WIND;
         }
-        else if (bucket == 2U)
+        if (std::fabs(totals.moisture) > 1e-4f ||
+            std::fabs(totals.fertility) > 1e-4f ||
+            std::fabs(totals.plant_density) > 1e-4f ||
+            std::fabs(totals.salinity) > 1e-4f ||
+            std::fabs(totals.growth_pressure) > 1e-4f)
         {
             mask |= REGIONAL_SUPPORT_PREVIEW_FERTILITY;
         }
-        else
+        if (std::fabs(totals.health) > 1e-4f ||
+            std::fabs(totals.hydration) > 1e-4f ||
+            std::fabs(totals.nourishment) > 1e-4f ||
+            std::fabs(totals.energy_cap) > 1e-4f ||
+            std::fabs(totals.energy) > 1e-4f ||
+            std::fabs(totals.morale) > 1e-4f ||
+            std::fabs(totals.work_efficiency) > 1e-4f)
         {
             mask |= REGIONAL_SUPPORT_PREVIEW_RECOVERY;
         }
@@ -3218,6 +3244,58 @@ void GameRuntime::queue_all_site_task_upsert_messages()
     }
 }
 
+void GameRuntime::queue_site_modifier_list_begin_message(Gs1ProjectionMode mode)
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
+
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_MODIFIER_LIST_BEGIN);
+    auto& payload = message.emplace_payload<Gs1EngineMessageSiteModifierListData>();
+    payload.mode = mode;
+    payload.reserved0 = 0U;
+    payload.modifier_count = static_cast<std::uint16_t>(std::min<std::size_t>(
+        active_site_run_->modifier.active_site_modifiers.size(),
+        std::numeric_limits<std::uint16_t>::max()));
+    engine_messages_.push_back(message);
+}
+
+void GameRuntime::queue_site_modifier_upsert_message(std::size_t modifier_index)
+{
+    if (!active_site_run_.has_value() ||
+        modifier_index >= active_site_run_->modifier.active_site_modifiers.size())
+    {
+        return;
+    }
+
+    const auto& active_modifier =
+        active_site_run_->modifier.active_site_modifiers[modifier_index];
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_MODIFIER_UPSERT);
+    auto& payload = message.emplace_payload<Gs1EngineMessageSiteModifierData>();
+    payload.modifier_id = active_modifier.modifier_id.value;
+    payload.remaining_game_hours =
+        projected_remaining_game_hours(active_modifier.remaining_world_minutes);
+    payload.flags =
+        active_modifier.duration_world_minutes > 0.0 ? GS1_SITE_MODIFIER_FLAG_TIMED : 0U;
+    payload.reserved0 = 0U;
+    engine_messages_.push_back(message);
+}
+
+void GameRuntime::queue_all_site_modifier_upsert_messages(Gs1ProjectionMode mode)
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
+
+    queue_site_modifier_list_begin_message(mode);
+    for (std::size_t index = 0U; index < active_site_run_->modifier.active_site_modifiers.size(); ++index)
+    {
+        queue_site_modifier_upsert_message(index);
+    }
+}
+
 void GameRuntime::queue_site_phone_listing_upsert_message(std::size_t listing_index)
 {
     if (!active_site_run_.has_value())
@@ -3353,6 +3431,7 @@ void GameRuntime::queue_site_bootstrap_messages()
     queue_all_site_inventory_storage_upsert_messages();
     queue_all_site_inventory_slot_upsert_messages();
     queue_all_site_task_upsert_messages();
+    queue_all_site_modifier_upsert_messages(GS1_PROJECTION_MODE_SNAPSHOT);
     queue_site_phone_panel_state_message();
     queue_all_site_phone_listing_upsert_messages();
     queue_site_protection_overlay_state_message();
@@ -3379,6 +3458,7 @@ void GameRuntime::queue_site_delta_messages(std::uint64_t dirty_flags)
             SITE_PROJECTION_UPDATE_CRAFT_CONTEXT |
             SITE_PROJECTION_UPDATE_PLACEMENT_PREVIEW |
             SITE_PROJECTION_UPDATE_TASKS |
+            SITE_PROJECTION_UPDATE_MODIFIERS |
             SITE_PROJECTION_UPDATE_PHONE);
     if (site_dirty_flags == 0U)
     {
@@ -3425,6 +3505,11 @@ void GameRuntime::queue_site_delta_messages(std::uint64_t dirty_flags)
     if ((site_dirty_flags & SITE_PROJECTION_UPDATE_TASKS) != 0U)
     {
         queue_all_site_task_upsert_messages();
+    }
+
+    if ((site_dirty_flags & SITE_PROJECTION_UPDATE_MODIFIERS) != 0U)
+    {
+        queue_all_site_modifier_upsert_messages(GS1_PROJECTION_MODE_DELTA);
     }
 
     if ((site_dirty_flags & SITE_PROJECTION_UPDATE_PHONE) != 0U)
@@ -3871,6 +3956,15 @@ Gs1Status GameRuntime::translate_ui_action_to_message(const Gs1UiAction& action,
         out_message.set_payload(SetSiteProtectionOverlayModeMessage {
             static_cast<Gs1SiteProtectionOverlayMode>(action.arg0),
             {0U, 0U, 0U}});
+        return GS1_STATUS_OK;
+
+    case GS1_UI_ACTION_END_SITE_MODIFIER:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        out_message.type = GameMessageType::SiteModifierEndRequested;
+        out_message.set_payload(SiteModifierEndRequestedMessage {action.target_id});
         return GS1_STATUS_OK;
 
     case GS1_UI_ACTION_SELL_PHONE_LISTING:

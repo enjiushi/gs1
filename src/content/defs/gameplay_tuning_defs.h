@@ -90,6 +90,8 @@ struct EcologyTuning final
 
 struct ModifierSystemTuning final
 {
+    std::uint8_t active_timed_buff_cap {3U};
+    std::uint8_t reserved0[3] {};
     float modifier_channel_limit {1.0f};
     float factor_weight_limit {2.5f};
     float factor_bias_limit {2.0f};

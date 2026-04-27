@@ -34,6 +34,8 @@ inline constexpr std::uint32_t k_recipe_craft_camp_stove = 2U;
 inline constexpr std::uint32_t k_recipe_craft_workbench = 3U;
 inline constexpr std::uint32_t k_recipe_craft_storage_crate = 4U;
 inline constexpr std::uint32_t k_recipe_craft_hammer = 5U;
+inline constexpr std::uint32_t k_recipe_cook_field_tea = 6U;
+inline constexpr std::uint32_t k_recipe_cook_spiced_stew = 7U;
 
 [[nodiscard]] std::span<const CraftRecipeDef> all_craft_recipe_defs() noexcept;
 

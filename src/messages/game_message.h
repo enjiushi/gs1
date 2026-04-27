@@ -81,6 +81,7 @@ enum class GameMessageType : std::uint8_t
     EconomyMoneyAwardRequested,
     SiteUnlockableRevealRequested,
     RunModifierAwardRequested,
+    SiteModifierEndRequested,
     PhoneListingPurchaseRequested,
     PhoneListingSaleRequested,
     PhoneListingCartAddRequested,
@@ -601,6 +602,11 @@ struct RunModifierAwardRequestedMessage final
     std::uint32_t modifier_id;
 };
 
+struct SiteModifierEndRequestedMessage final
+{
+    std::uint32_t modifier_id;
+};
+
 struct PhoneListingPurchaseRequestedMessage final
 {
     std::uint32_t listing_id;
@@ -836,6 +842,7 @@ GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryCraftCompletedMessage, 12U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(EconomyMoneyAwardRequestedMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteUnlockableRevealRequestedMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(RunModifierAwardRequestedMessage, 4U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteModifierEndRequestedMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingPurchaseRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingSaleRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingCartAddRequestedMessage, 8U);

@@ -261,6 +261,10 @@ std::optional<Gs1UiActionType> parse_ui_action_type(const std::string& value)
     {
         return GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE;
     }
+    if (value == "END_SITE_MODIFIER")
+    {
+        return GS1_UI_ACTION_END_SITE_MODIFIER;
+    }
 
     return std::nullopt;
 }

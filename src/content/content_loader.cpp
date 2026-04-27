@@ -1404,7 +1404,8 @@ void load_item_defs(ContentDatabase& content, const std::filesystem::path& path)
             require_toml_float(path, entry, "hydration_delta"),
             require_toml_float(path, entry, "nourishment_delta"),
             require_toml_float(path, entry, "energy_delta"),
-            optional_toml_float(path, entry, "morale_delta").value_or(0.0f)});
+            optional_toml_float(path, entry, "morale_delta").value_or(0.0f),
+            ModifierId {optional_toml_unsigned<std::uint32_t>(path, entry, "modifier_id").value_or(0U)}});
     }
 }
 
@@ -1568,42 +1569,58 @@ void load_excavation_defs(ContentDatabase& content, const std::filesystem::path&
     }
 }
 
-void load_modifier_preset_defs(ContentDatabase& content, const std::filesystem::path& path)
+void load_modifier_defs(ContentDatabase& content, const std::filesystem::path& path)
 {
     const auto document = load_toml_document(path);
-    const auto& modifier_presets = require_toml_array(path, document, "modifier_presets");
-    for (const auto& node : modifier_presets)
+    const auto& modifiers = require_toml_array(path, document, "modifier_presets");
+    for (const auto& node : modifiers)
     {
         const auto& entry = require_array_entry_table(path, node, "modifier_presets");
-        ModifierPresetDef preset {};
-        preset.preset_kind =
+        ModifierDef modifier {};
+        modifier.preset_kind =
             parse_modifier_preset_kind(path, toml_line_number(entry), require_toml_string(path, entry, "preset_kind"));
-        preset.preset_index = require_toml_unsigned<std::uint32_t>(path, entry, "preset_index");
-        preset.totals.heat = require_toml_float(path, entry, "heat");
-        preset.totals.wind = require_toml_float(path, entry, "wind");
-        preset.totals.dust = require_toml_float(path, entry, "dust");
-        preset.totals.moisture = require_toml_float(path, entry, "moisture");
-        preset.totals.fertility = require_toml_float(path, entry, "fertility");
-        preset.totals.salinity = require_toml_float(path, entry, "salinity");
-        preset.totals.growth_pressure = require_toml_float(path, entry, "growth_pressure");
-        preset.totals.salinity_density_cap = require_toml_float(path, entry, "salinity_density_cap");
-        preset.totals.plant_density = require_toml_float(path, entry, "plant_density");
-        preset.totals.health = require_toml_float(path, entry, "health");
-        preset.totals.hydration = require_toml_float(path, entry, "hydration");
-        preset.totals.nourishment = require_toml_float(path, entry, "nourishment");
-        preset.totals.energy_cap = require_toml_float(path, entry, "energy_cap");
-        preset.totals.energy = require_toml_float(path, entry, "energy");
-        preset.totals.morale = require_toml_float(path, entry, "morale");
-        preset.totals.work_efficiency = require_toml_float(path, entry, "work_efficiency");
-
-        if (preset.preset_kind == ModifierPresetKind::NearbyAura)
-        {
-            content.nearby_aura_modifier_presets.push_back(preset);
-        }
-        else
-        {
-            content.run_modifier_presets.push_back(preset);
-        }
+        modifier.modifier_id = ModifierId {require_toml_unsigned<std::uint32_t>(path, entry, "modifier_id")};
+        modifier.display_name =
+            store_string_view(content, optional_toml_string(path, entry, "display_name").value_or(std::string {}));
+        modifier.description =
+            store_string_view(content, optional_toml_string(path, entry, "description").value_or(std::string {}));
+        modifier.duration_eight_hour_blocks =
+            optional_toml_unsigned<std::uint16_t>(path, entry, "duration_eight_hour_blocks").value_or(0U);
+        modifier.totals.heat = require_toml_float(path, entry, "heat");
+        modifier.totals.wind = require_toml_float(path, entry, "wind");
+        modifier.totals.dust = require_toml_float(path, entry, "dust");
+        modifier.totals.moisture = require_toml_float(path, entry, "moisture");
+        modifier.totals.fertility = require_toml_float(path, entry, "fertility");
+        modifier.totals.salinity = require_toml_float(path, entry, "salinity");
+        modifier.totals.growth_pressure = require_toml_float(path, entry, "growth_pressure");
+        modifier.totals.salinity_density_cap = require_toml_float(path, entry, "salinity_density_cap");
+        modifier.totals.plant_density = require_toml_float(path, entry, "plant_density");
+        modifier.totals.health = require_toml_float(path, entry, "health");
+        modifier.totals.hydration = require_toml_float(path, entry, "hydration");
+        modifier.totals.nourishment = require_toml_float(path, entry, "nourishment");
+        modifier.totals.energy_cap = require_toml_float(path, entry, "energy_cap");
+        modifier.totals.energy = require_toml_float(path, entry, "energy");
+        modifier.totals.morale = require_toml_float(path, entry, "morale");
+        modifier.totals.work_efficiency = require_toml_float(path, entry, "work_efficiency");
+        modifier.totals.timed_buff_cap_bias =
+            optional_toml_float(path, entry, "timed_buff_cap_bias").value_or(0.0f);
+        modifier.action_cost_modifiers.hydration_weight_delta =
+            optional_toml_float(path, entry, "hydration_cost_weight_delta").value_or(0.0f);
+        modifier.action_cost_modifiers.hydration_bias =
+            optional_toml_float(path, entry, "hydration_cost_bias").value_or(0.0f);
+        modifier.action_cost_modifiers.nourishment_weight_delta =
+            optional_toml_float(path, entry, "nourishment_cost_weight_delta").value_or(0.0f);
+        modifier.action_cost_modifiers.nourishment_bias =
+            optional_toml_float(path, entry, "nourishment_cost_bias").value_or(0.0f);
+        modifier.action_cost_modifiers.energy_weight_delta =
+            optional_toml_float(path, entry, "energy_cost_weight_delta").value_or(0.0f);
+        modifier.action_cost_modifiers.energy_bias =
+            optional_toml_float(path, entry, "energy_cost_bias").value_or(0.0f);
+        modifier.action_cost_modifiers.morale_weight_delta =
+            optional_toml_float(path, entry, "morale_cost_weight_delta").value_or(0.0f);
+        modifier.action_cost_modifiers.morale_bias =
+            optional_toml_float(path, entry, "morale_cost_bias").value_or(0.0f);
+        content.modifier_defs.push_back(modifier);
     }
 }
 
@@ -1763,6 +1780,8 @@ void load_gameplay_tuning_def(ContentDatabase& content, const std::filesystem::p
         require_toml_float(path, ecology, "highway_cover_gain_dust_scale");
 
     const auto& modifier_system = require_toml_table(path, document, "modifier_system");
+    tuning.modifier_system.active_timed_buff_cap =
+        require_toml_unsigned<std::uint8_t>(path, modifier_system, "active_timed_buff_cap");
     tuning.modifier_system.modifier_channel_limit =
         require_toml_float(path, modifier_system, "modifier_channel_limit");
     tuning.modifier_system.factor_weight_limit =
@@ -2074,7 +2093,7 @@ ContentDatabase ContentLoader::load_prototype_content()
     load_site_onboarding_task_seed_defs(content, site_onboarding_task_seeds_path);
     load_reward_candidate_defs(content, reward_candidates_path);
     load_site_action_defs(content, site_actions_path);
-    load_modifier_preset_defs(content, modifier_presets_path);
+    load_modifier_defs(content, modifier_presets_path);
     load_gameplay_tuning_def(content, gameplay_tuning_path);
     load_technology_tier_defs(content, technology_tiers_path);
     load_reputation_unlock_defs(content, reputation_unlocks_path);
@@ -2111,6 +2130,14 @@ ContentDatabase ContentLoader::load_prototype_content()
         content.index.craft_recipe_by_id,
         [](const CraftRecipeDef& def) {
             return def.recipe_id.value;
+        });
+    index_defs(
+        modifier_presets_path,
+        "modifier",
+        content.modifier_defs,
+        content.index.modifier_by_id,
+        [](const ModifierDef& def) {
+            return def.modifier_id.value;
         });
     index_defs(
         task_templates_path,

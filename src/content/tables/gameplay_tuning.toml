@@ -77,6 +77,7 @@ highway_cover_gain_wind_scale = 0.00028
 highway_cover_gain_dust_scale = 0.00045
 
 [modifier_system]
+active_timed_buff_cap = 3
 modifier_channel_limit = 1.0
 factor_weight_limit = 2.5
 factor_bias_limit = 2.0

@@ -439,6 +439,7 @@ void site_weather_changes_emit_hud_wind_warning_codes()
         assert(payload.warning_code == k_hud_warning_wind_watch);
     }
 }
+
 }  // namespace
 
 int main()
