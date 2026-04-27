@@ -328,7 +328,7 @@ void craft_action_waits_for_worker_to_reach_device_range_before_starting(
 
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.started_at_world_minute.has_value());
     GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::SiteActionStarted) == 1U);
-    GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::WorkerMeterDeltaRequested) == 1U);
+    GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::WorkerMeterDeltaRequested) == 0U);
     GS1_SYSTEM_TEST_CHECK(
         context,
         site_run.site_world->worker().position.tile_coord.x == expected_approach_tile.x);

@@ -8,7 +8,8 @@ Site-owned state, ECS world support, and helper logic for active site gameplay.
 - When files or folders in this directory change, update this file in the same change.
 
 ## Contents
-- `action_state.h`: Site action queue/state owned by action execution flows, including deferred-placement mode tracking, harvest plus excavate action state, and follow-up plant-mode reactivation after successful item-based planting when inventory remains.
+- `action_state.h`: Site action queue/state owned by action execution flows, including deferred-placement mode tracking, deferred worker-meter-cost snapshots captured at action start and applied on completion, harvest action state, plus follow-up plant-mode reactivation after successful item-based planting when inventory remains.
+- `action_state.h`: Site action queue/state owned by action execution flows, including deferred-placement mode tracking, deferred worker-meter-cost snapshots captured at action start and applied on completion, harvest plus excavate action state, and follow-up plant-mode reactivation after successful item-based planting when inventory remains.
 - `contractor_state.h`: Contractor/worker assignment state for the site run.
 - `craft_logic.h`: Shared crafting rules/helper declarations used by craft-related systems.
 - `craft_logic.cpp`: Shared crafting rules/helper implementation kept out of headers to reduce rebuild fan-out.

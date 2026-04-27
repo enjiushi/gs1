@@ -16,7 +16,8 @@ public:
                 SiteComponent::RunMeta,
                 SiteComponent::TileWeather,
                 SiteComponent::WorkerMotion,
-                SiteComponent::WorkerNeeds),
+                SiteComponent::WorkerNeeds,
+                SiteComponent::Action),
             site_component_mask_of(SiteComponent::WorkerNeeds)};
     }
 
