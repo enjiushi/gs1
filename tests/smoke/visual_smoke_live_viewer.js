@@ -80,6 +80,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let animationTimeSeconds = 0;
     let fpsSampleFrameCount = 0;
     let fpsSampleElapsedSeconds = 0;
+    let fpsSampleWebWorkMilliseconds = 0;
+    let framePerfSampleCount = 0;
+    let framePerfSampleVisualHostMilliseconds = 0;
+    let framePerfSampleGameplayDllMilliseconds = 0;
+    let latestFramePerfSample = null;
+    let latestFramePerfSampleTimestampMs = 0;
     let rendererWidth = 0;
     let rendererHeight = 0;
     let weatherPostProcess = null;
@@ -9886,40 +9892,104 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         });
     }
 
-    function updateFpsChip(frameDeltaSeconds) {
+    function resetFpsChipSamples() {
+        fpsSampleFrameCount = 0;
+        fpsSampleElapsedSeconds = 0.0;
+        fpsSampleWebWorkMilliseconds = 0.0;
+        framePerfSampleCount = 0;
+        framePerfSampleVisualHostMilliseconds = 0.0;
+        framePerfSampleGameplayDllMilliseconds = 0.0;
+    }
+
+    function formatFramePerfMilliseconds(value) {
+        if (!Number.isFinite(value) || value < 0.0) {
+            return "-- ms";
+        }
+
+        return value.toFixed(2) + " ms";
+    }
+
+    function normalizeFramePerfSample(payload) {
+        if (!payload || typeof payload !== "object") {
+            return null;
+        }
+
+        const visualHostMs = Number(payload.visualHostMs);
+        const gameplayDllMs = Number(payload.gameplayDllMs);
+        return {
+            frameNumber: typeof payload.frameNumber === "number" ? payload.frameNumber : 0,
+            visualHostMs: Number.isFinite(visualHostMs) ? Math.max(visualHostMs, 0.0) : NaN,
+            gameplayDllMs: Number.isFinite(gameplayDllMs) ? Math.max(gameplayDllMs, 0.0) : NaN
+        };
+    }
+
+    function recordFramePerfSample(sample) {
+        if (!sample) {
+            return;
+        }
+
+        latestFramePerfSample = sample;
+        latestFramePerfSampleTimestampMs = performance.now();
+        if (!Number.isFinite(sample.visualHostMs) || !Number.isFinite(sample.gameplayDllMs)) {
+            return;
+        }
+
+        framePerfSampleCount += 1;
+        framePerfSampleVisualHostMilliseconds += sample.visualHostMs;
+        framePerfSampleGameplayDllMilliseconds += sample.gameplayDllMs;
+    }
+
+    function updateFpsChip(frameDeltaSeconds, webFrameWorkMilliseconds) {
         if (!fpsChip || !Number.isFinite(frameDeltaSeconds) || frameDeltaSeconds <= 0.0) {
             return;
         }
 
         // Ignore long tab stalls so the readout keeps reflecting active rendering performance.
         if (frameDeltaSeconds > 0.5) {
-            fpsSampleFrameCount = 0;
-            fpsSampleElapsedSeconds = 0.0;
-            fpsChip.textContent = "Viewer Perf\nFPS --\nFrame -- ms";
+            resetFpsChipSamples();
+            fpsChip.textContent = "Visual Adapter\nFPS --\nWeb -- ms\nHost -- ms\nDLL -- ms";
             return;
         }
 
         fpsSampleFrameCount += 1;
         fpsSampleElapsedSeconds += frameDeltaSeconds;
+        fpsSampleWebWorkMilliseconds +=
+            Number.isFinite(webFrameWorkMilliseconds) && webFrameWorkMilliseconds >= 0.0
+                ? webFrameWorkMilliseconds
+                : 0.0;
         if (fpsSampleElapsedSeconds < 0.25) {
             return;
         }
 
         const fps = fpsSampleFrameCount / fpsSampleElapsedSeconds;
-        const frameMs = (fpsSampleElapsedSeconds * 1000.0) / fpsSampleFrameCount;
+        const webMs = fpsSampleWebWorkMilliseconds / fpsSampleFrameCount;
+        let visualHostMs = NaN;
+        let gameplayDllMs = NaN;
+        if (framePerfSampleCount > 0) {
+            visualHostMs = framePerfSampleVisualHostMilliseconds / framePerfSampleCount;
+            gameplayDllMs = framePerfSampleGameplayDllMilliseconds / framePerfSampleCount;
+        } else if (
+            latestFramePerfSample &&
+            (performance.now() - latestFramePerfSampleTimestampMs) < 1000.0
+        ) {
+            visualHostMs = latestFramePerfSample.visualHostMs;
+            gameplayDllMs = latestFramePerfSample.gameplayDllMs;
+        }
+
         fpsChip.textContent =
-            "Viewer Perf\nFPS " + Math.round(fps) +
-            "\nFrame " + frameMs.toFixed(1) + " ms";
-        fpsSampleFrameCount = 0;
-        fpsSampleElapsedSeconds = 0.0;
+            "Visual Adapter\nFPS " + Math.round(fps) +
+            "\nWeb " + formatFramePerfMilliseconds(webMs) +
+            "\nHost " + formatFramePerfMilliseconds(visualHostMs) +
+            "\nDLL " + formatFramePerfMilliseconds(gameplayDllMs);
+        resetFpsChipSamples();
     }
 
     function animate() {
         requestAnimationFrame(animate);
 
+        const frameWorkStartMs = performance.now();
         const rawDeltaSeconds = animationClock.getDelta();
         const deltaSeconds = Math.min(rawDeltaSeconds, 0.1);
-        updateFpsChip(rawDeltaSeconds);
         animationTimeSeconds += deltaSeconds;
         const elapsed = animationTimeSeconds;
         sendSiteControlState();
@@ -10015,6 +10085,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         renderPlacementFailureToast();
         updateDustOverlay(latestState, elapsed);
         renderSceneWithWeatherDistortion(latestState, elapsed);
+        updateFpsChip(rawDeltaSeconds, performance.now() - frameWorkStartMs);
     }
 
     function normalizeState(state) {
@@ -10267,6 +10338,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 handleIncomingState(state, false, patch);
             } catch (error) {
                 reportViewerError("state-patch", error);
+            }
+        });
+        stateStream.addEventListener("frame-perf", function (event) {
+            try {
+                recordFramePerfSample(normalizeFramePerfSample(JSON.parse(event.data)));
+            } catch (error) {
+                reportViewerError("frame-perf", error);
             }
         });
         stateStream.onerror = function () {

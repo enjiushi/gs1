@@ -6,11 +6,19 @@
 
 #include <algorithm>
 #include <cassert>
+#include <chrono>
 #include <cmath>
 #include <utility>
 
 namespace
 {
+double elapsed_seconds(
+    const std::chrono::steady_clock::time_point start,
+    const std::chrono::steady_clock::time_point end) noexcept
+{
+    return std::chrono::duration<double>(end - start).count();
+}
+
 float unit_from_raw_meter(float value) noexcept
 {
     return std::clamp(value * 0.01f, 0.0f, 1.0f);
@@ -416,7 +424,10 @@ void SmokeEngineHost::drain_incoming_commands()
 
 void SmokeEngineHost::update(double delta_seconds)
 {
+    const auto update_start = std::chrono::steady_clock::now();
+
     frame_number_ += 1U;
+    current_frame_gameplay_dll_seconds_ = 0.0;
     current_frame_message_entries_.clear();
     frame_live_state_patches_.clear();
 
@@ -430,7 +441,9 @@ void SmokeEngineHost::update(double delta_seconds)
     phase1_request.real_delta_seconds = delta_seconds;
 
     Gs1Phase1Result phase1_result {};
+    const auto phase1_start = std::chrono::steady_clock::now();
     const auto phase1_status = api_->run_phase1(runtime_, &phase1_request, &phase1_result);
+    current_frame_gameplay_dll_seconds_ += elapsed_seconds(phase1_start, std::chrono::steady_clock::now());
     assert(phase1_status == GS1_STATUS_OK);
     const bool log_phase1_summary = log_mode_ == LogMode::Verbose;
     if (log_phase1_summary)
@@ -452,10 +465,13 @@ void SmokeEngineHost::update(double delta_seconds)
 
     if (!frame_feedback_events_.empty())
     {
+        const auto feedback_submit_start = std::chrono::steady_clock::now();
         const auto status = api_->submit_feedback_events(
             runtime_,
             frame_feedback_events_.data(),
             static_cast<std::uint32_t>(frame_feedback_events_.size()));
+        current_frame_gameplay_dll_seconds_ +=
+            elapsed_seconds(feedback_submit_start, std::chrono::steady_clock::now());
         assert(status == GS1_STATUS_OK);
         if (log_mode_ == LogMode::Verbose)
         {
@@ -471,7 +487,9 @@ void SmokeEngineHost::update(double delta_seconds)
     phase2_request.struct_size = sizeof(Gs1Phase2Request);
 
     Gs1Phase2Result phase2_result {};
+    const auto phase2_start = std::chrono::steady_clock::now();
     const auto phase2_status = api_->run_phase2(runtime_, &phase2_request, &phase2_result);
+    current_frame_gameplay_dll_seconds_ += elapsed_seconds(phase2_start, std::chrono::steady_clock::now());
     assert(phase2_status == GS1_STATUS_OK);
     const bool log_phase2_summary = log_mode_ == LogMode::Verbose;
     if (log_phase2_summary)
@@ -488,6 +506,13 @@ void SmokeEngineHost::update(double delta_seconds)
     flush_engine_messages("phase2");
     resolve_inflight_script_directive();
     publish_live_state_snapshot();
+
+    const auto update_end = std::chrono::steady_clock::now();
+    last_frame_timing_.total_update_seconds = elapsed_seconds(update_start, update_end);
+    last_frame_timing_.gameplay_dll_seconds = current_frame_gameplay_dll_seconds_;
+    last_frame_timing_.host_update_seconds = std::max(
+        0.0,
+        last_frame_timing_.total_update_seconds - last_frame_timing_.gameplay_dll_seconds);
 }
 
 void SmokeEngineHost::queue_ui_action(const Gs1UiAction& action)
@@ -659,10 +684,12 @@ void SmokeEngineHost::submit_host_events(
         return;
     }
 
+    const auto submit_start = std::chrono::steady_clock::now();
     const auto status = api_->submit_host_events(
         runtime_,
         events.data(),
         static_cast<std::uint32_t>(events.size()));
+    current_frame_gameplay_dll_seconds_ += elapsed_seconds(submit_start, std::chrono::steady_clock::now());
     assert(status == GS1_STATUS_OK);
     if (log_mode_ == LogMode::Verbose)
     {
@@ -805,8 +832,16 @@ void SmokeEngineHost::flush_engine_messages(const char* stage_label)
 {
     Gs1EngineMessage message {};
 
-    while (api_->pop_engine_message(runtime_, &message) == GS1_STATUS_OK)
+    while (true)
     {
+        const auto pop_start = std::chrono::steady_clock::now();
+        const auto pop_status = api_->pop_engine_message(runtime_, &message);
+        current_frame_gameplay_dll_seconds_ += elapsed_seconds(pop_start, std::chrono::steady_clock::now());
+        if (pop_status != GS1_STATUS_OK)
+        {
+            break;
+        }
+
         seen_messages_.push_back(message.type);
         std::uint32_t live_state_patch_mask = LiveStatePatchField_None;
 

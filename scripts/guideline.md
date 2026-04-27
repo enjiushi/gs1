@@ -14,5 +14,5 @@ PowerShell entry points for building targets and running smoke/system test workf
 - `build_visual_smoke_host.ps1`: Builds the visual smoke host used by the live viewer.
 - `common.ps1`: Shared helper functions imported by the other PowerShell scripts.
 - `run_smoke.ps1`: Runs the scripted smoke-test flow and forwards PowerShell `-Verbose` to the smoke host as `--verbose`.
-- `run_system_tests.ps1`: Runs the system-test host and its authored test packs.
+- `run_system_tests.ps1`: Runs the standalone system-test host and its authored test packs without requiring a gameplay DLL path argument.
 - `run_visual_smoke.ps1`: Launches the visual smoke workflow and live viewer support, forwarding PowerShell `-Verbose` to the visual host as `--verbose`.

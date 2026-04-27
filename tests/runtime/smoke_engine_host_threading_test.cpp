@@ -2,6 +2,7 @@
 #include "smoke_engine_host.h"
 
 #include <cassert>
+#include <cmath>
 #include <cstring>
 #include <deque>
 #include <string>
@@ -215,11 +216,33 @@ void move_direction_commands_coalesce_before_the_frame_drains_them()
     assert(move_event.payload.site_move_direction.world_move_y == 5.0f);
     assert(move_event.payload.site_move_direction.world_move_z == 6.0f);
 }
+
+void update_records_frame_timing_breakdown()
+{
+    FakeRuntimeState runtime_state {};
+    runtime_state.engine_messages.push_back(make_set_app_state_message(GS1_APP_STATE_MAIN_MENU));
+
+    const auto api = make_fake_api();
+    auto* runtime = reinterpret_cast<Gs1RuntimeHandle*>(&runtime_state);
+    SmokeEngineHost host {api, runtime, SmokeEngineHost::LogMode::ActivityOnly};
+
+    host.update(1.0 / 60.0);
+
+    const auto timing = host.last_frame_timing();
+    assert(timing.total_update_seconds >= 0.0);
+    assert(timing.host_update_seconds >= 0.0);
+    assert(timing.gameplay_dll_seconds >= 0.0);
+    assert((timing.total_update_seconds + 1e-9) >= timing.host_update_seconds);
+    assert((timing.total_update_seconds + 1e-9) >= timing.gameplay_dll_seconds);
+    const double reconstructed_total = timing.host_update_seconds + timing.gameplay_dll_seconds;
+    assert(std::abs(reconstructed_total - timing.total_update_seconds) < 0.01);
+}
 }  // namespace
 
 int main()
 {
     queued_commands_only_publish_after_update();
     move_direction_commands_coalesce_before_the_frame_drains_them();
+    update_records_frame_timing_breakdown();
     return 0;
 }
