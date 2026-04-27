@@ -794,6 +794,42 @@ void ecology_non_growable_checkerboard_ignores_weather_pressure_and_uses_constan
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(calm.ecology.plant_density, harsh.ecology.plant_density, 0.01f));
 }
 
+void ecology_non_growable_checkerboard_withers_out_in_five_real_minutes(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(2U, 1708U, 101U, 6U, 6U);
+    GameMessageQueue queue {};
+    auto site_context = make_site_context<EcologySystem>(campaign, site_run, queue, 60.0);
+
+    auto tile = site_run.site_world->tile_at(TileCoord {2, 2});
+    tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_straw_checkerboard};
+    tile.ecology.plant_density = 100.0f;
+    tile.ecology.moisture = 0.0f;
+    tile.ecology.soil_fertility = 0.0f;
+    tile.ecology.soil_salinity = 0.0f;
+    tile.local_weather.heat = 0.0f;
+    tile.local_weather.wind = 0.0f;
+    tile.local_weather.dust = 0.0f;
+    site_run.site_world->set_tile(TileCoord {2, 2}, tile);
+
+    for (int minute = 0; minute < 4; ++minute)
+    {
+        EcologySystem::run(site_context);
+    }
+
+    tile = site_run.site_world->tile_at(TileCoord {2, 2});
+    GS1_SYSTEM_TEST_CHECK(context, tile.ecology.plant_id == gs1::PlantId {gs1::k_plant_straw_checkerboard});
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.plant_density, 20.0f, 0.02f));
+
+    EcologySystem::run(site_context);
+
+    tile = site_run.site_world->tile_at(TileCoord {2, 2});
+    GS1_SYSTEM_TEST_CHECK(context, tile.ecology.plant_id == gs1::PlantId {});
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.plant_density, 0.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.growth_pressure, 0.0f));
+}
+
 void ecology_density_change_speed_follows_linear_growth_pressure_curve(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -1378,6 +1414,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "ecology",
     "non_growable_checkerboard_ignores_weather_pressure_and_uses_constant_wither_only",
     ecology_non_growable_checkerboard_ignores_weather_pressure_and_uses_constant_wither_only);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "ecology",
+    "non_growable_checkerboard_withers_out_in_five_real_minutes",
+    ecology_non_growable_checkerboard_withers_out_in_five_real_minutes);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "ecology",
     "density_change_speed_follows_linear_growth_pressure_curve",
