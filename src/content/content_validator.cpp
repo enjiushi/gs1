@@ -36,6 +36,11 @@ inline constexpr float k_unlock_step_plant_pool = 10.0f;
     return value >= 0.0f && value <= 100.0f;
 }
 
+[[nodiscard]] bool percent_total_is_100(float value) noexcept
+{
+    return std::fabs(value - 100.0f) <= 0.001f;
+}
+
 [[nodiscard]] bool modifier_preset_indices_are_unique_and_contiguous(
     std::span<const ModifierPresetDef> presets) noexcept
 {
@@ -308,6 +313,123 @@ std::vector<ContentValidationIssue> validate_content_database(
                 ContentValidationSeverity::Error,
                 "Item definition references an unknown structure id."});
             break;
+        }
+
+        if (item_def.source_rule == ItemSourceRule::ExcavationOnly)
+        {
+            if (item_def.consumable ||
+                item_def.linked_plant_id.value != 0U ||
+                item_def.linked_structure_id.value != 0U ||
+                item_def.capability_flags != ITEM_CAPABILITY_SELL)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Excavation-only items must remain non-consumable sell-only merchandise with no linked plant or structure."});
+                break;
+            }
+        }
+    }
+
+    if (issues.empty())
+    {
+        bool saw_rough = false;
+        bool saw_careful = false;
+        bool saw_thorough = false;
+        for (const auto& depth_def : content.excavation_depth_defs)
+        {
+            const float tier_total =
+                depth_def.common_tier_percent +
+                depth_def.uncommon_tier_percent +
+                depth_def.rare_tier_percent +
+                depth_def.very_rare_tier_percent +
+                depth_def.jackpot_tier_percent;
+            if (depth_def.depth == ExcavationDepth::None ||
+                depth_def.energy_cost_multiplier <= 0.0f ||
+                depth_def.find_chance_percent < 0.0f ||
+                depth_def.find_chance_percent > 100.0f ||
+                !percent_total_is_100(tier_total))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Excavation depth definitions must use valid depths, positive energy multipliers, 0-100 find chance, and tier totals that sum to 100%."});
+                break;
+            }
+
+            saw_rough = saw_rough || depth_def.depth == ExcavationDepth::Rough;
+            saw_careful = saw_careful || depth_def.depth == ExcavationDepth::Careful;
+            saw_thorough = saw_thorough || depth_def.depth == ExcavationDepth::Thorough;
+        }
+
+        if (issues.empty() && (!saw_rough || !saw_careful || !saw_thorough))
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Excavation depth definitions must include rough, careful, and thorough rows."});
+        }
+    }
+
+    if (issues.empty())
+    {
+        float common_total = 0.0f;
+        float uncommon_total = 0.0f;
+        float rare_total = 0.0f;
+        float very_rare_total = 0.0f;
+        float jackpot_total = 0.0f;
+        for (const auto& entry : content.excavation_loot_entry_defs)
+        {
+            const auto item_it = content.index.item_by_id.find(entry.item_id.value);
+            if (item_it == content.index.item_by_id.end())
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Excavation loot entries must reference known item ids."});
+                break;
+            }
+
+            const auto& item_def = content.item_defs[item_it->second];
+            if (item_def.source_rule != ItemSourceRule::ExcavationOnly ||
+                entry.tier == ExcavationLootTier::None ||
+                entry.percent_within_tier < 0.0f)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Excavation loot entries must reference excavation-only items, use valid tiers, and non-negative tier percentages."});
+                break;
+            }
+
+            switch (entry.tier)
+            {
+            case ExcavationLootTier::Common:
+                common_total += entry.percent_within_tier;
+                break;
+            case ExcavationLootTier::Uncommon:
+                uncommon_total += entry.percent_within_tier;
+                break;
+            case ExcavationLootTier::Rare:
+                rare_total += entry.percent_within_tier;
+                break;
+            case ExcavationLootTier::VeryRare:
+                very_rare_total += entry.percent_within_tier;
+                break;
+            case ExcavationLootTier::Jackpot:
+                jackpot_total += entry.percent_within_tier;
+                break;
+            case ExcavationLootTier::None:
+            default:
+                break;
+            }
+        }
+
+        if (issues.empty() &&
+            (!percent_total_is_100(common_total) ||
+                !percent_total_is_100(uncommon_total) ||
+                !percent_total_is_100(rare_total) ||
+                !percent_total_is_100(very_rare_total) ||
+                !percent_total_is_100(jackpot_total)))
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Each excavation loot tier pool must sum to 100%."});
         }
     }
 

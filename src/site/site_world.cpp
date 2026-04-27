@@ -79,6 +79,7 @@ void register_site_world_types(flecs::world& world)
     register_component<TileGroundCoverSlot>(world);
     register_component<TilePlantDensity>(world);
     register_component<TileGrowthPressure>(world);
+    register_component<TileExcavationState>(world);
     register_component<DirtyEcologyMask>(world);
     register_component<TileEcologyReportState>(world);
     register_component<DeviceStructureId>(world);
@@ -167,6 +168,14 @@ SiteWorld::TileEcologyData tile_ecology_from_entity(flecs::entity entity)
         growth.value};
 }
 
+SiteWorld::TileExcavationData tile_excavation_from_entity(flecs::entity entity)
+{
+    const auto excavation = entity.get<TileExcavationState>();
+    return SiteWorld::TileExcavationData {
+        excavation.depth,
+        {excavation.reserved0[0], excavation.reserved0[1], excavation.reserved0[2]}};
+}
+
 SiteWorld::TileLocalWeatherData tile_local_weather_from_entity(flecs::entity entity)
 {
     const auto heat = entity.get<TileHeat>();
@@ -224,6 +233,7 @@ SiteWorld::TileData tile_data_from_entity(flecs::entity entity)
     return SiteWorld::TileData {
         tile_static_from_entity(entity),
         tile_ecology_from_entity(entity),
+        tile_excavation_from_entity(entity),
         tile_local_weather_from_entity(entity),
         tile_plant_weather_contribution_from_entity(entity),
         tile_device_weather_contribution_from_entity(entity),
@@ -235,6 +245,7 @@ SiteWorld::TileData default_tile_data() noexcept
     return SiteWorld::TileData {
         SiteWorld::TileStaticData {0U, true, true, false},
         SiteWorld::TileEcologyData {20.0f, 20.0f, 0.0f, 0.0f, PlantId {}, 0U, 0.0f, 0.0f},
+        SiteWorld::TileExcavationData {},
         SiteWorld::TileLocalWeatherData {0.0f, 0.0f, 0.0f},
         SiteWorld::TileWeatherContributionData {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f},
         SiteWorld::TileWeatherContributionData {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f},
@@ -279,6 +290,15 @@ void apply_tile_local_weather_to_entity(
         .set<TileHeat>({data.heat})
         .set<TileWind>({data.wind})
         .set<TileDust>({data.dust});
+}
+
+void apply_tile_excavation_to_entity(
+    flecs::entity entity,
+    const SiteWorld::TileExcavationData& data)
+{
+    entity.set<TileExcavationState>({
+        data.depth,
+        {data.reserved0[0], data.reserved0[1], data.reserved0[2]}});
 }
 
 void apply_tile_plant_weather_contribution_to_entity(
@@ -455,7 +475,10 @@ void SiteWorld::initialize(const CreateDesc& desc)
             .set<TilePlantSlot>({initial_tile.ecology.plant_id})
             .set<TileGroundCoverSlot>({initial_tile.ecology.ground_cover_type_id})
             .set<TilePlantDensity>({initial_tile.ecology.plant_density})
-            .set<TileGrowthPressure>({initial_tile.ecology.growth_pressure});
+            .set<TileGrowthPressure>({initial_tile.ecology.growth_pressure})
+            .set<TileExcavationState>({
+                initial_tile.excavation.depth,
+                {initial_tile.excavation.reserved0[0], initial_tile.excavation.reserved0[1], initial_tile.excavation.reserved0[2]}});
 
         sync_tile_occupant_tag(
             tile_entity,
@@ -667,6 +690,49 @@ SiteWorld::TileLocalWeatherData SiteWorld::tile_local_weather_at_index(std::size
 
     return tile_local_weather_from_entity(
         impl_->world.entity(impl_->tile_entity_base + static_cast<flecs::entity_t>(index)));
+}
+
+SiteWorld::TileExcavationData SiteWorld::tile_excavation(TileCoord coord) const noexcept
+{
+    if (!contains(coord))
+    {
+        return {};
+    }
+
+    return tile_excavation_at_index(tile_index(coord));
+}
+
+SiteWorld::TileExcavationData SiteWorld::tile_excavation_at_index(std::size_t index) const noexcept
+{
+    if (impl_ == nullptr || index >= tile_count())
+    {
+        return {};
+    }
+
+    return tile_excavation_from_entity(
+        impl_->world.entity(impl_->tile_entity_base + static_cast<flecs::entity_t>(index)));
+}
+
+void SiteWorld::set_tile_excavation(TileCoord coord, const TileExcavationData& data)
+{
+    if (!contains(coord))
+    {
+        return;
+    }
+
+    set_tile_excavation_at_index(tile_index(coord), data);
+}
+
+void SiteWorld::set_tile_excavation_at_index(std::size_t index, const TileExcavationData& data)
+{
+    if (impl_ == nullptr || index >= tile_count())
+    {
+        return;
+    }
+
+    apply_tile_excavation_to_entity(
+        impl_->world.entity(impl_->tile_entity_base + static_cast<flecs::entity_t>(index)),
+        data);
 }
 
 void SiteWorld::set_tile_local_weather(TileCoord coord, const TileLocalWeatherData& data)
@@ -931,6 +997,7 @@ void SiteWorld::set_tile_at_index(std::size_t index, const TileData& data)
         impl_->tile_entity_base + static_cast<flecs::entity_t>(index));
     apply_tile_static_to_entity(entity, data.static_data);
     apply_tile_ecology_to_entity(entity, data.ecology);
+    apply_tile_excavation_to_entity(entity, data.excavation);
     apply_tile_local_weather_to_entity(entity, data.local_weather);
     apply_tile_plant_weather_contribution_to_entity(entity, data.plant_weather_contribution);
     apply_tile_device_weather_contribution_to_entity(entity, data.device_weather_contribution);

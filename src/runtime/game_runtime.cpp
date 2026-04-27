@@ -95,6 +95,13 @@ constexpr std::int32_t k_regional_map_tile_spacing = 160;
 [[nodiscard]] ProjectedSiteTileState capture_projected_tile_state(
     const SiteWorld::TileData& tile) noexcept
 {
+    const bool tile_is_occupied =
+        tile.ecology.plant_id.value != 0U ||
+        tile.ecology.ground_cover_type_id != 0U ||
+        tile.device.structure_id.value != 0U;
+    const auto visible_excavation_depth = tile_is_occupied
+        ? ExcavationDepth::None
+        : tile.excavation.depth;
     const float wind_protection =
         tile.plant_weather_contribution.wind_protection +
         tile.device_weather_contribution.wind_protection;
@@ -145,6 +152,8 @@ constexpr std::int32_t k_regional_map_tile_spacing = 160;
             tile.ecology.soil_salinity,
             100.0f,
             k_visible_tile_soil_salinity_projection_step),
+        static_cast<std::uint8_t>(tile.excavation.depth),
+        static_cast<std::uint8_t>(visible_excavation_depth),
         true};
 }
 
@@ -165,7 +174,9 @@ constexpr std::int32_t k_regional_map_tile_spacing = 160;
         lhs.dust_protection_quantized == rhs.dust_protection_quantized &&
         lhs.moisture_quantized == rhs.moisture_quantized &&
         lhs.soil_fertility_quantized == rhs.soil_fertility_quantized &&
-        lhs.soil_salinity_quantized == rhs.soil_salinity_quantized;
+        lhs.soil_salinity_quantized == rhs.soil_salinity_quantized &&
+        lhs.excavation_depth == rhs.excavation_depth &&
+        lhs.visible_excavation_depth == rhs.visible_excavation_depth;
 }
 
 [[nodiscard]] std::uint32_t visible_loadout_slot_count(const LoadoutPlannerState& planner) noexcept
@@ -2655,8 +2666,8 @@ void GameRuntime::queue_site_tile_upsert_message(std::uint32_t x, std::uint32_t 
 
     auto tile_message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     auto& payload = tile_message.emplace_payload<Gs1EngineMessageSiteTileData>();
-    payload.x = x;
-    payload.y = y;
+    payload.x = static_cast<std::uint16_t>(x);
+    payload.y = static_cast<std::uint16_t>(y);
     payload.terrain_type_id = tile.static_data.terrain_type_id;
     payload.plant_type_id = tile.ecology.plant_id.value;
     payload.structure_type_id = tile.device.structure_id.value;
@@ -2670,6 +2681,10 @@ void GameRuntime::queue_site_tile_upsert_message(std::uint32_t x, std::uint32_t 
     payload.moisture = tile.ecology.moisture;
     payload.soil_fertility = tile.ecology.soil_fertility;
     payload.soil_salinity = tile.ecology.soil_salinity;
+    payload.excavation_depth = projected_state.excavation_depth;
+    payload.visible_excavation_depth = projected_state.visible_excavation_depth;
+    payload.reserved0[0] = 0U;
+    payload.reserved0[1] = 0U;
     engine_messages_.push_back(tile_message);
 
     if (should_emit_site_one_runtime_probe(site_run, coord))

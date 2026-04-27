@@ -64,6 +64,24 @@ inline void set_tile_ecology(
     }
 }
 
+inline SiteWorld::TileExcavationData tile_excavation(
+    const SiteRunState& site_run,
+    TileCoord coord) noexcept
+{
+    return has_world(site_run) ? site_run.site_world->tile_excavation(coord) : SiteWorld::TileExcavationData {};
+}
+
+inline void set_tile_excavation(
+    SiteRunState& site_run,
+    TileCoord coord,
+    const SiteWorld::TileExcavationData& data)
+{
+    if (has_world(site_run))
+    {
+        site_run.site_world->set_tile_excavation(coord, data);
+    }
+}
+
 inline SiteWorld::TileLocalWeatherData tile_local_weather(
     const SiteRunState& site_run,
     TileCoord coord) noexcept

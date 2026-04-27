@@ -822,6 +822,7 @@ Rules:
 - interruption clears the active action and releases unspent reserved inputs
 - item-based planting resolves `totalActionMinutes` from the linked `PlantDef.plantActionDurationMinutes`; other prototype site actions may still use action-definition defaults
 - when an action execution actually starts, the runtime samples the worker tile's current local heat, wind, and dust once and scales the authored hydration, nourishment, and energy action costs through per-action weather-to-meter coefficients
+- excavation resolves its discovery roll only on successful action completion; it should not pre-roll item results when the action begins
 
 ### 6.16 `WeatherState`
 
@@ -1020,6 +1021,7 @@ Message handling rule:
 - `BeginBuildAction`
 - `BeginRepairAction`
 - `BeginWaterAction`
+- `BeginExcavateAction`
 - `BeginBurialClearAction`
 - `CancelCurrentAction`
 - `CompleteAction`
@@ -1197,6 +1199,7 @@ Responsibilities:
 - hold one active manual action for the worker
 - derive action duration and instant worker action-cost deltas from the previous-frame `workEfficiency` snapshot
 - scale authored hydration, nourishment, and energy action costs from the worker tile's current local weather using per-action weather-to-meter coefficients when the action actually starts
+- resolve excavation completion for eligible tiles, including depth progression from `Rough` to `Careful` to `Thorough`, a separate any-item discovery roll, and a bound excavation loot-table roll on success
 - check action completion against elapsed action time
 - on completion, emit domain messages that mutate inventory, tiles, or devices
 - apply interruption rules during severe hazards or cancellation
@@ -1205,6 +1208,14 @@ V1 rule:
 
 - only one player manual action can be active at a time
 - action-completion messages must resolve in message flush phase A so a completed watering, repair, burial clear, or build can affect the same simulation step before hazard damage is applied
+- excavation should add `ActionKind::Excavate` and `GS1_SITE_ACTION_EXCAVATE`, use a default authored base energy cost of `30`, then resolve `excavationEnergyCostWeight` and `excavationEnergyCostBias` before the normal weather coefficients apply
+- excavation should track per-tile depth state with `None`, `Rough`, `Careful`, and `Thorough`
+- the default prototype action should request the next unfinished depth for that tile, with only `Rough` available before tech unlocks expose `Careful` and `Thorough`
+- once a tile reaches `Thorough`, no more excavation actions should be accepted for that tile
+- occupied tiles must reject excavation start requests until the occupier is removed
+- excavation should use a default separate any-item discovery chance of `30%`, resolved through `excavationDiscoveryChanceWeight` and `excavationDiscoveryChanceBias`
+- excavation loot tables should remain pure `100%` item pools whose entries sum to `100%`; the any-item discovery chance is a separate action/mechanism tuning value and must not be baked into the table itself
+- excavation-state visuals should project the current visible depth when the tile is unoccupied and suppress that visual whenever an occupier covers the tile, without erasing the stored excavation depth
 
 ### 10.3 `WeatherEventSystem`
 

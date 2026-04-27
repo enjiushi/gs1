@@ -405,3 +405,139 @@ health_delta = 0.0
 hydration_delta = 0.0
 nourishment_delta = 0.0
 energy_delta = 0.0
+
+[[items]]
+item_id = 29
+display_name = "Wind-Polished Desert Pebble"
+stack_size = 10
+source_rule = "ExcavationOnly"
+consumable = false
+buy_price = 0
+sell_price = 1
+internal_price_cash_points = 100
+capabilities = "Sell"
+linked_plant_id = 0
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 30
+display_name = "Desert Jasper"
+stack_size = 10
+source_rule = "ExcavationOnly"
+consumable = false
+buy_price = 0
+sell_price = 4
+internal_price_cash_points = 480
+capabilities = "Sell"
+linked_plant_id = 0
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 31
+display_name = "Black Gobi Stone"
+stack_size = 10
+source_rule = "ExcavationOnly"
+consumable = false
+buy_price = 0
+sell_price = 8
+internal_price_cash_points = 900
+capabilities = "Sell"
+linked_plant_id = 0
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 32
+display_name = "Gobi Agate"
+stack_size = 10
+source_rule = "ExcavationOnly"
+consumable = false
+buy_price = 0
+sell_price = 16
+internal_price_cash_points = 1600
+capabilities = "Sell"
+linked_plant_id = 0
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 33
+display_name = "Alxa Agate"
+stack_size = 10
+source_rule = "ExcavationOnly"
+consumable = false
+buy_price = 0
+sell_price = 32
+internal_price_cash_points = 3200
+capabilities = "Sell"
+linked_plant_id = 0
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 34
+display_name = "Turquoise Vein Fragment"
+stack_size = 10
+source_rule = "ExcavationOnly"
+consumable = false
+buy_price = 0
+sell_price = 78
+internal_price_cash_points = 7800
+capabilities = "Sell"
+linked_plant_id = 0
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 35
+display_name = "Golden Silk Jade"
+stack_size = 10
+source_rule = "ExcavationOnly"
+consumable = false
+buy_price = 0
+sell_price = 92
+internal_price_cash_points = 9200
+capabilities = "Sell"
+linked_plant_id = 0
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 36
+display_name = "Hetian Jade Pebble"
+stack_size = 10
+source_rule = "ExcavationOnly"
+consumable = false
+buy_price = 0
+sell_price = 200
+internal_price_cash_points = 20000
+capabilities = "Sell"
+linked_plant_id = 0
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0

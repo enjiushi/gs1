@@ -312,6 +312,16 @@ void set_tile_soil_visual_state(
     gs1::site_world_access::set_tile_ecology(site_run, coord, ecology);
 }
 
+void set_tile_excavation_state(
+    gs1::SiteRunState& site_run,
+    TileCoord coord,
+    gs1::ExcavationDepth depth)
+{
+    auto excavation = gs1::site_world_access::tile_excavation(site_run, coord);
+    excavation.depth = depth;
+    gs1::site_world_access::set_tile_excavation(site_run, coord, excavation);
+}
+
 void set_tile_protection_visual_state(
     gs1::SiteRunState& site_run,
     TileCoord coord,
@@ -1077,6 +1087,32 @@ int main()
         assert(approx_equal(payload.moisture, 27.0f));
         assert(approx_equal(payload.soil_fertility, 14.0f));
         assert(approx_equal(payload.soil_salinity, 40.0f));
+    }
+
+    set_tile_excavation_state(site_run, density_coord, gs1::ExcavationDepth::Rough);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+    const auto excavation_first_messages = drain_engine_messages(runtime);
+    const auto excavation_first_tiles =
+        collect_messages_of_type(excavation_first_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
+    assert(excavation_first_tiles.size() == 1U);
+    {
+        const auto& payload = excavation_first_tiles.front()->payload_as<Gs1EngineMessageSiteTileData>();
+        assert(payload.excavation_depth == static_cast<std::uint8_t>(gs1::ExcavationDepth::Rough));
+        assert(payload.visible_excavation_depth == static_cast<std::uint8_t>(gs1::ExcavationDepth::Rough));
+    }
+
+    set_tile_plant_state(site_run, density_coord, gs1::PlantId {gs1::k_plant_straw_checkerboard}, 0.22f);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+    const auto excavation_hidden_messages = drain_engine_messages(runtime);
+    const auto excavation_hidden_tiles =
+        collect_messages_of_type(excavation_hidden_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
+    assert(excavation_hidden_tiles.size() == 1U);
+    {
+        const auto& payload = excavation_hidden_tiles.front()->payload_as<Gs1EngineMessageSiteTileData>();
+        assert(payload.excavation_depth == static_cast<std::uint8_t>(gs1::ExcavationDepth::Rough));
+        assert(payload.visible_excavation_depth == static_cast<std::uint8_t>(gs1::ExcavationDepth::None));
     }
 
     set_tile_sand_burial(site_run, TileCoord {0, 0}, 0.9f);

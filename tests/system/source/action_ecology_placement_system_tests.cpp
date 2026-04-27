@@ -2,6 +2,7 @@
 #include "content/defs/craft_recipe_defs.h"
 #include "content/defs/item_defs.h"
 #include "site/inventory_storage.h"
+#include "site/site_projection_update_flags.h"
 #include "site/site_world_access.h"
 #include "site/systems/action_execution_system.h"
 #include "site/systems/ecology_system.h"
@@ -986,6 +987,246 @@ void harvest_last_cut_kills_low_density_plant_without_loot(
         GS1_SYSTEM_TEST_CHECK(context, tile.ecology.plant_id.value == 0U);
         GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.plant_density, 0.0f));
     }
+}
+
+void action_execution_excavate_starts_immediately_and_emits_cost(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 5074U);
+    GameMessageQueue queue {};
+    auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            site_context,
+            make_start_action_message(GS1_SITE_ACTION_EXCAVATE, TileCoord {3, 3}, 1U, 0U, 0U)) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_REQUIRE(context, site_run.site_action.current_action_id.has_value());
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.action_kind == ActionKind::Excavate);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        site_run.site_action.primary_subject_id == static_cast<std::uint32_t>(gs1::ExcavationDepth::Rough));
+    GS1_SYSTEM_TEST_CHECK(context, queue.size() == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, queue[0].type == GameMessageType::SiteActionStarted);
+    GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameMessageType::WorkerMeterDeltaRequested);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            queue[1].payload_as<gs1::WorkerMeterDeltaRequestedMessage>().energy_delta,
+            -30.0f));
+}
+
+void action_execution_excavate_rejects_occupied_tiles(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 5075U);
+    GameMessageQueue queue {};
+    auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue);
+
+    auto tile = site_run.site_world->tile_at(TileCoord {3, 3});
+    tile.device.structure_id = gs1::StructureId {gs1::k_structure_workbench};
+    site_run.site_world->set_tile(TileCoord {3, 3}, tile);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            site_context,
+            make_start_action_message(GS1_SITE_ACTION_EXCAVATE, TileCoord {3, 3}, 1U, 0U, 0U)) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::SiteActionFailed);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        queue.front().payload_as<SiteActionFailedMessage>().reason == SiteActionFailureReason::InvalidState);
+}
+
+void action_execution_excavate_rejects_when_worker_pack_has_no_reward_space(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 5076U);
+    GameMessageQueue queue {};
+    auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue);
+
+    const auto worker_pack = gs1::inventory_storage::worker_pack_container(site_run);
+    GS1_SYSTEM_TEST_REQUIRE(context, worker_pack.is_valid());
+    for (const auto item_id : {
+             gs1::k_item_water_container,
+             gs1::k_item_medicine_pack,
+             gs1::k_item_ordos_wormwood_seed_bundle,
+             gs1::k_item_wood_bundle,
+             gs1::k_item_iron_bundle,
+             gs1::k_item_basic_straw_checkerboard,
+             gs1::k_item_storage_crate_kit,
+             gs1::k_item_workbench_kit})
+    {
+        GS1_SYSTEM_TEST_REQUIRE(
+            context,
+            gs1::inventory_storage::add_item_to_container(site_run, worker_pack, gs1::ItemId {item_id}, 1U) == 0U);
+    }
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        !gs1::inventory_storage::can_fit_item_in_container(
+            site_run,
+            worker_pack,
+            gs1::ItemId {gs1::k_item_gobi_agate},
+            1U));
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            site_context,
+            make_start_action_message(GS1_SITE_ACTION_EXCAVATE, TileCoord {3, 3}, 1U, 0U, 0U)) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::SiteActionFailed);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        queue.front().payload_as<SiteActionFailedMessage>().reason == SiteActionFailureReason::InvalidState);
+    GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.current_action_id.has_value());
+}
+
+void action_execution_excavate_completion_misses_or_finds_deterministic_loot(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 1U);
+    GameMessageQueue queue {};
+    auto action_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue, 60.0);
+    auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue, 60.0);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            action_context,
+            make_start_action_message(GS1_SITE_ACTION_EXCAVATE, TileCoord {1, 1}, 1U, 0U, 0U)) == GS1_STATUS_OK);
+    queue.clear();
+    ActionExecutionSystem::run(action_context);
+    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::InventoryWorkerPackInsertRequested) == 0U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        site_run.site_world->tile_excavation(TileCoord {1, 1}).depth == gs1::ExcavationDepth::Rough);
+
+    while (!queue.empty())
+    {
+        const auto message = queue.front();
+        queue.pop_front();
+        GS1_SYSTEM_TEST_CHECK(
+            context,
+            InventorySystem::process_message(inventory_context, message) == GS1_STATUS_OK);
+    }
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            action_context,
+            make_start_action_message(GS1_SITE_ACTION_EXCAVATE, TileCoord {3, 3}, 1U, 0U, 0U)) == GS1_STATUS_OK);
+    queue.clear();
+    ActionExecutionSystem::run(action_context);
+    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::InventoryWorkerPackInsertRequested) == 1U);
+    const auto* insert =
+        first_message_payload<InventoryWorkerPackInsertRequestedMessage>(
+            queue,
+            GameMessageType::InventoryWorkerPackInsertRequested);
+    GS1_SYSTEM_TEST_REQUIRE(context, insert != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, insert->item_id == gs1::k_item_gobi_agate);
+    GS1_SYSTEM_TEST_CHECK(context, insert->quantity == 1U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        site_run.site_world->tile_excavation(TileCoord {3, 3}).depth == gs1::ExcavationDepth::Rough);
+
+    while (!queue.empty())
+    {
+        const auto message = queue.front();
+        queue.pop_front();
+        GS1_SYSTEM_TEST_CHECK(
+            context,
+            InventorySystem::process_message(inventory_context, message) == GS1_STATUS_OK);
+    }
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        gs1::inventory_storage::available_item_quantity_in_container(
+            site_run,
+            gs1::inventory_storage::worker_pack_container(site_run),
+            gs1::ItemId {gs1::k_item_gobi_agate}) == 1U);
+}
+
+void action_execution_excavate_completion_marks_tile_projection_dirty(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 5077U);
+    GameMessageQueue queue {};
+    auto action_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue, 60.0);
+    auto flow_context = make_site_context<SiteFlowSystem>(campaign, site_run, queue, 60.0);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            action_context,
+            make_start_action_message(GS1_SITE_ACTION_EXCAVATE, TileCoord {3, 3}, 1U, 0U, 0U)) == GS1_STATUS_OK);
+    queue.clear();
+
+    site_run.pending_projection_update_flags = 0U;
+    site_run.pending_full_tile_projection_update = false;
+    std::fill(
+        site_run.pending_tile_projection_update_mask.begin(),
+        site_run.pending_tile_projection_update_mask.end(),
+        static_cast<std::uint8_t>(0U));
+    site_run.pending_tile_projection_updates.clear();
+
+    for (int step = 0; step < 4 && site_run.site_action.current_action_id.has_value(); ++step)
+    {
+        SiteFlowSystem::run(flow_context);
+        ActionExecutionSystem::run(action_context);
+    }
+
+    GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.current_action_id.has_value());
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        site_run.site_world->tile_excavation(TileCoord {3, 3}).depth == gs1::ExcavationDepth::Rough);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        (site_run.pending_projection_update_flags & gs1::SITE_PROJECTION_UPDATE_TILES) != 0U);
+    GS1_SYSTEM_TEST_CHECK(context, !site_run.pending_full_tile_projection_update);
+    GS1_SYSTEM_TEST_REQUIRE(context, site_run.pending_tile_projection_updates.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        site_run.pending_tile_projection_updates[0].x == 3 &&
+            site_run.pending_tile_projection_updates[0].y == 3);
+}
+
+void action_execution_excavate_cannot_repeat_rough_depth_by_default(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 2U);
+    GameMessageQueue queue {};
+    auto action_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue, 60.0);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            action_context,
+            make_start_action_message(GS1_SITE_ACTION_EXCAVATE, TileCoord {2, 2}, 1U, 0U, 0U)) == GS1_STATUS_OK);
+    queue.clear();
+    ActionExecutionSystem::run(action_context);
+    queue.clear();
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            action_context,
+            make_start_action_message(GS1_SITE_ACTION_EXCAVATE, TileCoord {2, 2}, 1U, 0U, 0U)) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::SiteActionFailed);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        queue.front().payload_as<SiteActionFailedMessage>().reason == SiteActionFailureReason::InvalidState);
 }
 
 void action_execution_item_based_plant_completion_consumes_seed_and_emits_planting(
@@ -2092,6 +2333,30 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "action_execution",
     "harvest_completion_emits_worker_pack_insert_and_tile_harvested",
     action_execution_harvest_completion_emits_worker_pack_insert_and_tile_harvested);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "action_execution",
+    "excavate_starts_immediately_and_emits_cost",
+    action_execution_excavate_starts_immediately_and_emits_cost);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "action_execution",
+    "excavate_rejects_occupied_tiles",
+    action_execution_excavate_rejects_occupied_tiles);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "action_execution",
+    "excavate_rejects_when_worker_pack_has_no_reward_space",
+    action_execution_excavate_rejects_when_worker_pack_has_no_reward_space);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "action_execution",
+    "excavate_completion_misses_or_finds_deterministic_loot",
+    action_execution_excavate_completion_misses_or_finds_deterministic_loot);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "action_execution",
+    "excavate_completion_marks_tile_projection_dirty",
+    action_execution_excavate_completion_marks_tile_projection_dirty);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "action_execution",
+    "excavate_cannot_repeat_rough_depth_by_default",
+    action_execution_excavate_cannot_repeat_rough_depth_by_default);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "action_execution",
     "item_based_plant_completion_consumes_seed_and_emits_planting",

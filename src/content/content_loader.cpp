@@ -191,6 +191,10 @@ template <typename T>
     {
         return ItemSourceRule::HarvestOnly;
     }
+    if (field == "ExcavationOnly")
+    {
+        return ItemSourceRule::ExcavationOnly;
+    }
 
     fail_load(path, line_number, "invalid item source rule");
 }
@@ -647,8 +651,70 @@ template <typename T>
     {
         return ActionKind::Harvest;
     }
+    if (field == "Excavate")
+    {
+        return ActionKind::Excavate;
+    }
 
     fail_load(path, line_number, "invalid site action kind");
+}
+
+[[nodiscard]] ExcavationDepth parse_excavation_depth(
+    const std::filesystem::path& path,
+    std::size_t line_number,
+    const std::string& field)
+{
+    if (field == "None")
+    {
+        return ExcavationDepth::None;
+    }
+    if (field == "Rough")
+    {
+        return ExcavationDepth::Rough;
+    }
+    if (field == "Careful")
+    {
+        return ExcavationDepth::Careful;
+    }
+    if (field == "Thorough")
+    {
+        return ExcavationDepth::Thorough;
+    }
+
+    fail_load(path, line_number, "invalid excavation depth");
+}
+
+[[nodiscard]] ExcavationLootTier parse_excavation_loot_tier(
+    const std::filesystem::path& path,
+    std::size_t line_number,
+    const std::string& field)
+{
+    if (field == "None")
+    {
+        return ExcavationLootTier::None;
+    }
+    if (field == "Common")
+    {
+        return ExcavationLootTier::Common;
+    }
+    if (field == "Uncommon")
+    {
+        return ExcavationLootTier::Uncommon;
+    }
+    if (field == "Rare")
+    {
+        return ExcavationLootTier::Rare;
+    }
+    if (field == "VeryRare")
+    {
+        return ExcavationLootTier::VeryRare;
+    }
+    if (field == "Jackpot")
+    {
+        return ExcavationLootTier::Jackpot;
+    }
+
+    fail_load(path, line_number, "invalid excavation loot tier");
 }
 
 [[nodiscard]] PlacementOccupancyLayer parse_placement_occupancy_layer(
@@ -1437,6 +1503,41 @@ void load_site_action_defs(ContentDatabase& content, const std::filesystem::path
     }
 }
 
+void load_excavation_defs(ContentDatabase& content, const std::filesystem::path& path)
+{
+    const auto document = load_toml_document(path);
+    const auto& excavation_depths = require_toml_array(path, document, "excavation_depths");
+    for (const auto& node : excavation_depths)
+    {
+        const auto& entry = require_array_entry_table(path, node, "excavation_depths");
+        content.excavation_depth_defs.push_back(ExcavationDepthDef {
+            parse_excavation_depth(
+                path,
+                toml_line_number(entry),
+                require_toml_string(path, entry, "depth")),
+            require_toml_float(path, entry, "energy_cost_multiplier"),
+            require_toml_float(path, entry, "find_chance_percent"),
+            require_toml_float(path, entry, "common_tier_percent"),
+            require_toml_float(path, entry, "uncommon_tier_percent"),
+            require_toml_float(path, entry, "rare_tier_percent"),
+            require_toml_float(path, entry, "very_rare_tier_percent"),
+            require_toml_float(path, entry, "jackpot_tier_percent")});
+    }
+
+    const auto& excavation_loot_entries = require_toml_array(path, document, "excavation_loot_entries");
+    for (const auto& node : excavation_loot_entries)
+    {
+        const auto& entry = require_array_entry_table(path, node, "excavation_loot_entries");
+        content.excavation_loot_entry_defs.push_back(ExcavationLootEntryDef {
+            ItemId {require_toml_unsigned<std::uint32_t>(path, entry, "item_id")},
+            parse_excavation_loot_tier(
+                path,
+                toml_line_number(entry),
+                require_toml_string(path, entry, "tier")),
+            require_toml_float(path, entry, "percent_within_tier")});
+    }
+}
+
 void load_modifier_preset_defs(ContentDatabase& content, const std::filesystem::path& path)
 {
     const auto document = load_toml_document(path);
@@ -1903,6 +2004,7 @@ ContentDatabase ContentLoader::load_prototype_content()
     const auto plants_path = root / "plants.toml";
     const auto structures_path = root / "structures.toml";
     const auto craft_recipes_path = root / "craft_recipes.toml";
+    const auto excavation_tables_path = root / "excavation_tables.toml";
     const auto task_templates_path = root / "task_templates.toml";
     const auto site_onboarding_task_seeds_path = root / "site_onboarding_task_seeds.toml";
     const auto reward_candidates_path = root / "reward_candidates.toml";
@@ -1921,6 +2023,7 @@ ContentDatabase ContentLoader::load_prototype_content()
     load_plant_defs(content, plants_path);
     load_structure_defs(content, structures_path);
     load_craft_recipe_defs(content, craft_recipes_path);
+    load_excavation_defs(content, excavation_tables_path);
     load_task_template_defs(content, task_templates_path);
     load_site_onboarding_task_seed_defs(content, site_onboarding_task_seeds_path);
     load_reward_candidate_defs(content, reward_candidates_path);

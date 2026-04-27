@@ -314,7 +314,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         21: { name: "White Thorn Berries", shortName: "White Thorn", stackSize: 10, canUse: false, canPlant: false, canDeploy: false },
         22: { name: "Red Tamarisk Bark", shortName: "Bark", stackSize: 10, canUse: false, canPlant: false, canDeploy: false },
         23: { name: "Ningxia Wolfberries", shortName: "Wolfberries", stackSize: 10, canUse: false, canPlant: false, canDeploy: false },
-        26: { name: "Sea Buckthorn Berries", shortName: "Buckthorn", stackSize: 10, canUse: false, canPlant: false, canDeploy: false }
+        26: { name: "Sea Buckthorn Berries", shortName: "Buckthorn", stackSize: 10, canUse: false, canPlant: false, canDeploy: false },
+        29: { name: "Wind-Polished Desert Pebble", shortName: "Pebble", stackSize: 10, canUse: false, canPlant: false, canDeploy: false },
+        30: { name: "Desert Jasper", shortName: "Jasper", stackSize: 10, canUse: false, canPlant: false, canDeploy: false },
+        31: { name: "Black Gobi Stone", shortName: "Gobi Stone", stackSize: 10, canUse: false, canPlant: false, canDeploy: false },
+        32: { name: "Gobi Agate", shortName: "Agate", stackSize: 10, canUse: false, canPlant: false, canDeploy: false },
+        33: { name: "Alxa Agate", shortName: "Alxa", stackSize: 10, canUse: false, canPlant: false, canDeploy: false },
+        34: { name: "Turquoise Vein Fragment", shortName: "Turquoise", stackSize: 10, canUse: false, canPlant: false, canDeploy: false },
+        35: { name: "Golden Silk Jade", shortName: "Silk Jade", stackSize: 10, canUse: false, canPlant: false, canDeploy: false },
+        36: { name: "Hetian Jade Pebble", shortName: "Hetian Jade", stackSize: 10, canUse: false, canPlant: false, canDeploy: false }
     };
     const itemVisuals = {
         1: { iconKey: "water", light: "#5d8eb3", dark: "#33546f" },
@@ -340,7 +348,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         21: { iconKey: "vine", light: "#c9a255", dark: "#7c5628" },
         22: { iconKey: "wood", light: "#b57f58", dark: "#73472a" },
         23: { iconKey: "vine", light: "#c45d4b", dark: "#7b3127" },
-        26: { iconKey: "vine", light: "#d08935", dark: "#844c22" }
+        26: { iconKey: "vine", light: "#d08935", dark: "#844c22" },
+        29: { iconKey: "grid", light: "#b19a7a", dark: "#66553e" },
+        30: { iconKey: "grid", light: "#ba8c63", dark: "#72472c" },
+        31: { iconKey: "grid", light: "#89858d", dark: "#4d4a52" },
+        32: { iconKey: "grid", light: "#d0a162", dark: "#7f562a" },
+        33: { iconKey: "grid", light: "#d68557", dark: "#7d3f25" },
+        34: { iconKey: "grid", light: "#67b8b5", dark: "#2d6667" },
+        35: { iconKey: "grid", light: "#d3c06d", dark: "#7b6528" },
+        36: { iconKey: "grid", light: "#dfe4e8", dark: "#7c8388" }
     };
     const uiIconMarkup = {
         water: [
@@ -1177,6 +1193,29 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return state.siteState || null;
     }
 
+    function getSiteAction(state) {
+        return state && state.siteAction ? state.siteAction : null;
+    }
+
+    function isSiteActionActive(siteAction) {
+        return !!siteAction &&
+            typeof siteAction.actionKind === "number" &&
+            siteAction.actionKind !== 0 &&
+            typeof siteAction.flags === "number" &&
+            (siteAction.flags & 1) !== 0;
+    }
+
+    function getActiveExcavationTile(siteAction) {
+        if (!isSiteActionActive(siteAction) || siteAction.actionKind !== 10) {
+            return null;
+        }
+
+        return {
+            x: typeof siteAction.targetTileX === "number" ? siteAction.targetTileX : 0,
+            y: typeof siteAction.targetTileY === "number" ? siteAction.targetTileY : 0
+        };
+    }
+
     function getSiteResult(state) {
         return state.siteResult || null;
     }
@@ -1925,6 +1964,60 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         };
     }
 
+    function getVisibleExcavationDepth(tile) {
+        return tile && typeof tile.visibleExcavationDepth === "number"
+            ? Math.max(0, Math.min(3, tile.visibleExcavationDepth | 0))
+            : 0;
+    }
+
+    function excavationDepthLabel(depth) {
+        if (depth === 1) {
+            return "Rough";
+        }
+        if (depth === 2) {
+            return "Careful";
+        }
+        if (depth === 3) {
+            return "Thorough";
+        }
+        return "None";
+    }
+
+    function getExcavationOptionForTile(state, tileX, tileY) {
+        const tile = getTileSnapshot(state, tileX, tileY);
+        if (!tile) {
+            return null;
+        }
+
+        const occupied =
+            !!(tile.plantTypeId || 0) ||
+            !!(tile.structureTypeId || 0) ||
+            !!(tile.groundCoverTypeId || 0);
+        const activeExcavationTile = getActiveExcavationTile(getSiteAction(state));
+        const tileAlreadyReservedForExcavation =
+            !!activeExcavationTile &&
+            activeExcavationTile.x === tileX &&
+            activeExcavationTile.y === tileY;
+        const visibleDepth = getVisibleExcavationDepth(tile);
+        const storedDepth =
+            tile && typeof tile.excavationDepth === "number"
+                ? Math.max(0, Math.min(3, tile.excavationDepth | 0))
+                : 0;
+        if (occupied || visibleDepth >= 1 || storedDepth >= 1 || tileAlreadyReservedForExcavation) {
+            return null;
+        }
+
+        return {
+            requestedDepth: 1,
+            label: "Rough Excavation",
+            shortLabel: "rough excavation",
+            meta: "30% base find chance. Deeper passes unlock later.",
+            iconKey: "stone",
+            iconLight: "#b89c6d",
+            iconDark: "#65523a"
+        };
+    }
+
     function getAllInventorySlots(state) {
         return inventoryCache.slots.slice();
     }
@@ -2581,6 +2674,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (actionKind === 9) {
             return "Harvest";
         }
+        if (actionKind === 10) {
+            return "Excavate";
+        }
         return "Idle";
     }
 
@@ -2765,6 +2861,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const carriedDeployables = getCarriedDeployableOptions(state);
         const carriedHammerCount = getCarriedItemQuantity(state, 14);
         const harvestOption = getHarvestOptionForTile(state, tileX, tileY);
+        const excavationOption = getExcavationOptionForTile(state, tileX, tileY);
         const rootItems = [];
         const tileHasStructure = structureId !== 0;
 
@@ -2924,6 +3021,35 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                         itemId: 0
                     }).catch(() => {
                         statusChip.textContent = "Failed to send harvest action.";
+                    });
+                    closeTileContextMenu();
+                }
+            });
+        }
+
+        if (excavationOption) {
+            rootItems.push({
+                id: "excavate",
+                label: "Excavate",
+                meta: excavationOption.meta,
+                iconKey: excavationOption.iconKey,
+                iconLight: excavationOption.iconLight,
+                iconDark: excavationOption.iconDark,
+                onSelect: function () {
+                    statusChip.textContent =
+                        "Moving to (" + tileX + "," + tileY + ") for " +
+                        excavationOption.shortLabel + ".";
+                    postSiteAction({
+                        actionKind: "EXCAVATE",
+                        flags: 0,
+                        quantity: 1,
+                        targetTileX: tileX,
+                        targetTileY: tileY,
+                        primarySubjectId: 0,
+                        secondarySubjectId: excavationOption.requestedDepth,
+                        itemId: 0
+                    }).catch(() => {
+                        statusChip.textContent = "Failed to send excavation action.";
                     });
                     closeTileContextMenu();
                 }
@@ -7354,7 +7480,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     Math.round((tile.sandBurial || 0) * 100),
                     Math.round((tile.moisture || 0) * 100),
                     Math.round((tile.soilFertility || 0) * 100),
-                    Math.round((tile.soilSalinity || 0) * 100)
+                    Math.round((tile.soilSalinity || 0) * 100),
+                    tile.visibleExcavationDepth || 0
                 ])
             }
         );
@@ -9123,7 +9250,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             sandBurial: 0,
             moisture: 0,
             soilFertility: 0,
-            soilSalinity: 0
+            soilSalinity: 0,
+            excavationDepth: 0,
+            visibleExcavationDepth: 0
         };
     }
 
@@ -9474,6 +9603,210 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         cache.protectionOverlayGroup = null;
     }
 
+    function disposeExcavationMarksGroup(cache) {
+        if (!cache || !cache.excavationMarksGroup) {
+            return;
+        }
+
+        const markGroup = cache.excavationMarksGroup;
+        worldGroup.remove(markGroup);
+        markGroup.traverse((node) => {
+            if (node.geometry && typeof node.geometry.dispose === "function") {
+                node.geometry.dispose();
+            }
+            if (node.material && typeof node.material.dispose === "function") {
+                node.material.dispose();
+            }
+        });
+        cache.excavationMarksGroup = null;
+    }
+
+    function addExcavationMarkPlate(group, centerX, centerY, centerZ, color, depth) {
+        const plateColor = color.clone().lerp(new THREE_NS.Color(0x1d140c), 0.72);
+        const plate = new THREE_NS.Mesh(
+            new THREE_NS.PlaneGeometry(0.92, 0.92),
+            new THREE_NS.MeshStandardMaterial({
+                color: plateColor,
+                emissive: color.clone().multiplyScalar(0.1),
+                emissiveIntensity: 0.35,
+                roughness: 0.78,
+                metalness: 0.04,
+                transparent: true,
+                opacity: depth >= 3 ? 0.52 : (depth === 2 ? 0.42 : 0.34),
+                side: THREE_NS.DoubleSide
+            })
+        );
+        plate.rotation.x = -Math.PI / 2;
+        plate.position.set(centerX, centerY, centerZ);
+        group.add(plate);
+    }
+
+    function addExcavationOutline(group, centerX, centerY, centerZ, color, depth) {
+        const halfExtent = 0.46;
+        const geometry = new THREE_NS.BufferGeometry().setFromPoints([
+            new THREE_NS.Vector3(centerX - halfExtent, centerY, centerZ - halfExtent),
+            new THREE_NS.Vector3(centerX + halfExtent, centerY, centerZ - halfExtent),
+            new THREE_NS.Vector3(centerX + halfExtent, centerY, centerZ + halfExtent),
+            new THREE_NS.Vector3(centerX - halfExtent, centerY, centerZ + halfExtent)
+        ]);
+        const outline = new THREE_NS.LineLoop(
+            geometry,
+            new THREE_NS.LineBasicMaterial({
+                color: color,
+                transparent: true,
+                opacity: depth >= 3 ? 0.98 : (depth === 2 ? 0.9 : 0.82)
+            })
+        );
+        group.add(outline);
+    }
+
+    function addExcavationMarkStrips(group, centerX, centerY, centerZ, color, depth) {
+        const stripAngles = depth >= 3
+            ? [0.0, Math.PI * 0.5, 0.78]
+            : (depth === 2 ? [0.0, Math.PI * 0.5] : [0.55]);
+        const stripLength = depth >= 3 ? 0.72 : (depth === 2 ? 0.66 : 0.58);
+        const stripWidth = depth >= 3 ? 0.12 : (depth === 2 ? 0.115 : 0.13);
+        stripAngles.forEach((angle, index) => {
+            const mesh = new THREE_NS.Mesh(
+                new THREE_NS.PlaneGeometry(stripLength, stripWidth),
+                new THREE_NS.MeshStandardMaterial({
+                    color: color,
+                    emissive: color.clone().multiplyScalar(0.32),
+                    emissiveIntensity: 0.62,
+                    roughness: 0.34,
+                    metalness: 0.02,
+                    transparent: true,
+                    opacity: depth >= 3 ? 0.94 : (depth === 2 ? 0.88 : 0.8),
+                    side: THREE_NS.DoubleSide
+                })
+            );
+            mesh.rotation.x = -Math.PI / 2;
+            mesh.rotation.z = angle;
+            mesh.position.set(centerX, centerY + 0.002 + index * 0.003, centerZ);
+            group.add(mesh);
+        });
+    }
+
+    function addExcavationCenterBadge(group, centerX, centerY, centerZ, color, depth) {
+        const outerRadius = depth >= 3 ? 0.16 : (depth === 2 ? 0.12 : 0.095);
+        const outer = new THREE_NS.Mesh(
+            depth >= 3
+                ? new THREE_NS.RingGeometry(outerRadius * 0.55, outerRadius, 24)
+                : new THREE_NS.CircleGeometry(outerRadius, 24),
+            new THREE_NS.MeshStandardMaterial({
+                color: depth >= 3 ? color : color.clone().offsetHSL(0, 0, 0.08),
+                emissive: color.clone().multiplyScalar(0.28),
+                emissiveIntensity: 0.55,
+                roughness: 0.28,
+                metalness: 0.04,
+                transparent: true,
+                opacity: depth >= 3 ? 0.96 : 0.88,
+                side: THREE_NS.DoubleSide
+            })
+        );
+        outer.rotation.x = -Math.PI / 2;
+        outer.position.set(centerX, centerY + 0.008, centerZ);
+        group.add(outer);
+
+        if (depth >= 2) {
+            const core = new THREE_NS.Mesh(
+                new THREE_NS.CircleGeometry(depth >= 3 ? 0.045 : 0.038, 18),
+                new THREE_NS.MeshStandardMaterial({
+                    color: depth >= 3 ? 0x17110b : 0x24170e,
+                    emissive: color.clone().multiplyScalar(0.12),
+                    emissiveIntensity: 0.4,
+                    roughness: 0.24,
+                    metalness: 0.0,
+                    transparent: true,
+                    opacity: 0.92,
+                    side: THREE_NS.DoubleSide
+                })
+            );
+            core.rotation.x = -Math.PI / 2;
+            core.position.set(centerX, centerY + 0.01, centerZ);
+            group.add(core);
+        }
+    }
+
+    function addExcavationCornerTicks(group, centerX, centerY, centerZ, color, depth) {
+        if (depth < 2) {
+            return;
+        }
+
+        const offsets = [
+            [-0.31, -0.31],
+            [0.31, -0.31],
+            [0.31, 0.31],
+            [-0.31, 0.31]
+        ];
+        offsets.forEach((offset, index) => {
+            const tick = new THREE_NS.Mesh(
+                new THREE_NS.PlaneGeometry(depth >= 3 ? 0.16 : 0.13, 0.04),
+                new THREE_NS.MeshStandardMaterial({
+                    color: color,
+                    emissive: color.clone().multiplyScalar(0.24),
+                    emissiveIntensity: 0.48,
+                    roughness: 0.32,
+                    metalness: 0.02,
+                    transparent: true,
+                    opacity: depth >= 3 ? 0.92 : 0.82,
+                    side: THREE_NS.DoubleSide
+                })
+            );
+            tick.rotation.x = -Math.PI / 2;
+            tick.rotation.z = index * (Math.PI * 0.5);
+            tick.position.set(centerX + offset[0], centerY + 0.006, centerZ + offset[1]);
+            group.add(tick);
+        });
+    }
+
+    function updateSiteExcavationMarksVisual(siteBootstrap, siteAction) {
+        if (!siteSceneCache || !worldGroup) {
+            return;
+        }
+
+        disposeExcavationMarksGroup(siteSceneCache);
+        const siteTiles = siteBootstrap && Array.isArray(siteBootstrap.tiles)
+            ? siteBootstrap.tiles
+            : [];
+        const markGroup = new THREE_NS.Group();
+        const roughColor = new THREE_NS.Color(0xd37b38);
+        const carefulColor = new THREE_NS.Color(0x58b8d7);
+        const thoroughColor = new THREE_NS.Color(0xf0d67a);
+        const pendingColor = new THREE_NS.Color(0xff5f2e);
+        const activeExcavationTile = getActiveExcavationTile(siteAction);
+
+        siteTiles.forEach((tile) => {
+            const visibleDepth = getVisibleExcavationDepth(tile);
+            const isActiveExcavationTarget =
+                !!activeExcavationTile &&
+                activeExcavationTile.x === tile.x &&
+                activeExcavationTile.y === tile.y;
+            if (visibleDepth <= 0 && !isActiveExcavationTarget) {
+                return;
+            }
+
+            const tileHeight = computeSiteTileVisualHeight(tile);
+            const centerX = tile.x - siteSceneCache.offsetX;
+            const centerZ = tile.y - siteSceneCache.offsetZ;
+            const color = isActiveExcavationTarget
+                ? pendingColor
+                : (visibleDepth >= 3
+                    ? thoroughColor
+                    : (visibleDepth === 2 ? carefulColor : roughColor));
+            const displayDepth = visibleDepth > 0 ? visibleDepth : 1;
+            const markHeight = tileHeight + 0.07;
+            addExcavationMarkPlate(markGroup, centerX, markHeight, centerZ, color, displayDepth);
+            addExcavationOutline(markGroup, centerX, markHeight + 0.001, centerZ, color, displayDepth);
+            addExcavationMarkStrips(markGroup, centerX, markHeight + 0.002, centerZ, color, displayDepth);
+            addExcavationCenterBadge(markGroup, centerX, markHeight, centerZ, color, displayDepth);
+            addExcavationCornerTicks(markGroup, centerX, markHeight, centerZ, color, displayDepth);
+        });
+
+        worldGroup.add(markGroup);
+        siteSceneCache.excavationMarksGroup = markGroup;
+    }
+
     function updateSitePlacementPreviewVisual(state) {
         if (!siteSceneCache || !worldGroup) {
             return;
@@ -9606,7 +9939,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         siteSceneCache.protectionOverlayGroup = overlayGroup;
     }
 
-    function rebuildStaticSiteScene(siteBootstrap, offsetX, offsetZ, width, height, previousCache, bootstrapSignature) {
+    function rebuildStaticSiteScene(siteBootstrap, siteAction, offsetX, offsetZ, width, height, previousCache, bootstrapSignature) {
         const carriedWitheringAlerts = cloneActiveWitheringAlerts(previousCache, animationTimeSeconds);
         const triggeredWitheringAlerts = collectWitheringAlertTriggers(
             previousCache ? previousCache.sourceBootstrap : null,
@@ -9721,6 +10054,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             placementGridGroup: placementGridGroup,
             placementPreviewGroup: null,
             protectionOverlayGroup: null,
+            excavationMarksGroup: null,
             witherAlertGroup: witherAlertGroup,
             witherAlerts: new Map(),
             cameraTargetX: 0,
@@ -9732,6 +10066,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         };
 
         restoreWitheringAlerts(siteSceneCache, carriedWitheringAlerts);
+        updateSiteExcavationMarksVisual(siteBootstrap, siteAction);
         triggerWitheringAlerts(siteSceneCache, triggeredWitheringAlerts, animationTimeSeconds);
     }
 
@@ -9811,6 +10146,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             sendSiteControlState();
             rebuildStaticSiteScene(
                 siteBootstrap,
+                getSiteAction(state),
                 offsetX,
                 offsetZ,
                 width,
@@ -9826,6 +10162,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (bootstrapReferenceChanged && !needsStaticRebuild) {
             siteSceneCache.sourceBootstrap = siteBootstrap;
             updateSitePlantVisualEcology(siteSceneCache, siteBootstrap);
+            updateSiteExcavationMarksVisual(siteBootstrap, getSiteAction(state));
             triggerWitheringAlerts(siteSceneCache, densityOnlyWitheringAlerts, animationTimeSeconds);
         }
 
@@ -10243,6 +10580,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                         closeTileContextMenu();
                     }
                     updateSiteProtectionOverlayVisual(normalizedState);
+                }
+                if (lightweightPatchParts.siteAction) {
+                    updateSiteExcavationMarksVisual(getSiteBootstrap(normalizedState), getSiteAction(normalizedState));
+                    if (tileContextMenuState) {
+                        renderTileContextMenu();
+                    }
                 }
 
                 const previousActionKind =

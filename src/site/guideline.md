@@ -8,7 +8,7 @@ Site-owned state, ECS world support, and helper logic for active site gameplay.
 - When files or folders in this directory change, update this file in the same change.
 
 ## Contents
-- `action_state.h`: Site action queue/state owned by action execution flows, including deferred-placement mode tracking, harvest action state, plus follow-up plant-mode reactivation after successful item-based planting when inventory remains.
+- `action_state.h`: Site action queue/state owned by action execution flows, including deferred-placement mode tracking, harvest plus excavate action state, and follow-up plant-mode reactivation after successful item-based planting when inventory remains.
 - `contractor_state.h`: Contractor/worker assignment state for the site run.
 - `craft_logic.h`: Shared crafting rules/helpers used by craft-related systems.
 - `craft_state.h`: Crafting queue/progress state for the active site, including cached nearby-item snapshots for crafting stations plus the last inventory/worker inputs used to refresh them.
@@ -26,11 +26,11 @@ Site-owned state, ECS world support, and helper logic for active site gameplay.
 - `placement_preview.h`: Placement-preview state for build/placement UI flows.
 - `site_projection_update_flags.h`: Dirty/update flags for projection refresh decisions.
 - `site_objective_state.h`: Site objective mode/config state, including highway target-band metadata plus green-wall connection masks, hold countdown state, and paused main-timer tracking for objective evaluation.
-- `site_run_state.h`: Aggregate active site-run state that owns the site slice, including pending projection dirtiness, retained plant/device weather-contribution dirty state, cached last-emitted tile projection state for delta coalescing across visible tile data including protection channels, local-wind-driven plant visuals, and ecology-owned counters such as living-plant stability status, with density-report bookkeeping now living on sparse active-ecology ECS components instead of dense site-run arrays.
-- `site_world.h`: ECS/world wrapper declarations for the active site, including split plant-versus-device weather contribution state alongside ecology, local weather, and device data.
-- `site_world.cpp`: ECS/world wrapper implementation and setup, including the default low-fertility/low-moisture startup tile ecology seed, owner-specific plant/device weather contribution component storage on tile entities, plus sparse active-ecology/report-state component sync on occupancy changes.
-- `site_world_access.h`: Owner-scoped ECS access helpers for reading/writing site components.
-- `site_world_components.h`: ECS component structs attached to site entities, including sparse `ActiveEcologyTag`, `DirtyEcologyTag`, dirty-mask, and ecology report-state data for occupied-tile iteration and batched ecology output.
+- `site_run_state.h`: Aggregate active site-run state that owns the site slice, including pending projection dirtiness, retained plant/device weather-contribution dirty state, cached last-emitted tile projection state for delta coalescing across visible tile data including protection channels and excavation-depth marks, local-wind-driven plant visuals, and ecology-owned counters such as living-plant stability status, with density-report bookkeeping now living on sparse active-ecology ECS components instead of dense site-run arrays.
+- `site_world.h`: ECS/world wrapper declarations for the active site, including split plant-versus-device weather contribution state alongside ecology, per-tile excavation depth, local weather, and device data.
+- `site_world.cpp`: ECS/world wrapper implementation and setup, including the default low-fertility/low-moisture startup tile ecology seed, owner-specific plant/device weather contribution component storage on tile entities, per-tile excavation-depth storage, plus sparse active-ecology/report-state component sync on occupancy changes.
+- `site_world_access.h`: Owner-scoped ECS access helpers for reading/writing site components, including per-tile excavation depth.
+- `site_world_components.h`: ECS component structs attached to site entities, including per-tile excavation state plus sparse `ActiveEcologyTag`, `DirtyEcologyTag`, dirty-mask, and ecology report-state data for occupied-tile iteration and batched ecology output.
 - `systems/`: Site system declarations and implementations, including harvest action execution, ecology harvest resolution, and worker-pack harvest insertion.
 - `task_board_state.h`: Task-board state for current site objectives and listings, including claimed-history tracking plus per-task resolved generator outputs, stored difficulty/reward cash-point valuation fields, runtime accumulators, masks, and the task-owned mirror caches updated from owner-emitted worker/tile/device progress messages.
 - `tile_footprint.h`: Tile-footprint geometry helpers for structures, placement, and footprint-scaled contribution distance helpers.

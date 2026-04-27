@@ -1,4 +1,5 @@
 #include "content/defs/craft_recipe_defs.h"
+#include "content/defs/excavation_defs.h"
 #include "content/defs/gameplay_tuning_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/modifier_defs.h"
@@ -81,6 +82,29 @@ bool structure_is_crafting_station(StructureId structure_id) noexcept
 std::span<const CraftRecipeDef> all_craft_recipe_defs() noexcept
 {
     return prototype_content_database().craft_recipe_defs;
+}
+
+std::span<const ExcavationDepthDef> all_excavation_depth_defs() noexcept
+{
+    return prototype_content_database().excavation_depth_defs;
+}
+
+const ExcavationDepthDef* find_excavation_depth_def(ExcavationDepth depth) noexcept
+{
+    for (const auto& depth_def : all_excavation_depth_defs())
+    {
+        if (depth_def.depth == depth)
+        {
+            return &depth_def;
+        }
+    }
+
+    return nullptr;
+}
+
+std::span<const ExcavationLootEntryDef> all_excavation_loot_entry_defs() noexcept
+{
+    return prototype_content_database().excavation_loot_entry_defs;
 }
 
 const CraftRecipeDef* find_craft_recipe_def(

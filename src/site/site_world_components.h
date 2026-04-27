@@ -1,5 +1,6 @@
 #pragma once
 
+#include "support/excavation_types.h"
 #include "support/id_types.h"
 
 #include <cstdint>
@@ -183,6 +184,12 @@ struct TileGrowthPressure final
     float value;
 };
 
+struct TileExcavationState final
+{
+    ExcavationDepth depth;
+    std::uint8_t reserved0[3];
+};
+
 struct DirtyEcologyMask final
 {
     std::uint32_t value;
@@ -276,6 +283,7 @@ GS1_REQUIRE_TRIVIAL(TilePlantSlot);
 GS1_REQUIRE_TRIVIAL(TileGroundCoverSlot);
 GS1_REQUIRE_TRIVIAL(TilePlantDensity);
 GS1_REQUIRE_TRIVIAL(TileGrowthPressure);
+GS1_REQUIRE_TRIVIAL(TileExcavationState);
 GS1_REQUIRE_TRIVIAL(DirtyEcologyMask);
 GS1_REQUIRE_TRIVIAL(TileEcologyReportState);
 GS1_REQUIRE_TRIVIAL(DeviceStructureId);

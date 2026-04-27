@@ -84,7 +84,7 @@ Required item authoring rules:
 - authored crafting materials such as wood, iron, harvested fiber, water, and seeds are ordinary `ItemDef` rows
 - an item may be both `consumable` and usable as a craft ingredient
 - deployable kits are ordinary items with a linked authored `StructureDef`
-- authored item source rules should distinguish at least `BuyOnly`, `CraftOnly`, `BuyOrCraft`, and `HarvestOnly`
+- authored item source rules should distinguish at least `BuyOnly`, `CraftOnly`, `BuyOrCraft`, `HarvestOnly`, and `ExcavationOnly`
 - authored stack size is the hard cap for one runtime item stack
 - item-level internal cash-point values remain the hidden valuation source for reward and task scoring even when the player only sees normal cash prices
 
@@ -93,12 +93,36 @@ Economy valuation clarification:
 - long-term tech rows and direct-purchase unlockable offers should author internal cash-point values as their source of truth
 - player-facing cash prices should be derived from those internal values using `100` cash points = `1` cash
 
+Excavation merchandise clarification:
+
+- excavation-only stone goods should remain ordinary `ItemDef` rows
+- prototype excavation-merchandise items should expose `Sell` capability only
+- prototype excavation-merchandise items should not link plants or structures and should not act as consume/build/plant inputs
+- provisional excavation-merchandise internal cash-point values should stay within `100-20000` until the broader economy rebalance pass
+- more valuable excavation items should generally be authored with lower excavation-table probability than cheaper stones in the same table
+
+Excavation-depth authoring clarification:
+
+- excavation depth should support at least `Rough`, `Careful`, and `Thorough`
+- the default ruleset should expose only `Rough` until tech or enhancement content explicitly unlocks deeper passes
+- later depth levels may author their own base energy cost, discovery chance, or loot-table overrides, but they should still use the same weight-plus-bias tuning pattern as the base excavation action
+- excavation visuals should be authored or mapped distinctly enough that the player can tell rough, careful, and thorough depth at a glance
+
 Technology authoring clarification:
 
 - each faction tech row should author whether it is a base tech or an enhancement plus its `enhancementChoiceIndex`
 - faction base techs use faction-reputation tiers `1-8`; paired enhancements use faction-reputation tiers `9-16`
 - an enhancement row must pair to the base tech in the same faction+tier and use one of the two exclusive enhancement choice slots
 - a tech row may optionally author a granted content payload such as an `ItemDef`, `PlantDef`, `StructureDef`, or `CraftRecipeDef` id in addition to any modifier or mechanism effect metadata
+
+Required excavation loot-table authoring rules:
+
+- each excavation loot table entry must author a valid excavation `itemId` plus its probability inside that table
+- each excavation loot table must sum to exactly `100%`
+- the chance to find any item from excavation is a separate action/mechanism tuning value and must not be folded into the loot-table entry totals
+- excavation loot tables should reference only prototype merchandise items intended to be sold rather than planted, consumed, or deployed
+- site or region content may point to different excavation loot tables, but each table must still validate independently against the same `100%` total rule
+- if different excavation depths use different loot tables, each depth-bound table must independently satisfy the same `100%` total rule
 
 Required structure authoring rules:
 

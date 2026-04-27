@@ -529,6 +529,10 @@ void append_site_bootstrap_json(std::string& json, const std::optional<SmokeEngi
         json += std::to_string(tile.soil_fertility);
         json += ",\"soilSalinity\":";
         json += std::to_string(tile.soil_salinity);
+        json += ",\"excavationDepth\":";
+        json += std::to_string(tile.excavation_depth);
+        json += ",\"visibleExcavationDepth\":";
+        json += std::to_string(tile.visible_excavation_depth);
         json += '}';
     }
     json += "]";

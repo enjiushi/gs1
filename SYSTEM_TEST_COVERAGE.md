@@ -192,6 +192,10 @@ Implemented behavior coverage should verify:
 - Starting a new action while another action is active fails with `Busy`.
 - Water and burial-clear actions begin immediately, emit `SiteActionStarted`,
   emit worker meter costs, and populate action state.
+- Excavation actions begin on eligible tiles, emit the same action-start and
+  worker-cost messages, and respect the authored default base energy cost plus
+  later weight/bias tuning.
+- Occupied tiles reject excavation requests until the occupier is removed.
 - Action worker meter costs scale from the worker's current local heat, wind,
   and dust using the authored weather-to-meter action coefficients, including
   zero-baseline morale scaling that uses the strongest weather channel instead
@@ -208,6 +212,15 @@ Implemented behavior coverage should verify:
 - Completing an action emits `SiteActionCompleted` plus the correct follow-up
   gameplay fact message:
   `SiteGroundCoverPlaced`, `SiteTileWatered`, or `SiteTileBurialCleared`.
+- Excavation completion coverage should include both no-find and found-item
+  outcomes, the separate any-item discovery chance, and the bound `100%`
+  excavation item-pool roll.
+- Excavation coverage should verify cumulative per-tile depth progression,
+  default rough-only availability, deeper-pass unlock gating, and no further
+  excavation after a tile reaches `Thorough`.
+- Excavation visual/projection coverage should verify that rough, careful, and
+  thorough tiles project distinct marks while unoccupied and suppress those
+  marks whenever an occupier covers the tile.
 
 ### `placement_validation`
 

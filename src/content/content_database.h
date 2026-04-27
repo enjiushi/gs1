@@ -2,6 +2,7 @@
 
 #include "content/defs/gameplay_tuning_defs.h"
 #include "content/defs/craft_recipe_defs.h"
+#include "content/defs/excavation_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/modifier_defs.h"
 #include "content/defs/plant_defs.h"
@@ -27,6 +28,8 @@ struct ContentDatabase final
     std::vector<PlantDef> plant_defs {};
     std::vector<StructureDef> structure_defs {};
     std::vector<CraftRecipeDef> craft_recipe_defs {};
+    std::vector<ExcavationDepthDef> excavation_depth_defs {};
+    std::vector<ExcavationLootEntryDef> excavation_loot_entry_defs {};
     std::vector<ModifierPresetDef> nearby_aura_modifier_presets {};
     std::vector<ModifierPresetDef> run_modifier_presets {};
     std::vector<TaskTemplateDef> task_template_defs {};

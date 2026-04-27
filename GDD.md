@@ -1224,7 +1224,7 @@ This means a water container, a medicine pack, a seed bundle, and a device kit a
 Every item definition should clearly specify:
 
 - how many units one stack can hold
-- how the item enters the site economy, such as `BuyOnly`, `CraftOnly`, `BuyOrCraft`, or `HarvestOnly`
+- how the item enters the site economy, such as `BuyOnly`, `CraftOnly`, `BuyOrCraft`, `HarvestOnly`, or `ExcavationOnly`
 - how much money it returns when sold through the `Field Phone`
 - what descriptive tags it carries
 - what actions the player may perform with it
@@ -1253,8 +1253,9 @@ Important rule:
 Acquisition and sale rules:
 
 - every item should be sellable through the `Field Phone`
-- each item should explicitly state whether it is `BuyOnly`, `CraftOnly`, `BuyOrCraft`, or `HarvestOnly`
+- each item should explicitly state whether it is `BuyOnly`, `CraftOnly`, `BuyOrCraft`, `HarvestOnly`, or `ExcavationOnly`
 - `HarvestOnly` is a source rule, not a separate gameplay type
+- `ExcavationOnly` is a source rule, not a separate gameplay type
 - stack size is a real carrying constraint, not just a presentation label
 - if the player wants to carry more than one stack limit of the same `Item`, the excess must occupy additional `Inventory` slots
 - `itemQuantity` may never exceed `stackSize` on one stack
@@ -1274,6 +1275,47 @@ Recommended simplified item catalog:
 | Device Kit | `deployableKit`, `mechanical` | `deployStructure`, `sell` | `itemQuantity`, `itemCondition` | `BuyOnly` or `BuyOrCraft` | `1` | Placement of one site device |
 | Seed Bundle | `plantingStock`, `fragile` | `plant`, `sell` | `itemQuantity`, `itemCondition` | `BuyOnly` or `BuyOrCraft` | `10` | Plant placement for a specific plant type |
 | Harvest Good | `harvested`, `craftingIngredient` | `craftInput`, `sell` | `itemQuantity` | `HarvestOnly` | `10` | Sale or crafting ingredient |
+| Excavated Stone Merchandise | `excavated`, `valuableStone`, `merchandise` | `sell` | `itemQuantity` | `ExcavationOnly` | `10` | Pure sale item found through excavation; higher-value stones should appear less often |
+
+#### Excavation Action And Stone Finds
+
+The prototype should support a tile-targeted `Excavation` action that lets the player search northwest-China desert sites for buried trade stones and mineral curios.
+
+Rules:
+
+- every eligible bare ground tile may expose `Excavation`
+- each tile should track a persistent excavation-depth state with `None`, `Roughly Excavated`, `Carefully Excavated`, and `Thoroughly Excavated`
+- excavation depth is cumulative per tile: `Rough` must be completed before `Careful`, and `Careful` before `Thorough`
+- the default baseline should let the player perform only `Rough` excavation; later techs or enhancements may unlock `Careful` and `Thorough`
+- each depth may be completed only once per tile, so even the full three-stage chain remains finite and cannot become infinite money farming
+- a tile may be excavated only while no plant, structure, device, checkerboard, or other occupier currently claims that tile
+- if a tile becomes occupied later, its excavation state should persist internally but the excavation visual mark should be hidden until the occupier is removed
+- default authored excavation energy cost should be `30`
+- rough excavation should use the default authored base energy cost of `30`
+- excavation energy cost should use the same factor style as other tunable site values: resolve `excavationBaseEnergyCost * excavationEnergyCostWeight + excavationEnergyCostBias`, clamp at `0`, then apply the normal one-time local-weather action-cost scaling when the action starts
+- later content may give `Careful` and `Thorough` their own deeper-pass base costs or depth multipliers, but they should still resolve through the same weight-plus-bias pattern
+- default authored chance to discover any item should be `30%`
+- item discovery chance should also use the factor pattern: resolve `excavationDiscoveryChance * excavationDiscoveryChanceWeight + excavationDiscoveryChanceBias`, then clamp the result to `0-100%`
+- later content may give `Careful` and `Thorough` their own discovery-chance tuning or loot-table bias, but each depth should still keep the separate "any item?" roll before the `100%` table roll
+- if the discovery roll fails, that resolved depth still counts as completed and no item is awarded
+- if the discovery roll succeeds, the game should roll once on the current site's excavation item table
+- excavation item tables should be true `100%` pools: all listed item probabilities must add to exactly `100%`
+- excavation item tables should contain only excavation-merchandise items
+- excavation merchandise is pure sale cargo in the prototype: it should expose only `sell`, avoid planting/crafting/deploy links, and use internal cash-point values as the hidden value source
+- until broader economy balancing is ready, excavation-merchandise internal cash-point values may provisionally range from `100` to `20000`
+- each visible excavation depth should have a distinct ground mark so the player can read whether a tile is rough, careful, or thorough at a glance
+- occupied tiles should not show excavation marks while occupied, even if an excavation state is stored underneath
+
+Suggested northwest-China desert excavation roster:
+
+| Stone Type | Region Flavor | Suggested internal cash-point band | Relative rarity |
+|---|---|---|---|
+| Wind-Polished Desert Pebble | Common Gobi or dune-basin decorative stone | `100-300` | Common |
+| Desert Jasper | Red/yellow jasper nodules from dry gravel beds | `300-900` | Common to uncommon |
+| Gobi Agate | Weathered agate with stronger color banding | `800-2500` | Uncommon |
+| Alxa Agate | Alxa-desert ornamental agate | `1800-5000` | Rare |
+| Golden Silk Jade | Gobi-desert jade/quartz trade stone with bright polish value | `4000-9000` | Very rare |
+| Hetian Jade Pebble | Xinjiang river-worn nephrite jade suitable as the prototype jackpot find | `9000-20000` | Extremely rare |
 
 #### Layer 3: Inventory And Containers
 

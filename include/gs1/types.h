@@ -134,7 +134,8 @@ enum Gs1SiteActionKind : std::uint8_t
     GS1_SITE_ACTION_CRAFT = 6,
     GS1_SITE_ACTION_DRINK = 7,
     GS1_SITE_ACTION_EAT = 8,
-    GS1_SITE_ACTION_HARVEST = 9
+    GS1_SITE_ACTION_HARVEST = 9,
+    GS1_SITE_ACTION_EXCAVATE = 10
 };
 
 enum Gs1SiteActionRequestFlags : std::uint8_t
@@ -575,8 +576,8 @@ struct Gs1EngineMessageSiteSnapshotData
 
 struct Gs1EngineMessageSiteTileData
 {
-    std::uint32_t x;
-    std::uint32_t y;
+    std::uint16_t x;
+    std::uint16_t y;
     std::uint32_t terrain_type_id;
     std::uint32_t plant_type_id;
     std::uint32_t structure_type_id;
@@ -590,6 +591,9 @@ struct Gs1EngineMessageSiteTileData
     float moisture;
     float soil_fertility;
     float soil_salinity;
+    std::uint8_t excavation_depth;
+    std::uint8_t visible_excavation_depth;
+    std::uint8_t reserved0[2];
 };
 
 struct Gs1EngineMessageWorkerData

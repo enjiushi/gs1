@@ -21,6 +21,7 @@ enum class SiteComponent : std::uint8_t
     Time,
     TileLayout,
     TileEcology,
+    TileExcavation,
     TileWeather,
     TilePlantWeatherContribution,
     TileDeviceWeatherContribution,
@@ -72,6 +73,8 @@ template <typename... Components>
         return "TileLayout";
     case SiteComponent::TileEcology:
         return "TileEcology";
+    case SiteComponent::TileExcavation:
+        return "TileExcavation";
     case SiteComponent::TileWeather:
         return "TileWeather";
     case SiteComponent::TilePlantWeatherContribution:
@@ -210,6 +213,7 @@ template <typename SystemTag>
 {
     return site_system_reads_component<SystemTag>(SiteComponent::TileLayout) ||
         site_system_reads_component<SystemTag>(SiteComponent::TileEcology) ||
+        site_system_reads_component<SystemTag>(SiteComponent::TileExcavation) ||
         site_system_reads_component<SystemTag>(SiteComponent::TileWeather) ||
         site_system_reads_component<SystemTag>(SiteComponent::TilePlantWeatherContribution) ||
         site_system_reads_component<SystemTag>(SiteComponent::TileDeviceWeatherContribution) ||
@@ -221,6 +225,7 @@ template <typename SystemTag>
 [[nodiscard]] consteval bool site_system_owns_any_tile_component() noexcept
 {
     return site_system_owns_component<SystemTag>(SiteComponent::TileEcology) ||
+        site_system_owns_component<SystemTag>(SiteComponent::TileExcavation) ||
         site_system_owns_component<SystemTag>(SiteComponent::TileWeather) ||
         site_system_owns_component<SystemTag>(SiteComponent::TilePlantWeatherContribution) ||
         site_system_owns_component<SystemTag>(SiteComponent::TileDeviceWeatherContribution) ||
@@ -368,6 +373,48 @@ public:
         if (world != nullptr)
         {
             world->set_tile_ecology_at_index(index, data);
+        }
+    }
+
+    [[nodiscard]] SiteWorld::TileExcavationData read_tile_excavation(TileCoord coord) const noexcept
+    {
+        static_assert(
+            site_system_reads_component<SystemTag>(SiteComponent::TileExcavation),
+            "System must declare TileExcavation as readable.");
+        const auto* world = site_world_ptr();
+        return world != nullptr ? world->tile_excavation(coord) : SiteWorld::TileExcavationData {};
+    }
+
+    [[nodiscard]] SiteWorld::TileExcavationData read_tile_excavation_at_index(std::size_t index) const noexcept
+    {
+        static_assert(
+            site_system_reads_component<SystemTag>(SiteComponent::TileExcavation),
+            "System must declare TileExcavation as readable.");
+        const auto* world = site_world_ptr();
+        return world != nullptr ? world->tile_excavation_at_index(index) : SiteWorld::TileExcavationData {};
+    }
+
+    void write_tile_excavation(TileCoord coord, const SiteWorld::TileExcavationData& data)
+    {
+        static_assert(
+            site_system_owns_component<SystemTag>(SiteComponent::TileExcavation),
+            "System must declare TileExcavation as owned.");
+        auto* world = site_world_ptr();
+        if (world != nullptr)
+        {
+            world->set_tile_excavation(coord, data);
+        }
+    }
+
+    void write_tile_excavation_at_index(std::size_t index, const SiteWorld::TileExcavationData& data)
+    {
+        static_assert(
+            site_system_owns_component<SystemTag>(SiteComponent::TileExcavation),
+            "System must declare TileExcavation as owned.");
+        auto* world = site_world_ptr();
+        if (world != nullptr)
+        {
+            world->set_tile_excavation_at_index(index, data);
         }
     }
 

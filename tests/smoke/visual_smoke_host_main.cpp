@@ -303,6 +303,10 @@ std::optional<Gs1SiteActionKind> parse_site_action_kind(const std::string& value
     {
         return GS1_SITE_ACTION_HARVEST;
     }
+    if (value == "EXCAVATE")
+    {
+        return GS1_SITE_ACTION_EXCAVATE;
+    }
 
     return std::nullopt;
 }

@@ -1,6 +1,7 @@
 #include "site/systems/action_execution_system.h"
 
 #include "content/defs/craft_recipe_defs.h"
+#include "content/defs/excavation_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/plant_defs.h"
 #include "content/defs/structure_defs.h"
@@ -29,6 +30,76 @@ constexpr float k_repair_integrity_epsilon = 0.0001f;
 constexpr float k_harvest_density_epsilon_raw = 0.01f;
 constexpr float k_minimum_action_efficiency = 0.4f;
 constexpr float k_maximum_action_efficiency = 1.0f;
+
+std::uint64_t mix_excavation_seed(std::uint64_t value) noexcept
+{
+    value += 0x9e3779b97f4a7c15ULL;
+    value = (value ^ (value >> 30U)) * 0xbf58476d1ce4e5b9ULL;
+    value = (value ^ (value >> 27U)) * 0x94d049bb133111ebULL;
+    return value ^ (value >> 31U);
+}
+
+float percent_from_seed(std::uint64_t seed) noexcept
+{
+    return static_cast<float>(mix_excavation_seed(seed) % 10000ULL) * 0.01f;
+}
+
+ExcavationDepth excavation_depth_from_subject_id(std::uint32_t subject_id) noexcept
+{
+    switch (subject_id)
+    {
+    case 1U:
+        return ExcavationDepth::Rough;
+    case 2U:
+        return ExcavationDepth::Careful;
+    case 3U:
+        return ExcavationDepth::Thorough;
+    default:
+        return ExcavationDepth::None;
+    }
+}
+
+std::uint32_t excavation_depth_subject_id(ExcavationDepth depth) noexcept
+{
+    return static_cast<std::uint32_t>(depth);
+}
+
+bool tile_has_excavation_blocking_occupier(const SiteWorld::TileData& tile) noexcept
+{
+    return tile.ecology.plant_id.value != 0U ||
+        tile.ecology.ground_cover_type_id != 0U ||
+        tile.device.structure_id.value != 0U;
+}
+
+ExcavationDepth max_excavation_depth_unlocked(
+    SiteSystemContext<ActionExecutionSystem>& context) noexcept
+{
+    static_cast<void>(context);
+    return ExcavationDepth::Rough;
+}
+
+ExcavationDepth resolve_excavation_depth_request(
+    ExcavationDepth current_depth,
+    ExcavationDepth requested_depth,
+    ExcavationDepth max_unlocked_depth) noexcept
+{
+    const auto next_depth = next_excavation_depth(current_depth);
+    if (current_depth == ExcavationDepth::Thorough ||
+        static_cast<std::uint8_t>(next_depth) > static_cast<std::uint8_t>(max_unlocked_depth))
+    {
+        return ExcavationDepth::None;
+    }
+
+    if (requested_depth == ExcavationDepth::None)
+    {
+        return next_depth;
+    }
+
+    return requested_depth == next_depth &&
+            static_cast<std::uint8_t>(requested_depth) <= static_cast<std::uint8_t>(max_unlocked_depth)
+        ? requested_depth
+        : ExcavationDepth::None;
+}
 
 ItemId repair_tool_item_id(std::uint32_t requested_item_id) noexcept
 {
@@ -73,6 +144,8 @@ ActionKind to_action_kind(Gs1SiteActionKind kind) noexcept
         return ActionKind::Eat;
     case GS1_SITE_ACTION_HARVEST:
         return ActionKind::Harvest;
+    case GS1_SITE_ACTION_EXCAVATE:
+        return ActionKind::Excavate;
     default:
         return ActionKind::None;
     }
@@ -100,6 +173,8 @@ Gs1SiteActionKind to_gs1_action_kind(ActionKind kind) noexcept
         return GS1_SITE_ACTION_EAT;
     case ActionKind::Harvest:
         return GS1_SITE_ACTION_HARVEST;
+    case ActionKind::Excavate:
+        return GS1_SITE_ACTION_EXCAVATE;
     default:
         return GS1_SITE_ACTION_NONE;
     }
@@ -118,6 +193,7 @@ double base_duration_minutes(ActionKind kind) noexcept
 float action_energy_cost(
     ActionKind kind,
     std::uint16_t quantity,
+    std::uint32_t primary_subject_id = 0U,
     const CraftRecipeDef* craft_recipe = nullptr) noexcept
 {
     const float scale = static_cast<float>(quantity == 0U ? 1U : quantity);
@@ -127,7 +203,21 @@ float action_energy_cost(
     }
 
     const auto* action_def = find_site_action_def(kind);
-    return action_def == nullptr ? 0.0f : action_def->energy_cost_per_unit * scale;
+    if (action_def == nullptr)
+    {
+        return 0.0f;
+    }
+
+    if (kind == ActionKind::Excavate)
+    {
+        const auto depth = excavation_depth_from_subject_id(primary_subject_id);
+        const auto* depth_def = find_excavation_depth_def(depth);
+        const float multiplier =
+            depth_def == nullptr ? 1.0f : depth_def->energy_cost_multiplier;
+        return action_def->energy_cost_per_unit * multiplier * scale;
+    }
+
+    return action_def->energy_cost_per_unit * scale;
 }
 
 float action_hydration_cost(
@@ -411,6 +501,7 @@ void emit_worker_meter_cost_request(
     std::uint32_t action_id,
     ActionKind action_kind,
     std::uint16_t quantity,
+    std::uint32_t primary_subject_id = 0U,
     const CraftRecipeDef* craft_recipe = nullptr)
 {
     const auto worker = context.world.read_worker();
@@ -435,9 +526,9 @@ void emit_worker_meter_cost_request(
             action_def->wind_to_nourishment_cost,
             action_def->dust_to_nourishment_cost);
     const float energy_cost = (action_def == nullptr
-        ? action_energy_cost(action_kind, quantity, craft_recipe)
+        ? action_energy_cost(action_kind, quantity, primary_subject_id, craft_recipe)
         : resolve_weather_scaled_action_cost(
-            action_energy_cost(action_kind, quantity, craft_recipe),
+            action_energy_cost(action_kind, quantity, primary_subject_id, craft_recipe),
             local_weather,
             action_def->heat_to_energy_cost,
             action_def->wind_to_energy_cost,
@@ -862,6 +953,173 @@ SiteActionFailureReason validate_harvest_target(
     return SiteActionFailureReason::None;
 }
 
+bool inventory_can_fit_all_excavation_rewards(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    ExcavationDepth depth) noexcept
+{
+    const auto* depth_def = find_excavation_depth_def(depth);
+    if (depth_def == nullptr || depth_def->find_chance_percent <= 0.0f)
+    {
+        return true;
+    }
+
+    const auto worker_pack = inventory_storage::worker_pack_container(context.site_run);
+    if (!worker_pack.is_valid())
+    {
+        return false;
+    }
+
+    const bool include_common = depth_def->common_tier_percent > 0.0f;
+    const bool include_uncommon = depth_def->uncommon_tier_percent > 0.0f;
+    const bool include_rare = depth_def->rare_tier_percent > 0.0f;
+    const bool include_very_rare = depth_def->very_rare_tier_percent > 0.0f;
+    const bool include_jackpot = depth_def->jackpot_tier_percent > 0.0f;
+
+    for (const auto& entry : all_excavation_loot_entry_defs())
+    {
+        const bool tier_enabled =
+            (entry.tier == ExcavationLootTier::Common && include_common) ||
+            (entry.tier == ExcavationLootTier::Uncommon && include_uncommon) ||
+            (entry.tier == ExcavationLootTier::Rare && include_rare) ||
+            (entry.tier == ExcavationLootTier::VeryRare && include_very_rare) ||
+            (entry.tier == ExcavationLootTier::Jackpot && include_jackpot);
+        if (!tier_enabled)
+        {
+            continue;
+        }
+
+        if (!inventory_storage::can_fit_item_in_container(
+                context.site_run,
+                worker_pack,
+                entry.item_id,
+                1U))
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+SiteActionFailureReason validate_excavation_target(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    TileCoord target_tile,
+    ExcavationDepth requested_depth) noexcept
+{
+    if (!context.world.tile_coord_in_bounds(target_tile))
+    {
+        return SiteActionFailureReason::InvalidTarget;
+    }
+
+    const auto tile = context.world.read_tile(target_tile);
+    if (tile_has_excavation_blocking_occupier(tile))
+    {
+        return SiteActionFailureReason::InvalidState;
+    }
+
+    const auto max_unlocked_depth = max_excavation_depth_unlocked(context);
+    const auto resolved_depth = resolve_excavation_depth_request(
+        tile.excavation.depth,
+        requested_depth,
+        max_unlocked_depth);
+    if (resolved_depth == ExcavationDepth::None)
+    {
+        return SiteActionFailureReason::InvalidState;
+    }
+
+    if (!inventory_can_fit_all_excavation_rewards(context, resolved_depth))
+    {
+        return SiteActionFailureReason::InvalidState;
+    }
+
+    return SiteActionFailureReason::None;
+}
+
+ExcavationLootTier roll_excavation_loot_tier(
+    ExcavationDepth depth,
+    std::uint64_t seed) noexcept
+{
+    const auto* depth_def = find_excavation_depth_def(depth);
+    if (depth_def == nullptr)
+    {
+        return ExcavationLootTier::None;
+    }
+
+    const float roll = percent_from_seed(seed);
+    float cursor = depth_def->common_tier_percent;
+    if (roll < cursor)
+    {
+        return ExcavationLootTier::Common;
+    }
+    cursor += depth_def->uncommon_tier_percent;
+    if (roll < cursor)
+    {
+        return ExcavationLootTier::Uncommon;
+    }
+    cursor += depth_def->rare_tier_percent;
+    if (roll < cursor)
+    {
+        return ExcavationLootTier::Rare;
+    }
+    cursor += depth_def->very_rare_tier_percent;
+    if (roll < cursor)
+    {
+        return ExcavationLootTier::VeryRare;
+    }
+    return ExcavationLootTier::Jackpot;
+}
+
+ItemId roll_excavation_loot_item(
+    ExcavationLootTier tier,
+    std::uint64_t seed) noexcept
+{
+    const float roll = percent_from_seed(seed);
+    float cursor = 0.0f;
+    for (const auto& entry : all_excavation_loot_entry_defs())
+    {
+        if (entry.tier != tier)
+        {
+            continue;
+        }
+
+        cursor += entry.percent_within_tier;
+        if (roll < cursor)
+        {
+            return entry.item_id;
+        }
+    }
+
+    return {};
+}
+
+ItemId resolve_excavation_reward_item(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    TileCoord target_tile,
+    ExcavationDepth depth) noexcept
+{
+    const auto* depth_def = find_excavation_depth_def(depth);
+    if (depth_def == nullptr)
+    {
+        return {};
+    }
+
+    const auto x = static_cast<std::uint32_t>(target_tile.x < 0 ? 0 : target_tile.x);
+    const auto y = static_cast<std::uint32_t>(target_tile.y < 0 ? 0 : target_tile.y);
+    const std::uint64_t base_seed =
+        context.world.site_attempt_seed() ^
+        (static_cast<std::uint64_t>(x) << 32U) ^
+        (static_cast<std::uint64_t>(y) << 16U) ^
+        static_cast<std::uint64_t>(depth);
+
+    if (percent_from_seed(base_seed + 1U) >= depth_def->find_chance_percent)
+    {
+        return {};
+    }
+
+    const auto tier = roll_excavation_loot_tier(depth, base_seed + 2U);
+    return roll_excavation_loot_item(tier, base_seed + 3U);
+}
+
 const CraftRecipeDef* resolve_craft_recipe_for_action(
     SiteSystemContext<ActionExecutionSystem>& context,
     TileCoord target_tile,
@@ -1059,6 +1317,7 @@ void begin_action_execution(
         action_state.current_action_id->value,
         action_state.action_kind,
         action_state.quantity,
+        action_state.primary_subject_id,
         craft_recipe);
     context.world.mark_projection_dirty(
         SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
@@ -1259,8 +1518,11 @@ void emit_placement_mode_commit_rejected(
             placement_mode.item_id});
 }
 
-void emit_action_fact_messages(GameMessageQueue& queue, const ActionState& action_state)
+void emit_action_fact_messages(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    const ActionState& action_state)
 {
+    auto& queue = context.message_queue;
     const TileCoord target_tile = action_target_tile(action_state);
     const auto action_id = action_id_value(action_state);
     const auto flags = static_cast<std::uint32_t>(action_state.request_flags);
@@ -1436,6 +1698,26 @@ void emit_action_fact_messages(GameMessageQueue& queue, const ActionState& actio
         }
         break;
 
+    case ActionKind::Excavate:
+    {
+        const auto depth = excavation_depth_from_subject_id(action_state.primary_subject_id);
+        const auto item_id = resolve_excavation_reward_item(context, target_tile, depth);
+        auto excavation = context.world.read_tile_excavation(target_tile);
+        excavation.depth = depth;
+        context.world.write_tile_excavation(target_tile, excavation);
+        if (item_id.value != 0U)
+        {
+            enqueue_message(
+                queue,
+                GameMessageType::InventoryWorkerPackInsertRequested,
+                InventoryWorkerPackInsertRequestedMessage {
+                    item_id.value,
+                    1U,
+                    0U});
+        }
+        break;
+    }
+
     case ActionKind::None:
     default:
         break;
@@ -1517,6 +1799,21 @@ SiteActionFailureReason validate_harvest_completion(
     }
 
     return validate_harvest_target(context, *action_state.target_tile);
+}
+
+SiteActionFailureReason validate_excavation_completion(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    const ActionState& action_state)
+{
+    if (!action_state.target_tile.has_value())
+    {
+        return SiteActionFailureReason::InvalidState;
+    }
+
+    return validate_excavation_target(
+        context,
+        *action_state.target_tile,
+        excavation_depth_from_subject_id(action_state.primary_subject_id));
 }
 
 }  // namespace
@@ -1810,6 +2107,35 @@ Gs1Status ActionExecutionSystem::process_message(
                 primary_subject_id = harvest_plant_def->plant_id.value;
                 item_id = harvest_plant_def->harvest_item_id.value;
             }
+        }
+
+        if (action_kind == ActionKind::Excavate)
+        {
+            const auto requested_depth = excavation_depth_from_subject_id(secondary_subject_id);
+            const auto excavation_failure_reason =
+                validate_excavation_target(context, target_tile, requested_depth);
+            if (excavation_failure_reason != SiteActionFailureReason::None)
+            {
+                emit_site_action_failed(
+                    context.message_queue,
+                    0U,
+                    action_kind,
+                    excavation_failure_reason,
+                    request_flags,
+                    target_tile,
+                    primary_subject_id,
+                    secondary_subject_id);
+                return GS1_STATUS_OK;
+            }
+
+            const auto current_depth = context.world.read_tile_excavation(target_tile).depth;
+            primary_subject_id = excavation_depth_subject_id(
+                resolve_excavation_depth_request(
+                    current_depth,
+                    requested_depth,
+                    max_excavation_depth_unlocked(context)));
+            secondary_subject_id = 0U;
+            item_id = 0U;
         }
 
         const CraftRecipeDef* craft_recipe = nullptr;
@@ -2157,6 +2483,27 @@ void ActionExecutionSystem::run(SiteSystemContext<ActionExecutionSystem>& contex
                 context.world.read_tile(*action_state.target_tile).ecology.plant_density * 100.0f));
         }
     }
+    else if (action_state.action_kind == ActionKind::Excavate)
+    {
+        const auto failure_reason = validate_excavation_completion(context, action_state);
+        if (failure_reason != SiteActionFailureReason::None)
+        {
+            emit_site_action_failed(
+                context.message_queue,
+                action_id_value(action_state),
+                action_state.action_kind,
+                failure_reason,
+                action_state.request_flags,
+                action_target_tile(action_state),
+                action_state.primary_subject_id,
+                action_state.secondary_subject_id);
+            emit_placement_reservation_released(context.message_queue, action_state);
+            clear_action_state(action_state);
+            context.world.mark_projection_dirty(
+                SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
+            return;
+        }
+    }
 
     const auto item_failure_reason = validate_reserved_item_completion(context, action_state);
     if (item_failure_reason != SiteActionFailureReason::None)
@@ -2178,12 +2525,14 @@ void ActionExecutionSystem::run(SiteSystemContext<ActionExecutionSystem>& contex
     }
 
     emit_site_action_completed(context.message_queue, action_state);
-    emit_action_fact_messages(context.message_queue, action_state);
+    emit_action_fact_messages(context, action_state);
     emit_placement_reservation_released(context.message_queue, action_state);
     const bool reactivated_placement_mode =
         should_reactivate_plant_placement_mode_after_completion(
             context,
             action_state);
+    const ActionKind completed_action_kind = action_state.action_kind;
+    const auto completed_target_tile = action_state.target_tile;
     if (reactivated_placement_mode)
     {
         reactivate_plant_placement_mode_from_completed_action(action_state);
@@ -2192,6 +2541,10 @@ void ActionExecutionSystem::run(SiteSystemContext<ActionExecutionSystem>& contex
     std::uint32_t dirty_flags =
         SITE_PROJECTION_UPDATE_WORKER |
         SITE_PROJECTION_UPDATE_HUD;
+    if (completed_action_kind == ActionKind::Excavate && completed_target_tile.has_value())
+    {
+        context.world.mark_tile_projection_dirty(*completed_target_tile);
+    }
     if (reactivated_placement_mode)
     {
         dirty_flags |= SITE_PROJECTION_UPDATE_PLACEMENT_PREVIEW;

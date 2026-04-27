@@ -26,7 +26,8 @@ enum class ItemSourceRule : std::uint8_t
     BuyOnly = 1,
     CraftOnly = 2,
     BuyOrCraft = 3,
-    HarvestOnly = 4
+    HarvestOnly = 4,
+    ExcavationOnly = 5
 };
 
 struct ItemDef final
@@ -76,6 +77,14 @@ inline constexpr std::uint32_t k_item_jiji_grass_fiber = 25U;
 inline constexpr std::uint32_t k_item_sea_buckthorn_berries = 26U;
 inline constexpr std::uint32_t k_item_desert_ephedra_sprigs = 27U;
 inline constexpr std::uint32_t k_item_saxaul_fuelwood = 28U;
+inline constexpr std::uint32_t k_item_wind_polished_desert_pebble = 29U;
+inline constexpr std::uint32_t k_item_desert_jasper = 30U;
+inline constexpr std::uint32_t k_item_black_gobi_stone = 31U;
+inline constexpr std::uint32_t k_item_gobi_agate = 32U;
+inline constexpr std::uint32_t k_item_alxa_agate = 33U;
+inline constexpr std::uint32_t k_item_turquoise_vein_fragment = 34U;
+inline constexpr std::uint32_t k_item_golden_silk_jade = 35U;
+inline constexpr std::uint32_t k_item_hetian_jade_pebble = 36U;
 
 [[nodiscard]] std::span<const ItemDef> all_item_defs() noexcept;
 

@@ -15,6 +15,7 @@ public:
             site_component_mask_of(
                 SiteComponent::Time,
                 SiteComponent::TileLayout,
+                SiteComponent::TileExcavation,
                 SiteComponent::TileWeather,
                 SiteComponent::DeviceCondition,
                 SiteComponent::WorkerMotion,
@@ -23,7 +24,9 @@ public:
                 SiteComponent::Modifier,
                 SiteComponent::Craft,
                 SiteComponent::Action),
-            site_component_mask_of(SiteComponent::Action)};
+            site_component_mask_of(
+                SiteComponent::TileExcavation,
+                SiteComponent::Action)};
     }
 
     [[nodiscard]] static bool subscribes_to(GameMessageType type) noexcept;

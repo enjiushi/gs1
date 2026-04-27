@@ -58,6 +58,8 @@ struct SiteActionDef final
         return ActionKind::Eat;
     case GS1_SITE_ACTION_HARVEST:
         return ActionKind::Harvest;
+    case GS1_SITE_ACTION_EXCAVATE:
+        return ActionKind::Excavate;
     default:
         return ActionKind::None;
     }

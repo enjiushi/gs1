@@ -1,5 +1,6 @@
 #pragma once
 
+#include "support/excavation_types.h"
 #include "support/id_types.h"
 
 #include <cstddef>
@@ -37,6 +38,12 @@ public:
         float growth_pressure;
     };
 
+    struct TileExcavationData final
+    {
+        ExcavationDepth depth;
+        std::uint8_t reserved0[3];
+    };
+
     struct TileLocalWeatherData final
     {
         float heat;
@@ -66,6 +73,7 @@ public:
     {
         TileStaticData static_data;
         TileEcologyData ecology;
+        TileExcavationData excavation;
         TileLocalWeatherData local_weather;
         TileWeatherContributionData plant_weather_contribution;
         TileWeatherContributionData device_weather_contribution;
@@ -144,6 +152,10 @@ public:
     [[nodiscard]] TileEcologyData tile_ecology_at_index(std::size_t index) const noexcept;
     void set_tile_ecology(TileCoord coord, const TileEcologyData& data);
     void set_tile_ecology_at_index(std::size_t index, const TileEcologyData& data);
+    [[nodiscard]] TileExcavationData tile_excavation(TileCoord coord) const noexcept;
+    [[nodiscard]] TileExcavationData tile_excavation_at_index(std::size_t index) const noexcept;
+    void set_tile_excavation(TileCoord coord, const TileExcavationData& data);
+    void set_tile_excavation_at_index(std::size_t index, const TileExcavationData& data);
     [[nodiscard]] TileLocalWeatherData tile_local_weather(TileCoord coord) const noexcept;
     [[nodiscard]] TileLocalWeatherData tile_local_weather_at_index(std::size_t index) const noexcept;
     void set_tile_local_weather(TileCoord coord, const TileLocalWeatherData& data);
@@ -187,6 +199,7 @@ private:
 
 GS1_REQUIRE_TRIVIAL(SiteWorld::TileStaticData);
 GS1_REQUIRE_TRIVIAL(SiteWorld::TileEcologyData);
+GS1_REQUIRE_TRIVIAL(SiteWorld::TileExcavationData);
 GS1_REQUIRE_TRIVIAL(SiteWorld::TileLocalWeatherData);
 GS1_REQUIRE_TRIVIAL(SiteWorld::TileWeatherContributionData);
 GS1_REQUIRE_TRIVIAL(SiteWorld::TileDeviceData);
