@@ -111,7 +111,8 @@ inline SiteRunState make_test_site_run(
     std::uint32_t height = 8U,
     TileCoord camp_anchor_tile = TileCoord {2, 2},
     TileCoord worker_tile = TileCoord {2, 2},
-    float worker_health = 100.0f)
+    float worker_health = 100.0f,
+    std::uint32_t worker_pack_slot_count = 8U)
 {
     SiteRunState site_run {};
     site_run.site_run_id = SiteRunId {site_run_id};
@@ -125,7 +126,7 @@ inline SiteRunState make_test_site_run(
     site_run.camp.camp_anchor_tile = camp_anchor_tile;
     site_run.camp.delivery_box_tile = default_delivery_box_tile(camp_anchor_tile, width, height);
     site_run.camp.starter_storage_tile = site_run.camp.delivery_box_tile;
-    site_run.inventory.worker_pack_slot_count = 8U;
+    site_run.inventory.worker_pack_slot_count = worker_pack_slot_count;
     site_run.inventory.worker_pack_slots.resize(site_run.inventory.worker_pack_slot_count);
     site_run.task_board.accepted_task_cap = 3U;
     site_run.counters.site_completion_tile_threshold = 3U;

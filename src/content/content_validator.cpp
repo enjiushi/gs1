@@ -420,11 +420,18 @@ std::vector<ContentValidationIssue> validate_content_database(
 
     if (issues.empty())
     {
-        float common_total = 0.0f;
-        float uncommon_total = 0.0f;
-        float rare_total = 0.0f;
-        float very_rare_total = 0.0f;
-        float jackpot_total = 0.0f;
+        struct DepthTierTotals final
+        {
+            float common {0.0f};
+            float uncommon {0.0f};
+            float rare {0.0f};
+            float very_rare {0.0f};
+            float jackpot {0.0f};
+        };
+
+        DepthTierTotals rough_totals {};
+        DepthTierTotals careful_totals {};
+        DepthTierTotals thorough_totals {};
         for (const auto& entry : content.excavation_loot_entry_defs)
         {
             const auto item_it = content.index.item_by_id.find(entry.item_id.value);
@@ -437,32 +444,50 @@ std::vector<ContentValidationIssue> validate_content_database(
             }
 
             const auto& item_def = content.item_defs[item_it->second];
-            if (item_def.source_rule != ItemSourceRule::ExcavationOnly ||
+            if (entry.depth == ExcavationDepth::None ||
+                item_def.source_rule != ItemSourceRule::ExcavationOnly ||
                 entry.tier == ExcavationLootTier::None ||
                 entry.percent_within_tier < 0.0f)
             {
                 issues.push_back(ContentValidationIssue {
                     ContentValidationSeverity::Error,
-                    "Excavation loot entries must reference excavation-only items, use valid tiers, and non-negative tier percentages."});
+                    "Excavation loot entries must reference excavation-only items, use valid depths and tiers, and non-negative tier percentages."});
+                break;
+            }
+
+            auto* totals = &rough_totals;
+            switch (entry.depth)
+            {
+            case ExcavationDepth::Rough:
+                totals = &rough_totals;
+                break;
+            case ExcavationDepth::Careful:
+                totals = &careful_totals;
+                break;
+            case ExcavationDepth::Thorough:
+                totals = &thorough_totals;
+                break;
+            case ExcavationDepth::None:
+            default:
                 break;
             }
 
             switch (entry.tier)
             {
             case ExcavationLootTier::Common:
-                common_total += entry.percent_within_tier;
+                totals->common += entry.percent_within_tier;
                 break;
             case ExcavationLootTier::Uncommon:
-                uncommon_total += entry.percent_within_tier;
+                totals->uncommon += entry.percent_within_tier;
                 break;
             case ExcavationLootTier::Rare:
-                rare_total += entry.percent_within_tier;
+                totals->rare += entry.percent_within_tier;
                 break;
             case ExcavationLootTier::VeryRare:
-                very_rare_total += entry.percent_within_tier;
+                totals->very_rare += entry.percent_within_tier;
                 break;
             case ExcavationLootTier::Jackpot:
-                jackpot_total += entry.percent_within_tier;
+                totals->jackpot += entry.percent_within_tier;
                 break;
             case ExcavationLootTier::None:
             default:
@@ -471,15 +496,25 @@ std::vector<ContentValidationIssue> validate_content_database(
         }
 
         if (issues.empty() &&
-            (!percent_total_is_100(common_total) ||
-                !percent_total_is_100(uncommon_total) ||
-                !percent_total_is_100(rare_total) ||
-                !percent_total_is_100(very_rare_total) ||
-                !percent_total_is_100(jackpot_total)))
+            (!percent_total_is_100(rough_totals.common) ||
+                !percent_total_is_100(rough_totals.uncommon) ||
+                !percent_total_is_100(rough_totals.rare) ||
+                !percent_total_is_100(rough_totals.very_rare) ||
+                !percent_total_is_100(rough_totals.jackpot) ||
+                !percent_total_is_100(careful_totals.common) ||
+                !percent_total_is_100(careful_totals.uncommon) ||
+                !percent_total_is_100(careful_totals.rare) ||
+                !percent_total_is_100(careful_totals.very_rare) ||
+                !percent_total_is_100(careful_totals.jackpot) ||
+                !percent_total_is_100(thorough_totals.common) ||
+                !percent_total_is_100(thorough_totals.uncommon) ||
+                !percent_total_is_100(thorough_totals.rare) ||
+                !percent_total_is_100(thorough_totals.very_rare) ||
+                !percent_total_is_100(thorough_totals.jackpot)))
         {
             issues.push_back(ContentValidationIssue {
                 ContentValidationSeverity::Error,
-                "Each excavation loot tier pool must sum to 100%."});
+                "Each excavation depth+tier loot pool must sum to 100%."});
         }
     }
 

@@ -999,6 +999,11 @@ bool inventory_can_fit_all_excavation_rewards(
 
     for (const auto& entry : all_excavation_loot_entry_defs())
     {
+        if (entry.depth != depth)
+        {
+            continue;
+        }
+
         const bool tier_enabled =
             (entry.tier == ExcavationLootTier::Common && include_common) ||
             (entry.tier == ExcavationLootTier::Uncommon && include_uncommon) ||
@@ -1092,6 +1097,7 @@ ExcavationLootTier roll_excavation_loot_tier(
 }
 
 ItemId roll_excavation_loot_item(
+    ExcavationDepth depth,
     ExcavationLootTier tier,
     std::uint64_t seed) noexcept
 {
@@ -1099,7 +1105,7 @@ ItemId roll_excavation_loot_item(
     float cursor = 0.0f;
     for (const auto& entry : all_excavation_loot_entry_defs())
     {
-        if (entry.tier != tier)
+        if (entry.depth != depth || entry.tier != tier)
         {
             continue;
         }
@@ -1139,7 +1145,7 @@ ItemId resolve_excavation_reward_item(
     }
 
     const auto tier = roll_excavation_loot_tier(depth, base_seed + 2U);
-    return roll_excavation_loot_item(tier, base_seed + 3U);
+    return roll_excavation_loot_item(depth, tier, base_seed + 3U);
 }
 
 const CraftRecipeDef* resolve_craft_recipe_for_action(

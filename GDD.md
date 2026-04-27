@@ -1308,14 +1308,21 @@ Rules:
 
 Suggested northwest-China desert excavation roster:
 
-| Stone Type | Region Flavor | Suggested internal cash-point band | Relative rarity |
+| Stone Type | Region Flavor | Current authored internal cash points | Relative rarity |
 |---|---|---|---|
-| Wind-Polished Desert Pebble | Common Gobi or dune-basin decorative stone | `100-300` | Common |
-| Desert Jasper | Red/yellow jasper nodules from dry gravel beds | `300-900` | Common to uncommon |
-| Gobi Agate | Weathered agate with stronger color banding | `800-2500` | Uncommon |
-| Alxa Agate | Alxa-desert ornamental agate | `1800-5000` | Rare |
-| Golden Silk Jade | Gobi-desert jade/quartz trade stone with bright polish value | `4000-9000` | Very rare |
-| Hetian Jade Pebble | Xinjiang river-worn nephrite jade suitable as the prototype jackpot find | `9000-20000` | Extremely rare |
+| Wind-Polished Desert Pebble | Common Gobi or dune-basin decorative stone | `110` | Common |
+| Desert Jasper | Red/yellow jasper nodules from dry gravel beds | `385` | Common to uncommon |
+| Black Gobi Stone | Dark polished Gobi trade stone between jasper and agate value bands | `605` | Uncommon |
+| Gobi Agate | Weathered agate with stronger color banding | `935` | Uncommon |
+| Alxa Agate | Alxa-desert ornamental agate | `1430` | Rare |
+| Turquoise Vein Fragment | Small turquoise-bearing mineral fragment worth chasing in deeper digs | `2420` | Rare to very rare |
+| Golden Silk Jade | Gobi-desert jade/quartz trade stone with bright polish value | `3080` | Very rare |
+| Hetian Jade Pebble | Xinjiang river-worn nephrite jade suitable as the prototype jackpot find | `11000` | Extremely rare |
+
+Current prototype authored excavation balance:
+- all three depths currently author `50%` chance to find any stone
+- jackpot chance is currently `1%` for `Rough`, `2%` for `Careful`, and `3%` for `Thorough`
+- calm-weather sell-value balance currently lands around `+156.30` CP for `Rough`, `+319.42` CP for `Careful`, and `+449.36` CP for `Thorough` against the current rounded meter-to-CP baseline, while harsh-weather morale pressure remains part of the dig risk curve
 
 #### Layer 3: Inventory And Containers
 

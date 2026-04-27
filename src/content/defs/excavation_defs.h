@@ -22,6 +22,7 @@ struct ExcavationDepthDef final
 
 struct ExcavationLootEntryDef final
 {
+    ExcavationDepth depth;
     ItemId item_id;
     ExcavationLootTier tier;
     float percent_within_tier;

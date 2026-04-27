@@ -1,16 +1,34 @@
 excavation_depths = [
-  { depth = "Rough", energy_cost_multiplier = 1.0, find_chance_percent = 30.0, common_tier_percent = 72.0, uncommon_tier_percent = 22.0, rare_tier_percent = 5.0, very_rare_tier_percent = 0.9, jackpot_tier_percent = 0.1 },
-  { depth = "Careful", energy_cost_multiplier = 1.35, find_chance_percent = 30.0, common_tier_percent = 52.0, uncommon_tier_percent = 28.0, rare_tier_percent = 14.0, very_rare_tier_percent = 5.0, jackpot_tier_percent = 1.0 },
-  { depth = "Thorough", energy_cost_multiplier = 1.75, find_chance_percent = 30.0, common_tier_percent = 32.0, uncommon_tier_percent = 33.0, rare_tier_percent = 22.0, very_rare_tier_percent = 10.0, jackpot_tier_percent = 3.0 }
+  { depth = "Rough", energy_cost_multiplier = 1.0, find_chance_percent = 50.0, common_tier_percent = 58.0, uncommon_tier_percent = 26.0, rare_tier_percent = 8.0, very_rare_tier_percent = 6.0, jackpot_tier_percent = 2.0 },
+  { depth = "Careful", energy_cost_multiplier = 1.35, find_chance_percent = 50.0, common_tier_percent = 49.0, uncommon_tier_percent = 25.5, rare_tier_percent = 9.5, very_rare_tier_percent = 12.0, jackpot_tier_percent = 4.0 },
+  { depth = "Thorough", energy_cost_multiplier = 1.75, find_chance_percent = 50.0, common_tier_percent = 42.0, uncommon_tier_percent = 26.0, rare_tier_percent = 11.0, very_rare_tier_percent = 15.0, jackpot_tier_percent = 6.0 }
 ]
 
 excavation_loot_entries = [
-  { item_id = 29, tier = "Common", percent_within_tier = 65.0 },
-  { item_id = 30, tier = "Common", percent_within_tier = 35.0 },
-  { item_id = 31, tier = "Uncommon", percent_within_tier = 55.0 },
-  { item_id = 32, tier = "Uncommon", percent_within_tier = 45.0 },
-  { item_id = 33, tier = "Rare", percent_within_tier = 100.0 },
-  { item_id = 34, tier = "VeryRare", percent_within_tier = 45.0 },
-  { item_id = 35, tier = "VeryRare", percent_within_tier = 55.0 },
-  { item_id = 36, tier = "Jackpot", percent_within_tier = 100.0 }
+  { depth = "Rough", item_id = 29, tier = "Common", percent_within_tier = 62.0690 },
+  { depth = "Rough", item_id = 30, tier = "Common", percent_within_tier = 37.9310 },
+  { depth = "Rough", item_id = 31, tier = "Uncommon", percent_within_tier = 57.6923 },
+  { depth = "Rough", item_id = 32, tier = "Uncommon", percent_within_tier = 42.3077 },
+  { depth = "Rough", item_id = 33, tier = "Rare", percent_within_tier = 100.0 },
+  { depth = "Rough", item_id = 34, tier = "VeryRare", percent_within_tier = 58.3333 },
+  { depth = "Rough", item_id = 35, tier = "VeryRare", percent_within_tier = 41.6667 },
+  { depth = "Rough", item_id = 36, tier = "Jackpot", percent_within_tier = 100.0 },
+
+  { depth = "Careful", item_id = 29, tier = "Common", percent_within_tier = 61.2245 },
+  { depth = "Careful", item_id = 30, tier = "Common", percent_within_tier = 38.7755 },
+  { depth = "Careful", item_id = 31, tier = "Uncommon", percent_within_tier = 54.9020 },
+  { depth = "Careful", item_id = 32, tier = "Uncommon", percent_within_tier = 45.0980 },
+  { depth = "Careful", item_id = 33, tier = "Rare", percent_within_tier = 100.0 },
+  { depth = "Careful", item_id = 34, tier = "VeryRare", percent_within_tier = 54.1667 },
+  { depth = "Careful", item_id = 35, tier = "VeryRare", percent_within_tier = 45.8333 },
+  { depth = "Careful", item_id = 36, tier = "Jackpot", percent_within_tier = 100.0 },
+
+  { depth = "Thorough", item_id = 29, tier = "Common", percent_within_tier = 59.5238 },
+  { depth = "Thorough", item_id = 30, tier = "Common", percent_within_tier = 40.4762 },
+  { depth = "Thorough", item_id = 31, tier = "Uncommon", percent_within_tier = 53.8462 },
+  { depth = "Thorough", item_id = 32, tier = "Uncommon", percent_within_tier = 46.1538 },
+  { depth = "Thorough", item_id = 33, tier = "Rare", percent_within_tier = 100.0 },
+  { depth = "Thorough", item_id = 34, tier = "VeryRare", percent_within_tier = 53.3333 },
+  { depth = "Thorough", item_id = 35, tier = "VeryRare", percent_within_tier = 46.6667 },
+  { depth = "Thorough", item_id = 36, tier = "Jackpot", percent_within_tier = 100.0 }
 ]

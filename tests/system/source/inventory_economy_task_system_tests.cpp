@@ -1,11 +1,13 @@
 #include "messages/game_message.h"
 #include "content/defs/gameplay_tuning_defs.h"
+#include "content/defs/excavation_defs.h"
 #include "content/defs/plant_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/faction_defs.h"
 #include "content/defs/structure_defs.h"
 #include "content/defs/task_defs.h"
 #include "content/prototype_content.h"
+#include "site/defs/site_action_defs.h"
 #include "site/systems/action_execution_system.h"
 #include "site/systems/device_maintenance_system.h"
 #include "site/systems/device_weather_contribution_system.h"
@@ -2075,6 +2077,146 @@ void task_board_content_tuning_exposes_internal_prices_and_task_scoring_inputs(
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(submit_task->risk_multiplier, 0.05f));
 }
 
+void excavation_content_tuning_exposes_depth_specific_sell_balance(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    struct ExpectedStoneValue final
+    {
+        std::uint32_t item_id;
+        std::uint32_t internal_cash_points;
+    };
+
+    constexpr ExpectedStoneValue expected_values[] {
+        {gs1::k_item_wind_polished_desert_pebble, 110U},
+        {gs1::k_item_desert_jasper, 385U},
+        {gs1::k_item_black_gobi_stone, 605U},
+        {gs1::k_item_gobi_agate, 935U},
+        {gs1::k_item_alxa_agate, 1430U},
+        {gs1::k_item_turquoise_vein_fragment, 2420U},
+        {gs1::k_item_golden_silk_jade, 3080U},
+        {gs1::k_item_hetian_jade_pebble, 11000U},
+    };
+
+    for (const auto& entry : expected_values)
+    {
+        GS1_SYSTEM_TEST_CHECK(
+            context,
+            gs1::item_internal_price_cash_points(gs1::ItemId {entry.item_id}) == entry.internal_cash_points);
+    }
+
+    const auto* excavate_action = gs1::find_site_action_def(gs1::ActionKind::Excavate);
+    GS1_SYSTEM_TEST_REQUIRE(context, excavate_action != nullptr);
+    const double sell_multiplier =
+        static_cast<double>(gs1::gameplay_tuning_def().player_meter_cash_points.sell_price_multiplier);
+
+    const auto expected_sell_ev_for_depth = [](
+                                           gs1::ExcavationDepth depth) -> double
+    {
+        const auto* depth_def = gs1::find_excavation_depth_def(depth);
+        if (depth_def == nullptr)
+        {
+            return 0.0;
+        }
+
+        const auto tier_percent = [depth_def](gs1::ExcavationLootTier tier) -> double
+        {
+            switch (tier)
+            {
+            case gs1::ExcavationLootTier::Common:
+                return static_cast<double>(depth_def->common_tier_percent);
+            case gs1::ExcavationLootTier::Uncommon:
+                return static_cast<double>(depth_def->uncommon_tier_percent);
+            case gs1::ExcavationLootTier::Rare:
+                return static_cast<double>(depth_def->rare_tier_percent);
+            case gs1::ExcavationLootTier::VeryRare:
+                return static_cast<double>(depth_def->very_rare_tier_percent);
+            case gs1::ExcavationLootTier::Jackpot:
+                return static_cast<double>(depth_def->jackpot_tier_percent);
+            case gs1::ExcavationLootTier::None:
+            default:
+                return 0.0;
+            }
+        };
+
+        double sell_ev = 0.0;
+        for (const auto& entry : gs1::all_excavation_loot_entry_defs())
+        {
+            if (entry.depth != depth)
+            {
+                continue;
+            }
+
+            sell_ev +=
+                static_cast<double>(gs1::item_internal_price_cash_points(entry.item_id)) *
+                (static_cast<double>(depth_def->find_chance_percent) * 0.01) *
+                (tier_percent(entry.tier) * 0.01) *
+                (static_cast<double>(entry.percent_within_tier) * 0.01);
+        }
+        return sell_ev;
+    };
+
+    const auto calm_excavation_cost_for_depth = [excavate_action](
+                                                     gs1::ExcavationDepth depth) -> std::uint32_t
+    {
+        const auto* depth_def = gs1::find_excavation_depth_def(depth);
+        return depth_def == nullptr
+            ? 0U
+            : gs1::player_meter_cost_internal_cash_points(
+                0.0f,
+                excavate_action->hydration_cost_per_unit,
+                excavate_action->nourishment_cost_per_unit,
+                excavate_action->energy_cost_per_unit * depth_def->energy_cost_multiplier,
+                0.0f);
+    };
+
+    const auto* rough_depth = gs1::find_excavation_depth_def(gs1::ExcavationDepth::Rough);
+    const auto* careful_depth = gs1::find_excavation_depth_def(gs1::ExcavationDepth::Careful);
+    const auto* thorough_depth = gs1::find_excavation_depth_def(gs1::ExcavationDepth::Thorough);
+    GS1_SYSTEM_TEST_REQUIRE(context, rough_depth != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(context, careful_depth != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(context, thorough_depth != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, rough_depth->find_chance_percent == 50.0f);
+    GS1_SYSTEM_TEST_CHECK(context, careful_depth->find_chance_percent == 50.0f);
+    GS1_SYSTEM_TEST_CHECK(context, thorough_depth->find_chance_percent == 50.0f);
+
+    const double rough_sell_ev = expected_sell_ev_for_depth(gs1::ExcavationDepth::Rough);
+    const double careful_sell_ev = expected_sell_ev_for_depth(gs1::ExcavationDepth::Careful);
+    const double thorough_sell_ev = expected_sell_ev_for_depth(gs1::ExcavationDepth::Thorough);
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(static_cast<float>(rough_sell_ev * sell_multiplier), 366.30f, 0.01f));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(static_cast<float>(careful_sell_ev * sell_multiplier), 540.42f, 0.01f));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(static_cast<float>(thorough_sell_ev * sell_multiplier), 682.36f, 0.01f));
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            static_cast<float>(
+                rough_sell_ev * sell_multiplier -
+                static_cast<double>(calm_excavation_cost_for_depth(gs1::ExcavationDepth::Rough))),
+            156.30f,
+            0.01f));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            static_cast<float>(careful_sell_ev * sell_multiplier -
+                static_cast<double>(calm_excavation_cost_for_depth(gs1::ExcavationDepth::Careful))),
+            319.42f,
+            0.01f));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            static_cast<float>(thorough_sell_ev * sell_multiplier -
+                static_cast<double>(calm_excavation_cost_for_depth(gs1::ExcavationDepth::Thorough))),
+            449.36f,
+            0.01f));
+}
+
 void task_board_submit_task_completes_from_successful_submission(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -2253,6 +2395,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "task_board",
     "content_tuning_exposes_internal_prices_and_task_scoring_inputs",
     task_board_content_tuning_exposes_internal_prices_and_task_scoring_inputs);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "inventory",
+    "excavation_content_tuning_exposes_depth_specific_sell_balance",
+    excavation_content_tuning_exposes_depth_specific_sell_balance);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "task_board",
     "submit_task_completes_from_successful_submission",

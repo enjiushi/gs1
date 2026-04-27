@@ -1555,6 +1555,10 @@ void load_excavation_defs(ContentDatabase& content, const std::filesystem::path&
     {
         const auto& entry = require_array_entry_table(path, node, "excavation_loot_entries");
         content.excavation_loot_entry_defs.push_back(ExcavationLootEntryDef {
+            parse_excavation_depth(
+                path,
+                toml_line_number(entry),
+                require_toml_string(path, entry, "depth")),
             ItemId {require_toml_unsigned<std::uint32_t>(path, entry, "item_id")},
             parse_excavation_loot_tier(
                 path,

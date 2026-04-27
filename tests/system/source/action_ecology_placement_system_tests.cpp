@@ -1026,10 +1026,24 @@ void action_execution_excavate_starts_immediately_and_emits_cost(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
-    auto site_run = make_test_site_run(1U, 5074U);
+    auto site_run = make_test_site_run(
+        1U,
+        5074U,
+        101U,
+        8U,
+        8U,
+        TileCoord {2, 2},
+        TileCoord {2, 2},
+        100.0f,
+        16U);
     GameMessageQueue queue {};
     auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue);
-    constexpr TileCoord k_excavate_tile {2, 2};
+    auto worker = site_run.site_world->worker();
+    worker.position.tile_coord = TileCoord {3, 3};
+    worker.position.tile_x = 3.0f;
+    worker.position.tile_y = 3.0f;
+    site_run.site_world->set_worker(worker);
+    constexpr TileCoord k_excavate_tile {3, 3};
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -1057,9 +1071,23 @@ void action_execution_excavate_rejects_occupied_tiles(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
-    auto site_run = make_test_site_run(1U, 5075U);
+    auto site_run = make_test_site_run(
+        1U,
+        5075U,
+        101U,
+        8U,
+        8U,
+        TileCoord {2, 2},
+        TileCoord {2, 2},
+        100.0f,
+        16U);
     GameMessageQueue queue {};
     auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue);
+    auto worker = site_run.site_world->worker();
+    worker.position.tile_coord = TileCoord {3, 3};
+    worker.position.tile_x = 3.0f;
+    worker.position.tile_y = 3.0f;
+    site_run.site_world->set_worker(worker);
 
     auto tile = site_run.site_world->tile_at(TileCoord {3, 3});
     tile.device.structure_id = gs1::StructureId {gs1::k_structure_workbench};
@@ -1085,6 +1113,11 @@ void action_execution_excavate_rejects_when_worker_pack_has_no_reward_space(
     auto site_run = make_test_site_run(1U, 5076U);
     GameMessageQueue queue {};
     auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue);
+    auto worker = site_run.site_world->worker();
+    worker.position.tile_coord = TileCoord {3, 3};
+    worker.position.tile_x = 3.0f;
+    worker.position.tile_y = 3.0f;
+    site_run.site_world->set_worker(worker);
 
     const auto worker_pack = gs1::inventory_storage::worker_pack_container(site_run);
     GS1_SYSTEM_TEST_REQUIRE(context, worker_pack.is_valid());
@@ -1128,10 +1161,24 @@ void action_execution_excavate_completion_misses_or_finds_deterministic_loot(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
-    auto site_run = make_test_site_run(1U, 1U);
+    auto site_run = make_test_site_run(
+        1U,
+        1U,
+        101U,
+        8U,
+        8U,
+        TileCoord {2, 2},
+        TileCoord {2, 2},
+        100.0f,
+        16U);
     GameMessageQueue queue {};
     auto action_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue, 60.0);
     auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue, 60.0);
+    auto worker = site_run.site_world->worker();
+    worker.position.tile_coord = TileCoord {1, 1};
+    worker.position.tile_x = 1.0f;
+    worker.position.tile_y = 1.0f;
+    site_run.site_world->set_worker(worker);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -1161,6 +1208,12 @@ void action_execution_excavate_completion_misses_or_finds_deterministic_loot(
             InventorySystem::process_message(inventory_context, message) == GS1_STATUS_OK);
     }
 
+    worker = site_run.site_world->worker();
+    worker.position.tile_coord = TileCoord {3, 3};
+    worker.position.tile_x = 3.0f;
+    worker.position.tile_y = 3.0f;
+    site_run.site_world->set_worker(worker);
+
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         ActionExecutionSystem::process_message(
@@ -1181,7 +1234,7 @@ void action_execution_excavate_completion_misses_or_finds_deterministic_loot(
             queue,
             GameMessageType::InventoryWorkerPackInsertRequested);
     GS1_SYSTEM_TEST_REQUIRE(context, insert != nullptr);
-    GS1_SYSTEM_TEST_CHECK(context, insert->item_id == gs1::k_item_gobi_agate);
+    GS1_SYSTEM_TEST_CHECK(context, insert->item_id == gs1::k_item_alxa_agate);
     GS1_SYSTEM_TEST_CHECK(context, insert->quantity == 1U);
     GS1_SYSTEM_TEST_CHECK(
         context,
@@ -1201,17 +1254,31 @@ void action_execution_excavate_completion_misses_or_finds_deterministic_loot(
         gs1::inventory_storage::available_item_quantity_in_container(
             site_run,
             gs1::inventory_storage::worker_pack_container(site_run),
-            gs1::ItemId {gs1::k_item_gobi_agate}) == 1U);
+            gs1::ItemId {gs1::k_item_alxa_agate}) == 1U);
 }
 
 void action_execution_excavate_completion_marks_tile_projection_dirty(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
-    auto site_run = make_test_site_run(1U, 5077U);
+    auto site_run = make_test_site_run(
+        1U,
+        5077U,
+        101U,
+        8U,
+        8U,
+        TileCoord {2, 2},
+        TileCoord {2, 2},
+        100.0f,
+        16U);
     GameMessageQueue queue {};
     auto action_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue, 60.0);
     auto flow_context = make_site_context<SiteFlowSystem>(campaign, site_run, queue, 60.0);
+    auto worker = site_run.site_world->worker();
+    worker.position.tile_coord = TileCoord {3, 3};
+    worker.position.tile_x = 3.0f;
+    worker.position.tile_y = 3.0f;
+    site_run.site_world->set_worker(worker);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -1253,7 +1320,16 @@ void action_execution_excavate_cannot_repeat_rough_depth_by_default(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
-    auto site_run = make_test_site_run(1U, 2U);
+    auto site_run = make_test_site_run(
+        1U,
+        2U,
+        101U,
+        8U,
+        8U,
+        TileCoord {2, 2},
+        TileCoord {2, 2},
+        100.0f,
+        16U);
     GameMessageQueue queue {};
     auto action_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue, 60.0);
 
