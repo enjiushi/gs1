@@ -255,35 +255,19 @@ void seed_runtime_test_task(GameRuntime& runtime, std::uint32_t site_completion_
 
 void set_worker_hydration(SiteRunState& site_run, float hydration)
 {
-    assert(site_run.site_world != nullptr);
-    auto entity = site_run.site_world->ecs_world().entity(site_run.site_world->worker_entity_id());
-    assert(entity.is_alive());
-
-    auto& vitals = entity.get_mut<gs1::site_ecs::WorkerVitals>();
+    auto vitals = gs1::site_world_access::worker_conditions(site_run);
     vitals.hydration = hydration;
-    entity.modified<gs1::site_ecs::WorkerVitals>();
+    gs1::site_world_access::set_worker_conditions(site_run, vitals);
 }
 
 void seed_plant_tile(SiteRunState& site_run, TileCoord coord, std::uint32_t plant_id, float density)
 {
-    assert(site_run.site_world != nullptr);
-    auto entity = site_run.site_world->ecs_world().entity(site_run.site_world->tile_entity_id(coord));
-    assert(entity.is_alive());
-
-    auto& burial = entity.get_mut<gs1::site_ecs::TileSandBurial>();
-    auto& plant = entity.get_mut<gs1::site_ecs::TilePlantSlot>();
-    auto& ground_cover = entity.get_mut<gs1::site_ecs::TileGroundCoverSlot>();
-    auto& plant_density = entity.get_mut<gs1::site_ecs::TilePlantDensity>();
-
-    burial.value = 0.0f;
-    plant.plant_id = gs1::PlantId {plant_id};
-    ground_cover.ground_cover_type_id = 0U;
-    plant_density.value = (density > 0.0f && density <= 1.0f) ? density * 100.0f : density;
-    entity.add<gs1::site_ecs::TileOccupantTag>();
-    entity.modified<gs1::site_ecs::TileSandBurial>();
-    entity.modified<gs1::site_ecs::TilePlantSlot>();
-    entity.modified<gs1::site_ecs::TileGroundCoverSlot>();
-    entity.modified<gs1::site_ecs::TilePlantDensity>();
+    auto ecology = gs1::site_world_access::tile_ecology(site_run, coord);
+    ecology.sand_burial = 0.0f;
+    ecology.plant_id = gs1::PlantId {plant_id};
+    ecology.ground_cover_type_id = 0U;
+    ecology.plant_density = (density > 0.0f && density <= 1.0f) ? density * 100.0f : density;
+    gs1::site_world_access::set_tile_ecology(site_run, coord, ecology);
 }
 
 void inventory_item_use_updates_worker_and_projection()

@@ -1029,26 +1029,28 @@ void action_execution_excavate_starts_immediately_and_emits_cost(
     auto site_run = make_test_site_run(1U, 5074U);
     GameMessageQueue queue {};
     auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue);
+    constexpr TileCoord k_excavate_tile {2, 2};
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         ActionExecutionSystem::process_message(
             site_context,
-            make_start_action_message(GS1_SITE_ACTION_EXCAVATE, TileCoord {3, 3}, 1U, 0U, 0U)) == GS1_STATUS_OK);
+            make_start_action_message(GS1_SITE_ACTION_EXCAVATE, k_excavate_tile, 1U, 0U, 0U)) == GS1_STATUS_OK);
 
     GS1_SYSTEM_TEST_REQUIRE(context, site_run.site_action.current_action_id.has_value());
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.action_kind == ActionKind::Excavate);
     GS1_SYSTEM_TEST_CHECK(
         context,
         site_run.site_action.primary_subject_id == static_cast<std::uint32_t>(gs1::ExcavationDepth::Rough));
-    GS1_SYSTEM_TEST_CHECK(context, queue.size() == 2U);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue[0].type == GameMessageType::SiteActionStarted);
-    GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameMessageType::WorkerMeterDeltaRequested);
+    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::WorkerMeterDeltaRequested) == 0U);
     GS1_SYSTEM_TEST_CHECK(
         context,
         approx_equal(
-            queue[1].payload_as<gs1::WorkerMeterDeltaRequestedMessage>().energy_delta,
+            site_run.site_action.deferred_meter_delta.energy_delta,
             -30.0f));
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.deferred_meter_delta.flags != 0U);
 }
 
 void action_execution_excavate_rejects_occupied_tiles(
@@ -1136,6 +1138,13 @@ void action_execution_excavate_completion_misses_or_finds_deterministic_loot(
         ActionExecutionSystem::process_message(
             action_context,
             make_start_action_message(GS1_SITE_ACTION_EXCAVATE, TileCoord {1, 1}, 1U, 0U, 0U)) == GS1_STATUS_OK);
+    {
+        auto worker = gs1::site_world_access::worker_position(site_run);
+        worker.tile_coord = TileCoord {1, 1};
+        worker.tile_x = 1.0f;
+        worker.tile_y = 1.0f;
+        gs1::site_world_access::set_worker_position(site_run, worker);
+    }
     queue.clear();
     ActionExecutionSystem::run(action_context);
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::InventoryWorkerPackInsertRequested) == 0U);
@@ -1157,6 +1166,13 @@ void action_execution_excavate_completion_misses_or_finds_deterministic_loot(
         ActionExecutionSystem::process_message(
             action_context,
             make_start_action_message(GS1_SITE_ACTION_EXCAVATE, TileCoord {3, 3}, 1U, 0U, 0U)) == GS1_STATUS_OK);
+    {
+        auto worker = gs1::site_world_access::worker_position(site_run);
+        worker.tile_coord = TileCoord {3, 3};
+        worker.tile_x = 3.0f;
+        worker.tile_y = 3.0f;
+        gs1::site_world_access::set_worker_position(site_run, worker);
+    }
     queue.clear();
     ActionExecutionSystem::run(action_context);
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::InventoryWorkerPackInsertRequested) == 1U);

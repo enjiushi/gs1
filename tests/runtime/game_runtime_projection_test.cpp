@@ -4,6 +4,7 @@
 #include "content/defs/item_defs.h"
 #include "content/defs/task_defs.h"
 #include "content/defs/technology_defs.h"
+#include "content/prototype_content.h"
 #include "site/inventory_storage.h"
 #include "site/site_projection_update_flags.h"
 #include "site/task_board_state.h"
@@ -769,6 +770,8 @@ int main()
     assert(contains_ui_element_text(site_forestry_messages, "Tab: Forestry"));
 
     const auto first_site_id = campaign_site_id;
+    const auto* first_site_content = gs1::find_prototype_site_content(gs1::SiteId {first_site_id});
+    assert(first_site_content != nullptr);
     assert(runtime.handle_message(make_start_site_attempt_message(first_site_id)) == GS1_STATUS_OK);
     assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).has_value());
 
@@ -814,10 +817,12 @@ int main()
     {
         const auto& weather_payload =
             weather_messages.front()->payload_as<Gs1EngineMessageWeatherData>();
-        assert(weather_payload.heat == 30.0f);
-        assert(weather_payload.wind == 20.0f);
-        assert(weather_payload.dust == 10.0f);
-        assert(weather_payload.wind_direction_degrees == 0.0f);
+        assert(approx_equal(weather_payload.heat, first_site_content->default_weather_heat));
+        assert(approx_equal(weather_payload.wind, first_site_content->default_weather_wind));
+        assert(approx_equal(weather_payload.dust, first_site_content->default_weather_dust));
+        assert(approx_equal(
+            weather_payload.wind_direction_degrees,
+            first_site_content->default_weather_wind_direction_degrees));
         assert(weather_payload.event_template_id == 0U);
         assert(weather_payload.event_start_time_minutes == 0.0f);
         assert(weather_payload.event_peak_time_minutes == 0.0f);
@@ -1089,6 +1094,7 @@ int main()
         assert(approx_equal(payload.soil_salinity, 40.0f));
     }
 
+    set_tile_plant_state(site_run, density_coord, gs1::PlantId {}, 0.0f);
     set_tile_excavation_state(site_run, density_coord, gs1::ExcavationDepth::Rough);
     gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
@@ -1138,26 +1144,51 @@ int main()
         gs1::GameRuntimeProjectionTestAccess::active_site_run(phone_panel_runtime).value();
     drain_engine_messages(phone_panel_runtime);
 
+    const auto buy_listing_it = std::find_if(
+        phone_panel_site_run.economy.available_phone_listings.begin(),
+        phone_panel_site_run.economy.available_phone_listings.end(),
+        [](const gs1::PhoneListingState& listing) {
+            if (listing.kind != gs1::PhoneListingKind::BuyItem)
+            {
+                return false;
+            }
+
+            const auto* item_def = gs1::find_item_def(listing.item_id);
+            return item_def != nullptr && gs1::item_has_capability(*item_def, gs1::ITEM_CAPABILITY_SELL);
+        });
+    assert(buy_listing_it != phone_panel_site_run.economy.available_phone_listings.end());
+    const auto delivered_item_id = buy_listing_it->item_id;
+    const auto expected_sell_listing_id = 1000U + delivered_item_id.value;
+    const auto delivery_box_container =
+        gs1::inventory_storage::delivery_box_container(phone_panel_site_run);
+    const auto delivery_quantity_before = gs1::inventory_storage::available_item_quantity_in_container(
+        phone_panel_site_run,
+        delivery_box_container,
+        delivered_item_id);
+
     GameMessage buy_sellable_listing {};
     buy_sellable_listing.type = GameMessageType::PhoneListingPurchaseRequested;
-    buy_sellable_listing.set_payload(PhoneListingPurchaseRequestedMessage {4U, 1U, 0U});
+    buy_sellable_listing.set_payload(PhoneListingPurchaseRequestedMessage {
+        buy_listing_it->listing_id,
+        1U,
+        0U});
     assert(phone_panel_runtime.handle_message(buy_sellable_listing) == GS1_STATUS_OK);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(phone_panel_runtime);
     drain_engine_messages(phone_panel_runtime);
 
     Gs1Phase1Result phone_panel_delivery_result {};
     run_phase1(phone_panel_runtime, k_default_delivery_real_seconds, phone_panel_delivery_result);
-    const auto delivered_sellable_slot_index = find_delivery_box_slot_index(
+    const auto delivery_quantity_after = gs1::inventory_storage::available_item_quantity_in_container(
         phone_panel_site_run,
-        gs1::ItemId {gs1::k_item_ordos_wormwood_seed_bundle},
-        1U);
-    assert(delivered_sellable_slot_index != std::numeric_limits<std::uint16_t>::max());
+        delivery_box_container,
+        delivered_item_id);
+    assert(delivery_quantity_after == delivery_quantity_before + 1U);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(phone_panel_runtime);
     const auto phone_panel_delivery_messages = drain_engine_messages(phone_panel_runtime);
     assert(contains_phone_listing_message(
         phone_panel_delivery_messages,
         GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_UPSERT,
-        1000U + gs1::k_item_ordos_wormwood_seed_bundle));
+        expected_sell_listing_id));
     assert(!collect_messages_of_type(
         phone_panel_delivery_messages,
         GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE).empty());

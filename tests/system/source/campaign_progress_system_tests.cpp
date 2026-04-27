@@ -113,7 +113,7 @@ void campaign_flow_start_new_campaign_initializes_state(gs1::testing::SystemTest
     GS1_SYSTEM_TEST_CHECK(
         context,
         campaign->regional_map_state.selected_tech_tree_faction_id.value == gs1::k_faction_village_committee);
-    GS1_SYSTEM_TEST_CHECK(context, campaign->cash == 45);
+    GS1_SYSTEM_TEST_CHECK(context, campaign->cash == gs1::cash_points_from_cash(45));
     GS1_SYSTEM_TEST_CHECK(context, campaign->technology_state.total_reputation == 0);
     GS1_SYSTEM_TEST_CHECK(context, campaign->loadout_planner_state.baseline_deployment_items.size() == 2U);
     GS1_SYSTEM_TEST_CHECK(context, campaign->loadout_planner_state.selected_loadout_slots.size() == 2U);

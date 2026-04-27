@@ -1,4 +1,5 @@
 #include "messages/game_message.h"
+#include "content/defs/item_defs.h"
 #include "site/inventory_storage.h"
 #include "site/systems/economy_phone_system.h"
 #include "site/systems/inventory_system.h"
@@ -6,6 +7,8 @@
 #include "site/systems/task_board_system.h"
 #include "testing/system_test_registry.h"
 #include "system_test_fixtures.h"
+
+#include <algorithm>
 
 namespace
 {
@@ -177,11 +180,33 @@ void phone_panel_sell_list_refreshes_when_purchase_delivery_arrives(
         context,
         PhonePanelSystem::process_message(phone_context, start_message) == GS1_STATUS_OK);
 
-    const auto sell_listing_id =
-        1000U + static_cast<std::uint32_t>(gs1::k_item_ordos_wormwood_seed_bundle);
+    const auto buy_listing_it = std::find_if(
+        site_run.economy.available_phone_listings.begin(),
+        site_run.economy.available_phone_listings.end(),
+        [&site_run](const gs1::PhoneListingState& listing) {
+            if (listing.kind != gs1::PhoneListingKind::BuyItem)
+            {
+                return false;
+            }
+
+            const auto* item_def = gs1::find_item_def(listing.item_id);
+            return item_def != nullptr &&
+                gs1::item_has_capability(*item_def, gs1::ITEM_CAPABILITY_SELL) &&
+                gs1::inventory_storage::available_item_quantity_in_container(
+                    site_run,
+                    gs1::inventory_storage::delivery_box_container(site_run),
+                    listing.item_id) == 0U;
+        });
+    GS1_SYSTEM_TEST_REQUIRE(context, buy_listing_it != site_run.economy.available_phone_listings.end());
+    const auto delivered_item_id = buy_listing_it->item_id;
+    const auto dynamic_sell_listing_id = 1000U + delivered_item_id.value;
     GS1_SYSTEM_TEST_CHECK(
         context,
-        find_phone_panel_listing(site_run.phone_panel, sell_listing_id) == nullptr);
+        find_phone_panel_listing(site_run.phone_panel, dynamic_sell_listing_id) == nullptr);
+    const auto quantity_before = gs1::inventory_storage::available_item_quantity_in_container(
+        site_run,
+        gs1::inventory_storage::delivery_box_container(site_run),
+        delivered_item_id);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -189,7 +214,7 @@ void phone_panel_sell_list_refreshes_when_purchase_delivery_arrives(
             economy_context,
             make_message(
                 GameMessageType::PhoneListingPurchaseRequested,
-                gs1::PhoneListingPurchaseRequestedMessage {4U, 1U, 0U})) == GS1_STATUS_OK);
+                gs1::PhoneListingPurchaseRequestedMessage {buy_listing_it->listing_id, 1U, 0U})) == GS1_STATUS_OK);
     bool processed_delivery = false;
     while (!queue.empty())
     {
@@ -209,16 +234,15 @@ void phone_panel_sell_list_refreshes_when_purchase_delivery_arrives(
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.pending_delivery_queue.empty());
     PhonePanelSystem::run(phone_context);
 
-    const auto* sell_listing = find_phone_panel_listing(site_run.phone_panel, sell_listing_id);
+    const auto quantity_after = gs1::inventory_storage::available_item_quantity_in_container(
+        site_run,
+        gs1::inventory_storage::delivery_box_container(site_run),
+        delivered_item_id);
+    const auto* sell_listing = find_phone_panel_listing(site_run.phone_panel, dynamic_sell_listing_id);
     GS1_SYSTEM_TEST_REQUIRE(context, sell_listing != nullptr);
     GS1_SYSTEM_TEST_CHECK(context, sell_listing->quantity == 1U);
     GS1_SYSTEM_TEST_CHECK(context, site_run.phone_panel.sell_listing_count >= 1U);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        gs1::inventory_storage::available_item_quantity_in_container(
-            site_run,
-            gs1::inventory_storage::delivery_box_container(site_run),
-            gs1::ItemId {gs1::k_item_ordos_wormwood_seed_bundle}) == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, quantity_after == quantity_before + 1U);
 }
 
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
