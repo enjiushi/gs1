@@ -62,7 +62,7 @@ struct EcologyTuning final
     float growth_pressure_salinity_weight {0.45f};
     float growth_pressure_dust_burial_scale {12.0f};
     float growth_pressure_modifier_influence {0.35f};
-    float density_full_range_real_minutes {10.0f};
+    float density_full_range_real_minutes {5.0f};
     float salinity_cap_softening {0.75f};
     float salinity_cap_min_unit {0.15f};
     float salinity_density_cap_modifier_influence {0.35f};
