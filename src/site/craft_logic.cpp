@@ -1,5 +1,6 @@
 #include "site/craft_logic.h"
 
+#include "campaign/systems/technology_system.h"
 #include "site/inventory_storage.h"
 #include "site/site_world_access.h"
 
@@ -255,12 +256,15 @@ bool can_store_output_after_recipe_consumption(
     return remaining_output == 0U;
 }
 
-std::vector<const CraftRecipeDef*> recipes_for_station(StructureId structure_id)
+std::vector<const CraftRecipeDef*> recipes_for_station(
+    const CampaignState& campaign,
+    StructureId structure_id)
 {
     std::vector<const CraftRecipeDef*> recipes {};
     for (const auto& recipe_def : all_craft_recipe_defs())
     {
-        if (recipe_def.station_structure_id == structure_id)
+        if (recipe_def.station_structure_id == structure_id &&
+            TechnologySystem::recipe_unlocked(campaign, recipe_def.recipe_id))
         {
             recipes.push_back(&recipe_def);
         }

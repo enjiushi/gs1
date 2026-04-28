@@ -66,7 +66,8 @@ struct PlantDef final
     float output_dependency;
     ItemId harvest_item_id;
     std::uint16_t harvest_quantity;
-    std::uint16_t reserved0;
+    ItemId secondary_harvest_item_id;
+    std::uint16_t secondary_harvest_quantity;
     float harvest_action_duration_minutes;
     float harvest_density_required;
     float harvest_density_removed;
@@ -174,6 +175,7 @@ inline constexpr PlantDef k_generic_living_plant_def {
     16.0f,
     ItemId {},
     0U,
+    ItemId {},
     0U,
     0.0f,
     0.0f,
@@ -203,6 +205,7 @@ inline constexpr PlantDef k_generic_ground_cover_def {
     0.0f,
     ItemId {},
     0U,
+    ItemId {},
     0U,
     0.0f,
     0.0f,

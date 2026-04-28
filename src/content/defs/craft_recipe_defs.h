@@ -36,6 +36,19 @@ inline constexpr std::uint32_t k_recipe_craft_storage_crate = 4U;
 inline constexpr std::uint32_t k_recipe_craft_hammer = 5U;
 inline constexpr std::uint32_t k_recipe_cook_field_tea = 6U;
 inline constexpr std::uint32_t k_recipe_cook_spiced_stew = 7U;
+inline constexpr std::uint32_t k_recipe_craft_shovel = 8U;
+inline constexpr std::uint32_t k_recipe_cook_wormwood_broth = 9U;
+inline constexpr std::uint32_t k_recipe_cook_thornberry_cooler = 10U;
+inline constexpr std::uint32_t k_recipe_cook_rich_wormwood_broth = 11U;
+inline constexpr std::uint32_t k_recipe_cook_rich_thornberry_cooler = 12U;
+inline constexpr std::uint32_t k_recipe_cook_peashrub_hotpot = 13U;
+inline constexpr std::uint32_t k_recipe_cook_buckthorn_tonic = 14U;
+inline constexpr std::uint32_t k_recipe_cook_rich_peashrub_hotpot = 15U;
+inline constexpr std::uint32_t k_recipe_cook_rich_buckthorn_tonic = 16U;
+inline constexpr std::uint32_t k_recipe_cook_jadeleaf_stew = 17U;
+inline constexpr std::uint32_t k_recipe_cook_desert_revival_draught = 18U;
+inline constexpr std::uint32_t k_recipe_cook_rich_jadeleaf_stew = 19U;
+inline constexpr std::uint32_t k_recipe_cook_rich_desert_revival_draught = 20U;
 
 [[nodiscard]] std::span<const CraftRecipeDef> all_craft_recipe_defs() noexcept;
 

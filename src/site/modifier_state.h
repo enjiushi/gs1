@@ -65,6 +65,25 @@ struct ActionCostModifierState final
     float morale_bias {0.0f};
 };
 
+struct VillageTechnologyEffectState final
+{
+    float shovel_meter_cost_reduction {0.0f};
+    float shovel_plant_duration_reduction {0.0f};
+    float shovel_excavate_duration_reduction {0.0f};
+    float careful_excavation_meter_cost_reduction {0.0f};
+    float careful_excavation_duration_reduction {0.0f};
+    float thorough_excavation_meter_cost_reduction {0.0f};
+    float thorough_excavation_duration_reduction {0.0f};
+    float weather_nourishment_hydration_loss_reduction {0.0f};
+    float weather_health_morale_loss_reduction {0.0f};
+    float timed_buff_effect_multiplier {1.0f};
+    bool careful_excavation_loot_rebalance {false};
+    bool thorough_excavation_loot_rebalance {false};
+    bool tier_two_food_buffs_upgraded {false};
+    bool tier_five_food_buffs_upgraded {false};
+    bool tier_eight_food_buffs_upgraded {false};
+};
+
 struct ActiveSiteModifierState final
 {
     ModifierId modifier_id {};
@@ -82,5 +101,6 @@ struct ModifierState final
     ModifierChannelTotals resolved_channel_totals {};
     TerrainFactorModifierState resolved_terrain_factor_modifiers {};
     ActionCostModifierState resolved_action_cost_modifiers {};
+    VillageTechnologyEffectState resolved_village_technology_effects {};
 };
 }  // namespace gs1

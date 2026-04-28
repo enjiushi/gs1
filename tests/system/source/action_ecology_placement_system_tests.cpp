@@ -1,18 +1,21 @@
 #include "messages/game_message.h"
 #include "content/defs/craft_recipe_defs.h"
 #include "content/defs/item_defs.h"
+#include "content/defs/technology_defs.h"
 #include "site/inventory_storage.h"
 #include "site/site_projection_update_flags.h"
 #include "site/site_world_access.h"
 #include "site/systems/action_execution_system.h"
 #include "site/systems/ecology_system.h"
 #include "site/systems/inventory_system.h"
+#include "site/systems/modifier_system.h"
 #include "site/systems/placement_validation_system.h"
 #include "site/systems/site_flow_system.h"
 #include "testing/system_test_registry.h"
 #include "system_test_fixtures.h"
 
 #include <algorithm>
+#include <utility>
 
 namespace
 {
@@ -25,6 +28,7 @@ using gs1::GameMessageType;
 using gs1::InventoryItemConsumeRequestedMessage;
 using gs1::InventorySystem;
 using gs1::InventoryWorkerPackInsertRequestedMessage;
+using gs1::ModifierSystem;
 using gs1::PlacementOccupancyLayer;
 using gs1::PlacementReservationAcceptedMessage;
 using gs1::PlacementReservationRejectedMessage;
@@ -882,17 +886,31 @@ void action_execution_harvest_completion_emits_worker_pack_insert_and_tile_harve
     queue.clear();
     ActionExecutionSystem::run(site_context);
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::SiteActionCompleted) == 1U);
-    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::InventoryWorkerPackInsertRequested) == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::InventoryWorkerPackInsertRequested) == 2U);
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::SiteTileHarvested) == 1U);
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::PlacementReservationReleased) == 1U);
 
-    const auto* insert =
-        first_message_payload<InventoryWorkerPackInsertRequestedMessage>(
-            queue,
-            GameMessageType::InventoryWorkerPackInsertRequested);
-    GS1_SYSTEM_TEST_REQUIRE(context, insert != nullptr);
-    GS1_SYSTEM_TEST_CHECK(context, insert->item_id == gs1::k_item_white_thorn_berries);
-    GS1_SYSTEM_TEST_CHECK(context, insert->quantity == 1U);
+    std::uint16_t primary_quantity = 0U;
+    std::uint16_t secondary_quantity = 0U;
+    for (const auto& message : queue)
+    {
+        if (message.type != GameMessageType::InventoryWorkerPackInsertRequested)
+        {
+            continue;
+        }
+
+        const auto& insert = message.payload_as<InventoryWorkerPackInsertRequestedMessage>();
+        if (insert.item_id == gs1::k_item_white_thorn_berries)
+        {
+            primary_quantity = insert.quantity;
+        }
+        else if (insert.item_id == gs1::k_item_wormwood_bundle)
+        {
+            secondary_quantity = insert.quantity;
+        }
+    }
+    GS1_SYSTEM_TEST_CHECK(context, primary_quantity == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, secondary_quantity == 1U);
 
     const auto* harvested =
         first_message_payload<SiteTileHarvestedMessage>(
@@ -901,7 +919,7 @@ void action_execution_harvest_completion_emits_worker_pack_insert_and_tile_harve
     GS1_SYSTEM_TEST_REQUIRE(context, harvested != nullptr);
     GS1_SYSTEM_TEST_CHECK(context, harvested->plant_type_id == gs1::k_plant_white_thorn);
     GS1_SYSTEM_TEST_CHECK(context, harvested->item_id == gs1::k_item_white_thorn_berries);
-    GS1_SYSTEM_TEST_CHECK(context, harvested->item_quantity == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, harvested->item_quantity == 2U);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(harvested->density_removed, 25.0f));
 }
 
@@ -949,7 +967,13 @@ void harvest_flow_inserts_output_and_reduces_multitile_density(
         gs1::inventory_storage::available_item_quantity_in_container(
             site_run,
             gs1::inventory_storage::worker_pack_container(site_run),
-            gs1::ItemId {gs1::k_item_white_thorn_berries}) == 1U);
+            gs1::ItemId {gs1::k_item_white_thorn_berries}) == 2U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        gs1::inventory_storage::available_item_quantity_in_container(
+            site_run,
+            gs1::inventory_storage::worker_pack_container(site_run),
+            gs1::ItemId {gs1::k_item_wormwood_bundle}) == 1U);
 
     for (const auto coord : {TileCoord {2, 2}, TileCoord {3, 2}, TileCoord {2, 3}, TileCoord {3, 3}})
     {
@@ -1357,6 +1381,287 @@ void action_execution_excavate_cannot_repeat_rough_depth_by_default(
     GS1_SYSTEM_TEST_CHECK(
         context,
         queue.front().payload_as<SiteActionFailedMessage>().reason == SiteActionFailureReason::InvalidState);
+}
+
+void action_execution_shovel_in_worker_pack_reduces_plant_and_excavate_duration_and_costs(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto baseline_campaign = make_campaign();
+    auto baseline_site_run = make_test_site_run(1U, 5201U);
+    GameMessageQueue baseline_queue {};
+    auto baseline_context =
+        make_site_context<ActionExecutionSystem>(baseline_campaign, baseline_site_run, baseline_queue);
+    auto baseline_flow_context =
+        make_site_context<SiteFlowSystem>(baseline_campaign, baseline_site_run, baseline_queue);
+    baseline_site_run.inventory.worker_pack_slots[0].occupied = true;
+    baseline_site_run.inventory.worker_pack_slots[0].item_id = gs1::ItemId {gs1::k_item_ordos_wormwood_seed_bundle};
+    baseline_site_run.inventory.worker_pack_slots[0].item_quantity = 2U;
+    baseline_site_run.inventory.worker_pack_slots[0].item_condition = 1.0f;
+    baseline_site_run.inventory.worker_pack_slots[0].item_freshness = 1.0f;
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            baseline_context,
+            make_start_action_message(
+                GS1_SITE_ACTION_PLANT,
+                TileCoord {4, 2},
+                1U,
+                1U,
+                gs1::k_item_ordos_wormwood_seed_bundle)) == GS1_STATUS_OK);
+    const auto baseline_action_id = baseline_site_run.site_action.current_action_id->value;
+    baseline_queue.clear();
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            baseline_context,
+            make_message(
+                GameMessageType::PlacementReservationAccepted,
+                PlacementReservationAcceptedMessage {baseline_action_id, 4, 2, 101U})) == GS1_STATUS_OK);
+    baseline_queue.clear();
+    SiteFlowSystem::run(baseline_flow_context);
+    baseline_queue.clear();
+    ActionExecutionSystem::run(baseline_context);
+    const auto* baseline_started =
+        first_message_payload<SiteActionStartedMessage>(
+            baseline_queue,
+            GameMessageType::SiteActionStarted);
+    GS1_SYSTEM_TEST_REQUIRE(context, baseline_started != nullptr);
+    const auto baseline_plant_duration = baseline_started->duration_minutes;
+    const auto baseline_plant_cost = baseline_site_run.site_action.deferred_meter_delta;
+
+    auto boosted_campaign = make_campaign();
+    boosted_campaign.technology_state.purchased_nodes.push_back(
+        gs1::TechnologyPurchaseRecord {
+            gs1::TechNodeId {gs1::k_tech_node_village_t1_field_briefing}});
+    boosted_campaign.technology_state.purchased_nodes.push_back(
+        gs1::TechnologyPurchaseRecord {
+            gs1::TechNodeId {gs1::k_tech_node_village_t1_field_briefing_choice_a}});
+    boosted_campaign.technology_state.purchased_nodes.push_back(
+        gs1::TechnologyPurchaseRecord {
+            gs1::TechNodeId {gs1::k_tech_node_village_t1_field_briefing_choice_b}});
+    auto boosted_site_run = make_test_site_run(1U, 5202U);
+    GameMessageQueue boosted_queue {};
+    auto boosted_context =
+        make_site_context<ActionExecutionSystem>(boosted_campaign, boosted_site_run, boosted_queue);
+    auto boosted_flow_context =
+        make_site_context<SiteFlowSystem>(boosted_campaign, boosted_site_run, boosted_queue);
+    auto boosted_modifier_context =
+        make_site_context<ModifierSystem>(boosted_campaign, boosted_site_run, boosted_queue);
+    boosted_site_run.inventory.worker_pack_slots[0] = baseline_site_run.inventory.worker_pack_slots[0];
+    boosted_site_run.inventory.worker_pack_slots[1].occupied = true;
+    boosted_site_run.inventory.worker_pack_slots[1].item_id = gs1::ItemId {gs1::k_item_shovel};
+    boosted_site_run.inventory.worker_pack_slots[1].item_quantity = 1U;
+    boosted_site_run.inventory.worker_pack_slots[1].item_condition = 1.0f;
+    boosted_site_run.inventory.worker_pack_slots[1].item_freshness = 1.0f;
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ModifierSystem::process_message(
+            boosted_modifier_context,
+            make_message(
+                GameMessageType::SiteRunStarted,
+                gs1::SiteRunStartedMessage {1U, 5202U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+    boosted_queue.clear();
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            boosted_context,
+            make_start_action_message(
+                GS1_SITE_ACTION_PLANT,
+                TileCoord {4, 2},
+                1U,
+                1U,
+                gs1::k_item_ordos_wormwood_seed_bundle)) == GS1_STATUS_OK);
+    const auto boosted_action_id = boosted_site_run.site_action.current_action_id->value;
+    boosted_queue.clear();
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            boosted_context,
+            make_message(
+                GameMessageType::PlacementReservationAccepted,
+                PlacementReservationAcceptedMessage {boosted_action_id, 4, 2, 102U})) == GS1_STATUS_OK);
+    boosted_queue.clear();
+    SiteFlowSystem::run(boosted_flow_context);
+    boosted_queue.clear();
+    ActionExecutionSystem::run(boosted_context);
+    const auto* boosted_started =
+        first_message_payload<SiteActionStartedMessage>(
+            boosted_queue,
+            GameMessageType::SiteActionStarted);
+    GS1_SYSTEM_TEST_REQUIRE(context, boosted_started != nullptr);
+    const auto boosted_plant_duration = boosted_started->duration_minutes;
+    const auto boosted_plant_cost = boosted_site_run.site_action.deferred_meter_delta;
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(boosted_plant_duration, baseline_plant_duration * 0.45f));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(boosted_plant_cost.hydration_delta, baseline_plant_cost.hydration_delta * 0.70f));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(boosted_plant_cost.nourishment_delta, baseline_plant_cost.nourishment_delta * 0.70f));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(boosted_plant_cost.energy_delta, baseline_plant_cost.energy_delta * 0.70f));
+
+    auto baseline_excavate_campaign = make_campaign();
+    auto baseline_excavate_site_run = make_test_site_run(1U, 5203U);
+    GameMessageQueue baseline_excavate_queue {};
+    auto baseline_excavate_context =
+        make_site_context<ActionExecutionSystem>(
+            baseline_excavate_campaign,
+            baseline_excavate_site_run,
+            baseline_excavate_queue);
+    auto baseline_excavate_worker = baseline_excavate_site_run.site_world->worker();
+    baseline_excavate_worker.position.tile_coord = TileCoord {3, 3};
+    baseline_excavate_worker.position.tile_x = 3.0f;
+    baseline_excavate_worker.position.tile_y = 3.0f;
+    baseline_excavate_site_run.site_world->set_worker(baseline_excavate_worker);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            baseline_excavate_context,
+            make_start_action_message(GS1_SITE_ACTION_EXCAVATE, TileCoord {3, 3}, 1U, 1U, 0U)) ==
+            GS1_STATUS_OK);
+    const auto baseline_excavate_duration =
+        baseline_excavate_queue.front().payload_as<SiteActionStartedMessage>().duration_minutes;
+    const auto baseline_excavate_cost = baseline_excavate_site_run.site_action.deferred_meter_delta;
+
+    auto boosted_excavate_campaign = boosted_campaign;
+    auto boosted_excavate_site_run = make_test_site_run(1U, 5204U);
+    GameMessageQueue boosted_excavate_queue {};
+    auto boosted_excavate_context =
+        make_site_context<ActionExecutionSystem>(
+            boosted_excavate_campaign,
+            boosted_excavate_site_run,
+            boosted_excavate_queue);
+    auto boosted_excavate_modifier_context =
+        make_site_context<ModifierSystem>(
+            boosted_excavate_campaign,
+            boosted_excavate_site_run,
+            boosted_excavate_queue);
+    auto boosted_excavate_worker = boosted_excavate_site_run.site_world->worker();
+    boosted_excavate_worker.position.tile_coord = TileCoord {3, 3};
+    boosted_excavate_worker.position.tile_x = 3.0f;
+    boosted_excavate_worker.position.tile_y = 3.0f;
+    boosted_excavate_site_run.site_world->set_worker(boosted_excavate_worker);
+    boosted_excavate_site_run.inventory.worker_pack_slots[0].occupied = true;
+    boosted_excavate_site_run.inventory.worker_pack_slots[0].item_id = gs1::ItemId {gs1::k_item_shovel};
+    boosted_excavate_site_run.inventory.worker_pack_slots[0].item_quantity = 1U;
+    boosted_excavate_site_run.inventory.worker_pack_slots[0].item_condition = 1.0f;
+    boosted_excavate_site_run.inventory.worker_pack_slots[0].item_freshness = 1.0f;
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ModifierSystem::process_message(
+            boosted_excavate_modifier_context,
+            make_message(
+                GameMessageType::SiteRunStarted,
+                gs1::SiteRunStartedMessage {1U, 5204U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+    boosted_excavate_queue.clear();
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            boosted_excavate_context,
+            make_start_action_message(GS1_SITE_ACTION_EXCAVATE, TileCoord {3, 3}, 1U, 1U, 0U)) ==
+            GS1_STATUS_OK);
+    const auto boosted_excavate_duration =
+        boosted_excavate_queue.front().payload_as<SiteActionStartedMessage>().duration_minutes;
+    const auto boosted_excavate_cost = boosted_excavate_site_run.site_action.deferred_meter_delta;
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(boosted_excavate_duration, baseline_excavate_duration * 0.85f));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(boosted_excavate_cost.hydration_delta, baseline_excavate_cost.hydration_delta * 0.70f));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(boosted_excavate_cost.nourishment_delta, baseline_excavate_cost.nourishment_delta * 0.70f));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(boosted_excavate_cost.energy_delta, baseline_excavate_cost.energy_delta * 0.70f));
+}
+
+void action_execution_village_tech_unlocks_careful_and_thorough_excavation(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 5205U);
+    GameMessageQueue queue {};
+    auto action_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue, 60.0);
+    auto worker = site_run.site_world->worker();
+    worker.position.tile_coord = TileCoord {2, 2};
+    worker.position.tile_x = 2.0f;
+    worker.position.tile_y = 2.0f;
+    site_run.site_world->set_worker(worker);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            action_context,
+            make_start_action_message(GS1_SITE_ACTION_EXCAVATE, TileCoord {2, 2}, 1U, 1U, 0U)) ==
+            GS1_STATUS_OK);
+    queue.clear();
+    ActionExecutionSystem::run(action_context);
+    queue.clear();
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            action_context,
+            make_start_action_message(GS1_SITE_ACTION_EXCAVATE, TileCoord {2, 2}, 1U, 2U, 0U)) ==
+            GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::SiteActionFailed);
+
+    campaign.technology_state.purchased_nodes.push_back(
+        gs1::TechnologyPurchaseRecord {
+            gs1::TechNodeId {gs1::base_technology_node_id(
+                gs1::FactionId {gs1::k_faction_village_committee},
+                3U)}});
+    queue.clear();
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            action_context,
+            make_start_action_message(GS1_SITE_ACTION_EXCAVATE, TileCoord {2, 2}, 1U, 2U, 0U)) ==
+            GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        site_run.site_action.primary_subject_id == static_cast<std::uint32_t>(gs1::ExcavationDepth::Careful));
+    queue.clear();
+    ActionExecutionSystem::run(action_context);
+    queue.clear();
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            action_context,
+            make_start_action_message(GS1_SITE_ACTION_EXCAVATE, TileCoord {2, 2}, 1U, 3U, 0U)) ==
+            GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::SiteActionFailed);
+
+    campaign.technology_state.purchased_nodes.push_back(
+        gs1::TechnologyPurchaseRecord {
+            gs1::TechNodeId {gs1::base_technology_node_id(
+                gs1::FactionId {gs1::k_faction_village_committee},
+                6U)}});
+    queue.clear();
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            action_context,
+            make_start_action_message(GS1_SITE_ACTION_EXCAVATE, TileCoord {2, 2}, 1U, 3U, 0U)) ==
+            GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        site_run.site_action.primary_subject_id == static_cast<std::uint32_t>(gs1::ExcavationDepth::Thorough));
 }
 
 void action_execution_item_based_plant_completion_consumes_seed_and_emits_planting(
@@ -2397,6 +2702,122 @@ void ecology_highway_target_tiles_accumulate_cover_and_clear_via_burial_action(
     GS1_SYSTEM_TEST_CHECK(context, road_tile.ecology.soil_fertility < cover_after_accumulation);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(road_tile.ecology.sand_burial, 0.0f));
 }
+
+void action_execution_uses_resolved_village_effect_state_for_shovel_bonuses(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto baseline_run = make_test_site_run(1U, 5206U);
+    GameMessageQueue baseline_queue {};
+    auto baseline_action_context =
+        make_site_context<ActionExecutionSystem>(campaign, baseline_run, baseline_queue);
+    auto baseline_flow_context =
+        make_site_context<SiteFlowSystem>(campaign, baseline_run, baseline_queue);
+
+    auto boosted_run = make_test_site_run(1U, 5207U);
+    GameMessageQueue boosted_queue {};
+    auto boosted_action_context =
+        make_site_context<ActionExecutionSystem>(campaign, boosted_run, boosted_queue);
+    auto boosted_flow_context =
+        make_site_context<SiteFlowSystem>(campaign, boosted_run, boosted_queue);
+
+    const auto seed_inventory = [](gs1::SiteRunState& site_run) {
+        site_run.inventory.worker_pack_slots[0].occupied = true;
+        site_run.inventory.worker_pack_slots[0].item_id =
+            gs1::ItemId {gs1::k_item_ordos_wormwood_seed_bundle};
+        site_run.inventory.worker_pack_slots[0].item_quantity = 2U;
+        site_run.inventory.worker_pack_slots[0].item_condition = 1.0f;
+        site_run.inventory.worker_pack_slots[0].item_freshness = 1.0f;
+        site_run.inventory.worker_pack_slots[1].occupied = true;
+        site_run.inventory.worker_pack_slots[1].item_id = gs1::ItemId {gs1::k_item_shovel};
+        site_run.inventory.worker_pack_slots[1].item_quantity = 1U;
+        site_run.inventory.worker_pack_slots[1].item_condition = 1.0f;
+        site_run.inventory.worker_pack_slots[1].item_freshness = 1.0f;
+    };
+    seed_inventory(baseline_run);
+    seed_inventory(boosted_run);
+    boosted_run.modifier.resolved_village_technology_effects.shovel_meter_cost_reduction = 0.30f;
+    boosted_run.modifier.resolved_village_technology_effects.shovel_plant_duration_reduction = 0.55f;
+    boosted_run.modifier.resolved_village_technology_effects.shovel_excavate_duration_reduction = 0.15f;
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            baseline_action_context,
+            make_start_action_message(
+                GS1_SITE_ACTION_PLANT,
+                TileCoord {4, 2},
+                1U,
+                1U,
+                gs1::k_item_ordos_wormwood_seed_bundle)) == GS1_STATUS_OK);
+    const auto baseline_action_id = baseline_run.site_action.current_action_id->value;
+    baseline_queue.clear();
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            baseline_action_context,
+            make_message(
+                GameMessageType::PlacementReservationAccepted,
+                PlacementReservationAcceptedMessage {baseline_action_id, 4, 2, 103U})) ==
+            GS1_STATUS_OK);
+    baseline_queue.clear();
+    SiteFlowSystem::run(baseline_flow_context);
+    baseline_queue.clear();
+    ActionExecutionSystem::run(baseline_action_context);
+    const auto* baseline_started =
+        first_message_payload<SiteActionStartedMessage>(
+            baseline_queue,
+            GameMessageType::SiteActionStarted);
+    GS1_SYSTEM_TEST_REQUIRE(context, baseline_started != nullptr);
+    const auto baseline_duration = baseline_started->duration_minutes;
+    const auto baseline_cost = baseline_run.site_action.deferred_meter_delta;
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            boosted_action_context,
+            make_start_action_message(
+                GS1_SITE_ACTION_PLANT,
+                TileCoord {4, 2},
+                1U,
+                1U,
+                gs1::k_item_ordos_wormwood_seed_bundle)) == GS1_STATUS_OK);
+    const auto boosted_action_id = boosted_run.site_action.current_action_id->value;
+    boosted_queue.clear();
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            boosted_action_context,
+            make_message(
+                GameMessageType::PlacementReservationAccepted,
+                PlacementReservationAcceptedMessage {boosted_action_id, 4, 2, 104U})) ==
+            GS1_STATUS_OK);
+    boosted_queue.clear();
+    SiteFlowSystem::run(boosted_flow_context);
+    boosted_queue.clear();
+    ActionExecutionSystem::run(boosted_action_context);
+    const auto* boosted_started =
+        first_message_payload<SiteActionStartedMessage>(
+            boosted_queue,
+            GameMessageType::SiteActionStarted);
+    GS1_SYSTEM_TEST_REQUIRE(context, boosted_started != nullptr);
+    const auto boosted_duration = boosted_started->duration_minutes;
+    const auto boosted_cost = boosted_run.site_action.deferred_meter_delta;
+
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(boosted_duration, baseline_duration * 0.45f, 0.01f));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(boosted_cost.hydration_delta, baseline_cost.hydration_delta * 0.70f, 0.01f));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            boosted_cost.nourishment_delta,
+            baseline_cost.nourishment_delta * 0.70f,
+            0.01f));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(boosted_cost.energy_delta, baseline_cost.energy_delta * 0.70f, 0.01f));
+}
 }  // namespace
 
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
@@ -2487,6 +2908,18 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "action_execution",
     "excavate_cannot_repeat_rough_depth_by_default",
     action_execution_excavate_cannot_repeat_rough_depth_by_default);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "action_execution",
+    "shovel_in_worker_pack_reduces_plant_and_excavate_duration_and_costs",
+    action_execution_shovel_in_worker_pack_reduces_plant_and_excavate_duration_and_costs);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "action_execution",
+    "uses_resolved_village_effect_state_for_shovel_bonuses",
+    action_execution_uses_resolved_village_effect_state_for_shovel_bonuses);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "action_execution",
+    "village_tech_unlocks_careful_and_thorough_excavation",
+    action_execution_village_tech_unlocks_careful_and_thorough_excavation);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "action_execution",
     "item_based_plant_completion_consumes_seed_and_emits_planting",

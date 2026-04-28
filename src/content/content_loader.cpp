@@ -1960,7 +1960,8 @@ void load_plant_defs(ContentDatabase& content, const std::filesystem::path& path
             require_toml_float(path, entry, "output_dependency"),
             ItemId {require_toml_unsigned<std::uint32_t>(path, entry, "harvest_item_id")},
             require_toml_unsigned<std::uint16_t>(path, entry, "harvest_quantity"),
-            0U,
+            ItemId {optional_toml_unsigned<std::uint32_t>(path, entry, "secondary_harvest_item_id").value_or(0U)},
+            optional_toml_unsigned<std::uint16_t>(path, entry, "secondary_harvest_quantity").value_or(0U),
             require_toml_float(path, entry, "harvest_action_duration_minutes"),
             require_toml_float(path, entry, "harvest_density_required"),
             require_toml_float(path, entry, "harvest_density_removed")});

@@ -43,7 +43,7 @@ inline constexpr float k_unlock_step_plant_pool = 10.0f;
 
 [[nodiscard]] float max_output_power_for_item_value(std::uint32_t internal_cash_points) noexcept
 {
-    return static_cast<float>(internal_cash_points) * 0.125f;
+    return static_cast<float>(internal_cash_points) / 9.0f;
 }
 
 [[nodiscard]] bool item_has_player_meter_valuation(const ItemDef& item_def) noexcept
@@ -230,6 +230,8 @@ std::vector<ContentValidationIssue> validate_content_database(
         {
             if (plant_def.output_power != 0.0f ||
                 plant_def.harvest_quantity != 0U ||
+                plant_def.secondary_harvest_item_id.value != 0U ||
+                plant_def.secondary_harvest_quantity != 0U ||
                 plant_def.harvest_action_duration_minutes != 0.0f ||
                 plant_def.harvest_density_required != 0.0f ||
                 plant_def.harvest_density_removed != 0.0f)
@@ -265,13 +267,45 @@ std::vector<ContentValidationIssue> validate_content_database(
             break;
         }
 
-        if (plant_def.output_power <= 0.0f ||
-            plant_def.output_power >
-                max_output_power_for_item_value(harvest_item_cash_points))
+        if (plant_def.secondary_harvest_item_id.value != 0U)
+        {
+            if (plant_def.secondary_harvest_quantity == 0U ||
+                !content.index.item_by_id.contains(plant_def.secondary_harvest_item_id.value))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Secondary harvest outputs must reference a valid item and positive quantity."});
+                break;
+            }
+
+            const auto& secondary_harvest_item =
+                content.item_defs.at(content.index.item_by_id.at(plant_def.secondary_harvest_item_id.value));
+            if (secondary_harvest_item.source_rule != ItemSourceRule::HarvestOnly ||
+                (secondary_harvest_item.linked_plant_id.value != 0U &&
+                    secondary_harvest_item.linked_plant_id != plant_def.plant_id))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Secondary harvest outputs must point at harvest-only items linked back to the same plant or to the shared generic harvest item."});
+                break;
+            }
+        }
+        else if (plant_def.secondary_harvest_quantity != 0U)
         {
             issues.push_back(ContentValidationIssue {
                 ContentValidationSeverity::Error,
-                "Harvest plants must author a positive output meter that stays within the allowed band for the linked harvest item's internal cash-point value."});
+                "Secondary harvest quantities require a matching secondary harvest item id."});
+            break;
+        }
+
+        if (plant_def.output_power <= 0.0f ||
+            plant_def.output_power >
+                max_output_power_for_item_value(
+                    harvest_item_cash_points * static_cast<std::uint32_t>(plant_def.harvest_quantity)))
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Harvest plants must author a positive output meter that stays within the allowed band for the total primary harvest cash-point value."});
             break;
         }
 

@@ -74,3 +74,146 @@ energy_cost = 1.2
 hydration_cost = 0.4
 nourishment_cost = 0.2
 ingredients = [{ item_id = 2, quantity = 1 }, { item_id = 23, quantity = 1 }]
+
+[[craft_recipes]]
+recipe_id = 8
+station_structure_id = 202
+output_item_id = 41
+output_quantity = 1
+craft_minutes = 1.25
+energy_cost = 1.0
+hydration_cost = 0.3
+nourishment_cost = 0.2
+ingredients = [{ item_id = 8, quantity = 2 }, { item_id = 9, quantity = 1 }]
+
+[[craft_recipes]]
+recipe_id = 9
+station_structure_id = 201
+output_item_id = 42
+output_quantity = 1
+craft_minutes = 1.75
+energy_cost = 1.2
+hydration_cost = 0.4
+nourishment_cost = 0.2
+ingredients = [{ item_id = 1, quantity = 1 }, { item_id = 40, quantity = 2 }]
+
+[[craft_recipes]]
+recipe_id = 10
+station_structure_id = 201
+output_item_id = 43
+output_quantity = 1
+craft_minutes = 1.75
+energy_cost = 1.2
+hydration_cost = 0.4
+nourishment_cost = 0.2
+ingredients = [{ item_id = 1, quantity = 1 }, { item_id = 21, quantity = 2 }]
+
+[[craft_recipes]]
+recipe_id = 11
+station_structure_id = 201
+output_item_id = 48
+output_quantity = 1
+craft_minutes = 2.0
+energy_cost = 1.3
+hydration_cost = 0.4
+nourishment_cost = 0.2
+ingredients = [{ item_id = 1, quantity = 2 }, { item_id = 40, quantity = 4 }]
+
+[[craft_recipes]]
+recipe_id = 12
+station_structure_id = 201
+output_item_id = 49
+output_quantity = 1
+craft_minutes = 2.0
+energy_cost = 1.3
+hydration_cost = 0.4
+nourishment_cost = 0.2
+ingredients = [{ item_id = 1, quantity = 2 }, { item_id = 21, quantity = 4 }]
+
+[[craft_recipes]]
+recipe_id = 13
+station_structure_id = 201
+output_item_id = 44
+output_quantity = 1
+craft_minutes = 2.2
+energy_cost = 1.4
+hydration_cost = 0.5
+nourishment_cost = 0.2
+ingredients = [{ item_id = 1, quantity = 1 }, { item_id = 24, quantity = 2 }, { item_id = 26, quantity = 1 }]
+
+[[craft_recipes]]
+recipe_id = 14
+station_structure_id = 201
+output_item_id = 45
+output_quantity = 1
+craft_minutes = 2.2
+energy_cost = 1.4
+hydration_cost = 0.5
+nourishment_cost = 0.2
+ingredients = [{ item_id = 1, quantity = 2 }, { item_id = 26, quantity = 2 }, { item_id = 25, quantity = 1 }]
+
+[[craft_recipes]]
+recipe_id = 15
+station_structure_id = 201
+output_item_id = 50
+output_quantity = 1
+craft_minutes = 2.45
+energy_cost = 1.5
+hydration_cost = 0.5
+nourishment_cost = 0.2
+ingredients = [{ item_id = 1, quantity = 2 }, { item_id = 24, quantity = 4 }, { item_id = 26, quantity = 2 }]
+
+[[craft_recipes]]
+recipe_id = 16
+station_structure_id = 201
+output_item_id = 51
+output_quantity = 1
+craft_minutes = 2.45
+energy_cost = 1.5
+hydration_cost = 0.5
+nourishment_cost = 0.2
+ingredients = [{ item_id = 1, quantity = 3 }, { item_id = 26, quantity = 4 }, { item_id = 25, quantity = 2 }]
+
+[[craft_recipes]]
+recipe_id = 17
+station_structure_id = 201
+output_item_id = 46
+output_quantity = 1
+craft_minutes = 2.6
+energy_cost = 1.6
+hydration_cost = 0.5
+nourishment_cost = 0.3
+ingredients = [{ item_id = 1, quantity = 1 }, { item_id = 23, quantity = 2 }, { item_id = 27, quantity = 1 }]
+
+[[craft_recipes]]
+recipe_id = 18
+station_structure_id = 201
+output_item_id = 47
+output_quantity = 1
+craft_minutes = 2.6
+energy_cost = 1.6
+hydration_cost = 0.5
+nourishment_cost = 0.3
+ingredients = [{ item_id = 1, quantity = 2 }, { item_id = 27, quantity = 1 }, { item_id = 26, quantity = 1 }]
+
+[[craft_recipes]]
+recipe_id = 19
+station_structure_id = 201
+output_item_id = 52
+output_quantity = 1
+craft_minutes = 2.85
+energy_cost = 1.7
+hydration_cost = 0.6
+nourishment_cost = 0.3
+ingredients = [{ item_id = 1, quantity = 2 }, { item_id = 23, quantity = 3 }, { item_id = 27, quantity = 2 }]
+
+[[craft_recipes]]
+recipe_id = 20
+station_structure_id = 201
+output_item_id = 53
+output_quantity = 1
+craft_minutes = 2.85
+energy_cost = 1.7
+hydration_cost = 0.6
+nourishment_cost = 0.3
+ingredients = [{ item_id = 1, quantity = 3 }, { item_id = 27, quantity = 2 }, { item_id = 26, quantity = 2 }]

@@ -126,6 +126,30 @@ void prototype_site_run_seeds_site_one_ordos_wormwood_patches_near_camp(
             .ecology.plant_id.value == 0U);
 }
 
+void prototype_site_run_expands_worker_pack_with_village_pack_techs(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto base_site_run = make_prototype_site_run(campaign, 1U);
+    GS1_SYSTEM_TEST_CHECK(context, base_site_run.inventory.worker_pack_slot_count == 8U);
+
+    campaign.technology_state.purchased_nodes.push_back(
+        gs1::TechnologyPurchaseRecord {
+            gs1::TechNodeId {gs1::base_technology_node_id(
+                gs1::FactionId {gs1::k_faction_village_committee},
+                4U)}});
+    auto tier_four_site_run = make_prototype_site_run(campaign, 1U);
+    GS1_SYSTEM_TEST_CHECK(context, tier_four_site_run.inventory.worker_pack_slot_count == 12U);
+
+    campaign.technology_state.purchased_nodes.push_back(
+        gs1::TechnologyPurchaseRecord {
+            gs1::TechNodeId {gs1::base_technology_node_id(
+                gs1::FactionId {gs1::k_faction_village_committee},
+                7U)}});
+    auto tier_seven_site_run = make_prototype_site_run(campaign, 1U);
+    GS1_SYSTEM_TEST_CHECK(context, tier_seven_site_run.inventory.worker_pack_slot_count == 16U);
+}
+
 void weather_event_site_run_started_applies_site_one_background_conditions(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -1295,6 +1319,59 @@ void worker_condition_run_uses_requested_weather_decay_ratios(
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(dust_only.nourishment, 99.832f, 0.01f));
 }
 
+void worker_condition_run_uses_resolved_village_effect_state_for_weather_mitigation(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto baseline_run = make_test_site_run(1U, 1314U);
+    auto mitigated_run = make_test_site_run(1U, 1315U);
+    GameMessageQueue baseline_queue {};
+    GameMessageQueue mitigated_queue {};
+    auto baseline_context =
+        make_site_context<WorkerConditionSystem>(campaign, baseline_run, baseline_queue, 60.0);
+    auto mitigated_context =
+        make_site_context<WorkerConditionSystem>(campaign, mitigated_run, mitigated_queue, 60.0);
+
+    const auto seed_weather = [](gs1::SiteRunState& site_run) {
+        auto tile = site_run.site_world->tile_at(TileCoord {2, 2});
+        tile.local_weather.heat = 100.0f;
+        tile.local_weather.wind = 100.0f;
+        tile.local_weather.dust = 100.0f;
+        site_run.site_world->set_tile(TileCoord {2, 2}, tile);
+    };
+    seed_weather(baseline_run);
+    seed_weather(mitigated_run);
+
+    auto baseline_worker = gs1::site_world_access::worker_conditions(baseline_run);
+    baseline_worker.health = 100.0f;
+    baseline_worker.hydration = 100.0f;
+    baseline_worker.nourishment = 100.0f;
+    baseline_worker.energy = 100.0f;
+    baseline_worker.morale = 100.0f;
+    gs1::site_world_access::set_worker_conditions(baseline_run, baseline_worker);
+    auto mitigated_worker = gs1::site_world_access::worker_conditions(mitigated_run);
+    mitigated_worker.health = 100.0f;
+    mitigated_worker.hydration = 100.0f;
+    mitigated_worker.nourishment = 100.0f;
+    mitigated_worker.energy = 100.0f;
+    mitigated_worker.morale = 100.0f;
+    gs1::site_world_access::set_worker_conditions(mitigated_run, mitigated_worker);
+    mitigated_run.modifier.resolved_village_technology_effects
+        .weather_nourishment_hydration_loss_reduction = 0.70f;
+    mitigated_run.modifier.resolved_village_technology_effects
+        .weather_health_morale_loss_reduction = 0.30f;
+
+    WorkerConditionSystem::run(baseline_context);
+    WorkerConditionSystem::run(mitigated_context);
+
+    const auto baseline = gs1::site_world_access::worker_conditions(baseline_run);
+    const auto mitigated = gs1::site_world_access::worker_conditions(mitigated_run);
+    GS1_SYSTEM_TEST_CHECK(context, mitigated.hydration > baseline.hydration);
+    GS1_SYSTEM_TEST_CHECK(context, mitigated.nourishment > baseline.nourishment);
+    GS1_SYSTEM_TEST_CHECK(context, mitigated.health > baseline.health);
+    GS1_SYSTEM_TEST_CHECK(context, mitigated.morale > baseline.morale);
+}
+
 void device_support_updates_efficiency_and_water_from_heat(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -1437,10 +1514,10 @@ void modifier_imports_campaign_assistant_and_scales_technology_run_modifiers_wit
     auto campaign = make_campaign();
     campaign.faction_progress[0].has_unlocked_assistant_package = true;
     campaign.faction_progress[0].unlocked_assistant_package_id = 1001U;
-    campaign.faction_progress[0].faction_reputation = 10;
+    campaign.faction_progress[2].faction_reputation = 10;
     campaign.technology_state.purchased_nodes.push_back(
         gs1::TechnologyPurchaseRecord {
-            gs1::TechNodeId {gs1::k_tech_node_t1_field_briefing}});
+            gs1::TechNodeId {gs1::k_tech_node_university_t1_survey_bias}});
     auto site_run = make_test_site_run(1U, 1602U);
     GameMessageQueue queue {};
     auto site_context = make_site_context<ModifierSystem>(campaign, site_run, queue);
@@ -1454,7 +1531,7 @@ void modifier_imports_campaign_assistant_and_scales_technology_run_modifiers_wit
                 SiteRunStartedMessage {1U, 1602U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     const auto* imported_modifier = gs1::find_technology_node_def(
-        gs1::TechNodeId {gs1::k_tech_node_t1_field_briefing});
+        gs1::TechNodeId {gs1::k_tech_node_university_t1_survey_bias});
     GS1_SYSTEM_TEST_REQUIRE(context, imported_modifier != nullptr);
     GS1_SYSTEM_TEST_CHECK(
         context,
@@ -1462,7 +1539,7 @@ void modifier_imports_campaign_assistant_and_scales_technology_run_modifiers_wit
     const auto initial_hydration = site_run.modifier.resolved_channel_totals.hydration;
     const auto initial_work_efficiency = site_run.modifier.resolved_channel_totals.work_efficiency;
 
-    campaign.faction_progress[0].faction_reputation = 20;
+    campaign.faction_progress[2].faction_reputation = 20;
     ModifierSystem::run(site_context);
 
     GS1_SYSTEM_TEST_CHECK(context, site_run.modifier.resolved_channel_totals.hydration > initial_hydration);
@@ -1479,6 +1556,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "site_run_factory",
     "prototype_site_run_seeds_site_one_ordos_wormwood_patches_near_camp",
     prototype_site_run_seeds_site_one_ordos_wormwood_patches_near_camp);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "site_run_factory",
+    "prototype_site_run_expands_worker_pack_with_village_pack_techs",
+    prototype_site_run_expands_worker_pack_with_village_pack_techs);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "weather_event",
     "site_run_started_applies_site_one_background_conditions",
@@ -1591,6 +1672,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "worker_condition",
     "run_uses_requested_weather_decay_ratios",
     worker_condition_run_uses_requested_weather_decay_ratios);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "worker_condition",
+    "run_uses_resolved_village_effect_state_for_weather_mitigation",
+    worker_condition_run_uses_resolved_village_effect_state_for_weather_mitigation);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "device_support",
     "updates_efficiency_and_water_from_heat",

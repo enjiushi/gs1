@@ -9,6 +9,21 @@ namespace gs1
 {
 namespace
 {
+constexpr FactionId k_village_faction {k_faction_village_committee};
+
+constexpr TechNodeId k_village_t1_base {base_technology_node_id(k_village_faction, 1U)};
+constexpr TechNodeId k_village_t1_enh1 {enhancement_technology_node_id(k_village_faction, 1U, 1U)};
+constexpr TechNodeId k_village_t1_enh2 {enhancement_technology_node_id(k_village_faction, 1U, 2U)};
+constexpr TechNodeId k_village_t2_base {base_technology_node_id(k_village_faction, 2U)};
+constexpr TechNodeId k_village_t2_enh1 {enhancement_technology_node_id(k_village_faction, 2U, 1U)};
+constexpr TechNodeId k_village_t2_enh2 {enhancement_technology_node_id(k_village_faction, 2U, 2U)};
+constexpr TechNodeId k_village_t5_base {base_technology_node_id(k_village_faction, 5U)};
+constexpr TechNodeId k_village_t5_enh1 {enhancement_technology_node_id(k_village_faction, 5U, 1U)};
+constexpr TechNodeId k_village_t5_enh2 {enhancement_technology_node_id(k_village_faction, 5U, 2U)};
+constexpr TechNodeId k_village_t8_base {base_technology_node_id(k_village_faction, 8U)};
+constexpr TechNodeId k_village_t8_enh1 {enhancement_technology_node_id(k_village_faction, 8U, 1U)};
+constexpr TechNodeId k_village_t8_enh2 {enhancement_technology_node_id(k_village_faction, 8U, 2U)};
+
 const FactionProgressState* find_faction_progress(
     const CampaignState& campaign,
     FactionId faction_id) noexcept
@@ -82,6 +97,23 @@ const FactionProgressState* find_faction_progress(
 
     return highest_requirement;
 }
+
+[[nodiscard]] bool recipe_is_baseline_unlocked(RecipeId recipe_id) noexcept
+{
+    switch (recipe_id.value)
+    {
+    case k_recipe_cook_food_pack:
+    case k_recipe_craft_camp_stove:
+    case k_recipe_craft_workbench:
+    case k_recipe_craft_storage_crate:
+    case k_recipe_craft_hammer:
+    case k_recipe_cook_field_tea:
+    case k_recipe_cook_spiced_stew:
+        return true;
+    default:
+        return false;
+    }
+}
 }  // namespace
 
 bool TechnologySystem::subscribes_to(GameMessageType type) noexcept
@@ -149,6 +181,91 @@ bool TechnologySystem::plant_unlocked(
         }
 
         if (campaign.technology_state.total_reputation >= unlock_def.reputation_requirement)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool TechnologySystem::recipe_unlocked(
+    const CampaignState& campaign,
+    RecipeId recipe_id) noexcept
+{
+    if (recipe_id.value == 0U)
+    {
+        return false;
+    }
+
+    if (recipe_is_baseline_unlocked(recipe_id))
+    {
+        return true;
+    }
+
+    switch (recipe_id.value)
+    {
+    case k_recipe_craft_shovel:
+        return node_purchased(campaign, k_village_t1_base);
+
+    case k_recipe_cook_wormwood_broth:
+    case k_recipe_cook_thornberry_cooler:
+        return node_purchased(campaign, k_village_t2_base) &&
+            !node_purchased(campaign, k_village_t2_enh1);
+
+    case k_recipe_cook_rich_wormwood_broth:
+    case k_recipe_cook_rich_thornberry_cooler:
+        return node_purchased(campaign, k_village_t2_enh1);
+
+    case k_recipe_cook_peashrub_hotpot:
+    case k_recipe_cook_buckthorn_tonic:
+        return node_purchased(campaign, k_village_t5_base) &&
+            !node_purchased(campaign, k_village_t5_enh1);
+
+    case k_recipe_cook_rich_peashrub_hotpot:
+    case k_recipe_cook_rich_buckthorn_tonic:
+        return node_purchased(campaign, k_village_t5_enh1);
+
+    case k_recipe_cook_jadeleaf_stew:
+    case k_recipe_cook_desert_revival_draught:
+        return node_purchased(campaign, k_village_t8_base) &&
+            !node_purchased(campaign, k_village_t8_enh1);
+
+    case k_recipe_cook_rich_jadeleaf_stew:
+    case k_recipe_cook_rich_desert_revival_draught:
+        return node_purchased(campaign, k_village_t8_enh1);
+
+    default:
+        break;
+    }
+
+    for (const auto& purchase : campaign.technology_state.purchased_nodes)
+    {
+        const auto* node_def = find_technology_node_def(purchase.tech_node_id);
+        if (node_def != nullptr &&
+            node_def->granted_content_kind == TechnologyGrantedContentKind::Recipe &&
+            node_def->granted_content_id == recipe_id.value)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool TechnologySystem::craft_output_unlocked(
+    const CampaignState& campaign,
+    ItemId item_id) noexcept
+{
+    if (item_id.value == 0U)
+    {
+        return false;
+    }
+
+    for (const auto& recipe_def : all_craft_recipe_defs())
+    {
+        if (recipe_def.output_item_id == item_id &&
+            recipe_unlocked(campaign, recipe_def.recipe_id))
         {
             return true;
         }

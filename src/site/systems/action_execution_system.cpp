@@ -1,5 +1,6 @@
 #include "site/systems/action_execution_system.h"
 
+#include "campaign/systems/technology_system.h"
 #include "content/defs/craft_recipe_defs.h"
 #include "content/defs/excavation_defs.h"
 #include "content/defs/item_defs.h"
@@ -30,6 +31,138 @@ constexpr float k_repair_integrity_epsilon = 0.0001f;
 constexpr float k_harvest_density_epsilon_raw = 0.01f;
 constexpr float k_minimum_action_efficiency = 0.4f;
 constexpr float k_maximum_action_efficiency = 1.0f;
+constexpr FactionId k_village_faction {k_faction_village_committee};
+
+constexpr TechNodeId k_village_t3_base {base_technology_node_id(k_village_faction, 3U)};
+constexpr TechNodeId k_village_t6_base {base_technology_node_id(k_village_faction, 6U)};
+
+struct ExcavationTierPercents final
+{
+    float common {0.0f};
+    float uncommon {0.0f};
+    float rare {0.0f};
+    float very_rare {0.0f};
+    float jackpot {0.0f};
+};
+
+bool worker_pack_has_item(
+    const InventoryState& inventory,
+    ItemId item_id) noexcept
+{
+    for (const auto& slot : inventory.worker_pack_slots)
+    {
+        if (slot.occupied && slot.item_id == item_id && slot.item_quantity > 0U)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool shovel_bonus_active(SiteSystemContext<ActionExecutionSystem>& context) noexcept
+{
+    const auto& effects = context.world.read_modifier().resolved_village_technology_effects;
+    return (effects.shovel_meter_cost_reduction > 0.0f ||
+            effects.shovel_plant_duration_reduction > 0.0f ||
+            effects.shovel_excavate_duration_reduction > 0.0f) &&
+        worker_pack_has_item(context.world.read_inventory(), ItemId {k_item_shovel});
+}
+
+float shovel_meter_cost_reduction(SiteSystemContext<ActionExecutionSystem>& context) noexcept
+{
+    if (!shovel_bonus_active(context))
+    {
+        return 0.0f;
+    }
+
+    return std::clamp(
+        context.world.read_modifier().resolved_village_technology_effects.shovel_meter_cost_reduction,
+        0.0f,
+        0.95f);
+}
+
+float shovel_duration_reduction_for_action(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    ActionKind kind) noexcept
+{
+    if (!shovel_bonus_active(context) || (kind != ActionKind::Plant && kind != ActionKind::Excavate))
+    {
+        return 0.0f;
+    }
+
+    const auto& effects = context.world.read_modifier().resolved_village_technology_effects;
+    const float reduction =
+        kind == ActionKind::Plant
+        ? effects.shovel_plant_duration_reduction
+        : effects.shovel_excavate_duration_reduction;
+    return std::clamp(reduction, 0.0f, 0.95f);
+}
+
+bool excavation_depth_matches_loot_rebalance(
+    const ModifierState& modifier_state,
+    ExcavationDepth depth) noexcept
+{
+    const auto& effects = modifier_state.resolved_village_technology_effects;
+    return (depth == ExcavationDepth::Careful && effects.careful_excavation_loot_rebalance) ||
+        (depth == ExcavationDepth::Thorough && effects.thorough_excavation_loot_rebalance);
+}
+
+float excavation_meter_cost_reduction(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    ExcavationDepth depth) noexcept
+{
+    const auto& effects = context.world.read_modifier().resolved_village_technology_effects;
+    if (depth == ExcavationDepth::Careful)
+    {
+        return effects.careful_excavation_meter_cost_reduction;
+    }
+    if (depth == ExcavationDepth::Thorough)
+    {
+        return effects.thorough_excavation_meter_cost_reduction;
+    }
+    return 0.0f;
+}
+
+float excavation_duration_reduction(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    ExcavationDepth depth) noexcept
+{
+    const auto& effects = context.world.read_modifier().resolved_village_technology_effects;
+    if (depth == ExcavationDepth::Careful)
+    {
+        return effects.careful_excavation_duration_reduction;
+    }
+    if (depth == ExcavationDepth::Thorough)
+    {
+        return effects.thorough_excavation_duration_reduction;
+    }
+    return 0.0f;
+}
+
+ExcavationTierPercents depth_tier_percents(const ExcavationDepthDef& depth_def) noexcept
+{
+    return ExcavationTierPercents {
+        depth_def.common_tier_percent,
+        depth_def.uncommon_tier_percent,
+        depth_def.rare_tier_percent,
+        depth_def.very_rare_tier_percent,
+        depth_def.jackpot_tier_percent};
+}
+
+ExcavationTierPercents blend_excavation_tier_percents(
+    const ExcavationTierPercents& lhs,
+    const ExcavationTierPercents& rhs,
+    float rhs_weight) noexcept
+{
+    const float lhs_weight = 1.0f - rhs_weight;
+    return ExcavationTierPercents {
+        (lhs.common * lhs_weight) + (rhs.common * rhs_weight),
+        (lhs.uncommon * lhs_weight) + (rhs.uncommon * rhs_weight),
+        (lhs.rare * lhs_weight) + (rhs.rare * rhs_weight),
+        (lhs.very_rare * lhs_weight) + (rhs.very_rare * rhs_weight),
+        (lhs.jackpot * lhs_weight) + (rhs.jackpot * rhs_weight)};
+}
 
 std::uint64_t mix_excavation_seed(std::uint64_t value) noexcept
 {
@@ -74,7 +207,16 @@ bool tile_has_excavation_blocking_occupier(const SiteWorld::TileData& tile) noex
 ExcavationDepth max_excavation_depth_unlocked(
     SiteSystemContext<ActionExecutionSystem>& context) noexcept
 {
-    static_cast<void>(context);
+    if (TechnologySystem::node_purchased(context.campaign, k_village_t6_base))
+    {
+        return ExcavationDepth::Thorough;
+    }
+
+    if (TechnologySystem::node_purchased(context.campaign, k_village_t3_base))
+    {
+        return ExcavationDepth::Careful;
+    }
+
     return ExcavationDepth::Rough;
 }
 
@@ -115,6 +257,18 @@ bool plant_def_is_harvestable(const PlantDef& plant_def) noexcept
         plant_def.harvest_action_duration_minutes > 0.0f &&
         plant_def.harvest_density_required >= 0.0f &&
         plant_def.harvest_density_removed > 0.0f;
+}
+
+std::uint32_t plant_primary_harvest_quantity(const PlantDef& plant_def) noexcept
+{
+    return static_cast<std::uint32_t>(plant_def.harvest_quantity);
+}
+
+std::uint32_t plant_secondary_harvest_quantity(const PlantDef& plant_def) noexcept
+{
+    return plant_def.secondary_harvest_item_id.value == 0U
+        ? 0U
+        : static_cast<std::uint32_t>(plant_def.secondary_harvest_quantity);
 }
 
 bool harvest_awards_item(const PlantDef& plant_def, float plant_density) noexcept
@@ -266,6 +420,7 @@ float action_morale_cost(
 }
 
 double action_unit_duration_minutes(
+    SiteSystemContext<ActionExecutionSystem>& context,
     ActionKind kind,
     std::uint32_t primary_subject_id,
     std::uint32_t item_id,
@@ -290,8 +445,10 @@ double action_unit_duration_minutes(
                     kind == ActionKind::Harvest
                     ? static_cast<double>(plant_def->harvest_action_duration_minutes)
                     : static_cast<double>(plant_def->plant_action_duration_minutes);
+                const double shovel_scale =
+                    1.0 - static_cast<double>(shovel_duration_reduction_for_action(context, kind));
                 return std::max(
-                    authored_duration,
+                    authored_duration * shovel_scale,
                     k_minimum_action_duration_minutes);
             }
         }
@@ -303,8 +460,12 @@ double action_unit_duration_minutes(
         const auto* depth_def = find_excavation_depth_def(depth);
         if (depth_def != nullptr)
         {
+            const double shovel_scale =
+                1.0 - static_cast<double>(shovel_duration_reduction_for_action(context, kind));
+            const double excavation_scale =
+                1.0 - static_cast<double>(excavation_duration_reduction(context, depth));
             return std::max(
-                static_cast<double>(depth_def->duration_minutes),
+                static_cast<double>(depth_def->duration_minutes) * shovel_scale * excavation_scale,
                 k_minimum_action_duration_minutes);
         }
     }
@@ -377,7 +538,7 @@ double compute_duration_minutes(
 {
     const std::uint16_t safe_quantity = quantity == 0U ? 1U : quantity;
     const double duration =
-        action_unit_duration_minutes(kind, primary_subject_id, item_id, craft_recipe) *
+        action_unit_duration_minutes(context, kind, primary_subject_id, item_id, craft_recipe) *
         static_cast<double>(safe_quantity);
     return std::max(
         k_minimum_action_duration_minutes,
@@ -577,36 +738,59 @@ DeferredWorkerMeterDelta resolve_worker_meter_cost_delta(
                 action_def->dust_to_morale_cost),
         action_cost_modifiers.morale_weight_delta,
         action_cost_modifiers.morale_bias);
-    if (hydration_cost == 0.0f &&
-        nourishment_cost == 0.0f &&
-        energy_cost == 0.0f &&
-        morale_cost == 0.0f)
+    const bool apply_shovel_cost_reduction =
+        action_kind == ActionKind::Plant || action_kind == ActionKind::Excavate;
+    const auto excavation_depth =
+        action_kind == ActionKind::Excavate
+        ? excavation_depth_from_subject_id(primary_subject_id)
+        : ExcavationDepth::None;
+    const float shovel_cost_multiplier =
+        apply_shovel_cost_reduction
+        ? (1.0f - shovel_meter_cost_reduction(context))
+        : 1.0f;
+    const float excavation_cost_multiplier =
+        action_kind == ActionKind::Excavate
+        ? (1.0f - excavation_meter_cost_reduction(context, excavation_depth))
+        : 1.0f;
+    const float combined_cost_multiplier =
+        std::clamp(shovel_cost_multiplier * excavation_cost_multiplier, 0.0f, 1.0f);
+    const float adjusted_hydration_cost = hydration_cost * combined_cost_multiplier;
+    const float adjusted_nourishment_cost = nourishment_cost * combined_cost_multiplier;
+    const float adjusted_energy_cost = energy_cost * combined_cost_multiplier;
+    const float adjusted_morale_cost =
+        action_kind == ActionKind::Excavate
+        ? morale_cost * excavation_cost_multiplier
+        : morale_cost;
+    if (adjusted_hydration_cost == 0.0f &&
+        adjusted_nourishment_cost == 0.0f &&
+        adjusted_energy_cost == 0.0f &&
+        adjusted_morale_cost == 0.0f)
     {
         return {};
     }
 
     DeferredWorkerMeterDelta meter_delta {};
-    if (hydration_cost != 0.0f)
+    if (adjusted_hydration_cost != 0.0f)
     {
         meter_delta.flags |= WORKER_METER_CHANGED_HYDRATION;
     }
-    if (nourishment_cost != 0.0f)
+    if (adjusted_nourishment_cost != 0.0f)
     {
         meter_delta.flags |= WORKER_METER_CHANGED_NOURISHMENT;
     }
-    if (energy_cost != 0.0f)
+    if (adjusted_energy_cost != 0.0f)
     {
         meter_delta.flags |= WORKER_METER_CHANGED_ENERGY;
     }
-    if (morale_cost != 0.0f)
+    if (adjusted_morale_cost != 0.0f)
     {
         meter_delta.flags |= WORKER_METER_CHANGED_MORALE;
     }
 
-    meter_delta.hydration_delta = -hydration_cost;
-    meter_delta.nourishment_delta = -nourishment_cost;
-    meter_delta.energy_delta = -energy_cost;
-    meter_delta.morale_delta = -morale_cost;
+    meter_delta.hydration_delta = -adjusted_hydration_cost;
+    meter_delta.nourishment_delta = -adjusted_nourishment_cost;
+    meter_delta.energy_delta = -adjusted_energy_cost;
+    meter_delta.morale_delta = -adjusted_morale_cost;
     return meter_delta;
 }
 
@@ -952,7 +1136,13 @@ SiteActionFailureReason validate_harvest_target(
                 context.site_run,
                 worker_pack,
                 plant_def->harvest_item_id,
-                static_cast<std::uint32_t>(plant_def->harvest_quantity)))
+                plant_primary_harvest_quantity(*plant_def)) ||
+            (plant_def->secondary_harvest_item_id.value != 0U &&
+                !inventory_storage::can_fit_item_in_container(
+                    context.site_run,
+                    worker_pack,
+                    plant_def->secondary_harvest_item_id,
+                    plant_secondary_harvest_quantity(*plant_def))))
         {
             return SiteActionFailureReason::InvalidState;
         }
@@ -1053,33 +1243,89 @@ SiteActionFailureReason validate_excavation_target(
     return SiteActionFailureReason::None;
 }
 
-ExcavationLootTier roll_excavation_loot_tier(
-    ExcavationDepth depth,
-    std::uint64_t seed) noexcept
+ExcavationTierPercents resolve_excavation_tier_percents(
+    const ModifierState& modifier_state,
+    ExcavationDepth depth) noexcept
 {
     const auto* depth_def = find_excavation_depth_def(depth);
     if (depth_def == nullptr)
     {
-        return ExcavationLootTier::None;
+        return {};
     }
 
+    auto current = depth_tier_percents(*depth_def);
+    if (!excavation_depth_matches_loot_rebalance(modifier_state, depth))
+    {
+        return current;
+    }
+
+    if (depth == ExcavationDepth::Careful)
+    {
+        const auto* next_depth_def = find_excavation_depth_def(ExcavationDepth::Thorough);
+        return next_depth_def == nullptr
+            ? current
+            : blend_excavation_tier_percents(current, depth_tier_percents(*next_depth_def), 0.5f);
+    }
+
+    if (depth == ExcavationDepth::Thorough)
+    {
+        const auto* previous_depth_def = find_excavation_depth_def(ExcavationDepth::Careful);
+        if (previous_depth_def == nullptr)
+        {
+            return current;
+        }
+
+        const auto previous = depth_tier_percents(*previous_depth_def);
+        ExcavationTierPercents extrapolated {
+            std::max(0.0f, current.common + (current.common - previous.common)),
+            std::max(0.0f, current.uncommon + (current.uncommon - previous.uncommon)),
+            std::max(0.0f, current.rare + (current.rare - previous.rare)),
+            std::max(0.0f, current.very_rare + (current.very_rare - previous.very_rare)),
+            std::max(0.0f, current.jackpot + (current.jackpot - previous.jackpot))};
+        const float total =
+            extrapolated.common + extrapolated.uncommon + extrapolated.rare +
+            extrapolated.very_rare + extrapolated.jackpot;
+        if (total > 0.0f)
+        {
+            const float normalize = 100.0f / total;
+            extrapolated.common *= normalize;
+            extrapolated.uncommon *= normalize;
+            extrapolated.rare *= normalize;
+            extrapolated.very_rare *= normalize;
+            extrapolated.jackpot *= normalize;
+        }
+        return blend_excavation_tier_percents(current, extrapolated, 0.5f);
+    }
+
+    return current;
+}
+
+ExcavationLootTier roll_excavation_loot_tier(
+    const ModifierState& modifier_state,
+    ExcavationDepth depth,
+    std::uint64_t seed) noexcept
+{
+    const auto percents = resolve_excavation_tier_percents(
+        modifier_state,
+        depth);
+
     const float roll = percent_from_seed(seed);
-    float cursor = depth_def->common_tier_percent;
+    float cursor = percents.common;
     if (roll < cursor)
     {
         return ExcavationLootTier::Common;
     }
-    cursor += depth_def->uncommon_tier_percent;
+    cursor += percents.uncommon;
     if (roll < cursor)
     {
         return ExcavationLootTier::Uncommon;
     }
-    cursor += depth_def->rare_tier_percent;
+    cursor += percents.rare;
     if (roll < cursor)
     {
         return ExcavationLootTier::Rare;
     }
-    cursor += depth_def->very_rare_tier_percent;
+    cursor += percents.very_rare;
     if (roll < cursor)
     {
         return ExcavationLootTier::VeryRare;
@@ -1135,7 +1381,7 @@ ItemId resolve_excavation_reward_item(
         return {};
     }
 
-    const auto tier = roll_excavation_loot_tier(depth, base_seed + 2U);
+    const auto tier = roll_excavation_loot_tier(context.world.read_modifier(), depth, base_seed + 2U);
     return roll_excavation_loot_item(depth, tier, base_seed + 3U);
 }
 
@@ -1690,6 +1936,10 @@ void emit_action_fact_messages(
                         ? 0.0f
                         : (static_cast<float>(action_state.secondary_subject_id) * 0.01f));
             const std::uint16_t item_quantity = awards_item ? plant_def->harvest_quantity : 0U;
+            const std::uint16_t secondary_item_quantity =
+                awards_item && plant_def->secondary_harvest_item_id.value != 0U
+                ? plant_def->secondary_harvest_quantity
+                : 0U;
             if (item_quantity > 0U)
             {
                 enqueue_message(
@@ -1698,6 +1948,16 @@ void emit_action_fact_messages(
                     InventoryWorkerPackInsertRequestedMessage {
                         plant_def->harvest_item_id.value,
                         item_quantity,
+                        0U});
+            }
+            if (secondary_item_quantity > 0U)
+            {
+                enqueue_message(
+                    queue,
+                    GameMessageType::InventoryWorkerPackInsertRequested,
+                    InventoryWorkerPackInsertRequestedMessage {
+                        plant_def->secondary_harvest_item_id.value,
+                        secondary_item_quantity,
                         0U});
             }
             enqueue_message(

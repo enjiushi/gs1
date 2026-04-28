@@ -420,9 +420,10 @@ bool item_is_accessible_for_task(
     switch (item_def->source_rule)
     {
     case ItemSourceRule::BuyOnly:
-    case ItemSourceRule::CraftOnly:
     case ItemSourceRule::BuyOrCraft:
         return true;
+    case ItemSourceRule::CraftOnly:
+        return TechnologySystem::craft_output_unlocked(campaign, item_id);
     case ItemSourceRule::HarvestOnly:
         return false;
     case ItemSourceRule::None:
@@ -452,11 +453,12 @@ bool structure_is_buildable_for_task(
     return false;
 }
 
-bool any_craftable_output_available() noexcept
+bool any_craftable_output_available(const CampaignState& campaign) noexcept
 {
     for (const auto& recipe_def : all_craft_recipe_defs())
     {
-        if (recipe_def.output_item_id.value != 0U)
+        if (recipe_def.output_item_id.value != 0U &&
+            TechnologySystem::recipe_unlocked(campaign, recipe_def.recipe_id))
         {
             return true;
         }
@@ -599,11 +601,13 @@ std::vector<PlantId> collect_plant_candidates(
 }
 
 std::vector<RecipeId> collect_recipe_candidates(
+    SiteSystemContext<TaskBoardSystem>& context,
     const TaskTemplateDef& task_template_def)
 {
     if (task_template_def.recipe_id.value != 0U)
     {
-        return find_craft_recipe_def(task_template_def.recipe_id) != nullptr
+        return find_craft_recipe_def(task_template_def.recipe_id) != nullptr &&
+                TechnologySystem::recipe_unlocked(context.campaign, task_template_def.recipe_id)
             ? std::vector<RecipeId> {task_template_def.recipe_id}
             : std::vector<RecipeId> {};
     }
@@ -611,7 +615,10 @@ std::vector<RecipeId> collect_recipe_candidates(
     std::vector<RecipeId> candidates {};
     for (const auto& recipe_def : all_craft_recipe_defs())
     {
-        candidates.push_back(recipe_def.recipe_id);
+        if (TechnologySystem::recipe_unlocked(context.campaign, recipe_def.recipe_id))
+        {
+            candidates.push_back(recipe_def.recipe_id);
+        }
     }
 
     return candidates;
@@ -678,7 +685,7 @@ bool task_template_is_eligible(
         return !collect_plant_candidates(context, task_template_def).empty();
 
     case TaskProgressKind::CraftRecipe:
-        return !collect_recipe_candidates(task_template_def).empty();
+        return !collect_recipe_candidates(context, task_template_def).empty();
 
     case TaskProgressKind::PerformAction:
         return !collect_action_candidates(task_template_def).empty();
@@ -700,7 +707,7 @@ bool task_template_is_eligible(
         return !collect_structure_candidates(context, StructureId {}).empty();
 
     case TaskProgressKind::CraftAnyItem:
-        return any_craftable_output_available();
+        return any_craftable_output_available(context.campaign);
 
     case TaskProgressKind::SellCraftedItem:
         return has_sellable_crafted_item();
@@ -809,7 +816,7 @@ TaskInstanceState make_task_instance(
         (onboarding_seed != nullptr && onboarding_seed->recipe_id.value != 0U)
         ? onboarding_seed->recipe_id
         : choose_candidate(
-              collect_recipe_candidates(task_template_def),
+              collect_recipe_candidates(context, task_template_def),
               mix_seed(task_seed, 4U, 0U));
     task.structure_id =
         (onboarding_seed != nullptr && onboarding_seed->structure_id.value != 0U)

@@ -2,6 +2,8 @@
 
 #include "campaign/campaign_state.h"
 #include "campaign/systems/campaign_system_context.h"
+#include "content/defs/craft_recipe_defs.h"
+#include "content/defs/item_defs.h"
 #include "content/defs/technology_defs.h"
 #include "gs1/status.h"
 #include "messages/game_message.h"
@@ -27,6 +29,12 @@ public:
     [[nodiscard]] static bool plant_unlocked(
         const CampaignState& campaign,
         PlantId plant_id) noexcept;
+    [[nodiscard]] static bool recipe_unlocked(
+        const CampaignState& campaign,
+        RecipeId recipe_id) noexcept;
+    [[nodiscard]] static bool craft_output_unlocked(
+        const CampaignState& campaign,
+        ItemId item_id) noexcept;
     [[nodiscard]] static std::int32_t faction_reputation(
         const CampaignState& campaign,
         FactionId faction_id) noexcept;

@@ -89,6 +89,20 @@ inline constexpr std::uint32_t k_item_hetian_jade_pebble = 36U;
 inline constexpr std::uint32_t k_item_field_tea = 37U;
 inline constexpr std::uint32_t k_item_spiced_stew = 38U;
 inline constexpr std::uint32_t k_item_focus_tonic = 39U;
+inline constexpr std::uint32_t k_item_ordos_wormwood_sprigs = 40U;
+inline constexpr std::uint32_t k_item_shovel = 41U;
+inline constexpr std::uint32_t k_item_wormwood_broth = 42U;
+inline constexpr std::uint32_t k_item_thornberry_cooler = 43U;
+inline constexpr std::uint32_t k_item_peashrub_hotpot = 44U;
+inline constexpr std::uint32_t k_item_buckthorn_tonic = 45U;
+inline constexpr std::uint32_t k_item_jadeleaf_stew = 46U;
+inline constexpr std::uint32_t k_item_desert_revival_draught = 47U;
+inline constexpr std::uint32_t k_item_rich_wormwood_broth = 48U;
+inline constexpr std::uint32_t k_item_rich_thornberry_cooler = 49U;
+inline constexpr std::uint32_t k_item_rich_peashrub_hotpot = 50U;
+inline constexpr std::uint32_t k_item_rich_buckthorn_tonic = 51U;
+inline constexpr std::uint32_t k_item_rich_jadeleaf_stew = 52U;
+inline constexpr std::uint32_t k_item_rich_desert_revival_draught = 53U;
 
 [[nodiscard]] std::span<const ItemDef> all_item_defs() noexcept;
 

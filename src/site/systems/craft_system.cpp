@@ -95,7 +95,7 @@ Gs1Status handle_craft_context_requested(
     }
 
     const auto tile = context.world.read_tile(target_tile);
-    const auto recipes = craft_logic::recipes_for_station(tile.device.structure_id);
+    const auto recipes = craft_logic::recipes_for_station(context.campaign, tile.device.structure_id);
     presentation.occupied = true;
     presentation.tile_coord = target_tile;
     if (recipes.empty())

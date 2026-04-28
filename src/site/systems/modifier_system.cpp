@@ -20,6 +20,21 @@ namespace
 {
 constexpr float k_modifier_change_epsilon = 1e-4f;
 constexpr double k_timed_buff_block_world_minutes = 480.0;
+constexpr FactionId k_village_faction {k_faction_village_committee};
+constexpr TechNodeId k_village_t1_base {base_technology_node_id(k_village_faction, 1U)};
+constexpr TechNodeId k_village_t1_enh1 {enhancement_technology_node_id(k_village_faction, 1U, 1U)};
+constexpr TechNodeId k_village_t1_enh2 {enhancement_technology_node_id(k_village_faction, 1U, 2U)};
+constexpr TechNodeId k_village_t2_enh2 {enhancement_technology_node_id(k_village_faction, 2U, 2U)};
+constexpr TechNodeId k_village_t3_enh1 {enhancement_technology_node_id(k_village_faction, 3U, 1U)};
+constexpr TechNodeId k_village_t3_enh2 {enhancement_technology_node_id(k_village_faction, 3U, 2U)};
+constexpr TechNodeId k_village_t4_base {base_technology_node_id(k_village_faction, 4U)};
+constexpr TechNodeId k_village_t4_enh1 {enhancement_technology_node_id(k_village_faction, 4U, 1U)};
+constexpr TechNodeId k_village_t4_enh2 {enhancement_technology_node_id(k_village_faction, 4U, 2U)};
+constexpr TechNodeId k_village_t5_enh2 {enhancement_technology_node_id(k_village_faction, 5U, 2U)};
+constexpr TechNodeId k_village_t6_enh1 {enhancement_technology_node_id(k_village_faction, 6U, 1U)};
+constexpr TechNodeId k_village_t6_enh2 {enhancement_technology_node_id(k_village_faction, 6U, 2U)};
+constexpr TechNodeId k_village_t7_enh2 {enhancement_technology_node_id(k_village_faction, 7U, 2U)};
+constexpr TechNodeId k_village_t8_enh2 {enhancement_technology_node_id(k_village_faction, 8U, 2U)};
 
 const ModifierSystemTuning& modifier_system_tuning() noexcept
 {
@@ -61,6 +76,22 @@ void accumulate_action_cost_modifiers(
     destination.energy_bias += source.energy_bias;
     destination.morale_weight_delta += source.morale_weight_delta;
     destination.morale_bias += source.morale_bias;
+}
+
+ActionCostModifierState scale_action_cost_modifiers(
+    const ActionCostModifierState& modifiers,
+    float scale) noexcept
+{
+    ActionCostModifierState scaled = modifiers;
+    scaled.hydration_weight_delta *= scale;
+    scaled.hydration_bias *= scale;
+    scaled.nourishment_weight_delta *= scale;
+    scaled.nourishment_bias *= scale;
+    scaled.energy_weight_delta *= scale;
+    scaled.energy_bias *= scale;
+    scaled.morale_weight_delta *= scale;
+    scaled.morale_bias *= scale;
+    return scaled;
 }
 
 ModifierChannelTotals clamp_totals(ModifierChannelTotals totals) noexcept
@@ -253,6 +284,45 @@ bool action_cost_modifiers_match(
             k_modifier_change_epsilon;
 }
 
+bool village_technology_effects_match(
+    const VillageTechnologyEffectState& lhs,
+    const VillageTechnologyEffectState& rhs) noexcept
+{
+    return
+        std::fabs(lhs.shovel_meter_cost_reduction - rhs.shovel_meter_cost_reduction) <=
+            k_modifier_change_epsilon &&
+        std::fabs(lhs.shovel_plant_duration_reduction - rhs.shovel_plant_duration_reduction) <=
+            k_modifier_change_epsilon &&
+        std::fabs(
+            lhs.shovel_excavate_duration_reduction - rhs.shovel_excavate_duration_reduction) <=
+            k_modifier_change_epsilon &&
+        std::fabs(
+            lhs.careful_excavation_meter_cost_reduction -
+            rhs.careful_excavation_meter_cost_reduction) <= k_modifier_change_epsilon &&
+        std::fabs(
+            lhs.careful_excavation_duration_reduction -
+            rhs.careful_excavation_duration_reduction) <= k_modifier_change_epsilon &&
+        std::fabs(
+            lhs.thorough_excavation_meter_cost_reduction -
+            rhs.thorough_excavation_meter_cost_reduction) <= k_modifier_change_epsilon &&
+        std::fabs(
+            lhs.thorough_excavation_duration_reduction -
+            rhs.thorough_excavation_duration_reduction) <= k_modifier_change_epsilon &&
+        std::fabs(
+            lhs.weather_nourishment_hydration_loss_reduction -
+            rhs.weather_nourishment_hydration_loss_reduction) <= k_modifier_change_epsilon &&
+        std::fabs(
+            lhs.weather_health_morale_loss_reduction -
+            rhs.weather_health_morale_loss_reduction) <= k_modifier_change_epsilon &&
+        std::fabs(lhs.timed_buff_effect_multiplier - rhs.timed_buff_effect_multiplier) <=
+            k_modifier_change_epsilon &&
+        lhs.careful_excavation_loot_rebalance == rhs.careful_excavation_loot_rebalance &&
+        lhs.thorough_excavation_loot_rebalance == rhs.thorough_excavation_loot_rebalance &&
+        lhs.tier_two_food_buffs_upgraded == rhs.tier_two_food_buffs_upgraded &&
+        lhs.tier_five_food_buffs_upgraded == rhs.tier_five_food_buffs_upgraded &&
+        lhs.tier_eight_food_buffs_upgraded == rhs.tier_eight_food_buffs_upgraded;
+}
+
 double modifier_duration_world_minutes(const ModifierDef& modifier_def) noexcept
 {
     return static_cast<double>(modifier_def.duration_eight_hour_blocks) *
@@ -310,15 +380,17 @@ std::uint32_t resolved_active_timed_buff_cap(const ModifierState& modifier_state
 
 ActiveSiteModifierState make_active_modifier_state(
     const ModifierDef& modifier_def,
-    ItemId source_item_id) noexcept
+    ItemId source_item_id,
+    float effect_scale = 1.0f) noexcept
 {
     ActiveSiteModifierState modifier {};
     modifier.modifier_id = modifier_def.modifier_id;
     modifier.source_item_id = source_item_id;
     modifier.duration_world_minutes = modifier_duration_world_minutes(modifier_def);
     modifier.remaining_world_minutes = modifier.duration_world_minutes;
-    modifier.totals = modifier_def.totals;
-    modifier.action_cost_modifiers = modifier_def.action_cost_modifiers;
+    modifier.totals = scale_totals(modifier_def.totals, effect_scale);
+    modifier.action_cost_modifiers =
+        scale_action_cost_modifiers(modifier_def.action_cost_modifiers, effect_scale);
     return modifier;
 }
 
@@ -337,7 +409,8 @@ std::vector<ActiveSiteModifierState>::iterator find_active_modifier(
 bool apply_modifier(
     ModifierState& modifier_state,
     const ModifierDef& modifier_def,
-    ItemId source_item_id) noexcept
+    ItemId source_item_id,
+    float effect_scale = 1.0f) noexcept
 {
     if (modifier_def.modifier_id.value == 0U)
     {
@@ -347,7 +420,7 @@ bool apply_modifier(
     auto existing_it = find_active_modifier(modifier_state, modifier_def.modifier_id);
     if (existing_it != modifier_state.active_site_modifiers.end())
     {
-        *existing_it = make_active_modifier_state(modifier_def, source_item_id);
+        *existing_it = make_active_modifier_state(modifier_def, source_item_id, effect_scale);
         return true;
     }
 
@@ -359,8 +432,103 @@ bool apply_modifier(
     }
 
     modifier_state.active_site_modifiers.push_back(
-        make_active_modifier_state(modifier_def, source_item_id));
+        make_active_modifier_state(modifier_def, source_item_id, effect_scale));
     return true;
+}
+
+VillageTechnologyEffectState resolve_village_technology_effects(
+    const CampaignState& campaign) noexcept
+{
+    VillageTechnologyEffectState effects {};
+
+    if (TechnologySystem::node_purchased(campaign, k_village_t1_base))
+    {
+        effects.shovel_meter_cost_reduction = 0.15f;
+        effects.shovel_plant_duration_reduction = 0.15f;
+        effects.shovel_excavate_duration_reduction = 0.15f;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_village_t1_enh1))
+    {
+        effects.shovel_meter_cost_reduction += 0.15f;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_village_t1_enh2))
+    {
+        effects.shovel_plant_duration_reduction += 0.40f;
+    }
+
+    effects.careful_excavation_loot_rebalance =
+        TechnologySystem::node_purchased(campaign, k_village_t3_enh1);
+    if (TechnologySystem::node_purchased(campaign, k_village_t3_enh2))
+    {
+        effects.careful_excavation_meter_cost_reduction = 0.20f;
+        effects.careful_excavation_duration_reduction = 0.30f;
+    }
+
+    effects.weather_nourishment_hydration_loss_reduction =
+        TechnologySystem::node_purchased(campaign, k_village_t4_base)
+        ? (TechnologySystem::node_purchased(campaign, k_village_t4_enh2) ? 0.70f : 0.30f)
+        : 0.0f;
+    effects.weather_health_morale_loss_reduction =
+        TechnologySystem::node_purchased(campaign, k_village_t4_enh1) ? 0.30f : 0.0f;
+
+    effects.thorough_excavation_loot_rebalance =
+        TechnologySystem::node_purchased(campaign, k_village_t6_enh1);
+    if (TechnologySystem::node_purchased(campaign, k_village_t6_enh2))
+    {
+        effects.thorough_excavation_meter_cost_reduction = 0.20f;
+        effects.thorough_excavation_duration_reduction = 0.30f;
+    }
+
+    effects.timed_buff_effect_multiplier =
+        TechnologySystem::node_purchased(campaign, k_village_t7_enh2) ? 1.25f : 1.0f;
+    effects.tier_two_food_buffs_upgraded =
+        TechnologySystem::node_purchased(campaign, k_village_t2_enh2);
+    effects.tier_five_food_buffs_upgraded =
+        TechnologySystem::node_purchased(campaign, k_village_t5_enh2);
+    effects.tier_eight_food_buffs_upgraded =
+        TechnologySystem::node_purchased(campaign, k_village_t8_enh2);
+    return effects;
+}
+
+ModifierId custom_consumable_modifier_id(
+    const VillageTechnologyEffectState& village_effects,
+    ItemId item_id) noexcept
+{
+    switch (item_id.value)
+    {
+    case k_item_wormwood_broth:
+    case k_item_rich_wormwood_broth:
+        return village_effects.tier_two_food_buffs_upgraded
+            ? ModifierId {3402U}
+            : ModifierId {3401U};
+    case k_item_thornberry_cooler:
+    case k_item_rich_thornberry_cooler:
+        return village_effects.tier_two_food_buffs_upgraded
+            ? ModifierId {3404U}
+            : ModifierId {3403U};
+    case k_item_peashrub_hotpot:
+    case k_item_rich_peashrub_hotpot:
+        return village_effects.tier_five_food_buffs_upgraded
+            ? ModifierId {3406U}
+            : ModifierId {3405U};
+    case k_item_buckthorn_tonic:
+    case k_item_rich_buckthorn_tonic:
+        return village_effects.tier_five_food_buffs_upgraded
+            ? ModifierId {3408U}
+            : ModifierId {3407U};
+    case k_item_jadeleaf_stew:
+    case k_item_rich_jadeleaf_stew:
+        return village_effects.tier_eight_food_buffs_upgraded
+            ? ModifierId {3410U}
+            : ModifierId {3409U};
+    case k_item_desert_revival_draught:
+    case k_item_rich_desert_revival_draught:
+        return village_effects.tier_eight_food_buffs_upgraded
+            ? ModifierId {3412U}
+            : ModifierId {3411U};
+    default:
+        return {};
+    }
 }
 
 void import_campaign_run_modifiers(
@@ -493,6 +661,7 @@ struct ResolvedModifierOutputs final
 {
     ModifierChannelTotals totals {};
     ActionCostModifierState action_cost_modifiers {};
+    VillageTechnologyEffectState village_technology_effects {};
 };
 
 ResolvedModifierOutputs resolve_owned_modifiers(
@@ -512,6 +681,7 @@ ResolvedModifierOutputs resolve_owned_modifiers(
         resolved.totals,
         resolved.action_cost_modifiers);
     accumulate_campaign_technology_modifier_totals(campaign, resolved.totals);
+    resolved.village_technology_effects = resolve_village_technology_effects(campaign);
     accumulate_totals(resolved.totals, camp_comfort_bias(camp));
     resolved.totals = clamp_totals(resolved.totals);
     return resolved;
@@ -525,16 +695,21 @@ void resolve_modifier_totals(SiteSystemContext<ModifierSystem>& context)
     const auto next_terrain_factors = resolve_terrain_factor_modifiers(next_outputs.totals);
     auto& current_terrain_factors = context.world.own_modifier().resolved_terrain_factor_modifiers;
     auto& current_action_cost_modifiers = context.world.own_modifier().resolved_action_cost_modifiers;
+    auto& current_village_effects = context.world.own_modifier().resolved_village_technology_effects;
 
     if (!totals_match(current_totals, next_outputs.totals) ||
         !terrain_factors_match(current_terrain_factors, next_terrain_factors) ||
         !action_cost_modifiers_match(
             current_action_cost_modifiers,
-            next_outputs.action_cost_modifiers))
+            next_outputs.action_cost_modifiers) ||
+        !village_technology_effects_match(
+            current_village_effects,
+            next_outputs.village_technology_effects))
     {
         current_totals = next_outputs.totals;
         current_terrain_factors = next_terrain_factors;
         current_action_cost_modifiers = next_outputs.action_cost_modifiers;
+        current_village_effects = next_outputs.village_technology_effects;
         context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_HUD);
     }
 }
@@ -549,6 +724,7 @@ void handle_site_run_started(
     modifier_state.resolved_channel_totals = {};
     modifier_state.resolved_terrain_factor_modifiers = {};
     modifier_state.resolved_action_cost_modifiers = {};
+    modifier_state.resolved_village_technology_effects = {};
 
     const auto& aura_ids = context.campaign.loadout_planner_state.active_nearby_aura_modifier_ids;
     modifier_state.active_nearby_aura_modifier_ids.insert(
@@ -565,23 +741,41 @@ void handle_inventory_item_use_completed(
     SiteSystemContext<ModifierSystem>& context,
     const InventoryItemUseCompletedMessage& payload) noexcept
 {
-    const auto* item_def = find_item_def(ItemId {payload.item_id});
-    if (item_def == nullptr || item_def->modifier_id.value == 0U)
+    const ItemId item_id {payload.item_id};
+    const auto* item_def = find_item_def(item_id);
+    if (item_def == nullptr)
     {
         return;
     }
 
-    const auto* modifier_def = find_modifier_def(item_def->modifier_id);
+    const ModifierId resolved_modifier_id =
+        item_def->modifier_id.value != 0U
+        ? item_def->modifier_id
+        : custom_consumable_modifier_id(
+            resolve_village_technology_effects(context.campaign),
+            item_id);
+    if (resolved_modifier_id.value == 0U)
+    {
+        return;
+    }
+
+    const auto* modifier_def = find_modifier_def(resolved_modifier_id);
     if (modifier_def == nullptr ||
         modifier_def->preset_kind != ModifierPresetKind::RunModifier)
     {
         return;
     }
 
+    const float effect_scale =
+        modifier_def->duration_eight_hour_blocks == 0U
+        ? 1.0f
+        : resolve_village_technology_effects(context.campaign).timed_buff_effect_multiplier;
+
     if (apply_modifier(
             context.world.own_modifier(),
             *modifier_def,
-            item_def->item_id))
+            item_def->item_id,
+            effect_scale))
     {
         context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_MODIFIERS);
         resolve_modifier_totals(context);

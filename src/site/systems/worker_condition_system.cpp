@@ -56,6 +56,16 @@ constexpr float kNormalizedMeterMax = 100.0f;
 constexpr float kMeterChangeThreshold = 0.01f;
 constexpr float kMoraleWeatherNeutralPoint = 50.0f;
 constexpr float kMoraleWeatherHalfBand = 50.0f;
+constexpr ModifierId k_modifier_wormwood_broth {3401U};
+constexpr ModifierId k_modifier_wormwood_broth_plus {3402U};
+constexpr ModifierId k_modifier_peashrub_hotpot {3405U};
+constexpr ModifierId k_modifier_peashrub_hotpot_plus {3406U};
+constexpr ModifierId k_modifier_buckthorn_tonic {3407U};
+constexpr ModifierId k_modifier_buckthorn_tonic_plus {3408U};
+constexpr ModifierId k_modifier_jadeleaf_stew {3409U};
+constexpr ModifierId k_modifier_jadeleaf_stew_plus {3410U};
+constexpr ModifierId k_modifier_desert_revival_draught {3411U};
+constexpr ModifierId k_modifier_desert_revival_draught_plus {3412U};
 
 constexpr std::uint32_t kWorkerMetersChangedInitialMask =
     WORKER_METER_CHANGED_HEALTH |
@@ -83,6 +93,8 @@ const WorkerConditionTuning& worker_condition_tuning() noexcept
     return gameplay_tuning_def().worker_condition;
 }
 
+float resolve_meter_units_per_real_second(float full_change_real_minutes) noexcept;
+
 float resolve_factor(float base) noexcept
 {
     const auto& tuning = worker_condition_tuning();
@@ -99,6 +111,88 @@ float resolve_factor(float base, float bias) noexcept
         (base * tuning.factor_weight_default) + bias,
         tuning.factor_min,
         tuning.factor_max);
+}
+
+bool active_modifier_present(
+    const ModifierState& modifier_state,
+    ModifierId modifier_id) noexcept
+{
+    return std::any_of(
+        modifier_state.active_site_modifiers.begin(),
+        modifier_state.active_site_modifiers.end(),
+        [&](const ActiveSiteModifierState& modifier) {
+            return modifier.modifier_id == modifier_id && modifier.remaining_world_minutes > 0.0;
+        });
+}
+
+float special_energy_recovery_bonus(
+    const ModifierState& modifier_state) noexcept
+{
+    float bonus = 0.0f;
+    if (active_modifier_present(modifier_state, k_modifier_wormwood_broth) ||
+        active_modifier_present(modifier_state, k_modifier_jadeleaf_stew))
+    {
+        bonus = std::max(bonus, 0.15f);
+    }
+    if (active_modifier_present(modifier_state, k_modifier_wormwood_broth_plus) ||
+        active_modifier_present(modifier_state, k_modifier_jadeleaf_stew_plus))
+    {
+        bonus = std::max(bonus, 0.35f);
+    }
+
+    return bonus * modifier_state.resolved_village_technology_effects.timed_buff_effect_multiplier;
+}
+
+float special_health_recovery_delta(
+    const ModifierState& modifier_state,
+    float step_real_seconds) noexcept
+{
+    if (step_real_seconds <= 0.0f)
+    {
+        return 0.0f;
+    }
+
+    float full_recovery_real_minutes = 0.0f;
+    if (active_modifier_present(modifier_state, k_modifier_peashrub_hotpot) ||
+        active_modifier_present(modifier_state, k_modifier_jadeleaf_stew))
+    {
+        full_recovery_real_minutes = 10.0f;
+    }
+    if (active_modifier_present(modifier_state, k_modifier_peashrub_hotpot_plus) ||
+        active_modifier_present(modifier_state, k_modifier_jadeleaf_stew_plus))
+    {
+        full_recovery_real_minutes = 5.0f;
+    }
+
+    return resolve_meter_units_per_real_second(full_recovery_real_minutes) *
+        modifier_state.resolved_village_technology_effects.timed_buff_effect_multiplier *
+        step_real_seconds;
+}
+
+float special_morale_recovery_delta(
+    const ModifierState& modifier_state,
+    float step_real_seconds) noexcept
+{
+    if (step_real_seconds <= 0.0f)
+    {
+        return 0.0f;
+    }
+
+    float full_recovery_real_minutes = 0.0f;
+    if (active_modifier_present(modifier_state, k_modifier_buckthorn_tonic) ||
+        active_modifier_present(modifier_state, k_modifier_desert_revival_draught))
+    {
+        full_recovery_real_minutes = 10.0f;
+    }
+    if (active_modifier_present(modifier_state, k_modifier_buckthorn_tonic_plus) ||
+        active_modifier_present(modifier_state, k_modifier_desert_revival_draught_plus))
+    {
+        full_recovery_real_minutes = 5.0f;
+    }
+
+    return resolve_meter_units_per_real_second(full_recovery_real_minutes) *
+        modifier_state.resolved_village_technology_effects.timed_buff_effect_multiplier *
+        step_real_seconds;
 }
 
 WorkerMeterSnapshot make_snapshot(const SiteWorld::WorkerConditionData& worker) noexcept
@@ -234,6 +328,102 @@ WorkerMeterDeltas deltas_from_message(const WorkerMeterDeltaRequestedMessage& pa
         payload.work_efficiency_delta};
 }
 
+float meter_units_from_cash_points(std::uint32_t cash_points, float cash_points_per_unit) noexcept
+{
+    return cash_points_per_unit <= 0.0f
+        ? 0.0f
+        : static_cast<float>(cash_points) / cash_points_per_unit;
+}
+
+std::optional<WorkerMeterDeltas> custom_food_item_deltas(
+    ItemId item_id,
+    const ItemDef& item_def) noexcept
+{
+    std::uint32_t bonus_cash_points = 0U;
+    enum class PrimaryMeter : std::uint8_t
+    {
+        None = 0,
+        Hydration = 1,
+        Nourishment = 2
+    } primary_meter = PrimaryMeter::None;
+
+    switch (item_id.value)
+    {
+    case k_item_wormwood_broth:
+        bonus_cash_points = 300U;
+        primary_meter = PrimaryMeter::Nourishment;
+        break;
+    case k_item_rich_wormwood_broth:
+        bonus_cash_points = 600U;
+        primary_meter = PrimaryMeter::Nourishment;
+        break;
+    case k_item_thornberry_cooler:
+        bonus_cash_points = 300U;
+        primary_meter = PrimaryMeter::Hydration;
+        break;
+    case k_item_rich_thornberry_cooler:
+        bonus_cash_points = 600U;
+        primary_meter = PrimaryMeter::Hydration;
+        break;
+    case k_item_peashrub_hotpot:
+        bonus_cash_points = 400U;
+        primary_meter = PrimaryMeter::Nourishment;
+        break;
+    case k_item_rich_peashrub_hotpot:
+        bonus_cash_points = 700U;
+        primary_meter = PrimaryMeter::Nourishment;
+        break;
+    case k_item_buckthorn_tonic:
+        bonus_cash_points = 400U;
+        primary_meter = PrimaryMeter::Hydration;
+        break;
+    case k_item_rich_buckthorn_tonic:
+        bonus_cash_points = 700U;
+        primary_meter = PrimaryMeter::Hydration;
+        break;
+    case k_item_jadeleaf_stew:
+        bonus_cash_points = 500U;
+        primary_meter = PrimaryMeter::Nourishment;
+        break;
+    case k_item_rich_jadeleaf_stew:
+        bonus_cash_points = 800U;
+        primary_meter = PrimaryMeter::Nourishment;
+        break;
+    case k_item_desert_revival_draught:
+        bonus_cash_points = 500U;
+        primary_meter = PrimaryMeter::Hydration;
+        break;
+    case k_item_rich_desert_revival_draught:
+        bonus_cash_points = 800U;
+        primary_meter = PrimaryMeter::Hydration;
+        break;
+    default:
+        return std::nullopt;
+    }
+
+    const auto ingredient_cash_points =
+        item_def.internal_price_cash_points > bonus_cash_points
+        ? item_def.internal_price_cash_points - bonus_cash_points
+        : 0U;
+    const auto primary_meter_cash_points = ingredient_cash_points + (bonus_cash_points / 2U);
+    const auto morale_cash_points = bonus_cash_points / 2U;
+    const auto& meter_tuning = gameplay_tuning_def().player_meter_cash_points;
+
+    WorkerMeterDeltas deltas {};
+    if (primary_meter == PrimaryMeter::Hydration)
+    {
+        deltas.hydration =
+            meter_units_from_cash_points(primary_meter_cash_points, meter_tuning.hydration_per_point);
+    }
+    else if (primary_meter == PrimaryMeter::Nourishment)
+    {
+        deltas.nourishment =
+            meter_units_from_cash_points(primary_meter_cash_points, meter_tuning.nourishment_per_point);
+    }
+    deltas.morale = meter_units_from_cash_points(morale_cash_points, meter_tuning.morale_per_point);
+    return deltas;
+}
+
 WorkerMeterDeltas deltas_from_item_use_completed(
     const InventoryItemUseCompletedMessage& payload) noexcept
 {
@@ -241,6 +431,11 @@ WorkerMeterDeltas deltas_from_item_use_completed(
     if (item_def == nullptr)
     {
         return {};
+    }
+
+    if (const auto custom = custom_food_item_deltas(item_def->item_id, *item_def); custom.has_value())
+    {
+        return *custom;
     }
 
     const float quantity = static_cast<float>(payload.quantity == 0U ? 1U : payload.quantity);
@@ -276,7 +471,8 @@ float resolve_energy_background_speed_factor(
 
 float resolve_energy_background_delta(
     const SiteWorld::WorkerConditionData& current,
-    float step_real_seconds) noexcept
+    float step_real_seconds,
+    float bonus_multiplier = 0.0f) noexcept
 {
     if (step_real_seconds <= 0.0f)
     {
@@ -284,6 +480,7 @@ float resolve_energy_background_delta(
     }
 
     return step_real_seconds *
+        (1.0f + std::max(0.0f, bonus_multiplier)) *
         resolve_energy_background_speed_factor(current) *
         resolve_meter_units_per_real_second(
             worker_condition_tuning().energy_background_increase_real_minutes);
@@ -293,7 +490,7 @@ void accumulate_passive_deltas(
     WorkerMeterDeltas& deltas,
     const SiteWorld::WorkerConditionData& previous,
     const SiteWorld::TileLocalWeatherData& local_weather,
-    const ModifierChannelTotals& modifiers,
+    const ModifierState& modifier_state,
     float step_game_minutes,
     float step_real_seconds) noexcept
 {
@@ -303,25 +500,37 @@ void accumulate_passive_deltas(
     }
 
     const auto& tuning = worker_condition_tuning();
+    const auto& modifiers = modifier_state.resolved_channel_totals;
+    const auto& village_effects = modifier_state.resolved_village_technology_effects;
     const float exposure_scale = previous.is_sheltered ? tuning.sheltered_exposure_scale : 1.0f;
     const float heat = normalize_meter(std::max(local_weather.heat, 0.0f)) * exposure_scale;
     const float wind = normalize_meter(std::max(local_weather.wind, 0.0f)) * exposure_scale;
     const float dust = normalize_meter(std::max(local_weather.dust, 0.0f)) * exposure_scale;
+    const float nourishment_hydration_weather_reduction =
+        village_effects.weather_nourishment_hydration_loss_reduction;
+    const float health_morale_weather_reduction =
+        village_effects.weather_health_morale_loss_reduction;
+    const float hydration_heat = heat * (1.0f - nourishment_hydration_weather_reduction);
+    const float hydration_wind = wind * (1.0f - nourishment_hydration_weather_reduction);
+    const float hydration_dust = dust * (1.0f - nourishment_hydration_weather_reduction);
+    const float health_heat = heat * (1.0f - health_morale_weather_reduction);
+    const float health_wind = wind * (1.0f - health_morale_weather_reduction);
+    const float health_dust = dust * (1.0f - health_morale_weather_reduction);
     const float max_weather =
         std::max(
             std::max(std::max(local_weather.heat, 0.0f), std::max(local_weather.wind, 0.0f)),
-            std::max(local_weather.dust, 0.0f)) * exposure_scale;
+            std::max(local_weather.dust, 0.0f)) * exposure_scale * (1.0f - health_morale_weather_reduction);
 
     deltas.hydration -= step_game_minutes * (
         resolve_factor(tuning.hydration_base_loss_per_game_minute) +
-        heat * resolve_factor(tuning.heat_to_hydration_factor) +
-        wind * resolve_factor(tuning.wind_to_hydration_factor) +
-        dust * resolve_factor(tuning.dust_to_hydration_factor));
+        hydration_heat * resolve_factor(tuning.heat_to_hydration_factor) +
+        hydration_wind * resolve_factor(tuning.wind_to_hydration_factor) +
+        hydration_dust * resolve_factor(tuning.dust_to_hydration_factor));
     deltas.nourishment -= step_game_minutes * (
         resolve_factor(tuning.nourishment_base_loss_per_game_minute) +
-        wind * resolve_factor(tuning.wind_to_nourishment_factor) +
-        heat * resolve_factor(tuning.heat_to_nourishment_factor) +
-        dust * resolve_factor(tuning.dust_to_nourishment_factor));
+        hydration_wind * resolve_factor(tuning.wind_to_nourishment_factor) +
+        hydration_heat * resolve_factor(tuning.heat_to_nourishment_factor) +
+        hydration_dust * resolve_factor(tuning.dust_to_nourishment_factor));
     const float morale_weather_factor = std::clamp(
         (kMoraleWeatherNeutralPoint - max_weather) / kMoraleWeatherHalfBand,
         -1.0f,
@@ -339,10 +548,12 @@ void accumulate_passive_deltas(
     deltas.morale += step_real_seconds *
         std::clamp(modifiers.morale, -1.0f, 1.0f) *
         morale_support_per_real_second;
+    deltas.health += special_health_recovery_delta(modifier_state, step_real_seconds);
+    deltas.morale += special_morale_recovery_delta(modifier_state, step_real_seconds);
     deltas.health -= step_game_minutes * (
-        heat * resolve_factor(tuning.heat_to_health_factor) +
-        wind * resolve_factor(tuning.wind_to_health_factor) +
-        dust * resolve_factor(tuning.dust_to_health_factor));
+        health_heat * resolve_factor(tuning.heat_to_health_factor) +
+        health_wind * resolve_factor(tuning.wind_to_health_factor) +
+        health_dust * resolve_factor(tuning.dust_to_health_factor));
 }
 
 float resolve_energy_cap(
@@ -396,7 +607,8 @@ SiteWorld::WorkerConditionData resolve_worker_conditions(
     const SiteWorld::WorkerConditionData& previous,
     const WorkerMeterDeltas& deltas,
     const ModifierChannelTotals& modifiers,
-    float passive_energy_step_real_seconds) noexcept
+    float passive_energy_step_real_seconds,
+    float passive_energy_bonus = 0.0f) noexcept
 {
     SiteWorld::WorkerConditionData current = previous;
     current.health = clamp_meter(previous.health + deltas.health, kHealthMax);
@@ -405,7 +617,7 @@ SiteWorld::WorkerConditionData resolve_worker_conditions(
     current.morale = clamp_meter(previous.morale + deltas.morale, kMoraleMax);
     current.energy_cap = resolve_energy_cap(current, modifiers, deltas.energy_cap);
     const float passive_energy_delta =
-        resolve_energy_background_delta(current, passive_energy_step_real_seconds);
+        resolve_energy_background_delta(current, passive_energy_step_real_seconds, passive_energy_bonus);
     current.energy = std::clamp(
         previous.energy + deltas.energy + passive_energy_delta,
         kMeterMin,
@@ -454,6 +666,7 @@ Gs1Status WorkerConditionSystem::process_message(
         previous,
         deltas,
         context.world.read_modifier().resolved_channel_totals,
+        0.0f,
         0.0f);
     const bool modified = worker_conditions_changed(previous, worker.conditions);
     if (modified)
@@ -479,16 +692,19 @@ void WorkerConditionSystem::run(SiteSystemContext<WorkerConditionSystem>& contex
         deltas,
         previous,
         context.world.read_tile_local_weather(worker.position.tile_coord),
-        context.world.read_modifier().resolved_channel_totals,
+        context.world.read_modifier(),
         static_cast<float>(runtime_minutes_from_real_seconds(context.fixed_step_seconds)),
         step_real_seconds);
     const float passive_energy_step_real_seconds =
         action_is_executing(context.world.read_action()) ? 0.0f : step_real_seconds;
+    const float passive_energy_bonus =
+        special_energy_recovery_bonus(context.world.read_modifier());
     worker.conditions = resolve_worker_conditions(
         previous,
         deltas,
         context.world.read_modifier().resolved_channel_totals,
-        passive_energy_step_real_seconds);
+        passive_energy_step_real_seconds,
+        passive_energy_bonus);
     const bool modified = worker_conditions_changed(previous, worker.conditions);
     if (modified)
     {

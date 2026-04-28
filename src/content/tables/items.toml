@@ -331,9 +331,39 @@ display_name = "Ningxia Wolfberries"
 stack_size = 10
 source_rule = "HarvestOnly"
 consumable = false
-internal_price_cash_points = 450
+internal_price_cash_points = 180
 capabilities = "Sell"
 linked_plant_id = 4
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 24
+display_name = "Korshinsk Peashrub Pods"
+stack_size = 10
+source_rule = "HarvestOnly"
+consumable = false
+internal_price_cash_points = 110
+capabilities = "Sell"
+linked_plant_id = 6
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 25
+display_name = "Jiji Grass Fiber"
+stack_size = 10
+source_rule = "HarvestOnly"
+consumable = false
+internal_price_cash_points = 100
+capabilities = "Sell"
+linked_plant_id = 7
 linked_structure_id = 0
 health_delta = 0.0
 hydration_delta = 0.0
@@ -346,9 +376,39 @@ display_name = "Sea Buckthorn Berries"
 stack_size = 10
 source_rule = "HarvestOnly"
 consumable = false
-internal_price_cash_points = 350
+internal_price_cash_points = 160
 capabilities = "Sell"
 linked_plant_id = 8
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 27
+display_name = "Desert Ephedra Sprigs"
+stack_size = 10
+source_rule = "HarvestOnly"
+consumable = false
+internal_price_cash_points = 120
+capabilities = "Sell"
+linked_plant_id = 9
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 28
+display_name = "Saxaul Fuelwood"
+stack_size = 10
+source_rule = "HarvestOnly"
+consumable = false
+internal_price_cash_points = 100
+capabilities = "Sell"
+linked_plant_id = 10
 linked_structure_id = 0
 health_delta = 0.0
 hydration_delta = 0.0
@@ -522,3 +582,213 @@ nourishment_delta = 0.0
 energy_delta = 10.0
 morale_delta = 5.0
 modifier_id = 3003
+
+[[items]]
+item_id = 40
+display_name = "Ordos Wormwood Sprigs"
+stack_size = 10
+source_rule = "HarvestOnly"
+consumable = false
+internal_price_cash_points = 100
+capabilities = "Sell"
+linked_plant_id = 1
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 41
+display_name = "Shovel"
+stack_size = 1
+source_rule = "CraftOnly"
+consumable = false
+internal_price_cash_points = 450
+capabilities = "Sell"
+linked_plant_id = 0
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 42
+display_name = "Wormwood Broth"
+stack_size = 3
+source_rule = "CraftOnly"
+consumable = true
+internal_price_cash_points = 700
+capabilities = "Eat,Sell"
+linked_plant_id = 0
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 43
+display_name = "Thornberry Cooler"
+stack_size = 3
+source_rule = "CraftOnly"
+consumable = true
+internal_price_cash_points = 780
+capabilities = "Drink,Sell"
+linked_plant_id = 0
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 44
+display_name = "Peashrub Hotpot"
+stack_size = 3
+source_rule = "CraftOnly"
+consumable = true
+internal_price_cash_points = 980
+capabilities = "Eat,Sell"
+linked_plant_id = 0
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 45
+display_name = "Buckthorn Tonic"
+stack_size = 3
+source_rule = "CraftOnly"
+consumable = true
+internal_price_cash_points = 1220
+capabilities = "Drink,Sell"
+linked_plant_id = 0
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 46
+display_name = "Jadeleaf Stew"
+stack_size = 3
+source_rule = "CraftOnly"
+consumable = true
+internal_price_cash_points = 1180
+capabilities = "Eat,Sell"
+linked_plant_id = 0
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 47
+display_name = "Desert Revival Draught"
+stack_size = 3
+source_rule = "CraftOnly"
+consumable = true
+internal_price_cash_points = 1160
+capabilities = "Drink,Sell"
+linked_plant_id = 0
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 48
+display_name = "Rich Wormwood Broth"
+stack_size = 3
+source_rule = "CraftOnly"
+consumable = true
+internal_price_cash_points = 1400
+capabilities = "Eat,Sell"
+linked_plant_id = 0
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 49
+display_name = "Rich Thornberry Cooler"
+stack_size = 3
+source_rule = "CraftOnly"
+consumable = true
+internal_price_cash_points = 1560
+capabilities = "Drink,Sell"
+linked_plant_id = 0
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 50
+display_name = "Rich Peashrub Hotpot"
+stack_size = 3
+source_rule = "CraftOnly"
+consumable = true
+internal_price_cash_points = 1660
+capabilities = "Eat,Sell"
+linked_plant_id = 0
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 51
+display_name = "Rich Buckthorn Tonic"
+stack_size = 3
+source_rule = "CraftOnly"
+consumable = true
+internal_price_cash_points = 2140
+capabilities = "Drink,Sell"
+linked_plant_id = 0
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 52
+display_name = "Rich Jadeleaf Stew"
+stack_size = 3
+source_rule = "CraftOnly"
+consumable = true
+internal_price_cash_points = 1980
+capabilities = "Eat,Sell"
+linked_plant_id = 0
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 53
+display_name = "Rich Desert Revival Draught"
+stack_size = 3
+source_rule = "CraftOnly"
+consumable = true
+internal_price_cash_points = 1960
+capabilities = "Drink,Sell"
+linked_plant_id = 0
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0

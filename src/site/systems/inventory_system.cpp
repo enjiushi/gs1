@@ -1,6 +1,7 @@
 #include "site/systems/inventory_system.h"
 
 #include "campaign/campaign_state.h"
+#include "campaign/systems/technology_system.h"
 #include "content/defs/craft_recipe_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/structure_defs.h"
@@ -813,6 +814,11 @@ Gs1Status handle_inventory_craft_commit(
         if (recipe_def == nullptr)
         {
             return GS1_STATUS_NOT_FOUND;
+        }
+
+        if (!TechnologySystem::recipe_unlocked(context.campaign, recipe_def->recipe_id))
+        {
+            return GS1_STATUS_INVALID_STATE;
         }
 
         const TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};

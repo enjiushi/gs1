@@ -1,5 +1,6 @@
 #include "app/site_run_factory.h"
 
+#include "campaign/systems/technology_system.h"
 #include "content/defs/plant_defs.h"
 #include "content/defs/structure_defs.h"
 #include "content/prototype_content.h"
@@ -19,6 +20,27 @@ namespace
 constexpr std::uint32_t k_site_width = 32U;
 constexpr std::uint32_t k_site_height = 32U;
 constexpr std::uint32_t k_highway_terrain_type_id = 9001U;
+constexpr FactionId k_village_faction {k_faction_village_committee};
+
+std::uint32_t resolved_worker_pack_slot_count(const CampaignState& campaign) noexcept
+{
+    std::uint32_t slot_count = 8U;
+    if (TechnologySystem::node_purchased(
+            campaign,
+            TechNodeId {base_technology_node_id(k_village_faction, 4U)}))
+    {
+        slot_count += 4U;
+    }
+
+    if (TechnologySystem::node_purchased(
+            campaign,
+            TechNodeId {base_technology_node_id(k_village_faction, 7U)}))
+    {
+        slot_count += 4U;
+    }
+
+    return slot_count;
+}
 
 TileCoord starter_workbench_tile(TileCoord camp_anchor_tile) noexcept
 {
@@ -160,7 +182,7 @@ SiteRunState SiteRunFactory::create_site_run(
     run.site_attempt_seed = campaign.campaign_seed + site_meta.site_id.value + site_meta.attempt_count;
     run.run_status = SiteRunStatus::Active;
     run.clock.day_phase = DayPhase::Dawn;
-    run.inventory.worker_pack_slot_count = 8U;
+    run.inventory.worker_pack_slot_count = resolved_worker_pack_slot_count(campaign);
     run.inventory.worker_pack_slots.resize(run.inventory.worker_pack_slot_count);
     run.task_board.accepted_task_cap = 3U;
 

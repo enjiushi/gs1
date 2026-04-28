@@ -1198,8 +1198,7 @@ void technology_uses_authored_internal_cash_points_requirements_and_effect_param
         village_tier_one->granted_content_kind == gs1::TechnologyGrantedContentKind::None);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        TechnologySystem::current_effect_parameter(campaign, *village_tier_one) > 1.549f &&
-            TechnologySystem::current_effect_parameter(campaign, *village_tier_one) < 1.551f);
+        TechnologySystem::current_effect_parameter(campaign, *village_tier_one) == 1.0f);
     GS1_SYSTEM_TEST_CHECK(
         context,
         TechnologySystem::current_internal_cost_cash_points(*village_tier_one_enhancement) == 500U);
@@ -1214,8 +1213,7 @@ void technology_uses_authored_internal_cash_points_requirements_and_effect_param
         village_tier_one_enhancement->granted_content_kind == gs1::TechnologyGrantedContentKind::None);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        TechnologySystem::current_effect_parameter(campaign, *village_tier_one_enhancement) > 1.269f &&
-            TechnologySystem::current_effect_parameter(campaign, *village_tier_one_enhancement) < 1.271f);
+        TechnologySystem::current_effect_parameter(campaign, *village_tier_one_enhancement) == 1.0f);
     GS1_SYSTEM_TEST_CHECK(
         context,
         TechnologySystem::current_reputation_requirement(*village_tier_eight_enhancement) == 15);
@@ -1224,8 +1222,69 @@ void technology_uses_authored_internal_cash_points_requirements_and_effect_param
     GS1_SYSTEM_TEST_REQUIRE(context, village_tier_two != nullptr);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        village_tier_two->granted_content_kind == gs1::TechnologyGrantedContentKind::Recipe);
-    GS1_SYSTEM_TEST_CHECK(context, village_tier_two->granted_content_id == gs1::k_recipe_cook_food_pack);
+        village_tier_two->granted_content_kind == gs1::TechnologyGrantedContentKind::None);
+    GS1_SYSTEM_TEST_CHECK(context, village_tier_two->granted_content_id == 0U);
+}
+
+void technology_village_recipe_unlocks_switch_between_base_and_rich_variants(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        !TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_craft_shovel}));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        !TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_wormwood_broth}));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        !TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_rich_wormwood_broth}));
+
+    campaign.technology_state.purchased_nodes.push_back(
+        gs1::TechnologyPurchaseRecord {
+            gs1::TechNodeId {gs1::k_tech_node_village_t1_field_briefing}});
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_craft_shovel}));
+
+    campaign.technology_state.purchased_nodes.push_back(
+        gs1::TechnologyPurchaseRecord {
+            gs1::TechNodeId {gs1::k_tech_node_village_t2_field_logistics}});
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_wormwood_broth}));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_thornberry_cooler}));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        !TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_rich_wormwood_broth}));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::craft_output_unlocked(campaign, gs1::ItemId {gs1::k_item_wormwood_broth}));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        !TechnologySystem::craft_output_unlocked(campaign, gs1::ItemId {gs1::k_item_rich_wormwood_broth}));
+
+    campaign.technology_state.purchased_nodes.push_back(
+        gs1::TechnologyPurchaseRecord {
+            gs1::TechNodeId {gs1::k_tech_node_village_t1_field_briefing_choice_a}});
+    campaign.technology_state.purchased_nodes.push_back(
+        gs1::TechnologyPurchaseRecord {
+            gs1::TechNodeId {gs1::enhancement_technology_node_id(
+                gs1::FactionId {gs1::k_faction_village_committee},
+                2U,
+                1U)}});
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        !TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_wormwood_broth}));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_rich_wormwood_broth}));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::craft_output_unlocked(campaign, gs1::ItemId {gs1::k_item_rich_wormwood_broth}));
 }
 
 void regional_support_placeholder_test_plan_is_recorded(gs1::testing::SystemTestExecutionContext& context)
@@ -1351,6 +1410,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "technology",
     "uses_authored_internal_cash_points_requirements_and_effect_parameters",
     technology_uses_authored_internal_cash_points_requirements_and_effect_parameters);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "technology",
+    "village_recipe_unlocks_switch_between_base_and_rich_variants",
+    technology_village_recipe_unlocks_switch_between_base_and_rich_variants);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "regional_support",
     "placeholder_test_plan_is_recorded",

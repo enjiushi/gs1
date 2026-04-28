@@ -6,6 +6,7 @@
 #include "content/defs/plant_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/faction_defs.h"
+#include "content/defs/technology_defs.h"
 #include "content/defs/structure_defs.h"
 #include "content/defs/task_defs.h"
 #include "content/prototype_content.h"
@@ -1186,6 +1187,58 @@ void timed_buff_cap_blocks_distinct_buffs_and_bias_can_expand_limit(
         context,
         ModifierSystem::process_message(modifier_context, tea_completed) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, count_active_timed_buffs(site_run) == 4U);
+    GS1_SYSTEM_TEST_REQUIRE(context, find_active_timed_buff(site_run, gs1::ModifierId {3001U}) != nullptr);
+}
+
+void village_tier_seven_tech_expands_timed_buff_cap(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    campaign.technology_state.purchased_nodes.push_back(
+        gs1::TechnologyPurchaseRecord {
+            gs1::TechNodeId {gs1::base_technology_node_id(
+                gs1::FactionId {gs1::k_faction_village_committee},
+                7U)}});
+    campaign.technology_state.purchased_nodes.push_back(
+        gs1::TechnologyPurchaseRecord {
+            gs1::TechNodeId {gs1::enhancement_technology_node_id(
+                gs1::FactionId {gs1::k_faction_village_committee},
+                7U,
+                1U)}});
+    auto site_run = make_test_site_run(1U, 814U);
+    GameMessageQueue queue {};
+    auto modifier_context = make_site_context<ModifierSystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ModifierSystem::process_message(
+            modifier_context,
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(site_run.modifier.resolved_channel_totals.timed_buff_cap_bias, 2.0f));
+
+    site_run.modifier.active_site_modifiers.push_back(
+        make_manual_timed_buff_state(gs1::ModifierId {3002U}));
+    site_run.modifier.active_site_modifiers.push_back(
+        make_manual_timed_buff_state(gs1::ModifierId {3011U}));
+    site_run.modifier.active_site_modifiers.push_back(
+        make_manual_timed_buff_state(gs1::ModifierId {3012U}));
+    site_run.modifier.active_site_modifiers.push_back(
+        make_manual_timed_buff_state(gs1::ModifierId {3013U}));
+
+    const auto tea_completed = make_message(
+        GameMessageType::InventoryItemUseCompleted,
+        gs1::InventoryItemUseCompletedMessage {
+            gs1::k_item_field_tea,
+            1U,
+            0U});
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ModifierSystem::process_message(modifier_context, tea_completed) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, count_active_timed_buffs(site_run) == 5U);
     GS1_SYSTEM_TEST_REQUIRE(context, find_active_timed_buff(site_run, gs1::ModifierId {3001U}) != nullptr);
 }
 
@@ -2745,6 +2798,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "inventory",
     "timed_buff_cap_blocks_distinct_buffs_and_bias_can_expand_limit",
     timed_buff_cap_blocks_distinct_buffs_and_bias_can_expand_limit);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "inventory",
+    "village_tier_seven_tech_expands_timed_buff_cap",
+    village_tier_seven_tech_expands_timed_buff_cap);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "inventory",
     "delivery_queues_only_overflow_until_delivery_crate_space_opens",

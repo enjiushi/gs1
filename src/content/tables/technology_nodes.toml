@@ -3,28 +3,28 @@ faction_id = 1
 tier_index = 1
 node_kind = "BaseTech"
 enhancement_choice_index = 0
-entry_kind = "GlobalModifier"
+entry_kind = "MechanismChange"
 reputation_requirement = 1
 internal_cost_cash_points = 400
 unlock_effect_parameter = 1.00
-effect_parameter_per_bonus_reputation = 0.050
+effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Field Ration Drills"
-description = "Sets the Village branch around steadier worker pacing, lighter action energy drain, and routines that keep the pack moving longer."
+display_name = "Shovel Issue"
+description = "Unlocks the Shovel recipe. Carrying a shovel in the worker pack reduces Plant and Excavate duration plus hydration, nourishment, and energy costs by 15%."
 
 [[technology_nodes]]
 faction_id = 1
 tier_index = 1
 node_kind = "Enhancement"
 enhancement_choice_index = 1
-entry_kind = "GlobalModifier"
+entry_kind = "MechanismChange"
 reputation_requirement = 8
 internal_cost_cash_points = 500
-unlock_effect_parameter = 1.15
-effect_parameter_per_bonus_reputation = 0.030
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Measured Footwork"
-description = "Specializes the branch toward lower energy burn on movement-heavy and repeatable work actions."
+display_name = "Light Digging Form"
+description = "Extends the shovel carry bonus so Plant and Excavate hydration, nourishment, and energy costs drop by another 15%."
 
 [[technology_nodes]]
 faction_id = 1
@@ -34,11 +34,11 @@ enhancement_choice_index = 2
 entry_kind = "MechanismChange"
 reputation_requirement = 8
 internal_cost_cash_points = 500
-unlock_effect_parameter = 1.12
-effect_parameter_per_bonus_reputation = 0.028
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Shade Break Whistles"
-description = "Specializes the branch toward softer morale and energy losses when heat and fatigue start to stack."
+display_name = "Planter's Rhythm"
+description = "Extends the shovel carry bonus so Plant action duration drops by another 40%."
 
 [[technology_nodes]]
 faction_id = 1
@@ -49,12 +49,10 @@ entry_kind = "MechanismChange"
 reputation_requirement = 2
 internal_cost_cash_points = 800
 unlock_effect_parameter = 1.00
-effect_parameter_per_bonus_reputation = 0.040
-granted_content_kind = "Recipe"
-granted_content_id = 1
+effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Community Meal Prep"
-description = "Unlocks the Food Pack recipe and turns Village cooking into the first real meter-refill spike for the branch."
+display_name = "Camp Broth Kitchen"
+description = "Unlocks Wormwood Broth and Thornberry Cooler, giving Village its first harvest-to-meal conversion recipes."
 
 [[technology_nodes]]
 faction_id = 1
@@ -64,25 +62,25 @@ enhancement_choice_index = 1
 entry_kind = "MechanismChange"
 reputation_requirement = 9
 internal_cost_cash_points = 1000
-unlock_effect_parameter = 1.15
-effect_parameter_per_bonus_reputation = 0.028
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Fortified Broth Pots"
-description = "Pushes food output toward stronger nourishment and energy refill after hard labor."
+display_name = "Hearty Broth Upgrade"
+description = "Upgrades the tier-2 food recipes into richer versions with 600 extra internal cash points while keeping the same direct-gain split."
 
 [[technology_nodes]]
 faction_id = 1
 tier_index = 2
 node_kind = "Enhancement"
 enhancement_choice_index = 2
-entry_kind = "GlobalModifier"
+entry_kind = "MechanismChange"
 reputation_requirement = 9
 internal_cost_cash_points = 1000
-unlock_effect_parameter = 1.12
-effect_parameter_per_bonus_reputation = 0.026
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Salt Tea Rotation"
-description = "Pushes food service toward better hydration recovery and cheaper recovery loops during hot weather."
+display_name = "Long Simmer Tonic"
+description = "Strengthens the tier-2 food buffs: energy recovery speed gains another 20%, all-action meter-cost reduction gains another 10%, and both buffs last another 8 game hours."
 
 [[technology_nodes]]
 faction_id = 1
@@ -93,24 +91,24 @@ entry_kind = "MechanismChange"
 reputation_requirement = 3
 internal_cost_cash_points = 1200
 unlock_effect_parameter = 1.00
-effect_parameter_per_bonus_reputation = 0.032
+effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Camp Care Circles"
-description = "Centers the branch on between-action recovery so the player can rebound faster after heavy field commitments."
+display_name = "Careful Excavation"
+description = "Unlocks the Careful excavation depth so already-dug tiles can be worked one layer deeper."
 
 [[technology_nodes]]
 faction_id = 1
 tier_index = 3
 node_kind = "Enhancement"
 enhancement_choice_index = 1
-entry_kind = "GlobalModifier"
+entry_kind = "MechanismChange"
 reputation_requirement = 10
 internal_cost_cash_points = 1500
-unlock_effect_parameter = 1.15
-effect_parameter_per_bonus_reputation = 0.026
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Night Watch Handovers"
-description = "Favors calmer energy recovery between work windows and smoother meter stabilization after long action chains."
+display_name = "Layer Reading Notes"
+description = "Rebalances the newly unlocked Careful excavation depth toward better stone tiers by blending it halfway toward the next-depth odds."
 
 [[technology_nodes]]
 faction_id = 1
@@ -120,25 +118,25 @@ enhancement_choice_index = 2
 entry_kind = "MechanismChange"
 reputation_requirement = 10
 internal_cost_cash_points = 1500
-unlock_effect_parameter = 1.12
-effect_parameter_per_bonus_reputation = 0.024
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Quiet Recovery Tents"
-description = "Favors morale protection and slower condition collapse during rough weather or crowded schedules."
+display_name = "Measured Digging Cadence"
+description = "Reduces Careful excavation duration by 30% and its hydration, nourishment, and energy costs by 20%."
 
 [[technology_nodes]]
 faction_id = 1
 tier_index = 4
 node_kind = "BaseTech"
 enhancement_choice_index = 0
-entry_kind = "GlobalModifier"
+entry_kind = "MechanismChange"
 reputation_requirement = 4
 internal_cost_cash_points = 1600
 unlock_effect_parameter = 1.00
-effect_parameter_per_bonus_reputation = 0.026
+effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Supply Relay Board"
-description = "Builds the Village identity around dependable restocking so food, medicine, and comfort tools stay near camp."
+display_name = "Weather-Wrapped Packs"
+description = "Reduces weather-driven nourishment and hydration loss by 30% and adds 4 worker-pack slots."
 
 [[technology_nodes]]
 faction_id = 1
@@ -148,55 +146,53 @@ enhancement_choice_index = 1
 entry_kind = "MechanismChange"
 reputation_requirement = 11
 internal_cost_cash_points = 2000
-unlock_effect_parameter = 1.15
-effect_parameter_per_bonus_reputation = 0.024
-granted_content_kind = "Item"
-granted_content_id = 11
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Hot Meal Priority Route"
-description = "Unlocks a Camp Stove kit and leans the branch toward earlier hot-meal access and faster restocking for survival cooking."
+display_name = "Storm Shelter Discipline"
+description = "Reduces weather-driven health and morale loss by 30%."
 
 [[technology_nodes]]
 faction_id = 1
 tier_index = 4
 node_kind = "Enhancement"
 enhancement_choice_index = 2
-entry_kind = "GlobalModifier"
+entry_kind = "MechanismChange"
 reputation_requirement = 11
 internal_cost_cash_points = 2000
-unlock_effect_parameter = 1.12
-effect_parameter_per_bonus_reputation = 0.022
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Clinic Rounds"
-description = "Leans the branch toward stronger refill timing after meals, medicine, and camp-side recovery actions."
+display_name = "Dry-Wrap Layering"
+description = "Extends the base effect so weather-driven nourishment and hydration loss is reduced by 70% total."
 
 [[technology_nodes]]
 faction_id = 1
 tier_index = 5
 node_kind = "BaseTech"
 enhancement_choice_index = 0
-entry_kind = "GlobalModifier"
+entry_kind = "MechanismChange"
 reputation_requirement = 5
 internal_cost_cash_points = 2000
 unlock_effect_parameter = 1.00
-effect_parameter_per_bonus_reputation = 0.022
+effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Work Song Cadence"
-description = "Improves the rhythm of long jobs by making worker meters hold together better through repeated actions."
+display_name = "Recovery Pot Line"
+description = "Unlocks Peashrub Hotpot and Buckthorn Tonic, giving Village stronger mid-branch recovery cooking."
 
 [[technology_nodes]]
 faction_id = 1
 tier_index = 5
 node_kind = "Enhancement"
 enhancement_choice_index = 1
-entry_kind = "GlobalModifier"
+entry_kind = "MechanismChange"
 reputation_requirement = 12
 internal_cost_cash_points = 2500
-unlock_effect_parameter = 1.15
-effect_parameter_per_bonus_reputation = 0.022
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Shared Tool Borrowing"
-description = "Specializes the tier toward lower action drain on build, repair, and craft loops."
+display_name = "Hearty Recovery Pots"
+description = "Upgrades the tier-5 food recipes into richer versions with 700 extra internal cash points while keeping the same direct-gain split."
 
 [[technology_nodes]]
 faction_id = 1
@@ -206,11 +202,11 @@ enhancement_choice_index = 2
 entry_kind = "MechanismChange"
 reputation_requirement = 12
 internal_cost_cash_points = 2500
-unlock_effect_parameter = 1.12
-effect_parameter_per_bonus_reputation = 0.020
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Kitchen Line Harmony"
-description = "Specializes the tier toward stronger food payoff and better value from each refill window."
+display_name = "Rapid Recovery Broths"
+description = "Improves both tier-5 recovery foods so their 0-to-100 health or morale restoration completes in 4 game hours."
 
 [[technology_nodes]]
 faction_id = 1
@@ -221,10 +217,10 @@ entry_kind = "MechanismChange"
 reputation_requirement = 6
 internal_cost_cash_points = 2400
 unlock_effect_parameter = 1.00
-effect_parameter_per_bonus_reputation = 0.019
+effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Village Rest Ledger"
-description = "Adds institutional memory to camp upkeep so the player regains meters more reliably after stressful task streaks."
+display_name = "Thorough Excavation"
+description = "Unlocks the Thorough excavation depth so already-dug tiles can be worked to the final layer."
 
 [[technology_nodes]]
 faction_id = 1
@@ -234,25 +230,25 @@ enhancement_choice_index = 1
 entry_kind = "MechanismChange"
 reputation_requirement = 13
 internal_cost_cash_points = 3000
-unlock_effect_parameter = 1.15
-effect_parameter_per_bonus_reputation = 0.020
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Repair Volunteer Teams"
-description = "Favors smoother recovery after maintenance-heavy jobs and lowers the strain of long repair chains."
+display_name = "Deep Layer Notes"
+description = "Rebalances the newly unlocked Thorough excavation depth toward better stone tiers by blending it halfway toward the next-depth odds."
 
 [[technology_nodes]]
 faction_id = 1
 tier_index = 6
 node_kind = "Enhancement"
 enhancement_choice_index = 2
-entry_kind = "GlobalModifier"
+entry_kind = "MechanismChange"
 reputation_requirement = 13
 internal_cost_cash_points = 3000
-unlock_effect_parameter = 1.12
-effect_parameter_per_bonus_reputation = 0.018
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Festival Kitchen Fires"
-description = "Favors larger refill surges from prepared food and steadier morale after restocking breaks."
+display_name = "Deep Digging Rhythm"
+description = "Reduces Thorough excavation duration by 30% and its hydration, nourishment, and energy costs by 20%."
 
 [[technology_nodes]]
 faction_id = 1
@@ -263,10 +259,10 @@ entry_kind = "GlobalModifier"
 reputation_requirement = 7
 internal_cost_cash_points = 2800
 unlock_effect_parameter = 1.00
-effect_parameter_per_bonus_reputation = 0.017
+effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Route Steward Network"
-description = "Supports long site sessions by reducing passive wear on the player meters during extended field plans."
+display_name = "Carried Reserves"
+description = "Adds 1 timed-buff slot and increases worker-pack capacity by another 4 slots."
 
 [[technology_nodes]]
 faction_id = 1
@@ -276,11 +272,11 @@ enhancement_choice_index = 1
 entry_kind = "GlobalModifier"
 reputation_requirement = 14
 internal_cost_cash_points = 3500
-unlock_effect_parameter = 1.15
-effect_parameter_per_bonus_reputation = 0.018
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Escort Hand-Offs"
-description = "Specializes the tier toward lower stamina loss on hauling, planting, and repeated traversal."
+display_name = "Shared Thermos Rotation"
+description = "Adds 1 more timed-buff slot."
 
 [[technology_nodes]]
 faction_id = 1
@@ -290,11 +286,11 @@ enhancement_choice_index = 2
 entry_kind = "MechanismChange"
 reputation_requirement = 14
 internal_cost_cash_points = 3500
-unlock_effect_parameter = 1.12
-effect_parameter_per_bonus_reputation = 0.016
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Grant Clerk Promises"
-description = "Specializes the tier toward better morale retention whenever the plan gets crowded or the board gets demanding."
+display_name = "Favored Portions"
+description = "Amplifies all timed food and drink buffs by 25% compared to their base effect."
 
 [[technology_nodes]]
 faction_id = 1
@@ -305,10 +301,10 @@ entry_kind = "MechanismChange"
 reputation_requirement = 8
 internal_cost_cash_points = 3200
 unlock_effect_parameter = 1.00
-effect_parameter_per_bonus_reputation = 0.015
+effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Regional Relief Backbone"
-description = "Caps the Village branch with a broad meter-sustain package meant to keep the worker functional through ugly late-site pressure."
+display_name = "Capstone Relief Kitchen"
+description = "Unlocks Jadeleaf Stew and Desert Revival Draught, combining the branch's tier-2 and tier-5 food-buff identities."
 
 [[technology_nodes]]
 faction_id = 1
@@ -318,25 +314,25 @@ enhancement_choice_index = 1
 entry_kind = "MechanismChange"
 reputation_requirement = 15
 internal_cost_cash_points = 4000
-unlock_effect_parameter = 1.15
-effect_parameter_per_bonus_reputation = 0.016
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Emergency Kitchens"
-description = "Turns the capstone toward maximum refill value from cooked food and emergency recovery routines."
+display_name = "Loaded Relief Servings"
+description = "Upgrades the tier-8 food recipes into richer versions with 800 extra internal cash points while keeping the same direct-gain split."
 
 [[technology_nodes]]
 faction_id = 1
 tier_index = 8
 node_kind = "Enhancement"
 enhancement_choice_index = 2
-entry_kind = "GlobalModifier"
+entry_kind = "MechanismChange"
 reputation_requirement = 15
 internal_cost_cash_points = 4000
-unlock_effect_parameter = 1.12
-effect_parameter_per_bonus_reputation = 0.014
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Shelter Registry"
-description = "Turns the capstone toward lower all-around meter losses while the camp is under sustained pressure."
+display_name = "All-Night Relief Rotation"
+description = "Extends both tier-8 combo buffs by another 8 game hours and upgrades each bundled effect to its enhanced version."
 
 [[technology_nodes]]
 faction_id = 2

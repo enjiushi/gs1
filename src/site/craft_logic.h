@@ -1,5 +1,6 @@
 #pragma once
 
+#include "campaign/campaign_state.h"
 #include "content/defs/craft_recipe_defs.h"
 #include "content/defs/structure_defs.h"
 #include "site/craft_state.h"
@@ -55,5 +56,7 @@ bool can_store_output_after_recipe_consumption(
     const std::vector<flecs::entity>& source_containers,
     const CraftRecipeDef& recipe_def);
 
-std::vector<const CraftRecipeDef*> recipes_for_station(StructureId structure_id);
+std::vector<const CraftRecipeDef*> recipes_for_station(
+    const CampaignState& campaign,
+    StructureId structure_id);
 }  // namespace gs1::craft_logic
