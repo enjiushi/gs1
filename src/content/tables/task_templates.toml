@@ -510,3 +510,193 @@ threshold_value = 0.0
 completion_faction_reputation_delta = 0
 expected_task_hours_in_game = 0.5
 risk_multiplier = 0.05
+
+[[task_templates]]
+task_template_id = 101
+publisher_faction_id = 1
+task_tier_id = 1
+progress_kind = "PlantItem"
+target_amount = 1
+required_count = 0
+item_id = 15
+plant_id = 5
+recipe_id = 0
+structure_id = 0
+secondary_structure_id = 0
+tertiary_structure_id = 0
+action_kind = "None"
+threshold_value = 0.0
+completion_faction_reputation_delta = 0
+expected_task_hours_in_game = 0.3
+risk_multiplier = 0.05
+
+[[task_templates]]
+task_template_id = 102
+publisher_faction_id = 1
+task_tier_id = 1
+progress_kind = "CraftRecipe"
+target_amount = 1
+required_count = 0
+item_id = 0
+plant_id = 0
+recipe_id = 4
+structure_id = 0
+secondary_structure_id = 0
+tertiary_structure_id = 0
+action_kind = "None"
+threshold_value = 0.0
+completion_faction_reputation_delta = 0
+expected_task_hours_in_game = 0.4
+risk_multiplier = 0.05
+
+[[task_templates]]
+task_template_id = 103
+publisher_faction_id = 1
+task_tier_id = 1
+progress_kind = "BuyItem"
+target_amount = 1
+required_count = 0
+item_id = 1
+plant_id = 0
+recipe_id = 0
+structure_id = 0
+secondary_structure_id = 0
+tertiary_structure_id = 0
+action_kind = "None"
+threshold_value = 0.0
+completion_faction_reputation_delta = 0
+expected_task_hours_in_game = 0.2
+risk_multiplier = 0.02
+
+[[task_templates]]
+task_template_id = 104
+publisher_faction_id = 1
+task_tier_id = 1
+progress_kind = "BuyItem"
+target_amount = 1
+required_count = 0
+item_id = 2
+plant_id = 0
+recipe_id = 0
+structure_id = 0
+secondary_structure_id = 0
+tertiary_structure_id = 0
+action_kind = "None"
+threshold_value = 0.0
+completion_faction_reputation_delta = 0
+expected_task_hours_in_game = 0.2
+risk_multiplier = 0.02
+
+[[task_templates]]
+task_template_id = 105
+publisher_faction_id = 1
+task_tier_id = 1
+progress_kind = "CraftRecipe"
+target_amount = 1
+required_count = 0
+item_id = 0
+plant_id = 0
+recipe_id = 8
+structure_id = 0
+secondary_structure_id = 0
+tertiary_structure_id = 0
+action_kind = "None"
+threshold_value = 0.0
+completion_faction_reputation_delta = 0
+expected_task_hours_in_game = 0.35
+risk_multiplier = 0.05
+
+[[task_templates]]
+task_template_id = 106
+publisher_faction_id = 1
+task_tier_id = 1
+progress_kind = "KeepAllLivingPlantsNotWitheringForDuration"
+target_amount = 30
+required_count = 2
+item_id = 0
+plant_id = 0
+recipe_id = 0
+structure_id = 0
+secondary_structure_id = 0
+tertiary_structure_id = 0
+action_kind = "None"
+threshold_value = 0.0
+completion_faction_reputation_delta = 0
+expected_task_hours_in_game = 0.5
+risk_multiplier = 0.05
+
+[[task_templates]]
+task_template_id = 107
+publisher_faction_id = 1
+task_tier_id = 1
+progress_kind = "CraftRecipe"
+target_amount = 1
+required_count = 0
+item_id = 0
+plant_id = 0
+recipe_id = 2
+structure_id = 0
+secondary_structure_id = 0
+tertiary_structure_id = 0
+action_kind = "None"
+threshold_value = 0.0
+completion_faction_reputation_delta = 0
+expected_task_hours_in_game = 0.45
+risk_multiplier = 0.05
+
+[[task_templates]]
+task_template_id = 108
+publisher_faction_id = 1
+task_tier_id = 1
+progress_kind = "BuildStructure"
+target_amount = 1
+required_count = 0
+item_id = 0
+plant_id = 0
+recipe_id = 0
+structure_id = 201
+secondary_structure_id = 0
+tertiary_structure_id = 0
+action_kind = "None"
+threshold_value = 0.0
+completion_faction_reputation_delta = 0
+expected_task_hours_in_game = 0.3
+risk_multiplier = 0.05
+
+[[task_templates]]
+task_template_id = 109
+publisher_faction_id = 1
+task_tier_id = 1
+progress_kind = "PerformAction"
+target_amount = 1
+required_count = 0
+item_id = 0
+plant_id = 0
+recipe_id = 0
+structure_id = 0
+secondary_structure_id = 0
+tertiary_structure_id = 0
+action_kind = "Harvest"
+threshold_value = 0.0
+completion_faction_reputation_delta = 0
+expected_task_hours_in_game = 0.25
+risk_multiplier = 0.03
+
+[[task_templates]]
+task_template_id = 110
+publisher_faction_id = 1
+task_tier_id = 1
+progress_kind = "CraftRecipe"
+target_amount = 1
+required_count = 0
+item_id = 0
+plant_id = 0
+recipe_id = 21
+structure_id = 0
+secondary_structure_id = 0
+tertiary_structure_id = 0
+action_kind = "None"
+threshold_value = 0.0
+completion_faction_reputation_delta = 0
+expected_task_hours_in_game = 0.3
+risk_multiplier = 0.03

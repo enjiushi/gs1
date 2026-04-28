@@ -105,7 +105,7 @@ void campaign_flow_start_new_campaign_initializes_state(gs1::testing::SystemTest
     GS1_SYSTEM_TEST_CHECK(context, campaign->regional_map_state.available_site_ids.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, campaign->regional_map_state.available_site_ids.front().value == 1U);
     GS1_SYSTEM_TEST_CHECK(context, campaign->faction_progress.size() == 3U);
-    GS1_SYSTEM_TEST_CHECK(context, gs1::k_faction_tech_tier_count == 8U);
+    GS1_SYSTEM_TEST_CHECK(context, gs1::k_faction_tech_tier_count == 32U);
     GS1_SYSTEM_TEST_CHECK(context, campaign->faction_progress[0].faction_id.value == gs1::k_faction_village_committee);
     GS1_SYSTEM_TEST_CHECK(context, campaign->faction_progress[1].faction_id.value == gs1::k_faction_forestry_bureau);
     GS1_SYSTEM_TEST_CHECK(context, campaign->faction_progress[2].faction_id.value == gs1::k_faction_agricultural_university);
@@ -902,33 +902,29 @@ void technology_total_reputation_unlocks_progression_content_one_by_one(
     GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_desert_ephedra}));
     GS1_SYSTEM_TEST_CHECK(context, !TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_ordos_wormwood}));
     GS1_SYSTEM_TEST_CHECK(context, !TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_field_tea}));
-    GS1_SYSTEM_TEST_CHECK(context, !TechnologySystem::structure_recipe_unlocked(campaign, gs1::StructureId {gs1::k_structure_camp_stove}));
+    GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::structure_recipe_unlocked(campaign, gs1::StructureId {gs1::k_structure_camp_stove}));
     GS1_SYSTEM_TEST_CHECK(context, !TechnologySystem::item_unlocked(campaign, gs1::ItemId {gs1::k_item_medicine_pack}));
 
-    campaign.technology_state.total_reputation = 1;
+    campaign.technology_state.total_reputation = 240;
     GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_ordos_wormwood}));
 
-    campaign.technology_state.total_reputation = 2;
+    campaign.technology_state.total_reputation = 440;
     GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_field_tea}));
 
-    campaign.technology_state.total_reputation = 3;
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        TechnologySystem::structure_recipe_unlocked(campaign, gs1::StructureId {gs1::k_structure_camp_stove}));
     GS1_SYSTEM_TEST_CHECK(
         context,
         TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_craft_camp_stove}));
 
-    campaign.technology_state.total_reputation = 6;
+    campaign.technology_state.total_reputation = 1040;
     GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::item_unlocked(campaign, gs1::ItemId {gs1::k_item_medicine_pack}));
 
-    campaign.technology_state.total_reputation = 29;
+    campaign.technology_state.total_reputation = 5040;
     GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_saxaul}));
     GS1_SYSTEM_TEST_CHECK(
         context,
         !TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_rich_desert_revival_draught}));
 
-    campaign.technology_state.total_reputation = 32;
+    campaign.technology_state.total_reputation = 5640;
     GS1_SYSTEM_TEST_CHECK(
         context,
         TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_rich_desert_revival_draught}));
@@ -1138,7 +1134,7 @@ void technology_linear_refund_uses_highest_reputation_band_and_restores_cash(
                 GameMessageType::TechnologyNodeRefundRequested,
                 gs1::TechnologyNodeRefundRequestedMessage {
                     village_tier_two})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, campaign.cash == 4100 + 500);
+    GS1_SYSTEM_TEST_CHECK(context, campaign.cash == 4100);
     GS1_SYSTEM_TEST_CHECK(
         context,
         !TechnologySystem::node_purchased(campaign, gs1::TechNodeId {village_tier_two}));
@@ -1151,7 +1147,7 @@ void technology_linear_refund_uses_highest_reputation_band_and_restores_cash(
                 GameMessageType::TechnologyNodeRefundRequested,
                 gs1::TechnologyNodeRefundRequestedMessage {
                     village_tier_one})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, campaign.cash == gs1::cash_points_from_cash(50));
+    GS1_SYSTEM_TEST_CHECK(context, campaign.cash == gs1::cash_points_from_cash(45));
     GS1_SYSTEM_TEST_CHECK(
         context,
         !TechnologySystem::node_purchased(campaign, gs1::TechNodeId {village_tier_one}));
@@ -1218,25 +1214,21 @@ void technology_reputation_unlocks_gate_village_recipes_items_and_structure_buil
         !TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_craft_shovel}));
     GS1_SYSTEM_TEST_CHECK(
         context,
-        !TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_craft_camp_stove}));
+        TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_craft_camp_stove}));
     GS1_SYSTEM_TEST_CHECK(
         context,
         !TechnologySystem::item_unlocked(campaign, gs1::ItemId {gs1::k_item_focus_tonic}));
 
-    campaign.technology_state.total_reputation = 2;
+    campaign.technology_state.total_reputation = 440;
     GS1_SYSTEM_TEST_CHECK(
         context,
         TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_field_tea}));
 
-    campaign.technology_state.total_reputation = 3;
     GS1_SYSTEM_TEST_CHECK(
         context,
         TechnologySystem::structure_recipe_unlocked(campaign, gs1::StructureId {gs1::k_structure_camp_stove}));
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_craft_camp_stove}));
 
-    campaign.technology_state.total_reputation = 7;
+    campaign.technology_state.total_reputation = 40;
     GS1_SYSTEM_TEST_CHECK(
         context,
         TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_craft_shovel}));
@@ -1244,17 +1236,17 @@ void technology_reputation_unlocks_gate_village_recipes_items_and_structure_buil
         context,
         TechnologySystem::craft_output_unlocked(campaign, gs1::ItemId {gs1::k_item_shovel}));
 
-    campaign.technology_state.total_reputation = 14;
+    campaign.technology_state.total_reputation = 2240;
     GS1_SYSTEM_TEST_CHECK(
         context,
         TechnologySystem::item_unlocked(campaign, gs1::ItemId {gs1::k_item_focus_tonic}));
 
-    campaign.technology_state.total_reputation = 18;
+    campaign.technology_state.total_reputation = 2840;
     GS1_SYSTEM_TEST_CHECK(
         context,
         TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_rich_wormwood_broth}));
 
-    campaign.technology_state.total_reputation = 32;
+    campaign.technology_state.total_reputation = 5640;
     GS1_SYSTEM_TEST_CHECK(
         context,
         TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_rich_desert_revival_draught}));

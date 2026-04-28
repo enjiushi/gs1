@@ -116,6 +116,7 @@ void inventory_craft_commit_consumes_nearby_ingredients_and_outputs_to_device_st
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
+    campaign.technology_state.total_reputation = 8;
     auto site_run = make_test_site_run(1U, 1502U);
     GameMessageQueue queue {};
     auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
@@ -180,6 +181,7 @@ void inventory_craft_commit_crafts_hammer_from_wood_and_iron(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
+    campaign.technology_state.total_reputation = 1440;
     auto site_run = make_test_site_run(1U, 1507U);
     GameMessageQueue queue {};
     auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);

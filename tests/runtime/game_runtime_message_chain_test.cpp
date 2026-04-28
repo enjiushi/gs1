@@ -340,7 +340,7 @@ void inventory_item_use_updates_worker_and_projection()
         assert(approx_equal(payload.player_health, 88.0f));
         assert(approx_equal(payload.player_morale, 100.0f));
         assert(approx_equal(payload.current_money, 45.0f));
-        assert(payload.active_task_count == 0U);
+        assert(payload.active_task_count == 1U);
     }
 }
 
@@ -356,7 +356,8 @@ void ecology_growth_completes_task_and_site_attempt()
 
     auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
     assert(site_run.counters.site_completion_tile_threshold == 10U);
-    assert(site_run.task_board.visible_tasks.empty());
+    assert(site_run.task_board.visible_tasks.size() == 1U);
+    assert(site_run.task_board.accepted_task_ids.size() == 1U);
     site_run.counters.site_completion_tile_threshold = 1U;
     seed_runtime_test_task(runtime, 10U);
     assert(site_run.task_board.visible_tasks.front().target_amount == 10U);

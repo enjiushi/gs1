@@ -352,7 +352,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         50: { name: "Rich Peashrub Hotpot", shortName: "Rich Hotpot", stackSize: 3, canUse: true, canPlant: false, canDeploy: false, useLabel: "Eat" },
         51: { name: "Rich Buckthorn Tonic", shortName: "Rich Tonic", stackSize: 3, canUse: true, canPlant: false, canDeploy: false, useLabel: "Drink" },
         52: { name: "Rich Jadeleaf Stew", shortName: "Rich Stew", stackSize: 3, canUse: true, canPlant: false, canDeploy: false, useLabel: "Eat" },
-        53: { name: "Rich Desert Revival Draught", shortName: "Rich Revival", stackSize: 3, canUse: true, canPlant: false, canDeploy: false, useLabel: "Drink" }
+        53: { name: "Rich Desert Revival Draught", shortName: "Rich Revival", stackSize: 3, canUse: true, canPlant: false, canDeploy: false, useLabel: "Drink" },
+        54: { name: "Ephedra Stew", shortName: "Ephedra Stew", stackSize: 3, canUse: true, canPlant: false, canDeploy: false, useLabel: "Eat" }
     };
     const itemVisuals = {
         1: { iconKey: "water", light: "#5d8eb3", dark: "#33546f" },
@@ -404,7 +405,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         50: { iconKey: "ration", light: "#cf965e", dark: "#7a4b2a" },
         51: { iconKey: "water", light: "#e0aa63", dark: "#865629" },
         52: { iconKey: "ration", light: "#afc578", dark: "#657541" },
-        53: { iconKey: "water", light: "#acd7c0", dark: "#587f6e" }
+        53: { iconKey: "water", light: "#acd7c0", dark: "#587f6e" },
+        54: { iconKey: "ration", light: "#9eb67c", dark: "#5f7443" }
     };
     const uiIconMarkup = {
         water: [
@@ -5815,29 +5817,65 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function getPhoneTaskTemplatePresentation(task) {
         switch (task.taskTemplateId) {
-        case 1:
+        case 101:
             return {
-                title: "Clear the Camp Path",
-                summary: "Use Clear Burial on the drift packed against the camp approach.",
-                reward: "Reward: 2 Wood to the delivery box."
+                title: "Lay One Checkerboard",
+                summary: "Plant 1 Basic Straw Checkerboard to learn the first placement step.",
+                reward: "Reward: 3 Wood, 2 Iron, and +10 total reputation."
             };
-        case 2:
+        case 102:
             return {
-                title: "Fix the Workbench",
-                summary: "Repair the damaged starter workbench beside camp.",
-                reward: "Reward: 2 Iron to the delivery box."
+                title: "Craft a Storage Crate",
+                summary: "Use the starter workbench to craft 1 Storage Crate Kit.",
+                reward: "Reward: $8.00 and +10 total reputation."
             };
-        case 3:
+        case 103:
             return {
-                title: "Plant a Starter Patch",
-                summary: "Plant two Ordos Wormwood tiles to learn the base restoration action.",
-                reward: "Reward: 2 Ordos Wormwood Seeds to the delivery box."
+                title: "Buy Water",
+                summary: "Buy 1 Water from the phone market.",
+                reward: "Reward: $10.00 and +10 total reputation."
             };
-        case 4:
+        case 104:
             return {
-                title: "Water the Seedlings",
-                summary: "Use Water twice on planted tiles to learn follow-up care.",
-                reward: "Reward: 1 Water to the delivery box."
+                title: "Buy Food",
+                summary: "Buy 1 Food from the phone market.",
+                reward: "Reward: 2 Wood, 1 Iron, and +10 total reputation."
+            };
+        case 105:
+            return {
+                title: "Craft a Shovel",
+                summary: "The first unlock just landed. Craft 1 Shovel at the workbench.",
+                reward: "Reward: 8 Basic Straw Checkerboards and +10 total reputation."
+            };
+        case 106:
+            return {
+                title: "Hold the Starter Patch",
+                summary: "Keep the 2 starter Desert Ephedra plants from losing density for 0.5 in-game hour.",
+                reward: "Reward: 4 Wood, 2 Iron, and +10 total reputation."
+            };
+        case 107:
+            return {
+                title: "Craft a Cook Plot",
+                summary: "Craft 1 Camp Stove Kit at the workbench.",
+                reward: "Reward: +10 total reputation."
+            };
+        case 108:
+            return {
+                title: "Place the Cook Plot",
+                summary: "Deploy 1 Camp Stove on the ground beside camp.",
+                reward: "Reward: $2.00 and +10 total reputation."
+            };
+        case 109:
+            return {
+                title: "Harvest Desert Ephedra",
+                summary: "Harvest 1 starter Desert Ephedra patch.",
+                reward: "Reward: 1 Water and +10 total reputation."
+            };
+        case 110:
+            return {
+                title: "Cook Ephedra Stew",
+                summary: "Cook 1 Ephedra Stew from harvested Desert Ephedra Sprigs.",
+                reward: "Reward: 2 Desert Ephedra Seeds and +10 total reputation."
             };
         default:
             return {

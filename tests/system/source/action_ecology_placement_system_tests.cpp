@@ -1577,13 +1577,13 @@ void action_execution_shovel_in_worker_pack_reduces_plant_and_excavate_duration_
         approx_equal(boosted_excavate_duration, baseline_excavate_duration * 0.85f));
     GS1_SYSTEM_TEST_CHECK(
         context,
-        approx_equal(boosted_excavate_cost.hydration_delta, baseline_excavate_cost.hydration_delta * 0.70f));
+        approx_equal(boosted_excavate_cost.hydration_delta, baseline_excavate_cost.hydration_delta * 0.85f));
     GS1_SYSTEM_TEST_CHECK(
         context,
-        approx_equal(boosted_excavate_cost.nourishment_delta, baseline_excavate_cost.nourishment_delta * 0.70f));
+        approx_equal(boosted_excavate_cost.nourishment_delta, baseline_excavate_cost.nourishment_delta * 0.85f));
     GS1_SYSTEM_TEST_CHECK(
         context,
-        approx_equal(boosted_excavate_cost.energy_delta, baseline_excavate_cost.energy_delta * 0.70f));
+        approx_equal(boosted_excavate_cost.energy_delta, baseline_excavate_cost.energy_delta * 0.85f));
 }
 
 void action_execution_village_tech_unlocks_careful_and_thorough_excavation(
@@ -1620,9 +1620,9 @@ void action_execution_village_tech_unlocks_careful_and_thorough_excavation(
 
     campaign.technology_state.purchased_nodes.push_back(
         gs1::TechnologyPurchaseRecord {
-            gs1::TechNodeId {gs1::base_technology_node_id(
-                gs1::FactionId {gs1::k_faction_village_committee},
-                3U)}});
+                gs1::TechNodeId {gs1::base_technology_node_id(
+                    gs1::FactionId {gs1::k_faction_village_committee},
+                    12U)}});
     queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -1648,9 +1648,9 @@ void action_execution_village_tech_unlocks_careful_and_thorough_excavation(
 
     campaign.technology_state.purchased_nodes.push_back(
         gs1::TechnologyPurchaseRecord {
-            gs1::TechNodeId {gs1::base_technology_node_id(
-                gs1::FactionId {gs1::k_faction_village_committee},
-                6U)}});
+                gs1::TechNodeId {gs1::base_technology_node_id(
+                    gs1::FactionId {gs1::k_faction_village_committee},
+                    30U)}});
     queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(
         context,

@@ -81,3 +81,159 @@ modifier_id = 5
 faction_id = 0
 delivery_minutes = 0
 reputation_delta = 0
+
+[[reward_candidates]]
+reward_candidate_id = 101
+effect_kind = "CampaignReputation"
+money_delta = 0
+item_id = 0
+quantity = 0
+unlockable_id = 0
+modifier_id = 0
+faction_id = 0
+delivery_minutes = 0
+reputation_delta = 10
+
+[[reward_candidates]]
+reward_candidate_id = 102
+effect_kind = "ItemDelivery"
+money_delta = 0
+item_id = 8
+quantity = 3
+unlockable_id = 0
+modifier_id = 0
+faction_id = 0
+delivery_minutes = 0
+reputation_delta = 0
+
+[[reward_candidates]]
+reward_candidate_id = 103
+effect_kind = "ItemDelivery"
+money_delta = 0
+item_id = 9
+quantity = 2
+unlockable_id = 0
+modifier_id = 0
+faction_id = 0
+delivery_minutes = 0
+reputation_delta = 0
+
+[[reward_candidates]]
+reward_candidate_id = 104
+effect_kind = "Money"
+money_delta = 8
+item_id = 0
+quantity = 0
+unlockable_id = 0
+modifier_id = 0
+faction_id = 0
+delivery_minutes = 0
+reputation_delta = 0
+
+[[reward_candidates]]
+reward_candidate_id = 105
+effect_kind = "Money"
+money_delta = 10
+item_id = 0
+quantity = 0
+unlockable_id = 0
+modifier_id = 0
+faction_id = 0
+delivery_minutes = 0
+reputation_delta = 0
+
+[[reward_candidates]]
+reward_candidate_id = 106
+effect_kind = "ItemDelivery"
+money_delta = 0
+item_id = 8
+quantity = 2
+unlockable_id = 0
+modifier_id = 0
+faction_id = 0
+delivery_minutes = 0
+reputation_delta = 0
+
+[[reward_candidates]]
+reward_candidate_id = 107
+effect_kind = "ItemDelivery"
+money_delta = 0
+item_id = 9
+quantity = 1
+unlockable_id = 0
+modifier_id = 0
+faction_id = 0
+delivery_minutes = 0
+reputation_delta = 0
+
+[[reward_candidates]]
+reward_candidate_id = 108
+effect_kind = "ItemDelivery"
+money_delta = 0
+item_id = 15
+quantity = 8
+unlockable_id = 0
+modifier_id = 0
+faction_id = 0
+delivery_minutes = 0
+reputation_delta = 0
+
+[[reward_candidates]]
+reward_candidate_id = 109
+effect_kind = "ItemDelivery"
+money_delta = 0
+item_id = 8
+quantity = 4
+unlockable_id = 0
+modifier_id = 0
+faction_id = 0
+delivery_minutes = 0
+reputation_delta = 0
+
+[[reward_candidates]]
+reward_candidate_id = 110
+effect_kind = "ItemDelivery"
+money_delta = 0
+item_id = 9
+quantity = 2
+unlockable_id = 0
+modifier_id = 0
+faction_id = 0
+delivery_minutes = 0
+reputation_delta = 0
+
+[[reward_candidates]]
+reward_candidate_id = 111
+effect_kind = "Money"
+money_delta = 2
+item_id = 0
+quantity = 0
+unlockable_id = 0
+modifier_id = 0
+faction_id = 0
+delivery_minutes = 0
+reputation_delta = 0
+
+[[reward_candidates]]
+reward_candidate_id = 112
+effect_kind = "ItemDelivery"
+money_delta = 0
+item_id = 1
+quantity = 1
+unlockable_id = 0
+modifier_id = 0
+faction_id = 0
+delivery_minutes = 0
+reputation_delta = 0
+
+[[reward_candidates]]
+reward_candidate_id = 113
+effect_kind = "ItemDelivery"
+money_delta = 0
+item_id = 19
+quantity = 2
+unlockable_id = 0
+modifier_id = 0
+faction_id = 0
+delivery_minutes = 0
+reputation_delta = 0

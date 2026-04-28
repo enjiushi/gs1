@@ -711,7 +711,7 @@ int main()
     GameMessage claim_tech_node_message {};
     claim_tech_node_message.type = GameMessageType::TechnologyNodeClaimRequested;
     claim_tech_node_message.set_payload(gs1::TechnologyNodeClaimRequestedMessage {
-        gs1::k_tech_node_t1_field_briefing,
+        gs1::base_technology_node_id(gs1::FactionId {gs1::k_faction_village_committee}, 1U),
         gs1::k_faction_village_committee});
     assert(runtime.handle_message(claim_tech_node_message) == GS1_STATUS_OK);
     const auto claimed_messages = drain_engine_messages(runtime);
@@ -788,9 +788,10 @@ int main()
                bootstrap_site_run,
                gs1::inventory_storage::starter_storage_container(bootstrap_site_run),
                gs1::ItemId {gs1::k_item_basic_straw_checkerboard}) == 8U);
-    assert(bootstrap_site_run.task_board.visible_tasks.empty());
-    assert(bootstrap_site_run.economy.money == 4100);
-    assert(bootstrap_site_run.economy.available_phone_listings.size() >= 11U);
+    assert(bootstrap_site_run.task_board.visible_tasks.size() == 1U);
+    assert(bootstrap_site_run.task_board.accepted_task_ids.size() == 1U);
+    assert(gs1::GameRuntimeProjectionTestAccess::campaign(runtime)->cash == 4100);
+    assert(bootstrap_site_run.economy.available_phone_listings.size() >= 5U);
 
     const auto bootstrap_messages = drain_engine_messages(runtime);
     const auto storage_messages =
@@ -800,7 +801,7 @@ int main()
     assert(!collect_messages_of_type(bootstrap_messages, GS1_ENGINE_MESSAGE_SITE_INVENTORY_SLOT_UPSERT).empty());
     assert(storage_messages.size() == 3U);
     assert(weather_messages.size() == 1U);
-    assert(collect_messages_of_type(bootstrap_messages, GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT).empty());
+    assert(!collect_messages_of_type(bootstrap_messages, GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT).empty());
     const auto bootstrap_phone_panel_messages =
         collect_messages_of_type(bootstrap_messages, GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE);
     assert(!bootstrap_phone_panel_messages.empty());
@@ -810,9 +811,10 @@ int main()
             bootstrap_phone_panel_messages.front()->payload_as<Gs1EngineMessagePhonePanelData>();
         assert(phone_panel_payload.active_section == GS1_PHONE_PANEL_SECTION_HOME);
         assert(phone_panel_payload.visible_task_count == 0U);
+        assert(phone_panel_payload.accepted_task_count == 1U);
         assert(phone_panel_payload.completed_task_count == 0U);
         assert(phone_panel_payload.claimed_task_count == 0U);
-        assert(phone_panel_payload.buy_listing_count >= 9U);
+        assert(phone_panel_payload.buy_listing_count >= 3U);
     }
     {
         const auto& weather_payload =
@@ -892,7 +894,7 @@ int main()
     buy_listing.type = GameMessageType::PhoneListingPurchaseRequested;
     buy_listing.set_payload(PhoneListingPurchaseRequestedMessage {1U, 1U, 0U});
     assert(runtime.handle_message(buy_listing) == GS1_STATUS_OK);
-    assert(bootstrap_site_run.economy.money == 3380);
+    assert(gs1::GameRuntimeProjectionTestAccess::campaign(runtime)->cash == 3380);
     assert(bootstrap_site_run.economy.available_phone_listings[0].quantity == 5U);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
     drain_engine_messages(runtime);

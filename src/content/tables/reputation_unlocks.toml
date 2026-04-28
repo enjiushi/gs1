@@ -1,7 +1,15 @@
 [[reputation_unlocks]]
+unlock_id = 5007
+unlock_kind = "Recipe"
+reputation_requirement = 40
+content_id = 8
+display_name = "Shovel"
+description = "Unlocks the Shovel crafting recipe for portable field work support."
+
+[[reputation_unlocks]]
 unlock_id = 5001
 unlock_kind = "Plant"
-reputation_requirement = 1
+reputation_requirement = 240
 content_id = 1
 display_name = "Ordos Wormwood"
 description = "Unlocks the first dedicated windbreak plant for exposed starter lanes."
@@ -9,23 +17,15 @@ description = "Unlocks the first dedicated windbreak plant for exposed starter l
 [[reputation_unlocks]]
 unlock_id = 5002
 unlock_kind = "Recipe"
-reputation_requirement = 2
+reputation_requirement = 440
 content_id = 6
 display_name = "Field Tea"
 description = "Unlocks the first simple restorative drink recipe for light hydration support."
 
 [[reputation_unlocks]]
-unlock_id = 5003
-unlock_kind = "StructureRecipe"
-reputation_requirement = 3
-content_id = 201
-display_name = "Camp Stove"
-description = "Unlocks the build recipe for the Camp Stove so cooking can start on-site."
-
-[[reputation_unlocks]]
 unlock_id = 5004
 unlock_kind = "Recipe"
-reputation_requirement = 4
+reputation_requirement = 640
 content_id = 7
 display_name = "Spiced Stew"
 description = "Unlocks the first hearty cooked meal recipe for basic nourishment support."
@@ -33,7 +33,7 @@ description = "Unlocks the first hearty cooked meal recipe for basic nourishment
 [[reputation_unlocks]]
 unlock_id = 5005
 unlock_kind = "Plant"
-reputation_requirement = 5
+reputation_requirement = 840
 content_id = 2
 display_name = "White Thorn"
 description = "Unlocks a salinity-tolerant shrub for harsher starter ground."
@@ -41,31 +41,15 @@ description = "Unlocks a salinity-tolerant shrub for harsher starter ground."
 [[reputation_unlocks]]
 unlock_id = 5006
 unlock_kind = "Item"
-reputation_requirement = 6
+reputation_requirement = 1040
 content_id = 3
 display_name = "Medicine"
 description = "Unlocks medicine access so the phone store can stock emergency treatment."
 
 [[reputation_unlocks]]
-unlock_id = 5007
-unlock_kind = "Recipe"
-reputation_requirement = 7
-content_id = 8
-display_name = "Shovel"
-description = "Unlocks the Shovel crafting recipe for portable field work support."
-
-[[reputation_unlocks]]
-unlock_id = 5008
-unlock_kind = "StructureRecipe"
-reputation_requirement = 8
-content_id = 203
-display_name = "Storage Crate"
-description = "Unlocks the build recipe for the Storage Crate to expand logistics capacity."
-
-[[reputation_unlocks]]
 unlock_id = 5009
 unlock_kind = "Plant"
-reputation_requirement = 9
+reputation_requirement = 1240
 content_id = 7
 display_name = "Jiji Grass"
 description = "Unlocks a dedicated soil-support grass for fertility-led expansion."
@@ -73,7 +57,7 @@ description = "Unlocks a dedicated soil-support grass for fertility-led expansio
 [[reputation_unlocks]]
 unlock_id = 5010
 unlock_kind = "Recipe"
-reputation_requirement = 10
+reputation_requirement = 1440
 content_id = 5
 display_name = "Hammer"
 description = "Unlocks the Hammer crafting recipe for basic construction support."
@@ -81,7 +65,7 @@ description = "Unlocks the Hammer crafting recipe for basic construction support
 [[reputation_unlocks]]
 unlock_id = 5011
 unlock_kind = "StructureRecipe"
-reputation_requirement = 11
+reputation_requirement = 1640
 content_id = 202
 display_name = "Workbench"
 description = "Unlocks the build recipe for the Workbench so fabrication can scale out."
@@ -89,7 +73,7 @@ description = "Unlocks the build recipe for the Workbench so fabrication can sca
 [[reputation_unlocks]]
 unlock_id = 5012
 unlock_kind = "Recipe"
-reputation_requirement = 12
+reputation_requirement = 1840
 content_id = 9
 display_name = "Wormwood Broth"
 description = "Unlocks the first Village recovery broth recipe."
@@ -97,7 +81,7 @@ description = "Unlocks the first Village recovery broth recipe."
 [[reputation_unlocks]]
 unlock_id = 5013
 unlock_kind = "Plant"
-reputation_requirement = 13
+reputation_requirement = 2040
 content_id = 8
 display_name = "Sea Buckthorn"
 description = "Unlocks a productive perimeter plant that mixes output with real protection."
@@ -105,7 +89,7 @@ description = "Unlocks a productive perimeter plant that mixes output with real 
 [[reputation_unlocks]]
 unlock_id = 5014
 unlock_kind = "Item"
-reputation_requirement = 14
+reputation_requirement = 2240
 content_id = 39
 display_name = "Focus Tonic"
 description = "Unlocks Focus Tonic access so the phone store can stock the stimulant directly."
@@ -113,23 +97,15 @@ description = "Unlocks Focus Tonic access so the phone store can stock the stimu
 [[reputation_unlocks]]
 unlock_id = 5015
 unlock_kind = "Recipe"
-reputation_requirement = 15
+reputation_requirement = 2440
 content_id = 10
 display_name = "Thornberry Cooler"
 description = "Unlocks the first Village cooling drink recipe."
 
 [[reputation_unlocks]]
-unlock_id = 5016
-unlock_kind = "StructureRecipe"
-reputation_requirement = 16
-content_id = 204
-display_name = "Wind Fence"
-description = "Unlocks the build recipe for the Wind Fence so hard shelter can join plant shelter."
-
-[[reputation_unlocks]]
 unlock_id = 5017
 unlock_kind = "Plant"
-reputation_requirement = 17
+reputation_requirement = 2640
 content_id = 6
 display_name = "Korshinsk Peashrub"
 description = "Unlocks a deep soil-rehab specialist for long salty-ground conversion work."
@@ -137,7 +113,7 @@ description = "Unlocks a deep soil-rehab specialist for long salty-ground conver
 [[reputation_unlocks]]
 unlock_id = 5018
 unlock_kind = "Recipe"
-reputation_requirement = 18
+reputation_requirement = 2840
 content_id = 11
 display_name = "Rich Wormwood Broth"
 description = "Unlocks the richer Wormwood Broth recipe variant."
@@ -145,7 +121,7 @@ description = "Unlocks the richer Wormwood Broth recipe variant."
 [[reputation_unlocks]]
 unlock_id = 5019
 unlock_kind = "Item"
-reputation_requirement = 19
+reputation_requirement = 3040
 content_id = 8
 display_name = "Wood"
 description = "Unlocks wood access so the phone store can restock fabrication materials."
@@ -153,7 +129,7 @@ description = "Unlocks wood access so the phone store can restock fabrication ma
 [[reputation_unlocks]]
 unlock_id = 5020
 unlock_kind = "Recipe"
-reputation_requirement = 20
+reputation_requirement = 3240
 content_id = 12
 display_name = "Rich Thornberry Cooler"
 description = "Unlocks the richer Thornberry Cooler recipe variant."
@@ -161,7 +137,7 @@ description = "Unlocks the richer Thornberry Cooler recipe variant."
 [[reputation_unlocks]]
 unlock_id = 5021
 unlock_kind = "Plant"
-reputation_requirement = 21
+reputation_requirement = 3440
 content_id = 3
 display_name = "Red Tamarisk"
 description = "Unlocks a heat-pocket protection plant for harsher hot zones."
@@ -169,7 +145,7 @@ description = "Unlocks a heat-pocket protection plant for harsher hot zones."
 [[reputation_unlocks]]
 unlock_id = 5022
 unlock_kind = "Recipe"
-reputation_requirement = 22
+reputation_requirement = 3640
 content_id = 13
 display_name = "Peashrub Hotpot"
 description = "Unlocks the first stronger Village recovery meal recipe."
@@ -177,7 +153,7 @@ description = "Unlocks the first stronger Village recovery meal recipe."
 [[reputation_unlocks]]
 unlock_id = 5023
 unlock_kind = "Item"
-reputation_requirement = 23
+reputation_requirement = 3840
 content_id = 9
 display_name = "Iron"
 description = "Unlocks iron access so the phone store can restock tougher fabrication materials."
@@ -185,7 +161,7 @@ description = "Unlocks iron access so the phone store can restock tougher fabric
 [[reputation_unlocks]]
 unlock_id = 5024
 unlock_kind = "Recipe"
-reputation_requirement = 24
+reputation_requirement = 4040
 content_id = 14
 display_name = "Buckthorn Tonic"
 description = "Unlocks the first stronger Village restorative drink recipe."
@@ -193,7 +169,7 @@ description = "Unlocks the first stronger Village restorative drink recipe."
 [[reputation_unlocks]]
 unlock_id = 5025
 unlock_kind = "Plant"
-reputation_requirement = 25
+reputation_requirement = 4240
 content_id = 4
 display_name = "Ningxia Wolfberry"
 description = "Unlocks a fragile high-payoff crop that depends on established support."
@@ -201,7 +177,7 @@ description = "Unlocks a fragile high-payoff crop that depends on established su
 [[reputation_unlocks]]
 unlock_id = 5026
 unlock_kind = "Recipe"
-reputation_requirement = 26
+reputation_requirement = 4440
 content_id = 15
 display_name = "Rich Peashrub Hotpot"
 description = "Unlocks the richer Peashrub Hotpot recipe variant."
@@ -209,7 +185,7 @@ description = "Unlocks the richer Peashrub Hotpot recipe variant."
 [[reputation_unlocks]]
 unlock_id = 5027
 unlock_kind = "Recipe"
-reputation_requirement = 27
+reputation_requirement = 4640
 content_id = 16
 display_name = "Rich Buckthorn Tonic"
 description = "Unlocks the richer Buckthorn Tonic recipe variant."
@@ -217,7 +193,7 @@ description = "Unlocks the richer Buckthorn Tonic recipe variant."
 [[reputation_unlocks]]
 unlock_id = 5028
 unlock_kind = "Recipe"
-reputation_requirement = 28
+reputation_requirement = 4840
 content_id = 17
 display_name = "Jadeleaf Stew"
 description = "Unlocks the first late-branch combo recovery meal recipe."
@@ -225,7 +201,7 @@ description = "Unlocks the first late-branch combo recovery meal recipe."
 [[reputation_unlocks]]
 unlock_id = 5029
 unlock_kind = "Plant"
-reputation_requirement = 29
+reputation_requirement = 5040
 content_id = 10
 display_name = "Saxaul"
 description = "Unlocks the late anchor canopy plant for turning a zone into a refuge core."
@@ -233,7 +209,7 @@ description = "Unlocks the late anchor canopy plant for turning a zone into a re
 [[reputation_unlocks]]
 unlock_id = 5030
 unlock_kind = "Recipe"
-reputation_requirement = 30
+reputation_requirement = 5240
 content_id = 18
 display_name = "Desert Revival Draught"
 description = "Unlocks the first late-branch combo recovery drink recipe."
@@ -241,7 +217,7 @@ description = "Unlocks the first late-branch combo recovery drink recipe."
 [[reputation_unlocks]]
 unlock_id = 5031
 unlock_kind = "Recipe"
-reputation_requirement = 31
+reputation_requirement = 5440
 content_id = 19
 display_name = "Rich Jadeleaf Stew"
 description = "Unlocks the richer Jadeleaf Stew recipe variant."
@@ -249,7 +225,7 @@ description = "Unlocks the richer Jadeleaf Stew recipe variant."
 [[reputation_unlocks]]
 unlock_id = 5032
 unlock_kind = "Recipe"
-reputation_requirement = 32
+reputation_requirement = 5640
 content_id = 20
 display_name = "Rich Desert Revival Draught"
 description = "Unlocks the richer Desert Revival Draught recipe variant."

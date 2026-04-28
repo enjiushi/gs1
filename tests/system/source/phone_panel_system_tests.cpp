@@ -88,19 +88,19 @@ void phone_panel_site_run_started_seeds_home_snapshot(
     const auto& phone_panel = site_run.phone_panel;
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.active_section == PhonePanelSection::Home);
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.visible_task_count == 0U);
-    GS1_SYSTEM_TEST_CHECK(context, phone_panel.accepted_task_count == 0U);
+    GS1_SYSTEM_TEST_CHECK(context, phone_panel.accepted_task_count == 1U);
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.completed_task_count == 0U);
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.claimed_task_count == 0U);
-    GS1_SYSTEM_TEST_CHECK(context, phone_panel.buy_listing_count >= 7U);
+    GS1_SYSTEM_TEST_CHECK(context, phone_panel.buy_listing_count >= 4U);
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.sell_listing_count >= 1U);
-    GS1_SYSTEM_TEST_CHECK(context, phone_panel.service_listing_count == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, phone_panel.service_listing_count == 0U);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         find_phone_panel_listing(
             phone_panel,
             1000U + static_cast<std::uint32_t>(gs1::k_item_water_container)) != nullptr);
     GS1_SYSTEM_TEST_CHECK(context, find_phone_panel_listing(phone_panel, 10U) == nullptr);
-    GS1_SYSTEM_TEST_REQUIRE(context, find_phone_panel_listing(phone_panel, 11U) != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(context, find_phone_panel_listing(phone_panel, 16U) != nullptr);
 }
 
 void phone_panel_section_request_switches_authoritative_section(

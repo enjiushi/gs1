@@ -23,8 +23,8 @@ default_weather_wind = 20.0
 default_weather_dust = 10.0
 default_weather_wind_direction_degrees = 0.0
 starting_plants = [
-    { plant_id = 1, anchor_x = 12, anchor_y = 14, initial_density = 60.0 },
-    { plant_id = 1, anchor_x = 12, anchor_y = 16, initial_density = 60.0 }
+    { plant_id = 9, anchor_x = 12, anchor_y = 14, initial_density = 60.0 },
+    { plant_id = 9, anchor_x = 12, anchor_y = 16, initial_density = 60.0 }
 ]
 phone_delivery_fee = 5
 phone_delivery_minutes = 0

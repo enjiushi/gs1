@@ -103,6 +103,7 @@ inline constexpr std::uint32_t k_item_rich_peashrub_hotpot = 50U;
 inline constexpr std::uint32_t k_item_rich_buckthorn_tonic = 51U;
 inline constexpr std::uint32_t k_item_rich_jadeleaf_stew = 52U;
 inline constexpr std::uint32_t k_item_rich_desert_revival_draught = 53U;
+inline constexpr std::uint32_t k_item_ephedra_stew = 54U;
 
 [[nodiscard]] std::span<const ItemDef> all_item_defs() noexcept;
 

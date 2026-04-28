@@ -740,14 +740,99 @@ std::vector<TaskRewardDraftOption> make_reward_draft_options(
     (void)context;
     (void)task_instance_id;
     (void)task_template_def;
-    if (onboarding_seed == nullptr ||
-        onboarding_seed->reward_candidate_id.value == 0U ||
-        find_reward_candidate_def(onboarding_seed->reward_candidate_id) == nullptr)
+    if (onboarding_seed == nullptr)
     {
         return {};
     }
 
-    return {TaskRewardDraftOption {onboarding_seed->reward_candidate_id, false}};
+    std::vector<TaskRewardDraftOption> options {};
+    const RewardCandidateId reward_ids[] {
+        onboarding_seed->reward_candidate_id,
+        onboarding_seed->secondary_reward_candidate_id,
+        onboarding_seed->tertiary_reward_candidate_id,
+        onboarding_seed->quaternary_reward_candidate_id};
+    for (const auto reward_candidate_id : reward_ids)
+    {
+        if (reward_candidate_id.value == 0U ||
+            find_reward_candidate_def(reward_candidate_id) == nullptr)
+        {
+            continue;
+        }
+
+        const bool already_present = std::any_of(
+            options.begin(),
+            options.end(),
+            [&](const TaskRewardDraftOption& option) {
+                return option.reward_candidate_id == reward_candidate_id;
+            });
+        if (!already_present)
+        {
+            options.push_back(TaskRewardDraftOption {reward_candidate_id, false});
+        }
+    }
+
+    return options;
+}
+
+const SiteOnboardingTaskSeedDef* find_onboarding_seed_def(
+    SiteId site_id,
+    TaskTemplateId task_template_id) noexcept
+{
+    for (const auto& seed_def : all_site_onboarding_task_seed_defs())
+    {
+        if (seed_def.site_id == site_id &&
+            seed_def.task_template_id == task_template_id)
+        {
+            return &seed_def;
+        }
+    }
+
+    return nullptr;
+}
+
+const SiteOnboardingTaskSeedDef* find_root_onboarding_seed(SiteId site_id) noexcept
+{
+    for (const auto& candidate_seed : all_site_onboarding_task_seed_defs())
+    {
+        if (candidate_seed.site_id != site_id ||
+            candidate_seed.task_template_id.value == 0U)
+        {
+            continue;
+        }
+
+        bool referenced_as_follow_up = false;
+        for (const auto& other_seed : all_site_onboarding_task_seed_defs())
+        {
+            if (other_seed.site_id != site_id)
+            {
+                continue;
+            }
+
+            if (other_seed.follow_up_task_template_id == candidate_seed.task_template_id)
+            {
+                referenced_as_follow_up = true;
+                break;
+            }
+        }
+
+        if (!referenced_as_follow_up)
+        {
+            return &candidate_seed;
+        }
+    }
+
+    return nullptr;
+}
+
+std::uint32_t next_task_instance_id(const TaskBoardState& board) noexcept
+{
+    std::uint32_t next_id = 1U;
+    for (const auto& task : board.visible_tasks)
+    {
+        next_id = std::max(next_id, task.task_instance_id.value + 1U);
+    }
+
+    return next_id;
 }
 
 TaskInstanceState make_task_instance(
@@ -888,6 +973,11 @@ TaskInstanceState make_task_instance(
     task.reward_draft_options =
         make_reward_draft_options(context, task_instance_id, task_template_def, onboarding_seed);
     task.runtime_list_kind = TaskRuntimeListKind::Visible;
+    if (onboarding_seed != nullptr && onboarding_seed->follow_up_task_template_id.value != 0U)
+    {
+        task.follow_up_task_template_id = onboarding_seed->follow_up_task_template_id;
+        task.has_follow_up_task_template = true;
+    }
     return task;
 }
 
@@ -932,6 +1022,63 @@ TaskInstanceState* find_task_instance(TaskBoardState& board, TaskInstanceId id) 
     }
 
     return nullptr;
+}
+
+bool complete_task(
+    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardState& board,
+    TaskInstanceState& task) noexcept;
+
+bool is_snapshot_progress_kind(TaskProgressKind progress_kind) noexcept;
+bool is_duration_progress_kind(TaskProgressKind progress_kind) noexcept;
+bool refresh_snapshot_task_progress(
+    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardState& board,
+    TaskInstanceState& task) noexcept;
+bool refresh_duration_task_condition(
+    SiteSystemContext<TaskBoardSystem>& context,
+    TaskInstanceState& task) noexcept;
+
+void activate_task_instance(
+    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardState& board,
+    TaskInstanceState& task) noexcept
+{
+    if (task.runtime_list_kind != TaskRuntimeListKind::Visible)
+    {
+        return;
+    }
+
+    task.runtime_list_kind = TaskRuntimeListKind::Accepted;
+    task.progress_accumulator = 0.0;
+    task.requirement_mask = 0U;
+    board.accepted_task_ids.push_back(task.task_instance_id);
+    const auto* task_template_def = find_task_template_def(task.task_template_id);
+    if (task_template_def != nullptr && is_snapshot_progress_kind(task_template_def->progress_kind))
+    {
+        (void)refresh_snapshot_task_progress(context, board, task);
+    }
+    else if (task_template_def != nullptr && is_duration_progress_kind(task_template_def->progress_kind))
+    {
+        if (task_template_def->progress_kind == TaskProgressKind::KeepAllLivingPlantsNotWitheringForDuration)
+        {
+            const auto& board_state = context.world.read_task_board();
+            task.requirement_mask =
+                (board_state.all_tracked_living_plants_stable &&
+                    board_state.tracked_living_plant_count >=
+                        normalized_required_count(task.required_count))
+                ? 1U
+                : 0U;
+        }
+        else
+        {
+            (void)refresh_duration_task_condition(context, task);
+        }
+    }
+    else if (task.current_progress_amount >= std::max<std::uint32_t>(1U, task.target_amount))
+    {
+        (void)complete_task(context, board, task);
+    }
 }
 
 TaskRewardDraftOption* find_reward_option(
@@ -1031,7 +1178,25 @@ bool queue_reward_message(
         break;
 
     case RewardEffectKind::CampaignReputation:
+        if (reward_candidate_def.reputation_delta == 0)
+        {
+            return false;
+        }
+        reward_message.type = GameMessageType::CampaignReputationAwardRequested;
+        reward_message.set_payload(CampaignReputationAwardRequestedMessage {
+            reward_candidate_def.reputation_delta});
+        break;
     case RewardEffectKind::FactionReputation:
+        if (reward_candidate_def.faction_id.value == 0U ||
+            reward_candidate_def.reputation_delta == 0)
+        {
+            return false;
+        }
+        reward_message.type = GameMessageType::FactionReputationAwardRequested;
+        reward_message.set_payload(FactionReputationAwardRequestedMessage {
+            reward_candidate_def.faction_id.value,
+            reward_candidate_def.reputation_delta});
+        break;
     case RewardEffectKind::None:
     default:
         return false;
@@ -1675,32 +1840,35 @@ void handle_site_run_started(
     auto& board = context.world.own_task_board();
     reset_task_board(board);
     initialize_task_tracking_cache(context, board);
-
-    std::uint32_t next_task_instance_id = 1U;
+    std::uint32_t site_seed_count = 0U;
     for (const auto& seed_def : all_site_onboarding_task_seed_defs())
     {
-        if (seed_def.site_id.value != payload.site_id ||
-            seed_def.task_template_id.value == 0U)
+        if (seed_def.site_id.value == payload.site_id &&
+            seed_def.task_template_id.value != 0U)
         {
-            continue;
+            site_seed_count += 1U;
         }
-
-        const auto* task_template_def = find_task_template_def(seed_def.task_template_id);
-        if (task_template_def == nullptr)
-        {
-            continue;
-        }
-
-        board.visible_tasks.push_back(make_task_instance(
-            context,
-            TaskInstanceId {next_task_instance_id++},
-            *task_template_def,
-            context.world.read_counters(),
-            &seed_def));
     }
 
-    board.task_pool_size = static_cast<std::uint32_t>(board.visible_tasks.size());
+    board.task_pool_size = site_seed_count;
     board.minutes_until_next_refresh = 0.0;
+
+    if (const auto* root_seed = find_root_onboarding_seed(SiteId {payload.site_id});
+        root_seed != nullptr)
+    {
+        const auto* task_template_def = find_task_template_def(root_seed->task_template_id);
+        if (task_template_def != nullptr)
+        {
+            board.visible_tasks.push_back(make_task_instance(
+                context,
+                TaskInstanceId {1U},
+                *task_template_def,
+                context.world.read_counters(),
+                root_seed));
+            activate_task_instance(context, board, board.visible_tasks.back());
+        }
+    }
+
     if (!board.visible_tasks.empty())
     {
         mark_task_projection_dirty(context);
@@ -1724,36 +1892,7 @@ void handle_task_accept_requested(
         return;
     }
 
-    task->runtime_list_kind = TaskRuntimeListKind::Accepted;
-    task->progress_accumulator = 0.0;
-    task->requirement_mask = 0U;
-    board.accepted_task_ids.push_back(task->task_instance_id);
-    const auto* task_template_def = find_task_template_def(task->task_template_id);
-    if (task_template_def != nullptr && is_snapshot_progress_kind(task_template_def->progress_kind))
-    {
-        (void)refresh_snapshot_task_progress(context, board, *task);
-    }
-    else if (task_template_def != nullptr && is_duration_progress_kind(task_template_def->progress_kind))
-    {
-        if (task_template_def->progress_kind == TaskProgressKind::KeepAllLivingPlantsNotWitheringForDuration)
-        {
-            const auto& board_state = context.world.read_task_board();
-            task->requirement_mask =
-                (board_state.all_tracked_living_plants_stable &&
-                    board_state.tracked_living_plant_count >=
-                        normalized_required_count(task->required_count))
-                ? 1U
-                : 0U;
-        }
-        else
-        {
-            (void)refresh_duration_task_condition(context, *task);
-        }
-    }
-    else if (task->current_progress_amount >= std::max<std::uint32_t>(1U, task->target_amount))
-    {
-        (void)complete_task(context, board, *task);
-    }
+    activate_task_instance(context, board, *task);
     mark_task_projection_dirty(context);
 }
 
@@ -1780,16 +1919,41 @@ void handle_task_reward_claim_requested(
         return;
     }
 
-    const auto* reward_candidate_def = find_reward_candidate_def(reward_option->reward_candidate_id);
-    if (reward_candidate_def == nullptr || !queue_reward_message(context, *reward_candidate_def))
+    for (const auto& reward_bundle_option : task->reward_draft_options)
     {
-        return;
+        const auto* reward_candidate_def = find_reward_candidate_def(reward_bundle_option.reward_candidate_id);
+        if (reward_candidate_def == nullptr || !queue_reward_message(context, *reward_candidate_def))
+        {
+            return;
+        }
     }
 
-    reward_option->selected = true;
+    for (auto& reward_bundle_option : task->reward_draft_options)
+    {
+        reward_bundle_option.selected = true;
+    }
     task->runtime_list_kind = TaskRuntimeListKind::Claimed;
     remove_task_id(board.completed_task_ids, task->task_instance_id);
     board.claimed_task_ids.push_back(task->task_instance_id);
+
+    if (task->has_follow_up_task_template)
+    {
+        const auto* follow_up_seed =
+            find_onboarding_seed_def(context.site_run.site_id, task->follow_up_task_template_id);
+        const auto* follow_up_template_def =
+            find_task_template_def(task->follow_up_task_template_id);
+        if (follow_up_seed != nullptr && follow_up_template_def != nullptr)
+        {
+            board.visible_tasks.push_back(make_task_instance(
+                context,
+                TaskInstanceId {next_task_instance_id(board)},
+                *follow_up_template_def,
+                context.world.read_counters(),
+                follow_up_seed));
+            activate_task_instance(context, board, board.visible_tasks.back());
+        }
+    }
+
     mark_task_projection_dirty(context);
 }
 

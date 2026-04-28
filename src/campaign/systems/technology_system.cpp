@@ -44,6 +44,19 @@ const FactionProgressState* find_faction_progress(
     switch (recipe_id.value)
     {
     case k_recipe_cook_food_pack:
+    case k_recipe_cook_ephedra_stew:
+        return true;
+    default:
+        return false;
+    }
+}
+
+[[nodiscard]] bool structure_recipe_is_baseline_unlocked(StructureId structure_id) noexcept
+{
+    switch (structure_id.value)
+    {
+    case k_structure_camp_stove:
+    case k_structure_storage_crate:
         return true;
     default:
         return false;
@@ -190,6 +203,11 @@ bool TechnologySystem::structure_recipe_unlocked(
     if (structure_id.value == 0U)
     {
         return false;
+    }
+
+    if (structure_recipe_is_baseline_unlocked(structure_id))
+    {
+        return true;
     }
 
     return reputation_unlock_ready(

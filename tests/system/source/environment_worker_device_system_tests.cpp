@@ -92,7 +92,7 @@ void run_local_weather_pipeline(
     LocalWeatherResolveSystem::run(local_weather_context);
 }
 
-void prototype_site_run_seeds_site_one_ordos_wormwood_patches_near_camp(
+void prototype_site_run_seeds_site_one_desert_ephedra_patches_near_camp(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
@@ -110,7 +110,7 @@ void prototype_site_run_seeds_site_one_ordos_wormwood_patches_near_camp(
              TileCoord {13, 17}})
     {
         const auto tile = site_run.site_world->tile_at(coord);
-        GS1_SYSTEM_TEST_CHECK(context, tile.ecology.plant_id.value == gs1::k_plant_ordos_wormwood);
+        GS1_SYSTEM_TEST_CHECK(context, tile.ecology.plant_id.value == gs1::k_plant_desert_ephedra);
         GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.plant_density, 60.0f));
     }
 
@@ -1558,8 +1558,8 @@ void modifier_imports_campaign_assistant_and_scales_technology_run_modifiers_wit
 
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "site_run_factory",
-    "prototype_site_run_seeds_site_one_ordos_wormwood_patches_near_camp",
-    prototype_site_run_seeds_site_one_ordos_wormwood_patches_near_camp);
+    "prototype_site_run_seeds_site_one_desert_ephedra_patches_near_camp",
+    prototype_site_run_seeds_site_one_desert_ephedra_patches_near_camp);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "site_run_factory",
     "prototype_site_run_expands_worker_pack_with_village_pack_techs",

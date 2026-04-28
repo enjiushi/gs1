@@ -70,6 +70,7 @@ struct SiteOnboardingTaskSeedDef final
 {
     SiteId site_id {};
     TaskTemplateId task_template_id {};
+    TaskTemplateId follow_up_task_template_id {};
     std::uint32_t target_amount {0};
     std::uint32_t required_count {0};
     ItemId item_id {};
@@ -81,6 +82,9 @@ struct SiteOnboardingTaskSeedDef final
     ActionKind action_kind {ActionKind::None};
     float threshold_value {0.0f};
     RewardCandidateId reward_candidate_id {};
+    RewardCandidateId secondary_reward_candidate_id {};
+    RewardCandidateId tertiary_reward_candidate_id {};
+    RewardCandidateId quaternary_reward_candidate_id {};
 };
 
 inline constexpr std::uint32_t k_task_template_site1_restore_patch = 1U;
@@ -95,6 +99,16 @@ inline constexpr std::uint32_t k_task_template_site1_keep_worker_meters_high = 2
 inline constexpr std::uint32_t k_task_template_site1_keep_devices_healthy = 38U;
 inline constexpr std::uint32_t k_task_template_site1_keep_living_plants_stable = 39U;
 inline constexpr std::uint32_t k_task_template_site1_submit_water = 40U;
+inline constexpr std::uint32_t k_task_template_site1_onboarding_plant_checkerboard = 101U;
+inline constexpr std::uint32_t k_task_template_site1_onboarding_craft_storage_crate = 102U;
+inline constexpr std::uint32_t k_task_template_site1_onboarding_buy_water = 103U;
+inline constexpr std::uint32_t k_task_template_site1_onboarding_buy_food = 104U;
+inline constexpr std::uint32_t k_task_template_site1_onboarding_craft_shovel = 105U;
+inline constexpr std::uint32_t k_task_template_site1_onboarding_keep_starter_ephedra_stable = 106U;
+inline constexpr std::uint32_t k_task_template_site1_onboarding_craft_camp_stove = 107U;
+inline constexpr std::uint32_t k_task_template_site1_onboarding_build_camp_stove = 108U;
+inline constexpr std::uint32_t k_task_template_site1_onboarding_harvest_starter_ephedra = 109U;
+inline constexpr std::uint32_t k_task_template_site1_onboarding_cook_ephedra_stew = 110U;
 
 [[nodiscard]] std::span<const TaskTemplateDef> all_task_template_defs() noexcept;
 [[nodiscard]] const TaskTemplateDef* find_task_template_def(TaskTemplateId task_template_id) noexcept;

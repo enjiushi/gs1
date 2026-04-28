@@ -786,26 +786,6 @@ work_efficiency = 0.0
 
 [[modifier_presets]]
 preset_kind = "RunModifier"
-modifier_id = 23010
-heat = 0.0
-wind = 0.0
-dust = 0.0
-moisture = 0.14
-fertility = 0.0
-salinity = 0.0
-growth_pressure = 0.0
-salinity_density_cap = 0.0
-plant_density = 0.0
-health = 0.0
-hydration = 0.25
-nourishment = 0.15
-energy_cap = 0.0
-energy = 0.0
-morale = 0.04
-work_efficiency = 0.0
-
-[[modifier_presets]]
-preset_kind = "RunModifier"
 modifier_id = 23011
 heat = 0.0
 wind = 0.0
@@ -966,26 +946,6 @@ work_efficiency = 0.0
 
 [[modifier_presets]]
 preset_kind = "RunModifier"
-modifier_id = 23070
-heat = 0.0
-wind = 0.0
-dust = 0.0
-moisture = 0.14
-fertility = 0.0
-salinity = 0.0
-growth_pressure = 0.0
-salinity_density_cap = 0.0
-plant_density = 0.0
-health = 0.0
-hydration = 0.25
-nourishment = 0.15
-energy_cap = 0.0
-energy = 0.0
-morale = 0.04
-work_efficiency = 0.0
-
-[[modifier_presets]]
-preset_kind = "RunModifier"
 modifier_id = 23071
 heat = 0.0
 wind = 0.0
@@ -1007,26 +967,6 @@ work_efficiency = 0.05
 [[modifier_presets]]
 preset_kind = "RunModifier"
 modifier_id = 23082
-heat = 0.0
-wind = 0.0
-dust = 0.0
-moisture = 0.14
-fertility = 0.0
-salinity = 0.0
-growth_pressure = 0.0
-salinity_density_cap = 0.0
-plant_density = 0.0
-health = 0.0
-hydration = 0.25
-nourishment = 0.15
-energy_cap = 0.0
-energy = 0.0
-morale = 0.04
-work_efficiency = 0.0
-
-[[modifier_presets]]
-preset_kind = "RunModifier"
-modifier_id = 24010
 heat = 0.0
 wind = 0.0
 dust = 0.0
@@ -1187,26 +1127,6 @@ work_efficiency = 0.05
 [[modifier_presets]]
 preset_kind = "RunModifier"
 modifier_id = 24062
-heat = 0.0
-wind = 0.0
-dust = 0.0
-moisture = 0.14
-fertility = 0.0
-salinity = 0.0
-growth_pressure = 0.0
-salinity_density_cap = 0.0
-plant_density = 0.0
-health = 0.0
-hydration = 0.25
-nourishment = 0.15
-energy_cap = 0.0
-energy = 0.0
-morale = 0.04
-work_efficiency = 0.0
-
-[[modifier_presets]]
-preset_kind = "RunModifier"
-modifier_id = 24070
 heat = 0.0
 wind = 0.0
 dust = 0.0

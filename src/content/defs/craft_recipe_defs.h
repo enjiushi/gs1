@@ -49,6 +49,7 @@ inline constexpr std::uint32_t k_recipe_cook_jadeleaf_stew = 17U;
 inline constexpr std::uint32_t k_recipe_cook_desert_revival_draught = 18U;
 inline constexpr std::uint32_t k_recipe_cook_rich_jadeleaf_stew = 19U;
 inline constexpr std::uint32_t k_recipe_cook_rich_desert_revival_draught = 20U;
+inline constexpr std::uint32_t k_recipe_cook_ephedra_stew = 21U;
 
 [[nodiscard]] std::span<const CraftRecipeDef> all_craft_recipe_defs() noexcept;
 

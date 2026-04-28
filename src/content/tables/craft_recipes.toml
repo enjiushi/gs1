@@ -217,3 +217,14 @@ energy_cost = 1.7
 hydration_cost = 0.6
 nourishment_cost = 0.3
 ingredients = [{ item_id = 1, quantity = 3 }, { item_id = 27, quantity = 2 }, { item_id = 26, quantity = 2 }]
+
+[[craft_recipes]]
+recipe_id = 21
+station_structure_id = 201
+output_item_id = 54
+output_quantity = 1
+craft_minutes = 1.4
+energy_cost = 1.0
+hydration_cost = 0.3
+nourishment_cost = 0.1
+ingredients = [{ item_id = 1, quantity = 1 }, { item_id = 27, quantity = 1 }]

@@ -1530,7 +1530,6 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
         queue_campaign_resources_message();
         if (campaign_.has_value() && active_site_run_.has_value())
         {
-            active_site_run_->economy.money = std::max(0, campaign_->cash);
             queue_hud_state_message();
         }
         if (app_state_supports_technology_tree(app_state_))
@@ -3535,7 +3534,7 @@ void GameRuntime::queue_hud_state_message()
     payload.player_hydration = worker_conditions.hydration;
     payload.player_energy = worker_conditions.energy;
     payload.player_morale = worker_conditions.morale;
-    payload.current_money = cash_value_from_cash_points(active_site_run_->economy.money);
+    payload.current_money = cash_value_from_cash_points(campaign_->cash);
     payload.active_task_count =
         static_cast<std::uint16_t>(active_site_run_->task_board.accepted_task_ids.size());
     payload.current_action_kind =

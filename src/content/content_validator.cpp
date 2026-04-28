@@ -736,6 +736,15 @@ std::vector<ContentValidationIssue> validate_content_database(
                 break;
             }
 
+            if (seed_def.follow_up_task_template_id.value != 0U &&
+                !content.index.task_template_by_id.contains(seed_def.follow_up_task_template_id.value))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Site onboarding task seed references an unknown follow-up task template id."});
+                break;
+            }
+
             if (seed_def.item_id.value != 0U &&
                 !content.index.item_by_id.contains(seed_def.item_id.value))
             {
@@ -796,6 +805,33 @@ std::vector<ContentValidationIssue> validate_content_database(
                 issues.push_back(ContentValidationIssue {
                     ContentValidationSeverity::Error,
                     "Site onboarding task seed references an unknown reward candidate id."});
+                break;
+            }
+
+            if (seed_def.secondary_reward_candidate_id.value != 0U &&
+                !content.index.reward_candidate_by_id.contains(seed_def.secondary_reward_candidate_id.value))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Site onboarding task seed references an unknown secondary reward candidate id."});
+                break;
+            }
+
+            if (seed_def.tertiary_reward_candidate_id.value != 0U &&
+                !content.index.reward_candidate_by_id.contains(seed_def.tertiary_reward_candidate_id.value))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Site onboarding task seed references an unknown tertiary reward candidate id."});
+                break;
+            }
+
+            if (seed_def.quaternary_reward_candidate_id.value != 0U &&
+                !content.index.reward_candidate_by_id.contains(seed_def.quaternary_reward_candidate_id.value))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Site onboarding task seed references an unknown quaternary reward candidate id."});
                 break;
             }
         }

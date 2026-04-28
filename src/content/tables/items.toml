@@ -792,3 +792,18 @@ health_delta = 0.0
 hydration_delta = 0.0
 nourishment_delta = 0.0
 energy_delta = 0.0
+
+[[items]]
+item_id = 54
+display_name = "Ephedra Stew"
+stack_size = 3
+source_rule = "CraftOnly"
+consumable = true
+capabilities = "Eat,Sell"
+linked_plant_id = 0
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 18.0
+energy_delta = 0.0
+morale_delta = 2.0

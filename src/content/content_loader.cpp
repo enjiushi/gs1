@@ -1440,6 +1440,8 @@ void load_site_onboarding_task_seed_defs(ContentDatabase& content, const std::fi
         content.site_onboarding_task_seed_defs.push_back(SiteOnboardingTaskSeedDef {
             SiteId {require_toml_unsigned<std::uint32_t>(path, entry, "site_id")},
             TaskTemplateId {require_toml_unsigned<std::uint32_t>(path, entry, "task_template_id")},
+            TaskTemplateId {
+                optional_toml_unsigned<std::uint32_t>(path, entry, "follow_up_task_template_id").value_or(0U)},
             require_toml_unsigned<std::uint32_t>(path, entry, "target_amount"),
             require_toml_unsigned<std::uint32_t>(path, entry, "required_count"),
             ItemId {require_toml_unsigned<std::uint32_t>(path, entry, "item_id")},
@@ -1453,7 +1455,16 @@ void load_site_onboarding_task_seed_defs(ContentDatabase& content, const std::fi
                 toml_line_number(entry),
                 require_toml_string(path, entry, "action_kind")),
             require_toml_float(path, entry, "threshold_value"),
-            RewardCandidateId {require_toml_unsigned<std::uint32_t>(path, entry, "reward_candidate_id")}});
+            RewardCandidateId {require_toml_unsigned<std::uint32_t>(path, entry, "reward_candidate_id")},
+            RewardCandidateId {
+                optional_toml_unsigned<std::uint32_t>(path, entry, "secondary_reward_candidate_id")
+                    .value_or(0U)},
+            RewardCandidateId {
+                optional_toml_unsigned<std::uint32_t>(path, entry, "tertiary_reward_candidate_id")
+                    .value_or(0U)},
+            RewardCandidateId {
+                optional_toml_unsigned<std::uint32_t>(path, entry, "quaternary_reward_candidate_id")
+                    .value_or(0U)}});
     }
 }
 
