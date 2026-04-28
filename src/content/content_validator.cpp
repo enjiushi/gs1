@@ -1242,7 +1242,8 @@ std::vector<ContentValidationIssue> validate_content_database(
             {
                 if (node_def.enhancement_choice_index != 0U ||
                     node_def.reputation_requirement == 0 ||
-                    node_def.reputation_requirement > k_faction_tech_tier_count)
+                    node_def.reputation_requirement >
+                        k_faction_base_tech_reputation_max_requirement)
                 {
                     issues.push_back(ContentValidationIssue {
                         ContentValidationSeverity::Error,
@@ -1254,12 +1255,14 @@ std::vector<ContentValidationIssue> validate_content_database(
             {
                 if (node_def.enhancement_choice_index == 0U ||
                     node_def.enhancement_choice_index > k_technology_enhancement_choice_count ||
-                    node_def.reputation_requirement <= k_faction_tech_tier_count ||
-                    node_def.reputation_requirement > k_faction_reputation_tier_count)
+                    node_def.reputation_requirement <
+                        k_faction_enhancement_reputation_min_requirement ||
+                    node_def.reputation_requirement >
+                        k_faction_enhancement_reputation_max_requirement)
                 {
                     issues.push_back(ContentValidationIssue {
                         ContentValidationSeverity::Error,
-                        "Enhancement technology nodes must use enhancement choices 1-2 and faction-reputation requirements inside the 9-16 enhancement band."});
+                        "Enhancement technology nodes must use enhancement choices 1-2 and faction-reputation requirements inside the 8-15 enhancement band."});
                     break;
                 }
 

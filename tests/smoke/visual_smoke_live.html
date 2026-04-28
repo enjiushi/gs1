@@ -1614,31 +1614,85 @@ body {
 
 .tech-tier-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: minmax(102px, 112px) repeat(3, minmax(0, 1fr));
+  gap: 10px;
   margin-top: 10px;
   align-items: start;
 }
 
-.tech-column {
+.tech-grid-spacer {
+  min-height: 1px;
+}
+
+.tech-faction-heading {
+  padding: 0 4px 2px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(80, 57, 30, 0.86);
+}
+
+.tech-row-requirement {
+  min-height: 116px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid rgba(108, 80, 44, 0.12);
+  background:
+    linear-gradient(180deg, rgba(248, 240, 226, 0.98), rgba(231, 214, 188, 0.86));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.6),
+    0 8px 14px rgba(55, 35, 14, 0.04);
+}
+
+.tech-row-requirement.enhancement {
+  min-height: 106px;
+}
+
+.tech-row-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(96, 68, 37, 0.7);
+}
+
+.tech-row-value {
+  font-size: 20px;
+  font-weight: 800;
+  color: rgba(62, 43, 23, 0.94);
+}
+
+.tech-row-cell {
   min-width: 0;
+}
+
+.tech-amp-cell {
+  min-height: 106px;
 }
 
 .tech-amp-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+  height: 100%;
 }
 
 .tech-base-card,
 .tech-amp-card {
   width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   border: 1px solid rgba(113, 83, 48, 0.14);
-  padding: 11px 12px 12px;
-  text-align: left;
+  padding: 12px 10px;
+  text-align: center;
   background:
     linear-gradient(180deg, rgba(255, 251, 244, 0.96), rgba(235, 221, 199, 0.88));
   color: rgba(43, 31, 17, 0.94);
@@ -1649,12 +1703,11 @@ body {
 }
 
 .tech-base-card {
-  min-height: 172px;
+  min-height: 116px;
 }
 
 .tech-amp-card {
-  min-height: 122px;
-  padding: 10px 10px 11px;
+  min-height: 106px;
 }
 
 .tech-base-card.claimable,
@@ -1675,13 +1728,14 @@ body {
 .tech-base-card.disabled,
 .tech-amp-card.locked,
 .tech-amp-card.disabled {
-  opacity: 0.72;
   cursor: default;
 }
 
-.tech-base-card:disabled,
-.tech-amp-card:disabled {
-  cursor: default;
+.tech-base-card:not(.disabled):hover,
+.tech-amp-card:not(.disabled):hover,
+.tech-base-card.claimable:hover,
+.tech-amp-card.claimable:hover {
+  transform: translateY(-1px);
 }
 
 .tech-placeholder {
@@ -1695,12 +1749,12 @@ body {
 
 .tech-node-top {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: flex-start;
+  justify-content: center;
+  align-items: center;
 }
 
 .tech-node-icon {
+  position: relative;
   width: 52px;
   height: 52px;
   display: grid;
@@ -1727,41 +1781,75 @@ body {
   font-size: 14px;
 }
 
-.tech-node-cost {
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(74, 96, 58, 0.92);
-  text-align: right;
-  align-self: flex-start;
+.tech-node-icon.locked-visual {
+  filter: grayscale(1) saturate(0.14) brightness(0.88);
 }
 
-.tech-base-card.locked .tech-node-cost,
-.tech-base-card.disabled .tech-node-cost,
-.tech-amp-card.locked .tech-node-cost,
-.tech-amp-card.disabled .tech-node-cost {
-  color: rgba(102, 80, 52, 0.72);
+.tech-node-lock {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(46, 31, 18, 0.22);
+  color: rgba(255, 246, 234, 0.72);
+  backdrop-filter: blur(1px);
+}
+
+.tech-node-lock .ui-icon-svg {
+  width: 58%;
+  height: 58%;
 }
 
 .tech-node-title {
-  margin-top: 10px;
-  font-size: 15px;
+  width: 100%;
+  font-size: 12px;
   font-weight: 700;
+  line-height: 1.35;
   color: rgba(35, 25, 14, 0.96);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-.tech-node-description {
+.tech-tooltip {
+  position: fixed;
+  z-index: 80;
+  min-width: 220px;
+  max-width: 300px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(97, 71, 41, 0.18);
+  background: rgba(255, 250, 241, 0.96);
+  box-shadow:
+    0 16px 30px rgba(36, 24, 14, 0.18),
+    inset 0 1px 0 rgba(255,255,255,0.72);
+  pointer-events: none;
+  backdrop-filter: blur(10px);
+  white-space: pre-line;
+}
+
+.tech-tooltip[hidden] {
+  display: none;
+}
+
+.tech-tooltip-title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(63, 41, 18, 0.94);
+}
+
+.tech-tooltip-meta {
   margin-top: 6px;
   font-size: 11px;
-  line-height: 1.45;
-  color: rgba(73, 52, 29, 0.82);
-}
-
-.tech-node-state {
-  margin-top: 5px;
-  font-size: 11px;
-  line-height: 1.4;
+  line-height: 1.55;
   color: rgba(88, 63, 34, 0.74);
 }
 
@@ -3482,6 +3570,10 @@ DLL -- ms</div>
 <div class="modifier-tooltip" id="modifier-tooltip" hidden>
   <div class="modifier-tooltip-title" id="modifier-tooltip-title">Modifier</div>
   <div class="modifier-tooltip-meta" id="modifier-tooltip-meta">Details</div>
+</div>
+<div class="tech-tooltip" id="tech-tooltip" hidden>
+  <div class="tech-tooltip-title" id="tech-tooltip-title">Technology</div>
+  <div class="tech-tooltip-meta" id="tech-tooltip-meta">Details</div>
 </div>
 <div class="tile-context-menu" id="tile-context-menu" hidden></div>
 

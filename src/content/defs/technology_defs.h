@@ -82,7 +82,12 @@ struct TechnologyNodeDef final
 };
 
 inline constexpr std::uint8_t k_faction_tech_tier_count = 8U;
-inline constexpr std::uint8_t k_faction_reputation_tier_count = k_faction_tech_tier_count * 2U;
+inline constexpr std::uint8_t k_faction_base_tech_reputation_max_requirement =
+    k_faction_tech_tier_count;
+inline constexpr std::uint8_t k_faction_enhancement_reputation_min_requirement =
+    k_faction_base_tech_reputation_max_requirement;
+inline constexpr std::uint8_t k_faction_enhancement_reputation_max_requirement =
+    k_faction_enhancement_reputation_min_requirement + k_faction_tech_tier_count - 1U;
 inline constexpr std::uint8_t k_technology_enhancement_choice_count = 2U;
 inline constexpr std::uint8_t k_initial_unlocked_plant_count = 2U;
 

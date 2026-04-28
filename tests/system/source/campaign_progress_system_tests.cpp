@@ -1048,7 +1048,7 @@ void technology_enhancements_require_paired_base_and_enforce_exclusive_choices(
 {
     auto campaign = make_campaign();
     auto campaign_context = make_campaign_context(campaign);
-    campaign.faction_progress[0].faction_reputation = 9;
+    campaign.faction_progress[0].faction_reputation = 8;
 
     GS1_SYSTEM_TEST_CHECK(
         context,
@@ -1208,17 +1208,17 @@ void technology_uses_authored_internal_cash_points_requirements_and_effect_param
         TechnologySystem::current_cash_cost(campaign, *village_tier_one_enhancement) == 5);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        TechnologySystem::current_reputation_requirement(*village_tier_one_enhancement) == 9);
+        TechnologySystem::current_reputation_requirement(*village_tier_one_enhancement) == 8);
     GS1_SYSTEM_TEST_CHECK(
         context,
         village_tier_one_enhancement->granted_content_kind == gs1::TechnologyGrantedContentKind::None);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        TechnologySystem::current_effect_parameter(campaign, *village_tier_one_enhancement) > 1.239f &&
-            TechnologySystem::current_effect_parameter(campaign, *village_tier_one_enhancement) < 1.241f);
+        TechnologySystem::current_effect_parameter(campaign, *village_tier_one_enhancement) > 1.269f &&
+            TechnologySystem::current_effect_parameter(campaign, *village_tier_one_enhancement) < 1.271f);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        TechnologySystem::current_reputation_requirement(*village_tier_eight_enhancement) == 16);
+        TechnologySystem::current_reputation_requirement(*village_tier_eight_enhancement) == 15);
     const auto* village_tier_two =
         gs1::find_technology_node_def(gs1::TechNodeId {gs1::k_tech_node_village_t2_field_logistics});
     GS1_SYSTEM_TEST_REQUIRE(context, village_tier_two != nullptr);

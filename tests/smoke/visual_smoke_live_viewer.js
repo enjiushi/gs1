@@ -50,6 +50,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const modifierTooltip = document.getElementById("modifier-tooltip");
     const modifierTooltipTitle = document.getElementById("modifier-tooltip-title");
     const modifierTooltipMeta = document.getElementById("modifier-tooltip-meta");
+    const techTooltip = document.getElementById("tech-tooltip");
+    const techTooltipTitle = document.getElementById("tech-tooltip-title");
+    const techTooltipMeta = document.getElementById("tech-tooltip-meta");
     const buffModifierStrip = document.getElementById("buff-modifier-strip");
     const normalModifierStrip = document.getElementById("normal-modifier-strip");
     const tileContextMenu = document.getElementById("tile-context-menu");
@@ -1146,6 +1149,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     function setTechTreeOverlayActive(active) {
         stageFrame.classList.toggle("tech-tree-overlay-active", !!active);
         selectionChip.classList.toggle("tech-tree-overlay", !!active);
+        if (!active) {
+            hideTechTooltip();
+        }
     }
 
     function makeUiAction(type, targetId, arg0, arg1) {
@@ -3342,6 +3348,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
     }
 
+    function hideTechTooltip() {
+        if (techTooltip) {
+            techTooltip.hidden = true;
+        }
+    }
+
     function moveInventoryTooltip(clientX, clientY) {
         const tooltipWidth = 220;
         const tooltipHeight = 90;
@@ -3391,6 +3403,19 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         modifierTooltip.style.top = top + "px";
     }
 
+    function moveTechTooltip(clientX, clientY) {
+        if (!techTooltip) {
+            return;
+        }
+
+        const tooltipWidth = 300;
+        const tooltipHeight = 132;
+        const left = Math.min(clientX + 18, Math.max(12, window.innerWidth - tooltipWidth - 16));
+        const top = Math.min(clientY + 18, Math.max(12, window.innerHeight - tooltipHeight - 16));
+        techTooltip.style.left = left + "px";
+        techTooltip.style.top = top + "px";
+    }
+
     function showModifierTooltip(modifier, clientX, clientY) {
         if (!modifierTooltip || !modifier) {
             hideModifierTooltip();
@@ -3401,6 +3426,69 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         modifierTooltipMeta.textContent = buildModifierTooltipMeta(modifier);
         modifierTooltip.hidden = false;
         moveModifierTooltip(clientX, clientY);
+    }
+
+    function formatTechNodeKindLabel(nodeModel) {
+        if (!nodeModel) {
+            return "Tech";
+        }
+        if (nodeModel.isEnhancement) {
+            return nodeModel.enhancementChoiceIndex > 0
+                ? ("Enhancement " + nodeModel.enhancementChoiceIndex)
+                : "Enhancement";
+        }
+        return "Base Tech";
+    }
+
+    function buildTechTooltipMeta(nodeModel) {
+        if (!nodeModel) {
+            return "No details.";
+        }
+
+        const lines = [];
+        if (nodeModel.descriptionText) {
+            lines.push(nodeModel.descriptionText);
+        }
+
+        const identityParts = [];
+        if (nodeModel.factionText) {
+            identityParts.push(nodeModel.factionText);
+        }
+        identityParts.push(formatTechNodeKindLabel(nodeModel));
+        if (nodeModel.tierNumber > 0) {
+            identityParts.push("Tier " + nodeModel.tierNumber);
+        }
+        if (identityParts.length > 0) {
+            lines.push(identityParts.join(" | "));
+        }
+
+        const costParts = [];
+        if (nodeModel.reputationRequirement > 0) {
+            costParts.push("Rep " + nodeModel.reputationRequirement);
+        }
+        if (nodeModel.cashCostText) {
+            costParts.push(nodeModel.cashCostText);
+        }
+        if (nodeModel.statusText) {
+            costParts.push(nodeModel.statusText);
+        }
+        if (costParts.length > 0) {
+            lines.push(costParts.join(" | "));
+        }
+
+        return lines.join("\n");
+    }
+
+    function showTechTooltip(nodeModel, clientX, clientY) {
+        if (!techTooltip || !nodeModel) {
+            hideTechTooltip();
+            return;
+        }
+
+        techTooltipTitle.textContent = nodeModel.titleText || "Technology";
+        techTooltipMeta.textContent = buildTechTooltipMeta(nodeModel);
+        techTooltip.hidden = false;
+        moveTechTooltip(clientX, clientY);
     }
 
     function modifierRemainingHours(modifier) {
@@ -4162,13 +4250,27 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (normalized.includes("village")) {
             return "village committee";
         }
-        if (normalized.includes("forestry")) {
+        if (normalized.includes("forestry") || normalized.includes("bureau")) {
             return "forestry bureau";
         }
         if (normalized.includes("university")) {
             return "agricultural university";
         }
         return normalized;
+    }
+
+    function displayTechFactionLabel(name) {
+        const normalized = normalizeTechFactionName(name);
+        if (normalized === "village committee") {
+            return "Village";
+        }
+        if (normalized === "forestry bureau") {
+            return "Bureau";
+        }
+        if (normalized === "agricultural university") {
+            return "University";
+        }
+        return String(name || "Faction");
     }
 
     function expandCompactTechStatus(statusText) {
@@ -4379,6 +4481,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     (Number.isFinite(parsedTierNumber) ? parsedTierNumber : 0),
                 descriptionText: (catalogNode && catalogNode.description) || fields.desc || "",
                 statusText: resolvedStatusText,
+                reputationRequirement: catalogNode ? Number(catalogNode.reputationRequirement || 0) : 0,
+                cashCostText:
+                    catalogNode
+                        ? ("$" + formatMoney((catalogNode.internalCostCashPoints || 0) / 100))
+                        : "",
+                enhancementChoiceIndex: catalogNode ? Number(catalogNode.enhancementChoiceIndex || 0) : 0,
+                isEnhancement: !!(catalogNode && Number(catalogNode.enhancementChoiceIndex || 0) > 0),
                 costText: (() => {
                     const effectiveStatus = resolvedStatusText;
                     const matchedCash = effectiveStatus.match(/\$\d+(?:\.\d{2})?/);
@@ -4441,6 +4550,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             tierNumber: tierNumber,
             descriptionText: descriptionText,
             statusText: statusText,
+            reputationRequirement: 0,
+            cashCostText: "",
+            enhancementChoiceIndex: 0,
+            isEnhancement: /^Enh/i.test(kindText),
             costText: costText,
             isClaimable: (element.flags & 1) !== 0,
             isDisabled: (element.flags & 2) !== 0,
@@ -4453,11 +4566,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const nodeButton = document.createElement("button");
         nodeButton.type = "button";
         nodeButton.className = extraClassName;
+        nodeButton.setAttribute("aria-disabled", nodeModel.isDisabled ? "true" : "false");
         if (nodeModel.isClaimable) {
             nodeButton.classList.add("claimable");
         }
         if (nodeModel.isDisabled) {
-            nodeButton.disabled = true;
             nodeButton.classList.add("disabled");
         }
         if (nodeModel.isClaimed) {
@@ -4472,6 +4585,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 });
             });
         }
+        nodeButton.addEventListener("mouseenter", function (event) {
+            showTechTooltip(nodeModel, event.clientX, event.clientY);
+        });
+        nodeButton.addEventListener("mousemove", function (event) {
+            moveTechTooltip(event.clientX, event.clientY);
+        });
+        nodeButton.addEventListener("mouseleave", function () {
+            hideTechTooltip();
+        });
 
         const nodeTop = document.createElement("div");
         nodeTop.className = "tech-node-top";
@@ -4487,30 +4609,51 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (/^Enh/i.test(nodeModel.kindText)) {
             nodeIcon.classList.add("amp");
         }
-
-        const nodeCost = document.createElement("div");
-        nodeCost.className = "tech-node-cost";
-        nodeCost.textContent = nodeModel.costText;
-        nodeTop.appendChild(nodeCost);
+        if (!nodeModel.isClaimed) {
+            nodeIcon.classList.add("locked-visual");
+            const nodeLock = document.createElement("div");
+            nodeLock.className = "tech-node-lock";
+            appendUiIcon(nodeLock, "lock");
+            nodeIcon.appendChild(nodeLock);
+        }
 
         const nodeTitle = document.createElement("div");
         nodeTitle.className = "tech-node-title";
         nodeTitle.textContent = nodeModel.titleText;
         nodeButton.appendChild(nodeTitle);
 
-        if (nodeModel.descriptionText) {
-            const nodeDescription = document.createElement("div");
-            nodeDescription.className = "tech-node-description";
-            nodeDescription.textContent = nodeModel.descriptionText;
-            nodeButton.appendChild(nodeDescription);
-        }
-
-        const nodeState = document.createElement("div");
-        nodeState.className = "tech-node-state";
-        nodeState.textContent = nodeModel.statusText;
-        nodeButton.appendChild(nodeState);
-
         return nodeButton;
+    }
+
+    function techRowRequirementText(nodes) {
+        const requirements = Array.from(new Set((nodes || [])
+            .map((nodeModel) => Number(nodeModel.reputationRequirement || 0))
+            .filter((value) => value > 0)))
+            .sort(function (left, right) { return left - right; });
+        if (requirements.length === 0) {
+            return "Rep --";
+        }
+        if (requirements.length === 1) {
+            return "Rep " + requirements[0];
+        }
+        return "Rep " + requirements[0] + "-" + requirements[requirements.length - 1];
+    }
+
+    function buildTechRequirementCell(labelText, nodes, extraClassName) {
+        const requirementCell = document.createElement("div");
+        requirementCell.className = "tech-row-requirement " + extraClassName;
+
+        const requirementLabel = document.createElement("div");
+        requirementLabel.className = "tech-row-label";
+        requirementLabel.textContent = labelText;
+        requirementCell.appendChild(requirementLabel);
+
+        const requirementValue = document.createElement("div");
+        requirementValue.className = "tech-row-value";
+        requirementValue.textContent = techRowRequirementText(nodes);
+        requirementCell.appendChild(requirementValue);
+
+        return requirementCell;
     }
 
     function parseTechTreeStructure(techTreeSetup) {
@@ -4634,7 +4777,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
             const tierMeta = document.createElement("div");
             tierMeta.className = "tech-tier-meta";
-            tierMeta.textContent = "Each tier row shows 3 faction techs side by side, with 2 exclusive enhancements below each base tech.";
+            tierMeta.textContent = "Base techs open lighter unlocks first. Enhancements sit on the higher faction-reputation row for the same tier.";
             tierCard.appendChild(tierMeta);
 
             const tierGrid = document.createElement("div");
@@ -4646,6 +4789,20 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     ? factionTabs.map((tabModel) => tabModel.label)
                     : Array.from(new Set(factionNodes.map((nodeModel) => nodeModel.factionText)));
 
+            const gridSpacer = document.createElement("div");
+            gridSpacer.className = "tech-grid-spacer";
+            tierGrid.appendChild(gridSpacer);
+
+            factionOrder.forEach((factionName) => {
+                const heading = document.createElement("div");
+                heading.className = "tech-faction-heading";
+                heading.textContent = displayTechFactionLabel(factionName);
+                tierGrid.appendChild(heading);
+            });
+
+            const baseNodes = factionNodes.filter((nodeModel) => !nodeModel.isEnhancement);
+            const enhancementNodes = factionNodes.filter((nodeModel) => nodeModel.isEnhancement);
+            tierGrid.appendChild(buildTechRequirementCell("Base Tech", baseNodes, "base"));
             factionOrder.forEach((factionName) => {
                 const normalizedFactionName = normalizeTechFactionName(factionName);
                 const columnNodes = factionNodes.filter((nodeModel) => {
@@ -4653,21 +4810,25 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 });
 
                 const column = document.createElement("div");
-                column.className = "tech-column";
-                tierGrid.appendChild(column);
-
-                const factionLabel = document.createElement("div");
-                factionLabel.className = "tech-tier-meta";
-                factionLabel.textContent = factionName;
-                column.appendChild(factionLabel);
-
+                column.className = "tech-row-cell";
                 const baseNode = columnNodes.find((nodeModel) => /^Base$/i.test(nodeModel.kindText));
                 if (baseNode) {
                     column.appendChild(buildTechTreeNodeButton(baseNode, "tech-base-card"));
                 } else {
                     column.appendChild(makeTechPlaceholder("No Base Tech", "tech-base-card"));
                 }
+                tierGrid.appendChild(column);
+            });
 
+            tierGrid.appendChild(buildTechRequirementCell("Enhancements", enhancementNodes, "enhancement"));
+            factionOrder.forEach((factionName) => {
+                const normalizedFactionName = normalizeTechFactionName(factionName);
+                const columnNodes = factionNodes.filter((nodeModel) => {
+                    return normalizeTechFactionName(nodeModel.factionText) === normalizedFactionName;
+                });
+
+                const column = document.createElement("div");
+                column.className = "tech-row-cell tech-amp-cell";
                 const enhancementRow = document.createElement("div");
                 enhancementRow.className = "tech-amp-row";
                 column.appendChild(enhancementRow);
@@ -4681,6 +4842,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                             ? buildTechTreeNodeButton(enhancementNode, "tech-amp-card")
                             : makeTechPlaceholder("No Enhancement", "tech-amp-card"));
                 });
+                tierGrid.appendChild(column);
             });
         });
 
@@ -4712,6 +4874,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             activeTechTreePanelTabId = "unlockables";
         }
 
+        hideTechTooltip();
         setTechTreeOverlayActive(true);
         selectionInventory.hidden = false;
         selectionInventory.innerHTML = "";
