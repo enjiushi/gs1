@@ -772,23 +772,6 @@ template <typename T>
     fail_load(path, line_number, "invalid technology entry kind");
 }
 
-[[nodiscard]] TechnologyNodeKind parse_technology_node_kind(
-    const std::filesystem::path& path,
-    std::size_t line_number,
-    const std::string& field)
-{
-    if (field == "BaseTech")
-    {
-        return TechnologyNodeKind::BaseTech;
-    }
-    if (field == "Enhancement")
-    {
-        return TechnologyNodeKind::Enhancement;
-    }
-
-    fail_load(path, line_number, "invalid technology node kind");
-}
-
 [[nodiscard]] ReputationUnlockKind parse_reputation_unlock_kind(
     const std::filesystem::path& path,
     std::size_t line_number,
@@ -798,13 +781,17 @@ template <typename T>
     {
         return ReputationUnlockKind::Plant;
     }
-    if (field == "Device")
-    {
-        return ReputationUnlockKind::Device;
-    }
     if (field == "Recipe")
     {
         return ReputationUnlockKind::Recipe;
+    }
+    if (field == "Item")
+    {
+        return ReputationUnlockKind::Item;
+    }
+    if (field == "StructureRecipe")
+    {
+        return ReputationUnlockKind::StructureRecipe;
     }
 
     fail_load(path, line_number, "invalid reputation unlock kind");
@@ -1864,12 +1851,6 @@ void load_technology_node_defs(ContentDatabase& content, const std::filesystem::
         const auto tier_index = require_toml_unsigned<std::uint8_t>(path, entry, "tier_index");
         const auto faction_id = FactionId {
             require_toml_unsigned<std::uint32_t>(path, entry, "faction_id")};
-        const auto node_kind = parse_technology_node_kind(
-            path,
-            toml_line_number(entry),
-            require_toml_string(path, entry, "node_kind"));
-        const auto enhancement_choice_index =
-            require_toml_unsigned<std::uint8_t>(path, entry, "enhancement_choice_index");
         const auto entry_kind = parse_technology_entry_kind(
             path,
             toml_line_number(entry),
@@ -1881,14 +1862,12 @@ void load_technology_node_defs(ContentDatabase& content, const std::filesystem::
         const auto granted_content_id =
             optional_toml_unsigned<std::uint32_t>(path, entry, "granted_content_id").value_or(0U);
         const auto tech_node_id = TechNodeId {
-            technology_node_id(faction_id, tier_index, enhancement_choice_index)};
+            technology_node_id(faction_id, tier_index)};
         content.technology_node_defs.push_back(TechnologyNodeDef {
             tech_node_id,
             faction_id,
             tier_index,
-            node_kind,
-            enhancement_choice_index,
-            {0U},
+            {0U, 0U, 0U},
             entry_kind,
             {0U, 0U, 0U},
             require_toml_signed<std::int32_t>(path, entry, "reputation_requirement"),

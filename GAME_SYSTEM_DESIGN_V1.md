@@ -560,11 +560,11 @@ purchasedNodeIds[]
 
 Rules:
 
-- `totalReputation` is never spent and unlocks the three prototype global plant tiers
-- `persistentCash` is shared across the campaign and pays for both faction base-tech and faction-enhancement claims
+- `totalReputation` is never spent and unlocks the authored global progression ladder across plants/items/recipes/device-build recipes
+- `persistentCash` is shared across the campaign and pays for the linear faction-tech claims
 - tech rows should author internal cash-point valuation and derive player-facing cash cost from `100` cash points = `1` cash
 - technology claims do not spend down total reputation or faction reputation
-- each faction branch should expose `8` base-tech tiers plus `2` exclusive enhancements per base tech, with enhancements gated by faction-reputation tiers `9-16`
+- each faction branch should expose a linear `32`-tier tech ladder gated by matching faction-reputation tiers `1-32`
 - `purchasedNodeIds[]` is authoritative progression state
 
 ### 6.7 `LoadoutPlannerState`

@@ -1207,12 +1207,69 @@ std::vector<ContentValidationIssue> validate_content_database(
                 break;
             }
 
-            if (unlock_def.unlock_kind == ReputationUnlockKind::Plant &&
-                !content.index.plant_by_id.contains(unlock_def.content_id))
+            switch (unlock_def.unlock_kind)
             {
-                issues.push_back(ContentValidationIssue {
-                    ContentValidationSeverity::Error,
-                    "Reputation unlock definitions reference an unknown plant id."});
+            case ReputationUnlockKind::Plant:
+                if (!content.index.plant_by_id.contains(unlock_def.content_id))
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Plant reputation unlocks must reference known plant ids."});
+                }
+                break;
+
+            case ReputationUnlockKind::Item:
+                if (!content.index.item_by_id.contains(unlock_def.content_id))
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Item reputation unlocks must reference known item ids."});
+                }
+                break;
+
+            case ReputationUnlockKind::StructureRecipe:
+            {
+                if (!content.index.structure_by_id.contains(unlock_def.content_id))
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Structure-recipe reputation unlocks must reference known structure ids."});
+                    break;
+                }
+
+                bool found_matching_recipe = false;
+                for (const auto& recipe_def : content.craft_recipe_defs)
+                {
+                    const auto item_it = content.index.item_by_id.find(recipe_def.output_item_id.value);
+                    if (item_it != content.index.item_by_id.end() &&
+                        content.item_defs[item_it->second].linked_structure_id.value == unlock_def.content_id)
+                    {
+                        found_matching_recipe = true;
+                        break;
+                    }
+                }
+
+                if (!found_matching_recipe)
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Structure-recipe reputation unlocks must target a structure with at least one matching craft recipe output."});
+                }
+                break;
+            }
+
+            case ReputationUnlockKind::Recipe:
+                if (!content.index.craft_recipe_by_id.contains(unlock_def.content_id))
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Recipe reputation unlocks must reference known recipe ids."});
+                }
+                break;
+            }
+
+            if (!issues.empty() && issues.back().severity == ContentValidationSeverity::Error)
+            {
                 break;
             }
 
@@ -1272,53 +1329,14 @@ std::vector<ContentValidationIssue> validate_content_database(
                 break;
             }
 
-            if (node_def.node_kind == TechnologyNodeKind::BaseTech)
+            if (node_def.reputation_requirement != static_cast<std::int32_t>(node_def.tier_index) ||
+                node_def.reputation_requirement <= 0 ||
+                node_def.reputation_requirement > k_faction_tech_tier_count)
             {
-                if (node_def.enhancement_choice_index != 0U ||
-                    node_def.reputation_requirement == 0 ||
-                    node_def.reputation_requirement >
-                        k_faction_base_tech_reputation_max_requirement)
-                {
-                    issues.push_back(ContentValidationIssue {
-                        ContentValidationSeverity::Error,
-                        "Base technology nodes must use enhancement choice 0 and faction-reputation requirements inside the 1-8 basic-tech band."});
-                    break;
-                }
-            }
-            else
-            {
-                if (node_def.enhancement_choice_index == 0U ||
-                    node_def.enhancement_choice_index > k_technology_enhancement_choice_count ||
-                    node_def.reputation_requirement <
-                        k_faction_enhancement_reputation_min_requirement ||
-                    node_def.reputation_requirement >
-                        k_faction_enhancement_reputation_max_requirement)
-                {
-                    issues.push_back(ContentValidationIssue {
-                        ContentValidationSeverity::Error,
-                        "Enhancement technology nodes must use enhancement choices 1-2 and faction-reputation requirements inside the 8-15 enhancement band."});
-                    break;
-                }
-
-                bool paired_base_exists = false;
-                for (const auto& candidate : content.technology_node_defs)
-                {
-                    if (candidate.faction_id == node_def.faction_id &&
-                        candidate.tier_index == node_def.tier_index &&
-                        candidate.node_kind == TechnologyNodeKind::BaseTech)
-                    {
-                        paired_base_exists = true;
-                        break;
-                    }
-                }
-
-                if (!paired_base_exists)
-                {
-                    issues.push_back(ContentValidationIssue {
-                        ContentValidationSeverity::Error,
-                        "Enhancement technology nodes must pair to a base technology in the same faction and tier."});
-                    break;
-                }
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Technology nodes must form a linear faction-reputation ladder where each tier requires exactly its own tier index inside the 1-32 band."});
+                break;
             }
 
             if (node_def.unlock_effect_parameter < 0.0f ||
@@ -1400,13 +1418,11 @@ std::vector<ContentValidationIssue> validate_content_database(
                 }
 
                 if (content.technology_node_defs[previous].faction_id == node_def.faction_id &&
-                    content.technology_node_defs[previous].tier_index == node_def.tier_index &&
-                    content.technology_node_defs[previous].enhancement_choice_index ==
-                        node_def.enhancement_choice_index)
+                    content.technology_node_defs[previous].tier_index == node_def.tier_index)
                 {
                     issues.push_back(ContentValidationIssue {
                         ContentValidationSeverity::Error,
-                        "Technology node definitions must use unique enhancement-choice slots per faction and tier."});
+                        "Technology node definitions must use one unique linear tech node per faction and tier."});
                     break;
                 }
             }

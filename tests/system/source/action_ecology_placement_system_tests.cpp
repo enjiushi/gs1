@@ -1431,15 +1431,14 @@ void action_execution_shovel_in_worker_pack_reduces_plant_and_excavate_duration_
     const auto baseline_plant_cost = baseline_site_run.site_action.deferred_meter_delta;
 
     auto boosted_campaign = make_campaign();
-    boosted_campaign.technology_state.purchased_nodes.push_back(
-        gs1::TechnologyPurchaseRecord {
-            gs1::TechNodeId {gs1::k_tech_node_village_t1_field_briefing}});
-    boosted_campaign.technology_state.purchased_nodes.push_back(
-        gs1::TechnologyPurchaseRecord {
-            gs1::TechNodeId {gs1::k_tech_node_village_t1_field_briefing_choice_a}});
-    boosted_campaign.technology_state.purchased_nodes.push_back(
-        gs1::TechnologyPurchaseRecord {
-            gs1::TechNodeId {gs1::k_tech_node_village_t1_field_briefing_choice_b}});
+    for (std::uint8_t tier = 1U; tier <= 11U; ++tier)
+    {
+        boosted_campaign.technology_state.purchased_nodes.push_back(
+            gs1::TechnologyPurchaseRecord {
+                gs1::TechNodeId {gs1::base_technology_node_id(
+                    gs1::FactionId {gs1::k_faction_village_committee},
+                    tier)}});
+    }
     auto boosted_site_run = make_test_site_run(1U, 5202U);
     GameMessageQueue boosted_queue {};
     auto boosted_context =

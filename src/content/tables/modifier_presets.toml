@@ -1263,3 +1263,528 @@ energy_cap = 0.0
 energy = 0.0
 morale = 0.04
 work_efficiency = 0.0
+
+# BEGIN generated linear tech modifiers
+# Auto-generated to match the linear 32-tier faction tech layout.
+
+[[modifier_presets]]
+preset_kind = "RunModifier"
+modifier_id = 23010
+heat = 0.0
+wind = 0.0
+dust = 0.0
+moisture = 0.14
+fertility = 0.0
+salinity = 0.0
+growth_pressure = 0.0
+salinity_density_cap = 0.0
+plant_density = 0.0
+health = 0.0
+hydration = 0.25
+nourishment = 0.15
+energy_cap = 0.0
+energy = 0.0
+morale = 0.04
+work_efficiency = 0.0
+
+[[modifier_presets]]
+preset_kind = "RunModifier"
+modifier_id = 23020
+heat = 0.0
+wind = 0.0
+dust = 0.0
+moisture = 0.0
+fertility = 0.0
+salinity = 0.0
+growth_pressure = -0.18
+salinity_density_cap = 0.0
+plant_density = 0.2
+health = 0.0
+hydration = 0.0
+nourishment = 0.0
+energy_cap = 0.0
+energy = 0.0
+morale = 0.0
+work_efficiency = 0.05
+
+[[modifier_presets]]
+preset_kind = "RunModifier"
+modifier_id = 23070
+heat = 0.0
+wind = 0.0
+dust = 0.0
+moisture = 0.14
+fertility = 0.0
+salinity = 0.0
+growth_pressure = 0.0
+salinity_density_cap = 0.0
+plant_density = 0.0
+health = 0.0
+hydration = 0.25
+nourishment = 0.15
+energy_cap = 0.0
+energy = 0.0
+morale = 0.04
+work_efficiency = 0.0
+
+[[modifier_presets]]
+preset_kind = "RunModifier"
+modifier_id = 23100
+heat = 0.0
+wind = 0.0
+dust = 0.0
+moisture = 0.0
+fertility = 0.0
+salinity = 0.0
+growth_pressure = -0.18
+salinity_density_cap = 0.0
+plant_density = 0.2
+health = 0.0
+hydration = 0.0
+nourishment = 0.0
+energy_cap = 0.0
+energy = 0.0
+morale = 0.0
+work_efficiency = 0.05
+
+[[modifier_presets]]
+preset_kind = "RunModifier"
+modifier_id = 23130
+heat = 0.0
+wind = 0.0
+dust = 0.0
+moisture = 0.0
+fertility = 0.0
+salinity = 0.0
+growth_pressure = 0.0
+salinity_density_cap = 0.0
+plant_density = 0.0
+health = 0.15
+hydration = 0.0
+nourishment = 0.05
+energy_cap = 0.25
+energy = 0.0
+morale = 0.08
+work_efficiency = 0.1
+
+[[modifier_presets]]
+preset_kind = "RunModifier"
+modifier_id = 23150
+heat = 0.0
+wind = 0.0
+dust = 0.0
+moisture = 0.14
+fertility = 0.0
+salinity = 0.0
+growth_pressure = 0.0
+salinity_density_cap = 0.0
+plant_density = 0.0
+health = 0.0
+hydration = 0.25
+nourishment = 0.15
+energy_cap = 0.0
+energy = 0.0
+morale = 0.04
+work_efficiency = 0.0
+
+[[modifier_presets]]
+preset_kind = "RunModifier"
+modifier_id = 23170
+heat = 0.0
+wind = 0.0
+dust = 0.0
+moisture = 0.14
+fertility = 0.0
+salinity = 0.0
+growth_pressure = 0.0
+salinity_density_cap = 0.0
+plant_density = 0.0
+health = 0.0
+hydration = 0.25
+nourishment = 0.15
+energy_cap = 0.0
+energy = 0.0
+morale = 0.04
+work_efficiency = 0.0
+
+[[modifier_presets]]
+preset_kind = "RunModifier"
+modifier_id = 23180
+heat = 0.0
+wind = 0.0
+dust = 0.0
+moisture = 0.0
+fertility = 0.0
+salinity = 0.0
+growth_pressure = -0.18
+salinity_density_cap = 0.0
+plant_density = 0.2
+health = 0.0
+hydration = 0.0
+nourishment = 0.0
+energy_cap = 0.0
+energy = 0.0
+morale = 0.0
+work_efficiency = 0.05
+
+[[modifier_presets]]
+preset_kind = "RunModifier"
+modifier_id = 23230
+heat = 0.0
+wind = 0.0
+dust = 0.0
+moisture = 0.14
+fertility = 0.0
+salinity = 0.0
+growth_pressure = 0.0
+salinity_density_cap = 0.0
+plant_density = 0.0
+health = 0.0
+hydration = 0.25
+nourishment = 0.15
+energy_cap = 0.0
+energy = 0.0
+morale = 0.04
+work_efficiency = 0.0
+
+[[modifier_presets]]
+preset_kind = "RunModifier"
+modifier_id = 23250
+heat = 0.0
+wind = 0.0
+dust = 0.0
+moisture = 0.14
+fertility = 0.0
+salinity = 0.0
+growth_pressure = 0.0
+salinity_density_cap = 0.0
+plant_density = 0.0
+health = 0.0
+hydration = 0.25
+nourishment = 0.15
+energy_cap = 0.0
+energy = 0.0
+morale = 0.04
+work_efficiency = 0.0
+
+[[modifier_presets]]
+preset_kind = "RunModifier"
+modifier_id = 23260
+heat = 0.0
+wind = 0.0
+dust = 0.0
+moisture = 0.0
+fertility = 0.0
+salinity = 0.0
+growth_pressure = -0.18
+salinity_density_cap = 0.0
+plant_density = 0.2
+health = 0.0
+hydration = 0.0
+nourishment = 0.0
+energy_cap = 0.0
+energy = 0.0
+morale = 0.0
+work_efficiency = 0.05
+
+[[modifier_presets]]
+preset_kind = "RunModifier"
+modifier_id = 23310
+heat = 0.0
+wind = 0.0
+dust = 0.0
+moisture = 0.14
+fertility = 0.0
+salinity = 0.0
+growth_pressure = 0.0
+salinity_density_cap = 0.0
+plant_density = 0.0
+health = 0.0
+hydration = 0.25
+nourishment = 0.15
+energy_cap = 0.0
+energy = 0.0
+morale = 0.04
+work_efficiency = 0.0
+
+[[modifier_presets]]
+preset_kind = "RunModifier"
+modifier_id = 24010
+heat = 0.0
+wind = 0.0
+dust = 0.0
+moisture = 0.14
+fertility = 0.0
+salinity = 0.0
+growth_pressure = 0.0
+salinity_density_cap = 0.0
+plant_density = 0.0
+health = 0.0
+hydration = 0.25
+nourishment = 0.15
+energy_cap = 0.0
+energy = 0.0
+morale = 0.04
+work_efficiency = 0.0
+
+[[modifier_presets]]
+preset_kind = "RunModifier"
+modifier_id = 24020
+heat = 0.0
+wind = 0.0
+dust = 0.0
+moisture = 0.0
+fertility = 0.0
+salinity = 0.0
+growth_pressure = -0.18
+salinity_density_cap = 0.0
+plant_density = 0.2
+health = 0.0
+hydration = 0.0
+nourishment = 0.0
+energy_cap = 0.0
+energy = 0.0
+morale = 0.0
+work_efficiency = 0.05
+
+[[modifier_presets]]
+preset_kind = "RunModifier"
+modifier_id = 24070
+heat = 0.0
+wind = 0.0
+dust = 0.0
+moisture = 0.14
+fertility = 0.0
+salinity = 0.0
+growth_pressure = 0.0
+salinity_density_cap = 0.0
+plant_density = 0.0
+health = 0.0
+hydration = 0.25
+nourishment = 0.15
+energy_cap = 0.0
+energy = 0.0
+morale = 0.04
+work_efficiency = 0.0
+
+[[modifier_presets]]
+preset_kind = "RunModifier"
+modifier_id = 24100
+heat = 0.0
+wind = 0.0
+dust = 0.0
+moisture = 0.0
+fertility = 0.0
+salinity = 0.0
+growth_pressure = -0.18
+salinity_density_cap = 0.0
+plant_density = 0.2
+health = 0.0
+hydration = 0.0
+nourishment = 0.0
+energy_cap = 0.0
+energy = 0.0
+morale = 0.0
+work_efficiency = 0.05
+
+[[modifier_presets]]
+preset_kind = "RunModifier"
+modifier_id = 24130
+heat = 0.0
+wind = 0.0
+dust = 0.0
+moisture = 0.0
+fertility = 0.0
+salinity = 0.0
+growth_pressure = 0.0
+salinity_density_cap = 0.0
+plant_density = 0.0
+health = 0.15
+hydration = 0.0
+nourishment = 0.05
+energy_cap = 0.25
+energy = 0.0
+morale = 0.08
+work_efficiency = 0.1
+
+[[modifier_presets]]
+preset_kind = "RunModifier"
+modifier_id = 24150
+heat = 0.0
+wind = 0.0
+dust = 0.0
+moisture = 0.14
+fertility = 0.0
+salinity = 0.0
+growth_pressure = 0.0
+salinity_density_cap = 0.0
+plant_density = 0.0
+health = 0.0
+hydration = 0.25
+nourishment = 0.15
+energy_cap = 0.0
+energy = 0.0
+morale = 0.04
+work_efficiency = 0.0
+
+[[modifier_presets]]
+preset_kind = "RunModifier"
+modifier_id = 24170
+heat = 0.0
+wind = 0.0
+dust = 0.0
+moisture = 0.14
+fertility = 0.0
+salinity = 0.0
+growth_pressure = 0.0
+salinity_density_cap = 0.0
+plant_density = 0.0
+health = 0.0
+hydration = 0.25
+nourishment = 0.15
+energy_cap = 0.0
+energy = 0.0
+morale = 0.04
+work_efficiency = 0.0
+
+[[modifier_presets]]
+preset_kind = "RunModifier"
+modifier_id = 24180
+heat = 0.0
+wind = 0.0
+dust = 0.0
+moisture = 0.0
+fertility = 0.0
+salinity = 0.0
+growth_pressure = -0.18
+salinity_density_cap = 0.0
+plant_density = 0.2
+health = 0.0
+hydration = 0.0
+nourishment = 0.0
+energy_cap = 0.0
+energy = 0.0
+morale = 0.0
+work_efficiency = 0.05
+
+[[modifier_presets]]
+preset_kind = "RunModifier"
+modifier_id = 24230
+heat = 0.0
+wind = 0.0
+dust = 0.0
+moisture = 0.14
+fertility = 0.0
+salinity = 0.0
+growth_pressure = 0.0
+salinity_density_cap = 0.0
+plant_density = 0.0
+health = 0.0
+hydration = 0.25
+nourishment = 0.15
+energy_cap = 0.0
+energy = 0.0
+morale = 0.04
+work_efficiency = 0.0
+
+[[modifier_presets]]
+preset_kind = "RunModifier"
+modifier_id = 24250
+heat = 0.0
+wind = 0.0
+dust = 0.0
+moisture = 0.14
+fertility = 0.0
+salinity = 0.0
+growth_pressure = 0.0
+salinity_density_cap = 0.0
+plant_density = 0.0
+health = 0.0
+hydration = 0.25
+nourishment = 0.15
+energy_cap = 0.0
+energy = 0.0
+morale = 0.04
+work_efficiency = 0.0
+
+[[modifier_presets]]
+preset_kind = "RunModifier"
+modifier_id = 24260
+heat = 0.0
+wind = 0.0
+dust = 0.0
+moisture = 0.0
+fertility = 0.0
+salinity = 0.0
+growth_pressure = -0.18
+salinity_density_cap = 0.0
+plant_density = 0.2
+health = 0.0
+hydration = 0.0
+nourishment = 0.0
+energy_cap = 0.0
+energy = 0.0
+morale = 0.0
+work_efficiency = 0.05
+
+[[modifier_presets]]
+preset_kind = "RunModifier"
+modifier_id = 24310
+heat = 0.0
+wind = 0.0
+dust = 0.0
+moisture = 0.14
+fertility = 0.0
+salinity = 0.0
+growth_pressure = 0.0
+salinity_density_cap = 0.0
+plant_density = 0.0
+health = 0.0
+hydration = 0.25
+nourishment = 0.15
+energy_cap = 0.0
+energy = 0.0
+morale = 0.04
+work_efficiency = 0.0
+
+[[modifier_presets]]
+preset_kind = "RunModifier"
+modifier_id = 22260
+heat = 0.0
+wind = 0.0
+dust = 0.0
+moisture = 0.0
+fertility = 0.0
+salinity = 0.0
+growth_pressure = 0.0
+salinity_density_cap = 0.0
+plant_density = 0.0
+health = 0.0
+hydration = 0.0
+nourishment = 0.0
+energy_cap = 0.0
+energy = 0.0
+morale = 0.0
+work_efficiency = 0.0
+timed_buff_cap_bias = 1.0
+
+[[modifier_presets]]
+preset_kind = "RunModifier"
+modifier_id = 22270
+heat = 0.0
+wind = 0.0
+dust = 0.0
+moisture = 0.0
+fertility = 0.0
+salinity = 0.0
+growth_pressure = 0.0
+salinity_density_cap = 0.0
+plant_density = 0.0
+health = 0.0
+hydration = 0.0
+nourishment = 0.0
+energy_cap = 0.0
+energy = 0.0
+morale = 0.0
+work_efficiency = 0.0
+timed_buff_cap_bias = 1.0

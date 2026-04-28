@@ -27,16 +27,16 @@ std::uint32_t resolved_worker_pack_slot_count(const CampaignState& campaign) noe
     std::uint32_t slot_count = 8U;
     if (TechnologySystem::node_purchased(
             campaign,
-            TechNodeId {base_technology_node_id(k_village_faction, 4U)}))
+            TechNodeId {base_technology_node_id(k_village_faction, 21U)}))
     {
-        slot_count += 4U;
+        slot_count += 2U;
     }
 
     if (TechnologySystem::node_purchased(
             campaign,
-            TechNodeId {base_technology_node_id(k_village_faction, 7U)}))
+            TechNodeId {base_technology_node_id(k_village_faction, 22U)}))
     {
-        slot_count += 4U;
+        slot_count += 2U;
     }
 
     return slot_count;

@@ -10,12 +10,12 @@ Gameplay/runtime implementation grouped by ownership domain and integration boun
 ## Contents
 - `app/`: Bootstrap, API glue, scene coordination, and factory entry points.
 - `campaign/`: Campaign-owned state and campaign-level systems.
-- `content/`: Prototype content database, indexing, and definition types, including per-plant primary-plus-secondary harvest-output authoring, Village shovel/food recipe tables, and faction-tech content gating data.
+- `content/`: Prototype content database, indexing, and definition types, including per-plant primary-plus-secondary harvest-output authoring, the shared total-reputation unlock ladder, Village shovel/food recipe tables, and the linear `32`-tier faction-tech content gating data.
 - `events/`: Engine feedback event translation types.
 - `gs1_pch.h`: Stable internal precompiled-header umbrella for common STL and Flecs includes shared across heavy C++ build targets.
 - `messages/`: Internal gameplay message contracts and dispatch helpers.
 - `runtime/`: Core runtime loop, queues, clocks, and execution services, including timed-modifier remaining-game-hour projection for smoke/viewer consumers.
-- `site/`: Active site-run state, ECS world helpers, and site-owned systems, including harvest action execution plus worker-pack harvest output routing, campaign-aware craft unlock filtering, and Village-specific shovel, excavation, buff, and custom-food runtime hooks.
+- `site/`: Active site-run state, ECS world helpers, and site-owned systems, including harvest action execution plus worker-pack harvest output routing, campaign-aware recipe/item unlock filtering, and Village-specific shovel, excavation, buff, and custom-food runtime hooks.
 - `support/`: Shared lightweight support types such as IDs.
 - `testing/`: Runtime-side helpers that back the system-test framework.
 - `ui/`: View-model and presenter state projected for the frontend/runtime host.

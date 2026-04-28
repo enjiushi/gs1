@@ -121,13 +121,11 @@ Implemented behavior coverage should verify:
 Implemented behavior coverage should verify:
 
 - Faction reputation awards never decrease a faction's lifetime total reputation.
-- Campaign-wide total reputation unlocks the three prototype plant tiers without being spent.
-- Each faction exposes `8` prototype base-tech tiers gated by authored faction-reputation requirements `1-8`.
-- Each faction base tech exposes `2` mutually exclusive enhancements gated by authored faction-reputation requirements `9-16`.
-- Reaching a total-reputation tier threshold unlocks that tier's authored plant pair without spending reputation.
-- Base technologies become claimable as soon as the matching faction-reputation tier threshold is met; they do not require previous-tier purchases.
-- Enhancements require both the paired base tech purchase and the matching faction-reputation tier.
-- Prototype technologies cover placeholder base-tech and enhancement modifier/mechanism effects plus optional item/plant/structure/recipe grant payloads, all with authored per-node internal cash-point values that convert to player-facing cash costs.
+- Campaign-wide total reputation unlocks the authored multi-kind progression ladder without being spent.
+- Each faction exposes a linear `32`-tier tech ladder gated by authored faction-reputation requirements `1-32`.
+- Reaching a total-reputation tier threshold unlocks that tier's authored content access without spending reputation.
+- Faction technologies become claimable as soon as the matching faction-reputation tier threshold is met; they do not require previous-tier purchases.
+- Prototype technologies cover placeholder linear-tier modifier/mechanism effects, all with authored per-node internal cash-point values that convert to player-facing cash costs.
 - Purchased tech state is stored as node ownership, not as unspent pick inventory.
 
 ### `regional_support`
@@ -275,16 +273,14 @@ Implemented behavior coverage should verify:
 
 Implemented behavior coverage should verify:
 
-- `SiteRunStarted` seeds site-one money, listings, and unlockables.
+- `SiteRunStarted` seeds site-one money and listings, with progression-sensitive stock filtered by reputation unlock state.
 - Non-site-one runs are reset to an empty/default economy state.
 - Buying from a buy listing spends money and decrements limited quantity.
 - Successful buy-item purchases route inventory through the delivery crate
   immediately instead of waiting on a timed arrival.
 - Selling to a sell listing increases money and decrements limited quantity.
 - Contractor hire spends money and decrements available work units.
-- Unlockable purchase removes the unlockable from direct-purchase availability
-  and reveals it in the owned list.
-- Direct-purchase unlockable listings derive their displayed/spent cash price from authored internal cash-point values.
+- The direct site-unlockable purchase path is absent by default when progression comes only from the total-reputation unlock ladder.
 - Missing listings return `NOT_FOUND`.
 - Wrong listing kinds or insufficient funds/quantity return invalid-state
   failures.
@@ -295,7 +291,7 @@ Implemented behavior coverage should verify:
 Implemented behavior coverage should verify:
 
 - `SiteRunStarted` seeds the home snapshot counts and listings for the current site.
-- Projected phone listings omit frozen contractor offers while still surfacing direct-purchase unlockables and dynamic sell listings.
+- Projected phone listings omit frozen contractor offers while still surfacing reputation-eligible progression stock and dynamic sell listings.
 - Section requests switch authoritative phone app state for the existing home, task, buy, sell, service, and cart surfaces.
 - Invalid section requests return `INVALID_ARGUMENT`.
 - Projection refresh picks up newly sellable inventory after delivery-crate insertions.

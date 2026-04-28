@@ -4328,8 +4328,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return compactStatus;
     }
 
-    function technologyNodeIdFromParts(factionId, tierIndex, enhancementChoiceIndex) {
-        return 1000 + factionId * 1000 + tierIndex * 10 + enhancementChoiceIndex;
+    function technologyNodeIdFromParts(factionId, tierIndex) {
+        return 1000 + factionId * 1000 + tierIndex * 10;
     }
 
     function parseSimpleTomlValue(rawValue) {
@@ -4401,14 +4401,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         parseTomlTableArray(nodeTomlText, "technology_nodes").forEach((row) => {
             const factionId = Number(row.faction_id || 0);
             const tierIndex = Number(row.tier_index || 0);
-            const enhancementChoiceIndex = Number(row.enhancement_choice_index || 0);
-            const nodeId = technologyNodeIdFromParts(factionId, tierIndex, enhancementChoiceIndex);
+            const nodeId = technologyNodeIdFromParts(factionId, tierIndex);
             catalog.nodesById.set(nodeId, {
                 nodeId: nodeId,
                 factionId: factionId,
                 tierIndex: tierIndex,
-                enhancementChoiceIndex: enhancementChoiceIndex,
-                nodeKind: String(row.node_kind || ""),
                 displayName: String(row.display_name || ""),
                 description: String(row.description || ""),
                 internalCostCashPoints: Number(row.internal_cost_cash_points || 0),
@@ -4459,7 +4456,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return false;
         }
 
-        return /^TECHNODE\|/i.test(text) || /\b(Base|Enh\s+\d+)\s+T\d+\b/i.test(text) || /\bRefund\b/i.test(text);
+        return /^TECHNODE\|/i.test(text) || /\bT\d+\b/i.test(text) || /\bRefund\b/i.test(text);
     }
 
     function parseTechTreeActionElement(element) {
@@ -4500,10 +4497,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return {
                 element: element,
                 titleText: (catalogNode && catalogNode.displayName) || fields.title || text,
-                kindText:
-                    (catalogNode
-                        ? (catalogNode.enhancementChoiceIndex === 0 ? "Base" : ("Enh " + catalogNode.enhancementChoiceIndex))
-                        : (fields.kind || "Tech")),
+                kindText: fields.kind || "Tech",
                 factionText:
                     (catalogNode
                         ? ({
@@ -4522,8 +4516,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     catalogNode
                         ? ("$" + formatMoney((catalogNode.internalCostCashPoints || 0) / 100))
                         : "",
-                enhancementChoiceIndex: catalogNode ? Number(catalogNode.enhancementChoiceIndex || 0) : 0,
-                isEnhancement: !!(catalogNode && Number(catalogNode.enhancementChoiceIndex || 0) > 0),
+                enhancementChoiceIndex: 0,
+                isEnhancement: false,
                 costText: (() => {
                     const effectiveStatus = resolvedStatusText;
                     const matchedCash = effectiveStatus.match(/\$\d+(?:\.\d{2})?/);
@@ -4549,11 +4543,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             .filter(Boolean);
         const leftText = parts[0] || "";
         const detailParts = parts.length > 1 ? parts.slice(1) : [];
-        const leftMatch = leftText.match(/^(.*?)\s+(Base|Enh\s+\d+)\s+T(\d+)(?:\s+(.*))?$/i);
+        const leftMatch = leftText.match(/^(.*?)\s+T(\d+)(?:\s+(.*))?$/i);
         const factionText = leftMatch ? leftMatch[1].trim() : "";
-        const kindText = leftMatch ? leftMatch[2].trim() : "Tech";
-        const tierNumber = leftMatch ? Number(leftMatch[3]) : 0;
-        const primaryStatusText = leftMatch && leftMatch[4] ? leftMatch[4].trim() : leftText;
+        const kindText = "Tech";
+        const tierNumber = leftMatch ? Number(leftMatch[2]) : 0;
+        const primaryStatusText = leftMatch && leftMatch[3] ? leftMatch[3].trim() : leftText;
         let titleText = "";
         let descriptionText = "";
         const filteredDetailParts = [];
@@ -4589,7 +4583,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             reputationRequirement: 0,
             cashCostText: "",
             enhancementChoiceIndex: 0,
-            isEnhancement: /^Enh/i.test(kindText),
+            isEnhancement: false,
             costText: costText,
             isClaimable: (element.flags & 1) !== 0,
             isDisabled: (element.flags & 2) !== 0,
@@ -4642,9 +4636,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         nodeIcon.style.setProperty("--tech-icon-dark", iconPresentation.dark);
         appendUiIcon(nodeIcon, iconPresentation.iconKey);
         nodeTop.appendChild(nodeIcon);
-        if (/^Enh/i.test(nodeModel.kindText)) {
-            nodeIcon.classList.add("amp");
-        }
         if (!nodeModel.isClaimed) {
             nodeIcon.classList.add("locked-visual");
             const nodeLock = document.createElement("div");
@@ -4813,7 +4804,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
             const tierMeta = document.createElement("div");
             tierMeta.className = "tech-tier-meta";
-            tierMeta.textContent = "Base techs open lighter unlocks first. Enhancements sit on the higher faction-reputation row for the same tier.";
+            tierMeta.textContent = "Each faction now advances through one linear tech per tier, with faction reputation matching the tier number.";
             tierCard.appendChild(tierMeta);
 
             const tierGrid = document.createElement("div");
@@ -4836,9 +4827,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 tierGrid.appendChild(heading);
             });
 
-            const baseNodes = factionNodes.filter((nodeModel) => !nodeModel.isEnhancement);
-            const enhancementNodes = factionNodes.filter((nodeModel) => nodeModel.isEnhancement);
-            tierGrid.appendChild(buildTechRequirementCell("Base Tech", baseNodes, "base"));
+            tierGrid.appendChild(buildTechRequirementCell("Faction Tech", factionNodes, "base"));
             factionOrder.forEach((factionName) => {
                 const normalizedFactionName = normalizeTechFactionName(factionName);
                 const columnNodes = factionNodes.filter((nodeModel) => {
@@ -4847,37 +4836,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
                 const column = document.createElement("div");
                 column.className = "tech-row-cell";
-                const baseNode = columnNodes.find((nodeModel) => /^Base$/i.test(nodeModel.kindText));
-                if (baseNode) {
-                    column.appendChild(buildTechTreeNodeButton(baseNode, "tech-base-card"));
+                const linearNode = columnNodes[0] || null;
+                if (linearNode) {
+                    column.appendChild(buildTechTreeNodeButton(linearNode, "tech-base-card"));
                 } else {
-                    column.appendChild(makeTechPlaceholder("No Base Tech", "tech-base-card"));
+                    column.appendChild(makeTechPlaceholder("No Tech", "tech-base-card"));
                 }
-                tierGrid.appendChild(column);
-            });
-
-            tierGrid.appendChild(buildTechRequirementCell("Enhancements", enhancementNodes, "enhancement"));
-            factionOrder.forEach((factionName) => {
-                const normalizedFactionName = normalizeTechFactionName(factionName);
-                const columnNodes = factionNodes.filter((nodeModel) => {
-                    return normalizeTechFactionName(nodeModel.factionText) === normalizedFactionName;
-                });
-
-                const column = document.createElement("div");
-                column.className = "tech-row-cell tech-amp-cell";
-                const enhancementRow = document.createElement("div");
-                enhancementRow.className = "tech-amp-row";
-                column.appendChild(enhancementRow);
-
-                [1, 2].forEach((enhIndex) => {
-                    const enhancementNode = columnNodes.find((nodeModel) => {
-                        return new RegExp("^Enh\\s+" + String(enhIndex) + "$", "i").test(nodeModel.kindText);
-                    });
-                    enhancementRow.appendChild(
-                        enhancementNode
-                            ? buildTechTreeNodeButton(enhancementNode, "tech-amp-card")
-                            : makeTechPlaceholder("No Enhancement", "tech-amp-card"));
-                });
                 tierGrid.appendChild(column);
             });
         });

@@ -137,17 +137,17 @@ void prototype_site_run_expands_worker_pack_with_village_pack_techs(
         gs1::TechnologyPurchaseRecord {
             gs1::TechNodeId {gs1::base_technology_node_id(
                 gs1::FactionId {gs1::k_faction_village_committee},
-                4U)}});
-    auto tier_four_site_run = make_prototype_site_run(campaign, 1U);
-    GS1_SYSTEM_TEST_CHECK(context, tier_four_site_run.inventory.worker_pack_slot_count == 12U);
+                21U)}});
+    auto first_pack_site_run = make_prototype_site_run(campaign, 1U);
+    GS1_SYSTEM_TEST_CHECK(context, first_pack_site_run.inventory.worker_pack_slot_count == 10U);
 
     campaign.technology_state.purchased_nodes.push_back(
         gs1::TechnologyPurchaseRecord {
             gs1::TechNodeId {gs1::base_technology_node_id(
                 gs1::FactionId {gs1::k_faction_village_committee},
-                7U)}});
-    auto tier_seven_site_run = make_prototype_site_run(campaign, 1U);
-    GS1_SYSTEM_TEST_CHECK(context, tier_seven_site_run.inventory.worker_pack_slot_count == 16U);
+                22U)}});
+    auto second_pack_site_run = make_prototype_site_run(campaign, 1U);
+    GS1_SYSTEM_TEST_CHECK(context, second_pack_site_run.inventory.worker_pack_slot_count == 12U);
 }
 
 void weather_event_site_run_started_applies_site_one_background_conditions(
@@ -1517,7 +1517,9 @@ void modifier_imports_campaign_assistant_and_scales_technology_run_modifiers_wit
     campaign.faction_progress[2].faction_reputation = 10;
     campaign.technology_state.purchased_nodes.push_back(
         gs1::TechnologyPurchaseRecord {
-            gs1::TechNodeId {gs1::k_tech_node_university_t1_survey_bias}});
+            gs1::TechNodeId {gs1::base_technology_node_id(
+                gs1::FactionId {gs1::k_faction_agricultural_university},
+                1U)}});
     auto site_run = make_test_site_run(1U, 1602U);
     GameMessageQueue queue {};
     auto site_context = make_site_context<ModifierSystem>(campaign, site_run, queue);
@@ -1531,7 +1533,9 @@ void modifier_imports_campaign_assistant_and_scales_technology_run_modifiers_wit
                 SiteRunStartedMessage {1U, 1602U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     const auto* imported_modifier = gs1::find_technology_node_def(
-        gs1::TechNodeId {gs1::k_tech_node_university_t1_survey_bias});
+        gs1::TechNodeId {gs1::base_technology_node_id(
+            gs1::FactionId {gs1::k_faction_agricultural_university},
+            1U)});
     GS1_SYSTEM_TEST_REQUIRE(context, imported_modifier != nullptr);
     GS1_SYSTEM_TEST_CHECK(
         context,

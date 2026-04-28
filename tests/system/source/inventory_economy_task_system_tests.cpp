@@ -1198,13 +1198,12 @@ void village_tier_seven_tech_expands_timed_buff_cap(
         gs1::TechnologyPurchaseRecord {
             gs1::TechNodeId {gs1::base_technology_node_id(
                 gs1::FactionId {gs1::k_faction_village_committee},
-                7U)}});
+                26U)}});
     campaign.technology_state.purchased_nodes.push_back(
         gs1::TechnologyPurchaseRecord {
-            gs1::TechNodeId {gs1::enhancement_technology_node_id(
+            gs1::TechNodeId {gs1::base_technology_node_id(
                 gs1::FactionId {gs1::k_faction_village_committee},
-                7U,
-                1U)}});
+                27U)}});
     auto site_run = make_test_site_run(1U, 814U);
     GameMessageQueue queue {};
     auto modifier_context = make_site_context<ModifierSystem>(campaign, site_run, queue);
@@ -1341,7 +1340,7 @@ void economy_site_run_started_seeds_site_one_and_resets_other_sites(
         EconomyPhoneSystem::process_message(site_one_context, started_one) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, site_one_run.economy.money == gs1::cash_points_from_cash(45));
     GS1_SYSTEM_TEST_CHECK(context, site_one_run.economy.available_phone_listings.size() >= 9U);
-    GS1_SYSTEM_TEST_CHECK(context, site_one_run.economy.direct_purchase_unlockable_ids.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, site_one_run.economy.direct_purchase_unlockable_ids.empty());
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -1350,7 +1349,7 @@ void economy_site_run_started_seeds_site_one_and_resets_other_sites(
     GS1_SYSTEM_TEST_CHECK(context, other_site_run.economy.available_phone_listings.empty());
 }
 
-void economy_purchase_sell_hire_and_unlockable_paths_update_money(
+void economy_purchase_sell_and_hire_paths_update_money(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
@@ -1424,17 +1423,6 @@ void economy_purchase_sell_hire_and_unlockable_paths_update_money(
     GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 3120);
     GS1_SYSTEM_TEST_REQUIRE(context, find_listing_by_id(site_run.economy, 10U) != nullptr);
     GS1_SYSTEM_TEST_CHECK(context, find_listing_by_id(site_run.economy, 10U)->quantity == 2U);
-
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        EconomyPhoneSystem::process_message(
-            site_context,
-            make_message(
-                GameMessageType::SiteUnlockablePurchaseRequested,
-                gs1::SiteUnlockablePurchaseRequestedMessage {101U})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 1120);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.direct_purchase_unlockable_ids.empty());
-    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.revealed_site_unlockable_ids.size() == 1U);
 }
 
 void economy_cart_checkout_charges_delivery_fee_and_clears_cart(
@@ -1494,7 +1482,7 @@ void economy_cart_checkout_charges_delivery_fee_and_clears_cart(
     GS1_SYSTEM_TEST_CHECK(context, queue[3].type == GameMessageType::PhoneListingPurchased);
 }
 
-void economy_purchase_listing_unlockable_path_spends_money_and_removes_direct_unlockable(
+void economy_site_unlockable_purchase_path_is_absent_without_seeded_progression_listings(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
@@ -1515,11 +1503,11 @@ void economy_purchase_listing_unlockable_path_spends_money_and_removes_direct_un
         EconomyPhoneSystem::process_message(
             site_context,
             make_message(
-                GameMessageType::PhoneListingPurchaseRequested,
-                gs1::PhoneListingPurchaseRequestedMessage {11U, 1U, 0U})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == 2500);
+                GameMessageType::SiteUnlockablePurchaseRequested,
+                gs1::SiteUnlockablePurchaseRequestedMessage {101U})) == GS1_STATUS_NOT_FOUND);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.money == gs1::cash_points_from_cash(45));
     GS1_SYSTEM_TEST_CHECK(context, site_run.economy.direct_purchase_unlockable_ids.empty());
-    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.revealed_site_unlockable_ids.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.economy.revealed_site_unlockable_ids.empty());
 }
 
 void economy_invalid_listing_or_money_returns_failures(gs1::testing::SystemTestExecutionContext& context)
@@ -2812,16 +2800,16 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     economy_site_run_started_seeds_site_one_and_resets_other_sites);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "economy_phone",
-    "purchase_sell_hire_and_unlockable_paths_update_money",
-    economy_purchase_sell_hire_and_unlockable_paths_update_money);
+    "purchase_sell_and_hire_paths_update_money",
+    economy_purchase_sell_and_hire_paths_update_money);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "economy_phone",
     "cart_checkout_charges_delivery_fee_and_clears_cart",
     economy_cart_checkout_charges_delivery_fee_and_clears_cart);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "economy_phone",
-    "purchase_listing_unlockable_path_spends_money_and_removes_direct_unlockable",
-    economy_purchase_listing_unlockable_path_spends_money_and_removes_direct_unlockable);
+    "site_unlockable_purchase_path_is_absent_without_seeded_progression_listings",
+    economy_site_unlockable_purchase_path_is_absent_without_seeded_progression_listings);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "economy_phone",
     "invalid_listing_or_money_returns_failures",

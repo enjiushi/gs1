@@ -763,8 +763,7 @@ void append_seed_phone_listing(
             return;
         }
 
-        if (item_def->linked_plant_id.value != 0U &&
-            !TechnologySystem::plant_unlocked(context.campaign, item_def->linked_plant_id))
+        if (!TechnologySystem::item_unlocked(context.campaign, item_id))
         {
             return;
         }

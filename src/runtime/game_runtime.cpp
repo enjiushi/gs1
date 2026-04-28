@@ -2228,7 +2228,7 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
         GS1_UI_ELEMENT_LABEL,
         GS1_UI_ELEMENT_FLAG_NONE,
         no_action,
-        "Plant Unlocks");
+        "Reputation Unlocks");
 
     queue_ui_element_message(
         7U,
@@ -2242,7 +2242,7 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
         GS1_UI_ELEMENT_LABEL,
         GS1_UI_ELEMENT_FLAG_NONE,
         no_action,
-        "Base + 2 enhancements");
+        "32 linear tiers per faction");
 
     std::uint32_t next_element_id = 9U;
 
@@ -2252,9 +2252,11 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
         std::snprintf(
             unlock_text,
             sizeof(unlock_text),
-            "%.*s Need Total %d | %s",
+            "%.*s (%.*s) Need Total %d | %s",
             static_cast<int>(unlock_def.display_name.size()),
             unlock_def.display_name.data(),
+            static_cast<int>(reputation_unlock_kind_display_name(unlock_def.unlock_kind).size()),
+            reputation_unlock_kind_display_name(unlock_def.unlock_kind).data(),
             unlock_def.reputation_requirement,
             campaign_->technology_state.total_reputation >= unlock_def.reputation_requirement
                 ? "Ready"
@@ -2319,31 +2321,6 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
             const auto display_cash_cost = cash_value_from_cash_points(internal_cash_cost);
             const auto node_faction_reputation =
                 TechnologySystem::faction_reputation(*campaign_, node_def.faction_id);
-            const auto paired_base_purchased =
-                node_def.node_kind != TechnologyNodeKind::Enhancement ||
-                TechnologySystem::node_purchased(
-                    *campaign_,
-                    TechNodeId {base_technology_node_id(node_def.faction_id, node_def.tier_index)});
-            bool sibling_enhancement_purchased = false;
-            if (node_def.node_kind == TechnologyNodeKind::Enhancement)
-            {
-                for (const auto& sibling_node_def : technology_node_defs)
-                {
-                    if (sibling_node_def.node_kind != TechnologyNodeKind::Enhancement ||
-                        sibling_node_def.faction_id != node_def.faction_id ||
-                        sibling_node_def.tier_index != node_def.tier_index ||
-                        sibling_node_def.tech_node_id == node_def.tech_node_id)
-                    {
-                        continue;
-                    }
-
-                    if (TechnologySystem::node_purchased(*campaign_, sibling_node_def.tech_node_id))
-                    {
-                        sibling_enhancement_purchased = true;
-                        break;
-                    }
-                }
-            }
 
             Gs1UiAction action {};
             action.target_id = node_def.tech_node_id.value;
@@ -2403,20 +2380,6 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
                         sizeof(node_text),
                         "TECHNODE|s=Need %dr",
                         reputation_requirement);
-                }
-                else if (!paired_base_purchased)
-                {
-                    std::snprintf(
-                        node_text,
-                        sizeof(node_text),
-                        "TECHNODE|s=Need base");
-                }
-                else if (sibling_enhancement_purchased)
-                {
-                    std::snprintf(
-                        node_text,
-                        sizeof(node_text),
-                        "TECHNODE|s=Other choice");
                 }
                 else
                 {

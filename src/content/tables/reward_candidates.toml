@@ -24,11 +24,11 @@ reputation_delta = 0
 
 [[reward_candidates]]
 reward_candidate_id = 3
-effect_kind = "RevealUnlockable"
-money_delta = 0
+effect_kind = "Money"
+money_delta = 10
 item_id = 0
 quantity = 0
-unlockable_id = 102
+unlockable_id = 0
 modifier_id = 0
 faction_id = 0
 delivery_minutes = 0
@@ -60,14 +60,14 @@ reputation_delta = 0
 
 [[reward_candidates]]
 reward_candidate_id = 6
-effect_kind = "RevealUnlockable"
+effect_kind = "ItemDelivery"
 money_delta = 0
-item_id = 0
-quantity = 0
-unlockable_id = 103
+item_id = 3
+quantity = 1
+unlockable_id = 0
 modifier_id = 0
 faction_id = 0
-delivery_minutes = 0
+delivery_minutes = 10
 reputation_delta = 0
 
 [[reward_candidates]]

@@ -411,8 +411,7 @@ bool item_is_accessible_for_task(
         return false;
     }
 
-    if (item_def->linked_plant_id.value != 0U &&
-        !TechnologySystem::plant_unlocked(campaign, item_def->linked_plant_id))
+    if (!TechnologySystem::item_unlocked(campaign, item_id))
     {
         return false;
     }

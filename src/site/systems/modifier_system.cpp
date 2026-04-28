@@ -21,20 +21,32 @@ namespace
 constexpr float k_modifier_change_epsilon = 1e-4f;
 constexpr double k_timed_buff_block_world_minutes = 480.0;
 constexpr FactionId k_village_faction {k_faction_village_committee};
-constexpr TechNodeId k_village_t1_base {base_technology_node_id(k_village_faction, 1U)};
-constexpr TechNodeId k_village_t1_enh1 {enhancement_technology_node_id(k_village_faction, 1U, 1U)};
-constexpr TechNodeId k_village_t1_enh2 {enhancement_technology_node_id(k_village_faction, 1U, 2U)};
-constexpr TechNodeId k_village_t2_enh2 {enhancement_technology_node_id(k_village_faction, 2U, 2U)};
-constexpr TechNodeId k_village_t3_enh1 {enhancement_technology_node_id(k_village_faction, 3U, 1U)};
-constexpr TechNodeId k_village_t3_enh2 {enhancement_technology_node_id(k_village_faction, 3U, 2U)};
-constexpr TechNodeId k_village_t4_base {base_technology_node_id(k_village_faction, 4U)};
-constexpr TechNodeId k_village_t4_enh1 {enhancement_technology_node_id(k_village_faction, 4U, 1U)};
-constexpr TechNodeId k_village_t4_enh2 {enhancement_technology_node_id(k_village_faction, 4U, 2U)};
-constexpr TechNodeId k_village_t5_enh2 {enhancement_technology_node_id(k_village_faction, 5U, 2U)};
-constexpr TechNodeId k_village_t6_enh1 {enhancement_technology_node_id(k_village_faction, 6U, 1U)};
-constexpr TechNodeId k_village_t6_enh2 {enhancement_technology_node_id(k_village_faction, 6U, 2U)};
-constexpr TechNodeId k_village_t7_enh2 {enhancement_technology_node_id(k_village_faction, 7U, 2U)};
-constexpr TechNodeId k_village_t8_enh2 {enhancement_technology_node_id(k_village_faction, 8U, 2U)};
+constexpr TechNodeId k_village_t1 {base_technology_node_id(k_village_faction, 1U)};
+constexpr TechNodeId k_village_t2 {base_technology_node_id(k_village_faction, 2U)};
+constexpr TechNodeId k_village_t3 {base_technology_node_id(k_village_faction, 3U)};
+constexpr TechNodeId k_village_t4 {base_technology_node_id(k_village_faction, 4U)};
+constexpr TechNodeId k_village_t5 {base_technology_node_id(k_village_faction, 5U)};
+constexpr TechNodeId k_village_t6 {base_technology_node_id(k_village_faction, 6U)};
+constexpr TechNodeId k_village_t7 {base_technology_node_id(k_village_faction, 7U)};
+constexpr TechNodeId k_village_t8 {base_technology_node_id(k_village_faction, 8U)};
+constexpr TechNodeId k_village_t9 {base_technology_node_id(k_village_faction, 9U)};
+constexpr TechNodeId k_village_t10 {base_technology_node_id(k_village_faction, 10U)};
+constexpr TechNodeId k_village_t11 {base_technology_node_id(k_village_faction, 11U)};
+constexpr TechNodeId k_village_t13 {base_technology_node_id(k_village_faction, 13U)};
+constexpr TechNodeId k_village_t14 {base_technology_node_id(k_village_faction, 14U)};
+constexpr TechNodeId k_village_t15 {base_technology_node_id(k_village_faction, 15U)};
+constexpr TechNodeId k_village_t16 {base_technology_node_id(k_village_faction, 16U)};
+constexpr TechNodeId k_village_t17 {base_technology_node_id(k_village_faction, 17U)};
+constexpr TechNodeId k_village_t18 {base_technology_node_id(k_village_faction, 18U)};
+constexpr TechNodeId k_village_t19 {base_technology_node_id(k_village_faction, 19U)};
+constexpr TechNodeId k_village_t20 {base_technology_node_id(k_village_faction, 20U)};
+constexpr TechNodeId k_village_t23 {base_technology_node_id(k_village_faction, 23U)};
+constexpr TechNodeId k_village_t24 {base_technology_node_id(k_village_faction, 24U)};
+constexpr TechNodeId k_village_t25 {base_technology_node_id(k_village_faction, 25U)};
+constexpr TechNodeId k_village_t28 {base_technology_node_id(k_village_faction, 28U)};
+constexpr TechNodeId k_village_t29 {base_technology_node_id(k_village_faction, 29U)};
+constexpr TechNodeId k_village_t31 {base_technology_node_id(k_village_faction, 31U)};
+constexpr TechNodeId k_village_t32 {base_technology_node_id(k_village_faction, 32U)};
 
 const ModifierSystemTuning& modifier_system_tuning() noexcept
 {
@@ -441,52 +453,107 @@ VillageTechnologyEffectState resolve_village_technology_effects(
 {
     VillageTechnologyEffectState effects {};
 
-    if (TechnologySystem::node_purchased(campaign, k_village_t1_base))
+    if (TechnologySystem::node_purchased(campaign, k_village_t1))
     {
-        effects.shovel_meter_cost_reduction = 0.15f;
-        effects.shovel_plant_duration_reduction = 0.15f;
-        effects.shovel_excavate_duration_reduction = 0.15f;
+        effects.shovel_meter_cost_reduction += 0.05f;
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t1_enh1))
+    if (TechnologySystem::node_purchased(campaign, k_village_t2))
     {
-        effects.shovel_meter_cost_reduction += 0.15f;
+        effects.shovel_plant_duration_reduction += 0.05f;
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t1_enh2))
+    if (TechnologySystem::node_purchased(campaign, k_village_t3))
     {
-        effects.shovel_plant_duration_reduction += 0.40f;
+        effects.shovel_excavate_duration_reduction += 0.05f;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_village_t4))
+    {
+        effects.shovel_meter_cost_reduction += 0.05f;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_village_t5))
+    {
+        effects.shovel_plant_duration_reduction += 0.05f;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_village_t6))
+    {
+        effects.shovel_excavate_duration_reduction += 0.05f;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_village_t7))
+    {
+        effects.shovel_meter_cost_reduction += 0.05f;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_village_t8))
+    {
+        effects.shovel_plant_duration_reduction += 0.05f;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_village_t9))
+    {
+        effects.shovel_excavate_duration_reduction += 0.05f;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_village_t10))
+    {
+        effects.shovel_plant_duration_reduction += 0.20f;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_village_t11))
+    {
+        effects.shovel_plant_duration_reduction += 0.20f;
     }
 
     effects.careful_excavation_loot_rebalance =
-        TechnologySystem::node_purchased(campaign, k_village_t3_enh1);
-    if (TechnologySystem::node_purchased(campaign, k_village_t3_enh2))
+        TechnologySystem::node_purchased(campaign, k_village_t13);
+    if (TechnologySystem::node_purchased(campaign, k_village_t14))
     {
         effects.careful_excavation_meter_cost_reduction = 0.20f;
         effects.careful_excavation_duration_reduction = 0.30f;
     }
 
-    effects.weather_nourishment_hydration_loss_reduction =
-        TechnologySystem::node_purchased(campaign, k_village_t4_base)
-        ? (TechnologySystem::node_purchased(campaign, k_village_t4_enh2) ? 0.70f : 0.30f)
-        : 0.0f;
-    effects.weather_health_morale_loss_reduction =
-        TechnologySystem::node_purchased(campaign, k_village_t4_enh1) ? 0.30f : 0.0f;
+    if (TechnologySystem::node_purchased(campaign, k_village_t15))
+    {
+        effects.weather_nourishment_hydration_loss_reduction += 0.15f;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_village_t16))
+    {
+        effects.weather_nourishment_hydration_loss_reduction += 0.15f;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_village_t17))
+    {
+        effects.weather_health_morale_loss_reduction += 0.15f;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_village_t18))
+    {
+        effects.weather_health_morale_loss_reduction += 0.15f;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_village_t19))
+    {
+        effects.weather_nourishment_hydration_loss_reduction += 0.20f;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_village_t20))
+    {
+        effects.weather_nourishment_hydration_loss_reduction += 0.20f;
+    }
 
     effects.thorough_excavation_loot_rebalance =
-        TechnologySystem::node_purchased(campaign, k_village_t6_enh1);
-    if (TechnologySystem::node_purchased(campaign, k_village_t6_enh2))
+        TechnologySystem::node_purchased(campaign, k_village_t31);
+    if (TechnologySystem::node_purchased(campaign, k_village_t32))
     {
         effects.thorough_excavation_meter_cost_reduction = 0.20f;
         effects.thorough_excavation_duration_reduction = 0.30f;
     }
 
-    effects.timed_buff_effect_multiplier =
-        TechnologySystem::node_purchased(campaign, k_village_t7_enh2) ? 1.25f : 1.0f;
+    effects.timed_buff_effect_multiplier = 1.0f;
+    if (TechnologySystem::node_purchased(campaign, k_village_t28))
+    {
+        effects.timed_buff_effect_multiplier = 1.10f;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_village_t29))
+    {
+        effects.timed_buff_effect_multiplier = 1.25f;
+    }
     effects.tier_two_food_buffs_upgraded =
-        TechnologySystem::node_purchased(campaign, k_village_t2_enh2);
+        TechnologySystem::node_purchased(campaign, k_village_t23);
     effects.tier_five_food_buffs_upgraded =
-        TechnologySystem::node_purchased(campaign, k_village_t5_enh2);
+        TechnologySystem::node_purchased(campaign, k_village_t24);
     effects.tier_eight_food_buffs_upgraded =
-        TechnologySystem::node_purchased(campaign, k_village_t8_enh2);
+        TechnologySystem::node_purchased(campaign, k_village_t25);
     return effects;
 }
 

@@ -9,21 +9,6 @@ namespace gs1
 {
 namespace
 {
-constexpr FactionId k_village_faction {k_faction_village_committee};
-
-constexpr TechNodeId k_village_t1_base {base_technology_node_id(k_village_faction, 1U)};
-constexpr TechNodeId k_village_t1_enh1 {enhancement_technology_node_id(k_village_faction, 1U, 1U)};
-constexpr TechNodeId k_village_t1_enh2 {enhancement_technology_node_id(k_village_faction, 1U, 2U)};
-constexpr TechNodeId k_village_t2_base {base_technology_node_id(k_village_faction, 2U)};
-constexpr TechNodeId k_village_t2_enh1 {enhancement_technology_node_id(k_village_faction, 2U, 1U)};
-constexpr TechNodeId k_village_t2_enh2 {enhancement_technology_node_id(k_village_faction, 2U, 2U)};
-constexpr TechNodeId k_village_t5_base {base_technology_node_id(k_village_faction, 5U)};
-constexpr TechNodeId k_village_t5_enh1 {enhancement_technology_node_id(k_village_faction, 5U, 1U)};
-constexpr TechNodeId k_village_t5_enh2 {enhancement_technology_node_id(k_village_faction, 5U, 2U)};
-constexpr TechNodeId k_village_t8_base {base_technology_node_id(k_village_faction, 8U)};
-constexpr TechNodeId k_village_t8_enh1 {enhancement_technology_node_id(k_village_faction, 8U, 1U)};
-constexpr TechNodeId k_village_t8_enh2 {enhancement_technology_node_id(k_village_faction, 8U, 2U)};
-
 const FactionProgressState* find_faction_progress(
     const CampaignState& campaign,
     FactionId faction_id) noexcept
@@ -37,50 +22,6 @@ const FactionProgressState* find_faction_progress(
     }
 
     return nullptr;
-}
-
-[[nodiscard]] TechNodeId paired_base_tech_node_id(const TechnologyNodeDef& node_def) noexcept
-{
-    return TechNodeId {base_technology_node_id(node_def.faction_id, node_def.tier_index)};
-}
-
-[[nodiscard]] bool paired_base_node_purchased(
-    const CampaignState& campaign,
-    const TechnologyNodeDef& node_def) noexcept
-{
-    if (node_def.node_kind != TechnologyNodeKind::Enhancement)
-    {
-        return true;
-    }
-
-    return TechnologySystem::node_purchased(campaign, paired_base_tech_node_id(node_def));
-}
-
-[[nodiscard]] bool sibling_enhancement_purchased(
-    const CampaignState& campaign,
-    const TechnologyNodeDef& node_def) noexcept
-{
-    if (node_def.node_kind != TechnologyNodeKind::Enhancement)
-    {
-        return false;
-    }
-
-    for (const auto& purchase : campaign.technology_state.purchased_nodes)
-    {
-        const auto* purchased_node_def = find_technology_node_def(purchase.tech_node_id);
-        if (purchased_node_def == nullptr ||
-            purchased_node_def->node_kind != TechnologyNodeKind::Enhancement ||
-            purchased_node_def->faction_id != node_def.faction_id ||
-            purchased_node_def->tier_index != node_def.tier_index ||
-            purchased_node_def->tech_node_id == node_def.tech_node_id)
-        {
-            continue;
-        }
-
-        return true;
-    }
-
-    return false;
 }
 
 [[nodiscard]] std::int32_t highest_purchased_reputation_requirement(const CampaignState& campaign) noexcept
@@ -103,16 +44,48 @@ const FactionProgressState* find_faction_progress(
     switch (recipe_id.value)
     {
     case k_recipe_cook_food_pack:
-    case k_recipe_craft_camp_stove:
-    case k_recipe_craft_workbench:
-    case k_recipe_craft_storage_crate:
-    case k_recipe_craft_hammer:
-    case k_recipe_cook_field_tea:
-    case k_recipe_cook_spiced_stew:
         return true;
     default:
         return false;
     }
+}
+
+[[nodiscard]] bool has_reputation_unlock(
+    ReputationUnlockKind unlock_kind,
+    std::uint32_t content_id) noexcept
+{
+    for (const auto& unlock_def : all_reputation_unlock_defs())
+    {
+        if (unlock_def.unlock_kind == unlock_kind &&
+            unlock_def.content_id == content_id)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+[[nodiscard]] bool reputation_unlock_ready(
+    const CampaignState& campaign,
+    ReputationUnlockKind unlock_kind,
+    std::uint32_t content_id) noexcept
+{
+    for (const auto& unlock_def : all_reputation_unlock_defs())
+    {
+        if (unlock_def.unlock_kind != unlock_kind ||
+            unlock_def.content_id != content_id)
+        {
+            continue;
+        }
+
+        if (campaign.technology_state.total_reputation >= unlock_def.reputation_requirement)
+        {
+            return true;
+        }
+    }
+
+    return false;
 }
 }  // namespace
 
@@ -172,21 +145,57 @@ bool TechnologySystem::plant_unlocked(
         }
     }
 
-    for (const auto& unlock_def : all_reputation_unlock_defs())
-    {
-        if (unlock_def.unlock_kind != ReputationUnlockKind::Plant ||
-            unlock_def.content_id != plant_id.value)
-        {
-            continue;
-        }
+    return reputation_unlock_ready(campaign, ReputationUnlockKind::Plant, plant_id.value);
+}
 
-        if (campaign.technology_state.total_reputation >= unlock_def.reputation_requirement)
-        {
-            return true;
-        }
+bool TechnologySystem::item_unlocked(
+    const CampaignState& campaign,
+    ItemId item_id) noexcept
+{
+    if (item_id.value == 0U)
+    {
+        return false;
     }
 
-    return false;
+    const auto* item_def = find_item_def(item_id);
+    if (item_def == nullptr)
+    {
+        return false;
+    }
+
+    if (item_def->linked_plant_id.value != 0U &&
+        !plant_unlocked(campaign, item_def->linked_plant_id))
+    {
+        return false;
+    }
+
+    if (item_def->linked_structure_id.value != 0U &&
+        !structure_recipe_unlocked(campaign, item_def->linked_structure_id))
+    {
+        return false;
+    }
+
+    if (!has_reputation_unlock(ReputationUnlockKind::Item, item_id.value))
+    {
+        return true;
+    }
+
+    return reputation_unlock_ready(campaign, ReputationUnlockKind::Item, item_id.value);
+}
+
+bool TechnologySystem::structure_recipe_unlocked(
+    const CampaignState& campaign,
+    StructureId structure_id) noexcept
+{
+    if (structure_id.value == 0U)
+    {
+        return false;
+    }
+
+    return reputation_unlock_ready(
+        campaign,
+        ReputationUnlockKind::StructureRecipe,
+        structure_id.value);
 }
 
 bool TechnologySystem::recipe_unlocked(
@@ -203,40 +212,21 @@ bool TechnologySystem::recipe_unlocked(
         return true;
     }
 
-    switch (recipe_id.value)
+    if (reputation_unlock_ready(campaign, ReputationUnlockKind::Recipe, recipe_id.value))
     {
-    case k_recipe_craft_shovel:
-        return node_purchased(campaign, k_village_t1_base);
+        return true;
+    }
 
-    case k_recipe_cook_wormwood_broth:
-    case k_recipe_cook_thornberry_cooler:
-        return node_purchased(campaign, k_village_t2_base) &&
-            !node_purchased(campaign, k_village_t2_enh1);
-
-    case k_recipe_cook_rich_wormwood_broth:
-    case k_recipe_cook_rich_thornberry_cooler:
-        return node_purchased(campaign, k_village_t2_enh1);
-
-    case k_recipe_cook_peashrub_hotpot:
-    case k_recipe_cook_buckthorn_tonic:
-        return node_purchased(campaign, k_village_t5_base) &&
-            !node_purchased(campaign, k_village_t5_enh1);
-
-    case k_recipe_cook_rich_peashrub_hotpot:
-    case k_recipe_cook_rich_buckthorn_tonic:
-        return node_purchased(campaign, k_village_t5_enh1);
-
-    case k_recipe_cook_jadeleaf_stew:
-    case k_recipe_cook_desert_revival_draught:
-        return node_purchased(campaign, k_village_t8_base) &&
-            !node_purchased(campaign, k_village_t8_enh1);
-
-    case k_recipe_cook_rich_jadeleaf_stew:
-    case k_recipe_cook_rich_desert_revival_draught:
-        return node_purchased(campaign, k_village_t8_enh1);
-
-    default:
-        break;
+    const auto* recipe_def = find_craft_recipe_def(recipe_id);
+    if (recipe_def != nullptr)
+    {
+        const auto* output_item_def = find_item_def(recipe_def->output_item_id);
+        if (output_item_def != nullptr &&
+            output_item_def->linked_structure_id.value != 0U &&
+            structure_recipe_unlocked(campaign, output_item_def->linked_structure_id))
+        {
+            return true;
+        }
     }
 
     for (const auto& purchase : campaign.technology_state.purchased_nodes)
@@ -323,28 +313,12 @@ bool TechnologySystem::node_claimable(
         return false;
     }
 
-    if (node_def.node_kind == TechnologyNodeKind::Enhancement &&
-        find_technology_node_def(paired_base_tech_node_id(node_def)) == nullptr)
-    {
-        return false;
-    }
-
     if (campaign.cash < static_cast<std::int32_t>(current_internal_cost_cash_points(node_def)))
     {
         return false;
     }
 
     if (!technology_tier_visible(campaign, node_def))
-    {
-        return false;
-    }
-
-    if (!paired_base_node_purchased(campaign, node_def))
-    {
-        return false;
-    }
-
-    if (sibling_enhancement_purchased(campaign, node_def))
     {
         return false;
     }

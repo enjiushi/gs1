@@ -25,7 +25,7 @@ The game combines direct on-foot play with site-scale strategy. The player is no
 | Setting | Present-day, grounded, China-inspired remote desert |
 | Narrative weight | Mostly sandbox with light contextual storytelling |
 | Replay value target | High run-to-run variety through procedural generation, task-board variation, events, and strategic progression choices |
-| Tech model | Per-faction progression with `8` faction-reputation-gated base tech tiers, `2` exclusive enhancements per base tech unlocked across faction-reputation tiers `9-16`, plus task-revealed site unlocks and session-only modifiers |
+| Tech model | Per-faction progression with a linear `32`-tier faction-reputation-gated tech ladder, a separate total-reputation unlock ladder spanning plants/items/recipes/device-build recipes, and session-only modifiers |
 
 ## 3. Vision And Pillars
 
@@ -54,9 +54,9 @@ These terms are stable and should be used consistently in future design and impl
 | `Contract Board` | The on-site progression system available only during an active `Site` session; it contains the current site's faction-published `Site Task` pool that drives site progression and rewards. |
 | `Field Phone` | The player's in-world access point for money-related actions during a `Site` session; it supports the on-site `Contract Board` plus buying, selling, hiring, and related field planning actions. |
 | `Reputation` | The cumulative campaign-level government standing resource earned progressively from official work; it is never spent and instead gates faction-tech tiers and broader program trust. |
-| `Persistent Tech Tree` | The long-term campaign progression layer formed by three faction branches, each with `8` base tech tiers and `2` mutually exclusive enhancements per base tech. |
+| `Persistent Tech Tree` | The long-term campaign progression layer formed by three faction branches, each with one linear `32`-tier ladder. |
 | `Faction` | One of the three institutional backers on the `Contract Board`; each `Faction` has its own play style, task bias, random events, assistant support, and tech branch. |
-| `Faction Reputation` | The cumulative standing value with one specific `Faction`, earned mainly through that faction's tasks and events; it unlocks that faction's enhancement tiers and improves post-event help. |
+| `Faction Reputation` | The cumulative standing value with one specific `Faction`, earned mainly through that faction's tasks and events; it unlocks that faction's matching `1-32` tech tiers and improves post-event help. |
 | `Faction Assistant` | A temporary signature support package provided by a `Faction`. In the current design, each faction should expose only one clear assistant package: `Workforce Support`, `Plant-Water Support`, or `Device Upgrade Support`. |
 | `Concept Unlock` | A real progression gate used during onboarding, where a new gameplay concept becomes available only after the player has meaningfully used the previous one; this is not just a tutorial popup or hidden full system. |
 | `Learning Budget` | The maximum amount of genuinely new gameplay the player is expected to absorb from one site game's rewards and unlocks; reputation pacing should keep this budget small. |
@@ -3122,7 +3122,7 @@ To make the game more compelling without feeling manipulative, these systems wou
 - `Reputation`: total campaign standing with the restoration program, earned progressively from official work and never spent
 - `Faction Reputation`: cumulative standing with each individual `Faction`, earned mainly from that faction's `Site Task`s, faction events, and aligned follow-through
 
-`Reputation` should function as thresholded trust, not consumable currency. `Faction Reputation` should also remain cumulative. In the prototype, `Reputation` still unlocks the three global plant tiers, while each faction's long-term tech branch is gated by that faction's `Faction Reputation`: tiers `1-8` unlock the branch's base techs, tiers `9-16` unlock the paired enhancement bands, and claiming tech always spends persistent campaign cash instead of spending or occupying reputation.
+`Reputation` should function as thresholded trust, not consumable currency. `Faction Reputation` should also remain cumulative. In the prototype, `Reputation` now drives a shared `32`-step unlock ladder across plants/items/recipes/device-build recipes, while each faction's long-term tech branch is gated by that faction's `Faction Reputation`: tiers `1-32` unlock the branch's linear tech rows, and claiming tech always spends persistent campaign cash instead of spending or occupying reputation.
 
 Claiming tech therefore never lowers the visible total trust value. Trust unlocks access; campaign cash pays for the actual tech claim. Tech pricing should be authored internally in cash points, with `100` cash points equal to `1` displayed cash, so balancing can stay granular while the player still sees normal whole-cash costs.
 
@@ -3342,20 +3342,18 @@ High replay value depends on making progression choices meaningfully different a
 
 ### Faction Technology
 
-The `Persistent Tech Tree` is the long-term campaign progression layer. In the current design, it should stay readable, data-driven, and split by faction tab. Each faction tab should show `8` base-tech tiers, and each base tech should expose `2` mutually exclusive enhancement choices in the higher faction-reputation band.
+The `Persistent Tech Tree` is the long-term campaign progression layer. In the current design, it should stay readable, data-driven, and split by faction tab. Each faction tab should show one linear `32`-tier ladder with one claimable tech row per tier.
 
 #### Technology Design Rules
 
 - the current prototype tech panel should show `3` faction tabs, one for each faction branch
-- each faction branch should contain `8` base tech tiers gated by that faction's `Faction Reputation` tiers `1-8`
-- each base tech should expose `2` exclusive enhancements gated by that faction's `Faction Reputation` tiers `9-16`
-- an enhancement may be purchased only after its paired base tech has already been purchased
-- reaching a later tier threshold should immediately make that tier's base techs or enhancements claimable; it should not require previous-tier purchases
-- both base techs and enhancements should spend only `campaignCash`
-- base-tech and enhancement rows should author internal cash-point values and convert them to player-facing cash at `100` points per `1` cash
+- each faction branch should contain `32` linear tech tiers gated by that faction's `Faction Reputation` tiers `1-32`
+- reaching a later tier threshold should immediately make that tier's tech row claimable; it should not require previous-tier purchases
+- tech rows should spend only `campaignCash`
+- tech rows should author internal cash-point values and convert them to player-facing cash at `100` points per `1` cash
 - `Reputation` and `Faction Reputation` unlock access but are never spent
-- branch identity should still come from signature content family plus enhancement direction rather than bespoke code per faction
-- a tech node may carry one or more authored payloads such as a modifier, a mechanism change, an unlockable item/plant/structure, or a recipe unlock
+- branch identity should still come from signature content family plus incremental improvement direction rather than bespoke code per faction
+- content access such as plants/items/recipes/device-build recipes should come from the shared total-reputation unlock ladder, while faction tech rows focus on modifier or mechanism improvements
 
 #### Technology Progression Meters
 
@@ -3363,9 +3361,9 @@ Technology should remain tied to a tiny set of progression meters:
 
 | Meter | Meaning |
 |---|---|
-| `reputation` | Campaign-wide trust that unlocks the three prototype global plant tiers |
-| `factionReputation[factionId]` | Total trust earned with one faction and used for that faction branch's base-tech tiers `1-8` plus enhancement tiers `9-16` |
-| `campaignCash` | Persistent money shared across the campaign and spent on base-tech and enhancement purchases |
+| `reputation` | Campaign-wide trust that unlocks the shared total-reputation access ladder |
+| `factionReputation[factionId]` | Total trust earned with one faction and used for that faction branch's linear tech tiers `1-32` |
+| `campaignCash` | Persistent money shared across the campaign and spent on linear faction-tech purchases |
 
 Important rule:
 

@@ -72,56 +72,48 @@ quantity = 3
 [[phone_listings]]
 site_id = 1
 listing_id = 11
-listing_kind = "PurchaseUnlockable"
-item_or_unlockable_id = 101
-internal_price_cash_points = 2000
-quantity = 1
-
-[[phone_listings]]
-site_id = 1
-listing_id = 12
 listing_kind = "BuyItem"
 item_or_unlockable_id = 16
 quantity = 8
 
 [[phone_listings]]
 site_id = 1
-listing_id = 13
+listing_id = 12
 listing_kind = "BuyItem"
 item_or_unlockable_id = 17
 quantity = 8
 
 [[phone_listings]]
 site_id = 1
-listing_id = 14
+listing_id = 13
 listing_kind = "BuyItem"
 item_or_unlockable_id = 18
 quantity = 6
 
 [[phone_listings]]
 site_id = 1
-listing_id = 15
+listing_id = 14
 listing_kind = "BuyItem"
 item_or_unlockable_id = 19
 quantity = 6
 
 [[phone_listings]]
 site_id = 1
-listing_id = 16
+listing_id = 15
 listing_kind = "BuyItem"
 item_or_unlockable_id = 20
 quantity = 4
 
 [[phone_listings]]
 site_id = 1
-listing_id = 17
+listing_id = 16
 listing_kind = "BuyItem"
 item_or_unlockable_id = 15
 quantity = 8
 
 [[phone_listings]]
 site_id = 1
-listing_id = 18
+listing_id = 17
 listing_kind = "BuyItem"
 item_or_unlockable_id = 39
 quantity = 3

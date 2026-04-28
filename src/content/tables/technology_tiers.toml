@@ -1,31 +1,127 @@
 [[technology_tiers]]
 tier_index = 1
-display_name = "Field Foundations"
+display_name = "Progress Tier 01"
 
 [[technology_tiers]]
 tier_index = 2
-display_name = "Operational Growth"
+display_name = "Progress Tier 02"
 
 [[technology_tiers]]
 tier_index = 3
-display_name = "Regional Coordination"
+display_name = "Progress Tier 03"
 
 [[technology_tiers]]
 tier_index = 4
-display_name = "Program Expansion"
+display_name = "Progress Tier 04"
 
 [[technology_tiers]]
 tier_index = 5
-display_name = "Cross-Site Logistics"
+display_name = "Progress Tier 05"
 
 [[technology_tiers]]
 tier_index = 6
-display_name = "Institutional Scale"
+display_name = "Progress Tier 06"
 
 [[technology_tiers]]
 tier_index = 7
-display_name = "Long-Horizon Planning"
+display_name = "Progress Tier 07"
 
 [[technology_tiers]]
 tier_index = 8
-display_name = "Program Backbone"
+display_name = "Progress Tier 08"
+
+[[technology_tiers]]
+tier_index = 9
+display_name = "Progress Tier 09"
+
+[[technology_tiers]]
+tier_index = 10
+display_name = "Progress Tier 10"
+
+[[technology_tiers]]
+tier_index = 11
+display_name = "Progress Tier 11"
+
+[[technology_tiers]]
+tier_index = 12
+display_name = "Progress Tier 12"
+
+[[technology_tiers]]
+tier_index = 13
+display_name = "Progress Tier 13"
+
+[[technology_tiers]]
+tier_index = 14
+display_name = "Progress Tier 14"
+
+[[technology_tiers]]
+tier_index = 15
+display_name = "Progress Tier 15"
+
+[[technology_tiers]]
+tier_index = 16
+display_name = "Progress Tier 16"
+
+[[technology_tiers]]
+tier_index = 17
+display_name = "Progress Tier 17"
+
+[[technology_tiers]]
+tier_index = 18
+display_name = "Progress Tier 18"
+
+[[technology_tiers]]
+tier_index = 19
+display_name = "Progress Tier 19"
+
+[[technology_tiers]]
+tier_index = 20
+display_name = "Progress Tier 20"
+
+[[technology_tiers]]
+tier_index = 21
+display_name = "Progress Tier 21"
+
+[[technology_tiers]]
+tier_index = 22
+display_name = "Progress Tier 22"
+
+[[technology_tiers]]
+tier_index = 23
+display_name = "Progress Tier 23"
+
+[[technology_tiers]]
+tier_index = 24
+display_name = "Progress Tier 24"
+
+[[technology_tiers]]
+tier_index = 25
+display_name = "Progress Tier 25"
+
+[[technology_tiers]]
+tier_index = 26
+display_name = "Progress Tier 26"
+
+[[technology_tiers]]
+tier_index = 27
+display_name = "Progress Tier 27"
+
+[[technology_tiers]]
+tier_index = 28
+display_name = "Progress Tier 28"
+
+[[technology_tiers]]
+tier_index = 29
+display_name = "Progress Tier 29"
+
+[[technology_tiers]]
+tier_index = 30
+display_name = "Progress Tier 30"
+
+[[technology_tiers]]
+tier_index = 31
+display_name = "Progress Tier 31"
+
+[[technology_tiers]]
+tier_index = 32
+display_name = "Progress Tier 32"

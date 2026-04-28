@@ -106,15 +106,14 @@ Excavation merchandise clarification:
 Excavation-depth authoring clarification:
 
 - excavation depth should support at least `Rough`, `Careful`, and `Thorough`
-- the default ruleset should expose only `Rough` until tech or enhancement content explicitly unlocks deeper passes
+- the default ruleset should expose only `Rough` until linear Village tech content explicitly unlocks deeper passes
 - later depth levels may author their own base energy cost, discovery chance, or loot-table overrides, but they should still use the same weight-plus-bias tuning pattern as the base excavation action
 - excavation visuals should be authored or mapped distinctly enough that the player can tell rough, careful, and thorough depth at a glance
 
 Technology authoring clarification:
 
-- each faction tech row should author whether it is a base tech or an enhancement plus its `enhancementChoiceIndex`
-- faction base techs use faction-reputation tiers `1-8`; paired enhancements use faction-reputation tiers `9-16`
-- an enhancement row must pair to the base tech in the same faction+tier and use one of the two exclusive enhancement choice slots
+- each faction tech row should author one linear tier entry with no enhancement-choice metadata
+- faction tech rows use faction-reputation tiers `1-32`, with each row requiring the matching tier number
 - a tech row may optionally author a granted content payload such as an `ItemDef`, `PlantDef`, `StructureDef`, or `CraftRecipeDef` id in addition to any modifier or mechanism effect metadata
 
 Required excavation loot-table authoring rules:

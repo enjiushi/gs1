@@ -33,8 +33,8 @@ constexpr float k_minimum_action_efficiency = 0.4f;
 constexpr float k_maximum_action_efficiency = 1.0f;
 constexpr FactionId k_village_faction {k_faction_village_committee};
 
-constexpr TechNodeId k_village_t3_base {base_technology_node_id(k_village_faction, 3U)};
-constexpr TechNodeId k_village_t6_base {base_technology_node_id(k_village_faction, 6U)};
+constexpr TechNodeId k_village_t12_access {base_technology_node_id(k_village_faction, 12U)};
+constexpr TechNodeId k_village_t30_access {base_technology_node_id(k_village_faction, 30U)};
 
 struct ExcavationTierPercents final
 {
@@ -207,12 +207,12 @@ bool tile_has_excavation_blocking_occupier(const SiteWorld::TileData& tile) noex
 ExcavationDepth max_excavation_depth_unlocked(
     SiteSystemContext<ActionExecutionSystem>& context) noexcept
 {
-    if (TechnologySystem::node_purchased(context.campaign, k_village_t6_base))
+    if (TechnologySystem::node_purchased(context.campaign, k_village_t30_access))
     {
         return ExcavationDepth::Thorough;
     }
 
-    if (TechnologySystem::node_purchased(context.campaign, k_village_t3_base))
+    if (TechnologySystem::node_purchased(context.campaign, k_village_t12_access))
     {
         return ExcavationDepth::Careful;
     }

@@ -1,344 +1,390 @@
 [[technology_nodes]]
 faction_id = 1
 tier_index = 1
-node_kind = "BaseTech"
-enhancement_choice_index = 0
 entry_kind = "MechanismChange"
 reputation_requirement = 1
 internal_cost_cash_points = 400
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Shovel Issue"
-description = "Unlocks the Shovel recipe. Carrying a shovel in the worker pack reduces Plant and Excavate duration plus hydration, nourishment, and energy costs by 15%."
-
-[[technology_nodes]]
-faction_id = 1
-tier_index = 1
-node_kind = "Enhancement"
-enhancement_choice_index = 1
-entry_kind = "MechanismChange"
-reputation_requirement = 8
-internal_cost_cash_points = 500
-unlock_effect_parameter = 1.00
-effect_parameter_per_bonus_reputation = 0.000
-is_todo_placeholder = false
-display_name = "Light Digging Form"
-description = "Extends the shovel carry bonus so Plant and Excavate hydration, nourishment, and energy costs drop by another 15%."
-
-[[technology_nodes]]
-faction_id = 1
-tier_index = 1
-node_kind = "Enhancement"
-enhancement_choice_index = 2
-entry_kind = "MechanismChange"
-reputation_requirement = 8
-internal_cost_cash_points = 500
-unlock_effect_parameter = 1.00
-effect_parameter_per_bonus_reputation = 0.000
-is_todo_placeholder = false
-display_name = "Planter's Rhythm"
-description = "Extends the shovel carry bonus so Plant action duration drops by another 40%."
+display_name = "Grip Training"
+description = "Reduces shovel-carried Plant and Excavate meter costs by 5%."
 
 [[technology_nodes]]
 faction_id = 1
 tier_index = 2
-node_kind = "BaseTech"
-enhancement_choice_index = 0
 entry_kind = "MechanismChange"
 reputation_requirement = 2
+internal_cost_cash_points = 500
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.000
+is_todo_placeholder = false
+display_name = "Planter Warmup"
+description = "Reduces shovel-carried Plant action duration by 5%."
+
+[[technology_nodes]]
+faction_id = 1
+tier_index = 3
+entry_kind = "MechanismChange"
+reputation_requirement = 3
+internal_cost_cash_points = 600
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.000
+is_todo_placeholder = false
+display_name = "Digging Warmup"
+description = "Reduces shovel-carried Excavate action duration by 5%."
+
+[[technology_nodes]]
+faction_id = 1
+tier_index = 4
+entry_kind = "MechanismChange"
+reputation_requirement = 4
+internal_cost_cash_points = 700
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.000
+is_todo_placeholder = false
+display_name = "Grip Reinforcement"
+description = "Extends the shovel meter-cost reduction to 10% total."
+
+[[technology_nodes]]
+faction_id = 1
+tier_index = 5
+entry_kind = "MechanismChange"
+reputation_requirement = 5
 internal_cost_cash_points = 800
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Camp Broth Kitchen"
-description = "Unlocks Wormwood Broth and Thornberry Cooler, giving Village its first harvest-to-meal conversion recipes."
+display_name = "Planter Tempo"
+description = "Extends the shovel Plant duration reduction to 10% total."
 
 [[technology_nodes]]
 faction_id = 1
-tier_index = 2
-node_kind = "Enhancement"
-enhancement_choice_index = 1
+tier_index = 6
 entry_kind = "MechanismChange"
-reputation_requirement = 9
+reputation_requirement = 6
+internal_cost_cash_points = 900
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.000
+is_todo_placeholder = false
+display_name = "Digging Tempo"
+description = "Extends the shovel Excavate duration reduction to 10% total."
+
+[[technology_nodes]]
+faction_id = 1
+tier_index = 7
+entry_kind = "MechanismChange"
+reputation_requirement = 7
 internal_cost_cash_points = 1000
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Hearty Broth Upgrade"
-description = "Upgrades the tier-2 food recipes into richer versions with 600 extra internal cash points while keeping the same direct-gain split."
+display_name = "Field Leverage"
+description = "Extends the shovel meter-cost reduction to 15% total."
 
 [[technology_nodes]]
 faction_id = 1
-tier_index = 2
-node_kind = "Enhancement"
-enhancement_choice_index = 2
+tier_index = 8
 entry_kind = "MechanismChange"
-reputation_requirement = 9
-internal_cost_cash_points = 1000
+reputation_requirement = 8
+internal_cost_cash_points = 1100
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Long Simmer Tonic"
-description = "Strengthens the tier-2 food buffs: energy recovery speed gains another 20%, all-action meter-cost reduction gains another 10%, and both buffs last another 8 game hours."
+display_name = "Planting Leverage"
+description = "Extends the shovel Plant duration reduction to 15% total."
 
 [[technology_nodes]]
 faction_id = 1
-tier_index = 3
-node_kind = "BaseTech"
-enhancement_choice_index = 0
+tier_index = 9
 entry_kind = "MechanismChange"
-reputation_requirement = 3
+reputation_requirement = 9
 internal_cost_cash_points = 1200
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Careful Excavation"
-description = "Unlocks the Careful excavation depth so already-dug tiles can be worked one layer deeper."
+display_name = "Excavation Leverage"
+description = "Extends the shovel Excavate duration reduction to 15% total."
 
 [[technology_nodes]]
 faction_id = 1
-tier_index = 3
-node_kind = "Enhancement"
-enhancement_choice_index = 1
+tier_index = 10
 entry_kind = "MechanismChange"
 reputation_requirement = 10
+internal_cost_cash_points = 1300
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.000
+is_todo_placeholder = false
+display_name = "Planter Rhythm I"
+description = "Adds another 20% shovel Plant duration reduction."
+
+[[technology_nodes]]
+faction_id = 1
+tier_index = 11
+entry_kind = "MechanismChange"
+reputation_requirement = 11
+internal_cost_cash_points = 1400
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.000
+is_todo_placeholder = false
+display_name = "Planter Rhythm II"
+description = "Adds another 20% shovel Plant duration reduction, reaching the old capstone pace."
+
+[[technology_nodes]]
+faction_id = 1
+tier_index = 12
+entry_kind = "MechanismChange"
+reputation_requirement = 12
 internal_cost_cash_points = 1500
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Layer Reading Notes"
-description = "Rebalances the newly unlocked Careful excavation depth toward better stone tiers by blending it halfway toward the next-depth odds."
+display_name = "Careful Layer Access"
+description = "Unlocks Careful excavation depth for one layer deeper site digging."
 
 [[technology_nodes]]
 faction_id = 1
-tier_index = 3
-node_kind = "Enhancement"
-enhancement_choice_index = 2
+tier_index = 13
 entry_kind = "MechanismChange"
-reputation_requirement = 10
-internal_cost_cash_points = 1500
-unlock_effect_parameter = 1.00
-effect_parameter_per_bonus_reputation = 0.000
-is_todo_placeholder = false
-display_name = "Measured Digging Cadence"
-description = "Reduces Careful excavation duration by 30% and its hydration, nourishment, and energy costs by 20%."
-
-[[technology_nodes]]
-faction_id = 1
-tier_index = 4
-node_kind = "BaseTech"
-enhancement_choice_index = 0
-entry_kind = "MechanismChange"
-reputation_requirement = 4
+reputation_requirement = 13
 internal_cost_cash_points = 1600
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Weather-Wrapped Packs"
-description = "Reduces weather-driven nourishment and hydration loss by 30% and adds 4 worker-pack slots."
+display_name = "Careful Layer Reading"
+description = "Rebalances Careful excavation toward better stone tiers."
 
 [[technology_nodes]]
 faction_id = 1
-tier_index = 4
-node_kind = "Enhancement"
-enhancement_choice_index = 1
+tier_index = 14
 entry_kind = "MechanismChange"
-reputation_requirement = 11
+reputation_requirement = 14
+internal_cost_cash_points = 1700
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.000
+is_todo_placeholder = false
+display_name = "Careful Digging Cadence"
+description = "Reduces Careful excavation duration by 30% and its meter costs by 20%."
+
+[[technology_nodes]]
+faction_id = 1
+tier_index = 15
+entry_kind = "MechanismChange"
+reputation_requirement = 15
+internal_cost_cash_points = 1800
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.000
+is_todo_placeholder = false
+display_name = "Dry-Wrap Basics"
+description = "Reduces weather-driven nourishment and hydration loss by 15%."
+
+[[technology_nodes]]
+faction_id = 1
+tier_index = 16
+entry_kind = "MechanismChange"
+reputation_requirement = 16
+internal_cost_cash_points = 1900
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.000
+is_todo_placeholder = false
+display_name = "Dry-Wrap Practice"
+description = "Extends weather-driven nourishment and hydration mitigation to 30% total."
+
+[[technology_nodes]]
+faction_id = 1
+tier_index = 17
+entry_kind = "MechanismChange"
+reputation_requirement = 17
 internal_cost_cash_points = 2000
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Storm Shelter Discipline"
-description = "Reduces weather-driven health and morale loss by 30%."
+display_name = "Shelter Discipline I"
+description = "Reduces weather-driven health and morale loss by 15%."
 
 [[technology_nodes]]
 faction_id = 1
-tier_index = 4
-node_kind = "Enhancement"
-enhancement_choice_index = 2
+tier_index = 18
 entry_kind = "MechanismChange"
-reputation_requirement = 11
-internal_cost_cash_points = 2000
+reputation_requirement = 18
+internal_cost_cash_points = 2100
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Dry-Wrap Layering"
-description = "Extends the base effect so weather-driven nourishment and hydration loss is reduced by 70% total."
+display_name = "Shelter Discipline II"
+description = "Extends weather-driven health and morale mitigation to 30% total."
 
 [[technology_nodes]]
 faction_id = 1
-tier_index = 5
-node_kind = "BaseTech"
-enhancement_choice_index = 0
+tier_index = 19
 entry_kind = "MechanismChange"
-reputation_requirement = 5
-internal_cost_cash_points = 2000
+reputation_requirement = 19
+internal_cost_cash_points = 2200
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Recovery Pot Line"
-description = "Unlocks Peashrub Hotpot and Buckthorn Tonic, giving Village stronger mid-branch recovery cooking."
+display_name = "Layered Wraps I"
+description = "Extends weather-driven nourishment and hydration mitigation by another 20%."
 
 [[technology_nodes]]
 faction_id = 1
-tier_index = 5
-node_kind = "Enhancement"
-enhancement_choice_index = 1
+tier_index = 20
 entry_kind = "MechanismChange"
-reputation_requirement = 12
-internal_cost_cash_points = 2500
+reputation_requirement = 20
+internal_cost_cash_points = 2300
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Hearty Recovery Pots"
-description = "Upgrades the tier-5 food recipes into richer versions with 700 extra internal cash points while keeping the same direct-gain split."
+display_name = "Layered Wraps II"
+description = "Extends weather-driven nourishment and hydration mitigation to the old 70% ceiling."
 
 [[technology_nodes]]
 faction_id = 1
-tier_index = 5
-node_kind = "Enhancement"
-enhancement_choice_index = 2
+tier_index = 21
 entry_kind = "MechanismChange"
-reputation_requirement = 12
-internal_cost_cash_points = 2500
-unlock_effect_parameter = 1.00
-effect_parameter_per_bonus_reputation = 0.000
-is_todo_placeholder = false
-display_name = "Rapid Recovery Broths"
-description = "Improves both tier-5 recovery foods so their 0-to-100 health or morale restoration completes in 4 game hours."
-
-[[technology_nodes]]
-faction_id = 1
-tier_index = 6
-node_kind = "BaseTech"
-enhancement_choice_index = 0
-entry_kind = "MechanismChange"
-reputation_requirement = 6
+reputation_requirement = 21
 internal_cost_cash_points = 2400
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Thorough Excavation"
-description = "Unlocks the Thorough excavation depth so already-dug tiles can be worked to the final layer."
+display_name = "Pack Lashings"
+description = "Adds 2 worker-pack slots."
 
 [[technology_nodes]]
 faction_id = 1
-tier_index = 6
-node_kind = "Enhancement"
-enhancement_choice_index = 1
+tier_index = 22
 entry_kind = "MechanismChange"
-reputation_requirement = 13
-internal_cost_cash_points = 3000
+reputation_requirement = 22
+internal_cost_cash_points = 2500
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Deep Layer Notes"
-description = "Rebalances the newly unlocked Thorough excavation depth toward better stone tiers by blending it halfway toward the next-depth odds."
+display_name = "Reserve Pockets"
+description = "Adds 2 more worker-pack slots."
 
 [[technology_nodes]]
 faction_id = 1
-tier_index = 6
-node_kind = "Enhancement"
-enhancement_choice_index = 2
+tier_index = 23
 entry_kind = "MechanismChange"
-reputation_requirement = 13
-internal_cost_cash_points = 3000
+reputation_requirement = 23
+internal_cost_cash_points = 2600
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Deep Digging Rhythm"
-description = "Reduces Thorough excavation duration by 30% and its hydration, nourishment, and energy costs by 20%."
+display_name = "Broth Fortification"
+description = "Upgrades the tier-two Village food buffs to their stronger tuned variant."
 
 [[technology_nodes]]
 faction_id = 1
-tier_index = 7
-node_kind = "BaseTech"
-enhancement_choice_index = 0
-entry_kind = "GlobalModifier"
-reputation_requirement = 7
+tier_index = 24
+entry_kind = "MechanismChange"
+reputation_requirement = 24
+internal_cost_cash_points = 2700
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.000
+is_todo_placeholder = false
+display_name = "Recovery Fortification"
+description = "Upgrades the tier-five Village recovery foods to their stronger tuned variant."
+
+[[technology_nodes]]
+faction_id = 1
+tier_index = 25
+entry_kind = "MechanismChange"
+reputation_requirement = 25
 internal_cost_cash_points = 2800
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Carried Reserves"
-description = "Adds 1 timed-buff slot and increases worker-pack capacity by another 4 slots."
+display_name = "Relief Fortification"
+description = "Upgrades the tier-eight Village combo foods to their stronger tuned variant."
 
 [[technology_nodes]]
 faction_id = 1
-tier_index = 7
-node_kind = "Enhancement"
-enhancement_choice_index = 1
+tier_index = 26
 entry_kind = "GlobalModifier"
-reputation_requirement = 14
-internal_cost_cash_points = 3500
+reputation_requirement = 26
+internal_cost_cash_points = 2900
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Shared Thermos Rotation"
+display_name = "Shared Thermos"
+description = "Adds 1 timed-buff slot."
+
+[[technology_nodes]]
+faction_id = 1
+tier_index = 27
+entry_kind = "GlobalModifier"
+reputation_requirement = 27
+internal_cost_cash_points = 3000
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.000
+is_todo_placeholder = false
+display_name = "Extra Thermos"
 description = "Adds 1 more timed-buff slot."
 
 [[technology_nodes]]
 faction_id = 1
-tier_index = 7
-node_kind = "Enhancement"
-enhancement_choice_index = 2
+tier_index = 28
 entry_kind = "MechanismChange"
-reputation_requirement = 14
-internal_cost_cash_points = 3500
+reputation_requirement = 28
+internal_cost_cash_points = 3100
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Favored Portions"
-description = "Amplifies all timed food and drink buffs by 25% compared to their base effect."
+display_name = "Favored Portions I"
+description = "Amplifies timed food and drink buffs by 10%."
 
 [[technology_nodes]]
 faction_id = 1
-tier_index = 8
-node_kind = "BaseTech"
-enhancement_choice_index = 0
+tier_index = 29
 entry_kind = "MechanismChange"
-reputation_requirement = 8
+reputation_requirement = 29
 internal_cost_cash_points = 3200
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Capstone Relief Kitchen"
-description = "Unlocks Jadeleaf Stew and Desert Revival Draught, combining the branch's tier-2 and tier-5 food-buff identities."
+display_name = "Favored Portions II"
+description = "Amplifies timed food and drink buffs to 25% total."
 
 [[technology_nodes]]
 faction_id = 1
-tier_index = 8
-node_kind = "Enhancement"
-enhancement_choice_index = 1
+tier_index = 30
 entry_kind = "MechanismChange"
-reputation_requirement = 15
-internal_cost_cash_points = 4000
+reputation_requirement = 30
+internal_cost_cash_points = 3300
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Loaded Relief Servings"
-description = "Upgrades the tier-8 food recipes into richer versions with 800 extra internal cash points while keeping the same direct-gain split."
+display_name = "Thorough Layer Access"
+description = "Unlocks Thorough excavation depth for final-layer site digging."
 
 [[technology_nodes]]
 faction_id = 1
-tier_index = 8
-node_kind = "Enhancement"
-enhancement_choice_index = 2
+tier_index = 31
 entry_kind = "MechanismChange"
-reputation_requirement = 15
-internal_cost_cash_points = 4000
+reputation_requirement = 31
+internal_cost_cash_points = 3400
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "All-Night Relief Rotation"
-description = "Extends both tier-8 combo buffs by another 8 game hours and upgrades each bundled effect to its enhanced version."
+display_name = "Thorough Layer Reading"
+description = "Rebalances Thorough excavation toward better stone tiers."
+
+[[technology_nodes]]
+faction_id = 1
+tier_index = 32
+entry_kind = "MechanismChange"
+reputation_requirement = 32
+internal_cost_cash_points = 3500
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.000
+is_todo_placeholder = false
+display_name = "Thorough Digging Cadence"
+description = "Reduces Thorough excavation duration by 30% and its meter costs by 20%."
 
 [[technology_nodes]]
 faction_id = 2
 tier_index = 1
-node_kind = "BaseTech"
-enhancement_choice_index = 0
 entry_kind = "GlobalModifier"
 reputation_requirement = 1
 internal_cost_cash_points = 400
@@ -350,11 +396,9 @@ description = "Opens the Bureau branch with stronger establishment logic so new 
 
 [[technology_nodes]]
 faction_id = 2
-tier_index = 1
-node_kind = "Enhancement"
-enhancement_choice_index = 1
+tier_index = 2
 entry_kind = "GlobalModifier"
-reputation_requirement = 8
+reputation_requirement = 2
 internal_cost_cash_points = 500
 unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.030
@@ -364,12 +408,10 @@ description = "Pushes the tier toward faster early density gain and cleaner plan
 
 [[technology_nodes]]
 faction_id = 2
-tier_index = 1
-node_kind = "Enhancement"
-enhancement_choice_index = 2
+tier_index = 3
 entry_kind = "MechanismChange"
-reputation_requirement = 8
-internal_cost_cash_points = 500
+reputation_requirement = 3
+internal_cost_cash_points = 600
 unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.028
 is_todo_placeholder = false
@@ -378,11 +420,21 @@ description = "Pushes the tier toward better survival when young plants take a s
 
 [[technology_nodes]]
 faction_id = 2
-tier_index = 2
-node_kind = "BaseTech"
-enhancement_choice_index = 0
+tier_index = 4
 entry_kind = "MechanismChange"
-reputation_requirement = 2
+reputation_requirement = 4
+internal_cost_cash_points = 700
+unlock_effect_parameter = 1.09
+effect_parameter_per_bonus_reputation = 0.036
+is_todo_placeholder = false
+display_name = "Seed Selection Nursery Review"
+description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
+
+[[technology_nodes]]
+faction_id = 2
+tier_index = 5
+entry_kind = "MechanismChange"
+reputation_requirement = 5
 internal_cost_cash_points = 800
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.040
@@ -392,12 +444,10 @@ description = "Focuses the branch on stronger plant-made shelter so restoration 
 
 [[technology_nodes]]
 faction_id = 2
-tier_index = 2
-node_kind = "Enhancement"
-enhancement_choice_index = 1
+tier_index = 6
 entry_kind = "MechanismChange"
-reputation_requirement = 9
-internal_cost_cash_points = 1000
+reputation_requirement = 6
+internal_cost_cash_points = 900
 unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.028
 is_todo_placeholder = false
@@ -406,11 +456,9 @@ description = "Specializes the belt toward longer, cleaner wind-shadow lanes for
 
 [[technology_nodes]]
 faction_id = 2
-tier_index = 2
-node_kind = "Enhancement"
-enhancement_choice_index = 2
+tier_index = 7
 entry_kind = "GlobalModifier"
-reputation_requirement = 9
+reputation_requirement = 7
 internal_cost_cash_points = 1000
 unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.026
@@ -420,28 +468,34 @@ description = "Specializes the belt toward better dust buffering and less burial
 
 [[technology_nodes]]
 faction_id = 2
-tier_index = 3
-node_kind = "BaseTech"
-enhancement_choice_index = 0
+tier_index = 8
 entry_kind = "MechanismChange"
-reputation_requirement = 3
-internal_cost_cash_points = 1200
-unlock_effect_parameter = 1.00
-effect_parameter_per_bonus_reputation = 0.032
-granted_content_kind = "Plant"
-granted_content_id = 8
+reputation_requirement = 8
+internal_cost_cash_points = 1100
+unlock_effect_parameter = 1.09
+effect_parameter_per_bonus_reputation = 0.031
 is_todo_placeholder = false
-display_name = "Nurse Crop Pairing"
-description = "Unlocks Sea Buckthorn as a resilient companion-plant option and turns the branch toward cover-assisted growth and layered planting."
+display_name = "Windline Shelter Belts Review"
+description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
 
 [[technology_nodes]]
 faction_id = 2
-tier_index = 3
-node_kind = "Enhancement"
-enhancement_choice_index = 1
+tier_index = 9
+entry_kind = "MechanismChange"
+reputation_requirement = 9
+internal_cost_cash_points = 1200
+unlock_effect_parameter = 1.00
+effect_parameter_per_bonus_reputation = 0.032
+is_todo_placeholder = false
+display_name = "Nurse Crop Pairing"
+description = ""
+
+[[technology_nodes]]
+faction_id = 2
+tier_index = 10
 entry_kind = "GlobalModifier"
 reputation_requirement = 10
-internal_cost_cash_points = 1500
+internal_cost_cash_points = 1300
 unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.026
 is_todo_placeholder = false
@@ -450,12 +504,10 @@ description = "Pushes nearby seedlings toward safer starts whenever a hardy supp
 
 [[technology_nodes]]
 faction_id = 2
-tier_index = 3
-node_kind = "Enhancement"
-enhancement_choice_index = 2
+tier_index = 11
 entry_kind = "MechanismChange"
-reputation_requirement = 10
-internal_cost_cash_points = 1500
+reputation_requirement = 11
+internal_cost_cash_points = 1400
 unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.024
 is_todo_placeholder = false
@@ -464,11 +516,21 @@ description = "Pushes the tier toward small water-holding pockets that help mixe
 
 [[technology_nodes]]
 faction_id = 2
-tier_index = 4
-node_kind = "BaseTech"
-enhancement_choice_index = 0
+tier_index = 12
+entry_kind = "MechanismChange"
+reputation_requirement = 12
+internal_cost_cash_points = 1500
+unlock_effect_parameter = 1.09
+effect_parameter_per_bonus_reputation = 0.027
+is_todo_placeholder = false
+display_name = "Nurse Crop Pairing Review"
+description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
+
+[[technology_nodes]]
+faction_id = 2
+tier_index = 13
 entry_kind = "GlobalModifier"
-reputation_requirement = 4
+reputation_requirement = 13
 internal_cost_cash_points = 1600
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.026
@@ -478,12 +540,10 @@ description = "Reorients the branch around salinity tolerance and root resilienc
 
 [[technology_nodes]]
 faction_id = 2
-tier_index = 4
-node_kind = "Enhancement"
-enhancement_choice_index = 1
+tier_index = 14
 entry_kind = "MechanismChange"
-reputation_requirement = 11
-internal_cost_cash_points = 2000
+reputation_requirement = 14
+internal_cost_cash_points = 1700
 unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.024
 is_todo_placeholder = false
@@ -492,12 +552,10 @@ description = "Specializes the tier toward stronger terrain rehabilitation and s
 
 [[technology_nodes]]
 faction_id = 2
-tier_index = 4
-node_kind = "Enhancement"
-enhancement_choice_index = 2
+tier_index = 15
 entry_kind = "GlobalModifier"
-reputation_requirement = 11
-internal_cost_cash_points = 2000
+reputation_requirement = 15
+internal_cost_cash_points = 1800
 unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.022
 is_todo_placeholder = false
@@ -506,11 +564,21 @@ description = "Specializes the tier toward lower salt pressure and better retent
 
 [[technology_nodes]]
 faction_id = 2
-tier_index = 5
-node_kind = "BaseTech"
-enhancement_choice_index = 0
+tier_index = 16
+entry_kind = "MechanismChange"
+reputation_requirement = 16
+internal_cost_cash_points = 1900
+unlock_effect_parameter = 1.09
+effect_parameter_per_bonus_reputation = 0.024
+is_todo_placeholder = false
+display_name = "Salt Edge Rootstock Review"
+description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
+
+[[technology_nodes]]
+faction_id = 2
+tier_index = 17
 entry_kind = "GlobalModifier"
-reputation_requirement = 5
+reputation_requirement = 17
 internal_cost_cash_points = 2000
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.022
@@ -520,28 +588,22 @@ description = "Builds the branch around layered plant height and denser shelter 
 
 [[technology_nodes]]
 faction_id = 2
-tier_index = 5
-node_kind = "Enhancement"
-enhancement_choice_index = 1
+tier_index = 18
 entry_kind = "GlobalModifier"
-reputation_requirement = 12
-internal_cost_cash_points = 2500
+reputation_requirement = 18
+internal_cost_cash_points = 2100
 unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.022
-granted_content_kind = "Structure"
-granted_content_id = 204
 is_todo_placeholder = false
 display_name = "Mixed Height Windbreaks"
-description = "Unlocks the Wind Fence structure and mixes hard barriers with living canopy layers for longer protection corridors."
+description = ""
 
 [[technology_nodes]]
 faction_id = 2
-tier_index = 5
-node_kind = "Enhancement"
-enhancement_choice_index = 2
+tier_index = 19
 entry_kind = "MechanismChange"
-reputation_requirement = 12
-internal_cost_cash_points = 2500
+reputation_requirement = 19
+internal_cost_cash_points = 2200
 unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.020
 is_todo_placeholder = false
@@ -550,11 +612,21 @@ description = "Leans the tier toward stronger spread, patch continuity, and prod
 
 [[technology_nodes]]
 faction_id = 2
-tier_index = 6
-node_kind = "BaseTech"
-enhancement_choice_index = 0
+tier_index = 20
 entry_kind = "MechanismChange"
-reputation_requirement = 6
+reputation_requirement = 20
+internal_cost_cash_points = 2300
+unlock_effect_parameter = 1.09
+effect_parameter_per_bonus_reputation = 0.021
+is_todo_placeholder = false
+display_name = "Canopy Ladder Program Review"
+description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
+
+[[technology_nodes]]
+faction_id = 2
+tier_index = 21
+entry_kind = "MechanismChange"
+reputation_requirement = 21
 internal_cost_cash_points = 2400
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.019
@@ -564,12 +636,10 @@ description = "Targets late-site sand pressure directly by helping plants reboun
 
 [[technology_nodes]]
 faction_id = 2
-tier_index = 6
-node_kind = "Enhancement"
-enhancement_choice_index = 1
+tier_index = 22
 entry_kind = "MechanismChange"
-reputation_requirement = 13
-internal_cost_cash_points = 3000
+reputation_requirement = 22
+internal_cost_cash_points = 2500
 unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.020
 is_todo_placeholder = false
@@ -578,12 +648,10 @@ description = "Specializes the grove toward stronger anti-burial holding power u
 
 [[technology_nodes]]
 faction_id = 2
-tier_index = 6
-node_kind = "Enhancement"
-enhancement_choice_index = 2
+tier_index = 23
 entry_kind = "GlobalModifier"
-reputation_requirement = 13
-internal_cost_cash_points = 3000
+reputation_requirement = 23
+internal_cost_cash_points = 2600
 unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.018
 is_todo_placeholder = false
@@ -592,11 +660,21 @@ description = "Specializes the grove toward plants that recover shape and functi
 
 [[technology_nodes]]
 faction_id = 2
-tier_index = 7
-node_kind = "BaseTech"
-enhancement_choice_index = 0
+tier_index = 24
+entry_kind = "MechanismChange"
+reputation_requirement = 24
+internal_cost_cash_points = 2700
+unlock_effect_parameter = 1.09
+effect_parameter_per_bonus_reputation = 0.019
+is_todo_placeholder = false
+display_name = "Burial Recovery Groves Review"
+description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
+
+[[technology_nodes]]
+faction_id = 2
+tier_index = 25
 entry_kind = "GlobalModifier"
-reputation_requirement = 7
+reputation_requirement = 25
 internal_cost_cash_points = 2800
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.017
@@ -606,28 +684,22 @@ description = "Turns the branch toward patch-to-patch continuity so one healthy 
 
 [[technology_nodes]]
 faction_id = 2
-tier_index = 7
-node_kind = "Enhancement"
-enhancement_choice_index = 1
+tier_index = 26
 entry_kind = "GlobalModifier"
-reputation_requirement = 14
-internal_cost_cash_points = 3500
+reputation_requirement = 26
+internal_cost_cash_points = 2900
 unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.018
-granted_content_kind = "Plant"
-granted_content_id = 9
 is_todo_placeholder = false
 display_name = "Corridor Stitching"
-description = "Unlocks Desert Ephedra and pushes the tier toward linked shelter corridors plus smoother expansion between planted islands."
+description = ""
 
 [[technology_nodes]]
 faction_id = 2
-tier_index = 7
-node_kind = "Enhancement"
-enhancement_choice_index = 2
+tier_index = 27
 entry_kind = "MechanismChange"
-reputation_requirement = 14
-internal_cost_cash_points = 3500
+reputation_requirement = 27
+internal_cost_cash_points = 3000
 unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.016
 is_todo_placeholder = false
@@ -636,11 +708,21 @@ description = "Pushes the tier toward extra plant-side mechanics around spread w
 
 [[technology_nodes]]
 faction_id = 2
-tier_index = 8
-node_kind = "BaseTech"
-enhancement_choice_index = 0
+tier_index = 28
 entry_kind = "MechanismChange"
-reputation_requirement = 8
+reputation_requirement = 28
+internal_cost_cash_points = 3100
+unlock_effect_parameter = 1.09
+effect_parameter_per_bonus_reputation = 0.017
+is_todo_placeholder = false
+display_name = "Succession Patch Planning Review"
+description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
+
+[[technology_nodes]]
+faction_id = 2
+tier_index = 29
+entry_kind = "MechanismChange"
+reputation_requirement = 29
 internal_cost_cash_points = 3200
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.015
@@ -650,12 +732,10 @@ description = "Caps the Bureau branch with a broad plant-modifier package meant 
 
 [[technology_nodes]]
 faction_id = 2
-tier_index = 8
-node_kind = "Enhancement"
-enhancement_choice_index = 1
+tier_index = 30
 entry_kind = "MechanismChange"
-reputation_requirement = 15
-internal_cost_cash_points = 4000
+reputation_requirement = 30
+internal_cost_cash_points = 3300
 unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.016
 is_todo_placeholder = false
@@ -664,12 +744,10 @@ description = "Turns the capstone toward moisture capture, terrain repair, and l
 
 [[technology_nodes]]
 faction_id = 2
-tier_index = 8
-node_kind = "Enhancement"
-enhancement_choice_index = 2
+tier_index = 31
 entry_kind = "GlobalModifier"
-reputation_requirement = 15
-internal_cost_cash_points = 4000
+reputation_requirement = 31
+internal_cost_cash_points = 3400
 unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.014
 is_todo_placeholder = false
@@ -677,28 +755,34 @@ display_name = "Keystone Habitat Weave"
 description = "Turns the capstone toward extra plant mechanisms, companion effects, and durable mixed-patch survival."
 
 [[technology_nodes]]
+faction_id = 2
+tier_index = 32
+entry_kind = "MechanismChange"
+reputation_requirement = 32
+internal_cost_cash_points = 3500
+unlock_effect_parameter = 1.09
+effect_parameter_per_bonus_reputation = 0.015
+is_todo_placeholder = false
+display_name = "Regional Living Matrix Review"
+description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
+
+[[technology_nodes]]
 faction_id = 3
 tier_index = 1
-node_kind = "BaseTech"
-enhancement_choice_index = 0
 entry_kind = "GlobalModifier"
 reputation_requirement = 1
 internal_cost_cash_points = 400
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.050
-granted_content_kind = "Recipe"
-granted_content_id = 3
 is_todo_placeholder = false
 display_name = "Survey Benchmark Course"
-description = "Unlocks the Workbench recipe and starts the University branch with better instruments, setup discipline, and cleaner field data."
+description = ""
 
 [[technology_nodes]]
 faction_id = 3
-tier_index = 1
-node_kind = "Enhancement"
-enhancement_choice_index = 1
+tier_index = 2
 entry_kind = "GlobalModifier"
-reputation_requirement = 8
+reputation_requirement = 2
 internal_cost_cash_points = 500
 unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.030
@@ -708,12 +792,10 @@ description = "Pushes the branch toward more efficient devices and cleaner techn
 
 [[technology_nodes]]
 faction_id = 3
-tier_index = 1
-node_kind = "Enhancement"
-enhancement_choice_index = 2
+tier_index = 3
 entry_kind = "MechanismChange"
-reputation_requirement = 8
-internal_cost_cash_points = 500
+reputation_requirement = 3
+internal_cost_cash_points = 600
 unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.028
 is_todo_placeholder = false
@@ -722,11 +804,21 @@ description = "Pushes the branch toward steadier outcomes whenever device perfor
 
 [[technology_nodes]]
 faction_id = 3
-tier_index = 2
-node_kind = "BaseTech"
-enhancement_choice_index = 0
+tier_index = 4
 entry_kind = "MechanismChange"
-reputation_requirement = 2
+reputation_requirement = 4
+internal_cost_cash_points = 700
+unlock_effect_parameter = 1.09
+effect_parameter_per_bonus_reputation = 0.036
+is_todo_placeholder = false
+display_name = "Survey Benchmark Course Review"
+description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
+
+[[technology_nodes]]
+faction_id = 3
+tier_index = 5
+entry_kind = "MechanismChange"
+reputation_requirement = 5
 internal_cost_cash_points = 800
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.040
@@ -736,12 +828,10 @@ description = "Frames the branch around technical support for real site actions 
 
 [[technology_nodes]]
 faction_id = 3
-tier_index = 2
-node_kind = "Enhancement"
-enhancement_choice_index = 1
+tier_index = 6
 entry_kind = "MechanismChange"
-reputation_requirement = 9
-internal_cost_cash_points = 1000
+reputation_requirement = 6
+internal_cost_cash_points = 900
 unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.028
 is_todo_placeholder = false
@@ -750,11 +840,9 @@ description = "Specializes the tier toward cleaner setup paths for build, inspec
 
 [[technology_nodes]]
 faction_id = 3
-tier_index = 2
-node_kind = "Enhancement"
-enhancement_choice_index = 2
+tier_index = 7
 entry_kind = "GlobalModifier"
-reputation_requirement = 9
+reputation_requirement = 7
 internal_cost_cash_points = 1000
 unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.026
@@ -764,11 +852,21 @@ description = "Specializes the tier toward shorter downtime between action windo
 
 [[technology_nodes]]
 faction_id = 3
-tier_index = 3
-node_kind = "BaseTech"
-enhancement_choice_index = 0
+tier_index = 8
 entry_kind = "MechanismChange"
-reputation_requirement = 3
+reputation_requirement = 8
+internal_cost_cash_points = 1100
+unlock_effect_parameter = 1.09
+effect_parameter_per_bonus_reputation = 0.031
+is_todo_placeholder = false
+display_name = "Action Timing Study Review"
+description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
+
+[[technology_nodes]]
+faction_id = 3
+tier_index = 9
+entry_kind = "MechanismChange"
+reputation_requirement = 9
 internal_cost_cash_points = 1200
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.032
@@ -778,12 +876,10 @@ description = "Shifts the branch toward salt-aware water handling so well water 
 
 [[technology_nodes]]
 faction_id = 3
-tier_index = 3
-node_kind = "Enhancement"
-enhancement_choice_index = 1
+tier_index = 10
 entry_kind = "GlobalModifier"
 reputation_requirement = 10
-internal_cost_cash_points = 1500
+internal_cost_cash_points = 1300
 unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.026
 is_todo_placeholder = false
@@ -792,12 +888,10 @@ description = "Pushes this line toward lower salinity pressure from stored or pu
 
 [[technology_nodes]]
 faction_id = 3
-tier_index = 3
-node_kind = "Enhancement"
-enhancement_choice_index = 2
+tier_index = 11
 entry_kind = "MechanismChange"
-reputation_requirement = 10
-internal_cost_cash_points = 1500
+reputation_requirement = 11
+internal_cost_cash_points = 1400
 unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.024
 is_todo_placeholder = false
@@ -806,11 +900,21 @@ description = "Pushes this line toward stronger treatment cycles and better devi
 
 [[technology_nodes]]
 faction_id = 3
-tier_index = 4
-node_kind = "BaseTech"
-enhancement_choice_index = 0
+tier_index = 12
+entry_kind = "MechanismChange"
+reputation_requirement = 12
+internal_cost_cash_points = 1500
+unlock_effect_parameter = 1.09
+effect_parameter_per_bonus_reputation = 0.027
+is_todo_placeholder = false
+display_name = "Brackish Water Protocols Review"
+description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
+
+[[technology_nodes]]
+faction_id = 3
+tier_index = 13
 entry_kind = "GlobalModifier"
-reputation_requirement = 4
+reputation_requirement = 13
 internal_cost_cash_points = 1600
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.026
@@ -820,12 +924,10 @@ description = "Expands the branch into denser instrument coverage so more device
 
 [[technology_nodes]]
 faction_id = 3
-tier_index = 4
-node_kind = "Enhancement"
-enhancement_choice_index = 1
+tier_index = 14
 entry_kind = "MechanismChange"
-reputation_requirement = 11
-internal_cost_cash_points = 2000
+reputation_requirement = 14
+internal_cost_cash_points = 1700
 unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.024
 is_todo_placeholder = false
@@ -834,27 +936,33 @@ description = "Specializes the rig toward better device efficiency, better track
 
 [[technology_nodes]]
 faction_id = 3
-tier_index = 4
-node_kind = "Enhancement"
-enhancement_choice_index = 2
+tier_index = 15
 entry_kind = "GlobalModifier"
-reputation_requirement = 11
-internal_cost_cash_points = 2000
+reputation_requirement = 15
+internal_cost_cash_points = 1800
 unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.022
-granted_content_kind = "Item"
-granted_content_id = 12
 is_todo_placeholder = false
 display_name = "Failure Budget Spares"
-description = "Unlocks a Workbench kit and specializes the rig toward redundancy, quicker technical recovery, and safer redeployment."
+description = ""
 
 [[technology_nodes]]
 faction_id = 3
-tier_index = 5
-node_kind = "BaseTech"
-enhancement_choice_index = 0
+tier_index = 16
+entry_kind = "MechanismChange"
+reputation_requirement = 16
+internal_cost_cash_points = 1900
+unlock_effect_parameter = 1.09
+effect_parameter_per_bonus_reputation = 0.024
+is_todo_placeholder = false
+display_name = "Sensor Sweep Rig Review"
+description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
+
+[[technology_nodes]]
+faction_id = 3
+tier_index = 17
 entry_kind = "GlobalModifier"
-reputation_requirement = 5
+reputation_requirement = 17
 internal_cost_cash_points = 2000
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.022
@@ -864,12 +972,10 @@ description = "Turns University support into practical action assistance, lettin
 
 [[technology_nodes]]
 faction_id = 3
-tier_index = 5
-node_kind = "Enhancement"
-enhancement_choice_index = 1
+tier_index = 18
 entry_kind = "GlobalModifier"
-reputation_requirement = 12
-internal_cost_cash_points = 2500
+reputation_requirement = 18
+internal_cost_cash_points = 2100
 unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.022
 is_todo_placeholder = false
@@ -878,27 +984,33 @@ description = "Specializes the tier toward stronger water-facing devices and ste
 
 [[technology_nodes]]
 faction_id = 3
-tier_index = 5
-node_kind = "Enhancement"
-enhancement_choice_index = 2
+tier_index = 19
 entry_kind = "MechanismChange"
-reputation_requirement = 12
-internal_cost_cash_points = 2500
+reputation_requirement = 19
+internal_cost_cash_points = 2200
 unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.020
-granted_content_kind = "Recipe"
-granted_content_id = 5
 is_todo_placeholder = false
 display_name = "Task Helper Rigs"
-description = "Unlocks the Hammer recipe and specializes the tier toward device-side help for build, harvest, repair, and craft action families."
+description = ""
 
 [[technology_nodes]]
 faction_id = 3
-tier_index = 6
-node_kind = "BaseTech"
-enhancement_choice_index = 0
+tier_index = 20
 entry_kind = "MechanismChange"
-reputation_requirement = 6
+reputation_requirement = 20
+internal_cost_cash_points = 2300
+unlock_effect_parameter = 1.09
+effect_parameter_per_bonus_reputation = 0.021
+is_todo_placeholder = false
+display_name = "Control Loop Theory Review"
+description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
+
+[[technology_nodes]]
+faction_id = 3
+tier_index = 21
+entry_kind = "MechanismChange"
+reputation_requirement = 21
 internal_cost_cash_points = 2400
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.019
@@ -908,12 +1020,10 @@ description = "Keeps the branch flexible by making technical loadouts respond be
 
 [[technology_nodes]]
 faction_id = 3
-tier_index = 6
-node_kind = "Enhancement"
-enhancement_choice_index = 1
+tier_index = 22
 entry_kind = "MechanismChange"
-reputation_requirement = 13
-internal_cost_cash_points = 3000
+reputation_requirement = 22
+internal_cost_cash_points = 2500
 unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.020
 is_todo_placeholder = false
@@ -922,12 +1032,10 @@ description = "Pushes the tier toward faster technical iteration and safer first
 
 [[technology_nodes]]
 faction_id = 3
-tier_index = 6
-node_kind = "Enhancement"
-enhancement_choice_index = 2
+tier_index = 23
 entry_kind = "GlobalModifier"
-reputation_requirement = 13
-internal_cost_cash_points = 3000
+reputation_requirement = 23
+internal_cost_cash_points = 2600
 unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.018
 is_todo_placeholder = false
@@ -936,11 +1044,21 @@ description = "Pushes the tier toward better device durability and smaller losse
 
 [[technology_nodes]]
 faction_id = 3
-tier_index = 7
-node_kind = "BaseTech"
-enhancement_choice_index = 0
+tier_index = 24
+entry_kind = "MechanismChange"
+reputation_requirement = 24
+internal_cost_cash_points = 2700
+unlock_effect_parameter = 1.09
+effect_parameter_per_bonus_reputation = 0.019
+is_todo_placeholder = false
+display_name = "Adaptive Trial Beds Review"
+description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
+
+[[technology_nodes]]
+faction_id = 3
+tier_index = 25
 entry_kind = "GlobalModifier"
-reputation_requirement = 7
+reputation_requirement = 25
 internal_cost_cash_points = 2800
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.017
@@ -950,12 +1068,10 @@ description = "Links device knowledge across sites so forecasts, support logic, 
 
 [[technology_nodes]]
 faction_id = 3
-tier_index = 7
-node_kind = "Enhancement"
-enhancement_choice_index = 1
+tier_index = 26
 entry_kind = "GlobalModifier"
-reputation_requirement = 14
-internal_cost_cash_points = 3500
+reputation_requirement = 26
+internal_cost_cash_points = 2900
 unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.018
 is_todo_placeholder = false
@@ -964,12 +1080,10 @@ description = "Specializes the tier toward cleaner weather reads and better tech
 
 [[technology_nodes]]
 faction_id = 3
-tier_index = 7
-node_kind = "Enhancement"
-enhancement_choice_index = 2
+tier_index = 27
 entry_kind = "MechanismChange"
-reputation_requirement = 14
-internal_cost_cash_points = 3500
+reputation_requirement = 27
+internal_cost_cash_points = 3000
 unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.016
 is_todo_placeholder = false
@@ -978,11 +1092,21 @@ description = "Specializes the tier toward more reliable follow-up after tasks, 
 
 [[technology_nodes]]
 faction_id = 3
-tier_index = 8
-node_kind = "BaseTech"
-enhancement_choice_index = 0
+tier_index = 28
 entry_kind = "MechanismChange"
-reputation_requirement = 8
+reputation_requirement = 28
+internal_cost_cash_points = 3100
+unlock_effect_parameter = 1.09
+effect_parameter_per_bonus_reputation = 0.017
+is_todo_placeholder = false
+display_name = "Shared Model Exchange Review"
+description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
+
+[[technology_nodes]]
+faction_id = 3
+tier_index = 29
+entry_kind = "MechanismChange"
+reputation_requirement = 29
 internal_cost_cash_points = 3200
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.015
@@ -992,12 +1116,10 @@ description = "Caps the University branch with a full-site device network built 
 
 [[technology_nodes]]
 faction_id = 3
-tier_index = 8
-node_kind = "Enhancement"
-enhancement_choice_index = 1
+tier_index = 30
 entry_kind = "MechanismChange"
-reputation_requirement = 15
-internal_cost_cash_points = 4000
+reputation_requirement = 30
+internal_cost_cash_points = 3300
 unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.016
 is_todo_placeholder = false
@@ -1006,15 +1128,25 @@ description = "Turns the capstone toward prediction, timing, and proactive suppo
 
 [[technology_nodes]]
 faction_id = 3
-tier_index = 8
-node_kind = "Enhancement"
-enhancement_choice_index = 2
+tier_index = 31
 entry_kind = "GlobalModifier"
-reputation_requirement = 15
-internal_cost_cash_points = 4000
+reputation_requirement = 31
+internal_cost_cash_points = 3400
 unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.014
 is_todo_placeholder = false
 display_name = "Field Signal Archive"
 description = "Turns the capstone toward resilient device coordination, faster resets, and stronger support continuity after disruption."
+
+[[technology_nodes]]
+faction_id = 3
+tier_index = 32
+entry_kind = "MechanismChange"
+reputation_requirement = 32
+internal_cost_cash_points = 3500
+unlock_effect_parameter = 1.09
+effect_parameter_per_bonus_reputation = 0.015
+is_todo_placeholder = false
+display_name = "Autonomous Response Grid Review"
+description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
 
