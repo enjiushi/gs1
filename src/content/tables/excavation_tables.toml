@@ -1,7 +1,7 @@
 excavation_depths = [
-  { depth = "Rough", energy_cost_multiplier = 1.0, find_chance_percent = 50.0, common_tier_percent = 58.0, uncommon_tier_percent = 26.0, rare_tier_percent = 8.0, very_rare_tier_percent = 6.0, jackpot_tier_percent = 2.0 },
-  { depth = "Careful", energy_cost_multiplier = 1.35, find_chance_percent = 50.0, common_tier_percent = 49.0, uncommon_tier_percent = 25.5, rare_tier_percent = 9.5, very_rare_tier_percent = 12.0, jackpot_tier_percent = 4.0 },
-  { depth = "Thorough", energy_cost_multiplier = 1.75, find_chance_percent = 50.0, common_tier_percent = 42.0, uncommon_tier_percent = 26.0, rare_tier_percent = 11.0, very_rare_tier_percent = 15.0, jackpot_tier_percent = 6.0 }
+  { depth = "Rough", duration_minutes = 20.0, energy_cost_multiplier = 1.0, find_chance_percent = 50.0, common_tier_percent = 58.0, uncommon_tier_percent = 26.0, rare_tier_percent = 8.0, very_rare_tier_percent = 6.0, jackpot_tier_percent = 2.0 },
+  { depth = "Careful", duration_minutes = 30.0, energy_cost_multiplier = 1.35, find_chance_percent = 50.0, common_tier_percent = 49.0, uncommon_tier_percent = 25.5, rare_tier_percent = 9.5, very_rare_tier_percent = 12.0, jackpot_tier_percent = 4.0 },
+  { depth = "Thorough", duration_minutes = 40.0, energy_cost_multiplier = 1.75, find_chance_percent = 50.0, common_tier_percent = 42.0, uncommon_tier_percent = 26.0, rare_tier_percent = 11.0, very_rare_tier_percent = 15.0, jackpot_tier_percent = 6.0 }
 ]
 
 excavation_loot_entries = [

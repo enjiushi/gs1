@@ -1058,6 +1058,11 @@ void action_execution_excavate_starts_immediately_and_emits_cost(
         site_run.site_action.primary_subject_id == static_cast<std::uint32_t>(gs1::ExcavationDepth::Rough));
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue[0].type == GameMessageType::SiteActionStarted);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            queue[0].payload_as<SiteActionStartedMessage>().duration_minutes,
+            20.0f));
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::WorkerMeterDeltaRequested) == 0U);
     GS1_SYSTEM_TEST_CHECK(
         context,

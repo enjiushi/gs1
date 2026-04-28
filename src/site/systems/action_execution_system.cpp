@@ -267,6 +267,7 @@ float action_morale_cost(
 
 double action_unit_duration_minutes(
     ActionKind kind,
+    std::uint32_t primary_subject_id,
     std::uint32_t item_id,
     const CraftRecipeDef* craft_recipe = nullptr) noexcept
 {
@@ -293,6 +294,18 @@ double action_unit_duration_minutes(
                     authored_duration,
                     k_minimum_action_duration_minutes);
             }
+        }
+    }
+
+    if (kind == ActionKind::Excavate)
+    {
+        const auto depth = excavation_depth_from_subject_id(primary_subject_id);
+        const auto* depth_def = find_excavation_depth_def(depth);
+        if (depth_def != nullptr)
+        {
+            return std::max(
+                static_cast<double>(depth_def->duration_minutes),
+                k_minimum_action_duration_minutes);
         }
     }
 
@@ -358,12 +371,14 @@ double compute_duration_minutes(
     SiteSystemContext<ActionExecutionSystem>& context,
     ActionKind kind,
     std::uint16_t quantity,
+    std::uint32_t primary_subject_id,
     std::uint32_t item_id,
     const CraftRecipeDef* craft_recipe = nullptr) noexcept
 {
     const std::uint16_t safe_quantity = quantity == 0U ? 1U : quantity;
     const double duration =
-        action_unit_duration_minutes(kind, item_id, craft_recipe) * static_cast<double>(safe_quantity);
+        action_unit_duration_minutes(kind, primary_subject_id, item_id, craft_recipe) *
+        static_cast<double>(safe_quantity);
     return std::max(
         k_minimum_action_duration_minutes,
         duration * static_cast<double>(resolve_action_cost_multiplier(context.world.read_worker().conditions)));
@@ -2186,6 +2201,7 @@ Gs1Status ActionExecutionSystem::process_message(
             context,
             action_kind,
             requested_quantity,
+            primary_subject_id,
             item_id,
             craft_recipe);
         const RuntimeActionId action_id = allocate_runtime_action_id();

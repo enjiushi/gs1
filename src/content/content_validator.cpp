@@ -415,6 +415,7 @@ std::vector<ContentValidationIssue> validate_content_database(
                 depth_def.very_rare_tier_percent +
                 depth_def.jackpot_tier_percent;
             if (depth_def.depth == ExcavationDepth::None ||
+                depth_def.duration_minutes <= 0.0f ||
                 depth_def.energy_cost_multiplier <= 0.0f ||
                 depth_def.find_chance_percent < 0.0f ||
                 depth_def.find_chance_percent > 100.0f ||
@@ -422,7 +423,7 @@ std::vector<ContentValidationIssue> validate_content_database(
             {
                 issues.push_back(ContentValidationIssue {
                     ContentValidationSeverity::Error,
-                    "Excavation depth definitions must use valid depths, positive energy multipliers, 0-100 find chance, and tier totals that sum to 100%."});
+                    "Excavation depth definitions must use valid depths, positive durations and energy multipliers, 0-100 find chance, and tier totals that sum to 100%."});
                 break;
             }
 

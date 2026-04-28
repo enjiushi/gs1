@@ -1542,6 +1542,7 @@ void load_excavation_defs(ContentDatabase& content, const std::filesystem::path&
                 path,
                 toml_line_number(entry),
                 require_toml_string(path, entry, "depth")),
+            require_toml_float(path, entry, "duration_minutes"),
             require_toml_float(path, entry, "energy_cost_multiplier"),
             require_toml_float(path, entry, "find_chance_percent"),
             require_toml_float(path, entry, "common_tier_percent"),

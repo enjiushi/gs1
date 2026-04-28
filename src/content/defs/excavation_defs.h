@@ -11,6 +11,7 @@ namespace gs1
 struct ExcavationDepthDef final
 {
     ExcavationDepth depth;
+    float duration_minutes;
     float energy_cost_multiplier;
     float find_chance_percent;
     float common_tier_percent;

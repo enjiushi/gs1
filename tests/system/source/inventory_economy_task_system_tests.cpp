@@ -2578,6 +2578,9 @@ void excavation_content_tuning_exposes_depth_specific_sell_balance(
     GS1_SYSTEM_TEST_REQUIRE(context, rough_depth != nullptr);
     GS1_SYSTEM_TEST_REQUIRE(context, careful_depth != nullptr);
     GS1_SYSTEM_TEST_REQUIRE(context, thorough_depth != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, rough_depth->duration_minutes == 20.0f);
+    GS1_SYSTEM_TEST_CHECK(context, careful_depth->duration_minutes == 30.0f);
+    GS1_SYSTEM_TEST_CHECK(context, thorough_depth->duration_minutes == 40.0f);
     GS1_SYSTEM_TEST_CHECK(context, rough_depth->find_chance_percent == 50.0f);
     GS1_SYSTEM_TEST_CHECK(context, careful_depth->find_chance_percent == 50.0f);
     GS1_SYSTEM_TEST_CHECK(context, thorough_depth->find_chance_percent == 50.0f);
