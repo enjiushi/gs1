@@ -3377,20 +3377,30 @@ Important rule:
 
 #### Branch Content Rule
 
-Each faction should own one signature content family:
+Each faction should still own one signature unlock family, but its techs and enhancements should push a broader branch identity around that family:
 
-| Faction | Signature content family | Assistant | Core branch promise |
-|---|---|---|---|
-| `Village Committee` | `recipe` | `Workforce Support` | Better field food and drink recipes that stabilize worker condition, comfort, and work tempo |
-| `Forestry Bureau of Autonomous Region` | `plant` | `Plant-Water Support` | Better restoration plants that establish faster, protect harder, and rehabilitate land more reliably |
-| `Autonomous Region Agricultural University` | `device` | `Device Upgrade Support` | Better technical devices that perform more efficiently, survive hazards better, and shape the local field environment |
+| Faction | Signature unlock family | Assistant | Secondary tech focus | Core branch promise |
+|---|---|---|---|---|
+| `Village Committee` | `recipe` | `Workforce Support` | player-meter resilience, harsh-weather resistance, work-efficiency sustain, excavation tempo / depth support | Better field food, worker buffs, and practical labor/excavation improvements that keep the player functional through rough weather and long work chains |
+| `Forestry Bureau of Autonomous Region` | `plant` | `Plant-Water Support` | plant-meter improvement, support reach, wind protection, harvest upgrades, rare harvest outcomes, plant-linked sale goods | Better restoration plants plus plant-linked harvest and product upgrades that make the land safer, more productive, and more commercially valuable |
+| `Autonomous Region Agricultural University` | `device` | `Device Upgrade Support` | structure/device upgrades, irrigation, protection, well-water handling, salinity treatment, advanced tools, solar utility | Better technical structures and devices that improve field support quality, survive hazards better, and build steady utility-backed income |
 
 Delivery rule:
 
-- village recipe unlocks should add permanent recipes to the `Field Workshop` or other camp crafting access
-- forestry plant unlocks should add new tech-eligible plant options to the `Site Unlockable` pool
-- university device unlocks should add new tech-eligible device options to the `Site Unlockable` pool
-- if a faction branch wants to influence other content later, it should usually do so through modifier bundles or neutral utility nodes rather than by stealing another branch's main unlock family
+- village recipe unlocks should add permanent recipes to the `Field Workshop` or other camp crafting access, while village modifier/mechanism techs may also improve harsh-weather handling, work tempo, and excavation depth/efficiency
+- forestry plant unlocks should add new tech-eligible plant options to the `Site Unlockable` pool, and forestry techs may also grant plant-linked harvest upgrades, rare-harvest behavior, or sale-only processing recipes
+- university device unlocks should add new tech-eligible device or support-structure options to the `Site Unlockable` pool, and university techs may also grant advanced tool recipes or utility-behavior upgrades around those devices
+- if a faction branch wants to influence other content later, it should usually do so through modifier bundles, mechanism unlocks, or optional payload grants rather than by stealing another branch's main unlock family
+
+#### Faction Economy Identity
+
+The factions should also feel economically different, and faction-focused income should be treated as the long-term main source mix rather than as pure side flavor:
+
+- `Village Committee` should be the branch that most improves excavation as a main cash source through better worker sustain, harsh-weather resilience, lower dig cost, higher dig reliability, and access to deeper excavation passes
+- `Forestry Bureau of Autonomous Region` should be the branch that most improves harvest-side value through stronger output, occasional rare harvest items, and plant-linked commercial-product recipes that produce sell-only goods with higher internal cash-point value
+- `Autonomous Region Agricultural University` should be the branch that most improves structure/device-backed steady income, especially through stronger solar output and better utility efficiency once a support pocket is established
+- task income should remain one meaningful line of income, but it should not be treated as the main source once faction-economic identities are fully resolved
+- current prototype caution: the broader sell economy is still less resolved than excavation and faction-tech identity, so short-term implementation/design effort should prioritize `Village Committee` first, then `Forestry Bureau of Autonomous Region`, and leave `Autonomous Region Agricultural University` for later passes because it is the most difficult branch to resolve cleanly
 
 #### Tier Structure
 
@@ -3408,15 +3418,15 @@ Every base tech should use its `2` amplification choices to push that base tech 
 
 | Faction | Signature content | Update family | Main target meters / values | Design intent |
 |---|---|---|---|---|
-| `Village Committee` | `recipe` | `Recovery Blend` | `playerHealth`, `playerHydration`, `playerNourishment` | Make crafted food and drink better at restoring survival condition after hard field work. |
-| `Village Committee` | `recipe` | `Endurance Blend` | `playerEnergyCap`, `playerEnergy`, `playerWorkEfficiency` | Make food and drink better at sustaining long work windows and reducing work slowdown. |
-| `Village Committee` | `recipe` | `Comfort Blend` | `playerMorale`, `itemFreshness` | Make crafted goods better at maintaining morale and staying usable for longer. |
+| `Village Committee` | `recipe` | `Recovery Blend` | `playerHealth`, `playerHydration`, `playerNourishment`, `playerMorale` | Make crafted food and drink better at restoring survival condition and stabilizing the player after rough field work or bad weather. |
+| `Village Committee` | `recipe` | `Endurance Blend` | `playerEnergyCap`, `playerEnergy`, `playerWorkEfficiency` | Make food, drink, and buff recipes better at sustaining long work windows and reducing work slowdown. |
+| `Village Committee` | `mechanism` | `Excavation Kit` | `excavationEnergyCostWeight`, `excavationEnergyCostBias`, `excavationDiscoveryChanceWeight`, `excavationDiscoveryChanceBias`, excavation depth access | Make excavation safer, cheaper, more reliable, and eventually deeper without changing the core excavation state model. |
 | `Forestry Bureau of Autonomous Region` | `plant` | `Establishment Update` | `growthPressure`, `plantDensityModifier`, `salinityDensityCap` | Help a new plant establish on difficult land and hold density sooner. |
 | `Forestry Bureau of Autonomous Region` | `plant` | `Protection Update` | `windResistance`, `windProtectionRange`, `heatTolerance`, `dustTolerance`, `auraSize` | Make the plant provide stronger outward shelter once it is established without changing the no-self-shield rule on its own footprint. |
-| `Forestry Bureau of Autonomous Region` | `plant` | `Rehab Update` | `fertilityImprovePower`, `saltTolerance` | Make the plant better at long-term land recovery and salt rehabilitation without adding a separate plant salinity-support meter. |
-| `Autonomous Region Agricultural University` | `device` | `Calibration Update` | `deviceEfficiency`, linked device primary output values | Make the device perform its main job more efficiently once deployed. |
-| `Autonomous Region Agricultural University` | `device` | `Hardening Update` | `deviceIntegrity`, `burialSensitivity` | Make the device more durable and less vulnerable to harsh conditions. |
-| `Autonomous Region Agricultural University` | `device` | `Field Envelope Update` | `windProtectionPower`, `windProtectionRange`, linked device support values | Make the device shape a stronger local protection or support pocket around itself. |
+| `Forestry Bureau of Autonomous Region` | `plant` | `Yield Update` | `outputPower`, harvest-output quality, rare-harvest chance, plant-linked commercial recipe payloads | Make the plant line more productive and more commercially valuable while keeping the plant branch centered on harvest-driven play. |
+| `Autonomous Region Agricultural University` | `device` | `Calibration Update` | `deviceEfficiency`, linked device primary output values, `irrigationPower` | Make the device perform its main job more efficiently once deployed. |
+| `Autonomous Region Agricultural University` | `device` | `Hardening Update` | `deviceIntegrity`, `burialSensitivity`, `windProtectionPower`, `windProtectionRange` | Make support structures and devices more durable and more effective in exposed terrain. |
+| `Autonomous Region Agricultural University` | `device` | `Utility Update` | `salinityReductionPower`, solar output, advanced tool recipe payloads, linked device support values | Make devices better at water treatment, field support, and steady utility-backed value generation. |
 
 Important rule:
 
@@ -3447,14 +3457,14 @@ Use the current authored roster as the first tuning target. The table below is n
 
 | Tier | Base tech | Primary mechanic targets | Enhancement A | Primary mechanic targets | Enhancement B | Primary mechanic targets |
 |---|---|---|---|---|---|---|
-| `1` | `Field Ration Drills` | lower action `energy` cost on repeated field work, smoother `energy` pacing | `Measured Footwork` | lower `energy` cost on move / plant / build loops | `Shade Break Whistles` | reduce heat-linked `morale` and `energy` losses |
-| `2` | `Community Meal Prep` | unlock `Food Pack`, improve food-side `hydration`, `nourishment`, `energy` refill | `Fortified Broth Pots` | stronger food `nourishment` and `energy` refill | `Salt Tea Rotation` | stronger food `hydration` refill and lower hot-weather recovery burden |
-| `3` | `Camp Care Circles` | faster background `energy` recovery, steadier `energyCap`, steadier `morale` | `Night Watch Handovers` | smoother between-action `energy` recovery | `Quiet Recovery Tents` | better `morale` protection during long or rough runs |
-| `4` | `Supply Relay Board` | steadier refill timing after camp-side recovery actions | `Hot Meal Priority Route` | unlock `Camp Stove Kit`, accelerate cooking access and survival-refill cadence | `Clinic Rounds` | better refill timing after `eat` / `drink` / recovery actions |
-| `5` | `Work Song Cadence` | lower repeated action drain, better long-chain `workEfficiency` sustain | `Shared Tool Borrowing` | lower build / repair / craft action costs | `Kitchen Line Harmony` | stronger value per meal and better refill efficiency |
-| `6` | `Village Rest Ledger` | more reliable post-task recovery, less collapse after stressful streaks | `Repair Volunteer Teams` | lower maintenance-chain strain and recovery lag | `Festival Kitchen Fires` | larger refill surges from prepared food and restock breaks |
-| `7` | `Route Steward Network` | reduce passive meter wear during extended field plans | `Escort Hand-Offs` | lower traversal / hauling / planting fatigue | `Grant Clerk Promises` | stronger `morale` retention when the board is crowded |
-| `8` | `Regional Relief Backbone` | broad late-game worker-meter sustain under pressure | `Emergency Kitchens` | maximum cooked-food refill payoff | `Shelter Registry` | lower all-around `hydration`, `energy`, and `morale` losses under sustained site pressure |
+| `1` | `Storm Shift Briefing` | lower harsh-weather meter loss, steadier early `playerWorkEfficiency`, cleaner opener under heat / wind / dust | `Shade March Rhythm` | lower move / build / plant strain during exposed work loops | `Dust Mask Drill` | better `playerHydration` and `playerMorale` retention during bad weather |
+| `2` | `Community Meal Prep` | unlock `Food Pack`, improve food-side `hydration`, `nourishment`, `energy` refill | `Fortified Broth Pots` | stronger food `nourishment` and `energy` refill | `Salt Tea Rotation` | stronger food `hydration` refill plus a small heat-resistance buff window |
+| `3` | `Camp Care Circles` | faster background `energy` recovery, steadier `energyCap`, steadier `morale` | `Night Watch Handovers` | smoother between-action `energy` recovery | `Quiet Recovery Tents` | better harsh-event recovery and `morale` protection during long runs |
+| `4` | `Excavation Safety Class` | unlock `Careful` excavation, lower dig-side strain, safer dig pacing in rough weather | `Measured Dig Lines` | lower `excavationEnergyCost` and steadier action chains while digging | `Sift Discipline` | higher `excavationDiscoveryChance` and more reliable item finds |
+| `5` | `Field Kitchen Signals` | stronger cooked-food buff uptime, better long-chain `playerWorkEfficiency` sustain | `Endurance Snack Packs` | longer `playerEnergy` and `playerWorkEfficiency` buff duration | `Storm Shelter Stew` | stronger harsh-weather resistance buff on prepared meals |
+| `6` | `Deep Pit Rotation` | unlock `Thorough` excavation, steadier post-dig recovery, less collapse after stressful dig streaks | `Spoil Sorting Teams` | better high-value excavation cadence and more reliable deep-dig outcomes | `Brace And Clear Crews` | lower disruption from wind / dust pressure during excavation-heavy loops |
+| `7` | `Relief Ledger Network` | reduce passive meter wear during extended field plans and post-event cleanup | `Ration Priority Boards` | better refill timing and less downtime around recovery actions | `Shift Swap Stewards` | lower fatigue and morale collapse after long labor chains |
+| `8` | `Village Recovery Backbone` | broad late-game worker-meter sustain plus excavation-readiness under pressure | `Emergency Field Kitchens` | maximum prepared-food buff payoff and recovery value | `Deep Cache Syndicate` | best excavation efficiency, discovery reliability, and dig-sale cadence in the branch |
 
 ##### `Forestry Bureau Of Autonomous Region`
 
@@ -3462,25 +3472,25 @@ Use the current authored roster as the first tuning target. The table below is n
 |---|---|---|---|---|---|---|
 | `1` | `Seed Selection Nursery` | lower early-plant `growthPressure`, faster establishment, cleaner first density gains | `Rooting Powder Coats` | higher early `tilePlantDensity` gain | `Dormant Reserve Packing` | better seedling survival under sudden exposure spikes |
 | `2` | `Windline Shelter Belts` | stronger plant-made shelter, earlier local-weather shaping | `Staggered Fence Shrubs` | longer / cleaner `windProtectionRange` lanes | `Leeward Dust Traps` | stronger dust buffering and lower burial pressure |
-| `3` | `Nurse Crop Pairing` | unlock `Sea Buckthorn`, encourage companion planting and support rows | `Shade Nurse Pattern` | lower seedling `growthPressure` beside support plants | `Moisture Catch Basins` | better moisture retention and mixed-patch survival |
-| `4` | `Salt Edge Rootstock` | better salty-ground survival and density retention | `Mycorrhiza Threading` | stronger `fertilityImprovePower` and slower collapse on stressed soil | `Capillary Break Ridges` | lower `tileSoilSalinity` pressure and stronger `salinityDensityCap` behavior |
-| `5` | `Canopy Ladder Program` | layered shelter stacks and mixed-height infrastructure patches | `Mixed Height Windbreaks` | unlock `Wind Fence`, stronger combined plant+structure shelter corridors | `Pollinator Verge Pockets` | stronger spread-side patch continuity and productive planted edges |
-| `6` | `Burial Recovery Groves` | faster rebound after sand cover and gust cycles | `Dune Pin Root Nets` | stronger anti-burial holding power | `Self-Pruning Fans` | faster recovery after exposure-driven density loss |
-| `7` | `Succession Patch Planning` | patch-to-patch continuity and smoother expansion from one stable zone to the next | `Corridor Stitching` | unlock `Desert Ephedra`, build linked shelter corridors | `Seed Rain Timing` | stronger `spreadReadiness`, spread timing, and follow-on growth behavior |
-| `8` | `Regional Living Matrix` | capstone plant-modifier package for field-wide resilience | `Watershed Green Lanes` | stronger moisture capture and terrain rehab corridors | `Keystone Habitat Weave` | extra companion effects, patch durability, and plant-side mechanism hooks |
+| `3` | `Edge Yield Orchards` | stronger harvest output identity and better sale value from productive plant lines | `Sweet Resin Lines` | higher-value core harvest products from linked plants | `Odd-Pod Sorting` | small rare-harvest-item chance on successful harvests |
+| `4` | `Nurse Crop Pairing` | unlock `Sea Buckthorn`, encourage companion planting and support rows | `Shade Nurse Pattern` | lower seedling `growthPressure` beside support plants | `Moisture Catch Basins` | better moisture retention and mixed-patch survival |
+| `5` | `Field Processing Cooperative` | unlock a plant-linked commercial-product recipe path for sell-only goods | `Pressed Goods Standards` | higher internal cash-point value on commercial-product output | `Drying Rack Batches` | stronger harvest-to-product conversion efficiency and steadier sale cadence |
+| `6` | `Salt Edge Rootstock` | better salty-ground survival and density retention | `Mycorrhiza Threading` | stronger `fertilityImprovePower` and slower collapse on stressed soil | `Capillary Break Ridges` | lower `tileSoilSalinity` pressure and stronger `salinityDensityCap` behavior |
+| `7` | `Canopy Ladder Program` | layered shelter stacks, mixed-height protection, and productive planted edges | `Mixed Height Windbreaks` | unlock `Wind Fence`, stronger combined plant+structure shelter corridors | `Pollinator Verge Pockets` | stronger productive-edge behavior and more frequent rare-harvest opportunities |
+| `8` | `Regional Living Market` | capstone plant-modifier package for field-wide resilience plus top-end harvest-side value | `Watershed Green Lanes` | stronger moisture capture and terrain rehab corridors | `Merchant Grove Contracts` | best commercial-product output and rare-harvest payoff in the branch |
 
 ##### `Autonomous Region Agricultural University`
 
 | Tier | Base tech | Primary mechanic targets | Enhancement A | Primary mechanic targets | Enhancement B | Primary mechanic targets |
 |---|---|---|---|---|---|---|
-| `1` | `Survey Benchmark Course` | unlock `Workbench`, better technical setup and device output discipline | `Probe Calibration Sheets` | higher `deviceEfficiency` and cleaner support output | `Variance Log Books` | steadier technical outcomes and lower timing variance |
-| `2` | `Action Timing Study` | lower technical overhead around real site actions | `Mesh Sampling Routes` | cheaper setup for build / inspect / placement-heavy actions | `Windowed Dispatch` | less wasted effort from mistimed action windows |
-| `3` | `Brackish Water Protocols` | make well-water use less punishing on salty ground | `Settling Drum Notes` | lower salinity burden from stored or pumped well water | `Filter Media Swaps` | stronger treatment cycles and cleaner device-side water handling |
-| `4` | `Sensor Sweep Rig` | denser instrument coverage and broader decision support | `Telemetry Filters` | better device tracking and less wasted support output | `Failure Budget Spares` | unlock `Workbench Kit`, stronger redundancy and faster technical recovery |
-| `5` | `Control Loop Theory` | let devices actively reduce repeated job cost | `Pump Assist Governors` | stronger water-device performance under heat | `Task Helper Rigs` | unlock `Hammer` recipe, support build / harvest / repair / craft action families |
-| `6` | `Adaptive Trial Beds` | flexible technical loadouts that respond to local conditions | `Pilot Arrays` | safer first deployments and faster iteration | `Stress Table Safeguards` | stronger device durability and lower technical losses under pressure |
-| `7` | `Shared Model Exchange` | compound forecasting and support logic across sites | `Simulation Library` | better weather reads and pre-action planning | `Case Transfer Kits` | stronger recovery after task failure or improvised fixes |
-| `8` | `Autonomous Response Grid` | late-game full-site device coordination | `Forecast Solver Stack` | proactive support for the hardest timing windows | `Field Signal Archive` | resilient device coordination and faster technical resets after disruption |
+| `1` | `Workshop Standards Course` | unlock `Field Workshop`, better technical setup and crafting discipline around support gear | `Tool Roll Templates` | cleaner tool-side setup and lower support-device waste | `Bench Calibration Cards` | steadier technical outcomes and lower timing variance |
+| `2` | `Drip Line Practice` | unlock `Drip Irrigator`, better irrigation discipline and cleaner support output | `Emitter Calibration` | higher `deviceEfficiency` and stronger `irrigationPower` | `Pressure Relief Valves` | less wasted water and steadier support behavior under heat |
+| `3` | `Wind Corridor Fixtures` | stronger support-structure protection in exposed lanes | `Anchor Spikes` | higher `deviceIntegrity` and lower harsh-weather disruption | `Lee Pattern Charts` | stronger `windProtectionPower` and better shelter shaping from support devices |
+| `4` | `Brackish Water Protocols` | make salty water handling less punishing on stressed ground and storage loops | `Settling Drum Notes` | lower salinity burden from stored support water | `Filter Media Swaps` | stronger treatment cycles and cleaner device-side water handling |
+| `5` | `Utility Tool Lab` | unlock better field-tool recipe support and lower technical overhead around build / repair / craft work | `Task Helper Rigs` | unlock `Hammer` recipe, support build / harvest / repair / craft action families | `Field Spanner Packs` | faster technical setup and smoother maintenance tempo |
+| `6` | `Solar Array Standards` | unlock `Solar Array`, stronger utility output, and steadier local support uptime | `Panel Angle Guides` | higher solar output and better heat-relief support | `Storage Relay Notes` | steadier sellable electricity surplus after local demand is covered |
+| `7` | `Support Grid Exchange` | compound water, protection, and support logic across one mature site pocket | `Pilot Arrays` | safer first deployments and faster utility iteration | `Stress Table Safeguards` | stronger device durability and lower technical losses under pressure |
+| `8` | `Autonomous Utility Grid` | late-game structure/device coordination with the branch's strongest steady utility income | `Forecast Solver Stack` | proactive support for the hardest timing windows | `Microgrid Sales Ledger` | best solar-backed steady-income behavior and resilient technical resets after disruption |
 
 ### Site Unlockables And Run Modifiers
 
@@ -4157,7 +4167,9 @@ This preserves the key promise that reputation matters during crisis recovery.
 #### Economy
 
 - money must exist and matter
-- direct task payouts should be the main cash source
+- task payouts should be one meaningful income line, but not the default long-term main source
+- the intended main cash focus should come mostly from each faction's play pattern: excavation for `Village Committee`, commercial plant-product selling for `Forestry Bureau of Autonomous Region`, and steady solar-electricity utility income for `Autonomous Region Agricultural University`
+- current resolution priority should stay on `Village Committee` first, then `Forestry Bureau of Autonomous Region`, with `Autonomous Region Agricultural University` left for later because its device/water/electricity design space is the hardest to settle cleanly
 - the player only needs a very small shop list such as water and a few field supplies
 - a broad sell economy, contractor market, and trade simulation can be deferred
 
