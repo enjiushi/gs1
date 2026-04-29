@@ -2735,6 +2735,28 @@ body {
     0 8px 14px rgba(55, 35, 14, 0.05);
 }
 
+.phone-task-card.interactive {
+  cursor: pointer;
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+}
+
+.phone-task-card.interactive:hover {
+  transform: translateY(-1px);
+  border-color: rgba(154, 118, 74, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.56),
+    0 12px 20px rgba(55, 35, 14, 0.08);
+}
+
+.phone-task-card.interactive:focus-visible {
+  outline: 2px solid rgba(104, 127, 138, 0.72);
+  outline-offset: 2px;
+}
+
+.phone-task-card.detail {
+  padding: 12px 13px 13px;
+}
+
 .phone-list-card.disabled {
   opacity: 0.7;
 }
@@ -2787,6 +2809,51 @@ body {
   font-size: 11px;
   line-height: 1.45;
   color: rgba(92, 68, 40, 0.74);
+}
+
+.phone-task-detail-label {
+  margin-top: 10px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: rgba(110, 78, 43, 0.74);
+}
+
+.phone-task-detail-copy {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: rgba(49, 36, 21, 0.9);
+}
+
+.phone-task-detail-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.phone-task-detail-item {
+  position: relative;
+  padding: 9px 10px 9px 24px;
+  border-radius: 14px;
+  background: rgba(255, 249, 239, 0.74);
+  border: 1px solid rgba(142, 111, 75, 0.12);
+  color: rgba(66, 48, 27, 0.86);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.phone-task-detail-item::before {
+  content: "";
+  position: absolute;
+  left: 10px;
+  top: 13px;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #748b61, #c4a36c);
+  box-shadow: 0 0 0 3px rgba(116, 139, 97, 0.12);
 }
 
 .phone-stepper-row {

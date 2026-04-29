@@ -71,6 +71,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let inventoryPanelOpen = true;
     let phonePanelOpen = false;
     let activeTechTreePanelTabId = "unlockables";
+    let selectedPhoneTaskInstanceId = 0;
     let phoneBodyScrollTop = 0;
     const phoneSectionScrollTops = {};
     let phonePointerInteractionActive = false;
@@ -5124,6 +5125,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function clearPhonePanel() {
+        selectedPhoneTaskInstanceId = 0;
         phoneBodyScrollTop = 0;
         Object.keys(phoneSectionScrollTops).forEach(function (key) {
             delete phoneSectionScrollTops[key];
@@ -5541,6 +5543,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return button;
     }
 
+    function makePhoneLocalBackButton(label, onClick) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "phone-back-button";
+        button.textContent = label || "Back";
+        bindReliablePrimaryPress(button, onClick);
+        return button;
+    }
+
     function makePhoneCartButton(cartItemCount) {
         const button = document.createElement("button");
         button.type = "button";
@@ -5819,68 +5830,120 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return {
                 title: "Lay One Checkerboard",
                 summary: "Plant 1 Basic Straw Checkerboard to learn the first placement step.",
-                reward: "Reward: 3 Wood, 2 Iron, and +10 total reputation."
+                description: "Plant 1 Basic Straw Checkerboard near camp to complete the first placement contract.",
+                rewards: ["3 Wood", "2 Iron", "+10 total reputation"]
             };
         case 102:
             return {
                 title: "Craft a Storage Crate",
                 summary: "Use the starter workbench to craft 1 Storage Crate Kit.",
-                reward: "Reward: $8.00 and +10 total reputation."
+                description: "Use the starter workbench and craft 1 Storage Crate Kit so the site can start expanding storage.",
+                rewards: ["$8.00", "+10 total reputation"]
             };
         case 103:
             return {
                 title: "Buy Water",
                 summary: "Buy 1 Water from the phone market.",
-                reward: "Reward: $10.00 and +10 total reputation."
+                description: "Open the phone marketplace and buy 1 Water to confirm the first supply delivery flow.",
+                rewards: ["$10.00", "+10 total reputation"]
             };
         case 104:
             return {
                 title: "Buy Food",
                 summary: "Buy 1 Food from the phone market.",
-                reward: "Reward: 2 Wood, 1 Iron, and +10 total reputation."
+                description: "Order 1 Food from the phone market so the camp has another basic supply line online.",
+                rewards: ["2 Wood", "1 Iron", "+10 total reputation"]
             };
         case 105:
             return {
                 title: "Craft a Shovel",
                 summary: "The first unlock just landed. Craft 1 Shovel at the workbench.",
-                reward: "Reward: 8 Basic Straw Checkerboards and +10 total reputation."
+                description: "Use the newly unlocked recipe and craft 1 Shovel at the workbench to expand what the worker can do.",
+                rewards: ["8 Basic Straw Checkerboards", "+10 total reputation"]
             };
         case 106:
             return {
                 title: "Hold the Starter Patch",
                 summary: "Keep the 2 starter Desert Ephedra plants from losing density for 0.5 in-game hour.",
-                reward: "Reward: 4 Wood, 2 Iron, and +10 total reputation."
+                description: "Stabilize the 2 starter Desert Ephedra plants and keep them from losing density for 0.5 in-game hour.",
+                rewards: ["4 Wood", "2 Iron", "+10 total reputation"]
             };
         case 107:
             return {
                 title: "Craft a Cook Plot",
                 summary: "Craft 1 Camp Stove Kit at the workbench.",
-                reward: "Reward: +10 total reputation."
+                description: "Craft 1 Camp Stove Kit at the workbench to unlock the next camp food step.",
+                rewards: ["+10 total reputation"]
             };
         case 108:
             return {
                 title: "Place the Cook Plot",
                 summary: "Deploy 1 Camp Stove on the ground beside camp.",
-                reward: "Reward: $2.00 and +10 total reputation."
+                description: "Place 1 Camp Stove on the ground near camp so the new cooking station is ready to use.",
+                rewards: ["$2.00", "+10 total reputation"]
             };
         case 109:
             return {
                 title: "Harvest Desert Ephedra",
                 summary: "Harvest 1 starter Desert Ephedra patch.",
-                reward: "Reward: 1 Water and +10 total reputation."
+                description: "Harvest 1 starter Desert Ephedra patch and bring in the first plant output from the site.",
+                rewards: ["1 Water", "+10 total reputation"]
             };
         case 110:
             return {
                 title: "Cook Ephedra Stew",
                 summary: "Cook 1 Ephedra Stew from harvested Desert Ephedra Sprigs.",
-                reward: "Reward: 2 Desert Ephedra Seeds and +10 total reputation."
+                description: "Use harvested Desert Ephedra Sprigs to cook 1 Ephedra Stew and complete the first meal contract.",
+                rewards: ["2 Desert Ephedra Seeds", "+10 total reputation"]
             };
         default:
             return {
                 title: "Contract " + task.taskInstanceId,
                 summary: "Template " + task.taskTemplateId,
-                reward: ""
+                description: "Template " + task.taskTemplateId,
+                rewards: []
             };
+        }
+    }
+
+    function formatPhoneTaskRewardSummary(taskPresentation) {
+        if (!taskPresentation || !Array.isArray(taskPresentation.rewards) || taskPresentation.rewards.length === 0) {
+            return "";
+        }
+
+        return "Rewards: " + taskPresentation.rewards.join(", ");
+    }
+
+    function getSelectedPhoneTask(tasks) {
+        if (!Array.isArray(tasks) || selectedPhoneTaskInstanceId === 0) {
+            return null;
+        }
+
+        return tasks.find(function (task) {
+            return task && task.taskInstanceId === selectedPhoneTaskInstanceId;
+        }) || null;
+    }
+
+    function openPhoneTaskDetail(task) {
+        if (!task || typeof task.taskInstanceId !== "number" || task.taskInstanceId === 0) {
+            return;
+        }
+
+        capturePhoneScrollPositions();
+        selectedPhoneTaskInstanceId = task.taskInstanceId;
+        if (latestState) {
+            renderPhonePanel(latestState);
+        }
+    }
+
+    function closePhoneTaskDetail() {
+        if (selectedPhoneTaskInstanceId === 0) {
+            return;
+        }
+
+        selectedPhoneTaskInstanceId = 0;
+        if (latestState) {
+            renderPhonePanel(latestState);
         }
     }
 
@@ -5901,6 +5964,27 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 false
             )
         );
+    }
+
+    function appendPhoneTaskRewardsList(container, rewards) {
+        if (!Array.isArray(rewards) || rewards.length === 0) {
+            return;
+        }
+
+        const rewardLabel = document.createElement("div");
+        rewardLabel.className = "phone-task-detail-label";
+        rewardLabel.textContent = "Rewards";
+        container.appendChild(rewardLabel);
+
+        const rewardList = document.createElement("div");
+        rewardList.className = "phone-task-detail-list";
+        rewards.forEach(function (rewardText) {
+            const rewardItem = document.createElement("div");
+            rewardItem.className = "phone-task-detail-item";
+            rewardItem.textContent = rewardText;
+            rewardList.appendChild(rewardItem);
+        });
+        container.appendChild(rewardList);
     }
 
     function appendPhoneTaskSection(container, tasks, metaText, scrollKey) {
@@ -5932,7 +6016,21 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             const currentProgress = Math.max(0, Math.min(task.currentProgress || 0, targetProgress));
             const completion = Math.round((currentProgress / targetProgress) * 100);
             const card = document.createElement("article");
-            card.className = "phone-task-card";
+            card.className = "phone-task-card interactive";
+            card.setAttribute("role", "button");
+            card.setAttribute("aria-label", "Open task details for " + taskPresentation.title);
+            card.tabIndex = 0;
+            bindReliablePrimaryPress(card, function () {
+                openPhoneTaskDetail(task);
+            });
+            card.addEventListener("keydown", function (event) {
+                if (event.key !== "Enter" && event.key !== " ") {
+                    return;
+                }
+
+                event.preventDefault();
+                openPhoneTaskDetail(task);
+            });
 
             const header = document.createElement("div");
             header.className = "phone-task-header";
@@ -5956,10 +6054,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 "  |  " + completion + "%";
             card.appendChild(metaElement);
 
-            if (taskPresentation.reward) {
+            const rewardSummary = formatPhoneTaskRewardSummary(taskPresentation);
+            if (rewardSummary) {
                 const rewardElement = document.createElement("div");
                 rewardElement.className = "phone-task-meta";
-                rewardElement.textContent = taskPresentation.reward;
+                rewardElement.textContent = rewardSummary;
                 card.appendChild(rewardElement);
             }
 
@@ -5979,16 +6078,88 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         container.appendChild(section);
     }
 
+    function appendPhoneTaskDetailPanel(container, task) {
+        const taskPresentation = getPhoneTaskTemplatePresentation(task);
+        const targetProgress = Math.max(task.targetProgress || 0, 1);
+        const currentProgress = Math.max(0, Math.min(task.currentProgress || 0, targetProgress));
+        const completion = Math.round((currentProgress / targetProgress) * 100);
+        const detailMeta =
+            getPhoneTaskStateLabel(task) +
+            "  |  Progress " + currentProgress + "/" + targetProgress +
+            "  |  " + completion + "%";
+
+        appendPhonePanelToolbar(container, [
+            makePhoneLocalBackButton("Back To Tasks", function () {
+                closePhoneTaskDetail();
+            })
+        ]);
+
+        const section = makePhoneSection(taskPresentation.title, detailMeta);
+        const content = appendPhoneSectionContent(section, true);
+        bindPhoneScrollableRegion(content, "contract-detail-" + String(task.taskInstanceId));
+
+        const card = document.createElement("article");
+        card.className = "phone-task-card detail";
+
+        const header = document.createElement("div");
+        header.className = "phone-task-header";
+
+        const titleElement = document.createElement("div");
+        titleElement.className = "phone-task-title";
+        titleElement.textContent = taskPresentation.title;
+        header.appendChild(titleElement);
+
+        const stateElement = document.createElement("div");
+        stateElement.className = getPhoneTaskStateClassName(task);
+        stateElement.textContent = getPhoneTaskStateLabel(task);
+        header.appendChild(stateElement);
+        card.appendChild(header);
+
+        const descriptionLabel = document.createElement("div");
+        descriptionLabel.className = "phone-task-detail-label";
+        descriptionLabel.textContent = "Task Description";
+        card.appendChild(descriptionLabel);
+
+        const descriptionBody = document.createElement("div");
+        descriptionBody.className = "phone-task-detail-copy";
+        descriptionBody.textContent = taskPresentation.description || taskPresentation.summary;
+        card.appendChild(descriptionBody);
+
+        const progressMeta = document.createElement("div");
+        progressMeta.className = "phone-task-meta";
+        progressMeta.textContent =
+            "Progress " + currentProgress + "/" + targetProgress + "  |  Completion " + completion + "%";
+        card.appendChild(progressMeta);
+
+        const track = document.createElement("div");
+        track.className = "phone-task-track";
+        const fill = document.createElement("div");
+        fill.className = "phone-task-fill";
+        fill.style.width = completion + "%";
+        track.appendChild(fill);
+        card.appendChild(track);
+
+        appendPhoneTaskRewardsList(card, taskPresentation.rewards);
+        appendPhoneTaskAction(card, task);
+
+        content.appendChild(card);
+        container.appendChild(section);
+    }
+
     function setPhoneHeader(title, subtitle) {
         phoneAppTitle.textContent = title;
         phoneAppSubtitle.hidden = !subtitle;
         phoneAppSubtitle.textContent = subtitle || "";
     }
 
-    function setPhoneHeaderForSection(activeSection) {
+    function setPhoneHeaderForSection(activeSection, selectedTask) {
         switch (activeSection) {
         case "TASKS":
-            setPhoneHeader("Tasks", "");
+            if (selectedTask) {
+                setPhoneHeader("Task Detail", "Review the contract, reward, and progress before going back.");
+            } else {
+                setPhoneHeader("Tasks", "");
+            }
             break;
         case "BUY":
             setPhoneHeader("Buy", "");
@@ -6156,6 +6327,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         phoneScreenBody.innerHTML = "";
 
         if (!isSiteActive || !phonePanelOpen) {
+            if (!phonePanelOpen) {
+                selectedPhoneTaskInstanceId = 0;
+            }
             return;
         }
 
@@ -6171,6 +6345,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             phonePanelState && typeof phonePanelState.activeSection === "string"
                 ? phonePanelState.activeSection
                 : "HOME";
+        if (activeSection !== "TASKS") {
+            selectedPhoneTaskInstanceId = 0;
+        }
         const activeTaskCount = phonePanelState && typeof phonePanelState.acceptedTaskCount === "number"
             ? phonePanelState.acceptedTaskCount
             : countTasksByListKind(tasks, "ACCEPTED");
@@ -6186,12 +6363,21 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const serviceListingCount = phonePanelState && typeof phonePanelState.serviceListingCount === "number"
             ? phonePanelState.serviceListingCount
             : specialListings.length;
+        let selectedTask = activeSection === "TASKS" ? getSelectedPhoneTask(tasks) : null;
+        if (activeSection === "TASKS" && selectedPhoneTaskInstanceId !== 0 && !selectedTask) {
+            selectedPhoneTaskInstanceId = 0;
+        }
+        selectedTask = activeSection === "TASKS" ? getSelectedPhoneTask(tasks) : null;
 
-        setPhoneHeaderForSection(activeSection);
+        setPhoneHeaderForSection(activeSection, selectedTask);
 
         switch (activeSection) {
         case "TASKS":
-            appendPhoneTasksPanel(phoneScreenBody, tasks, activeTaskCount, visibleTaskCount);
+            if (selectedTask) {
+                appendPhoneTaskDetailPanel(phoneScreenBody, selectedTask);
+            } else {
+                appendPhoneTasksPanel(phoneScreenBody, tasks, activeTaskCount, visibleTaskCount);
+            }
             break;
         case "BUY":
             appendPhoneBuyPanel(phoneScreenBody, state, buyListings, buyListingCount, cartItemCount);
