@@ -2271,7 +2271,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     function getTrackedSiteTasks(state) {
         return getSiteTasks(state)
             .filter(function (task) {
-                return !!task && task.listKind === "ACCEPTED";
+                return !!task &&
+                    (task.listKind === "ACCEPTED" || task.listKind === "PENDING_CLAIM");
             })
             .sort(function (lhs, rhs) {
                 const priorityDelta = getSiteTaskListPriority(lhs) - getSiteTaskListPriority(rhs);
@@ -3803,7 +3804,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             const taskPresentation = getPhoneTaskTemplatePresentation(task);
             const taskProgress = getTaskProgressPresentation(task);
             const descriptionText = taskPresentation.description || taskPresentation.summary;
-            const isCompleted = task.listKind === "COMPLETED";
+            const isCompleted = task.listKind === "PENDING_CLAIM";
 
             const card = document.createElement("article");
             card.className = "site-task-card" + (isCompleted ? " completed" : "");

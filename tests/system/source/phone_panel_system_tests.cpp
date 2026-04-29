@@ -245,6 +245,45 @@ void phone_panel_sell_list_refreshes_when_purchase_delivery_arrives(
     GS1_SYSTEM_TEST_CHECK(context, quantity_after == quantity_before + 1U);
 }
 
+void phone_panel_task_counts_follow_pending_claim_until_reward_claim(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 1205U);
+    GameMessageQueue queue {};
+    auto phone_context = make_site_context<PhonePanelSystem>(campaign, site_run, queue);
+
+    auto& task = site_run.task_board.visible_tasks.emplace_back();
+    task.task_instance_id = gs1::TaskInstanceId {1U};
+    task.runtime_list_kind = gs1::TaskRuntimeListKind::Accepted;
+    site_run.task_board.accepted_task_ids.push_back(task.task_instance_id);
+
+    const auto start_message =
+        make_message(GameMessageType::SiteRunStarted, SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        PhonePanelSystem::process_message(phone_context, start_message) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.phone_panel.accepted_task_count == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.phone_panel.completed_task_count == 0U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.phone_panel.claimed_task_count == 0U);
+
+    task.runtime_list_kind = gs1::TaskRuntimeListKind::PendingClaim;
+    site_run.task_board.accepted_task_ids.clear();
+    site_run.task_board.completed_task_ids.push_back(task.task_instance_id);
+    PhonePanelSystem::run(phone_context);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.phone_panel.accepted_task_count == 0U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.phone_panel.completed_task_count == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.phone_panel.claimed_task_count == 0U);
+
+    task.runtime_list_kind = gs1::TaskRuntimeListKind::Claimed;
+    site_run.task_board.completed_task_ids.clear();
+    site_run.task_board.claimed_task_ids.push_back(task.task_instance_id);
+    PhonePanelSystem::run(phone_context);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.phone_panel.accepted_task_count == 0U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.phone_panel.completed_task_count == 0U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.phone_panel.claimed_task_count == 1U);
+}
+
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "phone_panel",
     "site_run_started_seeds_home_snapshot",
@@ -261,4 +300,8 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "phone_panel",
     "sell_list_refreshes_when_purchase_delivery_arrives",
     phone_panel_sell_list_refreshes_when_purchase_delivery_arrives);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "phone_panel",
+    "task_counts_follow_pending_claim_until_reward_claim",
+    phone_panel_task_counts_follow_pending_claim_until_reward_claim);
 }  // namespace
