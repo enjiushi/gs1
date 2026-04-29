@@ -1,12 +1,4 @@
 [[reputation_unlocks]]
-unlock_id = 5007
-unlock_kind = "Recipe"
-reputation_requirement = 40
-content_id = 8
-display_name = "Shovel"
-description = "Unlocks the Shovel crafting recipe for portable field work support."
-
-[[reputation_unlocks]]
 unlock_id = 5001
 unlock_kind = "Plant"
 reputation_requirement = 240

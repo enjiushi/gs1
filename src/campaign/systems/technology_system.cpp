@@ -28,6 +28,7 @@ const FactionProgressState* find_faction_progress(
     {
     case k_recipe_cook_food_pack:
     case k_recipe_cook_ephedra_stew:
+    case k_recipe_craft_shovel:
         return true;
     default:
         return false;

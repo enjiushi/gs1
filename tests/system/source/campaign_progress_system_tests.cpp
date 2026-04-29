@@ -8,6 +8,7 @@
 #include "content/defs/craft_recipe_defs.h"
 #include "content/defs/faction_defs.h"
 #include "content/defs/item_defs.h"
+#include "content/defs/task_defs.h"
 #include "content/defs/technology_defs.h"
 #include "messages/game_message.h"
 #include "runtime/runtime_clock.h"
@@ -1105,10 +1106,16 @@ void technology_reputation_unlocks_gate_village_recipes_items_and_structure_buil
         !TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_field_tea}));
     GS1_SYSTEM_TEST_CHECK(
         context,
-        !TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_craft_shovel}));
+        TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_craft_shovel}));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::craft_output_unlocked(campaign, gs1::ItemId {gs1::k_item_shovel}));
     GS1_SYSTEM_TEST_CHECK(
         context,
         TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_craft_camp_stove}));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::structure_recipe_unlocked(campaign, gs1::StructureId {gs1::k_structure_camp_stove}));
     GS1_SYSTEM_TEST_CHECK(
         context,
         !TechnologySystem::item_unlocked(campaign, gs1::ItemId {gs1::k_item_focus_tonic}));
@@ -1117,18 +1124,6 @@ void technology_reputation_unlocks_gate_village_recipes_items_and_structure_buil
     GS1_SYSTEM_TEST_CHECK(
         context,
         TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_field_tea}));
-
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        TechnologySystem::structure_recipe_unlocked(campaign, gs1::StructureId {gs1::k_structure_camp_stove}));
-
-    campaign.technology_state.total_reputation = 40;
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_craft_shovel}));
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        TechnologySystem::craft_output_unlocked(campaign, gs1::ItemId {gs1::k_item_shovel}));
 
     campaign.technology_state.total_reputation = 2240;
     GS1_SYSTEM_TEST_CHECK(
@@ -1144,6 +1139,29 @@ void technology_reputation_unlocks_gate_village_recipes_items_and_structure_buil
     GS1_SYSTEM_TEST_CHECK(
         context,
         TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_rich_desert_revival_draught}));
+}
+
+void technology_site_one_onboarding_recipe_references_are_initially_unlocked(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    const auto campaign = make_campaign();
+    bool found_site_one_recipe_reference = false;
+
+    for (const auto& onboarding_seed : gs1::all_site_onboarding_task_seed_defs())
+    {
+        if (onboarding_seed.site_id != SiteId {1U} ||
+            onboarding_seed.recipe_id.value == 0U)
+        {
+            continue;
+        }
+
+        found_site_one_recipe_reference = true;
+        GS1_SYSTEM_TEST_CHECK(
+            context,
+            TechnologySystem::recipe_unlocked(campaign, onboarding_seed.recipe_id));
+    }
+
+    GS1_SYSTEM_TEST_CHECK(context, found_site_one_recipe_reference);
 }
 
 void regional_support_placeholder_test_plan_is_recorded(gs1::testing::SystemTestExecutionContext& context)
@@ -1269,6 +1287,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "technology",
     "reputation_unlocks_gate_village_recipes_items_and_structure_builds",
     technology_reputation_unlocks_gate_village_recipes_items_and_structure_builds);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "technology",
+    "site_one_onboarding_recipe_references_are_initially_unlocked",
+    technology_site_one_onboarding_recipe_references_are_initially_unlocked);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "regional_support",
     "placeholder_test_plan_is_recorded",
