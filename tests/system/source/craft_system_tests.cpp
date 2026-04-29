@@ -41,6 +41,11 @@ GameMessage make_message(gs1::GameMessageType type, const Payload& payload)
     return message;
 }
 
+constexpr std::int32_t reputation_for_progress_tier(std::uint32_t tier_index) noexcept
+{
+    return static_cast<std::int32_t>(tier_index) * 200;
+}
+
 void action_execution_build_completion_consumes_deployable_and_emits_device_placement(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -181,7 +186,7 @@ void inventory_craft_commit_crafts_hammer_from_wood_and_iron(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
-    campaign.technology_state.total_reputation = 1440;
+    campaign.technology_state.total_reputation = reputation_for_progress_tier(7U);
     auto site_run = make_test_site_run(1U, 1507U);
     GameMessageQueue queue {};
     auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);

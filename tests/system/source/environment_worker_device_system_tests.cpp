@@ -53,6 +53,11 @@ GameMessage make_message(gs1::GameMessageType type, const Payload& payload)
     return message;
 }
 
+constexpr std::int32_t reputation_for_progress_tier(std::uint32_t tier_index) noexcept
+{
+    return static_cast<std::int32_t>(tier_index) * 200;
+}
+
 const gs1::ActiveSiteModifierState* find_active_run_modifier(
     const gs1::SiteRunState& site_run,
     gs1::ModifierId modifier_id)
@@ -133,11 +138,11 @@ void prototype_site_run_expands_worker_pack_with_village_pack_techs(
     auto base_site_run = make_prototype_site_run(campaign, 1U);
     GS1_SYSTEM_TEST_CHECK(context, base_site_run.inventory.worker_pack_slot_count == 8U);
 
-    campaign.faction_progress[0].faction_reputation = 21;
+    campaign.faction_progress[0].faction_reputation = reputation_for_progress_tier(21U);
     auto first_pack_site_run = make_prototype_site_run(campaign, 1U);
     GS1_SYSTEM_TEST_CHECK(context, first_pack_site_run.inventory.worker_pack_slot_count == 10U);
 
-    campaign.faction_progress[0].faction_reputation = 22;
+    campaign.faction_progress[0].faction_reputation = reputation_for_progress_tier(22U);
     auto second_pack_site_run = make_prototype_site_run(campaign, 1U);
     GS1_SYSTEM_TEST_CHECK(context, second_pack_site_run.inventory.worker_pack_slot_count == 12U);
 }
@@ -1506,7 +1511,7 @@ void modifier_imports_campaign_assistant_and_scales_technology_run_modifiers_wit
     auto campaign = make_campaign();
     campaign.faction_progress[0].has_unlocked_assistant_package = true;
     campaign.faction_progress[0].unlocked_assistant_package_id = 1001U;
-    campaign.faction_progress[2].faction_reputation = 10;
+    campaign.faction_progress[2].faction_reputation = reputation_for_progress_tier(1U) + 20;
     auto site_run = make_test_site_run(1U, 1602U);
     GameMessageQueue queue {};
     auto site_context = make_site_context<ModifierSystem>(campaign, site_run, queue);
@@ -1530,7 +1535,7 @@ void modifier_imports_campaign_assistant_and_scales_technology_run_modifiers_wit
     const auto initial_hydration = site_run.modifier.resolved_channel_totals.hydration;
     const auto initial_work_efficiency = site_run.modifier.resolved_channel_totals.work_efficiency;
 
-    campaign.faction_progress[2].faction_reputation = 20;
+    campaign.faction_progress[2].faction_reputation = reputation_for_progress_tier(1U) + 40;
     ModifierSystem::run(site_context);
 
     GS1_SYSTEM_TEST_CHECK(context, site_run.modifier.resolved_channel_totals.hydration > initial_hydration);

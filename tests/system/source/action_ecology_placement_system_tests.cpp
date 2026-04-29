@@ -62,6 +62,11 @@ GameMessage make_message(gs1::GameMessageType type, const Payload& payload)
     return message;
 }
 
+constexpr std::int32_t reputation_for_progress_tier(std::uint32_t tier_index) noexcept
+{
+    return static_cast<std::int32_t>(tier_index) * 200;
+}
+
 GameMessage make_start_action_message(
     Gs1SiteActionKind action_kind,
     TileCoord target_tile,
@@ -1431,7 +1436,7 @@ void action_execution_shovel_in_worker_pack_reduces_plant_and_excavate_duration_
     const auto baseline_plant_cost = baseline_site_run.site_action.deferred_meter_delta;
 
     auto boosted_campaign = make_campaign();
-    boosted_campaign.faction_progress[0].faction_reputation = 11;
+    boosted_campaign.faction_progress[0].faction_reputation = reputation_for_progress_tier(11U);
     auto boosted_site_run = make_test_site_run(1U, 5202U);
     GameMessageQueue boosted_queue {};
     auto boosted_context =
@@ -1611,7 +1616,7 @@ void action_execution_village_tech_unlocks_careful_and_thorough_excavation(
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::SiteActionFailed);
 
-    campaign.faction_progress[0].faction_reputation = 12;
+    campaign.faction_progress[0].faction_reputation = reputation_for_progress_tier(12U);
     queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -1635,7 +1640,7 @@ void action_execution_village_tech_unlocks_careful_and_thorough_excavation(
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::SiteActionFailed);
 
-    campaign.faction_progress[0].faction_reputation = 30;
+    campaign.faction_progress[0].faction_reputation = reputation_for_progress_tier(30U);
     queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(
         context,

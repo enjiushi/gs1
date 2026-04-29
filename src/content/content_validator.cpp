@@ -13,6 +13,7 @@ namespace
 {
 inline constexpr float k_starter_plant_pool = 90.0f;
 inline constexpr float k_unlock_step_plant_pool = 10.0f;
+inline constexpr std::int32_t k_progression_reputation_step = 200;
 
 [[nodiscard]] bool is_power_of_two(std::uint8_t value) noexcept
 {
@@ -44,6 +45,16 @@ inline constexpr float k_unlock_step_plant_pool = 10.0f;
 [[nodiscard]] float max_output_power_for_item_value(std::uint32_t internal_cash_points) noexcept
 {
     return static_cast<float>(internal_cash_points) / 9.0f;
+}
+
+[[nodiscard]] std::int32_t expected_progression_reputation_requirement(std::size_t zero_based_index) noexcept
+{
+    return static_cast<std::int32_t>(zero_based_index + 1U) * k_progression_reputation_step;
+}
+
+[[nodiscard]] std::int32_t expected_faction_tech_reputation_requirement(std::uint8_t tier_index) noexcept
+{
+    return static_cast<std::int32_t>(tier_index) * k_progression_reputation_step;
 }
 
 [[nodiscard]] bool item_has_player_meter_valuation(const ItemDef& item_def) noexcept
@@ -1329,6 +1340,28 @@ std::vector<ContentValidationIssue> validate_content_database(
 
     if (issues.empty())
     {
+        std::vector<std::int32_t> sorted_requirements {};
+        sorted_requirements.reserve(content.reputation_unlock_defs.size());
+        for (const auto& unlock_def : content.reputation_unlock_defs)
+        {
+            sorted_requirements.push_back(unlock_def.reputation_requirement);
+        }
+
+        std::sort(sorted_requirements.begin(), sorted_requirements.end());
+        for (std::size_t index = 0U; index < sorted_requirements.size(); ++index)
+        {
+            if (sorted_requirements[index] != expected_progression_reputation_requirement(index))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Reputation unlock definitions must form a one-by-one total-reputation ladder stepping by 200 starting at 200."});
+                break;
+            }
+        }
+    }
+
+    if (issues.empty())
+    {
         for (std::size_t index = 0U; index < content.technology_node_defs.size(); ++index)
         {
             const auto& node_def = content.technology_node_defs[index];
@@ -1365,13 +1398,14 @@ std::vector<ContentValidationIssue> validate_content_database(
                 break;
             }
 
-            if (node_def.reputation_requirement != static_cast<std::int32_t>(node_def.tier_index) ||
+            if (node_def.reputation_requirement != expected_faction_tech_reputation_requirement(node_def.tier_index) ||
                 node_def.reputation_requirement <= 0 ||
-                node_def.reputation_requirement > k_faction_tech_tier_count)
+                node_def.reputation_requirement >
+                    expected_faction_tech_reputation_requirement(k_faction_tech_tier_count))
             {
                 issues.push_back(ContentValidationIssue {
                     ContentValidationSeverity::Error,
-                    "Technology nodes must form a linear faction-reputation ladder where each tier requires exactly its own tier index inside the 1-32 band."});
+                    "Technology nodes must form a linear faction-reputation ladder where each tier requires exactly 200 reputation times its tier index inside the 1-32 band."});
                 break;
             }
 

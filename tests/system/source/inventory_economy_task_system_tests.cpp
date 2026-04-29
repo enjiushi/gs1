@@ -56,6 +56,11 @@ GameMessage make_message(gs1::GameMessageType type, const Payload& payload)
     return message;
 }
 
+constexpr std::int32_t reputation_for_progress_tier(std::uint32_t tier_index) noexcept
+{
+    return static_cast<std::int32_t>(tier_index) * 200;
+}
+
 std::uint32_t count_active_timed_buffs(const gs1::SiteRunState& site_run)
 {
     return static_cast<std::uint32_t>(std::count_if(
@@ -1199,7 +1204,7 @@ void village_tier_seven_tech_expands_timed_buff_cap(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
-    campaign.faction_progress[0].faction_reputation = 27;
+    campaign.faction_progress[0].faction_reputation = reputation_for_progress_tier(27U);
     auto site_run = make_test_site_run(1U, 814U);
     GameMessageQueue queue {};
     auto modifier_context = make_site_context<ModifierSystem>(campaign, site_run, queue);
