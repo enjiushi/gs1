@@ -47,6 +47,17 @@ const PlantHarvestOutputDef* find_seed_harvest_output_def_for_item_id(ItemId ite
 
     return nullptr;
 }
+
+const PlantDef* find_plant_def_for_derived_harvest_item(const ItemDef& item_def) noexcept
+{
+    if (item_def.source_rule != ItemSourceRule::HarvestOnly ||
+        item_def.linked_plant_id.value == 0U)
+    {
+        return nullptr;
+    }
+
+    return find_plant_def(item_def.linked_plant_id);
+}
 }  // namespace
 
 const GameplayTuningDef& gameplay_tuning_def() noexcept
@@ -135,6 +146,13 @@ std::uint32_t item_internal_price_cash_points(ItemId item_id) noexcept
         item_def->morale_delta);
     if (derived_cash_points == 0U)
     {
+        if (const auto* plant_def = find_plant_def_for_derived_harvest_item(*item_def))
+        {
+            return derive_plant_harvest_item_internal_cash_points(
+                gameplay_tuning_def().plant_harvest,
+                *plant_def);
+        }
+
         if (const auto* seed_output_def = find_seed_harvest_output_def_for_item_id(item_id))
         {
             if (const auto* plant_def = find_plant_def(seed_output_def->plant_id))

@@ -183,7 +183,8 @@ std::uint64_t harvest_roll_seed(
     RuntimeActionId action_id,
     TileCoord target_tile,
     PlantId plant_id,
-    std::size_t output_index) noexcept
+    std::size_t output_index,
+    std::uint32_t salt = 0U) noexcept
 {
     std::uint64_t seed = site_attempt_seed;
     seed ^= static_cast<std::uint64_t>(action_id.value) * 0x9e3779b97f4a7c15ULL;
@@ -191,6 +192,7 @@ std::uint64_t harvest_roll_seed(
     seed ^= static_cast<std::uint64_t>(static_cast<std::uint32_t>(target_tile.x)) << 32U;
     seed ^= static_cast<std::uint64_t>(static_cast<std::uint32_t>(target_tile.y));
     seed ^= static_cast<std::uint64_t>(output_index + 1U) * 0x94d049bb133111ebULL;
+    seed ^= static_cast<std::uint64_t>(salt + 1U) * 0xd6e8feb86659fd93ULL;
     return seed;
 }
 
@@ -293,9 +295,37 @@ double harvest_output_cash_points(ItemId item_id, std::uint16_t quantity) noexce
         static_cast<double>(quantity);
 }
 
+std::uint32_t harvest_output_budget_cash_points(
+    const PlantDef& plant_def,
+    const PlantHarvestOutputDef& harvest_output_def,
+    std::uint32_t remaining_dedicated_cash_points,
+    float output_cash_point_multiplier) noexcept
+{
+    switch (harvest_output_def.output_kind)
+    {
+    case PlantHarvestOutputKind::Dedicated:
+        return remaining_dedicated_cash_points;
+    case PlantHarvestOutputKind::Basic:
+    case PlantHarvestOutputKind::Seed:
+        return 0U;
+    case PlantHarvestOutputKind::Bonus:
+    default:
+        return derive_plant_harvest_output_cash_point_budget(
+            gameplay_tuning_def().plant_harvest,
+            plant_def,
+            output_cash_point_multiplier);
+    }
+}
+
+bool harvest_output_uses_authored_quantity(PlantHarvestOutputKind output_kind) noexcept
+{
+    return output_kind == PlantHarvestOutputKind::Basic ||
+        output_kind == PlantHarvestOutputKind::Seed;
+}
+
 float resolve_harvest_output_chance_percent(
     const PlantHarvestOutputDef& harvest_output_def,
-    double remaining_expected_cash_points) noexcept
+    std::uint32_t available_cash_points) noexcept
 {
     switch (harvest_output_def.chance_mode)
     {
@@ -315,7 +345,7 @@ float resolve_harvest_output_chance_percent(
         const double resolved_percent =
             std::min(
                 static_cast<double>(std::clamp(harvest_output_def.max_chance_percent, 0.0f, 100.0f)),
-                (remaining_expected_cash_points / output_cash_points) * 100.0);
+                (static_cast<double>(available_cash_points) / output_cash_points) * 100.0);
         return static_cast<float>(std::clamp(resolved_percent, 0.0, 100.0));
     }
     default:
@@ -323,12 +353,79 @@ float resolve_harvest_output_chance_percent(
     }
 }
 
-double expected_harvest_output_cash_points(
-    const PlantHarvestOutputDef& harvest_output_def,
-    float chance_percent) noexcept
+std::uint16_t resolve_budgeted_harvest_output_quantity(
+    ItemId item_id,
+    std::uint32_t available_cash_points,
+    std::uint64_t roll_seed) noexcept
 {
-    return harvest_output_cash_points(harvest_output_def.item_id, harvest_output_def.quantity) *
-        (static_cast<double>(chance_percent) * 0.01);
+    const std::uint32_t item_cash_points = item_internal_price_cash_points(item_id);
+    if (available_cash_points == 0U || item_cash_points == 0U)
+    {
+        return 0U;
+    }
+
+    const double raw_quantity =
+        static_cast<double>(available_cash_points) / static_cast<double>(item_cash_points);
+    std::uint32_t quantity = static_cast<std::uint32_t>(std::floor(raw_quantity));
+    const double fractional_quantity = raw_quantity - static_cast<double>(quantity);
+    if (fractional_quantity > 0.000001 &&
+        percent_from_seed(roll_seed) < static_cast<float>(fractional_quantity * 100.0))
+    {
+        quantity += 1U;
+    }
+
+    return static_cast<std::uint16_t>(std::min<std::uint32_t>(quantity, 65535U));
+}
+
+std::uint16_t resolve_harvest_output_quantity(
+    const PlantHarvestOutputDef& harvest_output_def,
+    std::uint32_t available_cash_points,
+    std::uint64_t roll_seed) noexcept
+{
+    if (harvest_output_uses_authored_quantity(harvest_output_def.output_kind))
+    {
+        return harvest_output_def.quantity;
+    }
+
+    return resolve_budgeted_harvest_output_quantity(
+        harvest_output_def.item_id,
+        available_cash_points,
+        roll_seed);
+}
+
+void append_resolved_harvest_output(
+    std::vector<ResolvedHarvestOutputStack>& resolved_outputs,
+    ItemId item_id,
+    std::uint16_t quantity) noexcept
+{
+    if (quantity == 0U)
+    {
+        return;
+    }
+
+    const auto it = std::find_if(
+        resolved_outputs.begin(),
+        resolved_outputs.end(),
+        [&](const ResolvedHarvestOutputStack& resolved_output) {
+            return resolved_output.item_id == item_id.value;
+        });
+    if (it == resolved_outputs.end())
+    {
+        resolved_outputs.push_back(ResolvedHarvestOutputStack {
+            item_id.value,
+            quantity,
+            {0U, 0U}});
+        return;
+    }
+
+    const std::uint32_t merged_quantity =
+        static_cast<std::uint32_t>(it->quantity) + static_cast<std::uint32_t>(quantity);
+    it->quantity = static_cast<std::uint16_t>(std::min<std::uint32_t>(merged_quantity, 65535U));
+}
+
+bool harvest_output_uses_dedicated_budget(PlantHarvestOutputKind output_kind) noexcept
+{
+    return output_kind == PlantHarvestOutputKind::Dedicated;
 }
 
 std::uint32_t harvest_summary_item_id(
@@ -394,11 +491,11 @@ std::vector<ResolvedHarvestOutputStack> resolve_harvest_outputs(
 
     const auto output_cash_point_multiplier =
         resolved_harvest_output_cash_point_multiplier(context.world.read_modifier());
-    double remaining_expected_cash_points = static_cast<double>(
+    std::uint32_t remaining_dedicated_cash_points =
         derive_plant_harvest_output_cash_point_budget(
             gameplay_tuning_def().plant_harvest,
             plant_def,
-            output_cash_point_multiplier));
+            output_cash_point_multiplier);
     const auto harvest_outputs = plant_harvest_output_defs(plant_def);
     resolved_outputs.reserve(harvest_outputs.size());
     for (std::size_t harvest_output_index = 0U;
@@ -406,14 +503,16 @@ std::vector<ResolvedHarvestOutputStack> resolve_harvest_outputs(
          ++harvest_output_index)
     {
         const auto& harvest_output_def = harvest_outputs[harvest_output_index];
+        const std::uint32_t available_cash_points =
+            harvest_output_budget_cash_points(
+                plant_def,
+                harvest_output_def,
+                remaining_dedicated_cash_points,
+                output_cash_point_multiplier);
         const float chance_percent =
             resolve_harvest_output_chance_percent(
                 harvest_output_def,
-                remaining_expected_cash_points);
-        remaining_expected_cash_points = std::max(
-            0.0,
-            remaining_expected_cash_points -
-                expected_harvest_output_cash_points(harvest_output_def, chance_percent));
+                available_cash_points);
         if (chance_percent <= 0.0f)
         {
             continue;
@@ -427,16 +526,39 @@ std::vector<ResolvedHarvestOutputStack> resolve_harvest_outputs(
                     action_id,
                     target_tile,
                     plant_def.plant_id,
-                    harvest_output_index)) < chance_percent;
+                    harvest_output_index,
+                    0U)) < chance_percent;
         if (!should_award)
         {
             continue;
         }
 
-        resolved_outputs.push_back(ResolvedHarvestOutputStack {
-            harvest_output_def.item_id.value,
-            harvest_output_def.quantity,
-            {0U, 0U}});
+        const std::uint16_t resolved_quantity =
+            resolve_harvest_output_quantity(
+                harvest_output_def,
+                available_cash_points,
+                harvest_roll_seed(
+                    context.world.site_attempt_seed(),
+                    action_id,
+                    target_tile,
+                    plant_def.plant_id,
+                    harvest_output_index,
+                    1U));
+        append_resolved_harvest_output(
+            resolved_outputs,
+            harvest_output_def.item_id,
+            resolved_quantity);
+
+        if (harvest_output_uses_dedicated_budget(harvest_output_def.output_kind))
+        {
+            const std::uint32_t consumed_cash_points =
+                item_internal_price_cash_points(harvest_output_def.item_id) *
+                static_cast<std::uint32_t>(resolved_quantity);
+            remaining_dedicated_cash_points =
+                consumed_cash_points >= remaining_dedicated_cash_points
+                ? 0U
+                : remaining_dedicated_cash_points - consumed_cash_points;
+        }
     }
 
     return resolved_outputs;

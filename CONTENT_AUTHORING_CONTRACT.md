@@ -436,7 +436,7 @@ Required fields in addition to the existing plant ecology fields:
 | `windResistance` | number `0-100` | Wind resistance and outward wind-shelter source. |
 | `dustTolerance` | number `0-100` | Dust resistance and outward dust-shelter source. |
 | `fertilityImprovePower` | number `0-100` | Plant-side fertility support meter. |
-| `outputPower` | number `0-100` | Plant-side output share of the authored roster pool; should stay aligned with the linked harvest item's internal cash-point value. |
+| `outputPower` | number `0-100` | Plant-side output share of the authored roster pool; runtime converts it into dedicated harvest budget cash points separately from the plant-pool-derived harvest-item and seed values. |
 | `plantActionDurationMinutes` | positive number | Per-seed planting duration used when a `Plant` site action starts from an inventory seed item linked to this plant. |
 
 Rules:
@@ -450,7 +450,10 @@ Rules:
 - `Support` plants must keep `protectionRatio = 0` and `windProtectionRange = 0`
 - `Output` and `Self` plants must keep `auraSize = 0`, `windProtectionRange = 0`, and `protectionRatio = 0`
 - plants without harvest output must keep `outputPower = 0`
-- plants with harvest output must use positive `outputPower` and keep it within the allowed band for the linked harvest item's internal cash-point value
+- plants with harvest output must use positive `outputPower`
+- plant-linked `HarvestOnly` goods should omit authored `internal_price_cash_points`; runtime derives their internal value from total plant meter pool using the shared harvest-item conversion rate
+- plant seed items should omit authored `internal_price_cash_points`; runtime derives their internal value from total plant meter pool using the shared seed conversion rate
+- dedicated harvest quantity should resolve from `outputPower` budget cash points divided by the linked harvest item's derived internal cash-point value
 - `plantActionDurationMinutes` must be positive
 - item-based planting must resolve its action duration from the linked plant row, not from a hardcoded per-item switch
 - adapter progress bars should treat this authored value as total action duration and animate locally after the start message arrives

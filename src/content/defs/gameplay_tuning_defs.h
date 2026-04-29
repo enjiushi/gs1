@@ -54,10 +54,9 @@ struct PlayerMeterCashPointTuning final
 
 struct PlantHarvestTuning final
 {
-    float output_cash_points_per_power {125.0f};
-    float seed_cash_points_per_pool_point {4.0f};
-    float seed_cash_points_base {50.0f};
-    float seed_cash_points_rounding_step {50.0f};
+    float output_cash_points_per_power {25.0f};
+    float harvest_item_cash_points_per_pool_point {1.0f};
+    float seed_cash_points_per_pool_point {2.0f};
 };
 
 struct EcologyTuning final
@@ -151,19 +150,23 @@ struct GameplayTuningDef final
     const PlantDef& plant_def) noexcept
 {
     const double raw_cash_points =
-        static_cast<double>(tuning.seed_cash_points_base) +
         static_cast<double>(plant_total_meter_pool(plant_def)) *
             static_cast<double>(tuning.seed_cash_points_per_pool_point);
-    const double rounded_cash_points =
-        tuning.seed_cash_points_rounding_step <= 0.0f
-        ? raw_cash_points
-        : std::round(
-            raw_cash_points /
-                static_cast<double>(tuning.seed_cash_points_rounding_step)) *
-            static_cast<double>(tuning.seed_cash_points_rounding_step);
-    return rounded_cash_points <= 0.0
+    return raw_cash_points <= 0.0
         ? 0U
-        : static_cast<std::uint32_t>(std::lround(rounded_cash_points));
+        : static_cast<std::uint32_t>(std::lround(raw_cash_points));
+}
+
+[[nodiscard]] inline std::uint32_t derive_plant_harvest_item_internal_cash_points(
+    const PlantHarvestTuning& tuning,
+    const PlantDef& plant_def) noexcept
+{
+    const double raw_cash_points =
+        static_cast<double>(plant_total_meter_pool(plant_def)) *
+        static_cast<double>(tuning.harvest_item_cash_points_per_pool_point);
+    return raw_cash_points <= 0.0
+        ? 0U
+        : static_cast<std::uint32_t>(std::lround(raw_cash_points));
 }
 
 [[nodiscard]] inline std::uint32_t derive_plant_harvest_output_cash_point_budget(

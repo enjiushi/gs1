@@ -1783,12 +1783,10 @@ void load_gameplay_tuning_def(ContentDatabase& content, const std::filesystem::p
     const auto& plant_harvest = require_toml_table(path, document, "plant_harvest");
     tuning.plant_harvest.output_cash_points_per_power =
         require_toml_float(path, plant_harvest, "output_cash_points_per_power");
+    tuning.plant_harvest.harvest_item_cash_points_per_pool_point =
+        require_toml_float(path, plant_harvest, "harvest_item_cash_points_per_pool_point");
     tuning.plant_harvest.seed_cash_points_per_pool_point =
         require_toml_float(path, plant_harvest, "seed_cash_points_per_pool_point");
-    tuning.plant_harvest.seed_cash_points_base =
-        require_toml_float(path, plant_harvest, "seed_cash_points_base");
-    tuning.plant_harvest.seed_cash_points_rounding_step =
-        require_toml_float(path, plant_harvest, "seed_cash_points_rounding_step");
 
     const auto& ecology = require_toml_table(path, document, "ecology");
     tuning.ecology.moisture_gain_per_water_unit =
