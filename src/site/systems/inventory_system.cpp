@@ -857,6 +857,10 @@ Gs1Status handle_inventory_craft_commit(
             structure_def->storage_slot_count);
         const auto source_containers =
             craft_logic::collect_nearby_source_containers(context.site_run, target_tile);
+        const auto nearby_item_instance_ids =
+            inventory_storage::collect_item_instance_ids_in_containers(
+                context.site_run,
+                source_containers);
         if (!craft_logic::can_store_output_after_recipe_consumption(
                 context.site_run,
                 output_container,
@@ -865,16 +869,12 @@ Gs1Status handle_inventory_craft_commit(
         {
             return GS1_STATUS_INVALID_STATE;
         }
-        for (std::uint8_t index = 0U; index < recipe_def->ingredient_count; ++index)
+        if (!craft_logic::can_satisfy_recipe_requirements(
+                context.site_run,
+                nearby_item_instance_ids,
+                *recipe_def))
         {
-            const auto& ingredient = recipe_def->ingredients[index];
-            if (inventory_storage::available_item_quantity_in_containers(
-                    context.site_run,
-                    source_containers,
-                    ingredient.item_id) < ingredient.quantity)
-            {
-                return GS1_STATUS_INVALID_STATE;
-            }
+            return GS1_STATUS_INVALID_STATE;
         }
 
         for (std::uint8_t index = 0U; index < recipe_def->ingredient_count; ++index)

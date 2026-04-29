@@ -390,6 +390,11 @@ void action_execution_craft_uses_recipe_authored_duration_and_cost(
         gs1::inventory_storage::worker_pack_container(site_run),
         gs1::ItemId {gs1::k_item_iron_bundle},
         3U);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        gs1::inventory_storage::worker_pack_container(site_run),
+        gs1::ItemId {gs1::k_item_hammer},
+        1U);
 
     const auto workbench_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);
     GS1_SYSTEM_TEST_REQUIRE(

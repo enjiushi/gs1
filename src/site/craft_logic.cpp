@@ -1,6 +1,7 @@
 #include "site/craft_logic.h"
 
 #include "campaign/systems/technology_system.h"
+#include "content/defs/item_defs.h"
 #include "site/inventory_storage.h"
 #include "site/site_world_access.h"
 
@@ -9,6 +10,20 @@
 
 namespace gs1::craft_logic
 {
+namespace
+{
+bool item_is_hammer_gated_tool(ItemId item_id) noexcept
+{
+    switch (item_id.value)
+    {
+    case k_item_shovel:
+        return true;
+    default:
+        return false;
+    }
+}
+}  // namespace
+
 bool tile_in_craft_range(TileCoord source, TileCoord target) noexcept
 {
     return std::abs(target.x - source.x) <= k_craft_cache_radius_tiles &&
@@ -136,6 +151,23 @@ std::uint32_t available_cached_item_quantity(
     return total;
 }
 
+bool recipe_requires_hammer(const CraftRecipeDef& recipe_def) noexcept
+{
+    const auto* output_item_def = find_item_def(recipe_def.output_item_id);
+    if (output_item_def == nullptr || output_item_def->item_id.value == k_item_hammer)
+    {
+        return false;
+    }
+
+    if (item_has_capability(*output_item_def, ITEM_CAPABILITY_DEPLOY) &&
+        output_item_def->linked_structure_id.value != 0U)
+    {
+        return true;
+    }
+
+    return item_is_hammer_gated_tool(output_item_def->item_id);
+}
+
 bool can_satisfy_recipe_ingredients(
     SiteRunState& site_run,
     const std::vector<std::uint32_t>& item_instance_ids,
@@ -152,6 +184,23 @@ bool can_satisfy_recipe_ingredients(
     }
 
     return true;
+}
+
+bool can_satisfy_recipe_requirements(
+    SiteRunState& site_run,
+    const std::vector<std::uint32_t>& item_instance_ids,
+    const CraftRecipeDef& recipe_def) noexcept
+{
+    if (!can_satisfy_recipe_ingredients(site_run, item_instance_ids, recipe_def))
+    {
+        return false;
+    }
+
+    return !recipe_requires_hammer(recipe_def) ||
+        available_cached_item_quantity(
+            site_run,
+            item_instance_ids,
+            ItemId {k_item_hammer}) > 0U;
 }
 
 bool can_store_output_after_recipe_consumption(

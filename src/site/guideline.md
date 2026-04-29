@@ -10,8 +10,8 @@ Site-owned state, ECS world support, and helper logic for active site gameplay.
 ## Contents
 - `action_state.h`: Site action queue/state owned by action execution flows, including deferred-placement mode tracking, deferred worker-meter-cost snapshots captured at action start and applied on completion, harvest plus excavate action state, resolved multi-item harvest outputs locked at action start, and follow-up plant-mode reactivation after successful item-based planting when inventory remains.
 - `contractor_state.h`: Contractor/worker assignment state for the site run.
-- `craft_logic.h`: Shared crafting rules/helper declarations used by craft-related systems, now including campaign-aware recipe filtering.
-- `craft_logic.cpp`: Shared crafting rules/helper implementation kept out of headers to reduce rebuild fan-out, including technology-gated recipe availability for Village-exclusive crafting content.
+- `craft_logic.h`: Shared crafting rules/helper declarations used by craft-related systems, now including campaign-aware recipe filtering plus hammer-gated device/tool crafting checks.
+- `craft_logic.cpp`: Shared crafting rules/helper implementation kept out of headers to reduce rebuild fan-out, including technology-gated recipe availability for Village-exclusive crafting content plus shared hammer prerequisite checks for device/tool craft outputs.
 - `craft_state.h`: Crafting queue/progress state for the active site, including cached nearby-item snapshots for crafting stations plus the last inventory/worker inputs used to refresh them.
 - `defs/`: Site-specific authored definition helpers, including harvest-capable site action metadata access.
 - `device_weather_contribution_state.h`: Device weather-contribution runtime state, including retained dirty-target tracking plus cached wind-direction sector invalidation.

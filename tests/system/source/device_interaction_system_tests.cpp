@@ -291,6 +291,11 @@ void craft_action_waits_for_worker_to_reach_device_range_before_starting(
         workbench_storage,
         gs1::ItemId {gs1::k_item_iron_bundle},
         3U);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        workbench_storage,
+        gs1::ItemId {gs1::k_item_hammer},
+        1U);
 
     queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(

@@ -6260,8 +6260,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         case 102:
             return {
                 title: "Craft a Storage Crate",
-                summary: "Use the starter workbench to craft 1 Storage Crate Kit.",
-                description: "Use the starter workbench and craft 1 Storage Crate Kit so the site can start expanding storage.",
+                summary: "Use the starter workbench and the new hammer to craft 1 Storage Crate Kit.",
+                description: "Use the starter workbench with the newly crafted hammer nearby and craft 1 Storage Crate Kit so the site can start expanding storage.",
                 rewards: ["$8.00", "+10 total reputation"]
             };
         case 103:
@@ -6281,8 +6281,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         case 105:
             return {
                 title: "Craft a Shovel",
-                summary: "The first unlock just landed. Craft 1 Shovel at the workbench.",
-                description: "Use the newly unlocked recipe and craft 1 Shovel at the workbench to expand what the worker can do.",
+                summary: "The first unlock just landed. Craft 1 Shovel at the workbench with the hammer ready.",
+                description: "Use the newly unlocked recipe and craft 1 Shovel at the workbench while the hammer is available nearby to expand what the worker can do.",
                 rewards: ["8 Basic Straw Checkerboards", "+10 total reputation"]
             };
         case 106:
@@ -6295,8 +6295,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         case 107:
             return {
                 title: "Craft a Cook Plot",
-                summary: "Craft 1 Camp Stove Kit at the workbench.",
-                description: "Craft 1 Camp Stove Kit at the workbench to unlock the next camp food step.",
+                summary: "Craft 1 Camp Stove Kit at the workbench with the hammer ready.",
+                description: "Craft 1 Camp Stove Kit at the workbench while the hammer is available nearby to unlock the next camp food step.",
                 rewards: ["+10 total reputation"]
             };
         case 108:
@@ -6319,6 +6319,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 summary: "Cook 1 Ephedra Stew from harvested Desert Ephedra Sprigs.",
                 description: "Use harvested Desert Ephedra Sprigs to cook 1 Ephedra Stew and complete the first meal contract.",
                 rewards: ["2 Desert Ephedra Seeds", "+10 total reputation"]
+            };
+        case 111:
+            return {
+                title: "Craft a Hammer",
+                summary: "Use the starter workbench to craft 1 Hammer before the heavier camp work begins.",
+                description: "Craft 1 Hammer at the starter workbench so the camp can move on to tool crafting, repair work, and device assembly.",
+                rewards: ["2 Wood", "1 Iron", "+10 total reputation"]
             };
         default:
             return {

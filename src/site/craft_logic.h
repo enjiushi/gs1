@@ -45,7 +45,14 @@ std::uint32_t available_cached_item_quantity(
     const std::vector<std::uint32_t>& item_instance_ids,
     ItemId item_id) noexcept;
 
+bool recipe_requires_hammer(const CraftRecipeDef& recipe_def) noexcept;
+
 bool can_satisfy_recipe_ingredients(
+    SiteRunState& site_run,
+    const std::vector<std::uint32_t>& item_instance_ids,
+    const CraftRecipeDef& recipe_def) noexcept;
+
+bool can_satisfy_recipe_requirements(
     SiteRunState& site_run,
     const std::vector<std::uint32_t>& item_instance_ids,
     const CraftRecipeDef& recipe_def) noexcept;

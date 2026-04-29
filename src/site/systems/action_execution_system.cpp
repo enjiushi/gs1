@@ -1728,7 +1728,7 @@ bool craft_ingredients_available_for_action(
         context.world.read_craft(),
         device_entity_id,
         target_tile);
-    return craft_logic::can_satisfy_recipe_ingredients(
+    return craft_logic::can_satisfy_recipe_requirements(
         context.site_run,
         cached_items,
         recipe_def);

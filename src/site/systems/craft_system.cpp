@@ -124,7 +124,7 @@ Gs1Status handle_craft_context_requested(
             continue;
         }
 
-        if (!craft_logic::can_satisfy_recipe_ingredients(
+        if (!craft_logic::can_satisfy_recipe_requirements(
                 context.site_run,
                 nearby_items,
                 *recipe_def))

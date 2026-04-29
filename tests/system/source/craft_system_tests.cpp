@@ -14,6 +14,7 @@ namespace
 {
 using gs1::ActionExecutionSystem;
 using gs1::CraftSystem;
+using gs1::CraftContextRequestedMessage;
 using gs1::DeviceMaintenanceSystem;
 using gs1::GameMessage;
 using gs1::GameMessageQueue;
@@ -117,6 +118,87 @@ void action_execution_build_completion_consumes_deployable_and_emits_device_plac
             GameMessageType::SiteDevicePlaced)->structure_id == gs1::k_structure_storage_crate);
 }
 
+void action_execution_craft_requires_hammer_for_shovel_recipe(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 1513U);
+    GameMessageQueue queue {};
+    auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
+    auto action_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue, 60.0);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_message(
+            inventory_context,
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    const auto delivery_box = gs1::inventory_storage::delivery_box_container(site_run);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        delivery_box,
+        gs1::ItemId {gs1::k_item_wood_bundle},
+        2U);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        delivery_box,
+        gs1::ItemId {gs1::k_item_iron_bundle},
+        1U);
+
+    const auto workbench_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);
+    queue.clear();
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            action_context,
+            make_message(
+                GameMessageType::StartSiteAction,
+                gs1::StartSiteActionMessage {
+                    GS1_SITE_ACTION_CRAFT,
+                    4U,
+                    1U,
+                    workbench_tile.x,
+                    workbench_tile.y,
+                    0U,
+                    0U,
+                    gs1::k_item_shovel})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::SiteActionFailed) == 1U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        first_message_payload<SiteActionFailedMessage>(
+            queue,
+            GameMessageType::SiteActionFailed)->reason == gs1::SiteActionFailureReason::InsufficientResources);
+    GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.current_action_id.has_value());
+
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        delivery_box,
+        gs1::ItemId {gs1::k_item_hammer},
+        1U);
+    queue.clear();
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            action_context,
+            make_message(
+                GameMessageType::StartSiteAction,
+                gs1::StartSiteActionMessage {
+                    GS1_SITE_ACTION_CRAFT,
+                    4U,
+                    1U,
+                    workbench_tile.x,
+                    workbench_tile.y,
+                    0U,
+                    0U,
+                    gs1::k_item_shovel})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::SiteActionFailed) == 0U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.current_action_id.has_value());
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.action_kind == gs1::ActionKind::Craft);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.secondary_subject_id == gs1::k_recipe_craft_shovel);
+}
+
 void inventory_craft_commit_consumes_nearby_ingredients_and_outputs_to_device_storage(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -144,6 +226,11 @@ void inventory_craft_commit_consumes_nearby_ingredients_and_outputs_to_device_st
         delivery_box,
         gs1::ItemId {gs1::k_item_iron_bundle},
         2U);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        delivery_box,
+        gs1::ItemId {gs1::k_item_hammer},
+        1U);
 
     const auto workbench_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);
     GS1_SYSTEM_TEST_REQUIRE(
@@ -175,10 +262,52 @@ void inventory_craft_commit_consumes_nearby_ingredients_and_outputs_to_device_st
             gs1::ItemId {gs1::k_item_wood_bundle}) == 2U);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        gs1::inventory_storage::available_item_quantity_in_container(
+            gs1::inventory_storage::available_item_quantity_in_container(
             site_run,
             gs1::inventory_storage::starter_storage_container(site_run),
             gs1::ItemId {gs1::k_item_iron_bundle}) == 0U);
+}
+
+void inventory_craft_commit_requires_hammer_for_storage_crate_recipe(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 1511U);
+    GameMessageQueue queue {};
+    auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_message(
+            inventory_context,
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    const auto delivery_box = gs1::inventory_storage::delivery_box_container(site_run);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        delivery_box,
+        gs1::ItemId {gs1::k_item_wood_bundle},
+        5U);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        delivery_box,
+        gs1::ItemId {gs1::k_item_iron_bundle},
+        2U);
+
+    const auto workbench_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        InventorySystem::process_message(
+            inventory_context,
+            make_message(
+                GameMessageType::InventoryCraftCommitRequested,
+                InventoryCraftCommitRequestedMessage {
+                    gs1::k_recipe_craft_storage_crate,
+                    workbench_tile.x,
+                    workbench_tile.y,
+                    0U})) == GS1_STATUS_INVALID_STATE);
 }
 
 void inventory_craft_commit_crafts_hammer_from_wood_and_iron(
@@ -274,6 +403,11 @@ void craft_commit_crafts_chemistry_station_kit_from_workbench_when_unlocked(
         delivery_box,
         gs1::ItemId {gs1::k_item_iron_bundle},
         3U);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        delivery_box,
+        gs1::ItemId {gs1::k_item_hammer},
+        1U);
 
     const auto workbench_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);
     GS1_SYSTEM_TEST_REQUIRE(
@@ -305,10 +439,94 @@ void craft_commit_crafts_chemistry_station_kit_from_workbench_when_unlocked(
             gs1::ItemId {gs1::k_item_wood_bundle}) == 0U);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        gs1::inventory_storage::available_item_quantity_in_container(
+            gs1::inventory_storage::available_item_quantity_in_container(
             site_run,
             gs1::inventory_storage::starter_storage_container(site_run),
             gs1::ItemId {gs1::k_item_iron_bundle}) == 0U);
+}
+
+void craft_context_omits_hammer_gated_device_recipe_without_hammer(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 1512U);
+    GameMessageQueue queue {};
+    auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
+    auto craft_context = make_site_context<CraftSystem>(campaign, site_run, queue);
+
+    const auto start_message =
+        make_message(GameMessageType::SiteRunStarted, SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_message(inventory_context, start_message) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        CraftSystem::process_message(craft_context, start_message) == GS1_STATUS_OK);
+
+    const auto delivery_box = gs1::inventory_storage::delivery_box_container(site_run);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        delivery_box,
+        gs1::ItemId {gs1::k_item_wood_bundle},
+        3U);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        delivery_box,
+        gs1::ItemId {gs1::k_item_iron_bundle},
+        2U);
+
+    const auto workbench_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        CraftSystem::process_message(
+            craft_context,
+            make_message(
+                GameMessageType::InventoryCraftContextRequested,
+                CraftContextRequestedMessage {
+                    workbench_tile.x,
+                    workbench_tile.y,
+                    0U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.craft.context_presentation.occupied);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        std::any_of(
+            site_run.craft.context_presentation.options.begin(),
+            site_run.craft.context_presentation.options.end(),
+            [](const gs1::CraftContextOptionState& option) {
+                return option.recipe_id == gs1::k_recipe_craft_hammer;
+            }));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        !std::any_of(
+            site_run.craft.context_presentation.options.begin(),
+            site_run.craft.context_presentation.options.end(),
+            [](const gs1::CraftContextOptionState& option) {
+                return option.recipe_id == gs1::k_recipe_craft_storage_crate;
+            }));
+
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        delivery_box,
+        gs1::ItemId {gs1::k_item_hammer},
+        1U);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        CraftSystem::process_message(
+            craft_context,
+            make_message(
+                GameMessageType::InventoryCraftContextRequested,
+                CraftContextRequestedMessage {
+                    workbench_tile.x,
+                    workbench_tile.y,
+                    0U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        std::any_of(
+            site_run.craft.context_presentation.options.begin(),
+            site_run.craft.context_presentation.options.end(),
+            [](const gs1::CraftContextOptionState& option) {
+                return option.recipe_id == gs1::k_recipe_craft_storage_crate;
+            }));
 }
 
 void craft_cache_tracks_worker_pack_membership_by_distance(
@@ -685,12 +903,20 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     inventory_craft_commit_consumes_nearby_ingredients_and_outputs_to_device_storage);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "inventory",
+    "craft_commit_requires_hammer_for_storage_crate_recipe",
+    inventory_craft_commit_requires_hammer_for_storage_crate_recipe);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "inventory",
     "craft_commit_crafts_hammer_from_wood_and_iron",
     inventory_craft_commit_crafts_hammer_from_wood_and_iron);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "craft",
     "craft_commit_crafts_chemistry_station_kit_from_workbench_when_unlocked",
     craft_commit_crafts_chemistry_station_kit_from_workbench_when_unlocked);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "craft",
+    "context_omits_hammer_gated_device_recipe_without_hammer",
+    craft_context_omits_hammer_gated_device_recipe_without_hammer);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "craft",
     "cache_tracks_worker_pack_membership_by_distance",
@@ -703,6 +929,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "inventory",
     "dynamically_placed_storage_device_reuses_single_inventory_container",
     dynamically_placed_storage_device_reuses_single_inventory_container);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "action_execution",
+    "craft_requires_hammer_for_shovel_recipe",
+    action_execution_craft_requires_hammer_for_shovel_recipe);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "action_execution",
     "repair_requires_hammer_and_restores_device_integrity",
