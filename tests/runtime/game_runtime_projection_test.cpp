@@ -431,6 +431,27 @@ const Gs1EngineMessage* find_inventory_slot_message(
     return nullptr;
 }
 
+const Gs1EngineMessage* find_task_message(
+    const std::vector<Gs1EngineMessage>& messages,
+    std::uint32_t task_instance_id)
+{
+    for (const auto& message : messages)
+    {
+        if (message.type != GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT)
+        {
+            continue;
+        }
+
+        const auto& payload = message.payload_as<Gs1EngineMessageTaskData>();
+        if (payload.task_instance_id == task_instance_id)
+        {
+            return &message;
+        }
+    }
+
+    return nullptr;
+}
+
 const Gs1EngineMessage* find_inventory_view_message(
     const std::vector<Gs1EngineMessage>& messages,
     std::uint32_t storage_id,
@@ -863,12 +884,75 @@ int main()
     seed_runtime_test_task(runtime, bootstrap_site_run.counters.site_completion_tile_threshold);
     const auto seeded_task_messages = drain_engine_messages(runtime);
     assert(!collect_messages_of_type(seeded_task_messages, GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT).empty());
+    {
+        const auto* seeded_task_message = find_task_message(seeded_task_messages, 1U);
+        assert(seeded_task_message != nullptr);
+        const auto& payload = seeded_task_message->payload_as<Gs1EngineMessageTaskData>();
+        assert(payload.task_template_id == gs1::k_task_template_site1_restore_patch);
+        assert(payload.current_progress == 0U);
+        assert(payload.target_progress == bootstrap_site_run.counters.site_completion_tile_threshold);
+        assert(payload.list_kind == GS1_TASK_PRESENTATION_LIST_VISIBLE);
+    }
 
     GameMessage accept_task {};
     accept_task.type = GameMessageType::TaskAcceptRequested;
     accept_task.set_payload(TaskAcceptRequestedMessage {1U});
     assert(runtime.handle_message(accept_task) == GS1_STATUS_OK);
     assert(bootstrap_site_run.task_board.accepted_task_ids.size() == 1U);
+
+    {
+        auto& accepted_task = bootstrap_site_run.task_board.visible_tasks.front();
+        accepted_task.task_template_id = gs1::TaskTemplateId {gs1::k_task_template_site1_onboarding_buy_water};
+        accepted_task.runtime_list_kind = gs1::TaskRuntimeListKind::Accepted;
+        accepted_task.current_progress_amount = 1U;
+        accepted_task.target_amount = 3U;
+
+        gs1::TaskInstanceState completed_task {};
+        completed_task.task_instance_id = gs1::TaskInstanceId {2U};
+        completed_task.task_template_id = gs1::TaskTemplateId {gs1::k_task_template_site1_onboarding_buy_food};
+        completed_task.publisher_faction_id = gs1::FactionId {gs1::k_faction_village_committee};
+        completed_task.task_tier_id = 1U;
+        completed_task.target_amount = 1U;
+        completed_task.current_progress_amount = 1U;
+        completed_task.runtime_list_kind = gs1::TaskRuntimeListKind::Completed;
+        bootstrap_site_run.task_board.visible_tasks.push_back(completed_task);
+        bootstrap_site_run.task_board.completed_task_ids.push_back(gs1::TaskInstanceId {2U});
+
+        gs1::GameRuntimeProjectionTestAccess::mark_projection_dirty(
+            runtime,
+            gs1::SITE_PROJECTION_UPDATE_TASKS | gs1::SITE_PROJECTION_UPDATE_PHONE);
+        gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+        const auto mixed_task_messages = drain_engine_messages(runtime);
+        const auto mixed_phone_panel_messages =
+            collect_messages_of_type(mixed_task_messages, GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE);
+        assert(!mixed_phone_panel_messages.empty());
+        {
+            const auto& phone_panel_payload =
+                mixed_phone_panel_messages.front()->payload_as<Gs1EngineMessagePhonePanelData>();
+            assert(phone_panel_payload.visible_task_count == 0U);
+            assert(phone_panel_payload.accepted_task_count == 1U);
+            assert(phone_panel_payload.completed_task_count == 1U);
+            assert(phone_panel_payload.claimed_task_count == 0U);
+        }
+        {
+            const auto* accepted_task_message = find_task_message(mixed_task_messages, 1U);
+            assert(accepted_task_message != nullptr);
+            const auto& payload = accepted_task_message->payload_as<Gs1EngineMessageTaskData>();
+            assert(payload.task_template_id == gs1::k_task_template_site1_onboarding_buy_water);
+            assert(payload.current_progress == 1U);
+            assert(payload.target_progress == 3U);
+            assert(payload.list_kind == GS1_TASK_PRESENTATION_LIST_ACCEPTED);
+        }
+        {
+            const auto* completed_task_message = find_task_message(mixed_task_messages, 2U);
+            assert(completed_task_message != nullptr);
+            const auto& payload = completed_task_message->payload_as<Gs1EngineMessageTaskData>();
+            assert(payload.task_template_id == gs1::k_task_template_site1_onboarding_buy_food);
+            assert(payload.current_progress == 1U);
+            assert(payload.target_progress == 1U);
+            assert(payload.list_kind == GS1_TASK_PRESENTATION_LIST_COMPLETED);
+        }
+    }
 
     bootstrap_site_run.inventory.worker_pack_slots[4].occupied = true;
     bootstrap_site_run.inventory.worker_pack_slots[4].item_id = gs1::ItemId {gs1::k_item_medicine_pack};

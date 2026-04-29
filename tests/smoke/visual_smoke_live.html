@@ -381,6 +381,141 @@ body {
   gap: 7px;
 }
 
+.site-task-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(35, 28, 21, 0.78), rgba(49, 38, 28, 0.82));
+  border: 1px solid rgba(202, 184, 152, 0.18);
+  box-shadow: 0 14px 28px rgba(17, 13, 10, 0.26);
+  color: #f4ebdc;
+}
+
+.site-task-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.site-task-eyebrow,
+.site-task-count {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.site-task-eyebrow {
+  color: rgba(235, 224, 203, 0.76);
+}
+
+.site-task-count {
+  color: rgba(198, 185, 164, 0.88);
+}
+
+.site-task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.site-task-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(246, 238, 224, 0.08);
+  border: 1px solid rgba(226, 203, 162, 0.16);
+}
+
+.site-task-card.completed {
+  background: linear-gradient(180deg, rgba(82, 126, 73, 0.3), rgba(46, 78, 42, 0.34));
+  border-color: rgba(143, 196, 129, 0.34);
+}
+
+.site-task-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.site-task-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff4e2;
+}
+
+.site-task-card.completed .site-task-title {
+  color: #dff4d6;
+}
+
+.site-task-state {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(214, 193, 160, 0.2);
+  background: rgba(245, 235, 221, 0.08);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(247, 238, 223, 0.88);
+}
+
+.site-task-state.completed {
+  border-color: rgba(165, 220, 145, 0.28);
+  background: rgba(111, 170, 96, 0.24);
+  color: #dff4d6;
+}
+
+.site-task-description {
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(238, 226, 208, 0.84);
+}
+
+.site-task-card.completed .site-task-description {
+  color: rgba(223, 244, 214, 0.9);
+}
+
+.site-task-progress {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(223, 209, 184, 0.88);
+}
+
+.site-task-card.completed .site-task-progress {
+  color: rgba(223, 244, 214, 0.92);
+}
+
+.site-task-track {
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(246, 238, 224, 0.12);
+}
+
+.site-task-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #c9b184 0%, #f0dcc0 100%);
+}
+
+.site-task-card.completed .site-task-fill {
+  background: linear-gradient(90deg, #71b466 0%, #a8df9c 100%);
+}
+
 .modifier-strip {
   display: flex;
   flex-wrap: wrap;
@@ -3512,6 +3647,13 @@ body {
               </div>
             </div>
             <div class="site-vitals-bars" id="site-vitals-bars"></div>
+            <div class="site-task-panel" id="site-task-panel" hidden>
+              <div class="site-task-header">
+                <span class="site-task-eyebrow">Tracked Tasks</span>
+                <span class="site-task-count" id="site-task-count">0 Active</span>
+              </div>
+              <div class="site-task-list" id="site-task-list"></div>
+            </div>
             <div class="modifier-strip" id="buff-modifier-strip" hidden></div>
           </div>
         </div>

@@ -11,6 +11,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const siteVitalsMoney = document.getElementById("site-vitals-money");
     const siteVitalsReputation = document.getElementById("site-vitals-reputation");
     const siteVitalsBars = document.getElementById("site-vitals-bars");
+    const siteTaskPanel = document.getElementById("site-task-panel");
+    const siteTaskCount = document.getElementById("site-task-count");
+    const siteTaskList = document.getElementById("site-task-list");
     const fpsChip = document.getElementById("fps-chip");
     const statusChip = document.getElementById("status-chip");
     const menuPanel = document.getElementById("menu-panel");
@@ -2158,6 +2161,36 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return siteState.tasks.slice();
     }
 
+    function getSiteTaskListPriority(task) {
+        if (!task) {
+            return 99;
+        }
+
+        switch (task.listKind) {
+        case "ACCEPTED":
+            return 0;
+        case "COMPLETED":
+            return 1;
+        default:
+            return 2;
+        }
+    }
+
+    function getTrackedSiteTasks(state) {
+        return getSiteTasks(state)
+            .filter(function (task) {
+                return !!task && (task.listKind === "ACCEPTED" || task.listKind === "COMPLETED");
+            })
+            .sort(function (lhs, rhs) {
+                const priorityDelta = getSiteTaskListPriority(lhs) - getSiteTaskListPriority(rhs);
+                if (priorityDelta !== 0) {
+                    return priorityDelta;
+                }
+
+                return (lhs.taskInstanceId || 0) - (rhs.taskInstanceId || 0);
+            });
+    }
+
     function getCraftContextForTile(state, tileX, tileY) {
         const siteState = getSiteState(state);
         const craftContext = siteState ? siteState.craftContext : null;
@@ -3637,6 +3670,85 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         renderModifierStrip(normalModifierStrip, normalModifiers, false);
     }
 
+    function renderSiteTaskPanel(state) {
+        if (!siteTaskPanel || !siteTaskCount || !siteTaskList) {
+            return;
+        }
+
+        const tasks = !!state && state.appState === "SITE_ACTIVE"
+            ? getTrackedSiteTasks(state)
+            : [];
+        if (tasks.length === 0) {
+            siteTaskPanel.hidden = true;
+            siteTaskList.innerHTML = "";
+            siteTaskCount.textContent = "0 Active";
+            return;
+        }
+
+        const activeCount = countTasksByListKind(tasks, "ACCEPTED");
+        const completedCount = countTasksByListKind(tasks, "COMPLETED");
+        siteTaskCount.textContent =
+            activeCount + " Active" + (completedCount > 0 ? "  |  " + completedCount + " Done" : "");
+
+        siteTaskList.innerHTML = "";
+        tasks.forEach(function (task) {
+            const taskPresentation = getPhoneTaskTemplatePresentation(task);
+            const taskProgress = getTaskProgressPresentation(task);
+            const descriptionText = taskPresentation.description || taskPresentation.summary;
+            const isCompleted = task.listKind === "COMPLETED";
+
+            const card = document.createElement("article");
+            card.className = "site-task-card" + (isCompleted ? " completed" : "");
+
+            const titleRow = document.createElement("div");
+            titleRow.className = "site-task-title-row";
+
+            const titleElement = document.createElement("div");
+            titleElement.className = "site-task-title";
+            titleElement.textContent = taskPresentation.title;
+            titleRow.appendChild(titleElement);
+
+            const stateElement = document.createElement("div");
+            stateElement.className = "site-task-state" + (isCompleted ? " completed" : "");
+            stateElement.textContent = isCompleted ? "Done" : "Active";
+            titleRow.appendChild(stateElement);
+
+            card.appendChild(titleRow);
+
+            if (descriptionText) {
+                const descriptionElement = document.createElement("div");
+                descriptionElement.className = "site-task-description";
+                descriptionElement.textContent = descriptionText;
+                card.appendChild(descriptionElement);
+            }
+
+            const progressRow = document.createElement("div");
+            progressRow.className = "site-task-progress";
+
+            const progressLabel = document.createElement("span");
+            progressLabel.textContent =
+                "Progress " + taskProgress.currentProgress + "/" + taskProgress.targetProgress;
+            progressRow.appendChild(progressLabel);
+
+            const completionLabel = document.createElement("span");
+            completionLabel.textContent = taskProgress.completion + "%";
+            progressRow.appendChild(completionLabel);
+            card.appendChild(progressRow);
+
+            const track = document.createElement("div");
+            track.className = "site-task-track";
+            const fill = document.createElement("div");
+            fill.className = "site-task-fill";
+            fill.style.width = taskProgress.completion + "%";
+            track.appendChild(fill);
+            card.appendChild(track);
+
+            siteTaskList.appendChild(card);
+        });
+
+        siteTaskPanel.hidden = false;
+    }
+
     function clearSelectionInventory() {
         selectionInventory.classList.remove("site-result-actions");
         setTechTreeOverlayActive(false);
@@ -3658,6 +3770,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (!state || (state.appState !== "SITE_ACTIVE" && state.appState !== "REGIONAL_MAP")) {
             siteVitalsPanel.hidden = true;
             siteVitalsBars.innerHTML = "";
+            renderSiteTaskPanel(null);
             renderSiteModifiers(null);
             return;
         }
@@ -3699,6 +3812,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         siteVitalsBars.innerHTML = "";
 
         if (state.appState !== "SITE_ACTIVE") {
+            renderSiteTaskPanel(null);
             renderSiteModifiers(null);
             return;
         }
@@ -3728,6 +3842,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             siteVitalsBars.appendChild(bar);
         });
 
+        renderSiteTaskPanel(state);
         renderSiteModifiers(state);
     }
 
@@ -5824,8 +5939,209 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return className;
     }
 
+    function getTaskProgressPresentation(task) {
+        const targetProgress = Math.max(task && task.targetProgress ? task.targetProgress : 0, 1);
+        const currentProgress = Math.max(
+            0,
+            Math.min(task && task.currentProgress ? task.currentProgress : 0, targetProgress));
+        return {
+            targetProgress: targetProgress,
+            currentProgress: currentProgress,
+            completion: Math.round((currentProgress / targetProgress) * 100)
+        };
+    }
+
     function getPhoneTaskTemplatePresentation(task) {
         switch (task.taskTemplateId) {
+        case 1:
+            return {
+                title: "Restore The Patch",
+                summary: "Grow the site's restored tile count until the restoration target is reached.",
+                description: "Expand the healthy restored patch across the site until the current restoration target is satisfied.",
+                rewards: []
+            };
+        case 2:
+            return {
+                title: "Buy Supplies",
+                summary: "Purchase supplies through the phone market.",
+                description: "Use the phone market to order the required supply count and keep the delivery crate stocked.",
+                rewards: []
+            };
+        case 3:
+            return {
+                title: "Sell Cargo",
+                summary: "Sell gathered goods through the phone market.",
+                description: "Ship out saleable goods through the phone so the site turns materials back into cash.",
+                rewards: []
+            };
+        case 4:
+            return {
+                title: "Transfer Stock",
+                summary: "Move items between the worker pack and nearby storage.",
+                description: "Reorganize supplies between carried inventory and storage until the transfer quota is satisfied.",
+                rewards: []
+            };
+        case 5:
+            return {
+                title: "Plant New Cover",
+                summary: "Place new plants on the site.",
+                description: "Set new plantings into the ground and keep expanding local cover until the planting quota is met.",
+                rewards: []
+            };
+        case 6:
+            return {
+                title: "Craft Recipes",
+                summary: "Craft recipe outputs at the camp devices.",
+                description: "Use the available crafting stations to produce the required recipe outputs for this contract.",
+                rewards: []
+            };
+        case 7:
+            return {
+                title: "Use Supplies",
+                summary: "Consume site supplies through the worker inventory.",
+                description: "Use the required number of carried supplies so the worker stays provisioned and the contract clears.",
+                rewards: []
+            };
+        case 21:
+            return {
+                title: "Perform Field Actions",
+                summary: "Complete field actions out on the active site.",
+                description: "Carry out the required number of field actions on site to satisfy this service request.",
+                rewards: []
+            };
+        case 22:
+            return {
+                title: "Keep Meters High",
+                summary: "Hold every worker meter above the target threshold for the full duration.",
+                description: "Stabilize health, hydration, nourishment, energy, and morale together and keep them above the requested threshold until the timer finishes.",
+                rewards: []
+            };
+        case 23:
+            return {
+                title: "Hold Moisture",
+                summary: "Keep enough tracked tiles above the requested moisture target for the full duration.",
+                description: "Maintain moisture across the tracked tiles and keep the threshold satisfied until the duration goal completes.",
+                rewards: []
+            };
+        case 24:
+            return {
+                title: "Earn Cash",
+                summary: "Increase site cash by completing profitable work.",
+                description: "Sell, deliver, or complete other profitable tasks until the required cash gain has been earned.",
+                rewards: []
+            };
+        case 25:
+            return {
+                title: "Plant Anything",
+                summary: "Place any plants on the site.",
+                description: "Expand the site's cover with any available plants until the planting count is satisfied.",
+                rewards: []
+            };
+        case 26:
+            return {
+                title: "Grow Dense Plantings",
+                summary: "Bring multiple planted tiles up to the required density target.",
+                description: "Care for planted tiles and push enough of them up to the density threshold for this contract.",
+                rewards: []
+            };
+        case 27:
+            return {
+                title: "Raise Peak Density",
+                summary: "Push a planted tile to a very high density target.",
+                description: "Nurture at least one planted tile until it reaches the requested peak density threshold.",
+                rewards: []
+            };
+        case 28:
+            return {
+                title: "Build Wind Shelter",
+                summary: "Raise plant wind protection on enough tracked tiles.",
+                description: "Arrange cover so the tracked plants hold the required wind shelter value across the requested tile count.",
+                rewards: []
+            };
+        case 29:
+            return {
+                title: "Build Heat Shelter",
+                summary: "Raise plant heat protection on enough tracked tiles.",
+                description: "Improve local protection so the tracked plants maintain the target heat shelter across the requested tile count.",
+                rewards: []
+            };
+        case 30:
+            return {
+                title: "Build Dust Shelter",
+                summary: "Raise plant dust protection on enough tracked tiles.",
+                description: "Improve nearby cover so the tracked plants maintain the target dust shelter across the requested tile count.",
+                rewards: []
+            };
+        case 31:
+            return {
+                title: "Cluster Plant Life",
+                summary: "Create a stronger neighborhood of nearby populated plant tiles.",
+                description: "Fill in the site so tracked plants are surrounded by enough populated neighbors to satisfy the spacing goal.",
+                rewards: []
+            };
+        case 32:
+            return {
+                title: "Craft Any Items",
+                summary: "Produce crafted items through any available recipe.",
+                description: "Use camp devices to craft any valid outputs until the required item count is produced.",
+                rewards: []
+            };
+        case 33:
+            return {
+                title: "Sell Crafted Goods",
+                summary: "Sell items that were produced through crafting.",
+                description: "Move crafted goods through the market and complete the requested number of crafted-item sales.",
+                rewards: []
+            };
+        case 34:
+            return {
+                title: "Build Utility Structures",
+                summary: "Construct the requested structure type on site.",
+                description: "Use gathered materials to place the requested utility structure until the build quota is finished.",
+                rewards: []
+            };
+        case 35:
+            return {
+                title: "Build Support Structures",
+                summary: "Construct another supported structure type on site.",
+                description: "Assemble and place the required support structures so the site meets the contract's build count.",
+                rewards: []
+            };
+        case 36:
+            return {
+                title: "Build Any Structures",
+                summary: "Place any valid structures on the site.",
+                description: "Expand the site with any available structure placements until the requested build count is satisfied.",
+                rewards: []
+            };
+        case 37:
+            return {
+                title: "Complete A Build Set",
+                summary: "Assemble a broader set of structures around camp.",
+                description: "Broaden the site's footprint with the required structure set until the contract's full build count is complete.",
+                rewards: []
+            };
+        case 38:
+            return {
+                title: "Keep Devices Healthy",
+                summary: "Hold all tracked devices above the requested integrity threshold.",
+                description: "Protect and maintain site devices so their integrity stays above the threshold for the full duration.",
+                rewards: []
+            };
+        case 39:
+            return {
+                title: "Prevent Withering",
+                summary: "Keep the tracked living plants from withering for the full duration.",
+                description: "Stabilize enough living plants and stop them from withering until the protection timer completes.",
+                rewards: []
+            };
+        case 40:
+            return {
+                title: "Submit Water",
+                summary: "Hand in the requested water supply to complete the order.",
+                description: "Deliver the requested water supplies into the submission flow until the full order is satisfied.",
+                rewards: []
+            };
         case 101:
             return {
                 title: "Lay One Checkerboard",
@@ -6012,9 +6328,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         tasks.forEach((task) => {
             const taskPresentation = getPhoneTaskTemplatePresentation(task);
-            const targetProgress = Math.max(task.targetProgress || 0, 1);
-            const currentProgress = Math.max(0, Math.min(task.currentProgress || 0, targetProgress));
-            const completion = Math.round((currentProgress / targetProgress) * 100);
+            const taskProgress = getTaskProgressPresentation(task);
             const card = document.createElement("article");
             card.className = "phone-task-card interactive";
             card.setAttribute("role", "button");
@@ -6050,8 +6364,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             metaElement.className = "phone-task-meta";
             metaElement.textContent =
                 taskPresentation.summary +
-                "  |  Progress " + currentProgress + "/" + targetProgress +
-                "  |  " + completion + "%";
+                "  |  Progress " + taskProgress.currentProgress + "/" + taskProgress.targetProgress +
+                "  |  " + taskProgress.completion + "%";
             card.appendChild(metaElement);
 
             const rewardSummary = formatPhoneTaskRewardSummary(taskPresentation);
@@ -6066,7 +6380,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             track.className = "phone-task-track";
             const fill = document.createElement("div");
             fill.className = "phone-task-fill";
-            fill.style.width = completion + "%";
+            fill.style.width = taskProgress.completion + "%";
             track.appendChild(fill);
             card.appendChild(track);
 
@@ -6080,13 +6394,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function appendPhoneTaskDetailPanel(container, task) {
         const taskPresentation = getPhoneTaskTemplatePresentation(task);
-        const targetProgress = Math.max(task.targetProgress || 0, 1);
-        const currentProgress = Math.max(0, Math.min(task.currentProgress || 0, targetProgress));
-        const completion = Math.round((currentProgress / targetProgress) * 100);
+        const taskProgress = getTaskProgressPresentation(task);
         const detailMeta =
             getPhoneTaskStateLabel(task) +
-            "  |  Progress " + currentProgress + "/" + targetProgress +
-            "  |  " + completion + "%";
+            "  |  Progress " + taskProgress.currentProgress + "/" + taskProgress.targetProgress +
+            "  |  " + taskProgress.completion + "%";
 
         appendPhonePanelToolbar(container, [
             makePhoneLocalBackButton("Back To Tasks", function () {
@@ -6128,14 +6440,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const progressMeta = document.createElement("div");
         progressMeta.className = "phone-task-meta";
         progressMeta.textContent =
-            "Progress " + currentProgress + "/" + targetProgress + "  |  Completion " + completion + "%";
+            "Progress " + taskProgress.currentProgress + "/" + taskProgress.targetProgress +
+            "  |  Completion " + taskProgress.completion + "%";
         card.appendChild(progressMeta);
 
         const track = document.createElement("div");
         track.className = "phone-task-track";
         const fill = document.createElement("div");
         fill.className = "phone-task-fill";
-        fill.style.width = completion + "%";
+        fill.style.width = taskProgress.completion + "%";
         track.appendChild(fill);
         card.appendChild(track);
 
