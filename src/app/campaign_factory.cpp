@@ -61,7 +61,6 @@ CampaignState CampaignFactory::create_prototype_campaign(
 
     campaign.campaign_id = CampaignId{1U};
     campaign.campaign_seed = campaign_seed;
-    campaign.cash = content.starting_campaign_cash;
     campaign.campaign_clock_minutes_elapsed = 0.0;
     campaign.campaign_days_total = campaign_days;
     campaign.campaign_days_remaining = campaign_days;

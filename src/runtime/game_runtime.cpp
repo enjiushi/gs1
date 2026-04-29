@@ -1527,11 +1527,9 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
     case GameMessageType::FactionReputationAwardRequested:
     case GameMessageType::TechnologyNodeClaimRequested:
     case GameMessageType::TechnologyNodeRefundRequested:
+    case GameMessageType::EconomyMoneyAwardRequested:
+    case GameMessageType::PhoneCartCheckoutRequested:
         queue_campaign_resources_message();
-        if (campaign_.has_value() && active_site_run_.has_value())
-        {
-            queue_hud_state_message();
-        }
         if (app_state_supports_technology_tree(app_state_))
         {
             queue_regional_map_menu_ui_messages();
@@ -1732,16 +1730,36 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
     case GameMessageType::InventoryItemSubmitted:
     case GameMessageType::InventoryItemUseCompleted:
     case GameMessageType::InventoryCraftCompleted:
-    case GameMessageType::PhoneListingPurchaseRequested:
-    case GameMessageType::PhoneListingSaleRequested:
+        if (active_site_run_.has_value() &&
+            active_site_run_->site_action.placement_mode.active &&
+            site_protection_overlay_mode_ != GS1_SITE_PROTECTION_OVERLAY_NONE)
+        {
+            site_protection_overlay_mode_ = GS1_SITE_PROTECTION_OVERLAY_NONE;
+            queue_site_protection_overlay_state_message();
+        }
+        break;
+
     case GameMessageType::InventoryDeliveryRequested:
     case GameMessageType::InventoryItemUseRequested:
     case GameMessageType::InventoryItemConsumeRequested:
     case GameMessageType::InventoryTransferRequested:
     case GameMessageType::InventoryItemSubmitRequested:
     case GameMessageType::InventoryCraftContextRequested:
+        if (active_site_run_.has_value() &&
+            active_site_run_->site_action.placement_mode.active &&
+            site_protection_overlay_mode_ != GS1_SITE_PROTECTION_OVERLAY_NONE)
+        {
+            site_protection_overlay_mode_ = GS1_SITE_PROTECTION_OVERLAY_NONE;
+            queue_site_protection_overlay_state_message();
+        }
+        break;
+
+    case GameMessageType::PhoneListingPurchaseRequested:
+    case GameMessageType::PhoneListingSaleRequested:
     case GameMessageType::ContractorHireRequested:
     case GameMessageType::SiteUnlockablePurchaseRequested:
+        queue_campaign_resources_message();
+        [[fallthrough]];
     default:
         if (active_site_run_.has_value() &&
             active_site_run_->site_action.placement_mode.active &&
@@ -2181,12 +2199,15 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
         "Prototype Tech Tree");
 
     char summary_text[64] {};
+    const float site_cash = active_site_run_.has_value()
+        ? cash_value_from_cash_points(active_site_run_->economy.current_cash)
+        : 0.0f;
     std::snprintf(
         summary_text,
         sizeof(summary_text),
-        "Cash $%d | Total %d",
-        campaign_->cash,
-        campaign_->technology_state.total_reputation);
+        active_site_run_.has_value() ? "Total %d | Site $%.2f" : "Total %d | Auto Rep",
+        campaign_->technology_state.total_reputation,
+        site_cash);
     queue_ui_element_message(
         2U,
         GS1_UI_ELEMENT_LABEL,
@@ -2315,78 +2336,27 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
 
             const auto reputation_requirement =
                 TechnologySystem::current_reputation_requirement(node_def);
-            const auto internal_cash_cost =
-                static_cast<std::int32_t>(TechnologySystem::current_internal_cost_cash_points(node_def));
-            const auto display_cash_cost = cash_value_from_cash_points(internal_cash_cost);
-            const auto node_faction_reputation =
-                TechnologySystem::faction_reputation(*campaign_, node_def.faction_id);
 
             Gs1UiAction action {};
             action.target_id = node_def.tech_node_id.value;
             action.arg0 = 0U;
 
             char node_text[512] {};
-            std::uint32_t flags = GS1_UI_ELEMENT_FLAG_NONE;
-            if (const auto* purchase =
-                    TechnologySystem::find_purchase_record(*campaign_, node_def.tech_node_id);
-                purchase != nullptr)
+            std::uint32_t flags = GS1_UI_ELEMENT_FLAG_DISABLED;
+            if (TechnologySystem::node_purchased(*campaign_, node_def.tech_node_id))
             {
-                if (TechnologySystem::node_refundable(*campaign_, node_def))
-                {
-                    action.type = GS1_UI_ACTION_REFUND_TECHNOLOGY_NODE;
-                    std::snprintf(
-                        node_text,
-                        sizeof(node_text),
-                        "TECHNODE|s=Refund +$%.2f",
-                        display_cash_cost);
-                    flags |= GS1_UI_ELEMENT_FLAG_PRIMARY;
-                }
-                else
-                {
-                    std::snprintf(
-                        node_text,
-                        sizeof(node_text),
-                        "TECHNODE|s=Claimed");
-                    flags |= GS1_UI_ELEMENT_FLAG_DISABLED;
-                }
-            }
-            else if (TechnologySystem::node_claimable(*campaign_, node_def))
-            {
-                action.type = GS1_UI_ACTION_CLAIM_TECHNOLOGY_NODE;
                 std::snprintf(
                     node_text,
                     sizeof(node_text),
-                    "TECHNODE|s=Need %dr +$%.2f",
-                    reputation_requirement,
-                    display_cash_cost);
-                flags |= GS1_UI_ELEMENT_FLAG_PRIMARY;
+                    "TECHNODE|s=Unlocked");
             }
             else
             {
-                flags |= GS1_UI_ELEMENT_FLAG_DISABLED;
-                if (campaign_->cash < internal_cash_cost)
-                {
-                    std::snprintf(
-                        node_text,
-                        sizeof(node_text),
-                        "TECHNODE|s=Need $%.2f",
-                        display_cash_cost);
-                }
-                else if (node_faction_reputation < reputation_requirement)
-                {
-                    std::snprintf(
-                        node_text,
-                        sizeof(node_text),
-                        "TECHNODE|s=Need %dr",
-                        reputation_requirement);
-                }
-                else
-                {
-                    std::snprintf(
-                        node_text,
-                        sizeof(node_text),
-                        "TECHNODE|s=Locked");
-                }
+                std::snprintf(
+                    node_text,
+                    sizeof(node_text),
+                    "TECHNODE|s=Need %dr",
+                    reputation_requirement);
             }
 
             queue_ui_element_message(
@@ -3534,7 +3504,7 @@ void GameRuntime::queue_hud_state_message()
     payload.player_hydration = worker_conditions.hydration;
     payload.player_energy = worker_conditions.energy;
     payload.player_morale = worker_conditions.morale;
-    payload.current_money = cash_value_from_cash_points(campaign_->cash);
+    payload.current_money = cash_value_from_cash_points(active_site_run_->economy.current_cash);
     payload.active_task_count =
         static_cast<std::uint16_t>(active_site_run_->task_board.accepted_task_ids.size());
     payload.current_action_kind =
@@ -3553,7 +3523,9 @@ void GameRuntime::queue_campaign_resources_message()
 
     auto message = make_engine_message(GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES);
     auto& payload = message.emplace_payload<Gs1EngineMessageCampaignResourcesData>();
-    payload.current_money = cash_value_from_cash_points(campaign_->cash);
+    payload.current_money = active_site_run_.has_value()
+        ? cash_value_from_cash_points(active_site_run_->economy.current_cash)
+        : 0.0f;
     payload.total_reputation = campaign_->technology_state.total_reputation;
     engine_messages_.push_back(message);
 }

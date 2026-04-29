@@ -21,9 +21,6 @@ public:
     [[nodiscard]] static bool node_purchased(
         const CampaignState& campaign,
         TechNodeId tech_node_id) noexcept;
-    [[nodiscard]] static const TechnologyPurchaseRecord* find_purchase_record(
-        const CampaignState& campaign,
-        TechNodeId tech_node_id) noexcept;
     [[nodiscard]] static bool technology_tier_visible(
         const CampaignState& campaign,
         const TechnologyNodeDef& node_def) noexcept;
@@ -56,9 +53,6 @@ public:
         const CampaignState& campaign,
         const TechnologyNodeDef& node_def) noexcept;
     [[nodiscard]] static bool node_claimable(
-        const CampaignState& campaign,
-        const TechnologyNodeDef& node_def) noexcept;
-    [[nodiscard]] static bool node_refundable(
         const CampaignState& campaign,
         const TechnologyNodeDef& node_def) noexcept;
 };

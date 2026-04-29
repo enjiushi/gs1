@@ -1357,11 +1357,11 @@ std::vector<ContentValidationIssue> validate_content_database(
                 break;
             }
 
-            if (node_def.reputation_requirement < 0 || node_def.internal_cost_cash_points == 0U)
+            if (node_def.reputation_requirement < 0)
             {
                 issues.push_back(ContentValidationIssue {
                     ContentValidationSeverity::Error,
-                    "Technology node definitions must use non-negative reputation requirements and positive internal cash-point values."});
+                    "Technology node definitions must use non-negative reputation requirements."});
                 break;
             }
 
@@ -1472,11 +1472,11 @@ std::vector<ContentValidationIssue> validate_content_database(
 
     if (issues.empty())
     {
-        if (content.prototype_campaign.starting_campaign_cash < 0)
+        if (content.prototype_campaign.starting_site_cash < 0)
         {
             issues.push_back(ContentValidationIssue {
                 ContentValidationSeverity::Error,
-                "Prototype campaign starting cash must be non-negative."});
+                "Prototype site-session starting cash must be non-negative."});
         }
         else if (content.prototype_campaign.support_quota_per_contributor == 0U)
         {

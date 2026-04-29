@@ -42,7 +42,7 @@ These areas are defined strongly enough to start module design and runtime-struc
 - China-desert plant roster direction, density model, growth pressure, spread, salinity, and straw checkerboard behavior
 - Contract-board concept, prototype task model, faction publishing, reward-draft direction, chain-task direction, and accepted-task-cap concept
 - Faction identities, assistants, onboarding order, and prototype four-site arc
-- Data-driven technology model with a shared total-reputation unlock ladder across plants/items/recipes/device-build recipes, a linear per-faction `32`-tier tech ladder where each tier requires matching faction reputation, and cash-purchased tech nodes
+- Data-driven technology model with a shared total-reputation unlock ladder across plants/items/recipes/device-build recipes, plus a linear per-faction `32`-tier tech ladder where each tier auto-unlocks as soon as the matching faction reputation is reached
 - Meter-relationship chapter as the current implementation-facing causal reference
 
 These areas are good enough that the next step can define code ownership, runtime structs, content-definition tables, and service boundaries without waiting for more game-loop design.

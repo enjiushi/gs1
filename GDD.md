@@ -3122,9 +3122,9 @@ To make the game more compelling without feeling manipulative, these systems wou
 - `Reputation`: total campaign standing with the restoration program, earned progressively from official work and never spent
 - `Faction Reputation`: cumulative standing with each individual `Faction`, earned mainly from that faction's `Site Task`s, faction events, and aligned follow-through
 
-`Reputation` should function as thresholded trust, not consumable currency. `Faction Reputation` should also remain cumulative. In the prototype, `Reputation` now drives a shared `32`-step unlock ladder across plants/items/recipes/device-build recipes, while each faction's long-term tech branch is gated by that faction's `Faction Reputation`: tiers `1-32` unlock the branch's linear tech rows, and claiming tech always spends persistent campaign cash instead of spending or occupying reputation.
+`Reputation` should function as thresholded trust, not consumable currency. `Faction Reputation` should also remain cumulative. In the prototype, `Reputation` now drives a shared `32`-step unlock ladder across plants/items/recipes/device-build recipes, while each faction's long-term tech branch is gated by that faction's `Faction Reputation`: tiers `1-32` auto-unlock the branch's linear tech rows as soon as that faction reaches the matching tier.
 
-Claiming tech therefore never lowers the visible total trust value. Trust unlocks access; campaign cash pays for the actual tech claim. Tech pricing should be authored internally in cash points, with `100` cash points equal to `1` displayed cash, so balancing can stay granular while the player still sees normal whole-cash costs.
+Tech therefore never lowers the visible total trust value. Trust unlocks access directly, while money remains a site-session tactical currency for local spending only. Site money values should be authored internally in cash points, with `100` cash points equal to `1` displayed cash, so balancing can stay granular while the player still sees normal whole-cash costs.
 
 For clarity, `Faction Reputation` from `Site Task`s should usually be a guaranteed completion payout tied to the task's publisher, with the amount scaling by task tier or level, while the task's visible reward draft should stay focused on immediate tactical rewards.
 
@@ -3348,9 +3348,9 @@ The `Persistent Tech Tree` is the long-term campaign progression layer. In the c
 
 - the current prototype tech panel should show `3` faction tabs, one for each faction branch
 - each faction branch should contain `32` linear tech tiers gated by that faction's `Faction Reputation` tiers `1-32`
-- reaching a later tier threshold should immediately make that tier's tech row claimable; it should not require previous-tier purchases
-- tech rows should spend only `campaignCash`
-- tech rows should author internal cash-point values and convert them to player-facing cash at `100` points per `1` cash
+- reaching a later tier threshold should immediately auto-unlock that tier's tech row; it should not require previous-tier purchases
+- tech rows should spend no money
+- site money should continue to use internal cash-point values converted to player-facing cash at `100` points per `1` cash
 - `Reputation` and `Faction Reputation` unlock access but are never spent
 - branch identity should still come from signature content family plus incremental improvement direction rather than bespoke code per faction
 - content access such as plants/items/recipes/device-build recipes should come from the shared total-reputation unlock ladder, while faction tech rows focus on modifier or mechanism improvements
@@ -3363,14 +3363,14 @@ Technology should remain tied to a tiny set of progression meters:
 |---|---|
 | `reputation` | Campaign-wide trust that unlocks the shared total-reputation access ladder |
 | `factionReputation[factionId]` | Total trust earned with one faction and used for that faction branch's linear tech tiers `1-32` |
-| `campaignCash` | Persistent money shared across the campaign and spent on linear faction-tech purchases |
+| `siteCash` | Transient money owned by the current site session and spent on local buying, hiring, and revealed unlockable purchases |
 
 Important rule:
 
 - `reputation` and `factionReputation[factionId]` unlock tier access but are never spent
-- `campaignCash` is the only prototype currency used to claim tech nodes
-- tech-node internal valuation should use cash points, with the displayed/spent cash price derived from `100` cash points = `1` cash
-- claimed tech state is persistent node ownership, not an unspent-pick inventory
+- tech rows auto-unlock from faction reputation and never spend money
+- site-session money values should use cash points, with the displayed/spent cash price derived from `100` cash points = `1` cash
+- linear faction-tech ownership follows reached reputation tiers rather than stored purchase picks
 - the runtime impact should still come from linked content plus persistent modifier direction, not from a hidden branch bonus table
 
 #### Branch Content Rule
@@ -3408,7 +3408,7 @@ Use this shared prototype structure in the current design:
 |---|---|---|
 | Base techs per faction tier | `1` | Each faction tier owns one base tech claim. |
 | Enhancements per base tech in the prototype | `2` | Each one belongs to the same faction+tier and forms an exclusive pair around that base tech. |
-| Unlock requirement for any claim | tier threshold + cash | Base techs use faction `Faction Reputation` tiers `1-8`; enhancements use faction `Faction Reputation` tiers `9-16` plus the paired base tech purchase. |
+| Unlock requirement for any tech row | matching faction-reputation tier | Base tech rows auto-unlock at the matching faction `Faction Reputation` tiers, and the prototype no longer requires a separate cash claim step. |
 
 #### Per-Unlockable Update Rule
 
@@ -4502,7 +4502,7 @@ This summary should include only core runtime meters and the core plant-side val
 | Weather meters | `weatherHeat`, `weatherWind`, `weatherDust` | Site-wide ambient weather outputs after baseline site conditions and current event meters are combined. |
 | Resolved tile contribution meters | `tileHeatProtection`, `tileWindProtection`, `tileDustProtection`, `tileFertilityImprove`, `tileSalinityReduction`, `tileIrrigation` | Per-tile support result after nearby plants, devices, and shelter are accumulated. They bridge local objects and final weather or terrain computation. |
 | Resolved local weather meters | `tileHeat`, `tileWind`, `tileDust` | Per-tile weather result after site weather, local support, and shelter are combined. They bridge site weather and final terrain or plant pressure. |
-| Technology progression meters | `reputation`, `factionReputation[factionId]`, `campaignCash` | Campaign progression meters that unlock global plant tiers, gate each faction branch's base and enhancement bands, and pay for permanent tech claims. |
+| Technology progression meters | `reputation`, `factionReputation[factionId]` | Campaign progression meters that unlock global plant tiers and gate each faction branch's linear tech bands. |
 | Worker state meters and derived values | `playerHealth`, `playerHydration`, `playerNourishment`, `playerEnergy`, `playerMorale`, derived `playerEnergyCap`, derived `playerWorkEfficiency` | Core worker survival and performance values. `playerHealth`, `playerHydration`, `playerNourishment`, `playerEnergy`, and `playerMorale` are stored worker meters, while `playerEnergyCap` and `playerWorkEfficiency` are recomputed every frame from the current worker condition. |
 | Item state meters | `itemQuantity`, `itemCondition`, `itemFreshness` | Core runtime item-stack meters. `itemQuantity` tracks how much of a stack remains, `itemCondition` tracks damage-sensitive item usability, and `itemFreshness` tracks spoilable item usability. |
 | Persistent terrain soil meters | `tileSoilFertility`, `tileMoisture`, `tileSoilSalinity` | Long-lived or short-lived land condition on plantable `Ground`. These meters determine what can grow well. |
@@ -4785,7 +4785,7 @@ Prototype authoring note:
 |---|---|---|---|
 | `reputation` | Site completion, selected task rewards, commendations, major campaign progress | Global plant-tier eligibility and broader program trust | Campaign-wide trust meter. In the prototype it unlocks the three global plant tiers and is never spent on tech. |
 | `factionReputation[factionId]` | Completed tasks from that faction, faction events, post-event follow-through | Faction base-tech tiers `1-8`, faction-enhancement tiers `9-16`, post-event relief quality, faction-side event quality | Branch-specific total trust meter. It gates a faction branch's full tech depth but is never spent. |
-| `campaignCash` | Site money rewards, buy/sell outcomes, contractor spending, unlock purchases, tech claims | Site purchasing power and tech claims | Persistent campaign money shared across site runs. It is the only prototype currency used to buy base techs and enhancements. |
+| `siteCash` | Site money rewards, buy/sell outcomes, contractor spending, and revealed unlock purchases | Site purchasing power during the current attempt | Transient site-session money that resets for each site run. |
 
 Important rule:
 

@@ -495,7 +495,7 @@ private:
     std::vector<Gs1FeedbackEvent> frame_feedback_events_ {};
     std::vector<std::string> message_logs_ {};
     std::vector<std::string> current_frame_message_entries_ {};
-    std::vector<std::string> frame_live_state_patches_ {};
+    std::uint32_t frame_live_state_patch_mask_ {0U};
     std::vector<Gs1EngineMessageType> seen_messages_ {};
     std::map<Gs1UiSetupId, ActiveUiSetup> active_ui_setups_ {};
     std::optional<PendingUiSetup> pending_ui_setup_ {};

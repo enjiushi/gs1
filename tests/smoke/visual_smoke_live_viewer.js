@@ -4489,9 +4489,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 }
                 if (element.action && element.action.type === "CLAIM_TECHNOLOGY_NODE") {
                     const repRequirement = catalogNode ? catalogNode.reputationRequirement : 0;
-                    const cashCost =
-                        catalogNode ? formatMoney((catalogNode.internalCostCashPoints || 0) / 100) : "0.00";
-                    return "Need " + repRequirement + " rep + $" + cashCost;
+                    return "Need " + repRequirement + " rep";
                 }
                 return (element.flags & 2) !== 0 ? "Locked" : "Unavailable";
             })();
@@ -4515,7 +4513,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 statusText: resolvedStatusText,
                 reputationRequirement: catalogNode ? Number(catalogNode.reputationRequirement || 0) : 0,
                 cashCostText:
-                    catalogNode
+                    catalogNode && Number(catalogNode.internalCostCashPoints || 0) > 0
                         ? ("$" + formatMoney((catalogNode.internalCostCashPoints || 0) / 100))
                         : "",
                 enhancementChoiceIndex: 0,
@@ -4865,7 +4863,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const subtitle = labelElements[1];
         const factionSummary = labelElements[2];
         const titleText = title ? title.text : "Prototype Tech Tree";
-        const subtitleText = subtitle ? subtitle.text : "Claim nodes with available faction reputation.";
+        const subtitleText = subtitle ? subtitle.text : "Tech rows auto-unlock from available faction reputation.";
         const summaryParts = splitInfoParts(subtitleText);
         if (factionSummary && factionSummary.text) {
             summaryParts.push(factionSummary.text);

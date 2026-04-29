@@ -67,7 +67,7 @@ struct PrototypeSiteContent final
 
 struct PrototypeCampaignContent final
 {
-    std::int32_t starting_campaign_cash {0};
+    std::int32_t starting_site_cash {0};
     std::uint32_t support_quota_per_contributor {0};
     std::vector<PrototypeSupportItemContent> baseline_deployment_items {};
     std::vector<PrototypeSiteContent> sites {};

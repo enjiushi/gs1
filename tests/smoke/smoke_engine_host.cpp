@@ -435,7 +435,7 @@ void SmokeEngineHost::update(double delta_seconds)
     frame_number_ += 1U;
     current_frame_gameplay_dll_seconds_ = 0.0;
     current_frame_message_entries_.clear();
-    frame_live_state_patches_.clear();
+    frame_live_state_patch_mask_ = LiveStatePatchField_None;
 
     drain_incoming_commands();
 
@@ -631,13 +631,16 @@ void SmokeEngineHost::publish_live_state_snapshot()
     LiveStateSnapshot snapshot = capture_frame_live_state_snapshot();
     std::scoped_lock lock {published_state_mutex_};
     published_live_state_snapshot_ = std::move(snapshot);
-    if (!frame_live_state_patches_.empty())
+    if (frame_live_state_patch_mask_ != LiveStatePatchField_None)
     {
-        published_live_state_patches_.insert(
-            published_live_state_patches_.end(),
-            frame_live_state_patches_.begin(),
-            frame_live_state_patches_.end());
-        frame_live_state_patches_.clear();
+        const auto patch = build_live_state_patch_json(
+            published_live_state_snapshot_,
+            frame_live_state_patch_mask_);
+        if (!patch.empty())
+        {
+            published_live_state_patches_.push_back(patch);
+        }
+        frame_live_state_patch_mask_ = LiveStatePatchField_None;
     }
 }
 
@@ -2000,12 +2003,7 @@ void SmokeEngineHost::queue_live_state_patch(std::uint32_t field_mask)
     {
         return;
     }
-
-    const auto patch = build_live_state_patch_json(capture_frame_live_state_snapshot(), field_mask);
-    if (!patch.empty())
-    {
-        frame_live_state_patches_.push_back(patch);
-    }
+    frame_live_state_patch_mask_ |= field_mask;
 }
 
 std::vector<SmokeEngineHost::ActiveUiSetup> SmokeEngineHost::snapshot_active_ui_setups() const

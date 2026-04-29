@@ -23,6 +23,7 @@ using gs1::GameMessage;
 using gs1::GameMessageType;
 using gs1::GameRuntime;
 using gs1::InventoryItemUseRequestedMessage;
+using gs1::PhoneListingPurchaseRequestedMessage;
 using gs1::SiteRunState;
 using gs1::StartNewCampaignMessage;
 using gs1::StartSiteAttemptMessage;
@@ -150,6 +151,29 @@ std::vector<const Gs1EngineMessage*> collect_messages_of_type(
         }
     }
     return matches;
+}
+
+void append_messages(std::vector<Gs1EngineMessage>& destination, std::vector<Gs1EngineMessage>&& source)
+{
+    destination.insert(destination.end(), source.begin(), source.end());
+}
+
+void assert_singleton_projection_messages_do_not_repeat(const std::vector<Gs1EngineMessage>& messages)
+{
+    constexpr Gs1EngineMessageType k_singleton_projection_types[] = {
+        GS1_ENGINE_MESSAGE_HUD_STATE,
+        GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES,
+        GS1_ENGINE_MESSAGE_SITE_ACTION_UPDATE,
+        GS1_ENGINE_MESSAGE_SITE_WORKER_UPDATE,
+        GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE,
+        GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE,
+        GS1_ENGINE_MESSAGE_SITE_RESULT_READY};
+
+    for (const auto type : k_singleton_projection_types)
+    {
+        const auto matches = collect_messages_of_type(messages, type);
+        assert(matches.size() <= 1U);
+    }
 }
 
 const Gs1EngineMessage* find_inventory_slot_message(
@@ -309,6 +333,7 @@ void inventory_item_use_updates_worker_and_projection()
 
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
     const auto messages = drain_engine_messages(runtime);
+    assert_singleton_projection_messages_do_not_repeat(messages);
 
     const auto snapshot_messages =
         collect_messages_of_type(messages, GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT);
@@ -316,8 +341,11 @@ void inventory_item_use_updates_worker_and_projection()
     const auto worker_messages =
         collect_messages_of_type(messages, GS1_ENGINE_MESSAGE_SITE_WORKER_UPDATE);
     const auto hud_messages = collect_messages_of_type(messages, GS1_ENGINE_MESSAGE_HUD_STATE);
+    const auto campaign_resource_messages =
+        collect_messages_of_type(messages, GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES);
     assert(worker_messages.size() == 1U);
     assert(hud_messages.size() == 1U);
+    assert(campaign_resource_messages.empty());
 
     const auto* slot_message =
         find_inventory_slot_message(messages, site_run.inventory.worker_pack_storage_id, 4U);
@@ -336,12 +364,108 @@ void inventory_item_use_updates_worker_and_projection()
     }
 
     {
-        const auto& payload = hud_messages.front()->payload_as<Gs1EngineMessageHudStateData>();
+        const auto& payload = hud_messages.back()->payload_as<Gs1EngineMessageHudStateData>();
         assert(approx_equal(payload.player_health, 88.0f));
         assert(approx_equal(payload.player_morale, 100.0f));
-        assert(approx_equal(payload.current_money, 45.0f));
+        assert(approx_equal(payload.current_money, 20.0f));
         assert(payload.active_task_count == 1U);
     }
+}
+
+void task_accept_request_does_not_emit_campaign_resource_projection()
+{
+    Gs1RuntimeCreateDesc create_desc {};
+    create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
+    create_desc.api_version = gs1::k_api_version;
+    create_desc.fixed_step_seconds = 1.0 / 60.0;
+
+    GameRuntime runtime {create_desc};
+    bootstrap_site_one(runtime);
+    seed_runtime_test_task(runtime, 10U);
+    drain_engine_messages(runtime);
+
+    assert(runtime.handle_message(make_accept_task_message(1U)) == GS1_STATUS_OK);
+
+    std::vector<Gs1EngineMessage> messages = drain_engine_messages(runtime);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+    append_messages(messages, drain_engine_messages(runtime));
+    assert_singleton_projection_messages_do_not_repeat(messages);
+
+    const auto campaign_resource_messages =
+        collect_messages_of_type(messages, GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES);
+    assert(campaign_resource_messages.empty());
+}
+
+void phone_purchase_request_emits_single_hud_and_campaign_resource_projection()
+{
+    Gs1RuntimeCreateDesc create_desc {};
+    create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
+    create_desc.api_version = gs1::k_api_version;
+    create_desc.fixed_step_seconds = 1.0 / 60.0;
+
+    GameRuntime runtime {create_desc};
+    bootstrap_site_one(runtime);
+    auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
+    drain_engine_messages(runtime);
+
+    GameMessage buy_listing {};
+    buy_listing.type = GameMessageType::PhoneListingPurchaseRequested;
+    buy_listing.set_payload(PhoneListingPurchaseRequestedMessage {1U, 1U, 0U});
+    assert(runtime.handle_message(buy_listing) == GS1_STATUS_OK);
+    assert(site_run.economy.current_cash == 1280);
+
+    std::vector<Gs1EngineMessage> messages = drain_engine_messages(runtime);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+    append_messages(messages, drain_engine_messages(runtime));
+    assert_singleton_projection_messages_do_not_repeat(messages);
+
+    const auto hud_messages = collect_messages_of_type(messages, GS1_ENGINE_MESSAGE_HUD_STATE);
+    const auto campaign_resource_messages =
+        collect_messages_of_type(messages, GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES);
+    assert(hud_messages.size() == 1U);
+    assert(campaign_resource_messages.size() == 1U);
+
+    {
+        const auto& payload = hud_messages.front()->payload_as<Gs1EngineMessageHudStateData>();
+        assert(approx_equal(payload.current_money, 12.8f));
+    }
+
+    {
+        const auto& payload =
+            campaign_resource_messages.front()->payload_as<Gs1EngineMessageCampaignResourcesData>();
+        assert(approx_equal(payload.current_money, 12.8f));
+    }
+}
+
+void inventory_use_request_keeps_singleton_projections_singular_across_immediate_and_flush_paths()
+{
+    Gs1RuntimeCreateDesc create_desc {};
+    create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
+    create_desc.api_version = gs1::k_api_version;
+    create_desc.fixed_step_seconds = 1.0 / 60.0;
+
+    GameRuntime runtime {create_desc};
+    bootstrap_site_one(runtime);
+
+    auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
+    drain_engine_messages(runtime);
+
+    site_run.inventory.worker_pack_slots[4].occupied = true;
+    site_run.inventory.worker_pack_slots[4].item_id = gs1::ItemId {gs1::k_item_medicine_pack};
+    site_run.inventory.worker_pack_slots[4].item_quantity = 1U;
+    site_run.inventory.worker_pack_slots[4].item_condition = 1.0f;
+    site_run.inventory.worker_pack_slots[4].item_freshness = 1.0f;
+
+    assert(runtime.handle_message(make_inventory_use_message(
+               gs1::k_item_medicine_pack,
+               1U,
+               site_run.inventory.worker_pack_storage_id,
+               4U)) == GS1_STATUS_OK);
+
+    std::vector<Gs1EngineMessage> messages = drain_engine_messages(runtime);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+    append_messages(messages, drain_engine_messages(runtime));
+    assert_singleton_projection_messages_do_not_repeat(messages);
 }
 
 void ecology_growth_completes_task_and_site_attempt()
@@ -446,6 +570,9 @@ void site_weather_changes_emit_hud_wind_warning_codes()
 int main()
 {
     inventory_item_use_updates_worker_and_projection();
+    inventory_use_request_keeps_singleton_projections_singular_across_immediate_and_flush_paths();
+    task_accept_request_does_not_emit_campaign_resource_projection();
+    phone_purchase_request_emits_single_hud_and_campaign_resource_projection();
     ecology_growth_completes_task_and_site_attempt();
     site_weather_changes_emit_hud_wind_warning_codes();
     return 0;

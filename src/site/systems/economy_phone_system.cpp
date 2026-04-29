@@ -30,11 +30,11 @@ bool money_delta_fits(std::int64_t amount) noexcept
         amount <= std::numeric_limits<std::int32_t>::max();
 }
 
-bool can_apply_campaign_cash_delta(
+bool can_apply_site_cash_delta(
     const SiteSystemContext<EconomyPhoneSystem>& context,
     std::int32_t delta) noexcept
 {
-    const auto updated = static_cast<std::int64_t>(context.campaign.cash) + delta;
+    const auto updated = static_cast<std::int64_t>(context.world.read_economy().current_cash) + delta;
     if (updated < 0 || updated > std::numeric_limits<std::int32_t>::max())
     {
         return false;
@@ -52,6 +52,21 @@ void mark_phone_and_hud_dirty(SiteSystemContext<EconomyPhoneSystem>& context) no
 {
     context.world.mark_projection_dirty(
         SITE_PROJECTION_UPDATE_PHONE | SITE_PROJECTION_UPDATE_HUD);
+}
+
+bool apply_site_cash_delta(
+    SiteSystemContext<EconomyPhoneSystem>& context,
+    std::int32_t delta) noexcept
+{
+    if (!can_apply_site_cash_delta(context, delta))
+    {
+        return false;
+    }
+
+    auto& economy = context.world.own_economy();
+    economy.current_cash = static_cast<std::int32_t>(
+        static_cast<std::int64_t>(economy.current_cash) + delta);
+    return true;
 }
 
 PhoneListingState make_item_listing(
@@ -78,21 +93,6 @@ PhoneListingState make_item_listing(
 std::uint32_t make_sell_listing_id(ItemId item_id) noexcept
 {
     return k_sell_listing_id_base + item_id.value;
-}
-
-void queue_campaign_cash_delta_message(
-    SiteSystemContext<EconomyPhoneSystem>& context,
-    std::int32_t delta) noexcept
-{
-    if (delta == 0)
-    {
-        return;
-    }
-
-    GameMessage cash_message {};
-    cash_message.type = GameMessageType::CampaignCashDeltaRequested;
-    cash_message.set_payload(CampaignCashDeltaRequestedMessage {delta});
-    context.message_queue.push_back(cash_message);
 }
 
 void clamp_cart_quantity(PhoneListingState& listing) noexcept
@@ -430,11 +430,10 @@ Gs1Status process_buy_listing(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    if (!can_apply_campaign_cash_delta(context, static_cast<std::int32_t>(-total_cost)))
+    if (!apply_site_cash_delta(context, static_cast<std::int32_t>(-total_cost)))
     {
         return GS1_STATUS_INVALID_STATE;
     }
-    queue_campaign_cash_delta_message(context, static_cast<std::int32_t>(-total_cost));
 
     if (limited)
     {
@@ -552,11 +551,10 @@ Gs1Status process_cart_checkout(SiteSystemContext<EconomyPhoneSystem>& context)
         return GS1_STATUS_INVALID_STATE;
     }
 
-    if (!can_apply_campaign_cash_delta(context, static_cast<std::int32_t>(-total_cost)))
+    if (!apply_site_cash_delta(context, static_cast<std::int32_t>(-total_cost)))
     {
         return GS1_STATUS_INVALID_STATE;
     }
-    queue_campaign_cash_delta_message(context, static_cast<std::int32_t>(-total_cost));
 
     for (auto& listing : economy.available_phone_listings)
     {
@@ -628,11 +626,10 @@ Gs1Status process_sell_listing(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    if (!can_apply_campaign_cash_delta(context, static_cast<std::int32_t>(total_gain)))
+    if (!apply_site_cash_delta(context, static_cast<std::int32_t>(total_gain)))
     {
         return GS1_STATUS_INVALID_STATE;
     }
-    queue_campaign_cash_delta_message(context, static_cast<std::int32_t>(total_gain));
 
     listing.quantity = effective_available - quantity_to_sell;
 
@@ -677,11 +674,10 @@ Gs1Status process_contractor_hire(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    if (!can_apply_campaign_cash_delta(context, static_cast<std::int32_t>(-total_cost)))
+    if (!apply_site_cash_delta(context, static_cast<std::int32_t>(-total_cost)))
     {
         return GS1_STATUS_INVALID_STATE;
     }
-    queue_campaign_cash_delta_message(context, static_cast<std::int32_t>(-total_cost));
 
     if (limited)
     {
@@ -708,11 +704,10 @@ Gs1Status process_unlockable_purchase(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    if (!can_apply_campaign_cash_delta(context, static_cast<std::int32_t>(-price)))
+    if (!apply_site_cash_delta(context, static_cast<std::int32_t>(-price)))
     {
         return GS1_STATUS_INVALID_STATE;
     }
-    queue_campaign_cash_delta_message(context, static_cast<std::int32_t>(-price));
 
     remove_unlockable(economy.direct_purchase_unlockable_ids, unlockable_id);
     if (!contains_unlockable(economy.revealed_site_unlockable_ids, unlockable_id))
@@ -797,6 +792,7 @@ void seed_site_economy(SiteSystemContext<EconomyPhoneSystem>& context, std::uint
     economy.phone_listing_source_membership_revision = 0U;
     economy.phone_listing_source_quantity_revision = 0U;
     economy.phone_listing_source_action_reservation_signature = 0U;
+    economy.current_cash = get_prototype_campaign_content().starting_site_cash;
     economy.phone_delivery_fee = site_content == nullptr ? 0 : site_content->phone_delivery_fee;
     economy.phone_delivery_minutes = site_content == nullptr ? 0U : site_content->phone_delivery_minutes;
     economy.available_phone_listings.clear();
@@ -861,11 +857,10 @@ Gs1Status EconomyPhoneSystem::process_message(
             return GS1_STATUS_OK;
         }
 
-        if (!can_apply_campaign_cash_delta(context, payload.delta))
+        if (!apply_site_cash_delta(context, payload.delta))
         {
             return GS1_STATUS_INVALID_STATE;
         }
-        queue_campaign_cash_delta_message(context, payload.delta);
 
         mark_phone_and_hud_dirty(context);
         return GS1_STATUS_OK;

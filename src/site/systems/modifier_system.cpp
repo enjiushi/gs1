@@ -627,11 +627,10 @@ void accumulate_campaign_technology_modifier_totals(
     const CampaignState& campaign,
     ModifierChannelTotals& totals) noexcept
 {
-    for (const auto& purchase : campaign.technology_state.purchased_nodes)
+    for (const auto& node_def : all_technology_node_defs())
     {
-        const auto* node_def = find_technology_node_def(purchase.tech_node_id);
-        if (node_def == nullptr ||
-            node_def->entry_kind != TechnologyEntryKind::GlobalModifier)
+        if (node_def.entry_kind != TechnologyEntryKind::GlobalModifier ||
+            !TechnologySystem::node_purchased(campaign, node_def.tech_node_id))
         {
             continue;
         }
@@ -639,8 +638,8 @@ void accumulate_campaign_technology_modifier_totals(
         accumulate_totals(
             totals,
             scale_totals(
-                resolve_run_modifier_preset(node_def->linked_modifier_id),
-                TechnologySystem::current_effect_parameter(campaign, *node_def)));
+                resolve_run_modifier_preset(node_def.linked_modifier_id),
+                TechnologySystem::current_effect_parameter(campaign, node_def)));
     }
 }
 

@@ -42,22 +42,9 @@ using gs1::TaskRuntimeListKind;
 using gs1::TileCoord;
 using namespace gs1::testing::fixtures;
 
-std::int32_t effective_campaign_cash(
-    const gs1::CampaignState& campaign,
-    const gs1::GameMessageQueue& queue)
+std::int32_t current_site_cash(const gs1::SiteRunState& site_run)
 {
-    std::int64_t total = campaign.cash;
-    for (const auto& message : queue)
-    {
-        if (message.type != gs1::GameMessageType::CampaignCashDeltaRequested)
-        {
-            continue;
-        }
-
-        total += message.payload_as<gs1::CampaignCashDeltaRequestedMessage>().delta;
-    }
-
-    return static_cast<std::int32_t>(total);
+    return site_run.economy.current_cash;
 }
 
 std::string trim_copy(std::string_view value)
@@ -431,8 +418,8 @@ void economy_phone_regression_runner(
         const auto expected_money =
             values.contains("expect_money")
             ? gs1::cash_points_from_cash(static_cast<std::int32_t>(parse_u32(context, values, "expect_money")))
-            : effective_campaign_cash(campaign, queue);
-        GS1_SYSTEM_TEST_CHECK(context, effective_campaign_cash(campaign, queue) == expected_money);
+            : current_site_cash(site_run);
+        GS1_SYSTEM_TEST_CHECK(context, current_site_cash(site_run) == expected_money);
         GS1_SYSTEM_TEST_CHECK(
             context,
             site_run.economy.direct_purchase_unlockable_ids.size() ==
@@ -454,10 +441,10 @@ void economy_phone_regression_runner(
         const auto expected_money =
             values.contains("expect_money")
             ? gs1::cash_points_from_cash(static_cast<std::int32_t>(parse_u32(context, values, "expect_money")))
-            : effective_campaign_cash(campaign, queue);
+            : current_site_cash(site_run);
         GS1_SYSTEM_TEST_CHECK(
             context,
-            effective_campaign_cash(campaign, queue) == expected_money);
+            current_site_cash(site_run) == expected_money);
         return;
     }
 
@@ -465,7 +452,7 @@ void economy_phone_regression_runner(
     {
         if (values.contains("override_money"))
         {
-            campaign.cash =
+            site_run.economy.current_cash =
                 gs1::cash_points_from_cash(static_cast<std::int32_t>(parse_u32(context, values, "override_money")));
         }
 
@@ -480,10 +467,10 @@ void economy_phone_regression_runner(
         const auto expected_money =
             values.contains("expect_money")
             ? gs1::cash_points_from_cash(static_cast<std::int32_t>(parse_u32(context, values, "expect_money")))
-            : effective_campaign_cash(campaign, queue);
+            : current_site_cash(site_run);
         GS1_SYSTEM_TEST_CHECK(
             context,
-            effective_campaign_cash(campaign, queue) == expected_money);
+            current_site_cash(site_run) == expected_money);
         return;
     }
 

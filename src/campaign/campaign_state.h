@@ -42,7 +42,6 @@ struct CampaignState final
 {
     CampaignId campaign_id {};
     std::uint64_t campaign_seed {0};
-    std::int32_t cash {0};
     double campaign_clock_minutes_elapsed {0.0};
     std::uint32_t campaign_days_total {0};
     std::uint32_t campaign_days_remaining {0};

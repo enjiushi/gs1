@@ -1431,14 +1431,7 @@ void action_execution_shovel_in_worker_pack_reduces_plant_and_excavate_duration_
     const auto baseline_plant_cost = baseline_site_run.site_action.deferred_meter_delta;
 
     auto boosted_campaign = make_campaign();
-    for (std::uint8_t tier = 1U; tier <= 11U; ++tier)
-    {
-        boosted_campaign.technology_state.purchased_nodes.push_back(
-            gs1::TechnologyPurchaseRecord {
-                gs1::TechNodeId {gs1::base_technology_node_id(
-                    gs1::FactionId {gs1::k_faction_village_committee},
-                    tier)}});
-    }
+    boosted_campaign.faction_progress[0].faction_reputation = 11;
     auto boosted_site_run = make_test_site_run(1U, 5202U);
     GameMessageQueue boosted_queue {};
     auto boosted_context =
@@ -1618,11 +1611,7 @@ void action_execution_village_tech_unlocks_careful_and_thorough_excavation(
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::SiteActionFailed);
 
-    campaign.technology_state.purchased_nodes.push_back(
-        gs1::TechnologyPurchaseRecord {
-                gs1::TechNodeId {gs1::base_technology_node_id(
-                    gs1::FactionId {gs1::k_faction_village_committee},
-                    12U)}});
+    campaign.faction_progress[0].faction_reputation = 12;
     queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -1646,11 +1635,7 @@ void action_execution_village_tech_unlocks_careful_and_thorough_excavation(
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::SiteActionFailed);
 
-    campaign.technology_state.purchased_nodes.push_back(
-        gs1::TechnologyPurchaseRecord {
-                gs1::TechNodeId {gs1::base_technology_node_id(
-                    gs1::FactionId {gs1::k_faction_village_committee},
-                    30U)}});
+    campaign.faction_progress[0].faction_reputation = 30;
     queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(
         context,

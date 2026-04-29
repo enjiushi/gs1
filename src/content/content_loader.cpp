@@ -1298,8 +1298,8 @@ void load_prototype_campaign_sites(ContentDatabase& content, const std::filesyst
 void load_prototype_campaign_setup(ContentDatabase& content, const std::filesystem::path& path)
 {
     const auto document = load_toml_document(path);
-    content.prototype_campaign.starting_campaign_cash =
-        cash_points_from_cash(require_toml_signed<std::int32_t>(path, document, "starting_campaign_cash"));
+    content.prototype_campaign.starting_site_cash =
+        cash_points_from_cash(require_toml_signed<std::int32_t>(path, document, "starting_site_cash"));
     content.prototype_campaign.support_quota_per_contributor =
         require_toml_unsigned<std::uint32_t>(path, document, "support_quota_per_contributor");
     content.prototype_campaign.baseline_deployment_items =

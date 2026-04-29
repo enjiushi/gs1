@@ -778,7 +778,7 @@ int main()
     auto& bootstrap_site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
     assert(gs1::site_world_access::width(bootstrap_site_run) == 32U);
     assert(gs1::site_world_access::height(bootstrap_site_run) == 32U);
-    assert(bootstrap_site_run.inventory.worker_pack_slots.size() == 8U);
+    assert(bootstrap_site_run.inventory.worker_pack_slots.size() == 12U);
     assert(!bootstrap_site_run.inventory.worker_pack_slots[0].occupied);
     assert(gs1::inventory_storage::available_item_quantity_in_container(
                bootstrap_site_run,
@@ -790,7 +790,7 @@ int main()
                gs1::ItemId {gs1::k_item_basic_straw_checkerboard}) == 8U);
     assert(bootstrap_site_run.task_board.visible_tasks.size() == 1U);
     assert(bootstrap_site_run.task_board.accepted_task_ids.size() == 1U);
-    assert(gs1::GameRuntimeProjectionTestAccess::campaign(runtime)->cash == 4100);
+    assert(bootstrap_site_run.economy.current_cash == 2000);
     assert(bootstrap_site_run.economy.available_phone_listings.size() >= 5U);
 
     const auto bootstrap_messages = drain_engine_messages(runtime);
@@ -894,7 +894,7 @@ int main()
     buy_listing.type = GameMessageType::PhoneListingPurchaseRequested;
     buy_listing.set_payload(PhoneListingPurchaseRequestedMessage {1U, 1U, 0U});
     assert(runtime.handle_message(buy_listing) == GS1_STATUS_OK);
-    assert(gs1::GameRuntimeProjectionTestAccess::campaign(runtime)->cash == 3380);
+    assert(bootstrap_site_run.economy.current_cash == 1280);
     assert(bootstrap_site_run.economy.available_phone_listings[0].quantity == 5U);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
     drain_engine_messages(runtime);

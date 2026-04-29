@@ -554,18 +554,18 @@ Required fields:
 
 ```text
 totalReputation
-persistentCash
-purchasedNodeIds[]
+siteCash
+factionReputation[factionId]
 ```
 
 Rules:
 
 - `totalReputation` is never spent and unlocks the authored global progression ladder across plants/items/recipes/device-build recipes
-- `persistentCash` is shared across the campaign and pays for the linear faction-tech claims
-- tech rows should author internal cash-point valuation and derive player-facing cash cost from `100` cash points = `1` cash
-- technology claims do not spend down total reputation or faction reputation
+- `siteCash` is transient per active site session and pays for local buying, hiring, and revealed unlockable purchases
+- tech rows now auto-unlock from faction reputation; the authored internal cash-point values stay at `0`, while site-session money still uses the standard `100` cash points = `1` cash display rule
+- technology progression does not spend down total reputation or faction reputation
 - each faction branch should expose a linear `32`-tier tech ladder gated by matching faction-reputation tiers `1-32`
-- `purchasedNodeIds[]` is authoritative progression state
+- faction reputation thresholds are authoritative for linear tech ownership
 
 ### 6.7 `LoadoutPlannerState`
 
@@ -1357,8 +1357,8 @@ Responsibilities:
 
 - validate faction base-tech or paired-enhancement prerequisites
 - validate total-reputation plant-tier eligibility
-- convert authored internal cash-point valuation into player-facing cash and spend persistent campaign cash when a tech node is claimed
-- mark node purchased
+- auto-unlock tech rows when the owning faction reaches the authored reputation requirement
+- refresh eligibility directly from faction-reputation-derived ownership
 - update `ContentDatabase` eligibility view for recipes, plants, items, and devices/structures granted by tech nodes
 
 ## 11. Content Loading And Runtime Eligibility
@@ -1392,7 +1392,7 @@ Gameplay code reads only:
 - `getEligibleSiteUnlockables(siteRun, campaignState)`
 - `getEligibleDirectPurchaseUnlockables(siteRun, campaignState)`
 
-Direct-purchase unlockable offers should author internal cash-point values and derive displayed/spent cash from the same `100` cash points = `1` cash rule used by tech claims.
+Direct-purchase unlockable offers should author internal cash-point values and derive displayed/spent cash from the same `100` cash points = `1` cash rule used by the rest of site-session money.
 
 These are query helpers over validated content plus current progression state. They are not the generator themselves.
 

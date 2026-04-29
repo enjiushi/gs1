@@ -133,19 +133,11 @@ void prototype_site_run_expands_worker_pack_with_village_pack_techs(
     auto base_site_run = make_prototype_site_run(campaign, 1U);
     GS1_SYSTEM_TEST_CHECK(context, base_site_run.inventory.worker_pack_slot_count == 8U);
 
-    campaign.technology_state.purchased_nodes.push_back(
-        gs1::TechnologyPurchaseRecord {
-            gs1::TechNodeId {gs1::base_technology_node_id(
-                gs1::FactionId {gs1::k_faction_village_committee},
-                21U)}});
+    campaign.faction_progress[0].faction_reputation = 21;
     auto first_pack_site_run = make_prototype_site_run(campaign, 1U);
     GS1_SYSTEM_TEST_CHECK(context, first_pack_site_run.inventory.worker_pack_slot_count == 10U);
 
-    campaign.technology_state.purchased_nodes.push_back(
-        gs1::TechnologyPurchaseRecord {
-            gs1::TechNodeId {gs1::base_technology_node_id(
-                gs1::FactionId {gs1::k_faction_village_committee},
-                22U)}});
+    campaign.faction_progress[0].faction_reputation = 22;
     auto second_pack_site_run = make_prototype_site_run(campaign, 1U);
     GS1_SYSTEM_TEST_CHECK(context, second_pack_site_run.inventory.worker_pack_slot_count == 12U);
 }
@@ -1515,11 +1507,6 @@ void modifier_imports_campaign_assistant_and_scales_technology_run_modifiers_wit
     campaign.faction_progress[0].has_unlocked_assistant_package = true;
     campaign.faction_progress[0].unlocked_assistant_package_id = 1001U;
     campaign.faction_progress[2].faction_reputation = 10;
-    campaign.technology_state.purchased_nodes.push_back(
-        gs1::TechnologyPurchaseRecord {
-            gs1::TechNodeId {gs1::base_technology_node_id(
-                gs1::FactionId {gs1::k_faction_agricultural_university},
-                1U)}});
     auto site_run = make_test_site_run(1U, 1602U);
     GameMessageQueue queue {};
     auto site_context = make_site_context<ModifierSystem>(campaign, site_run, queue);
