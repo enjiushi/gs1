@@ -70,6 +70,7 @@ enum class GameMessageType : std::uint8_t
     LivingPlantStabilityChanged,
     SiteTileStateChanged,
     RestorationProgressChanged,
+    SiteRefreshTick,
     TaskAcceptRequested,
     TaskRewardClaimRequested,
     PhoneListingPurchased,
@@ -171,6 +172,13 @@ enum TileEcologyChangedFlags : std::uint32_t
     TILE_ECOLOGY_CHANGED_FERTILITY = 1u << 4,
     TILE_ECOLOGY_CHANGED_SALINITY = 1u << 5,
     TILE_ECOLOGY_CHANGED_GROWTH_PRESSURE = 1u << 6
+};
+
+enum SiteRefreshTickFlags : std::uint32_t
+{
+    SITE_REFRESH_TICK_NONE = 0,
+    SITE_REFRESH_TICK_TASK_BOARD = 1u << 0,
+    SITE_REFRESH_TICK_PHONE_BUY_STOCK = 1u << 1
 };
 
 struct StartNewCampaignMessage final
@@ -529,6 +537,11 @@ struct RestorationProgressChangedMessage final
     float normalized_progress;
 };
 
+struct SiteRefreshTickMessage final
+{
+    std::uint32_t refresh_mask;
+};
+
 struct TaskAcceptRequestedMessage final
 {
     std::uint32_t task_instance_id;
@@ -831,6 +844,7 @@ GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TileEcologyBatchChangedMessage, 52U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(LivingPlantStabilityChangedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteTileStateChangedMessage, 44U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(RestorationProgressChangedMessage, 12U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteRefreshTickMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TaskAcceptRequestedMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TaskRewardClaimRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingPurchasedMessage, 12U);

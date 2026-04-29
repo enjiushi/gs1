@@ -16,6 +16,7 @@ public:
                 SiteComponent::Inventory,
                 SiteComponent::Craft,
                 SiteComponent::Action,
+                SiteComponent::TaskBoard,
                 SiteComponent::Economy),
             site_component_mask_of(SiteComponent::Economy)};
     }

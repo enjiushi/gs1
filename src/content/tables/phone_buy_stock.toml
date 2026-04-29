@@ -1,0 +1,104 @@
+[[phone_buy_stock]]
+site_id = 1
+listing_id = 1
+item_id = 1
+base_stock_cash_points = 1320
+stock_cash_points_variance = 220
+
+[[phone_buy_stock]]
+site_id = 1
+listing_id = 2
+item_id = 2
+base_stock_cash_points = 1237
+stock_cash_points_variance = 247
+
+[[phone_buy_stock]]
+site_id = 1
+listing_id = 3
+item_id = 3
+base_stock_cash_points = 3960
+stock_cash_points_variance = 990
+
+[[phone_buy_stock]]
+site_id = 1
+listing_id = 4
+item_id = 4
+base_stock_cash_points = 1980
+stock_cash_points_variance = 330
+
+[[phone_buy_stock]]
+site_id = 1
+listing_id = 5
+item_id = 5
+base_stock_cash_points = 2200
+stock_cash_points_variance = 440
+
+[[phone_buy_stock]]
+site_id = 1
+listing_id = 6
+item_id = 6
+base_stock_cash_points = 1980
+stock_cash_points_variance = 495
+
+[[phone_buy_stock]]
+site_id = 1
+listing_id = 7
+item_id = 7
+base_stock_cash_points = 4290
+stock_cash_points_variance = 715
+
+[[phone_buy_stock]]
+site_id = 1
+listing_id = 8
+item_id = 8
+base_stock_cash_points = 1320
+stock_cash_points_variance = 220
+
+[[phone_buy_stock]]
+site_id = 1
+listing_id = 9
+item_id = 9
+base_stock_cash_points = 2200
+stock_cash_points_variance = 440
+
+[[phone_buy_stock]]
+site_id = 1
+listing_id = 11
+item_id = 16
+base_stock_cash_points = 4400
+stock_cash_points_variance = 550
+
+[[phone_buy_stock]]
+site_id = 1
+listing_id = 12
+item_id = 17
+base_stock_cash_points = 4840
+stock_cash_points_variance = 605
+
+[[phone_buy_stock]]
+site_id = 1
+listing_id = 13
+item_id = 18
+base_stock_cash_points = 3960
+stock_cash_points_variance = 660
+
+[[phone_buy_stock]]
+site_id = 1
+listing_id = 14
+item_id = 19
+base_stock_cash_points = 4290
+stock_cash_points_variance = 715
+
+[[phone_buy_stock]]
+site_id = 1
+listing_id = 15
+item_id = 20
+base_stock_cash_points = 3080
+stock_cash_points_variance = 770
+
+[[phone_buy_stock]]
+site_id = 1
+listing_id = 16
+item_id = 15
+base_stock_cash_points = 3080
+stock_cash_points_variance = 385

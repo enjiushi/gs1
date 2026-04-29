@@ -27,6 +27,14 @@ struct PrototypePhoneListingContent final
     std::uint32_t quantity {0};
 };
 
+struct PrototypePhoneBuyStockContent final
+{
+    std::uint32_t listing_id {0};
+    ItemId item_id {};
+    std::uint32_t base_stock_cash_points {0U};
+    std::uint32_t stock_cash_points_variance {0U};
+};
+
 struct PrototypeSiteStartingPlantContent final
 {
     PlantId plant_id {};
@@ -63,6 +71,7 @@ struct PrototypeSiteContent final
     std::vector<std::uint32_t> initial_revealed_unlockable_ids {};
     std::vector<std::uint32_t> initial_direct_purchase_unlockable_ids {};
     std::vector<PrototypePhoneListingContent> seeded_phone_listings {};
+    std::vector<PrototypePhoneBuyStockContent> phone_buy_stock_pool {};
 };
 
 struct PrototypeCampaignContent final

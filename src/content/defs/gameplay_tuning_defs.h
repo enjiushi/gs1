@@ -117,6 +117,12 @@ struct CampDurabilityTuning final
     float shared_storage_threshold {30.0f};
 };
 
+struct TaskBoardTuning final
+{
+    float refresh_interval_minutes {240.0f};
+    std::uint32_t normal_task_pool_size {3U};
+};
+
 struct GameplayTuningDef final
 {
     WorkerConditionTuning worker_condition {};
@@ -125,6 +131,7 @@ struct GameplayTuningDef final
     ModifierSystemTuning modifier_system {};
     DeviceSupportTuning device_support {};
     CampDurabilityTuning camp_durability {};
+    TaskBoardTuning task_board {};
 };
 
 [[nodiscard]] const GameplayTuningDef& gameplay_tuning_def() noexcept;

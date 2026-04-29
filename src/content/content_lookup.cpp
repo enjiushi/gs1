@@ -250,6 +250,24 @@ const CraftRecipeDef* find_craft_recipe_def(RecipeId recipe_id) noexcept
         : &content.craft_recipe_defs[it->second];
 }
 
+bool item_has_craft_recipe_output(ItemId item_id) noexcept
+{
+    if (item_id.value == 0U)
+    {
+        return false;
+    }
+
+    for (const auto& recipe_def : all_craft_recipe_defs())
+    {
+        if (recipe_def.output_item_id == item_id)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 std::span<const TaskTemplateDef> all_task_template_defs() noexcept
 {
     return prototype_content_database().task_template_defs;

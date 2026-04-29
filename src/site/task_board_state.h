@@ -109,6 +109,7 @@ struct TaskBoardState final
     std::uint32_t fully_grown_tile_count {0};
     std::uint32_t site_completion_tile_threshold {0};
     std::uint32_t tracked_living_plant_count {0};
+    std::uint32_t refresh_generation {0U};
     double minutes_until_next_refresh {0.0};
     TaskTrackedWorkerState worker {};
     bool all_tracked_living_plants_stable {false};

@@ -121,7 +121,9 @@ bool same_listing_vector(
             left.price != right.price ||
             left.quantity != right.quantity ||
             left.cart_quantity != right.cart_quantity ||
-            left.occupied != right.occupied)
+            left.stock_refresh_generation != right.stock_refresh_generation ||
+            left.occupied != right.occupied ||
+            left.generated_from_stock != right.generated_from_stock)
         {
             return false;
         }
@@ -139,7 +141,9 @@ PhoneListingState make_sell_listing(ItemId item_id, std::uint32_t quantity) noex
         static_cast<std::int32_t>(item_sell_price_cash_points(item_id)),
         quantity,
         0U,
-        true};
+        0U,
+        true,
+        false};
 }
 
 void build_projected_listings(

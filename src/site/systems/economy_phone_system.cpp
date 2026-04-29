@@ -1,5 +1,7 @@
 #include "campaign/systems/technology_system.h"
+#include "content/defs/craft_recipe_defs.h"
 #include "content/defs/item_defs.h"
+#include "content/defs/task_defs.h"
 #include "content/prototype_content.h"
 #include "site/craft_logic.h"
 #include "site/inventory_storage.h"
@@ -87,7 +89,9 @@ PhoneListingState make_item_listing(
         item_def == nullptr ? 0 : static_cast<std::int32_t>(item_price_cash_points),
         quantity,
         0U,
-        true};
+        0U,
+        true,
+        false};
 }
 
 std::uint32_t make_sell_listing_id(ItemId item_id) noexcept
@@ -157,6 +161,75 @@ bool contains_unlockable(
 void remove_unlockable(std::vector<std::uint32_t>& container, std::uint32_t unlockable_id) noexcept
 {
     container.erase(std::remove(container.begin(), container.end(), unlockable_id), container.end());
+}
+
+std::uint64_t mix_seed(
+    std::uint64_t base_seed,
+    std::uint32_t a,
+    std::uint32_t b) noexcept
+{
+    std::uint64_t value = base_seed ^ (static_cast<std::uint64_t>(a) << 32U) ^ static_cast<std::uint64_t>(b);
+    value ^= value >> 33U;
+    value *= 0xff51afd7ed558ccdULL;
+    value ^= value >> 33U;
+    value *= 0xc4ceb9fe1a85ec53ULL;
+    value ^= value >> 33U;
+    return value;
+}
+
+bool onboarding_chain_effective(const SiteSystemContext<EconomyPhoneSystem>& context) noexcept
+{
+    for (const auto& task : context.world.read_task_board().visible_tasks)
+    {
+        if (task.runtime_list_kind == TaskRuntimeListKind::Claimed)
+        {
+            continue;
+        }
+
+        for (const auto& seed_def : all_site_onboarding_task_seed_defs())
+        {
+            if (seed_def.site_id == context.site_run.site_id &&
+                seed_def.task_template_id == task.task_template_id)
+            {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+bool phone_buy_stock_item_available(
+    const SiteSystemContext<EconomyPhoneSystem>& context,
+    ItemId item_id) noexcept
+{
+    const auto* item_def = find_item_def(item_id);
+    if (item_def == nullptr)
+    {
+        return false;
+    }
+
+    if (item_def->linked_plant_id.value != 0U)
+    {
+        return TechnologySystem::plant_unlocked(context.campaign, item_def->linked_plant_id);
+    }
+
+    return item_buy_price_cash_points(item_id) > 0U;
+}
+
+PhoneListingState* find_generated_stock_listing(
+    EconomyState& economy,
+    std::uint32_t listing_id) noexcept
+{
+    for (auto& listing : economy.available_phone_listings)
+    {
+        if (listing.generated_from_stock && listing.listing_id == listing_id)
+        {
+            return &listing;
+        }
+    }
+
+    return nullptr;
 }
 
 std::vector<std::uint32_t> phone_item_instance_ids(
@@ -230,7 +303,9 @@ bool same_listing_vector(
             left.price != right.price ||
             left.quantity != right.quantity ||
             left.cart_quantity != right.cart_quantity ||
-            left.occupied != right.occupied)
+            left.stock_refresh_generation != right.stock_refresh_generation ||
+            left.occupied != right.occupied ||
+            left.generated_from_stock != right.generated_from_stock)
         {
             return false;
         }
@@ -337,6 +412,109 @@ void queue_sale_completed_message(
         static_cast<std::uint16_t>(std::min<std::uint32_t>(quantity, 65535U)),
         0U});
     context.message_queue.push_back(message);
+}
+
+std::uint32_t resolved_stock_cash_points(
+    const SiteSystemContext<EconomyPhoneSystem>& context,
+    const PrototypePhoneBuyStockContent& stock_entry,
+    std::uint32_t refresh_generation) noexcept
+{
+    const auto span = stock_entry.stock_cash_points_variance * 2U + 1U;
+    const auto roll = static_cast<std::uint32_t>(
+        mix_seed(
+            context.world.site_attempt_seed(),
+            refresh_generation ^ stock_entry.listing_id,
+            stock_entry.item_id.value) %
+        std::max<std::uint32_t>(span, 1U));
+    const auto delta = static_cast<std::int64_t>(roll) -
+        static_cast<std::int64_t>(stock_entry.stock_cash_points_variance);
+    const auto total = static_cast<std::int64_t>(stock_entry.base_stock_cash_points) + delta;
+    return total > 0 ? static_cast<std::uint32_t>(total) : 0U;
+}
+
+std::uint32_t resolved_stock_quantity(
+    const SiteSystemContext<EconomyPhoneSystem>& context,
+    const PrototypePhoneBuyStockContent& stock_entry,
+    std::uint32_t refresh_generation) noexcept
+{
+    const auto unit_price = item_buy_price_cash_points(stock_entry.item_id);
+    if (unit_price == 0U)
+    {
+        return 0U;
+    }
+
+    const auto stock_cash_points =
+        resolved_stock_cash_points(context, stock_entry, refresh_generation);
+    if (stock_cash_points == 0U)
+    {
+        return 1U;
+    }
+
+    return std::max<std::uint32_t>(1U, stock_cash_points / unit_price);
+}
+
+void refresh_generated_buy_stock_listings(
+    SiteSystemContext<EconomyPhoneSystem>& context,
+    bool force_dirty = false)
+{
+    auto& economy = context.world.own_economy();
+    const auto* site_content = find_prototype_site_content(context.site_run.site_id);
+    const auto next_generation = economy.phone_buy_stock_refresh_generation + 1U;
+
+    std::vector<PhoneListingState> refreshed {};
+    refreshed.reserve(
+        economy.available_phone_listings.size() + (site_content == nullptr ? 0U : site_content->phone_buy_stock_pool.size()));
+    for (const auto& listing : economy.available_phone_listings)
+    {
+        if (!listing.generated_from_stock)
+        {
+            refreshed.push_back(listing);
+        }
+    }
+
+    if (site_content != nullptr)
+    {
+        for (const auto& stock_entry : site_content->phone_buy_stock_pool)
+        {
+            const auto* item_def = find_item_def(stock_entry.item_id);
+            if (item_def == nullptr ||
+                !phone_buy_stock_item_available(context, stock_entry.item_id))
+            {
+                continue;
+            }
+
+            const auto quantity =
+                resolved_stock_quantity(context, stock_entry, next_generation);
+            if (quantity == 0U)
+            {
+                continue;
+            }
+
+            PhoneListingState generated_listing = make_item_listing(
+                PhoneListingKind::BuyItem,
+                stock_entry.listing_id,
+                stock_entry.item_id,
+                quantity);
+            generated_listing.stock_refresh_generation = next_generation;
+            generated_listing.generated_from_stock = true;
+            if (auto* previous_listing =
+                    find_generated_stock_listing(economy, stock_entry.listing_id);
+                previous_listing != nullptr)
+            {
+                generated_listing.cart_quantity = previous_listing->cart_quantity;
+                clamp_cart_quantity(generated_listing);
+            }
+            refreshed.push_back(generated_listing);
+        }
+    }
+
+    const bool changed = !same_listing_vector(refreshed, economy.available_phone_listings);
+    economy.available_phone_listings = std::move(refreshed);
+    economy.phone_buy_stock_refresh_generation = next_generation;
+    if (changed || force_dirty)
+    {
+        mark_phone_dirty(context);
+    }
 }
 
 void refresh_dynamic_sell_listings(
@@ -752,7 +930,7 @@ void append_seed_phone_listing(
             return;
         }
 
-        if (!TechnologySystem::item_unlocked(context.campaign, item_id))
+        if (!phone_buy_stock_item_available(context, item_id))
         {
             return;
         }
@@ -776,7 +954,9 @@ void append_seed_phone_listing(
                 : listing_content.price,
             listing_content.quantity,
             0U,
-            true});
+            0U,
+            true,
+            false});
         return;
 
     case PhoneListingKind::SellItem:
@@ -792,6 +972,7 @@ void seed_site_economy(SiteSystemContext<EconomyPhoneSystem>& context, std::uint
     economy.phone_listing_source_membership_revision = 0U;
     economy.phone_listing_source_quantity_revision = 0U;
     economy.phone_listing_source_action_reservation_signature = 0U;
+    economy.phone_buy_stock_refresh_generation = 0U;
     economy.current_cash = get_prototype_campaign_content().starting_site_cash;
     economy.phone_delivery_fee = site_content == nullptr ? 0 : site_content->phone_delivery_fee;
     economy.phone_delivery_minutes = site_content == nullptr ? 0U : site_content->phone_delivery_minutes;
@@ -811,6 +992,7 @@ void seed_site_economy(SiteSystemContext<EconomyPhoneSystem>& context, std::uint
         append_seed_phone_listing(context, listing_content);
     }
 
+    refresh_generated_buy_stock_listings(context, true);
     refresh_dynamic_sell_listings(context, true);
     mark_phone_and_hud_dirty(context);
 }
@@ -821,6 +1003,7 @@ bool EconomyPhoneSystem::subscribes_to(GameMessageType type) noexcept
     switch (type)
     {
     case GameMessageType::SiteRunStarted:
+    case GameMessageType::SiteRefreshTick:
     case GameMessageType::EconomyMoneyAwardRequested:
     case GameMessageType::PhoneListingPurchaseRequested:
     case GameMessageType::PhoneListingSaleRequested:
@@ -848,6 +1031,15 @@ Gs1Status EconomyPhoneSystem::process_message(
         seed_site_economy(context, payload.site_id);
         return GS1_STATUS_OK;
     }
+
+    case GameMessageType::SiteRefreshTick:
+        if ((message.payload_as<SiteRefreshTickMessage>().refresh_mask &
+                SITE_REFRESH_TICK_PHONE_BUY_STOCK) != 0U &&
+            !onboarding_chain_effective(context))
+        {
+            refresh_generated_buy_stock_listings(context, true);
+        }
+        return GS1_STATUS_OK;
 
     case GameMessageType::EconomyMoneyAwardRequested:
     {

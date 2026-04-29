@@ -7,6 +7,7 @@
 #include "content/defs/reward_defs.h"
 #include "content/defs/structure_defs.h"
 #include "content/defs/task_defs.h"
+#include "content/prototype_content.h"
 #include "runtime/runtime_clock.h"
 #include "site/defs/site_action_defs.h"
 #include "site/site_projection_update_flags.h"
@@ -262,6 +263,20 @@ bool item_is_crafted(ItemId item_id) noexcept
     return item_def != nullptr && item_def->source_rule == ItemSourceRule::CraftOnly;
 }
 
+bool item_is_buyable_from_authored_phone_stock(
+    SiteSystemContext<TaskBoardSystem>& context,
+    ItemId item_id) noexcept;
+
+float task_board_refresh_interval_minutes() noexcept
+{
+    return gameplay_tuning_def().task_board.refresh_interval_minutes;
+}
+
+std::uint32_t normal_task_pool_size() noexcept
+{
+    return gameplay_tuning_def().task_board.normal_task_pool_size;
+}
+
 ItemId find_structure_linked_item(StructureId structure_id) noexcept
 {
     for (const auto& item_def : all_item_defs())
@@ -494,6 +509,33 @@ std::vector<ItemId> collect_item_candidates(
     SiteSystemContext<TaskBoardSystem>& context,
     const TaskTemplateDef& task_template_def)
 {
+    if (task_template_def.progress_kind == TaskProgressKind::BuyItem)
+    {
+        if (task_template_def.item_id.value != 0U)
+        {
+            return item_is_buyable_from_authored_phone_stock(context, task_template_def.item_id)
+                ? std::vector<ItemId> {task_template_def.item_id}
+                : std::vector<ItemId> {};
+        }
+
+        std::vector<ItemId> candidates {};
+        const auto* site_content = find_prototype_site_content(context.site_run.site_id);
+        if (site_content == nullptr)
+        {
+            return candidates;
+        }
+
+        for (const auto& stock_entry : site_content->phone_buy_stock_pool)
+        {
+            if (item_is_buyable_from_authored_phone_stock(context, stock_entry.item_id))
+            {
+                candidates.push_back(stock_entry.item_id);
+            }
+        }
+
+        return candidates;
+    }
+
     if (task_template_def.item_id.value != 0U)
     {
         return item_is_accessible_for_task(context.campaign, task_template_def.item_id)
@@ -511,12 +553,6 @@ std::vector<ItemId> collect_item_candidates(
 
         switch (task_template_def.progress_kind)
         {
-        case TaskProgressKind::BuyItem:
-            if (item_buy_price_cash_points(item_def.item_id) > 0U)
-            {
-                candidates.push_back(item_def.item_id);
-            }
-            break;
         case TaskProgressKind::SellItem:
             if (item_has_capability(item_def, ITEM_CAPABILITY_SELL))
             {
@@ -824,6 +860,35 @@ const SiteOnboardingTaskSeedDef* find_root_onboarding_seed(SiteId site_id) noexc
     return nullptr;
 }
 
+bool task_template_is_onboarding_only(TaskTemplateId task_template_id) noexcept
+{
+    for (const auto& seed_def : all_site_onboarding_task_seed_defs())
+    {
+        if (seed_def.task_template_id == task_template_id)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool onboarding_chain_effective(
+    SiteId site_id,
+    const TaskBoardState& board) noexcept
+{
+    for (const auto& task : board.visible_tasks)
+    {
+        if (task.runtime_list_kind != TaskRuntimeListKind::Claimed &&
+            find_onboarding_seed_def(site_id, task.task_template_id) != nullptr)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 std::uint32_t next_task_instance_id(const TaskBoardState& board) noexcept
 {
     std::uint32_t next_id = 1U;
@@ -995,6 +1060,7 @@ void reset_task_board(TaskBoardState& board) noexcept
     board.fully_grown_tile_count = 0U;
     board.site_completion_tile_threshold = 0U;
     board.tracked_living_plant_count = 0U;
+    board.refresh_generation = 0U;
     board.minutes_until_next_refresh = 0.0;
     board.worker = TaskTrackedWorkerState {};
     board.all_tracked_living_plants_stable = false;
@@ -1777,6 +1843,87 @@ bool refresh_snapshot_tasks(
     return mutated;
 }
 
+bool refresh_normal_task_pool(
+    SiteSystemContext<TaskBoardSystem>& context,
+    bool force_dirty = false) noexcept
+{
+    auto& board = context.world.own_task_board();
+    if (onboarding_chain_effective(context.site_run.site_id, board))
+    {
+        return false;
+    }
+
+    const std::uint32_t pool_size = normal_task_pool_size();
+    bool mutated = board.task_pool_size != pool_size;
+    board.task_pool_size = pool_size;
+
+    const auto visible_begin = std::remove_if(
+        board.visible_tasks.begin(),
+        board.visible_tasks.end(),
+        [](const TaskInstanceState& task) {
+            return task.runtime_list_kind == TaskRuntimeListKind::Visible;
+        });
+    if (visible_begin != board.visible_tasks.end())
+    {
+        board.visible_tasks.erase(visible_begin, board.visible_tasks.end());
+        mutated = true;
+    }
+
+    std::vector<const TaskTemplateDef*> candidates {};
+    candidates.reserve(all_task_template_defs().size());
+    for (const auto& task_template_def : all_task_template_defs())
+    {
+        if (task_template_is_onboarding_only(task_template_def.task_template_id) ||
+            !task_template_is_eligible(context, task_template_def))
+        {
+            continue;
+        }
+
+        bool already_present = false;
+        for (const auto& task : board.visible_tasks)
+        {
+            if (task.runtime_list_kind != TaskRuntimeListKind::Claimed &&
+                task.task_template_id == task_template_def.task_template_id)
+            {
+                already_present = true;
+                break;
+            }
+        }
+        if (!already_present)
+        {
+            candidates.push_back(&task_template_def);
+        }
+    }
+
+    const auto next_generation = board.refresh_generation + 1U;
+    for (std::uint32_t slot_index = 0U;
+         slot_index < pool_size && !candidates.empty();
+         ++slot_index)
+    {
+        const std::size_t selected_index = static_cast<std::size_t>(
+            mix_seed(context.world.site_attempt_seed(), next_generation, slot_index) %
+            candidates.size());
+        const TaskTemplateDef& task_template_def = *candidates[selected_index];
+        board.visible_tasks.push_back(make_task_instance(
+            context,
+            TaskInstanceId {next_task_instance_id(board)},
+            task_template_def,
+            context.world.read_counters()));
+        candidates.erase(candidates.begin() + static_cast<std::ptrdiff_t>(selected_index));
+        mutated = true;
+    }
+
+    board.refresh_generation = next_generation;
+    board.minutes_until_next_refresh = static_cast<double>(task_board_refresh_interval_minutes());
+    mutated = refresh_snapshot_tasks(context) || mutated;
+    if (mutated || force_dirty)
+    {
+        mark_task_projection_dirty(context);
+    }
+
+    return mutated;
+}
+
 bool update_duration_tasks(
     SiteSystemContext<TaskBoardSystem>& context) noexcept
 {
@@ -1873,6 +2020,53 @@ void handle_site_run_started(
     {
         mark_task_projection_dirty(context);
     }
+    else
+    {
+        (void)refresh_normal_task_pool(context, true);
+    }
+}
+
+bool item_is_buyable_from_authored_phone_stock(
+    SiteSystemContext<TaskBoardSystem>& context,
+    ItemId item_id) noexcept
+{
+    if (item_id.value == 0U)
+    {
+        return false;
+    }
+
+    const auto* site_content = find_prototype_site_content(context.site_run.site_id);
+    if (site_content == nullptr)
+    {
+        return false;
+    }
+
+    const auto* item_def = find_item_def(item_id);
+    if (item_def == nullptr || item_buy_price_cash_points(item_id) == 0U)
+    {
+        return false;
+    }
+
+    bool authored = false;
+    for (const auto& stock_entry : site_content->phone_buy_stock_pool)
+    {
+        if (stock_entry.item_id == item_id)
+        {
+            authored = true;
+            break;
+        }
+    }
+    if (!authored)
+    {
+        return false;
+    }
+
+    if (item_def->linked_plant_id.value != 0U)
+    {
+        return TechnologySystem::plant_unlocked(context.campaign, item_def->linked_plant_id);
+    }
+
+    return true;
 }
 
 void handle_task_accept_requested(
@@ -1936,6 +2130,9 @@ void handle_task_reward_claim_requested(
     remove_task_id(board.completed_task_ids, task->task_instance_id);
     board.claimed_task_ids.push_back(task->task_instance_id);
 
+    const bool claimed_onboarding_task =
+        find_onboarding_seed_def(context.site_run.site_id, task->task_template_id) != nullptr;
+    const bool had_follow_up_task_template = task->has_follow_up_task_template;
     if (task->has_follow_up_task_template)
     {
         const auto* follow_up_seed =
@@ -1954,7 +2151,18 @@ void handle_task_reward_claim_requested(
         }
     }
 
-    mark_task_projection_dirty(context);
+    const bool onboarding_finished =
+        claimed_onboarding_task &&
+        !had_follow_up_task_template &&
+        !onboarding_chain_effective(context.site_run.site_id, board);
+    if (onboarding_finished)
+    {
+        (void)refresh_normal_task_pool(context, true);
+    }
+    else
+    {
+        mark_task_projection_dirty(context);
+    }
 }
 
 void handle_restoration_progress(
@@ -2435,6 +2643,7 @@ bool TaskBoardSystem::subscribes_to(GameMessageType type) noexcept
     switch (type)
     {
     case GameMessageType::SiteRunStarted:
+    case GameMessageType::SiteRefreshTick:
     case GameMessageType::TaskAcceptRequested:
     case GameMessageType::TaskRewardClaimRequested:
     case GameMessageType::RestorationProgressChanged:
@@ -2468,6 +2677,16 @@ Gs1Status TaskBoardSystem::process_message(
     {
     case GameMessageType::SiteRunStarted:
         handle_site_run_started(context, message.payload_as<SiteRunStartedMessage>());
+        break;
+    case GameMessageType::SiteRefreshTick:
+        if ((message.payload_as<SiteRefreshTickMessage>().refresh_mask &
+                SITE_REFRESH_TICK_TASK_BOARD) != 0U &&
+            !onboarding_chain_effective(
+                context.site_run.site_id,
+                context.world.read_task_board()))
+        {
+            (void)refresh_normal_task_pool(context, true);
+        }
         break;
     case GameMessageType::TaskAcceptRequested:
         handle_task_accept_requested(context, message.payload_as<TaskAcceptRequestedMessage>());
@@ -2555,6 +2774,23 @@ Gs1Status TaskBoardSystem::process_message(
 
 void TaskBoardSystem::run(SiteSystemContext<TaskBoardSystem>& context)
 {
+    auto& board = context.world.own_task_board();
+    if (onboarding_chain_effective(context.site_run.site_id, board))
+    {
+        board.minutes_until_next_refresh = 0.0;
+    }
+    else if (board.task_pool_size != normal_task_pool_size())
+    {
+        (void)refresh_normal_task_pool(context, true);
+    }
+    else if (board.minutes_until_next_refresh > 0.0)
+    {
+        board.minutes_until_next_refresh = std::max(
+            0.0,
+            board.minutes_until_next_refresh -
+                runtime_minutes_from_real_seconds(context.fixed_step_seconds));
+    }
+
     if (update_duration_tasks(context))
     {
         mark_task_projection_dirty(context);

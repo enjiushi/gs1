@@ -91,7 +91,7 @@ void phone_panel_site_run_started_seeds_home_snapshot(
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.accepted_task_count == 1U);
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.completed_task_count == 0U);
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.claimed_task_count == 0U);
-    GS1_SYSTEM_TEST_CHECK(context, phone_panel.buy_listing_count >= 4U);
+    GS1_SYSTEM_TEST_CHECK(context, phone_panel.buy_listing_count >= 3U);
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.sell_listing_count >= 1U);
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.service_listing_count == 0U);
     GS1_SYSTEM_TEST_REQUIRE(

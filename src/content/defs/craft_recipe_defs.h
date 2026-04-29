@@ -57,4 +57,5 @@ inline constexpr std::uint32_t k_recipe_cook_ephedra_stew = 21U;
     StructureId station_structure_id,
     ItemId output_item_id) noexcept;
 [[nodiscard]] const CraftRecipeDef* find_craft_recipe_def(RecipeId recipe_id) noexcept;
+[[nodiscard]] bool item_has_craft_recipe_output(ItemId item_id) noexcept;
 }  // namespace gs1

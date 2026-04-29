@@ -97,3 +97,7 @@ peak_event_pressure_total = 30.0
 protection_threshold = 70.0
 delivery_threshold = 50.0
 shared_storage_threshold = 30.0
+
+[task_board]
+refresh_interval_minutes = 240.0
+normal_task_pool_size = 3

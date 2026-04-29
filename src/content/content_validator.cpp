@@ -640,6 +640,7 @@ std::vector<ContentValidationIssue> validate_content_database(
         {
             break;
         }
+
     }
 
     if (issues.empty())
@@ -1176,6 +1177,13 @@ std::vector<ContentValidationIssue> validate_content_database(
             issues.push_back(ContentValidationIssue {
                 ContentValidationSeverity::Error,
                 "Gameplay tuning camp service thresholds must descend from protection to delivery to shared storage within the durability max."});
+        }
+        else if (tuning.task_board.refresh_interval_minutes <= 0.0f ||
+            tuning.task_board.normal_task_pool_size == 0U)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Gameplay tuning task-board refresh interval and normal pool size must stay positive."});
         }
         else if (tuning.ecology.resistance_density_influence < 0.0f ||
             tuning.ecology.resistance_density_influence > 1.0f ||
@@ -1715,6 +1723,67 @@ std::vector<ContentValidationIssue> validate_content_database(
                 break;
             }
 
+            if (!issues.empty() && issues.back().severity == ContentValidationSeverity::Error)
+            {
+                break;
+            }
+        }
+        if (!issues.empty() && issues.back().severity == ContentValidationSeverity::Error)
+        {
+            break;
+        }
+
+        for (std::size_t index = 0U; index < site_def.phone_buy_stock_pool.size(); ++index)
+        {
+            const auto& stock_entry = site_def.phone_buy_stock_pool[index];
+            for (const auto& seeded_listing : site_def.seeded_phone_listings)
+            {
+                if (seeded_listing.listing_id == stock_entry.listing_id)
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Prototype site phone buy stock listings must not reuse a seeded phone listing id."});
+                    break;
+                }
+            }
+            if (!issues.empty() && issues.back().severity == ContentValidationSeverity::Error)
+            {
+                break;
+            }
+
+            for (std::size_t previous = 0U; previous < index; ++previous)
+            {
+                if (site_def.phone_buy_stock_pool[previous].listing_id == stock_entry.listing_id)
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Prototype site phone buy stock listings must use unique listing ids per site."});
+                    break;
+                }
+            }
+            if (!issues.empty() && issues.back().severity == ContentValidationSeverity::Error)
+            {
+                break;
+            }
+
+            if (!content.index.item_by_id.contains(stock_entry.item_id.value))
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Prototype site phone buy stock references an unknown item id."});
+            }
+            else if (stock_entry.base_stock_cash_points == 0U)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Prototype site phone buy stock must author a positive base internal cash-point budget."});
+            }
+            else if (stock_entry.stock_cash_points_variance > stock_entry.base_stock_cash_points)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Prototype site phone buy stock variance must not exceed the base internal cash-point budget."});
+            }
             if (!issues.empty() && issues.back().severity == ContentValidationSeverity::Error)
             {
                 break;

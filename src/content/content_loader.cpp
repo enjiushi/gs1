@@ -1364,6 +1364,28 @@ void load_prototype_site_phone_listings(ContentDatabase& content, const std::fil
     }
 }
 
+void load_prototype_site_phone_buy_stock(ContentDatabase& content, const std::filesystem::path& path)
+{
+    const auto document = load_toml_document(path);
+    const auto& entries = require_toml_array(path, document, "phone_buy_stock");
+    for (const auto& node : entries)
+    {
+        const auto& entry = require_array_entry_table(path, node, "phone_buy_stock");
+        const SiteId site_id {require_toml_unsigned<std::uint32_t>(path, entry, "site_id")};
+        auto* site = find_loaded_site(content.prototype_campaign, site_id);
+        if (site == nullptr)
+        {
+            fail_load(path, toml_line_number(entry), "phone buy stock references an unknown site id");
+        }
+
+        site->phone_buy_stock_pool.push_back(PrototypePhoneBuyStockContent {
+            require_toml_unsigned<std::uint32_t>(path, entry, "listing_id"),
+            ItemId {require_toml_unsigned<std::uint32_t>(path, entry, "item_id")},
+            require_toml_unsigned<std::uint32_t>(path, entry, "base_stock_cash_points"),
+            require_toml_unsigned<std::uint32_t>(path, entry, "stock_cash_points_variance")});
+    }
+}
+
 void load_item_defs(ContentDatabase& content, const std::filesystem::path& path)
 {
     const auto document = load_toml_document(path);
@@ -1815,6 +1837,12 @@ void load_gameplay_tuning_def(ContentDatabase& content, const std::filesystem::p
         require_toml_float(path, camp_durability, "delivery_threshold");
     tuning.camp_durability.shared_storage_threshold =
         require_toml_float(path, camp_durability, "shared_storage_threshold");
+
+    const auto& task_board = require_toml_table(path, document, "task_board");
+    tuning.task_board.refresh_interval_minutes =
+        require_toml_float(path, task_board, "refresh_interval_minutes");
+    tuning.task_board.normal_task_pool_size =
+        require_toml_unsigned<std::uint32_t>(path, task_board, "normal_task_pool_size");
 }
 
 void load_technology_tier_defs(ContentDatabase& content, const std::filesystem::path& path)
@@ -2057,6 +2085,7 @@ ContentDatabase ContentLoader::load_prototype_content()
     const auto sites_path = root / "sites.toml";
     const auto campaign_setup_path = root / "campaign_setup.toml";
     const auto phone_listings_path = root / "phone_listings.toml";
+    const auto phone_buy_stock_path = root / "phone_buy_stock.toml";
     const auto items_path = root / "items.toml";
     const auto plants_path = root / "plants.toml";
     const auto structures_path = root / "structures.toml";
@@ -2076,6 +2105,7 @@ ContentDatabase ContentLoader::load_prototype_content()
     load_prototype_campaign_sites(content, sites_path);
     load_prototype_campaign_setup(content, campaign_setup_path);
     load_prototype_site_phone_listings(content, phone_listings_path);
+    load_prototype_site_phone_buy_stock(content, phone_buy_stock_path);
     load_item_defs(content, items_path);
     load_plant_defs(content, plants_path);
     load_structure_defs(content, structures_path);

@@ -14,7 +14,7 @@ energy_delta = 0.0
 
 [[items]]
 item_id = 2
-display_name = "Food"
+display_name = "Field Rations"
 stack_size = 5
 source_rule = "BuyOrCraft"
 consumable = true
