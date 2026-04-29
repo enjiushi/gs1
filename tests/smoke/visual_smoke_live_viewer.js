@@ -2179,7 +2179,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     function getTrackedSiteTasks(state) {
         return getSiteTasks(state)
             .filter(function (task) {
-                return !!task && (task.listKind === "ACCEPTED" || task.listKind === "COMPLETED");
+                return !!task && task.listKind === "ACCEPTED";
             })
             .sort(function (lhs, rhs) {
                 const priorityDelta = getSiteTaskListPriority(lhs) - getSiteTaskListPriority(rhs);
@@ -2189,6 +2189,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
                 return (lhs.taskInstanceId || 0) - (rhs.taskInstanceId || 0);
             });
+    }
+
+    function getPlayerFacingPhoneTasks(state) {
+        return getSiteTasks(state).filter(function (task) {
+            return !!task && (task.listKind === "VISIBLE" || task.listKind === "ACCEPTED");
+        });
     }
 
     function getCraftContextForTile(state, tileX, tileY) {
@@ -3686,9 +3692,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
 
         const activeCount = countTasksByListKind(tasks, "ACCEPTED");
-        const completedCount = countTasksByListKind(tasks, "COMPLETED");
-        siteTaskCount.textContent =
-            activeCount + " Active" + (completedCount > 0 ? "  |  " + completedCount + " Done" : "");
+        siteTaskCount.textContent = activeCount + " Active";
 
         siteTaskList.innerHTML = "";
         tasks.forEach(function (task) {
@@ -6649,7 +6653,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         phoneStatusTime.textContent = formatPhoneClockLabel();
 
         const phonePanelState = getPhonePanelState(state);
-        const tasks = getSiteTasks(state);
+        const tasks = getPlayerFacingPhoneTasks(state);
         const buyListings = getBuyListings(state);
         const sellListings = getSellListings(state);
         const specialListings = getSpecialPhoneListings(state);
