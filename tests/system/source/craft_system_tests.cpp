@@ -121,7 +121,6 @@ void inventory_craft_commit_consumes_nearby_ingredients_and_outputs_to_device_st
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
-    campaign.technology_state.total_reputation = 8;
     auto site_run = make_test_site_run(1U, 1502U);
     GameMessageQueue queue {};
     auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
@@ -186,7 +185,7 @@ void inventory_craft_commit_crafts_hammer_from_wood_and_iron(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
-    campaign.technology_state.total_reputation = reputation_for_progress_tier(7U);
+    campaign.technology_state.total_reputation = reputation_for_progress_tier(1U);
     auto site_run = make_test_site_run(1U, 1507U);
     GameMessageQueue queue {};
     auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
@@ -245,6 +244,71 @@ void inventory_craft_commit_crafts_hammer_from_wood_and_iron(
             site_run,
             gs1::inventory_storage::starter_storage_container(site_run),
             gs1::ItemId {gs1::k_item_iron_bundle}) == 3U);
+}
+
+void craft_commit_crafts_chemistry_station_kit_from_workbench_when_unlocked(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    campaign.technology_state.total_reputation = reputation_for_progress_tier(5U);
+    auto site_run = make_test_site_run(1U, 1510U);
+    GameMessageQueue queue {};
+    auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_message(
+            inventory_context,
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    const auto delivery_box = gs1::inventory_storage::delivery_box_container(site_run);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        delivery_box,
+        gs1::ItemId {gs1::k_item_wood_bundle},
+        4U);
+    (void)gs1::inventory_storage::add_item_to_container(
+        site_run,
+        delivery_box,
+        gs1::ItemId {gs1::k_item_iron_bundle},
+        3U);
+
+    const auto workbench_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_message(
+            inventory_context,
+            make_message(
+                GameMessageType::InventoryCraftCommitRequested,
+                InventoryCraftCommitRequestedMessage {
+                    gs1::k_recipe_craft_chemistry_station,
+                    workbench_tile.x,
+                    workbench_tile.y,
+                    0U})) == GS1_STATUS_OK);
+
+    const auto workbench_entity_id = site_run.site_world->device_entity_id(workbench_tile);
+    const auto workbench_storage =
+        gs1::inventory_storage::find_device_storage_container(site_run, workbench_entity_id);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        gs1::inventory_storage::available_item_quantity_in_container(
+            site_run,
+            workbench_storage,
+            gs1::ItemId {gs1::k_item_chemistry_station_kit}) == 1U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        gs1::inventory_storage::available_item_quantity_in_container(
+            site_run,
+            gs1::inventory_storage::starter_storage_container(site_run),
+            gs1::ItemId {gs1::k_item_wood_bundle}) == 0U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        gs1::inventory_storage::available_item_quantity_in_container(
+            site_run,
+            gs1::inventory_storage::starter_storage_container(site_run),
+            gs1::ItemId {gs1::k_item_iron_bundle}) == 0U);
 }
 
 void craft_cache_tracks_worker_pack_membership_by_distance(
@@ -623,6 +687,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "inventory",
     "craft_commit_crafts_hammer_from_wood_and_iron",
     inventory_craft_commit_crafts_hammer_from_wood_and_iron);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "craft",
+    "craft_commit_crafts_chemistry_station_kit_from_workbench_when_unlocked",
+    craft_commit_crafts_chemistry_station_kit_from_workbench_when_unlocked);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "craft",
     "cache_tracks_worker_pack_membership_by_distance",

@@ -340,6 +340,10 @@ template <typename T>
     {
         return CraftingStationKind::Fabrication;
     }
+    if (field == "Chemistry")
+    {
+        return CraftingStationKind::Chemistry;
+    }
 
     fail_load(path, line_number, "invalid crafting station kind");
 }

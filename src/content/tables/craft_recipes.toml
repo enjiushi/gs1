@@ -228,3 +228,36 @@ energy_cost = 1.0
 hydration_cost = 0.3
 nourishment_cost = 0.1
 ingredients = [{ item_id = 1, quantity = 1 }, { item_id = 27, quantity = 1 }]
+
+[[craft_recipes]]
+recipe_id = 22
+station_structure_id = 202
+output_item_id = 55
+output_quantity = 1
+craft_minutes = 1.25
+energy_cost = 1.0
+hydration_cost = 0.2
+nourishment_cost = 0.1
+ingredients = [{ item_id = 8, quantity = 2 }, { item_id = 9, quantity = 1 }]
+
+[[craft_recipes]]
+recipe_id = 23
+station_structure_id = 205
+output_item_id = 56
+output_quantity = 1
+craft_minutes = 1.25
+energy_cost = 0.8
+hydration_cost = 0.2
+nourishment_cost = 0.1
+ingredients = [{ item_id = 3, quantity = 1 }, { item_id = 40, quantity = 2 }]
+
+[[craft_recipes]]
+recipe_id = 24
+station_structure_id = 202
+output_item_id = 57
+output_quantity = 1
+craft_minutes = 1.75
+energy_cost = 1.2
+hydration_cost = 0.3
+nourishment_cost = 0.2
+ingredients = [{ item_id = 8, quantity = 4 }, { item_id = 9, quantity = 3 }]

@@ -147,7 +147,7 @@ energy_delta = 0.0
 
 [[items]]
 item_id = 11
-display_name = "Camp Stove Kit"
+display_name = "Field Kitchen Kit"
 stack_size = 1
 source_rule = "CraftOnly"
 consumable = false
@@ -807,3 +807,48 @@ hydration_delta = 0.0
 nourishment_delta = 18.0
 energy_delta = 0.0
 morale_delta = 2.0
+
+[[items]]
+item_id = 55
+display_name = "Wind Fence Kit"
+stack_size = 1
+source_rule = "CraftOnly"
+consumable = false
+internal_price_cash_points = 700
+capabilities = "Deploy,Sell"
+linked_plant_id = 0
+linked_structure_id = 204
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 56
+display_name = "Herbal Poultice"
+stack_size = 2
+source_rule = "CraftOnly"
+consumable = true
+capabilities = "UseMedicine,Sell"
+linked_plant_id = 0
+linked_structure_id = 0
+health_delta = 30.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+morale_delta = 2.0
+
+[[items]]
+item_id = 57
+display_name = "Chemistry Station Kit"
+stack_size = 1
+source_rule = "CraftOnly"
+consumable = false
+internal_price_cash_points = 1400
+capabilities = "Deploy,Sell"
+linked_plant_id = 0
+linked_structure_id = 205
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0

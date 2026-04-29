@@ -1,6 +1,6 @@
 [[structures]]
 structure_id = 201
-display_name = "Camp Stove"
+display_name = "Field Kitchen"
 durability = 1.0
 aura_size = 0
 wind_protection_value = 0.0
@@ -67,5 +67,23 @@ irrigation_value = 0.0
 storage_slot_count = 0
 crafting_station_kind = "None"
 grants_storage = false
+footprint_width = 1
+footprint_height = 1
+
+[[structures]]
+structure_id = 205
+display_name = "Chemistry Station"
+durability = 1.0
+aura_size = 0
+wind_protection_value = 0.0
+wind_protection_range = 0
+heat_protection_value = 0.0
+dust_protection_value = 0.0
+fertility_improve_value = 0.0
+salinity_reduction_value = 0.0
+irrigation_value = 0.0
+storage_slot_count = 4
+crafting_station_kind = "Chemistry"
+grants_storage = true
 footprint_width = 1
 footprint_height = 1

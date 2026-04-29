@@ -12,7 +12,8 @@ enum class CraftingStationKind : std::uint8_t
 {
     None = 0,
     Cooking = 1,
-    Fabrication = 2
+    Fabrication = 2,
+    Chemistry = 3
 };
 
 struct StructureDef final
@@ -39,6 +40,7 @@ inline constexpr std::uint32_t k_structure_camp_stove = 201U;
 inline constexpr std::uint32_t k_structure_workbench = 202U;
 inline constexpr std::uint32_t k_structure_storage_crate = 203U;
 inline constexpr std::uint32_t k_structure_wind_fence = 204U;
+inline constexpr std::uint32_t k_structure_chemistry_station = 205U;
 
 [[nodiscard]] std::span<const StructureDef> all_structure_defs() noexcept;
 [[nodiscard]] const StructureDef* find_structure_def(StructureId structure_id) noexcept;

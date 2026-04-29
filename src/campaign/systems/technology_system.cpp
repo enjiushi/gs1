@@ -28,6 +28,7 @@ const FactionProgressState* find_faction_progress(
     {
     case k_recipe_cook_food_pack:
     case k_recipe_cook_ephedra_stew:
+    case k_recipe_craft_hammer:
     case k_recipe_craft_shovel:
         return true;
     default:
@@ -40,6 +41,7 @@ const FactionProgressState* find_faction_progress(
     switch (structure_id.value)
     {
     case k_structure_camp_stove:
+    case k_structure_workbench:
     case k_structure_storage_crate:
         return true;
     default:
