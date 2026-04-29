@@ -77,18 +77,46 @@ bool is_in_target_edge_band(
     }
 }
 
+float resolve_initial_objective_progress(
+    const PrototypeSiteContent& site_content) noexcept
+{
+    switch (site_content.objective_type)
+    {
+    case SiteObjectiveType::HighwayProtection:
+        return 1.0f;
+
+    case SiteObjectiveType::CashTargetSurvival:
+        if (site_content.objective_target_cash_points <= 0)
+        {
+            return 0.0f;
+        }
+
+        return static_cast<float>(std::clamp(
+            static_cast<double>(get_prototype_campaign_content().starting_site_cash) /
+                static_cast<double>(site_content.objective_target_cash_points),
+            0.0,
+            1.0));
+
+    case SiteObjectiveType::DenseRestoration:
+    case SiteObjectiveType::GreenWallConnection:
+    case SiteObjectiveType::PureSurvival:
+    default:
+        return 0.0f;
+    }
+}
+
 void initialize_site_objective(
     SiteRunState& run,
     const PrototypeSiteContent& site_content)
 {
     run.objective.type = site_content.objective_type;
     run.objective.time_limit_minutes = site_content.site_time_limit_minutes;
+    run.objective.target_cash_points = site_content.objective_target_cash_points;
     run.objective.target_edge = site_content.objective_target_edge;
     run.objective.target_band_width = site_content.objective_target_band_width;
     run.objective.highway_max_average_sand_cover = site_content.highway_max_average_sand_cover;
     run.counters.site_completion_tile_threshold = site_content.site_completion_tile_threshold;
-    run.counters.objective_progress_normalized =
-        run.objective.type == SiteObjectiveType::HighwayProtection ? 1.0f : 0.0f;
+    run.counters.objective_progress_normalized = resolve_initial_objective_progress(site_content);
     run.counters.highway_average_sand_cover = 0.0f;
 }
 

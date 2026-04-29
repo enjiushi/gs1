@@ -25,6 +25,22 @@ constexpr double k_min_wave_delay_minutes = 4.0;
 constexpr double k_max_wave_delay_minutes = 8.0;
 constexpr float k_weather_meter_max = 100.0f;
 
+bool has_pending_site_transition_message(
+    const GameMessageQueue& message_queue,
+    std::uint32_t site_id)
+{
+    for (const auto& message : message_queue)
+    {
+        if (message.type == GameMessageType::SiteAttemptEnded &&
+            message.payload_as<SiteAttemptEndedMessage>().site_id == site_id)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 void emit_site_one_weather_probe_log(
     SiteSystemContext<WeatherEventSystem>& context,
     const char* label,
@@ -182,6 +198,31 @@ float normalized_hash(std::uint64_t value) noexcept
         static_cast<double>(hash_u64(value) & 0xffffffffULL) / k_u32_max);
 }
 
+bool objective_uses_repeating_weather_waves(
+    const SiteObjectiveState& objective) noexcept
+{
+    return objective.type == SiteObjectiveType::HighwayProtection ||
+        objective.type == SiteObjectiveType::CashTargetSurvival;
+}
+
+bool objective_wave_window_is_active(
+    const SiteObjectiveState& objective,
+    double world_time_minutes) noexcept
+{
+    if (!objective_uses_repeating_weather_waves(objective))
+    {
+        return false;
+    }
+
+    if (objective.type == SiteObjectiveType::HighwayProtection)
+    {
+        return objective.time_limit_minutes > 0.0 &&
+            world_time_minutes < objective.time_limit_minutes;
+    }
+
+    return true;
+}
+
 float resolve_edge_base_wind_direction(SiteObjectiveTargetEdge edge) noexcept
 {
     switch (edge)
@@ -263,7 +304,7 @@ float resolve_event_wind_direction(
     const SiteSystemContext<WeatherEventSystem>& context) noexcept
 {
     const auto& objective = context.world.read_objective();
-    if (objective.type == SiteObjectiveType::HighwayProtection)
+    if (objective_uses_repeating_weather_waves(objective))
     {
         const auto& event = context.world.read_event();
         const float edge_base = resolve_edge_base_wind_direction(objective.target_edge);
@@ -343,7 +384,7 @@ Gs1Status WeatherEventSystem::process_message(
         return GS1_STATUS_OK;
     }
 
-    if (objective.type == SiteObjectiveType::HighwayProtection)
+    if (objective_uses_repeating_weather_waves(objective))
     {
         weather.forecast_profile_state.forecast_profile_id = 2U;
         weather.site_weather_bias = 0.0f;
@@ -398,9 +439,10 @@ void WeatherEventSystem::run(SiteSystemContext<WeatherEventSystem>& context)
     if (!has_active_event(event))
     {
         clear_event_timeline(event);
-        if (objective.type == SiteObjectiveType::HighwayProtection &&
-            objective.time_limit_minutes > 0.0 &&
-            world_time_minutes < objective.time_limit_minutes)
+        if (objective_wave_window_is_active(objective, world_time_minutes) &&
+            !has_pending_site_transition_message(
+                context.message_queue,
+                context.world.site_id_value()))
         {
             event.minutes_until_next_wave =
                 std::max(0.0, event.minutes_until_next_wave - step_minutes);
@@ -424,9 +466,10 @@ void WeatherEventSystem::run(SiteSystemContext<WeatherEventSystem>& context)
     if (world_time_minutes >= end_time_minutes)
     {
         clear_event_timeline(event);
-        if (objective.type == SiteObjectiveType::HighwayProtection &&
-            objective.time_limit_minutes > 0.0 &&
-            world_time_minutes < objective.time_limit_minutes)
+        if (objective_wave_window_is_active(objective, world_time_minutes) &&
+            !has_pending_site_transition_message(
+                context.message_queue,
+                context.world.site_id_value()))
         {
             event.minutes_until_next_wave =
                 resolve_next_wave_delay_minutes(context, event.wave_sequence_index);

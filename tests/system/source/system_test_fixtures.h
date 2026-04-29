@@ -230,6 +230,40 @@ inline void configure_pure_survival_objective(
     site_run.counters.objective_progress_normalized = 0.0f;
 }
 
+inline void configure_cash_target_survival_objective(
+    SiteRunState& site_run,
+    SiteObjectiveTargetEdge edge,
+    std::int32_t target_cash_points)
+{
+    site_run.objective.type = SiteObjectiveType::CashTargetSurvival;
+    site_run.objective.time_limit_minutes = 0.0;
+    site_run.objective.completion_hold_minutes = 0.0;
+    site_run.objective.completion_hold_progress_minutes = 0.0;
+    site_run.objective.paused_main_timer_minutes = 0.0;
+    site_run.objective.last_evaluated_world_time_minutes = 0.0;
+    site_run.objective.target_cash_points = target_cash_points;
+    site_run.objective.target_edge = edge;
+    site_run.objective.target_band_width = 0U;
+    site_run.objective.highway_max_average_sand_cover = 0.0f;
+    site_run.objective.last_target_average_sand_level = 0.0f;
+    site_run.objective.has_hold_baseline = false;
+    site_run.counters.objective_progress_normalized =
+        target_cash_points <= 0
+        ? 0.0f
+        : static_cast<float>(std::clamp(
+              static_cast<double>(std::max(site_run.economy.current_cash, 0)) /
+                  static_cast<double>(target_cash_points),
+              0.0,
+              1.0));
+    site_run.counters.highway_average_sand_cover = 0.0f;
+    site_run.objective.target_tile_indices.clear();
+    site_run.objective.target_tile_mask.assign(site_run.site_world->tile_count(), 0U);
+    site_run.objective.connection_start_tile_indices.clear();
+    site_run.objective.connection_start_tile_mask.assign(site_run.site_world->tile_count(), 0U);
+    site_run.objective.connection_goal_tile_indices.clear();
+    site_run.objective.connection_goal_tile_mask.assign(site_run.site_world->tile_count(), 0U);
+}
+
 inline void mark_objective_target_tile(SiteRunState& site_run, TileCoord coord)
 {
     if (site_run.site_world == nullptr || !site_run.site_world->contains(coord))

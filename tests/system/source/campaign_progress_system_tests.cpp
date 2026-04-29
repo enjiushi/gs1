@@ -663,6 +663,38 @@ void site_completion_pure_survival_completes_at_time_limit(
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.counters.objective_progress_normalized, 1.0f));
 }
 
+void site_completion_cash_target_survival_tracks_progress_and_completes_at_target(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(8U, 408U);
+    GameMessageQueue queue {};
+
+    configure_cash_target_survival_objective(
+        site_run,
+        gs1::SiteObjectiveTargetEdge::East,
+        gs1::cash_points_from_cash(45));
+    site_run.economy.current_cash = gs1::cash_points_from_cash(20);
+
+    auto site_context = make_site_context<SiteCompletionSystem>(campaign, site_run, queue);
+    SiteCompletionSystem::run(site_context);
+
+    GS1_SYSTEM_TEST_CHECK(context, queue.empty());
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(site_run.counters.objective_progress_normalized, 20.0f / 45.0f, 0.001f));
+
+    site_run.economy.current_cash = gs1::cash_points_from_cash(45);
+    SiteCompletionSystem::run(site_context);
+
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::SiteAttemptEnded);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        queue.front().payload_as<SiteAttemptEndedMessage>().result == GS1_SITE_ATTEMPT_RESULT_COMPLETED);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.counters.objective_progress_normalized, 1.0f));
+}
+
 void site_completion_green_wall_completes_after_stable_hold_and_pauses_main_timer(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -1352,6 +1384,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "site_completion",
     "pure_survival_completes_at_time_limit",
     site_completion_pure_survival_completes_at_time_limit);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "site_completion",
+    "cash_target_survival_tracks_progress_and_completes_at_target",
+    site_completion_cash_target_survival_tracks_progress_and_completes_at_target);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "site_completion",
     "green_wall_completes_after_stable_hold_and_pauses_main_timer",

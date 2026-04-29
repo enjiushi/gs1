@@ -157,6 +157,22 @@ bool green_wall_regions_connected(SiteSystemContext<SiteCompletionSystem>& conte
     return false;
 }
 
+float normalized_cash_target_progress(
+    const SiteObjectiveState& objective,
+    const EconomyState& economy) noexcept
+{
+    if (objective.target_cash_points <= 0)
+    {
+        return 0.0f;
+    }
+
+    return static_cast<float>(std::clamp(
+        static_cast<double>(std::max(economy.current_cash, 0)) /
+            static_cast<double>(objective.target_cash_points),
+        0.0,
+        1.0));
+}
+
 void run_green_wall_connection(
     SiteSystemContext<SiteCompletionSystem>& context,
     const SiteClockState& clock)
@@ -325,6 +341,25 @@ void SiteCompletionSystem::run(SiteSystemContext<SiteCompletionSystem>& context)
             context.world.site_id_value(),
             GS1_SITE_ATTEMPT_RESULT_COMPLETED);
         return;
+
+    case SiteObjectiveType::CashTargetSurvival:
+    {
+        const auto& economy = context.world.read_economy();
+        update_objective_progress(
+            context,
+            normalized_cash_target_progress(objective, economy));
+        if (objective.target_cash_points <= 0 ||
+            economy.current_cash < objective.target_cash_points)
+        {
+            return;
+        }
+
+        enqueue_site_attempt_result(
+            context.message_queue,
+            context.world.site_id_value(),
+            GS1_SITE_ATTEMPT_RESULT_COMPLETED);
+        return;
+    }
 
     default:
         return;

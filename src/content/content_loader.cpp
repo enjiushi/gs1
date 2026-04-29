@@ -415,6 +415,10 @@ template <typename T>
     {
         return SiteObjectiveType::PureSurvival;
     }
+    if (field == "CashTargetSurvival")
+    {
+        return SiteObjectiveType::CashTargetSurvival;
+    }
 
     fail_load(path, line_number, "invalid site objective type");
 }
@@ -1308,6 +1312,8 @@ void load_prototype_campaign_sites(ContentDatabase& content, const std::filesyst
             require_toml_string(path, entry, "objective_target_edge"));
         site.objective_target_band_width =
             require_toml_unsigned<std::uint8_t>(path, entry, "objective_target_band_width");
+        site.objective_target_cash_points =
+            cash_points_from_cash(require_toml_signed<std::int32_t>(path, entry, "objective_target_cash"));
         site.highway_max_average_sand_cover =
             require_toml_float(path, entry, "highway_max_average_sand_cover");
         site.completion_reputation_reward =

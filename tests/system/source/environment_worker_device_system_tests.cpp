@@ -20,6 +20,7 @@
 #include "site/systems/site_time_system.h"
 #include "site/systems/weather_event_system.h"
 #include "site/systems/worker_condition_system.h"
+#include "support/currency.h"
 #include "testing/system_test_registry.h"
 #include "system_test_fixtures.h"
 
@@ -145,6 +146,18 @@ void prototype_site_run_expands_worker_pack_with_village_pack_techs(
     campaign.faction_progress[0].faction_reputation = reputation_for_progress_tier(22U);
     auto second_pack_site_run = make_prototype_site_run(campaign, 1U);
     GS1_SYSTEM_TEST_CHECK(context, second_pack_site_run.inventory.worker_pack_slot_count == 12U);
+}
+
+void prototype_site_run_loads_cash_target_survival_objective_for_site_four(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_prototype_site_run(campaign, 4U);
+
+    GS1_SYSTEM_TEST_CHECK(context, site_run.objective.type == gs1::SiteObjectiveType::CashTargetSurvival);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.objective.target_cash_points == gs1::cash_points_from_cash(45));
+    GS1_SYSTEM_TEST_CHECK(context, site_run.objective.target_edge == gs1::SiteObjectiveTargetEdge::East);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.counters.objective_progress_normalized, 20.0f / 45.0f, 0.001f));
 }
 
 void weather_event_site_run_started_applies_site_one_background_conditions(
@@ -491,6 +504,44 @@ void weather_event_highway_objective_schedules_repeating_waves_with_one_sided_wi
     GS1_SYSTEM_TEST_CHECK(context, site_run.event.end_time_minutes > site_run.event.peak_time_minutes);
     GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_wind_direction_degrees < 90.0f ||
         site_run.weather.weather_wind_direction_degrees > 270.0f);
+}
+
+void weather_event_cash_target_objective_schedules_repeating_waves_from_target_edge(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(8U, 1108U);
+    GameMessageQueue queue {};
+    auto weather_context = make_site_context<WeatherEventSystem>(campaign, site_run, queue);
+
+    configure_cash_target_survival_objective(
+        site_run,
+        gs1::SiteObjectiveTargetEdge::West,
+        gs1::cash_points_from_cash(45));
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        WeatherEventSystem::process_message(
+            weather_context,
+            make_message(
+                GameMessageType::SiteRunStarted,
+                SiteRunStartedMessage {8U, 1U, 108U, 1U, 42ULL})) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.forecast_profile_state.forecast_profile_id == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.event.minutes_until_next_wave >= 4.0);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.event.minutes_until_next_wave <= 8.0);
+
+    for (int index = 0; index < 40; ++index)
+    {
+        WeatherEventSystem::run(weather_context);
+    }
+
+    GS1_SYSTEM_TEST_REQUIRE(context, site_run.event.active_event_template_id.has_value());
+    GS1_SYSTEM_TEST_CHECK(context, site_run.event.wave_sequence_index == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.event.peak_time_minutes > site_run.event.start_time_minutes);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.event.end_time_minutes > site_run.event.peak_time_minutes);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_wind_direction_degrees > 90.0f &&
+        site_run.weather.weather_wind_direction_degrees < 270.0f);
 }
 
 void local_weather_resolve_recomputes_full_grid_each_run(
@@ -1557,6 +1608,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "prototype_site_run_expands_worker_pack_with_village_pack_techs",
     prototype_site_run_expands_worker_pack_with_village_pack_techs);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "site_run_factory",
+    "prototype_site_run_loads_cash_target_survival_objective_for_site_four",
+    prototype_site_run_loads_cash_target_survival_objective_for_site_four);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "weather_event",
     "site_run_started_applies_site_one_background_conditions",
     weather_event_site_run_started_applies_site_one_background_conditions);
@@ -1600,6 +1655,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "weather_event",
     "highway_objective_schedules_repeating_waves_with_one_sided_wind",
     weather_event_highway_objective_schedules_repeating_waves_with_one_sided_wind);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "weather_event",
+    "cash_target_objective_schedules_repeating_waves_from_target_edge",
+    weather_event_cash_target_objective_schedules_repeating_waves_from_target_edge);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "local_weather_resolve",
     "recomputes_full_grid_each_run",

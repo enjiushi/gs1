@@ -1820,6 +1820,24 @@ std::vector<ContentValidationIssue> validate_content_database(
             break;
         }
 
+        if (site_def.objective_type == SiteObjectiveType::CashTargetSurvival)
+        {
+            if (site_def.objective_target_cash_points <= content.prototype_campaign.starting_site_cash)
+            {
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Cash-target survival sites must set a positive target cash amount above the starting site cash."});
+                break;
+            }
+        }
+        else if (site_def.objective_target_cash_points != 0)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Only cash-target survival sites may author a non-zero objective target cash amount."});
+            break;
+        }
+
         if (!is_weather_meter_in_range(site_def.default_weather_heat) ||
             !is_weather_meter_in_range(site_def.default_weather_wind) ||
             !is_weather_meter_in_range(site_def.default_weather_dust))

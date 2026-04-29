@@ -9,7 +9,8 @@ enum class SiteObjectiveType : std::uint32_t
     DenseRestoration = 0,
     HighwayProtection = 1,
     GreenWallConnection = 2,
-    PureSurvival = 3
+    PureSurvival = 3,
+    CashTargetSurvival = 4
 };
 
 enum class SiteObjectiveTargetEdge : std::uint8_t

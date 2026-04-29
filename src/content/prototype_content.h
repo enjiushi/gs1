@@ -57,6 +57,7 @@ struct PrototypeSiteContent final
     double site_time_limit_minutes {0.0};
     SiteObjectiveTargetEdge objective_target_edge {SiteObjectiveTargetEdge::East};
     std::uint8_t objective_target_band_width {0U};
+    std::int32_t objective_target_cash_points {0};
     float highway_max_average_sand_cover {0.0f};
     std::int32_t completion_reputation_reward {0};
     std::int32_t completion_faction_reputation_reward {0};
