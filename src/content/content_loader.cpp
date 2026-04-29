@@ -323,6 +323,52 @@ template <typename T>
     fail_load(path, line_number, "invalid plant focus");
 }
 
+[[nodiscard]] PlantHarvestOutputKind parse_plant_harvest_output_kind(
+    const std::filesystem::path& path,
+    std::size_t line_number,
+    const std::string& field)
+{
+    if (field == "Dedicated")
+    {
+        return PlantHarvestOutputKind::Dedicated;
+    }
+    if (field == "Basic")
+    {
+        return PlantHarvestOutputKind::Basic;
+    }
+    if (field == "Seed")
+    {
+        return PlantHarvestOutputKind::Seed;
+    }
+    if (field == "Bonus")
+    {
+        return PlantHarvestOutputKind::Bonus;
+    }
+
+    fail_load(path, line_number, "invalid plant harvest output kind");
+}
+
+[[nodiscard]] PlantHarvestOutputChanceMode parse_plant_harvest_output_chance_mode(
+    const std::filesystem::path& path,
+    std::size_t line_number,
+    const std::string& field)
+{
+    if (field == "Guaranteed")
+    {
+        return PlantHarvestOutputChanceMode::Guaranteed;
+    }
+    if (field == "FixedChance")
+    {
+        return PlantHarvestOutputChanceMode::FixedChance;
+    }
+    if (field == "BudgetScaled")
+    {
+        return PlantHarvestOutputChanceMode::BudgetScaled;
+    }
+
+    fail_load(path, line_number, "invalid plant harvest output chance mode");
+}
+
 [[nodiscard]] CraftingStationKind parse_crafting_station_kind(
     const std::filesystem::path& path,
     std::size_t line_number,
@@ -1645,6 +1691,8 @@ void load_modifier_defs(ContentDatabase& content, const std::filesystem::path& p
             optional_toml_float(path, entry, "morale_cost_weight_delta").value_or(0.0f);
         modifier.action_cost_modifiers.morale_bias =
             optional_toml_float(path, entry, "morale_cost_bias").value_or(0.0f);
+        modifier.harvest_output_modifiers.cash_point_multiplier_delta =
+            optional_toml_float(path, entry, "harvest_output_cash_point_multiplier_delta").value_or(0.0f);
         content.modifier_defs.push_back(modifier);
     }
 }
@@ -1731,6 +1779,16 @@ void load_gameplay_tuning_def(ContentDatabase& content, const std::filesystem::p
         require_toml_float(path, player_meter_cash_points, "buy_price_multiplier");
     tuning.player_meter_cash_points.sell_price_multiplier =
         require_toml_float(path, player_meter_cash_points, "sell_price_multiplier");
+
+    const auto& plant_harvest = require_toml_table(path, document, "plant_harvest");
+    tuning.plant_harvest.output_cash_points_per_power =
+        require_toml_float(path, plant_harvest, "output_cash_points_per_power");
+    tuning.plant_harvest.seed_cash_points_per_pool_point =
+        require_toml_float(path, plant_harvest, "seed_cash_points_per_pool_point");
+    tuning.plant_harvest.seed_cash_points_base =
+        require_toml_float(path, plant_harvest, "seed_cash_points_base");
+    tuning.plant_harvest.seed_cash_points_rounding_step =
+        require_toml_float(path, plant_harvest, "seed_cash_points_rounding_step");
 
     const auto& ecology = require_toml_table(path, document, "ecology");
     tuning.ecology.moisture_gain_per_water_unit =
@@ -1952,8 +2010,39 @@ void load_plant_defs(ContentDatabase& content, const std::filesystem::path& path
     for (const auto& node : plants)
     {
         const auto& entry = require_array_entry_table(path, node, "plants");
+        const PlantId plant_id {require_toml_unsigned<std::uint32_t>(path, entry, "plant_id")};
+        const std::uint16_t harvest_output_begin =
+            static_cast<std::uint16_t>(content.plant_harvest_output_defs.size());
+        const auto& harvest_outputs = require_toml_array(path, entry, "harvest_outputs");
+        for (const auto& harvest_output_node : harvest_outputs)
+        {
+            const auto& harvest_output =
+                require_array_entry_table(path, harvest_output_node, "harvest_outputs");
+            PlantHarvestOutputDef harvest_output_def {};
+            harvest_output_def.plant_id = plant_id;
+            harvest_output_def.item_id =
+                ItemId {require_toml_unsigned<std::uint32_t>(path, harvest_output, "item_id")};
+            harvest_output_def.quantity =
+                require_toml_unsigned<std::uint16_t>(path, harvest_output, "quantity");
+            harvest_output_def.output_kind =
+                parse_plant_harvest_output_kind(
+                    path,
+                    toml_line_number(harvest_output),
+                    require_toml_string(path, harvest_output, "output_kind"));
+            harvest_output_def.chance_mode =
+                parse_plant_harvest_output_chance_mode(
+                    path,
+                    toml_line_number(harvest_output),
+                    require_toml_string(path, harvest_output, "chance_mode"));
+            harvest_output_def.chance_percent =
+                optional_toml_float(path, harvest_output, "chance_percent").value_or(100.0f);
+            harvest_output_def.max_chance_percent =
+                optional_toml_float(path, harvest_output, "max_chance_percent").value_or(100.0f);
+            content.plant_harvest_output_defs.push_back(harvest_output_def);
+        }
+
         content.plant_defs.push_back(PlantDef {
-            PlantId {require_toml_unsigned<std::uint32_t>(path, entry, "plant_id")},
+            plant_id,
             store_cstring(content, require_toml_string(path, entry, "display_name")),
             parse_plant_height_class(
                 path,
@@ -1980,10 +2069,8 @@ void load_plant_defs(ContentDatabase& content, const std::filesystem::path& path
             require_toml_float(path, entry, "spread_readiness"),
             require_toml_float(path, entry, "spread_chance"),
             require_toml_float(path, entry, "output_dependency"),
-            ItemId {require_toml_unsigned<std::uint32_t>(path, entry, "harvest_item_id")},
-            require_toml_unsigned<std::uint16_t>(path, entry, "harvest_quantity"),
-            ItemId {optional_toml_unsigned<std::uint32_t>(path, entry, "secondary_harvest_item_id").value_or(0U)},
-            optional_toml_unsigned<std::uint16_t>(path, entry, "secondary_harvest_quantity").value_or(0U),
+            harvest_output_begin,
+            static_cast<std::uint16_t>(harvest_outputs.size()),
             require_toml_float(path, entry, "harvest_action_duration_minutes"),
             require_toml_float(path, entry, "harvest_density_required"),
             require_toml_float(path, entry, "harvest_density_removed")});

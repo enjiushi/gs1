@@ -1,5 +1,8 @@
 #pragma once
 
+#include "content/defs/plant_defs.h"
+
+#include <cmath>
 #include <cstdint>
 
 namespace gs1
@@ -47,6 +50,14 @@ struct PlayerMeterCashPointTuning final
     float morale_per_point {35.0f};
     float buy_price_multiplier {1.1f};
     float sell_price_multiplier {0.9f};
+};
+
+struct PlantHarvestTuning final
+{
+    float output_cash_points_per_power {125.0f};
+    float seed_cash_points_per_pool_point {4.0f};
+    float seed_cash_points_base {50.0f};
+    float seed_cash_points_rounding_step {50.0f};
 };
 
 struct EcologyTuning final
@@ -127,12 +138,51 @@ struct GameplayTuningDef final
 {
     WorkerConditionTuning worker_condition {};
     PlayerMeterCashPointTuning player_meter_cash_points {};
+    PlantHarvestTuning plant_harvest {};
     EcologyTuning ecology {};
     ModifierSystemTuning modifier_system {};
     DeviceSupportTuning device_support {};
     CampDurabilityTuning camp_durability {};
     TaskBoardTuning task_board {};
 };
+
+[[nodiscard]] inline std::uint32_t derive_plant_seed_internal_cash_points(
+    const PlantHarvestTuning& tuning,
+    const PlantDef& plant_def) noexcept
+{
+    const double raw_cash_points =
+        static_cast<double>(tuning.seed_cash_points_base) +
+        static_cast<double>(plant_total_meter_pool(plant_def)) *
+            static_cast<double>(tuning.seed_cash_points_per_pool_point);
+    const double rounded_cash_points =
+        tuning.seed_cash_points_rounding_step <= 0.0f
+        ? raw_cash_points
+        : std::round(
+            raw_cash_points /
+                static_cast<double>(tuning.seed_cash_points_rounding_step)) *
+            static_cast<double>(tuning.seed_cash_points_rounding_step);
+    return rounded_cash_points <= 0.0
+        ? 0U
+        : static_cast<std::uint32_t>(std::lround(rounded_cash_points));
+}
+
+[[nodiscard]] inline std::uint32_t derive_plant_harvest_output_cash_point_budget(
+    const PlantHarvestTuning& tuning,
+    const PlantDef& plant_def,
+    float output_cash_point_multiplier = 1.0f) noexcept
+{
+    const double clamped_multiplier =
+        output_cash_point_multiplier <= 0.0f
+        ? 0.0
+        : static_cast<double>(output_cash_point_multiplier);
+    const double raw_cash_points =
+        static_cast<double>(plant_def.output_power) *
+        static_cast<double>(tuning.output_cash_points_per_power) *
+        clamped_multiplier;
+    return raw_cash_points <= 0.0
+        ? 0U
+        : static_cast<std::uint32_t>(std::lround(raw_cash_points));
+}
 
 [[nodiscard]] const GameplayTuningDef& gameplay_tuning_def() noexcept;
 [[nodiscard]] double player_meter_cash_point_value(

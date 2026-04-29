@@ -30,6 +30,21 @@ enum class PlantFocus : std::uint8_t
     ProtectionSoilSupport = 9
 };
 
+enum class PlantHarvestOutputKind : std::uint8_t
+{
+    Dedicated = 0,
+    Basic = 1,
+    Seed = 2,
+    Bonus = 3
+};
+
+enum class PlantHarvestOutputChanceMode : std::uint8_t
+{
+    Guaranteed = 0,
+    FixedChance = 1,
+    BudgetScaled = 2
+};
+
 inline constexpr std::uint32_t k_plant_ordos_wormwood = 1U;
 inline constexpr std::uint32_t k_plant_white_thorn = 2U;
 inline constexpr std::uint32_t k_plant_red_tamarisk = 3U;
@@ -40,6 +55,18 @@ inline constexpr std::uint32_t k_plant_jiji_grass = 7U;
 inline constexpr std::uint32_t k_plant_sea_buckthorn = 8U;
 inline constexpr std::uint32_t k_plant_desert_ephedra = 9U;
 inline constexpr std::uint32_t k_plant_saxaul = 10U;
+
+struct PlantHarvestOutputDef final
+{
+    PlantId plant_id;
+    ItemId item_id;
+    std::uint16_t quantity;
+    PlantHarvestOutputKind output_kind;
+    PlantHarvestOutputChanceMode chance_mode;
+    std::uint8_t reserved0[2];
+    float chance_percent;
+    float max_chance_percent;
+};
 
 struct PlantDef final
 {
@@ -64,10 +91,8 @@ struct PlantDef final
     float spread_readiness;
     float spread_chance;
     float output_dependency;
-    ItemId harvest_item_id;
-    std::uint16_t harvest_quantity;
-    ItemId secondary_harvest_item_id;
-    std::uint16_t secondary_harvest_quantity;
+    std::uint16_t harvest_output_begin;
+    std::uint16_t harvest_output_count;
     float harvest_action_duration_minutes;
     float harvest_density_required;
     float harvest_density_removed;
@@ -173,9 +198,7 @@ inline constexpr PlantDef k_generic_living_plant_def {
     35.0f,
     12.0f,
     16.0f,
-    ItemId {},
     0U,
-    ItemId {},
     0U,
     0.0f,
     0.0f,
@@ -203,18 +226,28 @@ inline constexpr PlantDef k_generic_ground_cover_def {
     0.0f,
     0.0f,
     0.0f,
-    ItemId {},
     0U,
-    ItemId {},
     0U,
     0.0f,
     0.0f,
     0.0f};
 
 [[nodiscard]] std::span<const PlantDef> all_plant_defs() noexcept;
+[[nodiscard]] std::span<const PlantHarvestOutputDef> all_plant_harvest_output_defs() noexcept;
 [[nodiscard]] const PlantDef* find_plant_def(PlantId plant_id) noexcept;
+[[nodiscard]] std::span<const PlantHarvestOutputDef> plant_harvest_output_defs(
+    const PlantDef& plant_def) noexcept;
+[[nodiscard]] std::span<const PlantHarvestOutputDef> plant_harvest_output_defs(
+    PlantId plant_id) noexcept;
 
 static_assert(std::is_standard_layout_v<PlantDef>, "PlantDef must remain standard layout.");
 static_assert(std::is_trivial_v<PlantDef>, "PlantDef must remain trivial.");
 static_assert(std::is_trivially_copyable_v<PlantDef>, "PlantDef must remain trivially copyable.");
+static_assert(
+    std::is_standard_layout_v<PlantHarvestOutputDef>,
+    "PlantHarvestOutputDef must remain standard layout.");
+static_assert(std::is_trivial_v<PlantHarvestOutputDef>, "PlantHarvestOutputDef must remain trivial.");
+static_assert(
+    std::is_trivially_copyable_v<PlantHarvestOutputDef>,
+    "PlantHarvestOutputDef must remain trivially copyable.");
 }  // namespace gs1

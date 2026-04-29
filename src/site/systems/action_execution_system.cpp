@@ -3,6 +3,7 @@
 #include "campaign/systems/technology_system.h"
 #include "content/defs/craft_recipe_defs.h"
 #include "content/defs/excavation_defs.h"
+#include "content/defs/gameplay_tuning_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/plant_defs.h"
 #include "content/defs/structure_defs.h"
@@ -177,6 +178,22 @@ float percent_from_seed(std::uint64_t seed) noexcept
     return static_cast<float>(mix_excavation_seed(seed) % 10000ULL) * 0.01f;
 }
 
+std::uint64_t harvest_roll_seed(
+    std::uint64_t site_attempt_seed,
+    RuntimeActionId action_id,
+    TileCoord target_tile,
+    PlantId plant_id,
+    std::size_t output_index) noexcept
+{
+    std::uint64_t seed = site_attempt_seed;
+    seed ^= static_cast<std::uint64_t>(action_id.value) * 0x9e3779b97f4a7c15ULL;
+    seed ^= static_cast<std::uint64_t>(plant_id.value) * 0xbf58476d1ce4e5b9ULL;
+    seed ^= static_cast<std::uint64_t>(static_cast<std::uint32_t>(target_tile.x)) << 32U;
+    seed ^= static_cast<std::uint64_t>(static_cast<std::uint32_t>(target_tile.y));
+    seed ^= static_cast<std::uint64_t>(output_index + 1U) * 0x94d049bb133111ebULL;
+    return seed;
+}
+
 ExcavationDepth excavation_depth_from_subject_id(std::uint32_t subject_id) noexcept
 {
     switch (subject_id)
@@ -252,28 +269,207 @@ ItemId repair_tool_item_id(std::uint32_t requested_item_id) noexcept
 
 bool plant_def_is_harvestable(const PlantDef& plant_def) noexcept
 {
-    return plant_def.harvest_item_id.value != 0U &&
-        plant_def.harvest_quantity > 0U &&
+    return plant_def.harvest_output_count > 0U &&
         plant_def.harvest_action_duration_minutes > 0.0f &&
         plant_def.harvest_density_required >= 0.0f &&
         plant_def.harvest_density_removed > 0.0f;
 }
 
-std::uint32_t plant_primary_harvest_quantity(const PlantDef& plant_def) noexcept
-{
-    return static_cast<std::uint32_t>(plant_def.harvest_quantity);
-}
-
-std::uint32_t plant_secondary_harvest_quantity(const PlantDef& plant_def) noexcept
-{
-    return plant_def.secondary_harvest_item_id.value == 0U
-        ? 0U
-        : static_cast<std::uint32_t>(plant_def.secondary_harvest_quantity);
-}
-
 bool harvest_awards_item(const PlantDef& plant_def, float plant_density) noexcept
 {
     return plant_density > (plant_def.harvest_density_required + k_harvest_density_epsilon_raw);
+}
+
+float resolved_harvest_output_cash_point_multiplier(const ModifierState& modifier_state) noexcept
+{
+    return std::max(
+        0.0f,
+        1.0f + modifier_state.resolved_harvest_output_modifiers.cash_point_multiplier_delta);
+}
+
+double harvest_output_cash_points(ItemId item_id, std::uint16_t quantity) noexcept
+{
+    return static_cast<double>(item_internal_price_cash_points(item_id)) *
+        static_cast<double>(quantity);
+}
+
+float resolve_harvest_output_chance_percent(
+    const PlantHarvestOutputDef& harvest_output_def,
+    double remaining_expected_cash_points) noexcept
+{
+    switch (harvest_output_def.chance_mode)
+    {
+    case PlantHarvestOutputChanceMode::Guaranteed:
+        return 100.0f;
+    case PlantHarvestOutputChanceMode::FixedChance:
+        return std::clamp(harvest_output_def.chance_percent, 0.0f, 100.0f);
+    case PlantHarvestOutputChanceMode::BudgetScaled:
+    {
+        const double output_cash_points =
+            harvest_output_cash_points(harvest_output_def.item_id, harvest_output_def.quantity);
+        if (output_cash_points <= 0.0)
+        {
+            return 0.0f;
+        }
+
+        const double resolved_percent =
+            std::min(
+                static_cast<double>(std::clamp(harvest_output_def.max_chance_percent, 0.0f, 100.0f)),
+                (remaining_expected_cash_points / output_cash_points) * 100.0);
+        return static_cast<float>(std::clamp(resolved_percent, 0.0, 100.0));
+    }
+    default:
+        return 0.0f;
+    }
+}
+
+double expected_harvest_output_cash_points(
+    const PlantHarvestOutputDef& harvest_output_def,
+    float chance_percent) noexcept
+{
+    return harvest_output_cash_points(harvest_output_def.item_id, harvest_output_def.quantity) *
+        (static_cast<double>(chance_percent) * 0.01);
+}
+
+std::uint32_t harvest_summary_item_id(
+    const std::vector<ResolvedHarvestOutputStack>& resolved_outputs,
+    const PlantDef& plant_def) noexcept
+{
+    for (const auto& harvest_output_def : plant_harvest_output_defs(plant_def))
+    {
+        if (harvest_output_def.output_kind != PlantHarvestOutputKind::Dedicated)
+        {
+            continue;
+        }
+
+        const auto it = std::find_if(
+            resolved_outputs.begin(),
+            resolved_outputs.end(),
+            [&](const ResolvedHarvestOutputStack& resolved_output) {
+                return resolved_output.item_id == harvest_output_def.item_id.value &&
+                    resolved_output.quantity > 0U;
+            });
+        if (it != resolved_outputs.end())
+        {
+            return it->item_id;
+        }
+    }
+
+    return resolved_outputs.empty() ? 0U : resolved_outputs.front().item_id;
+}
+
+std::uint16_t harvest_summary_item_quantity(
+    const std::vector<ResolvedHarvestOutputStack>& resolved_outputs,
+    std::uint32_t summary_item_id) noexcept
+{
+    if (summary_item_id == 0U)
+    {
+        return 0U;
+    }
+
+    std::uint32_t total_quantity = 0U;
+    for (const auto& resolved_output : resolved_outputs)
+    {
+        if (resolved_output.item_id == summary_item_id)
+        {
+            total_quantity += resolved_output.quantity;
+        }
+    }
+
+    return static_cast<std::uint16_t>(std::min<std::uint32_t>(total_quantity, 65535U));
+}
+
+std::vector<ResolvedHarvestOutputStack> resolve_harvest_outputs(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    RuntimeActionId action_id,
+    TileCoord target_tile,
+    const PlantDef& plant_def,
+    float plant_density)
+{
+    std::vector<ResolvedHarvestOutputStack> resolved_outputs {};
+    if (!harvest_awards_item(plant_def, plant_density))
+    {
+        return resolved_outputs;
+    }
+
+    const auto output_cash_point_multiplier =
+        resolved_harvest_output_cash_point_multiplier(context.world.read_modifier());
+    double remaining_expected_cash_points = static_cast<double>(
+        derive_plant_harvest_output_cash_point_budget(
+            gameplay_tuning_def().plant_harvest,
+            plant_def,
+            output_cash_point_multiplier));
+    const auto harvest_outputs = plant_harvest_output_defs(plant_def);
+    resolved_outputs.reserve(harvest_outputs.size());
+    for (std::size_t harvest_output_index = 0U;
+         harvest_output_index < harvest_outputs.size();
+         ++harvest_output_index)
+    {
+        const auto& harvest_output_def = harvest_outputs[harvest_output_index];
+        const float chance_percent =
+            resolve_harvest_output_chance_percent(
+                harvest_output_def,
+                remaining_expected_cash_points);
+        remaining_expected_cash_points = std::max(
+            0.0,
+            remaining_expected_cash_points -
+                expected_harvest_output_cash_points(harvest_output_def, chance_percent));
+        if (chance_percent <= 0.0f)
+        {
+            continue;
+        }
+
+        const bool should_award =
+            chance_percent >= 99.999f ||
+            percent_from_seed(
+                harvest_roll_seed(
+                    context.world.site_attempt_seed(),
+                    action_id,
+                    target_tile,
+                    plant_def.plant_id,
+                    harvest_output_index)) < chance_percent;
+        if (!should_award)
+        {
+            continue;
+        }
+
+        resolved_outputs.push_back(ResolvedHarvestOutputStack {
+            harvest_output_def.item_id.value,
+            harvest_output_def.quantity,
+            {0U, 0U}});
+    }
+
+    return resolved_outputs;
+}
+
+bool inventory_can_fit_harvest_outputs(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    const std::vector<ResolvedHarvestOutputStack>& resolved_outputs) noexcept
+{
+    const auto worker_pack = inventory_storage::worker_pack_container(context.site_run);
+    if (!worker_pack.is_valid())
+    {
+        return resolved_outputs.empty();
+    }
+
+    for (const auto& resolved_output : resolved_outputs)
+    {
+        if (resolved_output.quantity == 0U)
+        {
+            continue;
+        }
+
+        if (!inventory_storage::can_fit_item_in_container(
+                context.site_run,
+                worker_pack,
+                ItemId {resolved_output.item_id},
+                resolved_output.quantity))
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 ActionKind to_action_kind(Gs1SiteActionKind kind) noexcept
@@ -577,7 +773,10 @@ void clear_action_state(ActionState& action_state) noexcept
     action_state.total_action_minutes = 0.0;
     action_state.remaining_action_minutes = 0.0;
     action_state.reserved_input_item_stacks.clear();
+    action_state.resolved_harvest_outputs.clear();
     action_state.deferred_meter_delta = {};
+    action_state.resolved_harvest_density = 0.0f;
+    action_state.resolved_harvest_outputs_valid = false;
     action_state.started_at_world_minute.reset();
 }
 
@@ -1128,24 +1327,10 @@ SiteActionFailureReason validate_harvest_target(
     }
 
     const bool awards_item = harvest_awards_item(*plant_def, tile.ecology.plant_density);
-    if (awards_item)
+    if (awards_item &&
+        inventory_storage::worker_pack_container(context.site_run).is_valid() == false)
     {
-        const auto worker_pack = inventory_storage::worker_pack_container(context.site_run);
-        if (!worker_pack.is_valid() ||
-            !inventory_storage::can_fit_item_in_container(
-                context.site_run,
-                worker_pack,
-                plant_def->harvest_item_id,
-                plant_primary_harvest_quantity(*plant_def)) ||
-            (plant_def->secondary_harvest_item_id.value != 0U &&
-                !inventory_storage::can_fit_item_in_container(
-                    context.site_run,
-                    worker_pack,
-                    plant_def->secondary_harvest_item_id,
-                    plant_secondary_harvest_quantity(*plant_def))))
-        {
-            return SiteActionFailureReason::InvalidState;
-        }
+        return SiteActionFailureReason::InvalidState;
     }
 
     if (out_plant_def != nullptr)
@@ -1929,37 +2114,25 @@ void emit_action_fact_messages(
         if (const auto* plant_def = find_plant_def(PlantId {action_state.primary_subject_id});
             plant_def != nullptr && plant_def_is_harvestable(*plant_def))
         {
-            const bool awards_item =
-                harvest_awards_item(
-                    *plant_def,
-                    action_state.secondary_subject_id == 0U
-                        ? 0.0f
-                        : (static_cast<float>(action_state.secondary_subject_id) * 0.01f));
-            const std::uint16_t item_quantity = awards_item ? plant_def->harvest_quantity : 0U;
-            const std::uint16_t secondary_item_quantity =
-                awards_item && plant_def->secondary_harvest_item_id.value != 0U
-                ? plant_def->secondary_harvest_quantity
-                : 0U;
-            if (item_quantity > 0U)
+            for (const auto& resolved_output : action_state.resolved_harvest_outputs)
             {
+                if (resolved_output.quantity == 0U)
+                {
+                    continue;
+                }
+
                 enqueue_message(
                     queue,
                     GameMessageType::InventoryWorkerPackInsertRequested,
                     InventoryWorkerPackInsertRequestedMessage {
-                        plant_def->harvest_item_id.value,
-                        item_quantity,
+                        resolved_output.item_id,
+                        resolved_output.quantity,
                         0U});
             }
-            if (secondary_item_quantity > 0U)
-            {
-                enqueue_message(
-                    queue,
-                    GameMessageType::InventoryWorkerPackInsertRequested,
-                    InventoryWorkerPackInsertRequestedMessage {
-                        plant_def->secondary_harvest_item_id.value,
-                        secondary_item_quantity,
-                        0U});
-            }
+            const std::uint32_t summary_item_id =
+                harvest_summary_item_id(action_state.resolved_harvest_outputs, *plant_def);
+            const std::uint16_t summary_item_quantity =
+                harvest_summary_item_quantity(action_state.resolved_harvest_outputs, summary_item_id);
             enqueue_message(
                 queue,
                 GameMessageType::SiteTileHarvested,
@@ -1968,8 +2141,8 @@ void emit_action_fact_messages(
                     target_tile.x,
                     target_tile.y,
                     plant_def->plant_id.value,
-                    plant_def->harvest_item_id.value,
-                    item_quantity,
+                    summary_item_id,
+                    summary_item_quantity,
                     0U,
                     plant_def->harvest_density_removed});
         }
@@ -2075,7 +2248,20 @@ SiteActionFailureReason validate_harvest_completion(
         return SiteActionFailureReason::InvalidState;
     }
 
-    return validate_harvest_target(context, *action_state.target_tile);
+    const auto failure_reason = validate_harvest_target(context, *action_state.target_tile);
+    if (failure_reason != SiteActionFailureReason::None)
+    {
+        return failure_reason;
+    }
+
+    if (!action_state.resolved_harvest_outputs_valid)
+    {
+        return SiteActionFailureReason::InvalidState;
+    }
+
+    return inventory_can_fit_harvest_outputs(context, action_state.resolved_harvest_outputs)
+        ? SiteActionFailureReason::None
+        : SiteActionFailureReason::InvalidState;
 }
 
 SiteActionFailureReason validate_excavation_completion(
@@ -2382,7 +2568,7 @@ Gs1Status ActionExecutionSystem::process_message(
             if (harvest_plant_def != nullptr)
             {
                 primary_subject_id = harvest_plant_def->plant_id.value;
-                item_id = harvest_plant_def->harvest_item_id.value;
+                item_id = 0U;
             }
         }
 
@@ -2465,6 +2651,34 @@ Gs1Status ActionExecutionSystem::process_message(
             item_id,
             craft_recipe);
         const RuntimeActionId action_id = allocate_runtime_action_id();
+        std::vector<ResolvedHarvestOutputStack> resolved_harvest_outputs {};
+        float resolved_harvest_density = 0.0f;
+        if (action_kind == ActionKind::Harvest && harvest_plant_def != nullptr)
+        {
+            resolved_harvest_density = context.world.read_tile(target_tile).ecology.plant_density;
+            resolved_harvest_outputs =
+                resolve_harvest_outputs(
+                    context,
+                    action_id,
+                    target_tile,
+                    *harvest_plant_def,
+                    resolved_harvest_density);
+            if (!inventory_can_fit_harvest_outputs(context, resolved_harvest_outputs))
+            {
+                emit_site_action_failed(
+                    context.message_queue,
+                    0U,
+                    action_kind,
+                    SiteActionFailureReason::InvalidState,
+                    request_flags,
+                    target_tile,
+                    primary_subject_id,
+                    secondary_subject_id);
+                return GS1_STATUS_OK;
+            }
+
+            item_id = harvest_summary_item_id(resolved_harvest_outputs, *harvest_plant_def);
+        }
 
         action_state.current_action_id = action_id;
         action_state.action_kind = action_kind;
@@ -2487,6 +2701,9 @@ Gs1Status ActionExecutionSystem::process_message(
             reactivate_plant_placement_mode_on_completion;
         action_state.total_action_minutes = duration_minutes;
         action_state.remaining_action_minutes = duration_minutes;
+        action_state.resolved_harvest_outputs = std::move(resolved_harvest_outputs);
+        action_state.resolved_harvest_density = resolved_harvest_density;
+        action_state.resolved_harvest_outputs_valid = action_kind == ActionKind::Harvest;
         action_state.started_at_world_minute.reset();
         action_state.awaiting_placement_reservation =
             should_request_placement_reservation(action_kind);

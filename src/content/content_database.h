@@ -26,6 +26,7 @@ struct ContentDatabase final
     GameplayTuningDef gameplay_tuning {};
     std::vector<ItemDef> item_defs {};
     std::vector<PlantDef> plant_defs {};
+    std::vector<PlantHarvestOutputDef> plant_harvest_output_defs {};
     std::vector<StructureDef> structure_defs {};
     std::vector<CraftRecipeDef> craft_recipe_defs {};
     std::vector<ExcavationDepthDef> excavation_depth_defs {};

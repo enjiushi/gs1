@@ -90,6 +90,13 @@ void accumulate_action_cost_modifiers(
     destination.morale_bias += source.morale_bias;
 }
 
+void accumulate_harvest_output_modifiers(
+    HarvestOutputModifierState& destination,
+    const HarvestOutputModifierState& source) noexcept
+{
+    destination.cash_point_multiplier_delta += source.cash_point_multiplier_delta;
+}
+
 ActionCostModifierState scale_action_cost_modifiers(
     const ActionCostModifierState& modifiers,
     float scale) noexcept
@@ -103,6 +110,15 @@ ActionCostModifierState scale_action_cost_modifiers(
     scaled.energy_bias *= scale;
     scaled.morale_weight_delta *= scale;
     scaled.morale_bias *= scale;
+    return scaled;
+}
+
+HarvestOutputModifierState scale_harvest_output_modifiers(
+    const HarvestOutputModifierState& modifiers,
+    float scale) noexcept
+{
+    HarvestOutputModifierState scaled = modifiers;
+    scaled.cash_point_multiplier_delta *= scale;
     return scaled;
 }
 
@@ -296,6 +312,15 @@ bool action_cost_modifiers_match(
             k_modifier_change_epsilon;
 }
 
+bool harvest_output_modifiers_match(
+    const HarvestOutputModifierState& lhs,
+    const HarvestOutputModifierState& rhs) noexcept
+{
+    return
+        std::fabs(lhs.cash_point_multiplier_delta - rhs.cash_point_multiplier_delta) <=
+        k_modifier_change_epsilon;
+}
+
 bool village_technology_effects_match(
     const VillageTechnologyEffectState& lhs,
     const VillageTechnologyEffectState& rhs) noexcept
@@ -403,6 +428,8 @@ ActiveSiteModifierState make_active_modifier_state(
     modifier.totals = scale_totals(modifier_def.totals, effect_scale);
     modifier.action_cost_modifiers =
         scale_action_cost_modifiers(modifier_def.action_cost_modifiers, effect_scale);
+    modifier.harvest_output_modifiers =
+        scale_harvest_output_modifiers(modifier_def.harvest_output_modifiers, effect_scale);
     return modifier;
 }
 
@@ -646,7 +673,8 @@ void accumulate_campaign_technology_modifier_totals(
 void accumulate_active_site_modifier_totals(
     const ModifierState& modifier_state,
     ModifierChannelTotals& totals,
-    ActionCostModifierState& action_cost_modifiers) noexcept
+    ActionCostModifierState& action_cost_modifiers,
+    HarvestOutputModifierState& harvest_output_modifiers) noexcept
 {
     for (const auto& active_modifier : modifier_state.active_site_modifiers)
     {
@@ -654,6 +682,35 @@ void accumulate_active_site_modifier_totals(
         accumulate_action_cost_modifiers(
             action_cost_modifiers,
             active_modifier.action_cost_modifiers);
+        accumulate_harvest_output_modifiers(
+            harvest_output_modifiers,
+            active_modifier.harvest_output_modifiers);
+    }
+}
+
+void accumulate_campaign_technology_harvest_output_modifiers(
+    const CampaignState& campaign,
+    HarvestOutputModifierState& harvest_output_modifiers) noexcept
+{
+    for (const auto& node_def : all_technology_node_defs())
+    {
+        if (node_def.entry_kind != TechnologyEntryKind::GlobalModifier ||
+            !TechnologySystem::node_purchased(campaign, node_def.tech_node_id))
+        {
+            continue;
+        }
+
+        const auto* modifier_def = find_modifier_def(node_def.linked_modifier_id);
+        if (modifier_def == nullptr)
+        {
+            continue;
+        }
+
+        accumulate_harvest_output_modifiers(
+            harvest_output_modifiers,
+            scale_harvest_output_modifiers(
+                modifier_def->harvest_output_modifiers,
+                TechnologySystem::current_effect_parameter(campaign, node_def)));
     }
 }
 
@@ -727,6 +784,7 @@ struct ResolvedModifierOutputs final
 {
     ModifierChannelTotals totals {};
     ActionCostModifierState action_cost_modifiers {};
+    HarvestOutputModifierState harvest_output_modifiers {};
     VillageTechnologyEffectState village_technology_effects {};
 };
 
@@ -740,13 +798,23 @@ ResolvedModifierOutputs resolve_owned_modifiers(
     for (const auto modifier_id : modifier_state.active_nearby_aura_modifier_ids)
     {
         accumulate_totals(resolved.totals, resolve_nearby_aura_modifier_preset(modifier_id));
+        if (const auto* modifier_def = find_modifier_def(modifier_id))
+        {
+            accumulate_harvest_output_modifiers(
+                resolved.harvest_output_modifiers,
+                modifier_def->harvest_output_modifiers);
+        }
     }
 
     accumulate_active_site_modifier_totals(
         modifier_state,
         resolved.totals,
-        resolved.action_cost_modifiers);
+        resolved.action_cost_modifiers,
+        resolved.harvest_output_modifiers);
     accumulate_campaign_technology_modifier_totals(campaign, resolved.totals);
+    accumulate_campaign_technology_harvest_output_modifiers(
+        campaign,
+        resolved.harvest_output_modifiers);
     resolved.village_technology_effects = resolve_village_technology_effects(campaign);
     accumulate_totals(resolved.totals, camp_comfort_bias(camp));
     resolved.totals = clamp_totals(resolved.totals);
@@ -761,6 +829,8 @@ void resolve_modifier_totals(SiteSystemContext<ModifierSystem>& context)
     const auto next_terrain_factors = resolve_terrain_factor_modifiers(next_outputs.totals);
     auto& current_terrain_factors = context.world.own_modifier().resolved_terrain_factor_modifiers;
     auto& current_action_cost_modifiers = context.world.own_modifier().resolved_action_cost_modifiers;
+    auto& current_harvest_output_modifiers =
+        context.world.own_modifier().resolved_harvest_output_modifiers;
     auto& current_village_effects = context.world.own_modifier().resolved_village_technology_effects;
 
     if (!totals_match(current_totals, next_outputs.totals) ||
@@ -768,6 +838,9 @@ void resolve_modifier_totals(SiteSystemContext<ModifierSystem>& context)
         !action_cost_modifiers_match(
             current_action_cost_modifiers,
             next_outputs.action_cost_modifiers) ||
+        !harvest_output_modifiers_match(
+            current_harvest_output_modifiers,
+            next_outputs.harvest_output_modifiers) ||
         !village_technology_effects_match(
             current_village_effects,
             next_outputs.village_technology_effects))
@@ -775,6 +848,7 @@ void resolve_modifier_totals(SiteSystemContext<ModifierSystem>& context)
         current_totals = next_outputs.totals;
         current_terrain_factors = next_terrain_factors;
         current_action_cost_modifiers = next_outputs.action_cost_modifiers;
+        current_harvest_output_modifiers = next_outputs.harvest_output_modifiers;
         current_village_effects = next_outputs.village_technology_effects;
         context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_HUD);
     }
@@ -790,6 +864,7 @@ void handle_site_run_started(
     modifier_state.resolved_channel_totals = {};
     modifier_state.resolved_terrain_factor_modifiers = {};
     modifier_state.resolved_action_cost_modifiers = {};
+    modifier_state.resolved_harvest_output_modifiers = {};
     modifier_state.resolved_village_technology_effects = {};
 
     const auto& aura_ids = context.campaign.loadout_planner_state.active_nearby_aura_modifier_ids;

@@ -9,4 +9,4 @@ Asset-driven economy phone regressions around listings, purchase outcomes, and p
 
 ## Contents
 - `insufficient_money_hire_rejected.gs1systemtest`: Verifies hires/purchases are rejected when funds are insufficient.
-- `missing_listing_not_found.gs1systemtest`: Verifies a missing listing resolves to a not-found outcome.
+- `missing_listing_not_found.gs1systemtest`: Verifies a missing listing resolves to a not-found outcome while leaving the current site-session cash unchanged at the authored startup balance.

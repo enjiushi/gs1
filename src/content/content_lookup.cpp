@@ -11,6 +11,7 @@
 #include "content/content_loader.h"
 #include "site/defs/site_action_defs.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace gs1
@@ -31,6 +32,20 @@ std::uint32_t truncate_to_cash_points(double value) noexcept
     return value <= 0.0
         ? 0U
         : static_cast<std::uint32_t>(std::floor(value + 0.0001));
+}
+
+const PlantHarvestOutputDef* find_seed_harvest_output_def_for_item_id(ItemId item_id) noexcept
+{
+    for (const auto& harvest_output_def : prototype_content_database().plant_harvest_output_defs)
+    {
+        if (harvest_output_def.item_id == item_id &&
+            harvest_output_def.output_kind == PlantHarvestOutputKind::Seed)
+        {
+            return &harvest_output_def;
+        }
+    }
+
+    return nullptr;
 }
 }  // namespace
 
@@ -118,6 +133,19 @@ std::uint32_t item_internal_price_cash_points(ItemId item_id) noexcept
         item_def->nourishment_delta,
         item_def->energy_delta,
         item_def->morale_delta);
+    if (derived_cash_points == 0U)
+    {
+        if (const auto* seed_output_def = find_seed_harvest_output_def_for_item_id(item_id))
+        {
+            if (const auto* plant_def = find_plant_def(seed_output_def->plant_id))
+            {
+                return derive_plant_seed_internal_cash_points(
+                    gameplay_tuning_def().plant_harvest,
+                    *plant_def);
+            }
+        }
+    }
+
     const auto base_cash_points =
         derived_cash_points != 0U ? derived_cash_points : item_def->internal_price_cash_points;
     const auto* modifier_def = find_modifier_def(item_def->modifier_id);
@@ -165,11 +193,36 @@ std::span<const PlantDef> all_plant_defs() noexcept
     return prototype_content_database().plant_defs;
 }
 
+std::span<const PlantHarvestOutputDef> all_plant_harvest_output_defs() noexcept
+{
+    return prototype_content_database().plant_harvest_output_defs;
+}
+
 const PlantDef* find_plant_def(PlantId plant_id) noexcept
 {
     const auto& content = prototype_content_database();
     const auto it = content.index.plant_by_id.find(plant_id.value);
     return it == content.index.plant_by_id.end() ? nullptr : &content.plant_defs[it->second];
+}
+
+std::span<const PlantHarvestOutputDef> plant_harvest_output_defs(const PlantDef& plant_def) noexcept
+{
+    const auto& harvest_outputs = prototype_content_database().plant_harvest_output_defs;
+    const std::size_t begin = static_cast<std::size_t>(plant_def.harvest_output_begin);
+    const std::size_t count = static_cast<std::size_t>(plant_def.harvest_output_count);
+    if (begin >= harvest_outputs.size() || count == 0U)
+    {
+        return {};
+    }
+
+    const std::size_t clamped_count = std::min(count, harvest_outputs.size() - begin);
+    return std::span<const PlantHarvestOutputDef> {harvest_outputs.data() + begin, clamped_count};
+}
+
+std::span<const PlantHarvestOutputDef> plant_harvest_output_defs(PlantId plant_id) noexcept
+{
+    const auto* plant_def = find_plant_def(plant_id);
+    return plant_def == nullptr ? std::span<const PlantHarvestOutputDef> {} : plant_harvest_output_defs(*plant_def);
 }
 
 std::span<const StructureDef> all_structure_defs() noexcept

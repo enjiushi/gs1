@@ -25,6 +25,7 @@ struct ModifierDef final
     std::uint16_t reserved0 {0U};
     ModifierChannelTotals totals {};
     ActionCostModifierState action_cost_modifiers {};
+    HarvestOutputModifierState harvest_output_modifiers {};
 };
 
 [[nodiscard]] std::span<const ModifierDef> all_modifier_defs() noexcept;

@@ -39,6 +39,12 @@ morale_per_point = 35.0
 buy_price_multiplier = 1.1
 sell_price_multiplier = 0.9
 
+[plant_harvest]
+output_cash_points_per_power = 125.0
+seed_cash_points_per_pool_point = 4.0
+seed_cash_points_base = 50.0
+seed_cash_points_rounding_step = 50.0
+
 [ecology]
 moisture_gain_per_water_unit = 22.0
 fertility_to_moisture_cap_factor = 1.0

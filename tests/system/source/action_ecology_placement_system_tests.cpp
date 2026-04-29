@@ -891,12 +891,13 @@ void action_execution_harvest_completion_emits_worker_pack_insert_and_tile_harve
     queue.clear();
     ActionExecutionSystem::run(site_context);
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::SiteActionCompleted) == 1U);
-    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::InventoryWorkerPackInsertRequested) == 2U);
+    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::InventoryWorkerPackInsertRequested) == 3U);
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::SiteTileHarvested) == 1U);
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::PlacementReservationReleased) == 1U);
 
     std::uint16_t primary_quantity = 0U;
-    std::uint16_t secondary_quantity = 0U;
+    std::uint16_t grass_quantity = 0U;
+    std::uint16_t seed_quantity = 0U;
     for (const auto& message : queue)
     {
         if (message.type != GameMessageType::InventoryWorkerPackInsertRequested)
@@ -911,11 +912,16 @@ void action_execution_harvest_completion_emits_worker_pack_insert_and_tile_harve
         }
         else if (insert.item_id == gs1::k_item_wormwood_bundle)
         {
-            secondary_quantity = insert.quantity;
+            grass_quantity = insert.quantity;
+        }
+        else if (insert.item_id == gs1::k_item_white_thorn_seed_bundle)
+        {
+            seed_quantity = insert.quantity;
         }
     }
     GS1_SYSTEM_TEST_CHECK(context, primary_quantity == 2U);
-    GS1_SYSTEM_TEST_CHECK(context, secondary_quantity == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, grass_quantity == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, seed_quantity == 1U);
 
     const auto* harvested =
         first_message_payload<SiteTileHarvestedMessage>(
@@ -979,6 +985,12 @@ void harvest_flow_inserts_output_and_reduces_multitile_density(
             site_run,
             gs1::inventory_storage::worker_pack_container(site_run),
             gs1::ItemId {gs1::k_item_wormwood_bundle}) == 1U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        gs1::inventory_storage::available_item_quantity_in_container(
+            site_run,
+            gs1::inventory_storage::worker_pack_container(site_run),
+            gs1::ItemId {gs1::k_item_white_thorn_seed_bundle}) == 1U);
 
     for (const auto coord : {TileCoord {2, 2}, TileCoord {3, 2}, TileCoord {2, 3}, TileCoord {3, 3}})
     {

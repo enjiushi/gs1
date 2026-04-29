@@ -65,6 +65,11 @@ struct ActionCostModifierState final
     float morale_bias {0.0f};
 };
 
+struct HarvestOutputModifierState final
+{
+    float cash_point_multiplier_delta {0.0f};
+};
+
 struct VillageTechnologyEffectState final
 {
     float shovel_meter_cost_reduction {0.0f};
@@ -92,6 +97,7 @@ struct ActiveSiteModifierState final
     double remaining_world_minutes {0.0};
     ModifierChannelTotals totals {};
     ActionCostModifierState action_cost_modifiers {};
+    HarvestOutputModifierState harvest_output_modifiers {};
 };
 
 struct ModifierState final
@@ -101,6 +107,7 @@ struct ModifierState final
     ModifierChannelTotals resolved_channel_totals {};
     TerrainFactorModifierState resolved_terrain_factor_modifiers {};
     ActionCostModifierState resolved_action_cost_modifiers {};
+    HarvestOutputModifierState resolved_harvest_output_modifiers {};
     VillageTechnologyEffectState resolved_village_technology_effects {};
 };
 }  // namespace gs1

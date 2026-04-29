@@ -59,6 +59,13 @@ struct DeferredWorkerMeterDelta final
     float work_efficiency_delta {0.0f};
 };
 
+struct ResolvedHarvestOutputStack final
+{
+    std::uint32_t item_id {0U};
+    std::uint16_t quantity {0U};
+    std::uint8_t reserved0[2] {};
+};
+
 struct ActionState final
 {
     std::optional<RuntimeActionId> current_action_id {};
@@ -76,7 +83,10 @@ struct ActionState final
     double total_action_minutes {0.0};
     double remaining_action_minutes {0.0};
     std::vector<ReservedItemStack> reserved_input_item_stacks {};
+    std::vector<ResolvedHarvestOutputStack> resolved_harvest_outputs {};
     DeferredWorkerMeterDelta deferred_meter_delta {};
+    float resolved_harvest_density {0.0f};
+    bool resolved_harvest_outputs_valid {false};
     std::optional<double> started_at_world_minute {};
     PlacementModeState placement_mode {};
 };
