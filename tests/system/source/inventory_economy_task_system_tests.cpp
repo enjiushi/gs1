@@ -2183,7 +2183,7 @@ void task_board_completion_does_not_queue_faction_reputation(
     complete_seeded_task(context, site_context, site_run, queue);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        site_run.task_board.visible_tasks.front().runtime_list_kind == TaskRuntimeListKind::Completed);
+        site_run.task_board.visible_tasks.front().runtime_list_kind == TaskRuntimeListKind::PendingClaim);
     GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.completed_task_ids.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.accepted_task_ids.empty());
     GS1_SYSTEM_TEST_CHECK(context, queue.empty());
@@ -2266,7 +2266,7 @@ void task_board_buy_task_completes_from_successful_purchase(
 
     buy_task = find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_buy_water);
     GS1_SYSTEM_TEST_REQUIRE(context, buy_task != nullptr);
-    GS1_SYSTEM_TEST_CHECK(context, buy_task->runtime_list_kind == TaskRuntimeListKind::Completed);
+    GS1_SYSTEM_TEST_CHECK(context, buy_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
 }
 
 void task_board_transfer_task_completes_from_successful_transfer(
@@ -2348,7 +2348,7 @@ void task_board_transfer_task_completes_from_successful_transfer(
     transfer_task =
         find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_transfer_seeds);
     GS1_SYSTEM_TEST_REQUIRE(context, transfer_task != nullptr);
-    GS1_SYSTEM_TEST_CHECK(context, transfer_task->runtime_list_kind == TaskRuntimeListKind::Completed);
+    GS1_SYSTEM_TEST_CHECK(context, transfer_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
 }
 
 void task_board_build_task_completes_from_device_placement(
@@ -2392,7 +2392,7 @@ void task_board_build_task_completes_from_device_placement(
     build_task =
         find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_build_camp_stove);
     GS1_SYSTEM_TEST_REQUIRE(context, build_task != nullptr);
-    GS1_SYSTEM_TEST_CHECK(context, build_task->runtime_list_kind == TaskRuntimeListKind::Completed);
+    GS1_SYSTEM_TEST_CHECK(context, build_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
 }
 
 void task_board_worker_meter_duration_task_tracks_time_and_resets(
@@ -2477,7 +2477,7 @@ void task_board_worker_meter_duration_task_tracks_time_and_resets(
     meter_task =
         find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_keep_worker_meters_high);
     GS1_SYSTEM_TEST_REQUIRE(context, meter_task != nullptr);
-    GS1_SYSTEM_TEST_CHECK(context, meter_task->runtime_list_kind == TaskRuntimeListKind::Completed);
+    GS1_SYSTEM_TEST_CHECK(context, meter_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
 }
 
 void task_board_living_plant_duration_task_ignores_straw_and_resets_on_density_drop(
@@ -2591,7 +2591,7 @@ void task_board_living_plant_duration_task_ignores_straw_and_resets_on_density_d
     plant_task =
         find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_keep_living_plants_stable);
     GS1_SYSTEM_TEST_REQUIRE(context, plant_task != nullptr);
-    GS1_SYSTEM_TEST_CHECK(context, plant_task->runtime_list_kind == TaskRuntimeListKind::Completed);
+    GS1_SYSTEM_TEST_CHECK(context, plant_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
 }
 
 void task_board_reward_claim_is_ignored_without_draft_options(
@@ -2620,8 +2620,98 @@ void task_board_reward_claim_is_ignored_without_draft_options(
     GS1_SYSTEM_TEST_CHECK(context, queue.empty());
     GS1_SYSTEM_TEST_CHECK(
         context,
-        site_run.task_board.visible_tasks.front().runtime_list_kind == TaskRuntimeListKind::Completed);
+        site_run.task_board.visible_tasks.front().runtime_list_kind == TaskRuntimeListKind::PendingClaim);
     GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.claimed_task_ids.empty());
+}
+
+void task_board_reward_claim_queues_resolved_message_after_reward_effects(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 1010U);
+    GameMessageQueue queue {};
+    auto task_context = make_site_context<TaskBoardSystem>(campaign, site_run, queue);
+
+    auto& task = site_run.task_board.visible_tasks.emplace_back();
+    task.task_instance_id = gs1::TaskInstanceId {1U};
+    task.task_template_id = gs1::TaskTemplateId {gs1::k_task_template_site1_buy_water};
+    task.publisher_faction_id = gs1::FactionId {gs1::k_faction_village_committee};
+    task.task_tier_id = 1U;
+    task.target_amount = 1U;
+    task.current_progress_amount = 1U;
+    task.runtime_list_kind = TaskRuntimeListKind::PendingClaim;
+    task.reward_draft_options.push_back(gs1::TaskRewardDraftOption {gs1::RewardCandidateId {1U}, false});
+    task.reward_draft_options.push_back(gs1::TaskRewardDraftOption {gs1::RewardCandidateId {2U}, false});
+    site_run.task_board.completed_task_ids.push_back(task.task_instance_id);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_message(
+            task_context,
+            make_message(
+                GameMessageType::TaskRewardClaimRequested,
+                gs1::TaskRewardClaimRequestedMessage {
+                    task.task_instance_id.value,
+                    0U})) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 3U);
+    GS1_SYSTEM_TEST_CHECK(context, queue[0].type == GameMessageType::EconomyMoneyAwardRequested);
+    GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameMessageType::InventoryDeliveryRequested);
+    GS1_SYSTEM_TEST_CHECK(context, queue[2].type == GameMessageType::TaskRewardClaimResolved);
+    {
+        const auto& payload = queue[2].payload_as<gs1::TaskRewardClaimResolvedMessage>();
+        GS1_SYSTEM_TEST_CHECK(context, payload.task_instance_id == 1U);
+        GS1_SYSTEM_TEST_CHECK(context, payload.task_template_id == gs1::k_task_template_site1_buy_water);
+        GS1_SYSTEM_TEST_CHECK(context, payload.reward_candidate_count == 2U);
+    }
+}
+
+void task_board_reward_claim_uses_first_draft_option_when_candidate_is_unspecified(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 1009U);
+    GameMessageQueue queue {};
+    auto task_context = make_site_context<TaskBoardSystem>(campaign, site_run, queue);
+
+    auto& task = site_run.task_board.visible_tasks.emplace_back();
+    task.task_instance_id = gs1::TaskInstanceId {1U};
+    task.task_template_id = gs1::TaskTemplateId {gs1::k_task_template_site1_buy_water};
+    task.publisher_faction_id = gs1::FactionId {gs1::k_faction_village_committee};
+    task.task_tier_id = 1U;
+    task.target_amount = 1U;
+    task.current_progress_amount = 1U;
+    task.runtime_list_kind = TaskRuntimeListKind::PendingClaim;
+    task.reward_draft_options.push_back(gs1::TaskRewardDraftOption {gs1::RewardCandidateId {1U}, false});
+    task.reward_draft_options.push_back(gs1::TaskRewardDraftOption {gs1::RewardCandidateId {2U}, false});
+    site_run.task_board.completed_task_ids.push_back(task.task_instance_id);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_message(
+            task_context,
+            make_message(
+                GameMessageType::TaskRewardClaimRequested,
+                gs1::TaskRewardClaimRequestedMessage {
+                    task.task_instance_id.value,
+                    0U})) == GS1_STATUS_OK);
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        site_run.task_board.visible_tasks.front().runtime_list_kind == TaskRuntimeListKind::Claimed);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.completed_task_ids.empty());
+    GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.claimed_task_ids.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        count_queued_messages(queue, GameMessageType::EconomyMoneyAwardRequested) == 1U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        count_queued_messages(queue, GameMessageType::InventoryDeliveryRequested) == 1U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        count_queued_messages(queue, GameMessageType::TaskRewardClaimResolved) == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.visible_tasks.front().reward_draft_options[0].selected);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.visible_tasks.front().reward_draft_options[1].selected);
 }
 
 void task_board_content_tuning_exposes_internal_prices_and_task_scoring_inputs(
@@ -2928,7 +3018,7 @@ void task_board_submit_task_completes_from_successful_submission(
     submit_task =
         find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_submit_water);
     GS1_SYSTEM_TEST_REQUIRE(context, submit_task != nullptr);
-    GS1_SYSTEM_TEST_CHECK(context, submit_task->runtime_list_kind == TaskRuntimeListKind::Completed);
+    GS1_SYSTEM_TEST_CHECK(context, submit_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
 }
 
 void economy_phone_refresh_tick_ignores_onboarding_then_rerolls_generated_stock(
@@ -3172,6 +3262,14 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "task_board",
     "reward_claim_is_ignored_without_draft_options",
     task_board_reward_claim_is_ignored_without_draft_options);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "task_board",
+    "reward_claim_queues_resolved_message_after_reward_effects",
+    task_board_reward_claim_queues_resolved_message_after_reward_effects);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "task_board",
+    "reward_claim_uses_first_draft_option_when_candidate_is_unspecified",
+    task_board_reward_claim_uses_first_draft_option_when_candidate_is_unspecified);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "task_board",
     "content_tuning_exposes_internal_prices_and_task_scoring_inputs",

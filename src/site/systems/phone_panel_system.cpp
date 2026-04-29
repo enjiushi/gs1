@@ -207,7 +207,7 @@ void count_projected_tasks(
         {
             out_accepted_count += 1U;
         }
-        else if (task.runtime_list_kind == TaskRuntimeListKind::Completed)
+        else if (task.runtime_list_kind == TaskRuntimeListKind::PendingClaim)
         {
             out_completed_count += 1U;
         }

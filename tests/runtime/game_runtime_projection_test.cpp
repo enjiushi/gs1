@@ -914,7 +914,7 @@ int main()
         completed_task.task_tier_id = 1U;
         completed_task.target_amount = 1U;
         completed_task.current_progress_amount = 1U;
-        completed_task.runtime_list_kind = gs1::TaskRuntimeListKind::Completed;
+        completed_task.runtime_list_kind = gs1::TaskRuntimeListKind::PendingClaim;
         bootstrap_site_run.task_board.visible_tasks.push_back(completed_task);
         bootstrap_site_run.task_board.completed_task_ids.push_back(gs1::TaskInstanceId {2U});
 
@@ -950,7 +950,7 @@ int main()
             assert(payload.task_template_id == gs1::k_task_template_site1_onboarding_buy_food);
             assert(payload.current_progress == 1U);
             assert(payload.target_progress == 1U);
-            assert(payload.list_kind == GS1_TASK_PRESENTATION_LIST_COMPLETED);
+            assert(payload.list_kind == GS1_TASK_PRESENTATION_LIST_PENDING_CLAIM);
         }
     }
 

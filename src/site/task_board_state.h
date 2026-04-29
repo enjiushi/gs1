@@ -13,7 +13,7 @@ enum class TaskRuntimeListKind : std::uint32_t
 {
     Visible = 0,
     Accepted = 1,
-    Completed = 2,
+    PendingClaim = 2,
     Claimed = 3
 };
 

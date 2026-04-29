@@ -204,6 +204,8 @@ const char* one_shot_cue_name(Gs1OneShotCueKind cue_kind)
         return "SITE_COMPLETED";
     case GS1_ONE_SHOT_CUE_SITE_FAILED:
         return "SITE_FAILED";
+    case GS1_ONE_SHOT_CUE_TASK_REWARD_CLAIMED:
+        return "TASK_REWARD_CLAIMED";
     case GS1_ONE_SHOT_CUE_NONE:
     default:
         return "NONE";
@@ -228,8 +230,8 @@ const char* task_list_kind_name(Gs1TaskPresentationListKind kind)
     {
     case GS1_TASK_PRESENTATION_LIST_ACCEPTED:
         return "ACCEPTED";
-    case GS1_TASK_PRESENTATION_LIST_COMPLETED:
-        return "COMPLETED";
+    case GS1_TASK_PRESENTATION_LIST_PENDING_CLAIM:
+        return "PENDING_CLAIM";
     case GS1_TASK_PRESENTATION_LIST_CLAIMED:
         return "CLAIMED";
     case GS1_TASK_PRESENTATION_LIST_VISIBLE:

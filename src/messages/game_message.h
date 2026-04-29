@@ -73,6 +73,7 @@ enum class GameMessageType : std::uint8_t
     SiteRefreshTick,
     TaskAcceptRequested,
     TaskRewardClaimRequested,
+    TaskRewardClaimResolved,
     PhoneListingPurchased,
     PhoneListingSold,
     InventoryTransferCompleted,
@@ -553,6 +554,13 @@ struct TaskRewardClaimRequestedMessage final
     std::uint32_t reward_candidate_id;
 };
 
+struct TaskRewardClaimResolvedMessage final
+{
+    std::uint32_t task_instance_id;
+    std::uint32_t task_template_id;
+    std::uint32_t reward_candidate_count;
+};
+
 struct PhoneListingPurchasedMessage final
 {
     std::uint32_t listing_id;
@@ -847,6 +855,7 @@ GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(RestorationProgressChangedMessage, 12U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteRefreshTickMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TaskAcceptRequestedMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TaskRewardClaimRequestedMessage, 8U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TaskRewardClaimResolvedMessage, 12U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingPurchasedMessage, 12U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingSoldMessage, 12U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryTransferCompletedMessage, 16U);

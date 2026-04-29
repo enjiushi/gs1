@@ -1283,7 +1283,7 @@ bool complete_task(
         return false;
     }
 
-    task.runtime_list_kind = TaskRuntimeListKind::Completed;
+    task.runtime_list_kind = TaskRuntimeListKind::PendingClaim;
     board.completed_task_ids.push_back(task.task_instance_id);
     remove_task_id(board.accepted_task_ids, task.task_instance_id);
     return true;
@@ -1799,7 +1799,7 @@ bool refresh_snapshot_task_progress(
     TaskBoardState& board,
     TaskInstanceState& task) noexcept
 {
-    if (task.runtime_list_kind == TaskRuntimeListKind::Completed ||
+    if (task.runtime_list_kind == TaskRuntimeListKind::PendingClaim ||
         task.runtime_list_kind == TaskRuntimeListKind::Claimed)
     {
         return false;
@@ -2096,7 +2096,7 @@ void handle_task_reward_claim_requested(
 {
     auto& board = context.world.own_task_board();
     TaskInstanceState* task = find_task_instance(board, TaskInstanceId {payload.task_instance_id});
-    if (task == nullptr || task->runtime_list_kind != TaskRuntimeListKind::Completed)
+    if (task == nullptr || task->runtime_list_kind != TaskRuntimeListKind::PendingClaim)
     {
         return;
     }
@@ -2106,8 +2106,16 @@ void handle_task_reward_claim_requested(
         return;
     }
 
-    TaskRewardDraftOption* reward_option =
-        find_reward_option(*task, RewardCandidateId {payload.reward_candidate_id});
+    TaskRewardDraftOption* reward_option = nullptr;
+    if (payload.reward_candidate_id != 0U)
+    {
+        reward_option = find_reward_option(*task, RewardCandidateId {payload.reward_candidate_id});
+    }
+    else if (!task->reward_draft_options.empty())
+    {
+        reward_option = &task->reward_draft_options.front();
+    }
+
     if (reward_option == nullptr)
     {
         return;
@@ -2121,6 +2129,11 @@ void handle_task_reward_claim_requested(
             return;
         }
     }
+
+    const auto claimed_task_instance_id = task->task_instance_id.value;
+    const auto claimed_task_template_id = task->task_template_id.value;
+    const auto reward_candidate_count =
+        static_cast<std::uint32_t>(task->reward_draft_options.size());
 
     for (auto& reward_bundle_option : task->reward_draft_options)
     {
@@ -2163,6 +2176,14 @@ void handle_task_reward_claim_requested(
     {
         mark_task_projection_dirty(context);
     }
+
+    GameMessage resolved_message {};
+    resolved_message.type = GameMessageType::TaskRewardClaimResolved;
+    resolved_message.set_payload(TaskRewardClaimResolvedMessage {
+        claimed_task_instance_id,
+        claimed_task_template_id,
+        reward_candidate_count});
+    context.message_queue.push_back(resolved_message);
 }
 
 void handle_restoration_progress(
@@ -2176,7 +2197,7 @@ void handle_restoration_progress(
 
     for (auto& task : board.visible_tasks)
     {
-        if (task.runtime_list_kind == TaskRuntimeListKind::Completed ||
+        if (task.runtime_list_kind == TaskRuntimeListKind::PendingClaim ||
             task.runtime_list_kind == TaskRuntimeListKind::Claimed)
         {
             continue;

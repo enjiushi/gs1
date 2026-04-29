@@ -47,6 +47,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const actionProgressTarget = document.getElementById("action-progress-target");
     const placementToast = document.getElementById("placement-toast");
     const placementToastBody = document.getElementById("placement-toast-body");
+    const rewardPanel = document.getElementById("reward-panel");
+    const rewardPanelTitle = document.getElementById("reward-panel-title");
+    const rewardPanelSubtitle = document.getElementById("reward-panel-subtitle");
+    const rewardPanelRewards = document.getElementById("reward-panel-rewards");
     const inventoryTooltip = document.getElementById("inventory-tooltip");
     const inventoryTooltipTitle = document.getElementById("inventory-tooltip-title");
     const inventoryTooltipMeta = document.getElementById("inventory-tooltip-meta");
@@ -86,6 +90,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let tileContextMenuRenderSignature = "";
     let localActionProgressState = null;
     let placementFailureToastState = null;
+    let rewardPanelState = null;
     let viewerCompatibilityWarning = "";
     let placementCursorSendInFlight = false;
     let lastSentPlacementCursorSignature = "";
@@ -117,6 +122,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const orbitMouseButtonsMask = 2;
     const orbitDragThresholdPixels = 6;
     const heatColorAddGainForVfx = 1.0;
+    const rewardPanelDurationMs = 2800;
     const witheringAlertDurationSeconds = 2.0;
     const witheringAlertDensityDropThreshold = 0.01;
     const witheringAlertHeightOffset = 0.04;
@@ -1868,8 +1874,93 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             scheduleToneBurst({ type: "sawtooth", startFrequency: 164.81, endFrequency: 82.41, duration: 0.55, peakGain: 0.05 });
             scheduleNoiseBurst({ filterType: "bandpass", filterFrequency: 420.0, duration: 0.24, peakGain: 0.03, qValue: 0.7 });
             break;
+        case "TASK_REWARD_CLAIMED":
+            scheduleToneBurst({ type: "triangle", startFrequency: 523.25, endFrequency: 783.99, duration: 0.24, peakGain: 0.038 });
+            scheduleToneBurst({ type: "sine", startFrequency: 783.99, endFrequency: 1046.5, duration: 0.3, peakGain: 0.024 });
+            break;
         default:
             break;
+        }
+    }
+
+    function rewardPanelPresentationFromCue(cue) {
+        const taskTemplateId = cue && typeof cue.arg0 === "number" ? cue.arg0 : 0;
+        const rewardCandidateCount = cue && typeof cue.arg1 === "number" ? cue.arg1 : 0;
+        const taskPresentation = getPhoneTaskTemplatePresentation({
+            taskTemplateId: taskTemplateId,
+            taskInstanceId: cue && typeof cue.subjectId === "number" ? cue.subjectId : 0
+        });
+        let rewards = Array.isArray(taskPresentation.rewards) ? taskPresentation.rewards.slice() : [];
+        if (rewards.length === 0) {
+            rewards.push(
+                rewardCandidateCount > 0
+                    ? (rewardCandidateCount + " reward bundle" + (rewardCandidateCount === 1 ? "" : "s") + " applied to the site state.")
+                    : "Reward effects applied to the active site state."
+            );
+        }
+
+        return {
+            title: "Rewards Received",
+            subtitle: taskPresentation.title || ("Contract " + (cue && cue.subjectId ? cue.subjectId : 0)),
+            rewards: rewards
+        };
+    }
+
+    function renderRewardPanel() {
+        if (!rewardPanelState || (latestState && latestState.appState !== "SITE_ACTIVE")) {
+            rewardPanel.hidden = true;
+            rewardPanel.classList.remove("active");
+            rewardPanelRewards.innerHTML = "";
+            return;
+        }
+
+        rewardPanelTitle.textContent = rewardPanelState.title;
+        rewardPanelSubtitle.textContent = rewardPanelState.subtitle;
+        rewardPanelRewards.innerHTML = "";
+        rewardPanelState.rewards.forEach((rewardText) => {
+            const rewardElement = document.createElement("div");
+            rewardElement.className = "reward-panel-reward";
+            rewardElement.textContent = rewardText;
+            rewardPanelRewards.appendChild(rewardElement);
+        });
+        rewardPanel.hidden = false;
+    }
+
+    function openRewardPanelForCue(cue) {
+        rewardPanelState = Object.assign(
+            rewardPanelPresentationFromCue(cue),
+            { hideAtMs: performance.now() + rewardPanelDurationMs });
+        renderRewardPanel();
+        rewardPanel.classList.remove("active");
+        void rewardPanel.offsetWidth;
+        rewardPanel.classList.add("active");
+    }
+
+    function syncRewardPanel(nowMs) {
+        if (!rewardPanelState) {
+            if (!rewardPanel.hidden) {
+                rewardPanel.hidden = true;
+                rewardPanel.classList.remove("active");
+                rewardPanelRewards.innerHTML = "";
+            }
+            return;
+        }
+
+        if ((latestState && latestState.appState !== "SITE_ACTIVE") || nowMs >= rewardPanelState.hideAtMs) {
+            rewardPanelState = null;
+            rewardPanel.hidden = true;
+            rewardPanel.classList.remove("active");
+            rewardPanelRewards.innerHTML = "";
+        }
+    }
+
+    function handleOneShotCueVisual(cue) {
+        if (!cue || !cue.cueKind) {
+            return;
+        }
+
+        if (cue.cueKind === "TASK_REWARD_CLAIMED") {
+            openRewardPanelForCue(cue);
         }
     }
 
@@ -1884,6 +1975,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             }
             lastProcessedOneShotCueSequenceId = sequenceId;
             playOneShotCue(cue);
+            handleOneShotCueVisual(cue);
         });
     }
 
@@ -2169,7 +2261,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         switch (task.listKind) {
         case "ACCEPTED":
             return 0;
-        case "COMPLETED":
+        case "PENDING_CLAIM":
             return 1;
         default:
             return 2;
@@ -2192,9 +2284,21 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function getPlayerFacingPhoneTasks(state) {
-        return getSiteTasks(state).filter(function (task) {
-            return !!task && (task.listKind === "VISIBLE" || task.listKind === "ACCEPTED");
-        });
+        return getSiteTasks(state)
+            .filter(function (task) {
+                return !!task &&
+                    (task.listKind === "VISIBLE" ||
+                        task.listKind === "ACCEPTED" ||
+                        task.listKind === "PENDING_CLAIM");
+            })
+            .sort(function (lhs, rhs) {
+                const priorityDelta = getSiteTaskListPriority(lhs) - getSiteTaskListPriority(rhs);
+                if (priorityDelta !== 0) {
+                    return priorityDelta;
+                }
+
+                return (lhs.taskInstanceId || 0) - (rhs.taskInstanceId || 0);
+            });
     }
 
     function getCraftContextForTile(state, tileX, tileY) {
@@ -5634,7 +5738,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return postJson("/ui-action", {
             type: type,
             targetId: task.taskInstanceId,
-            arg0: task.taskTemplateId || 0,
+            arg0: type === "CLAIM_TASK_REWARD" ? 0 : (task.taskTemplateId || 0),
             arg1: 0
         });
     }
@@ -5923,8 +6027,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         switch (task.listKind) {
         case "ACCEPTED":
             return "Active";
-        case "COMPLETED":
-            return "Done";
+        case "PENDING_CLAIM":
+            return "Pending Claim";
         case "CLAIMED":
             return "History";
         case "VISIBLE":
@@ -5937,7 +6041,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         let className = "phone-task-state";
         if (task.listKind === "ACCEPTED") {
             className += " accepted";
-        } else if (task.listKind === "COMPLETED" || task.listKind === "CLAIMED") {
+        } else if (task.listKind === "PENDING_CLAIM" || task.listKind === "CLAIMED") {
             className += " completed";
         }
         return className;
@@ -6268,16 +6372,32 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function appendPhoneTaskAction(card, task) {
-        if (task.listKind !== "VISIBLE") {
+        if (task.listKind === "VISIBLE") {
+            card.appendChild(
+                makePhoneActionButton(
+                    "Accept Contract",
+                    function () {
+                        postPhoneTaskAction("ACCEPT_TASK", task).catch(() => {
+                            statusChip.textContent = "Failed to accept contract.";
+                        });
+                    },
+                    true,
+                    false
+                )
+            );
+            return;
+        }
+
+        if (task.listKind !== "PENDING_CLAIM") {
             return;
         }
 
         card.appendChild(
             makePhoneActionButton(
-                "Accept Contract",
+                "Claim Reward",
                 function () {
-                    postPhoneTaskAction("ACCEPT_TASK", task).catch(() => {
-                        statusChip.textContent = "Failed to accept contract.";
+                    postPhoneTaskAction("CLAIM_TASK_REWARD", task).catch(() => {
+                        statusChip.textContent = "Failed to claim task reward.";
                     });
                 },
                 true,
@@ -6310,9 +6430,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     function appendPhoneTaskSection(container, tasks, metaText, scrollKey) {
         const visibleTaskCount = countTasksByListKind(tasks, "VISIBLE");
         const acceptedTaskCount = countTasksByListKind(tasks, "ACCEPTED");
+        const pendingClaimTaskCount = countTasksByListKind(tasks, "PENDING_CLAIM");
         const section = makePhoneSection(
             "Contracts",
-            metaText || ("Open " + visibleTaskCount + "  |  Active " + acceptedTaskCount)
+            metaText || (
+                "Open " + visibleTaskCount +
+                "  |  Active " + acceptedTaskCount +
+                "  |  Ready " + pendingClaimTaskCount)
         );
 
         if (tasks.length === 0) {
@@ -6621,12 +6745,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         );
     }
 
-    function appendPhoneTasksPanel(container, tasks, activeTaskCount, visibleTaskCount) {
+    function appendPhoneTasksPanel(container, tasks, activeTaskCount, visibleTaskCount, pendingClaimTaskCount) {
         appendPhonePanelToolbar(container, [makePhoneBackButton("HOME")]);
         appendPhoneTaskSection(
             container,
             tasks,
-            "Open " + visibleTaskCount + "  |  Active " + activeTaskCount,
+            "Open " + visibleTaskCount + "  |  Active " + activeTaskCount + "  |  Ready " + pendingClaimTaskCount,
             "contracts"
         );
     }
@@ -6671,6 +6795,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const visibleTaskCount = phonePanelState && typeof phonePanelState.visibleTaskCount === "number"
             ? phonePanelState.visibleTaskCount
             : countTasksByListKind(tasks, "VISIBLE");
+        const pendingClaimTaskCount = phonePanelState && typeof phonePanelState.completedTaskCount === "number"
+            ? phonePanelState.completedTaskCount
+            : countTasksByListKind(tasks, "PENDING_CLAIM");
         const buyListingCount = phonePanelState && typeof phonePanelState.buyListingCount === "number"
             ? phonePanelState.buyListingCount
             : buyListings.length;
@@ -6693,7 +6820,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             if (selectedTask) {
                 appendPhoneTaskDetailPanel(phoneScreenBody, selectedTask);
             } else {
-                appendPhoneTasksPanel(phoneScreenBody, tasks, activeTaskCount, visibleTaskCount);
+                appendPhoneTasksPanel(
+                    phoneScreenBody,
+                    tasks,
+                    activeTaskCount,
+                    visibleTaskCount,
+                    pendingClaimTaskCount);
             }
             break;
         case "BUY":
@@ -11278,6 +11410,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 cameraBlend);
         }
 
+        syncRewardPanel(frameWorkStartMs);
         if (siteSceneCache && siteSceneCache.windField) {
             updateWindFieldVisual(siteSceneCache, latestState, elapsed);
         }

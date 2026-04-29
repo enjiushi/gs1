@@ -184,6 +184,10 @@ private:
         std::uint32_t site_id,
         Gs1SiteAttemptResult result,
         std::uint32_t newly_revealed_site_count);
+    void queue_task_reward_claimed_cue_message(
+        std::uint32_t task_instance_id,
+        std::uint32_t task_template_id,
+        std::uint32_t reward_candidate_count);
     void close_site_protection_ui() noexcept;
     void mark_site_projection_update_dirty(std::uint64_t dirty_flags) noexcept;
     void mark_site_tile_projection_dirty(TileCoord coord) noexcept;

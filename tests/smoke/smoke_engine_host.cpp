@@ -337,6 +337,8 @@ const char* one_shot_cue_name(Gs1OneShotCueKind cue_kind)
         return "SITE_COMPLETED";
     case GS1_ONE_SHOT_CUE_SITE_FAILED:
         return "SITE_FAILED";
+    case GS1_ONE_SHOT_CUE_TASK_REWARD_CLAIMED:
+        return "TASK_REWARD_CLAIMED";
     case GS1_ONE_SHOT_CUE_NONE:
     default:
         return "NONE";

@@ -524,8 +524,8 @@ Gs1TaskPresentationListKind to_task_presentation_list_kind(TaskRuntimeListKind k
     {
     case TaskRuntimeListKind::Accepted:
         return GS1_TASK_PRESENTATION_LIST_ACCEPTED;
-    case TaskRuntimeListKind::Completed:
-        return GS1_TASK_PRESENTATION_LIST_COMPLETED;
+    case TaskRuntimeListKind::PendingClaim:
+        return GS1_TASK_PRESENTATION_LIST_PENDING_CLAIM;
     case TaskRuntimeListKind::Claimed:
         return GS1_TASK_PRESENTATION_LIST_CLAIMED;
     case TaskRuntimeListKind::Visible:
@@ -1642,6 +1642,17 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
     {
         const auto& payload = message.payload_as<PresentLogMessage>();
         queue_log_message(payload.text, payload.level);
+        break;
+    }
+
+    case GameMessageType::TaskRewardClaimResolved:
+    {
+        const auto& payload = message.payload_as<TaskRewardClaimResolvedMessage>();
+        flush_site_presentation_if_dirty();
+        queue_task_reward_claimed_cue_message(
+            payload.task_instance_id,
+            payload.task_template_id,
+            payload.reward_candidate_count);
         break;
     }
 
@@ -3540,6 +3551,22 @@ void GameRuntime::queue_site_result_ready_message(
     payload.site_id = site_id;
     payload.result = result;
     payload.newly_revealed_site_count = static_cast<std::uint16_t>(newly_revealed_site_count);
+    engine_messages_.push_back(message);
+}
+
+void GameRuntime::queue_task_reward_claimed_cue_message(
+    std::uint32_t task_instance_id,
+    std::uint32_t task_template_id,
+    std::uint32_t reward_candidate_count)
+{
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_PLAY_ONE_SHOT_CUE);
+    auto& payload = message.emplace_payload<Gs1EngineMessageOneShotCueData>();
+    payload.subject_id = task_instance_id;
+    payload.world_x = 0.0f;
+    payload.world_y = 0.0f;
+    payload.arg0 = task_template_id;
+    payload.arg1 = reward_candidate_count;
+    payload.cue_kind = GS1_ONE_SHOT_CUE_TASK_REWARD_CLAIMED;
     engine_messages_.push_back(message);
 }
 
