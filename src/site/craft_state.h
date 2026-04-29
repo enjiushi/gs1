@@ -12,13 +12,13 @@ struct CraftDeviceCacheState final
     std::uint64_t device_entity_id {0U};
     std::uint64_t source_membership_revision {0U};
     bool worker_pack_included {false};
-    std::vector<std::uint32_t> nearby_item_instance_ids {};
+    std::vector<std::uint64_t> nearby_item_instance_ids {};
 };
 
 struct PhoneInventoryCacheState final
 {
     std::uint64_t source_membership_revision {0U};
-    std::vector<std::uint32_t> item_instance_ids {};
+    std::vector<std::uint64_t> item_instance_ids {};
 };
 
 struct CraftContextOptionState final

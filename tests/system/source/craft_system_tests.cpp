@@ -10,6 +10,8 @@
 #include "testing/system_test_registry.h"
 #include "system_test_fixtures.h"
 
+#include <limits>
+
 namespace
 {
 using gs1::ActionExecutionSystem;
@@ -561,7 +563,7 @@ void craft_cache_tracks_worker_pack_membership_by_distance(
             1U) == 0U);
     const auto worker_pack_ids_after_add =
         gs1::inventory_storage::collect_item_instance_ids_in_container(site_run, worker_pack);
-    std::uint32_t worker_pack_item_instance_id = 0U;
+    std::uint64_t worker_pack_item_instance_id = 0U;
     for (const auto item_instance_id : worker_pack_ids_after_add)
     {
         if (std::find(
@@ -629,7 +631,7 @@ void craft_cache_skips_refresh_while_idle(
     auto* cache = gs1::craft_logic::find_device_cache(site_run.craft, workbench_entity_id);
     GS1_SYSTEM_TEST_REQUIRE(context, cache != nullptr);
 
-    constexpr std::uint32_t k_sentinel_item_instance_id = 0xFFFFFFFFU;
+    constexpr std::uint64_t k_sentinel_item_instance_id = 0xFFFFFFFFULL;
     cache->nearby_item_instance_ids.push_back(k_sentinel_item_instance_id);
     const auto expected_membership_revision =
         site_run.craft.device_cache_source_membership_revision;
@@ -654,6 +656,108 @@ void craft_cache_skips_refresh_while_idle(
         context,
         site_run.craft.device_cache_worker_tile.x == expected_worker_tile.x &&
             site_run.craft.device_cache_worker_tile.y == expected_worker_tile.y);
+}
+
+void craft_context_recognizes_nearby_inputs_with_64bit_item_entity_ids(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 1514U);
+    GameMessageQueue queue {};
+    auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
+    auto craft_context = make_site_context<CraftSystem>(campaign, site_run, queue);
+
+    const auto start_message =
+        make_message(GameMessageType::SiteRunStarted, SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        InventorySystem::process_message(inventory_context, start_message) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        CraftSystem::process_message(craft_context, start_message) == GS1_STATUS_OK);
+
+    const auto delivery_box = gs1::inventory_storage::delivery_box_container(site_run);
+    GS1_SYSTEM_TEST_REQUIRE(context, delivery_box.is_valid());
+    std::uint64_t recycled_wood_item_entity_id = 0U;
+    for (int attempt = 0; attempt < 4; ++attempt)
+    {
+        GS1_SYSTEM_TEST_REQUIRE(
+            context,
+            gs1::inventory_storage::add_item_to_container(
+                site_run,
+                delivery_box,
+                gs1::ItemId {gs1::k_item_wood_bundle},
+                3U) == 0U);
+        const auto delivery_item_ids =
+            gs1::inventory_storage::collect_item_instance_ids_in_container(site_run, delivery_box);
+        for (const auto item_entity_id : delivery_item_ids)
+        {
+            const auto item = gs1::inventory_storage::entity_from_id(site_run, item_entity_id);
+            const auto* stack = gs1::inventory_storage::stack_data(site_run, item);
+            if (stack != nullptr && stack->item_id.value == gs1::k_item_wood_bundle)
+            {
+                recycled_wood_item_entity_id = item_entity_id;
+                break;
+            }
+        }
+
+        if (recycled_wood_item_entity_id >
+            static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()))
+        {
+            break;
+        }
+
+        GS1_SYSTEM_TEST_REQUIRE(
+            context,
+            gs1::inventory_storage::consume_item_type_from_container(
+                site_run,
+                delivery_box,
+                gs1::ItemId {gs1::k_item_wood_bundle},
+                3U) == 0U);
+        recycled_wood_item_entity_id = 0U;
+    }
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        gs1::inventory_storage::add_item_to_container(
+            site_run,
+            delivery_box,
+            gs1::ItemId {gs1::k_item_iron_bundle},
+            1U) == 0U);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        recycled_wood_item_entity_id >
+            static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()));
+
+    const auto delivery_item_ids =
+        gs1::inventory_storage::collect_item_instance_ids_in_container(site_run, delivery_box);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        std::find(
+            delivery_item_ids.begin(),
+            delivery_item_ids.end(),
+            recycled_wood_item_entity_id) != delivery_item_ids.end());
+
+    const auto workbench_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        CraftSystem::process_message(
+            craft_context,
+            make_message(
+                GameMessageType::InventoryCraftContextRequested,
+                CraftContextRequestedMessage {
+                    workbench_tile.x,
+                    workbench_tile.y,
+                    0U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.craft.context_presentation.occupied);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        std::any_of(
+            site_run.craft.context_presentation.options.begin(),
+            site_run.craft.context_presentation.options.end(),
+            [](const gs1::CraftContextOptionState& option) {
+                return option.recipe_id == gs1::k_recipe_craft_hammer;
+            }));
 }
 
 void dynamically_placed_storage_device_reuses_single_inventory_container(
@@ -925,6 +1029,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "craft",
     "cache_skips_refresh_while_idle",
     craft_cache_skips_refresh_while_idle);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "craft",
+    "context_recognizes_nearby_inputs_with_64bit_item_entity_ids",
+    craft_context_recognizes_nearby_inputs_with_64bit_item_entity_ids);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "inventory",
     "dynamically_placed_storage_device_reuses_single_inventory_container",

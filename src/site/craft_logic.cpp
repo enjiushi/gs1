@@ -74,7 +74,7 @@ std::vector<flecs::entity> collect_nearby_source_containers(
     return containers;
 }
 
-std::vector<std::uint32_t> collect_nearby_item_instance_ids(
+std::vector<std::uint64_t> collect_nearby_item_instance_ids(
     SiteRunState& site_run,
     TileCoord device_tile)
 {
@@ -113,7 +113,7 @@ const CraftDeviceCacheState* find_device_cache(
     return nullptr;
 }
 
-std::vector<std::uint32_t> nearby_item_instance_ids_for_device(
+std::vector<std::uint64_t> nearby_item_instance_ids_for_device(
     SiteRunState& site_run,
     const CraftState& craft_state,
     std::uint64_t device_entity_id,
@@ -134,7 +134,7 @@ std::vector<std::uint32_t> nearby_item_instance_ids_for_device(
 
 std::uint32_t available_cached_item_quantity(
     SiteRunState& site_run,
-    const std::vector<std::uint32_t>& item_instance_ids,
+    const std::vector<std::uint64_t>& item_instance_ids,
     ItemId item_id) noexcept
 {
     std::uint32_t total = 0U;
@@ -170,7 +170,7 @@ bool recipe_requires_hammer(const CraftRecipeDef& recipe_def) noexcept
 
 bool can_satisfy_recipe_ingredients(
     SiteRunState& site_run,
-    const std::vector<std::uint32_t>& item_instance_ids,
+    const std::vector<std::uint64_t>& item_instance_ids,
     const CraftRecipeDef& recipe_def) noexcept
 {
     for (std::uint8_t index = 0U; index < recipe_def.ingredient_count; ++index)
@@ -188,7 +188,7 @@ bool can_satisfy_recipe_ingredients(
 
 bool can_satisfy_recipe_requirements(
     SiteRunState& site_run,
-    const std::vector<std::uint32_t>& item_instance_ids,
+    const std::vector<std::uint64_t>& item_instance_ids,
     const CraftRecipeDef& recipe_def) noexcept
 {
     if (!can_satisfy_recipe_ingredients(site_run, item_instance_ids, recipe_def))

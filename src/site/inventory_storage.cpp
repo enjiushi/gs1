@@ -863,11 +863,11 @@ std::uint32_t slot_count_in_container(
         : static_cast<std::uint32_t>(storage_state->slot_item_instance_ids.size());
 }
 
-std::vector<std::uint32_t> collect_item_instance_ids_in_containers(
+std::vector<std::uint64_t> collect_item_instance_ids_in_containers(
     SiteRunState& site_run,
     const std::vector<flecs::entity>& containers)
 {
-    std::vector<std::uint32_t> item_ids {};
+    std::vector<std::uint64_t> item_ids {};
     for (const auto& container : containers)
     {
         const auto container_items = collect_item_instance_ids_in_container(site_run, container);
@@ -879,11 +879,11 @@ std::vector<std::uint32_t> collect_item_instance_ids_in_containers(
     return item_ids;
 }
 
-std::vector<std::uint32_t> collect_item_instance_ids_in_container(
+std::vector<std::uint64_t> collect_item_instance_ids_in_container(
     SiteRunState& site_run,
     flecs::entity container)
 {
-    std::vector<std::uint32_t> item_ids {};
+    std::vector<std::uint64_t> item_ids {};
     const auto* storage_state =
         find_storage_container_state_by_entity_id(site_run.inventory, container.id());
     if (storage_state == nullptr)
@@ -891,11 +891,12 @@ std::vector<std::uint32_t> collect_item_instance_ids_in_container(
         return item_ids;
     }
 
-    for (const auto item_id : storage_state->slot_item_instance_ids)
+    for (std::uint32_t slot_index = 0U; slot_index < storage_state->slot_item_instance_ids.size(); ++slot_index)
     {
-        if (item_id != 0U)
+        const auto item = item_entity_for_slot(site_run, container, slot_index);
+        if (item.is_valid() && item.has<StorageItemStack>())
         {
-            item_ids.push_back(static_cast<std::uint32_t>(item_id));
+            item_ids.push_back(item.id());
         }
     }
 

@@ -232,7 +232,7 @@ PhoneListingState* find_generated_stock_listing(
     return nullptr;
 }
 
-std::vector<std::uint32_t> phone_item_instance_ids(
+std::vector<std::uint64_t> phone_item_instance_ids(
     SiteSystemContext<EconomyPhoneSystem>& context)
 {
     const auto& craft = context.world.read_craft();

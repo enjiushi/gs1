@@ -68,7 +68,7 @@ void clamp_cart_quantity(PhoneListingState& listing) noexcept
     }
 }
 
-std::vector<std::uint32_t> phone_item_instance_ids(SiteSystemContext<PhonePanelSystem>& context)
+std::vector<std::uint64_t> phone_item_instance_ids(SiteSystemContext<PhonePanelSystem>& context)
 {
     const auto& craft = context.world.read_craft();
     const auto& inventory = context.world.read_inventory();

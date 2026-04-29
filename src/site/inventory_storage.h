@@ -186,11 +186,11 @@ std::uint32_t slot_count_in_container(
     SiteRunState& site_run,
     flecs::entity container) noexcept;
 
-std::vector<std::uint32_t> collect_item_instance_ids_in_containers(
+std::vector<std::uint64_t> collect_item_instance_ids_in_containers(
     SiteRunState& site_run,
     const std::vector<flecs::entity>& containers);
 
-std::vector<std::uint32_t> collect_item_instance_ids_in_container(
+std::vector<std::uint64_t> collect_item_instance_ids_in_container(
     SiteRunState& site_run,
     flecs::entity container);
 
