@@ -8,7 +8,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const hudTitle = document.getElementById("hud-title");
     const hudSubtitle = document.getElementById("hud-subtitle");
     const siteVitalsPanel = document.getElementById("site-vitals-panel");
-    const siteVitalsResources = document.getElementById("site-vitals-resources");
+    const siteVitalsResources = document.getElementById("site-vitals-resources") ||
+        (siteVitalsPanel ? siteVitalsPanel.querySelector(".site-vitals-resources") : null);
     const siteVitalsMoney = document.getElementById("site-vitals-money");
     const siteVitalsReputation = document.getElementById("site-vitals-reputation");
     const siteVitalsBars = document.getElementById("site-vitals-bars");
