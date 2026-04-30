@@ -1,5 +1,6 @@
 #include "site/systems/weather_event_system.h"
 
+#include "content/defs/task_defs.h"
 #include "content/prototype_content.h"
 #include "runtime/runtime_clock.h"
 #include "site/site_projection_update_flags.h"
@@ -245,6 +246,30 @@ bool has_active_event(const EventState& event) noexcept
     return event.active_event_template_id.has_value();
 }
 
+bool onboarding_chain_weather_locked(
+    SiteId site_id,
+    const TaskBoardState& board) noexcept
+{
+    for (const auto& task : board.visible_tasks)
+    {
+        if (task.runtime_list_kind == TaskRuntimeListKind::Claimed)
+        {
+            continue;
+        }
+
+        for (const auto& seed_def : all_site_onboarding_task_seed_defs())
+        {
+            if (seed_def.site_id == site_id &&
+                seed_def.task_template_id == task.task_template_id)
+            {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 double resolve_peak_end_time_minutes(const EventState& event) noexcept
 {
     const double peak_time = std::max(event.peak_time_minutes, event.start_time_minutes);
@@ -434,8 +459,22 @@ void WeatherEventSystem::run(SiteSystemContext<WeatherEventSystem>& context)
         runtime_minutes_from_real_seconds(context.fixed_step_seconds);
     auto& event = context.world.own_event();
     const auto& objective = context.world.read_objective();
+    const auto& board = context.world.read_task_board();
     const auto baseline_weather = resolve_site_baseline_weather(context.world.site_id_value());
     const double world_time_minutes = context.world.read_time().world_time_minutes;
+    if (onboarding_chain_weather_locked(context.world.site_id(), board))
+    {
+        clear_event_timeline(event);
+        event.minutes_until_next_wave = 0.0;
+        smooth_site_weather_toward(
+            context,
+            baseline_weather.heat,
+            baseline_weather.wind,
+            baseline_weather.dust,
+            baseline_weather.wind_direction_degrees);
+        return;
+    }
+
     if (!has_active_event(event))
     {
         clear_event_timeline(event);
