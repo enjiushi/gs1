@@ -65,6 +65,11 @@ constexpr std::int32_t reputation_for_progress_tier(std::uint32_t tier_index) no
     return static_cast<std::int32_t>(tier_index) * 200;
 }
 
+constexpr std::int32_t shared_unlock_reputation(std::uint32_t step_index) noexcept
+{
+    return static_cast<std::int32_t>(step_index) * 100;
+}
+
 const gs1::LoadoutSlot* find_loadout_slot(
     const std::vector<gs1::LoadoutSlot>& slots,
     std::uint32_t item_id) noexcept
@@ -941,6 +946,8 @@ void technology_total_reputation_unlocks_progression_content_one_by_one(
     GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::item_unlocked(campaign, gs1::ItemId {gs1::k_item_wood_bundle}));
     GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::item_unlocked(campaign, gs1::ItemId {gs1::k_item_iron_bundle}));
     GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::item_unlocked(campaign, gs1::ItemId {gs1::k_item_medicine_pack}));
+    GS1_SYSTEM_TEST_CHECK(context, !TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_ephedra_stew}));
+    GS1_SYSTEM_TEST_CHECK(context, !TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_wormwood_broth}));
     GS1_SYSTEM_TEST_CHECK(context, !TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_field_tea}));
     GS1_SYSTEM_TEST_CHECK(context, !TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_spiced_stew}));
     GS1_SYSTEM_TEST_CHECK(
@@ -964,21 +971,31 @@ void technology_total_reputation_unlocks_progression_content_one_by_one(
     GS1_SYSTEM_TEST_CHECK(
         context,
         !TechnologySystem::structure_recipe_unlocked(campaign, gs1::StructureId {gs1::k_structure_wind_fence}));
-    campaign.technology_state.total_reputation = reputation_for_progress_tier(1U) - 1;
+
+    campaign.technology_state.total_reputation = shared_unlock_reputation(1U) - 1;
+    GS1_SYSTEM_TEST_CHECK(context, !TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_ephedra_stew}));
+
+    campaign.technology_state.total_reputation = shared_unlock_reputation(1U);
+    GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_ephedra_stew}));
+
+    campaign.technology_state.total_reputation = shared_unlock_reputation(2U) - 1;
     GS1_SYSTEM_TEST_CHECK(context, !TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_ordos_wormwood}));
     GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_craft_hammer}));
 
-    campaign.technology_state.total_reputation = reputation_for_progress_tier(1U);
+    campaign.technology_state.total_reputation = shared_unlock_reputation(2U);
     GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_ordos_wormwood}));
+
+    campaign.technology_state.total_reputation = shared_unlock_reputation(3U);
+    GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_wormwood_broth}));
 
     GS1_SYSTEM_TEST_CHECK(
         context,
         TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_craft_camp_stove}));
 
-    campaign.technology_state.total_reputation = reputation_for_progress_tier(4U);
+    campaign.technology_state.total_reputation = shared_unlock_reputation(7U);
     GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_field_tea}));
 
-    campaign.technology_state.total_reputation = reputation_for_progress_tier(9U);
+    campaign.technology_state.total_reputation = shared_unlock_reputation(18U);
     GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_saxaul}));
     GS1_SYSTEM_TEST_CHECK(
         context,
@@ -1160,6 +1177,9 @@ void technology_reputation_unlocks_gate_village_recipes_items_and_structure_buil
 
     GS1_SYSTEM_TEST_CHECK(
         context,
+        !TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_ephedra_stew}));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
         !TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_field_tea}));
     GS1_SYSTEM_TEST_CHECK(
         context,
@@ -1222,7 +1242,12 @@ void technology_reputation_unlocks_gate_village_recipes_items_and_structure_buil
         context,
         !TechnologySystem::item_unlocked(campaign, gs1::ItemId {gs1::k_item_focus_tonic}));
 
-    campaign.technology_state.total_reputation = reputation_for_progress_tier(4U);
+    campaign.technology_state.total_reputation = shared_unlock_reputation(1U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_ephedra_stew}));
+
+    campaign.technology_state.total_reputation = shared_unlock_reputation(7U);
     GS1_SYSTEM_TEST_CHECK(
         context,
         TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_field_tea}));
@@ -1237,7 +1262,7 @@ void technology_reputation_unlocks_gate_village_recipes_items_and_structure_buil
                 8U)}));
     GS1_SYSTEM_TEST_CHECK(
         context,
-        TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_spiced_stew}));
+        TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_rich_wormwood_broth}));
 
     campaign.faction_progress[1].faction_reputation = reputation_for_progress_tier(1U);
     GS1_SYSTEM_TEST_CHECK(
@@ -1289,27 +1314,18 @@ void technology_reputation_unlocks_gate_village_recipes_items_and_structure_buil
         TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_rich_desert_revival_draught}));
 }
 
-void technology_site_one_onboarding_recipe_references_are_initially_unlocked(
+void technology_site_one_onboarding_recipe_references_unlock_by_onboarding_timing(
     gs1::testing::SystemTestExecutionContext& context)
 {
-    const auto campaign = make_campaign();
-    bool found_site_one_recipe_reference = false;
+    auto campaign = make_campaign();
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        !TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_ephedra_stew}));
 
-    for (const auto& onboarding_seed : gs1::all_site_onboarding_task_seed_defs())
-    {
-        if (onboarding_seed.site_id != SiteId {1U} ||
-            onboarding_seed.recipe_id.value == 0U)
-        {
-            continue;
-        }
-
-        found_site_one_recipe_reference = true;
-        GS1_SYSTEM_TEST_CHECK(
-            context,
-            TechnologySystem::recipe_unlocked(campaign, onboarding_seed.recipe_id));
-    }
-
-    GS1_SYSTEM_TEST_CHECK(context, found_site_one_recipe_reference);
+    campaign.technology_state.total_reputation = shared_unlock_reputation(1U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_ephedra_stew}));
 }
 
 void regional_support_placeholder_test_plan_is_recorded(gs1::testing::SystemTestExecutionContext& context)
@@ -1441,8 +1457,8 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     technology_reputation_unlocks_gate_village_recipes_items_and_structure_builds);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "technology",
-    "site_one_onboarding_recipe_references_are_initially_unlocked",
-    technology_site_one_onboarding_recipe_references_are_initially_unlocked);
+    "site_one_onboarding_recipe_references_unlock_by_onboarding_timing",
+    technology_site_one_onboarding_recipe_references_unlock_by_onboarding_timing);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "regional_support",
     "placeholder_test_plan_is_recorded",

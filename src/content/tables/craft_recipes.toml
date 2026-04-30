@@ -62,7 +62,7 @@ craft_minutes = 1.5
 energy_cost = 1.0
 hydration_cost = 0.3
 nourishment_cost = 0.1
-ingredients = [{ item_id = 1, quantity = 1 }, { item_id = 21, quantity = 1 }]
+ingredients = [{ item_id = 1, quantity = 1 }, { item_id = 40, quantity = 1 }]
 
 [[craft_recipes]]
 recipe_id = 7
@@ -73,7 +73,7 @@ craft_minutes = 2.0
 energy_cost = 1.2
 hydration_cost = 0.4
 nourishment_cost = 0.2
-ingredients = [{ item_id = 2, quantity = 1 }, { item_id = 23, quantity = 1 }]
+ingredients = [{ item_id = 10, quantity = 2 }, { item_id = 21, quantity = 1 }, { item_id = 25, quantity = 1 }]
 
 [[craft_recipes]]
 recipe_id = 8
@@ -194,7 +194,7 @@ craft_minutes = 2.6
 energy_cost = 1.6
 hydration_cost = 0.5
 nourishment_cost = 0.3
-ingredients = [{ item_id = 1, quantity = 2 }, { item_id = 27, quantity = 1 }, { item_id = 26, quantity = 1 }]
+ingredients = [{ item_id = 1, quantity = 1 }, { item_id = 22, quantity = 1 }, { item_id = 26, quantity = 1 }]
 
 [[craft_recipes]]
 recipe_id = 19

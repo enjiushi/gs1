@@ -26,8 +26,6 @@ const FactionProgressState* find_faction_progress(
 {
     switch (recipe_id.value)
     {
-    case k_recipe_cook_food_pack:
-    case k_recipe_cook_ephedra_stew:
     case k_recipe_craft_hammer:
     case k_recipe_craft_shovel:
         return true;

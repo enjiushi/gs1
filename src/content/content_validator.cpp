@@ -13,7 +13,8 @@ namespace
 {
 inline constexpr float k_starter_plant_pool = 90.0f;
 inline constexpr float k_unlock_step_plant_pool = 10.0f;
-inline constexpr std::int32_t k_progression_reputation_step = 200;
+inline constexpr std::int32_t k_total_reputation_unlock_step = 100;
+inline constexpr std::int32_t k_faction_reputation_step = 200;
 
 [[nodiscard]] bool is_power_of_two(std::uint8_t value) noexcept
 {
@@ -44,12 +45,12 @@ inline constexpr std::int32_t k_progression_reputation_step = 200;
 
 [[nodiscard]] std::int32_t expected_progression_reputation_requirement(std::size_t zero_based_index) noexcept
 {
-    return static_cast<std::int32_t>(zero_based_index + 1U) * k_progression_reputation_step;
+    return static_cast<std::int32_t>(zero_based_index + 1U) * k_total_reputation_unlock_step;
 }
 
 [[nodiscard]] std::int32_t expected_faction_tech_reputation_requirement(std::uint8_t tier_index) noexcept
 {
-    return static_cast<std::int32_t>(tier_index) * k_progression_reputation_step;
+    return static_cast<std::int32_t>(tier_index) * k_faction_reputation_step;
 }
 
 [[nodiscard]] bool item_has_player_meter_valuation(const ItemDef& item_def) noexcept
@@ -1518,7 +1519,7 @@ std::vector<ContentValidationIssue> validate_content_database(
             {
                 issues.push_back(ContentValidationIssue {
                     ContentValidationSeverity::Error,
-                    "Reputation unlock definitions must form a one-by-one total-reputation ladder stepping by 200 starting at 200."});
+                    "Reputation unlock definitions must form a one-by-one total-reputation ladder stepping by 100 starting at 100."});
                 break;
             }
         }

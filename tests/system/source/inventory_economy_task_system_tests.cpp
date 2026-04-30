@@ -45,6 +45,7 @@ using gs1::PlantWeatherContributionSystem;
 using gs1::SiteRunStartedMessage;
 using gs1::TaskBoardSystem;
 using gs1::TaskRuntimeListKind;
+using gs1::TechnologySystem;
 using gs1::WorkerConditionSystem;
 using namespace gs1::testing::fixtures;
 
@@ -60,6 +61,11 @@ GameMessage make_message(gs1::GameMessageType type, const Payload& payload)
 constexpr std::int32_t reputation_for_progress_tier(std::uint32_t tier_index) noexcept
 {
     return static_cast<std::int32_t>(tier_index) * 200;
+}
+
+constexpr std::int32_t shared_unlock_reputation(std::uint32_t step_index) noexcept
+{
+    return static_cast<std::int32_t>(step_index) * 100;
 }
 
 std::uint32_t count_active_timed_buffs(const gs1::SiteRunState& site_run)
@@ -2283,6 +2289,206 @@ void task_board_site_one_onboarding_buy_food_progresses_from_food_purchase(
     GS1_SYSTEM_TEST_CHECK(context, buy_food_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
 }
 
+void task_board_site_one_onboarding_unlocks_ephedra_stew_before_cook_step(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 1015U);
+    GameMessageQueue queue {};
+    auto task_context = make_site_context<TaskBoardSystem>(campaign, site_run, queue);
+
+    const auto start_message =
+        make_message(GameMessageType::SiteRunStarted, SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_message(task_context, start_message) == GS1_STATUS_OK);
+
+    const auto claim_task = [&](gs1::TaskInstanceId task_instance_id) {
+        queue.clear();
+        GS1_SYSTEM_TEST_REQUIRE(
+            context,
+            TaskBoardSystem::process_message(
+                task_context,
+                make_message(
+                    GameMessageType::TaskRewardClaimRequested,
+                    gs1::TaskRewardClaimRequestedMessage {task_instance_id.value, 0U})) == GS1_STATUS_OK);
+
+        auto campaign_context = make_campaign_context(campaign);
+        for (const auto& message : queue)
+        {
+            if (TechnologySystem::subscribes_to(message.type))
+            {
+                GS1_SYSTEM_TEST_REQUIRE(
+                    context,
+                    TechnologySystem::process_message(campaign_context, message) == GS1_STATUS_OK);
+            }
+        }
+    };
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        !gs1::TechnologySystem::recipe_unlocked(
+            campaign,
+            gs1::RecipeId {gs1::k_recipe_cook_ephedra_stew}));
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_message(
+            task_context,
+            make_message(
+                GameMessageType::SiteTilePlantingCompleted,
+                gs1::SiteTilePlantingCompletedMessage {1U, 4, 4, 5U, 100.0f, 0U})) ==
+            GS1_STATUS_OK);
+    claim_task(site_run.task_board.visible_tasks.front().task_instance_id);
+
+    auto* hammer_task =
+        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_craft_hammer);
+    GS1_SYSTEM_TEST_REQUIRE(context, hammer_task != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_message(
+            task_context,
+            make_message(
+                GameMessageType::InventoryCraftCompleted,
+                gs1::InventoryCraftCompletedMessage {
+                    gs1::k_recipe_craft_hammer,
+                    gs1::k_item_hammer,
+                    1U,
+                    0U})) == GS1_STATUS_OK);
+    claim_task(hammer_task->task_instance_id);
+
+    auto* storage_crate_task =
+        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_craft_storage_crate);
+    GS1_SYSTEM_TEST_REQUIRE(context, storage_crate_task != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_message(
+            task_context,
+            make_message(
+                GameMessageType::InventoryCraftCompleted,
+                gs1::InventoryCraftCompletedMessage {
+                    gs1::k_recipe_craft_storage_crate,
+                    gs1::k_item_storage_crate_kit,
+                    1U,
+                    0U})) == GS1_STATUS_OK);
+    claim_task(storage_crate_task->task_instance_id);
+
+    auto* buy_water_task =
+        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_buy_water);
+    GS1_SYSTEM_TEST_REQUIRE(context, buy_water_task != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_message(
+            task_context,
+            make_message(
+                GameMessageType::PhoneListingPurchased,
+                gs1::PhoneListingPurchasedMessage {1U, gs1::k_item_water_container, 1U, 0U})) ==
+            GS1_STATUS_OK);
+    claim_task(buy_water_task->task_instance_id);
+
+    auto* buy_food_task =
+        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_buy_food);
+    GS1_SYSTEM_TEST_REQUIRE(context, buy_food_task != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_message(
+            task_context,
+            make_message(
+                GameMessageType::PhoneListingPurchased,
+                gs1::PhoneListingPurchasedMessage {2U, gs1::k_item_food_pack, 1U, 0U})) ==
+            GS1_STATUS_OK);
+    claim_task(buy_food_task->task_instance_id);
+
+    auto* shovel_task =
+        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_craft_shovel);
+    GS1_SYSTEM_TEST_REQUIRE(context, shovel_task != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_message(
+            task_context,
+            make_message(
+                GameMessageType::InventoryCraftCompleted,
+                gs1::InventoryCraftCompletedMessage {
+                    gs1::k_recipe_craft_shovel,
+                    gs1::k_item_shovel,
+                    1U,
+                    0U})) == GS1_STATUS_OK);
+    claim_task(shovel_task->task_instance_id);
+
+    auto* stable_task =
+        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_keep_starter_ephedra_stable);
+    GS1_SYSTEM_TEST_REQUIRE(context, stable_task != nullptr);
+    stable_task->runtime_list_kind = TaskRuntimeListKind::PendingClaim;
+    claim_task(stable_task->task_instance_id);
+
+    auto* camp_stove_task =
+        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_craft_camp_stove);
+    GS1_SYSTEM_TEST_REQUIRE(context, camp_stove_task != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_message(
+            task_context,
+            make_message(
+                GameMessageType::InventoryCraftCompleted,
+                gs1::InventoryCraftCompletedMessage {
+                    gs1::k_recipe_craft_camp_stove,
+                    gs1::k_item_camp_stove_kit,
+                    1U,
+                    0U})) == GS1_STATUS_OK);
+    claim_task(camp_stove_task->task_instance_id);
+
+    auto* build_camp_stove_task =
+        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_build_camp_stove);
+    GS1_SYSTEM_TEST_REQUIRE(context, build_camp_stove_task != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_message(
+            task_context,
+            make_message(
+                GameMessageType::SiteDevicePlaced,
+                gs1::SiteDevicePlacedMessage {201U, 14, 14, gs1::k_structure_camp_stove})) ==
+            GS1_STATUS_OK);
+    claim_task(build_camp_stove_task->task_instance_id);
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        !gs1::TechnologySystem::recipe_unlocked(
+            campaign,
+            gs1::RecipeId {gs1::k_recipe_cook_ephedra_stew}));
+
+    auto* harvest_task =
+        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_harvest_starter_ephedra);
+    GS1_SYSTEM_TEST_REQUIRE(context, harvest_task != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_message(
+            task_context,
+            make_message(
+                GameMessageType::SiteActionCompleted,
+                gs1::SiteActionCompletedMessage {
+                    1U,
+                    GS1_SITE_ACTION_HARVEST,
+                    0U,
+                    0U,
+                    12,
+                    14,
+                    gs1::k_item_desert_ephedra_sprigs,
+                    1U})) == GS1_STATUS_OK);
+    claim_task(harvest_task->task_instance_id);
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        gs1::TechnologySystem::recipe_unlocked(
+            campaign,
+            gs1::RecipeId {gs1::k_recipe_cook_ephedra_stew}));
+
+    auto* cook_task =
+        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_cook_ephedra_stew);
+    GS1_SYSTEM_TEST_REQUIRE(context, cook_task != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, cook_task->runtime_list_kind == TaskRuntimeListKind::Accepted);
+    GS1_SYSTEM_TEST_CHECK(context, cook_task->recipe_id.value == gs1::k_recipe_cook_ephedra_stew);
+}
+
 void task_board_non_site_run_started_clears_existing_board_state(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -3485,6 +3691,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "task_board",
     "reward_claim_uses_first_draft_option_when_candidate_is_unspecified",
     task_board_reward_claim_uses_first_draft_option_when_candidate_is_unspecified);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "task_board",
+    "site_one_onboarding_unlocks_ephedra_stew_before_cook_step",
+    task_board_site_one_onboarding_unlocks_ephedra_stew_before_cook_step);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "task_board",
     "content_tuning_exposes_internal_prices_and_task_scoring_inputs",

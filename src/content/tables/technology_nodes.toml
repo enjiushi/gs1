@@ -91,10 +91,10 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 granted_content_kind = "Recipe"
-granted_content_id = 7
+granted_content_id = 11
 is_todo_placeholder = false
-display_name = "Camp Supper Pot"
-description = "Unlocks Spiced Stew as the first Village meal that turns simple field supplies into better nourishment and morale."
+display_name = "Wormwood Broth Reserve"
+description = "Unlocks Rich Wormwood Broth as the first stronger Village meal built on top of the shared wormwood food line."
 
 [[technology_nodes]]
 faction_id = 1
@@ -189,10 +189,10 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 granted_content_kind = "Recipe"
-granted_content_id = 13
+granted_content_id = 15
 is_todo_placeholder = false
-display_name = "Hearty Pot Line"
-description = "Unlocks Peashrub Hotpot as the first stronger Village recovery meal for sustained field work."
+display_name = "Hearty Pot Reserve"
+description = "Unlocks Rich Peashrub Hotpot as a stronger Village recovery meal for sustained field work."
 
 [[technology_nodes]]
 faction_id = 1
@@ -263,10 +263,10 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 granted_content_kind = "Recipe"
-granted_content_id = 17
+granted_content_id = 16
 is_todo_placeholder = false
-display_name = "Comfort Supper Line"
-description = "Unlocks Jadeleaf Stew as the first late-branch Village comfort meal for richer combined recovery."
+display_name = "Tonic Reserve"
+description = "Unlocks Rich Buckthorn Tonic as a stronger Village drink that upgrades the shared Buckthorn recovery line."
 
 [[technology_nodes]]
 faction_id = 1
@@ -340,7 +340,7 @@ granted_content_kind = "Recipe"
 granted_content_id = 19
 is_todo_placeholder = false
 display_name = "Rich Supper Service"
-description = "Unlocks Rich Jadeleaf Stew as a premium Village field meal that scales strongly with high-quality ingredients."
+description = "Unlocks Rich Jadeleaf Stew as a premium Village field meal that scales strongly with later shared harvest unlocks."
 
 [[technology_nodes]]
 faction_id = 1
@@ -390,7 +390,7 @@ granted_content_kind = "Recipe"
 granted_content_id = 20
 is_todo_placeholder = false
 display_name = "Rich Revival Service"
-description = "Unlocks Rich Desert Revival Draught as the top-end Village premium drink for full-site recovery support."
+description = "Unlocks Rich Desert Revival Draught as the top-end Village premium drink layered above the shared revival line."
 
 [[technology_nodes]]
 faction_id = 2
