@@ -321,6 +321,10 @@ body {
   gap: 8px;
 }
 
+.site-vitals-resources.single-resource {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .site-vitals-money,
 .site-vitals-reputation {
   display: inline-flex;
@@ -1178,68 +1182,285 @@ body {
 
 .reward-panel {
   position: absolute;
-  left: 50%;
-  top: 84px;
+  inset: 0;
   z-index: 4;
-  width: min(420px, calc(100% - 48px));
-  padding: 16px 18px;
-  border-radius: 20px;
-  border: 1px solid rgba(202, 182, 148, 0.26);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 24px;
   pointer-events: none;
-  color: var(--ink-light);
-  background:
-    linear-gradient(180deg, rgba(68, 56, 40, 0.94), rgba(38, 31, 24, 0.92)),
-    radial-gradient(circle at top, rgba(202, 182, 148, 0.28), transparent 52%);
-  box-shadow:
-    0 18px 44px rgba(24, 18, 13, 0.34),
-    inset 0 1px 0 rgba(255, 248, 235, 0.1);
   opacity: 0;
-  transform: translateX(-50%) translateY(-18px) scale(0.96);
-  transition: opacity 180ms ease, transform 180ms ease;
+  transition: opacity 180ms ease;
 }
 
 .reward-panel.active {
   opacity: 1;
-  transform: translateX(-50%) translateY(0) scale(1);
 }
 
 .reward-panel[hidden] {
   display: none;
 }
 
+.reward-panel-backdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 232, 184, 0.14), transparent 26%),
+    radial-gradient(circle at 50% 50%, rgba(38, 31, 24, 0.12), rgba(20, 17, 13, 0.54) 72%);
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+
+.reward-panel.active .reward-panel-backdrop {
+  opacity: 1;
+}
+
+.reward-panel-burst {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(72vw, 680px);
+  height: min(72vw, 680px);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+}
+
+.reward-panel.active .reward-panel-burst {
+  opacity: 1;
+}
+
+.reward-panel-burst-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: 999px;
+  transform: translate(-50%, -50%) scale(0.4);
+  border: 1px solid rgba(255, 228, 171, 0.26);
+  box-shadow:
+    0 0 34px rgba(255, 207, 109, 0.18),
+    inset 0 0 24px rgba(255, 246, 220, 0.08);
+}
+
+.reward-panel.active .reward-panel-burst-ring {
+  animation: reward-panel-ring-expand 900ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.reward-panel-burst-ring-a {
+  width: 56%;
+  height: 56%;
+}
+
+.reward-panel-burst-ring-b {
+  width: 76%;
+  height: 76%;
+  animation-delay: 90ms;
+}
+
+.reward-panel-sparkles {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.reward-panel-sparkle {
+  position: absolute;
+  left: var(--sparkle-x, 50%);
+  top: var(--sparkle-y, 50%);
+  width: calc(10px * var(--sparkle-scale, 1));
+  height: calc(10px * var(--sparkle-scale, 1));
+  margin-left: calc(-5px * var(--sparkle-scale, 1));
+  margin-top: calc(-5px * var(--sparkle-scale, 1));
+  border-radius: 999px;
+  opacity: 0;
+  background:
+    radial-gradient(circle, rgba(255, 247, 214, 0.95) 0 24%, rgba(255, 219, 135, 0.82) 24% 54%, rgba(255, 219, 135, 0) 72%);
+  filter: drop-shadow(0 0 12px rgba(255, 224, 155, 0.55));
+}
+
+.reward-panel.active .reward-panel-sparkle {
+  animation: reward-panel-sparkle-drift 1100ms ease-out forwards;
+  animation-delay: var(--sparkle-delay, 0ms);
+}
+
+.reward-panel-card {
+  position: relative;
+  width: min(520px, calc(100% - 8px));
+  padding: 26px 26px 24px;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 226, 170, 0.24);
+  color: var(--ink-light);
+  background:
+    linear-gradient(180deg, rgba(80, 63, 39, 0.96), rgba(43, 34, 24, 0.96)),
+    radial-gradient(circle at 50% -8%, rgba(255, 220, 131, 0.34), transparent 52%),
+    linear-gradient(135deg, rgba(255, 245, 223, 0.08), transparent 54%);
+  box-shadow:
+    0 28px 70px rgba(20, 14, 9, 0.46),
+    0 0 0 1px rgba(255, 246, 220, 0.05),
+    inset 0 1px 0 rgba(255, 249, 235, 0.18),
+    inset 0 -16px 36px rgba(0, 0, 0, 0.18);
+  opacity: 0;
+  transform: translateY(26px) scale(0.9);
+  overflow: hidden;
+}
+
+.reward-panel.active .reward-panel-card {
+  animation:
+    reward-panel-card-pop 460ms cubic-bezier(0.16, 1, 0.3, 1) forwards,
+    reward-panel-card-glow 1800ms ease-in-out 280ms infinite alternate;
+}
+
+.reward-panel-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 236, 182, 0.2), transparent 44%),
+    linear-gradient(120deg, rgba(255, 250, 236, 0.14), transparent 42%);
+  pointer-events: none;
+}
+
+.reward-panel-card::after {
+  content: "";
+  position: absolute;
+  left: -18%;
+  top: -64%;
+  width: 40%;
+  height: 220%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(255, 241, 208, 0.3), rgba(255, 255, 255, 0));
+  transform: rotate(18deg);
+  opacity: 0;
+}
+
+.reward-panel.active .reward-panel-card::after {
+  animation: reward-panel-shine 1100ms ease-out 120ms forwards;
+}
+
 .reward-panel-eyebrow {
+  position: relative;
+  z-index: 1;
   font-size: 11px;
-  letter-spacing: 0.18em;
+  font-weight: 700;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: rgba(234, 225, 210, 0.72);
+  color: rgba(255, 232, 188, 0.86);
 }
 
 .reward-panel-title {
-  margin-top: 6px;
-  font-size: 22px;
+  position: relative;
+  z-index: 1;
+  margin-top: 8px;
+  font-size: clamp(28px, 4vw, 34px);
+  line-height: 1.02;
   font-weight: 700;
-  color: #f6efe2;
+  color: #fff7ea;
+  text-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
 }
 
 .reward-panel-subtitle {
-  margin-top: 6px;
-  font-size: 13px;
-  color: rgba(234, 225, 210, 0.78);
+  position: relative;
+  z-index: 1;
+  margin-top: 10px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: rgba(246, 237, 221, 0.82);
 }
 
 .reward-panel-rewards {
-  margin-top: 14px;
+  position: relative;
+  z-index: 1;
+  margin-top: 18px;
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .reward-panel-reward {
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: rgba(255, 248, 235, 0.08);
-  border: 1px solid rgba(202, 182, 148, 0.18);
-  font-size: 13px;
-  color: #f3eadb;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 247, 228, 0.12), rgba(255, 232, 184, 0.07)),
+    rgba(255, 248, 235, 0.05);
+  border: 1px solid rgba(255, 223, 162, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 251, 240, 0.08);
+  font-size: 14px;
+  line-height: 1.42;
+  color: #fff1db;
+}
+
+@keyframes reward-panel-card-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(26px) scale(0.9);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1.03);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes reward-panel-card-glow {
+  from {
+    box-shadow:
+      0 28px 70px rgba(20, 14, 9, 0.46),
+      0 0 0 1px rgba(255, 246, 220, 0.05),
+      inset 0 1px 0 rgba(255, 249, 235, 0.18),
+      inset 0 -16px 36px rgba(0, 0, 0, 0.18);
+  }
+  to {
+    box-shadow:
+      0 34px 84px rgba(20, 14, 9, 0.52),
+      0 0 42px rgba(255, 205, 102, 0.16),
+      0 0 0 1px rgba(255, 246, 220, 0.05),
+      inset 0 1px 0 rgba(255, 249, 235, 0.18),
+      inset 0 -16px 36px rgba(0, 0, 0, 0.18);
+  }
+}
+
+@keyframes reward-panel-ring-expand {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4);
+  }
+  18% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.08);
+  }
+}
+
+@keyframes reward-panel-sparkle-drift {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale(0.46);
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform:
+      translate3d(var(--sparkle-drift-x, 0px), var(--sparkle-drift-y, -42px), 0)
+      scale(1.12);
+  }
+}
+
+@keyframes reward-panel-shine {
+  0% {
+    opacity: 0;
+    transform: translateX(-24%) rotate(18deg);
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(255%) rotate(18deg);
+  }
 }
 
 .action-progress[hidden] {
@@ -3853,10 +4074,18 @@ DLL -- ms</div>
       </div>
 
       <div class="reward-panel" id="reward-panel" hidden>
-        <div class="reward-panel-eyebrow">Field Device</div>
-        <div class="reward-panel-title" id="reward-panel-title">Rewards Received</div>
-        <div class="reward-panel-subtitle" id="reward-panel-subtitle">Claim resolved.</div>
-        <div class="reward-panel-rewards" id="reward-panel-rewards"></div>
+        <div class="reward-panel-backdrop" aria-hidden="true"></div>
+        <div class="reward-panel-burst" aria-hidden="true">
+          <div class="reward-panel-burst-ring reward-panel-burst-ring-a"></div>
+          <div class="reward-panel-burst-ring reward-panel-burst-ring-b"></div>
+        </div>
+        <div class="reward-panel-sparkles" id="reward-panel-sparkles" aria-hidden="true"></div>
+        <div class="reward-panel-card">
+          <div class="reward-panel-eyebrow">Task Complete</div>
+          <div class="reward-panel-title" id="reward-panel-title">Reward Secured</div>
+          <div class="reward-panel-subtitle" id="reward-panel-subtitle">Claim resolved.</div>
+          <div class="reward-panel-rewards" id="reward-panel-rewards"></div>
+        </div>
       </div>
 
       <div class="storage-panel" id="storage-panel" hidden>

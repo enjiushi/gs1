@@ -8,6 +8,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const hudTitle = document.getElementById("hud-title");
     const hudSubtitle = document.getElementById("hud-subtitle");
     const siteVitalsPanel = document.getElementById("site-vitals-panel");
+    const siteVitalsResources = document.getElementById("site-vitals-resources");
     const siteVitalsMoney = document.getElementById("site-vitals-money");
     const siteVitalsReputation = document.getElementById("site-vitals-reputation");
     const siteVitalsBars = document.getElementById("site-vitals-bars");
@@ -51,6 +52,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const rewardPanelTitle = document.getElementById("reward-panel-title");
     const rewardPanelSubtitle = document.getElementById("reward-panel-subtitle");
     const rewardPanelRewards = document.getElementById("reward-panel-rewards");
+    const rewardPanelSparkles = document.getElementById("reward-panel-sparkles");
     const inventoryTooltip = document.getElementById("inventory-tooltip");
     const inventoryTooltipTitle = document.getElementById("inventory-tooltip-title");
     const inventoryTooltipMeta = document.getElementById("inventory-tooltip-meta");
@@ -122,7 +124,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const orbitMouseButtonsMask = 2;
     const orbitDragThresholdPixels = 6;
     const heatColorAddGainForVfx = 1.0;
-    const rewardPanelDurationMs = 2800;
+    const rewardPanelDurationMs = 3400;
     const witheringAlertDurationSeconds = 2.0;
     const witheringAlertDensityDropThreshold = 0.01;
     const witheringAlertHeightOffset = 0.04;
@@ -1900,10 +1902,43 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
 
         return {
-            title: "Rewards Received",
-            subtitle: taskPresentation.title || ("Contract " + (cue && cue.subjectId ? cue.subjectId : 0)),
+            title: "Reward Secured",
+            subtitle: taskPresentation.title
+                ? (taskPresentation.title + " completed.")
+                : ("Contract " + (cue && cue.subjectId ? cue.subjectId : 0) + " completed."),
             rewards: rewards
         };
+    }
+
+    function renderRewardPanelSparkles() {
+        if (!rewardPanelSparkles) {
+            return;
+        }
+
+        rewardPanelSparkles.innerHTML = "";
+        const sparkleSeeds = [
+            { x: 18, y: 32, dx: -54, dy: -42, scale: 1.0, delay: 20 },
+            { x: 30, y: 22, dx: -18, dy: -58, scale: 0.8, delay: 110 },
+            { x: 50, y: 14, dx: 0, dy: -68, scale: 1.15, delay: 0 },
+            { x: 68, y: 22, dx: 20, dy: -56, scale: 0.86, delay: 150 },
+            { x: 82, y: 34, dx: 56, dy: -36, scale: 0.96, delay: 70 },
+            { x: 24, y: 74, dx: -48, dy: 12, scale: 0.72, delay: 180 },
+            { x: 76, y: 74, dx: 52, dy: 10, scale: 0.7, delay: 210 },
+            { x: 38, y: 86, dx: -20, dy: 34, scale: 0.62, delay: 240 },
+            { x: 62, y: 86, dx: 18, dy: 36, scale: 0.68, delay: 260 }
+        ];
+
+        sparkleSeeds.forEach(function (seed) {
+            const sparkle = document.createElement("div");
+            sparkle.className = "reward-panel-sparkle";
+            sparkle.style.setProperty("--sparkle-x", seed.x + "%");
+            sparkle.style.setProperty("--sparkle-y", seed.y + "%");
+            sparkle.style.setProperty("--sparkle-drift-x", seed.dx + "px");
+            sparkle.style.setProperty("--sparkle-drift-y", seed.dy + "px");
+            sparkle.style.setProperty("--sparkle-scale", String(seed.scale));
+            sparkle.style.setProperty("--sparkle-delay", seed.delay + "ms");
+            rewardPanelSparkles.appendChild(sparkle);
+        });
     }
 
     function renderRewardPanel() {
@@ -1911,6 +1946,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             rewardPanel.hidden = true;
             rewardPanel.classList.remove("active");
             rewardPanelRewards.innerHTML = "";
+            if (rewardPanelSparkles) {
+                rewardPanelSparkles.innerHTML = "";
+            }
             return;
         }
 
@@ -1923,6 +1961,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             rewardElement.textContent = rewardText;
             rewardPanelRewards.appendChild(rewardElement);
         });
+        renderRewardPanelSparkles();
         rewardPanel.hidden = false;
     }
 
@@ -1942,6 +1981,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 rewardPanel.hidden = true;
                 rewardPanel.classList.remove("active");
                 rewardPanelRewards.innerHTML = "";
+                if (rewardPanelSparkles) {
+                    rewardPanelSparkles.innerHTML = "";
+                }
             }
             return;
         }
@@ -1951,6 +1993,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             rewardPanel.hidden = true;
             rewardPanel.classList.remove("active");
             rewardPanelRewards.innerHTML = "";
+            if (rewardPanelSparkles) {
+                rewardPanelSparkles.innerHTML = "";
+            }
         }
     }
 
@@ -3892,7 +3937,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function renderSiteVitalsPanel(state) {
-        if (!siteVitalsPanel || !siteVitalsMoney || !siteVitalsReputation || !siteVitalsBars) {
+        if (!siteVitalsPanel || !siteVitalsResources || !siteVitalsMoney || !siteVitalsReputation || !siteVitalsBars) {
             return;
         }
 
@@ -3928,8 +3973,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             campaignResources && typeof campaignResources.totalReputation === "number"
                 ? campaignResources.totalReputation
                 : 0;
+        const showRegionalMapCash = state.appState !== "REGIONAL_MAP";
 
         siteVitalsPanel.hidden = false;
+        siteVitalsMoney.hidden = !showRegionalMapCash;
+        siteVitalsResources.classList.toggle("single-resource", !showRegionalMapCash);
         const cashValue = siteVitalsMoney.querySelector(".resource-value");
         const reputationValue = siteVitalsReputation.querySelector(".resource-value");
         if (cashValue) {
