@@ -5,6 +5,9 @@
 #include <cmath>
 #include <cstring>
 #include <deque>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <string>
 #include <vector>
 
@@ -220,6 +223,15 @@ Gs1EngineMessage make_campaign_resources_message(float money, std::uint32_t repu
     return message;
 }
 
+std::string load_text_file(const std::filesystem::path& path)
+{
+    std::ifstream stream(path, std::ios::binary);
+    assert(stream.is_open());
+    return std::string(
+        std::istreambuf_iterator<char>(stream),
+        std::istreambuf_iterator<char>());
+}
+
 void queued_commands_only_publish_after_update()
 {
     FakeRuntimeState runtime_state {};
@@ -391,6 +403,22 @@ void repeated_hud_and_campaign_messages_publish_one_coalesced_patch_per_frame()
     assert(patches.front().find("\"currentMoney\":12.500000") != std::string::npos);
     assert(patches.front().find("\"totalReputation\":6") != std::string::npos);
 }
+
+void visual_smoke_assets_keep_hidden_regional_map_panels_collapsed()
+{
+    const auto html = load_text_file(std::filesystem::path("tests/smoke/visual_smoke_live.html"));
+    const auto viewer = load_text_file(std::filesystem::path("tests/smoke/visual_smoke_live_viewer.js"));
+
+    assert(html.find(".site-vitals-money[hidden]") != std::string::npos);
+    assert(html.find(".site-vitals-reputation[hidden]") != std::string::npos);
+    assert(html.find(".site-task-panel[hidden]") != std::string::npos);
+    assert(html.find(".modifier-strip[hidden]") != std::string::npos);
+
+    assert(viewer.find("siteVitalsMoney.hidden = !showRegionalMapCash;") != std::string::npos);
+    assert(viewer.find("if (state.appState !== \"SITE_ACTIVE\") {") != std::string::npos);
+    assert(viewer.find("renderSiteTaskPanel(null);") != std::string::npos);
+    assert(viewer.find("renderSiteModifiers(null);") != std::string::npos);
+}
 }  // namespace
 
 int main()
@@ -400,5 +428,6 @@ int main()
     update_records_frame_timing_breakdown();
     modifier_patch_publishes_remaining_game_hours();
     repeated_hud_and_campaign_messages_publish_one_coalesced_patch_per_frame();
+    visual_smoke_assets_keep_hidden_regional_map_panels_collapsed();
     return 0;
 }
