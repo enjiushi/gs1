@@ -21,6 +21,7 @@ namespace
 constexpr float k_modifier_change_epsilon = 1e-4f;
 constexpr double k_timed_buff_block_world_minutes = 480.0;
 constexpr FactionId k_village_faction {k_faction_village_committee};
+constexpr FactionId k_bureau_faction {k_faction_forestry_bureau};
 constexpr TechNodeId k_village_t1 {base_technology_node_id(k_village_faction, 1U)};
 constexpr TechNodeId k_village_t2 {base_technology_node_id(k_village_faction, 2U)};
 constexpr TechNodeId k_village_t3 {base_technology_node_id(k_village_faction, 3U)};
@@ -53,6 +54,12 @@ constexpr TechNodeId k_village_t29 {base_technology_node_id(k_village_faction, 2
 constexpr TechNodeId k_village_t30 {base_technology_node_id(k_village_faction, 30U)};
 constexpr TechNodeId k_village_t31 {base_technology_node_id(k_village_faction, 31U)};
 constexpr TechNodeId k_village_t32 {base_technology_node_id(k_village_faction, 32U)};
+constexpr TechNodeId k_bureau_t5 {base_technology_node_id(k_bureau_faction, 5U)};
+constexpr TechNodeId k_bureau_t10 {base_technology_node_id(k_bureau_faction, 10U)};
+constexpr TechNodeId k_bureau_t15 {base_technology_node_id(k_bureau_faction, 15U)};
+constexpr TechNodeId k_bureau_t20 {base_technology_node_id(k_bureau_faction, 20U)};
+constexpr TechNodeId k_bureau_t25 {base_technology_node_id(k_bureau_faction, 25U)};
+constexpr TechNodeId k_bureau_t30 {base_technology_node_id(k_bureau_faction, 30U)};
 
 const ModifierSystemTuning& modifier_system_tuning() noexcept
 {
@@ -366,6 +373,18 @@ bool village_technology_effects_match(
         lhs.tier_eight_food_buffs_upgraded == rhs.tier_eight_food_buffs_upgraded;
 }
 
+bool bureau_technology_effects_match(
+    const BureauTechnologyEffectState& lhs,
+    const BureauTechnologyEffectState& rhs) noexcept
+{
+    return lhs.unlocked_harvest_bonus_tier == rhs.unlocked_harvest_bonus_tier &&
+        std::fabs(lhs.harvest_bonus_proc_chance_percent - rhs.harvest_bonus_proc_chance_percent) <=
+            k_modifier_change_epsilon &&
+        std::fabs(
+            lhs.harvest_bonus_higher_tier_bias_percent -
+            rhs.harvest_bonus_higher_tier_bias_percent) <= k_modifier_change_epsilon;
+}
+
 double modifier_duration_world_minutes(const ModifierDef& modifier_def) noexcept
 {
     return static_cast<double>(modifier_def.duration_eight_hour_blocks) *
@@ -616,6 +635,46 @@ VillageTechnologyEffectState resolve_village_technology_effects(
     return effects;
 }
 
+BureauTechnologyEffectState resolve_bureau_technology_effects(
+    const CampaignState& campaign) noexcept
+{
+    BureauTechnologyEffectState effects {};
+    effects.unlocked_harvest_bonus_tier = HarvestBonusTier::Tier1;
+    effects.harvest_bonus_proc_chance_percent = 6.0f;
+    effects.harvest_bonus_higher_tier_bias_percent = 0.0f;
+
+    if (TechnologySystem::node_purchased(campaign, k_bureau_t5))
+    {
+        effects.unlocked_harvest_bonus_tier = HarvestBonusTier::Tier2;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_bureau_t10))
+    {
+        effects.harvest_bonus_higher_tier_bias_percent += 20.0f;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_bureau_t15))
+    {
+        effects.harvest_bonus_proc_chance_percent += 6.0f;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_bureau_t20))
+    {
+        effects.unlocked_harvest_bonus_tier = HarvestBonusTier::Tier3;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_bureau_t25))
+    {
+        effects.harvest_bonus_higher_tier_bias_percent += 20.0f;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_bureau_t30))
+    {
+        effects.harvest_bonus_proc_chance_percent += 6.0f;
+    }
+
+    effects.harvest_bonus_proc_chance_percent =
+        std::clamp(effects.harvest_bonus_proc_chance_percent, 0.0f, 100.0f);
+    effects.harvest_bonus_higher_tier_bias_percent =
+        std::clamp(effects.harvest_bonus_higher_tier_bias_percent, 0.0f, 100.0f);
+    return effects;
+}
+
 ModifierId custom_consumable_modifier_id(
     const VillageTechnologyEffectState& village_effects,
     ItemId item_id) noexcept
@@ -818,6 +877,7 @@ struct ResolvedModifierOutputs final
     ActionCostModifierState action_cost_modifiers {};
     HarvestOutputModifierState harvest_output_modifiers {};
     VillageTechnologyEffectState village_technology_effects {};
+    BureauTechnologyEffectState bureau_technology_effects {};
 };
 
 ResolvedModifierOutputs resolve_owned_modifiers(
@@ -848,6 +908,7 @@ ResolvedModifierOutputs resolve_owned_modifiers(
         campaign,
         resolved.harvest_output_modifiers);
     resolved.village_technology_effects = resolve_village_technology_effects(campaign);
+    resolved.bureau_technology_effects = resolve_bureau_technology_effects(campaign);
     accumulate_totals(resolved.totals, camp_comfort_bias(camp));
     resolved.totals = clamp_totals(resolved.totals);
     return resolved;
@@ -864,6 +925,7 @@ void resolve_modifier_totals(SiteSystemContext<ModifierSystem>& context)
     auto& current_harvest_output_modifiers =
         context.world.own_modifier().resolved_harvest_output_modifiers;
     auto& current_village_effects = context.world.own_modifier().resolved_village_technology_effects;
+    auto& current_bureau_effects = context.world.own_modifier().resolved_bureau_technology_effects;
 
     if (!totals_match(current_totals, next_outputs.totals) ||
         !terrain_factors_match(current_terrain_factors, next_terrain_factors) ||
@@ -875,13 +937,17 @@ void resolve_modifier_totals(SiteSystemContext<ModifierSystem>& context)
             next_outputs.harvest_output_modifiers) ||
         !village_technology_effects_match(
             current_village_effects,
-            next_outputs.village_technology_effects))
+            next_outputs.village_technology_effects) ||
+        !bureau_technology_effects_match(
+            current_bureau_effects,
+            next_outputs.bureau_technology_effects))
     {
         current_totals = next_outputs.totals;
         current_terrain_factors = next_terrain_factors;
         current_action_cost_modifiers = next_outputs.action_cost_modifiers;
         current_harvest_output_modifiers = next_outputs.harvest_output_modifiers;
         current_village_effects = next_outputs.village_technology_effects;
+        current_bureau_effects = next_outputs.bureau_technology_effects;
         context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_HUD);
     }
 }
@@ -898,6 +964,7 @@ void handle_site_run_started(
     modifier_state.resolved_action_cost_modifiers = {};
     modifier_state.resolved_harvest_output_modifiers = {};
     modifier_state.resolved_village_technology_effects = {};
+    modifier_state.resolved_bureau_technology_effects = {};
 
     const auto& aura_ids = context.campaign.loadout_planner_state.active_nearby_aura_modifier_ids;
     modifier_state.active_nearby_aura_modifier_ids.insert(

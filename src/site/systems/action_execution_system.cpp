@@ -46,6 +46,25 @@ struct ExcavationTierPercents final
     float jackpot {0.0f};
 };
 
+enum class HarvestBonusCategory : std::uint8_t
+{
+    None = 0,
+    MainItem = 1,
+    Seed = 2,
+    Basic = 3
+};
+
+struct HarvestBonusRoll final
+{
+    HarvestBonusCategory category {HarvestBonusCategory::None};
+    std::uint16_t quantity {0U};
+};
+
+void append_resolved_harvest_output(
+    std::vector<ResolvedHarvestOutputStack>& resolved_outputs,
+    ItemId item_id,
+    std::uint16_t quantity) noexcept;
+
 bool worker_pack_has_item(
     const InventoryState& inventory,
     ItemId item_id) noexcept
@@ -314,6 +333,209 @@ std::uint16_t resolve_harvest_output_quantity(
     return 1U;
 }
 
+const PlantHarvestOutputDef* find_harvest_output_by_kind(
+    const PlantDef& plant_def,
+    PlantHarvestOutputKind output_kind) noexcept
+{
+    for (const auto& harvest_output_def : plant_harvest_output_defs(plant_def))
+    {
+        if (harvest_output_def.output_kind == output_kind)
+        {
+            return &harvest_output_def;
+        }
+    }
+
+    return nullptr;
+}
+
+float harvest_bonus_proc_chance_percent(
+    SiteSystemContext<ActionExecutionSystem>& context) noexcept
+{
+    return std::clamp(
+        context.world.read_modifier().resolved_bureau_technology_effects.harvest_bonus_proc_chance_percent,
+        0.0f,
+        100.0f);
+}
+
+HarvestBonusTier unlocked_harvest_bonus_tier(
+    SiteSystemContext<ActionExecutionSystem>& context) noexcept
+{
+    return context.world.read_modifier().resolved_bureau_technology_effects.unlocked_harvest_bonus_tier;
+}
+
+float harvest_bonus_higher_tier_bias_percent(
+    SiteSystemContext<ActionExecutionSystem>& context) noexcept
+{
+    return std::clamp(
+        context.world.read_modifier()
+            .resolved_bureau_technology_effects.harvest_bonus_higher_tier_bias_percent,
+        0.0f,
+        100.0f);
+}
+
+HarvestBonusRoll resolve_harvest_bonus_roll(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    RuntimeActionId action_id,
+    TileCoord target_tile,
+    const PlantDef& plant_def) noexcept
+{
+    const auto unlocked_tier = unlocked_harvest_bonus_tier(context);
+    if (unlocked_tier == HarvestBonusTier::None)
+    {
+        return {};
+    }
+
+    const float proc_chance = harvest_bonus_proc_chance_percent(context);
+    if (proc_chance <= 0.0f)
+    {
+        return {};
+    }
+
+    const float proc_roll = percent_from_seed(
+        harvest_roll_seed(
+            context.world.site_attempt_seed(),
+            action_id,
+            target_tile,
+            plant_def.plant_id,
+            900U,
+            0U));
+    if (proc_roll >= proc_chance)
+    {
+        return {};
+    }
+
+    const float bias_percent = harvest_bonus_higher_tier_bias_percent(context);
+    const std::uint8_t max_tier = static_cast<std::uint8_t>(unlocked_tier);
+    std::uint8_t rolled_tier = 1U;
+    if (max_tier >= 3U)
+    {
+        float tier_three_weight = 6.0f + bias_percent;
+        float tier_two_weight = 22.0f + (bias_percent * 0.6f);
+        float tier_one_weight = 72.0f - (bias_percent * 1.6f);
+        tier_one_weight = std::max(10.0f, tier_one_weight);
+        const float total_weight = tier_one_weight + tier_two_weight + tier_three_weight;
+        const float tier_roll =
+            percent_from_seed(
+                harvest_roll_seed(
+                    context.world.site_attempt_seed(),
+                    action_id,
+                    target_tile,
+                    plant_def.plant_id,
+                    901U,
+                    0U)) *
+            (total_weight / 100.0f);
+        if (tier_roll >= tier_one_weight + tier_two_weight)
+        {
+            rolled_tier = 3U;
+        }
+        else if (tier_roll >= tier_one_weight)
+        {
+            rolled_tier = 2U;
+        }
+    }
+    else if (max_tier >= 2U)
+    {
+        float tier_two_weight = 28.0f + bias_percent;
+        float tier_one_weight = 72.0f - bias_percent;
+        tier_one_weight = std::max(15.0f, tier_one_weight);
+        const float total_weight = tier_one_weight + tier_two_weight;
+        const float tier_roll =
+            percent_from_seed(
+                harvest_roll_seed(
+                    context.world.site_attempt_seed(),
+                    action_id,
+                    target_tile,
+                    plant_def.plant_id,
+                    901U,
+                    0U)) *
+            (total_weight / 100.0f);
+        if (tier_roll >= tier_one_weight)
+        {
+            rolled_tier = 2U;
+        }
+    }
+
+    const float category_roll = percent_from_seed(
+        harvest_roll_seed(
+            context.world.site_attempt_seed(),
+            action_id,
+            target_tile,
+            plant_def.plant_id,
+            902U,
+            0U));
+    HarvestBonusCategory category = HarvestBonusCategory::MainItem;
+    if (category_roll >= 66.0f)
+    {
+        category = HarvestBonusCategory::Basic;
+    }
+    else if (category_roll >= 33.0f)
+    {
+        category = HarvestBonusCategory::Seed;
+    }
+
+    const auto* dedicated_output = find_harvest_output_by_kind(plant_def, PlantHarvestOutputKind::Dedicated);
+    const auto* basic_output = find_harvest_output_by_kind(plant_def, PlantHarvestOutputKind::Basic);
+    const auto* seed_output = find_harvest_output_by_kind(plant_def, PlantHarvestOutputKind::Seed);
+    if ((category == HarvestBonusCategory::MainItem && dedicated_output == nullptr) ||
+        (category == HarvestBonusCategory::Seed && seed_output == nullptr) ||
+        (category == HarvestBonusCategory::Basic && basic_output == nullptr))
+    {
+        category = dedicated_output != nullptr
+            ? HarvestBonusCategory::MainItem
+            : (seed_output != nullptr ? HarvestBonusCategory::Seed : HarvestBonusCategory::Basic);
+    }
+
+    std::uint16_t quantity = 1U;
+    if (rolled_tier == 2U)
+    {
+        quantity = category == HarvestBonusCategory::MainItem ? 2U : 1U;
+    }
+    else if (rolled_tier >= 3U)
+    {
+        quantity = category == HarvestBonusCategory::MainItem ? 2U : 2U;
+    }
+
+    return HarvestBonusRoll {category, quantity};
+}
+
+void append_harvest_bonus_output(
+    std::vector<ResolvedHarvestOutputStack>& resolved_outputs,
+    const PlantDef& plant_def,
+    const HarvestBonusRoll& bonus_roll) noexcept
+{
+    if (bonus_roll.category == HarvestBonusCategory::None || bonus_roll.quantity == 0U)
+    {
+        return;
+    }
+
+    const PlantHarvestOutputDef* harvest_output_def = nullptr;
+    switch (bonus_roll.category)
+    {
+    case HarvestBonusCategory::MainItem:
+        harvest_output_def = find_harvest_output_by_kind(plant_def, PlantHarvestOutputKind::Dedicated);
+        break;
+    case HarvestBonusCategory::Seed:
+        harvest_output_def = find_harvest_output_by_kind(plant_def, PlantHarvestOutputKind::Seed);
+        break;
+    case HarvestBonusCategory::Basic:
+        harvest_output_def = find_harvest_output_by_kind(plant_def, PlantHarvestOutputKind::Basic);
+        break;
+    case HarvestBonusCategory::None:
+    default:
+        break;
+    }
+
+    if (harvest_output_def == nullptr)
+    {
+        return;
+    }
+
+    append_resolved_harvest_output(
+        resolved_outputs,
+        harvest_output_def->item_id,
+        bonus_roll.quantity);
+}
+
 void append_resolved_harvest_output(
     std::vector<ResolvedHarvestOutputStack>& resolved_outputs,
     ItemId item_id,
@@ -441,6 +663,11 @@ std::vector<ResolvedHarvestOutputStack> resolve_harvest_outputs(
             harvest_output_def.item_id,
             resolved_quantity);
     }
+
+    append_harvest_bonus_output(
+        resolved_outputs,
+        plant_def,
+        resolve_harvest_bonus_roll(context, action_id, target_tile, plant_def));
 
     return resolved_outputs;
 }

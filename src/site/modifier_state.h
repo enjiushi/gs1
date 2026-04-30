@@ -70,6 +70,14 @@ struct HarvestOutputModifierState final
     float cash_point_multiplier_delta {0.0f};
 };
 
+enum class HarvestBonusTier : std::uint8_t
+{
+    None = 0,
+    Tier1 = 1,
+    Tier2 = 2,
+    Tier3 = 3
+};
+
 struct VillageTechnologyEffectState final
 {
     float shovel_meter_cost_reduction {0.0f};
@@ -87,6 +95,14 @@ struct VillageTechnologyEffectState final
     bool tier_two_food_buffs_upgraded {false};
     bool tier_five_food_buffs_upgraded {false};
     bool tier_eight_food_buffs_upgraded {false};
+};
+
+struct BureauTechnologyEffectState final
+{
+    HarvestBonusTier unlocked_harvest_bonus_tier {HarvestBonusTier::None};
+    std::uint8_t reserved0[3] {};
+    float harvest_bonus_proc_chance_percent {0.0f};
+    float harvest_bonus_higher_tier_bias_percent {0.0f};
 };
 
 struct ActiveSiteModifierState final
@@ -109,5 +125,6 @@ struct ModifierState final
     ActionCostModifierState resolved_action_cost_modifiers {};
     HarvestOutputModifierState resolved_harvest_output_modifiers {};
     VillageTechnologyEffectState resolved_village_technology_effects {};
+    BureauTechnologyEffectState resolved_bureau_technology_effects {};
 };
 }  // namespace gs1

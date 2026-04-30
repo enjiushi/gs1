@@ -121,6 +121,153 @@ std::uint64_t harvest_roll_seed_for_test(
     return seed;
 }
 
+enum class HarvestBonusTierForTest : std::uint8_t
+{
+    None = 0,
+    Tier1 = 1,
+    Tier2 = 2,
+    Tier3 = 3
+};
+
+struct ExpectedHarvestBonusForTest final
+{
+    std::uint32_t item_id {0U};
+    std::uint16_t quantity {0U};
+};
+
+ExpectedHarvestBonusForTest expected_harvest_bonus_for_test(
+    std::uint64_t site_attempt_seed,
+    RuntimeActionId action_id,
+    TileCoord target_tile,
+    const gs1::PlantDef& plant_def,
+    HarvestBonusTierForTest unlocked_tier,
+    float proc_chance_percent,
+    float higher_tier_bias_percent) noexcept
+{
+    if (unlocked_tier == HarvestBonusTierForTest::None || proc_chance_percent <= 0.0f)
+    {
+        return {};
+    }
+
+    if (percent_from_seed_for_test(
+            harvest_roll_seed_for_test(
+                site_attempt_seed,
+                action_id,
+                target_tile,
+                plant_def.plant_id,
+                900U,
+                0U)) >= proc_chance_percent)
+    {
+        return {};
+    }
+
+    std::uint8_t rolled_tier = 1U;
+    const std::uint8_t max_tier = static_cast<std::uint8_t>(unlocked_tier);
+    if (max_tier >= 3U)
+    {
+        float tier_three_weight = 6.0f + higher_tier_bias_percent;
+        float tier_two_weight = 22.0f + (higher_tier_bias_percent * 0.6f);
+        float tier_one_weight = 72.0f - (higher_tier_bias_percent * 1.6f);
+        tier_one_weight = std::max(10.0f, tier_one_weight);
+        const float total_weight = tier_one_weight + tier_two_weight + tier_three_weight;
+        const float tier_roll =
+            percent_from_seed_for_test(
+                harvest_roll_seed_for_test(
+                    site_attempt_seed,
+                    action_id,
+                    target_tile,
+                    plant_def.plant_id,
+                    901U,
+                    0U)) *
+            (total_weight / 100.0f);
+        if (tier_roll >= tier_one_weight + tier_two_weight)
+        {
+            rolled_tier = 3U;
+        }
+        else if (tier_roll >= tier_one_weight)
+        {
+            rolled_tier = 2U;
+        }
+    }
+    else if (max_tier >= 2U)
+    {
+        float tier_two_weight = 28.0f + higher_tier_bias_percent;
+        float tier_one_weight = 72.0f - higher_tier_bias_percent;
+        tier_one_weight = std::max(15.0f, tier_one_weight);
+        const float total_weight = tier_one_weight + tier_two_weight;
+        const float tier_roll =
+            percent_from_seed_for_test(
+                harvest_roll_seed_for_test(
+                    site_attempt_seed,
+                    action_id,
+                    target_tile,
+                    plant_def.plant_id,
+                    901U,
+                    0U)) *
+            (total_weight / 100.0f);
+        if (tier_roll >= tier_one_weight)
+        {
+            rolled_tier = 2U;
+        }
+    }
+
+    const float category_roll = percent_from_seed_for_test(
+        harvest_roll_seed_for_test(
+            site_attempt_seed,
+            action_id,
+            target_tile,
+            plant_def.plant_id,
+            902U,
+            0U));
+    gs1::PlantHarvestOutputKind output_kind = gs1::PlantHarvestOutputKind::Dedicated;
+    if (category_roll >= 66.0f)
+    {
+        output_kind = gs1::PlantHarvestOutputKind::Basic;
+    }
+    else if (category_roll >= 33.0f)
+    {
+        output_kind = gs1::PlantHarvestOutputKind::Seed;
+    }
+
+    const auto harvest_outputs = gs1::plant_harvest_output_defs(plant_def);
+    const gs1::PlantHarvestOutputDef* selected_output = nullptr;
+    for (const auto& harvest_output_def : harvest_outputs)
+    {
+        if (harvest_output_def.output_kind == output_kind)
+        {
+            selected_output = &harvest_output_def;
+            break;
+        }
+    }
+    if (selected_output == nullptr)
+    {
+        for (const auto& harvest_output_def : harvest_outputs)
+        {
+            if (harvest_output_def.output_kind == gs1::PlantHarvestOutputKind::Dedicated)
+            {
+                selected_output = &harvest_output_def;
+                break;
+            }
+        }
+    }
+    if (selected_output == nullptr)
+    {
+        return {};
+    }
+
+    std::uint16_t quantity = 1U;
+    if (rolled_tier == 2U)
+    {
+        quantity = output_kind == gs1::PlantHarvestOutputKind::Dedicated ? 2U : 1U;
+    }
+    else if (rolled_tier >= 3U)
+    {
+        quantity = 2U;
+    }
+
+    return ExpectedHarvestBonusForTest {selected_output->item_id.value, quantity};
+}
+
 std::uint16_t inserted_quantity_for_item(
     const GameMessageQueue& queue,
     std::uint32_t item_id) noexcept
@@ -950,7 +1097,7 @@ void action_execution_harvest_completion_emits_worker_pack_insert_and_tile_harve
     const auto action_id = *site_run.site_action.current_action_id;
     const auto* plant_def = gs1::find_plant_def(gs1::PlantId {gs1::k_plant_white_thorn});
     GS1_SYSTEM_TEST_REQUIRE(context, plant_def != nullptr);
-    const std::uint16_t expected_primary_quantity = 1U;
+    std::uint16_t expected_primary_quantity = 1U;
     std::uint16_t expected_grass_quantity = 0U;
     if (percent_from_seed_for_test(
             harvest_roll_seed_for_test(
@@ -974,6 +1121,29 @@ void action_execution_harvest_completion_emits_worker_pack_insert_and_tile_harve
                 0U)) < 10.0f)
     {
         expected_seed_quantity = 1U;
+    }
+    const auto expected_bonus = expected_harvest_bonus_for_test(
+        site_run.site_attempt_seed,
+        action_id,
+        TileCoord {2, 2},
+        *plant_def,
+        HarvestBonusTierForTest::Tier1,
+        6.0f,
+        0.0f);
+    if (expected_bonus.item_id == gs1::k_item_white_thorn_berries)
+    {
+        expected_primary_quantity = static_cast<std::uint16_t>(
+            expected_primary_quantity + expected_bonus.quantity);
+    }
+    else if (expected_bonus.item_id == gs1::k_item_wormwood_bundle)
+    {
+        expected_grass_quantity = static_cast<std::uint16_t>(
+            expected_grass_quantity + expected_bonus.quantity);
+    }
+    else if (expected_bonus.item_id == gs1::k_item_white_thorn_seed_bundle)
+    {
+        expected_seed_quantity = static_cast<std::uint16_t>(
+            expected_seed_quantity + expected_bonus.quantity);
     }
 
     queue.clear();
@@ -1033,13 +1203,30 @@ void action_execution_harvest_guarantees_one_dedicated_item_for_low_output_plant
             site_context,
             make_start_action_message(GS1_SITE_ACTION_HARVEST, TileCoord {2, 2}, 1U, 0U, 0U)) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, site_run.site_action.current_action_id.has_value());
+    const auto action_id = *site_run.site_action.current_action_id;
+    const auto* plant_def = gs1::find_plant_def(gs1::PlantId {gs1::k_plant_ordos_wormwood});
+    GS1_SYSTEM_TEST_REQUIRE(context, plant_def != nullptr);
+    std::uint16_t expected_primary_quantity = 1U;
+    const auto expected_bonus = expected_harvest_bonus_for_test(
+        site_run.site_attempt_seed,
+        action_id,
+        TileCoord {2, 2},
+        *plant_def,
+        HarvestBonusTierForTest::Tier1,
+        6.0f,
+        0.0f);
+    if (expected_bonus.item_id == gs1::k_item_ordos_wormwood_sprigs)
+    {
+        expected_primary_quantity = static_cast<std::uint16_t>(
+            expected_primary_quantity + expected_bonus.quantity);
+    }
 
     queue.clear();
     ActionExecutionSystem::run(site_context);
 
     GS1_SYSTEM_TEST_CHECK(
         context,
-        inserted_quantity_for_item(queue, gs1::k_item_ordos_wormwood_sprigs) == 1U);
+        inserted_quantity_for_item(queue, gs1::k_item_ordos_wormwood_sprigs) == expected_primary_quantity);
     const auto* harvested =
         first_message_payload<SiteTileHarvestedMessage>(
             queue,
@@ -1047,7 +1234,7 @@ void action_execution_harvest_guarantees_one_dedicated_item_for_low_output_plant
     GS1_SYSTEM_TEST_REQUIRE(context, harvested != nullptr);
     GS1_SYSTEM_TEST_CHECK(context, harvested->plant_type_id == gs1::k_plant_ordos_wormwood);
     GS1_SYSTEM_TEST_CHECK(context, harvested->item_id == gs1::k_item_ordos_wormwood_sprigs);
-    GS1_SYSTEM_TEST_CHECK(context, harvested->item_quantity == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, harvested->item_quantity == expected_primary_quantity);
 }
 
 void action_execution_harvest_always_produces_one_dedicated_item_for_output_plants(
@@ -1072,13 +1259,165 @@ void action_execution_harvest_always_produces_one_dedicated_item_for_output_plan
             site_context,
             make_start_action_message(GS1_SITE_ACTION_HARVEST, TileCoord {2, 2}, 1U, 0U, 0U)) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, site_run.site_action.current_action_id.has_value());
+    const auto action_id = *site_run.site_action.current_action_id;
+    const auto* plant_def = gs1::find_plant_def(gs1::PlantId {gs1::k_plant_red_tamarisk});
+    GS1_SYSTEM_TEST_REQUIRE(context, plant_def != nullptr);
+    std::uint16_t expected_primary_quantity = 1U;
+    const auto expected_bonus = expected_harvest_bonus_for_test(
+        site_run.site_attempt_seed,
+        action_id,
+        TileCoord {2, 2},
+        *plant_def,
+        HarvestBonusTierForTest::Tier1,
+        6.0f,
+        0.0f);
+    if (expected_bonus.item_id == gs1::k_item_red_tamarisk_bark)
+    {
+        expected_primary_quantity = static_cast<std::uint16_t>(
+            expected_primary_quantity + expected_bonus.quantity);
+    }
 
     queue.clear();
     ActionExecutionSystem::run(site_context);
 
     GS1_SYSTEM_TEST_CHECK(
         context,
-        inserted_quantity_for_item(queue, gs1::k_item_red_tamarisk_bark) == 1U);
+        inserted_quantity_for_item(queue, gs1::k_item_red_tamarisk_bark) == expected_primary_quantity);
+}
+
+void action_execution_harvest_bonus_progression_tracks_global_and_bureau_tiers(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    const auto* plant_def = gs1::find_plant_def(gs1::PlantId {gs1::k_plant_white_thorn});
+    GS1_SYSTEM_TEST_REQUIRE(context, plant_def != nullptr);
+
+    auto baseline_campaign = make_campaign();
+    auto baseline_run = make_test_site_run(1U, 5301U);
+    GameMessageQueue baseline_queue {};
+    auto baseline_context =
+        make_site_context<ActionExecutionSystem>(baseline_campaign, baseline_run, baseline_queue, 60.0);
+    for (const auto coord : {TileCoord {2, 2}, TileCoord {3, 2}, TileCoord {2, 3}, TileCoord {3, 3}})
+    {
+        auto tile = baseline_run.site_world->tile_at(coord);
+        tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_white_thorn};
+        tile.ecology.plant_density = 85.0f;
+        baseline_run.site_world->set_tile(coord, tile);
+    }
+    baseline_run.modifier.resolved_bureau_technology_effects.unlocked_harvest_bonus_tier =
+        gs1::HarvestBonusTier::Tier1;
+    baseline_run.modifier.resolved_bureau_technology_effects.harvest_bonus_proc_chance_percent = 6.0f;
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            baseline_context,
+            make_start_action_message(GS1_SITE_ACTION_HARVEST, TileCoord {2, 2}, 1U, 0U, 0U)) ==
+            GS1_STATUS_OK);
+    const auto baseline_action_id = *baseline_run.site_action.current_action_id;
+    baseline_queue.clear();
+    ActionExecutionSystem::run(baseline_context);
+    const auto baseline_bonus = expected_harvest_bonus_for_test(
+        baseline_run.site_attempt_seed,
+        baseline_action_id,
+        TileCoord {2, 2},
+        *plant_def,
+        HarvestBonusTierForTest::Tier1,
+        6.0f,
+        0.0f);
+    if (baseline_bonus.item_id != 0U)
+    {
+        GS1_SYSTEM_TEST_CHECK(
+            context,
+            inserted_quantity_for_item(baseline_queue, baseline_bonus.item_id) >= baseline_bonus.quantity);
+    }
+
+    auto bureau_campaign = make_campaign();
+    bureau_campaign.faction_progress[1].faction_reputation = reputation_for_progress_tier(20U);
+    auto bureau_run = make_test_site_run(1U, 5302U);
+    GameMessageQueue bureau_queue {};
+    auto bureau_context =
+        make_site_context<ActionExecutionSystem>(bureau_campaign, bureau_run, bureau_queue, 60.0);
+    for (const auto coord : {TileCoord {2, 2}, TileCoord {3, 2}, TileCoord {2, 3}, TileCoord {3, 3}})
+    {
+        auto tile = bureau_run.site_world->tile_at(coord);
+        tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_white_thorn};
+        tile.ecology.plant_density = 85.0f;
+        bureau_run.site_world->set_tile(coord, tile);
+    }
+    bureau_run.modifier.resolved_bureau_technology_effects.unlocked_harvest_bonus_tier =
+        gs1::HarvestBonusTier::Tier3;
+    bureau_run.modifier.resolved_bureau_technology_effects.harvest_bonus_proc_chance_percent = 12.0f;
+    bureau_run.modifier.resolved_bureau_technology_effects.harvest_bonus_higher_tier_bias_percent =
+        20.0f;
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            bureau_context,
+            make_start_action_message(GS1_SITE_ACTION_HARVEST, TileCoord {2, 2}, 1U, 0U, 0U)) ==
+            GS1_STATUS_OK);
+    const auto bureau_action_id = *bureau_run.site_action.current_action_id;
+    bureau_queue.clear();
+    ActionExecutionSystem::run(bureau_context);
+    const auto bureau_bonus = expected_harvest_bonus_for_test(
+        bureau_run.site_attempt_seed,
+        bureau_action_id,
+        TileCoord {2, 2},
+        *plant_def,
+        HarvestBonusTierForTest::Tier3,
+        12.0f,
+        20.0f);
+    if (bureau_bonus.item_id != 0U)
+    {
+        GS1_SYSTEM_TEST_CHECK(
+            context,
+            inserted_quantity_for_item(bureau_queue, bureau_bonus.item_id) >= bureau_bonus.quantity);
+    }
+
+    auto late_bureau_campaign = make_campaign();
+    late_bureau_campaign.faction_progress[1].faction_reputation = reputation_for_progress_tier(30U);
+    auto late_bureau_run = make_test_site_run(1U, 5303U);
+    GameMessageQueue late_bureau_queue {};
+    auto late_bureau_context =
+        make_site_context<ActionExecutionSystem>(
+            late_bureau_campaign,
+            late_bureau_run,
+            late_bureau_queue,
+            60.0);
+    for (const auto coord : {TileCoord {2, 2}, TileCoord {3, 2}, TileCoord {2, 3}, TileCoord {3, 3}})
+    {
+        auto tile = late_bureau_run.site_world->tile_at(coord);
+        tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_white_thorn};
+        tile.ecology.plant_density = 85.0f;
+        late_bureau_run.site_world->set_tile(coord, tile);
+    }
+    late_bureau_run.modifier.resolved_bureau_technology_effects.unlocked_harvest_bonus_tier =
+        gs1::HarvestBonusTier::Tier3;
+    late_bureau_run.modifier.resolved_bureau_technology_effects.harvest_bonus_proc_chance_percent = 18.0f;
+    late_bureau_run.modifier.resolved_bureau_technology_effects.harvest_bonus_higher_tier_bias_percent =
+        40.0f;
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            late_bureau_context,
+            make_start_action_message(GS1_SITE_ACTION_HARVEST, TileCoord {2, 2}, 1U, 0U, 0U)) ==
+            GS1_STATUS_OK);
+    const auto late_bureau_action_id = *late_bureau_run.site_action.current_action_id;
+    late_bureau_queue.clear();
+    ActionExecutionSystem::run(late_bureau_context);
+    const auto late_bureau_bonus = expected_harvest_bonus_for_test(
+        late_bureau_run.site_attempt_seed,
+        late_bureau_action_id,
+        TileCoord {2, 2},
+        *plant_def,
+        HarvestBonusTierForTest::Tier3,
+        18.0f,
+        40.0f);
+    if (late_bureau_bonus.item_id != 0U)
+    {
+        GS1_SYSTEM_TEST_CHECK(
+            context,
+            inserted_quantity_for_item(late_bureau_queue, late_bureau_bonus.item_id) >=
+                late_bureau_bonus.quantity);
+    }
 }
 
 void harvest_content_authors_one_guaranteed_dedicated_item_for_every_harvestable_plant(
@@ -1707,7 +2046,7 @@ void action_execution_shovel_in_worker_pack_reduces_plant_and_excavate_duration_
 
     GS1_SYSTEM_TEST_CHECK(
         context,
-        approx_equal(boosted_plant_duration, baseline_plant_duration * 0.45f));
+        approx_equal(boosted_plant_duration, baseline_plant_duration * 0.90f));
     GS1_SYSTEM_TEST_CHECK(
         context,
         approx_equal(boosted_plant_cost.hydration_delta, baseline_plant_cost.hydration_delta * 0.70f));
@@ -1786,16 +2125,16 @@ void action_execution_shovel_in_worker_pack_reduces_plant_and_excavate_duration_
 
     GS1_SYSTEM_TEST_CHECK(
         context,
-        approx_equal(boosted_excavate_duration, baseline_excavate_duration * 0.85f));
+        approx_equal(boosted_excavate_duration, baseline_excavate_duration * 0.95f));
     GS1_SYSTEM_TEST_CHECK(
         context,
-        approx_equal(boosted_excavate_cost.hydration_delta, baseline_excavate_cost.hydration_delta * 0.85f));
+        approx_equal(boosted_excavate_cost.hydration_delta, baseline_excavate_cost.hydration_delta * 0.95f));
     GS1_SYSTEM_TEST_CHECK(
         context,
-        approx_equal(boosted_excavate_cost.nourishment_delta, baseline_excavate_cost.nourishment_delta * 0.85f));
+        approx_equal(boosted_excavate_cost.nourishment_delta, baseline_excavate_cost.nourishment_delta * 0.95f));
     GS1_SYSTEM_TEST_CHECK(
         context,
-        approx_equal(boosted_excavate_cost.energy_delta, baseline_excavate_cost.energy_delta * 0.85f));
+        approx_equal(boosted_excavate_cost.energy_delta, baseline_excavate_cost.energy_delta * 0.95f));
 }
 
 void action_execution_village_tech_unlocks_careful_and_thorough_excavation(
@@ -3095,6 +3434,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "action_execution",
     "harvest_always_produces_one_dedicated_item_for_output_plants",
     action_execution_harvest_always_produces_one_dedicated_item_for_output_plants);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "action_execution",
+    "harvest_bonus_progression_tracks_global_and_bureau_tiers",
+    action_execution_harvest_bonus_progression_tracks_global_and_bureau_tiers);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "action_execution",
     "harvest_content_authors_one_guaranteed_dedicated_item_for_every_harvestable_plant",

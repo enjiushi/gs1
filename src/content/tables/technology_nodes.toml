@@ -439,8 +439,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.040
 is_todo_placeholder = false
-display_name = "Windline Shelter Belts"
-description = "Focuses the branch on stronger plant-made shelter so restoration patches begin shaping local weather sooner."
+display_name = "Common Harvest Sorting"
+description = "Unlocks Bureau-only tier-two harvest bonuses so productive plants sometimes return a stronger extra bundle after the normal cut."
 
 [[technology_nodes]]
 faction_id = 2
@@ -499,8 +499,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.026
 is_todo_placeholder = false
-display_name = "Shade Nurse Pattern"
-description = "Pushes nearby seedlings toward safer starts whenever a hardy support plant is already holding the lane."
+display_name = "Selective Pod Grading"
+description = "Improves Bureau harvest-bonus rarity weighting so higher unlocked bonus tiers appear more often when the extra roll hits."
 
 [[technology_nodes]]
 faction_id = 2
@@ -559,8 +559,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.022
 is_todo_placeholder = false
-display_name = "Capillary Break Ridges"
-description = "Specializes the tier toward lower salt pressure and better retention of workable density."
+display_name = "Lane Picking Rhythm"
+description = "Improves Bureau harvest-bonus consistency so extra post-harvest bundles trigger more often without changing harvest action tempo."
 
 [[technology_nodes]]
 faction_id = 2
@@ -619,8 +619,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.09
 effect_parameter_per_bonus_reputation = 0.021
 is_todo_placeholder = false
-display_name = "Canopy Ladder Program Review"
-description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
+display_name = "Rare Harvest Contracts"
+description = "Unlocks Bureau-only tier-three harvest bonuses so mature productive plants can occasionally return rare extra harvest bundles."
 
 [[technology_nodes]]
 faction_id = 2
@@ -679,8 +679,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.017
 is_todo_placeholder = false
-display_name = "Succession Patch Planning"
-description = "Turns the branch toward patch-to-patch continuity so one healthy planted zone can help bootstrap the next."
+display_name = "Merchant Grove Sorting"
+description = "Improves late Bureau harvest-bonus rarity weighting again so tier-three extra bundles show up more often once unlocked."
 
 [[technology_nodes]]
 faction_id = 2
@@ -739,8 +739,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.016
 is_todo_placeholder = false
-display_name = "Watershed Green Lanes"
-description = "Turns the capstone toward moisture capture, terrain repair, and long shelter lanes across the map."
+display_name = "Harvest Cadence Network"
+description = "Caps the Bureau cash lane with its strongest harvest-bonus consistency step, making extra bundles far more dependable on productive harvest runs."
 
 [[technology_nodes]]
 faction_id = 2
