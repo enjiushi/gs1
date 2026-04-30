@@ -1677,7 +1677,7 @@ int main()
     }
 
     assert(action_ecology.plant_id.value == gs1::k_plant_ordos_wormwood);
-    assert(action_ecology.plant_density >= 20.0f);
+    assert(approx_equal(action_ecology.plant_density, 100.0f));
     assert(action_site_run.inventory.worker_pack_slots[3].item_quantity == 1U);
 
     run_phase1(action_runtime, 0.0);
@@ -1692,7 +1692,7 @@ int main()
             return payload.x == static_cast<std::uint32_t>(action_target.x) &&
                 payload.y == static_cast<std::uint32_t>(action_target.y) &&
                 payload.plant_type_id == gs1::k_plant_ordos_wormwood &&
-                payload.plant_density >= 20.0f;
+                approx_equal(payload.plant_density, 100.0f);
         });
     assert(projected_action_tile != action_tile_messages.end());
 

@@ -1935,7 +1935,7 @@ void action_execution_item_based_plant_completion_consumes_seed_and_emits_planti
             GameMessageType::SiteTilePlantingCompleted);
     GS1_SYSTEM_TEST_REQUIRE(context, planting != nullptr);
     GS1_SYSTEM_TEST_CHECK(context, planting->plant_type_id == gs1::k_plant_ordos_wormwood);
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(planting->initial_density, 40.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(planting->initial_density, 100.0f));
     GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.current_action_id.has_value());
 }
 

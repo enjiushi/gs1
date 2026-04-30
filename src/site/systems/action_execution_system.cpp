@@ -2004,7 +2004,7 @@ void emit_action_fact_messages(
                     target_tile.x,
                     target_tile.y,
                     item_def->linked_plant_id.value,
-                    std::min(100.0f, 20.0f * static_cast<float>(safe_quantity)),
+                    100.0f,
                     flags});
         }
         else
