@@ -86,6 +86,7 @@ void register_site_world_types(flecs::world& world)
     register_component<DeviceIntegrity>(world);
     register_component<DeviceEfficiency>(world);
     register_component<DeviceStoredWater>(world);
+    register_component<DeviceFixedIntegrity>(world);
     register_component<WorkerTilePosition>(world);
     register_component<WorkerFacing>(world);
     register_component<WorkerVitals>(world);
@@ -220,12 +221,14 @@ SiteWorld::TileDeviceData tile_device_from_entity(flecs::entity entity)
     const auto integrity = entity.get<DeviceIntegrity>();
     const auto efficiency = entity.get<DeviceEfficiency>();
     const auto stored_water = entity.get<DeviceStoredWater>();
+    const auto fixed_integrity = entity.get<DeviceFixedIntegrity>();
 
     return SiteWorld::TileDeviceData {
         structure.structure_id,
         integrity.value,
         efficiency.value,
-        stored_water.value};
+        stored_water.value,
+        fixed_integrity.value};
 }
 
 SiteWorld::TileData tile_data_from_entity(flecs::entity entity)
@@ -237,7 +240,7 @@ SiteWorld::TileData tile_data_from_entity(flecs::entity entity)
         tile_local_weather_from_entity(entity),
         tile_plant_weather_contribution_from_entity(entity),
         tile_device_weather_contribution_from_entity(entity),
-        SiteWorld::TileDeviceData {StructureId {}, 1.0f, 1.0f, 0.0f}};
+        SiteWorld::TileDeviceData {StructureId {}, 1.0f, 1.0f, 0.0f, false}};
 }
 
 SiteWorld::TileData default_tile_data() noexcept
@@ -249,12 +252,12 @@ SiteWorld::TileData default_tile_data() noexcept
         SiteWorld::TileLocalWeatherData {0.0f, 0.0f, 0.0f},
         SiteWorld::TileWeatherContributionData {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f},
         SiteWorld::TileWeatherContributionData {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f},
-        SiteWorld::TileDeviceData {StructureId {}, 1.0f, 1.0f, 0.0f}};
+        SiteWorld::TileDeviceData {StructureId {}, 1.0f, 1.0f, 0.0f, false}};
 }
 
 SiteWorld::TileDeviceData default_device_data() noexcept
 {
-    return SiteWorld::TileDeviceData {StructureId {}, 1.0f, 1.0f, 0.0f};
+    return SiteWorld::TileDeviceData {StructureId {}, 1.0f, 1.0f, 0.0f, false};
 }
 
 void apply_tile_static_to_entity(flecs::entity entity, const SiteWorld::TileStaticData& data)
@@ -333,7 +336,8 @@ void apply_device_to_entity(flecs::entity entity, const SiteWorld::TileDeviceDat
         .set<DeviceStructureId>({data.structure_id})
         .set<DeviceIntegrity>({data.device_integrity})
         .set<DeviceEfficiency>({data.device_efficiency})
-        .set<DeviceStoredWater>({data.device_stored_water});
+        .set<DeviceStoredWater>({data.device_stored_water})
+        .set<DeviceFixedIntegrity>({data.fixed_integrity});
 }
 
 SiteWorld::WorkerPositionData worker_position_from_entity(flecs::entity entity)

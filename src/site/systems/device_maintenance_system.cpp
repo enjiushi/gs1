@@ -1,5 +1,6 @@
 #include "site/systems/device_maintenance_system.h"
 
+#include "content/defs/structure_defs.h"
 #include "site/site_run_state.h"
 #include "site/site_world_components.h"
 #include "site/tile_footprint.h"
@@ -19,8 +20,7 @@ namespace gs1
 namespace
 {
 constexpr float k_integrity_epsilon = 0.0001f;
-constexpr float k_weather_wear_per_unit = 0.0001f;
-constexpr float k_burial_wear_per_unit = 0.05f;
+constexpr float k_weather_meter_max = 100.0f;
 
 struct BrokenDeviceEntry final
 {
@@ -179,7 +179,8 @@ Gs1Status DeviceMaintenanceSystem::process_message(
                     StructureId {payload.structure_id},
                     1.0f,
                     1.0f,
-                    0.0f});
+                    0.0f,
+                    false});
             context.world.mark_tile_projection_dirty(footprint_coord);
             emit_device_condition_changed_message(
                 context.message_queue,
@@ -203,11 +204,11 @@ void DeviceMaintenanceSystem::run(SiteSystemContext<DeviceMaintenanceSystem>& co
         return;
     }
 
-    const float weather_wear_base =
-        std::fabs(context.world.read_weather().weather_heat) +
-        std::fabs(context.world.read_weather().weather_wind) +
-        std::fabs(context.world.read_weather().weather_dust);
-    const float weather_wear = weather_wear_base * k_weather_wear_per_unit * step_seconds;
+    const float max_weather_meter = std::max({
+        std::fabs(context.world.read_weather().weather_heat),
+        std::fabs(context.world.read_weather().weather_wind),
+        std::fabs(context.world.read_weather().weather_dust)});
+    const float weather_factor = std::clamp(max_weather_meter / k_weather_meter_max, 0.0f, 1.0f);
     if (context.site_run.site_world == nullptr)
     {
         return;
@@ -218,7 +219,8 @@ void DeviceMaintenanceSystem::run(SiteSystemContext<DeviceMaintenanceSystem>& co
         ecs_world.query_builder<
             const site_ecs::TileCoordComponent,
             const site_ecs::DeviceStructureId,
-            const site_ecs::DeviceIntegrity>()
+            const site_ecs::DeviceIntegrity,
+            const site_ecs::DeviceFixedIntegrity>()
             .with<site_ecs::DeviceTag>()
             .build();
     std::vector<BrokenDeviceEntry> broken_devices {};
@@ -229,26 +231,29 @@ void DeviceMaintenanceSystem::run(SiteSystemContext<DeviceMaintenanceSystem>& co
         [&](flecs::entity entity,
             const site_ecs::TileCoordComponent& coord_component,
             const site_ecs::DeviceStructureId& structure_component,
-            const site_ecs::DeviceIntegrity& integrity_component) {
+            const site_ecs::DeviceIntegrity& integrity_component,
+            const site_ecs::DeviceFixedIntegrity& fixed_integrity_component) {
             const auto structure_id = structure_component.structure_id;
             if (structure_id.value == 0U)
             {
                 return;
             }
 
-            const auto coord = coord_component.value;
-            const auto tile_entity =
-                ecs_world.entity(context.site_run.site_world->tile_entity_id(coord));
-            const auto burial_component = tile_entity.get<site_ecs::TileSandBurial>();
-            const float burial_amount =
-                std::clamp(burial_component.value / 100.0f, 0.0f, 1.0f);
-            const float burial_wear = burial_amount * k_burial_wear_per_unit * step_seconds;
-            const float total_wear = weather_wear + burial_wear;
+            if (fixed_integrity_component.value)
+            {
+                return;
+            }
+
+            const auto* structure_def = find_structure_def(structure_id);
+            const float base_loss_per_second =
+                structure_def == nullptr ? 0.0f : structure_def->integrity_loss_per_second_at_max_weather;
+            const float total_wear = std::lerp(0.0f, base_loss_per_second, weather_factor) * step_seconds;
             if (total_wear <= 0.0f)
             {
                 return;
             }
 
+            const auto coord = coord_component.value;
             const float next_integrity =
                 std::clamp(integrity_component.value - total_wear, 0.0f, 1.0f);
             if (std::fabs(next_integrity - integrity_component.value) <= k_integrity_epsilon)

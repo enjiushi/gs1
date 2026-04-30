@@ -67,6 +67,7 @@ public:
         float device_integrity;
         float device_efficiency;
         float device_stored_water;
+        bool fixed_integrity;
     };
 
     struct TileData final

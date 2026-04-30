@@ -482,6 +482,14 @@ std::vector<ContentValidationIssue> validate_content_database(
                 "Structure footprints must use power-of-two tile sizes."});
             break;
         }
+
+        if (structure_def.integrity_loss_per_second_at_max_weather < 0.0f)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Structure integrity loss speed at max weather must be non-negative."});
+            break;
+        }
     }
 
     for (const auto& item_def : content.item_defs)

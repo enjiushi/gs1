@@ -2090,6 +2090,7 @@ void load_structure_defs(ContentDatabase& content, const std::filesystem::path& 
             StructureId {require_toml_unsigned<std::uint32_t>(path, entry, "structure_id")},
             store_string_view(content, require_toml_string(path, entry, "display_name")),
             require_toml_float(path, entry, "durability"),
+            require_toml_float(path, entry, "integrity_loss_per_second_at_max_weather"),
             require_toml_unsigned<std::uint8_t>(path, entry, "aura_size"),
             require_toml_float(path, entry, "wind_protection_value"),
             require_toml_unsigned<std::uint8_t>(path, entry, "wind_protection_range"),

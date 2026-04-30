@@ -222,6 +222,11 @@ struct DeviceStoredWater final
     float value;
 };
 
+struct DeviceFixedIntegrity final
+{
+    bool value;
+};
+
 struct WorkerTilePosition final
 {
     TileCoord tile_coord;
@@ -290,6 +295,7 @@ GS1_REQUIRE_TRIVIAL(DeviceStructureId);
 GS1_REQUIRE_TRIVIAL(DeviceIntegrity);
 GS1_REQUIRE_TRIVIAL(DeviceEfficiency);
 GS1_REQUIRE_TRIVIAL(DeviceStoredWater);
+GS1_REQUIRE_TRIVIAL(DeviceFixedIntegrity);
 GS1_REQUIRE_TRIVIAL(WorkerTilePosition);
 GS1_REQUIRE_TRIVIAL(WorkerFacing);
 GS1_REQUIRE_TRIVIAL(WorkerVitals);

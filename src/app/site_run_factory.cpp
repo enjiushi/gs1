@@ -258,6 +258,7 @@ SiteRunState SiteRunFactory::create_site_run(
         auto tile = run.site_world->tile_at(run.camp.delivery_box_tile);
         tile.device.structure_id = StructureId {k_structure_storage_crate};
         tile.device.device_integrity = 1.0f;
+        tile.device.fixed_integrity = true;
         run.site_world->set_tile(run.camp.delivery_box_tile, tile);
     }
     if (run.site_id.value == 1U)
@@ -268,6 +269,7 @@ SiteRunState SiteRunFactory::create_site_run(
             auto tile = run.site_world->tile_at(workbench_tile);
             tile.device.structure_id = StructureId {k_structure_workbench};
             tile.device.device_integrity = 1.0f;
+            tile.device.fixed_integrity = false;
             run.site_world->set_tile(workbench_tile, tile);
         }
     }

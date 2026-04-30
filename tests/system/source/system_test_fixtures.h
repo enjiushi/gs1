@@ -154,6 +154,7 @@ inline SiteRunState make_test_site_run(
         auto tile = site_run.site_world->tile_at(site_run.camp.delivery_box_tile);
         tile.device.structure_id = gs1::StructureId {gs1::k_structure_storage_crate};
         tile.device.device_integrity = 1.0f;
+        tile.device.fixed_integrity = true;
         site_run.site_world->set_tile(site_run.camp.delivery_box_tile, tile);
     }
     if (site_id == 1U && site_run.site_world->contains(default_starter_workbench_tile(camp_anchor_tile)))
@@ -161,6 +162,7 @@ inline SiteRunState make_test_site_run(
         auto tile = site_run.site_world->tile_at(default_starter_workbench_tile(camp_anchor_tile));
         tile.device.structure_id = gs1::StructureId {gs1::k_structure_workbench};
         tile.device.device_integrity = 1.0f;
+        tile.device.fixed_integrity = false;
         site_run.site_world->set_tile(default_starter_workbench_tile(camp_anchor_tile), tile);
     }
     site_run.pending_tile_projection_update_mask.assign(site_run.site_world->tile_count(), 0U);

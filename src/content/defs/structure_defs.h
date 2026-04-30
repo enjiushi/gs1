@@ -21,6 +21,7 @@ struct StructureDef final
     StructureId structure_id {};
     std::string_view display_name {};
     float durability {0.0f};
+    float integrity_loss_per_second_at_max_weather {0.0f};
     std::uint8_t aura_size {0U};
     float wind_protection_value {0.0f};
     std::uint8_t wind_protection_range {0U};

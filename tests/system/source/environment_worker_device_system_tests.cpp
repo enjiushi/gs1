@@ -1444,7 +1444,8 @@ void device_support_updates_efficiency_and_water_from_heat(
     GS1_SYSTEM_TEST_CHECK(context, device.device_stored_water > 0.0f);
 }
 
-void device_maintenance_applies_weather_and_burial_wear(gs1::testing::SystemTestExecutionContext& context)
+void device_maintenance_uses_max_weather_meter_and_authored_base_speed(
+    gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(1U, 1402U);
@@ -1456,15 +1457,49 @@ void device_maintenance_applies_weather_and_burial_wear(gs1::testing::SystemTest
     site_run.weather.weather_dust = 5.0f;
 
     auto tile = site_run.site_world->tile_at(TileCoord {3, 3});
-    tile.ecology.sand_burial = 1.0f;
-    tile.device.structure_id = gs1::StructureId {8U};
+    tile.ecology.sand_burial = 100.0f;
+    tile.device.structure_id = gs1::StructureId {gs1::k_structure_workbench};
     tile.device.device_integrity = 1.0f;
     site_run.site_world->set_tile(TileCoord {3, 3}, tile);
 
     DeviceMaintenanceSystem::run(site_context);
 
     const auto device = site_run.site_world->tile_device(TileCoord {3, 3});
-    GS1_SYSTEM_TEST_CHECK(context, device.device_integrity < 1.0f);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(device.device_integrity, 0.99666667f));
+}
+
+void device_maintenance_preserves_fixed_integrity_delivery_crate(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 1403U);
+    GameMessageQueue queue {};
+    auto site_context = make_site_context<DeviceMaintenanceSystem>(campaign, site_run, queue, 10.0);
+
+    site_run.weather.weather_heat = 50.0f;
+    site_run.weather.weather_wind = 20.0f;
+    site_run.weather.weather_dust = 10.0f;
+
+    const auto delivery_box_tile = site_run.camp.delivery_box_tile;
+    const auto workbench_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);
+
+    const auto delivery_box_before = site_run.site_world->tile_device(delivery_box_tile);
+    const auto workbench_before = site_run.site_world->tile_device(workbench_tile);
+    GS1_SYSTEM_TEST_REQUIRE(context, delivery_box_before.structure_id.value == gs1::k_structure_storage_crate);
+    GS1_SYSTEM_TEST_REQUIRE(context, delivery_box_before.fixed_integrity);
+    GS1_SYSTEM_TEST_REQUIRE(context, workbench_before.structure_id.value == gs1::k_structure_workbench);
+    GS1_SYSTEM_TEST_REQUIRE(context, !workbench_before.fixed_integrity);
+
+    DeviceMaintenanceSystem::run(site_context);
+
+    const auto delivery_box_after = site_run.site_world->tile_device(delivery_box_tile);
+    const auto workbench_after = site_run.site_world->tile_device(workbench_tile);
+    GS1_SYSTEM_TEST_CHECK(context, delivery_box_after.structure_id.value == gs1::k_structure_storage_crate);
+    GS1_SYSTEM_TEST_CHECK(context, delivery_box_after.fixed_integrity);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(delivery_box_after.device_integrity, 1.0f));
+    GS1_SYSTEM_TEST_CHECK(context, workbench_after.structure_id.value == gs1::k_structure_workbench);
+    GS1_SYSTEM_TEST_CHECK(context, !workbench_after.fixed_integrity);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(workbench_after.device_integrity, 0.99166667f));
 }
 
 void camp_durability_resets_and_crosses_service_thresholds(gs1::testing::SystemTestExecutionContext& context)
@@ -1737,8 +1772,12 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     device_support_updates_efficiency_and_water_from_heat);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "device_maintenance",
-    "applies_weather_and_burial_wear",
-    device_maintenance_applies_weather_and_burial_wear);
+    "uses_max_weather_meter_and_authored_base_speed",
+    device_maintenance_uses_max_weather_meter_and_authored_base_speed);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "device_maintenance",
+    "preserves_fixed_integrity_delivery_crate",
+    device_maintenance_preserves_fixed_integrity_delivery_crate);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "camp_durability",
     "resets_and_crosses_service_thresholds",
