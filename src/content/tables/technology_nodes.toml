@@ -13,14 +13,14 @@ description = "Reduces shovel-carried Plant and Excavate meter costs by 5%."
 [[technology_nodes]]
 faction_id = 1
 tier_index = 2
-entry_kind = "MechanismChange"
+entry_kind = "GlobalModifier"
 reputation_requirement = 400
 internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Planter Warmup"
-description = "Reduces shovel-carried Plant action duration by 5%."
+display_name = "Shared Thermos"
+description = "Adds 1 timed-buff slot."
 
 [[technology_nodes]]
 faction_id = 1
@@ -31,8 +31,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Digging Warmup"
-description = "Reduces shovel-carried Excavate action duration by 5%."
+display_name = "Planter Warmup"
+description = "Reduces shovel-carried Plant action duration by 5%."
 
 [[technology_nodes]]
 faction_id = 1
@@ -43,8 +43,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Grip Reinforcement"
-description = "Extends the shovel meter-cost reduction to 10% total."
+display_name = "Pack Lashings"
+description = "Adds 2 worker-pack slots."
 
 [[technology_nodes]]
 faction_id = 1
@@ -55,8 +55,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Planter Tempo"
-description = "Extends the shovel Plant duration reduction to 10% total."
+display_name = "Careful Layer Access"
+description = "Unlocks Careful excavation depth for one layer deeper site digging."
 
 [[technology_nodes]]
 faction_id = 1
@@ -67,8 +67,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Digging Tempo"
-description = "Extends the shovel Excavate duration reduction to 10% total."
+display_name = "Digging Warmup"
+description = "Reduces shovel-carried Excavate action duration by 5%."
 
 [[technology_nodes]]
 faction_id = 1
@@ -79,8 +79,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Field Leverage"
-description = "Extends the shovel meter-cost reduction to 15% total."
+display_name = "Dry-Wrap Basics"
+description = "Reduces weather-driven nourishment and hydration loss by 15%."
 
 [[technology_nodes]]
 faction_id = 1
@@ -91,8 +91,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Planting Leverage"
-description = "Extends the shovel Plant duration reduction to 15% total."
+display_name = "Broth Fortification"
+description = "Upgrades the tier-two Village food buffs to their stronger tuned variant."
 
 [[technology_nodes]]
 faction_id = 1
@@ -103,8 +103,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Excavation Leverage"
-description = "Extends the shovel Excavate duration reduction to 15% total."
+display_name = "Planter Tempo"
+description = "Extends the shovel Plant duration reduction to 10% total."
 
 [[technology_nodes]]
 faction_id = 1
@@ -115,8 +115,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Planter Rhythm I"
-description = "Adds another 20% shovel Plant duration reduction."
+display_name = "Careful Layer Reading"
+description = "Rebalances Careful excavation toward better stone tiers."
 
 [[technology_nodes]]
 faction_id = 1
@@ -127,8 +127,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Planter Rhythm II"
-description = "Adds another 20% shovel Plant duration reduction, reaching the old capstone pace."
+display_name = "Reserve Pockets"
+description = "Adds 2 more worker-pack slots."
 
 [[technology_nodes]]
 faction_id = 1
@@ -139,8 +139,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Careful Layer Access"
-description = "Unlocks Careful excavation depth for one layer deeper site digging."
+display_name = "Shelter Discipline I"
+description = "Reduces weather-driven health and morale loss by 15%."
 
 [[technology_nodes]]
 faction_id = 1
@@ -151,8 +151,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Careful Layer Reading"
-description = "Rebalances Careful excavation toward better stone tiers."
+display_name = "Excavation Leverage"
+description = "Extends the shovel Excavate duration reduction to 15% total."
 
 [[technology_nodes]]
 faction_id = 1
@@ -163,8 +163,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Careful Digging Cadence"
-description = "Reduces Careful excavation duration by 30% and its meter costs by 20%."
+display_name = "Dry-Wrap Practice"
+description = "Extends weather-driven nourishment and hydration mitigation to 30% total."
 
 [[technology_nodes]]
 faction_id = 1
@@ -175,8 +175,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Dry-Wrap Basics"
-description = "Reduces weather-driven nourishment and hydration loss by 15%."
+display_name = "Careful Digging Cadence"
+description = "Reduces Careful excavation duration by 30% and its meter costs by 20%."
 
 [[technology_nodes]]
 faction_id = 1
@@ -187,8 +187,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Dry-Wrap Practice"
-description = "Extends weather-driven nourishment and hydration mitigation to 30% total."
+display_name = "Recovery Fortification"
+description = "Upgrades the tier-five Village recovery foods to their stronger tuned variant."
 
 [[technology_nodes]]
 faction_id = 1
@@ -199,8 +199,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Shelter Discipline I"
-description = "Reduces weather-driven health and morale loss by 15%."
+display_name = "Grip Reinforcement"
+description = "Extends the shovel meter-cost reduction to 10% total."
 
 [[technology_nodes]]
 faction_id = 1
@@ -211,20 +211,20 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Shelter Discipline II"
-description = "Extends weather-driven health and morale mitigation to 30% total."
+display_name = "Planting Leverage"
+description = "Extends the shovel Plant duration reduction to 15% total."
 
 [[technology_nodes]]
 faction_id = 1
 tier_index = 19
-entry_kind = "MechanismChange"
+entry_kind = "GlobalModifier"
 reputation_requirement = 3800
 internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Layered Wraps I"
-description = "Extends weather-driven nourishment and hydration mitigation by another 20%."
+display_name = "Extra Thermos"
+description = "Adds 1 more timed-buff slot."
 
 [[technology_nodes]]
 faction_id = 1
@@ -235,8 +235,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Layered Wraps II"
-description = "Extends weather-driven nourishment and hydration mitigation to the old 70% ceiling."
+display_name = "Thorough Layer Access"
+description = "Unlocks Thorough excavation depth for final-layer site digging."
 
 [[technology_nodes]]
 faction_id = 1
@@ -247,8 +247,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Pack Lashings"
-description = "Adds 2 worker-pack slots."
+display_name = "Field Leverage"
+description = "Extends the shovel meter-cost reduction to 15% total."
 
 [[technology_nodes]]
 faction_id = 1
@@ -259,8 +259,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Reserve Pockets"
-description = "Adds 2 more worker-pack slots."
+display_name = "Relief Fortification"
+description = "Upgrades the tier-eight Village combo foods to their stronger tuned variant."
 
 [[technology_nodes]]
 faction_id = 1
@@ -271,8 +271,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Broth Fortification"
-description = "Upgrades the tier-two Village food buffs to their stronger tuned variant."
+display_name = "Digging Tempo"
+description = "Extends the shovel Excavate duration reduction to 10% total."
 
 [[technology_nodes]]
 faction_id = 1
@@ -283,8 +283,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Recovery Fortification"
-description = "Upgrades the tier-five Village recovery foods to their stronger tuned variant."
+display_name = "Layered Wraps I"
+description = "Extends weather-driven nourishment and hydration mitigation by another 20%."
 
 [[technology_nodes]]
 faction_id = 1
@@ -295,32 +295,32 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Relief Fortification"
-description = "Upgrades the tier-eight Village combo foods to their stronger tuned variant."
+display_name = "Thorough Layer Reading"
+description = "Rebalances Thorough excavation toward better stone tiers."
 
 [[technology_nodes]]
 faction_id = 1
 tier_index = 26
-entry_kind = "GlobalModifier"
+entry_kind = "MechanismChange"
 reputation_requirement = 5200
 internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Shared Thermos"
-description = "Adds 1 timed-buff slot."
+display_name = "Planter Rhythm I"
+description = "Adds another 20% shovel Plant duration reduction."
 
 [[technology_nodes]]
 faction_id = 1
 tier_index = 27
-entry_kind = "GlobalModifier"
+entry_kind = "MechanismChange"
 reputation_requirement = 5400
 internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Extra Thermos"
-description = "Adds 1 more timed-buff slot."
+display_name = "Shelter Discipline II"
+description = "Extends weather-driven health and morale mitigation to 30% total."
 
 [[technology_nodes]]
 faction_id = 1
@@ -343,8 +343,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Favored Portions II"
-description = "Amplifies timed food and drink buffs to 25% total."
+display_name = "Planter Rhythm II"
+description = "Adds another 20% shovel Plant duration reduction, reaching the old capstone pace."
 
 [[technology_nodes]]
 faction_id = 1
@@ -355,8 +355,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Thorough Layer Access"
-description = "Unlocks Thorough excavation depth for final-layer site digging."
+display_name = "Thorough Digging Cadence"
+description = "Reduces Thorough excavation duration by 30% and its meter costs by 20%."
 
 [[technology_nodes]]
 faction_id = 1
@@ -367,8 +367,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Thorough Layer Reading"
-description = "Rebalances Thorough excavation toward better stone tiers."
+display_name = "Layered Wraps II"
+description = "Extends weather-driven nourishment and hydration mitigation to the old 70% ceiling."
 
 [[technology_nodes]]
 faction_id = 1
@@ -379,8 +379,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
-display_name = "Thorough Digging Cadence"
-description = "Reduces Thorough excavation duration by 30% and its meter costs by 20%."
+display_name = "Favored Portions II"
+description = "Amplifies timed food and drink buffs to 25% total."
 
 [[technology_nodes]]
 faction_id = 2

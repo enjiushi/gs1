@@ -1317,11 +1317,11 @@ void timed_buff_cap_blocks_distinct_buffs_and_bias_can_expand_limit(
     GS1_SYSTEM_TEST_REQUIRE(context, find_active_timed_buff(site_run, gs1::ModifierId {3001U}) != nullptr);
 }
 
-void village_tier_seven_tech_expands_timed_buff_cap(
+void village_second_timed_buff_slot_tech_expands_timed_buff_cap(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
-    campaign.faction_progress[0].faction_reputation = reputation_for_progress_tier(27U);
+    campaign.faction_progress[0].faction_reputation = reputation_for_progress_tier(19U);
     auto site_run = make_test_site_run(1U, 814U);
     GameMessageQueue queue {};
     auto modifier_context = make_site_context<ModifierSystem>(campaign, site_run, queue);
@@ -3391,8 +3391,8 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     timed_buff_cap_blocks_distinct_buffs_and_bias_can_expand_limit);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "inventory",
-    "village_tier_seven_tech_expands_timed_buff_cap",
-    village_tier_seven_tech_expands_timed_buff_cap);
+    "village_second_timed_buff_slot_tech_expands_timed_buff_cap",
+    village_second_timed_buff_slot_tech_expands_timed_buff_cap);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "inventory",
     "delivery_queues_only_overflow_until_delivery_crate_space_opens",

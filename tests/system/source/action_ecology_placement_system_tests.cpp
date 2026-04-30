@@ -1830,7 +1830,7 @@ void action_execution_village_tech_unlocks_careful_and_thorough_excavation(
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::SiteActionFailed);
 
-    campaign.faction_progress[0].faction_reputation = reputation_for_progress_tier(12U);
+    campaign.faction_progress[0].faction_reputation = reputation_for_progress_tier(5U);
     queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -1854,7 +1854,7 @@ void action_execution_village_tech_unlocks_careful_and_thorough_excavation(
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::SiteActionFailed);
 
-    campaign.faction_progress[0].faction_reputation = reputation_for_progress_tier(30U);
+    campaign.faction_progress[0].faction_reputation = reputation_for_progress_tier(20U);
     queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(
         context,

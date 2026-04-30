@@ -32,6 +32,7 @@ constexpr TechNodeId k_village_t8 {base_technology_node_id(k_village_faction, 8U
 constexpr TechNodeId k_village_t9 {base_technology_node_id(k_village_faction, 9U)};
 constexpr TechNodeId k_village_t10 {base_technology_node_id(k_village_faction, 10U)};
 constexpr TechNodeId k_village_t11 {base_technology_node_id(k_village_faction, 11U)};
+constexpr TechNodeId k_village_t12 {base_technology_node_id(k_village_faction, 12U)};
 constexpr TechNodeId k_village_t13 {base_technology_node_id(k_village_faction, 13U)};
 constexpr TechNodeId k_village_t14 {base_technology_node_id(k_village_faction, 14U)};
 constexpr TechNodeId k_village_t15 {base_technology_node_id(k_village_faction, 15U)};
@@ -40,11 +41,16 @@ constexpr TechNodeId k_village_t17 {base_technology_node_id(k_village_faction, 1
 constexpr TechNodeId k_village_t18 {base_technology_node_id(k_village_faction, 18U)};
 constexpr TechNodeId k_village_t19 {base_technology_node_id(k_village_faction, 19U)};
 constexpr TechNodeId k_village_t20 {base_technology_node_id(k_village_faction, 20U)};
+constexpr TechNodeId k_village_t21 {base_technology_node_id(k_village_faction, 21U)};
+constexpr TechNodeId k_village_t22 {base_technology_node_id(k_village_faction, 22U)};
 constexpr TechNodeId k_village_t23 {base_technology_node_id(k_village_faction, 23U)};
 constexpr TechNodeId k_village_t24 {base_technology_node_id(k_village_faction, 24U)};
 constexpr TechNodeId k_village_t25 {base_technology_node_id(k_village_faction, 25U)};
+constexpr TechNodeId k_village_t26 {base_technology_node_id(k_village_faction, 26U)};
+constexpr TechNodeId k_village_t27 {base_technology_node_id(k_village_faction, 27U)};
 constexpr TechNodeId k_village_t28 {base_technology_node_id(k_village_faction, 28U)};
 constexpr TechNodeId k_village_t29 {base_technology_node_id(k_village_faction, 29U)};
+constexpr TechNodeId k_village_t30 {base_technology_node_id(k_village_faction, 30U)};
 constexpr TechNodeId k_village_t31 {base_technology_node_id(k_village_faction, 31U)};
 constexpr TechNodeId k_village_t32 {base_technology_node_id(k_village_faction, 32U)};
 
@@ -486,19 +492,19 @@ VillageTechnologyEffectState resolve_village_technology_effects(
     }
     if (TechnologySystem::node_purchased(campaign, k_village_t2))
     {
-        effects.shovel_plant_duration_reduction += 0.05f;
+        // First timed-buff slot comes from the linked GlobalModifier preset.
     }
     if (TechnologySystem::node_purchased(campaign, k_village_t3))
     {
-        effects.shovel_excavate_duration_reduction += 0.05f;
+        effects.shovel_plant_duration_reduction += 0.05f;
     }
     if (TechnologySystem::node_purchased(campaign, k_village_t4))
     {
-        effects.shovel_meter_cost_reduction += 0.05f;
+        // Worker-pack expansion resolves in site_run_factory.
     }
     if (TechnologySystem::node_purchased(campaign, k_village_t5))
     {
-        effects.shovel_plant_duration_reduction += 0.05f;
+        // Careful-depth access resolves in action_execution_system.
     }
     if (TechnologySystem::node_purchased(campaign, k_village_t6))
     {
@@ -506,81 +512,107 @@ VillageTechnologyEffectState resolve_village_technology_effects(
     }
     if (TechnologySystem::node_purchased(campaign, k_village_t7))
     {
-        effects.shovel_meter_cost_reduction += 0.05f;
+        effects.weather_nourishment_hydration_loss_reduction += 0.15f;
     }
     if (TechnologySystem::node_purchased(campaign, k_village_t8))
     {
-        effects.shovel_plant_duration_reduction += 0.05f;
+        effects.tier_two_food_buffs_upgraded = true;
     }
     if (TechnologySystem::node_purchased(campaign, k_village_t9))
     {
-        effects.shovel_excavate_duration_reduction += 0.05f;
+        effects.shovel_plant_duration_reduction += 0.05f;
     }
     if (TechnologySystem::node_purchased(campaign, k_village_t10))
     {
-        effects.shovel_plant_duration_reduction += 0.20f;
+        effects.careful_excavation_loot_rebalance = true;
     }
     if (TechnologySystem::node_purchased(campaign, k_village_t11))
     {
-        effects.shovel_plant_duration_reduction += 0.20f;
+        // Worker-pack expansion resolves in site_run_factory.
     }
-
-    effects.careful_excavation_loot_rebalance =
-        TechnologySystem::node_purchased(campaign, k_village_t13);
+    if (TechnologySystem::node_purchased(campaign, k_village_t12))
+    {
+        effects.weather_health_morale_loss_reduction += 0.15f;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_village_t13))
+    {
+        effects.shovel_excavate_duration_reduction += 0.05f;
+    }
     if (TechnologySystem::node_purchased(campaign, k_village_t14))
+    {
+        effects.weather_nourishment_hydration_loss_reduction += 0.15f;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_village_t15))
     {
         effects.careful_excavation_meter_cost_reduction = 0.20f;
         effects.careful_excavation_duration_reduction = 0.30f;
     }
-
-    if (TechnologySystem::node_purchased(campaign, k_village_t15))
-    {
-        effects.weather_nourishment_hydration_loss_reduction += 0.15f;
-    }
     if (TechnologySystem::node_purchased(campaign, k_village_t16))
     {
-        effects.weather_nourishment_hydration_loss_reduction += 0.15f;
+        effects.tier_five_food_buffs_upgraded = true;
     }
+
     if (TechnologySystem::node_purchased(campaign, k_village_t17))
     {
-        effects.weather_health_morale_loss_reduction += 0.15f;
+        effects.shovel_meter_cost_reduction += 0.05f;
     }
     if (TechnologySystem::node_purchased(campaign, k_village_t18))
     {
-        effects.weather_health_morale_loss_reduction += 0.15f;
+        effects.shovel_plant_duration_reduction += 0.05f;
     }
     if (TechnologySystem::node_purchased(campaign, k_village_t19))
     {
-        effects.weather_nourishment_hydration_loss_reduction += 0.20f;
+        // Second timed-buff slot comes from the linked GlobalModifier preset.
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t20))
+    if (TechnologySystem::node_purchased(campaign, k_village_t21))
+    {
+        effects.shovel_meter_cost_reduction += 0.05f;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_village_t22))
+    {
+        effects.tier_eight_food_buffs_upgraded = true;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_village_t23))
+    {
+        effects.shovel_excavate_duration_reduction += 0.05f;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_village_t24))
     {
         effects.weather_nourishment_hydration_loss_reduction += 0.20f;
     }
-
-    effects.thorough_excavation_loot_rebalance =
-        TechnologySystem::node_purchased(campaign, k_village_t31);
-    if (TechnologySystem::node_purchased(campaign, k_village_t32))
+    if (TechnologySystem::node_purchased(campaign, k_village_t25))
     {
-        effects.thorough_excavation_meter_cost_reduction = 0.20f;
-        effects.thorough_excavation_duration_reduction = 0.30f;
+        effects.thorough_excavation_loot_rebalance = true;
     }
-
-    effects.timed_buff_effect_multiplier = 1.0f;
+    if (TechnologySystem::node_purchased(campaign, k_village_t26))
+    {
+        effects.shovel_plant_duration_reduction += 0.20f;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_village_t27))
+    {
+        effects.weather_health_morale_loss_reduction += 0.15f;
+    }
     if (TechnologySystem::node_purchased(campaign, k_village_t28))
     {
         effects.timed_buff_effect_multiplier = 1.10f;
     }
     if (TechnologySystem::node_purchased(campaign, k_village_t29))
     {
+        effects.shovel_plant_duration_reduction += 0.20f;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_village_t30))
+    {
+        effects.thorough_excavation_meter_cost_reduction = 0.20f;
+        effects.thorough_excavation_duration_reduction = 0.30f;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_village_t31))
+    {
+        effects.weather_nourishment_hydration_loss_reduction += 0.20f;
+    }
+    if (TechnologySystem::node_purchased(campaign, k_village_t32))
+    {
         effects.timed_buff_effect_multiplier = 1.25f;
     }
-    effects.tier_two_food_buffs_upgraded =
-        TechnologySystem::node_purchased(campaign, k_village_t23);
-    effects.tier_five_food_buffs_upgraded =
-        TechnologySystem::node_purchased(campaign, k_village_t24);
-    effects.tier_eight_food_buffs_upgraded =
-        TechnologySystem::node_purchased(campaign, k_village_t25);
     return effects;
 }
 

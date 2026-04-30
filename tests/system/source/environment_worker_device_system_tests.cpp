@@ -140,11 +140,11 @@ void prototype_site_run_expands_worker_pack_with_village_pack_techs(
     auto base_site_run = make_prototype_site_run(campaign, 1U);
     GS1_SYSTEM_TEST_CHECK(context, base_site_run.inventory.worker_pack_slot_count == 8U);
 
-    campaign.faction_progress[0].faction_reputation = reputation_for_progress_tier(21U);
+    campaign.faction_progress[0].faction_reputation = reputation_for_progress_tier(4U);
     auto first_pack_site_run = make_prototype_site_run(campaign, 1U);
     GS1_SYSTEM_TEST_CHECK(context, first_pack_site_run.inventory.worker_pack_slot_count == 10U);
 
-    campaign.faction_progress[0].faction_reputation = reputation_for_progress_tier(22U);
+    campaign.faction_progress[0].faction_reputation = reputation_for_progress_tier(11U);
     auto second_pack_site_run = make_prototype_site_run(campaign, 1U);
     GS1_SYSTEM_TEST_CHECK(context, second_pack_site_run.inventory.worker_pack_slot_count == 12U);
 }

@@ -34,8 +34,8 @@ constexpr float k_minimum_action_efficiency = 0.4f;
 constexpr float k_maximum_action_efficiency = 1.0f;
 constexpr FactionId k_village_faction {k_faction_village_committee};
 
-constexpr TechNodeId k_village_t12_access {base_technology_node_id(k_village_faction, 12U)};
-constexpr TechNodeId k_village_t30_access {base_technology_node_id(k_village_faction, 30U)};
+constexpr TechNodeId k_village_t12_access {base_technology_node_id(k_village_faction, 5U)};
+constexpr TechNodeId k_village_t30_access {base_technology_node_id(k_village_faction, 20U)};
 
 struct ExcavationTierPercents final
 {

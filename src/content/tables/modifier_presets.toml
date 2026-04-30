@@ -1669,7 +1669,7 @@ work_efficiency = 0.0
 
 [[modifier_presets]]
 preset_kind = "RunModifier"
-modifier_id = 22260
+modifier_id = 22020
 heat = 0.0
 wind = 0.0
 dust = 0.0
@@ -1690,7 +1690,7 @@ timed_buff_cap_bias = 1.0
 
 [[modifier_presets]]
 preset_kind = "RunModifier"
-modifier_id = 22270
+modifier_id = 22190
 heat = 0.0
 wind = 0.0
 dust = 0.0
