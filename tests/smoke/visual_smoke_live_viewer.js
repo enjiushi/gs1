@@ -3797,7 +3797,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
 
         const activeCount = countTasksByListKind(tasks, "ACCEPTED");
-        siteTaskCount.textContent = activeCount + " Active";
+        const pendingClaimCount = countTasksByListKind(tasks, "PENDING_CLAIM");
+        siteTaskCount.textContent = pendingClaimCount > 0
+            ? (activeCount + " Active  |  Ready " + pendingClaimCount)
+            : (activeCount + " Active");
 
         siteTaskList.innerHTML = "";
         tasks.forEach(function (task) {
@@ -3851,6 +3854,23 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             fill.style.width = taskProgress.completion + "%";
             track.appendChild(fill);
             card.appendChild(track);
+
+            if (isCompleted) {
+                const actionRow = document.createElement("div");
+                actionRow.className = "site-task-action-row";
+                actionRow.appendChild(
+                    makeSiteTaskActionButton(
+                        "Claim Reward",
+                        function () {
+                            postTaskAction("CLAIM_TASK_REWARD", task).catch(() => {
+                                statusChip.textContent = "Failed to claim task reward.";
+                            });
+                        },
+                        false
+                    )
+                );
+                card.appendChild(actionRow);
+            }
 
             siteTaskList.appendChild(card);
         });
@@ -5735,13 +5755,20 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return Promise.resolve(false);
     }
 
-    function postPhoneTaskAction(type, task) {
+    function postTaskAction(type, task) {
         return postJson("/ui-action", {
             type: type,
             targetId: task.taskInstanceId,
             arg0: type === "CLAIM_TASK_REWARD" ? 0 : (task.taskTemplateId || 0),
             arg1: 0
         });
+    }
+
+    function makeSiteTaskActionButton(label, onClick, disabled) {
+        const button = makeButton(label, onClick, false, disabled, true);
+        button.classList.add("site-task-action-button");
+        bindReliablePrimaryPress(button, onClick);
+        return button;
     }
 
     function makePhoneStepperButton(label, onClick, disabled) {
@@ -6413,7 +6440,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 makePhoneActionButton(
                     "Accept Contract",
                     function () {
-                        postPhoneTaskAction("ACCEPT_TASK", task).catch(() => {
+                        postTaskAction("ACCEPT_TASK", task).catch(() => {
                             statusChip.textContent = "Failed to accept contract.";
                         });
                     },
@@ -6432,7 +6459,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             makePhoneActionButton(
                 "Claim Reward",
                 function () {
-                    postPhoneTaskAction("CLAIM_TASK_REWARD", task).catch(() => {
+                    postTaskAction("CLAIM_TASK_REWARD", task).catch(() => {
                         statusChip.textContent = "Failed to claim task reward.";
                     });
                 },

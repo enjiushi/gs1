@@ -2998,6 +2998,22 @@ void task_board_content_tuning_exposes_internal_prices_and_task_scoring_inputs(
     GS1_SYSTEM_TEST_CHECK(context, submit_task->progress_kind == gs1::TaskProgressKind::SubmitItem);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(submit_task->expected_task_hours_in_game, 0.5f));
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(submit_task->risk_multiplier, 0.05f));
+
+    std::vector<std::uint32_t> task_template_ids {};
+    for (const auto& task_template : gs1::all_task_template_defs())
+    {
+        task_template_ids.push_back(task_template.task_template_id.value);
+    }
+    std::sort(task_template_ids.begin(), task_template_ids.end());
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        std::adjacent_find(task_template_ids.begin(), task_template_ids.end()) == task_template_ids.end());
+
+    const auto* hammer_onboarding_task =
+        gs1::find_task_template_def(gs1::TaskTemplateId {gs1::k_task_template_site1_onboarding_craft_hammer});
+    GS1_SYSTEM_TEST_REQUIRE(context, hammer_onboarding_task != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, hammer_onboarding_task->progress_kind == gs1::TaskProgressKind::CraftRecipe);
+    GS1_SYSTEM_TEST_CHECK(context, hammer_onboarding_task->recipe_id.value == gs1::k_recipe_craft_hammer);
 }
 
 void excavation_content_tuning_exposes_depth_specific_sell_balance(

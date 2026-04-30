@@ -117,6 +117,14 @@ GameMessage make_inventory_use_message(
     return message;
 }
 
+Gs1HostEvent make_ui_action_event(const Gs1UiAction& action)
+{
+    Gs1HostEvent event {};
+    event.type = GS1_HOST_EVENT_UI_ACTION;
+    event.payload.ui_action.action = action;
+    return event;
+}
+
 std::vector<Gs1EngineMessage> drain_engine_messages(GameRuntime& runtime)
 {
     std::vector<Gs1EngineMessage> messages {};
@@ -589,6 +597,63 @@ void task_reward_claim_emits_pending_claim_projection_then_reward_cue()
     }
 }
 
+void task_reward_claim_ui_action_claims_pending_task_and_emits_reward_cue()
+{
+    Gs1RuntimeCreateDesc create_desc {};
+    create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
+    create_desc.api_version = gs1::k_api_version;
+    create_desc.fixed_step_seconds = 60.0;
+
+    GameRuntime runtime {create_desc};
+    bootstrap_site_one(runtime);
+
+    auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
+    drain_engine_messages(runtime);
+
+    auto& task = site_run.task_board.visible_tasks.front();
+    task.task_instance_id = gs1::TaskInstanceId {1U};
+    task.task_template_id = gs1::TaskTemplateId {gs1::k_task_template_site1_buy_water};
+    task.publisher_faction_id = gs1::FactionId {gs1::k_faction_village_committee};
+    task.target_amount = 1U;
+    task.current_progress_amount = 1U;
+    task.runtime_list_kind = TaskRuntimeListKind::PendingClaim;
+    task.reward_draft_options.clear();
+    task.reward_draft_options.push_back(gs1::TaskRewardDraftOption {gs1::RewardCandidateId {1U}, false});
+    task.reward_draft_options.push_back(gs1::TaskRewardDraftOption {gs1::RewardCandidateId {2U}, false});
+    site_run.task_board.accepted_task_ids.clear();
+    site_run.task_board.completed_task_ids.clear();
+    site_run.task_board.completed_task_ids.push_back(task.task_instance_id);
+    site_run.task_board.claimed_task_ids.clear();
+
+    Gs1UiAction claim_action {};
+    claim_action.type = GS1_UI_ACTION_CLAIM_TASK_REWARD;
+    claim_action.target_id = 1U;
+    const auto claim_event = make_ui_action_event(claim_action);
+
+    Gs1Phase1Result claim_result {};
+    assert(runtime.submit_host_events(&claim_event, 1U) == GS1_STATUS_OK);
+    run_phase1(runtime, 0.0, claim_result);
+    assert(claim_result.processed_host_event_count == 1U);
+
+    const auto messages = drain_engine_messages(runtime);
+    const auto* claimed_task_message = find_task_message(messages, 1U);
+    assert(claimed_task_message != nullptr);
+    {
+        const auto& payload = claimed_task_message->payload_as<Gs1EngineMessageTaskData>();
+        assert(payload.list_kind == GS1_TASK_PRESENTATION_LIST_CLAIMED);
+    }
+
+    const auto* reward_cue_message =
+        find_one_shot_cue_message(messages, GS1_ONE_SHOT_CUE_TASK_REWARD_CLAIMED);
+    assert(reward_cue_message != nullptr);
+    {
+        const auto& payload = reward_cue_message->payload_as<Gs1EngineMessageOneShotCueData>();
+        assert(payload.subject_id == 1U);
+        assert(payload.arg0 == gs1::k_task_template_site1_buy_water);
+        assert(payload.arg1 == 2U);
+    }
+}
+
 void site_weather_changes_emit_hud_wind_warning_codes()
 {
     constexpr std::uint16_t k_hud_warning_wind_watch = 1U;
@@ -648,6 +713,7 @@ int main()
     phone_purchase_request_emits_single_hud_and_campaign_resource_projection();
     ecology_growth_completes_task_and_site_attempt();
     task_reward_claim_emits_pending_claim_projection_then_reward_cue();
+    task_reward_claim_ui_action_claims_pending_task_and_emits_reward_cue();
     site_weather_changes_emit_hud_wind_warning_codes();
     return 0;
 }

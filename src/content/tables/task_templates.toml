@@ -719,3 +719,22 @@ threshold_value = 0.0
 completion_faction_reputation_delta = 0
 expected_task_hours_in_game = 0.3
 risk_multiplier = 0.04
+
+[[task_templates]]
+task_template_id = 114
+publisher_faction_id = 1
+task_tier_id = 1
+progress_kind = "CraftRecipe"
+target_amount = 1
+required_count = 0
+item_id = 0
+plant_id = 0
+recipe_id = 2
+structure_id = 0
+secondary_structure_id = 0
+tertiary_structure_id = 0
+action_kind = "None"
+threshold_value = 0.0
+completion_faction_reputation_delta = 0
+expected_task_hours_in_game = 0.45
+risk_multiplier = 0.05

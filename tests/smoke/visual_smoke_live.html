@@ -530,6 +530,43 @@ body {
   background: linear-gradient(90deg, #71b466 0%, #a8df9c 100%);
 }
 
+.site-task-action-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.site-task-action-button {
+  min-width: 132px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(180, 226, 162, 0.4);
+  background: linear-gradient(180deg, rgba(124, 182, 105, 0.96), rgba(71, 121, 60, 0.98));
+  box-shadow:
+    0 10px 20px rgba(18, 33, 15, 0.26),
+    inset 0 1px 0 rgba(255,255,255,0.18);
+  color: #f6fff1;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.site-task-action-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow:
+    0 14px 24px rgba(18, 33, 15, 0.32),
+    inset 0 1px 0 rgba(255,255,255,0.2);
+}
+
+.site-task-action-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+  transform: none;
+  box-shadow:
+    0 8px 16px rgba(18, 33, 15, 0.2),
+    inset 0 1px 0 rgba(255,255,255,0.12);
+}
+
 .modifier-strip {
   display: flex;
   flex-wrap: wrap;

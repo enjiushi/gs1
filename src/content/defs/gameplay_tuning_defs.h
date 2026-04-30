@@ -2,6 +2,7 @@
 
 #include "content/defs/plant_defs.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 
