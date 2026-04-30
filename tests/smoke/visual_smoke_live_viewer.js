@@ -11,7 +11,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const siteVitalsResources = document.getElementById("site-vitals-resources") ||
         (siteVitalsPanel ? siteVitalsPanel.querySelector(".site-vitals-resources") : null);
     const siteVitalsMoney = document.getElementById("site-vitals-money");
-    const siteVitalsReputation = document.getElementById("site-vitals-reputation");
+    const siteReputationStack = document.getElementById("site-reputation-stack");
     const siteVitalsBars = document.getElementById("site-vitals-bars");
     const siteTaskPanel = document.getElementById("site-task-panel");
     const siteTaskCount = document.getElementById("site-task-count");
@@ -1467,6 +1467,81 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function getCampaignResources(state) {
         return state ? state.campaignResources || null : null;
+    }
+
+    function clampNonNegativeNumber(value) {
+        return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0;
+    }
+
+    function buildTierProgressModel(name, reputation, stepSize, className) {
+        const safeReputation = clampNonNegativeNumber(reputation);
+        const safeStepSize = stepSize > 0 ? stepSize : 1;
+        const tier = Math.floor(safeReputation / safeStepSize) + 1;
+        const progress = safeReputation % safeStepSize;
+        const progressPercent = Math.max(0, Math.min(100, (progress / safeStepSize) * 100));
+        return {
+            className: className,
+            title: name + " Tier " + tier,
+            progressText: progress + " / " + safeStepSize,
+            progressPercent: progressPercent
+        };
+    }
+
+    function renderReputationBars(campaignResources) {
+        if (!siteReputationStack) {
+            return;
+        }
+
+        const totalReputation =
+            campaignResources && typeof campaignResources.totalReputation === "number"
+                ? campaignResources.totalReputation
+                : 0;
+        const villageReputation =
+            campaignResources && typeof campaignResources.villageReputation === "number"
+                ? campaignResources.villageReputation
+                : 0;
+        const forestryReputation =
+            campaignResources && typeof campaignResources.forestryReputation === "number"
+                ? campaignResources.forestryReputation
+                : 0;
+        const universityReputation =
+            campaignResources && typeof campaignResources.universityReputation === "number"
+                ? campaignResources.universityReputation
+                : 0;
+
+        const bars = [
+            buildTierProgressModel("Total Rep", totalReputation, 100, "total"),
+            buildTierProgressModel("Village", villageReputation, 200, "village"),
+            buildTierProgressModel("Forestry", forestryReputation, 200, "forestry"),
+            buildTierProgressModel("University", universityReputation, 200, "university")
+        ];
+
+        siteReputationStack.innerHTML = "";
+        bars.forEach((barModel) => {
+            const bar = document.createElement("div");
+            bar.className = "site-reputation-bar " + barModel.className;
+            bar.style.setProperty("--site-reputation-progress", barModel.progressPercent + "%");
+
+            const fill = document.createElement("div");
+            fill.className = "site-reputation-bar-fill";
+            bar.appendChild(fill);
+
+            const content = document.createElement("div");
+            content.className = "site-reputation-bar-content";
+
+            const title = document.createElement("span");
+            title.className = "site-reputation-bar-title";
+            title.textContent = barModel.title;
+            content.appendChild(title);
+
+            const progress = document.createElement("span");
+            progress.className = "site-reputation-bar-progress";
+            progress.textContent = barModel.progressText;
+            content.appendChild(progress);
+
+            bar.appendChild(content);
+            siteReputationStack.appendChild(bar);
+        });
     }
 
     function createAudioManagerState() {
@@ -3948,12 +4023,14 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function renderSiteVitalsPanel(state) {
-        if (!siteVitalsPanel || !siteVitalsResources || !siteVitalsMoney || !siteVitalsReputation || !siteVitalsBars) {
+        if (!siteVitalsPanel || !siteVitalsResources || !siteVitalsMoney || !siteReputationStack || !siteVitalsBars) {
             return;
         }
 
         if (!state || (state.appState !== "SITE_ACTIVE" && state.appState !== "REGIONAL_MAP")) {
             siteVitalsPanel.hidden = true;
+            siteReputationStack.hidden = true;
+            siteReputationStack.innerHTML = "";
             siteVitalsBars.innerHTML = "";
             renderSiteTaskPanel(null);
             renderSiteModifiers(null);
@@ -3980,23 +4057,16 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             campaignResources && typeof campaignResources.currentMoney === "number"
                 ? campaignResources.currentMoney
                 : (hud && typeof hud.currentMoney === "number" ? hud.currentMoney : 0);
-        const totalReputation =
-            campaignResources && typeof campaignResources.totalReputation === "number"
-                ? campaignResources.totalReputation
-                : 0;
         const showRegionalMapCash = state.appState !== "REGIONAL_MAP";
 
         siteVitalsPanel.hidden = false;
+        siteReputationStack.hidden = false;
         siteVitalsMoney.hidden = !showRegionalMapCash;
-        siteVitalsResources.classList.toggle("single-resource", !showRegionalMapCash);
         const cashValue = siteVitalsMoney.querySelector(".resource-value");
-        const reputationValue = siteVitalsReputation.querySelector(".resource-value");
         if (cashValue) {
             cashValue.textContent = formatMoney(currentMoney);
         }
-        if (reputationValue) {
-            reputationValue.textContent = String(totalReputation);
-        }
+        renderReputationBars(campaignResources);
         siteVitalsBars.innerHTML = "";
 
         if (state.appState !== "SITE_ACTIVE") {

@@ -360,6 +360,9 @@ public:
     {
         float current_money {0.0f};
         std::int32_t total_reputation {0};
+        std::int32_t village_reputation {0};
+        std::int32_t forestry_reputation {0};
+        std::int32_t university_reputation {0};
     };
 
     struct SiteActionProjection final

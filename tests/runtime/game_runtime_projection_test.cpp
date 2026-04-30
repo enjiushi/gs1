@@ -724,6 +724,8 @@ int main()
     total_reputation_award.set_payload(gs1::CampaignReputationAwardRequestedMessage {10});
     assert(runtime.handle_message(total_reputation_award) == GS1_STATUS_OK);
 
+    (void)drain_engine_messages(runtime);
+
     GameMessage select_village_tab_message {};
     select_village_tab_message.type = GameMessageType::SelectRegionalMapTechTreeFaction;
     select_village_tab_message.set_payload(gs1::SelectRegionalMapTechTreeFactionMessage {

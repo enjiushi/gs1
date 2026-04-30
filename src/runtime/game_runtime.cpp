@@ -3538,6 +3538,15 @@ void GameRuntime::queue_campaign_resources_message()
         ? cash_value_from_cash_points(active_site_run_->economy.current_cash)
         : 0.0f;
     payload.total_reputation = campaign_->technology_state.total_reputation;
+    payload.village_reputation = TechnologySystem::faction_reputation(
+        *campaign_,
+        FactionId {k_faction_village_committee});
+    payload.forestry_reputation = TechnologySystem::faction_reputation(
+        *campaign_,
+        FactionId {k_faction_forestry_bureau});
+    payload.university_reputation = TechnologySystem::faction_reputation(
+        *campaign_,
+        FactionId {k_faction_agricultural_university});
     engine_messages_.push_back(message);
 }
 

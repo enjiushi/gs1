@@ -1249,6 +1249,12 @@ void append_campaign_resources_json(
     json += std::to_string(resources.current_money);
     json += ",\"totalReputation\":";
     json += std::to_string(resources.total_reputation);
+    json += ",\"villageReputation\":";
+    json += std::to_string(resources.village_reputation);
+    json += ",\"forestryReputation\":";
+    json += std::to_string(resources.forestry_reputation);
+    json += ",\"universityReputation\":";
+    json += std::to_string(resources.university_reputation);
     json += '}';
 }
 

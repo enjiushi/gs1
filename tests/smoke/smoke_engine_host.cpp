@@ -1939,6 +1939,9 @@ void SmokeEngineHost::apply_campaign_resources(const Gs1EngineMessage& message)
     CampaignResourcesProjection projection {};
     projection.current_money = payload.current_money;
     projection.total_reputation = payload.total_reputation;
+    projection.village_reputation = payload.village_reputation;
+    projection.forestry_reputation = payload.forestry_reputation;
+    projection.university_reputation = payload.university_reputation;
     campaign_resources_ = projection;
 }
 
@@ -2253,6 +2256,9 @@ std::string SmokeEngineHost::describe_message(const Gs1EngineMessage& message)
         const auto& payload = message.payload_as<Gs1EngineMessageCampaignResourcesData>();
         description += " cash=" + std::to_string(payload.current_money);
         description += " reputation=" + std::to_string(payload.total_reputation);
+        description += " village=" + std::to_string(payload.village_reputation);
+        description += " forestry=" + std::to_string(payload.forestry_reputation);
+        description += " university=" + std::to_string(payload.university_reputation);
         break;
     }
 

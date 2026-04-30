@@ -213,13 +213,21 @@ Gs1EngineMessage make_hud_state_message(float money)
     return message;
 }
 
-Gs1EngineMessage make_campaign_resources_message(float money, std::uint32_t reputation)
+Gs1EngineMessage make_campaign_resources_message(
+    float money,
+    std::uint32_t reputation,
+    std::uint32_t village_reputation,
+    std::uint32_t forestry_reputation,
+    std::uint32_t university_reputation)
 {
     Gs1EngineMessage message {};
     message.type = GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES;
     auto& payload = message.emplace_payload<Gs1EngineMessageCampaignResourcesData>();
     payload.current_money = money;
     payload.total_reputation = reputation;
+    payload.village_reputation = village_reputation;
+    payload.forestry_reputation = forestry_reputation;
+    payload.university_reputation = university_reputation;
     return message;
 }
 
@@ -379,9 +387,9 @@ void repeated_hud_and_campaign_messages_publish_one_coalesced_patch_per_frame()
 {
     FakeRuntimeState runtime_state {};
     runtime_state.engine_messages.push_back(make_hud_state_message(10.0f));
-    runtime_state.engine_messages.push_back(make_campaign_resources_message(10.0f, 5U));
+    runtime_state.engine_messages.push_back(make_campaign_resources_message(10.0f, 5U, 200U, 400U, 600U));
     runtime_state.engine_messages.push_back(make_hud_state_message(12.5f));
-    runtime_state.engine_messages.push_back(make_campaign_resources_message(12.5f, 6U));
+    runtime_state.engine_messages.push_back(make_campaign_resources_message(12.5f, 6U, 300U, 500U, 700U));
 
     const auto api = make_fake_api();
     auto* runtime = reinterpret_cast<Gs1RuntimeHandle*>(&runtime_state);
@@ -395,6 +403,9 @@ void repeated_hud_and_campaign_messages_publish_one_coalesced_patch_per_frame()
     assert(std::abs(snapshot.hud_state->current_money - 12.5f) < 0.0001f);
     assert(std::abs(snapshot.campaign_resources->current_money - 12.5f) < 0.0001f);
     assert(snapshot.campaign_resources->total_reputation == 6U);
+    assert(snapshot.campaign_resources->village_reputation == 300U);
+    assert(snapshot.campaign_resources->forestry_reputation == 500U);
+    assert(snapshot.campaign_resources->university_reputation == 700U);
 
     const auto patches = host.consume_pending_live_state_patches();
     assert(patches.size() == 1U);
@@ -402,6 +413,9 @@ void repeated_hud_and_campaign_messages_publish_one_coalesced_patch_per_frame()
     assert(patches.front().find("\"campaignResources\":") != std::string::npos);
     assert(patches.front().find("\"currentMoney\":12.500000") != std::string::npos);
     assert(patches.front().find("\"totalReputation\":6") != std::string::npos);
+    assert(patches.front().find("\"villageReputation\":300") != std::string::npos);
+    assert(patches.front().find("\"forestryReputation\":500") != std::string::npos);
+    assert(patches.front().find("\"universityReputation\":700") != std::string::npos);
 }
 
 void visual_smoke_assets_keep_hidden_regional_map_panels_collapsed()

@@ -463,6 +463,10 @@ void phone_purchase_request_emits_single_hud_and_campaign_resource_projection()
         const auto& payload =
             campaign_resource_messages.front()->payload_as<Gs1EngineMessageCampaignResourcesData>();
         assert(approx_equal(payload.current_money, 12.8f));
+        assert(payload.total_reputation == 0);
+        assert(payload.village_reputation == 0);
+        assert(payload.forestry_reputation == 0);
+        assert(payload.university_reputation == 0);
     }
 }
 

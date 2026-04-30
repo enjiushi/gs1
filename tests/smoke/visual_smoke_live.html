@@ -25,6 +25,18 @@
   --glass-line: rgba(202, 184, 152, 0.16);
   --ok: #6a9861;
   --locked: #7f8791;
+  --faction-total-primary: #64abff;
+  --faction-total-secondary: #3a6fd7;
+  --faction-total-rgb: 100, 171, 255;
+  --faction-village-primary: #ebb067;
+  --faction-village-secondary: #b4682c;
+  --faction-village-rgb: 235, 176, 103;
+  --faction-forestry-primary: #63b96e;
+  --faction-forestry-secondary: #34844a;
+  --faction-forestry-rgb: 99, 185, 110;
+  --faction-university-primary: #9a80ea;
+  --faction-university-secondary: #5747b7;
+  --faction-university-rgb: 154, 128, 234;
 }
 
 * { box-sizing: border-box; }
@@ -316,53 +328,39 @@ body {
 }
 
 .site-vitals-resources {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
   gap: 8px;
 }
 
-.site-vitals-resources.single-resource {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.site-vitals-money,
-.site-vitals-reputation {
+.site-vitals-money {
   display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: flex-start;
+  gap: 8px;
+  width: auto;
   min-width: 0;
-  width: 100%;
-  padding: 9px 14px;
-  border-radius: 18px;
+  padding: 6px 10px 5px;
+  border-radius: 999px;
   box-sizing: border-box;
+  white-space: nowrap;
 }
 
 .site-vitals-money {
   background: linear-gradient(180deg, rgba(72, 156, 88, 0.95), rgba(40, 103, 56, 0.94));
   border: 1px solid rgba(205, 176, 126, 0.34);
   box-shadow: 0 12px 24px rgba(17, 48, 24, 0.22);
-  font-size: 15px;
+  font-size: 11px;
   font-weight: 700;
   color: #f7f4ec;
   text-shadow: none;
 }
 
-.site-vitals-reputation {
-  background: linear-gradient(180deg, rgba(63, 88, 140, 0.96), rgba(35, 52, 93, 0.95));
-  border: 1px solid rgba(146, 183, 245, 0.32);
-  box-shadow: 0 12px 24px rgba(18, 28, 52, 0.24);
-  font-size: 15px;
-  font-weight: 700;
-  color: #dfe9ff;
-  text-shadow: none;
-}
-
-.site-vitals-money .resource-label,
-.site-vitals-reputation .resource-label {
-  font-size: 11px;
+.site-vitals-money .resource-label {
+  font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
@@ -370,15 +368,124 @@ body {
   color: #ffffff;
 }
 
-.site-vitals-reputation .resource-label {
-  color: #9fc1ff;
+.site-vitals-money .resource-value {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
 }
 
-.site-vitals-money .resource-value,
-.site-vitals-reputation .resource-value {
-  font-size: 18px;
+.site-reputation-stack {
+  position: absolute;
+  left: 20px;
+  bottom: 20px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(320px, calc(100vw - 40px));
+}
+
+.site-reputation-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 38px;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(194, 218, 255, 0.22);
+  background:
+    linear-gradient(180deg, rgba(17, 24, 40, 0.86), rgba(10, 14, 24, 0.9)),
+    rgba(12, 18, 31, 0.9);
+  box-shadow: 0 10px 22px rgba(8, 11, 20, 0.26);
+}
+
+.site-reputation-bar.total {
+  border-color: rgba(var(--faction-total-rgb), 0.22);
+  background:
+    linear-gradient(180deg, rgba(var(--faction-total-rgb), 0.16), rgba(var(--faction-total-rgb), 0.08)),
+    linear-gradient(180deg, rgba(17, 24, 40, 0.86), rgba(10, 14, 24, 0.9)),
+    rgba(12, 18, 31, 0.9);
+}
+
+.site-reputation-bar.village {
+  border-color: rgba(var(--faction-village-rgb), 0.22);
+  background:
+    linear-gradient(180deg, rgba(var(--faction-village-rgb), 0.16), rgba(var(--faction-village-rgb), 0.08)),
+    linear-gradient(180deg, rgba(17, 24, 40, 0.86), rgba(10, 14, 24, 0.9)),
+    rgba(12, 18, 31, 0.9);
+}
+
+.site-reputation-bar.forestry {
+  border-color: rgba(var(--faction-forestry-rgb), 0.22);
+  background:
+    linear-gradient(180deg, rgba(var(--faction-forestry-rgb), 0.16), rgba(var(--faction-forestry-rgb), 0.08)),
+    linear-gradient(180deg, rgba(17, 24, 40, 0.86), rgba(10, 14, 24, 0.9)),
+    rgba(12, 18, 31, 0.9);
+}
+
+.site-reputation-bar.university {
+  border-color: rgba(var(--faction-university-rgb), 0.24);
+  background:
+    linear-gradient(180deg, rgba(var(--faction-university-rgb), 0.16), rgba(var(--faction-university-rgb), 0.08)),
+    linear-gradient(180deg, rgba(17, 24, 40, 0.86), rgba(10, 14, 24, 0.9)),
+    rgba(12, 18, 31, 0.9);
+}
+
+.site-reputation-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--site-reputation-progress, 0%);
+  border-radius: inherit;
+  transition: width 180ms ease-out;
+}
+
+.site-reputation-bar.total .site-reputation-bar-fill {
+  background: linear-gradient(90deg, var(--faction-total-primary), var(--faction-total-secondary));
+}
+
+.site-reputation-bar.village .site-reputation-bar-fill {
+  background: linear-gradient(90deg, var(--faction-village-primary), var(--faction-village-secondary));
+}
+
+.site-reputation-bar.forestry .site-reputation-bar-fill {
+  background: linear-gradient(90deg, var(--faction-forestry-primary), var(--faction-forestry-secondary));
+}
+
+.site-reputation-bar.university .site-reputation-bar-fill {
+  background: linear-gradient(90deg, var(--faction-university-primary), var(--faction-university-secondary));
+}
+
+.site-reputation-bar-content {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 12px;
+  box-sizing: border-box;
+  color: #edf3ff;
+  text-shadow: 0 1px 0 rgba(9, 12, 19, 0.28);
+}
+
+.site-reputation-bar-title {
+  min-width: 0;
+  font-size: 13px;
   font-weight: 800;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.site-reputation-bar-progress {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(236, 243, 255, 0.92);
 }
 
 .site-vitals-money[hidden],
@@ -3730,6 +3837,12 @@ body {
   max-width: 356px;
   width: min(356px, calc(100vw - 40px));
   max-height: min(34vh, calc(100vh - 220px));
+  margin-left: auto;
+}
+
+.stage-frame.site-active-mode .bottom-row {
+  justify-content: flex-end;
+  padding-left: calc(var(--site-left-panel-width, 320px) + 36px);
 }
 
 .stage-frame.site-result-mode .hud-row {
@@ -3881,6 +3994,16 @@ body {
     --site-left-panel-width: min(300px, calc(100vw - 28px));
   }
 
+  .site-reputation-stack {
+    left: 14px;
+    bottom: 14px;
+    width: min(300px, calc(100vw - 28px));
+  }
+
+  .stage-frame.site-active-mode .bottom-row {
+    padding-left: 0;
+  }
+
   .storage-panel {
     left: 14px;
     right: 14px;
@@ -3986,10 +4109,6 @@ body {
                 <span class="resource-label">Cash</span>
                 <span class="resource-value">0</span>
               </div>
-              <div class="site-vitals-reputation" id="site-vitals-reputation">
-                <span class="resource-label">Reputation</span>
-                <span class="resource-value">0</span>
-              </div>
             </div>
             <div class="site-vitals-bars" id="site-vitals-bars"></div>
             <div class="site-task-panel" id="site-task-panel" hidden>
@@ -4001,6 +4120,8 @@ body {
             </div>
             <div class="modifier-strip" id="buff-modifier-strip" hidden></div>
           </div>
+
+          <div class="site-reputation-stack" id="site-reputation-stack" hidden></div>
         </div>
 
         <div class="status-stack">
