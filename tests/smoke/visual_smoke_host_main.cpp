@@ -2,6 +2,7 @@
 #include "smoke_engine_host.h"
 #include "smoke_live_http_server.h"
 #include "smoke_log.h"
+#include "visual_smoke_silent_onboarding.h"
 
 #include <algorithm>
 #include <cassert>
@@ -514,6 +515,8 @@ int main(int argc, char** argv)
 
     std::uint16_t preferred_port = 0U;
     bool verbose_logging = false;
+    bool silent_onboarding = false;
+    VisualSmokeSilentOnboardingOptions silent_onboarding_options {};
 
     for (int index = 2; index < argc; ++index)
     {
@@ -527,6 +530,19 @@ int main(int argc, char** argv)
         if (argument == "--verbose")
         {
             verbose_logging = true;
+            continue;
+        }
+
+        if (argument == "--silent-onboarding")
+        {
+            silent_onboarding = true;
+            continue;
+        }
+
+        if (argument == "--max-frames" && (index + 1) < argc)
+        {
+            silent_onboarding_options.max_frames = static_cast<std::uint32_t>(
+                std::strtoul(argv[++index], nullptr, 10));
         }
     }
 
@@ -565,7 +581,14 @@ int main(int argc, char** argv)
         const auto log_mode = verbose_logging
             ? SmokeEngineHost::LogMode::Verbose
             : SmokeEngineHost::LogMode::ActivityOnly;
-        run_live_mode(api, runtime, repo_root, preferred_port, log_mode);
+        if (silent_onboarding)
+        {
+            exit_code = run_visual_smoke_silent_onboarding(api, runtime, log_mode, silent_onboarding_options);
+        }
+        else
+        {
+            run_live_mode(api, runtime, repo_root, preferred_port, log_mode);
+        }
     }
     catch (const std::exception& exception)
     {

@@ -181,6 +181,7 @@ if(GS1_BUILD_TESTS)
         tests/smoke/smoke_log.cpp
         tests/smoke/runtime_dll_loader.cpp
         tests/smoke/smoke_live_state_json.cpp
+        tests/smoke/visual_smoke_silent_onboarding.cpp
         ${GS1_CONTENT_RUNTIME_SOURCES})
 
     add_library(gs1_smoke_support STATIC
@@ -313,6 +314,13 @@ if(GS1_BUILD_TESTS)
         NAME gs1_smoke_engine_host_threading_test
         COMMAND gs1_smoke_engine_host_threading_test)
 
+    add_test(
+        NAME gs1_visual_smoke_silent_onboarding
+        COMMAND gs1_visual_smoke_host
+            $<TARGET_FILE:gs1_game>
+            --silent-onboarding
+            --max-frames 18000)
+
     set(GS1_SYSTEM_TEST_HOST_COMMAND
         gs1_system_test_host)
     if(GS1_SYSTEM_TEST_SYSTEMS)
@@ -338,6 +346,9 @@ if(GS1_BUILD_TESTS)
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(gs1_smoke_engine_host_threading_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(gs1_visual_smoke_silent_onboarding PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        TIMEOUT 120)
     set_tests_properties(gs1_system_test_host PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         LABELS "system;dll")

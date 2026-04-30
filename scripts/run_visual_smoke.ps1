@@ -5,6 +5,8 @@ param(
     [uint16]$Port = 18765,
     [switch]$BuildFirst,
     [switch]$NoBrowser,
+    [switch]$SilentOnboarding,
+    [uint32]$MaxFrames = 18000,
     [string]$LogPath = "out/logs/visual_smoke_host_latest.log",
     [string]$CMakePath
 )
@@ -105,11 +107,25 @@ if (Test-Path $resolvedLogPath) {
 }
 
 $arguments = @($dllPath)
-if ($Port -gt 0) {
+if ($SilentOnboarding) {
+    $arguments += @("--silent-onboarding", "--max-frames", "$MaxFrames")
+} elseif ($Port -gt 0) {
     $arguments += @("--port", "$Port")
 }
 if ($hostVerbose) {
     $arguments += "--verbose"
+}
+
+if ($SilentOnboarding) {
+    Write-Host ">> $visualExePath $($arguments -join ' ')"
+    Push-Location $repoRoot
+    try {
+        & $visualExePath @arguments
+        exit $LASTEXITCODE
+    }
+    finally {
+        Pop-Location
+    }
 }
 
 $escapedRepoRoot = $repoRoot -replace "'", "''"
