@@ -71,6 +71,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let latestState = null;
     let technologyCatalog = null;
     let technologyCatalogPromise = null;
+    let reputationUnlockCatalog = null;
+    let reputationUnlockCatalogPromise = null;
     let stateStream = null;
     let mapPickables = [];
     let latestPresentationSignature = "";
@@ -4371,75 +4373,85 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return { iconKey: "sprout", light: "#90a86f", dark: "#596b45" };
     }
 
-    function parseTechTreeUnlockableTiers(techTreeSetup) {
+    function buildReputationUnlockCatalog(reputationUnlockTomlText) {
+        const rows = parseTomlTableArray(reputationUnlockTomlText, "reputation_unlocks");
+        return rows
+            .map((row) => {
+                return {
+                    unlockId: Number(row.unlock_id || 0),
+                    unlockKind: String(row.unlock_kind || ""),
+                    reputationRequirement: Number(row.reputation_requirement || 0),
+                    contentId: Number(row.content_id || 0),
+                    displayName: String(row.display_name || ""),
+                    description: String(row.description || "")
+                };
+            })
+            .filter((row) => row.reputationRequirement > 0 && row.displayName.length > 0)
+            .sort((left, right) => {
+                if (left.reputationRequirement !== right.reputationRequirement) {
+                    return left.reputationRequirement - right.reputationRequirement;
+                }
+                return left.unlockId - right.unlockId;
+            });
+    }
+
+    function ensureReputationUnlockCatalog() {
+        if (reputationUnlockCatalog) {
+            return Promise.resolve(reputationUnlockCatalog);
+        }
+        if (reputationUnlockCatalogPromise) {
+            return reputationUnlockCatalogPromise;
+        }
+        reputationUnlockCatalogPromise = fetch("/content/reputation_unlocks.toml", { cache: "no-store" })
+            .then((response) => response.text())
+            .then((tomlText) => {
+                reputationUnlockCatalog = buildReputationUnlockCatalog(tomlText);
+                reputationUnlockCatalogPromise = null;
+                if (latestState) {
+                    renderState(latestState, {});
+                }
+                return reputationUnlockCatalog;
+            }).catch((error) => {
+                reputationUnlockCatalogPromise = null;
+                reportViewerError("ensureReputationUnlockCatalog", error);
+                throw error;
+            });
+        return reputationUnlockCatalogPromise;
+    }
+
+    function parseTechTreeUnlockableTiers(state) {
+        if (!reputationUnlockCatalog) {
+            ensureReputationUnlockCatalog().catch(() => {});
+            return null;
+        }
+
+        const campaignResources = getCampaignResources(state);
+        const totalReputation =
+            campaignResources && typeof campaignResources.totalReputation === "number"
+                ? campaignResources.totalReputation
+                : 0;
         const tiers = [];
-        let parsingUnlockables = false;
-        let activeTier = null;
+        const tiersByRequirement = new Map();
 
-        (techTreeSetup.elements || []).forEach((element) => {
-            if (!element) {
-                return;
-            }
-
-            const text = String(element.text || "").trim();
-            if (!text) {
-                return;
-            }
-
-            if (text === "Total Reputation Unlocks") {
-                parsingUnlockables = true;
-                activeTier = null;
-                return;
-            }
-
-            if (!parsingUnlockables) {
-                return;
-            }
-
-            if (element.action && element.action.type === "SELECT_TECH_TREE_FACTION_TAB") {
-                parsingUnlockables = false;
-                activeTier = null;
-                return;
-            }
-
-            if (/^Starter Plants$/i.test(text) ||
-                /^Base Tier\b/i.test(text) ||
-                /^Faction Tier\b/i.test(text))
-            {
-                parsingUnlockables = false;
-                activeTier = null;
-                return;
-            }
-
-            if (/^(Base Tech Tree)$/i.test(text) || /^Enhancements\b/i.test(text)) {
-                return;
-            }
-
-            const tierMatch = text.match(/^Global\s+(\d+)\s+Need\s+(-?\d+)\s+(Ready|Locked)$/i);
-            if (tierMatch) {
-                activeTier = {
-                    tierNumber: Number(tierMatch[1]),
-                    requirement: Number(tierMatch[2]),
-                    isUnlocked: /^ready$/i.test(tierMatch[3]),
+        reputationUnlockCatalog.forEach((unlockDef) => {
+            const requirement = Number(unlockDef.reputationRequirement || 0);
+            let tier = tiersByRequirement.get(requirement);
+            if (!tier) {
+                tier = {
+                    tierNumber: tiers.length + 1,
+                    requirement: requirement,
+                    isUnlocked: totalReputation >= requirement,
                     unlockables: []
                 };
-                tiers.push(activeTier);
-                return;
+                tiersByRequirement.set(requirement, tier);
+                tiers.push(tier);
             }
 
-            const hasNoAction = !element.action || element.action.type === "NONE";
-            if (!hasNoAction || !activeTier) {
-                return;
-            }
-
-            const unlockableMatch = text.match(/^(.*?)\s+(Ready|Locked)$/i);
-            if (!unlockableMatch) {
-                return;
-            }
-
-            activeTier.unlockables.push({
-                name: unlockableMatch[1].trim(),
-                isUnlocked: /^ready$/i.test(unlockableMatch[2])
+            tier.unlockables.push({
+                name: unlockDef.displayName,
+                kind: unlockDef.unlockKind,
+                description: unlockDef.description,
+                isUnlocked: totalReputation >= requirement
             });
         });
 
@@ -4450,6 +4462,24 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const tierStack = document.createElement("div");
         tierStack.className = "tech-tree-tier-stack";
         container.appendChild(tierStack);
+
+        if (unlockableTiers == null) {
+            const emptyState = document.createElement("div");
+            emptyState.className = "tech-tree-empty-state";
+
+            const emptyTitle = document.createElement("div");
+            emptyTitle.className = "tech-tree-empty-title";
+            emptyTitle.textContent = "Loading unlockables";
+            emptyState.appendChild(emptyTitle);
+
+            const emptyCopy = document.createElement("div");
+            emptyCopy.className = "tech-tree-empty-copy";
+            emptyCopy.textContent = "Waiting for authored reputation unlock data from the local smoke host.";
+            emptyState.appendChild(emptyCopy);
+
+            tierStack.appendChild(emptyState);
+            return;
+        }
 
         if (unlockableTiers.length === 0) {
             const emptyState = document.createElement("div");
@@ -5162,7 +5192,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (factionSummary && factionSummary.text) {
             summaryParts.push(factionSummary.text);
         }
-        const unlockableTiers = parseTechTreeUnlockableTiers(techTreeSetup);
+        const unlockableTiers = parseTechTreeUnlockableTiers(latestState || {});
         const parsedTree = parseTechTreeStructure(techTreeSetup);
         if (activeTechTreePanelTabId !== "unlockables" && activeTechTreePanelTabId !== "tech-tree") {
             activeTechTreePanelTabId = "unlockables";

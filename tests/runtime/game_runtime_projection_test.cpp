@@ -688,8 +688,11 @@ int main()
     const auto tech_tree_messages = drain_engine_messages(runtime);
     assert(contains_ui_element_text(tech_tree_messages, "Prototype Tech Tree"));
     assert(contains_ui_element_text(tech_tree_messages, "Starter Plants"));
+    assert(contains_ui_element_text(tech_tree_messages, "Reputation Unlocks"));
     assert(contains_ui_element_text(tech_tree_messages, "Tier Tech Tree"));
     assert(contains_ui_element_text(tech_tree_messages, "Checkerboard | Wormwood"));
+    assert(contains_ui_element_text_fragment(tech_tree_messages, "Ephedra Stew"));
+    assert(contains_ui_element_text_fragment(tech_tree_messages, "Ordos Wormwood"));
     assert(contains_ui_element_text(tech_tree_messages, "Tab: Village"));
     assert(contains_ui_element_text(tech_tree_messages, "Tab: University"));
 
