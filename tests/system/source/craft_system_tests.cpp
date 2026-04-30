@@ -945,7 +945,7 @@ void storage_device_breakage_destroys_owned_storage_and_items(
     auto site_run = make_test_site_run(1U, 1506U);
     GameMessageQueue queue {};
     auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
-    auto maintenance_context = make_site_context<DeviceMaintenanceSystem>(campaign, site_run, queue, 1.0);
+    auto maintenance_context = make_site_context<DeviceMaintenanceSystem>(campaign, site_run, queue, 10.0);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -955,7 +955,7 @@ void storage_device_breakage_destroys_owned_storage_and_items(
                 GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
-    const auto storage_tile = site_run.camp.starter_storage_tile;
+    const auto storage_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);
     const auto broken_device_entity_id = site_run.site_world->device_entity_id(storage_tile);
     const auto storage_container =
         gs1::inventory_storage::find_device_storage_container(site_run, broken_device_entity_id);
@@ -975,6 +975,7 @@ void storage_device_breakage_destroys_owned_storage_and_items(
     tile.ecology.sand_burial = 100.0f;
     tile.device.device_integrity = 0.01f;
     site_run.site_world->set_tile(storage_tile, tile);
+    site_run.weather.weather_heat = 100.0f;
 
     queue.clear();
     DeviceMaintenanceSystem::run(maintenance_context);

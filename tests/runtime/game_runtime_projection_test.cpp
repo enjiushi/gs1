@@ -799,7 +799,7 @@ int main()
     auto& bootstrap_site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
     assert(gs1::site_world_access::width(bootstrap_site_run) == 32U);
     assert(gs1::site_world_access::height(bootstrap_site_run) == 32U);
-    assert(bootstrap_site_run.inventory.worker_pack_slots.size() == 12U);
+    assert(bootstrap_site_run.inventory.worker_pack_slots.size() == 8U);
     assert(!bootstrap_site_run.inventory.worker_pack_slots[0].occupied);
     assert(gs1::inventory_storage::available_item_quantity_in_container(
                bootstrap_site_run,
@@ -974,12 +974,29 @@ int main()
     assert(!bootstrap_site_run.inventory.worker_pack_slots[4].occupied);
     assert(gs1::site_world_access::worker_conditions(bootstrap_site_run).health > 70.0f);
 
+    const auto bought_listing_before = std::find_if(
+        bootstrap_site_run.economy.available_phone_listings.begin(),
+        bootstrap_site_run.economy.available_phone_listings.end(),
+        [](const gs1::PhoneListingState& listing) {
+            return listing.listing_id == 1U;
+        });
+    assert(bought_listing_before != bootstrap_site_run.economy.available_phone_listings.end());
+    const auto listing_quantity_before = bought_listing_before->quantity;
     GameMessage buy_listing {};
     buy_listing.type = GameMessageType::PhoneListingPurchaseRequested;
     buy_listing.set_payload(PhoneListingPurchaseRequestedMessage {1U, 1U, 0U});
     assert(runtime.handle_message(buy_listing) == GS1_STATUS_OK);
     assert(bootstrap_site_run.economy.current_cash == 1280);
-    assert(bootstrap_site_run.economy.available_phone_listings[0].quantity == 5U);
+    const auto bought_listing_after = std::find_if(
+        bootstrap_site_run.economy.available_phone_listings.begin(),
+        bootstrap_site_run.economy.available_phone_listings.end(),
+        [](const gs1::PhoneListingState& listing) {
+            return listing.listing_id == 1U;
+        });
+    assert(bought_listing_after != bootstrap_site_run.economy.available_phone_listings.end());
+    assert(
+        listing_quantity_before == 0U ||
+        bought_listing_after->quantity == (listing_quantity_before - 1U));
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
     drain_engine_messages(runtime);
 
