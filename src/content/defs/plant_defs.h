@@ -55,6 +55,12 @@ inline constexpr std::uint32_t k_plant_jiji_grass = 7U;
 inline constexpr std::uint32_t k_plant_sea_buckthorn = 8U;
 inline constexpr std::uint32_t k_plant_desert_ephedra = 9U;
 inline constexpr std::uint32_t k_plant_saxaul = 10U;
+inline constexpr std::uint32_t k_plant_aromatic_wormwood = 11U;
+inline constexpr std::uint32_t k_plant_sweet_white_thorn = 12U;
+inline constexpr std::uint32_t k_plant_high_oil_buckthorn = 13U;
+inline constexpr std::uint32_t k_plant_potent_desert_ephedra = 14U;
+inline constexpr std::uint32_t k_plant_dense_pod_peashrub = 15U;
+inline constexpr std::uint32_t k_plant_selected_wolfberry = 16U;
 
 struct PlantHarvestOutputDef final
 {

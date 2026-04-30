@@ -90,9 +90,11 @@ reputation_requirement = 1600
 internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
+granted_content_kind = "Recipe"
+granted_content_id = 7
 is_todo_placeholder = false
-display_name = "Broth Fortification"
-description = "Upgrades the tier-two Village food buffs to their stronger tuned variant."
+display_name = "Camp Supper Pot"
+description = "Unlocks Spiced Stew as the first Village meal that turns simple field supplies into better nourishment and morale."
 
 [[technology_nodes]]
 faction_id = 1
@@ -186,9 +188,11 @@ reputation_requirement = 3200
 internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
+granted_content_kind = "Recipe"
+granted_content_id = 13
 is_todo_placeholder = false
-display_name = "Recovery Fortification"
-description = "Upgrades the tier-five Village recovery foods to their stronger tuned variant."
+display_name = "Hearty Pot Line"
+description = "Unlocks Peashrub Hotpot as the first stronger Village recovery meal for sustained field work."
 
 [[technology_nodes]]
 faction_id = 1
@@ -258,9 +262,11 @@ reputation_requirement = 4400
 internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
+granted_content_kind = "Recipe"
+granted_content_id = 17
 is_todo_placeholder = false
-display_name = "Relief Fortification"
-description = "Upgrades the tier-eight Village combo foods to their stronger tuned variant."
+display_name = "Comfort Supper Line"
+description = "Unlocks Jadeleaf Stew as the first late-branch Village comfort meal for richer combined recovery."
 
 [[technology_nodes]]
 faction_id = 1
@@ -330,9 +336,11 @@ reputation_requirement = 5600
 internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
+granted_content_kind = "Recipe"
+granted_content_id = 19
 is_todo_placeholder = false
-display_name = "Favored Portions I"
-description = "Amplifies timed food and drink buffs by 10%."
+display_name = "Rich Supper Service"
+description = "Unlocks Rich Jadeleaf Stew as a premium Village field meal that scales strongly with high-quality ingredients."
 
 [[technology_nodes]]
 faction_id = 1
@@ -378,21 +386,25 @@ reputation_requirement = 6400
 internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
+granted_content_kind = "Recipe"
+granted_content_id = 20
 is_todo_placeholder = false
-display_name = "Favored Portions II"
-description = "Amplifies timed food and drink buffs to 25% total."
+display_name = "Rich Revival Service"
+description = "Unlocks Rich Desert Revival Draught as the top-end Village premium drink for full-site recovery support."
 
 [[technology_nodes]]
 faction_id = 2
 tier_index = 1
-entry_kind = "GlobalModifier"
+ entry_kind = "MechanismChange"
 reputation_requirement = 200
 internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.050
+granted_content_kind = "Structure"
+granted_content_id = 205
 is_todo_placeholder = false
-display_name = "Seed Selection Nursery"
-description = "Opens the Bureau branch with stronger establishment logic so new plants root faster and lose less momentum to bad starts."
+display_name = "Field Processing Charter"
+description = "Unlocks the Chemistry Station build line so Bureau progress starts by improving practical field processing and medicine support."
 
 [[technology_nodes]]
 faction_id = 2
@@ -438,9 +450,11 @@ reputation_requirement = 1000
 internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.040
+granted_content_kind = "Recipe"
+granted_content_id = 23
 is_todo_placeholder = false
-display_name = "Common Harvest Sorting"
-description = "Unlocks Bureau-only tier-two harvest bonuses so productive plants sometimes return a stronger extra bundle after the normal cut."
+display_name = "Clinic Batch Notes"
+description = "Unlocks Herbal Poultice so Bureau processing turns basic medicine and wormwood into stronger treatment stock."
 
 [[technology_nodes]]
 faction_id = 2
@@ -486,9 +500,11 @@ reputation_requirement = 1800
 internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.032
+granted_content_kind = "Item"
+granted_content_id = 39
 is_todo_placeholder = false
-display_name = "Nurse Crop Pairing"
-description = ""
+display_name = "Stimulant Procurement Line"
+description = "Unlocks Focus Tonic store access so Bureau logistics can stock stronger emergency work stimulants."
 
 [[technology_nodes]]
 faction_id = 2
@@ -618,9 +634,11 @@ reputation_requirement = 4000
 internal_cost_cash_points = 0
 unlock_effect_parameter = 1.09
 effect_parameter_per_bonus_reputation = 0.021
+granted_content_kind = "Structure"
+granted_content_id = 204
 is_todo_placeholder = false
-display_name = "Rare Harvest Contracts"
-description = "Unlocks Bureau-only tier-three harvest bonuses so mature productive plants can occasionally return rare extra harvest bundles."
+display_name = "Windbreak Works Program"
+description = "Unlocks Wind Fence construction so Bureau infrastructure can add device-side wind shelter to exposed lanes."
 
 [[technology_nodes]]
 faction_id = 2
@@ -769,14 +787,16 @@ description = "Consolidates the preceding branch lessons into a steadier, more r
 [[technology_nodes]]
 faction_id = 3
 tier_index = 1
-entry_kind = "GlobalModifier"
+ entry_kind = "MechanismChange"
 reputation_requirement = 200
 internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.050
+granted_content_kind = "Plant"
+granted_content_id = 11
 is_todo_placeholder = false
-display_name = "Survey Benchmark Course"
-description = ""
+display_name = "Wormwood Selection Trial"
+description = "Opens the University branch by unlocking Aromatic Wormwood, a higher-pool cultivar with stronger protection and more valuable herb output."
 
 [[technology_nodes]]
 faction_id = 3
@@ -787,8 +807,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.030
 is_todo_placeholder = false
-display_name = "Probe Calibration Sheets"
-description = "Pushes the branch toward more efficient devices and cleaner technical output from placed hardware."
+display_name = "Seed Viability Notes"
+description = "Pushes the branch toward more reliable plant starts and cleaner early growth from better seed handling."
 
 [[technology_nodes]]
 faction_id = 3
@@ -799,8 +819,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.028
 is_todo_placeholder = false
-display_name = "Variance Log Books"
-description = "Pushes the branch toward steadier outcomes whenever device performance or timing would otherwise swing wide."
+display_name = "Field Phenotype Logs"
+description = "Pushes the branch toward steadier plant outcomes by selecting for lines with less bad-luck variance under field stress."
 
 [[technology_nodes]]
 faction_id = 3
@@ -811,8 +831,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.09
 effect_parameter_per_bonus_reputation = 0.036
 is_todo_placeholder = false
-display_name = "Survey Benchmark Course Review"
-description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
+display_name = "Selection Trial Review"
+description = "Consolidates the early cultivar lessons into a steadier, more reliable plant-breeding practice."
 
 [[technology_nodes]]
 faction_id = 3
@@ -822,9 +842,11 @@ reputation_requirement = 1000
 internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.040
+granted_content_kind = "Plant"
+granted_content_id = 12
 is_todo_placeholder = false
-display_name = "Action Timing Study"
-description = "Frames the branch around technical support for real site actions so setup, execution, and follow-through become cheaper."
+display_name = "Thorn Sugar Trial"
+description = "Unlocks Sweet White Thorn, a salinity-focused cultivar with a larger pool and better-value cooling harvests."
 
 [[technology_nodes]]
 faction_id = 3
@@ -835,8 +857,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.028
 is_todo_placeholder = false
-display_name = "Mesh Sampling Routes"
-description = "Specializes the tier toward cleaner setup paths for build, inspect, and placement-heavy work."
+display_name = "Canopy Sampling Rows"
+description = "Specializes the tier toward cleaner comparisons between planted lines so protective and productive traits are easier to refine."
 
 [[technology_nodes]]
 faction_id = 3
@@ -847,8 +869,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.026
 is_todo_placeholder = false
-display_name = "Windowed Dispatch"
-description = "Specializes the tier toward shorter downtime between action windows and less wasted effort on mistimed jobs."
+display_name = "Growth Window Charts"
+description = "Specializes the tier toward better timing around growth and recovery windows so improved lines lose less momentum."
 
 [[technology_nodes]]
 faction_id = 3
@@ -859,8 +881,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.09
 effect_parameter_per_bonus_reputation = 0.031
 is_todo_placeholder = false
-display_name = "Action Timing Study Review"
-description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
+display_name = "Cooling Trial Review"
+description = "Consolidates the cooling-line breeding work into a steadier, more reliable field practice."
 
 [[technology_nodes]]
 faction_id = 3
@@ -870,9 +892,11 @@ reputation_requirement = 1800
 internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.032
+granted_content_kind = "Plant"
+granted_content_id = 13
 is_todo_placeholder = false
-display_name = "Brackish Water Protocols"
-description = "Shifts the branch toward salt-aware water handling so well water becomes easier to use without poisoning the whole field."
+display_name = "Buckthorn Oil Trial"
+description = "Unlocks High-Oil Buckthorn, a stronger protection-output cultivar whose berries sell better and support stronger premium tonics."
 
 [[technology_nodes]]
 faction_id = 3
@@ -883,8 +907,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.026
 is_todo_placeholder = false
-display_name = "Settling Drum Notes"
-description = "Pushes this line toward lower salinity pressure from stored or pumped well water."
+display_name = "Salt Tolerance Notes"
+description = "Pushes this line toward better salinity handling so selected plants stay useful on harsher ground."
 
 [[technology_nodes]]
 faction_id = 3
@@ -895,8 +919,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.024
 is_todo_placeholder = false
-display_name = "Filter Media Swaps"
-description = "Pushes this line toward stronger treatment cycles and better device-side cleanup of rough inputs."
+display_name = "Rootstock Crosses"
+description = "Pushes this line toward stronger rehabilitation traits and sturdier survival on rough or salty soil."
 
 [[technology_nodes]]
 faction_id = 3
@@ -907,20 +931,22 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.09
 effect_parameter_per_bonus_reputation = 0.027
 is_todo_placeholder = false
-display_name = "Brackish Water Protocols Review"
-description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
+display_name = "Buckthorn Trial Review"
+description = "Consolidates the Buckthorn quality work into a steadier, more reliable field practice."
 
 [[technology_nodes]]
 faction_id = 3
 tier_index = 13
-entry_kind = "GlobalModifier"
+ entry_kind = "MechanismChange"
 reputation_requirement = 2600
 internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.026
+granted_content_kind = "Plant"
+granted_content_id = 14
 is_todo_placeholder = false
-display_name = "Sensor Sweep Rig"
-description = "Expands the branch into denser instrument coverage so more devices can inform more decisions in the same site."
+display_name = "Ephedra Potency Program"
+description = "Unlocks Potent Desert Ephedra, a worker-support cultivar with a larger pool and stronger high-value herb output."
 
 [[technology_nodes]]
 faction_id = 3
@@ -931,8 +957,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.024
 is_todo_placeholder = false
-display_name = "Telemetry Filters"
-description = "Specializes the rig toward better device efficiency, better tracking, and less wasted support output."
+display_name = "Alkaloid Profile Sheets"
+description = "Specializes the line toward stronger herb character and better premium-use potential from selected Ephedra strains."
 
 [[technology_nodes]]
 faction_id = 3
@@ -943,8 +969,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.022
 is_todo_placeholder = false
-display_name = "Failure Budget Spares"
-description = ""
+display_name = "Resilience Reserve Seeds"
+description = "Leans the branch toward backup plant lines that recover better after bad weather and failed early establishment."
 
 [[technology_nodes]]
 faction_id = 3
@@ -955,20 +981,22 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.09
 effect_parameter_per_bonus_reputation = 0.024
 is_todo_placeholder = false
-display_name = "Sensor Sweep Rig Review"
-description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
+display_name = "Ephedra Program Review"
+description = "Consolidates the Ephedra potency work into a steadier, more reliable field practice."
 
 [[technology_nodes]]
 faction_id = 3
 tier_index = 17
-entry_kind = "GlobalModifier"
+ entry_kind = "MechanismChange"
 reputation_requirement = 3400
 internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.022
+granted_content_kind = "Plant"
+granted_content_id = 15
 is_todo_placeholder = false
-display_name = "Control Loop Theory"
-description = "Turns University support into practical action assistance, letting technical devices actively reduce the cost of repeated jobs."
+display_name = "Wormwood Concentrate Program"
+description = "Unlocks Dense-Pod Peashrub, an advanced rehab cultivar with a larger pool and stronger sale-grade pod harvests."
 
 [[technology_nodes]]
 faction_id = 3
@@ -979,8 +1007,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.022
 is_todo_placeholder = false
-display_name = "Pump Assist Governors"
-description = "Specializes the tier toward stronger water-facing devices and steadier support output under heat."
+display_name = "Moisture Holding Crosses"
+description = "Specializes the tier toward plant lines that hold performance more steadily through hot dry swings."
 
 [[technology_nodes]]
 faction_id = 3
@@ -991,8 +1019,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.020
 is_todo_placeholder = false
-display_name = "Task Helper Rigs"
-description = ""
+display_name = "Companion Planting Notes"
+description = "Pushes the branch toward pairings and mixed patches that help improved lines support one another."
 
 [[technology_nodes]]
 faction_id = 3
@@ -1003,8 +1031,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.09
 effect_parameter_per_bonus_reputation = 0.021
 is_todo_placeholder = false
-display_name = "Control Loop Theory Review"
-description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
+display_name = "Concentrate Program Review"
+description = "Consolidates the concentrated herb-quality work into a steadier, more reliable field practice."
 
 [[technology_nodes]]
 faction_id = 3
@@ -1016,7 +1044,7 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.019
 is_todo_placeholder = false
 display_name = "Adaptive Trial Beds"
-description = "Keeps the branch flexible by making technical loadouts respond better to local conditions instead of one fixed script."
+description = "Keeps the branch flexible by making cultivar programs respond better to local site conditions instead of one fixed breeding script."
 
 [[technology_nodes]]
 faction_id = 3
@@ -1027,8 +1055,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.020
 is_todo_placeholder = false
-display_name = "Pilot Arrays"
-description = "Pushes the tier toward faster technical iteration and safer first deployments for new equipment."
+display_name = "Pilot Nurseries"
+description = "Pushes the tier toward faster plant iteration and safer first deployments for newly improved lines."
 
 [[technology_nodes]]
 faction_id = 3
@@ -1039,8 +1067,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.018
 is_todo_placeholder = false
-display_name = "Stress Table Safeguards"
-description = "Pushes the tier toward better device durability and smaller losses under sustained field strain."
+display_name = "Stress Table Selections"
+description = "Pushes the tier toward plant lines that keep more value and function under sustained field strain."
 
 [[technology_nodes]]
 faction_id = 3
@@ -1051,8 +1079,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.09
 effect_parameter_per_bonus_reputation = 0.019
 is_todo_placeholder = false
-display_name = "Adaptive Trial Beds Review"
-description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
+display_name = "Adaptive Trial Review"
+description = "Consolidates the adaptive breeding work into a steadier, more reliable field practice."
 
 [[technology_nodes]]
 faction_id = 3
@@ -1063,8 +1091,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.017
 is_todo_placeholder = false
-display_name = "Shared Model Exchange"
-description = "Links device knowledge across sites so forecasts, support logic, and field adaptations compound instead of resetting each run."
+display_name = "Shared Seed Archive"
+description = "Links plant knowledge across sites so proven lines and field adaptations compound instead of resetting each run."
 
 [[technology_nodes]]
 faction_id = 3
@@ -1075,8 +1103,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.018
 is_todo_placeholder = false
-display_name = "Simulation Library"
-description = "Specializes the tier toward cleaner weather reads and better technical planning before costly actions start."
+display_name = "Climate Trial Library"
+description = "Specializes the tier toward better weather-aware breeding judgments before committing rare improved lines."
 
 [[technology_nodes]]
 faction_id = 3
@@ -1087,8 +1115,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.016
 is_todo_placeholder = false
-display_name = "Case Transfer Kits"
-description = "Specializes the tier toward more reliable follow-up after tasks, failures, and improvised technical fixes."
+display_name = "Cutting Transfer Kits"
+description = "Specializes the tier toward more reliable propagation and follow-up after failed or improvised field trials."
 
 [[technology_nodes]]
 faction_id = 3
@@ -1099,8 +1127,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.09
 effect_parameter_per_bonus_reputation = 0.017
 is_todo_placeholder = false
-display_name = "Shared Model Exchange Review"
-description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
+display_name = "Seed Archive Review"
+description = "Consolidates the archive-driven breeding work into a steadier, more reliable field practice."
 
 [[technology_nodes]]
 faction_id = 3
@@ -1110,9 +1138,11 @@ reputation_requirement = 5800
 internal_cost_cash_points = 0
 unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.015
+granted_content_kind = "Plant"
+granted_content_id = 16
 is_todo_placeholder = false
-display_name = "Autonomous Response Grid"
-description = "Caps the University branch with a full-site device network built to keep technical support useful across many action types at once."
+display_name = "Thorn Selection Archive"
+description = "Unlocks Selected Wolfberry, a late University premium cultivar with the branch's strongest direct harvest-value output."
 
 [[technology_nodes]]
 faction_id = 3
@@ -1123,8 +1153,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.016
 is_todo_placeholder = false
-display_name = "Forecast Solver Stack"
-description = "Turns the capstone toward prediction, timing, and proactive support for the hardest late-site work windows."
+display_name = "Canopy Forecast Sheets"
+description = "Turns the capstone toward predicting which improved lines will hold, thrive, or fail in the hardest late-site weather windows."
 
 [[technology_nodes]]
 faction_id = 3
@@ -1135,8 +1165,8 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.014
 is_todo_placeholder = false
-display_name = "Field Signal Archive"
-description = "Turns the capstone toward resilient device coordination, faster resets, and stronger support continuity after disruption."
+display_name = "Field Lineage Archive"
+description = "Turns the capstone toward resilient cultivar continuity, faster re-selection, and stronger follow-through after disrupted field trials."
 
 [[technology_nodes]]
 faction_id = 3
@@ -1147,6 +1177,6 @@ internal_cost_cash_points = 0
 unlock_effect_parameter = 1.09
 effect_parameter_per_bonus_reputation = 0.015
 is_todo_placeholder = false
-display_name = "Autonomous Response Grid Review"
-description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
+display_name = "Advanced Selection Review"
+description = "Consolidates the late University plant-science work into a steadier, more reliable final breeding practice."
 

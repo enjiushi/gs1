@@ -942,6 +942,7 @@ void technology_total_reputation_unlocks_progression_content_one_by_one(
     GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::item_unlocked(campaign, gs1::ItemId {gs1::k_item_iron_bundle}));
     GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::item_unlocked(campaign, gs1::ItemId {gs1::k_item_medicine_pack}));
     GS1_SYSTEM_TEST_CHECK(context, !TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_field_tea}));
+    GS1_SYSTEM_TEST_CHECK(context, !TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_spiced_stew}));
     GS1_SYSTEM_TEST_CHECK(
         context,
         TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_craft_hammer}));
@@ -970,50 +971,18 @@ void technology_total_reputation_unlocks_progression_content_one_by_one(
     campaign.technology_state.total_reputation = reputation_for_progress_tier(1U);
     GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_ordos_wormwood}));
 
-    campaign.technology_state.total_reputation = reputation_for_progress_tier(2U);
-    GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_spiced_stew}));
-
     GS1_SYSTEM_TEST_CHECK(
         context,
         TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_craft_camp_stove}));
 
     campaign.technology_state.total_reputation = reputation_for_progress_tier(4U);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        TechnologySystem::structure_recipe_unlocked(campaign, gs1::StructureId {gs1::k_structure_chemistry_station}));
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_craft_chemistry_station}));
-
-    campaign.technology_state.total_reputation = reputation_for_progress_tier(5U);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_craft_herbal_poultice}));
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        TechnologySystem::craft_output_unlocked(campaign, gs1::ItemId {gs1::k_item_herbal_poultice}));
-
-    campaign.technology_state.total_reputation = reputation_for_progress_tier(7U);
     GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_field_tea}));
 
-    campaign.technology_state.total_reputation = reputation_for_progress_tier(17U);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        TechnologySystem::structure_recipe_unlocked(campaign, gs1::StructureId {gs1::k_structure_wind_fence}));
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_craft_wind_fence}));
-
-    campaign.technology_state.total_reputation = reputation_for_progress_tier(23U);
+    campaign.technology_state.total_reputation = reputation_for_progress_tier(9U);
     GS1_SYSTEM_TEST_CHECK(context, TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_saxaul}));
     GS1_SYSTEM_TEST_CHECK(
         context,
         !TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_rich_desert_revival_draught}));
-
-    campaign.technology_state.total_reputation = reputation_for_progress_tier(26U);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_rich_desert_revival_draught}));
 }
 
 void technology_first_basic_tier_auto_unlocks_with_faction_requirement(
@@ -1181,7 +1150,7 @@ void technology_uses_authored_internal_cash_points_requirements_and_effect_param
         TechnologySystem::current_effect_parameter(campaign, *university_tier_one) > 1.0f);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        university_tier_one->granted_content_kind == gs1::TechnologyGrantedContentKind::None);
+        university_tier_one->granted_content_kind == gs1::TechnologyGrantedContentKind::Plant);
 }
 
 void technology_reputation_unlocks_gate_village_recipes_items_and_structure_builds(
@@ -1192,6 +1161,12 @@ void technology_reputation_unlocks_gate_village_recipes_items_and_structure_buil
     GS1_SYSTEM_TEST_CHECK(
         context,
         !TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_field_tea}));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        !TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_spiced_stew}));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        !TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_wormwood_broth}));
     GS1_SYSTEM_TEST_CHECK(
         context,
         TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_craft_shovel}));
@@ -1250,37 +1225,57 @@ void technology_reputation_unlocks_gate_village_recipes_items_and_structure_buil
     campaign.technology_state.total_reputation = reputation_for_progress_tier(4U);
     GS1_SYSTEM_TEST_CHECK(
         context,
+        TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_field_tea}));
+
+    campaign.faction_progress[0].faction_reputation = reputation_for_progress_tier(8U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::node_purchased(
+            campaign,
+            gs1::TechNodeId {gs1::base_technology_node_id(
+                gs1::FactionId {gs1::k_faction_village_committee},
+                8U)}));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_spiced_stew}));
+
+    campaign.faction_progress[1].faction_reputation = reputation_for_progress_tier(1U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
         TechnologySystem::structure_recipe_unlocked(campaign, gs1::StructureId {gs1::k_structure_chemistry_station}));
     GS1_SYSTEM_TEST_CHECK(
         context,
         TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_craft_chemistry_station}));
 
-    campaign.technology_state.total_reputation = reputation_for_progress_tier(4U);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        !TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_craft_herbal_poultice}));
-
-    campaign.technology_state.total_reputation = reputation_for_progress_tier(5U);
+    campaign.faction_progress[1].faction_reputation = reputation_for_progress_tier(5U);
     GS1_SYSTEM_TEST_CHECK(
         context,
         TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_craft_herbal_poultice}));
 
-    campaign.technology_state.total_reputation = reputation_for_progress_tier(7U);
+    campaign.faction_progress[2].faction_reputation = reputation_for_progress_tier(1U);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_field_tea}));
+        TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_aromatic_wormwood}));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::item_unlocked(campaign, gs1::ItemId {gs1::k_item_aromatic_wormwood_seed_bundle}));
 
-    campaign.technology_state.total_reputation = reputation_for_progress_tier(10U);
+    campaign.faction_progress[1].faction_reputation = reputation_for_progress_tier(9U);
     GS1_SYSTEM_TEST_CHECK(
         context,
         TechnologySystem::item_unlocked(campaign, gs1::ItemId {gs1::k_item_focus_tonic}));
 
-    campaign.technology_state.total_reputation = reputation_for_progress_tier(13U);
+    campaign.faction_progress[2].faction_reputation = reputation_for_progress_tier(13U);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_rich_wormwood_broth}));
+        TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_potent_desert_ephedra}));
 
-    campaign.technology_state.total_reputation = reputation_for_progress_tier(17U);
+    campaign.faction_progress[2].faction_reputation = reputation_for_progress_tier(29U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        TechnologySystem::plant_unlocked(campaign, gs1::PlantId {gs1::k_plant_selected_wolfberry}));
+
+    campaign.faction_progress[1].faction_reputation = reputation_for_progress_tier(20U);
     GS1_SYSTEM_TEST_CHECK(
         context,
         TechnologySystem::structure_recipe_unlocked(campaign, gs1::StructureId {gs1::k_structure_wind_fence}));
@@ -1288,7 +1283,7 @@ void technology_reputation_unlocks_gate_village_recipes_items_and_structure_buil
         context,
         TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_craft_wind_fence}));
 
-    campaign.technology_state.total_reputation = reputation_for_progress_tier(26U);
+    campaign.faction_progress[0].faction_reputation = reputation_for_progress_tier(32U);
     GS1_SYSTEM_TEST_CHECK(
         context,
         TechnologySystem::recipe_unlocked(campaign, gs1::RecipeId {gs1::k_recipe_cook_rich_desert_revival_draught}));

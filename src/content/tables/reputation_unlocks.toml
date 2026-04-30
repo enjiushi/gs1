@@ -7,41 +7,17 @@ display_name = "Ordos Wormwood"
 description = "Unlocks the first dedicated windbreak plant for exposed starter lanes."
 
 [[reputation_unlocks]]
-unlock_id = 5004
-unlock_kind = "Recipe"
-reputation_requirement = 400
-content_id = 7
-display_name = "Spiced Stew"
-description = "Unlocks the first hearty cooked meal recipe for basic nourishment support."
-
-[[reputation_unlocks]]
 unlock_id = 5005
 unlock_kind = "Plant"
-reputation_requirement = 600
+reputation_requirement = 400
 content_id = 2
 display_name = "White Thorn"
 description = "Unlocks a salinity-tolerant shrub for harsher starter ground."
 
 [[reputation_unlocks]]
-unlock_id = 5006
-unlock_kind = "StructureRecipe"
-reputation_requirement = 800
-content_id = 205
-display_name = "Chemistry Station"
-description = "Unlocks the build recipe for the Chemistry Station so medicine-focused crafting can scale beyond starter supplies."
-
-[[reputation_unlocks]]
-unlock_id = 5009
-unlock_kind = "Recipe"
-reputation_requirement = 1000
-content_id = 23
-display_name = "Herbal Poultice"
-description = "Unlocks a stronger crafted treatment recipe that turns starter medicine into a more powerful recovery item."
-
-[[reputation_unlocks]]
 unlock_id = 5010
 unlock_kind = "Plant"
-reputation_requirement = 1200
+reputation_requirement = 600
 content_id = 7
 display_name = "Jiji Grass"
 description = "Unlocks a dedicated soil-support grass for fertility-led expansion."
@@ -49,159 +25,47 @@ description = "Unlocks a dedicated soil-support grass for fertility-led expansio
 [[reputation_unlocks]]
 unlock_id = 5012
 unlock_kind = "Recipe"
-reputation_requirement = 1400
+reputation_requirement = 800
 content_id = 6
 display_name = "Field Tea"
 description = "Unlocks the first simple restorative drink recipe for light hydration support."
 
 [[reputation_unlocks]]
-unlock_id = 5013
-unlock_kind = "Recipe"
-reputation_requirement = 1600
-content_id = 9
-display_name = "Wormwood Broth"
-description = "Unlocks the first Village recovery broth recipe."
-
-[[reputation_unlocks]]
 unlock_id = 5014
 unlock_kind = "Plant"
-reputation_requirement = 1800
+reputation_requirement = 1000
 content_id = 8
 display_name = "Sea Buckthorn"
 description = "Unlocks a productive perimeter plant that mixes output with real protection."
 
 [[reputation_unlocks]]
-unlock_id = 5015
-unlock_kind = "Item"
-reputation_requirement = 2000
-content_id = 39
-display_name = "Focus Tonic"
-description = "Unlocks Focus Tonic access so the phone store can stock the stimulant directly."
-
-[[reputation_unlocks]]
-unlock_id = 5017
-unlock_kind = "Recipe"
-reputation_requirement = 2200
-content_id = 10
-display_name = "Thornberry Cooler"
-description = "Unlocks the first Village cooling drink recipe."
-
-[[reputation_unlocks]]
 unlock_id = 5018
 unlock_kind = "Plant"
-reputation_requirement = 2400
+reputation_requirement = 1200
 content_id = 6
 display_name = "Korshinsk Peashrub"
 description = "Unlocks a deep soil-rehab specialist for long salty-ground conversion work."
 
 [[reputation_unlocks]]
-unlock_id = 5020
-unlock_kind = "Recipe"
-reputation_requirement = 2600
-content_id = 11
-display_name = "Rich Wormwood Broth"
-description = "Unlocks the richer Wormwood Broth recipe variant."
-
-[[reputation_unlocks]]
-unlock_id = 5021
-unlock_kind = "Recipe"
-reputation_requirement = 2800
-content_id = 12
-display_name = "Rich Thornberry Cooler"
-description = "Unlocks the richer Thornberry Cooler recipe variant."
-
-[[reputation_unlocks]]
 unlock_id = 5022
 unlock_kind = "Plant"
-reputation_requirement = 3000
+reputation_requirement = 1400
 content_id = 3
 display_name = "Red Tamarisk"
 description = "Unlocks a heat-pocket protection plant for harsher hot zones."
 
 [[reputation_unlocks]]
-unlock_id = 5023
-unlock_kind = "Recipe"
-reputation_requirement = 3200
-content_id = 13
-display_name = "Peashrub Hotpot"
-description = "Unlocks the first stronger Village recovery meal recipe."
-
-[[reputation_unlocks]]
-unlock_id = 5024
-unlock_kind = "StructureRecipe"
-reputation_requirement = 3400
-content_id = 204
-display_name = "Wind Fence"
-description = "Unlocks the build recipe for the Wind Fence so exposed lanes can gain device-side wind shelter."
-
-[[reputation_unlocks]]
-unlock_id = 5025
-unlock_kind = "Recipe"
-reputation_requirement = 3600
-content_id = 14
-display_name = "Buckthorn Tonic"
-description = "Unlocks the first stronger Village restorative drink recipe."
-
-[[reputation_unlocks]]
 unlock_id = 5026
 unlock_kind = "Plant"
-reputation_requirement = 3800
+reputation_requirement = 1600
 content_id = 4
 display_name = "Ningxia Wolfberry"
 description = "Unlocks a fragile high-payoff crop that depends on established support."
 
 [[reputation_unlocks]]
-unlock_id = 5027
-unlock_kind = "Recipe"
-reputation_requirement = 4000
-content_id = 15
-display_name = "Rich Peashrub Hotpot"
-description = "Unlocks the richer Peashrub Hotpot recipe variant."
-
-[[reputation_unlocks]]
-unlock_id = 5028
-unlock_kind = "Recipe"
-reputation_requirement = 4200
-content_id = 16
-display_name = "Rich Buckthorn Tonic"
-description = "Unlocks the richer Buckthorn Tonic recipe variant."
-
-[[reputation_unlocks]]
-unlock_id = 5029
-unlock_kind = "Recipe"
-reputation_requirement = 4400
-content_id = 17
-display_name = "Jadeleaf Stew"
-description = "Unlocks the first late-branch combo recovery meal recipe."
-
-[[reputation_unlocks]]
 unlock_id = 5030
 unlock_kind = "Plant"
-reputation_requirement = 4600
+reputation_requirement = 1800
 content_id = 10
 display_name = "Saxaul"
 description = "Unlocks the late anchor canopy plant for turning a zone into a refuge core."
-
-[[reputation_unlocks]]
-unlock_id = 5031
-unlock_kind = "Recipe"
-reputation_requirement = 4800
-content_id = 18
-display_name = "Desert Revival Draught"
-description = "Unlocks the first late-branch combo recovery drink recipe."
-
-[[reputation_unlocks]]
-unlock_id = 5032
-unlock_kind = "Recipe"
-reputation_requirement = 5000
-content_id = 19
-display_name = "Rich Jadeleaf Stew"
-description = "Unlocks the richer Jadeleaf Stew recipe variant."
-
-[[reputation_unlocks]]
-unlock_id = 5033
-unlock_kind = "Recipe"
-reputation_requirement = 5200
-content_id = 20
-display_name = "Rich Desert Revival Draught"
-description = "Unlocks the richer Desert Revival Draught recipe variant."

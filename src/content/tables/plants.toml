@@ -303,3 +303,189 @@ harvest_outputs = [
 harvest_action_duration_minutes = 1.3
 harvest_density_required = 25.0
 harvest_density_removed = 25.0
+
+[[plants]]
+plant_id = 11
+display_name = "Aromatic Wormwood"
+height_class = "Low"
+focus = "Protection"
+growable = true
+aura_size = 1
+footprint_width = 2
+footprint_height = 2
+wind_protection_range = 1
+protection_ratio = 1.0
+plant_action_duration_minutes = 0.8
+constant_wither_rate = 0.0
+salt_tolerance = 12.0
+heat_tolerance = 16.0
+wind_resistance = 74.0
+dust_tolerance = 24.0
+fertility_improve_power = 8.0
+output_power = 16.0
+spread_readiness = 60.0
+spread_chance = 36.0
+output_dependency = 14.0
+harvest_outputs = [
+    { item_id = 64, quantity = 1, output_kind = "Dedicated", chance_mode = "Guaranteed" },
+    { item_id = 10, quantity = 1, output_kind = "Basic", chance_mode = "FixedChance", chance_percent = 15.0 },
+    { item_id = 58, quantity = 1, output_kind = "Seed", chance_mode = "FixedChance", chance_percent = 10.0 },
+]
+harvest_action_duration_minutes = 0.75
+harvest_density_required = 25.0
+harvest_density_removed = 25.0
+
+[[plants]]
+plant_id = 12
+display_name = "Sweet White Thorn"
+height_class = "Low"
+focus = "SalinityOutput"
+growable = true
+aura_size = 1
+footprint_width = 2
+footprint_height = 2
+wind_protection_range = 0
+protection_ratio = 0.0
+plant_action_duration_minutes = 1.05
+constant_wither_rate = 0.0
+salt_tolerance = 58.0
+heat_tolerance = 14.0
+wind_resistance = 6.0
+dust_tolerance = 10.0
+fertility_improve_power = 24.0
+output_power = 28.0
+spread_readiness = 46.0
+spread_chance = 22.0
+output_dependency = 36.0
+harvest_outputs = [
+    { item_id = 65, quantity = 1, output_kind = "Dedicated", chance_mode = "Guaranteed" },
+    { item_id = 10, quantity = 1, output_kind = "Basic", chance_mode = "FixedChance", chance_percent = 15.0 },
+    { item_id = 59, quantity = 1, output_kind = "Seed", chance_mode = "FixedChance", chance_percent = 10.0 },
+]
+harvest_action_duration_minutes = 0.9
+harvest_density_required = 25.0
+harvest_density_removed = 25.0
+
+[[plants]]
+plant_id = 13
+display_name = "High-Oil Buckthorn"
+height_class = "Medium"
+focus = "ProtectionOutput"
+growable = true
+aura_size = 1
+footprint_width = 2
+footprint_height = 2
+wind_protection_range = 1
+protection_ratio = 1.0
+plant_action_duration_minutes = 1.3
+constant_wither_rate = 0.0
+salt_tolerance = 16.0
+heat_tolerance = 20.0
+wind_resistance = 52.0
+dust_tolerance = 22.0
+fertility_improve_power = 14.0
+output_power = 46.0
+spread_readiness = 54.0
+spread_chance = 22.0
+output_dependency = 48.0
+harvest_outputs = [
+    { item_id = 66, quantity = 1, output_kind = "Dedicated", chance_mode = "Guaranteed" },
+    { item_id = 10, quantity = 1, output_kind = "Basic", chance_mode = "FixedChance", chance_percent = 15.0 },
+    { item_id = 60, quantity = 1, output_kind = "Seed", chance_mode = "FixedChance", chance_percent = 10.0 },
+]
+harvest_action_duration_minutes = 1.05
+harvest_density_required = 25.0
+harvest_density_removed = 25.0
+
+[[plants]]
+plant_id = 14
+display_name = "Potent Desert Ephedra"
+height_class = "Low"
+focus = "OutputWorkerSupport"
+growable = true
+aura_size = 0
+footprint_width = 2
+footprint_height = 2
+wind_protection_range = 0
+protection_ratio = 0.0
+plant_action_duration_minutes = 1.2
+constant_wither_rate = 0.0
+salt_tolerance = 18.0
+heat_tolerance = 34.0
+wind_resistance = 6.0
+dust_tolerance = 28.0
+fertility_improve_power = 10.0
+output_power = 38.0
+spread_readiness = 50.0
+spread_chance = 20.0
+output_dependency = 52.0
+harvest_outputs = [
+    { item_id = 67, quantity = 1, output_kind = "Dedicated", chance_mode = "Guaranteed" },
+    { item_id = 10, quantity = 1, output_kind = "Basic", chance_mode = "FixedChance", chance_percent = 15.0 },
+    { item_id = 61, quantity = 1, output_kind = "Seed", chance_mode = "FixedChance", chance_percent = 10.0 },
+]
+harvest_action_duration_minutes = 1.0
+harvest_density_required = 25.0
+harvest_density_removed = 25.0
+
+[[plants]]
+plant_id = 15
+display_name = "Dense-Pod Peashrub"
+height_class = "Low"
+focus = "SoilSupportSalinity"
+growable = true
+aura_size = 1
+footprint_width = 2
+footprint_height = 2
+wind_protection_range = 0
+protection_ratio = 0.0
+plant_action_duration_minutes = 1.15
+constant_wither_rate = 0.0
+salt_tolerance = 56.0
+heat_tolerance = 16.0
+wind_resistance = 8.0
+dust_tolerance = 10.0
+fertility_improve_power = 74.0
+output_power = 16.0
+spread_readiness = 50.0
+spread_chance = 26.0
+output_dependency = 18.0
+harvest_outputs = [
+    { item_id = 68, quantity = 1, output_kind = "Dedicated", chance_mode = "Guaranteed" },
+    { item_id = 10, quantity = 1, output_kind = "Basic", chance_mode = "FixedChance", chance_percent = 15.0 },
+    { item_id = 62, quantity = 1, output_kind = "Seed", chance_mode = "FixedChance", chance_percent = 10.0 },
+]
+harvest_action_duration_minutes = 0.95
+harvest_density_required = 25.0
+harvest_density_removed = 25.0
+
+[[plants]]
+plant_id = 16
+display_name = "Selected Wolfberry"
+height_class = "Low"
+focus = "Output"
+growable = true
+aura_size = 0
+footprint_width = 2
+footprint_height = 2
+wind_protection_range = 0
+protection_ratio = 0.0
+plant_action_duration_minutes = 1.3
+constant_wither_rate = 0.0
+salt_tolerance = 22.0
+heat_tolerance = 62.0
+wind_resistance = 6.0
+dust_tolerance = 22.0
+fertility_improve_power = 8.0
+output_power = 72.0
+spread_readiness = 72.0
+spread_chance = 16.0
+output_dependency = 84.0
+harvest_outputs = [
+    { item_id = 69, quantity = 1, output_kind = "Dedicated", chance_mode = "Guaranteed" },
+    { item_id = 10, quantity = 1, output_kind = "Basic", chance_mode = "FixedChance", chance_percent = 15.0 },
+    { item_id = 63, quantity = 1, output_kind = "Seed", chance_mode = "FixedChance", chance_percent = 10.0 },
+]
+harvest_action_duration_minutes = 1.25
+harvest_density_required = 25.0
+harvest_density_removed = 25.0

@@ -852,3 +852,183 @@ health_delta = 0.0
 hydration_delta = 0.0
 nourishment_delta = 0.0
 energy_delta = 0.0
+
+[[items]]
+item_id = 58
+display_name = "Aromatic Wormwood Seeds"
+stack_size = 10
+source_rule = "BuyOnly"
+consumable = false
+internal_price_cash_points = 0
+capabilities = "Plant,Sell"
+linked_plant_id = 11
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 59
+display_name = "Sweet White Thorn Seeds"
+stack_size = 10
+source_rule = "BuyOnly"
+consumable = false
+internal_price_cash_points = 0
+capabilities = "Plant,Sell"
+linked_plant_id = 12
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 60
+display_name = "High-Oil Buckthorn Seeds"
+stack_size = 10
+source_rule = "BuyOnly"
+consumable = false
+internal_price_cash_points = 0
+capabilities = "Plant,Sell"
+linked_plant_id = 13
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 61
+display_name = "Potent Desert Ephedra Seeds"
+stack_size = 10
+source_rule = "BuyOnly"
+consumable = false
+internal_price_cash_points = 0
+capabilities = "Plant,Sell"
+linked_plant_id = 14
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 62
+display_name = "Dense-Pod Peashrub Seeds"
+stack_size = 10
+source_rule = "BuyOnly"
+consumable = false
+internal_price_cash_points = 0
+capabilities = "Plant,Sell"
+linked_plant_id = 15
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 63
+display_name = "Selected Wolfberry Seeds"
+stack_size = 10
+source_rule = "BuyOnly"
+consumable = false
+internal_price_cash_points = 0
+capabilities = "Plant,Sell"
+linked_plant_id = 16
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 64
+display_name = "Aromatic Wormwood Sprigs"
+stack_size = 10
+source_rule = "HarvestOnly"
+consumable = false
+internal_price_cash_points = 0
+capabilities = "Sell"
+linked_plant_id = 11
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 65
+display_name = "Sweet Thornberries"
+stack_size = 10
+source_rule = "HarvestOnly"
+consumable = false
+internal_price_cash_points = 0
+capabilities = "Sell"
+linked_plant_id = 12
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 66
+display_name = "High-Oil Buckthorn Berries"
+stack_size = 10
+source_rule = "HarvestOnly"
+consumable = false
+internal_price_cash_points = 0
+capabilities = "Sell"
+linked_plant_id = 13
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 67
+display_name = "Potent Desert Ephedra Sprigs"
+stack_size = 10
+source_rule = "HarvestOnly"
+consumable = false
+internal_price_cash_points = 0
+capabilities = "Sell"
+linked_plant_id = 14
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 68
+display_name = "Dense Peashrub Pods"
+stack_size = 10
+source_rule = "HarvestOnly"
+consumable = false
+internal_price_cash_points = 0
+capabilities = "Sell"
+linked_plant_id = 15
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0
+
+[[items]]
+item_id = 69
+display_name = "Selected Wolfberries"
+stack_size = 10
+source_rule = "HarvestOnly"
+consumable = false
+internal_price_cash_points = 0
+capabilities = "Sell"
+linked_plant_id = 16
+linked_structure_id = 0
+health_delta = 0.0
+hydration_delta = 0.0
+nourishment_delta = 0.0
+energy_delta = 0.0

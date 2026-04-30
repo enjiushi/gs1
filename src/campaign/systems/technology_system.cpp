@@ -86,6 +86,44 @@ const FactionProgressState* find_faction_progress(
 
     return false;
 }
+
+[[nodiscard]] bool has_technology_grant(
+    TechnologyGrantedContentKind granted_content_kind,
+    std::uint32_t granted_content_id) noexcept
+{
+    for (const auto& node_def : all_technology_node_defs())
+    {
+        if (node_def.granted_content_kind == granted_content_kind &&
+            node_def.granted_content_id == granted_content_id)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+[[nodiscard]] bool technology_grant_unlocked(
+    const CampaignState& campaign,
+    TechnologyGrantedContentKind granted_content_kind,
+    std::uint32_t granted_content_id) noexcept
+{
+    for (const auto& node_def : all_technology_node_defs())
+    {
+        if (node_def.granted_content_kind != granted_content_kind ||
+            node_def.granted_content_id != granted_content_id)
+        {
+            continue;
+        }
+
+        if (TechnologySystem::node_purchased(campaign, node_def.tech_node_id))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
 }  // namespace
 
 bool TechnologySystem::subscribes_to(GameMessageType type) noexcept
@@ -133,6 +171,14 @@ bool TechnologySystem::plant_unlocked(
         }
     }
 
+    if (has_technology_grant(TechnologyGrantedContentKind::Plant, plant_id.value))
+    {
+        return technology_grant_unlocked(
+            campaign,
+            TechnologyGrantedContentKind::Plant,
+            plant_id.value);
+    }
+
     return reputation_unlock_ready(campaign, ReputationUnlockKind::Plant, plant_id.value);
 }
 
@@ -163,6 +209,14 @@ bool TechnologySystem::item_unlocked(
         return false;
     }
 
+    if (has_technology_grant(TechnologyGrantedContentKind::Item, item_id.value))
+    {
+        return technology_grant_unlocked(
+            campaign,
+            TechnologyGrantedContentKind::Item,
+            item_id.value);
+    }
+
     if (!has_reputation_unlock(ReputationUnlockKind::Item, item_id.value))
     {
         return true;
@@ -183,6 +237,14 @@ bool TechnologySystem::structure_recipe_unlocked(
     if (structure_recipe_is_baseline_unlocked(structure_id))
     {
         return true;
+    }
+
+    if (has_technology_grant(TechnologyGrantedContentKind::Structure, structure_id.value))
+    {
+        return technology_grant_unlocked(
+            campaign,
+            TechnologyGrantedContentKind::Structure,
+            structure_id.value);
     }
 
     return reputation_unlock_ready(
@@ -210,6 +272,14 @@ bool TechnologySystem::recipe_unlocked(
         return true;
     }
 
+    if (has_technology_grant(TechnologyGrantedContentKind::Recipe, recipe_id.value))
+    {
+        return technology_grant_unlocked(
+            campaign,
+            TechnologyGrantedContentKind::Recipe,
+            recipe_id.value);
+    }
+
     const auto* recipe_def = find_craft_recipe_def(recipe_id);
     if (recipe_def != nullptr)
     {
@@ -217,16 +287,6 @@ bool TechnologySystem::recipe_unlocked(
         if (output_item_def != nullptr &&
             output_item_def->linked_structure_id.value != 0U &&
             structure_recipe_unlocked(campaign, output_item_def->linked_structure_id))
-        {
-            return true;
-        }
-    }
-
-    for (const auto& node_def : all_technology_node_defs())
-    {
-        if (node_def.granted_content_kind == TechnologyGrantedContentKind::Recipe &&
-            node_def.granted_content_id == recipe_id.value &&
-            node_purchased(campaign, node_def.tech_node_id))
         {
             return true;
         }

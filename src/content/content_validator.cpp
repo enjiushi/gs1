@@ -456,10 +456,26 @@ std::vector<ContentValidationIssue> validate_content_database(
             const auto it = expected_pool_targets.find(plant_def.plant_id.value);
             if (it == expected_pool_targets.end())
             {
-                issues.push_back(ContentValidationIssue {
-                    ContentValidationSeverity::Error,
-                    "Every authored plant must be accounted for by either the starter unlock list or the reputation unlock table."});
-                break;
+                bool granted_by_technology = false;
+                for (const auto& node_def : content.technology_node_defs)
+                {
+                    if (node_def.granted_content_kind == TechnologyGrantedContentKind::Plant &&
+                        node_def.granted_content_id == plant_def.plant_id.value)
+                    {
+                        granted_by_technology = true;
+                        break;
+                    }
+                }
+
+                if (!granted_by_technology)
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Every authored plant must be accounted for by the starter unlock list, the shared reputation ladder, or a faction technology grant."});
+                    break;
+                }
+
+                continue;
             }
 
             if (std::fabs(plant_total_meter_pool(plant_def) - it->second) > 0.001f)

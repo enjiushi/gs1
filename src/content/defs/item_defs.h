@@ -107,6 +107,18 @@ inline constexpr std::uint32_t k_item_ephedra_stew = 54U;
 inline constexpr std::uint32_t k_item_wind_fence_kit = 55U;
 inline constexpr std::uint32_t k_item_herbal_poultice = 56U;
 inline constexpr std::uint32_t k_item_chemistry_station_kit = 57U;
+inline constexpr std::uint32_t k_item_aromatic_wormwood_seed_bundle = 58U;
+inline constexpr std::uint32_t k_item_sweet_white_thorn_seed_bundle = 59U;
+inline constexpr std::uint32_t k_item_high_oil_buckthorn_seed_bundle = 60U;
+inline constexpr std::uint32_t k_item_potent_desert_ephedra_seed_bundle = 61U;
+inline constexpr std::uint32_t k_item_dense_pod_peashrub_seed_bundle = 62U;
+inline constexpr std::uint32_t k_item_selected_wolfberry_seed_bundle = 63U;
+inline constexpr std::uint32_t k_item_aromatic_wormwood_sprigs = 64U;
+inline constexpr std::uint32_t k_item_sweet_thornberries = 65U;
+inline constexpr std::uint32_t k_item_high_oil_buckthorn_berries = 66U;
+inline constexpr std::uint32_t k_item_potent_desert_ephedra_sprigs = 67U;
+inline constexpr std::uint32_t k_item_dense_peashrub_pods = 68U;
+inline constexpr std::uint32_t k_item_selected_wolfberries = 69U;
 
 [[nodiscard]] std::span<const ItemDef> all_item_defs() noexcept;
 
