@@ -40,8 +40,7 @@ buy_price_multiplier = 1.1
 sell_price_multiplier = 0.9
 
 [plant_harvest]
-output_cash_points_per_power = 25.0
-harvest_item_cash_points_per_pool_point = 1.0
+plant_cash_points_per_pool_point = 10.0
 seed_cash_points_per_pool_point = 2.0
 
 [ecology]

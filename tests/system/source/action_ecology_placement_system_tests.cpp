@@ -121,29 +121,6 @@ std::uint64_t harvest_roll_seed_for_test(
     return seed;
 }
 
-std::uint16_t expected_budgeted_harvest_quantity_for_test(
-    std::uint32_t budget_cash_points,
-    std::uint32_t item_cash_points,
-    std::uint64_t roll_seed) noexcept
-{
-    if (budget_cash_points == 0U || item_cash_points == 0U)
-    {
-        return 0U;
-    }
-
-    const double raw_quantity =
-        static_cast<double>(budget_cash_points) / static_cast<double>(item_cash_points);
-    std::uint32_t quantity = static_cast<std::uint32_t>(std::floor(raw_quantity));
-    const double fractional_quantity = raw_quantity - static_cast<double>(quantity);
-    if (fractional_quantity > 0.000001 &&
-        percent_from_seed_for_test(roll_seed) < static_cast<float>(fractional_quantity * 100.0))
-    {
-        quantity += 1U;
-    }
-
-    return static_cast<std::uint16_t>(std::min<std::uint32_t>(quantity, 65535U));
-}
-
 std::uint16_t inserted_quantity_for_item(
     const GameMessageQueue& queue,
     std::uint32_t item_id) noexcept
@@ -973,21 +950,7 @@ void action_execution_harvest_completion_emits_worker_pack_insert_and_tile_harve
     const auto action_id = *site_run.site_action.current_action_id;
     const auto* plant_def = gs1::find_plant_def(gs1::PlantId {gs1::k_plant_white_thorn});
     GS1_SYSTEM_TEST_REQUIRE(context, plant_def != nullptr);
-    const auto dedicated_budget_cash_points =
-        gs1::derive_plant_harvest_output_cash_point_budget(
-            gs1::gameplay_tuning_def().plant_harvest,
-            *plant_def);
-    const std::uint16_t expected_primary_quantity =
-        expected_budgeted_harvest_quantity_for_test(
-            dedicated_budget_cash_points,
-            gs1::item_internal_price_cash_points(gs1::ItemId {gs1::k_item_white_thorn_berries}),
-            harvest_roll_seed_for_test(
-                site_run.site_attempt_seed,
-                action_id,
-                TileCoord {2, 2},
-                plant_def->plant_id,
-                0U,
-                1U));
+    const std::uint16_t expected_primary_quantity = 1U;
     std::uint16_t expected_grass_quantity = 0U;
     if (percent_from_seed_for_test(
             harvest_roll_seed_for_test(
@@ -1070,16 +1033,6 @@ void action_execution_harvest_guarantees_one_dedicated_item_for_low_output_plant
             site_context,
             make_start_action_message(GS1_SITE_ACTION_HARVEST, TileCoord {2, 2}, 1U, 0U, 0U)) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, site_run.site_action.current_action_id.has_value());
-    const auto* plant_def = gs1::find_plant_def(gs1::PlantId {gs1::k_plant_ordos_wormwood});
-    GS1_SYSTEM_TEST_REQUIRE(context, plant_def != nullptr);
-    const auto dedicated_budget_cash_points =
-        gs1::derive_plant_harvest_output_cash_point_budget(
-            gs1::gameplay_tuning_def().plant_harvest,
-            *plant_def);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        dedicated_budget_cash_points ==
-            gs1::item_internal_price_cash_points(gs1::ItemId {gs1::k_item_ordos_wormwood_sprigs}));
 
     queue.clear();
     ActionExecutionSystem::run(site_context);
@@ -1097,7 +1050,7 @@ void action_execution_harvest_guarantees_one_dedicated_item_for_low_output_plant
     GS1_SYSTEM_TEST_CHECK(context, harvested->item_quantity == 1U);
 }
 
-void action_execution_harvest_uses_fractional_budget_rounding_for_fractional_output_plants(
+void action_execution_harvest_always_produces_one_dedicated_item_for_output_plants(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
@@ -1119,34 +1072,16 @@ void action_execution_harvest_uses_fractional_budget_rounding_for_fractional_out
             site_context,
             make_start_action_message(GS1_SITE_ACTION_HARVEST, TileCoord {2, 2}, 1U, 0U, 0U)) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, site_run.site_action.current_action_id.has_value());
-    const auto action_id = *site_run.site_action.current_action_id;
-    const auto* plant_def = gs1::find_plant_def(gs1::PlantId {gs1::k_plant_red_tamarisk});
-    GS1_SYSTEM_TEST_REQUIRE(context, plant_def != nullptr);
-    const auto dedicated_budget_cash_points =
-        gs1::derive_plant_harvest_output_cash_point_budget(
-            gs1::gameplay_tuning_def().plant_harvest,
-            *plant_def);
-    const std::uint16_t expected_primary_quantity =
-        expected_budgeted_harvest_quantity_for_test(
-            dedicated_budget_cash_points,
-            gs1::item_internal_price_cash_points(gs1::ItemId {gs1::k_item_red_tamarisk_bark}),
-            harvest_roll_seed_for_test(
-                site_run.site_attempt_seed,
-                action_id,
-                TileCoord {2, 2},
-                plant_def->plant_id,
-                0U,
-                1U));
 
     queue.clear();
     ActionExecutionSystem::run(site_context);
 
     GS1_SYSTEM_TEST_CHECK(
         context,
-        inserted_quantity_for_item(queue, gs1::k_item_red_tamarisk_bark) == expected_primary_quantity);
+        inserted_quantity_for_item(queue, gs1::k_item_red_tamarisk_bark) == 1U);
 }
 
-void harvest_content_guarantees_one_dedicated_item_for_every_harvestable_plant(
+void harvest_content_authors_one_guaranteed_dedicated_item_for_every_harvestable_plant(
     gs1::testing::SystemTestExecutionContext& context)
 {
     for (const auto& plant_def : gs1::all_plant_defs())
@@ -1165,15 +1100,9 @@ void harvest_content_guarantees_one_dedicated_item_for_every_harvestable_plant(
                 continue;
             }
 
-            const auto dedicated_budget_cash_points =
-                gs1::derive_plant_harvest_output_cash_point_budget(
-                    gs1::gameplay_tuning_def().plant_harvest,
-                    plant_def);
-            const auto item_cash_points =
-                gs1::item_internal_price_cash_points(harvest_output_def.item_id);
             GS1_SYSTEM_TEST_CHECK(
                 context,
-                dedicated_budget_cash_points >= item_cash_points);
+                harvest_output_def.quantity == 1U);
         }
     }
 }
@@ -1205,21 +1134,7 @@ void harvest_flow_inserts_output_and_reduces_multitile_density(
     const auto action_id = *site_run.site_action.current_action_id;
     const auto* plant_def = gs1::find_plant_def(gs1::PlantId {gs1::k_plant_white_thorn});
     GS1_SYSTEM_TEST_REQUIRE(context, plant_def != nullptr);
-    const auto dedicated_budget_cash_points =
-        gs1::derive_plant_harvest_output_cash_point_budget(
-            gs1::gameplay_tuning_def().plant_harvest,
-            *plant_def);
-    const std::uint16_t expected_primary_quantity =
-        expected_budgeted_harvest_quantity_for_test(
-            dedicated_budget_cash_points,
-            gs1::item_internal_price_cash_points(gs1::ItemId {gs1::k_item_white_thorn_berries}),
-            harvest_roll_seed_for_test(
-                site_run.site_attempt_seed,
-                action_id,
-                TileCoord {2, 2},
-                plant_def->plant_id,
-                0U,
-                1U));
+    const std::uint16_t expected_primary_quantity = 1U;
     std::uint16_t expected_grass_quantity = 0U;
     if (percent_from_seed_for_test(
             harvest_roll_seed_for_test(
@@ -3178,12 +3093,12 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     action_execution_harvest_guarantees_one_dedicated_item_for_low_output_plants);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "action_execution",
-    "harvest_uses_fractional_budget_rounding_for_fractional_output_plants",
-    action_execution_harvest_uses_fractional_budget_rounding_for_fractional_output_plants);
+    "harvest_always_produces_one_dedicated_item_for_output_plants",
+    action_execution_harvest_always_produces_one_dedicated_item_for_output_plants);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "action_execution",
-    "harvest_content_guarantees_one_dedicated_item_for_every_harvestable_plant",
-    harvest_content_guarantees_one_dedicated_item_for_every_harvestable_plant);
+    "harvest_content_authors_one_guaranteed_dedicated_item_for_every_harvestable_plant",
+    harvest_content_authors_one_guaranteed_dedicated_item_for_every_harvestable_plant);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "action_execution",
     "excavate_starts_immediately_and_emits_cost",

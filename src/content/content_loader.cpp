@@ -1787,10 +1787,8 @@ void load_gameplay_tuning_def(ContentDatabase& content, const std::filesystem::p
         require_toml_float(path, player_meter_cash_points, "sell_price_multiplier");
 
     const auto& plant_harvest = require_toml_table(path, document, "plant_harvest");
-    tuning.plant_harvest.output_cash_points_per_power =
-        require_toml_float(path, plant_harvest, "output_cash_points_per_power");
-    tuning.plant_harvest.harvest_item_cash_points_per_pool_point =
-        require_toml_float(path, plant_harvest, "harvest_item_cash_points_per_pool_point");
+    tuning.plant_harvest.plant_cash_points_per_pool_point =
+        require_toml_float(path, plant_harvest, "plant_cash_points_per_pool_point");
     tuning.plant_harvest.seed_cash_points_per_pool_point =
         require_toml_float(path, plant_harvest, "seed_cash_points_per_pool_point");
 

@@ -79,7 +79,7 @@ spread_readiness = 44.0
 spread_chance = 20.0
 output_dependency = 34.0
 harvest_outputs = [
-    { item_id = 21, quantity = 2, output_kind = "Dedicated", chance_mode = "Guaranteed" },
+    { item_id = 21, quantity = 1, output_kind = "Dedicated", chance_mode = "Guaranteed" },
     { item_id = 10, quantity = 1, output_kind = "Basic", chance_mode = "FixedChance", chance_percent = 15.0 },
     { item_id = 5, quantity = 1, output_kind = "Seed", chance_mode = "FixedChance", chance_percent = 10.0 },
 ]
@@ -141,7 +141,7 @@ spread_readiness = 70.0
 spread_chance = 14.0
 output_dependency = 78.0
 harvest_outputs = [
-    { item_id = 23, quantity = 3, output_kind = "Dedicated", chance_mode = "Guaranteed" },
+    { item_id = 23, quantity = 1, output_kind = "Dedicated", chance_mode = "Guaranteed" },
     { item_id = 10, quantity = 1, output_kind = "Basic", chance_mode = "FixedChance", chance_percent = 15.0 },
     { item_id = 7, quantity = 1, output_kind = "Seed", chance_mode = "FixedChance", chance_percent = 10.0 },
 ]
@@ -234,7 +234,7 @@ spread_readiness = 52.0
 spread_chance = 20.0
 output_dependency = 40.0
 harvest_outputs = [
-    { item_id = 26, quantity = 2, output_kind = "Dedicated", chance_mode = "Guaranteed" },
+    { item_id = 26, quantity = 1, output_kind = "Dedicated", chance_mode = "Guaranteed" },
     { item_id = 10, quantity = 1, output_kind = "Basic", chance_mode = "FixedChance", chance_percent = 15.0 },
     { item_id = 18, quantity = 1, output_kind = "Seed", chance_mode = "FixedChance", chance_percent = 10.0 },
 ]

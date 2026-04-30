@@ -54,8 +54,7 @@ struct PlayerMeterCashPointTuning final
 
 struct PlantHarvestTuning final
 {
-    float output_cash_points_per_power {25.0f};
-    float harvest_item_cash_points_per_pool_point {1.0f};
+    float plant_cash_points_per_pool_point {10.0f};
     float seed_cash_points_per_pool_point {2.0f};
 };
 
@@ -161,27 +160,21 @@ struct GameplayTuningDef final
     const PlantHarvestTuning& tuning,
     const PlantDef& plant_def) noexcept
 {
-    const double raw_cash_points =
-        static_cast<double>(plant_total_meter_pool(plant_def)) *
-        static_cast<double>(tuning.harvest_item_cash_points_per_pool_point);
-    return raw_cash_points <= 0.0
-        ? 0U
-        : static_cast<std::uint32_t>(std::lround(raw_cash_points));
-}
+    const float total_meter = plant_total_meter_pool(plant_def);
+    if (total_meter <= 0.0f)
+    {
+        return 0U;
+    }
 
-[[nodiscard]] inline std::uint32_t derive_plant_harvest_output_cash_point_budget(
-    const PlantHarvestTuning& tuning,
-    const PlantDef& plant_def,
-    float output_cash_point_multiplier = 1.0f) noexcept
-{
-    const double clamped_multiplier =
-        output_cash_point_multiplier <= 0.0f
-        ? 0.0
-        : static_cast<double>(output_cash_point_multiplier);
+    const double plant_cash_points =
+        static_cast<double>(total_meter) *
+        static_cast<double>(tuning.plant_cash_points_per_pool_point);
+    const double output_ratio =
+        static_cast<double>(plant_def.output_power) / static_cast<double>(total_meter);
+    const double density_reduction_fraction =
+        static_cast<double>(std::clamp(plant_def.harvest_density_removed, 0.0f, 100.0f)) * 0.01;
     const double raw_cash_points =
-        static_cast<double>(plant_def.output_power) *
-        static_cast<double>(tuning.output_cash_points_per_power) *
-        clamped_multiplier;
+        plant_cash_points * output_ratio * density_reduction_fraction;
     return raw_cash_points <= 0.0
         ? 0U
         : static_cast<std::uint32_t>(std::lround(raw_cash_points));

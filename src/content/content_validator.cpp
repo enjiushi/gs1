@@ -156,73 +156,6 @@ inline constexpr std::int32_t k_progression_reputation_step = 200;
         });
 }
 
-[[nodiscard]] bool harvest_output_uses_dedicated_budget_for_validation(
-    PlantHarvestOutputKind output_kind) noexcept
-{
-    return output_kind == PlantHarvestOutputKind::Dedicated;
-}
-
-[[nodiscard]] std::uint32_t harvest_output_budget_cash_points_for_validation(
-    const ContentDatabase& content,
-    const PlantDef& plant_def,
-    const PlantHarvestOutputDef& harvest_output_def,
-    std::uint32_t remaining_dedicated_cash_points) noexcept
-{
-    switch (harvest_output_def.output_kind)
-    {
-    case PlantHarvestOutputKind::Dedicated:
-        return remaining_dedicated_cash_points;
-    case PlantHarvestOutputKind::Basic:
-    case PlantHarvestOutputKind::Seed:
-        return 0U;
-    case PlantHarvestOutputKind::Bonus:
-    default:
-        return derive_plant_harvest_output_cash_point_budget(
-            content.gameplay_tuning.plant_harvest,
-            plant_def);
-    }
-}
-
-[[nodiscard]] double harvest_output_chance_percent_for_validation(
-    const PlantHarvestOutputDef& harvest_output_def,
-    std::uint32_t available_cash_points,
-    std::uint32_t item_cash_points) noexcept
-{
-    switch (harvest_output_def.chance_mode)
-    {
-    case PlantHarvestOutputChanceMode::Guaranteed:
-        return 100.0;
-    case PlantHarvestOutputChanceMode::FixedChance:
-        return static_cast<double>(std::clamp(harvest_output_def.chance_percent, 0.0f, 100.0f));
-    case PlantHarvestOutputChanceMode::BudgetScaled:
-    {
-        if (item_cash_points == 0U)
-        {
-            return 0.0;
-        }
-
-        return std::min(
-            static_cast<double>(std::clamp(harvest_output_def.max_chance_percent, 0.0f, 100.0f)),
-            (static_cast<double>(available_cash_points) / static_cast<double>(item_cash_points)) * 100.0);
-    }
-    default:
-        return 0.0;
-    }
-}
-
-[[nodiscard]] double expected_budget_resolved_output_cash_points_for_validation(
-    std::uint32_t available_cash_points,
-    double chance_percent,
-    std::uint32_t item_cash_points) noexcept
-{
-    if (available_cash_points == 0U || item_cash_points == 0U || chance_percent <= 0.0)
-    {
-        return 0.0;
-    }
-
-    return static_cast<double>(available_cash_points) * (chance_percent * 0.01);
-}
-
 [[nodiscard]] std::unordered_map<std::uint32_t, float> build_expected_plant_pool_targets(
     const ContentDatabase& content)
 {
@@ -387,9 +320,7 @@ std::vector<ContentValidationIssue> validate_content_database(
             break;
         }
 
-        const auto harvest_budget_cash_points =
-            derive_plant_harvest_output_cash_point_budget(content.gameplay_tuning.plant_harvest, plant_def);
-        std::uint32_t remaining_dedicated_cash_points = harvest_budget_cash_points;
+        std::uint32_t dedicated_output_count = 0U;
         for (std::size_t harvest_output_index = 0U;
              harvest_output_index < harvest_output_count;
              ++harvest_output_index)
@@ -436,14 +367,6 @@ std::vector<ContentValidationIssue> validate_content_database(
                 break;
             }
 
-            const std::uint32_t item_cash_points =
-                resolved_item_cash_points_for_validation(content, harvest_item);
-            const std::uint32_t available_cash_points =
-                harvest_output_budget_cash_points_for_validation(
-                    content,
-                    plant_def,
-                    harvest_output_def,
-                    remaining_dedicated_cash_points);
             double chance_percent = 0.0;
             switch (harvest_output_def.chance_mode)
             {
@@ -463,27 +386,9 @@ std::vector<ContentValidationIssue> validate_content_database(
                 break;
             case PlantHarvestOutputChanceMode::BudgetScaled:
             {
-                if (harvest_output_def.output_kind == PlantHarvestOutputKind::Basic ||
-                    harvest_output_def.output_kind == PlantHarvestOutputKind::Seed)
-                {
-                    issues.push_back(ContentValidationIssue {
-                        ContentValidationSeverity::Error,
-                        "Basic and seed harvest outputs must use guaranteed or fixed-chance rolls because they no longer consume a plant cash-point budget."});
-                    break;
-                }
-                if (harvest_output_def.max_chance_percent <= 0.0f ||
-                    harvest_output_def.max_chance_percent > 100.0f)
-                {
-                    issues.push_back(ContentValidationIssue {
-                        ContentValidationSeverity::Error,
-                        "Budget-scaled harvest outputs must author a max_chance_percent in the 0-100 range."});
-                    break;
-                }
-                chance_percent =
-                    harvest_output_chance_percent_for_validation(
-                        harvest_output_def,
-                        available_cash_points,
-                        item_cash_points);
+                issues.push_back(ContentValidationIssue {
+                    ContentValidationSeverity::Error,
+                    "Budget-scaled harvest outputs are no longer supported by the fixed-one-item harvest model."});
                 break;
             }
             default:
@@ -495,34 +400,38 @@ std::vector<ContentValidationIssue> validate_content_database(
                 break;
             }
 
-            const double expected_output_cash_points =
-                expected_budget_resolved_output_cash_points_for_validation(
-                    available_cash_points,
-                    chance_percent,
-                    item_cash_points);
-
-            if (harvest_output_uses_dedicated_budget_for_validation(harvest_output_def.output_kind) &&
-                expected_output_cash_points - static_cast<double>(remaining_dedicated_cash_points) > 0.001)
+            if (harvest_output_def.output_kind == PlantHarvestOutputKind::Dedicated)
             {
-                issues.push_back(ContentValidationIssue {
-                    ContentValidationSeverity::Error,
-                    "Dedicated harvest outputs must resolve within the plant's reduced output cash-point budget."});
-                break;
-            }
+                ++dedicated_output_count;
+                if (harvest_output_def.quantity != 1U)
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Dedicated harvest outputs must author quantity 1 because each harvest now yields one main item."});
+                    break;
+                }
 
-            if (harvest_output_uses_dedicated_budget_for_validation(harvest_output_def.output_kind))
-            {
-                remaining_dedicated_cash_points =
-                    expected_output_cash_points >= static_cast<double>(remaining_dedicated_cash_points)
-                    ? 0U
-                    : static_cast<std::uint32_t>(std::lround(
-                        static_cast<double>(remaining_dedicated_cash_points) -
-                        expected_output_cash_points));
+                if (harvest_output_def.chance_mode != PlantHarvestOutputChanceMode::Guaranteed ||
+                    chance_percent != 100.0)
+                {
+                    issues.push_back(ContentValidationIssue {
+                        ContentValidationSeverity::Error,
+                        "Dedicated harvest outputs must be guaranteed so the main harvest item always drops above the density threshold."});
+                    break;
+                }
             }
         }
 
         if (!issues.empty())
         {
+            break;
+        }
+
+        if (dedicated_output_count != 1U)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Harvest plants must author exactly one dedicated main harvest output."});
             break;
         }
 
@@ -1364,13 +1273,12 @@ std::vector<ContentValidationIssue> validate_content_database(
                 ContentValidationSeverity::Error,
                 "Gameplay tuning player-meter internal cash-point values and item buy/sell multipliers must stay positive."});
         }
-        else if (tuning.plant_harvest.output_cash_points_per_power <= 0.0f ||
-            tuning.plant_harvest.harvest_item_cash_points_per_pool_point <= 0.0f ||
+        else if (tuning.plant_harvest.plant_cash_points_per_pool_point <= 0.0f ||
             tuning.plant_harvest.seed_cash_points_per_pool_point <= 0.0f)
         {
             issues.push_back(ContentValidationIssue {
                 ContentValidationSeverity::Error,
-                "Gameplay tuning plant-harvest output, harvest-item, and seed cash-point conversion values must stay positive."});
+                "Gameplay tuning plant-harvest plant and seed cash-point conversion values must stay positive."});
         }
         else if (tuning.modifier_system.modifier_channel_limit <= 0.0f ||
             tuning.modifier_system.factor_weight_limit <= 0.0f ||

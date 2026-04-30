@@ -2831,8 +2831,7 @@ void task_board_content_tuning_exposes_internal_prices_and_task_scoring_inputs(
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(meter_cash_points.buy_price_multiplier, 1.1f));
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(meter_cash_points.sell_price_multiplier, 0.9f));
     const auto& plant_harvest_tuning = gs1::gameplay_tuning_def().plant_harvest;
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(plant_harvest_tuning.output_cash_points_per_power, 25.0f));
-    GS1_SYSTEM_TEST_CHECK(context, approx_equal(plant_harvest_tuning.harvest_item_cash_points_per_pool_point, 1.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(plant_harvest_tuning.plant_cash_points_per_pool_point, 10.0f));
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(plant_harvest_tuning.seed_cash_points_per_pool_point, 2.0f));
     GS1_SYSTEM_TEST_CHECK(
         context,
@@ -2846,10 +2845,10 @@ void task_board_content_tuning_exposes_internal_prices_and_task_scoring_inputs(
     GS1_SYSTEM_TEST_CHECK(context, white_thorn_berries->internal_price_cash_points == 0U);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        gs1::item_internal_price_cash_points(gs1::ItemId {gs1::k_item_white_thorn_berries}) == 110U);
+        gs1::item_internal_price_cash_points(gs1::ItemId {gs1::k_item_white_thorn_berries}) == 60U);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        gs1::item_sell_price_cash_points(gs1::ItemId {gs1::k_item_white_thorn_berries}) == 99U);
+        gs1::item_sell_price_cash_points(gs1::ItemId {gs1::k_item_white_thorn_berries}) == 54U);
 
     const auto* white_thorn_seed = gs1::find_item_def(gs1::ItemId {gs1::k_item_white_thorn_seed_bundle});
     GS1_SYSTEM_TEST_REQUIRE(context, white_thorn_seed != nullptr);
