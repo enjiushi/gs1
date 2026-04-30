@@ -1978,27 +1978,35 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         rewardPanel.classList.add("active");
     }
 
+    function clearRewardPanelVisuals() {
+        rewardPanel.hidden = true;
+        rewardPanel.classList.remove("active");
+        rewardPanelRewards.innerHTML = "";
+        if (rewardPanelSparkles) {
+            rewardPanelSparkles.innerHTML = "";
+        }
+    }
+
+    function dismissRewardPanel() {
+        if (!rewardPanelState && rewardPanel.hidden) {
+            return false;
+        }
+
+        rewardPanelState = null;
+        clearRewardPanelVisuals();
+        return true;
+    }
+
     function syncRewardPanel(nowMs) {
         if (!rewardPanelState) {
             if (!rewardPanel.hidden) {
-                rewardPanel.hidden = true;
-                rewardPanel.classList.remove("active");
-                rewardPanelRewards.innerHTML = "";
-                if (rewardPanelSparkles) {
-                    rewardPanelSparkles.innerHTML = "";
-                }
+                clearRewardPanelVisuals();
             }
             return;
         }
 
         if ((latestState && latestState.appState !== "SITE_ACTIVE") || nowMs >= rewardPanelState.hideAtMs) {
-            rewardPanelState = null;
-            rewardPanel.hidden = true;
-            rewardPanel.classList.remove("active");
-            rewardPanelRewards.innerHTML = "";
-            if (rewardPanelSparkles) {
-                rewardPanelSparkles.innerHTML = "";
-            }
+            dismissRewardPanel();
         }
     }
 
@@ -11918,6 +11926,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     window.addEventListener("keydown", function (event) {
+        dismissRewardPanel();
+
         if ((event.code === "AltLeft" || event.code === "AltRight") &&
             !event.repeat &&
             latestState &&
@@ -12270,6 +12280,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return;
         }
         closeTileContextMenu();
+    }, true);
+
+    document.addEventListener("mousedown", function () {
+        dismissRewardPanel();
     }, true);
 
     renderer.domElement.addEventListener("click", function (event) {
