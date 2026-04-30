@@ -3803,7 +3803,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         tasks.forEach(function (task) {
             const taskPresentation = getPhoneTaskTemplatePresentation(task);
             const taskProgress = getTaskProgressPresentation(task);
-            const descriptionText = taskPresentation.description || taskPresentation.summary;
+            const descriptionText = getTrackedTaskDescription(taskPresentation);
             const isCompleted = task.listKind === "PENDING_CLAIM";
 
             const card = document.createElement("article");
@@ -6058,6 +6058,34 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             currentProgress: currentProgress,
             completion: Math.round((currentProgress / targetProgress) * 100)
         };
+    }
+
+    function compactTaskText(text, maxLength) {
+        const normalized = typeof text === "string" ? text.replace(/\s+/g, " ").trim() : "";
+        if (!normalized) {
+            return "";
+        }
+
+        if (normalized.length <= maxLength) {
+            return normalized;
+        }
+
+        const snippet = normalized.slice(0, Math.max(0, maxLength - 3));
+        const lastSpace = snippet.lastIndexOf(" ");
+        const compacted =
+            lastSpace >= Math.floor(maxLength * 0.6)
+                ? snippet.slice(0, lastSpace)
+                : snippet;
+        return compacted.replace(/[ ,;:.-]+$/g, "") + "...";
+    }
+
+    function getTrackedTaskDescription(taskPresentation) {
+        if (!taskPresentation) {
+            return "";
+        }
+
+        const preferredText = taskPresentation.summary || taskPresentation.description || "";
+        return compactTaskText(preferredText, 80);
     }
 
     function getPhoneTaskTemplatePresentation(task) {
