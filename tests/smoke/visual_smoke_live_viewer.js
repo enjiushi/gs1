@@ -132,7 +132,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const heatColorAddGainForVfx = 1.0;
     const rewardPanelDurationMs = 3400;
     const witheringAlertDurationSeconds = 2.0;
-    const witheringAlertDensityDropThreshold = 0.01;
+    // Density alerts compare normalized 0..1 tile values, while runtime projection
+    // quantizes visible density in 1/128 steps. Use a threshold below one step so
+    // ordinary projected increases/decreases still produce the red/green hint mesh.
+    const witheringAlertDensityDropThreshold = 1.0 / 256.0;
     const witheringAlertHeightOffset = 0.04;
     const witheringAlertMaxOpacity = 0.72;
     const densityDecreaseAlertStyle = {
@@ -11813,6 +11816,45 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function normalizeState(state) {
+        function normalizeSiteTile(tile) {
+            if (!tile || typeof tile !== "object") {
+                return tile;
+            }
+
+            const normalizedTile = Object.assign({}, tile);
+            if (typeof normalizedTile.plantDensity === "number") {
+                normalizedTile.plantDensity =
+                    normalizedTile.plantDensity > 1.0
+                        ? clamp01(normalizedTile.plantDensity / 100.0)
+                        : clamp01(normalizedTile.plantDensity);
+            }
+            if (typeof normalizedTile.sandBurial === "number") {
+                normalizedTile.sandBurial =
+                    normalizedTile.sandBurial > 1.0
+                        ? clamp01(normalizedTile.sandBurial / 100.0)
+                        : clamp01(normalizedTile.sandBurial);
+            }
+            if (typeof normalizedTile.moisture === "number") {
+                normalizedTile.moisture =
+                    normalizedTile.moisture > 1.0
+                        ? clamp01(normalizedTile.moisture / 100.0)
+                        : clamp01(normalizedTile.moisture);
+            }
+            if (typeof normalizedTile.soilFertility === "number") {
+                normalizedTile.soilFertility =
+                    normalizedTile.soilFertility > 1.0
+                        ? clamp01(normalizedTile.soilFertility / 100.0)
+                        : clamp01(normalizedTile.soilFertility);
+            }
+            if (typeof normalizedTile.soilSalinity === "number") {
+                normalizedTile.soilSalinity =
+                    normalizedTile.soilSalinity > 1.0
+                        ? clamp01(normalizedTile.soilSalinity / 100.0)
+                        : clamp01(normalizedTile.soilSalinity);
+            }
+            return normalizedTile;
+        }
+
         if (!state.uiSetups) {
             state.uiSetups = [];
         }
@@ -11824,6 +11866,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
         if (!Array.isArray(state.recentOneShotCues)) {
             state.recentOneShotCues = [];
+        }
+        if (state.siteBootstrap && Array.isArray(state.siteBootstrap.tiles)) {
+            state.siteBootstrap = Object.assign({}, state.siteBootstrap, {
+                tiles: state.siteBootstrap.tiles.map(normalizeSiteTile)
+            });
         }
         return state;
     }
