@@ -261,6 +261,20 @@ public:
         std::uint32_t footprint_height {1U};
     };
 
+    struct SitePlacementPreviewTileProjection final
+    {
+        std::int32_t x {0};
+        std::int32_t y {0};
+        std::uint32_t flags {0U};
+        float wind_protection {0.0f};
+        float heat_protection {0.0f};
+        float dust_protection {0.0f};
+        float final_wind_protection {0.0f};
+        float final_heat_protection {0.0f};
+        float final_dust_protection {0.0f};
+        float occupant_condition {0.0f};
+    };
+
     struct SitePlacementFailureProjection final
     {
         std::int32_t tile_x {0};
@@ -338,6 +352,7 @@ public:
         std::optional<SiteInventoryViewProjection> opened_storage {};
         std::optional<SiteCraftContextProjection> craft_context {};
         std::optional<SitePlacementPreviewProjection> placement_preview {};
+        std::vector<SitePlacementPreviewTileProjection> placement_preview_tiles {};
         std::optional<SitePlacementFailureProjection> placement_failure {};
         std::optional<SiteWorkerProjection> worker {};
         std::optional<SiteCampProjection> camp {};
@@ -454,6 +469,7 @@ private:
     void apply_site_craft_context_option_upsert(const Gs1EngineMessage& message);
     void apply_site_craft_context_end();
     void apply_site_placement_preview(const Gs1EngineMessage& message);
+    void apply_site_placement_preview_tile_upsert(const Gs1EngineMessage& message);
     void apply_site_placement_failure(const Gs1EngineMessage& message);
     void apply_site_task_upsert(const Gs1EngineMessage& message);
     void apply_site_modifier_list_begin(const Gs1EngineMessage& message);

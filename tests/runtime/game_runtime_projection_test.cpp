@@ -1817,6 +1817,40 @@ int main()
         assert((payload.flags & 1U) != 0U);
         assert((payload.flags & 2U) != 0U);
         assert(payload.blocked_mask == 0ULL);
+        assert(payload.preview_tile_count > 0U);
+    }
+    const auto preview_tile_messages =
+        collect_messages_of_type(placement_mode_messages, GS1_ENGINE_MESSAGE_SITE_PLACEMENT_PREVIEW_TILE_UPSERT);
+    assert(!preview_tile_messages.empty());
+    const auto preview_anchor_tile = std::find_if(
+        preview_tile_messages.begin(),
+        preview_tile_messages.end(),
+        [](const Gs1EngineMessage* message) {
+            const auto& payload = message->payload_as<Gs1EngineMessagePlacementPreviewTileData>();
+            return payload.x == 4 && payload.y == 4 &&
+                (payload.flags & GS1_PLACEMENT_PREVIEW_TILE_FLAG_OCCUPIED) != 0U &&
+                (payload.flags & GS1_PLACEMENT_PREVIEW_TILE_FLAG_PLANT) != 0U &&
+                approx_equal(payload.occupant_condition, 100.0f);
+        });
+    assert(preview_anchor_tile != preview_tile_messages.end());
+
+    Gs1UiAction placement_select_heat_overlay_action {};
+    placement_select_heat_overlay_action.type = GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE;
+    placement_select_heat_overlay_action.arg0 = GS1_SITE_PROTECTION_OVERLAY_HEAT;
+    const auto placement_select_heat_overlay_event = make_ui_action_event(placement_select_heat_overlay_action);
+    assert(placement_preview_runtime.submit_host_events(&placement_select_heat_overlay_event, 1U) == GS1_STATUS_OK);
+    run_phase1(placement_preview_runtime, 0.0);
+    assert(
+        gs1::GameRuntimeProjectionTestAccess::site_protection_overlay_mode(placement_preview_runtime) ==
+        GS1_SITE_PROTECTION_OVERLAY_HEAT);
+    const auto placement_overlay_messages = drain_engine_messages(placement_preview_runtime);
+    const auto placement_overlay_state_messages =
+        collect_messages_of_type(placement_overlay_messages, GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE);
+    assert(placement_overlay_state_messages.size() == 1U);
+    {
+        const auto& payload =
+            placement_overlay_state_messages.front()->payload_as<Gs1EngineMessageSiteProtectionOverlayData>();
+        assert(payload.mode == GS1_SITE_PROTECTION_OVERLAY_HEAT);
     }
 
     auto blocked_tile = placement_preview_site_run.site_world->tile_at(TileCoord {5, 4});
@@ -1838,7 +1872,11 @@ int main()
         assert((payload.flags & 1U) != 0U);
         assert((payload.flags & 2U) == 0U);
         assert(payload.blocked_mask == (1ULL << 1U));
+        assert(payload.preview_tile_count == 0U);
     }
+    assert(
+        gs1::GameRuntimeProjectionTestAccess::site_protection_overlay_mode(placement_preview_runtime) ==
+        GS1_SITE_PROTECTION_OVERLAY_HEAT);
 
     auto blocked_confirm_event = make_site_action_request_event(
         GS1_SITE_ACTION_PLANT,
