@@ -328,7 +328,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         8: { name: "Wood", shortName: "Wood", stackSize: 20, canUse: false, canPlant: false, canDeploy: false },
         9: { name: "Iron", shortName: "Iron", stackSize: 20, canUse: false, canPlant: false, canDeploy: false },
         10: { name: "Dried Grass", shortName: "Grass", stackSize: 10, canUse: false, canPlant: false, canDeploy: false },
-        11: { name: "Camp Stove Kit", shortName: "Stove Kit", stackSize: 1, canUse: false, canPlant: false, canDeploy: true, deployStructureId: 201 },
+        11: { name: "Field Kitchen Kit", shortName: "Kitchen Kit", stackSize: 1, canUse: false, canPlant: false, canDeploy: true, deployStructureId: 201 },
         12: { name: "Workbench Kit", shortName: "Bench Kit", stackSize: 1, canUse: false, canPlant: false, canDeploy: true, deployStructureId: 202 },
         13: { name: "Storage Crate Kit", shortName: "Crate Kit", stackSize: 1, canUse: false, canPlant: false, canDeploy: true, deployStructureId: 203 },
         14: { name: "Hammer", shortName: "Hammer", stackSize: 1, canUse: false, canPlant: false, canDeploy: false },
@@ -571,7 +571,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         Services: { iconKey: "userPlus", light: "#a37c93", dark: "#694d60" }
     };
     const structureCatalog = {
-        201: { name: "Camp Stove", shortName: "Stove", slotCount: 6 },
+        201: { name: "Field Kitchen", shortName: "Kitchen", slotCount: 6 },
         202: { name: "Workbench", shortName: "Workbench", slotCount: 8 },
         203: { name: "Storage Crate", shortName: "Crate", slotCount: 10 }
     };
@@ -6507,16 +6507,16 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             };
         case 107:
             return {
-                title: "Craft a Cook Plot",
-                summary: "Craft 1 Camp Stove Kit at the workbench with the hammer ready.",
-                description: "Craft 1 Camp Stove Kit at the workbench while the hammer is available nearby to unlock the next camp food step.",
+                title: "Craft a Field Kitchen Kit",
+                summary: "Craft 1 Field Kitchen Kit at the workbench with the hammer ready.",
+                description: "Craft 1 Field Kitchen Kit at the workbench while the hammer is available nearby to unlock the next camp food step.",
                 rewards: ["+10 total reputation"]
             };
         case 108:
             return {
-                title: "Place the Cook Plot",
-                summary: "Deploy 1 Camp Stove on the ground beside camp.",
-                description: "Place 1 Camp Stove on the ground near camp so the new cooking station is ready to use.",
+                title: "Place the Field Kitchen",
+                summary: "Deploy 1 Field Kitchen on the ground beside camp.",
+                description: "Place 1 Field Kitchen on the ground near camp so the new cooking station is ready to use.",
                 rewards: ["$2.00", "+10 total reputation"]
             };
         case 109:

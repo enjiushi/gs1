@@ -149,9 +149,9 @@ const char* onboarding_task_label(std::uint32_t task_template_id) noexcept
     case gs1::k_task_template_site1_onboarding_keep_starter_ephedra_stable:
         return "Hold the Starter Patch";
     case gs1::k_task_template_site1_onboarding_craft_camp_stove:
-        return "Craft a Cook Plot";
+        return "Craft a Field Kitchen Kit";
     case gs1::k_task_template_site1_onboarding_build_camp_stove:
-        return "Place the Cook Plot";
+        return "Place the Field Kitchen";
     case gs1::k_task_template_site1_onboarding_harvest_starter_ephedra:
         return "Harvest Desert Ephedra";
     case gs1::k_task_template_site1_onboarding_cook_ephedra_stew:
