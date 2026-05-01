@@ -3682,9 +3682,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const panels = collectTileContextPanels(rootItems, tileContextMenuState.hoverPath);
         const panelWidth = 220;
         const panelGap = 10;
-        const panelRise = 16;
         const viewportWidth = Math.max(window.innerWidth, 320);
         const viewportHeight = Math.max(window.innerHeight, 240);
+        let parentPanelTop = null;
 
         tileContextMenu.hidden = false;
         tileContextMenu.innerHTML = "";
@@ -3697,11 +3697,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 Math.max(10, tileContextMenuState.anchorX + panel.level * (panelWidth + panelGap)),
                 Math.max(10, viewportWidth - panelWidth - 12));
             const estimatedHeight = panel.items.length * 58 + 18;
+            const preferredTop = parentPanelTop === null
+                ? tileContextMenuState.anchorY
+                : parentPanelTop;
             const panelTop = Math.min(
-                Math.max(10, tileContextMenuState.anchorY - panel.level * panelRise),
+                Math.max(10, preferredTop),
                 Math.max(10, viewportHeight - estimatedHeight - 12));
             panelElement.style.left = panelLeft + "px";
             panelElement.style.top = panelTop + "px";
+            parentPanelTop = panelTop;
 
             panel.items.forEach((item) => {
                 const button = document.createElement("button");
