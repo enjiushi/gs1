@@ -2540,6 +2540,27 @@ body {
     0 12px 18px rgba(76, 49, 18, 0.12);
 }
 
+.inventory-slot.reward-highlighted {
+  border-color: rgba(201, 153, 62, 0.82);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 225, 156, 0.42),
+    0 0 0 2px rgba(232, 184, 71, 0.14),
+    0 0 22px rgba(219, 171, 55, 0.34);
+  animation: inventory-slot-reward-highlight 1.15s ease-out 2;
+}
+
+.inventory-slot.reward-highlighted::before {
+  content: "";
+  position: absolute;
+  inset: -14%;
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 239, 196, 0.52), rgba(255, 239, 196, 0.0) 62%);
+  pointer-events: none;
+  z-index: 0;
+  animation: inventory-slot-reward-glow 1.15s ease-out 2;
+}
+
 .inventory-slot.loadout-slot {
   min-height: 54px;
   min-width: 54px;
@@ -2618,6 +2639,36 @@ body {
 .inventory-slot.empty .inventory-slot-count,
 .inventory-slot.empty .inventory-slot-corner {
   display: none;
+}
+
+@keyframes inventory-slot-reward-highlight {
+  0% {
+    transform: scale(0.94);
+    filter: brightness(1.08);
+  }
+  28% {
+    transform: scale(1.06);
+    filter: brightness(1.24);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
+@keyframes inventory-slot-reward-glow {
+  0% {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+  26% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.2);
+  }
 }
 
 .slot-action-button {

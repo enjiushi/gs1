@@ -208,6 +208,8 @@ const char* one_shot_cue_name(Gs1OneShotCueKind cue_kind)
         return "TASK_REWARD_CLAIMED";
     case GS1_ONE_SHOT_CUE_CAMPAIGN_UNLOCKED:
         return "CAMPAIGN_UNLOCKED";
+    case GS1_ONE_SHOT_CUE_CRAFT_OUTPUT_STORED:
+        return "CRAFT_OUTPUT_STORED";
     case GS1_ONE_SHOT_CUE_NONE:
     default:
         return "NONE";

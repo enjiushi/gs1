@@ -2168,6 +2168,7 @@ void task_board_site_one_onboarding_inserts_hammer_before_storage_crate(
                     gs1::k_recipe_craft_hammer,
                     gs1::k_item_hammer,
                     1U,
+                    0U,
                     0U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, hammer_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
 
@@ -2237,6 +2238,7 @@ void task_board_site_one_onboarding_inserts_deploy_storage_crate_before_buy_wate
                     gs1::k_recipe_craft_hammer,
                     gs1::k_item_hammer,
                     1U,
+                    0U,
                     0U})) == GS1_STATUS_OK);
     claim_task(hammer_task->task_instance_id);
 
@@ -2253,6 +2255,7 @@ void task_board_site_one_onboarding_inserts_deploy_storage_crate_before_buy_wate
                     gs1::k_recipe_craft_storage_crate,
                     gs1::k_item_storage_crate_kit,
                     1U,
+                    0U,
                     0U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(
         context,
@@ -2353,6 +2356,7 @@ void task_board_site_one_onboarding_buy_food_progresses_from_food_purchase(
                     gs1::k_recipe_craft_hammer,
                     gs1::k_item_hammer,
                     1U,
+                    0U,
                     0U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, hammer_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
     claim_task(hammer_task->task_instance_id);
@@ -2370,6 +2374,7 @@ void task_board_site_one_onboarding_buy_food_progresses_from_food_purchase(
                     gs1::k_recipe_craft_storage_crate,
                     gs1::k_item_storage_crate_kit,
                     1U,
+                    0U,
                     0U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(
         context,
@@ -2489,6 +2494,7 @@ void task_board_site_one_onboarding_unlocks_ephedra_stew_before_cook_step(
                     gs1::k_recipe_craft_hammer,
                     gs1::k_item_hammer,
                     1U,
+                    0U,
                     0U})) == GS1_STATUS_OK);
     claim_task(hammer_task->task_instance_id);
 
@@ -2505,6 +2511,7 @@ void task_board_site_one_onboarding_unlocks_ephedra_stew_before_cook_step(
                     gs1::k_recipe_craft_storage_crate,
                     gs1::k_item_storage_crate_kit,
                     1U,
+                    0U,
                     0U})) == GS1_STATUS_OK);
     claim_task(storage_crate_task->task_instance_id);
 
@@ -2560,6 +2567,7 @@ void task_board_site_one_onboarding_unlocks_ephedra_stew_before_cook_step(
                     gs1::k_recipe_craft_shovel,
                     gs1::k_item_shovel,
                     1U,
+                    0U,
                     0U})) == GS1_STATUS_OK);
     claim_task(shovel_task->task_instance_id);
 
@@ -2582,6 +2590,7 @@ void task_board_site_one_onboarding_unlocks_ephedra_stew_before_cook_step(
                     gs1::k_recipe_craft_camp_stove,
                     gs1::k_item_camp_stove_kit,
                     1U,
+                    0U,
                     0U})) == GS1_STATUS_OK);
     claim_task(camp_stove_task->task_instance_id);
 
@@ -3225,6 +3234,7 @@ void site_one_onboarding_stable_ephedra_task_blocks_starter_density_loss_while_p
                     gs1::k_recipe_craft_hammer,
                     gs1::k_item_hammer,
                     1U,
+                    0U,
                     0U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, hammer_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
     claim_task(hammer_task->task_instance_id);
@@ -3242,6 +3252,7 @@ void site_one_onboarding_stable_ephedra_task_blocks_starter_density_loss_while_p
                     gs1::k_recipe_craft_storage_crate,
                     gs1::k_item_storage_crate_kit,
                     1U,
+                    0U,
                     0U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, storage_crate_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
     claim_task(storage_crate_task->task_instance_id);
@@ -3303,6 +3314,7 @@ void site_one_onboarding_stable_ephedra_task_blocks_starter_density_loss_while_p
                     gs1::k_recipe_craft_shovel,
                     gs1::k_item_shovel,
                     1U,
+                    0U,
                     0U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, shovel_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
     claim_task(shovel_task->task_instance_id);

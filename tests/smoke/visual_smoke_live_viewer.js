@@ -99,6 +99,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let placementFailureToastState = null;
     let rewardPanelState = null;
     let pendingRewardPanelPresentations = [];
+    let highlightedStorageItemState = null;
     let viewerCompatibilityWarning = "";
     let placementCursorSendInFlight = false;
     let lastSentPlacementCursorSignature = "";
@@ -132,6 +133,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const orbitDragThresholdPixels = 6;
     const heatColorAddGainForVfx = 1.0;
     const rewardPanelDurationMs = 3400;
+    const storageHighlightDurationMs = 2600;
     const witheringAlertDurationSeconds = 2.0;
     // Density alerts compare normalized 0..1 tile values, while runtime projection
     // quantizes visible density in 1/128 steps. Use a threshold below one step so
@@ -1989,6 +1991,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             scheduleToneBurst({ type: "triangle", startFrequency: 587.33, endFrequency: 880.0, duration: 0.22, peakGain: 0.034 });
             scheduleToneBurst({ type: "sine", startFrequency: 880.0, endFrequency: 1174.66, duration: 0.28, peakGain: 0.022 });
             break;
+        case "CRAFT_OUTPUT_STORED":
+            scheduleToneBurst({ type: "triangle", startFrequency: 698.46, endFrequency: 932.33, duration: 0.18, peakGain: 0.03 });
+            scheduleToneBurst({ type: "sine", startFrequency: 932.33, endFrequency: 1174.66, duration: 0.2, peakGain: 0.02 });
+            break;
         default:
             break;
         }
@@ -2126,6 +2132,42 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         rewardPanel.hidden = false;
     }
 
+    function clearExpiredHighlightedStorageItem(nowMs) {
+        if (!highlightedStorageItemState) {
+            return;
+        }
+
+        if ((latestState && latestState.appState !== "SITE_ACTIVE") ||
+            nowMs >= highlightedStorageItemState.hideAtMs) {
+            highlightedStorageItemState = null;
+        }
+    }
+
+    function noteCraftOutputStoredCue(cue) {
+        if (!cue) {
+            return;
+        }
+
+        highlightedStorageItemState = {
+            storageId: typeof cue.subjectId === "number" ? cue.subjectId : 0,
+            itemId: typeof cue.arg0 === "number" ? cue.arg0 : 0,
+            quantity: typeof cue.arg1 === "number" ? cue.arg1 : 0,
+            hideAtMs: performance.now() + storageHighlightDurationMs
+        };
+    }
+
+    function shouldHighlightStorageSlot(slot) {
+        if (!highlightedStorageItemState || !slot || !isOccupiedSlot(slot)) {
+            return false;
+        }
+
+        if ((slot.storageId || 0) !== highlightedStorageItemState.storageId) {
+            return false;
+        }
+
+        return slot.itemId === highlightedStorageItemState.itemId;
+    }
+
     function openRewardPanelPresentation(presentation) {
         rewardPanelState = Object.assign({}, presentation, {
             hideAtMs: performance.now() + rewardPanelDurationMs
@@ -2174,6 +2216,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function syncRewardPanel(nowMs) {
+        clearExpiredHighlightedStorageItem(nowMs);
         if (!rewardPanelState) {
             if (!rewardPanel.hidden) {
                 clearRewardPanelVisuals();
@@ -2181,7 +2224,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return;
         }
 
-        if ((latestState && latestState.appState !== "SITE_ACTIVE") || nowMs >= rewardPanelState.hideAtMs) {
+        if (latestState && latestState.appState !== "SITE_ACTIVE") {
+            rewardPanelState = null;
+            clearRewardPanelVisuals();
+            return;
+        }
+
+        if (nowMs >= rewardPanelState.hideAtMs) {
             dismissRewardPanel();
         }
     }
@@ -2204,6 +2253,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 ensureTechnologyCatalog().catch(() => {});
             }
             enqueueRewardPanelPresentation(campaignUnlockPresentationFromCue(cue));
+            return;
+        }
+
+        if (cue.cueKind === "CRAFT_OUTPUT_STORED") {
+            noteCraftOutputStoredCue(cue);
         }
     }
 
@@ -3682,9 +3736,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const panels = collectTileContextPanels(rootItems, tileContextMenuState.hoverPath);
         const panelWidth = 220;
         const panelGap = 10;
-        const panelRise = 16;
         const viewportWidth = Math.max(window.innerWidth, 320);
         const viewportHeight = Math.max(window.innerHeight, 240);
+        let parentPanelTop = null;
 
         tileContextMenu.hidden = false;
         tileContextMenu.innerHTML = "";
@@ -3697,11 +3751,15 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 Math.max(10, tileContextMenuState.anchorX + panel.level * (panelWidth + panelGap)),
                 Math.max(10, viewportWidth - panelWidth - 12));
             const estimatedHeight = panel.items.length * 58 + 18;
+            const preferredTop = parentPanelTop === null
+                ? tileContextMenuState.anchorY
+                : parentPanelTop;
             const panelTop = Math.min(
-                Math.max(10, tileContextMenuState.anchorY - panel.level * panelRise),
+                Math.max(10, preferredTop),
                 Math.max(10, viewportHeight - estimatedHeight - 12));
             panelElement.style.left = panelLeft + "px";
             panelElement.style.top = panelTop + "px";
+            parentPanelTop = panelTop;
 
             panel.items.forEach((item) => {
                 const button = document.createElement("button");
@@ -4404,6 +4462,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
         if (occupied && options.selectedSlotKey && slotKey(slot.containerKind, slot.slotIndex, slot.containerOwnerId) === options.selectedSlotKey) {
             slotClasses.push("selected");
+        }
+        if (occupied && shouldHighlightStorageSlot(slot)) {
+            slotClasses.push("reward-highlighted");
         }
         card.className = slotClasses.join(" ");
         card.title = occupied ? getInventoryItemLabel(slot) : label;

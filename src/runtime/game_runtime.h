@@ -194,6 +194,10 @@ private:
         std::uint32_t task_instance_id,
         std::uint32_t task_template_id,
         std::uint32_t reward_candidate_count);
+    void queue_craft_output_stored_cue_message(
+        std::uint32_t storage_id,
+        std::uint32_t item_id,
+        std::uint32_t quantity);
     void queue_campaign_unlock_cue_message(
         std::uint32_t subject_id,
         std::uint32_t detail_id,
