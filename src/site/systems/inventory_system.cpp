@@ -907,7 +907,8 @@ Gs1Status handle_inventory_craft_commit(
             recipe_def->recipe_id.value,
             recipe_def->output_item_id.value,
             recipe_def->output_quantity,
-            0U});
+            0U,
+            inventory_storage::storage_id_for_container(context.site_run, output_container)});
         context.message_queue.push_back(completed_message);
         return GS1_STATUS_OK;
     });

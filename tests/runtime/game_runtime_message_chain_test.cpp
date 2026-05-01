@@ -2,6 +2,7 @@
 #include "content/defs/faction_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/task_defs.h"
+#include "site/inventory_storage.h"
 #include "site/site_projection_update_flags.h"
 #include "content/defs/plant_defs.h"
 #include "site/task_board_state.h"
@@ -246,6 +247,35 @@ const Gs1EngineMessage* find_one_shot_cue_message(
     }
 
     return nullptr;
+}
+
+const Gs1EngineMessage* find_inventory_view_message(
+    const std::vector<Gs1EngineMessage>& messages,
+    std::uint32_t storage_id,
+    Gs1InventoryViewEventKind event_kind)
+{
+    for (const auto& message : messages)
+    {
+        if (message.type != GS1_ENGINE_MESSAGE_SITE_INVENTORY_VIEW_STATE)
+        {
+            continue;
+        }
+
+        const auto& payload = message.payload_as<Gs1EngineMessageInventoryViewData>();
+        if (payload.storage_id == storage_id && payload.event_kind == event_kind)
+        {
+            return &message;
+        }
+    }
+
+    return nullptr;
+}
+
+std::uint32_t starter_storage_id(gs1::SiteRunState& site_run)
+{
+    return gs1::inventory_storage::storage_id_for_container(
+        site_run,
+        gs1::inventory_storage::starter_storage_container(site_run));
 }
 
 const Gs1EngineMessage* find_tile_message(
@@ -699,6 +729,44 @@ void task_reward_claim_ui_action_claims_pending_task_and_emits_reward_cue()
     }
 }
 
+void inventory_craft_completed_opens_output_storage_and_emits_craft_output_cue()
+{
+    Gs1RuntimeCreateDesc create_desc {};
+    create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
+    create_desc.api_version = gs1::k_api_version;
+    create_desc.fixed_step_seconds = 1.0 / 60.0;
+
+    GameRuntime runtime {create_desc};
+    bootstrap_site_one(runtime);
+
+    auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
+    drain_engine_messages(runtime);
+
+    const auto storage_id = starter_storage_id(site_run);
+    GameMessage crafted_message {};
+    crafted_message.type = GameMessageType::InventoryCraftCompleted;
+    crafted_message.set_payload(gs1::InventoryCraftCompletedMessage {
+        gs1::k_recipe_craft_storage_crate,
+        gs1::k_item_storage_crate_kit,
+        1U,
+        0U,
+        storage_id});
+    assert(runtime.handle_message(crafted_message) == GS1_STATUS_OK);
+
+    assert(site_run.inventory.opened_device_storage_id == storage_id);
+
+    const auto messages = drain_engine_messages(runtime);
+    const auto* craft_cue_message =
+        find_one_shot_cue_message(messages, GS1_ONE_SHOT_CUE_CRAFT_OUTPUT_STORED);
+    assert(craft_cue_message != nullptr);
+    {
+        const auto& payload = craft_cue_message->payload_as<Gs1EngineMessageOneShotCueData>();
+        assert(payload.subject_id == storage_id);
+        assert(payload.arg0 == gs1::k_item_storage_crate_kit);
+        assert(payload.arg1 == 1U);
+    }
+}
+
 void site_weather_changes_emit_hud_wind_warning_codes()
 {
     constexpr std::uint16_t k_hud_warning_wind_watch = 1U;
@@ -760,6 +828,7 @@ int main()
     ecology_growth_completes_task_and_site_attempt();
     task_reward_claim_emits_pending_claim_projection_then_reward_cue();
     task_reward_claim_ui_action_claims_pending_task_and_emits_reward_cue();
+    inventory_craft_completed_opens_output_storage_and_emits_craft_output_cue();
     site_weather_changes_emit_hud_wind_warning_codes();
     return 0;
 }

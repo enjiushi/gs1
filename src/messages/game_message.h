@@ -605,7 +605,8 @@ struct InventoryCraftCompletedMessage final
     std::uint32_t recipe_id;
     std::uint32_t output_item_id;
     std::uint16_t output_quantity;
-    std::uint16_t flags;
+    std::uint16_t reserved;
+    std::uint32_t output_storage_id;
 };
 
 struct EconomyMoneyAwardRequestedMessage final
@@ -861,7 +862,7 @@ GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingSoldMessage, 12U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryTransferCompletedMessage, 16U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryItemSubmittedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryItemUseCompletedMessage, 8U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryCraftCompletedMessage, 12U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryCraftCompletedMessage, 16U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(EconomyMoneyAwardRequestedMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteUnlockableRevealRequestedMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(RunModifierAwardRequestedMessage, 4U);

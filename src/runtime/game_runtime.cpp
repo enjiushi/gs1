@@ -97,6 +97,24 @@ enum CampaignUnlockCueDetailKind : std::uint32_t
     CAMPAIGN_UNLOCK_CUE_DETAIL_TECHNOLOGY_NODE = 2U
 };
 
+void queue_storage_open_request(
+    std::deque<GameMessage>& message_queue,
+    std::uint32_t storage_id)
+{
+    if (storage_id == 0U)
+    {
+        return;
+    }
+
+    GameMessage open_storage {};
+    open_storage.type = GameMessageType::InventoryStorageViewRequest;
+    open_storage.set_payload(InventoryStorageViewRequestMessage {
+        storage_id,
+        GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT,
+        {0U, 0U, 0U}});
+    message_queue.push_back(open_storage);
+}
+
 [[nodiscard]] std::vector<std::uint32_t> capture_unlocked_reputation_unlock_ids(
     const CampaignState& campaign)
 {
@@ -1727,6 +1745,21 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
         break;
     }
 
+    case GameMessageType::InventoryCraftCompleted:
+    {
+        const auto& payload = message.payload_as<InventoryCraftCompletedMessage>();
+        if (active_site_run_.has_value() && payload.output_storage_id != 0U)
+        {
+            queue_storage_open_request(message_queue_, payload.output_storage_id);
+            flush_site_presentation_if_dirty();
+            queue_craft_output_stored_cue_message(
+                payload.output_storage_id,
+                payload.output_item_id,
+                payload.output_quantity == 0U ? 1U : payload.output_quantity);
+        }
+        break;
+    }
+
     case GameMessageType::SiteActionStarted:
     case GameMessageType::SiteActionCompleted:
     case GameMessageType::SiteActionFailed:
@@ -1811,7 +1844,6 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
     case GameMessageType::InventoryTransferCompleted:
     case GameMessageType::InventoryItemSubmitted:
     case GameMessageType::InventoryItemUseCompleted:
-    case GameMessageType::InventoryCraftCompleted:
         if (active_site_run_.has_value() &&
             active_site_run_->site_action.placement_mode.active &&
             site_protection_overlay_mode_ != GS1_SITE_PROTECTION_OVERLAY_NONE)
@@ -3648,6 +3680,22 @@ void GameRuntime::queue_task_reward_claimed_cue_message(
     payload.arg0 = task_template_id;
     payload.arg1 = reward_candidate_count;
     payload.cue_kind = GS1_ONE_SHOT_CUE_TASK_REWARD_CLAIMED;
+    engine_messages_.push_back(message);
+}
+
+void GameRuntime::queue_craft_output_stored_cue_message(
+    std::uint32_t storage_id,
+    std::uint32_t item_id,
+    std::uint32_t quantity)
+{
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_PLAY_ONE_SHOT_CUE);
+    auto& payload = message.emplace_payload<Gs1EngineMessageOneShotCueData>();
+    payload.subject_id = storage_id;
+    payload.world_x = 0.0f;
+    payload.world_y = 0.0f;
+    payload.arg0 = item_id;
+    payload.arg1 = quantity;
+    payload.cue_kind = GS1_ONE_SHOT_CUE_CRAFT_OUTPUT_STORED;
     engine_messages_.push_back(message);
 }
 
