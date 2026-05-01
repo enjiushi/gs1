@@ -3493,6 +3493,35 @@ void task_board_content_tuning_exposes_internal_prices_and_task_scoring_inputs(
         context,
         gs1::item_internal_price_cash_points(gs1::ItemId {gs1::k_item_food_pack}) == 375U);
 
+    const auto* ephedra_stew = gs1::find_item_def(gs1::ItemId {gs1::k_item_ephedra_stew});
+    GS1_SYSTEM_TEST_REQUIRE(context, ephedra_stew != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(ephedra_stew->hydration_delta, 10.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(ephedra_stew->nourishment_delta, 16.4f, 0.001f));
+
+    const auto* ephedra_stew_recipe =
+        gs1::find_craft_recipe_def(gs1::RecipeId {gs1::k_recipe_cook_ephedra_stew});
+    GS1_SYSTEM_TEST_REQUIRE(context, ephedra_stew_recipe != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, ephedra_stew_recipe->ingredient_count == 2U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        ephedra_stew_recipe->ingredients[0].item_id.value == gs1::k_item_water_container);
+    GS1_SYSTEM_TEST_CHECK(context, ephedra_stew_recipe->ingredients[0].quantity == 1U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        ephedra_stew_recipe->ingredients[1].item_id.value == gs1::k_item_desert_ephedra_sprigs);
+    GS1_SYSTEM_TEST_CHECK(context, ephedra_stew_recipe->ingredients[1].quantity == 1U);
+    const auto ephedra_stew_meter_cash_points = gs1::player_meter_gain_internal_cash_points(
+        ephedra_stew->health_delta,
+        ephedra_stew->hydration_delta,
+        ephedra_stew->nourishment_delta,
+        ephedra_stew->energy_delta,
+        ephedra_stew->morale_delta);
+    GS1_SYSTEM_TEST_CHECK(context, ephedra_stew_meter_cash_points == 580U);
+    const auto ephedra_stew_ingredient_cash_points =
+        gs1::item_internal_price_cash_points(gs1::ItemId {gs1::k_item_water_container}) +
+        gs1::item_internal_price_cash_points(gs1::ItemId {gs1::k_item_desert_ephedra_sprigs});
+    GS1_SYSTEM_TEST_CHECK(context, ephedra_stew_meter_cash_points > ephedra_stew_ingredient_cash_points);
+
     const auto* medicine = gs1::find_item_def(gs1::ItemId {gs1::k_item_medicine_pack});
     GS1_SYSTEM_TEST_REQUIRE(context, medicine != nullptr);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(medicine->health_delta, 18.0f));
