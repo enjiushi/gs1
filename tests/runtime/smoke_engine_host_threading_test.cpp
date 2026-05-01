@@ -442,6 +442,9 @@ void visual_smoke_assets_keep_hidden_regional_map_panels_collapsed()
     assert(viewer.find("Click to use or consume") != std::string::npos);
     assert(viewer.find("Click to select and use/store") == std::string::npos);
     assert(viewer.find("siteTechTreeActions.appendChild(") != std::string::npos);
+    assert(viewer.find("function resolveTileContextPanelTop(") != std::string::npos);
+    assert(viewer.find("return parentElement.offsetTop + hoveredElement.offsetTop;") != std::string::npos);
+    assert(viewer.find("clampTileContextPanelTop(preferredTop, estimatedHeight, viewportHeight)") != std::string::npos);
 }
 }  // namespace
 

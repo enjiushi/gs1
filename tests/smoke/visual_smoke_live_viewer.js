@@ -3397,6 +3397,41 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return panels;
     }
 
+    function clampTileContextPanelTop(preferredTop, estimatedHeight, viewportHeight) {
+        return Math.min(
+            Math.max(10, preferredTop),
+            Math.max(10, viewportHeight - estimatedHeight - 12));
+    }
+
+    function resolveTileContextPanelTop(panels, panelElements, panelIndex, fallbackTop) {
+        if (panelIndex <= 0) {
+            return fallbackTop;
+        }
+
+        const parentPanel = panels[panelIndex - 1];
+        const parentElement = panelElements[panelIndex - 1];
+        if (!parentPanel || !parentElement) {
+            return fallbackTop;
+        }
+
+        const hoveredId = tileContextMenuState.hoverPath[parentPanel.level];
+        const hoveredIndex = parentPanel.items.findIndex((item) => item.id === hoveredId);
+        if (hoveredIndex < 0 || hoveredIndex >= parentElement.children.length) {
+            return parentElement.offsetTop;
+        }
+
+        const hoveredElement = parentElement.children[hoveredIndex];
+        return parentElement.offsetTop + hoveredElement.offsetTop;
+    }
+
+    function computeTileContextPanelLeft(anchorX, panelLevel, viewportWidth) {
+        const panelWidth = 220;
+        const panelGap = 10;
+        return Math.min(
+            Math.max(10, anchorX + panelLevel * (panelWidth + panelGap)),
+            Math.max(10, viewportWidth - panelWidth - 12));
+    }
+
     function buildTileContextMenuItems(state, tileX, tileY) {
         const tile = getTileSnapshot(state, tileX, tileY);
         const structureId = tile ? (tile.structureTypeId || 0) : 0;
@@ -3737,32 +3772,29 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
         tileContextMenuRenderSignature = renderSignature;
         const panels = collectTileContextPanels(rootItems, tileContextMenuState.hoverPath);
-        const panelWidth = 220;
-        const panelGap = 10;
         const viewportWidth = Math.max(window.innerWidth, 320);
         const viewportHeight = Math.max(window.innerHeight, 240);
-        let parentPanelTop = null;
+        const panelElements = [];
 
         tileContextMenu.hidden = false;
         tileContextMenu.innerHTML = "";
 
-        panels.forEach((panel) => {
+        panels.forEach((panel, panelIndex) => {
             const panelElement = document.createElement("div");
             panelElement.className = "tile-context-panel";
-
-            const panelLeft = Math.min(
-                Math.max(10, tileContextMenuState.anchorX + panel.level * (panelWidth + panelGap)),
-                Math.max(10, viewportWidth - panelWidth - 12));
+            const panelLeft = computeTileContextPanelLeft(
+                tileContextMenuState.anchorX,
+                panel.level,
+                viewportWidth);
             const estimatedHeight = panel.items.length * 58 + 18;
-            const preferredTop = parentPanelTop === null
-                ? tileContextMenuState.anchorY
-                : parentPanelTop;
-            const panelTop = Math.min(
-                Math.max(10, preferredTop),
-                Math.max(10, viewportHeight - estimatedHeight - 12));
+            const preferredTop = resolveTileContextPanelTop(
+                panels,
+                panelElements,
+                panelIndex,
+                tileContextMenuState.anchorY);
             panelElement.style.left = panelLeft + "px";
-            panelElement.style.top = panelTop + "px";
-            parentPanelTop = panelTop;
+            panelElement.style.top =
+                clampTileContextPanelTop(preferredTop, estimatedHeight, viewportHeight) + "px";
 
             panel.items.forEach((item) => {
                 const button = document.createElement("button");
@@ -3834,6 +3866,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             });
 
             tileContextMenu.appendChild(panelElement);
+            panelElements.push(panelElement);
         });
     }
 
