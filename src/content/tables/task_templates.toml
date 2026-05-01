@@ -569,6 +569,25 @@ expected_task_hours_in_game = 0.2
 risk_multiplier = 0.02
 
 [[task_templates]]
+task_template_id = 112
+publisher_faction_id = 1
+task_tier_id = 1
+progress_kind = "BuildStructure"
+target_amount = 1
+required_count = 0
+item_id = 0
+plant_id = 0
+recipe_id = 0
+structure_id = 203
+secondary_structure_id = 0
+tertiary_structure_id = 0
+action_kind = "None"
+threshold_value = 0.0
+completion_faction_reputation_delta = 0
+expected_task_hours_in_game = 0.25
+risk_multiplier = 0.03
+
+[[task_templates]]
 task_template_id = 104
 publisher_faction_id = 1
 task_tier_id = 1

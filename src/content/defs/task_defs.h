@@ -101,6 +101,8 @@ inline constexpr std::uint32_t k_task_template_site1_keep_living_plants_stable =
 inline constexpr std::uint32_t k_task_template_site1_submit_water = 40U;
 inline constexpr std::uint32_t k_task_template_site1_onboarding_plant_checkerboard = 101U;
 inline constexpr std::uint32_t k_task_template_site1_onboarding_craft_storage_crate = 102U;
+inline constexpr std::uint32_t k_task_template_site1_onboarding_craft_hammer = 111U;
+inline constexpr std::uint32_t k_task_template_site1_onboarding_deploy_storage_crate = 112U;
 inline constexpr std::uint32_t k_task_template_site1_onboarding_buy_water = 103U;
 inline constexpr std::uint32_t k_task_template_site1_onboarding_buy_food = 104U;
 inline constexpr std::uint32_t k_task_template_site1_onboarding_craft_shovel = 105U;
@@ -109,7 +111,6 @@ inline constexpr std::uint32_t k_task_template_site1_onboarding_craft_camp_stove
 inline constexpr std::uint32_t k_task_template_site1_onboarding_build_camp_stove = 108U;
 inline constexpr std::uint32_t k_task_template_site1_onboarding_harvest_starter_ephedra = 109U;
 inline constexpr std::uint32_t k_task_template_site1_onboarding_cook_ephedra_stew = 110U;
-inline constexpr std::uint32_t k_task_template_site1_onboarding_craft_hammer = 111U;
 
 [[nodiscard]] std::span<const TaskTemplateDef> all_task_template_defs() noexcept;
 [[nodiscard]] const TaskTemplateDef* find_task_template_def(TaskTemplateId task_template_id) noexcept;

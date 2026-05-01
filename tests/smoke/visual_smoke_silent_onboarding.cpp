@@ -24,7 +24,7 @@ using SiteTaskProjection = SmokeEngineHost::SiteTaskProjection;
 using SiteTileProjection = SmokeEngineHost::SiteTileProjection;
 
 constexpr std::uint32_t k_onboarding_task_template_min = 101U;
-constexpr std::uint32_t k_onboarding_task_template_max = 111U;
+constexpr std::uint32_t k_onboarding_task_template_max = 112U;
 constexpr std::uint32_t k_preview_flag_active = 1U << 0U;
 constexpr std::uint32_t k_preview_flag_valid = 1U << 1U;
 
@@ -140,6 +140,8 @@ const char* onboarding_task_label(std::uint32_t task_template_id) noexcept
         return "Craft a Hammer";
     case gs1::k_task_template_site1_onboarding_craft_storage_crate:
         return "Craft a Storage Crate";
+    case gs1::k_task_template_site1_onboarding_deploy_storage_crate:
+        return "Deploy the Storage Crate";
     case gs1::k_task_template_site1_onboarding_buy_water:
         return "Buy Water";
     case gs1::k_task_template_site1_onboarding_buy_food:
@@ -654,6 +656,7 @@ private:
         const auto preview = current_preview(snapshot);
         if (preview.has_value() &&
             accepted_task->task_template_id != gs1::k_task_template_site1_onboarding_plant_checkerboard &&
+            accepted_task->task_template_id != gs1::k_task_template_site1_onboarding_deploy_storage_crate &&
             accepted_task->task_template_id != gs1::k_task_template_site1_onboarding_build_camp_stove)
         {
             maybe_cancel_placement_mode(host);
@@ -682,6 +685,9 @@ private:
                 gs1::k_structure_workbench,
                 gs1::k_item_storage_crate_kit);
             return TickResult::Running;
+
+        case gs1::k_task_template_site1_onboarding_deploy_storage_crate:
+            return handle_build_storage_crate_task(host, snapshot, site_snapshot, out_error);
 
         case gs1::k_task_template_site1_onboarding_buy_water:
             handle_buy_task(host, snapshot, gs1::k_item_water_container);
@@ -819,6 +825,34 @@ private:
             site_snapshot,
             GS1_SITE_ACTION_BUILD,
             gs1::k_item_camp_stove_kit,
+            1U,
+            1U,
+            out_error);
+    }
+
+    TickResult handle_build_storage_crate_task(
+        SmokeEngineHost& host,
+        const LiveStateSnapshot& snapshot,
+        const SiteSnapshotProjection& site_snapshot,
+        std::string& out_error)
+    {
+        if (worker_pack_item_quantity(snapshot, gs1::k_item_storage_crate_kit) == 0U)
+        {
+            ensure_item_in_worker_pack(
+                host,
+                snapshot,
+                find_structure_storage_id(site_snapshot, gs1::k_structure_workbench),
+                gs1::k_item_storage_crate_kit,
+                "open_workbench_storage_snapshot");
+            return TickResult::Running;
+        }
+
+        return handle_placement_task(
+            host,
+            snapshot,
+            site_snapshot,
+            GS1_SITE_ACTION_BUILD,
+            gs1::k_item_storage_crate_kit,
             1U,
             1U,
             out_error);

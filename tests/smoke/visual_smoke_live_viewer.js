@@ -6477,6 +6477,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 description: "Use the starter workbench with the newly crafted hammer nearby and craft 1 Storage Crate Kit so the site can start expanding storage.",
                 rewards: ["$8.00", "+10 total reputation"]
             };
+        case 112:
+            return {
+                title: "Deploy the Storage Crate",
+                summary: "Place 1 Storage Crate on the ground beside camp.",
+                description: "Deploy the newly crafted Storage Crate beside camp so the extra storage is actually available before the first phone delivery arrives.",
+                rewards: ["2 Wood", "1 Iron", "+10 total reputation"]
+            };
         case 103:
             return {
                 title: "Buy Water",
