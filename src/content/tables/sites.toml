@@ -19,9 +19,9 @@ completion_reputation_reward = 10
 completion_faction_reputation_reward = 10
 camp_anchor_x = 15
 camp_anchor_y = 15
-default_weather_heat = 50.0
-default_weather_wind = 20.0
-default_weather_dust = 10.0
+default_weather_heat = 10.0
+default_weather_wind = 30.0
+default_weather_dust = 0.0
 default_weather_wind_direction_degrees = 0.0
 starting_plants = [
     { plant_id = 9, anchor_x = 12, anchor_y = 14, initial_density = 60.0 },
