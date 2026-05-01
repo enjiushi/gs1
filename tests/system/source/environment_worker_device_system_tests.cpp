@@ -832,6 +832,102 @@ void local_weather_resolve_scales_multitile_plant_ranges_by_footprint(
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(wind_out_of_range.wind, 20.0f));
 }
 
+void local_weather_resolve_straw_checkerboard_projects_wind_protection_on_downwind_edge_tiles(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(2U, 1211U, 101U, 8U, 6U);
+    GameMessageQueue queue {};
+
+    site_run.weather.weather_wind = 50.0f;
+    site_run.weather.weather_wind_direction_degrees = 0.0f;
+
+    for (const auto coord : {TileCoord {2, 2}, TileCoord {3, 2}, TileCoord {2, 3}, TileCoord {3, 3}})
+    {
+        auto tile = site_run.site_world->tile_at(coord);
+        tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_straw_checkerboard};
+        tile.ecology.plant_density = 100.0f;
+        site_run.site_world->set_tile(coord, tile);
+    }
+
+    run_local_weather_pipeline(campaign, site_run, queue);
+
+    const auto first_lane =
+        site_run.site_world->tile_plant_weather_contribution(TileCoord {4, 2});
+    const auto second_lane =
+        site_run.site_world->tile_plant_weather_contribution(TileCoord {5, 2});
+    const auto lower_lane =
+        site_run.site_world->tile_plant_weather_contribution(TileCoord {4, 3});
+    const auto off_lane =
+        site_run.site_world->tile_plant_weather_contribution(TileCoord {4, 4});
+
+    GS1_SYSTEM_TEST_CHECK(context, first_lane.wind_protection > 50.0f);
+    GS1_SYSTEM_TEST_CHECK(context, first_lane.wind_protection < 61.0f);
+    GS1_SYSTEM_TEST_CHECK(context, second_lane.wind_protection > 25.0f);
+    GS1_SYSTEM_TEST_CHECK(context, second_lane.wind_protection < 31.0f);
+    GS1_SYSTEM_TEST_CHECK(context, lower_lane.wind_protection > 50.0f);
+    GS1_SYSTEM_TEST_CHECK(context, lower_lane.wind_protection < 61.0f);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(off_lane.wind_protection, 0.0f));
+}
+
+void local_weather_resolve_straw_checkerboard_planting_completion_projects_wind_protection_on_downwind_edge_tiles(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 1212U, 101U, 8U, 6U);
+    GameMessageQueue queue {};
+
+    auto ecology_context = make_site_context<EcologySystem>(campaign, site_run, queue);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        EcologySystem::process_message(
+            ecology_context,
+            make_message(
+                GameMessageType::SiteTilePlantingCompleted,
+                gs1::SiteTilePlantingCompletedMessage {
+                    1U,
+                    3,
+                    3,
+                    gs1::k_plant_straw_checkerboard,
+                    100.0f,
+                    0U})) == GS1_STATUS_OK);
+
+    auto plant_context =
+        make_site_context<PlantWeatherContributionSystem>(campaign, site_run, queue);
+    for (const auto& message : queue)
+    {
+        if (!PlantWeatherContributionSystem::subscribes_to(message.type))
+        {
+            continue;
+        }
+
+        GS1_SYSTEM_TEST_REQUIRE(
+            context,
+            PlantWeatherContributionSystem::process_message(plant_context, message) == GS1_STATUS_OK);
+    }
+
+    site_run.weather.weather_wind = 50.0f;
+    site_run.weather.weather_wind_direction_degrees = 0.0f;
+    run_local_weather_pipeline(campaign, site_run, queue);
+
+    const auto first_lane =
+        site_run.site_world->tile_plant_weather_contribution(TileCoord {4, 2});
+    const auto second_lane =
+        site_run.site_world->tile_plant_weather_contribution(TileCoord {5, 2});
+    const auto lower_lane =
+        site_run.site_world->tile_plant_weather_contribution(TileCoord {4, 3});
+    const auto off_lane =
+        site_run.site_world->tile_plant_weather_contribution(TileCoord {4, 4});
+
+    GS1_SYSTEM_TEST_CHECK(context, first_lane.wind_protection > 50.0f);
+    GS1_SYSTEM_TEST_CHECK(context, first_lane.wind_protection < 61.0f);
+    GS1_SYSTEM_TEST_CHECK(context, second_lane.wind_protection > 25.0f);
+    GS1_SYSTEM_TEST_CHECK(context, second_lane.wind_protection < 31.0f);
+    GS1_SYSTEM_TEST_CHECK(context, lower_lane.wind_protection > 50.0f);
+    GS1_SYSTEM_TEST_CHECK(context, lower_lane.wind_protection < 61.0f);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(off_lane.wind_protection, 0.0f));
+}
+
 void local_weather_resolve_respects_authored_plant_protection_ratio(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -897,6 +993,45 @@ void local_weather_resolve_marks_projected_plant_tiles_dirty_when_wind_changes(
     GS1_SYSTEM_TEST_REQUIRE(context, site_run.pending_tile_projection_updates.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, site_run.pending_tile_projection_updates.front().x == 2);
     GS1_SYSTEM_TEST_CHECK(context, site_run.pending_tile_projection_updates.front().y == 2);
+}
+
+void local_weather_resolve_marks_support_only_neighbor_tiles_dirty_when_wind_protection_changes(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(2U, 1210U, 101U, 6U, 5U);
+    GameMessageQueue queue {};
+
+    auto tile = site_run.site_world->tile_at(TileCoord {1, 2});
+    tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_straw_checkerboard};
+    tile.ecology.plant_density = 100.0f;
+    site_run.site_world->set_tile(TileCoord {1, 2}, tile);
+
+    site_run.weather.weather_wind = 50.0f;
+    site_run.weather.weather_wind_direction_degrees = 0.0f;
+    run_local_weather_pipeline(campaign, site_run, queue);
+
+    site_run.pending_projection_update_flags = 0U;
+    site_run.pending_tile_projection_updates.clear();
+    site_run.pending_tile_projection_update_mask.assign(site_run.site_world->tile_count(), 0U);
+
+    site_run.weather.weather_wind_direction_degrees = 180.0f;
+    run_local_weather_pipeline(campaign, site_run, queue);
+
+    const auto has_dirty_coord = [&](std::int32_t x, std::int32_t y) {
+        return std::find_if(
+                   site_run.pending_tile_projection_updates.begin(),
+                   site_run.pending_tile_projection_updates.end(),
+                   [&](const TileCoord& coord) {
+                       return coord.x == x && coord.y == y;
+                   }) != site_run.pending_tile_projection_updates.end();
+    };
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        (site_run.pending_projection_update_flags & gs1::SITE_PROJECTION_UPDATE_TILES) != 0U);
+    GS1_SYSTEM_TEST_CHECK(context, has_dirty_coord(3, 2));
+    GS1_SYSTEM_TEST_CHECK(context, has_dirty_coord(0, 2));
 }
 
 void local_weather_resolve_applies_device_wind_protection_value_and_range(
@@ -1812,12 +1947,24 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     local_weather_resolve_scales_multitile_plant_ranges_by_footprint);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "local_weather_resolve",
+    "straw_checkerboard_projects_wind_protection_on_downwind_edge_tiles",
+    local_weather_resolve_straw_checkerboard_projects_wind_protection_on_downwind_edge_tiles);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "local_weather_resolve",
+    "straw_checkerboard_planting_completion_projects_wind_protection_on_downwind_edge_tiles",
+    local_weather_resolve_straw_checkerboard_planting_completion_projects_wind_protection_on_downwind_edge_tiles);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "local_weather_resolve",
     "respects_authored_plant_protection_ratio",
     local_weather_resolve_respects_authored_plant_protection_ratio);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "local_weather_resolve",
     "marks_projected_plant_tiles_dirty_when_wind_changes",
     local_weather_resolve_marks_projected_plant_tiles_dirty_when_wind_changes);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "local_weather_resolve",
+    "marks_support_only_neighbor_tiles_dirty_when_wind_protection_changes",
+    local_weather_resolve_marks_support_only_neighbor_tiles_dirty_when_wind_protection_changes);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "local_weather_resolve",
     "applies_device_wind_protection_value_and_range",

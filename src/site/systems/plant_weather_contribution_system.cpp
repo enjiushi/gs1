@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <vector>
 
 namespace
 {
@@ -204,6 +205,49 @@ bool source_and_target_share_occupant_instance(
     return source_anchor.x == target_anchor.x && source_anchor.y == target_anchor.y;
 }
 
+struct WindContributionInstanceKey final
+{
+    gs1::PlantId plant_id {};
+    std::uint32_t ground_cover_type_id {0U};
+    gs1::TileCoord anchor {};
+};
+
+struct WindContributionInstanceEntry final
+{
+    WindContributionInstanceKey key {};
+    float wind_protection {0.0f};
+};
+
+[[nodiscard]] WindContributionInstanceKey make_wind_contribution_instance_key(
+    gs1::TileCoord source_coord,
+    gs1::PlantId plant_id,
+    std::uint32_t ground_cover_type_id) noexcept
+{
+    if (plant_id.value != 0U)
+    {
+        const auto footprint = gs1::resolve_plant_tile_footprint(plant_id);
+        return WindContributionInstanceKey {
+            plant_id,
+            ground_cover_type_id,
+            gs1::align_tile_anchor_to_footprint(source_coord, footprint)};
+    }
+
+    return WindContributionInstanceKey {
+        plant_id,
+        ground_cover_type_id,
+        source_coord};
+}
+
+[[nodiscard]] bool wind_contribution_instance_keys_match(
+    const WindContributionInstanceKey& lhs,
+    const WindContributionInstanceKey& rhs) noexcept
+{
+    return lhs.plant_id == rhs.plant_id &&
+        lhs.ground_cover_type_id == rhs.ground_cover_type_id &&
+        lhs.anchor.x == rhs.anchor.x &&
+        lhs.anchor.y == rhs.anchor.y;
+}
+
 gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
     gs1::SiteSystemContext<gs1::PlantWeatherContributionSystem>& context,
     const gs1::WeatherDirectionStep& wind_direction,
@@ -212,6 +256,8 @@ gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
 {
     auto& ecs_world = context.site_run.site_world->ecs_world();
     gs1::SiteWorld::TileWeatherContributionData total = gs1::zero_weather_contribution();
+    std::vector<WindContributionInstanceEntry> wind_instance_entries {};
+    wind_instance_entries.reserve(8U);
 
     for_each_contribution_sample(max_distance, [&](const gs1::WeatherContributionSample& sample)
     {
@@ -290,16 +336,40 @@ gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
                 wind_direction);
             if (shadow_scale > gs1::k_weather_contribution_epsilon)
             {
-                delta.wind_protection =
+                const float wind_protection =
                     plant_def.wind_resistance *
                     protection_ratio *
                     density *
                     shadow_scale;
+                const auto key = make_wind_contribution_instance_key(
+                    source_coord,
+                    plant_slot.plant_id,
+                    ground_cover_slot.ground_cover_type_id);
+                auto existing_entry = std::find_if(
+                    wind_instance_entries.begin(),
+                    wind_instance_entries.end(),
+                    [&](const WindContributionInstanceEntry& entry) {
+                        return wind_contribution_instance_keys_match(entry.key, key);
+                    });
+                if (existing_entry == wind_instance_entries.end())
+                {
+                    wind_instance_entries.push_back(WindContributionInstanceEntry {key, wind_protection});
+                }
+                else
+                {
+                    existing_entry->wind_protection =
+                        std::max(existing_entry->wind_protection, wind_protection);
+                }
             }
         }
 
         gs1::accumulate_weather_contribution(total, delta);
     });
+
+    for (const auto& entry : wind_instance_entries)
+    {
+        total.wind_protection += entry.wind_protection;
+    }
 
     return total;
 }
@@ -335,7 +405,8 @@ namespace gs1
 bool PlantWeatherContributionSystem::subscribes_to(GameMessageType type) noexcept
 {
     return type == GameMessageType::SiteRunStarted ||
-        type == GameMessageType::TileEcologyChanged;
+        type == GameMessageType::TileEcologyChanged ||
+        type == GameMessageType::TileEcologyBatchChanged;
 }
 
 Gs1Status PlantWeatherContributionSystem::process_message(
@@ -368,6 +439,25 @@ Gs1Status PlantWeatherContributionSystem::process_message(
             context,
             runtime,
             TileCoord {payload.target_tile_x, payload.target_tile_y});
+        return GS1_STATUS_OK;
+    }
+
+    case GameMessageType::TileEcologyBatchChanged:
+    {
+        const auto& payload = message.payload_as<TileEcologyBatchChangedMessage>();
+        for (std::uint32_t index = 0U; index < payload.entry_count; ++index)
+        {
+            const auto& entry = payload.entries[index];
+            if ((entry.changed_mask & (TILE_ECOLOGY_CHANGED_OCCUPANCY | TILE_ECOLOGY_CHANGED_DENSITY)) == 0U)
+            {
+                continue;
+            }
+
+            mark_tiles_affected_by_source(
+                context,
+                runtime,
+                TileCoord {entry.target_tile_x, entry.target_tile_y});
+        }
         return GS1_STATUS_OK;
     }
 

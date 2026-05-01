@@ -1264,9 +1264,12 @@ Gs1Status EcologySystem::process_message(
     {
         const auto& payload = message.payload_as<SiteTilePlantingCompletedMessage>();
         const TileCoord coord {payload.target_tile_x, payload.target_tile_y};
+        const TileFootprint footprint =
+            resolve_plant_tile_footprint(PlantId {payload.plant_type_id});
+        const TileCoord anchor = align_tile_anchor_to_footprint(coord, footprint);
         for_each_tile_in_footprint(
-            coord,
-            resolve_plant_tile_footprint(PlantId {payload.plant_type_id}),
+            anchor,
+            footprint,
             [&](TileCoord footprint_coord) {
                 const std::uint32_t changed_mask = apply_planting(context, footprint_coord, payload);
                 if (changed_mask != TILE_ECOLOGY_CHANGED_NONE)

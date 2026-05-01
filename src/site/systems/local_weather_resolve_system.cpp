@@ -314,8 +314,9 @@ void LocalWeatherResolveSystem::run(SiteSystemContext<LocalWeatherResolveSystem>
                     density_component.value);
             }
 
-            if (wind_changed &&
-                ecology_has_projected_plant_visual(plant_slot.plant_id, density_component.value))
+            if ((wind_changed &&
+                    ecology_has_projected_plant_visual(plant_slot.plant_id, density_component.value)) ||
+                support_changed)
             {
                 context.world.mark_tile_projection_dirty(coord_component.value);
             }

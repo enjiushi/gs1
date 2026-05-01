@@ -112,6 +112,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let latestFramePerfSampleTimestampMs = 0;
     let rendererWidth = 0;
     let rendererHeight = 0;
+    const protectionOverlayProjectVector = new THREE_NS.Vector3();
     let weatherPostProcess = null;
     let smoothedWeatherVisualResponse = {
         heatLevel: 0,
@@ -664,6 +665,14 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     renderer.outputColorSpace = THREE_NS.SRGBColorSpace;
     renderer.domElement.style.touchAction = "none";
     gameView.appendChild(renderer.domElement);
+    const protectionValueOverlayCanvas = document.createElement("canvas");
+    protectionValueOverlayCanvas.style.position = "absolute";
+    protectionValueOverlayCanvas.style.inset = "0";
+    protectionValueOverlayCanvas.style.pointerEvents = "none";
+    protectionValueOverlayCanvas.style.zIndex = "5";
+    protectionValueOverlayCanvas.style.display = "none";
+    gameView.appendChild(protectionValueOverlayCanvas);
+    const protectionValueOverlayContext = protectionValueOverlayCanvas.getContext("2d");
     const dustOverlay = document.createElement("div");
     dustOverlay.style.position = "absolute";
     dustOverlay.style.inset = "-8%";
@@ -704,6 +713,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         rendererWidth = width;
         rendererHeight = height;
         renderer.setSize(width, height, false);
+        const overlayScale = Math.min(window.devicePixelRatio || 1, 2);
+        protectionValueOverlayCanvas.width = Math.max(1, Math.round(width * overlayScale));
+        protectionValueOverlayCanvas.height = Math.max(1, Math.round(height * overlayScale));
+        protectionValueOverlayCanvas.style.width = width + "px";
+        protectionValueOverlayCanvas.style.height = height + "px";
         resizeWeatherDistortionPostProcess(weatherPostProcess, width, height);
         camera.aspect = width / height;
         camera.updateProjectionMatrix();
@@ -876,6 +890,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return normalizeAngleDegrees(getWeatherVisualResponse().windDirectionDegrees || 0);
     }
 
+    function resolveVisualWindDirectionRadians() {
+        return resolveVisualWindDirectionDegrees() * Math.PI / 180.0;
+    }
+
     function getHudWarningPresentation(state) {
         const hud = getHudState(state);
         const siteState = getSiteState(state);
@@ -976,7 +994,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             opacity: opacity,
             dustAlpha: dustAlpha,
             speedSeconds: Math.max(4.17, 5.4 - windSpeedLevel * 1.23),
-            tiltDegrees: directionDegrees - 90.0,
+            tiltDegrees: directionDegrees,
             directionDegrees: directionDegrees,
             severity: severity
         };
@@ -1033,9 +1051,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         const response = getWindVisualResponse(state);
         const isActive = response.opacity > 0.02;
-        const directionRadians = (response.directionDegrees || 0) * Math.PI / 180.0;
-        const driftX = Math.sin(directionRadians) * 10.0;
-        const driftY = -Math.cos(directionRadians) * 6.0;
+        const directionRadians = resolveVisualWindDirectionRadians();
+        const driftX = Math.cos(directionRadians) * 10.0;
+        const driftY = -Math.sin(directionRadians) * 6.0;
         stageFrame.classList.toggle("wind-overlay-active", isActive);
         stageFrame.classList.toggle("wind-overlay-severe", response.severity === "severe" || response.severity === "critical");
         stageFrame.classList.toggle("wind-overlay-critical", response.severity === "critical");
@@ -1056,6 +1074,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 weatherVisualResponse.dustLevel <= 0.001)) {
             renderer.setRenderTarget(null);
             renderer.render(scene, camera);
+            updateProtectionValueOverlayCanvas(state);
             return;
         }
 
@@ -1069,6 +1088,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         renderer.render(scene, camera);
         renderer.setRenderTarget(null);
         renderer.render(weatherPostProcess.scene, weatherPostProcess.camera);
+        updateProtectionValueOverlayCanvas(state);
     }
 
     function updateDustOverlay(state, elapsedSeconds) {
@@ -8486,7 +8506,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const windDensityLevel = Math.pow(clamp01(windLevel), 1.45);
         const windSpeedLevel = Math.pow(clamp01(windLevel), 1.2);
         const directionDegrees = resolveVisualWindDirectionDegrees();
-        const directionRadians = directionDegrees * Math.PI / 180.0;
+        const directionRadians = resolveVisualWindDirectionRadians();
         const alpha = Math.min(0.2, 0.015 + windDensityLevel * 0.185);
         const streakLength = lerp(0.72, 2.1, windDensityLevel);
         const streakWidth = lerp(0.62, 1.08, windDensityLevel);
@@ -8502,7 +8522,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const maxRespawnDelaySeconds = lerp(1.35, 0.16, windLevel);
 
         windField.group.visible = alpha > 0.02;
-        windField.group.rotation.y = directionRadians;
+        // The streak meshes flow along local +Z, while gameplay defines 0deg as +X/east.
+        windField.group.rotation.y = directionRadians + Math.PI * 0.5;
 
         let activeStreakCount = 0;
         windField.streaks.forEach((streak) => {
@@ -9529,13 +9550,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const weatherVisualResponse = getWeatherVisualResponse();
         const windStrength = clamp01(weatherVisualResponse.windLevel || 0);
         const directionDegrees = resolveVisualWindDirectionDegrees();
-        const directionRadians = directionDegrees * Math.PI / 180.0;
+        const directionRadians = resolveVisualWindDirectionRadians();
 
         plantWindShaderUniforms.uPlantTime.value = elapsedSeconds;
         plantWindShaderUniforms.uPlantWindStrength.value = windStrength;
         plantWindShaderUniforms.uPlantWindDirection.value.set(
-            Math.sin(directionRadians),
-            Math.cos(directionRadians)
+            Math.cos(directionRadians),
+            Math.sin(directionRadians)
         );
     }
 
@@ -10829,6 +10850,19 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         cache.protectionOverlayGroup = null;
     }
 
+    function traceRoundedRectPath(context, x, y, width, height, radius) {
+        const clampedRadius = Math.max(0, Math.min(radius, width * 0.5, height * 0.5));
+        context.moveTo(x + clampedRadius, y);
+        context.lineTo(x + width - clampedRadius, y);
+        context.quadraticCurveTo(x + width, y, x + width, y + clampedRadius);
+        context.lineTo(x + width, y + height - clampedRadius);
+        context.quadraticCurveTo(x + width, y + height, x + width - clampedRadius, y + height);
+        context.lineTo(x + clampedRadius, y + height);
+        context.quadraticCurveTo(x, y + height, x, y + height - clampedRadius);
+        context.lineTo(x, y + clampedRadius);
+        context.quadraticCurveTo(x, y, x + clampedRadius, y);
+    }
+
     function disposeExcavationMarksGroup(cache) {
         if (!cache || !cache.excavationMarksGroup) {
             return;
@@ -11113,6 +11147,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 overlayActive || !!(getPlacementPreview(state) && (getPlacementPreview(state).flags & 1) !== 0);
         }
         if (!overlayActive) {
+            updateProtectionValueOverlayCanvas(state);
             return;
         }
 
@@ -11134,8 +11169,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 tile.x,
                 tile.y
             );
+            const protectionValue = readTileProtectionValue(tileSnapshot, modeName);
             const normalizedProtection =
-                clamp01(readTileProtectionValue(tileSnapshot, modeName) / 100.0);
+                clamp01(protectionValue / 100.0);
             scratchColor.copy(lowColor).lerp(highColor, normalizedProtection);
 
             const tileHeight = computeSiteTileVisualHeight(tileSnapshot);
@@ -11163,6 +11199,130 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         worldGroup.add(overlayGroup);
         siteSceneCache.protectionOverlayGroup = overlayGroup;
+    }
+
+    function updateProtectionValueOverlayCanvas(state) {
+        if (!protectionValueOverlayContext) {
+            return;
+        }
+        if (!state) {
+            protectionValueOverlayCanvas.style.display = "none";
+            if (typeof protectionValueOverlayContext.setTransform === "function") {
+                protectionValueOverlayContext.setTransform(1, 0, 0, 1, 0, 0);
+            }
+            protectionValueOverlayContext.clearRect(0, 0, protectionValueOverlayCanvas.width, protectionValueOverlayCanvas.height);
+            return;
+        }
+
+        const protectionOverlay = getProtectionOverlayState(state);
+        const modeName = protectionOverlay && typeof protectionOverlay.mode === "string"
+            ? protectionOverlay.mode
+            : "NONE";
+        const overlayActive =
+            modeName !== "NONE" &&
+            !!siteSceneCache &&
+            rendererWidth > 0 &&
+            rendererHeight > 0;
+        protectionValueOverlayCanvas.style.display = overlayActive ? "block" : "none";
+        if (!overlayActive) {
+            if (typeof protectionValueOverlayContext.setTransform === "function") {
+                protectionValueOverlayContext.setTransform(1, 0, 0, 1, 0, 0);
+            }
+            protectionValueOverlayContext.clearRect(0, 0, protectionValueOverlayCanvas.width, protectionValueOverlayCanvas.height);
+            return;
+        }
+
+        const overlayScaleX = protectionValueOverlayCanvas.width / Math.max(rendererWidth, 1);
+        const overlayScaleY = protectionValueOverlayCanvas.height / Math.max(rendererHeight, 1);
+        if (typeof protectionValueOverlayContext.setTransform === "function") {
+            protectionValueOverlayContext.setTransform(1, 0, 0, 1, 0, 0);
+        }
+        protectionValueOverlayContext.clearRect(
+            0,
+            0,
+            protectionValueOverlayCanvas.width,
+            protectionValueOverlayCanvas.height
+        );
+        if (typeof protectionValueOverlayContext.setTransform === "function") {
+            protectionValueOverlayContext.setTransform(overlayScaleX, 0, 0, overlayScaleY, 0, 0);
+        } else if (typeof protectionValueOverlayContext.scale === "function") {
+            protectionValueOverlayContext.scale(overlayScaleX, overlayScaleY);
+        }
+
+        const siteBootstrap = getSiteBootstrap(state);
+        const siteTiles = siteBootstrap && Array.isArray(siteBootstrap.tiles)
+            ? siteBootstrap.tiles
+            : [];
+        const tileMap = buildSiteTileMap(siteTiles);
+        const lowColor = new THREE_NS.Color(0xc95649);
+        const highColor = new THREE_NS.Color(0x59b36c);
+        const tintColor = new THREE_NS.Color();
+        const labelWidth = 34;
+        const labelHeight = 16;
+        const minVisibleZ = -1.0;
+        const maxVisibleZ = 1.0;
+
+        protectionValueOverlayContext.textAlign = "center";
+        protectionValueOverlayContext.textBaseline = "middle";
+        protectionValueOverlayContext.font = "700 11px 'Trebuchet MS', 'Segoe UI', sans-serif";
+        protectionValueOverlayContext.lineWidth = 1;
+
+        siteTiles.forEach((tile) => {
+            const tileSnapshot = getSiteTileByCoord(
+                tileMap,
+                siteSceneCache.width,
+                siteSceneCache.height,
+                tile.x,
+                tile.y
+            );
+            if (!tileSnapshot) {
+                return;
+            }
+            const protectionValue = readTileProtectionValue(tileSnapshot, modeName);
+            const normalizedProtection = clamp01(protectionValue / 100.0);
+            tintColor.copy(lowColor).lerp(highColor, normalizedProtection);
+
+            protectionOverlayProjectVector.set(
+                tile.x - siteSceneCache.offsetX,
+                computeSiteTileVisualHeight(tileSnapshot) + 0.18,
+                tile.y - siteSceneCache.offsetZ
+            );
+            protectionOverlayProjectVector.project(camera);
+            if (protectionOverlayProjectVector.z < minVisibleZ ||
+                protectionOverlayProjectVector.z > maxVisibleZ) {
+                return;
+            }
+
+            const screenX = (protectionOverlayProjectVector.x * 0.5 + 0.5) * rendererWidth;
+            const screenY = (-protectionOverlayProjectVector.y * 0.5 + 0.5) * rendererHeight;
+            if (screenX < -labelWidth ||
+                screenX > rendererWidth + labelWidth ||
+                screenY < -labelHeight ||
+                screenY > rendererHeight + labelHeight) {
+                return;
+            }
+
+            protectionValueOverlayContext.fillStyle = "rgba(22, 17, 13, 0.82)";
+            protectionValueOverlayContext.strokeStyle = "rgba(240, 224, 198, 0.42)";
+            protectionValueOverlayContext.beginPath();
+            traceRoundedRectPath(
+                protectionValueOverlayContext,
+                screenX - labelWidth * 0.5,
+                screenY - labelHeight * 0.5,
+                labelWidth,
+                labelHeight,
+                6
+            );
+            protectionValueOverlayContext.fill();
+            protectionValueOverlayContext.stroke();
+
+            protectionValueOverlayContext.fillStyle = "#" + tintColor.getHexString();
+            protectionValueOverlayContext.fillText(
+                String(Math.round(protectionValue)),
+                screenX,
+                screenY + 0.5
+            );
+        });
     }
 
     function rebuildStaticSiteScene(siteBootstrap, siteAction, offsetX, offsetZ, width, height, previousCache, bootstrapSignature) {

@@ -3024,6 +3024,44 @@ void ecology_ground_cover_and_planting_update_tile_state(
     GS1_SYSTEM_TEST_CHECK(context, count_tile_ecology_entries(queue) == 4U);
 }
 
+void ecology_multitile_planting_completion_aligns_non_anchor_targets_to_footprint(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 7011U);
+    GameMessageQueue queue {};
+    auto site_context = make_site_context<EcologySystem>(campaign, site_run, queue);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        EcologySystem::process_message(
+            site_context,
+            make_message(
+                GameMessageType::SiteTilePlantingCompleted,
+                SiteTilePlantingCompletedMessage {
+                    3U,
+                    3,
+                    3,
+                    gs1::k_plant_straw_checkerboard,
+                    1.0f,
+                    0U})) == GS1_STATUS_OK);
+
+    for (const auto coord : {TileCoord {2, 2}, TileCoord {3, 2}, TileCoord {2, 3}, TileCoord {3, 3}})
+    {
+        const auto tile = site_run.site_world->tile_at(coord);
+        GS1_SYSTEM_TEST_CHECK(context, tile.ecology.plant_id.value == gs1::k_plant_straw_checkerboard);
+        GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.plant_density, 100.0f));
+    }
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        site_run.site_world->tile_at(TileCoord {4, 2}).ecology.plant_id.value == 0U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        site_run.site_world->tile_at(TileCoord {4, 3}).ecology.plant_id.value == 0U);
+    GS1_SYSTEM_TEST_CHECK(context, count_tile_ecology_entries(queue) == 4U);
+}
+
 void ecology_watering_and_burial_clear_require_valid_targets(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -3526,6 +3564,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "ecology",
     "ground_cover_and_planting_update_tile_state",
     ecology_ground_cover_and_planting_update_tile_state);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "ecology",
+    "multitile_planting_completion_aligns_non_anchor_targets_to_footprint",
+    ecology_multitile_planting_completion_aligns_non_anchor_targets_to_footprint);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "ecology",
     "watering_and_burial_clear_require_valid_targets",
