@@ -8299,6 +8299,26 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return mergedGeometry;
     }
 
+    function disposeGeometries(geometries) {
+        (geometries || []).forEach((geometry) => {
+            if (geometry && typeof geometry.dispose === "function") {
+                geometry.dispose();
+            }
+        });
+    }
+
+    function disposeMeshHierarchyGeometries(root) {
+        if (!root || typeof root.traverse !== "function") {
+            return;
+        }
+
+        root.traverse((node) => {
+            if (node && node.geometry && typeof node.geometry.dispose === "function") {
+                node.geometry.dispose();
+            }
+        });
+    }
+
     function collapseStaticMeshHierarchy(root) {
         if (!root || root.isMesh) {
             return root;
@@ -8359,7 +8379,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     ? batch.geometries[0]
                     : mergeCompatibleGeometries(batch.geometries, false);
             if (!mergedGeometry) {
+                disposeGeometries(meshEntries.map((entry) => entry.geometry));
                 return root;
+            }
+            if (mergedGeometry !== batch.geometries[0]) {
+                disposeGeometries(batch.geometries);
             }
             mergedGeometries.push(mergedGeometry);
             mergedMaterials.push(batch.material);
@@ -8370,7 +8394,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 ? mergedGeometries[0]
                 : mergeCompatibleGeometries(mergedGeometries, true);
         if (!finalGeometry) {
+            disposeGeometries(mergedGeometries);
             return root;
+        }
+        if (finalGeometry !== mergedGeometries[0]) {
+            disposeGeometries(mergedGeometries);
         }
 
         const mergedMesh = new THREE_NS.Mesh(
@@ -8386,6 +8414,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         mergedMesh.frustumCulled = root.frustumCulled;
         mergedMesh.matrixAutoUpdate = root.matrixAutoUpdate;
         mergedMesh.userData = Object.assign({}, root.userData);
+        disposeMeshHierarchyGeometries(root);
         return mergedMesh;
     }
 
