@@ -863,8 +863,8 @@ void local_weather_resolve_straw_checkerboard_projects_wind_protection_on_downwi
 
     GS1_SYSTEM_TEST_CHECK(context, first_lane.wind_protection > 50.0f);
     GS1_SYSTEM_TEST_CHECK(context, first_lane.wind_protection < 61.0f);
-    GS1_SYSTEM_TEST_CHECK(context, second_lane.wind_protection > 25.0f);
-    GS1_SYSTEM_TEST_CHECK(context, second_lane.wind_protection < 31.0f);
+    GS1_SYSTEM_TEST_CHECK(context, second_lane.wind_protection > 50.0f);
+    GS1_SYSTEM_TEST_CHECK(context, second_lane.wind_protection < 61.0f);
     GS1_SYSTEM_TEST_CHECK(context, lower_lane.wind_protection > 50.0f);
     GS1_SYSTEM_TEST_CHECK(context, lower_lane.wind_protection < 61.0f);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(off_lane.wind_protection, 0.0f));
@@ -921,11 +921,64 @@ void local_weather_resolve_straw_checkerboard_planting_completion_projects_wind_
 
     GS1_SYSTEM_TEST_CHECK(context, first_lane.wind_protection > 50.0f);
     GS1_SYSTEM_TEST_CHECK(context, first_lane.wind_protection < 61.0f);
-    GS1_SYSTEM_TEST_CHECK(context, second_lane.wind_protection > 25.0f);
-    GS1_SYSTEM_TEST_CHECK(context, second_lane.wind_protection < 31.0f);
+    GS1_SYSTEM_TEST_CHECK(context, second_lane.wind_protection > 50.0f);
+    GS1_SYSTEM_TEST_CHECK(context, second_lane.wind_protection < 61.0f);
     GS1_SYSTEM_TEST_CHECK(context, lower_lane.wind_protection > 50.0f);
     GS1_SYSTEM_TEST_CHECK(context, lower_lane.wind_protection < 61.0f);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(off_lane.wind_protection, 0.0f));
+}
+
+void local_weather_resolve_adjacent_straw_gives_full_wind_shelter_across_adjacent_multitile_plant_footprint(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_prototype_site_run(campaign, 1U);
+    GameMessageQueue queue {};
+
+    site_run.weather.weather_wind = 50.0f;
+    site_run.weather.weather_wind_direction_degrees = 0.0f;
+
+    for (const auto coord : {TileCoord {10, 14}, TileCoord {11, 14}, TileCoord {10, 15}, TileCoord {11, 15}})
+    {
+        auto tile = site_run.site_world->tile_at(coord);
+        tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_straw_checkerboard};
+        tile.ecology.plant_density = 100.0f;
+        site_run.site_world->set_tile(coord, tile);
+    }
+
+    run_local_weather_pipeline(campaign, site_run, queue);
+
+    for (const auto coord : {TileCoord {12, 14}, TileCoord {13, 14}, TileCoord {12, 15}, TileCoord {13, 15}})
+    {
+        const auto support = site_run.site_world->tile_plant_weather_contribution(coord);
+        GS1_SYSTEM_TEST_CHECK(context, support.wind_protection > 59.0f);
+    }
+}
+
+void local_weather_resolve_reduced_density_straw_projects_floored_wind_shelter(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(2U, 1213U, 101U, 8U, 6U);
+    GameMessageQueue queue {};
+
+    site_run.weather.weather_wind = 50.0f;
+    site_run.weather.weather_wind_direction_degrees = 0.0f;
+
+    for (const auto coord : {TileCoord {2, 2}, TileCoord {3, 2}, TileCoord {2, 3}, TileCoord {3, 3}})
+    {
+        auto tile = site_run.site_world->tile_at(coord);
+        tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_straw_checkerboard};
+        tile.ecology.plant_density = 24.0f;
+        site_run.site_world->set_tile(coord, tile);
+    }
+
+    run_local_weather_pipeline(campaign, site_run, queue);
+
+    const auto first_lane =
+        site_run.site_world->tile_plant_weather_contribution(TileCoord {4, 2});
+    GS1_SYSTEM_TEST_CHECK(context, first_lane.wind_protection > 43.0f);
+    GS1_SYSTEM_TEST_CHECK(context, first_lane.wind_protection < 45.5f);
 }
 
 void local_weather_resolve_respects_authored_plant_protection_ratio(
@@ -1953,6 +2006,14 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "local_weather_resolve",
     "straw_checkerboard_planting_completion_projects_wind_protection_on_downwind_edge_tiles",
     local_weather_resolve_straw_checkerboard_planting_completion_projects_wind_protection_on_downwind_edge_tiles);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "local_weather_resolve",
+    "adjacent_straw_gives_full_wind_shelter_across_adjacent_multitile_plant_footprint",
+    local_weather_resolve_adjacent_straw_gives_full_wind_shelter_across_adjacent_multitile_plant_footprint);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "local_weather_resolve",
+    "reduced_density_straw_projects_floored_wind_shelter",
+    local_weather_resolve_reduced_density_straw_projects_floored_wind_shelter);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "local_weather_resolve",
     "respects_authored_plant_protection_ratio",
