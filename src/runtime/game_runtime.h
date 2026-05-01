@@ -109,6 +109,12 @@ private:
         TimingAccumulator message_timing {};
     };
 
+    struct CampaignUnlockSnapshot final
+    {
+        std::vector<std::uint32_t> unlocked_reputation_unlock_ids {};
+        std::vector<std::uint32_t> unlocked_technology_node_ids {};
+    };
+
     void initialize_subscription_tables();
     void queue_log_message(const char* message, Gs1LogLevel level = GS1_LOG_LEVEL_INFO);
     void queue_app_state_message(Gs1AppState app_state);
@@ -188,6 +194,11 @@ private:
         std::uint32_t task_instance_id,
         std::uint32_t task_template_id,
         std::uint32_t reward_candidate_count);
+    void queue_campaign_unlock_cue_message(
+        std::uint32_t subject_id,
+        std::uint32_t detail_id,
+        std::uint32_t detail_kind);
+    void sync_campaign_unlock_presentations();
     void close_site_protection_ui() noexcept;
     void mark_site_projection_update_dirty(std::uint64_t dirty_flags) noexcept;
     void mark_site_tile_projection_dirty(TileCoord coord) noexcept;
@@ -245,6 +256,7 @@ private:
     Gs1SiteProtectionOverlayMode site_protection_overlay_mode_ {GS1_SITE_PROTECTION_OVERLAY_NONE};
     std::optional<Gs1AppState> last_emitted_app_state_ {};
     std::vector<std::uint32_t> last_emitted_phone_listing_ids_ {};
+    CampaignUnlockSnapshot last_campaign_unlock_snapshot_ {};
     bool boot_initialized_ {false};
 };
 

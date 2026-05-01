@@ -91,6 +91,70 @@ constexpr std::int32_t k_regional_map_tile_spacing = 160;
         app_state == GS1_APP_STATE_SITE_ACTIVE;
 }
 
+enum CampaignUnlockCueDetailKind : std::uint32_t
+{
+    CAMPAIGN_UNLOCK_CUE_DETAIL_REPUTATION_UNLOCK = 1U,
+    CAMPAIGN_UNLOCK_CUE_DETAIL_TECHNOLOGY_NODE = 2U
+};
+
+[[nodiscard]] std::vector<std::uint32_t> capture_unlocked_reputation_unlock_ids(
+    const CampaignState& campaign)
+{
+    std::vector<std::uint32_t> unlock_ids {};
+    unlock_ids.reserve(all_reputation_unlock_defs().size());
+    for (const auto& unlock_def : all_reputation_unlock_defs())
+    {
+        bool unlocked = false;
+        switch (unlock_def.unlock_kind)
+        {
+        case ReputationUnlockKind::Plant:
+            unlocked = TechnologySystem::plant_unlocked(campaign, PlantId {unlock_def.content_id});
+            break;
+        case ReputationUnlockKind::Item:
+            unlocked = TechnologySystem::item_unlocked(campaign, ItemId {unlock_def.content_id});
+            break;
+        case ReputationUnlockKind::StructureRecipe:
+            unlocked = TechnologySystem::structure_recipe_unlocked(campaign, StructureId {unlock_def.content_id});
+            break;
+        case ReputationUnlockKind::Recipe:
+            unlocked = TechnologySystem::recipe_unlocked(campaign, RecipeId {unlock_def.content_id});
+            break;
+        default:
+            break;
+        }
+
+        if (unlocked)
+        {
+            unlock_ids.push_back(unlock_def.unlock_id);
+        }
+    }
+
+    return unlock_ids;
+}
+
+[[nodiscard]] std::vector<std::uint32_t> capture_unlocked_technology_node_ids(
+    const CampaignState& campaign)
+{
+    std::vector<std::uint32_t> node_ids {};
+    node_ids.reserve(all_technology_node_defs().size());
+    for (const auto& node_def : all_technology_node_defs())
+    {
+        if (TechnologySystem::node_purchased(campaign, node_def.tech_node_id))
+        {
+            node_ids.push_back(node_def.tech_node_id.value);
+        }
+    }
+
+    return node_ids;
+}
+
+[[nodiscard]] bool sorted_contains(
+    const std::vector<std::uint32_t>& values,
+    std::uint32_t value) noexcept
+{
+    return std::binary_search(values.begin(), values.end(), value);
+}
+
 [[nodiscard]] std::uint16_t quantize_projected_tile_channel(
     float value,
     float max_value,
@@ -1534,6 +1598,13 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
         {
             queue_regional_map_menu_ui_messages();
             queue_regional_map_tech_tree_ui_messages();
+        }
+        if (message.type == GameMessageType::CampaignReputationAwardRequested ||
+            message.type == GameMessageType::FactionReputationAwardRequested ||
+            message.type == GameMessageType::TechnologyNodeClaimRequested ||
+            message.type == GameMessageType::TechnologyNodeRefundRequested)
+        {
+            sync_campaign_unlock_presentations();
         }
         break;
 
@@ -3578,6 +3649,63 @@ void GameRuntime::queue_task_reward_claimed_cue_message(
     payload.arg1 = reward_candidate_count;
     payload.cue_kind = GS1_ONE_SHOT_CUE_TASK_REWARD_CLAIMED;
     engine_messages_.push_back(message);
+}
+
+void GameRuntime::queue_campaign_unlock_cue_message(
+    std::uint32_t subject_id,
+    std::uint32_t detail_id,
+    std::uint32_t detail_kind)
+{
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_PLAY_ONE_SHOT_CUE);
+    auto& payload = message.emplace_payload<Gs1EngineMessageOneShotCueData>();
+    payload.subject_id = subject_id;
+    payload.world_x = 0.0f;
+    payload.world_y = 0.0f;
+    payload.arg0 = detail_id;
+    payload.arg1 = detail_kind;
+    payload.cue_kind = GS1_ONE_SHOT_CUE_CAMPAIGN_UNLOCKED;
+    engine_messages_.push_back(message);
+}
+
+void GameRuntime::sync_campaign_unlock_presentations()
+{
+    if (!campaign_.has_value())
+    {
+        last_campaign_unlock_snapshot_ = {};
+        return;
+    }
+
+    auto unlocked_reputation_unlock_ids = capture_unlocked_reputation_unlock_ids(*campaign_);
+    auto unlocked_technology_node_ids = capture_unlocked_technology_node_ids(*campaign_);
+    std::sort(unlocked_reputation_unlock_ids.begin(), unlocked_reputation_unlock_ids.end());
+    std::sort(unlocked_technology_node_ids.begin(), unlocked_technology_node_ids.end());
+
+    for (const auto unlock_id : unlocked_reputation_unlock_ids)
+    {
+        if (!sorted_contains(last_campaign_unlock_snapshot_.unlocked_reputation_unlock_ids, unlock_id))
+        {
+            queue_campaign_unlock_cue_message(
+                unlock_id,
+                unlock_id,
+                CAMPAIGN_UNLOCK_CUE_DETAIL_REPUTATION_UNLOCK);
+        }
+    }
+
+    for (const auto tech_node_id : unlocked_technology_node_ids)
+    {
+        if (!sorted_contains(last_campaign_unlock_snapshot_.unlocked_technology_node_ids, tech_node_id))
+        {
+            queue_campaign_unlock_cue_message(
+                tech_node_id,
+                tech_node_id,
+                CAMPAIGN_UNLOCK_CUE_DETAIL_TECHNOLOGY_NODE);
+        }
+    }
+
+    last_campaign_unlock_snapshot_.unlocked_reputation_unlock_ids =
+        std::move(unlocked_reputation_unlock_ids);
+    last_campaign_unlock_snapshot_.unlocked_technology_node_ids =
+        std::move(unlocked_technology_node_ids);
 }
 
 void GameRuntime::close_site_protection_ui() noexcept

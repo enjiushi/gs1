@@ -98,6 +98,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let localActionProgressState = null;
     let placementFailureToastState = null;
     let rewardPanelState = null;
+    let pendingRewardPanelPresentations = [];
     let viewerCompatibilityWarning = "";
     let placementCursorSendInFlight = false;
     let lastSentPlacementCursorSignature = "";
@@ -1984,6 +1985,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             scheduleToneBurst({ type: "triangle", startFrequency: 523.25, endFrequency: 783.99, duration: 0.24, peakGain: 0.038 });
             scheduleToneBurst({ type: "sine", startFrequency: 783.99, endFrequency: 1046.5, duration: 0.3, peakGain: 0.024 });
             break;
+        case "CAMPAIGN_UNLOCKED":
+            scheduleToneBurst({ type: "triangle", startFrequency: 587.33, endFrequency: 880.0, duration: 0.22, peakGain: 0.034 });
+            scheduleToneBurst({ type: "sine", startFrequency: 880.0, endFrequency: 1174.66, duration: 0.28, peakGain: 0.022 });
+            break;
         default:
             break;
         }
@@ -2011,6 +2016,58 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 ? (taskPresentation.title + " completed.")
                 : ("Contract " + (cue && cue.subjectId ? cue.subjectId : 0) + " completed."),
             rewards: rewards
+        };
+    }
+
+    function campaignUnlockPresentationFromCue(cue) {
+        const detailId = cue && typeof cue.arg0 === "number" ? cue.arg0 : 0;
+        const detailKind = cue && typeof cue.arg1 === "number" ? cue.arg1 : 0;
+
+        if (detailKind === 1 && reputationUnlockCatalog) {
+            const unlockDef = reputationUnlockCatalog.find((entry) => entry.unlockId === detailId);
+            if (unlockDef) {
+                return {
+                    title: "New Unlock",
+                    subtitle: unlockDef.displayName,
+                    rewards: [
+                        unlockDef.unlockKind + " unlocked at " + unlockDef.reputationRequirement + " reputation.",
+                        unlockDef.description || "Now available in campaign progression."
+                    ]
+                };
+            }
+        }
+
+        if (detailKind === 2 && technologyCatalog) {
+            const nodeDef = technologyCatalog.nodesById.get(detailId);
+            if (nodeDef) {
+                let grantedLabel = "";
+                if (nodeDef.grantedContentKind === "Recipe") {
+                    grantedLabel = getRecipeLabel(nodeDef.grantedContentId);
+                } else if (nodeDef.grantedContentKind === "Item") {
+                    grantedLabel = getItemLabel(nodeDef.grantedContentId);
+                } else if (nodeDef.grantedContentKind === "Plant") {
+                    grantedLabel = getPlantLabel(nodeDef.grantedContentId);
+                } else if (nodeDef.grantedContentKind === "Structure") {
+                    grantedLabel = getStructureLabel(nodeDef.grantedContentId);
+                }
+
+                const rewards = [];
+                if (grantedLabel) {
+                    rewards.push(nodeDef.grantedContentKind + " unlocked: " + grantedLabel);
+                }
+                rewards.push(nodeDef.description || "Faction technology unlocked.");
+                return {
+                    title: "Technology Unlocked",
+                    subtitle: nodeDef.displayName || ("Tech " + detailId),
+                    rewards: rewards
+                };
+            }
+        }
+
+        return {
+            title: "New Unlock",
+            subtitle: "Campaign progression advanced.",
+            rewards: ["New content unlocked."]
         };
     }
 
@@ -2069,14 +2126,29 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         rewardPanel.hidden = false;
     }
 
-    function openRewardPanelForCue(cue) {
-        rewardPanelState = Object.assign(
-            rewardPanelPresentationFromCue(cue),
-            { hideAtMs: performance.now() + rewardPanelDurationMs });
+    function openRewardPanelPresentation(presentation) {
+        rewardPanelState = Object.assign({}, presentation, {
+            hideAtMs: performance.now() + rewardPanelDurationMs
+        });
         renderRewardPanel();
         rewardPanel.classList.remove("active");
         void rewardPanel.offsetWidth;
         rewardPanel.classList.add("active");
+    }
+
+    function openRewardPanelForCue(cue) {
+        openRewardPanelPresentation(rewardPanelPresentationFromCue(cue));
+    }
+
+    function enqueueRewardPanelPresentation(presentation) {
+        if (!presentation) {
+            return;
+        }
+        if (!rewardPanelState) {
+            openRewardPanelPresentation(presentation);
+            return;
+        }
+        pendingRewardPanelPresentations.push(presentation);
     }
 
     function clearRewardPanelVisuals() {
@@ -2095,6 +2167,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         rewardPanelState = null;
         clearRewardPanelVisuals();
+        if (pendingRewardPanelPresentations.length > 0) {
+            openRewardPanelPresentation(pendingRewardPanelPresentations.shift());
+        }
         return true;
     }
 
@@ -2117,7 +2192,18 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
 
         if (cue.cueKind === "TASK_REWARD_CLAIMED") {
-            openRewardPanelForCue(cue);
+            enqueueRewardPanelPresentation(rewardPanelPresentationFromCue(cue));
+            return;
+        }
+
+        if (cue.cueKind === "CAMPAIGN_UNLOCKED") {
+            if (!reputationUnlockCatalog) {
+                ensureReputationUnlockCatalog().catch(() => {});
+            }
+            if (!technologyCatalog) {
+                ensureTechnologyCatalog().catch(() => {});
+            }
+            enqueueRewardPanelPresentation(campaignUnlockPresentationFromCue(cue));
         }
     }
 
@@ -2210,6 +2296,42 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     function getStructureLabel(structureId) {
         const structureMeta = getStructureMeta(structureId);
         return structureMeta ? structureMeta.name : ("Structure " + structureId);
+    }
+
+    function getPlantLabel(plantTypeId) {
+        const plantMeta = harvestablePlantCatalog[plantTypeId];
+        return plantMeta && plantMeta.name ? plantMeta.name : ("Plant " + plantTypeId);
+    }
+
+    function getRecipeLabel(recipeId) {
+        const recipeToOutputItemId = {
+            1: 2,
+            2: 11,
+            3: 12,
+            4: 13,
+            5: 14,
+            6: 37,
+            7: 38,
+            8: 41,
+            9: 42,
+            10: 43,
+            11: 48,
+            12: 49,
+            13: 44,
+            14: 45,
+            15: 50,
+            16: 51,
+            17: 46,
+            18: 47,
+            19: 52,
+            20: 53,
+            21: 54,
+            22: 55,
+            23: 56,
+            24: 57
+        };
+        const outputItemId = recipeToOutputItemId[recipeId];
+        return outputItemId ? getItemLabel(outputItemId) : ("Recipe " + recipeId);
     }
 
     function structureProvidesStorage(structureId) {

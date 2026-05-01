@@ -471,6 +471,46 @@ void phone_purchase_request_emits_single_hud_and_campaign_resource_projection()
     }
 }
 
+void campaign_reputation_award_emits_campaign_resource_projection_and_unlock_cue()
+{
+    Gs1RuntimeCreateDesc create_desc {};
+    create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
+    create_desc.api_version = gs1::k_api_version;
+    create_desc.fixed_step_seconds = 1.0 / 60.0;
+
+    GameRuntime runtime {create_desc};
+    bootstrap_site_one(runtime);
+    drain_engine_messages(runtime);
+
+    GameMessage reputation_award {};
+    reputation_award.type = GameMessageType::CampaignReputationAwardRequested;
+    reputation_award.set_payload(gs1::CampaignReputationAwardRequestedMessage {100});
+    assert(runtime.handle_message(reputation_award) == GS1_STATUS_OK);
+
+    std::vector<Gs1EngineMessage> messages = drain_engine_messages(runtime);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+    append_messages(messages, drain_engine_messages(runtime));
+    assert_singleton_projection_messages_do_not_repeat(messages);
+
+    const auto campaign_resource_messages =
+        collect_messages_of_type(messages, GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES);
+    assert(campaign_resource_messages.size() == 1U);
+    {
+        const auto& payload =
+            campaign_resource_messages.front()->payload_as<Gs1EngineMessageCampaignResourcesData>();
+        assert(payload.total_reputation == 100);
+    }
+
+    const auto* unlock_cue_message =
+        find_one_shot_cue_message(messages, GS1_ONE_SHOT_CUE_CAMPAIGN_UNLOCKED);
+    assert(unlock_cue_message != nullptr);
+    {
+        const auto& payload = unlock_cue_message->payload_as<Gs1EngineMessageOneShotCueData>();
+        assert(payload.arg1 == 1U || payload.arg1 == 2U);
+        assert(payload.arg0 != 0U);
+    }
+}
+
 void inventory_use_request_keeps_singleton_projections_singular_across_immediate_and_flush_paths()
 {
     Gs1RuntimeCreateDesc create_desc {};
@@ -716,6 +756,7 @@ int main()
     inventory_use_request_keeps_singleton_projections_singular_across_immediate_and_flush_paths();
     task_accept_request_does_not_emit_campaign_resource_projection();
     phone_purchase_request_emits_single_hud_and_campaign_resource_projection();
+    campaign_reputation_award_emits_campaign_resource_projection_and_unlock_cue();
     ecology_growth_completes_task_and_site_attempt();
     task_reward_claim_emits_pending_claim_projection_then_reward_cue();
     task_reward_claim_ui_action_claims_pending_task_and_emits_reward_cue();
