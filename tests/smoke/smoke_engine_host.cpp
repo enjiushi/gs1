@@ -1,8 +1,8 @@
 #include "smoke_engine_host.h"
 #include "smoke_log.h"
 
-#include "content/defs/gameplay_tuning_defs.h"
 #include "content/defs/plant_defs.h"
+#include "site/weather_contribution_logic.h"
 
 #include <algorithm>
 #include <cassert>
@@ -19,21 +19,6 @@ double elapsed_seconds(
     return std::chrono::duration<double>(end - start).count();
 }
 
-float unit_from_raw_meter(float value) noexcept
-{
-    return std::clamp(value * 0.01f, 0.0f, 1.0f);
-}
-
-float resolve_density_scaled_resistance(float max_value, float density) noexcept
-{
-    const auto& tuning = gs1::gameplay_tuning_def().ecology;
-    const float clamped_density = unit_from_raw_meter(density);
-    const float floor_scale =
-        1.0f - std::clamp(tuning.resistance_density_influence, 0.0f, 1.0f);
-    const float min_value = max_value * floor_scale;
-    return std::lerp(min_value, max_value, clamped_density);
-}
-
 float resolve_final_overlay_protection_value(
     std::uint32_t plant_type_id,
     float plant_density,
@@ -47,7 +32,7 @@ float resolve_final_overlay_protection_value(
     }
 
     const float self_resistance =
-        resolve_density_scaled_resistance(plant_def->*self_channel, plant_density);
+        gs1::resolve_density_scaled_resistance(plant_def->*self_channel, plant_density);
     return std::clamp(projected_protection + self_resistance, 0.0f, 100.0f);
 }
 

@@ -1,6 +1,7 @@
 #include "site/systems/plant_weather_contribution_system.h"
 
 #include "content/defs/plant_defs.h"
+#include "content/defs/gameplay_tuning_defs.h"
 #include "site/site_world_components.h"
 #include "site/tile_footprint.h"
 #include "site/weather_contribution_logic.h"
@@ -218,6 +219,86 @@ struct WindContributionInstanceEntry final
     float wind_protection {0.0f};
 };
 
+[[nodiscard]] gs1::TileCoord resolve_tile_anchor_for_occupant(
+    gs1::TileCoord coord,
+    gs1::PlantId plant_id,
+    std::uint32_t ground_cover_type_id) noexcept
+{
+    if (plant_id.value != 0U)
+    {
+        return gs1::align_tile_anchor_to_footprint(
+            coord,
+            gs1::resolve_plant_tile_footprint(plant_id));
+    }
+
+    (void)ground_cover_type_id;
+    return coord;
+}
+
+[[nodiscard]] bool source_instance_projects_full_wind_shelter_to_target_instance(
+    gs1::TileCoord source_anchor,
+    gs1::TileFootprint source_footprint,
+    gs1::TileCoord target_anchor,
+    gs1::TileFootprint target_footprint,
+    const gs1::WeatherDirectionStep& wind_direction,
+    std::uint8_t protection_range) noexcept
+{
+    const std::int32_t source_min_x = source_anchor.x;
+    const std::int32_t source_max_x = source_anchor.x + static_cast<std::int32_t>(source_footprint.width) - 1;
+    const std::int32_t source_min_y = source_anchor.y;
+    const std::int32_t source_max_y = source_anchor.y + static_cast<std::int32_t>(source_footprint.height) - 1;
+    const std::int32_t target_min_x = target_anchor.x;
+    const std::int32_t target_max_x = target_anchor.x + static_cast<std::int32_t>(target_footprint.width) - 1;
+    const std::int32_t target_min_y = target_anchor.y;
+    const std::int32_t target_max_y = target_anchor.y + static_cast<std::int32_t>(target_footprint.height) - 1;
+
+    if (wind_direction.x > 0)
+    {
+        const std::int32_t gap = target_min_x - source_max_x;
+        if (gap < 1 || gap > static_cast<std::int32_t>(protection_range))
+        {
+            return false;
+        }
+
+        return target_min_y <= source_max_y && target_max_y >= source_min_y;
+    }
+
+    if (wind_direction.x < 0)
+    {
+        const std::int32_t gap = source_min_x - target_max_x;
+        if (gap < 1 || gap > static_cast<std::int32_t>(protection_range))
+        {
+            return false;
+        }
+
+        return target_min_y <= source_max_y && target_max_y >= source_min_y;
+    }
+
+    if (wind_direction.y > 0)
+    {
+        const std::int32_t gap = target_min_y - source_max_y;
+        if (gap < 1 || gap > static_cast<std::int32_t>(protection_range))
+        {
+            return false;
+        }
+
+        return target_min_x <= source_max_x && target_max_x >= source_min_x;
+    }
+
+    if (wind_direction.y < 0)
+    {
+        const std::int32_t gap = source_min_y - target_max_y;
+        if (gap < 1 || gap > static_cast<std::int32_t>(protection_range))
+        {
+            return false;
+        }
+
+        return target_min_x <= source_max_x && target_max_x >= source_min_x;
+    }
+
+    return false;
+}
+
 [[nodiscard]] WindContributionInstanceKey make_wind_contribution_instance_key(
     gs1::TileCoord source_coord,
     gs1::PlantId plant_id,
@@ -258,6 +339,21 @@ gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
     gs1::SiteWorld::TileWeatherContributionData total = gs1::zero_weather_contribution();
     std::vector<WindContributionInstanceEntry> wind_instance_entries {};
     wind_instance_entries.reserve(8U);
+    gs1::PlantId target_plant_id {};
+    std::uint32_t target_ground_cover_type_id = 0U;
+
+    const auto target_entity_id = context.site_run.site_world->tile_entity_id(target_coord);
+    if (target_entity_id != 0U)
+    {
+        const auto target_entity = ecs_world.entity(target_entity_id);
+        if (target_entity.has<gs1::site_ecs::TileOccupantTag>())
+        {
+            const auto target_plant_slot = target_entity.get<gs1::site_ecs::TilePlantSlot>();
+            const auto target_ground_cover_slot = target_entity.get<gs1::site_ecs::TileGroundCoverSlot>();
+            target_plant_id = target_plant_slot.plant_id;
+            target_ground_cover_type_id = target_ground_cover_slot.ground_cover_type_id;
+        }
+    }
 
     for_each_contribution_sample(max_distance, [&](const gs1::WeatherContributionSample& sample)
     {
@@ -291,6 +387,20 @@ gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
         const auto ground_cover_slot = source_entity.get<gs1::site_ecs::TileGroundCoverSlot>();
         const auto& plant_def =
             resolve_occupant_def(plant_slot.plant_id, ground_cover_slot.ground_cover_type_id);
+        const gs1::TileCoord source_anchor = resolve_tile_anchor_for_occupant(
+            source_coord,
+            plant_slot.plant_id,
+            ground_cover_slot.ground_cover_type_id);
+        const gs1::TileCoord target_anchor = resolve_tile_anchor_for_occupant(
+            target_coord,
+            target_plant_id,
+            target_ground_cover_type_id);
+        const gs1::TileFootprint source_footprint = plant_slot.plant_id.value != 0U
+            ? gs1::resolve_plant_tile_footprint(plant_slot.plant_id)
+            : gs1::TileFootprint {1U, 1U};
+        const gs1::TileFootprint target_footprint = target_plant_id.value != 0U
+            ? gs1::resolve_plant_tile_footprint(target_plant_id)
+            : gs1::TileFootprint {1U, 1U};
         const bool same_occupant_instance =
             source_and_target_share_occupant_instance(
                 context,
@@ -317,9 +427,13 @@ gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
             if (!same_occupant_instance)
             {
                 delta.heat_protection =
-                    plant_def.heat_tolerance * protection_ratio * density * contribution_scale;
+                    gs1::resolve_density_scaled_support_value(plant_def.heat_tolerance, density) *
+                    protection_ratio *
+                    contribution_scale;
                 delta.dust_protection =
-                    plant_def.dust_tolerance * protection_ratio * density * contribution_scale;
+                    gs1::resolve_density_scaled_support_value(plant_def.dust_tolerance, density) *
+                    protection_ratio *
+                    contribution_scale;
             }
         }
 
@@ -334,13 +448,24 @@ gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
                 target_coord.y,
                 effective_wind_distance,
                 wind_direction);
-            if (shadow_scale > gs1::k_weather_contribution_epsilon)
+            const bool full_instance_lee_cover =
+                wind_direction.x != 0 && wind_direction.y == 0 &&
+                source_instance_projects_full_wind_shelter_to_target_instance(
+                    source_anchor,
+                    source_footprint,
+                    target_anchor,
+                    target_footprint,
+                    wind_direction,
+                    effective_wind_distance);
+            const float resolved_shadow_scale = full_instance_lee_cover
+                ? 1.0f
+                : shadow_scale;
+            if (resolved_shadow_scale > gs1::k_weather_contribution_epsilon)
             {
                 const float wind_protection =
-                    plant_def.wind_resistance *
+                    gs1::resolve_density_scaled_support_value(plant_def.wind_resistance, density) *
                     protection_ratio *
-                    density *
-                    shadow_scale;
+                    resolved_shadow_scale;
                 const auto key = make_wind_contribution_instance_key(
                     source_coord,
                     plant_slot.plant_id,

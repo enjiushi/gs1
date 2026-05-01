@@ -1,6 +1,7 @@
 #pragma once
 
 #include "site/site_world.h"
+#include "content/defs/gameplay_tuning_defs.h"
 
 #include <algorithm>
 #include <array>
@@ -50,6 +51,25 @@ inline constexpr std::array<WeatherContributionSample, 13> k_weather_contributio
     return manhattan_distance == 0
         ? k_own_tile_contribution_scale
         : (k_neighbor_contribution_scale / static_cast<float>(manhattan_distance));
+}
+
+[[nodiscard]] inline float resolve_density_scaled_resistance(
+    float max_value,
+    float density_raw) noexcept
+{
+    const auto& tuning = gameplay_tuning_def().ecology;
+    const float clamped_density = std::clamp(density_raw * k_inverse_meter_scale, 0.0f, 1.0f);
+    const float floor_scale =
+        1.0f - std::clamp(tuning.resistance_density_influence, 0.0f, 1.0f);
+    const float min_value = max_value * floor_scale;
+    return std::lerp(min_value, max_value, clamped_density);
+}
+
+[[nodiscard]] inline float resolve_density_scaled_support_value(
+    float max_value,
+    float density_unit) noexcept
+{
+    return resolve_density_scaled_resistance(max_value, density_unit * 100.0f);
 }
 
 [[nodiscard]] inline float normalize_wind_direction_degrees(float value) noexcept
