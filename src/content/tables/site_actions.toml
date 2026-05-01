@@ -24,7 +24,7 @@ impacts_worker_movement = true
 
 [[site_actions]]
 action_kind = "Build"
-duration_minutes_per_unit = 45.0
+duration_minutes_per_unit = 8.0
 energy_cost_per_unit = 15.0
 hydration_cost_per_unit = 8.0
 nourishment_cost_per_unit = 4.0

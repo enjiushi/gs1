@@ -56,7 +56,7 @@ void action_execution_build_completion_consumes_deployable_and_emits_device_plac
     auto site_run = make_test_site_run(1U, 1501U);
     GameMessageQueue queue {};
     auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
-    auto action_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue, 60.0);
+    auto action_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue);
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -102,9 +102,26 @@ void action_execution_build_completion_consumes_deployable_and_emits_device_plac
                     site_run.camp.camp_anchor_tile.y,
                     55U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::SiteActionStarted) == 1U);
+    const auto* started_message =
+        first_message_payload<SiteActionStartedMessage>(queue, GameMessageType::SiteActionStarted);
+    GS1_SYSTEM_TEST_REQUIRE(context, started_message != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(started_message->duration_minutes, 8.0f));
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.site_action.total_action_minutes, 8.0));
 
     queue.clear();
+    for (int step = 0; step < 9; ++step)
+    {
+        ActionExecutionSystem::run(action_context);
+    }
+    GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::SiteActionCompleted) == 0U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.remaining_action_minutes > 0.0);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.remaining_action_minutes <= 0.81);
+
     ActionExecutionSystem::run(action_context);
+    if (count_messages(queue, GameMessageType::SiteActionCompleted) == 0U)
+    {
+        ActionExecutionSystem::run(action_context);
+    }
     GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::SiteActionCompleted) == 1U);
     GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::InventoryItemConsumeRequested) == 1U);
     GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::SiteDevicePlaced) == 1U);
