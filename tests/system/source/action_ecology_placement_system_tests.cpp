@@ -1181,6 +1181,47 @@ void action_execution_harvest_completion_emits_worker_pack_insert_and_tile_harve
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(harvested->density_removed, 25.0f));
 }
 
+void action_execution_harvest_uses_plant_authored_duration(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 50716U);
+    GameMessageQueue queue {};
+    auto site_context = make_site_context<ActionExecutionSystem>(campaign, site_run, queue, 60.0);
+
+    for (const auto coord : {TileCoord {2, 2}, TileCoord {3, 2}, TileCoord {2, 3}, TileCoord {3, 3}})
+    {
+        auto tile = site_run.site_world->tile_at(coord);
+        tile.ecology.plant_id = gs1::PlantId {gs1::k_plant_desert_ephedra};
+        tile.ecology.plant_density = 85.0f;
+        site_run.site_world->set_tile(coord, tile);
+    }
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        ActionExecutionSystem::process_message(
+            site_context,
+            make_start_action_message(GS1_SITE_ACTION_HARVEST, TileCoord {2, 2}, 1U, 0U, 0U)) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(context, site_run.site_action.current_action_id.has_value());
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, queue[0].type == GameMessageType::SiteActionStarted);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.action_kind == ActionKind::Harvest);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.primary_subject_id == gs1::k_plant_desert_ephedra);
+
+    const auto* plant_def = gs1::find_plant_def(gs1::PlantId {gs1::k_plant_desert_ephedra});
+    GS1_SYSTEM_TEST_REQUIRE(context, plant_def != nullptr);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            queue[0].payload_as<SiteActionStartedMessage>().duration_minutes,
+            plant_def->harvest_action_duration_minutes));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            site_run.site_action.total_action_minutes,
+            static_cast<double>(plant_def->harvest_action_duration_minutes)));
+}
+
 void action_execution_harvest_guarantees_one_dedicated_item_for_low_output_plants(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -3464,6 +3505,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "action_execution",
     "harvest_completion_emits_worker_pack_insert_and_tile_harvested",
     action_execution_harvest_completion_emits_worker_pack_insert_and_tile_harvested);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "action_execution",
+    "harvest_uses_plant_authored_duration",
+    action_execution_harvest_uses_plant_authored_duration);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "action_execution",
     "harvest_guarantees_one_dedicated_item_for_low_output_plants",

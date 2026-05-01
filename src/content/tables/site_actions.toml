@@ -192,7 +192,7 @@ impacts_worker_movement = true
 
 [[site_actions]]
 action_kind = "Drink"
-duration_minutes_per_unit = 3.3333333
+duration_minutes_per_unit = 3.2
 energy_cost_per_unit = 0.0
 hydration_cost_per_unit = 0.0
 nourishment_cost_per_unit = 0.0
@@ -216,7 +216,7 @@ impacts_worker_movement = true
 
 [[site_actions]]
 action_kind = "Eat"
-duration_minutes_per_unit = 3.3333333
+duration_minutes_per_unit = 3.2
 energy_cost_per_unit = 0.0
 hydration_cost_per_unit = 0.0
 nourishment_cost_per_unit = 0.0

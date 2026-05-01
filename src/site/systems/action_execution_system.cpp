@@ -859,7 +859,20 @@ double action_unit_duration_minutes(
             k_minimum_action_duration_minutes);
     }
 
-    if ((kind == ActionKind::Plant || kind == ActionKind::Harvest) && item_id != 0U)
+    if (kind == ActionKind::Harvest && primary_subject_id != 0U)
+    {
+        const auto* plant_def = find_plant_def(PlantId {primary_subject_id});
+        if (plant_def != nullptr)
+        {
+            const double shovel_scale =
+                1.0 - static_cast<double>(shovel_duration_reduction_for_action(context, kind));
+            return std::max(
+                static_cast<double>(plant_def->harvest_action_duration_minutes) * shovel_scale,
+                k_minimum_action_duration_minutes);
+        }
+    }
+
+    if (kind == ActionKind::Plant && item_id != 0U)
     {
         const auto* item_def = find_item_def(ItemId {item_id});
         if (item_def != nullptr && item_def->linked_plant_id.value != 0U)
@@ -867,14 +880,10 @@ double action_unit_duration_minutes(
             const auto* plant_def = find_plant_def(item_def->linked_plant_id);
             if (plant_def != nullptr)
             {
-                const double authored_duration =
-                    kind == ActionKind::Harvest
-                    ? static_cast<double>(plant_def->harvest_action_duration_minutes)
-                    : static_cast<double>(plant_def->plant_action_duration_minutes);
                 const double shovel_scale =
                     1.0 - static_cast<double>(shovel_duration_reduction_for_action(context, kind));
                 return std::max(
-                    authored_duration * shovel_scale,
+                    static_cast<double>(plant_def->plant_action_duration_minutes) * shovel_scale,
                     k_minimum_action_duration_minutes);
             }
         }
