@@ -427,11 +427,16 @@ void visual_smoke_assets_keep_hidden_regional_map_panels_collapsed()
     assert(html.find(".site-vitals-reputation[hidden]") != std::string::npos);
     assert(html.find(".site-task-panel[hidden]") != std::string::npos);
     assert(html.find(".modifier-strip[hidden]") != std::string::npos);
+    assert(html.find("id=\"site-tech-tree-actions\"") != std::string::npos);
 
     assert(viewer.find("siteVitalsMoney.hidden = !showRegionalMapCash;") != std::string::npos);
     assert(viewer.find("if (state.appState !== \"SITE_ACTIVE\") {") != std::string::npos);
     assert(viewer.find("renderSiteTaskPanel(null);") != std::string::npos);
     assert(viewer.find("renderSiteModifiers(null);") != std::string::npos);
+    assert(viewer.find("postInventoryUse(slot).catch(() => {") != std::string::npos);
+    assert(viewer.find("Click to use or consume") != std::string::npos);
+    assert(viewer.find("Click to select and use/store") == std::string::npos);
+    assert(viewer.find("siteTechTreeActions.appendChild(") != std::string::npos);
 }
 }  // namespace
 

@@ -1241,7 +1241,28 @@ body {
   min-height: 0;
 }
 
+.site-tech-tree-anchor {
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  z-index: 3;
+  display: flex;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+
+.site-tech-tree-anchor .action-bar {
+  justify-content: flex-end;
+  margin-top: 0;
+  align-self: auto;
+  pointer-events: auto;
+}
+
 .action-progress {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 3;
   pointer-events: none;
   min-width: 0;
   width: min(360px, 100%);
@@ -1254,6 +1275,8 @@ body {
   box-shadow:
     0 16px 30px rgba(38, 30, 22, 0.08),
     inset 0 1px 0 rgba(255,255,255,0.44);
+  transform: translate3d(-50%, 120px, 0);
+  transition: transform 120ms ease-out;
 }
 
 .placement-toast {
@@ -3836,13 +3859,15 @@ body {
 .stage-frame.site-active-mode .selection-chip {
   max-width: 356px;
   width: min(356px, calc(100vw - 40px));
-  max-height: min(34vh, calc(100vh - 220px));
-  margin-left: auto;
+  max-height: min(42vh, calc(100vh - 280px));
+  margin-right: auto;
 }
 
 .stage-frame.site-active-mode .bottom-row {
-  justify-content: flex-end;
-  padding-left: calc(var(--site-left-panel-width, 320px) + 36px);
+  justify-content: flex-start;
+  align-items: flex-end;
+  padding-left: calc(var(--site-left-panel-width, 320px) + 32px);
+  padding-bottom: 20px;
 }
 
 .stage-frame.site-result-mode .hud-row {
@@ -3932,7 +3957,11 @@ body {
   }
 
   .action-progress {
+    position: static;
+    left: auto;
+    top: auto;
     width: 100%;
+    transform: none;
   }
 
   .status-chip {
@@ -3946,6 +3975,14 @@ body {
 
   .action-bar {
     justify-content: flex-start;
+  }
+
+  .site-tech-tree-anchor {
+    position: static;
+    left: auto;
+    bottom: auto;
+    z-index: auto;
+    width: 100%;
   }
 
   .site-panel-grid {
@@ -4194,6 +4231,10 @@ DLL -- ms</div>
         </div>
 
         <div class="action-bar" id="context-actions"></div>
+      </div>
+
+      <div class="site-tech-tree-anchor" id="site-tech-tree-anchor">
+        <div class="action-bar" id="site-tech-tree-actions"></div>
       </div>
 
       <div class="placement-toast" id="placement-toast" hidden>

@@ -842,6 +842,11 @@ void inventory_item_use_drink_defers_item_and_meter_changes_until_action_complet
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.started_at_world_minute.has_value());
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::SiteActionStarted);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            queue.front().payload_as<gs1::SiteActionStartedMessage>().duration_minutes,
+            3.3333333f));
 
     queue.clear();
     ActionExecutionSystem::run(action_context);
@@ -928,6 +933,11 @@ void inventory_item_use_food_restores_nourishment_without_refilling_energy(
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.started_at_world_minute.has_value());
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::SiteActionStarted);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            queue.front().payload_as<gs1::SiteActionStartedMessage>().duration_minutes,
+            3.3333333f));
 
     queue.clear();
     ActionExecutionSystem::run(action_context);

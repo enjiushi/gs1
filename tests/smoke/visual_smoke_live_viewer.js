@@ -29,6 +29,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const selectionEyebrow = document.getElementById("selection-eyebrow");
     const selectionText = document.getElementById("selection-text");
     const selectionInventory = document.getElementById("selection-inventory");
+    const siteTechTreeAnchor = document.getElementById("site-tech-tree-anchor");
+    const siteTechTreeActions = document.getElementById("site-tech-tree-actions");
     const storagePanel = document.getElementById("storage-panel");
     const storagePanelTitle = document.getElementById("storage-panel-title");
     const storagePanelSubtitle = document.getElementById("storage-panel-subtitle");
@@ -170,7 +172,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     };
     const siteTutorialTips = [
         "Move with WASD and drag with the right mouse button to orbit the camera around the worker.",
-        "Press B to open the player pack, then click a carried item to use it or move it into opened storage.",
+        "Press B to open the player pack, then left-click a carried consumable to use it or move items into opened storage.",
         "Press F to raise the phone for the market, delivery crate flow, and task board information.",
         "Short right-click any tile to open context actions such as harvest, water, repair, plant, or build.",
         "Planting and deployment enter placement mode first, so confirm with a left-click and cancel with Esc or a short right-click.",
@@ -191,6 +193,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const keys = new Set();
     const raycaster = new THREE_NS.Raycaster();
     const pointer = new THREE_NS.Vector2();
+    const screenAnchorVector = new THREE_NS.Vector3();
     const animationClock = new THREE_NS.Clock();
     const cameraForwardOnGround = new THREE_NS.Vector3();
     const cameraRightOnGround = new THREE_NS.Vector3();
@@ -2780,27 +2783,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return recipe.ingredients.every((ingredient) => (nearbyTotals.get(ingredient.itemId) || 0) >= ingredient.quantity);
     }
 
-    function clearSelectedInventorySlotIfInvalid(state) {
-        if (!selectedInventorySlotKey || !state || state.appState !== "SITE_ACTIVE") {
-            selectedInventorySlotKey = "";
-            return;
-        }
-
-        const selectedSlot = getAllInventorySlots(state).find((slot) =>
-            slotKey(slot.containerKind, slot.slotIndex, slot.containerOwnerId) === selectedInventorySlotKey);
-        if (!selectedSlot || selectedSlot.quantity <= 0 || selectedSlot.flags === 0) {
-            selectedInventorySlotKey = "";
-        }
-    }
-
-    function findSelectedInventorySlot(state) {
-        if (!selectedInventorySlotKey || !state) {
-            return null;
-        }
-        return getAllInventorySlots(state).find((slot) =>
-            slotKey(slot.containerKind, slot.slotIndex, slot.containerOwnerId) === selectedInventorySlotKey) || null;
-    }
-
     function findWorkerPackInventoryContainer(state) {
         return getInventoryContainers(state).find((container) => container.containerKind === "WORKER_PACK") || null;
     }
@@ -2860,15 +2842,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
 
         return null;
-    }
-
-    function slotSupportsSelection(slot) {
-        if (!isOccupiedSlot(slot) || slot.containerKind !== "WORKER_PACK") {
-            return false;
-        }
-
-        const itemMeta = getItemMeta(slot.itemId);
-        return !!(itemMeta && itemMeta.canUse);
     }
 
     function postInventoryUse(slot) {
@@ -3067,6 +3040,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         if (!state || state.appState !== "SITE_ACTIVE" || !localActionProgressState) {
             actionProgress.hidden = true;
+            actionProgress.style.transform = "";
             return;
         }
 
@@ -3085,6 +3059,32 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             localActionProgressState.actionKind === 7 || localActionProgressState.actionKind === 8
                 ? "Self"
                 : ("Tile " + localActionProgressState.targetTileX + ", " + localActionProgressState.targetTileY);
+        positionActionProgressBelowWorker();
+    }
+
+    function positionActionProgressBelowWorker() {
+        if (!actionProgress) {
+            return;
+        }
+
+        let offsetY = 120;
+        if (siteSceneCache && siteSceneCache.workerGroup && rendererWidth > 0 && rendererHeight > 0) {
+            screenAnchorVector.setFromMatrixPosition(siteSceneCache.workerGroup.matrixWorld);
+            screenAnchorVector.y += 1.9;
+            screenAnchorVector.project(camera);
+            if (Number.isFinite(screenAnchorVector.x) &&
+                Number.isFinite(screenAnchorVector.y) &&
+                screenAnchorVector.z >= -1.0 &&
+                screenAnchorVector.z <= 1.0) {
+                const workerScreenY = ((-screenAnchorVector.y * 0.5) + 0.5) * rendererHeight;
+                offsetY = Math.max(
+                    88,
+                    Math.min(rendererHeight - 160, workerScreenY + 84) - (rendererHeight * 0.5)
+                );
+            }
+        }
+
+        actionProgress.style.transform = "translate3d(-50%, " + offsetY.toFixed(1) + "px, 0)";
     }
 
     function renderSiteStatusChip(state) {
@@ -3691,9 +3691,16 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             containerTileX: slot.containerTileX || 0,
             containerTileY: slot.containerTileY || 0
         });
-        const actionHint = slot.containerKind === "WORKER_PACK"
-            ? (itemMeta && itemMeta.canPlant ? "Click to select and arm/store" : "Click to select and use/store")
-            : "Click to select and move";
+        let actionHint = "No direct left-click action";
+        if (slotUsesPrimaryTransferClick(latestState, slot)) {
+            actionHint = slot.containerKind === "WORKER_PACK"
+                ? "Click to move into the opened storage"
+                : "Click to move into the worker pack";
+        } else if (slot.containerKind === "WORKER_PACK" && itemMeta && itemMeta.canUse) {
+            actionHint = "Click to use or consume";
+        } else if (slot.containerKind === "WORKER_PACK" && itemMeta && (itemMeta.canPlant || itemMeta.canDeploy)) {
+            actionHint = "Carry this item and use the tile menu to place it";
+        }
 
         inventoryTooltipTitle.textContent = getInventoryItemLabel(slot);
         inventoryTooltipMeta.textContent =
@@ -4194,6 +4201,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         const primaryTransferClick = slotUsesPrimaryTransferClick(latestState, slot);
         const transferTargetContainer = findPrimaryTransferTargetContainer(latestState, slot);
+        const itemMeta = getItemMeta(slot.itemId);
 
         if (transferTargetContainer) {
             selectedInventorySlotKey = "";
@@ -4213,15 +4221,14 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return;
         }
 
-        if (!slotSupportsSelection(slot)) {
+        if (slot.containerKind !== "WORKER_PACK" || !itemMeta || !itemMeta.canUse) {
             return;
         }
 
-        const clickedKey = slotKey(slot.containerKind, slot.slotIndex, slot.containerOwnerId);
-        selectedInventorySlotKey = selectedInventorySlotKey === clickedKey ? "" : clickedKey;
-        if (latestState) {
-            renderSiteOverlay(latestState);
-        }
+        selectedInventorySlotKey = "";
+        postInventoryUse(slot).catch(() => {
+            statusChip.textContent = "Failed to use inventory item.";
+        });
     }
 
     function createInventorySlotCard(label, slot, options) {
@@ -5366,12 +5373,16 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function appendSiteTechTreeToggleAction(techTreeSetup) {
+        if (!siteTechTreeActions) {
+            return;
+        }
+
         const isOpen = !!techTreeSetup;
         const action = isOpen
             ? getTechTreeCloseAction(techTreeSetup)
             : makeUiAction("OPEN_REGIONAL_MAP_TECH_TREE", 0, 0, 0);
 
-        contextActions.appendChild(
+        siteTechTreeActions.appendChild(
             makeButton(
                 isOpen ? "Close Tech Tree" : "Open Tech Tree",
                 function () {
@@ -5472,57 +5483,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 slotLabelPrefix: "Device",
                 selectedSlotKey: selectedInventorySlotKey
             });
-    }
-
-    function appendSelectedInventoryActions(state, selectedSlot) {
-        if (!selectedSlot) {
-            return;
-        }
-
-        const itemMeta = getItemMeta(selectedSlot.itemId);
-        const slotSummary = document.createElement("div");
-        slotSummary.className = "helper-note";
-        slotSummary.textContent =
-            getInventoryItemLabel(selectedSlot) +
-            "  x" + selectedSlot.quantity +
-            "  " +
-            getContainerDisplayName(state, {
-                containerKind: selectedSlot.containerKind,
-                containerOwnerId: selectedSlot.containerOwnerId || 0,
-                containerTileX: selectedSlot.containerTileX || 0,
-                containerTileY: selectedSlot.containerTileY || 0
-            }) +
-            " slot " + (selectedSlot.slotIndex + 1);
-        contextActions.appendChild(slotSummary);
-
-        if (selectedSlot.containerKind === "WORKER_PACK" && itemMeta && itemMeta.canUse) {
-            contextActions.appendChild(
-                makeButton(
-                    (itemMeta.useLabel || "Use") + " " + getInventoryItemLabel(selectedSlot),
-                    function () {
-                        postInventoryUse(selectedSlot).catch(() => {
-                            statusChip.textContent = "Failed to use inventory item.";
-                        });
-                    },
-                    false,
-                    false
-                )
-            );
-        }
-
-        contextActions.appendChild(
-            makeButton(
-                "Clear Selection",
-                function () {
-                    selectedInventorySlotKey = "";
-                    if (latestState) {
-                        renderSiteOverlay(latestState);
-                    }
-                },
-                true,
-                false
-            )
-        );
     }
 
     function clearPhonePanel() {
@@ -7126,6 +7086,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         selectionText.textContent = "Supplies are thin, cover is fragile, and every deployment begins exposed to dust and heat. Begin the campaign and secure the first living foothold.";
         renderStoragePanel(null, null);
         contextActions.innerHTML = "";
+        if (siteTechTreeActions) {
+            siteTechTreeActions.innerHTML = "";
+        }
+        if (siteTechTreeAnchor) {
+            siteTechTreeAnchor.hidden = true;
+        }
     }
 
     function renderRegionalMapOverlay(state) {
@@ -7138,6 +7104,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const primaryLabel = labels.length > 0 ? labels[0].text : "";
 
         menuPanel.hidden = true;
+        if (siteTechTreeActions) {
+            siteTechTreeActions.innerHTML = "";
+        }
+        if (siteTechTreeAnchor) {
+            siteTechTreeAnchor.hidden = true;
+        }
 
         if (techTreeSetup) {
             selectionEyebrow.textContent = "Campaign Research";
@@ -7206,6 +7178,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const siteBootstrap = getSiteBootstrap(state);
         menuPanel.hidden = true;
         selectionChip.hidden = false;
+        if (siteTechTreeActions) {
+            siteTechTreeActions.innerHTML = "";
+        }
+        if (siteTechTreeAnchor) {
+            siteTechTreeAnchor.hidden = true;
+        }
         selectionEyebrow.textContent = "Current View";
         selectionText.hidden = false;
         selectionText.textContent =
@@ -7237,6 +7215,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         menuPanel.hidden = true;
         selectionChip.hidden = false;
+        if (siteTechTreeActions) {
+            siteTechTreeActions.innerHTML = "";
+        }
+        if (siteTechTreeAnchor) {
+            siteTechTreeAnchor.hidden = true;
+        }
         selectionEyebrow.textContent = resultCompleted ? "Mission Success" : "Mission Failed";
         selectionText.hidden = false;
         selectionText.textContent = resultLine;
@@ -7300,6 +7284,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         selectionInventory.hidden = false;
         selectionInventory.innerHTML = "";
         contextActions.innerHTML = "";
+        if (siteTechTreeActions) {
+            siteTechTreeActions.innerHTML = "";
+        }
+        if (siteTechTreeAnchor) {
+            siteTechTreeAnchor.hidden = true;
+        }
 
         const panel = document.createElement("section");
         panel.className = "protection-selector-panel";
@@ -7367,10 +7357,18 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         menuPanel.hidden = true;
         selectionChip.hidden = false;
         contextActions.innerHTML = "";
-        clearSelectedInventorySlotIfInvalid(state);
+        if (siteTechTreeActions) {
+            siteTechTreeActions.innerHTML = "";
+        }
+        if (siteTechTreeAnchor) {
+            siteTechTreeAnchor.hidden = false;
+        }
         clearOpenedInventoryContainerIfInvalid(state);
 
         if (protectionSelectorSetup) {
+            if (siteTechTreeAnchor) {
+                siteTechTreeAnchor.hidden = true;
+            }
             selectionEyebrow.textContent = "Site Analysis";
             selectionText.hidden = true;
             selectionText.textContent = "";
@@ -7380,6 +7378,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
 
         if (techTreeSetup) {
+            if (siteTechTreeAnchor) {
+                siteTechTreeAnchor.hidden = true;
+            }
             selectionEyebrow.textContent = "Campaign Research";
             selectionText.hidden = true;
             selectionText.textContent = "";
@@ -7390,7 +7391,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return;
         }
 
-        const selectedSlot = findSelectedInventorySlot(state);
         const openedContainerInfo = findOpenedInventoryContainer(state);
         selectionEyebrow.textContent = "Player Pack";
         selectionText.hidden = true;
@@ -7398,7 +7398,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         renderSiteInventoryPanel(state, workerPackSlots);
         renderStoragePanel(state, openedContainerInfo);
         appendSiteTechTreeToggleAction(techTreeSetup);
-        appendSelectedInventoryActions(state, selectedSlot);
     }
 
     function updateOverlay(state, options) {
