@@ -262,7 +262,8 @@ enum Gs1SiteProtectionOverlayMode : std::uint8_t
     GS1_SITE_PROTECTION_OVERLAY_NONE = 0,
     GS1_SITE_PROTECTION_OVERLAY_WIND = 1,
     GS1_SITE_PROTECTION_OVERLAY_HEAT = 2,
-    GS1_SITE_PROTECTION_OVERLAY_DUST = 3
+    GS1_SITE_PROTECTION_OVERLAY_DUST = 3,
+    GS1_SITE_PROTECTION_OVERLAY_OCCUPANT_CONDITION = 4
 };
 
 enum Gs1EngineMessageType : std::uint8_t
@@ -597,9 +598,9 @@ struct Gs1EngineMessageSiteTileData
     float moisture;
     float soil_fertility;
     float soil_salinity;
+    std::uint16_t device_integrity_quantized;
     std::uint8_t excavation_depth;
     std::uint8_t visible_excavation_depth;
-    std::uint8_t reserved0[2];
 };
 
 struct Gs1EngineMessageWorkerData

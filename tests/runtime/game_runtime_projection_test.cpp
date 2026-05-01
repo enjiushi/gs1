@@ -349,6 +349,20 @@ void set_tile_protection_visual_state(
     site_run.site_world->set_tile_device_weather_contribution(coord, device_contribution);
 }
 
+void set_tile_device_state(
+    gs1::SiteRunState& site_run,
+    TileCoord coord,
+    gs1::StructureId structure_id,
+    float device_integrity)
+{
+    auto device = gs1::site_world_access::tile_device(site_run, coord);
+    device.structure_id = structure_id;
+    device.device_integrity = std::clamp(device_integrity, 0.0f, 1.0f);
+    device.device_efficiency = device.device_integrity;
+    device.fixed_integrity = false;
+    gs1::site_world_access::set_tile_device(site_run, coord, device);
+}
+
 std::vector<Gs1EngineMessage> flush_tile_delta_for(
     GameRuntime& runtime,
     TileCoord coord,
@@ -1098,6 +1112,45 @@ int main()
         assert(approx_equal(payload.plant_density, 22.0f));
     }
 
+    const auto device_coord = TileCoord {7, 6};
+    set_tile_device_state(site_run, device_coord, gs1::StructureId {gs1::k_structure_workbench}, 0.625f);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, device_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+    const auto device_first_messages = drain_engine_messages(runtime);
+    const auto device_first_tiles =
+        collect_messages_of_type(device_first_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
+    assert(device_first_tiles.size() == 1U);
+    {
+        const auto& payload = device_first_tiles.front()->payload_as<Gs1EngineMessageSiteTileData>();
+        assert(payload.structure_type_id == gs1::k_structure_workbench);
+        assert(payload.device_integrity_quantized > 0U);
+        const float projected_device_integrity =
+            static_cast<float>(payload.device_integrity_quantized) * (100.0f / 128.0f);
+        assert(approx_equal(projected_device_integrity, 62.5f, 1.0f));
+    }
+
+    set_tile_device_state(site_run, device_coord, gs1::StructureId {gs1::k_structure_workbench}, 0.629f);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, device_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+    const auto device_second_messages = drain_engine_messages(runtime);
+    const auto device_second_tiles =
+        collect_messages_of_type(device_second_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
+    assert(device_second_tiles.empty());
+
+    set_tile_device_state(site_run, device_coord, gs1::StructureId {gs1::k_structure_workbench}, 0.68f);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, device_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+    const auto device_third_messages = drain_engine_messages(runtime);
+    const auto device_third_tiles =
+        collect_messages_of_type(device_third_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
+    assert(device_third_tiles.size() == 1U);
+    {
+        const auto& payload = device_third_tiles.front()->payload_as<Gs1EngineMessageSiteTileData>();
+        const float projected_device_integrity =
+            static_cast<float>(payload.device_integrity_quantized) * (100.0f / 128.0f);
+        assert(approx_equal(projected_device_integrity, 68.0f, 1.0f));
+    }
+
     set_tile_local_wind(site_run, density_coord, 14.0f);
     gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
@@ -1453,6 +1506,7 @@ int main()
     assert(contains_ui_element_text(open_protection_selector_messages, "Wind Protection"));
     assert(contains_ui_element_text(open_protection_selector_messages, "Heat Protection"));
     assert(contains_ui_element_text(open_protection_selector_messages, "Dust Protection"));
+    assert(contains_ui_element_text(open_protection_selector_messages, "Plant Density / Device Integrity"));
 
     Gs1UiAction select_heat_overlay_action {};
     select_heat_overlay_action.type = GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE;

@@ -162,6 +162,7 @@ public:
         float moisture {0.0f};
         float soil_fertility {0.0f};
         float soil_salinity {0.0f};
+        float device_integrity {0.0f};
         std::uint32_t excavation_depth {0};
         std::uint32_t visible_excavation_depth {0};
     };

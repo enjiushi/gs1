@@ -7,9 +7,10 @@
 #include "campaign/systems/loadout_planner_system.h"
 #include "campaign/systems/technology_system.h"
 #include "content/defs/faction_defs.h"
-#include "messages/message_dispatcher.h"
 #include "content/defs/item_defs.h"
+#include "content/defs/structure_defs.h"
 #include "content/defs/technology_defs.h"
+#include "messages/message_dispatcher.h"
 #include "site/inventory_storage.h"
 #include "site/site_world_access.h"
 #include "site/systems/action_execution_system.h"
@@ -54,6 +55,7 @@ constexpr float k_visible_tile_local_wind_projection_step = 2.5f;
 constexpr float k_visible_tile_moisture_projection_step = 100.0f / 64.0f;
 constexpr float k_visible_tile_soil_fertility_projection_step = 100.0f / 64.0f;
 constexpr float k_visible_tile_soil_salinity_projection_step = 100.0f / 64.0f;
+constexpr float k_visible_tile_device_integrity_projection_step = 100.0f / 128.0f;
 constexpr double k_site_one_probe_window_minutes = 0.25;
 constexpr std::int32_t k_regional_map_tile_spacing = 160;
 
@@ -207,6 +209,10 @@ void queue_storage_open_request(
     const float dust_protection =
         tile.plant_weather_contribution.dust_protection +
         tile.device_weather_contribution.dust_protection;
+    const float device_integrity =
+        tile.device.structure_id.value != 0U
+            ? (tile.device.device_integrity * 100.0f)
+            : 0.0f;
     return ProjectedSiteTileState {
         tile.static_data.terrain_type_id,
         tile.ecology.plant_id.value,
@@ -248,6 +254,10 @@ void queue_storage_open_request(
             tile.ecology.soil_salinity,
             100.0f,
             k_visible_tile_soil_salinity_projection_step),
+        quantize_projected_tile_channel(
+            device_integrity,
+            100.0f,
+            k_visible_tile_device_integrity_projection_step),
         static_cast<std::uint8_t>(tile.excavation.depth),
         static_cast<std::uint8_t>(visible_excavation_depth),
         true};
@@ -271,6 +281,7 @@ void queue_storage_open_request(
         lhs.moisture_quantized == rhs.moisture_quantized &&
         lhs.soil_fertility_quantized == rhs.soil_fertility_quantized &&
         lhs.soil_salinity_quantized == rhs.soil_salinity_quantized &&
+        lhs.device_integrity_quantized == rhs.device_integrity_quantized &&
         lhs.excavation_depth == rhs.excavation_depth &&
         lhs.visible_excavation_depth == rhs.visible_excavation_depth;
 }
@@ -2541,7 +2552,7 @@ void GameRuntime::queue_site_protection_selector_ui_messages()
     queue_ui_setup_begin_message(
         GS1_UI_SETUP_SITE_PROTECTION_SELECTOR,
         GS1_UI_SETUP_PRESENTATION_OVERLAY,
-        5U,
+        6U,
         active_site_run_->site_id.value);
 
     Gs1UiAction no_action {};
@@ -2582,10 +2593,20 @@ void GameRuntime::queue_site_protection_selector_ui_messages()
         dust_action,
         "Dust Protection");
 
+    Gs1UiAction occupant_condition_action {};
+    occupant_condition_action.type = GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE;
+    occupant_condition_action.arg0 = GS1_SITE_PROTECTION_OVERLAY_OCCUPANT_CONDITION;
+    queue_ui_element_message(
+        5U,
+        GS1_UI_ELEMENT_BUTTON,
+        GS1_UI_ELEMENT_FLAG_PRIMARY,
+        occupant_condition_action,
+        "Plant Density / Device Integrity");
+
     Gs1UiAction close_action {};
     close_action.type = GS1_UI_ACTION_CLOSE_SITE_PROTECTION_UI;
     queue_ui_element_message(
-        5U,
+        6U,
         GS1_UI_ELEMENT_BUTTON,
         GS1_UI_ELEMENT_FLAG_BACKGROUND_CLICK,
         close_action,
@@ -2756,10 +2777,9 @@ void GameRuntime::queue_site_tile_upsert_message(std::uint32_t x, std::uint32_t 
     payload.moisture = tile.ecology.moisture;
     payload.soil_fertility = tile.ecology.soil_fertility;
     payload.soil_salinity = tile.ecology.soil_salinity;
+    payload.device_integrity_quantized = projected_state.device_integrity_quantized;
     payload.excavation_depth = projected_state.excavation_depth;
     payload.visible_excavation_depth = projected_state.visible_excavation_depth;
-    payload.reserved0[0] = 0U;
-    payload.reserved0[1] = 0U;
     engine_messages_.push_back(tile_message);
 
     if (should_emit_site_one_runtime_probe(site_run, coord))
@@ -4095,7 +4115,7 @@ Gs1Status GameRuntime::translate_ui_action_to_message(const Gs1UiAction& action,
         return GS1_STATUS_OK;
 
     case GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE:
-        if (action.arg0 > static_cast<std::uint64_t>(GS1_SITE_PROTECTION_OVERLAY_DUST))
+        if (action.arg0 > static_cast<std::uint64_t>(GS1_SITE_PROTECTION_OVERLAY_OCCUPANT_CONDITION))
         {
             return GS1_STATUS_INVALID_ARGUMENT;
         }

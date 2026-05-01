@@ -155,6 +155,8 @@ const char* site_protection_overlay_mode_name(Gs1SiteProtectionOverlayMode mode)
         return "HEAT";
     case GS1_SITE_PROTECTION_OVERLAY_DUST:
         return "DUST";
+    case GS1_SITE_PROTECTION_OVERLAY_OCCUPANT_CONDITION:
+        return "OCCUPANT_CONDITION";
     case GS1_SITE_PROTECTION_OVERLAY_NONE:
     default:
         return "NONE";
@@ -647,6 +649,8 @@ void append_site_bootstrap_json(std::string& json, const std::optional<SmokeEngi
         json += std::to_string(tile.soil_fertility);
         json += ",\"soilSalinity\":";
         json += std::to_string(tile.soil_salinity);
+        json += ",\"deviceIntegrity\":";
+        json += std::to_string(tile.device_integrity);
         json += ",\"excavationDepth\":";
         json += std::to_string(tile.excavation_depth);
         json += ",\"visibleExcavationDepth\":";

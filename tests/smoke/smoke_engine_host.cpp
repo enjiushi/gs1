@@ -275,6 +275,8 @@ const char* site_protection_overlay_mode_name(Gs1SiteProtectionOverlayMode mode)
         return "HEAT";
     case GS1_SITE_PROTECTION_OVERLAY_DUST:
         return "DUST";
+    case GS1_SITE_PROTECTION_OVERLAY_OCCUPANT_CONDITION:
+        return "OCCUPANT_CONDITION";
     case GS1_SITE_PROTECTION_OVERLAY_NONE:
     default:
         return "NONE";
@@ -1398,6 +1400,8 @@ void SmokeEngineHost::apply_site_tile_upsert(const Gs1EngineMessage& message)
     projection.moisture = payload.moisture;
     projection.soil_fertility = payload.soil_fertility;
     projection.soil_salinity = payload.soil_salinity;
+    projection.device_integrity =
+        static_cast<float>(payload.device_integrity_quantized) * (100.0f / 128.0f);
     projection.excavation_depth = payload.excavation_depth;
     projection.visible_excavation_depth = payload.visible_excavation_depth;
 

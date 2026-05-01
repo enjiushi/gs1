@@ -167,7 +167,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         none: 0,
         wind: 1,
         heat: 2,
-        dust: 3
+        dust: 3,
+        occupantCondition: 4
     };
     const highwayTerrainTypeId = 9001;
     const audioWarningHazardLevels = {
@@ -583,7 +584,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const structureCatalog = {
         201: { name: "Field Kitchen", shortName: "Kitchen", slotCount: 6 },
         202: { name: "Workbench", shortName: "Workbench", slotCount: 8 },
-        203: { name: "Storage Crate", shortName: "Crate", slotCount: 10 }
+        203: { name: "Storage Crate", shortName: "Crate", slotCount: 10 },
+        204: { name: "Wind Fence", shortName: "Fence", slotCount: 0 },
+        205: { name: "Chemistry Station", shortName: "Chem", slotCount: 0 }
     };
     const plantFootprintCatalog = Object.freeze({
         1: { width: 2, height: 2 },
@@ -4341,9 +4344,14 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 ? siteBootstrap.tiles
                 : [];
             const peakValue = resolveProtectionOverlayPeakValue(siteTiles, overlayModeName);
+            const overlayValueLabel =
+                overlayModeName === "OCCUPANT_CONDITION"
+                    ? "strongest current occupied value is "
+                    : "strongest current final shelter is ";
             hudSubtitle.textContent =
                 overlayPresentation.title +
-                " overlay: strongest current final shelter is " +
+                " overlay: " +
+                overlayValueLabel +
                 peakValue.toFixed(1) +
                 " on the 0-100 scale.";
         } else {
@@ -7485,6 +7493,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return { title: "Heat Protection", iconKey: "flame" };
         case "DUST":
             return { title: "Dust Protection", iconKey: "grid" };
+        case "OCCUPANT_CONDITION":
+            return { title: "Plant Density / Device Integrity", iconKey: "compass" };
         default:
             return { title: "Protection", iconKey: "compass" };
         }
@@ -7532,6 +7542,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                         element.action.arg0 === protectionOverlayModes.wind ? "WIND" :
                         element.action.arg0 === protectionOverlayModes.heat ? "HEAT" :
                         element.action.arg0 === protectionOverlayModes.dust ? "DUST" :
+                        element.action.arg0 === protectionOverlayModes.occupantCondition ? "OCCUPANT_CONDITION" :
                         "NONE")
                     : "NONE";
             const presentation = protectionOverlayPresentation(modeName);
@@ -7554,7 +7565,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
             const subtitle = document.createElement("div");
             subtitle.className = "protection-selector-button-subtitle";
-            subtitle.textContent = "0 red  100 green";
+            subtitle.textContent =
+                modeName === "OCCUPANT_CONDITION"
+                    ? "Occupied entities only"
+                    : "0 red  100 green";
             button.appendChild(subtitle);
 
             grid.appendChild(button);
@@ -10713,6 +10727,14 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (modeName === "DUST") {
             return typeof tile.dustProtection === "number" ? tile.dustProtection : 0;
         }
+        if (modeName === "OCCUPANT_CONDITION") {
+            if (tile.plantTypeId) {
+                return typeof tile.plantDensity === "number" ? tile.plantDensity * 100.0 : 0;
+            }
+            if (tile.structureTypeId) {
+                return typeof tile.deviceIntegrity === "number" ? tile.deviceIntegrity : 0;
+            }
+        }
         return 0;
     }
 
@@ -10720,6 +10742,112 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return (tiles || []).reduce(function (peakValue, tile) {
             return Math.max(peakValue, readTileProtectionValue(tile, modeName));
         }, 0);
+    }
+
+    function resolveStructureFootprintByType(structureTypeId) {
+        const structureMeta = getStructureMeta(structureTypeId);
+        if (structureMeta && structureMeta.width && structureMeta.height) {
+            return { width: structureMeta.width, height: structureMeta.height };
+        }
+        return { width: 1, height: 1 };
+    }
+
+    function collectOverlayOccupantLabels(siteTiles, tileMap) {
+        const labels = [];
+        const visited = new Set();
+
+        (siteTiles || []).forEach((tile) => {
+            if (!tile) {
+                return;
+            }
+            const tileKey = buildSiteTileKey(tile.x, tile.y);
+            if (visited.has(tileKey)) {
+                return;
+            }
+
+            if (tile.plantTypeId) {
+                const footprint = resolvePlantFootprintByType(tile.plantTypeId || 0);
+                const anchorX = alignTileAxisToSpan(tile.x, footprint.width);
+                const anchorY = alignTileAxisToSpan(tile.y, footprint.height);
+                if (tile.x !== anchorX || tile.y !== anchorY) {
+                    return;
+                }
+
+                const footprintTiles = [];
+                let footprintComplete = true;
+                for (let offsetY = 0; offsetY < footprint.height; offsetY += 1) {
+                    for (let offsetX = 0; offsetX < footprint.width; offsetX += 1) {
+                        const footprintTile = tileMap.get(buildSiteTileKey(anchorX + offsetX, anchorY + offsetY));
+                        if (!footprintTile || footprintTile.plantTypeId !== tile.plantTypeId) {
+                            footprintComplete = false;
+                            break;
+                        }
+                        footprintTiles.push(footprintTile);
+                    }
+                    if (!footprintComplete) {
+                        break;
+                    }
+                }
+
+                const coveredTiles = footprintComplete ? footprintTiles : [tile];
+                coveredTiles.forEach((coveredTile) => {
+                    visited.add(buildSiteTileKey(coveredTile.x, coveredTile.y));
+                });
+                const plantSpec = buildPlantRenderSpec(
+                    tile,
+                    coveredTiles,
+                    footprintComplete ? footprint : { width: 1, height: 1 }
+                );
+                labels.push({
+                    value: clamp01(plantSpec.plantDensity) * 100.0,
+                    centerX: plantSpec.centerX,
+                    centerZ: plantSpec.centerZ,
+                    height: plantSpec.baseHeight + 0.24
+                });
+                return;
+            }
+
+            if (tile.structureTypeId) {
+                const footprint = resolveStructureFootprintByType(tile.structureTypeId || 0);
+                const anchorX = alignTileAxisToSpan(tile.x, footprint.width);
+                const anchorY = alignTileAxisToSpan(tile.y, footprint.height);
+                if (tile.x !== anchorX || tile.y !== anchorY) {
+                    return;
+                }
+
+                const footprintTiles = [];
+                let footprintComplete = true;
+                for (let offsetY = 0; offsetY < footprint.height; offsetY += 1) {
+                    for (let offsetX = 0; offsetX < footprint.width; offsetX += 1) {
+                        const footprintTile = tileMap.get(buildSiteTileKey(anchorX + offsetX, anchorY + offsetY));
+                        if (!footprintTile || footprintTile.structureTypeId !== tile.structureTypeId) {
+                            footprintComplete = false;
+                            break;
+                        }
+                        footprintTiles.push(footprintTile);
+                    }
+                    if (!footprintComplete) {
+                        break;
+                    }
+                }
+
+                const coveredTiles = footprintComplete ? footprintTiles : [tile];
+                coveredTiles.forEach((coveredTile) => {
+                    visited.add(buildSiteTileKey(coveredTile.x, coveredTile.y));
+                });
+                const averageHeight =
+                    coveredTiles.reduce((total, coveredTile) => total + computeSiteTileVisualHeight(coveredTile), 0) /
+                    Math.max(coveredTiles.length, 1);
+                labels.push({
+                    value: typeof tile.deviceIntegrity === "number" ? tile.deviceIntegrity : 0,
+                    centerX: anchorX + (Math.max(1, footprint.width) - 1) * 0.5,
+                    centerZ: anchorY + (Math.max(1, footprint.height) - 1) * 0.5,
+                    height: averageHeight + 0.26
+                });
+            }
+        });
+
+        return labels;
     }
 
     function applyTerrainSurfaceShader(material) {
@@ -11361,6 +11489,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 tile.x,
                 tile.y
             );
+            if (modeName === "OCCUPANT_CONDITION" &&
+                !((tileSnapshot && tileSnapshot.plantTypeId) || (tileSnapshot && tileSnapshot.structureTypeId))) {
+                return;
+            }
             const protectionValue = readTileProtectionValue(tileSnapshot, modeName);
             const normalizedProtection =
                 clamp01(protectionValue / 100.0);
@@ -11458,6 +11590,56 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         protectionValueOverlayContext.textBaseline = "middle";
         protectionValueOverlayContext.font = "700 11px 'Trebuchet MS', 'Segoe UI', sans-serif";
         protectionValueOverlayContext.lineWidth = 1;
+
+        if (modeName === "OCCUPANT_CONDITION") {
+            const overlayLabels = collectOverlayOccupantLabels(siteTiles, tileMap);
+            overlayLabels.forEach((label) => {
+                const normalizedValue = clamp01(label.value / 100.0);
+                tintColor.copy(lowColor).lerp(highColor, normalizedValue);
+
+                protectionOverlayProjectVector.set(
+                    label.centerX - siteSceneCache.offsetX,
+                    label.height,
+                    label.centerZ - siteSceneCache.offsetZ
+                );
+                protectionOverlayProjectVector.project(camera);
+                if (protectionOverlayProjectVector.z < minVisibleZ ||
+                    protectionOverlayProjectVector.z > maxVisibleZ) {
+                    return;
+                }
+
+                const screenX = (protectionOverlayProjectVector.x * 0.5 + 0.5) * rendererWidth;
+                const screenY = (-protectionOverlayProjectVector.y * 0.5 + 0.5) * rendererHeight;
+                if (screenX < -labelWidth ||
+                    screenX > rendererWidth + labelWidth ||
+                    screenY < -labelHeight ||
+                    screenY > rendererHeight + labelHeight) {
+                    return;
+                }
+
+                protectionValueOverlayContext.fillStyle = "rgba(22, 17, 13, 0.82)";
+                protectionValueOverlayContext.strokeStyle = "rgba(240, 224, 198, 0.42)";
+                protectionValueOverlayContext.beginPath();
+                traceRoundedRectPath(
+                    protectionValueOverlayContext,
+                    screenX - labelWidth * 0.5,
+                    screenY - labelHeight * 0.5,
+                    labelWidth,
+                    labelHeight,
+                    6
+                );
+                protectionValueOverlayContext.fill();
+                protectionValueOverlayContext.stroke();
+
+                protectionValueOverlayContext.fillStyle = "#" + tintColor.getHexString();
+                protectionValueOverlayContext.fillText(
+                    String(Math.round(label.value)),
+                    screenX,
+                    screenY + 0.5
+                );
+            });
+            return;
+        }
 
         siteTiles.forEach((tile) => {
             const tileSnapshot = getSiteTileByCoord(
@@ -12834,3 +13016,4 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     animate();
     connectStateStream();
 })();
+

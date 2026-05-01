@@ -93,6 +93,7 @@ struct ProjectedSiteTileState final
     std::uint16_t moisture_quantized {0};
     std::uint16_t soil_fertility_quantized {0};
     std::uint16_t soil_salinity_quantized {0};
+    std::uint16_t device_integrity_quantized {0};
     std::uint8_t excavation_depth {0};
     std::uint8_t visible_excavation_depth {0};
     bool valid {false};
