@@ -395,6 +395,7 @@ void inventory_item_use_updates_worker_and_projection()
     {
         const auto& payload = hud_messages.back()->payload_as<Gs1EngineMessageHudStateData>();
         assert(approx_equal(payload.player_health, 88.0f));
+        assert(approx_equal(payload.player_nourishment, 100.0f));
         assert(approx_equal(payload.player_morale, 100.0f));
         assert(approx_equal(payload.current_money, 20.0f));
         assert(payload.active_task_count == 1U);

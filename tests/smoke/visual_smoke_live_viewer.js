@@ -3125,6 +3125,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             siteState && siteState.worker ? siteState.worker.currentActionKind : 0;
         const warning = getHudWarningPresentation(state);
         const hydration = hud ? Math.round(hud.playerHydration) : 0;
+        const nourishment = hud ? Math.round(hud.playerNourishment) : 0;
         const energy = hud ? Math.round(hud.playerEnergy) : 0;
         const completion = hud ? Math.round((hud.siteCompletionNormalized || 0) * 100) : 0;
         const weatherHeat = weather ? Math.round(weather.heat || 0) : 0;
@@ -3139,6 +3140,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         statusChip.textContent =
             "Site Live\nHydration " + hydration +
+            "\nNourishment " + nourishment +
             "\nEnergy " + energy +
             "\nCompletion " + completion + "%" +
             "\nHeat " + weatherHeat +
@@ -4077,6 +4079,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         const hydration = hud && typeof hud.playerHydration === "number"
             ? hud.playerHydration
             : (worker && typeof worker.hydrationNormalized === "number" ? worker.hydrationNormalized * 100 : 0);
+        const nourishment = hud && typeof hud.playerNourishment === "number"
+            ? hud.playerNourishment
+            : 0;
         const energy = hud && typeof hud.playerEnergy === "number"
             ? hud.playerEnergy
             : (worker && typeof worker.energyNormalized === "number" ? worker.energyNormalized * 100 : 0);
@@ -4108,6 +4113,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         [
             { label: "Health", percent: clampMeterPercent(health), className: "health" },
             { label: "Hydration", percent: clampMeterPercent(hydration), className: "hydration" },
+            { label: "Nourishment", percent: clampMeterPercent(nourishment), className: "nourishment" },
             { label: "Energy", percent: clampMeterPercent(energy), className: "energy" },
             { label: "Morale", percent: clampMeterPercent(morale), className: "morale" }
         ].forEach((meter) => {

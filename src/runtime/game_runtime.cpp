@@ -3513,6 +3513,7 @@ void GameRuntime::queue_hud_state_message()
     auto& payload = hud_message.emplace_payload<Gs1EngineMessageHudStateData>();
     payload.player_health = worker_conditions.health;
     payload.player_hydration = worker_conditions.hydration;
+    payload.player_nourishment = worker_conditions.nourishment;
     payload.player_energy = worker_conditions.energy;
     payload.player_morale = worker_conditions.morale;
     payload.current_money = cash_value_from_cash_points(active_site_run_->economy.current_cash);

@@ -203,6 +203,7 @@ Gs1EngineMessage make_hud_state_message(float money)
     auto& payload = message.emplace_payload<Gs1EngineMessageHudStateData>();
     payload.player_health = 90.0f;
     payload.player_hydration = 80.0f;
+    payload.player_nourishment = 75.0f;
     payload.player_energy = 70.0f;
     payload.player_morale = 60.0f;
     payload.current_money = money;
@@ -400,6 +401,7 @@ void repeated_hud_and_campaign_messages_publish_one_coalesced_patch_per_frame()
     const auto snapshot = host.capture_live_state_snapshot();
     assert(snapshot.hud_state.has_value());
     assert(snapshot.campaign_resources.has_value());
+    assert(std::abs(snapshot.hud_state->player_nourishment - 75.0f) < 0.0001f);
     assert(std::abs(snapshot.hud_state->current_money - 12.5f) < 0.0001f);
     assert(std::abs(snapshot.campaign_resources->current_money - 12.5f) < 0.0001f);
     assert(snapshot.campaign_resources->total_reputation == 6U);
@@ -411,6 +413,7 @@ void repeated_hud_and_campaign_messages_publish_one_coalesced_patch_per_frame()
     assert(patches.size() == 1U);
     assert(patches.front().find("\"hud\":") != std::string::npos);
     assert(patches.front().find("\"campaignResources\":") != std::string::npos);
+    assert(patches.front().find("\"playerNourishment\":75.000000") != std::string::npos);
     assert(patches.front().find("\"currentMoney\":12.500000") != std::string::npos);
     assert(patches.front().find("\"totalReputation\":6") != std::string::npos);
     assert(patches.front().find("\"villageReputation\":300") != std::string::npos);
@@ -430,6 +433,8 @@ void visual_smoke_assets_keep_hidden_regional_map_panels_collapsed()
     assert(html.find("id=\"site-tech-tree-actions\"") != std::string::npos);
 
     assert(viewer.find("siteVitalsMoney.hidden = !showRegionalMapCash;") != std::string::npos);
+    assert(viewer.find("playerNourishment") != std::string::npos);
+    assert(viewer.find("{ label: \"Nourishment\", percent: clampMeterPercent(nourishment), className: \"nourishment\" }") != std::string::npos);
     assert(viewer.find("if (state.appState !== \"SITE_ACTIVE\") {") != std::string::npos);
     assert(viewer.find("renderSiteTaskPanel(null);") != std::string::npos);
     assert(viewer.find("renderSiteModifiers(null);") != std::string::npos);
