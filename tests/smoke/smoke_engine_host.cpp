@@ -102,6 +102,8 @@ const char* message_type_name(Gs1EngineMessageType type)
         return "SITE_CRAFT_CONTEXT_END";
     case GS1_ENGINE_MESSAGE_SITE_PLACEMENT_PREVIEW:
         return "SITE_PLACEMENT_PREVIEW";
+    case GS1_ENGINE_MESSAGE_SITE_PLACEMENT_PREVIEW_TILE_UPSERT:
+        return "SITE_PLACEMENT_PREVIEW_TILE_UPSERT";
     case GS1_ENGINE_MESSAGE_SITE_PLACEMENT_FAILURE:
         return "SITE_PLACEMENT_FAILURE";
     case GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE:
@@ -990,6 +992,9 @@ void SmokeEngineHost::flush_engine_messages(const char* stage_label)
         case GS1_ENGINE_MESSAGE_SITE_PLACEMENT_PREVIEW:
             apply_site_placement_preview(message);
             break;
+        case GS1_ENGINE_MESSAGE_SITE_PLACEMENT_PREVIEW_TILE_UPSERT:
+            apply_site_placement_preview_tile_upsert(message);
+            break;
         case GS1_ENGINE_MESSAGE_SITE_PLACEMENT_FAILURE:
             apply_site_placement_failure(message);
             live_state_patch_mask = LiveStatePatchField_SitePlacementFailure;
@@ -1661,6 +1666,7 @@ void SmokeEngineHost::apply_site_placement_preview(const Gs1EngineMessage& messa
     if ((payload.flags & 1U) == 0U)
     {
         pending_site_snapshot_->placement_preview.reset();
+        pending_site_snapshot_->placement_preview_tiles.clear();
     }
     else
     {
@@ -1673,6 +1679,46 @@ void SmokeEngineHost::apply_site_placement_preview(const Gs1EngineMessage& messa
             payload.flags,
             payload.footprint_width,
             payload.footprint_height};
+        pending_site_snapshot_->placement_preview_tiles.clear();
+    }
+
+    pending_site_snapshot_patch_mask_ |= LiveStatePatchField_SiteStatePlacementPreview;
+}
+
+void SmokeEngineHost::apply_site_placement_preview_tile_upsert(const Gs1EngineMessage& message)
+{
+    if (!pending_site_snapshot_.has_value())
+    {
+        return;
+    }
+
+    const auto& payload = message.payload_as<Gs1EngineMessagePlacementPreviewTileData>();
+    SitePlacementPreviewTileProjection projection {};
+    projection.x = payload.x;
+    projection.y = payload.y;
+    projection.flags = payload.flags;
+    projection.wind_protection = payload.wind_protection;
+    projection.heat_protection = payload.heat_protection;
+    projection.dust_protection = payload.dust_protection;
+    projection.final_wind_protection = payload.final_wind_protection;
+    projection.final_heat_protection = payload.final_heat_protection;
+    projection.final_dust_protection = payload.final_dust_protection;
+    projection.occupant_condition = payload.occupant_condition;
+
+    auto& preview_tiles = pending_site_snapshot_->placement_preview_tiles;
+    const auto existing = std::find_if(
+        preview_tiles.begin(),
+        preview_tiles.end(),
+        [&](const SitePlacementPreviewTileProjection& tile) {
+            return tile.x == projection.x && tile.y == projection.y;
+        });
+    if (existing != preview_tiles.end())
+    {
+        *existing = projection;
+    }
+    else
+    {
+        preview_tiles.push_back(projection);
     }
 
     pending_site_snapshot_patch_mask_ |= LiveStatePatchField_SiteStatePlacementPreview;

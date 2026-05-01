@@ -931,6 +931,44 @@ void append_placement_preview_json(std::string& json, const SmokeEngineHost::Sit
     json += "}";
 }
 
+void append_placement_preview_tiles_json(
+    std::string& json,
+    const SmokeEngineHost::SiteSnapshotProjection& site_snapshot)
+{
+    json += "\"placementPreviewTiles\":[";
+    for (std::size_t index = 0; index < site_snapshot.placement_preview_tiles.size(); ++index)
+    {
+        const auto& tile = site_snapshot.placement_preview_tiles[index];
+        if (index > 0U)
+        {
+            json.push_back(',');
+        }
+
+        json += "{\"x\":";
+        json += std::to_string(tile.x);
+        json += ",\"y\":";
+        json += std::to_string(tile.y);
+        json += ",\"flags\":";
+        json += std::to_string(tile.flags);
+        json += ",\"windProtection\":";
+        json += std::to_string(tile.wind_protection);
+        json += ",\"heatProtection\":";
+        json += std::to_string(tile.heat_protection);
+        json += ",\"dustProtection\":";
+        json += std::to_string(tile.dust_protection);
+        json += ",\"finalWindProtection\":";
+        json += std::to_string(tile.final_wind_protection);
+        json += ",\"finalHeatProtection\":";
+        json += std::to_string(tile.final_heat_protection);
+        json += ",\"finalDustProtection\":";
+        json += std::to_string(tile.final_dust_protection);
+        json += ",\"occupantCondition\":";
+        json += std::to_string(tile.occupant_condition);
+        json += "}";
+    }
+    json += "]";
+}
+
 void append_placement_failure_json(std::string& json, const SmokeEngineHost::SiteSnapshotProjection& site_snapshot)
 {
     json += "\"placementFailure\":";
@@ -1123,6 +1161,8 @@ void append_site_state_json(std::string& json, const std::optional<SmokeEngineHo
     json += ",";
     append_placement_preview_json(json, site_snapshot);
     json += ",";
+    append_placement_preview_tiles_json(json, site_snapshot);
+    json += ",";
     append_placement_failure_json(json, site_snapshot);
     json += ",";
     append_site_tasks_json(json, site_snapshot);
@@ -1186,6 +1226,7 @@ void append_site_state_patch_json(
     if ((field_mask & SmokeEngineHost::LiveStatePatchField_SiteStatePlacementPreview) != 0U)
     {
         append_field([&]() { append_placement_preview_json(json, site_snapshot); });
+        append_field([&]() { append_placement_preview_tiles_json(json, site_snapshot); });
     }
     if ((field_mask & SmokeEngineHost::LiveStatePatchField_SitePlacementFailure) != 0U)
     {

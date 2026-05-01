@@ -2655,6 +2655,14 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return siteState ? (siteState.placementPreview || null) : null;
     }
 
+    function getPlacementPreviewTiles(state) {
+        const siteState = getSiteState(state);
+        if (!siteState || !Array.isArray(siteState.placementPreviewTiles)) {
+            return [];
+        }
+        return siteState.placementPreviewTiles;
+    }
+
     function isPlacementModeActive(state) {
         const preview = getPlacementPreview(state);
         return !!(preview && (preview.flags & 1) !== 0 && preview.actionKind !== 0);
@@ -10775,6 +10783,42 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return clamp01(tile && typeof tile[key] === "number" ? tile[key] : 0);
     }
 
+    function buildPlacementPreviewTileMap(state) {
+        const previewTileMap = new Map();
+        const previewTiles = getPlacementPreviewTiles(state);
+        previewTiles.forEach((tile) => {
+            if (!tile) {
+                return;
+            }
+            previewTileMap.set(buildSiteTileKey(tile.x, tile.y), tile);
+        });
+        return previewTileMap;
+    }
+
+    function readEffectiveTileProtectionValue(tile, previewTile, modeName) {
+        if (previewTile) {
+            if (modeName === "WIND") {
+                return typeof previewTile.finalWindProtection === "number"
+                    ? previewTile.finalWindProtection
+                    : (typeof previewTile.windProtection === "number" ? previewTile.windProtection : 0);
+            }
+            if (modeName === "HEAT") {
+                return typeof previewTile.finalHeatProtection === "number"
+                    ? previewTile.finalHeatProtection
+                    : (typeof previewTile.heatProtection === "number" ? previewTile.heatProtection : 0);
+            }
+            if (modeName === "DUST") {
+                return typeof previewTile.finalDustProtection === "number"
+                    ? previewTile.finalDustProtection
+                    : (typeof previewTile.dustProtection === "number" ? previewTile.dustProtection : 0);
+            }
+            if (modeName === "OCCUPANT_CONDITION") {
+                return typeof previewTile.occupantCondition === "number" ? previewTile.occupantCondition : 0;
+            }
+        }
+        return readTileProtectionValue(tile, modeName);
+    }
+
     function readTileProtectionValue(tile, modeName) {
         if (!tile) {
             return 0;
@@ -10814,7 +10858,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return { width: 1, height: 1 };
     }
 
-    function collectOverlayOccupantLabels(siteTiles, tileMap) {
+    function collectOverlayOccupantLabels(siteTiles, tileMap, previewTileMap, placementPreview) {
         const labels = [];
         const visited = new Set();
 
@@ -10827,8 +10871,16 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 return;
             }
 
-            if (tile.plantTypeId) {
-                const footprint = resolvePlantFootprintByType(tile.plantTypeId || 0);
+            const previewTile = previewTileMap ? previewTileMap.get(tileKey) : null;
+
+            if (tile.plantTypeId || (previewTile && (previewTile.flags & 2) !== 0)) {
+                const footprint =
+                    tile.plantTypeId
+                        ? resolvePlantFootprintByType(tile.plantTypeId || 0)
+                        : {
+                            width: Math.max(1, placementPreview && placementPreview.footprintWidth ? placementPreview.footprintWidth : 1),
+                            height: Math.max(1, placementPreview && placementPreview.footprintHeight ? placementPreview.footprintHeight : 1)
+                        };
                 const anchorX = alignTileAxisToSpan(tile.x, footprint.width);
                 const anchorY = alignTileAxisToSpan(tile.y, footprint.height);
                 if (tile.x !== anchorX || tile.y !== anchorY) {
@@ -10861,7 +10913,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     footprintComplete ? footprint : { width: 1, height: 1 }
                 );
                 labels.push({
-                    value: clamp01(plantSpec.plantDensity) * 100.0,
+                    value: previewTile && typeof previewTile.occupantCondition === "number"
+                        ? previewTile.occupantCondition
+                        : clamp01(plantSpec.plantDensity) * 100.0,
                     centerX: plantSpec.centerX,
                     centerZ: plantSpec.centerZ,
                     height: plantSpec.baseHeight + 0.24
@@ -10869,8 +10923,14 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 return;
             }
 
-            if (tile.structureTypeId) {
-                const footprint = resolveStructureFootprintByType(tile.structureTypeId || 0);
+            if (tile.structureTypeId || (previewTile && (previewTile.flags & 4) !== 0)) {
+                const footprint =
+                    tile.structureTypeId
+                        ? resolveStructureFootprintByType(tile.structureTypeId || 0)
+                        : {
+                            width: Math.max(1, placementPreview && placementPreview.footprintWidth ? placementPreview.footprintWidth : 1),
+                            height: Math.max(1, placementPreview && placementPreview.footprintHeight ? placementPreview.footprintHeight : 1)
+                        };
                 const anchorX = alignTileAxisToSpan(tile.x, footprint.width);
                 const anchorY = alignTileAxisToSpan(tile.y, footprint.height);
                 if (tile.x !== anchorX || tile.y !== anchorY) {
@@ -10901,7 +10961,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     coveredTiles.reduce((total, coveredTile) => total + computeSiteTileVisualHeight(coveredTile), 0) /
                     Math.max(coveredTiles.length, 1);
                 labels.push({
-                    value: typeof tile.deviceIntegrity === "number" ? tile.deviceIntegrity : 0,
+                    value: previewTile && typeof previewTile.occupantCondition === "number"
+                        ? previewTile.occupantCondition
+                        : (typeof tile.deviceIntegrity === "number" ? tile.deviceIntegrity : 0),
                     centerX: anchorX + (Math.max(1, footprint.width) - 1) * 0.5,
                     centerZ: anchorY + (Math.max(1, footprint.height) - 1) * 0.5,
                     height: averageHeight + 0.26
@@ -11519,6 +11581,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         disposeProtectionOverlayGroup(siteSceneCache);
 
         const protectionOverlay = getProtectionOverlayState(state);
+        const placementPreview = getPlacementPreview(state);
         const modeName = protectionOverlay && typeof protectionOverlay.mode === "string"
             ? protectionOverlay.mode
             : "NONE";
@@ -11541,6 +11604,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             ? siteBootstrap.tiles
             : [];
         const tileMap = buildSiteTileMap(siteTiles);
+        const previewTileMap = buildPlacementPreviewTileMap(state);
         const scratchColor = new THREE_NS.Color();
 
         siteTiles.forEach((tile) => {
@@ -11551,11 +11615,14 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 tile.x,
                 tile.y
             );
+            const previewTile = previewTileMap.get(buildSiteTileKey(tile.x, tile.y));
             if (modeName === "OCCUPANT_CONDITION" &&
-                !((tileSnapshot && tileSnapshot.plantTypeId) || (tileSnapshot && tileSnapshot.structureTypeId))) {
+                !((tileSnapshot && tileSnapshot.plantTypeId) ||
+                    (tileSnapshot && tileSnapshot.structureTypeId) ||
+                    (previewTile && (previewTile.flags & 1) !== 0))) {
                 return;
             }
-            const protectionValue = readTileProtectionValue(tileSnapshot, modeName);
+            const protectionValue = readEffectiveTileProtectionValue(tileSnapshot, previewTile, modeName);
             const normalizedProtection =
                 clamp01(protectionValue / 100.0);
             scratchColor.copy(lowColor).lerp(highColor, normalizedProtection);
@@ -11640,6 +11707,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             ? siteBootstrap.tiles
             : [];
         const tileMap = buildSiteTileMap(siteTiles);
+        const previewTileMap = buildPlacementPreviewTileMap(state);
         const lowColor = new THREE_NS.Color(0xc95649);
         const highColor = new THREE_NS.Color(0x59b36c);
         const tintColor = new THREE_NS.Color();
@@ -11654,7 +11722,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         protectionValueOverlayContext.lineWidth = 1;
 
         if (modeName === "OCCUPANT_CONDITION") {
-            const overlayLabels = collectOverlayOccupantLabels(siteTiles, tileMap);
+            const overlayLabels = collectOverlayOccupantLabels(siteTiles, tileMap, previewTileMap, placementPreview);
             overlayLabels.forEach((label) => {
                 const normalizedValue = clamp01(label.value / 100.0);
                 tintColor.copy(lowColor).lerp(highColor, normalizedValue);
@@ -11711,10 +11779,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 tile.x,
                 tile.y
             );
+            const previewTile = previewTileMap.get(buildSiteTileKey(tile.x, tile.y));
             if (!tileSnapshot) {
                 return;
             }
-            const protectionValue = readTileProtectionValue(tileSnapshot, modeName);
+            const protectionValue = readEffectiveTileProtectionValue(tileSnapshot, previewTile, modeName);
             const normalizedProtection = clamp01(protectionValue / 100.0);
             tintColor.copy(lowColor).lerp(highColor, normalizedProtection);
 

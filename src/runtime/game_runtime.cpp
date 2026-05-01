@@ -8,11 +8,13 @@
 #include "campaign/systems/technology_system.h"
 #include "content/defs/faction_defs.h"
 #include "content/defs/item_defs.h"
+#include "content/defs/plant_defs.h"
 #include "content/defs/structure_defs.h"
 #include "content/defs/technology_defs.h"
 #include "messages/message_dispatcher.h"
 #include "site/inventory_storage.h"
 #include "site/site_world_access.h"
+#include "site/tile_footprint.h"
 #include "site/systems/action_execution_system.h"
 #include "site/systems/camp_durability_system.h"
 #include "site/systems/craft_system.h"
@@ -35,15 +37,19 @@
 #include "site/systems/task_board_system.h"
 #include "site/systems/weather_event_system.h"
 #include "site/systems/worker_condition_system.h"
+#include "site/weather_contribution_logic.h"
 #include "support/currency.h"
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <chrono>
 #include <cstdio>
 #include <cstring>
+#include <cmath>
 #include <limits>
 #include <set>
+#include <vector>
 
 namespace gs1
 {
@@ -261,6 +267,366 @@ void queue_storage_open_request(
         static_cast<std::uint8_t>(tile.excavation.depth),
         static_cast<std::uint8_t>(visible_excavation_depth),
         true};
+}
+
+struct PlacementPreviewTileProjectionState final
+{
+    TileCoord coord {};
+    float wind_protection {0.0f};
+    float heat_protection {0.0f};
+    float dust_protection {0.0f};
+    float final_wind_protection {0.0f};
+    float final_heat_protection {0.0f};
+    float final_dust_protection {0.0f};
+    float occupant_condition {0.0f};
+    std::uint8_t flags {0U};
+};
+
+struct PreviewOccupant final
+{
+    enum class Kind : std::uint8_t
+    {
+        None = 0,
+        Plant = 1,
+        Structure = 2
+    };
+
+    Kind kind {Kind::None};
+    std::uint32_t content_id {0U};
+    TileCoord anchor {};
+    gs1::TileFootprint footprint {1U, 1U};
+    float occupant_condition {0.0f};
+    float wind_support {0.0f};
+    float heat_support {0.0f};
+    float dust_support {0.0f};
+    float protection_ratio {1.0f};
+    std::uint8_t aura_distance {0U};
+    std::uint8_t wind_distance {0U};
+};
+
+[[nodiscard]] bool placement_mode_supports_preview_tiles(
+    const PlacementModeState& placement_mode) noexcept
+{
+    return placement_mode.active &&
+        placement_mode.target_tile.has_value() &&
+        placement_mode.action_kind != ActionKind::None &&
+        placement_mode.blocked_mask == 0ULL;
+}
+
+[[nodiscard]] std::uint8_t resolve_effective_preview_aura_distance(const PlantDef& plant_def) noexcept
+{
+    return gs1::scale_tile_distance_by_footprint_multiple(
+        plant_def.aura_size,
+        gs1::TileFootprint {plant_def.footprint_width, plant_def.footprint_height});
+}
+
+[[nodiscard]] std::uint8_t resolve_effective_preview_wind_distance(const PlantDef& plant_def) noexcept
+{
+    return gs1::scale_tile_distance_by_footprint_multiple(
+        plant_def.wind_protection_range,
+        gs1::TileFootprint {plant_def.footprint_width, plant_def.footprint_height});
+}
+
+[[nodiscard]] bool source_instance_projects_full_wind_shelter_to_target_instance(
+    TileCoord source_anchor,
+    gs1::TileFootprint source_footprint,
+    TileCoord target_anchor,
+    gs1::TileFootprint target_footprint,
+    const WeatherDirectionStep& wind_direction,
+    std::uint8_t protection_range) noexcept
+{
+    const std::int32_t source_min_x = source_anchor.x;
+    const std::int32_t source_max_x = source_anchor.x + static_cast<std::int32_t>(source_footprint.width) - 1;
+    const std::int32_t source_min_y = source_anchor.y;
+    const std::int32_t source_max_y = source_anchor.y + static_cast<std::int32_t>(source_footprint.height) - 1;
+    const std::int32_t target_min_x = target_anchor.x;
+    const std::int32_t target_max_x = target_anchor.x + static_cast<std::int32_t>(target_footprint.width) - 1;
+    const std::int32_t target_min_y = target_anchor.y;
+    const std::int32_t target_max_y = target_anchor.y + static_cast<std::int32_t>(target_footprint.height) - 1;
+
+    if (wind_direction.x > 0)
+    {
+        const std::int32_t gap = target_min_x - source_max_x;
+        if (gap < 1 || gap > static_cast<std::int32_t>(protection_range))
+        {
+            return false;
+        }
+
+        return target_min_y <= source_max_y && target_max_y >= source_min_y;
+    }
+
+    if (wind_direction.x < 0)
+    {
+        const std::int32_t gap = source_min_x - target_max_x;
+        if (gap < 1 || gap > static_cast<std::int32_t>(protection_range))
+        {
+            return false;
+        }
+
+        return target_min_y <= source_max_y && target_max_y >= source_min_y;
+    }
+
+    if (wind_direction.y > 0)
+    {
+        const std::int32_t gap = target_min_y - source_max_y;
+        if (gap < 1 || gap > static_cast<std::int32_t>(protection_range))
+        {
+            return false;
+        }
+
+        return target_min_x <= source_max_x && target_max_x >= source_min_x;
+    }
+
+    if (wind_direction.y < 0)
+    {
+        const std::int32_t gap = source_min_y - target_max_y;
+        if (gap < 1 || gap > static_cast<std::int32_t>(protection_range))
+        {
+            return false;
+        }
+
+        return target_min_x <= source_max_x && target_max_x >= source_min_x;
+    }
+
+    return false;
+}
+
+[[nodiscard]] PreviewOccupant resolve_preview_occupant(const SiteRunState& site_run) noexcept
+{
+    PreviewOccupant preview {};
+    const auto& placement_mode = site_run.site_action.placement_mode;
+    if (!placement_mode_supports_preview_tiles(placement_mode))
+    {
+        return preview;
+    }
+
+    if (placement_mode.action_kind == ActionKind::Plant)
+    {
+        const auto* item_def = find_item_def(ItemId {placement_mode.item_id});
+        if (item_def == nullptr || item_def->linked_plant_id.value == 0U)
+        {
+            return preview;
+        }
+
+        const auto* plant_def = find_plant_def(item_def->linked_plant_id);
+        if (plant_def == nullptr)
+        {
+            return preview;
+        }
+
+        preview.kind = PreviewOccupant::Kind::Plant;
+        preview.content_id = plant_def->plant_id.value;
+        preview.anchor = placement_mode.target_tile.value();
+        preview.footprint = gs1::TileFootprint {plant_def->footprint_width, plant_def->footprint_height};
+        preview.occupant_condition = 100.0f;
+        preview.wind_support = resolve_density_scaled_support_value(plant_def->wind_resistance, 1.0f);
+        preview.heat_support = resolve_density_scaled_support_value(plant_def->heat_tolerance, 1.0f);
+        preview.dust_support = resolve_density_scaled_support_value(plant_def->dust_tolerance, 1.0f);
+        preview.protection_ratio = std::clamp(plant_def->protection_ratio, 0.0f, 1.0f);
+        preview.aura_distance = resolve_effective_preview_aura_distance(*plant_def);
+        preview.wind_distance = resolve_effective_preview_wind_distance(*plant_def);
+        return preview;
+    }
+
+    if (placement_mode.action_kind == ActionKind::Build)
+    {
+        const auto* item_def = find_item_def(ItemId {placement_mode.item_id});
+        if (item_def == nullptr || item_def->linked_structure_id.value == 0U)
+        {
+            return preview;
+        }
+
+        const auto* structure_def = find_structure_def(item_def->linked_structure_id);
+        if (structure_def == nullptr)
+        {
+            return preview;
+        }
+
+        preview.kind = PreviewOccupant::Kind::Structure;
+        preview.content_id = structure_def->structure_id.value;
+        preview.anchor = placement_mode.target_tile.value();
+        preview.footprint = gs1::resolve_structure_tile_footprint(structure_def->structure_id);
+        preview.occupant_condition = 100.0f;
+        preview.wind_support = std::clamp(structure_def->wind_protection_value, 0.0f, 100.0f);
+        preview.heat_support = std::clamp(structure_def->heat_protection_value, 0.0f, 100.0f);
+        preview.dust_support = std::clamp(structure_def->dust_protection_value, 0.0f, 100.0f);
+        preview.protection_ratio = 1.0f;
+        preview.aura_distance = structure_def->aura_size;
+        preview.wind_distance = structure_def->wind_protection_range;
+        return preview;
+    }
+
+    return preview;
+}
+
+[[nodiscard]] bool preview_occupies_tile(const PreviewOccupant& preview, TileCoord coord) noexcept
+{
+    if (preview.kind == PreviewOccupant::Kind::None)
+    {
+        return false;
+    }
+
+    return coord.x >= preview.anchor.x &&
+        coord.y >= preview.anchor.y &&
+        coord.x < preview.anchor.x + static_cast<std::int32_t>(preview.footprint.width) &&
+        coord.y < preview.anchor.y + static_cast<std::int32_t>(preview.footprint.height);
+}
+
+[[nodiscard]] std::vector<PlacementPreviewTileProjectionState> build_placement_preview_tile_projections(
+    const SiteRunState& site_run) noexcept
+{
+    std::vector<PlacementPreviewTileProjectionState> projections {};
+    const auto preview = resolve_preview_occupant(site_run);
+    if (preview.kind == PreviewOccupant::Kind::None || site_run.site_world == nullptr)
+    {
+        return projections;
+    }
+
+    std::set<std::pair<std::int32_t, std::int32_t>> unique_tiles;
+    const auto wind_direction = resolve_wind_direction_step(site_run.weather.weather_wind_direction_degrees);
+    const auto max_distance = std::max(preview.aura_distance, preview.wind_distance);
+
+    for (std::int32_t offset_y = 0; offset_y < static_cast<std::int32_t>(preview.footprint.height); ++offset_y)
+    {
+        for (std::int32_t offset_x = 0; offset_x < static_cast<std::int32_t>(preview.footprint.width); ++offset_x)
+        {
+            const TileCoord source_coord {preview.anchor.x + offset_x, preview.anchor.y + offset_y};
+            for (std::int32_t dy = -static_cast<std::int32_t>(max_distance);
+                dy <= static_cast<std::int32_t>(max_distance);
+                ++dy)
+            {
+                for (std::int32_t dx = -static_cast<std::int32_t>(max_distance);
+                    dx <= static_cast<std::int32_t>(max_distance);
+                    ++dx)
+                {
+                    const int manhattan_distance = std::abs(dx) + std::abs(dy);
+                    if (manhattan_distance > static_cast<int>(max_distance))
+                    {
+                        continue;
+                    }
+
+                    const TileCoord target_coord {source_coord.x + dx, source_coord.y + dy};
+                    if (!site_world_access::tile_coord_in_bounds(site_run, target_coord))
+                    {
+                        continue;
+                    }
+
+                    unique_tiles.insert({target_coord.x, target_coord.y});
+                }
+            }
+        }
+    }
+
+    projections.reserve(unique_tiles.size());
+    for (const auto& coord_key : unique_tiles)
+    {
+        const TileCoord coord {coord_key.first, coord_key.second};
+        auto total = site_run.site_world->tile_total_weather_contribution(coord);
+
+        float preview_heat = 0.0f;
+        float preview_wind = 0.0f;
+        float preview_dust = 0.0f;
+        const bool occupied_by_preview = preview_occupies_tile(preview, coord);
+
+        for (std::int32_t offset_y = 0; offset_y < static_cast<std::int32_t>(preview.footprint.height); ++offset_y)
+        {
+            for (std::int32_t offset_x = 0; offset_x < static_cast<std::int32_t>(preview.footprint.width); ++offset_x)
+            {
+                const TileCoord source_coord {preview.anchor.x + offset_x, preview.anchor.y + offset_y};
+                const int dx = coord.x - source_coord.x;
+                const int dy = coord.y - source_coord.y;
+                const int manhattan_distance = std::abs(dx) + std::abs(dy);
+                if (manhattan_distance > static_cast<int>(max_distance))
+                {
+                    continue;
+                }
+
+                const float contribution_scale = resolve_contribution_scale(manhattan_distance);
+                const bool same_instance = occupied_by_preview;
+                const bool within_shared_aura =
+                    manhattan_distance == 0 || manhattan_distance <= static_cast<int>(preview.aura_distance);
+                if (within_shared_aura && !same_instance)
+                {
+                    preview_heat += preview.heat_support * preview.protection_ratio * contribution_scale;
+                    preview_dust += preview.dust_support * preview.protection_ratio * contribution_scale;
+                }
+
+                if (!same_instance &&
+                    manhattan_distance > 0 &&
+                    manhattan_distance <= static_cast<int>(preview.wind_distance))
+                {
+                    const float shadow_scale = compute_directional_wind_shadow_scale(
+                        source_coord.x,
+                        source_coord.y,
+                        coord.x,
+                        coord.y,
+                        preview.wind_distance,
+                        wind_direction);
+                    const bool full_instance_cover =
+                        wind_direction.x != 0 && wind_direction.y == 0 &&
+                        source_instance_projects_full_wind_shelter_to_target_instance(
+                            preview.anchor,
+                            preview.footprint,
+                            coord,
+                            occupied_by_preview ? preview.footprint : gs1::TileFootprint {1U, 1U},
+                            wind_direction,
+                            preview.wind_distance);
+                    const float resolved_shadow_scale = full_instance_cover ? 1.0f : shadow_scale;
+                    if (resolved_shadow_scale > k_weather_contribution_epsilon)
+                    {
+                        preview_wind = std::max(
+                            preview_wind,
+                            preview.wind_support * preview.protection_ratio * resolved_shadow_scale);
+                    }
+                }
+            }
+        }
+
+        total.heat_protection = std::clamp(total.heat_protection + preview_heat, 0.0f, 100.0f);
+        total.wind_protection = std::clamp(total.wind_protection + preview_wind, 0.0f, 100.0f);
+        total.dust_protection = std::clamp(total.dust_protection + preview_dust, 0.0f, 100.0f);
+
+        PlacementPreviewTileProjectionState projection {};
+        projection.coord = coord;
+        projection.wind_protection = total.wind_protection;
+        projection.heat_protection = total.heat_protection;
+        projection.dust_protection = total.dust_protection;
+        projection.final_wind_protection = total.wind_protection;
+        projection.final_heat_protection = total.heat_protection;
+        projection.final_dust_protection = total.dust_protection;
+        if (occupied_by_preview)
+        {
+            projection.flags |= GS1_PLACEMENT_PREVIEW_TILE_FLAG_OCCUPIED;
+            projection.occupant_condition = preview.occupant_condition;
+            if (preview.kind == PreviewOccupant::Kind::Plant)
+            {
+                projection.flags |= GS1_PLACEMENT_PREVIEW_TILE_FLAG_PLANT;
+                projection.final_wind_protection =
+                    std::clamp(total.wind_protection + preview.wind_support, 0.0f, 100.0f);
+                projection.final_heat_protection =
+                    std::clamp(total.heat_protection + preview.heat_support, 0.0f, 100.0f);
+                projection.final_dust_protection =
+                    std::clamp(total.dust_protection + preview.dust_support, 0.0f, 100.0f);
+            }
+            else if (preview.kind == PreviewOccupant::Kind::Structure)
+            {
+                projection.flags |= GS1_PLACEMENT_PREVIEW_TILE_FLAG_STRUCTURE;
+            }
+        }
+        projections.push_back(projection);
+    }
+
+    std::sort(
+        projections.begin(),
+        projections.end(),
+        [](const PlacementPreviewTileProjectionState& lhs, const PlacementPreviewTileProjectionState& rhs) {
+            if (lhs.coord.y != rhs.coord.y)
+            {
+                return lhs.coord.y < rhs.coord.y;
+            }
+            return lhs.coord.x < rhs.coord.x;
+        });
+    return projections;
 }
 
 [[nodiscard]] bool projected_tile_state_matches(
@@ -1784,8 +2150,7 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
 
     case GameMessageType::OpenSiteProtectionSelector:
         if (!active_site_run_.has_value() ||
-            app_state_ != GS1_APP_STATE_SITE_ACTIVE ||
-            active_site_run_->site_action.placement_mode.active)
+            app_state_ != GS1_APP_STATE_SITE_ACTIVE)
         {
             break;
         }
@@ -1824,8 +2189,7 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
 
     case GameMessageType::SetSiteProtectionOverlayMode:
         if (!active_site_run_.has_value() ||
-            app_state_ != GS1_APP_STATE_SITE_ACTIVE ||
-            active_site_run_->site_action.placement_mode.active)
+            app_state_ != GS1_APP_STATE_SITE_ACTIVE)
         {
             break;
         }
@@ -1855,13 +2219,6 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
     case GameMessageType::InventoryTransferCompleted:
     case GameMessageType::InventoryItemSubmitted:
     case GameMessageType::InventoryItemUseCompleted:
-        if (active_site_run_.has_value() &&
-            active_site_run_->site_action.placement_mode.active &&
-            site_protection_overlay_mode_ != GS1_SITE_PROTECTION_OVERLAY_NONE)
-        {
-            site_protection_overlay_mode_ = GS1_SITE_PROTECTION_OVERLAY_NONE;
-            queue_site_protection_overlay_state_message();
-        }
         break;
 
     case GameMessageType::InventoryDeliveryRequested:
@@ -1870,13 +2227,6 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
     case GameMessageType::InventoryTransferRequested:
     case GameMessageType::InventoryItemSubmitRequested:
     case GameMessageType::InventoryCraftContextRequested:
-        if (active_site_run_.has_value() &&
-            active_site_run_->site_action.placement_mode.active &&
-            site_protection_overlay_mode_ != GS1_SITE_PROTECTION_OVERLAY_NONE)
-        {
-            site_protection_overlay_mode_ = GS1_SITE_PROTECTION_OVERLAY_NONE;
-            queue_site_protection_overlay_state_message();
-        }
         break;
 
     case GameMessageType::PhoneListingPurchaseRequested:
@@ -1886,13 +2236,6 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
         queue_campaign_resources_message();
         [[fallthrough]];
     default:
-        if (active_site_run_.has_value() &&
-            active_site_run_->site_action.placement_mode.active &&
-            site_protection_overlay_mode_ != GS1_SITE_PROTECTION_OVERLAY_NONE)
-        {
-            site_protection_overlay_mode_ = GS1_SITE_PROTECTION_OVERLAY_NONE;
-            queue_site_protection_overlay_state_message();
-        }
         break;
     }
 }
@@ -3231,6 +3574,8 @@ void GameRuntime::queue_site_placement_preview_message()
         payload.tile_y = placement_mode.target_tile->y;
         payload.blocked_mask = placement_mode.blocked_mask;
         payload.item_id = placement_mode.item_id;
+        const auto preview_tiles = build_placement_preview_tile_projections(active_site_run_.value());
+        payload.preview_tile_count = static_cast<std::uint32_t>(std::min<std::size_t>(preview_tiles.size(), 1024U));
         payload.footprint_width = placement_mode.footprint_width;
         payload.footprint_height = placement_mode.footprint_height;
         payload.action_kind = static_cast<Gs1SiteActionKind>(placement_mode.action_kind);
@@ -3239,6 +3584,23 @@ void GameRuntime::queue_site_placement_preview_message()
         {
             payload.flags |= 2U;
         }
+        engine_messages_.push_back(message);
+        for (std::size_t index = 0; index < preview_tiles.size(); ++index)
+        {
+            Gs1EngineMessagePlacementPreviewTileData tile_payload {};
+            tile_payload.x = static_cast<std::int16_t>(preview_tiles[index].coord.x);
+            tile_payload.y = static_cast<std::int16_t>(preview_tiles[index].coord.y);
+            tile_payload.flags = preview_tiles[index].flags;
+            tile_payload.wind_protection = preview_tiles[index].wind_protection;
+            tile_payload.heat_protection = preview_tiles[index].heat_protection;
+            tile_payload.dust_protection = preview_tiles[index].dust_protection;
+            tile_payload.final_wind_protection = preview_tiles[index].final_wind_protection;
+            tile_payload.final_heat_protection = preview_tiles[index].final_heat_protection;
+            tile_payload.final_dust_protection = preview_tiles[index].final_dust_protection;
+            tile_payload.occupant_condition = preview_tiles[index].occupant_condition;
+            queue_site_placement_preview_tile_upsert_message(tile_payload);
+        }
+        return;
     }
     else
     {
@@ -3246,12 +3608,21 @@ void GameRuntime::queue_site_placement_preview_message()
         payload.tile_y = 0;
         payload.blocked_mask = 0ULL;
         payload.item_id = 0U;
+        payload.preview_tile_count = 0U;
         payload.footprint_width = 1U;
         payload.footprint_height = 1U;
         payload.action_kind = GS1_SITE_ACTION_NONE;
         payload.flags = 4U;
     }
 
+    engine_messages_.push_back(message);
+}
+
+void GameRuntime::queue_site_placement_preview_tile_upsert_message(
+    const Gs1EngineMessagePlacementPreviewTileData& payload)
+{
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_PLACEMENT_PREVIEW_TILE_UPSERT);
+    message.emplace_payload<Gs1EngineMessagePlacementPreviewTileData>() = payload;
     engine_messages_.push_back(message);
 }
 
