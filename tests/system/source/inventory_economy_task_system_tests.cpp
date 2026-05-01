@@ -22,6 +22,7 @@
 #include "site/systems/modifier_system.h"
 #include "site/systems/plant_weather_contribution_system.h"
 #include "site/systems/task_board_system.h"
+#include "site/systems/weather_event_system.h"
 #include "site/systems/worker_condition_system.h"
 #include "support/currency.h"
 #include "testing/system_test_registry.h"
@@ -46,6 +47,7 @@ using gs1::SiteRunStartedMessage;
 using gs1::TaskBoardSystem;
 using gs1::TaskRuntimeListKind;
 using gs1::TechnologySystem;
+using gs1::WeatherEventSystem;
 using gs1::WorkerConditionSystem;
 using namespace gs1::testing::fixtures;
 
@@ -2992,6 +2994,203 @@ void task_board_living_plant_duration_task_ignores_straw_and_resets_on_density_d
     GS1_SYSTEM_TEST_CHECK(context, plant_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
 }
 
+void site_one_onboarding_stable_ephedra_task_blocks_starter_density_loss_while_progress_runs(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_prototype_site_run(campaign, 1U);
+    GameMessageQueue queue {};
+    const auto started = make_message(
+        GameMessageType::SiteRunStarted,
+        SiteRunStartedMessage {1U, 1710U, 101U, 1U, 42ULL});
+
+    auto task_context = make_site_context<TaskBoardSystem>(campaign, site_run, queue, 60.0);
+    auto weather_context = make_site_context<WeatherEventSystem>(campaign, site_run, queue, 60.0);
+    auto local_weather_context =
+        make_site_context<LocalWeatherResolveSystem>(campaign, site_run, queue, 60.0);
+    auto ecology_context = make_site_context<EcologySystem>(campaign, site_run, queue, 60.0);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_message(task_context, started) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        WeatherEventSystem::process_message(weather_context, started) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        LocalWeatherResolveSystem::process_message(local_weather_context, started) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        EcologySystem::process_message(ecology_context, started) == GS1_STATUS_OK);
+
+    auto drain_task_messages = [&]() {
+        while (!queue.empty())
+        {
+            const auto message = queue.front();
+            queue.pop_front();
+            if (TaskBoardSystem::subscribes_to(message.type))
+            {
+                GS1_SYSTEM_TEST_REQUIRE(
+                    context,
+                    TaskBoardSystem::process_message(task_context, message) == GS1_STATUS_OK);
+            }
+        }
+    };
+
+    drain_task_messages();
+
+    auto claim_task = [&](gs1::TaskInstanceId task_instance_id) {
+        queue.clear();
+        GS1_SYSTEM_TEST_REQUIRE(
+            context,
+            TaskBoardSystem::process_message(
+                task_context,
+                make_message(
+                    GameMessageType::TaskRewardClaimRequested,
+                    gs1::TaskRewardClaimRequestedMessage {
+                        task_instance_id.value,
+                        0U})) == GS1_STATUS_OK);
+    };
+
+    auto* checkerboard_task =
+        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_plant_checkerboard);
+    GS1_SYSTEM_TEST_REQUIRE(context, checkerboard_task != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_message(
+            task_context,
+            make_message(
+                GameMessageType::SiteTilePlantingCompleted,
+                gs1::SiteTilePlantingCompletedMessage {1U, 4, 4, 5U, 100.0f, 0U})) ==
+            GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, checkerboard_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
+    claim_task(checkerboard_task->task_instance_id);
+
+    auto* hammer_task =
+        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_craft_hammer);
+    GS1_SYSTEM_TEST_REQUIRE(context, hammer_task != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_message(
+            task_context,
+            make_message(
+                GameMessageType::InventoryCraftCompleted,
+                gs1::InventoryCraftCompletedMessage {
+                    gs1::k_recipe_craft_hammer,
+                    gs1::k_item_hammer,
+                    1U,
+                    0U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, hammer_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
+    claim_task(hammer_task->task_instance_id);
+
+    auto* storage_crate_task =
+        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_craft_storage_crate);
+    GS1_SYSTEM_TEST_REQUIRE(context, storage_crate_task != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_message(
+            task_context,
+            make_message(
+                GameMessageType::InventoryCraftCompleted,
+                gs1::InventoryCraftCompletedMessage {
+                    gs1::k_recipe_craft_storage_crate,
+                    gs1::k_item_storage_crate_kit,
+                    1U,
+                    0U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, storage_crate_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
+    claim_task(storage_crate_task->task_instance_id);
+
+    auto* buy_water_task =
+        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_buy_water);
+    GS1_SYSTEM_TEST_REQUIRE(context, buy_water_task != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_message(
+            task_context,
+            make_message(
+                GameMessageType::PhoneListingPurchased,
+                gs1::PhoneListingPurchasedMessage {1U, gs1::k_item_water_container, 1U, 0U})) ==
+            GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, buy_water_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
+    claim_task(buy_water_task->task_instance_id);
+
+    auto* buy_food_task =
+        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_buy_food);
+    GS1_SYSTEM_TEST_REQUIRE(context, buy_food_task != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_message(
+            task_context,
+            make_message(
+                GameMessageType::PhoneListingPurchased,
+                gs1::PhoneListingPurchasedMessage {2U, gs1::k_item_food_pack, 1U, 0U})) ==
+            GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, buy_food_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
+    claim_task(buy_food_task->task_instance_id);
+
+    auto* shovel_task =
+        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_craft_shovel);
+    GS1_SYSTEM_TEST_REQUIRE(context, shovel_task != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        TaskBoardSystem::process_message(
+            task_context,
+            make_message(
+                GameMessageType::InventoryCraftCompleted,
+                gs1::InventoryCraftCompletedMessage {
+                    gs1::k_recipe_craft_shovel,
+                    gs1::k_item_shovel,
+                    1U,
+                    0U})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, shovel_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
+    claim_task(shovel_task->task_instance_id);
+
+    auto* stable_task =
+        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_keep_starter_ephedra_stable);
+    GS1_SYSTEM_TEST_REQUIRE(context, stable_task != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, stable_task->runtime_list_kind == TaskRuntimeListKind::Accepted);
+
+    auto set_hostile_starter_tile_conditions = [&]() {
+        for (const gs1::TileCoord coord : {
+                 gs1::TileCoord {12, 14},
+                 gs1::TileCoord {13, 14},
+                 gs1::TileCoord {12, 15},
+                 gs1::TileCoord {13, 15},
+                 gs1::TileCoord {12, 16},
+                 gs1::TileCoord {13, 16},
+                 gs1::TileCoord {12, 17},
+                 gs1::TileCoord {13, 17}})
+        {
+            auto tile = site_run.site_world->tile_at(coord);
+            tile.ecology.moisture = 0.0f;
+            tile.ecology.soil_fertility = 0.0f;
+            tile.ecology.soil_salinity = 100.0f;
+            tile.local_weather.heat = 100.0f;
+            tile.local_weather.wind = 100.0f;
+            tile.local_weather.dust = 100.0f;
+            site_run.site_world->set_tile(coord, tile);
+        }
+    };
+
+    set_hostile_starter_tile_conditions();
+    const auto starter_before = site_run.site_world->tile_at({12, 14}).ecology.plant_density;
+
+    EcologySystem::run(ecology_context);
+    drain_task_messages();
+    TaskBoardSystem::run(task_context);
+
+    stable_task =
+        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_keep_starter_ephedra_stable);
+    GS1_SYSTEM_TEST_REQUIRE(context, stable_task != nullptr);
+    const auto starter_after = site_run.site_world->tile_at({12, 14}).ecology.plant_density;
+    GS1_SYSTEM_TEST_CHECK(context, approx_equal(starter_after, starter_before, 0.0001f));
+    GS1_SYSTEM_TEST_CHECK(context, stable_task->current_progress_amount >= 1U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        stable_task->runtime_list_kind == TaskRuntimeListKind::Accepted ||
+            stable_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
+}
+
 void task_board_reward_claim_is_ignored_without_draft_options(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -3679,6 +3878,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "task_board",
     "living_plant_duration_task_ignores_straw_and_resets_on_density_drop",
     task_board_living_plant_duration_task_ignores_straw_and_resets_on_density_drop);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "task_board",
+    "site_one_onboarding_stable_ephedra_task_blocks_starter_density_loss_while_progress_runs",
+    site_one_onboarding_stable_ephedra_task_blocks_starter_density_loss_while_progress_runs);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "task_board",
     "reward_claim_is_ignored_without_draft_options",

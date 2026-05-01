@@ -1,7 +1,9 @@
 #include "site/systems/ecology_system.h"
 
+#include "content/defs/task_defs.h"
 #include "content/defs/gameplay_tuning_defs.h"
 #include "content/defs/plant_defs.h"
+#include "content/prototype_content.h"
 #include "runtime/runtime_clock.h"
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
@@ -50,6 +52,70 @@ bool is_site_one_probe_tile(TileCoord coord) noexcept
 {
     return (coord.x == 12 && coord.y >= 14 && coord.y <= 17) ||
         (coord.x == 13 && coord.y >= 14 && coord.y <= 17);
+}
+
+bool site_one_starter_ephedra_density_lock_active(
+    const SiteRunState& site_run,
+    TileCoord coord,
+    PlantId plant_id) noexcept
+{
+    if (site_run.site_id.value != 1U ||
+        plant_id.value != k_plant_desert_ephedra)
+    {
+        return false;
+    }
+
+    bool onboarding_task_active = false;
+    for (const auto& task : site_run.task_board.visible_tasks)
+    {
+        if (task.task_template_id.value !=
+                k_task_template_site1_onboarding_keep_starter_ephedra_stable ||
+            task.runtime_list_kind == TaskRuntimeListKind::Claimed)
+        {
+            continue;
+        }
+
+        onboarding_task_active = true;
+        break;
+    }
+
+    if (!onboarding_task_active)
+    {
+        return false;
+    }
+
+    const auto* site_content = find_prototype_site_content(site_run.site_id);
+    if (site_content == nullptr)
+    {
+        return false;
+    }
+
+    for (const auto& starting_plant : site_content->starting_plants)
+    {
+        if (starting_plant.plant_id != plant_id)
+        {
+            continue;
+        }
+
+        const TileFootprint footprint = resolve_plant_tile_footprint(starting_plant.plant_id);
+        bool matches = false;
+        for_each_tile_in_footprint(
+            starting_plant.anchor_tile,
+            footprint,
+            [&](TileCoord footprint_coord) {
+                if (footprint_coord.x == coord.x &&
+                    footprint_coord.y == coord.y)
+                {
+                    matches = true;
+                }
+            });
+        if (matches)
+        {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 bool should_emit_site_one_probe_log(
@@ -1413,7 +1479,7 @@ void EcologySystem::run(SiteSystemContext<EcologySystem>& context)
 
             const float salinity_cap =
                 compute_salinity_density_cap(ecology, plant_def, modifiers);
-            const float density_delta =
+            float density_delta =
                 compute_density_delta(
                     ecology,
                     plant_def,
@@ -1421,6 +1487,14 @@ void EcologySystem::run(SiteSystemContext<EcologySystem>& context)
                     next_growth_pressure,
                     salinity_cap,
                     simulation_dt_minutes);
+            if (site_one_starter_ephedra_density_lock_active(
+                    context.site_run,
+                    coord,
+                    ecology.plant_id) &&
+                density_delta < 0.0f)
+            {
+                density_delta = 0.0f;
+            }
             const float next_density = std::clamp(
                 ecology.plant_density + density_delta,
                 0.0f,
