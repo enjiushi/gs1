@@ -10,6 +10,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     const siteVitalsPanel = document.getElementById("site-vitals-panel");
     const siteVitalsResources = document.getElementById("site-vitals-resources") ||
         (siteVitalsPanel ? siteVitalsPanel.querySelector(".site-vitals-resources") : null);
+    const sitePhoneButton = document.getElementById("site-phone-button");
+    const sitePhoneButtonIcon = document.getElementById("site-phone-button-icon");
+    const sitePhoneButtonBadge = document.getElementById("site-phone-button-badge");
     const siteVitalsMoney = document.getElementById("site-vitals-money");
     const siteReputationStack = document.getElementById("site-reputation-stack");
     const siteVitalsBars = document.getElementById("site-vitals-bars");
@@ -569,6 +572,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             '<circle cx="12" cy="12" r="7"></circle>',
             '<path d="m10 14 1.7-4.7L16.5 7.5 14.7 12.3 10 14Z"></path>'
         ].join(""),
+        phone: [
+            '<rect x="7" y="3.5" width="10" height="17" rx="2.6"></rect>',
+            '<path d="M10 7.3h4"></path>',
+            '<path d="M11.2 17.1h1.6"></path>'
+        ].join(""),
         lock: [
             '<rect x="6.5" y="10.5" width="11" height="9.5" rx="2.5"></rect>',
             '<path d="M9 10.5V8.9a3 3 0 0 1 6 0v1.6"></path>',
@@ -668,6 +676,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         ]
     };
     const audioManager = createAudioManagerState();
+    let rendererResizeFrameHandle = 0;
 
     const renderer = new THREE_NS.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -712,9 +721,42 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     weatherPostProcess = createWeatherDistortionPostProcess();
 
+    function getViewportDimensions() {
+        const visualViewport = window.visualViewport;
+        const width =
+            visualViewport && Number.isFinite(visualViewport.width)
+                ? visualViewport.width
+                : (window.innerWidth || document.documentElement.clientWidth || 0);
+        const height =
+            visualViewport && Number.isFinite(visualViewport.height)
+                ? visualViewport.height
+                : (window.innerHeight || document.documentElement.clientHeight || 0);
+        return {
+            width: Math.max(1, Math.round(width)),
+            height: Math.max(1, Math.round(height))
+        };
+    }
+
+    function scheduleFitRenderer() {
+        if (rendererResizeFrameHandle !== 0) {
+            return;
+        }
+
+        rendererResizeFrameHandle = window.requestAnimationFrame(function () {
+            rendererResizeFrameHandle = 0;
+            fitRenderer();
+        });
+    }
+
     function fitRenderer() {
-        const width = Math.max(gameView.clientWidth, 320);
-        const height = Math.max(gameView.clientHeight, 240);
+        const gameViewBounds = gameView.getBoundingClientRect();
+        const viewport = getViewportDimensions();
+        const width = Math.max(
+            1,
+            Math.min(Math.round(gameViewBounds.width || gameView.clientWidth || 0), viewport.width));
+        const height = Math.max(
+            1,
+            Math.min(Math.round(gameViewBounds.height || gameView.clientHeight || 0), viewport.height));
         if (width === rendererWidth && height === rendererHeight) {
             return;
         }
@@ -1606,7 +1648,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             if (audioManager.context && audioManager.context.state === "running") {
                 label = "Audio On";
             } else {
-                label = "Audio Tap To Resume";
+                label = "Resume Audio";
             }
         }
 
@@ -1674,7 +1716,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (!AudioContextCtor) {
             if (audioToggle) {
                 audioToggle.disabled = true;
-                audioToggle.textContent = "Audio Unsupported";
+                audioToggle.textContent = "No Audio";
             }
             return null;
         }
@@ -2578,6 +2620,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     function isPhonePanelOpen(state) {
         const phonePanelState = getPhonePanelState(state);
         return !!(phonePanelState && phonePanelState.open);
+    }
+
+    function hasPhonePanelBadge(phonePanelState, badgeFieldName) {
+        return !!(phonePanelState && phonePanelState[badgeFieldName]);
     }
 
     function getSiteTasks(state) {
@@ -3780,8 +3826,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
         tileContextMenuRenderSignature = renderSignature;
         const panels = collectTileContextPanels(rootItems, tileContextMenuState.hoverPath);
-        const viewportWidth = Math.max(window.innerWidth, 320);
-        const viewportHeight = Math.max(window.innerHeight, 240);
+        const viewport = getViewportDimensions();
+        const viewportWidth = viewport.width;
+        const viewportHeight = viewport.height;
         const panelElements = [];
 
         tileContextMenu.hidden = false;
@@ -3920,8 +3967,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     function moveInventoryTooltip(clientX, clientY) {
         const tooltipWidth = 220;
         const tooltipHeight = 90;
-        const left = Math.min(clientX + 18, Math.max(12, window.innerWidth - tooltipWidth - 16));
-        const top = Math.min(clientY + 18, Math.max(12, window.innerHeight - tooltipHeight - 16));
+        const viewport = getViewportDimensions();
+        const left = Math.min(clientX + 18, Math.max(12, viewport.width - tooltipWidth - 16));
+        const top = Math.min(clientY + 18, Math.max(12, viewport.height - tooltipHeight - 16));
         inventoryTooltip.style.left = left + "px";
         inventoryTooltip.style.top = top + "px";
     }
@@ -3967,8 +4015,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         const tooltipWidth = 260;
         const tooltipHeight = 120;
-        const left = Math.min(clientX + 18, Math.max(12, window.innerWidth - tooltipWidth - 16));
-        const top = Math.min(clientY + 18, Math.max(12, window.innerHeight - tooltipHeight - 16));
+        const viewport = getViewportDimensions();
+        const left = Math.min(clientX + 18, Math.max(12, viewport.width - tooltipWidth - 16));
+        const top = Math.min(clientY + 18, Math.max(12, viewport.height - tooltipHeight - 16));
         modifierTooltip.style.left = left + "px";
         modifierTooltip.style.top = top + "px";
     }
@@ -3980,8 +4029,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         const tooltipWidth = 300;
         const tooltipHeight = 132;
-        const left = Math.min(clientX + 18, Math.max(12, window.innerWidth - tooltipWidth - 16));
-        const top = Math.min(clientY + 18, Math.max(12, window.innerHeight - tooltipHeight - 16));
+        const viewport = getViewportDimensions();
+        const left = Math.min(clientX + 18, Math.max(12, viewport.width - tooltipWidth - 16));
+        const top = Math.min(clientY + 18, Math.max(12, viewport.height - tooltipHeight - 16));
         techTooltip.style.left = left + "px";
         techTooltip.style.top = top + "px";
     }
@@ -4288,6 +4338,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             siteReputationStack.hidden = true;
             siteReputationStack.innerHTML = "";
             siteVitalsBars.innerHTML = "";
+            if (sitePhoneButton) {
+                sitePhoneButton.hidden = true;
+                sitePhoneButton.classList.remove("active");
+            }
             renderSiteTaskPanel(null);
             renderSiteModifiers(null);
             return;
@@ -4329,6 +4383,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         siteVitalsBars.innerHTML = "";
 
         if (state.appState !== "SITE_ACTIVE") {
+            if (sitePhoneButton) {
+                sitePhoneButton.hidden = true;
+                sitePhoneButton.classList.remove("active");
+            }
             renderSiteTaskPanel(null);
             renderSiteModifiers(null);
             return;
@@ -4364,9 +4422,27 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         renderSiteModifiers(state);
     }
 
+    function renderSitePhoneButton(state) {
+        if (!sitePhoneButton || !sitePhoneButtonBadge) {
+            return;
+        }
+
+        if (!state || state.appState !== "SITE_ACTIVE") {
+            sitePhoneButton.hidden = true;
+            sitePhoneButton.classList.remove("active");
+            return;
+        }
+
+        const phonePanelState = getPhonePanelState(state);
+        sitePhoneButton.hidden = false;
+        sitePhoneButton.classList.toggle("active", isPhonePanelOpen(state));
+        sitePhoneButtonBadge.hidden = !hasPhonePanelBadge(phonePanelState, "hasLauncherBadge");
+    }
+
     function renderSiteHudChrome(state) {
         if (!state || state.appState !== "SITE_ACTIVE") {
             renderSiteVitalsPanel(null);
+            renderSitePhoneButton(null);
             return;
         }
 
@@ -4399,6 +4475,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             hudSubtitle.textContent = getActiveSiteTip();
         }
         renderSiteVitalsPanel(state);
+        renderSitePhoneButton(state);
     }
 
     function makeInventorySection(title, metaText, gridClassName, columnCount) {
@@ -6213,7 +6290,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return button;
     }
 
-    function makePhoneAppLauncher(title, onClick) {
+    function makePhoneAppLauncher(title, onClick, options) {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "phone-app-launcher phone-app-launcher-simple";
@@ -6230,6 +6307,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         name.className = "phone-app-launcher-name";
         name.textContent = title;
         button.appendChild(name);
+
+        if (options && options.showBadge) {
+            const badge = document.createElement("span");
+            badge.className = "phone-notification-dot";
+            badge.setAttribute("aria-hidden", "true");
+            button.appendChild(badge);
+        }
 
         bindReliablePrimaryPress(button, onClick);
         return button;
@@ -7070,6 +7154,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function appendPhoneHomeScreen(container) {
+        const phonePanelState = getPhonePanelState(latestState);
         const appGrid = document.createElement("div");
         appGrid.className = "phone-home-grid";
         appGrid.appendChild(
@@ -7079,7 +7164,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     postPhonePanelSection("TASKS").catch(() => {
                         statusChip.textContent = "Failed to switch phone panel section.";
                     });
-                }
+                },
+                { showBadge: hasPhonePanelBadge(phonePanelState, "hasTasksBadge") }
             )
         );
         appGrid.appendChild(
@@ -7089,7 +7175,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     postPhonePanelSection("BUY").catch(() => {
                         statusChip.textContent = "Failed to switch phone panel section.";
                     });
-                }
+                },
+                { showBadge: hasPhonePanelBadge(phonePanelState, "hasBuyBadge") }
             )
         );
         appGrid.appendChild(
@@ -7099,7 +7186,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     postPhonePanelSection("SELL").catch(() => {
                         statusChip.textContent = "Failed to switch phone panel section.";
                     });
-                }
+                },
+                { showBadge: hasPhonePanelBadge(phonePanelState, "hasSellBadge") }
             )
         );
         appGrid.appendChild(
@@ -7109,7 +7197,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     postPhonePanelSection("HIRE").catch(() => {
                         statusChip.textContent = "Failed to switch phone panel section.";
                     });
-                }
+                },
+                { showBadge: hasPhonePanelBadge(phonePanelState, "hasHireBadge") }
             )
         );
         container.appendChild(appGrid);
@@ -13105,7 +13194,18 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         });
     });
 
-    window.addEventListener("resize", fitRenderer);
+    window.addEventListener("resize", scheduleFitRenderer);
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", scheduleFitRenderer);
+        window.visualViewport.addEventListener("scroll", scheduleFitRenderer);
+    }
+    if (typeof ResizeObserver === "function") {
+        const viewResizeObserver = new ResizeObserver(function () {
+            scheduleFitRenderer();
+        });
+        viewResizeObserver.observe(gameView);
+        viewResizeObserver.observe(stageFrame);
+    }
     window.addEventListener("error", function (event) {
         reportViewerError("window.error", event.error || event.message || "Unknown window error");
     });
@@ -13124,6 +13224,25 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
             resumeAudioGraphIfNeeded().then(function () {
                 updateAudioMix(latestState);
+            });
+        });
+    }
+
+    if (sitePhoneButton) {
+        appendUiIcon(sitePhoneButtonIcon, "phone");
+        bindReliablePrimaryPress(sitePhoneButton, function () {
+            if (!latestState || latestState.appState !== "SITE_ACTIVE") {
+                return;
+            }
+
+            const phoneIsOpen = isPhonePanelOpen(latestState);
+            const request = phoneIsOpen
+                ? postClosePhonePanel()
+                : postPhonePanelSection("HOME");
+            request.catch(() => {
+                statusChip.textContent = phoneIsOpen
+                    ? "Failed to close phone panel."
+                    : "Failed to open phone panel.";
             });
         });
     }
