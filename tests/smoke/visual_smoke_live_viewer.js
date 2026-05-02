@@ -117,6 +117,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let latestFramePerfSampleTimestampMs = 0;
     let rendererWidth = 0;
     let rendererHeight = 0;
+    let siteControlSendInFlight = false;
+    let pendingSiteControlState = null;
+    let lastSentSiteControlSignature = "";
     const protectionOverlayProjectVector = new THREE_NS.Vector3();
     let weatherPostProcess = null;
     let smoothedWeatherVisualResponse = {
@@ -181,6 +184,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         3: 0.82,
         4: 1.0
     };
+    const maxViewerPixelRatio = 1.5;
     const siteTutorialTips = [
         "Move with WASD and drag with the right mouse button to orbit the camera around the worker.",
         "Press B to open the player pack, then left-click a carried consumable to use it or move items into opened storage.",
@@ -679,7 +683,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     let rendererResizeFrameHandle = 0;
 
     const renderer = new THREE_NS.WebGLRenderer({ antialias: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, maxViewerPixelRatio));
     renderer.outputColorSpace = THREE_NS.SRGBColorSpace;
     renderer.domElement.style.touchAction = "none";
     gameView.appendChild(renderer.domElement);
@@ -764,7 +768,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         rendererWidth = width;
         rendererHeight = height;
         renderer.setSize(width, height, false);
-        const overlayScale = Math.min(window.devicePixelRatio || 1, 2);
+        const overlayScale = Math.min(window.devicePixelRatio || 1, maxViewerPixelRatio);
         protectionValueOverlayCanvas.width = Math.max(1, Math.round(width * overlayScale));
         protectionValueOverlayCanvas.height = Math.max(1, Math.round(height * overlayScale));
         protectionValueOverlayCanvas.style.width = width + "px";
@@ -12398,7 +12402,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         updatePlantWindShaderUniforms(latestState, elapsed);
         fitRenderer();
-        renderSiteHudChrome(latestState);
         renderActionProgressBar(latestState);
         renderPlacementFailureToast();
         updateDustOverlay(latestState, elapsed);
@@ -12790,13 +12793,69 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         };
     }
 
+    function quantizeSiteControlValue(value) {
+        return Number.isFinite(value)
+            ? Math.round(value * 1000) / 1000
+            : 0;
+    }
+
+    function buildSiteControlSignature(siteControlState) {
+        if (!siteControlState || !siteControlState.hasMoveInput) {
+            return "0";
+        }
+
+        return [
+            "1",
+            quantizeSiteControlValue(siteControlState.worldMoveX),
+            quantizeSiteControlValue(siteControlState.worldMoveY),
+            quantizeSiteControlValue(siteControlState.worldMoveZ)
+        ].join(":");
+    }
+
+    function flushPendingSiteControlState() {
+        if (siteControlSendInFlight || !pendingSiteControlState) {
+            return;
+        }
+
+        const nextSiteControlState = pendingSiteControlState;
+        pendingSiteControlState = null;
+        if (nextSiteControlState.signature === lastSentSiteControlSignature) {
+            return;
+        }
+
+        siteControlSendInFlight = true;
+        postJson("/site-control", nextSiteControlState.payload)
+            .then(() => {
+                lastSentSiteControlSignature = nextSiteControlState.signature;
+            })
+            .catch(() => {})
+            .finally(() => {
+                siteControlSendInFlight = false;
+                if (pendingSiteControlState &&
+                    pendingSiteControlState.signature !== lastSentSiteControlSignature) {
+                    flushPendingSiteControlState();
+                }
+            });
+    }
+
     function sendSiteControlState() {
         if (!latestState || latestState.appState !== "SITE_ACTIVE") {
+            pendingSiteControlState = null;
+            lastSentSiteControlSignature = "";
             return;
         }
 
         const siteControlState = computeSiteControlState();
-        postJson("/site-control", siteControlState).catch(() => {});
+        const signature = buildSiteControlSignature(siteControlState);
+        if (!siteControlSendInFlight && signature === lastSentSiteControlSignature) {
+            return;
+        }
+
+        pendingSiteControlState = {
+            payload: siteControlState,
+            signature: signature
+        };
+        flushPendingSiteControlState();
     }
 
     window.addEventListener("keydown", function (event) {
