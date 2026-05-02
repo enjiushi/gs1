@@ -3782,7 +3782,8 @@ void GameRuntime::queue_site_phone_panel_state_message()
     payload.sell_listing_count = phone_panel.sell_listing_count;
     payload.service_listing_count = phone_panel.service_listing_count;
     payload.cart_item_count = phone_panel.cart_item_count;
-    payload.flags = phone_panel.open ? GS1_PHONE_PANEL_FLAG_OPEN : 0U;
+    payload.flags = phone_panel.badge_flags |
+        (phone_panel.open ? GS1_PHONE_PANEL_FLAG_OPEN : 0U);
     engine_messages_.push_back(message);
 }
 

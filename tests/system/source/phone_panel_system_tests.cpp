@@ -284,6 +284,133 @@ void phone_panel_task_counts_follow_pending_claim_until_reward_claim(
     GS1_SYSTEM_TEST_CHECK(context, site_run.phone_panel.claimed_task_count == 1U);
 }
 
+void phone_panel_unread_badges_follow_launcher_and_app_visibility(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    auto site_run = make_test_site_run(1U, 1206U);
+    GameMessageQueue queue {};
+    auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
+    auto economy_context = make_site_context<EconomyPhoneSystem>(campaign, site_run, queue);
+    auto phone_context = make_site_context<PhonePanelSystem>(campaign, site_run, queue);
+
+    seed_site_one_inventory(campaign, site_run);
+    const auto start_message =
+        make_message(GameMessageType::SiteRunStarted, SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        EconomyPhoneSystem::process_message(economy_context, start_message) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        PhonePanelSystem::process_message(phone_context, start_message) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.phone_panel.badge_flags == 0U);
+
+    auto& task = site_run.task_board.visible_tasks.emplace_back();
+    task.task_instance_id = gs1::TaskInstanceId {9U};
+    task.runtime_list_kind = gs1::TaskRuntimeListKind::PendingClaim;
+    site_run.task_board.completed_task_ids.push_back(task.task_instance_id);
+    PhonePanelSystem::run(phone_context);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        (site_run.phone_panel.badge_flags & GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE) != 0U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        (site_run.phone_panel.badge_flags & GS1_PHONE_PANEL_FLAG_TASKS_BADGE) != 0U);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        PhonePanelSystem::process_message(
+            phone_context,
+            make_message(
+                GameMessageType::PhonePanelSectionRequested,
+                gs1::PhonePanelSectionRequestedMessage {
+                    GS1_PHONE_PANEL_SECTION_HOME,
+                    {0U, 0U, 0U}})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        (site_run.phone_panel.badge_flags & GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE) == 0U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        (site_run.phone_panel.badge_flags & GS1_PHONE_PANEL_FLAG_TASKS_BADGE) != 0U);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        PhonePanelSystem::process_message(
+            phone_context,
+            make_message(
+                GameMessageType::PhonePanelSectionRequested,
+                gs1::PhonePanelSectionRequestedMessage {
+                    GS1_PHONE_PANEL_SECTION_TASKS,
+                    {0U, 0U, 0U}})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        (site_run.phone_panel.badge_flags & GS1_PHONE_PANEL_FLAG_TASKS_BADGE) == 0U);
+
+    const auto buy_listing_it = std::find_if(
+        site_run.economy.available_phone_listings.begin(),
+        site_run.economy.available_phone_listings.end(),
+        [&site_run](const gs1::PhoneListingState& listing) {
+            if (listing.kind != gs1::PhoneListingKind::BuyItem)
+            {
+                return false;
+            }
+
+            const auto* item_def = gs1::find_item_def(listing.item_id);
+            return item_def != nullptr &&
+                gs1::item_has_capability(*item_def, gs1::ITEM_CAPABILITY_SELL) &&
+                gs1::inventory_storage::available_item_quantity_in_container(
+                    site_run,
+                    gs1::inventory_storage::delivery_box_container(site_run),
+                    listing.item_id) == 0U;
+        });
+    GS1_SYSTEM_TEST_REQUIRE(context, buy_listing_it != site_run.economy.available_phone_listings.end());
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        EconomyPhoneSystem::process_message(
+            economy_context,
+            make_message(
+                GameMessageType::PhoneListingPurchaseRequested,
+                gs1::PhoneListingPurchaseRequestedMessage {buy_listing_it->listing_id, 1U, 0U})) == GS1_STATUS_OK);
+    while (!queue.empty())
+    {
+        const auto message = queue.front();
+        queue.pop_front();
+        if (message.type == GameMessageType::InventoryDeliveryBatchRequested)
+        {
+            GS1_SYSTEM_TEST_REQUIRE(
+                context,
+                InventorySystem::process_message(inventory_context, message) == GS1_STATUS_OK);
+        }
+    }
+
+    site_run.phone_panel.open = false;
+    site_run.phone_panel.active_section = PhonePanelSection::Home;
+    PhonePanelSystem::run(phone_context);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        (site_run.phone_panel.badge_flags & GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE) != 0U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        (site_run.phone_panel.badge_flags & GS1_PHONE_PANEL_FLAG_SELL_BADGE) != 0U);
+
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        PhonePanelSystem::process_message(
+            phone_context,
+            make_message(
+                GameMessageType::PhonePanelSectionRequested,
+                gs1::PhonePanelSectionRequestedMessage {
+                    GS1_PHONE_PANEL_SECTION_SELL,
+                    {0U, 0U, 0U}})) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        (site_run.phone_panel.badge_flags & GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE) == 0U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        (site_run.phone_panel.badge_flags & GS1_PHONE_PANEL_FLAG_SELL_BADGE) == 0U);
+}
+
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "phone_panel",
     "site_run_started_seeds_home_snapshot",
@@ -304,4 +431,8 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "phone_panel",
     "task_counts_follow_pending_claim_until_reward_claim",
     phone_panel_task_counts_follow_pending_claim_until_reward_claim);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "phone_panel",
+    "unread_badges_follow_launcher_and_app_visibility",
+    phone_panel_unread_badges_follow_launcher_and_app_visibility);
 }  // namespace

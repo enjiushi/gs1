@@ -14,15 +14,46 @@ namespace gs1
 namespace
 {
 constexpr std::uint32_t k_sell_listing_id_base = 1000U;
+constexpr std::uint64_t k_phone_signature_offset = 14695981039346656037ULL;
+constexpr std::uint64_t k_phone_signature_prime = 1099511628211ULL;
 
 void mark_phone_dirty(SiteSystemContext<PhonePanelSystem>& context) noexcept
 {
     context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_PHONE);
 }
 
+std::uint64_t mix_phone_signature(std::uint64_t signature, std::uint64_t value) noexcept
+{
+    return (signature ^ value) * k_phone_signature_prime;
+}
+
 std::uint32_t make_sell_listing_id(ItemId item_id) noexcept
 {
     return k_sell_listing_id_base + item_id.value;
+}
+
+std::uint32_t badge_flag_for_section(PhonePanelSection section) noexcept
+{
+    switch (section)
+    {
+    case PhonePanelSection::Tasks:
+        return GS1_PHONE_PANEL_FLAG_TASKS_BADGE;
+    case PhonePanelSection::Buy:
+        return GS1_PHONE_PANEL_FLAG_BUY_BADGE;
+    case PhonePanelSection::Sell:
+        return GS1_PHONE_PANEL_FLAG_SELL_BADGE;
+    case PhonePanelSection::Hire:
+        return GS1_PHONE_PANEL_FLAG_HIRE_BADGE;
+    default:
+        return 0U;
+    }
+}
+
+bool section_is_visible(
+    const PhonePanelState& phone_panel,
+    PhonePanelSection section) noexcept
+{
+    return phone_panel.open && phone_panel.active_section == section;
 }
 
 bool try_map_phone_panel_section(
@@ -130,6 +161,52 @@ bool same_listing_vector(
     }
 
     return true;
+}
+
+std::uint64_t task_snapshot_signature(const TaskBoardState& task_board) noexcept
+{
+    std::uint64_t signature =
+        mix_phone_signature(
+            mix_phone_signature(k_phone_signature_offset, task_board.visible_tasks.size()),
+            task_board.refresh_generation);
+    for (const auto& task : task_board.visible_tasks)
+    {
+        signature = mix_phone_signature(signature, task.task_instance_id.value);
+        signature = mix_phone_signature(signature, task.task_template_id.value);
+        signature = mix_phone_signature(signature, task.publisher_faction_id.value);
+        signature = mix_phone_signature(signature, task.current_progress_amount);
+        signature = mix_phone_signature(signature, task.target_amount);
+        signature = mix_phone_signature(signature, task.required_count);
+        signature = mix_phone_signature(signature, static_cast<std::uint64_t>(task.runtime_list_kind));
+        signature = mix_phone_signature(signature, task.reward_draft_options.size());
+    }
+
+    return signature;
+}
+
+std::uint64_t listing_snapshot_signature(
+    const std::vector<PhoneListingState>& listings,
+    PhoneListingKind listing_kind) noexcept
+{
+    std::uint64_t signature =
+        mix_phone_signature(k_phone_signature_offset, static_cast<std::uint64_t>(listing_kind));
+    for (const auto& listing : listings)
+    {
+        if (listing.kind != listing_kind)
+        {
+            continue;
+        }
+
+        signature = mix_phone_signature(signature, listing.item_id.value);
+        signature = mix_phone_signature(signature, listing.listing_id);
+        signature = mix_phone_signature(signature, static_cast<std::uint64_t>(listing.price));
+        signature = mix_phone_signature(signature, listing.quantity);
+        signature = mix_phone_signature(signature, listing.stock_refresh_generation);
+        signature = mix_phone_signature(signature, listing.occupied ? 1U : 0U);
+        signature = mix_phone_signature(signature, listing.generated_from_stock ? 1U : 0U);
+    }
+
+    return signature;
 }
 
 PhoneListingState make_sell_listing(ItemId item_id, std::uint32_t quantity) noexcept
@@ -284,6 +361,46 @@ void sync_phone_panel_projection(
         service_listing_count,
         cart_item_count);
 
+    const auto next_task_signature = task_snapshot_signature(context.world.read_task_board());
+    const auto next_buy_signature =
+        listing_snapshot_signature(projected_listings, PhoneListingKind::BuyItem);
+    const auto next_sell_signature =
+        listing_snapshot_signature(projected_listings, PhoneListingKind::SellItem);
+    const auto next_service_signature =
+        listing_snapshot_signature(projected_listings, PhoneListingKind::PurchaseUnlockable) ^
+        listing_snapshot_signature(projected_listings, PhoneListingKind::HireContractor);
+    const auto previous_badge_flags = phone_panel.badge_flags;
+
+    if (phone_panel.notification_state_initialized)
+    {
+        std::uint32_t new_badge_flags = 0U;
+        if (phone_panel.task_snapshot_signature != next_task_signature &&
+            !section_is_visible(phone_panel, PhonePanelSection::Tasks))
+        {
+            new_badge_flags |= GS1_PHONE_PANEL_FLAG_TASKS_BADGE;
+        }
+        if (phone_panel.buy_snapshot_signature != next_buy_signature &&
+            !section_is_visible(phone_panel, PhonePanelSection::Buy))
+        {
+            new_badge_flags |= GS1_PHONE_PANEL_FLAG_BUY_BADGE;
+        }
+        if (phone_panel.sell_snapshot_signature != next_sell_signature &&
+            !section_is_visible(phone_panel, PhonePanelSection::Sell))
+        {
+            new_badge_flags |= GS1_PHONE_PANEL_FLAG_SELL_BADGE;
+        }
+        if (phone_panel.service_snapshot_signature != next_service_signature &&
+            !section_is_visible(phone_panel, PhonePanelSection::Hire))
+        {
+            new_badge_flags |= GS1_PHONE_PANEL_FLAG_HIRE_BADGE;
+        }
+
+        if (new_badge_flags != 0U)
+        {
+            phone_panel.badge_flags |= new_badge_flags | GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE;
+        }
+    }
+
     const bool changed =
         !same_listing_vector(projected_listings, phone_panel.listings) ||
         phone_panel.visible_task_count != visible_task_count ||
@@ -293,7 +410,8 @@ void sync_phone_panel_projection(
         phone_panel.buy_listing_count != buy_listing_count ||
         phone_panel.sell_listing_count != sell_listing_count ||
         phone_panel.service_listing_count != service_listing_count ||
-        phone_panel.cart_item_count != cart_item_count;
+        phone_panel.cart_item_count != cart_item_count ||
+        previous_badge_flags != phone_panel.badge_flags;
 
     phone_panel.listings = std::move(projected_listings);
     phone_panel.visible_task_count = visible_task_count;
@@ -304,6 +422,11 @@ void sync_phone_panel_projection(
     phone_panel.sell_listing_count = sell_listing_count;
     phone_panel.service_listing_count = service_listing_count;
     phone_panel.cart_item_count = cart_item_count;
+    phone_panel.task_snapshot_signature = next_task_signature;
+    phone_panel.buy_snapshot_signature = next_buy_signature;
+    phone_panel.sell_snapshot_signature = next_sell_signature;
+    phone_panel.service_snapshot_signature = next_service_signature;
+    phone_panel.notification_state_initialized = true;
 
     if (changed || force_dirty)
     {
@@ -347,14 +470,27 @@ Gs1Status PhonePanelSystem::process_message(
             return GS1_STATUS_INVALID_ARGUMENT;
         }
 
+        bool dirty = false;
+        const auto updated_badge_flags =
+            (phone_panel.badge_flags & ~GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE) &
+            ~badge_flag_for_section(section);
+        if (phone_panel.badge_flags != updated_badge_flags)
+        {
+            phone_panel.badge_flags = updated_badge_flags;
+            dirty = true;
+        }
         if (!phone_panel.open)
         {
             phone_panel.open = true;
-            mark_phone_dirty(context);
+            dirty = true;
         }
         if (phone_panel.active_section != section)
         {
             phone_panel.active_section = section;
+            dirty = true;
+        }
+        if (dirty)
+        {
             mark_phone_dirty(context);
         }
         return GS1_STATUS_OK;
@@ -363,9 +499,21 @@ Gs1Status PhonePanelSystem::process_message(
     case GameMessageType::ClosePhonePanel:
     {
         auto& phone_panel = context.world.own_phone_panel();
+        bool dirty = false;
+        const auto updated_badge_flags =
+            phone_panel.badge_flags & ~GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE;
+        if (phone_panel.badge_flags != updated_badge_flags)
+        {
+            phone_panel.badge_flags = updated_badge_flags;
+            dirty = true;
+        }
         if (phone_panel.open)
         {
             phone_panel.open = false;
+            dirty = true;
+        }
+        if (dirty)
+        {
             mark_phone_dirty(context);
         }
         return GS1_STATUS_OK;

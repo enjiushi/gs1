@@ -431,6 +431,10 @@ void visual_smoke_assets_keep_hidden_regional_map_panels_collapsed()
     assert(html.find(".site-task-panel[hidden]") != std::string::npos);
     assert(html.find(".modifier-strip[hidden]") != std::string::npos);
     assert(html.find("id=\"site-tech-tree-actions\"") != std::string::npos);
+    assert(html.find("--shell-height: 100dvh;") != std::string::npos);
+    assert(html.find("@media (max-width: 1366px), (max-height: 900px)") != std::string::npos);
+    assert(html.find("@media (max-height: 820px)") != std::string::npos);
+    assert(html.find("width: var(--phone-width);") != std::string::npos);
 
     assert(viewer.find("siteVitalsMoney.hidden = !showRegionalMapCash;") != std::string::npos);
     assert(viewer.find("playerNourishment") != std::string::npos);
@@ -442,6 +446,10 @@ void visual_smoke_assets_keep_hidden_regional_map_panels_collapsed()
     assert(viewer.find("Click to use or consume") != std::string::npos);
     assert(viewer.find("Click to select and use/store") == std::string::npos);
     assert(viewer.find("siteTechTreeActions.appendChild(") != std::string::npos);
+    assert(viewer.find("function getViewportDimensions() {") != std::string::npos);
+    assert(viewer.find("const gameViewBounds = gameView.getBoundingClientRect();") != std::string::npos);
+    assert(viewer.find("window.visualViewport.addEventListener(\"resize\", scheduleFitRenderer);") != std::string::npos);
+    assert(viewer.find("const viewResizeObserver = new ResizeObserver(function () {") != std::string::npos);
     assert(viewer.find("function resolveTileContextPanelTop(") != std::string::npos);
     assert(viewer.find("return parentElement.offsetTop + hoveredElement.offsetTop;") != std::string::npos);
     assert(viewer.find("clampTileContextPanelTop(preferredTop, estimatedHeight, viewportHeight)") != std::string::npos);

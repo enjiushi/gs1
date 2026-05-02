@@ -855,6 +855,8 @@ int main()
         assert(phone_panel_payload.completed_task_count == 0U);
         assert(phone_panel_payload.claimed_task_count == 0U);
         assert(phone_panel_payload.buy_listing_count >= 3U);
+        assert((phone_panel_payload.flags & GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE) == 0U);
+        assert((phone_panel_payload.flags & GS1_PHONE_PANEL_FLAG_TASKS_BADGE) == 0U);
     }
     {
         const auto& weather_payload =
@@ -952,6 +954,8 @@ int main()
             assert(phone_panel_payload.accepted_task_count == 1U);
             assert(phone_panel_payload.completed_task_count == 1U);
             assert(phone_panel_payload.claimed_task_count == 0U);
+            assert((phone_panel_payload.flags & GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE) != 0U);
+            assert((phone_panel_payload.flags & GS1_PHONE_PANEL_FLAG_TASKS_BADGE) != 0U);
         }
         {
             const auto* accepted_task_message = find_task_message(mixed_task_messages, 1U);
@@ -1350,9 +1354,15 @@ int main()
         phone_panel_delivery_messages,
         GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_UPSERT,
         expected_sell_listing_id));
-    assert(!collect_messages_of_type(
-        phone_panel_delivery_messages,
-        GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE).empty());
+    const auto phone_panel_delivery_state_messages =
+        collect_messages_of_type(phone_panel_delivery_messages, GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE);
+    assert(!phone_panel_delivery_state_messages.empty());
+    {
+        const auto& payload =
+            phone_panel_delivery_state_messages.back()->payload_as<Gs1EngineMessagePhonePanelData>();
+        assert((payload.flags & GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE) != 0U);
+        assert((payload.flags & GS1_PHONE_PANEL_FLAG_SELL_BADGE) != 0U);
+    }
 
     Gs1UiAction open_tasks_action {};
     open_tasks_action.type = GS1_UI_ACTION_SET_PHONE_PANEL_SECTION;
@@ -1370,6 +1380,8 @@ int main()
         const auto& payload =
             open_tasks_phone_panel_messages.front()->payload_as<Gs1EngineMessagePhonePanelData>();
         assert(payload.active_section == GS1_PHONE_PANEL_SECTION_TASKS);
+        assert((payload.flags & GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE) == 0U);
+        assert((payload.flags & GS1_PHONE_PANEL_FLAG_TASKS_BADGE) == 0U);
     }
 
     Gs1RuntimeCreateDesc panel_state_desc {};

@@ -773,6 +773,11 @@ struct Gs1EngineMessagePhonePanelData
 };
 
 inline constexpr std::uint32_t GS1_PHONE_PANEL_FLAG_OPEN = 1U << 0U;
+inline constexpr std::uint32_t GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE = 1U << 1U;
+inline constexpr std::uint32_t GS1_PHONE_PANEL_FLAG_TASKS_BADGE = 1U << 2U;
+inline constexpr std::uint32_t GS1_PHONE_PANEL_FLAG_BUY_BADGE = 1U << 3U;
+inline constexpr std::uint32_t GS1_PHONE_PANEL_FLAG_SELL_BADGE = 1U << 4U;
+inline constexpr std::uint32_t GS1_PHONE_PANEL_FLAG_HIRE_BADGE = 1U << 5U;
 
 struct Gs1EngineMessageSiteProtectionOverlayData
 {

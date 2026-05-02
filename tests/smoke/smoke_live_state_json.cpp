@@ -1079,6 +1079,16 @@ void append_site_phone_panel_json(std::string& json, const SmokeEngineHost::Site
     json += std::to_string(phone_panel.service_listing_count);
     json += ",\"cartItemCount\":";
     json += std::to_string(phone_panel.cart_item_count);
+    json += ",\"hasLauncherBadge\":";
+    append_bool_json(json, (phone_panel.flags & GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE) != 0U);
+    json += ",\"hasTasksBadge\":";
+    append_bool_json(json, (phone_panel.flags & GS1_PHONE_PANEL_FLAG_TASKS_BADGE) != 0U);
+    json += ",\"hasBuyBadge\":";
+    append_bool_json(json, (phone_panel.flags & GS1_PHONE_PANEL_FLAG_BUY_BADGE) != 0U);
+    json += ",\"hasSellBadge\":";
+    append_bool_json(json, (phone_panel.flags & GS1_PHONE_PANEL_FLAG_SELL_BADGE) != 0U);
+    json += ",\"hasHireBadge\":";
+    append_bool_json(json, (phone_panel.flags & GS1_PHONE_PANEL_FLAG_HIRE_BADGE) != 0U);
     json += ",\"flags\":";
     json += std::to_string(phone_panel.flags);
     json += "}";
