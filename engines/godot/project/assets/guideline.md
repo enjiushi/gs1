@@ -9,7 +9,7 @@ Google-Storage-backed Godot project art and presentation resources for the first
 - When pruning or restoring this folder, keep the local copy aligned with the Godot project's currently referenced resources and preserve any fuller archive outside the repo or in object storage.
 
 ## Contents
-- `field_command/`: Curated UI textures and font resources used by the shared shell themes.
+- `field_command/`: Curated UI textures and font resources used by the shared shell themes, now including the tracked `progression_placeholder.png` fallback icon used by engine-specific tech, unlockable, and general content presentation config.
 - `menu_backdrop/`: Desert backdrop meshes, textures, HDRI resources, and extracted `.res` support files used by the menu and regional-map shell scenes.
 - `characters/`: Minimal set of derived animation resources still used by the current menu backdrop, with larger source packs expected to live in external storage when not actively referenced.
 - `terrain/`: Terrain textures and related supporting Godot resources used by the shell-scene terrain presentation.

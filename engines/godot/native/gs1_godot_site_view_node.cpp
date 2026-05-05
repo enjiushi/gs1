@@ -1,10 +1,14 @@
 #include "gs1_godot_site_view_node.h"
 
+#include "godot_progression_resources.h"
+
 #include <godot_cpp/classes/box_mesh.hpp>
 #include <godot_cpp/classes/camera3d.hpp>
 #include <godot_cpp/classes/cylinder_mesh.hpp>
 #include <godot_cpp/classes/directional_light3d.hpp>
 #include <godot_cpp/classes/mesh_instance3d.hpp>
+#include <godot_cpp/classes/packed_scene.hpp>
+#include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/sphere_mesh.hpp>
 #include <godot_cpp/classes/standard_material3d.hpp>
 #include <godot_cpp/core/class_db.hpp>
@@ -550,23 +554,37 @@ void Gs1SiteViewNode::upsert_visual_node(
     }
 
     MeshInstance3D* mesh_instance = nullptr;
+    Node3D* instance_root = nullptr;
     auto found = registry.find(gameplay_id);
     if (found != registry.end())
     {
         mesh_instance = Object::cast_to<MeshInstance3D>(ObjectDB::get_instance(found->second.object_id));
+        instance_root = Object::cast_to<Node3D>(ObjectDB::get_instance(found->second.instance_root_id));
     }
 
     const float size_x = std::max(1.0f, static_cast<float>(footprint_width));
     const float size_z = std::max(1.0f, static_cast<float>(footprint_height));
     const float size_y = std::clamp(height_scale, device_visual ? 0.2f : 0.12f, device_visual ? 2.4f : 2.0f);
 
-    if (mesh_instance == nullptr)
+    if (mesh_instance == nullptr && instance_root == nullptr)
+    {
+        instance_root = instantiate_visual_scene(device_visual, type_id);
+        if (instance_root != nullptr)
+        {
+            instance_root->set_name(vformat(device_visual ? "Device_%d" : "Plant_%d", static_cast<int64_t>(gameplay_id)));
+            visual_root_->add_child(instance_root);
+            instance_root->set_meta("gameplay_id", static_cast<int64_t>(gameplay_id));
+            instance_root->set_meta("type_id", static_cast<int64_t>(type_id));
+        }
+    }
+
+    if (mesh_instance == nullptr && instance_root == nullptr)
     {
         mesh_instance = make_box_visual(Vector3(tile_size_ * size_x, size_y, tile_size_ * size_z), color);
         mesh_instance->set_name(vformat(device_visual ? "Device_%d" : "Plant_%d", static_cast<int64_t>(gameplay_id)));
         visual_root_->add_child(mesh_instance);
     }
-    else
+    else if (mesh_instance != nullptr)
     {
         Ref<BoxMesh> mesh = mesh_instance->get_mesh();
         if (mesh.is_valid())
@@ -581,15 +599,24 @@ void Gs1SiteViewNode::upsert_visual_node(
     }
 
     const float y_offset = device_visual ? k_device_y_offset : k_plant_y_offset;
-    mesh_instance->set_position(Vector3(
+    const Vector3 position(
         (anchor_tile_x + (size_x * 0.5f) - 0.5f) * tile_size_,
         y_offset * size_y,
-        (anchor_tile_y + (size_z * 0.5f) - 0.5f) * tile_size_));
-    mesh_instance->set_meta("gameplay_id", static_cast<int64_t>(gameplay_id));
-    mesh_instance->set_meta("type_id", static_cast<int64_t>(type_id));
+        (anchor_tile_y + (size_z * 0.5f) - 0.5f) * tile_size_);
+    if (mesh_instance != nullptr)
+    {
+        mesh_instance->set_position(position);
+        mesh_instance->set_meta("gameplay_id", static_cast<int64_t>(gameplay_id));
+        mesh_instance->set_meta("type_id", static_cast<int64_t>(type_id));
+    }
+    if (instance_root != nullptr)
+    {
+        instance_root->set_position(position);
+    }
 
     VisualNodeRecord record {};
-    record.object_id = ObjectID(mesh_instance->get_instance_id());
+    record.object_id = mesh_instance != nullptr ? ObjectID(mesh_instance->get_instance_id()) : ObjectID {};
+    record.instance_root_id = instance_root != nullptr ? ObjectID(instance_root->get_instance_id()) : ObjectID {};
     record.gameplay_id = gameplay_id;
     record.type_id = type_id;
     record.anchor_tile_x = anchor_tile_x;
@@ -597,6 +624,31 @@ void Gs1SiteViewNode::upsert_visual_node(
     record.height_scale = height_scale;
     record.last_seen_snapshot_serial = reconcile_full_snapshot_ ? active_snapshot_serial_ : 0U;
     registry[gameplay_id] = record;
+}
+
+Node3D* Gs1SiteViewNode::instantiate_visual_scene(bool device_visual, std::uint32_t type_id) const
+{
+    const std::uint8_t content_kind = device_visual ? 2U : 0U;
+    const String scene_path =
+        GodotProgressionResourceDatabase::instance().content_scene_path(content_kind, type_id);
+    if (scene_path.is_empty())
+    {
+        return nullptr;
+    }
+
+    ResourceLoader* loader = ResourceLoader::get_singleton();
+    if (loader == nullptr)
+    {
+        return nullptr;
+    }
+
+    const Ref<PackedScene> packed_scene = loader->load(scene_path);
+    if (packed_scene.is_null())
+    {
+        return nullptr;
+    }
+
+    return Object::cast_to<Node3D>(packed_scene->instantiate());
 }
 
 void Gs1SiteViewNode::remove_visual_node(std::unordered_map<std::uint64_t, VisualNodeRecord>& registry, std::uint64_t gameplay_id)
@@ -608,6 +660,13 @@ void Gs1SiteViewNode::remove_visual_node(std::unordered_map<std::uint64_t, Visua
     }
 
     if (Object* object = ObjectDB::get_instance(found->second.object_id))
+    {
+        if (Node* node = Object::cast_to<Node>(object))
+        {
+            node->queue_free();
+        }
+    }
+    if (Object* object = ObjectDB::get_instance(found->second.instance_root_id))
     {
         if (Node* node = Object::cast_to<Node>(object))
         {

@@ -359,6 +359,7 @@ void inventory_item_use_updates_worker_and_projection()
     create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
     create_desc.api_version = gs1::k_api_version;
     create_desc.fixed_step_seconds = 1.0 / 60.0;
+    create_desc.adapter_config_json_utf8 = nullptr;
 
     GameRuntime runtime {create_desc};
     bootstrap_site_one(runtime);
@@ -438,6 +439,7 @@ void task_accept_request_does_not_emit_campaign_resource_projection()
     create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
     create_desc.api_version = gs1::k_api_version;
     create_desc.fixed_step_seconds = 1.0 / 60.0;
+    create_desc.adapter_config_json_utf8 = nullptr;
 
     GameRuntime runtime {create_desc};
     bootstrap_site_one(runtime);
@@ -462,6 +464,7 @@ void phone_purchase_request_emits_single_hud_and_campaign_resource_projection()
     create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
     create_desc.api_version = gs1::k_api_version;
     create_desc.fixed_step_seconds = 1.0 / 60.0;
+    create_desc.adapter_config_json_utf8 = nullptr;
 
     GameRuntime runtime {create_desc};
     bootstrap_site_one(runtime);
@@ -507,6 +510,7 @@ void campaign_reputation_award_emits_campaign_resource_projection_and_unlock_cue
     create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
     create_desc.api_version = gs1::k_api_version;
     create_desc.fixed_step_seconds = 1.0 / 60.0;
+    create_desc.adapter_config_json_utf8 = nullptr;
 
     GameRuntime runtime {create_desc};
     bootstrap_site_one(runtime);
@@ -547,6 +551,7 @@ void inventory_use_request_keeps_singleton_projections_singular_across_immediate
     create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
     create_desc.api_version = gs1::k_api_version;
     create_desc.fixed_step_seconds = 1.0 / 60.0;
+    create_desc.adapter_config_json_utf8 = nullptr;
 
     GameRuntime runtime {create_desc};
     bootstrap_site_one(runtime);
@@ -578,6 +583,7 @@ void ecology_growth_completes_task_and_site_attempt()
     create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
     create_desc.api_version = gs1::k_api_version;
     create_desc.fixed_step_seconds = 60.0;
+    create_desc.adapter_config_json_utf8 = nullptr;
 
     GameRuntime runtime {create_desc};
     bootstrap_site_one(runtime);
@@ -626,6 +632,7 @@ void task_reward_claim_emits_pending_claim_projection_then_reward_cue()
     create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
     create_desc.api_version = gs1::k_api_version;
     create_desc.fixed_step_seconds = 60.0;
+    create_desc.adapter_config_json_utf8 = nullptr;
 
     GameRuntime runtime {create_desc};
     bootstrap_site_one(runtime);
@@ -678,6 +685,7 @@ void task_reward_claim_ui_action_claims_pending_task_and_emits_reward_cue()
     create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
     create_desc.api_version = gs1::k_api_version;
     create_desc.fixed_step_seconds = 60.0;
+    create_desc.adapter_config_json_utf8 = nullptr;
 
     GameRuntime runtime {create_desc};
     bootstrap_site_one(runtime);
@@ -735,6 +743,7 @@ void inventory_craft_completed_opens_output_storage_and_emits_craft_output_cue()
     create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
     create_desc.api_version = gs1::k_api_version;
     create_desc.fixed_step_seconds = 1.0 / 60.0;
+    create_desc.adapter_config_json_utf8 = nullptr;
 
     GameRuntime runtime {create_desc};
     bootstrap_site_one(runtime);
@@ -776,6 +785,7 @@ void site_weather_changes_emit_hud_wind_warning_codes()
     create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
     create_desc.api_version = gs1::k_api_version;
     create_desc.fixed_step_seconds = 1.0 / 60.0;
+    create_desc.adapter_config_json_utf8 = nullptr;
 
     GameRuntime runtime {create_desc};
     bootstrap_site_one(runtime);

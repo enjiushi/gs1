@@ -1,9 +1,13 @@
 #include "gs1_godot_runtime_node.h"
 
+#include "godot_progression_resources.h"
+
 #include "content/defs/craft_recipe_defs.h"
 #include "content/defs/item_defs.h"
+#include "content/defs/modifier_defs.h"
 #include "content/defs/plant_defs.h"
 #include "content/defs/structure_defs.h"
+#include "content/defs/task_defs.h"
 
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/array.hpp>
@@ -17,6 +21,11 @@ using namespace godot;
 
 namespace
 {
+constexpr std::int64_t k_content_resource_kind_plant = 0;
+constexpr std::int64_t k_content_resource_kind_item = 1;
+constexpr std::int64_t k_content_resource_kind_structure = 2;
+constexpr std::int64_t k_content_resource_kind_recipe = 3;
+
 String to_godot_string(const std::string& value)
 {
     return String::utf8(value.c_str(), static_cast<int64_t>(value.size()));
@@ -186,9 +195,13 @@ void Gs1RuntimeNode::ensure_runtime_started()
         refresh_project_config_root();
     }
 
+    adapter_config_ = load_adapter_config_blob(
+        project_config_root_,
+        std::filesystem::path {"project"} / "config");
+
     projection_cache_.reset();
     drained_messages_.clear();
-    if (!runtime_session_.start(gameplay_dll_path_, project_config_root_))
+    if (!runtime_session_.start(gameplay_dll_path_, project_config_root_, &adapter_config_))
     {
         last_error_ = runtime_session_.last_error();
         projection_revision_ += 1U;
@@ -715,6 +728,11 @@ Array Gs1RuntimeNode::build_inventory_slot_array(const std::vector<Gs1RuntimeInv
         slot_dict["container_kind"] = static_cast<int>(slot.container_kind);
         slot_dict["flags"] = static_cast<int64_t>(slot.flags);
         slot_dict["item_name"] = item_display_name(slot.item_id);
+        slot_dict["icon_content_kind"] = k_content_resource_kind_item;
+        slot_dict["icon_content_id"] = static_cast<int64_t>(slot.item_id);
+        slot_dict["icon_path"] = GodotProgressionResourceDatabase::instance().content_icon_path(
+            static_cast<std::uint8_t>(k_content_resource_kind_item),
+            slot.item_id);
         slot_dict["capability_flags"] = item_def != nullptr ? static_cast<int64_t>(item_def->capability_flags) : static_cast<int64_t>(0);
         slot_dict["linked_plant_id"] = item_def != nullptr ? static_cast<int64_t>(item_def->linked_plant_id.value) : static_cast<int64_t>(0);
         slot_dict["linked_structure_id"] = item_def != nullptr ? static_cast<int64_t>(item_def->linked_structure_id.value) : static_cast<int64_t>(0);
@@ -854,6 +872,11 @@ Dictionary Gs1RuntimeNode::build_active_site_dictionary() const
             option_dict["output_item_id"] = static_cast<int64_t>(option.output_item_id);
             option_dict["flags"] = static_cast<int64_t>(option.flags);
             option_dict["output_item_name"] = recipe_output_name(option.recipe_id, option.output_item_id);
+            option_dict["icon_content_kind"] = k_content_resource_kind_item;
+            option_dict["icon_content_id"] = static_cast<int64_t>(option.output_item_id);
+            option_dict["icon_path"] = GodotProgressionResourceDatabase::instance().content_icon_path(
+                static_cast<std::uint8_t>(k_content_resource_kind_item),
+                option.output_item_id);
             options.push_back(option_dict);
         }
         craft_context["options"] = options;
@@ -868,6 +891,13 @@ Dictionary Gs1RuntimeNode::build_active_site_dictionary() const
         preview["blocked_mask"] = static_cast<int64_t>(site.placement_preview->blocked_mask);
         preview["item_id"] = static_cast<int64_t>(site.placement_preview->item_id);
         preview["item_name"] = site.placement_preview->item_id != 0U ? item_display_name(site.placement_preview->item_id) : String();
+        preview["icon_content_kind"] = k_content_resource_kind_item;
+        preview["icon_content_id"] = static_cast<int64_t>(site.placement_preview->item_id);
+        preview["icon_path"] = site.placement_preview->item_id != 0U
+            ? GodotProgressionResourceDatabase::instance().content_icon_path(
+                static_cast<std::uint8_t>(k_content_resource_kind_item),
+                site.placement_preview->item_id)
+            : String();
         preview["preview_tile_count"] = static_cast<int64_t>(site.placement_preview->preview_tile_count);
         preview["footprint_width"] = static_cast<int64_t>(site.placement_preview->footprint_width);
         preview["footprint_height"] = static_cast<int64_t>(site.placement_preview->footprint_height);
@@ -917,6 +947,13 @@ Dictionary Gs1RuntimeNode::build_active_site_dictionary() const
         task_dict["target_progress"] = static_cast<int>(task.target_progress);
         task_dict["list_kind"] = static_cast<int>(task.list_kind);
         task_dict["flags"] = static_cast<int64_t>(task.flags);
+        task_dict["resource_icon_path"] =
+            GodotProgressionResourceDatabase::instance().task_template_icon_path(task.task_template_id);
+        if (const auto* task_def = gs1::find_task_template_def(gs1::TaskTemplateId {task.task_template_id}))
+        {
+            task_dict["task_tier_id"] = static_cast<int64_t>(task_def->task_tier_id);
+            task_dict["progress_kind"] = static_cast<int64_t>(task_def->progress_kind);
+        }
         tasks.push_back(task_dict);
     }
     dict["tasks"] = tasks;
@@ -928,6 +965,13 @@ Dictionary Gs1RuntimeNode::build_active_site_dictionary() const
         modifier_dict["modifier_id"] = static_cast<int64_t>(modifier.modifier_id);
         modifier_dict["remaining_game_hours"] = static_cast<int>(modifier.remaining_game_hours);
         modifier_dict["flags"] = static_cast<int64_t>(modifier.flags);
+        modifier_dict["resource_icon_path"] =
+            GodotProgressionResourceDatabase::instance().modifier_icon_path(modifier.modifier_id);
+        if (const auto* modifier_def = gs1::find_modifier_def(gs1::ModifierId {modifier.modifier_id}))
+        {
+            modifier_dict["display_name"] = to_godot_string(modifier_def->display_name);
+            modifier_dict["description"] = to_godot_string(modifier_def->description);
+        }
         modifiers.push_back(modifier_dict);
     }
     dict["active_modifiers"] = modifiers;
@@ -944,7 +988,16 @@ Dictionary Gs1RuntimeNode::build_active_site_dictionary() const
         listing_dict["cart_quantity"] = static_cast<int>(listing.cart_quantity);
         listing_dict["listing_kind"] = static_cast<int>(listing.listing_kind);
         listing_dict["flags"] = static_cast<int64_t>(listing.flags);
+        const bool is_unlockable = listing.listing_kind == GS1_PHONE_LISTING_PRESENTATION_PURCHASE_UNLOCKABLE;
         listing_dict["label"] = item_display_name(listing.item_or_unlockable_id);
+        listing_dict["icon_content_kind"] = k_content_resource_kind_item;
+        listing_dict["icon_content_id"] = static_cast<int64_t>(listing.item_or_unlockable_id);
+        listing_dict["is_unlockable"] = is_unlockable;
+        listing_dict["icon_path"] = !is_unlockable
+            ? GodotProgressionResourceDatabase::instance().content_icon_path(
+                static_cast<std::uint8_t>(k_content_resource_kind_item),
+                listing.item_or_unlockable_id)
+            : String();
         phone_listings.push_back(listing_dict);
     }
     dict["phone_listings"] = phone_listings;

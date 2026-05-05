@@ -730,6 +730,7 @@ int main()
     create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
     create_desc.api_version = gs1::k_api_version;
     create_desc.fixed_step_seconds = 1.0 / 60.0;
+    create_desc.adapter_config_json_utf8 = nullptr;
 
     GameRuntime runtime {create_desc};
 
@@ -1427,6 +1428,7 @@ int main()
     Gs1RuntimeCreateDesc phone_panel_desc {};
     phone_panel_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
     phone_panel_desc.api_version = gs1::k_api_version;
+    phone_panel_desc.adapter_config_json_utf8 = nullptr;
     phone_panel_desc.fixed_step_seconds = 1.0 / 60.0;
 
     GameRuntime phone_panel_runtime {phone_panel_desc};
@@ -1517,6 +1519,7 @@ int main()
     Gs1RuntimeCreateDesc panel_state_desc {};
     panel_state_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
     panel_state_desc.api_version = gs1::k_api_version;
+    panel_state_desc.adapter_config_json_utf8 = nullptr;
     panel_state_desc.fixed_step_seconds = 1.0 / 60.0;
 
     GameRuntime panel_state_runtime {panel_state_desc};
@@ -1693,6 +1696,7 @@ int main()
     Gs1RuntimeCreateDesc ui_desc {};
     ui_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
     ui_desc.api_version = gs1::k_api_version;
+    ui_desc.adapter_config_json_utf8 = nullptr;
     ui_desc.fixed_step_seconds = 1.0 / 60.0;
 
     GameRuntime ui_runtime {ui_desc};
@@ -1786,6 +1790,7 @@ int main()
     Gs1RuntimeCreateDesc water_action_desc {};
     water_action_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
     water_action_desc.api_version = gs1::k_api_version;
+    water_action_desc.adapter_config_json_utf8 = nullptr;
     water_action_desc.fixed_step_seconds = 60.0;
 
     GameRuntime water_action_runtime {water_action_desc};
@@ -1859,6 +1864,7 @@ int main()
     Gs1RuntimeCreateDesc action_desc {};
     action_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
     action_desc.api_version = gs1::k_api_version;
+    action_desc.adapter_config_json_utf8 = nullptr;
     action_desc.fixed_step_seconds = 60.0;
 
     GameRuntime action_runtime {action_desc};
@@ -1954,6 +1960,7 @@ int main()
     Gs1RuntimeCreateDesc placement_preview_desc {};
     placement_preview_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
     placement_preview_desc.api_version = gs1::k_api_version;
+    placement_preview_desc.adapter_config_json_utf8 = nullptr;
     placement_preview_desc.fixed_step_seconds = 1.0 / 60.0;
 
     GameRuntime placement_preview_runtime {placement_preview_desc};
@@ -2110,6 +2117,7 @@ int main()
     Gs1RuntimeCreateDesc storage_walk_desc {};
     storage_walk_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
     storage_walk_desc.api_version = gs1::k_api_version;
+    storage_walk_desc.adapter_config_json_utf8 = nullptr;
     storage_walk_desc.fixed_step_seconds = 0.1;
 
     GameRuntime storage_walk_runtime {storage_walk_desc};
@@ -2168,6 +2176,7 @@ int main()
     Gs1RuntimeCreateDesc storage_close_desc {};
     storage_close_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
     storage_close_desc.api_version = gs1::k_api_version;
+    storage_close_desc.adapter_config_json_utf8 = nullptr;
     storage_close_desc.fixed_step_seconds = 1.0;
 
     GameRuntime storage_close_runtime {storage_close_desc};

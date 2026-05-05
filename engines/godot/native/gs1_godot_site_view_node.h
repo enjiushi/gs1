@@ -38,6 +38,7 @@ private:
     struct VisualNodeRecord final
     {
         godot::ObjectID object_id {};
+        godot::ObjectID instance_root_id {};
         std::uint64_t gameplay_id {0};
         std::uint32_t type_id {0};
         float anchor_tile_x {0.0f};
@@ -79,6 +80,7 @@ private:
         bool device_visual,
         std::uint8_t footprint_width,
         std::uint8_t footprint_height);
+    [[nodiscard]] godot::Node3D* instantiate_visual_scene(bool device_visual, std::uint32_t type_id) const;
     void remove_visual_node(std::unordered_map<std::uint64_t, VisualNodeRecord>& registry, std::uint64_t gameplay_id);
 
 private:

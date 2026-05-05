@@ -407,6 +407,7 @@ struct Gs1RuntimeCreateDesc
     std::uint32_t api_version;
     double fixed_step_seconds;
     const char* project_config_root_utf8;
+    const char* adapter_config_json_utf8;
 };
 
 struct Gs1RuntimeTimingStats
@@ -1064,7 +1065,7 @@ private:
     }
 };
 
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1RuntimeCreateDesc, 24U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1RuntimeCreateDesc, 32U);
 GS1_ASSERT_TRIVIAL_SCHEMA(Gs1RuntimeTimingStats);
 GS1_ASSERT_TRIVIAL_SCHEMA(Gs1RuntimeProfileSystemStats);
 GS1_ASSERT_TRIVIAL_SCHEMA(Gs1RuntimeProfilingSnapshot);

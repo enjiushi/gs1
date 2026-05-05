@@ -83,6 +83,7 @@ private:
 private:
     std::filesystem::path gameplay_dll_path_ {};
     std::filesystem::path project_config_root_ {};
+    Gs1AdapterConfigBlob adapter_config_ {};
     Gs1RuntimeSession runtime_session_ {};
     Gs1RuntimeProjectionCache projection_cache_ {};
     Gs1RuntimeMessagePump message_pump_ {};

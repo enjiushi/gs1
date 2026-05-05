@@ -1,5 +1,6 @@
 #pragma once
 
+#include "host/adapter_config_loader.h"
 #include "host/runtime_dll_loader.h"
 
 #include <filesystem>
@@ -17,6 +18,7 @@ public:
     [[nodiscard]] bool start(
         const std::filesystem::path& gameplay_dll_path,
         const std::filesystem::path& project_config_root,
+        const Gs1AdapterConfigBlob* adapter_config,
         double fixed_step_seconds = 1.0 / 60.0);
     void stop() noexcept;
 
@@ -37,5 +39,6 @@ private:
     Gs1RuntimeHandle* runtime_ {nullptr};
     std::filesystem::path gameplay_dll_path_ {};
     std::string project_config_root_utf8_ {};
+    std::string adapter_config_json_utf8_ {};
     std::string last_error_ {};
 };

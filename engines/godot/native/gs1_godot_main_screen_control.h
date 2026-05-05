@@ -42,9 +42,11 @@ class PanelContainer;
 class RichTextLabel;
 class ScrollContainer;
 class StandardMaterial3D;
+class Texture2D;
 class TextureRect;
 class VBoxContainer;
 class GridContainer;
+class ScrollContainer;
 }
 
 class Gs1RuntimeNode;
@@ -139,6 +141,8 @@ private:
     void render_phone(const godot::Dictionary& site_state);
     void render_craft(const godot::Dictionary& site_state);
     void render_overlay(const godot::Dictionary& site_state);
+    void reconcile_task_rows(const godot::Array& tasks);
+    void reconcile_modifier_rows(const godot::Array& modifiers);
     void render_projected_ui_buttons(godot::VBoxContainer* container, const std::initializer_list<int>& allowed_action_types);
     void reconcile_phone_listing_buttons(const godot::Array& phone_listings);
     void reconcile_craft_option_buttons(const godot::Dictionary& craft_context);
@@ -228,7 +232,7 @@ private:
     [[nodiscard]] godot::String regional_card_status_text(const godot::Dictionary& spec) const;
     [[nodiscard]] godot::Color regional_card_status_color(const godot::Dictionary& spec) const;
     [[nodiscard]] godot::Color regional_card_icon_background_color(const godot::String& icon_text) const;
-    [[nodiscard]] godot::Ref<godot::ImageTexture> regional_card_icon_texture(const godot::Dictionary& spec) const;
+    [[nodiscard]] godot::Ref<godot::Texture2D> regional_card_icon_texture(const godot::Dictionary& spec) const;
     void ensure_card_content_nodes(godot::Button* button, ProjectedButtonRecord& record);
     void apply_tech_tree_overlay_layout();
 
@@ -409,6 +413,8 @@ private:
     std::vector<FixedSlotBinding> fixed_slot_bindings_;
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> phone_listing_buttons_;
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> craft_option_buttons_;
+    std::unordered_map<std::uint64_t, ProjectedButtonRecord> task_buttons_;
+    std::unordered_map<std::uint64_t, ProjectedButtonRecord> modifier_buttons_;
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> site_control_buttons_;
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> regional_selection_action_buttons_;
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> regional_tech_tree_faction_tab_buttons_;
@@ -442,6 +448,8 @@ private:
     godot::RichTextLabel* inventory_summary_ {nullptr};
     godot::PanelContainer* task_panel_ {nullptr};
     godot::RichTextLabel* task_summary_ {nullptr};
+    godot::VBoxContainer* task_rows_ {nullptr};
+    godot::VBoxContainer* modifier_rows_ {nullptr};
     godot::PanelContainer* phone_panel_ {nullptr};
     godot::VBoxContainer* phone_listings_ {nullptr};
     godot::PanelContainer* craft_panel_ {nullptr};

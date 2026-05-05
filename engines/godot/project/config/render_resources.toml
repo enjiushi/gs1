@@ -1,0 +1,260 @@
+# Godot-only render resources keyed by shared domain/id.
+# Shared gameplay meaning, names, and descriptions stay in project/content/*.toml.
+
+[[render_resources]]
+domain = "Modifier"
+content_id = 1
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "Modifier"
+content_id = 2
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "Modifier"
+content_id = 3
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "Modifier"
+content_id = 4
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "Modifier"
+content_id = 5
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "Modifier"
+content_id = 104
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "Modifier"
+content_id = 3001
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "Modifier"
+content_id = 3002
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "Modifier"
+content_id = 3003
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "TaskTemplate"
+content_id = 1
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "TaskTemplate"
+content_id = 22
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "TaskTemplate"
+content_id = 38
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "TaskTemplate"
+content_id = 39
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "TaskTemplate"
+content_id = 40
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "TaskTemplate"
+content_id = 101
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "TaskTemplate"
+content_id = 102
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "TaskTemplate"
+content_id = 103
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "TaskTemplate"
+content_id = 104
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "TaskTemplate"
+content_id = 105
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "TaskTemplate"
+content_id = 106
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "TaskTemplate"
+content_id = 107
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "TaskTemplate"
+content_id = 108
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "TaskTemplate"
+content_id = 109
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "TaskTemplate"
+content_id = 110
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "TaskTemplate"
+content_id = 111
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "TaskTemplate"
+content_id = 112
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "RewardCandidate"
+content_id = 1
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "RewardCandidate"
+content_id = 2
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "RewardCandidate"
+content_id = 3
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "RewardCandidate"
+content_id = 4
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "RewardCandidate"
+content_id = 5
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "RewardCandidate"
+content_id = 6
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "RewardCandidate"
+content_id = 7
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "RewardCandidate"
+content_id = 101
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "RewardCandidate"
+content_id = 102
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "RewardCandidate"
+content_id = 103
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "RewardCandidate"
+content_id = 104
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "RewardCandidate"
+content_id = 105
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "RewardCandidate"
+content_id = 106
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "RewardCandidate"
+content_id = 107
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "RewardCandidate"
+content_id = 108
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "RewardCandidate"
+content_id = 109
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "RewardCandidate"
+content_id = 110
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "RewardCandidate"
+content_id = 111
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "RewardCandidate"
+content_id = 112
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "RewardCandidate"
+content_id = 113
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[render_resources]]
+domain = "Site"
+content_id = 1
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+thumbnail_texture_path = "res://assets/field_command/progression_placeholder.png"
+scene_path = "res://scenes/regional_site_marker.tscn"
+
+[[render_resources]]
+domain = "Site"
+content_id = 2
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+thumbnail_texture_path = "res://assets/field_command/progression_placeholder.png"
+scene_path = "res://scenes/regional_site_marker.tscn"
+
+[[render_resources]]
+domain = "Site"
+content_id = 3
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+thumbnail_texture_path = "res://assets/field_command/progression_placeholder.png"
+scene_path = "res://scenes/regional_site_marker.tscn"
+
+[[render_resources]]
+domain = "Site"
+content_id = 4
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+thumbnail_texture_path = "res://assets/field_command/progression_placeholder.png"
+scene_path = "res://scenes/regional_site_marker.tscn"

@@ -1,3 +1,4 @@
+#include "godot_progression_resources.h"
 #include "gs1_godot_main_screen_control.h"
 #include "gs1_godot_runtime_node.h"
 
@@ -25,6 +26,7 @@
 #include <godot_cpp/classes/mesh_instance3d.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/node3d.hpp>
+#include <godot_cpp/classes/panel.hpp>
 #include <godot_cpp/classes/packed_scene.hpp>
 #include <godot_cpp/classes/panel_container.hpp>
 #include <godot_cpp/classes/rich_text_label.hpp>
@@ -64,12 +66,21 @@ using namespace godot;
 
 namespace
 {
+constexpr std::uint8_t k_unlockable_content_kind_plant = 0U;
+constexpr std::uint8_t k_unlockable_content_kind_item = 1U;
+constexpr std::uint8_t k_unlockable_content_kind_structure_recipe = 2U;
+constexpr std::uint8_t k_unlockable_content_kind_recipe = 3U;
+
+constexpr std::int64_t k_content_resource_kind_plant = 0;
+constexpr std::int64_t k_content_resource_kind_item = 1;
+constexpr std::int64_t k_content_resource_kind_structure = 2;
+constexpr std::int64_t k_content_resource_kind_recipe = 3;
+
 constexpr int k_mouse_button_left = 1;
 constexpr int k_key_up = 4194320;
 constexpr int k_key_down = 4194321;
 constexpr int k_key_left = 4194319;
 constexpr int k_key_right = 4194322;
-constexpr const char* k_regional_site_marker_scene_path = "res://scenes/regional_site_marker.tscn";
 
 String bool_text(bool value, const String& when_true, const String& when_false)
 {
@@ -191,14 +202,18 @@ Ref<PackedScene> load_packed_scene(const String& path)
     return Ref<PackedScene> {};
 }
 
-Ref<PackedScene> regional_site_marker_scene()
+Ref<Texture2D> load_texture_2d(const String& path)
 {
-    static Ref<PackedScene> cached_scene {};
-    if (cached_scene.is_null())
+    if (path.is_empty())
     {
-        cached_scene = load_packed_scene(k_regional_site_marker_scene_path);
+        return Ref<Texture2D> {};
     }
-    return cached_scene;
+
+    if (ResourceLoader* loader = ResourceLoader::get_singleton())
+    {
+        return loader->load(path);
+    }
+    return Ref<Texture2D> {};
 }
 
 Ref<ImageTexture> make_solid_icon_texture(const Color& base_color)
@@ -214,6 +229,47 @@ Ref<ImageTexture> make_solid_icon_texture(const Color& base_color)
     image->fill_rect(Rect2i(8, 8, 32, 32), Color(base_color.r * 1.10f, base_color.g * 1.10f, base_color.b * 1.10f, 1.0f));
     image->fill_rect(Rect2i(12, 12, 24, 24), Color(base_color.r * 0.56f, base_color.g * 0.56f, base_color.b * 0.56f, 1.0f));
     return ImageTexture::create_from_image(image);
+}
+
+const gs1::ReputationUnlockDef* find_unlockable_def_by_title(const String& title)
+{
+    const CharString title_utf8 = title.utf8();
+    const std::string_view title_view {title_utf8.get_data(), static_cast<std::size_t>(title_utf8.length())};
+    for (const auto& unlock_def : gs1::all_reputation_unlock_defs())
+    {
+        if (unlock_def.display_name == title_view)
+        {
+            return &unlock_def;
+        }
+    }
+    return nullptr;
+}
+
+std::uint8_t unlockable_content_kind_from_def(const gs1::ReputationUnlockDef& unlock_def)
+{
+    switch (unlock_def.unlock_kind)
+    {
+    case gs1::ReputationUnlockKind::Plant:
+        return k_unlockable_content_kind_plant;
+    case gs1::ReputationUnlockKind::Item:
+        return k_unlockable_content_kind_item;
+    case gs1::ReputationUnlockKind::StructureRecipe:
+        return k_unlockable_content_kind_structure_recipe;
+    case gs1::ReputationUnlockKind::Recipe:
+        return k_unlockable_content_kind_recipe;
+    default:
+        return k_unlockable_content_kind_item;
+    }
+}
+
+String trimmed_unlockable_title(const String& raw_text)
+{
+    const String trimmed = raw_text.strip_edges();
+    const int open_paren = trimmed.find("(");
+    const int need_index = trimmed.find(" Need ");
+    return (open_paren > 0 ? trimmed.substr(0, open_paren)
+                           : (need_index > 0 ? trimmed.substr(0, need_index) : trimmed))
+        .strip_edges();
 }
 }
 
@@ -509,6 +565,14 @@ void Gs1GodotMainScreenControl::cache_ui_references()
     if (task_summary_ == nullptr)
     {
         task_summary_ = Object::cast_to<RichTextLabel>(find_child("TaskSummary", true, false));
+    }
+    if (task_rows_ == nullptr)
+    {
+        task_rows_ = Object::cast_to<VBoxContainer>(find_child("TaskRows", true, false));
+    }
+    if (modifier_rows_ == nullptr)
+    {
+        modifier_rows_ = Object::cast_to<VBoxContainer>(find_child("ModifierRows", true, false));
     }
     if (phone_panel_ == nullptr)
     {
@@ -985,6 +1049,8 @@ void Gs1GodotMainScreenControl::render_tasks(const Dictionary& site_state)
     }
 
     task_summary_->set_text(String("\n").join(lines));
+    reconcile_task_rows(tasks);
+    reconcile_modifier_rows(site_state.get("active_modifiers", Array()));
 }
 
 void Gs1GodotMainScreenControl::render_phone(const Dictionary& site_state)
@@ -1066,6 +1132,117 @@ void Gs1GodotMainScreenControl::render_overlay(const Dictionary& site_state)
 
     const Dictionary overlay = site_state.get("protection_overlay", Dictionary());
     overlay_state_label_->set_text(vformat("Overlay Mode: %d", as_int(overlay.get("mode", 0), 0)));
+}
+
+void Gs1GodotMainScreenControl::reconcile_task_rows(const Array& tasks)
+{
+    if (task_rows_ == nullptr)
+    {
+        return;
+    }
+
+    std::unordered_set<std::uint64_t> desired_keys;
+    int desired_index = 0;
+    for (int64_t index = 0; index < tasks.size(); ++index)
+    {
+        const Dictionary task = tasks[index];
+        const int task_instance_id = as_int(task.get("task_instance_id", 0), 0);
+        const std::uint64_t stable_key = static_cast<std::uint64_t>(task_instance_id);
+        desired_keys.insert(stable_key);
+        Button* button = upsert_button_node(
+            task_rows_,
+            task_buttons_,
+            stable_key,
+            vformat("DynamicTask_%d", task_instance_id),
+            desired_index++);
+        if (button == nullptr)
+        {
+            continue;
+        }
+
+        const String icon_path = String(task.get("resource_icon_path", String()));
+        const Ref<Texture2D> icon_texture = load_texture_2d(icon_path);
+        if (icon_texture.is_valid())
+        {
+            button->set_button_icon(icon_texture);
+        }
+        else
+        {
+            button->set_button_icon(Ref<Texture2D> {});
+        }
+
+        button->set_text(vformat(
+            "Task %d  progress %d/%d  tier %d",
+            as_int(task.get("task_template_id", 0), 0),
+            as_int(task.get("current_progress", 0), 0),
+            as_int(task.get("target_progress", 0), 0),
+            as_int(task.get("task_tier_id", 0), 0)));
+        button->set_tooltip_text(vformat(
+            "Task template %d, progress kind %d, list %d",
+            as_int(task.get("task_template_id", 0), 0),
+            as_int(task.get("progress_kind", 0), 0),
+            as_int(task.get("list_kind", 0), 0)));
+        button->set_disabled(true);
+        button->set_focus_mode(Control::FOCUS_NONE);
+    }
+
+    prune_button_registry(task_buttons_, desired_keys);
+}
+
+void Gs1GodotMainScreenControl::reconcile_modifier_rows(const Array& modifiers)
+{
+    if (modifier_rows_ == nullptr)
+    {
+        return;
+    }
+
+    std::unordered_set<std::uint64_t> desired_keys;
+    int desired_index = 0;
+    for (int64_t index = 0; index < modifiers.size(); ++index)
+    {
+        const Dictionary modifier = modifiers[index];
+        const int modifier_id = as_int(modifier.get("modifier_id", 0), 0);
+        const std::uint64_t stable_key = pack_u32_pair(
+            static_cast<std::uint32_t>(modifier_id),
+            static_cast<std::uint32_t>(index));
+        desired_keys.insert(stable_key);
+        Button* button = upsert_button_node(
+            modifier_rows_,
+            modifier_buttons_,
+            stable_key,
+            vformat("DynamicModifier_%d", modifier_id),
+            desired_index++);
+        if (button == nullptr)
+        {
+            continue;
+        }
+
+        const String icon_path = String(modifier.get("resource_icon_path", String()));
+        const Ref<Texture2D> icon_texture = load_texture_2d(icon_path);
+        if (icon_texture.is_valid())
+        {
+            button->set_button_icon(icon_texture);
+        }
+        else
+        {
+            button->set_button_icon(Ref<Texture2D> {});
+        }
+
+        const String label = String(modifier.get("display_name", String())).is_empty()
+            ? vformat("Modifier %d", modifier_id)
+            : String(modifier.get("display_name", String()));
+        button->set_text(vformat(
+            "%s  %s",
+            label,
+            (as_int(modifier.get("flags", 0), 0) & 1) != 0
+                ? vformat("%dh left", as_int(modifier.get("remaining_game_hours", 0), 0))
+                : String("Permanent")));
+        button->set_tooltip_text(String(modifier.get("description", String())));
+        button->set_disabled(true);
+        button->set_focus_mode(Control::FOCUS_NONE);
+    }
+
+    prune_button_registry(modifier_buttons_, desired_keys);
 }
 
 void Gs1GodotMainScreenControl::render_projected_ui_buttons(VBoxContainer* container, const std::initializer_list<int>& allowed_action_types)
@@ -1566,8 +1743,6 @@ void Gs1GodotMainScreenControl::reconcile_regional_sites(const std::vector<Gs1Ru
     {
         return;
     }
-
-    const Ref<PackedScene> marker_scene = regional_site_marker_scene();
     std::unordered_set<int> desired_site_ids;
     for (const auto& site : sites)
     {
@@ -1578,6 +1753,8 @@ void Gs1GodotMainScreenControl::reconcile_regional_sites(const std::vector<Gs1Ru
         Node3D* root = resolve_object<Node3D>(record.root_id);
         if (root == nullptr)
         {
+            const String scene_path = GodotProgressionResourceDatabase::instance().site_scene_path(site.site_id);
+            const Ref<PackedScene> marker_scene = load_packed_scene(scene_path);
             if (!marker_scene.is_null())
             {
                 root = Object::cast_to<Node3D>(marker_scene->instantiate());
@@ -2315,15 +2492,18 @@ void Gs1GodotMainScreenControl::reconcile_phone_listing_buttons(const Array& pho
             continue;
         }
 
+        const String icon_text = as_bool(listing.get("is_unlockable", false), false) ? String("[UNL]") : String("[ITM]");
         button->set_text(vformat(
-            "%s  x%d  price %.2f",
+            "%s %s  x%d  price %.2f",
+            icon_text,
             String(listing.get("label", "Listing")),
             as_int(listing.get("quantity", 0), 0),
             as_float(listing.get("price", 0.0), 0.0)));
         button->set_tooltip_text(vformat(
-            "listing %d kind %d",
+            "listing %d kind %d id %d",
             listing_id,
-            as_int(listing.get("listing_kind", 0), 0)));
+            as_int(listing.get("listing_kind", 0), 0),
+            as_int(listing.get("item_or_unlockable_id", 0), 0)));
         const Callable callback = callable_mp(this, &Gs1GodotMainScreenControl::on_dynamic_phone_listing_pressed).bind(listing_id);
         if (!button->is_connected("pressed", callback))
         {
@@ -2365,7 +2545,7 @@ void Gs1GodotMainScreenControl::reconcile_craft_option_buttons(const Dictionary&
                 continue;
             }
 
-            button->set_text(vformat("Craft %s", String(option.get("output_item_name", "Output"))));
+            button->set_text(vformat("[ITM] Craft %s", String(option.get("output_item_name", "Output"))));
             button->set_tooltip_text(String());
             button->set_meta("tile_x", context_x);
             button->set_meta("tile_y", context_y);
@@ -2654,18 +2834,13 @@ String Gs1GodotMainScreenControl::regional_unlockable_tooltip_text(const String&
         return "Starter Plants\nBasic Straw Checkerboard and Ordos Wormwood start available at campaign opening.";
     }
 
-    const int open_paren = trimmed.find("(");
-    const int need_index = trimmed.find(" Need ");
-    const String title = (open_paren > 0 ? trimmed.substr(0, open_paren) : (need_index > 0 ? trimmed.substr(0, need_index) : trimmed)).strip_edges();
-    for (const auto& unlock_def : gs1::all_reputation_unlock_defs())
+    const String title = trimmed_unlockable_title(trimmed);
+    if (const auto* unlock_def = find_unlockable_def_by_title(title))
     {
-        if (string_from_view(unlock_def.display_name) == title)
-        {
-            const String description = unlock_def.description.empty()
-                ? String("No authored description yet.")
-                : string_from_view(unlock_def.description);
-            return vformat("%s\n%s\nNeed total reputation %d", title, description, unlock_def.reputation_requirement);
-        }
+        const String description = unlock_def->description.empty()
+            ? String("No authored description yet.")
+            : string_from_view(unlock_def->description);
+        return vformat("%s\n%s\nNeed total reputation %d", title, description, unlock_def->reputation_requirement);
     }
 
     return trimmed;
@@ -2855,8 +3030,45 @@ Color Gs1GodotMainScreenControl::regional_card_icon_background_color(const Strin
     return Color(0.58f, 0.50f, 0.34f, 1.0f);
 }
 
-Ref<ImageTexture> Gs1GodotMainScreenControl::regional_card_icon_texture(const Dictionary& spec) const
+Ref<Texture2D> Gs1GodotMainScreenControl::regional_card_icon_texture(const Dictionary& spec) const
 {
+    if (const auto* node_def = find_tech_tree_node_def(spec.get("action", Dictionary())))
+    {
+        const String icon_path =
+            GodotProgressionResourceDatabase::instance().technology_icon_path(node_def->tech_node_id.value);
+        if (ResourceLoader* loader = ResourceLoader::get_singleton())
+        {
+            const Ref<Resource> resource = loader->load(icon_path);
+            const Ref<Texture2D> texture = resource;
+            if (texture.is_valid())
+            {
+                return texture;
+            }
+        }
+    }
+    else
+    {
+        const String title = trimmed_unlockable_title(String(spec.get("text", "")));
+        if (!title.is_empty())
+        {
+            if (const auto* unlock_def = find_unlockable_def_by_title(title))
+            {
+                const String icon_path = GodotProgressionResourceDatabase::instance().unlockable_icon_path(
+                    unlockable_content_kind_from_def(*unlock_def),
+                    unlock_def->content_id);
+                if (ResourceLoader* loader = ResourceLoader::get_singleton())
+                {
+                    const Ref<Resource> resource = loader->load(icon_path);
+                    const Ref<Texture2D> texture = resource;
+                    if (texture.is_valid())
+                    {
+                        return texture;
+                    }
+                }
+            }
+        }
+    }
+
     const String icon_text = regional_card_icon_text(spec);
     return make_solid_icon_texture(regional_card_icon_background_color(icon_text));
 }

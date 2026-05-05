@@ -133,6 +133,7 @@ void timed_modifier_projection_only_republishes_on_game_hour_boundaries()
     create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
     create_desc.api_version = gs1::k_api_version;
     create_desc.fixed_step_seconds = 60.0;
+    create_desc.adapter_config_json_utf8 = nullptr;
 
     GameRuntime runtime {create_desc};
     bootstrap_site_one(runtime);

@@ -142,6 +142,7 @@ add_library(gs1_gameplay_core STATIC
     ${GS1_GAMEPLAY_CORE_SOURCES})
 
 add_library(gs1_host_bridge STATIC
+    src/host/adapter_config_loader.cpp
     src/host/runtime_dll_loader.cpp
     src/host/runtime_message_pump.cpp
     src/host/runtime_projection_state.cpp
@@ -462,6 +463,7 @@ if(GS1_BUILD_GODOT_ADAPTER)
 
     add_library(gs1_godot_adapter SHARED
         engines/godot/native/gs1_godot_extension_entry.cpp
+        engines/godot/native/godot_progression_resources.cpp
         engines/godot/native/gs1_godot_main_screen_control.cpp
         engines/godot/native/gs1_godot_runtime_node.cpp
         engines/godot/native/gs1_godot_scene_router_control.cpp
@@ -472,7 +474,8 @@ if(GS1_BUILD_GODOT_ADAPTER)
             ${CMAKE_CURRENT_SOURCE_DIR}/include
             ${CMAKE_CURRENT_SOURCE_DIR}/src
             ${GS1_GODOT_SOURCE_DIR}
-            ${CMAKE_CURRENT_BINARY_DIR}/third_party/godot-cpp/gen/include)
+            ${CMAKE_CURRENT_BINARY_DIR}/third_party/godot-cpp/gen/include
+            ${GS1_TOMLPLUSPLUS_INCLUDE_DIR})
 
     target_link_libraries(gs1_godot_adapter
         PRIVATE

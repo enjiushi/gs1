@@ -10,6 +10,7 @@ Gs1RuntimeSession::~Gs1RuntimeSession() noexcept
 bool Gs1RuntimeSession::start(
     const std::filesystem::path& gameplay_dll_path,
     const std::filesystem::path& project_config_root,
+    const Gs1AdapterConfigBlob* adapter_config,
     const double fixed_step_seconds)
 {
     stop();
@@ -34,6 +35,10 @@ bool Gs1RuntimeSession::start(
     create_desc.fixed_step_seconds = fixed_step_seconds;
     project_config_root_utf8_ = project_config_root.string();
     create_desc.project_config_root_utf8 = project_config_root_utf8_.c_str();
+    adapter_config_json_utf8_ = adapter_config != nullptr ? adapter_config->json_utf8 : std::string {};
+    create_desc.adapter_config_json_utf8 = adapter_config_json_utf8_.empty()
+        ? nullptr
+        : adapter_config_json_utf8_.c_str();
 
     Gs1RuntimeHandle* runtime = nullptr;
     const Gs1Status status = api.create_runtime(&create_desc, &runtime);
@@ -61,6 +66,7 @@ void Gs1RuntimeSession::stop() noexcept
     runtime_ = nullptr;
     gameplay_dll_path_.clear();
     project_config_root_utf8_.clear();
+    adapter_config_json_utf8_.clear();
     loader_.unload();
 }
 

@@ -12,6 +12,7 @@
 #include <deque>
 #include <map>
 #include <optional>
+#include <string>
 #include <unordered_set>
 #include <vector>
 
@@ -280,6 +281,7 @@ private:
 
 private:
     Gs1RuntimeCreateDesc create_desc_ {};
+    std::string adapter_config_json_utf8_ {};
     double fixed_step_seconds_ {k_default_fixed_step_seconds};
     Gs1AppState app_state_ {GS1_APP_STATE_BOOT};
     std::optional<CampaignState> campaign_ {};

@@ -283,6 +283,7 @@ ScenarioResult run_scenario(const ScenarioConfig& config)
     create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
     create_desc.api_version = gs1::k_api_version;
     create_desc.fixed_step_seconds = kFixedStepSeconds;
+    create_desc.adapter_config_json_utf8 = nullptr;
 
     GameRuntime runtime {create_desc};
     run_boot_phase(runtime);

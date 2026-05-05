@@ -1,0 +1,476 @@
+# Godot-only progression presentation resources keyed by shared tech ids and unlockable content ids.
+# Shared display names and descriptions stay in project/content/*.toml.
+
+[[technology_resources]]
+tech_node_id = 2010
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2020
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2030
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2040
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2050
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2060
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2070
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2080
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2090
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2100
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2110
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2120
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2130
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2140
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2150
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2160
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2170
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2180
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2190
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2200
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2210
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2220
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2230
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2240
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2250
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2260
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2270
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2280
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2290
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2300
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2310
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 2320
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3010
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3020
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3030
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3040
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3050
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3060
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3070
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3080
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3090
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3100
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3110
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3120
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3130
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3140
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3150
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3160
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3170
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3180
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3190
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3200
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3210
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3220
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3230
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3240
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3250
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3260
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3270
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3280
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3290
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3300
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3310
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 3320
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4010
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4020
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4030
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4040
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4050
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4060
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4070
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4080
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4090
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4100
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4110
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4120
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4130
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4140
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4150
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4160
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4170
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4180
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4190
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4200
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4210
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4220
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4230
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4240
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4250
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4260
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4270
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4280
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4290
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4300
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4310
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[technology_resources]]
+tech_node_id = 4320
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[unlockable_resources]]
+content_kind = "Recipe"
+content_id = 21
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[unlockable_resources]]
+content_kind = "Plant"
+content_id = 1
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[unlockable_resources]]
+content_kind = "Recipe"
+content_id = 9
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[unlockable_resources]]
+content_kind = "Plant"
+content_id = 2
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[unlockable_resources]]
+content_kind = "Recipe"
+content_id = 10
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[unlockable_resources]]
+content_kind = "Plant"
+content_id = 7
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[unlockable_resources]]
+content_kind = "Recipe"
+content_id = 6
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[unlockable_resources]]
+content_kind = "Recipe"
+content_id = 7
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[unlockable_resources]]
+content_kind = "Recipe"
+content_id = 1
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[unlockable_resources]]
+content_kind = "Plant"
+content_id = 8
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[unlockable_resources]]
+content_kind = "Recipe"
+content_id = 14
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[unlockable_resources]]
+content_kind = "Plant"
+content_id = 6
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[unlockable_resources]]
+content_kind = "Recipe"
+content_id = 13
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[unlockable_resources]]
+content_kind = "Plant"
+content_id = 3
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[unlockable_resources]]
+content_kind = "Recipe"
+content_id = 18
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[unlockable_resources]]
+content_kind = "Plant"
+content_id = 4
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[unlockable_resources]]
+content_kind = "Recipe"
+content_id = 17
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[unlockable_resources]]
+content_kind = "Plant"
+content_id = 10
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"

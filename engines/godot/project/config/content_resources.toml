@@ -1,0 +1,572 @@
+# Godot-only content presentation resources keyed by shared content ids.
+# Shared display names, descriptions, and gameplay meaning stay in project/content/*.toml.
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 1
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 2
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 3
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 4
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 5
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 6
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 7
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 8
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 9
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 10
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 11
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 12
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 13
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 14
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 15
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 16
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 17
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 18
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 19
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 20
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 21
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 22
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 23
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 24
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 25
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 26
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 27
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 28
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 29
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 30
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 31
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 32
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 33
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 34
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 35
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 36
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 37
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 38
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 39
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 40
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 41
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 42
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 43
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 44
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 45
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 46
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 47
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 48
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 49
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 50
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 51
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 52
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 53
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 54
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 55
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 56
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 57
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 58
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 59
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 60
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 61
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 62
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 63
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 64
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 65
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 66
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 67
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 68
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Item"
+content_id = 69
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Plant"
+content_id = 1
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Plant"
+content_id = 2
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Plant"
+content_id = 3
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Plant"
+content_id = 4
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Plant"
+content_id = 5
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Plant"
+content_id = 6
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Plant"
+content_id = 7
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Plant"
+content_id = 8
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Plant"
+content_id = 9
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Plant"
+content_id = 10
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Plant"
+content_id = 11
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Plant"
+content_id = 12
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Plant"
+content_id = 13
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Plant"
+content_id = 14
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Plant"
+content_id = 15
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Plant"
+content_id = 16
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Structure"
+content_id = 201
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Structure"
+content_id = 202
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Structure"
+content_id = 203
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Structure"
+content_id = 204
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Structure"
+content_id = 205
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Recipe"
+content_id = 1
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Recipe"
+content_id = 2
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Recipe"
+content_id = 3
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Recipe"
+content_id = 4
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Recipe"
+content_id = 5
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Recipe"
+content_id = 6
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Recipe"
+content_id = 7
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Recipe"
+content_id = 8
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Recipe"
+content_id = 9
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Recipe"
+content_id = 10
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Recipe"
+content_id = 11
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Recipe"
+content_id = 12
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Recipe"
+content_id = 13
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Recipe"
+content_id = 14
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Recipe"
+content_id = 15
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Recipe"
+content_id = 16
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Recipe"
+content_id = 17
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Recipe"
+content_id = 18
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Recipe"
+content_id = 19
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Recipe"
+content_id = 20
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Recipe"
+content_id = 21
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Recipe"
+content_id = 22
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Recipe"
+content_id = 23
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+
+[[content_resources]]
+content_kind = "Recipe"
+content_id = 24
+icon_texture_path = "res://assets/field_command/progression_placeholder.png"

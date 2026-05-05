@@ -1196,6 +1196,11 @@ GameRuntime::GameRuntime(Gs1RuntimeCreateDesc create_desc)
             std::filesystem::path {create_desc_.project_config_root_utf8} / "content");
     }
 
+    if (create_desc_.adapter_config_json_utf8 != nullptr)
+    {
+        adapter_config_json_utf8_ = create_desc_.adapter_config_json_utf8;
+    }
+
     initialize_subscription_tables();
 }
 
