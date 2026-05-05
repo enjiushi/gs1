@@ -1,6 +1,6 @@
 #pragma once
 
-#include "runtime_dll_loader.h"
+#include "host/runtime_dll_loader.h"
 #include "smoke_engine_host.h"
 
 #include <cstdint>

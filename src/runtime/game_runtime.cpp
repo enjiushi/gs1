@@ -11,6 +11,7 @@
 #include "content/defs/plant_defs.h"
 #include "content/defs/structure_defs.h"
 #include "content/defs/technology_defs.h"
+#include "content/content_loader.h"
 #include "messages/message_dispatcher.h"
 #include "site/inventory_storage.h"
 #include "site/site_world_access.h"
@@ -64,6 +65,20 @@ constexpr float k_visible_tile_soil_salinity_projection_step = 100.0f / 64.0f;
 constexpr float k_visible_tile_device_integrity_projection_step = 100.0f / 128.0f;
 constexpr double k_site_one_probe_window_minutes = 0.25;
 constexpr std::int32_t k_regional_map_tile_spacing = 160;
+
+[[nodiscard]] const char* regional_site_state_label(Gs1SiteState state) noexcept
+{
+    switch (state)
+    {
+    case GS1_SITE_STATE_AVAILABLE:
+        return "Ready";
+    case GS1_SITE_STATE_COMPLETED:
+        return "Restored";
+    case GS1_SITE_STATE_LOCKED:
+    default:
+        return "Locked";
+    }
+}
 
 [[nodiscard]] std::uint16_t projected_remaining_game_hours(double remaining_world_minutes) noexcept
 {
@@ -196,6 +211,13 @@ void queue_storage_open_request(
     return static_cast<std::uint16_t>(std::clamp(scaled, 0.0f, 65535.0f));
 }
 
+[[nodiscard]] std::uint16_t quantize_device_integrity_projection(float normalized_integrity) noexcept
+{
+    const float clamped = std::clamp(normalized_integrity, 0.0f, 1.0f);
+    const float scaled = std::floor((clamped * 128.0f) + 0.0001f);
+    return static_cast<std::uint16_t>(std::clamp(scaled, 0.0f, 128.0f));
+}
+
 [[nodiscard]] ProjectedSiteTileState capture_projected_tile_state(
     const SiteWorld::TileData& tile) noexcept
 {
@@ -215,10 +237,6 @@ void queue_storage_open_request(
     const float dust_protection =
         tile.plant_weather_contribution.dust_protection +
         tile.device_weather_contribution.dust_protection;
-    const float device_integrity =
-        tile.device.structure_id.value != 0U
-            ? (tile.device.device_integrity * 100.0f)
-            : 0.0f;
     return ProjectedSiteTileState {
         tile.static_data.terrain_type_id,
         tile.ecology.plant_id.value,
@@ -260,13 +278,107 @@ void queue_storage_open_request(
             tile.ecology.soil_salinity,
             100.0f,
             k_visible_tile_soil_salinity_projection_step),
-        quantize_projected_tile_channel(
-            device_integrity,
-            100.0f,
-            k_visible_tile_device_integrity_projection_step),
+        tile.device.structure_id.value != 0U
+            ? quantize_device_integrity_projection(tile.device.device_integrity)
+            : 0U,
         static_cast<std::uint8_t>(tile.excavation.depth),
         static_cast<std::uint8_t>(visible_excavation_depth),
         true};
+}
+
+[[nodiscard]] std::uint16_t quantize_visual_density(float density) noexcept
+{
+    return quantize_projected_tile_channel(
+        density,
+        100.0f,
+        k_visible_tile_density_projection_step);
+}
+
+[[nodiscard]] float resolve_plant_visual_height_scale(const PlantDef& plant_def, float density) noexcept
+{
+    const float density_factor = std::clamp(density / 100.0f, 0.25f, 1.0f);
+    float base_height = 0.45f;
+    switch (plant_def.height_class)
+    {
+    case PlantHeightClass::None:
+        base_height = 0.18f;
+        break;
+    case PlantHeightClass::Low:
+        base_height = 0.45f;
+        break;
+    case PlantHeightClass::Medium:
+        base_height = 0.75f;
+        break;
+    case PlantHeightClass::Tall:
+        base_height = 1.05f;
+        break;
+    default:
+        break;
+    }
+
+    return std::clamp(base_height * (0.55f + (density_factor * 0.55f)), 0.16f, 1.3f);
+}
+
+[[nodiscard]] std::uint8_t resolve_plant_visual_flags(const PlantDef& plant_def) noexcept
+{
+    std::uint8_t flags = 0U;
+    if (plant_focus_has_aura(plant_def.focus))
+    {
+        flags |= GS1_SITE_PLANT_VISUAL_FLAG_HAS_AURA;
+    }
+    if (plant_focus_has_wind_projection(plant_def.focus))
+    {
+        flags |= GS1_SITE_PLANT_VISUAL_FLAG_HAS_WIND_PROJECTION;
+    }
+    if (plant_def.growable)
+    {
+        flags |= GS1_SITE_PLANT_VISUAL_FLAG_GROWABLE;
+    }
+    return flags;
+}
+
+[[nodiscard]] float resolve_device_visual_height_scale(const StructureDef& structure_def) noexcept
+{
+    float height = 0.85f;
+    if (structure_def.grants_storage)
+    {
+        height += 0.15f;
+    }
+    if (structure_def.crafting_station_kind != CraftingStationKind::None)
+    {
+        height += 0.2f;
+    }
+    return std::clamp(height, 0.6f, 1.4f);
+}
+
+[[nodiscard]] std::uint8_t resolve_device_visual_flags(
+    const StructureDef& structure_def,
+    const SiteWorld::TileDeviceData& device) noexcept
+{
+    std::uint8_t flags = 0U;
+    if (structure_def.grants_storage)
+    {
+        flags |= GS1_SITE_DEVICE_VISUAL_FLAG_HAS_STORAGE;
+    }
+    if (structure_def.crafting_station_kind != CraftingStationKind::None)
+    {
+        flags |= GS1_SITE_DEVICE_VISUAL_FLAG_IS_CRAFTING_STATION;
+    }
+    if (device.fixed_integrity)
+    {
+        flags |= GS1_SITE_DEVICE_VISUAL_FLAG_FIXED_INTEGRITY;
+    }
+    return flags;
+}
+
+[[nodiscard]] std::uint64_t plant_visual_id_for_anchor(const SiteRunState& site_run, TileCoord anchor) noexcept
+{
+    return site_run.site_world == nullptr ? 0U : site_run.site_world->tile_entity_id(anchor);
+}
+
+[[nodiscard]] std::uint64_t device_visual_id_for_anchor(const SiteRunState& site_run, TileCoord anchor) noexcept
+{
+    return site_run.site_world == nullptr ? 0U : site_run.site_world->device_entity_id(anchor);
 }
 
 struct PlacementPreviewTileProjectionState final
@@ -681,6 +793,21 @@ struct PreviewOccupant final
     return nullptr;
 }
 
+[[nodiscard]] bool is_site_revealed(
+    const CampaignState& campaign,
+    SiteId site_id) noexcept
+{
+    for (const auto revealed_site_id : campaign.regional_map_state.revealed_site_ids)
+    {
+        if (revealed_site_id == site_id)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 [[nodiscard]] const FactionProgressState* find_faction_progress(
     const CampaignState& campaign,
     FactionId faction_id) noexcept
@@ -1062,6 +1189,13 @@ GameRuntime::GameRuntime(Gs1RuntimeCreateDesc create_desc)
         fixed_step_seconds_ = create_desc_.fixed_step_seconds;
     }
 
+    if (create_desc_.project_config_root_utf8 != nullptr &&
+        create_desc_.project_config_root_utf8[0] != '\0')
+    {
+        set_prototype_content_root(
+            std::filesystem::path {create_desc_.project_config_root_utf8} / "content");
+    }
+
     initialize_subscription_tables();
 }
 
@@ -1343,16 +1477,19 @@ Gs1Status GameRuntime::run_phase1(const Gs1Phase1Request& request, Gs1Phase1Resu
     auto status = GS1_STATUS_OK;
     if (!boot_initialized_)
     {
-        GameMessage boot_message {};
-        boot_message.type = GameMessageType::OpenMainMenu;
-        boot_message.set_payload(OpenMainMenuMessage {});
-        message_queue_.push_back(boot_message);
-
-        status = dispatch_queued_messages();
-        if (status != GS1_STATUS_OK)
+        if (!campaign_.has_value() && !active_site_run_.has_value())
         {
-            finish_phase();
-            return status;
+            GameMessage boot_message {};
+            boot_message.type = GameMessageType::OpenMainMenu;
+            boot_message.set_payload(OpenMainMenuMessage {});
+            message_queue_.push_back(boot_message);
+
+            status = dispatch_queued_messages();
+            if (status != GS1_STATUS_OK)
+            {
+                finish_phase();
+                return status;
+            }
         }
 
         boot_initialized_ = true;
@@ -1925,13 +2062,15 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
     case GameMessageType::OpenMainMenu:
         queue_close_active_normal_ui_if_open();
         queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE);
+        queue_clear_ui_panel_messages(GS1_UI_PANEL_REGIONAL_MAP);
+        queue_clear_ui_panel_messages(GS1_UI_PANEL_REGIONAL_MAP_SELECTION);
         queue_app_state_message(app_state_);
         queue_main_menu_ui_messages();
         queue_log_message("Entered main menu.");
         break;
 
     case GameMessageType::StartNewCampaign:
-        queue_close_ui_setup_if_open(GS1_UI_SETUP_MAIN_MENU);
+        queue_clear_ui_panel_messages(GS1_UI_PANEL_MAIN_MENU);
         queue_app_state_message(app_state_);
         queue_campaign_resources_message();
         queue_regional_map_snapshot_messages();
@@ -1950,7 +2089,7 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
     case GameMessageType::ClearDeploymentSiteSelection:
         queue_regional_map_snapshot_messages();
         queue_regional_map_menu_ui_messages();
-        queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_SELECTION);
+        queue_clear_ui_panel_messages(GS1_UI_PANEL_REGIONAL_MAP_SELECTION);
         queue_log_message("Cleared deployment site selection.");
         break;
 
@@ -2061,8 +2200,8 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
     case GameMessageType::StartSiteAttempt:
         close_site_protection_ui();
         queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
-        queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_SELECTION);
-        queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_MENU);
+        queue_clear_ui_panel_messages(GS1_UI_PANEL_REGIONAL_MAP_SELECTION);
+        queue_clear_ui_panel_messages(GS1_UI_PANEL_REGIONAL_MAP);
         queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE);
         queue_app_state_message(app_state_);
         break;
@@ -2306,6 +2445,36 @@ void GameRuntime::queue_ui_setup_close_message(
     }
 }
 
+void GameRuntime::queue_ui_panel_begin_message(
+    Gs1UiPanelId panel_id,
+    std::uint32_t context_id,
+    std::uint32_t text_line_count,
+    std::uint32_t slot_action_count,
+    std::uint32_t list_item_count,
+    std::uint32_t list_action_count)
+{
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_BEGIN_UI_PANEL);
+    auto& payload = message.emplace_payload<Gs1EngineMessageUiPanelData>();
+    payload.panel_id = panel_id;
+    payload.mode = GS1_PROJECTION_MODE_SNAPSHOT;
+    payload.context_id = context_id;
+    payload.text_line_count = static_cast<std::uint8_t>(std::min<std::uint32_t>(text_line_count, 255U));
+    payload.slot_action_count = static_cast<std::uint8_t>(std::min<std::uint32_t>(slot_action_count, 255U));
+    payload.list_item_count = static_cast<std::uint8_t>(std::min<std::uint32_t>(list_item_count, 255U));
+    payload.list_action_count = static_cast<std::uint8_t>(std::min<std::uint32_t>(list_action_count, 255U));
+    engine_messages_.push_back(message);
+    active_ui_panels_.insert(panel_id);
+}
+
+void GameRuntime::queue_ui_panel_close_message(Gs1UiPanelId panel_id)
+{
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_CLOSE_UI_PANEL);
+    auto& payload = message.emplace_payload<Gs1EngineMessageCloseUiPanelData>();
+    payload.panel_id = panel_id;
+    engine_messages_.push_back(message);
+    active_ui_panels_.erase(panel_id);
+}
+
 void GameRuntime::queue_close_ui_setup_if_open(Gs1UiSetupId setup_id)
 {
     const auto it = active_ui_setups_.find(setup_id);
@@ -2315,6 +2484,16 @@ void GameRuntime::queue_close_ui_setup_if_open(Gs1UiSetupId setup_id)
     }
 
     queue_ui_setup_close_message(setup_id, it->second);
+}
+
+void GameRuntime::queue_close_ui_panel_if_open(Gs1UiPanelId panel_id)
+{
+    if (!active_ui_panels_.contains(panel_id))
+    {
+        return;
+    }
+
+    queue_ui_panel_close_message(panel_id);
 }
 
 void GameRuntime::queue_close_active_normal_ui_if_open()
@@ -2401,9 +2580,76 @@ void GameRuntime::queue_ui_element_message(
     engine_messages_.push_back(message);
 }
 
+void GameRuntime::queue_ui_panel_text_message(
+    std::uint16_t line_id,
+    std::uint32_t flags,
+    const char* text)
+{
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_UI_PANEL_TEXT_UPSERT);
+    auto& payload = message.emplace_payload<Gs1EngineMessageUiPanelTextData>();
+    payload.line_id = line_id;
+    payload.flags = static_cast<std::uint8_t>(flags);
+    strncpy_s(payload.text, sizeof(payload.text), text, _TRUNCATE);
+    engine_messages_.push_back(message);
+}
+
+void GameRuntime::queue_ui_panel_slot_action_message(
+    Gs1UiPanelSlotId slot_id,
+    std::uint32_t flags,
+    const Gs1UiAction& action,
+    const char* label)
+{
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_UI_PANEL_SLOT_ACTION_UPSERT);
+    auto& payload = message.emplace_payload<Gs1EngineMessageUiPanelSlotActionData>();
+    payload.slot_id = slot_id;
+    payload.flags = static_cast<std::uint8_t>(flags);
+    payload.action = action;
+    strncpy_s(payload.label, sizeof(payload.label), label, _TRUNCATE);
+    engine_messages_.push_back(message);
+}
+
+void GameRuntime::queue_ui_panel_list_item_message(
+    Gs1UiPanelListId list_id,
+    std::uint32_t item_id,
+    std::uint32_t flags,
+    const char* primary_text,
+    const char* secondary_text)
+{
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_UI_PANEL_LIST_ITEM_UPSERT);
+    auto& payload = message.emplace_payload<Gs1EngineMessageUiPanelListItemData>();
+    payload.item_id = item_id;
+    payload.list_id = list_id;
+    payload.flags = static_cast<std::uint8_t>(flags);
+    strncpy_s(payload.primary_text, sizeof(payload.primary_text), primary_text, _TRUNCATE);
+    strncpy_s(payload.secondary_text, sizeof(payload.secondary_text), secondary_text, _TRUNCATE);
+    engine_messages_.push_back(message);
+}
+
+void GameRuntime::queue_ui_panel_list_action_message(
+    Gs1UiPanelListId list_id,
+    std::uint32_t item_id,
+    Gs1UiPanelListActionRole role,
+    std::uint32_t flags,
+    const Gs1UiAction& action)
+{
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_UI_PANEL_LIST_ACTION_UPSERT);
+    auto& payload = message.emplace_payload<Gs1EngineMessageUiPanelListActionData>();
+    payload.item_id = item_id;
+    payload.list_id = list_id;
+    payload.role = role;
+    payload.flags = static_cast<std::uint8_t>(flags);
+    payload.action = action;
+    engine_messages_.push_back(message);
+}
+
 void GameRuntime::queue_ui_setup_end_message()
 {
     engine_messages_.push_back(make_engine_message(GS1_ENGINE_MESSAGE_END_UI_SETUP));
+}
+
+void GameRuntime::queue_ui_panel_end_message()
+{
+    engine_messages_.push_back(make_engine_message(GS1_ENGINE_MESSAGE_END_UI_PANEL));
 }
 
 void GameRuntime::queue_clear_ui_setup_messages(Gs1UiSetupId setup_id)
@@ -2411,42 +2657,40 @@ void GameRuntime::queue_clear_ui_setup_messages(Gs1UiSetupId setup_id)
     queue_close_ui_setup_if_open(setup_id);
 }
 
+void GameRuntime::queue_clear_ui_panel_messages(Gs1UiPanelId panel_id)
+{
+    queue_close_ui_panel_if_open(panel_id);
+}
+
 void GameRuntime::queue_main_menu_ui_messages()
 {
-    queue_ui_setup_begin_message(
-        GS1_UI_SETUP_MAIN_MENU,
-        GS1_UI_SETUP_PRESENTATION_NORMAL,
-        1U,
-        0U);
-
     Gs1UiAction action {};
     action.type = GS1_UI_ACTION_START_NEW_CAMPAIGN;
     action.arg0 = 42ULL;
     action.arg1 = 30ULL;
-    queue_ui_element_message(
+    queue_ui_panel_begin_message(
+        GS1_UI_PANEL_MAIN_MENU,
+        0U,
+        0U,
         1U,
-        GS1_UI_ELEMENT_BUTTON,
-        GS1_UI_ELEMENT_FLAG_PRIMARY,
+        0U,
+        0U);
+    queue_ui_panel_slot_action_message(
+        GS1_UI_PANEL_SLOT_PRIMARY,
+        GS1_UI_PANEL_SLOT_FLAG_PRIMARY,
         action,
         "Start New Campaign");
-
-    queue_ui_setup_end_message();
+    queue_ui_panel_end_message();
 }
 
 void GameRuntime::queue_regional_map_menu_ui_messages()
 {
     if (!campaign_.has_value() || app_state_ != GS1_APP_STATE_REGIONAL_MAP)
     {
+        queue_clear_ui_panel_messages(GS1_UI_PANEL_REGIONAL_MAP);
         return;
     }
 
-    queue_ui_setup_begin_message(
-        GS1_UI_SETUP_REGIONAL_MAP_MENU,
-        GS1_UI_SETUP_PRESENTATION_NORMAL,
-        2U,
-        0U);
-
-    Gs1UiAction no_action {};
     const auto selected_faction_id = campaign_->regional_map_state.selected_tech_tree_faction_id.value != 0U
         ? campaign_->regional_map_state.selected_tech_tree_faction_id
         : FactionId {k_faction_village_committee};
@@ -2473,31 +2717,85 @@ void GameRuntime::queue_regional_map_menu_ui_messages()
         selected_faction_def == nullptr ? 0 : static_cast<int>(selected_faction_def->display_name.size()),
         selected_faction_def == nullptr ? "" : selected_faction_def->display_name.data(),
         TechnologySystem::faction_reputation(*campaign_, selected_faction_id));
-    queue_ui_element_message(
-        1U,
-        GS1_UI_ELEMENT_LABEL,
-        GS1_UI_ELEMENT_FLAG_NONE,
-        no_action,
-        summary_text);
 
     Gs1UiAction toggle_action {};
     toggle_action.type = campaign_->regional_map_state.tech_tree_open
         ? GS1_UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE
         : GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE;
-    queue_ui_element_message(
-        2U,
-        GS1_UI_ELEMENT_BUTTON,
-        GS1_UI_ELEMENT_FLAG_PRIMARY,
-        toggle_action,
-        campaign_->regional_map_state.tech_tree_open ? "Close Tech Tree" : "Open Tech Tree");
 
-    queue_ui_setup_end_message();
+    std::uint32_t site_row_count = 0U;
+    for (const auto revealed_site_id : campaign_->regional_map_state.revealed_site_ids)
+    {
+        if (find_site_meta(*campaign_, revealed_site_id.value) != nullptr)
+        {
+            ++site_row_count;
+        }
+    }
+
+    queue_ui_panel_begin_message(
+        GS1_UI_PANEL_REGIONAL_MAP,
+        0U,
+        1U,
+        1U,
+        site_row_count,
+        site_row_count);
+    queue_ui_panel_text_message(1U, 0U, summary_text);
+    queue_ui_panel_slot_action_message(
+        GS1_UI_PANEL_SLOT_PRIMARY,
+        GS1_UI_PANEL_SLOT_FLAG_PRIMARY,
+        toggle_action,
+        campaign_->regional_map_state.tech_tree_open ? "Close Research" : "Research & Unlocks");
+
+    for (const auto revealed_site_id : campaign_->regional_map_state.revealed_site_ids)
+    {
+        const SiteMetaState* site = find_site_meta(*campaign_, revealed_site_id.value);
+        if (site == nullptr)
+        {
+            continue;
+        }
+
+        char primary_text[24] {};
+        std::snprintf(primary_text, sizeof(primary_text), "Site %u", static_cast<unsigned>(site->site_id.value));
+
+        char secondary_text[28] {};
+        std::snprintf(
+            secondary_text,
+            sizeof(secondary_text),
+            "%s  (%d, %d)",
+            regional_site_state_label(site->site_state),
+            static_cast<int>(site->regional_map_tile.x),
+            static_cast<int>(site->regional_map_tile.y));
+
+        const bool selected = campaign_->regional_map_state.selected_site_id.has_value() &&
+            campaign_->regional_map_state.selected_site_id->value == site->site_id.value;
+        const std::uint32_t item_flags = selected ? GS1_UI_PANEL_LIST_ITEM_FLAG_SELECTED : GS1_UI_PANEL_LIST_ITEM_FLAG_NONE;
+
+        queue_ui_panel_list_item_message(
+            GS1_UI_PANEL_LIST_REGIONAL_SITES,
+            site->site_id.value,
+            item_flags,
+            primary_text,
+            secondary_text);
+
+        Gs1UiAction select_action {};
+        select_action.type = GS1_UI_ACTION_SELECT_DEPLOYMENT_SITE;
+        select_action.target_id = site->site_id.value;
+        queue_ui_panel_list_action_message(
+            GS1_UI_PANEL_LIST_REGIONAL_SITES,
+            site->site_id.value,
+            GS1_UI_PANEL_LIST_ACTION_ROLE_PRIMARY,
+            site->site_state == GS1_SITE_STATE_LOCKED ? GS1_UI_PANEL_LIST_ITEM_FLAG_DISABLED : GS1_UI_PANEL_LIST_ITEM_FLAG_NONE,
+            select_action);
+    }
+
+    queue_ui_panel_end_message();
 }
 
 void GameRuntime::queue_regional_map_selection_ui_messages()
 {
     if (!campaign_.has_value() || !campaign_->regional_map_state.selected_site_id.has_value())
     {
+        queue_clear_ui_panel_messages(GS1_UI_PANEL_REGIONAL_MAP_SELECTION);
         return;
     }
 
@@ -2508,23 +2806,20 @@ void GameRuntime::queue_regional_map_selection_ui_messages()
     const std::uint32_t summary_label_count =
         (has_support_contributors ? 1U : 0U) + (has_aura_support ? 1U : 0U);
 
-    queue_ui_setup_begin_message(
-        GS1_UI_SETUP_REGIONAL_MAP_SELECTION,
-        GS1_UI_SETUP_PRESENTATION_OVERLAY,
-        static_cast<std::uint32_t>(3U + summary_label_count + loadout_label_count),
-        site_id);
+    const std::uint32_t text_line_count = 1U + summary_label_count + loadout_label_count;
+    queue_ui_panel_begin_message(
+        GS1_UI_PANEL_REGIONAL_MAP_SELECTION,
+        site_id,
+        text_line_count,
+        2U,
+        0U,
+        0U);
 
-    Gs1UiAction no_action {};
+    std::uint16_t next_line_id = 1U;
     char label_text[64] {};
     std::snprintf(label_text, sizeof(label_text), "Selected Site %u", static_cast<unsigned>(site_id));
-    queue_ui_element_message(
-        1U,
-        GS1_UI_ELEMENT_LABEL,
-        GS1_UI_ELEMENT_FLAG_NONE,
-        no_action,
-        label_text);
+    queue_ui_panel_text_message(next_line_id++, 0U, label_text);
 
-    std::uint32_t next_element_id = 2U;
     if (has_support_contributors)
     {
         char support_text[64] {};
@@ -2533,12 +2828,7 @@ void GameRuntime::queue_regional_map_selection_ui_messages()
             sizeof(support_text),
             "Adj Support x%u",
             static_cast<unsigned>(campaign_->loadout_planner_state.support_quota));
-        queue_ui_element_message(
-            next_element_id++,
-            GS1_UI_ELEMENT_LABEL,
-            GS1_UI_ELEMENT_FLAG_NONE,
-            no_action,
-            support_text);
+        queue_ui_panel_text_message(next_line_id++, 0U, support_text);
     }
 
     if (has_aura_support)
@@ -2549,12 +2839,7 @@ void GameRuntime::queue_regional_map_selection_ui_messages()
             sizeof(aura_text),
             "Aura Ready x%u",
             static_cast<unsigned>(campaign_->loadout_planner_state.active_nearby_aura_modifier_ids.size()));
-        queue_ui_element_message(
-            next_element_id++,
-            GS1_UI_ELEMENT_LABEL,
-            GS1_UI_ELEMENT_FLAG_NONE,
-            no_action,
-            aura_text);
+        queue_ui_panel_text_message(next_line_id++, 0U, aura_text);
     }
 
     for (const auto& slot : campaign_->loadout_planner_state.selected_loadout_slots)
@@ -2585,12 +2870,7 @@ void GameRuntime::queue_regional_map_selection_ui_messages()
                 static_cast<unsigned>(slot.quantity));
         }
 
-        queue_ui_element_message(
-            next_element_id++,
-            GS1_UI_ELEMENT_LABEL,
-            GS1_UI_ELEMENT_FLAG_NONE,
-            no_action,
-            loadout_text);
+        queue_ui_panel_text_message(next_line_id++, 0U, loadout_text);
     }
 
     Gs1UiAction deploy_action {};
@@ -2598,23 +2878,21 @@ void GameRuntime::queue_regional_map_selection_ui_messages()
     deploy_action.target_id = site_id;
     char button_text[64] {};
     std::snprintf(button_text, sizeof(button_text), "Start Site %u", static_cast<unsigned>(site_id));
-    queue_ui_element_message(
-        next_element_id++,
-        GS1_UI_ELEMENT_BUTTON,
-        GS1_UI_ELEMENT_FLAG_PRIMARY,
+    queue_ui_panel_slot_action_message(
+        GS1_UI_PANEL_SLOT_PRIMARY,
+        GS1_UI_PANEL_SLOT_FLAG_PRIMARY,
         deploy_action,
         button_text);
 
     Gs1UiAction clear_selection_action {};
     clear_selection_action.type = GS1_UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION;
-    queue_ui_element_message(
-        next_element_id,
-        GS1_UI_ELEMENT_BUTTON,
-        GS1_UI_ELEMENT_FLAG_BACKGROUND_CLICK,
+    queue_ui_panel_slot_action_message(
+        GS1_UI_PANEL_SLOT_SECONDARY,
+        GS1_UI_PANEL_SLOT_FLAG_NONE,
         clear_selection_action,
-        "");
+        "Clear Selection");
 
-    queue_ui_setup_end_message();
+    queue_ui_panel_end_message();
 }
 
 void GameRuntime::queue_regional_map_tech_tree_ui_messages()
@@ -2807,7 +3085,7 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
 
             Gs1UiAction action {};
             action.target_id = node_def.tech_node_id.value;
-            action.arg0 = 0U;
+            action.arg0 = node_def.faction_id.value;
 
             char node_text[512] {};
             std::uint32_t flags = GS1_UI_ELEMENT_FLAG_DISABLED;
@@ -2944,7 +3222,7 @@ void GameRuntime::queue_site_protection_selector_ui_messages()
         GS1_UI_ELEMENT_BUTTON,
         GS1_UI_ELEMENT_FLAG_PRIMARY,
         occupant_condition_action,
-        "Plant Density / Device Integrity");
+        "Density / Integrity");
 
     Gs1UiAction close_action {};
     close_action.type = GS1_UI_ACTION_CLOSE_SITE_PROTECTION_UI;
@@ -2981,20 +3259,52 @@ void GameRuntime::queue_regional_map_snapshot_messages()
         }
     }
 
-    begin_payload.link_count = static_cast<std::uint32_t>(unique_links.size());
+    std::uint32_t revealed_site_count = 0U;
+    std::uint32_t revealed_link_count = 0U;
+    for (const auto& site : campaign_->sites)
+    {
+        if (is_site_revealed(*campaign_, site.site_id))
+        {
+            revealed_site_count += 1U;
+        }
+    }
+    for (const auto& link : unique_links)
+    {
+        if (!is_site_revealed(*campaign_, SiteId {link.first}) ||
+            !is_site_revealed(*campaign_, SiteId {link.second}))
+        {
+            continue;
+        }
+
+        revealed_link_count += 1U;
+    }
+
+    begin_payload.link_count = revealed_link_count;
     begin_payload.selected_site_id =
         campaign_->regional_map_state.selected_site_id.has_value()
             ? campaign_->regional_map_state.selected_site_id->value
             : 0U;
+    begin_payload.site_count = revealed_site_count;
     engine_messages_.push_back(begin);
 
     for (const auto& site : campaign_->sites)
     {
+        if (!is_site_revealed(*campaign_, site.site_id))
+        {
+            continue;
+        }
+
         queue_regional_map_site_upsert_message(site);
     }
 
     for (const auto& link : unique_links)
     {
+        if (!is_site_revealed(*campaign_, SiteId {link.first}) ||
+            !is_site_revealed(*campaign_, SiteId {link.second}))
+        {
+            continue;
+        }
+
         auto link_message = make_engine_message(GS1_ENGINE_MESSAGE_REGIONAL_MAP_LINK_UPSERT);
         auto& payload = link_message.emplace_payload<Gs1EngineMessageRegionalMapLinkData>();
         payload.from_site_id = link.first;
@@ -3213,6 +3523,9 @@ void GameRuntime::queue_site_worker_update_message()
 
     auto worker_message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_WORKER_UPDATE);
     auto& worker_payload = worker_message.emplace_payload<Gs1EngineMessageWorkerData>();
+    worker_payload.entity_id = active_site_run_->site_world != nullptr
+        ? active_site_run_->site_world->worker_entity_id()
+        : 0U;
     worker_payload.tile_x = worker_position.tile_x;
     worker_payload.tile_y = worker_position.tile_y;
     worker_payload.facing_degrees = worker_position.facing_degrees;
@@ -3224,7 +3537,305 @@ void GameRuntime::queue_site_worker_update_message()
             : 0.0f;
     worker_payload.current_action_kind =
         static_cast<Gs1SiteActionKind>(active_site_run_->site_action.action_kind);
+    worker_payload.reserved0 = 0U;
     engine_messages_.push_back(worker_message);
+}
+
+void GameRuntime::queue_site_plant_visual_upsert_message(TileCoord coord)
+{
+    if (!active_site_run_.has_value() || active_site_run_->site_world == nullptr)
+    {
+        return;
+    }
+
+    auto& site_run = active_site_run_.value();
+    if (!site_world_access::tile_coord_in_bounds(site_run, coord))
+    {
+        return;
+    }
+
+    const auto ecology = site_world_access::tile_ecology(site_run, coord);
+    if (ecology.plant_id.value == 0U)
+    {
+        return;
+    }
+    const PlantDef* plant_def = find_plant_def(ecology.plant_id);
+    if (plant_def == nullptr)
+    {
+        return;
+    }
+
+    const TileFootprint footprint = resolve_plant_tile_footprint(ecology.plant_id);
+    const TileCoord anchor = align_tile_anchor_to_footprint(coord, footprint);
+    if (anchor.x != coord.x || anchor.y != coord.y)
+    {
+        return;
+    }
+
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_PLANT_VISUAL_UPSERT);
+    auto& payload = message.emplace_payload<Gs1EngineMessageSitePlantVisualData>();
+    payload.visual_id = plant_visual_id_for_anchor(site_run, anchor);
+    payload.plant_type_id = ecology.plant_id.value;
+    payload.anchor_tile_x = static_cast<float>(anchor.x);
+    payload.anchor_tile_y = static_cast<float>(anchor.y);
+    payload.height_scale = resolve_plant_visual_height_scale(*plant_def, ecology.plant_density);
+    payload.density_quantized = quantize_visual_density(ecology.plant_density);
+    payload.footprint_width = footprint.width;
+    payload.footprint_height = footprint.height;
+    payload.height_class = static_cast<std::uint8_t>(plant_def->height_class);
+    payload.focus = static_cast<std::uint8_t>(plant_def->focus);
+    payload.flags = resolve_plant_visual_flags(*plant_def);
+    payload.reserved0 = 0U;
+    engine_messages_.push_back(message);
+}
+
+void GameRuntime::queue_site_plant_visual_remove_message(std::uint64_t visual_id)
+{
+    if (visual_id == 0U)
+    {
+        return;
+    }
+
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_PLANT_VISUAL_REMOVE);
+    auto& payload = message.emplace_payload<Gs1EngineMessageSiteVisualRemoveData>();
+    payload.visual_id = visual_id;
+    engine_messages_.push_back(message);
+}
+
+void GameRuntime::queue_all_site_plant_visual_messages()
+{
+    if (!active_site_run_.has_value() || active_site_run_->site_world == nullptr)
+    {
+        return;
+    }
+
+    auto& site_run = active_site_run_.value();
+    const auto width = site_world_access::width(site_run);
+    const auto height = site_world_access::height(site_run);
+    for (std::uint32_t y = 0; y < height; ++y)
+    {
+        for (std::uint32_t x = 0; x < width; ++x)
+        {
+            queue_site_plant_visual_upsert_message(TileCoord {static_cast<std::int32_t>(x), static_cast<std::int32_t>(y)});
+        }
+    }
+}
+
+void GameRuntime::queue_pending_site_plant_visual_messages()
+{
+    if (!active_site_run_.has_value() || active_site_run_->site_world == nullptr)
+    {
+        return;
+    }
+
+    auto& site_run = active_site_run_.value();
+    if (site_run.pending_full_tile_projection_update || site_run.pending_tile_projection_updates.empty())
+    {
+        queue_all_site_plant_visual_messages();
+        return;
+    }
+
+    std::set<std::uint64_t> emitted_visual_ids {};
+    for (const TileCoord coord : site_run.pending_tile_projection_updates)
+    {
+        if (!site_world_access::tile_coord_in_bounds(site_run, coord))
+        {
+            continue;
+        }
+
+        const auto tile_index = site_world_access::tile_index(site_run, coord);
+        const ProjectedSiteTileState previous_projection =
+            tile_index < site_run.last_projected_tile_states.size()
+                ? site_run.last_projected_tile_states[tile_index]
+                : ProjectedSiteTileState {};
+
+        const auto ecology = site_world_access::tile_ecology(site_run, coord);
+        if (ecology.plant_id.value != 0U)
+        {
+            const TileFootprint footprint = resolve_plant_tile_footprint(ecology.plant_id);
+            const TileCoord anchor = align_tile_anchor_to_footprint(coord, footprint);
+            const std::uint64_t visual_id = plant_visual_id_for_anchor(site_run, anchor);
+            if (emitted_visual_ids.insert(visual_id).second)
+            {
+                queue_site_plant_visual_upsert_message(anchor);
+            }
+
+            if (previous_projection.plant_type_id != 0U && previous_projection.plant_type_id != ecology.plant_id.value)
+            {
+                const TileFootprint previous_footprint =
+                    resolve_plant_tile_footprint(PlantId {previous_projection.plant_type_id});
+                const TileCoord previous_anchor = align_tile_anchor_to_footprint(coord, previous_footprint);
+                const std::uint64_t previous_visual_id = plant_visual_id_for_anchor(site_run, previous_anchor);
+                if (previous_visual_id != visual_id && emitted_visual_ids.insert(previous_visual_id).second)
+                {
+                    queue_site_plant_visual_remove_message(previous_visual_id);
+                }
+            }
+            continue;
+        }
+
+        if (previous_projection.plant_type_id == 0U)
+        {
+            continue;
+        }
+
+        const TileFootprint previous_footprint =
+            resolve_plant_tile_footprint(PlantId {previous_projection.plant_type_id});
+        const TileCoord previous_anchor = align_tile_anchor_to_footprint(coord, previous_footprint);
+        const std::uint64_t visual_id = plant_visual_id_for_anchor(site_run, previous_anchor);
+        if (emitted_visual_ids.insert(visual_id).second)
+        {
+            queue_site_plant_visual_remove_message(visual_id);
+        }
+    }
+}
+
+void GameRuntime::queue_site_device_visual_upsert_message(TileCoord coord)
+{
+    if (!active_site_run_.has_value() || active_site_run_->site_world == nullptr)
+    {
+        return;
+    }
+
+    auto& site_run = active_site_run_.value();
+    if (!site_world_access::tile_coord_in_bounds(site_run, coord))
+    {
+        return;
+    }
+
+    const auto device = site_world_access::tile_device(site_run, coord);
+    if (device.structure_id.value == 0U)
+    {
+        return;
+    }
+    const StructureDef* structure_def = find_structure_def(device.structure_id);
+    if (structure_def == nullptr)
+    {
+        return;
+    }
+
+    const TileFootprint footprint = resolve_structure_tile_footprint(device.structure_id);
+    const TileCoord anchor = align_tile_anchor_to_footprint(coord, footprint);
+    if (anchor.x != coord.x || anchor.y != coord.y)
+    {
+        return;
+    }
+
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_UPSERT);
+    auto& payload = message.emplace_payload<Gs1EngineMessageSiteDeviceVisualData>();
+    payload.visual_id = device_visual_id_for_anchor(site_run, anchor);
+    payload.structure_type_id = device.structure_id.value;
+    payload.anchor_tile_x = static_cast<float>(anchor.x);
+    payload.anchor_tile_y = static_cast<float>(anchor.y);
+    payload.integrity_normalized = std::clamp(device.device_integrity, 0.0f, 1.0f);
+    payload.height_scale = resolve_device_visual_height_scale(*structure_def);
+    payload.footprint_width = footprint.width;
+    payload.footprint_height = footprint.height;
+    payload.flags = resolve_device_visual_flags(*structure_def, device);
+    payload.reserved0 = 0U;
+    engine_messages_.push_back(message);
+}
+
+void GameRuntime::queue_site_device_visual_remove_message(std::uint64_t visual_id)
+{
+    if (visual_id == 0U)
+    {
+        return;
+    }
+
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_REMOVE);
+    auto& payload = message.emplace_payload<Gs1EngineMessageSiteVisualRemoveData>();
+    payload.visual_id = visual_id;
+    engine_messages_.push_back(message);
+}
+
+void GameRuntime::queue_all_site_device_visual_messages()
+{
+    if (!active_site_run_.has_value() || active_site_run_->site_world == nullptr)
+    {
+        return;
+    }
+
+    auto& site_run = active_site_run_.value();
+    const auto width = site_world_access::width(site_run);
+    const auto height = site_world_access::height(site_run);
+    for (std::uint32_t y = 0; y < height; ++y)
+    {
+        for (std::uint32_t x = 0; x < width; ++x)
+        {
+            queue_site_device_visual_upsert_message(TileCoord {static_cast<std::int32_t>(x), static_cast<std::int32_t>(y)});
+        }
+    }
+}
+
+void GameRuntime::queue_pending_site_device_visual_messages()
+{
+    if (!active_site_run_.has_value() || active_site_run_->site_world == nullptr)
+    {
+        return;
+    }
+
+    auto& site_run = active_site_run_.value();
+    if (site_run.pending_full_tile_projection_update || site_run.pending_tile_projection_updates.empty())
+    {
+        queue_all_site_device_visual_messages();
+        return;
+    }
+
+    std::set<std::uint64_t> emitted_visual_ids {};
+    for (const TileCoord coord : site_run.pending_tile_projection_updates)
+    {
+        if (!site_world_access::tile_coord_in_bounds(site_run, coord))
+        {
+            continue;
+        }
+
+        const auto tile_index = site_world_access::tile_index(site_run, coord);
+        const ProjectedSiteTileState previous_projection =
+            tile_index < site_run.last_projected_tile_states.size()
+                ? site_run.last_projected_tile_states[tile_index]
+                : ProjectedSiteTileState {};
+
+        const auto device = site_world_access::tile_device(site_run, coord);
+        if (device.structure_id.value != 0U)
+        {
+            const TileFootprint footprint = resolve_structure_tile_footprint(device.structure_id);
+            const TileCoord anchor = align_tile_anchor_to_footprint(coord, footprint);
+            const std::uint64_t visual_id = device_visual_id_for_anchor(site_run, anchor);
+            if (emitted_visual_ids.insert(visual_id).second)
+            {
+                queue_site_device_visual_upsert_message(anchor);
+            }
+
+            if (previous_projection.structure_type_id != 0U &&
+                previous_projection.structure_type_id != device.structure_id.value)
+            {
+                const TileFootprint previous_footprint =
+                    resolve_structure_tile_footprint(StructureId {previous_projection.structure_type_id});
+                const TileCoord previous_anchor = align_tile_anchor_to_footprint(coord, previous_footprint);
+                const std::uint64_t previous_visual_id = device_visual_id_for_anchor(site_run, previous_anchor);
+                if (previous_visual_id != visual_id && emitted_visual_ids.insert(previous_visual_id).second)
+                {
+                    queue_site_device_visual_remove_message(previous_visual_id);
+                }
+            }
+            continue;
+        }
+
+        if (previous_projection.structure_type_id == 0U)
+        {
+            continue;
+        }
+
+        const TileFootprint previous_footprint =
+            resolve_structure_tile_footprint(StructureId {previous_projection.structure_type_id});
+        const TileCoord previous_anchor = align_tile_anchor_to_footprint(coord, previous_footprint);
+        const std::uint64_t visual_id = device_visual_id_for_anchor(site_run, previous_anchor);
+        if (emitted_visual_ids.insert(visual_id).second)
+        {
+            queue_site_device_visual_remove_message(visual_id);
+        }
+    }
 }
 
 void GameRuntime::queue_site_camp_update_message()
@@ -3866,6 +4477,8 @@ void GameRuntime::queue_site_bootstrap_messages()
     queue_site_worker_update_message();
     queue_site_camp_update_message();
     queue_site_weather_update_message();
+    queue_all_site_plant_visual_messages();
+    queue_all_site_device_visual_messages();
     queue_all_site_inventory_storage_upsert_messages();
     queue_all_site_inventory_slot_upsert_messages();
     queue_all_site_task_upsert_messages();
@@ -3907,6 +4520,8 @@ void GameRuntime::queue_site_delta_messages(std::uint64_t dirty_flags)
 
     if ((site_dirty_flags & SITE_PROJECTION_UPDATE_TILES) != 0U)
     {
+        queue_pending_site_plant_visual_messages();
+        queue_pending_site_device_visual_messages();
         queue_pending_site_tile_upsert_messages();
     }
 

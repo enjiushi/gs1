@@ -265,7 +265,7 @@ bool SmokeLiveHttpServer::handle_client(std::uintptr_t client_socket_value)
 
     if (method == "GET" && path == "/content/technology_nodes.toml")
     {
-        const auto toml_text = load_text_file(repo_root_ / "src" / "content" / "tables" / "technology_nodes.toml");
+        const auto toml_text = load_text_file(repo_root_ / "project" / "content" / "technology_nodes.toml");
         if (toml_text.empty())
         {
             send_response(client_socket, 404, "Not Found", "text/plain; charset=utf-8", "Missing technology node table.");
@@ -279,7 +279,7 @@ bool SmokeLiveHttpServer::handle_client(std::uintptr_t client_socket_value)
 
     if (method == "GET" && path == "/content/technology_tiers.toml")
     {
-        const auto toml_text = load_text_file(repo_root_ / "src" / "content" / "tables" / "technology_tiers.toml");
+        const auto toml_text = load_text_file(repo_root_ / "project" / "content" / "technology_tiers.toml");
         if (toml_text.empty())
         {
             send_response(client_socket, 404, "Not Found", "text/plain; charset=utf-8", "Missing technology tier table.");
@@ -293,7 +293,7 @@ bool SmokeLiveHttpServer::handle_client(std::uintptr_t client_socket_value)
 
     if (method == "GET" && path == "/content/reputation_unlocks.toml")
     {
-        const auto toml_text = load_text_file(repo_root_ / "src" / "content" / "tables" / "reputation_unlocks.toml");
+        const auto toml_text = load_text_file(repo_root_ / "project" / "content" / "reputation_unlocks.toml");
         if (toml_text.empty())
         {
             send_response(client_socket, 404, "Not Found", "text/plain; charset=utf-8", "Missing reputation unlock table.");

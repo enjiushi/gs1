@@ -1,0 +1,8 @@
+[configuration]
+entry_symbol = "gs1_godot_adapter_init"
+compatibility_minimum = 4.7
+
+[libraries]
+windows.debug.x86_64 = "res://bin/win64/gs1_godot_adapter.dll"
+windows.release.x86_64 = "res://bin/win64/gs1_godot_adapter.dll"
+windows.editor.x86_64 = "res://bin/win64/gs1_godot_adapter.dll"

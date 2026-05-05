@@ -1,3 +1,13 @@
 build/
+build-godot/
+build-godot-cpp/
 out/
 .agent-progress/
+engines/godot/project/.godot/
+engines/godot/project/bin/
+engines/godot/project/assets/**
+!engines/godot/project/assets/
+!engines/godot/project/assets/guideline.md
+engines/godot/project/addons/**
+!engines/godot/project/addons/
+!engines/godot/project/addons/guideline.md

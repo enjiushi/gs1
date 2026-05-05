@@ -232,6 +232,22 @@ std::optional<Gs1EngineMessageType> parse_engine_message_type(const std::string&
     {
         return GS1_ENGINE_MESSAGE_SITE_ACTION_UPDATE;
     }
+    if (value == "SITE_PLANT_VISUAL_UPSERT")
+    {
+        return GS1_ENGINE_MESSAGE_SITE_PLANT_VISUAL_UPSERT;
+    }
+    if (value == "SITE_PLANT_VISUAL_REMOVE")
+    {
+        return GS1_ENGINE_MESSAGE_SITE_PLANT_VISUAL_REMOVE;
+    }
+    if (value == "SITE_DEVICE_VISUAL_UPSERT")
+    {
+        return GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_UPSERT;
+    }
+    if (value == "SITE_DEVICE_VISUAL_REMOVE")
+    {
+        return GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_REMOVE;
+    }
     if (value == "HUD_STATE")
     {
         return GS1_ENGINE_MESSAGE_HUD_STATE;

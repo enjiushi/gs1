@@ -1,5 +1,6 @@
 #include "runtime/game_runtime.h"
 #include "runtime/runtime_clock.h"
+#include "host/runtime_projection_state.h"
 #include "content/defs/faction_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/task_defs.h"
@@ -396,6 +397,54 @@ std::vector<const Gs1EngineMessage*> collect_inventory_slot_messages(
     return collect_messages_of_type(messages, GS1_ENGINE_MESSAGE_SITE_INVENTORY_SLOT_UPSERT);
 }
 
+const Gs1EngineMessage* find_plant_visual_message(
+    const std::vector<Gs1EngineMessage>& messages,
+    std::uint32_t plant_type_id,
+    TileCoord anchor)
+{
+    for (const auto& message : messages)
+    {
+        if (message.type != GS1_ENGINE_MESSAGE_SITE_PLANT_VISUAL_UPSERT)
+        {
+            continue;
+        }
+
+        const auto& payload = message.payload_as<Gs1EngineMessageSitePlantVisualData>();
+        if (payload.plant_type_id == plant_type_id &&
+            approx_equal(payload.anchor_tile_x, static_cast<float>(anchor.x)) &&
+            approx_equal(payload.anchor_tile_y, static_cast<float>(anchor.y)))
+        {
+            return &message;
+        }
+    }
+
+    return nullptr;
+}
+
+const Gs1EngineMessage* find_device_visual_message(
+    const std::vector<Gs1EngineMessage>& messages,
+    std::uint32_t structure_type_id,
+    TileCoord anchor)
+{
+    for (const auto& message : messages)
+    {
+        if (message.type != GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_UPSERT)
+        {
+            continue;
+        }
+
+        const auto& payload = message.payload_as<Gs1EngineMessageSiteDeviceVisualData>();
+        if (payload.structure_type_id == structure_type_id &&
+            approx_equal(payload.anchor_tile_x, static_cast<float>(anchor.x)) &&
+            approx_equal(payload.anchor_tile_y, static_cast<float>(anchor.y)))
+        {
+            return &message;
+        }
+    }
+
+    return nullptr;
+}
+
 const Gs1EngineMessage* find_inventory_storage_message(
     const std::vector<Gs1EngineMessage>& messages,
     Gs1InventoryContainerKind container_kind,
@@ -615,6 +664,27 @@ bool contains_ui_element_text_fragment(
     return false;
 }
 
+const Gs1EngineMessageUiElementData* find_ui_element_with_text_fragment(
+    const std::vector<Gs1EngineMessage>& messages,
+    const char* expected_fragment)
+{
+    for (const auto& message : messages)
+    {
+        if (message.type != GS1_ENGINE_MESSAGE_UI_ELEMENT_UPSERT)
+        {
+            continue;
+        }
+
+        const auto& payload = message.payload_as<Gs1EngineMessageUiElementData>();
+        if (std::strstr(payload.text, expected_fragment) != nullptr)
+        {
+            return &payload;
+        }
+    }
+
+    return nullptr;
+}
+
 const Gs1EngineMessage* find_regional_map_site_message(
     const std::vector<Gs1EngineMessage>& messages,
     std::uint32_t site_id)
@@ -672,20 +742,14 @@ int main()
         const auto* site_three_message = find_regional_map_site_message(initial_map_messages, 3U);
         const auto* site_four_message = find_regional_map_site_message(initial_map_messages, 4U);
         assert(site_one_message != nullptr);
-        assert(site_two_message != nullptr);
-        assert(site_three_message != nullptr);
-        assert(site_four_message != nullptr);
+        assert(site_two_message == nullptr);
+        assert(site_three_message == nullptr);
+        assert(site_four_message == nullptr);
         assert(site_one_message->payload_as<Gs1EngineMessageRegionalMapSiteData>().map_x == 0);
         assert(site_one_message->payload_as<Gs1EngineMessageRegionalMapSiteData>().map_y == 0);
-        assert(site_two_message->payload_as<Gs1EngineMessageRegionalMapSiteData>().map_x == 160);
-        assert(site_two_message->payload_as<Gs1EngineMessageRegionalMapSiteData>().map_y == 0);
-        assert(site_three_message->payload_as<Gs1EngineMessageRegionalMapSiteData>().map_x == 320);
-        assert(site_three_message->payload_as<Gs1EngineMessageRegionalMapSiteData>().map_y == 160);
-        assert(site_four_message->payload_as<Gs1EngineMessageRegionalMapSiteData>().map_x == 480);
-        assert(site_four_message->payload_as<Gs1EngineMessageRegionalMapSiteData>().map_y == 160);
-        assert(contains_regional_map_link(initial_map_messages, 1U, 2U));
-        assert(contains_regional_map_link(initial_map_messages, 2U, 3U));
-        assert(contains_regional_map_link(initial_map_messages, 3U, 4U));
+        assert(!contains_regional_map_link(initial_map_messages, 1U, 2U));
+        assert(!contains_regional_map_link(initial_map_messages, 2U, 3U));
+        assert(!contains_regional_map_link(initial_map_messages, 3U, 4U));
     }
 
     const auto campaign_site_id = gs1::GameRuntimeProjectionTestAccess::campaign(runtime)->sites.front().site_id.value;
@@ -694,6 +758,39 @@ int main()
     assert(contains_ui_element_text(loadout_ui_messages, "Water x1"));
     assert(contains_ui_element_text_fragment(loadout_ui_messages, "Basic Straw Checkerboard"));
     assert(contains_ui_element_text(loadout_ui_messages, "Open Tech Tree"));
+
+    assert(runtime.handle_message(make_start_site_attempt_message(campaign_site_id)) == GS1_STATUS_OK);
+    drain_engine_messages(runtime);
+
+    auto& completed_site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
+    completed_site_run.run_status = gs1::SiteRunStatus::Completed;
+    completed_site_run.result_newly_revealed_site_count = 1U;
+
+    GameMessage site_completed_message {};
+    site_completed_message.type = GameMessageType::SiteAttemptEnded;
+    site_completed_message.set_payload(gs1::SiteAttemptEndedMessage {
+        campaign_site_id,
+        GS1_SITE_ATTEMPT_RESULT_COMPLETED});
+    assert(runtime.handle_message(site_completed_message) == GS1_STATUS_OK);
+    drain_engine_messages(runtime);
+
+    GameMessage return_to_map_message {};
+    return_to_map_message.type = GameMessageType::ReturnToRegionalMap;
+    return_to_map_message.set_payload(gs1::ReturnToRegionalMapMessage {});
+    assert(runtime.handle_message(return_to_map_message) == GS1_STATUS_OK);
+    const auto reopened_map_messages = drain_engine_messages(runtime);
+    {
+        const auto* site_one_message = find_regional_map_site_message(reopened_map_messages, 1U);
+        const auto* site_two_message = find_regional_map_site_message(reopened_map_messages, 2U);
+        const auto* site_three_message = find_regional_map_site_message(reopened_map_messages, 3U);
+        assert(site_one_message != nullptr);
+        assert(site_two_message != nullptr);
+        assert(site_three_message == nullptr);
+        assert(site_two_message->payload_as<Gs1EngineMessageRegionalMapSiteData>().map_x == 160);
+        assert(site_two_message->payload_as<Gs1EngineMessageRegionalMapSiteData>().map_y == 0);
+        assert(contains_regional_map_link(reopened_map_messages, 1U, 2U));
+        assert(!contains_regional_map_link(reopened_map_messages, 2U, 3U));
+    }
 
     GameMessage open_tech_tree_message {};
     open_tech_tree_message.type = GameMessageType::OpenRegionalMapTechTree;
@@ -709,6 +806,11 @@ int main()
     assert(contains_ui_element_text_fragment(tech_tree_messages, "Ordos Wormwood"));
     assert(contains_ui_element_text(tech_tree_messages, "Tab: Village"));
     assert(contains_ui_element_text(tech_tree_messages, "Tab: University"));
+    {
+        const auto* village_node = find_ui_element_with_text_fragment(tech_tree_messages, "TECHNODE|s=Need 200r");
+        assert(village_node != nullptr);
+        assert(village_node->action.arg0 == gs1::k_faction_village_committee);
+    }
 
     GameMessage select_forestry_tab_message {};
     select_forestry_tab_message.type = GameMessageType::SelectRegionalMapTechTreeFaction;
@@ -1115,6 +1217,22 @@ int main()
         assert(payload.plant_type_id == gs1::k_plant_straw_checkerboard);
         assert(approx_equal(payload.plant_density, 22.0f));
     }
+    const auto density_visual =
+        find_plant_visual_message(density_third_messages, gs1::k_plant_straw_checkerboard, density_coord);
+    assert(density_visual != nullptr);
+    {
+        const auto& payload = density_visual->payload_as<Gs1EngineMessageSitePlantVisualData>();
+        assert(payload.visual_id != 0U);
+        assert(payload.footprint_width == 2U);
+        assert(payload.footprint_height == 2U);
+        assert(payload.height_scale >= 0.16f);
+        assert(payload.height_scale < 0.30f);
+        assert(payload.density_quantized > 0U);
+        assert(payload.height_class == static_cast<std::uint8_t>(gs1::PlantHeightClass::None));
+        assert(payload.focus == static_cast<std::uint8_t>(gs1::PlantFocus::Setup));
+        assert((payload.flags & GS1_SITE_PLANT_VISUAL_FLAG_HAS_AURA) != 0U);
+        assert((payload.flags & GS1_SITE_PLANT_VISUAL_FLAG_GROWABLE) == 0U);
+    }
 
     const auto device_coord = TileCoord {7, 6};
     set_tile_device_state(site_run, device_coord, gs1::StructureId {gs1::k_structure_workbench}, 0.625f);
@@ -1153,6 +1271,18 @@ int main()
         const float projected_device_integrity =
             static_cast<float>(payload.device_integrity_quantized) * (100.0f / 128.0f);
         assert(approx_equal(projected_device_integrity, 68.0f, 1.0f));
+    }
+    const auto device_visual =
+        find_device_visual_message(device_third_messages, gs1::k_structure_workbench, device_coord);
+    assert(device_visual != nullptr);
+    {
+        const auto& payload = device_visual->payload_as<Gs1EngineMessageSiteDeviceVisualData>();
+        assert(payload.visual_id != 0U);
+        assert(approx_equal(payload.integrity_normalized, 0.68f, 0.02f));
+        assert(payload.height_scale > 0.5f);
+        assert(payload.footprint_width == 1U);
+        assert(payload.footprint_height == 1U);
+        assert((payload.flags & GS1_SITE_DEVICE_VISUAL_FLAG_IS_CRAFTING_STATION) != 0U);
     }
 
     set_tile_local_wind(site_run, density_coord, 14.0f);
@@ -1518,7 +1648,7 @@ int main()
     assert(contains_ui_element_text(open_protection_selector_messages, "Wind Protection"));
     assert(contains_ui_element_text(open_protection_selector_messages, "Heat Protection"));
     assert(contains_ui_element_text(open_protection_selector_messages, "Dust Protection"));
-    assert(contains_ui_element_text(open_protection_selector_messages, "Plant Density / Device Integrity"));
+    assert(contains_ui_element_text(open_protection_selector_messages, "Density / Integrity"));
 
     Gs1UiAction select_heat_overlay_action {};
     select_heat_overlay_action.type = GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE;
@@ -1784,6 +1914,43 @@ int main()
         });
     assert(projected_action_tile != action_tile_messages.end());
 
+    Gs1RuntimeProjectionCache dense_projection_cache {};
+    for (const Gs1EngineMessage& message : action_messages)
+    {
+        dense_projection_cache.apply_engine_message(message);
+    }
+    assert(dense_projection_cache.state().active_site.has_value());
+    assert(
+        dense_projection_cache.state().active_site->tiles.size() ==
+        static_cast<std::size_t>(dense_projection_cache.state().active_site->width) *
+            static_cast<std::size_t>(dense_projection_cache.state().active_site->height));
+
+    const auto dirty_tile_messages = flush_tile_delta_for(action_runtime, action_target, 42.0f);
+    for (const Gs1EngineMessage& message : dirty_tile_messages)
+    {
+        dense_projection_cache.apply_engine_message(message);
+    }
+
+    assert(dense_projection_cache.state().active_site.has_value());
+    const auto dirty_tile_upserts = collect_messages_of_type(dirty_tile_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
+    assert(dirty_tile_upserts.size() == 1U);
+    {
+        const auto& payload = dirty_tile_upserts.front()->payload_as<Gs1EngineMessageSiteTileData>();
+        assert(payload.x == static_cast<std::uint32_t>(action_target.x));
+        assert(payload.y == static_cast<std::uint32_t>(action_target.y));
+        assert(approx_equal(payload.sand_burial, 42.0f));
+    }
+
+    const auto dirty_tile_index =
+        static_cast<std::size_t>(action_target.y) *
+            static_cast<std::size_t>(dense_projection_cache.state().active_site->width) +
+        static_cast<std::size_t>(action_target.x);
+    assert(dirty_tile_index < dense_projection_cache.state().active_site->tiles.size());
+    const auto& dirty_tile_projection = dense_projection_cache.state().active_site->tiles[dirty_tile_index];
+    assert(dirty_tile_projection.x == static_cast<std::uint16_t>(action_target.x));
+    assert(dirty_tile_projection.y == static_cast<std::uint16_t>(action_target.y));
+    assert(approx_equal(dirty_tile_projection.sand_burial, 42.0f));
+
     Gs1RuntimeCreateDesc placement_preview_desc {};
     placement_preview_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
     placement_preview_desc.api_version = gs1::k_api_version;
@@ -1845,6 +2012,18 @@ int main()
                 approx_equal(payload.occupant_condition, 100.0f);
         });
     assert(preview_anchor_tile != preview_tile_messages.end());
+
+    Gs1UiAction placement_open_protection_selector_action {};
+    placement_open_protection_selector_action.type = GS1_UI_ACTION_OPEN_SITE_PROTECTION_SELECTOR;
+    const auto placement_open_protection_selector_event =
+        make_ui_action_event(placement_open_protection_selector_action);
+    assert(placement_preview_runtime.submit_host_events(&placement_open_protection_selector_event, 1U) == GS1_STATUS_OK);
+    run_phase1(placement_preview_runtime, 0.0);
+    assert(gs1::GameRuntimeProjectionTestAccess::site_protection_selector_open(placement_preview_runtime));
+    assert(
+        gs1::GameRuntimeProjectionTestAccess::site_protection_overlay_mode(placement_preview_runtime) ==
+        GS1_SITE_PROTECTION_OVERLAY_NONE);
+    drain_engine_messages(placement_preview_runtime);
 
     Gs1UiAction placement_select_heat_overlay_action {};
     placement_select_heat_overlay_action.type = GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE;

@@ -15,13 +15,17 @@ This file is a quick orientation guide for agents working in this repository.
 
 - `.agent-progress/`: Session-progress and merge-coordination scratch area used by worktree/session rules.
 - `build/`: Local CMake build tree and IDE-generated build artifacts.
+- `engines/`: First-party engine client shells and engine-specific adapter scaffolding. Read `engines/guideline.md` before drilling deeper.
 - `include/`: Public headers exposed to the gameplay DLL host boundary. Read `include/guideline.md` before drilling deeper.
 - `out/`: Generated binaries, logs, exported headers, and local browser/debug profiles.
+- `project/`: Shared project-owned configuration and externalized content roots used across engine adapters. Read `project/guideline.md` before drilling deeper.
 - `scripts/`: PowerShell helpers for building and running tests. Read `scripts/guideline.md` before drilling deeper.
 - `src/`: Gameplay/runtime implementation code grouped by ownership domain. Read `src/guideline.md` before drilling deeper.
 - `tests/`: Runtime, smoke, and system test code plus scripted/system-test assets, including the visual smoke viewer-side FPS readout. Read `tests/guideline.md` before drilling deeper.
+- `tools/`: Repository-maintenance and infrastructure helpers that are not part of the normal gameplay/test script workflow, including the Google Cloud Storage content sync/push helpers for ignored Godot assets and addons. Read `tools/guideline.md` before drilling deeper.
 - `third_party/`: Vendored external dependencies. Read `third_party/guideline.md` before drilling deeper.
-- `CMakeLists.txt`: Builds the gameplay DLL plus the smoke, visual smoke, smoke-host threading regression, timed-modifier projection runtime regression, runtime-test, and system-test executables, now centralizing shared runtime and smoke compilation in reusable static libraries with an internal precompiled-header path so Flecs/content-heavy code is compiled once and reused across targets, while the standalone system-test host links source-authored system tests directly instead of compiling them into the normal gameplay DLL build, all while still including the campaign faction-reputation and technology sources plus the owner-specific plant/device weather contribution systems used by runtime/UI coverage, and now registering a silent visual-smoke onboarding test that runs the visual host headlessly through the full Site 1 tutorial flow without opening the browser.
+- `third_party/godot-cpp/`: Vendored `godot-cpp` bindings checkout used by the Godot adapter build so the native visual adapter can talk to Godot through normal C++ bindings instead of project scripts or raw engine ABI plumbing.
+- `CMakeLists.txt`: Builds the gameplay DLL plus the smoke, visual smoke, smoke-host threading regression, timed-modifier projection runtime regression, runtime-test, and system-test executables, now centralizing shared runtime and smoke compilation in reusable static libraries with an internal precompiled-header path so Flecs/content-heavy code is compiled once and reused across targets, pointing the default authored gameplay-config root at the repo-level `project/content/` directory instead of `src/content/tables`, while the standalone system-test host links source-authored system tests directly instead of compiling them into the normal gameplay DLL build, all while still including the campaign faction-reputation and technology sources plus the owner-specific plant/device weather contribution systems used by runtime/UI coverage, registering a silent visual-smoke onboarding test that runs the visual host headlessly through the full Site 1 tutorial flow without opening the browser, and now also building a first-party Godot runtime-extension path under `engines/godot/` around `godot-cpp`, with the adapter linking the shared gameplay-core content/runtime helpers, exposing typed projection dictionaries to the native shell, compiling the bootstrap Godot scene router alongside the routed screen shells, and owning gameplay-ID-to-Godot-object scene mapping for site visuals.
 - `launch_visual_game.ps1`: Convenience wrapper for the visual smoke host that forwards PowerShell `-Verbose` into host-side verbose logging.
 - `include/gs1/export.h`: Public DLL export/import macros.
 - `include/gs1/game_api.h`: C ABI entry points exposed by the gameplay DLL.
@@ -30,12 +34,14 @@ This file is a quick orientation guide for agents working in this repository.
 - `src/app/`: Runtime bootstrap, API glue, scene coordination, and campaign/site factory entry points.
 - `src/campaign/`: Campaign state and campaign-level systems such as flow, dedicated campaign time progression, loadout planning, regional support, and the linear per-faction tech progression model whose rows now auto-unlock from that faction's reputation while total reputation still drives the shared content-unlock ladder.
 - `src/messages/`: Internal game message IDs, payloads, handlers, and dispatcher.
-- `src/content/`: Prototype content database, loader/validator shells, and content definition types, including authored wind-shelter plant stats, per-plant harvest-output metadata, shared player-meter and fallback item/unlockable internal cash-point valuation data, excavation-merchandise loot-table authoring, one-by-one plant reputation unlock thresholds, per-site-session starting cash authoring, and linear faction-tech progression tables with optional item/plant/structure/recipe tech grants.
+- `src/content/`: Prototype content database, loader/validator shells, and content definition types, including loader support for the repo-level shared `project/content/` authored tables that cover wind-shelter plant stats, per-plant harvest-output metadata, shared player-meter and fallback item/unlockable internal cash-point valuation data, excavation-merchandise loot-table authoring, one-by-one plant reputation unlock thresholds, per-site-session starting cash authoring, and linear faction-tech progression tables with optional item/plant/structure/recipe tech grants.
 - `src/events/`: Translated engine feedback event types. Internal gameplay cross-system messages should use `GameMessage`, not runtime gameplay events.
+- `src/host/`: Engine-agnostic runtime-DLL host bridge code shared by smoke hosts and future engine adapters, now including the first shared engine-message projection cache and drain path used by the Godot adapter.
 - `src/runtime/`: Core runtime loop, fixed-step runner, host-event dispatch plus transient phase-control handling, message queues, random service, and engine message emission.
 - `src/site/`: Active site-run state and site systems for dedicated site time progression, actions, weather, owner-specific plant/device local-weather contribution passes, ecology, directional local wind shelter, inventory, economy, task board, camp durability, harvested-output flow, three-depth excavation-action resolution plus occupier-hidden excavation visuals, and completion/failure flow.
 - `src/support/`: Shared support types such as typed IDs.
 - `src/ui/`: View-model and presenter state for HUD, phone, notifications, inspection, regional map, and UI presentation.
+- `engines/godot/`: First-party Godot visual client scaffolding, including `native/` runtime-extension source that now uses a persistent `godot-cpp` runtime node, loads the shared repo-level `project/` config root before creating the gameplay runtime, a bootstrap scene router that swaps dedicated main-menu, regional-map, and site-session scenes by gameplay-projected app state, routed `godot-cpp` screen shells that reconcile projected regional-map world nodes and projected control widgets by stable gameplay keys, and a Godot-object-owning site presenter keyed by gameplay entity/visual IDs with snapshot-safe in-place mutation, plus `project/` Godot scenes and runtime-extension packaging. The regional-map shell now uses an authored dune backdrop, camp-style site markers, heat haze, and a tabbed scrollable tech overlay, while the heavy `engines/godot/project/assets` and `engines/godot/project/addons` payloads are still intended to be hydrated from Cloudflare/GCS rather than stored in Git. The Godot engine source checkout for this adapter work lives at `E:\godot`.
 - `tests/smoke/`: Smoke host, runtime DLL loader, script runner, live-state JSON, live HTTP server, and visual smoke UI, including the viewer-side FPS counter and right-click harvest action path plus the headless visual-host onboarding runner that can drive Site 1 without opening the web viewer.
 - `tests/smoke/scripts/`: Scripted smoke-test scenarios.
 - `scripts/`: PowerShell build and smoke-test helpers, now including the foreground silent visual-smoke onboarding entry point exposed through `run_visual_smoke.ps1 -SilentOnboarding`.
@@ -53,6 +59,29 @@ This file is a quick orientation guide for agents working in this repository.
 
 - All structs should try to be trivial. Prefer simple data-only layouts and avoid adding behavior or lifecycle management to structs unless there is a clear need.
 - Prefer POD-like structs for data containers: keep them trivial and standard-layout when practical, with no virtual functions, custom constructors/destructors, or owning containers unless the design clearly needs them. This keeps layout predictable and gives the compiler the best chance to optimize copies, binary payloads, and cache-friendly data paths.
+
+## Engine Project Rule
+
+- In engine-specific game-project folders such as `engines/godot/project/`, try not to add or rely on project-local scripts unless there is no practical alternative or the user explicitly asks for it.
+- Prefer shared runtime code, native engine adapters, engine-native scenes/resources, and configuration-driven wiring over embedding gameplay behavior in engine-project scripts.
+- For Godot specifically, try to keep gameplay and runtime code in the native plugin layer under `engines/godot/native/` rather than in GDScript or other Godot project-script files.
+
+## Visual Adapter Projection Rule
+
+- Treat gameplay-world IDs and engine-world object IDs as persistent cross-frame identities, not frame-local snapshot tokens.
+- When a gameplay entity, visual, UI element, or other projected object is created, the visual adapter should create the engine-side object once and record a persistent mapping between the gameplay-side ID and the engine-side object ID.
+- That gameplay-ID to engine-ID mapping must remain stable across frames until gameplay explicitly removes that object.
+- When gameplay updates an existing projected object, the adapter must mutate the already-existing engine-side object in place rather than recreating it or rebuilding the surrounding container.
+- When gameplay removes an object, the adapter must destroy the corresponding engine-side object and remove the mapping.
+- If gameplay sends no create, update, or remove message for an object, the adapter must leave that engine-side object alone.
+- Do not rebuild or refresh engine-side objects per frame just because a projection can be polled again; per-frame polling must not be used as a reason to recreate, relink, or remap persistent objects.
+- Treat snapshot messages as authoritative gameplay-DLL instructions, typically used when a projected scene or UI surface is first initialized or needs full authoritative reconciliation.
+- If the gameplay DLL sends a snapshot, the visual adapter must obey that snapshot without second-guessing whether it should have been sent.
+- If the gameplay DLL sends snapshots too frequently, that is a gameplay-DLL-side problem, not a license for the adapter to invent its own source of truth or frame-driven refresh behavior.
+- Even when consuming a full snapshot, the adapter should still use stable keyed reconciliation against the persistent gameplay-ID to engine-ID mapping: create missing engine objects, mutate existing mapped objects in place, and remove objects that are explicitly absent from the authoritative keyed snapshot.
+- A later snapshot must not cause the adapter to tear down and recreate already-mapped engine objects just because the snapshot was received again; if the mapping already exists for the same gameplay object, reuse it and apply only the required mutations.
+- The visual adapter contract is: gameplay DLL says create -> adapter creates once; gameplay DLL says update -> adapter mutates existing object; gameplay DLL says remove -> adapter destroys object; otherwise adapter leaves it alone.
+- Preserve and strengthen this rule whenever touching engine adapters, especially under `engines/godot/native/`, so the gameplay DLL remains the sole source of truth while the adapter remains a persistent object mapper rather than a per-frame rebuilder.
 
 ## Regression Test Rule
 

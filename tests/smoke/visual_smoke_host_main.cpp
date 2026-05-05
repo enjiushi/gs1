@@ -1,4 +1,4 @@
-#include "runtime_dll_loader.h"
+#include "host/runtime_dll_loader.h"
 #include "smoke_engine_host.h"
 #include "smoke_live_http_server.h"
 #include "smoke_log.h"
@@ -559,6 +559,8 @@ int main(int argc, char** argv)
     create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
     create_desc.api_version = api.get_api_version();
     create_desc.fixed_step_seconds = 1.0 / 60.0;
+    const std::string project_config_root = (repo_root / "project").string();
+    create_desc.project_config_root_utf8 = project_config_root.c_str();
 
     Gs1RuntimeHandle* runtime = nullptr;
     assert(api.create_runtime(&create_desc, &runtime) == GS1_STATUS_OK);

@@ -1,6 +1,6 @@
-# src/content/tables/
+# project/content/
 
-External prototype content TOML files loaded by the gameplay DLL at startup.
+Shared gameplay-authored TOML configuration loaded by the gameplay DLL at startup from the repo-level `project/` root.
 
 ## Usage
 - Read this file before scanning the folder in detail.

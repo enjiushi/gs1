@@ -1,0 +1,12 @@
+# engines/godot/
+
+Godot-specific client scaffolding for the current first-party visual runtime path, with the native adapter now centered on `godot-cpp` classes that own Godot-side scene manipulation while the gameplay DLL stays behind the shared host/session bridge.
+
+## Usage
+- Read this file before scanning the folder in detail.
+- If you open a child folder, read its `guideline.md` first when present.
+- When files or folders in this directory change, update this file in the same change.
+
+## Contents
+- `native/`: Godot runtime-extension native source files built by the repo CMake configuration, including the persistent `godot-cpp` runtime node, the routed per-screen shell controls that talk to that runtime node through direct C++ calls, the bootstrap scene router that swaps dedicated menu/regional/site scenes by projected app state, and the Godot-object presenter that maps gameplay IDs to live Godot nodes through drained engine messages with snapshot-safe keyed reconciliation, now with the regional map instancing authored camp markers and feeding the tabbed research overlay.
+- `project/`: The actual Godot project shell, including the bootstrap router scene plus the dedicated main-menu, regional-map, and site-session scene assets, the authored regional-map dune-basin backdrop and camp marker scenes, and the runtime extension packaging files.

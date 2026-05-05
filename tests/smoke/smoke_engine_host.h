@@ -1,6 +1,6 @@
 #pragma once
 
-#include "runtime_dll_loader.h"
+#include "host/runtime_dll_loader.h"
 #include "smoke_script_directive.h"
 
 #include <cstdint>
@@ -169,6 +169,7 @@ public:
 
     struct SiteWorkerProjection final
     {
+        std::uint64_t entity_id {0};
         float tile_x {0.0f};
         float tile_y {0.0f};
         float facing_degrees {0.0f};

@@ -114,6 +114,14 @@ const char* message_type_name(Gs1EngineMessageType type)
         return "SITE_MODIFIER_LIST_BEGIN";
     case GS1_ENGINE_MESSAGE_SITE_MODIFIER_UPSERT:
         return "SITE_MODIFIER_UPSERT";
+    case GS1_ENGINE_MESSAGE_SITE_PLANT_VISUAL_UPSERT:
+        return "SITE_PLANT_VISUAL_UPSERT";
+    case GS1_ENGINE_MESSAGE_SITE_PLANT_VISUAL_REMOVE:
+        return "SITE_PLANT_VISUAL_REMOVE";
+    case GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_UPSERT:
+        return "SITE_DEVICE_VISUAL_UPSERT";
+    case GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_REMOVE:
+        return "SITE_DEVICE_VISUAL_REMOVE";
     case GS1_ENGINE_MESSAGE_HUD_STATE:
         return "HUD_STATE";
     case GS1_ENGINE_MESSAGE_NOTIFICATION_PUSH:
@@ -1420,6 +1428,7 @@ void SmokeEngineHost::apply_site_worker_update(const Gs1EngineMessage& message)
 
     const auto& payload = message.payload_as<Gs1EngineMessageWorkerData>();
     SiteWorkerProjection projection {};
+    projection.entity_id = payload.entity_id;
     projection.tile_x = payload.tile_x;
     projection.tile_y = payload.tile_y;
     projection.facing_degrees = payload.facing_degrees;
@@ -2277,6 +2286,40 @@ std::string SmokeEngineHost::describe_message(const Gs1EngineMessage& message)
         const auto& payload = message.payload_as<Gs1EngineMessageSiteProtectionOverlayData>();
         description += " mode=";
         description += site_protection_overlay_mode_name(payload.mode);
+        break;
+    }
+
+    case GS1_ENGINE_MESSAGE_SITE_PLANT_VISUAL_UPSERT:
+    {
+        const auto& payload = message.payload_as<Gs1EngineMessageSitePlantVisualData>();
+        description += " plant=" + std::to_string(payload.plant_type_id);
+        description += " anchor=(" + std::to_string(payload.anchor_tile_x);
+        description += "," + std::to_string(payload.anchor_tile_y) + ")";
+        description += " visual=" + std::to_string(payload.visual_id);
+        break;
+    }
+
+    case GS1_ENGINE_MESSAGE_SITE_PLANT_VISUAL_REMOVE:
+    {
+        const auto& payload = message.payload_as<Gs1EngineMessageSiteVisualRemoveData>();
+        description += " visual=" + std::to_string(payload.visual_id);
+        break;
+    }
+
+    case GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_UPSERT:
+    {
+        const auto& payload = message.payload_as<Gs1EngineMessageSiteDeviceVisualData>();
+        description += " structure=" + std::to_string(payload.structure_type_id);
+        description += " anchor=(" + std::to_string(payload.anchor_tile_x);
+        description += "," + std::to_string(payload.anchor_tile_y) + ")";
+        description += " visual=" + std::to_string(payload.visual_id);
+        break;
+    }
+
+    case GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_REMOVE:
+    {
+        const auto& payload = message.payload_as<Gs1EngineMessageSiteVisualRemoveData>();
+        description += " visual=" + std::to_string(payload.visual_id);
         break;
     }
 

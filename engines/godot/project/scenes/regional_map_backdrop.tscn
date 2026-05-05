@@ -1,0 +1,179 @@
+[gd_scene load_steps=17 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/menu_backdrop/hdri/qwantani_afternoon_puresky_4k.hdr" id="1_hdri"]
+[ext_resource type="PackedScene" path="res://assets/menu_backdrop/canyonterrain/fbx_unity/Tile_Ground.fbx" id="2_ground"]
+[ext_resource type="PackedScene" path="res://assets/menu_backdrop/canyonterrain/fbx_unity/Rock_Formations_3.fbx" id="3_rock_form_a"]
+[ext_resource type="PackedScene" path="res://assets/menu_backdrop/canyonterrain/fbx_unity/Rock_Formations_11.fbx" id="4_rock_form_b"]
+[ext_resource type="PackedScene" path="res://assets/menu_backdrop/canyonterrain/fbx_unity/Rock_Platforms_7.fbx" id="5_rock_platform"]
+[ext_resource type="PackedScene" path="res://assets/menu_backdrop/canyonterrain/fbx_unity/Cactus_Tall_1.fbx" id="6_cactus_tall"]
+[ext_resource type="PackedScene" path="res://assets/menu_backdrop/canyonterrain/fbx_unity/Cactus_Small_4.fbx" id="7_cactus_small"]
+[ext_resource type="PackedScene" path="res://assets/menu_backdrop/canyonterrain/fbx_unity/Grass_7.fbx" id="8_grass"]
+[ext_resource type="PackedScene" path="res://assets/menu_backdrop/desert_props/FBX/rock_1.001.fbx" id="9_desert_rock"]
+
+[sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_regional"]
+panorama = ExtResource("1_hdri")
+
+[sub_resource type="Sky" id="Sky_regional"]
+sky_material = SubResource("PanoramaSkyMaterial_regional")
+
+[sub_resource type="Environment" id="Environment_regional"]
+background_mode = 2
+sky = SubResource("Sky_regional")
+ambient_light_source = 2
+ambient_light_sky_contribution = 1.0
+tonemap_exposure = 0.98
+
+[node name="RegionalMapWorld" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_regional")
+
+[node name="RegionalSun" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-42, 26, 0)
+light_energy = 3.55
+light_color = Color(1, 0.917647, 0.756863, 1)
+shadow_enabled = true
+shadow_blur = 0.7
+
+[node name="RegionalFill" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-8, -118, 0)
+light_energy = 0.56
+light_color = Color(0.705882, 0.827451, 1, 1)
+
+[node name="RegionalBounce" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(44, 31, 0)
+light_energy = 0.24
+light_color = Color(0.960784, 0.737255, 0.470588, 1)
+
+[node name="RegionalMapCamera" type="Camera3D" parent="."]
+position = Vector3(0, 19, 18)
+rotation_degrees = Vector3(-48, 0, 0)
+current = true
+fov = 34.0
+near = 0.05
+far = 700.0
+
+[node name="TerrainBackdrop" type="Node3D" parent="."]
+
+[node name="DuneA" parent="TerrainBackdrop" instance=ExtResource("2_ground")]
+position = Vector3(-13.6, -0.18, 7.2)
+rotation_degrees = Vector3(0, -16, 0)
+scale = Vector3(4.6, 1, 4.6)
+
+[node name="DuneB" parent="TerrainBackdrop" instance=ExtResource("2_ground")]
+position = Vector3(-5.2, -0.1, 1.1)
+rotation_degrees = Vector3(0, 12, 0)
+scale = Vector3(5.2, 1, 5.2)
+
+[node name="DuneC" parent="TerrainBackdrop" instance=ExtResource("2_ground")]
+position = Vector3(5.4, -0.08, -0.8)
+rotation_degrees = Vector3(0, -10, 0)
+scale = Vector3(5.6, 1, 5.6)
+
+[node name="DuneD" parent="TerrainBackdrop" instance=ExtResource("2_ground")]
+position = Vector3(14.2, -0.12, 5.8)
+rotation_degrees = Vector3(0, 18, 0)
+scale = Vector3(5.0, 1, 5.0)
+
+[node name="DuneE" parent="TerrainBackdrop" instance=ExtResource("2_ground")]
+position = Vector3(0.6, -0.05, 10.4)
+rotation_degrees = Vector3(0, 6, 0)
+scale = Vector3(5.4, 1, 5.4)
+
+[node name="DuneF" parent="TerrainBackdrop" instance=ExtResource("2_ground")]
+position = Vector3(-8.8, -0.22, 13.6)
+rotation_degrees = Vector3(0, -24, 0)
+scale = Vector3(4.8, 1, 4.8)
+
+[node name="DuneG" parent="TerrainBackdrop" instance=ExtResource("2_ground")]
+position = Vector3(10.7, -0.22, 13.1)
+rotation_degrees = Vector3(0, 20, 0)
+scale = Vector3(4.9, 1, 4.9)
+
+[node name="DuneH" parent="TerrainBackdrop" instance=ExtResource("2_ground")]
+position = Vector3(-16.4, -0.26, -4.9)
+rotation_degrees = Vector3(0, 8, 0)
+scale = Vector3(4.2, 1, 4.2)
+
+[node name="DuneI" parent="TerrainBackdrop" instance=ExtResource("2_ground")]
+position = Vector3(16.9, -0.22, -5.7)
+rotation_degrees = Vector3(0, -12, 0)
+scale = Vector3(4.4, 1, 4.4)
+
+[node name="NorthShelf" parent="TerrainBackdrop" instance=ExtResource("5_rock_platform")]
+position = Vector3(1.8, -0.38, -12.9)
+rotation_degrees = Vector3(0, 10, 0)
+scale = Vector3(7.8, 3.9, 7.8)
+
+[node name="NorthRidgeA" parent="TerrainBackdrop" instance=ExtResource("4_rock_form_b")]
+position = Vector3(-10.4, -0.2, -18.8)
+rotation_degrees = Vector3(0, -6, 0)
+scale = Vector3(8.7, 7.4, 8.7)
+
+[node name="NorthRidgeB" parent="TerrainBackdrop" instance=ExtResource("3_rock_form_a")]
+position = Vector3(14.5, -0.28, -18.2)
+rotation_degrees = Vector3(0, 22, 0)
+scale = Vector3(9.4, 7.8, 9.4)
+
+[node name="EastRidge" parent="TerrainBackdrop" instance=ExtResource("4_rock_form_b")]
+position = Vector3(24.8, -0.1, 2.8)
+rotation_degrees = Vector3(0, 48, 0)
+scale = Vector3(6.6, 5.1, 6.6)
+
+[node name="WestRidge" parent="TerrainBackdrop" instance=ExtResource("3_rock_form_a")]
+position = Vector3(-24.6, -0.14, 4.4)
+rotation_degrees = Vector3(0, -42, 0)
+scale = Vector3(7.2, 5.5, 7.2)
+
+[node name="SouthRidge" parent="TerrainBackdrop" instance=ExtResource("5_rock_platform")]
+position = Vector3(4.8, -0.34, 21.6)
+rotation_degrees = Vector3(0, -18, 0)
+scale = Vector3(6.8, 3.5, 6.8)
+
+[node name="Scatter" type="Node3D" parent="TerrainBackdrop"]
+
+[node name="CactusNorth" parent="TerrainBackdrop/Scatter" instance=ExtResource("6_cactus_tall")]
+position = Vector3(8.6, 0, -7.8)
+rotation_degrees = Vector3(0, -18, 0)
+scale = Vector3(1.18, 1.18, 1.18)
+
+[node name="CactusWest" parent="TerrainBackdrop/Scatter" instance=ExtResource("7_cactus_small")]
+position = Vector3(-12.4, 0, 9.1)
+rotation_degrees = Vector3(0, 24, 0)
+scale = Vector3(0.96, 0.96, 0.96)
+
+[node name="CactusEast" parent="TerrainBackdrop/Scatter" instance=ExtResource("7_cactus_small")]
+position = Vector3(15.2, 0, 9.5)
+rotation_degrees = Vector3(0, 34, 0)
+scale = Vector3(1.02, 1.02, 1.02)
+
+[node name="GrassSouth" parent="TerrainBackdrop/Scatter" instance=ExtResource("8_grass")]
+position = Vector3(-5.4, 0, 15.1)
+rotation_degrees = Vector3(0, -12, 0)
+scale = Vector3(1.8, 1.8, 1.8)
+
+[node name="GrassCenter" parent="TerrainBackdrop/Scatter" instance=ExtResource("8_grass")]
+position = Vector3(7.7, 0, 11.2)
+rotation_degrees = Vector3(0, 20, 0)
+scale = Vector3(1.6, 1.6, 1.6)
+
+[node name="RockScatterA" parent="TerrainBackdrop/Scatter" instance=ExtResource("9_desert_rock")]
+position = Vector3(-2.7, 0.03, -5.2)
+rotation_degrees = Vector3(0, 18, 0)
+scale = Vector3(0.88, 0.88, 0.88)
+
+[node name="RockScatterB" parent="TerrainBackdrop/Scatter" instance=ExtResource("9_desert_rock")]
+position = Vector3(11.6, 0.03, 2.4)
+rotation_degrees = Vector3(0, -14, 0)
+scale = Vector3(0.76, 0.76, 0.76)
+
+[node name="RockScatterC" parent="TerrainBackdrop/Scatter" instance=ExtResource("9_desert_rock")]
+position = Vector3(-14.8, 0.03, 1.8)
+rotation_degrees = Vector3(0, 26, 0)
+scale = Vector3(0.94, 0.94, 0.94)
+
+[node name="TerrainRoot" type="Node3D" parent="."]
+
+[node name="LinkRoot" type="Node3D" parent="."]
+
+[node name="SiteRoot" type="Node3D" parent="."]

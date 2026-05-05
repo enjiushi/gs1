@@ -1,0 +1,63 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="PackedScene" path="res://assets/menu_backdrop/desert_props/FBX/house1.002.fbx" id="1_house"]
+[ext_resource type="PackedScene" path="res://assets/menu_backdrop/water_tower/WaterTank.fbx" id="2_tower"]
+[ext_resource type="PackedScene" path="res://assets/menu_backdrop/desert_props/FBX/rock_1.001.fbx" id="3_rock"]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_state_base"]
+top_radius = 1.0
+bottom_radius = 1.16
+height = 0.18
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_state_tower"]
+top_radius = 0.12
+bottom_radius = 0.16
+height = 0.7
+
+[sub_resource type="SphereMesh" id="SphereMesh_state_beacon"]
+radius = 0.18
+height = 0.36
+
+[node name="RegionalSiteMarker" type="Node3D"]
+
+[node name="Camp" type="Node3D" parent="."]
+position = Vector3(0, 0, 0)
+
+[node name="StateBase" type="MeshInstance3D" parent="Camp"]
+mesh = SubResource("CylinderMesh_state_base")
+position = Vector3(0, 0.09, 0)
+
+[node name="Shelter" parent="Camp" instance=ExtResource("1_house")]
+position = Vector3(-0.28, 0, 0.14)
+rotation_degrees = Vector3(0, 18, 0)
+scale = Vector3(0.34, 0.34, 0.34)
+
+[node name="WaterTower" parent="Camp" instance=ExtResource("2_tower")]
+position = Vector3(0.86, 0, -0.44)
+rotation_degrees = Vector3(0, -26, 0)
+scale = Vector3(0.21, 0.21, 0.21)
+
+[node name="CampRockA" parent="Camp" instance=ExtResource("3_rock")]
+position = Vector3(-0.98, 0.02, 0.76)
+rotation_degrees = Vector3(0, 20, 0)
+scale = Vector3(0.42, 0.42, 0.42)
+
+[node name="CampRockB" parent="Camp" instance=ExtResource("3_rock")]
+position = Vector3(0.6, 0.02, 0.9)
+rotation_degrees = Vector3(0, -24, 0)
+scale = Vector3(0.32, 0.32, 0.32)
+
+[node name="StateTower" type="MeshInstance3D" parent="Camp"]
+mesh = SubResource("CylinderMesh_state_tower")
+position = Vector3(0.06, 0.53, -0.08)
+
+[node name="StateBeacon" type="MeshInstance3D" parent="Camp"]
+mesh = SubResource("SphereMesh_state_beacon")
+position = Vector3(0.06, 0.99, -0.08)
+
+[node name="SiteLabel" type="Label3D" parent="Camp"]
+position = Vector3(0, 1.54, 0)
+billboard = 1
+text = "SITE"
+font_size = 40
+modulate = Color(0.937255, 0.886275, 0.776471, 1)

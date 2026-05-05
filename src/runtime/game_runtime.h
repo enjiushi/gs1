@@ -12,11 +12,12 @@
 #include <deque>
 #include <map>
 #include <optional>
+#include <unordered_set>
 #include <vector>
 
 namespace gs1
 {
-inline constexpr std::uint32_t k_api_version = 4;
+inline constexpr std::uint32_t k_api_version = 5;
 inline constexpr std::size_t k_feedback_event_type_count = 4U;
 
 class GameRuntime final
@@ -126,7 +127,16 @@ private:
     void queue_ui_setup_close_message(
         Gs1UiSetupId setup_id,
         Gs1UiSetupPresentationType presentation_type);
+    void queue_ui_panel_begin_message(
+        Gs1UiPanelId panel_id,
+        std::uint32_t context_id,
+        std::uint32_t text_line_count,
+        std::uint32_t slot_action_count,
+        std::uint32_t list_item_count,
+        std::uint32_t list_action_count);
+    void queue_ui_panel_close_message(Gs1UiPanelId panel_id);
     void queue_close_ui_setup_if_open(Gs1UiSetupId setup_id);
+    void queue_close_ui_panel_if_open(Gs1UiPanelId panel_id);
     void queue_close_active_normal_ui_if_open();
     void queue_close_site_inventory_panels_if_open();
     void queue_close_site_phone_panel_if_open();
@@ -136,8 +146,31 @@ private:
         std::uint32_t flags,
         const Gs1UiAction& action,
         const char* text);
+    void queue_ui_panel_text_message(
+        std::uint16_t line_id,
+        std::uint32_t flags,
+        const char* text);
+    void queue_ui_panel_slot_action_message(
+        Gs1UiPanelSlotId slot_id,
+        std::uint32_t flags,
+        const Gs1UiAction& action,
+        const char* label);
+    void queue_ui_panel_list_item_message(
+        Gs1UiPanelListId list_id,
+        std::uint32_t item_id,
+        std::uint32_t flags,
+        const char* primary_text,
+        const char* secondary_text);
+    void queue_ui_panel_list_action_message(
+        Gs1UiPanelListId list_id,
+        std::uint32_t item_id,
+        Gs1UiPanelListActionRole role,
+        std::uint32_t flags,
+        const Gs1UiAction& action);
     void queue_ui_setup_end_message();
+    void queue_ui_panel_end_message();
     void queue_clear_ui_setup_messages(Gs1UiSetupId setup_id);
+    void queue_clear_ui_panel_messages(Gs1UiPanelId panel_id);
     void queue_main_menu_ui_messages();
     void queue_regional_map_menu_ui_messages();
     void queue_regional_map_selection_ui_messages();
@@ -177,6 +210,14 @@ private:
     void queue_site_modifier_list_begin_message(Gs1ProjectionMode mode);
     void queue_site_modifier_upsert_message(std::size_t modifier_index);
     void queue_all_site_modifier_upsert_messages(Gs1ProjectionMode mode);
+    void queue_site_plant_visual_upsert_message(TileCoord coord);
+    void queue_site_plant_visual_remove_message(std::uint64_t visual_id);
+    void queue_all_site_plant_visual_messages();
+    void queue_pending_site_plant_visual_messages();
+    void queue_site_device_visual_upsert_message(TileCoord coord);
+    void queue_site_device_visual_remove_message(std::uint64_t visual_id);
+    void queue_all_site_device_visual_messages();
+    void queue_pending_site_device_visual_messages();
     void queue_site_phone_panel_state_message();
     void queue_site_protection_overlay_state_message();
     void queue_site_phone_listing_remove_message(std::uint32_t listing_id);
@@ -256,6 +297,7 @@ private:
     std::array<ProfiledSystemState, static_cast<std::size_t>(GS1_RUNTIME_PROFILE_SYSTEM_COUNT)>
         profiled_systems_ {};
     std::map<Gs1UiSetupId, Gs1UiSetupPresentationType> active_ui_setups_ {};
+    std::unordered_set<Gs1UiPanelId> active_ui_panels_ {};
     std::optional<Gs1UiSetupId> active_normal_ui_setup_ {};
     bool site_protection_selector_open_ {false};
     Gs1SiteProtectionOverlayMode site_protection_overlay_mode_ {GS1_SITE_PROTECTION_OVERLAY_NONE};

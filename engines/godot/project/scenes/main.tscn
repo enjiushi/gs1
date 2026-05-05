@@ -1,0 +1,22 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="GDExtension" path="res://extensions/gs1_adapter/gs1_adapter.gdextension" id="1_ext"]
+
+[node name="Main" type="Gs1GodotSceneRouterControl"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Runtime" type="Gs1RuntimeNode" parent="."]
+
+[node name="SceneHost" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2

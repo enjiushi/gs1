@@ -1,0 +1,305 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="GDExtension" path="res://extensions/gs1_adapter/gs1_adapter.gdextension" id="1_ext"]
+[ext_resource type="Theme" path="res://assets/field_command_theme.tres" id="2_theme"]
+[ext_resource type="PackedScene" path="res://scenes/tech_tree_overlay.tscn" id="3_tech_tree_overlay"]
+
+[node name="SiteSession" type="Gs1GodotMainScreenControl"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("2_theme")
+
+[node name="SiteView" type="Gs1SiteViewNode" parent="."]
+
+[node name="BackdropTint" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.109804, 0.0784314, 0.0470588, 0.2)
+
+[node name="HudMargin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 18.0
+offset_top = 18.0
+offset_right = -18.0
+offset_bottom = -18.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+
+[node name="RootVBox" type="VBoxContainer" parent="HudMargin"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="StatusFrame" type="PanelContainer" parent="HudMargin/RootVBox"]
+layout_mode = 2
+
+[node name="StatusLabel" type="RichTextLabel" parent="HudMargin/RootVBox/StatusFrame"]
+custom_minimum_size = Vector2(0, 104)
+layout_mode = 2
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+
+[node name="MainColumns" type="HBoxContainer" parent="HudMargin/RootVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 18
+
+[node name="LeftColumn" type="VBoxContainer" parent="HudMargin/RootVBox/MainColumns"]
+layout_mode = 2
+custom_minimum_size = Vector2(420, 0)
+theme_override_constants/separation = 14
+
+[node name="SitePanel" type="PanelContainer" parent="HudMargin/RootVBox/MainColumns/LeftColumn"]
+visible = false
+layout_mode = 2
+
+[node name="SiteVBox" type="VBoxContainer" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SiteTitle" type="Label" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.878431, 0.686275, 0.380392, 1)
+theme_override_font_sizes/font_size = 22
+text = "Field Site"
+
+[node name="SiteSummary" type="RichTextLabel" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox"]
+custom_minimum_size = Vector2(0, 130)
+bbcode_enabled = true
+fit_content = true
+scroll_active = true
+
+[node name="TileLabel" type="Label" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.729412, 0.619608, 1)
+text = "Tile Brief"
+
+[node name="SiteControls" type="VBoxContainer" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="MoveGrid" type="GridContainer" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox/SiteControls"]
+layout_mode = 2
+columns = 2
+
+[node name="MoveNorthButton" type="Button" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox/SiteControls/MoveGrid"]
+layout_mode = 2
+text = "North"
+
+[node name="MoveSouthButton" type="Button" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox/SiteControls/MoveGrid"]
+layout_mode = 2
+text = "South"
+
+[node name="MoveWestButton" type="Button" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox/SiteControls/MoveGrid"]
+layout_mode = 2
+text = "West"
+
+[node name="MoveEastButton" type="Button" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox/SiteControls/MoveGrid"]
+layout_mode = 2
+text = "East"
+
+[node name="HoverTileButton" type="Button" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox/SiteControls"]
+layout_mode = 2
+text = "Survey Selected Tile"
+
+[node name="PlantSelectedSeedButton" type="Button" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox/SiteControls"]
+layout_mode = 2
+text = "Plant Seed"
+
+[node name="CraftAtSelectedTileButton" type="Button" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox/SiteControls"]
+layout_mode = 2
+text = "Review Craft Options"
+
+[node name="CancelActionButton" type="Button" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox/SiteControls"]
+layout_mode = 2
+text = "Cancel Current Order"
+
+[node name="ReturnToMapButton" type="Button" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox/SiteControls"]
+layout_mode = 2
+text = "Leave Site"
+
+[node name="OpenProtectionButton" type="Button" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox/SiteControls"]
+layout_mode = 2
+text = "Protection Overlay"
+
+[node name="OpenTechTreeButton" type="Button" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox/SiteControls"]
+layout_mode = 2
+text = "Research & Unlocks"
+
+[node name="OpenWorkerPackButton" type="Button" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox/SiteControls"]
+layout_mode = 2
+text = "Open Worker Pack"
+
+[node name="OpenNearestStorageButton" type="Button" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox/SiteControls"]
+layout_mode = 2
+text = "Open Nearby Storage"
+
+[node name="CloseStorageButton" type="Button" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox/SiteControls"]
+layout_mode = 2
+text = "Close Open Storage"
+
+[node name="UseSelectedItemButton" type="Button" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox/SiteControls"]
+layout_mode = 2
+text = "Use Pack Item"
+
+[node name="TransferSelectedItemButton" type="Button" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox/SiteControls"]
+layout_mode = 2
+text = "Move Storage Item To Pack"
+
+[node name="ViewSpacer" type="Control" parent="HudMargin/RootVBox/MainColumns"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="RightColumn" type="VBoxContainer" parent="HudMargin/RootVBox/MainColumns"]
+layout_mode = 2
+custom_minimum_size = Vector2(430, 0)
+theme_override_constants/separation = 14
+
+[node name="InventoryPanel" type="PanelContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn"]
+visible = false
+layout_mode = 2
+
+[node name="InventorySummary" type="RichTextLabel" parent="HudMargin/RootVBox/MainColumns/RightColumn/InventoryPanel"]
+custom_minimum_size = Vector2(0, 170)
+bbcode_enabled = true
+fit_content = true
+scroll_active = true
+
+[node name="TaskPanel" type="PanelContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn"]
+visible = false
+layout_mode = 2
+
+[node name="TaskSummary" type="RichTextLabel" parent="HudMargin/RootVBox/MainColumns/RightColumn/TaskPanel"]
+custom_minimum_size = Vector2(0, 140)
+bbcode_enabled = true
+fit_content = true
+scroll_active = true
+
+[node name="PhonePanel" type="PanelContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn"]
+visible = false
+layout_mode = 2
+
+[node name="PhoneVBox" type="VBoxContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn/PhonePanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PhoneStateLabel" type="Label" parent="HudMargin/RootVBox/MainColumns/RightColumn/PhonePanel/PhoneVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.878431, 0.686275, 0.380392, 1)
+text = "Field Phone"
+
+[node name="PhoneTabs" type="HBoxContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn/PhonePanel/PhoneVBox"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="OpenPhoneHomeButton" type="Button" parent="HudMargin/RootVBox/MainColumns/RightColumn/PhonePanel/PhoneVBox/PhoneTabs"]
+layout_mode = 2
+text = "Feed"
+
+[node name="OpenPhoneTasksButton" type="Button" parent="HudMargin/RootVBox/MainColumns/RightColumn/PhonePanel/PhoneVBox/PhoneTabs"]
+layout_mode = 2
+text = "Tasks"
+
+[node name="OpenPhoneBuyButton" type="Button" parent="HudMargin/RootVBox/MainColumns/RightColumn/PhonePanel/PhoneVBox/PhoneTabs"]
+layout_mode = 2
+text = "Procure"
+
+[node name="OpenPhoneSellButton" type="Button" parent="HudMargin/RootVBox/MainColumns/RightColumn/PhonePanel/PhoneVBox/PhoneTabs"]
+layout_mode = 2
+text = "Sell"
+
+[node name="ClosePhoneButton" type="Button" parent="HudMargin/RootVBox/MainColumns/RightColumn/PhonePanel/PhoneVBox/PhoneTabs"]
+layout_mode = 2
+text = "Close"
+
+[node name="PhoneListingsScroll" type="ScrollContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn/PhonePanel/PhoneVBox"]
+custom_minimum_size = Vector2(0, 190)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="PhoneListings" type="VBoxContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn/PhonePanel/PhoneVBox/PhoneListingsScroll"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="CraftPanel" type="PanelContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn"]
+visible = false
+layout_mode = 2
+
+[node name="CraftVBox" type="VBoxContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn/CraftPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="CraftSummary" type="RichTextLabel" parent="HudMargin/RootVBox/MainColumns/RightColumn/CraftPanel/CraftVBox"]
+custom_minimum_size = Vector2(0, 110)
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+
+[node name="CraftOptionsScroll" type="ScrollContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn/CraftPanel/CraftVBox"]
+custom_minimum_size = Vector2(0, 140)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="CraftOptions" type="VBoxContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn/CraftPanel/CraftVBox/CraftOptionsScroll"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="OverlayPanel" type="PanelContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn"]
+visible = false
+layout_mode = 2
+
+[node name="OverlayVBox" type="VBoxContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn/OverlayPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="OverlayStateLabel" type="Label" parent="HudMargin/RootVBox/MainColumns/RightColumn/OverlayPanel/OverlayVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.878431, 0.686275, 0.380392, 1)
+text = "Protection Overlay"
+
+[node name="OverlayButtons" type="HBoxContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn/OverlayPanel/OverlayVBox"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="OverlayWindButton" type="Button" parent="HudMargin/RootVBox/MainColumns/RightColumn/OverlayPanel/OverlayVBox/OverlayButtons"]
+layout_mode = 2
+text = "Wind"
+
+[node name="OverlayHeatButton" type="Button" parent="HudMargin/RootVBox/MainColumns/RightColumn/OverlayPanel/OverlayVBox/OverlayButtons"]
+layout_mode = 2
+text = "Heat"
+
+[node name="OverlayDustButton" type="Button" parent="HudMargin/RootVBox/MainColumns/RightColumn/OverlayPanel/OverlayVBox/OverlayButtons"]
+layout_mode = 2
+text = "Dust"
+
+[node name="OverlayConditionButton" type="Button" parent="HudMargin/RootVBox/MainColumns/RightColumn/OverlayPanel/OverlayVBox/OverlayButtons"]
+layout_mode = 2
+text = "Condition"
+
+[node name="OverlayClearButton" type="Button" parent="HudMargin/RootVBox/MainColumns/RightColumn/OverlayPanel/OverlayVBox/OverlayButtons"]
+layout_mode = 2
+text = "Clear"
+
+[node name="TechOverlay" parent="." instance=ExtResource("3_tech_tree_overlay")]
+metadata/gs1_overlay_margin_left = 96.0
+metadata/gs1_overlay_margin_top = 28.0
+metadata/gs1_overlay_margin_right = -32.0
+metadata/gs1_overlay_margin_bottom = -28.0
+metadata/gs1_panel_min_width = 920.0
+metadata/gs1_panel_min_height = 640.0

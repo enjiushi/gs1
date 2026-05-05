@@ -1,9 +1,8 @@
-#include "runtime_dll_loader.h"
+#include "host/runtime_dll_loader.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
-#include <cstdio>
 #include <string>
 
 namespace
@@ -94,11 +93,9 @@ bool RuntimeDllLoader::load(const wchar_t* dll_path)
         load_symbol(api_.run_phase1, "gs1_run_phase1") &&
         load_symbol(api_.run_phase2, "gs1_run_phase2") &&
         load_symbol(api_.pop_engine_message, "gs1_pop_engine_message") &&
-        load_symbol(api_.get_system_test_api_version, "gs1_get_system_test_api_version") &&
-        load_symbol(api_.get_system_test_case_count, "gs1_get_system_test_case_count") &&
-        load_symbol(api_.get_system_test_case_info, "gs1_get_system_test_case_info") &&
-        load_symbol(api_.run_system_test_case, "gs1_run_system_test_case") &&
-        load_symbol(api_.run_system_test_asset_file, "gs1_run_system_test_asset_file");
+        load_symbol(api_.get_runtime_profiling_snapshot, "gs1_get_runtime_profiling_snapshot") &&
+        load_symbol(api_.reset_runtime_profiling, "gs1_reset_runtime_profiling") &&
+        load_symbol(api_.set_runtime_profile_system_enabled, "gs1_set_runtime_profile_system_enabled");
 }
 
 void RuntimeDllLoader::unload() noexcept

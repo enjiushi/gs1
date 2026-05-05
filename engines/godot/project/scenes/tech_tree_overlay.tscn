@@ -1,0 +1,110 @@
+[gd_scene format=3]
+
+[node name="TechOverlay" type="MarginContainer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 72.0
+offset_top = 56.0
+offset_right = -72.0
+offset_bottom = -48.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+
+[node name="TechOverlayCenter" type="CenterContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="RegionalTechTreePanel" type="PanelContainer" parent="TechOverlayCenter"]
+visible = false
+custom_minimum_size = Vector2(980, 620)
+layout_mode = 2
+
+[node name="RegionalTechTreeVBox" type="VBoxContainer" parent="TechOverlayCenter/RegionalTechTreePanel"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 14
+
+[node name="RegionalTechTreeHeader" type="HBoxContainer" parent="TechOverlayCenter/RegionalTechTreePanel/RegionalTechTreeVBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="RegionalTechTreeTitle" type="Label" parent="TechOverlayCenter/RegionalTechTreePanel/RegionalTechTreeVBox/RegionalTechTreeHeader"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.490196, 0.862745, 0.529412, 1)
+theme_override_font_sizes/font_size = 22
+text = "RESEARCH AND UNLOCKS"
+
+[node name="RegionalTechTreeCloseButton" type="Button" parent="TechOverlayCenter/RegionalTechTreePanel/RegionalTechTreeVBox/RegionalTechTreeHeader"]
+custom_minimum_size = Vector2(152, 0)
+layout_mode = 2
+text = "Close"
+
+[node name="RegionalTechTreeTabs" type="TabContainer" parent="TechOverlayCenter/RegionalTechTreePanel/RegionalTechTreeVBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+current_tab = 0
+
+[node name="Unlockables" type="MarginContainer" parent="TechOverlayCenter/RegionalTechTreePanel/RegionalTechTreeVBox/RegionalTechTreeTabs"]
+layout_mode = 2
+
+[node name="UnlockablesVBox" type="VBoxContainer" parent="TechOverlayCenter/RegionalTechTreePanel/RegionalTechTreeVBox/RegionalTechTreeTabs/Unlockables"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 10
+
+[node name="UnlockablesCaption" type="Label" parent="TechOverlayCenter/RegionalTechTreePanel/RegionalTechTreeVBox/RegionalTechTreeTabs/Unlockables/UnlockablesVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.94902, 0.858824, 0.717647, 0.92)
+theme_override_font_sizes/font_size = 16
+text = "Starter plants and total-reputation unlock ladder"
+
+[node name="RegionalTechTreeSummary" type="ScrollContainer" parent="TechOverlayCenter/RegionalTechTreePanel/RegionalTechTreeVBox/RegionalTechTreeTabs/Unlockables/UnlockablesVBox"]
+custom_minimum_size = Vector2(0, 430)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RegionalTechTreeUnlockablesGrid" type="GridContainer" parent="TechOverlayCenter/RegionalTechTreePanel/RegionalTechTreeVBox/RegionalTechTreeTabs/Unlockables/UnlockablesVBox/RegionalTechTreeSummary"]
+layout_mode = 2
+size_flags_horizontal = 3
+columns = 4
+theme_override_constants/h_separation = 10
+theme_override_constants/v_separation = 10
+
+[node name="Tech" type="MarginContainer" parent="TechOverlayCenter/RegionalTechTreePanel/RegionalTechTreeVBox/RegionalTechTreeTabs"]
+layout_mode = 2
+
+[node name="TechVBox" type="VBoxContainer" parent="TechOverlayCenter/RegionalTechTreePanel/RegionalTechTreeVBox/RegionalTechTreeTabs/Tech"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 10
+
+[node name="RegionalTechTreeFactionTabs" type="HBoxContainer" parent="TechOverlayCenter/RegionalTechTreePanel/RegionalTechTreeVBox/RegionalTechTreeTabs/Tech/TechVBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="TechCaption" type="Label" parent="TechOverlayCenter/RegionalTechTreePanel/RegionalTechTreeVBox/RegionalTechTreeTabs/Tech/TechVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.94902, 0.858824, 0.717647, 0.92)
+theme_override_font_sizes/font_size = 16
+text = "Faction ladder, selected faction details, and projected tier status"
+
+[node name="RegionalTechTreeTechSummary" type="ScrollContainer" parent="TechOverlayCenter/RegionalTechTreePanel/RegionalTechTreeVBox/RegionalTechTreeTabs/Tech/TechVBox"]
+custom_minimum_size = Vector2(0, 360)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RegionalTechTreeActions" type="GridContainer" parent="TechOverlayCenter/RegionalTechTreePanel/RegionalTechTreeVBox/RegionalTechTreeTabs/Tech/TechVBox/RegionalTechTreeTechSummary"]
+layout_mode = 2
+size_flags_horizontal = 3
+columns = 4
+theme_override_constants/h_separation = 10
+theme_override_constants/v_separation = 10

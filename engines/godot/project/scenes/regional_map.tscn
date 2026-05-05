@@ -1,0 +1,170 @@
+[gd_scene format=3 uid="uid://bwnukrtkuhn3b"]
+
+[ext_resource type="Theme" uid="uid://dolja7d2yu1v7" path="res://assets/desert_shell_theme.tres" id="2_theme"]
+[ext_resource type="Shader" uid="uid://dtyhkexr3uqhr" path="res://assets/shaders/menu_heat_haze.gdshader" id="3_heat"]
+[ext_resource type="PackedScene" path="res://scenes/regional_map_backdrop.tscn" id="4_backdrop"]
+[ext_resource type="PackedScene" path="res://scenes/tech_tree_overlay.tscn" id="5_tech_tree_overlay"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_heat"]
+shader = ExtResource("3_heat")
+shader_parameter/distortion_strength = 0.0042
+shader_parameter/shimmer_speed = 1.42
+shader_parameter/band_density = 46.0
+shader_parameter/edge_falloff = 0.88
+
+[node name="RegionalMap" type="Gs1GodotMainScreenControl" unique_id=1236848156]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("2_theme")
+
+[node name="RegionalMapWorld" parent="." unique_id=326713988 instance=ExtResource("4_backdrop")]
+
+[node name="BackdropTint" type="ColorRect" parent="." unique_id=586140303]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.137255, 0.0941176, 0.0470588, 0.1)
+
+[node name="HeatHaze" type="ColorRect" parent="." unique_id=1292659282]
+material = SubResource("ShaderMaterial_heat")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="HudMargin" type="MarginContainer" parent="." unique_id=582141788]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = 20.0
+offset_right = -24.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="RootVBox" type="VBoxContainer" parent="HudMargin" unique_id=769428215]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="MainColumns" type="HBoxContainer" parent="HudMargin/RootVBox" unique_id=1415160725]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 24
+
+[node name="LeftColumn" type="VBoxContainer" parent="HudMargin/RootVBox/MainColumns" unique_id=1907747161]
+custom_minimum_size = Vector2(428, 0)
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 16
+
+[node name="RegionalMapPanel" type="PanelContainer" parent="HudMargin/RootVBox/MainColumns/LeftColumn" unique_id=221750624]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RegionalVBox" type="VBoxContainer" parent="HudMargin/RootVBox/MainColumns/LeftColumn/RegionalMapPanel" unique_id=309312984]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="RegionalHeader" type="Label" parent="HudMargin/RootVBox/MainColumns/LeftColumn/RegionalMapPanel/RegionalVBox" unique_id=2039314139]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.490196, 0.862745, 0.529412, 1)
+theme_override_font_sizes/font_size = 18
+text = "CAMPAIGN OVERWATCH"
+
+[node name="RegionalMapSummary" type="RichTextLabel" parent="HudMargin/RootVBox/MainColumns/LeftColumn/RegionalMapPanel/RegionalVBox" unique_id=69339313]
+custom_minimum_size = Vector2(0, 112)
+layout_mode = 2
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+
+[node name="RegionalMapGraph" type="RichTextLabel" parent="HudMargin/RootVBox/MainColumns/LeftColumn/RegionalMapPanel/RegionalVBox" unique_id=985671525]
+custom_minimum_size = Vector2(0, 162)
+layout_mode = 2
+bbcode_enabled = true
+
+[node name="RegionalActions" type="VBoxContainer" parent="HudMargin/RootVBox/MainColumns/LeftColumn/RegionalMapPanel/RegionalVBox" unique_id=603922482]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="OpenTechTreeButton" type="Button" parent="HudMargin/RootVBox/MainColumns/LeftColumn/RegionalMapPanel/RegionalVBox/RegionalActions" unique_id=2105511076]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Research & Unlocks"
+metadata/gs1_panel_id = 2
+metadata/gs1_slot_id = 1
+
+[node name="WorldSpacer" type="Control" parent="HudMargin/RootVBox/MainColumns" unique_id=535032526]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="RightColumn" type="VBoxContainer" parent="HudMargin/RootVBox/MainColumns" unique_id=1260819455]
+custom_minimum_size = Vector2(430, 0)
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 14
+
+[node name="RegionalSelectionPanel" type="PanelContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn" unique_id=866392839]
+visible = false
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RegionalSelectionVBox" type="VBoxContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn/RegionalSelectionPanel" unique_id=774269545]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="RegionalSelectionTitle" type="Label" parent="HudMargin/RootVBox/MainColumns/RightColumn/RegionalSelectionPanel/RegionalSelectionVBox" unique_id=1099548411]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.490196, 0.862745, 0.529412, 1)
+theme_override_font_sizes/font_size = 18
+text = "SITE BRIEF"
+
+[node name="RegionalSelectionSummary" type="RichTextLabel" parent="HudMargin/RootVBox/MainColumns/RightColumn/RegionalSelectionPanel/RegionalSelectionVBox" unique_id=504756649]
+custom_minimum_size = Vector2(0, 238)
+layout_mode = 2
+size_flags_vertical = 3
+bbcode_enabled = true
+fit_content = true
+
+[node name="RegionalSelectionActions" type="VBoxContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn/RegionalSelectionPanel/RegionalSelectionVBox" unique_id=1358209216]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="DeployButton" type="Button" parent="HudMargin/RootVBox/MainColumns/RightColumn/RegionalSelectionPanel/RegionalSelectionVBox/RegionalSelectionActions" unique_id=1032087152]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Deploy"
+metadata/gs1_panel_id = 3
+metadata/gs1_slot_id = 1
+
+[node name="ClearSelectionButton" type="Button" parent="HudMargin/RootVBox/MainColumns/RightColumn/RegionalSelectionPanel/RegionalSelectionVBox/RegionalSelectionActions" unique_id=728686955]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Clear Selection"
+metadata/gs1_panel_id = 3
+metadata/gs1_slot_id = 2
+
+[node name="TechOverlay" parent="." unique_id=1950611279 instance=ExtResource("5_tech_tree_overlay")]
+metadata/gs1_overlay_margin_left = 72.0
+metadata/gs1_overlay_margin_top = 56.0
+metadata/gs1_overlay_margin_right = -72.0
+metadata/gs1_overlay_margin_bottom = -48.0
+metadata/gs1_panel_min_width = 980.0
+metadata/gs1_panel_min_height = 620.0

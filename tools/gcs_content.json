@@ -1,0 +1,31 @@
+{
+    "vendor":  "cloudflare",
+    "bucketUri":  "gs1:gs1/gs1-content",
+    "latestLabel":  "latest",
+    "entries":  [
+                    {
+                        "name":  "godot-assets",
+                        "kind":  "directory",
+                        "localPath":  "engines/godot/project/assets",
+                        "remoteSubpath":  "engines/godot/project/assets",
+                        "excludeRegexes":  [
+                                               "^guideline\\.md$"
+                                           ]
+                    },
+                    {
+                        "name":  "godot-addons",
+                        "kind":  "directory",
+                        "localPath":  "engines/godot/project/addons",
+                        "remoteSubpath":  "engines/godot/project/addons",
+                        "excludeRegexes":  [
+                                               "^guideline\\.md$"
+                                           ]
+                    },
+                    {
+                        "name":  "godot-desert-shell-theme",
+                        "kind":  "file",
+                        "localPath":  "engines/godot/project/assets/desert_shell_theme.tres",
+                        "remoteSubpath":  "engines/godot/project/assets/desert_shell_theme.tres"
+                    }
+                ]
+}

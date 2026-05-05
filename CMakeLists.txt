@@ -4,6 +4,10 @@ if(POLICY CMP0141)
     cmake_policy(SET CMP0141 NEW)
 endif()
 
+if(POLICY CMP0091)
+    cmake_policy(SET CMP0091 NEW)
+endif()
+
 # Build definition for the gameplay DLL plus the smoke host executable.
 project(gs1_game
     VERSION 0.1.0
@@ -13,6 +17,19 @@ include(GNUInstallDirs)
 
 # Toggle test executable builds without affecting the gameplay DLL target.
 option(GS1_BUILD_TESTS "Build GS1 test executables" ON)
+option(GS1_BUILD_GODOT_ADAPTER "Build the scaffolded Godot runtime extension target" OFF)
+set(GS1_GODOT_SOURCE_DIR
+    "E:/godot"
+    CACHE PATH
+    "Path to a Godot source tree that provides core/extension/gdextension_interface.gen.h.")
+set(GS1_GODOT_CPP_SOURCE_DIR
+    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/godot-cpp"
+    CACHE PATH
+    "Path to a godot-cpp checkout used for native GDExtension bindings.")
+set(GS1_GODOT_EDITOR_BINARY
+    "${GS1_GODOT_SOURCE_DIR}/bin/godot.windows.editor.dev.x86_64.console.exe"
+    CACHE FILEPATH
+    "Path to the Godot editor binary used to dump extension API JSON for godot-cpp.")
 set(
     GS1_SYSTEM_TEST_SYSTEMS
     ""
@@ -32,9 +49,17 @@ set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY
+        "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL"
+        CACHE STRING
+        "Select the MSVC runtime library for use by compilers targeting the MSVC ABI."
+        FORCE)
+endif()
+
 set(
     GS1_CONTENT_TABLE_DIR_DEFINITION
-    GS1_CONTENT_TABLE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/src/content/tables")
+    GS1_CONTENT_TABLE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/project/content")
 
 function(gs1_enable_strict_warnings target_name)
     if(MSVC)
@@ -116,6 +141,22 @@ set(GS1_GAMEPLAY_CORE_SOURCES
 add_library(gs1_gameplay_core STATIC
     ${GS1_GAMEPLAY_CORE_SOURCES})
 
+add_library(gs1_host_bridge STATIC
+    src/host/runtime_dll_loader.cpp
+    src/host/runtime_message_pump.cpp
+    src/host/runtime_projection_state.cpp
+    src/host/runtime_session.cpp)
+
+target_include_directories(gs1_host_bridge
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+set_target_properties(gs1_host_bridge PROPERTIES
+    POSITION_INDEPENDENT_CODE ON)
+
+gs1_enable_strict_warnings(gs1_host_bridge)
+
 target_include_directories(gs1_gameplay_core
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -179,7 +220,6 @@ if(GS1_BUILD_TESTS)
     set(GS1_SMOKE_HOST_COMMON_SOURCES
         tests/smoke/smoke_engine_host.cpp
         tests/smoke/smoke_log.cpp
-        tests/smoke/runtime_dll_loader.cpp
         tests/smoke/smoke_live_state_json.cpp
         tests/smoke/visual_smoke_silent_onboarding.cpp
         ${GS1_CONTENT_RUNTIME_SOURCES})
@@ -198,6 +238,11 @@ if(GS1_BUILD_TESTS)
     target_compile_definitions(gs1_smoke_support
         PRIVATE
             ${GS1_CONTENT_TABLE_DIR_DEFINITION})
+
+    target_link_libraries(gs1_smoke_support
+        PRIVATE
+            gs1_host_bridge
+            flecs)
 
     gs1_enable_strict_warnings(gs1_smoke_support)
 
@@ -264,7 +309,7 @@ if(GS1_BUILD_TESTS)
 
     target_link_libraries(gs1_smoke_host PRIVATE gs1_smoke_support)
     target_link_libraries(gs1_visual_smoke_host PRIVATE gs1_smoke_support ws2_32 winmm)
-    target_link_libraries(gs1_runtime_projection_test PRIVATE gs1_gameplay_core)
+    target_link_libraries(gs1_runtime_projection_test PRIVATE gs1_gameplay_core gs1_host_bridge)
     target_link_libraries(gs1_runtime_message_chain_test PRIVATE gs1_gameplay_core)
     target_link_libraries(gs1_timed_modifier_projection_test PRIVATE gs1_gameplay_core)
     target_link_libraries(gs1_site_system_message_flow_test PRIVATE gs1_gameplay_core)
@@ -352,4 +397,115 @@ if(GS1_BUILD_TESTS)
     set_tests_properties(gs1_system_test_host PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         LABELS "system;dll")
+endif()
+
+if(GS1_BUILD_GODOT_ADAPTER)
+    if(NOT EXISTS "${GS1_GODOT_SOURCE_DIR}/core/extension/gdextension_interface.gen.h")
+        message(FATAL_ERROR
+            "GS1_BUILD_GODOT_ADAPTER requires GS1_GODOT_SOURCE_DIR to point at a Godot source tree containing core/extension/gdextension_interface.gen.h")
+    endif()
+
+    if(NOT EXISTS "${GS1_GODOT_CPP_SOURCE_DIR}/CMakeLists.txt")
+        message(FATAL_ERROR
+            "GS1_BUILD_GODOT_ADAPTER requires GS1_GODOT_CPP_SOURCE_DIR to point at a godot-cpp checkout")
+    endif()
+
+    if(NOT EXISTS "${GS1_GODOT_EDITOR_BINARY}")
+        message(FATAL_ERROR
+            "GS1_BUILD_GODOT_ADAPTER requires GS1_GODOT_EDITOR_BINARY to point at a runnable Godot editor binary")
+    endif()
+
+    set(GS1_GODOTCPP_API_DIR
+        ${CMAKE_CURRENT_BINARY_DIR}/godotcpp_api)
+    file(MAKE_DIRECTORY ${GS1_GODOTCPP_API_DIR})
+
+    set(GS1_GODOTCPP_EXTENSION_API_JSON
+        ${GS1_GODOTCPP_API_DIR}/extension_api.json)
+    set(GS1_GODOTCPP_INTERFACE_JSON
+        ${GS1_GODOTCPP_API_DIR}/gdextension_interface.json)
+
+    execute_process(
+        COMMAND ${GS1_GODOT_EDITOR_BINARY} --headless --dump-extension-api --dump-gdextension-interface-json --quit
+        WORKING_DIRECTORY ${GS1_GODOTCPP_API_DIR}
+        RESULT_VARIABLE GS1_GODOTCPP_DUMP_RESULT)
+    if(NOT GS1_GODOTCPP_DUMP_RESULT EQUAL 0)
+        message(FATAL_ERROR
+            "Failed to dump Godot extension API metadata using ${GS1_GODOT_EDITOR_BINARY}")
+    endif()
+
+    add_custom_command(
+        OUTPUT
+            ${GS1_GODOTCPP_EXTENSION_API_JSON}
+            ${GS1_GODOTCPP_INTERFACE_JSON}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${GS1_GODOTCPP_API_DIR}
+        COMMAND ${GS1_GODOT_EDITOR_BINARY} --headless --dump-extension-api --dump-gdextension-interface-json --quit
+        WORKING_DIRECTORY ${GS1_GODOTCPP_API_DIR}
+        COMMENT "Dumping Godot extension API metadata for godot-cpp"
+        VERBATIM)
+
+    add_custom_target(gs1_godotcpp_api DEPENDS
+        ${GS1_GODOTCPP_EXTENSION_API_JSON}
+        ${GS1_GODOTCPP_INTERFACE_JSON})
+
+    if(MSVC)
+        # Keep godot-cpp aligned with the repo-wide Debug CRT selection.
+        set(GODOTCPP_DEBUG_CRT ON CACHE BOOL "Compile with MSVC's debug CRT (/MDd)" FORCE)
+    endif()
+
+    set(GODOTCPP_CUSTOM_API_FILE ${GS1_GODOTCPP_EXTENSION_API_JSON} CACHE FILEPATH "" FORCE)
+    set(GODOTCPP_GDEXTENSION_DIR ${GS1_GODOTCPP_API_DIR} CACHE PATH "" FORCE)
+    add_subdirectory(${GS1_GODOT_CPP_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/third_party/godot-cpp)
+    add_dependencies(godot-cpp gs1_godotcpp_api)
+
+    set(GS1_GODOT_PROJECT_BIN_DIR
+        ${CMAKE_CURRENT_SOURCE_DIR}/engines/godot/project/bin/win64)
+
+    add_library(gs1_godot_adapter SHARED
+        engines/godot/native/gs1_godot_extension_entry.cpp
+        engines/godot/native/gs1_godot_main_screen_control.cpp
+        engines/godot/native/gs1_godot_runtime_node.cpp
+        engines/godot/native/gs1_godot_scene_router_control.cpp
+        engines/godot/native/gs1_godot_site_view_node.cpp)
+
+    target_include_directories(gs1_godot_adapter
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+            ${GS1_GODOT_SOURCE_DIR}
+            ${CMAKE_CURRENT_BINARY_DIR}/third_party/godot-cpp/gen/include)
+
+    target_link_libraries(gs1_godot_adapter
+        PRIVATE
+            godot::cpp
+            gs1_host_bridge
+            gs1_gameplay_core)
+
+    add_dependencies(gs1_godot_adapter gs1_game)
+
+    set_target_properties(gs1_godot_adapter PROPERTIES
+        OUTPUT_NAME "gs1_godot_adapter"
+        WINDOWS_EXPORT_ALL_SYMBOLS OFF
+        POSITION_INDEPENDENT_CODE ON
+        RUNTIME_OUTPUT_DIRECTORY ${GS1_GODOT_PROJECT_BIN_DIR}
+        LIBRARY_OUTPUT_DIRECTORY ${GS1_GODOT_PROJECT_BIN_DIR})
+
+    if(MSVC)
+        set_target_properties(gs1_godot_adapter PROPERTIES
+            MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+    endif()
+
+    foreach(gs1_output_config Debug Release RelWithDebInfo MinSizeRel)
+        string(TOUPPER ${gs1_output_config} gs1_output_config_upper)
+        set_target_properties(gs1_godot_adapter PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY_${gs1_output_config_upper} ${GS1_GODOT_PROJECT_BIN_DIR}
+            LIBRARY_OUTPUT_DIRECTORY_${gs1_output_config_upper} ${GS1_GODOT_PROJECT_BIN_DIR})
+    endforeach()
+
+    add_custom_command(TARGET gs1_godot_adapter POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${GS1_GODOT_PROJECT_BIN_DIR}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:gs1_game>
+            ${GS1_GODOT_PROJECT_BIN_DIR}/gs1_game.dll)
+
+    gs1_enable_strict_warnings(gs1_godot_adapter)
 endif()

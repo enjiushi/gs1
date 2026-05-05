@@ -92,6 +92,49 @@ enum Gs1UiSetupPresentationType : std::uint8_t
     GS1_UI_SETUP_PRESENTATION_OVERLAY = 2
 };
 
+enum Gs1UiPanelId : std::uint8_t
+{
+    GS1_UI_PANEL_NONE = 0,
+    GS1_UI_PANEL_MAIN_MENU = 1,
+    GS1_UI_PANEL_REGIONAL_MAP = 2,
+    GS1_UI_PANEL_REGIONAL_MAP_SELECTION = 3
+};
+
+enum Gs1UiPanelSlotId : std::uint8_t
+{
+    GS1_UI_PANEL_SLOT_NONE = 0,
+    GS1_UI_PANEL_SLOT_PRIMARY = 1,
+    GS1_UI_PANEL_SLOT_SECONDARY = 2,
+    GS1_UI_PANEL_SLOT_TERTIARY = 3
+};
+
+enum Gs1UiPanelListId : std::uint8_t
+{
+    GS1_UI_PANEL_LIST_NONE = 0,
+    GS1_UI_PANEL_LIST_REGIONAL_SITES = 1
+};
+
+enum Gs1UiPanelSlotFlags : std::uint8_t
+{
+    GS1_UI_PANEL_SLOT_FLAG_NONE = 0,
+    GS1_UI_PANEL_SLOT_FLAG_PRIMARY = 1u << 0,
+    GS1_UI_PANEL_SLOT_FLAG_DISABLED = 1u << 1
+};
+
+enum Gs1UiPanelListItemFlags : std::uint8_t
+{
+    GS1_UI_PANEL_LIST_ITEM_FLAG_NONE = 0,
+    GS1_UI_PANEL_LIST_ITEM_FLAG_SELECTED = 1u << 0,
+    GS1_UI_PANEL_LIST_ITEM_FLAG_DISABLED = 1u << 1
+};
+
+enum Gs1UiPanelListActionRole : std::uint8_t
+{
+    GS1_UI_PANEL_LIST_ACTION_ROLE_NONE = 0,
+    GS1_UI_PANEL_LIST_ACTION_ROLE_PRIMARY = 1,
+    GS1_UI_PANEL_LIST_ACTION_ROLE_SECONDARY = 2
+};
+
 enum Gs1UiActionType : std::uint8_t
 {
     GS1_UI_ACTION_NONE = 0,
@@ -309,6 +352,18 @@ enum Gs1EngineMessageType : std::uint8_t
     GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE = 41,
     GS1_ENGINE_MESSAGE_SITE_MODIFIER_LIST_BEGIN = 42,
     GS1_ENGINE_MESSAGE_SITE_MODIFIER_UPSERT = 43,
+    GS1_ENGINE_MESSAGE_SITE_PLANT_VISUAL_UPSERT = 49,
+    GS1_ENGINE_MESSAGE_SITE_PLANT_VISUAL_REMOVE = 50,
+    GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_UPSERT = 51,
+    GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_REMOVE = 52,
+
+    GS1_ENGINE_MESSAGE_BEGIN_UI_PANEL = 53,
+    GS1_ENGINE_MESSAGE_UI_PANEL_TEXT_UPSERT = 54,
+    GS1_ENGINE_MESSAGE_UI_PANEL_SLOT_ACTION_UPSERT = 55,
+    GS1_ENGINE_MESSAGE_UI_PANEL_LIST_ITEM_UPSERT = 56,
+    GS1_ENGINE_MESSAGE_UI_PANEL_LIST_ACTION_UPSERT = 57,
+    GS1_ENGINE_MESSAGE_END_UI_PANEL = 58,
+    GS1_ENGINE_MESSAGE_CLOSE_UI_PANEL = 59,
 
     GS1_ENGINE_MESSAGE_HUD_STATE = 44,
     GS1_ENGINE_MESSAGE_NOTIFICATION_PUSH = 45,
@@ -351,6 +406,7 @@ struct Gs1RuntimeCreateDesc
     std::uint32_t struct_size;
     std::uint32_t api_version;
     double fixed_step_seconds;
+    const char* project_config_root_utf8;
 };
 
 struct Gs1RuntimeTimingStats
@@ -564,6 +620,60 @@ struct Gs1EngineMessageCloseUiSetupData
     Gs1UiSetupPresentationType presentation_type;
 };
 
+struct Gs1EngineMessageUiPanelData
+{
+    std::uint32_t context_id;
+    Gs1UiPanelId panel_id;
+    Gs1ProjectionMode mode;
+    std::uint8_t text_line_count;
+    std::uint8_t slot_action_count;
+    std::uint8_t list_item_count;
+    std::uint8_t list_action_count;
+};
+
+struct Gs1EngineMessageCloseUiPanelData
+{
+    Gs1UiPanelId panel_id;
+    std::uint8_t reserved0[3];
+};
+
+struct Gs1EngineMessageUiPanelTextData
+{
+    std::uint16_t line_id;
+    std::uint8_t flags;
+    std::uint8_t reserved0;
+    char text[56];
+};
+
+struct Gs1EngineMessageUiPanelSlotActionData
+{
+    Gs1UiAction action;
+    Gs1UiPanelSlotId slot_id;
+    std::uint8_t flags;
+    std::uint8_t reserved0[2];
+    char label[28];
+};
+
+struct Gs1EngineMessageUiPanelListItemData
+{
+    std::uint32_t item_id;
+    Gs1UiPanelListId list_id;
+    std::uint8_t flags;
+    std::uint8_t reserved0[2];
+    char primary_text[24];
+    char secondary_text[28];
+};
+
+struct Gs1EngineMessageUiPanelListActionData
+{
+    Gs1UiAction action;
+    std::uint32_t item_id;
+    Gs1UiPanelListId list_id;
+    Gs1UiPanelListActionRole role;
+    std::uint8_t flags;
+    std::uint8_t reserved0;
+};
+
 struct Gs1EngineMessageUiElementData
 {
     Gs1UiAction action;
@@ -606,6 +716,7 @@ struct Gs1EngineMessageSiteTileData
 
 struct Gs1EngineMessageWorkerData
 {
+    std::uint64_t entity_id;
     float tile_x;
     float tile_y;
     float facing_degrees;
@@ -614,6 +725,7 @@ struct Gs1EngineMessageWorkerData
     float energy_normalized;
     std::uint8_t flags;
     Gs1SiteActionKind current_action_kind;
+    std::uint16_t reserved0;
 };
 
 struct Gs1EngineMessageCampData
@@ -814,6 +926,49 @@ struct Gs1EngineMessageSiteActionData
     float duration_minutes;
 };
 
+struct Gs1EngineMessageSitePlantVisualData
+{
+    std::uint64_t visual_id;
+    std::uint32_t plant_type_id;
+    float anchor_tile_x;
+    float anchor_tile_y;
+    float height_scale;
+    std::uint16_t density_quantized;
+    std::uint8_t footprint_width;
+    std::uint8_t footprint_height;
+    std::uint8_t height_class;
+    std::uint8_t focus;
+    std::uint8_t flags;
+    std::uint8_t reserved0;
+};
+
+inline constexpr std::uint8_t GS1_SITE_PLANT_VISUAL_FLAG_HAS_AURA = 1U << 0U;
+inline constexpr std::uint8_t GS1_SITE_PLANT_VISUAL_FLAG_HAS_WIND_PROJECTION = 1U << 1U;
+inline constexpr std::uint8_t GS1_SITE_PLANT_VISUAL_FLAG_GROWABLE = 1U << 2U;
+
+struct Gs1EngineMessageSiteVisualRemoveData
+{
+    std::uint64_t visual_id;
+};
+
+struct Gs1EngineMessageSiteDeviceVisualData
+{
+    std::uint64_t visual_id;
+    std::uint32_t structure_type_id;
+    float anchor_tile_x;
+    float anchor_tile_y;
+    float integrity_normalized;
+    float height_scale;
+    std::uint8_t footprint_width;
+    std::uint8_t footprint_height;
+    std::uint8_t flags;
+    std::uint8_t reserved0;
+};
+
+inline constexpr std::uint8_t GS1_SITE_DEVICE_VISUAL_FLAG_HAS_STORAGE = 1U << 0U;
+inline constexpr std::uint8_t GS1_SITE_DEVICE_VISUAL_FLAG_IS_CRAFTING_STATION = 1U << 1U;
+inline constexpr std::uint8_t GS1_SITE_DEVICE_VISUAL_FLAG_FIXED_INTEGRITY = 1U << 2U;
+
 struct Gs1EngineMessageHudStateData
 {
     float player_health;
@@ -909,7 +1064,7 @@ private:
     }
 };
 
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1RuntimeCreateDesc, 16U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1RuntimeCreateDesc, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA(Gs1RuntimeTimingStats);
 GS1_ASSERT_TRIVIAL_SCHEMA(Gs1RuntimeProfileSystemStats);
 GS1_ASSERT_TRIVIAL_SCHEMA(Gs1RuntimeProfilingSnapshot);
@@ -940,10 +1095,16 @@ GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageRegionalMapSiteData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageRegionalMapLinkData, 12U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageUiSetupData, 12U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageCloseUiSetupData, 2U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageUiPanelData, 12U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageCloseUiPanelData, 4U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageUiPanelTextData, 60U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageUiPanelSlotActionData, 56U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageUiPanelListItemData, 60U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageUiPanelListActionData, 32U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageUiElementData, 56U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteSnapshotData, 16U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteTileData, 60U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageWorkerData, 28U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageWorkerData, 40U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageCampData, 16U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageWeatherData, 36U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageInventoryStorageData, 16U);
@@ -960,6 +1121,9 @@ GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteProtectionOverlayData, 4U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteModifierListData, 4U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteModifierData, 8U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteActionData, 24U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSitePlantVisualData, 32U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteVisualRemoveData, 8U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteDeviceVisualData, 32U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageHudStateData, 36U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageCampaignResourcesData, 20U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageNotificationData, 56U);
@@ -975,6 +1139,12 @@ static_assert(sizeof(Gs1EngineMessageRegionalMapSiteData) <= GS1_MESSAGE_PAYLOAD
 static_assert(sizeof(Gs1EngineMessageRegionalMapLinkData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageUiSetupData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageCloseUiSetupData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageUiPanelData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageCloseUiPanelData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageUiPanelTextData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageUiPanelSlotActionData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageUiPanelListItemData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageUiPanelListActionData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageUiElementData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageSiteSnapshotData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageSiteTileData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
@@ -996,6 +1166,9 @@ static_assert(sizeof(Gs1EngineMessageSiteProtectionOverlayData) <= GS1_MESSAGE_P
 static_assert(sizeof(Gs1EngineMessageSiteModifierListData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageSiteModifierData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageSiteActionData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageSitePlantVisualData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageSiteVisualRemoveData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageSiteDeviceVisualData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageHudStateData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageCampaignResourcesData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageNotificationData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);

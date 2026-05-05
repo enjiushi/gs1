@@ -19,9 +19,15 @@ namespace gs1
 {
 namespace
 {
-[[nodiscard]] std::filesystem::path content_table_root()
+[[nodiscard]] std::filesystem::path& mutable_content_table_root()
 {
-    return std::filesystem::path {GS1_CONTENT_TABLE_DIR};
+    static std::filesystem::path root {GS1_CONTENT_TABLE_DIR};
+    return root;
+}
+
+[[nodiscard]] const std::filesystem::path& content_table_root()
+{
+    return mutable_content_table_root();
 }
 
 [[noreturn]] void fail_load(
@@ -2171,11 +2177,11 @@ void index_defs(
 }
 }  // namespace
 
-ContentDatabase ContentLoader::load_prototype_content()
+ContentDatabase ContentLoader::load_prototype_content(const std::filesystem::path& content_root)
 {
     ContentDatabase content {};
 
-    const auto root = content_table_root();
+    const auto root = content_root;
     const auto sites_path = root / "sites.toml";
     const auto campaign_setup_path = root / "campaign_setup.toml";
     const auto phone_listings_path = root / "phone_listings.toml";
@@ -2301,7 +2307,15 @@ ContentDatabase ContentLoader::load_prototype_content()
 
 const ContentDatabase& prototype_content_database() noexcept
 {
-    static const ContentDatabase content = ContentLoader::load_prototype_content();
+    static const ContentDatabase content = ContentLoader::load_prototype_content(content_table_root());
     return content;
+}
+
+void set_prototype_content_root(std::filesystem::path content_root)
+{
+    if (!content_root.empty())
+    {
+        mutable_content_table_root() = std::move(content_root);
+    }
 }
 }  // namespace gs1

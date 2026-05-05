@@ -1,0 +1,105 @@
+[gd_scene format=3 uid="uid://cgkfsfq813ym2"]
+
+[ext_resource type="Theme" uid="uid://dolja7d2yu1v7" path="res://assets/desert_shell_theme.tres" id="2_theme"]
+[ext_resource type="PackedScene" uid="uid://bkd61semyccuw" path="res://scenes/main_menu_backdrop.tscn" id="4_backdrop"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_menu_shell"]
+content_margin_left = 8.0
+content_margin_top = 10.0
+content_margin_right = 8.0
+content_margin_bottom = 10.0
+bg_color = Color(0.2, 0.137255, 0.0627451, 0.18)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.968627, 0.862745, 0.639216, 0.18)
+corner_radius_top_left = 26
+corner_radius_top_right = 26
+corner_radius_bottom_right = 26
+corner_radius_bottom_left = 26
+shadow_color = Color(0.0784314, 0.0509804, 0.0196078, 0.26)
+shadow_size = 16
+anti_aliasing_size = 2.0
+
+[node name="MainMenu" type="Gs1GodotMainScreenControl" unique_id=1957236222]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("2_theme")
+
+[node name="BackdropViewport" type="SubViewportContainer" parent="." unique_id=27601693]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch = true
+
+[node name="Viewport" type="SubViewport" parent="BackdropViewport" unique_id=142110443]
+handle_input_locally = false
+size = Vector2i(1600, 900)
+render_target_update_mode = 4
+
+[node name="RegionalMapWorld" parent="BackdropViewport/Viewport" unique_id=39603584 instance=ExtResource("4_backdrop")]
+
+[node name="HudMargin" type="MarginContainer" parent="." unique_id=742359163]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 42.0
+offset_top = 28.0
+offset_right = -42.0
+offset_bottom = -32.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="RootVBox" type="VBoxContainer" parent="HudMargin" unique_id=1471660251]
+layout_mode = 2
+theme_override_constants/separation = 22
+
+[node name="MenuWrap" type="HBoxContainer" parent="HudMargin/RootVBox" unique_id=987360074]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 20
+
+[node name="MenuPanel" type="PanelContainer" parent="HudMargin/RootVBox/MenuWrap" unique_id=822259590]
+custom_minimum_size = Vector2(432, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_menu_shell")
+
+[node name="MenuVBox" type="VBoxContainer" parent="HudMargin/RootVBox/MenuWrap/MenuPanel" unique_id=1992766354]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="StartCampaignButton" type="Button" parent="HudMargin/RootVBox/MenuWrap/MenuPanel/MenuVBox" unique_id=176542381]
+custom_minimum_size = Vector2(0, 54)
+layout_mode = 2
+size_flags_horizontal = 3
+metadata/gs1_panel_id = 1
+metadata/gs1_slot_id = 1
+text = "Start New Campaign"
+groups = ["gs1_slot_button"]
+
+[node name="MenuSettingsButton" type="Button" parent="HudMargin/RootVBox/MenuWrap/MenuPanel/MenuVBox" unique_id=732670092]
+custom_minimum_size = Vector2(0, 54)
+layout_mode = 2
+size_flags_horizontal = 3
+metadata/gs1_panel_id = 1
+metadata/gs1_slot_id = 2
+text = "Settings"
+groups = ["gs1_slot_button"]
+
+[node name="QuitButton" type="Button" parent="HudMargin/RootVBox/MenuWrap/MenuPanel/MenuVBox" unique_id=1390229338]
+custom_minimum_size = Vector2(0, 54)
+layout_mode = 2
+size_flags_horizontal = 3
+metadata/gs1_panel_id = 1
+metadata/gs1_slot_id = 3
+text = "Quit"
+groups = ["gs1_slot_button"]
