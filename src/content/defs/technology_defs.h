@@ -48,7 +48,6 @@ struct ReputationUnlockDef final
     std::int32_t reputation_requirement {0};
     std::uint32_t content_id {0};
     std::string_view display_name {};
-    std::string_view description {};
 };
 
 struct TechnologyNodeDef final
@@ -71,7 +70,6 @@ struct TechnologyNodeDef final
     bool is_todo_placeholder {true};
     std::uint8_t reserved3[3] {};
     std::string_view display_name {};
-    std::string_view description {};
 };
 
 inline constexpr std::uint8_t k_faction_tech_tier_count = 32U;

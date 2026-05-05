@@ -1663,10 +1663,6 @@ void load_modifier_defs(ContentDatabase& content, const std::filesystem::path& p
         modifier.preset_kind =
             parse_modifier_preset_kind(path, toml_line_number(entry), require_toml_string(path, entry, "preset_kind"));
         modifier.modifier_id = ModifierId {require_toml_unsigned<std::uint32_t>(path, entry, "modifier_id")};
-        modifier.display_name =
-            store_string_view(content, optional_toml_string(path, entry, "display_name").value_or(std::string {}));
-        modifier.description =
-            store_string_view(content, optional_toml_string(path, entry, "description").value_or(std::string {}));
         modifier.duration_eight_hour_blocks =
             optional_toml_unsigned<std::uint16_t>(path, entry, "duration_eight_hour_blocks").value_or(0U);
         modifier.totals.heat = require_toml_float(path, entry, "heat");
@@ -1945,8 +1941,7 @@ void load_reputation_unlock_defs(ContentDatabase& content, const std::filesystem
             {0U, 0U, 0U},
             require_toml_signed<std::int32_t>(path, entry, "reputation_requirement"),
             require_toml_unsigned<std::uint32_t>(path, entry, "content_id"),
-            store_string_view(content, require_toml_string(path, entry, "display_name")),
-            store_string_view(content, require_toml_string(path, entry, "description"))});
+            store_string_view(content, require_toml_string(path, entry, "display_name"))});
     }
 }
 
@@ -1994,8 +1989,7 @@ void load_technology_node_defs(ContentDatabase& content, const std::filesystem::
             granted_content_id,
             require_toml_bool(path, entry, "is_todo_placeholder"),
             {0U, 0U, 0U},
-            store_string_view(content, require_toml_string(path, entry, "display_name")),
-            store_string_view(content, require_toml_string(path, entry, "description"))});
+            store_string_view(content, require_toml_string(path, entry, "display_name"))});
     }
 }
 

@@ -2,6 +2,8 @@
 
 #include "godot_progression_resources.h"
 
+#include "host/adapter_metadata_catalog.h"
+
 #include "content/defs/craft_recipe_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/modifier_defs.h"
@@ -967,10 +969,12 @@ Dictionary Gs1RuntimeNode::build_active_site_dictionary() const
         modifier_dict["flags"] = static_cast<int64_t>(modifier.flags);
         modifier_dict["resource_icon_path"] =
             GodotProgressionResourceDatabase::instance().modifier_icon_path(modifier.modifier_id);
-        if (const auto* modifier_def = gs1::find_modifier_def(gs1::ModifierId {modifier.modifier_id}))
+        if (const auto* metadata = adapter_metadata_catalog().find(
+                Gs1AdapterMetadataDomain::Modifier,
+                modifier.modifier_id))
         {
-            modifier_dict["display_name"] = to_godot_string(modifier_def->display_name);
-            modifier_dict["description"] = to_godot_string(modifier_def->description);
+            modifier_dict["display_name"] = to_godot_string(metadata->display_name);
+            modifier_dict["description"] = to_godot_string(metadata->description);
         }
         modifiers.push_back(modifier_dict);
     }
@@ -1032,6 +1036,7 @@ void Gs1RuntimeNode::refresh_gameplay_dll_path()
 void Gs1RuntimeNode::refresh_project_config_root()
 {
     project_config_root_ = std::filesystem::path {compute_default_project_config_root()};
+    load_adapter_metadata_catalog_from_project_root(project_config_root_);
 }
 
 std::string Gs1RuntimeNode::compute_default_gameplay_dll_path() const

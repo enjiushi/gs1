@@ -8,7 +8,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
 display_name = "Grip Training"
-description = "Reduces shovel-carried Plant and Excavate meter costs by 5%."
 
 [[technology_nodes]]
 faction_id = 1
@@ -20,7 +19,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
 display_name = "Shared Thermos"
-description = "Adds 1 timed-buff slot."
 
 [[technology_nodes]]
 faction_id = 1
@@ -32,7 +30,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
 display_name = "Planter Warmup"
-description = "Reduces shovel-carried Plant action duration by 5%."
 
 [[technology_nodes]]
 faction_id = 1
@@ -44,7 +41,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
 display_name = "Pack Lashings"
-description = "Adds 2 worker-pack slots."
 
 [[technology_nodes]]
 faction_id = 1
@@ -56,7 +52,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
 display_name = "Careful Layer Access"
-description = "Unlocks Careful excavation depth for one layer deeper site digging."
 
 [[technology_nodes]]
 faction_id = 1
@@ -68,7 +63,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
 display_name = "Digging Warmup"
-description = "Reduces shovel-carried Excavate action duration by 5%."
 
 [[technology_nodes]]
 faction_id = 1
@@ -80,7 +74,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
 display_name = "Dry-Wrap Basics"
-description = "Reduces weather-driven nourishment and hydration loss by 15%."
 
 [[technology_nodes]]
 faction_id = 1
@@ -94,7 +87,6 @@ granted_content_kind = "Recipe"
 granted_content_id = 11
 is_todo_placeholder = false
 display_name = "Wormwood Broth Reserve"
-description = "Unlocks Rich Wormwood Broth as the first stronger Village meal built on top of the shared wormwood food line."
 
 [[technology_nodes]]
 faction_id = 1
@@ -106,7 +98,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
 display_name = "Planter Tempo"
-description = "Extends the shovel Plant duration reduction to 10% total."
 
 [[technology_nodes]]
 faction_id = 1
@@ -118,7 +109,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
 display_name = "Careful Layer Reading"
-description = "Rebalances Careful excavation toward better stone tiers."
 
 [[technology_nodes]]
 faction_id = 1
@@ -130,7 +120,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
 display_name = "Reserve Pockets"
-description = "Adds 2 more worker-pack slots."
 
 [[technology_nodes]]
 faction_id = 1
@@ -142,7 +131,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
 display_name = "Shelter Discipline I"
-description = "Reduces weather-driven health and morale loss by 15%."
 
 [[technology_nodes]]
 faction_id = 1
@@ -154,7 +142,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
 display_name = "Excavation Leverage"
-description = "Extends the shovel Excavate duration reduction to 15% total."
 
 [[technology_nodes]]
 faction_id = 1
@@ -166,7 +153,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
 display_name = "Dry-Wrap Practice"
-description = "Extends weather-driven nourishment and hydration mitigation to 30% total."
 
 [[technology_nodes]]
 faction_id = 1
@@ -178,7 +164,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
 display_name = "Careful Digging Cadence"
-description = "Reduces Careful excavation duration by 30% and its meter costs by 20%."
 
 [[technology_nodes]]
 faction_id = 1
@@ -192,7 +177,6 @@ granted_content_kind = "Recipe"
 granted_content_id = 15
 is_todo_placeholder = false
 display_name = "Hearty Pot Reserve"
-description = "Unlocks Rich Peashrub Hotpot as a stronger Village recovery meal for sustained field work."
 
 [[technology_nodes]]
 faction_id = 1
@@ -204,7 +188,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
 display_name = "Grip Reinforcement"
-description = "Extends the shovel meter-cost reduction to 10% total."
 
 [[technology_nodes]]
 faction_id = 1
@@ -216,7 +199,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
 display_name = "Planting Leverage"
-description = "Extends the shovel Plant duration reduction to 15% total."
 
 [[technology_nodes]]
 faction_id = 1
@@ -228,7 +210,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
 display_name = "Extra Thermos"
-description = "Adds 1 more timed-buff slot."
 
 [[technology_nodes]]
 faction_id = 1
@@ -240,7 +221,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
 display_name = "Thorough Layer Access"
-description = "Unlocks Thorough excavation depth for final-layer site digging."
 
 [[technology_nodes]]
 faction_id = 1
@@ -252,7 +232,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
 display_name = "Field Leverage"
-description = "Extends the shovel meter-cost reduction to 15% total."
 
 [[technology_nodes]]
 faction_id = 1
@@ -266,7 +245,6 @@ granted_content_kind = "Recipe"
 granted_content_id = 16
 is_todo_placeholder = false
 display_name = "Tonic Reserve"
-description = "Unlocks Rich Buckthorn Tonic as a stronger Village drink that upgrades the shared Buckthorn recovery line."
 
 [[technology_nodes]]
 faction_id = 1
@@ -278,7 +256,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
 display_name = "Digging Tempo"
-description = "Extends the shovel Excavate duration reduction to 10% total."
 
 [[technology_nodes]]
 faction_id = 1
@@ -290,7 +267,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
 display_name = "Layered Wraps I"
-description = "Extends weather-driven nourishment and hydration mitigation by another 20%."
 
 [[technology_nodes]]
 faction_id = 1
@@ -302,7 +278,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
 display_name = "Thorough Layer Reading"
-description = "Rebalances Thorough excavation toward better stone tiers."
 
 [[technology_nodes]]
 faction_id = 1
@@ -314,7 +289,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
 display_name = "Planter Rhythm I"
-description = "Adds another 20% shovel Plant duration reduction."
 
 [[technology_nodes]]
 faction_id = 1
@@ -326,7 +300,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
 display_name = "Shelter Discipline II"
-description = "Extends weather-driven health and morale mitigation to 30% total."
 
 [[technology_nodes]]
 faction_id = 1
@@ -340,7 +313,6 @@ granted_content_kind = "Recipe"
 granted_content_id = 19
 is_todo_placeholder = false
 display_name = "Rich Supper Service"
-description = "Unlocks Rich Jadeleaf Stew as a premium Village field meal that scales strongly with later shared harvest unlocks."
 
 [[technology_nodes]]
 faction_id = 1
@@ -352,7 +324,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
 display_name = "Planter Rhythm II"
-description = "Adds another 20% shovel Plant duration reduction, reaching the old capstone pace."
 
 [[technology_nodes]]
 faction_id = 1
@@ -364,7 +335,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
 display_name = "Thorough Digging Cadence"
-description = "Reduces Thorough excavation duration by 30% and its meter costs by 20%."
 
 [[technology_nodes]]
 faction_id = 1
@@ -376,7 +346,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.000
 is_todo_placeholder = false
 display_name = "Layered Wraps II"
-description = "Extends weather-driven nourishment and hydration mitigation to the old 70% ceiling."
 
 [[technology_nodes]]
 faction_id = 1
@@ -390,7 +359,6 @@ granted_content_kind = "Recipe"
 granted_content_id = 20
 is_todo_placeholder = false
 display_name = "Rich Revival Service"
-description = "Unlocks Rich Desert Revival Draught as the top-end Village premium drink layered above the shared revival line."
 
 [[technology_nodes]]
 faction_id = 2
@@ -404,7 +372,6 @@ granted_content_kind = "Structure"
 granted_content_id = 205
 is_todo_placeholder = false
 display_name = "Field Processing Charter"
-description = "Unlocks the Chemistry Station build line so Bureau progress starts by improving practical field processing and medicine support."
 
 [[technology_nodes]]
 faction_id = 2
@@ -416,7 +383,6 @@ unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.030
 is_todo_placeholder = false
 display_name = "Rooting Powder Coats"
-description = "Pushes the tier toward faster early density gain and cleaner planting starts."
 
 [[technology_nodes]]
 faction_id = 2
@@ -428,7 +394,6 @@ unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.028
 is_todo_placeholder = false
 display_name = "Dormant Reserve Packing"
-description = "Pushes the tier toward better survival when young plants take a sudden weather hit."
 
 [[technology_nodes]]
 faction_id = 2
@@ -440,7 +405,6 @@ unlock_effect_parameter = 1.09
 effect_parameter_per_bonus_reputation = 0.036
 is_todo_placeholder = false
 display_name = "Seed Selection Nursery Review"
-description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
 
 [[technology_nodes]]
 faction_id = 2
@@ -454,7 +418,6 @@ granted_content_kind = "Recipe"
 granted_content_id = 23
 is_todo_placeholder = false
 display_name = "Clinic Batch Notes"
-description = "Unlocks Herbal Poultice so Bureau processing turns basic medicine and wormwood into stronger treatment stock."
 
 [[technology_nodes]]
 faction_id = 2
@@ -466,7 +429,6 @@ unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.028
 is_todo_placeholder = false
 display_name = "Staggered Fence Shrubs"
-description = "Specializes the belt toward longer, cleaner wind-shadow lanes for planted rows."
 
 [[technology_nodes]]
 faction_id = 2
@@ -478,7 +440,6 @@ unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.026
 is_todo_placeholder = false
 display_name = "Leeward Dust Traps"
-description = "Specializes the belt toward better dust buffering and less burial pressure on the planted side of a lane."
 
 [[technology_nodes]]
 faction_id = 2
@@ -490,7 +451,6 @@ unlock_effect_parameter = 1.09
 effect_parameter_per_bonus_reputation = 0.031
 is_todo_placeholder = false
 display_name = "Windline Shelter Belts Review"
-description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
 
 [[technology_nodes]]
 faction_id = 2
@@ -504,7 +464,6 @@ granted_content_kind = "Item"
 granted_content_id = 39
 is_todo_placeholder = false
 display_name = "Stimulant Procurement Line"
-description = "Unlocks Focus Tonic store access so Bureau logistics can stock stronger emergency work stimulants."
 
 [[technology_nodes]]
 faction_id = 2
@@ -516,7 +475,6 @@ unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.026
 is_todo_placeholder = false
 display_name = "Selective Pod Grading"
-description = "Improves Bureau harvest-bonus rarity weighting so higher unlocked bonus tiers appear more often when the extra roll hits."
 
 [[technology_nodes]]
 faction_id = 2
@@ -528,7 +486,6 @@ unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.024
 is_todo_placeholder = false
 display_name = "Moisture Catch Basins"
-description = "Pushes the tier toward small water-holding pockets that help mixed patches stay alive through dry swings."
 
 [[technology_nodes]]
 faction_id = 2
@@ -540,7 +497,6 @@ unlock_effect_parameter = 1.09
 effect_parameter_per_bonus_reputation = 0.027
 is_todo_placeholder = false
 display_name = "Nurse Crop Pairing Review"
-description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
 
 [[technology_nodes]]
 faction_id = 2
@@ -552,7 +508,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.026
 is_todo_placeholder = false
 display_name = "Salt Edge Rootstock"
-description = "Reorients the branch around salinity tolerance and root resilience so planted lines can survive harsher ground."
 
 [[technology_nodes]]
 faction_id = 2
@@ -564,7 +519,6 @@ unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.024
 is_todo_placeholder = false
 display_name = "Mycorrhiza Threading"
-description = "Specializes the tier toward stronger terrain rehabilitation and slower collapse on stressed soil."
 
 [[technology_nodes]]
 faction_id = 2
@@ -576,7 +530,6 @@ unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.022
 is_todo_placeholder = false
 display_name = "Lane Picking Rhythm"
-description = "Improves Bureau harvest-bonus consistency so extra post-harvest bundles trigger more often without changing harvest action tempo."
 
 [[technology_nodes]]
 faction_id = 2
@@ -588,7 +541,6 @@ unlock_effect_parameter = 1.09
 effect_parameter_per_bonus_reputation = 0.024
 is_todo_placeholder = false
 display_name = "Salt Edge Rootstock Review"
-description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
 
 [[technology_nodes]]
 faction_id = 2
@@ -600,7 +552,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.022
 is_todo_placeholder = false
 display_name = "Canopy Ladder Program"
-description = "Builds the branch around layered plant height and denser shelter stacks so patches perform more like living infrastructure."
 
 [[technology_nodes]]
 faction_id = 2
@@ -612,7 +563,6 @@ unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.022
 is_todo_placeholder = false
 display_name = "Mixed Height Windbreaks"
-description = ""
 
 [[technology_nodes]]
 faction_id = 2
@@ -624,7 +574,6 @@ unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.020
 is_todo_placeholder = false
 display_name = "Pollinator Verge Pockets"
-description = "Leans the tier toward stronger spread, patch continuity, and productive planted edges."
 
 [[technology_nodes]]
 faction_id = 2
@@ -638,7 +587,6 @@ granted_content_kind = "Structure"
 granted_content_id = 204
 is_todo_placeholder = false
 display_name = "Windbreak Works Program"
-description = "Unlocks Wind Fence construction so Bureau infrastructure can add device-side wind shelter to exposed lanes."
 
 [[technology_nodes]]
 faction_id = 2
@@ -650,7 +598,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.019
 is_todo_placeholder = false
 display_name = "Burial Recovery Groves"
-description = "Targets late-site sand pressure directly by helping plants rebound after burial and rough gust cycles."
 
 [[technology_nodes]]
 faction_id = 2
@@ -662,7 +609,6 @@ unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.020
 is_todo_placeholder = false
 display_name = "Dune Pin Root Nets"
-description = "Specializes the grove toward stronger anti-burial holding power under repeated sand movement."
 
 [[technology_nodes]]
 faction_id = 2
@@ -674,7 +620,6 @@ unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.018
 is_todo_placeholder = false
 display_name = "Self-Pruning Fans"
-description = "Specializes the grove toward plants that recover shape and function faster after exposure spikes."
 
 [[technology_nodes]]
 faction_id = 2
@@ -686,7 +631,6 @@ unlock_effect_parameter = 1.09
 effect_parameter_per_bonus_reputation = 0.019
 is_todo_placeholder = false
 display_name = "Burial Recovery Groves Review"
-description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
 
 [[technology_nodes]]
 faction_id = 2
@@ -698,7 +642,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.017
 is_todo_placeholder = false
 display_name = "Merchant Grove Sorting"
-description = "Improves late Bureau harvest-bonus rarity weighting again so tier-three extra bundles show up more often once unlocked."
 
 [[technology_nodes]]
 faction_id = 2
@@ -710,7 +653,6 @@ unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.018
 is_todo_placeholder = false
 display_name = "Corridor Stitching"
-description = ""
 
 [[technology_nodes]]
 faction_id = 2
@@ -722,7 +664,6 @@ unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.016
 is_todo_placeholder = false
 display_name = "Seed Rain Timing"
-description = "Pushes the tier toward extra plant-side mechanics around spread windows, recovery windows, and follow-on growth."
 
 [[technology_nodes]]
 faction_id = 2
@@ -734,7 +675,6 @@ unlock_effect_parameter = 1.09
 effect_parameter_per_bonus_reputation = 0.017
 is_todo_placeholder = false
 display_name = "Succession Patch Planning Review"
-description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
 
 [[technology_nodes]]
 faction_id = 2
@@ -746,7 +686,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.015
 is_todo_placeholder = false
 display_name = "Regional Living Matrix"
-description = "Caps the Bureau branch with a broad plant-modifier package meant to make the whole field behave like a coordinated living system."
 
 [[technology_nodes]]
 faction_id = 2
@@ -758,7 +697,6 @@ unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.016
 is_todo_placeholder = false
 display_name = "Harvest Cadence Network"
-description = "Caps the Bureau cash lane with its strongest harvest-bonus consistency step, making extra bundles far more dependable on productive harvest runs."
 
 [[technology_nodes]]
 faction_id = 2
@@ -770,7 +708,6 @@ unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.014
 is_todo_placeholder = false
 display_name = "Keystone Habitat Weave"
-description = "Turns the capstone toward extra plant mechanisms, companion effects, and durable mixed-patch survival."
 
 [[technology_nodes]]
 faction_id = 2
@@ -782,7 +719,6 @@ unlock_effect_parameter = 1.09
 effect_parameter_per_bonus_reputation = 0.015
 is_todo_placeholder = false
 display_name = "Regional Living Matrix Review"
-description = "Consolidates the preceding branch lessons into a steadier, more reliable field practice."
 
 [[technology_nodes]]
 faction_id = 3
@@ -796,7 +732,6 @@ granted_content_kind = "Plant"
 granted_content_id = 11
 is_todo_placeholder = false
 display_name = "Wormwood Selection Trial"
-description = "Opens the University branch by unlocking Aromatic Wormwood, a higher-pool cultivar with stronger protection and more valuable herb output."
 
 [[technology_nodes]]
 faction_id = 3
@@ -808,7 +743,6 @@ unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.030
 is_todo_placeholder = false
 display_name = "Seed Viability Notes"
-description = "Pushes the branch toward more reliable plant starts and cleaner early growth from better seed handling."
 
 [[technology_nodes]]
 faction_id = 3
@@ -820,7 +754,6 @@ unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.028
 is_todo_placeholder = false
 display_name = "Field Phenotype Logs"
-description = "Pushes the branch toward steadier plant outcomes by selecting for lines with less bad-luck variance under field stress."
 
 [[technology_nodes]]
 faction_id = 3
@@ -832,7 +765,6 @@ unlock_effect_parameter = 1.09
 effect_parameter_per_bonus_reputation = 0.036
 is_todo_placeholder = false
 display_name = "Selection Trial Review"
-description = "Consolidates the early cultivar lessons into a steadier, more reliable plant-breeding practice."
 
 [[technology_nodes]]
 faction_id = 3
@@ -846,7 +778,6 @@ granted_content_kind = "Plant"
 granted_content_id = 12
 is_todo_placeholder = false
 display_name = "Thorn Sugar Trial"
-description = "Unlocks Sweet White Thorn, a salinity-focused cultivar with a larger pool and better-value cooling harvests."
 
 [[technology_nodes]]
 faction_id = 3
@@ -858,7 +789,6 @@ unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.028
 is_todo_placeholder = false
 display_name = "Canopy Sampling Rows"
-description = "Specializes the tier toward cleaner comparisons between planted lines so protective and productive traits are easier to refine."
 
 [[technology_nodes]]
 faction_id = 3
@@ -870,7 +800,6 @@ unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.026
 is_todo_placeholder = false
 display_name = "Growth Window Charts"
-description = "Specializes the tier toward better timing around growth and recovery windows so improved lines lose less momentum."
 
 [[technology_nodes]]
 faction_id = 3
@@ -882,7 +811,6 @@ unlock_effect_parameter = 1.09
 effect_parameter_per_bonus_reputation = 0.031
 is_todo_placeholder = false
 display_name = "Cooling Trial Review"
-description = "Consolidates the cooling-line breeding work into a steadier, more reliable field practice."
 
 [[technology_nodes]]
 faction_id = 3
@@ -896,7 +824,6 @@ granted_content_kind = "Plant"
 granted_content_id = 13
 is_todo_placeholder = false
 display_name = "Buckthorn Oil Trial"
-description = "Unlocks High-Oil Buckthorn, a stronger protection-output cultivar whose berries sell better and support stronger premium tonics."
 
 [[technology_nodes]]
 faction_id = 3
@@ -908,7 +835,6 @@ unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.026
 is_todo_placeholder = false
 display_name = "Salt Tolerance Notes"
-description = "Pushes this line toward better salinity handling so selected plants stay useful on harsher ground."
 
 [[technology_nodes]]
 faction_id = 3
@@ -920,7 +846,6 @@ unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.024
 is_todo_placeholder = false
 display_name = "Rootstock Crosses"
-description = "Pushes this line toward stronger rehabilitation traits and sturdier survival on rough or salty soil."
 
 [[technology_nodes]]
 faction_id = 3
@@ -932,7 +857,6 @@ unlock_effect_parameter = 1.09
 effect_parameter_per_bonus_reputation = 0.027
 is_todo_placeholder = false
 display_name = "Buckthorn Trial Review"
-description = "Consolidates the Buckthorn quality work into a steadier, more reliable field practice."
 
 [[technology_nodes]]
 faction_id = 3
@@ -946,7 +870,6 @@ granted_content_kind = "Plant"
 granted_content_id = 14
 is_todo_placeholder = false
 display_name = "Ephedra Potency Program"
-description = "Unlocks Potent Desert Ephedra, a worker-support cultivar with a larger pool and stronger high-value herb output."
 
 [[technology_nodes]]
 faction_id = 3
@@ -958,7 +881,6 @@ unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.024
 is_todo_placeholder = false
 display_name = "Alkaloid Profile Sheets"
-description = "Specializes the line toward stronger herb character and better premium-use potential from selected Ephedra strains."
 
 [[technology_nodes]]
 faction_id = 3
@@ -970,7 +892,6 @@ unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.022
 is_todo_placeholder = false
 display_name = "Resilience Reserve Seeds"
-description = "Leans the branch toward backup plant lines that recover better after bad weather and failed early establishment."
 
 [[technology_nodes]]
 faction_id = 3
@@ -982,7 +903,6 @@ unlock_effect_parameter = 1.09
 effect_parameter_per_bonus_reputation = 0.024
 is_todo_placeholder = false
 display_name = "Ephedra Program Review"
-description = "Consolidates the Ephedra potency work into a steadier, more reliable field practice."
 
 [[technology_nodes]]
 faction_id = 3
@@ -996,7 +916,6 @@ granted_content_kind = "Plant"
 granted_content_id = 15
 is_todo_placeholder = false
 display_name = "Wormwood Concentrate Program"
-description = "Unlocks Dense-Pod Peashrub, an advanced rehab cultivar with a larger pool and stronger sale-grade pod harvests."
 
 [[technology_nodes]]
 faction_id = 3
@@ -1008,7 +927,6 @@ unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.022
 is_todo_placeholder = false
 display_name = "Moisture Holding Crosses"
-description = "Specializes the tier toward plant lines that hold performance more steadily through hot dry swings."
 
 [[technology_nodes]]
 faction_id = 3
@@ -1020,7 +938,6 @@ unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.020
 is_todo_placeholder = false
 display_name = "Companion Planting Notes"
-description = "Pushes the branch toward pairings and mixed patches that help improved lines support one another."
 
 [[technology_nodes]]
 faction_id = 3
@@ -1032,7 +949,6 @@ unlock_effect_parameter = 1.09
 effect_parameter_per_bonus_reputation = 0.021
 is_todo_placeholder = false
 display_name = "Concentrate Program Review"
-description = "Consolidates the concentrated herb-quality work into a steadier, more reliable field practice."
 
 [[technology_nodes]]
 faction_id = 3
@@ -1044,7 +960,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.019
 is_todo_placeholder = false
 display_name = "Adaptive Trial Beds"
-description = "Keeps the branch flexible by making cultivar programs respond better to local site conditions instead of one fixed breeding script."
 
 [[technology_nodes]]
 faction_id = 3
@@ -1056,7 +971,6 @@ unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.020
 is_todo_placeholder = false
 display_name = "Pilot Nurseries"
-description = "Pushes the tier toward faster plant iteration and safer first deployments for newly improved lines."
 
 [[technology_nodes]]
 faction_id = 3
@@ -1068,7 +982,6 @@ unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.018
 is_todo_placeholder = false
 display_name = "Stress Table Selections"
-description = "Pushes the tier toward plant lines that keep more value and function under sustained field strain."
 
 [[technology_nodes]]
 faction_id = 3
@@ -1080,7 +993,6 @@ unlock_effect_parameter = 1.09
 effect_parameter_per_bonus_reputation = 0.019
 is_todo_placeholder = false
 display_name = "Adaptive Trial Review"
-description = "Consolidates the adaptive breeding work into a steadier, more reliable field practice."
 
 [[technology_nodes]]
 faction_id = 3
@@ -1092,7 +1004,6 @@ unlock_effect_parameter = 1.00
 effect_parameter_per_bonus_reputation = 0.017
 is_todo_placeholder = false
 display_name = "Shared Seed Archive"
-description = "Links plant knowledge across sites so proven lines and field adaptations compound instead of resetting each run."
 
 [[technology_nodes]]
 faction_id = 3
@@ -1104,7 +1015,6 @@ unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.018
 is_todo_placeholder = false
 display_name = "Climate Trial Library"
-description = "Specializes the tier toward better weather-aware breeding judgments before committing rare improved lines."
 
 [[technology_nodes]]
 faction_id = 3
@@ -1116,7 +1026,6 @@ unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.016
 is_todo_placeholder = false
 display_name = "Cutting Transfer Kits"
-description = "Specializes the tier toward more reliable propagation and follow-up after failed or improvised field trials."
 
 [[technology_nodes]]
 faction_id = 3
@@ -1128,7 +1037,6 @@ unlock_effect_parameter = 1.09
 effect_parameter_per_bonus_reputation = 0.017
 is_todo_placeholder = false
 display_name = "Seed Archive Review"
-description = "Consolidates the archive-driven breeding work into a steadier, more reliable field practice."
 
 [[technology_nodes]]
 faction_id = 3
@@ -1142,7 +1050,6 @@ granted_content_kind = "Plant"
 granted_content_id = 16
 is_todo_placeholder = false
 display_name = "Thorn Selection Archive"
-description = "Unlocks Selected Wolfberry, a late University premium cultivar with the branch's strongest direct harvest-value output."
 
 [[technology_nodes]]
 faction_id = 3
@@ -1154,7 +1061,6 @@ unlock_effect_parameter = 1.15
 effect_parameter_per_bonus_reputation = 0.016
 is_todo_placeholder = false
 display_name = "Canopy Forecast Sheets"
-description = "Turns the capstone toward predicting which improved lines will hold, thrive, or fail in the hardest late-site weather windows."
 
 [[technology_nodes]]
 faction_id = 3
@@ -1166,7 +1072,6 @@ unlock_effect_parameter = 1.12
 effect_parameter_per_bonus_reputation = 0.014
 is_todo_placeholder = false
 display_name = "Field Lineage Archive"
-description = "Turns the capstone toward resilient cultivar continuity, faster re-selection, and stronger follow-through after disrupted field trials."
 
 [[technology_nodes]]
 faction_id = 3
@@ -1178,5 +1083,4 @@ unlock_effect_parameter = 1.09
 effect_parameter_per_bonus_reputation = 0.015
 is_todo_placeholder = false
 display_name = "Advanced Selection Review"
-description = "Consolidates the late University plant-science work into a steadier, more reliable final breeding practice."
 

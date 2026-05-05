@@ -1,6 +1,7 @@
 #include "smoke_engine_host.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/modifier_defs.h"
+#include "host/adapter_metadata_catalog.h"
 
 #include <cmath>
 #include <string>
@@ -359,10 +360,12 @@ std::string build_modifier_summary(const gs1::ModifierDef& modifier_def)
 
 std::string modifier_display_name(const SmokeEngineHost::SiteModifierProjection& modifier)
 {
-    const auto* modifier_def = gs1::find_modifier_def(gs1::ModifierId {modifier.modifier_id});
-    if (modifier_def != nullptr && !modifier_def->display_name.empty())
+    if (const auto* metadata = adapter_metadata_catalog().find(
+            Gs1AdapterMetadataDomain::Modifier,
+            modifier.modifier_id);
+        metadata != nullptr && !metadata->display_name.empty())
     {
-        return std::string {modifier_def->display_name};
+        return metadata->display_name;
     }
 
     const bool timed = (modifier.flags & GS1_SITE_MODIFIER_FLAG_TIMED) != 0U;
@@ -374,16 +377,19 @@ std::string modifier_display_name(const SmokeEngineHost::SiteModifierProjection&
 std::string modifier_description(const SmokeEngineHost::SiteModifierProjection& modifier)
 {
     const auto* modifier_def = gs1::find_modifier_def(gs1::ModifierId {modifier.modifier_id});
+    if (const auto* metadata = adapter_metadata_catalog().find(
+            Gs1AdapterMetadataDomain::Modifier,
+            modifier.modifier_id);
+        metadata != nullptr && !metadata->description.empty())
+    {
+        return metadata->description;
+    }
+
     if (modifier_def == nullptr)
     {
         return (modifier.flags & GS1_SITE_MODIFIER_FLAG_TIMED) != 0U
             ? "Temporary modifier."
             : "Permanent modifier.";
-    }
-
-    if (!modifier_def->description.empty())
-    {
-        return std::string {modifier_def->description};
     }
 
     return build_modifier_summary(*modifier_def);

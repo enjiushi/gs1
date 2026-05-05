@@ -1,0 +1,74 @@
+[[modifier_presets]]
+modifier_id = 3001
+display_name = "Field Tea"
+description = "A steady tea that eases hydration strain and lifts morale for a short time."
+
+[[modifier_presets]]
+modifier_id = 3002
+display_name = "Spiced Stew"
+description = "A warm meal that steadies nourishment, expands endurance, and reduces nourishment-heavy work strain."
+
+[[modifier_presets]]
+modifier_id = 3003
+display_name = "Focus Tonic"
+description = "A sharp stimulant that boosts morale and work focus while cutting energy-heavy action costs."
+
+[[modifier_presets]]
+modifier_id = 3401
+display_name = "Wormwood Broth"
+description = "A sustaining broth that accelerates background energy recovery."
+
+[[modifier_presets]]
+modifier_id = 3402
+display_name = "Wormwood Broth Plus"
+description = "A fortified broth that greatly accelerates background energy recovery and lasts longer."
+
+[[modifier_presets]]
+modifier_id = 3403
+display_name = "Thornberry Cooler"
+description = "A cooling drink that trims worker meter costs across all actions."
+
+[[modifier_presets]]
+modifier_id = 3404
+display_name = "Thornberry Cooler Plus"
+description = "A sharpened cooling drink that trims worker meter costs harder and lasts longer."
+
+[[modifier_presets]]
+modifier_id = 3405
+display_name = "Peashrub Hotpot"
+description = "A restorative meal that steadily recovers health over the next shift."
+
+[[modifier_presets]]
+modifier_id = 3406
+display_name = "Peashrub Hotpot Plus"
+description = "A concentrated restorative meal that recovers health twice as quickly."
+
+[[modifier_presets]]
+modifier_id = 3407
+display_name = "Buckthorn Tonic"
+description = "A bright tonic that steadily restores morale over the next shift."
+
+[[modifier_presets]]
+modifier_id = 3408
+display_name = "Buckthorn Tonic Plus"
+description = "A concentrated tonic that restores morale twice as quickly."
+
+[[modifier_presets]]
+modifier_id = 3409
+display_name = "Jadeleaf Stew"
+description = "A late-site meal that combines faster energy recovery with steady health recovery."
+
+[[modifier_presets]]
+modifier_id = 3410
+display_name = "Jadeleaf Stew Plus"
+description = "A reinforced late-site meal that upgrades both recovery effects and extends the buff."
+
+[[modifier_presets]]
+modifier_id = 3411
+display_name = "Desert Revival Draught"
+description = "A late-site draught that combines lower worker action costs with steady morale recovery."
+
+[[modifier_presets]]
+modifier_id = 3412
+display_name = "Desert Revival Draught Plus"
+description = "A reinforced late-site draught that upgrades both bundled effects and extends the buff."

@@ -1,6 +1,6 @@
 # project/
 
-Shared project-owned configuration and content that is not specific to one engine adapter.
+Shared project-owned configuration and data roots that sit above any one engine adapter.
 
 ## Usage
 - Read this file before scanning the folder in detail.
@@ -8,4 +8,9 @@ Shared project-owned configuration and content that is not specific to one engin
 - When files or folders in this directory change, update this file in the same change.
 
 ## Contents
-- `content/`: Shared gameplay-authored TOML configuration loaded by hosts and engine adapters during gameplay DLL initialization, including campaign, site, unlock, tuning, task, reward, and technology tables that now live outside any engine-specific project shell.
+- `adapter_metadata/`: Shared adapter-owned presentation metadata tables, including modifier plus progression display text and descriptions that hosts and engine adapters may load directly without making the gameplay DLL own that non-simulation copy.
+- `content/`: Shared gameplay-authored TOML configuration loaded by the gameplay DLL from the project root path supplied by the host or adapter, including campaign, site, unlock, tuning, task, reward, and technology tables that stay outside any engine-specific project shell.
+
+## Cross-Table Id Rule
+- For any authored type family such as items, unlockables, modifiers, or technology nodes, the per-type id must be globally unique for that type and reused unchanged across every related table for that type.
+- Reference tables, resource tables, description tables, and adapter-metadata tables must all point at the same shared per-type id instead of introducing table-local keys or recomputing composite identifiers.

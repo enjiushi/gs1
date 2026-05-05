@@ -4,6 +4,7 @@
 
 #include "content/defs/faction_defs.h"
 #include "content/defs/technology_defs.h"
+#include "host/adapter_metadata_catalog.h"
 
 #include <godot_cpp/classes/base_button.hpp>
 #include <godot_cpp/classes/base_material3d.hpp>
@@ -243,6 +244,14 @@ const gs1::ReputationUnlockDef* find_unlockable_def_by_title(const String& title
         }
     }
     return nullptr;
+}
+
+const Gs1AdapterMetadataEntry* find_unlockable_metadata_by_title(const String& title)
+{
+    const auto* unlock_def = find_unlockable_def_by_title(title);
+    return unlock_def == nullptr
+        ? nullptr
+        : adapter_metadata_catalog().find(Gs1AdapterMetadataDomain::ReputationUnlock, unlock_def->unlock_id);
 }
 
 std::uint8_t unlockable_content_kind_from_def(const gs1::ReputationUnlockDef& unlock_def)
@@ -2837,9 +2846,12 @@ String Gs1GodotMainScreenControl::regional_unlockable_tooltip_text(const String&
     const String title = trimmed_unlockable_title(trimmed);
     if (const auto* unlock_def = find_unlockable_def_by_title(title))
     {
-        const String description = unlock_def->description.empty()
+        const auto* metadata = adapter_metadata_catalog().find(
+            Gs1AdapterMetadataDomain::ReputationUnlock,
+            unlock_def->unlock_id);
+        const String description = (metadata == nullptr || metadata->description.empty())
             ? String("No authored description yet.")
-            : string_from_view(unlock_def->description);
+            : string_from_view(metadata->description);
         return vformat("%s\n%s\nNeed total reputation %d", title, description, unlock_def->reputation_requirement);
     }
 
@@ -2857,7 +2869,12 @@ String Gs1GodotMainScreenControl::regional_tech_tooltip_text(const Dictionary& a
     const auto* faction_def = gs1::find_faction_def(node_def->faction_id);
     const String faction_name = faction_def == nullptr ? String("Faction") : string_from_view(faction_def->display_name);
     const String title = node_def->display_name.empty() ? String("Technology") : string_from_view(node_def->display_name);
-    const String description = node_def->description.empty() ? String("No authored description yet.") : string_from_view(node_def->description);
+    const auto* metadata = adapter_metadata_catalog().find(
+        Gs1AdapterMetadataDomain::TechnologyNode,
+        node_def->tech_node_id.value);
+    const String description = (metadata == nullptr || metadata->description.empty())
+        ? String("No authored description yet.")
+        : string_from_view(metadata->description);
     return vformat(
         "%s\n%s Tier %d\n%s",
         title,

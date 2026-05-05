@@ -19,8 +19,6 @@ struct ModifierDef final
 {
     ModifierPresetKind preset_kind {ModifierPresetKind::NearbyAura};
     ModifierId modifier_id {};
-    std::string_view display_name {};
-    std::string_view description {};
     std::uint16_t duration_eight_hour_blocks {0U};
     std::uint16_t reserved0 {0U};
     ModifierChannelTotals totals {};

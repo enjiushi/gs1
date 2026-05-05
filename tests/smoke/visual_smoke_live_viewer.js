@@ -4800,17 +4800,30 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return { iconKey: "sprout", light: "#90a86f", dark: "#596b45" };
     }
 
-    function buildReputationUnlockCatalog(reputationUnlockTomlText) {
+    function buildReputationUnlockCatalog(reputationUnlockTomlText, metadataTomlText) {
+        const metadataByUnlockId = new Map();
+        parseTomlTableArray(metadataTomlText, "reputation_unlocks").forEach((row) => {
+            const unlockId = Number(row.unlock_id || 0);
+            if (unlockId > 0) {
+                metadataByUnlockId.set(unlockId, {
+                    displayName: String(row.display_name || ""),
+                    description: String(row.description || "")
+                });
+            }
+        });
+
         const rows = parseTomlTableArray(reputationUnlockTomlText, "reputation_unlocks");
         return rows
             .map((row) => {
+                const unlockId = Number(row.unlock_id || 0);
+                const metadata = metadataByUnlockId.get(unlockId) || null;
                 return {
-                    unlockId: Number(row.unlock_id || 0),
+                    unlockId: unlockId,
                     unlockKind: String(row.unlock_kind || ""),
                     reputationRequirement: Number(row.reputation_requirement || 0),
                     contentId: Number(row.content_id || 0),
-                    displayName: String(row.display_name || ""),
-                    description: String(row.description || "")
+                    displayName: metadata && metadata.displayName ? metadata.displayName : String(row.display_name || ""),
+                    description: metadata ? metadata.description : ""
                 };
             })
             .filter((row) => row.reputationRequirement > 0 && row.displayName.length > 0)
@@ -4829,10 +4842,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         if (reputationUnlockCatalogPromise) {
             return reputationUnlockCatalogPromise;
         }
-        reputationUnlockCatalogPromise = fetch("/content/reputation_unlocks.toml", { cache: "no-store" })
-            .then((response) => response.text())
-            .then((tomlText) => {
-                reputationUnlockCatalog = buildReputationUnlockCatalog(tomlText);
+        reputationUnlockCatalogPromise = Promise.all([
+            fetch("/content/reputation_unlocks.toml", { cache: "no-store" }).then((response) => response.text()),
+            fetch("/adapter-metadata/reputation_unlocks.toml", { cache: "no-store" }).then((response) => response.text())
+        ]).then((results) => {
+                reputationUnlockCatalog = buildReputationUnlockCatalog(results[0], results[1]);
                 reputationUnlockCatalogPromise = null;
                 if (latestState) {
                     renderState(latestState, {});
@@ -5137,11 +5151,21 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return rows;
     }
 
-    function buildTechnologyCatalog(nodeTomlText, tierTomlText) {
+    function buildTechnologyCatalog(nodeTomlText, tierTomlText, metadataTomlText) {
         const catalog = {
             nodesById: new Map(),
             tiersByIndex: new Map()
         };
+        const metadataByNodeId = new Map();
+        parseTomlTableArray(metadataTomlText, "technology_nodes").forEach((row) => {
+            const nodeId = Number(row.tech_node_id || 0);
+            if (nodeId > 0) {
+                metadataByNodeId.set(nodeId, {
+                    displayName: String(row.display_name || ""),
+                    description: String(row.description || "")
+                });
+            }
+        });
         parseTomlTableArray(tierTomlText, "technology_tiers").forEach((row) => {
             const tierIndex = Number(row.tier_index || 0);
             if (tierIndex > 0) {
@@ -5155,12 +5179,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             const factionId = Number(row.faction_id || 0);
             const tierIndex = Number(row.tier_index || 0);
             const nodeId = technologyNodeIdFromParts(factionId, tierIndex);
+            const metadata = metadataByNodeId.get(nodeId) || null;
             catalog.nodesById.set(nodeId, {
                 nodeId: nodeId,
                 factionId: factionId,
                 tierIndex: tierIndex,
-                displayName: String(row.display_name || ""),
-                description: String(row.description || ""),
+                displayName: metadata && metadata.displayName ? metadata.displayName : String(row.display_name || ""),
+                description: metadata ? metadata.description : "",
                 internalCostCashPoints: Number(row.internal_cost_cash_points || 0),
                 reputationRequirement: Number(row.reputation_requirement || 0),
                 grantedContentKind: String(row.granted_content_kind || ""),
@@ -5179,9 +5204,10 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
         technologyCatalogPromise = Promise.all([
             fetch("/content/technology_nodes.toml", { cache: "no-store" }).then((response) => response.text()),
-            fetch("/content/technology_tiers.toml", { cache: "no-store" }).then((response) => response.text())
+            fetch("/content/technology_tiers.toml", { cache: "no-store" }).then((response) => response.text()),
+            fetch("/adapter-metadata/technology_nodes.toml", { cache: "no-store" }).then((response) => response.text())
         ]).then((results) => {
-            technologyCatalog = buildTechnologyCatalog(results[0], results[1]);
+            technologyCatalog = buildTechnologyCatalog(results[0], results[1], results[2]);
             technologyCatalogPromise = null;
             if (latestState) {
                 renderState(latestState, {});

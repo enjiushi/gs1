@@ -7,7 +7,8 @@ Shared engine-agnostic host bridge code used by runtime clients that load the ga
 - When files or folders in this directory change, update this file in the same change.
 
 ## Contents
-- `adapter_config_loader.h` / `adapter_config_loader.cpp`: Shared host-side helper for packaging adapter-owned config roots into a runtime-startup payload so engine adapters can follow one initialization path when passing engine-specific presentation/resource config into the gameplay DLL.
+- `adapter_config_loader.h` / `adapter_config_loader.cpp`: Shared host-side helper for packaging adapter-owned config roots into a runtime-startup payload so engine adapters can pass the shared project root into gameplay startup alongside any engine-specific presentation/resource config.
+- `adapter_metadata_catalog.h` / `adapter_metadata_catalog.cpp`: Shared adapter-side metadata catalog loader for presentation-only labels and descriptions such as modifiers plus progression entries, loaded from `project/adapter_metadata/` so the gameplay DLL does not own that descriptive copy, with adapter metadata keyed directly by the same globally unique per-type ids used by gameplay content and references.
 - `runtime_dll_loader.h`: Shared function-pointer table and Win32 DLL loader for the engine-free gameplay runtime ABI.
 - `runtime_dll_loader.cpp`: Win32 implementation of the shared gameplay DLL loader.
 - `runtime_message_pump.h`: Shared engine-message drain helper that feeds projection caches from the gameplay runtime and can also retain the authoritative drained message list for adapters that consume deltas directly.

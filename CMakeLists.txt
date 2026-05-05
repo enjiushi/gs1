@@ -143,6 +143,7 @@ add_library(gs1_gameplay_core STATIC
 
 add_library(gs1_host_bridge STATIC
     src/host/adapter_config_loader.cpp
+    src/host/adapter_metadata_catalog.cpp
     src/host/runtime_dll_loader.cpp
     src/host/runtime_message_pump.cpp
     src/host/runtime_projection_state.cpp
@@ -151,7 +152,9 @@ add_library(gs1_host_bridge STATIC
 target_include_directories(gs1_host_bridge
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+    PRIVATE
+        ${GS1_TOMLPLUSPLUS_INCLUDE_DIR})
 
 set_target_properties(gs1_host_bridge PROPERTIES
     POSITION_INDEPENDENT_CODE ON)

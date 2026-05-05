@@ -50,6 +50,7 @@ All authored content rows in this document should follow these shared rules:
 | Optional fields | Optional fields should be absent or null when unused, not filled with fake placeholder ids. |
 | Positive authored counts | `targetAmount`, fixed reward amounts, duration mins, duration maxes, and authored export counts must all be positive when present. |
 | Reference validity | Any referenced `factionId`, `itemId`, `unlockableId`, `modifierId`, `taskTemplateId`, `eventArchetypeId`, or tech id must resolve to a real row. |
+| Cross-table typed ids | When one gameplay type is split across multiple authored tables, that type must use one globally unique per-type id reused unchanged across all related tables, metadata tables, resource tables, and references. |
 | Internal cash points | Any authored row that uses hidden valuation should either author `internalCashPoint`-style values directly or derive them from shared authored meter cash-point tuning; rows that still surface player-facing cash should keep that visible cash integral where required. |
 | Onboarding separation | Authored onboarding-only content must be explicitly flagged so the normal generator cannot surface it in the repeatable runtime pools. |
 | Prototype-first simplicity | If a row can be expressed through one existing shared content family, do not add a new one-off schema just for one prototype case. |

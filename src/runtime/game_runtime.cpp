@@ -50,6 +50,7 @@
 #include <cmath>
 #include <limits>
 #include <set>
+#include <string_view>
 #include <vector>
 
 namespace gs1
@@ -65,6 +66,119 @@ constexpr float k_visible_tile_soil_salinity_projection_step = 100.0f / 64.0f;
 constexpr float k_visible_tile_device_integrity_projection_step = 100.0f / 128.0f;
 constexpr double k_site_one_probe_window_minutes = 0.25;
 constexpr std::int32_t k_regional_map_tile_spacing = 160;
+
+[[nodiscard]] std::string unescape_json_string(std::string_view value)
+{
+    std::string result;
+    result.reserve(value.size());
+
+    for (std::size_t index = 0; index < value.size(); ++index)
+    {
+        const char ch = value[index];
+        if (ch != '\\' || (index + 1U) >= value.size())
+        {
+            result.push_back(ch);
+            continue;
+        }
+
+        const char escaped = value[++index];
+        switch (escaped)
+        {
+        case '\\':
+            result.push_back('\\');
+            break;
+        case '"':
+            result.push_back('"');
+            break;
+        case 'n':
+            result.push_back('\n');
+            break;
+        case 'r':
+            result.push_back('\r');
+            break;
+        case 't':
+            result.push_back('\t');
+            break;
+        default:
+            result.push_back(escaped);
+            break;
+        }
+    }
+
+    return result;
+}
+
+[[nodiscard]] std::size_t skip_json_whitespace(std::string_view text, std::size_t index) noexcept
+{
+    while (index < text.size())
+    {
+        const char ch = text[index];
+        if (ch != ' ' && ch != '\t' && ch != '\r' && ch != '\n')
+        {
+            break;
+        }
+        ++index;
+    }
+    return index;
+}
+
+[[nodiscard]] std::size_t find_json_string_end(std::string_view text, std::size_t start_index) noexcept
+{
+    bool escaping = false;
+    for (std::size_t index = start_index; index < text.size(); ++index)
+    {
+        const char ch = text[index];
+        if (escaping)
+        {
+            escaping = false;
+            continue;
+        }
+        if (ch == '\\')
+        {
+            escaping = true;
+            continue;
+        }
+        if (ch == '"')
+        {
+            return index;
+        }
+    }
+
+    return std::string_view::npos;
+}
+
+[[nodiscard]] std::filesystem::path extract_project_config_root_from_adapter_config_json(
+    std::string_view adapter_config_json_utf8)
+{
+    constexpr std::string_view key = "\"project_config_root\"";
+    const std::size_t key_pos = adapter_config_json_utf8.find(key);
+    if (key_pos == std::string_view::npos)
+    {
+        return {};
+    }
+
+    std::size_t cursor = skip_json_whitespace(adapter_config_json_utf8, key_pos + key.size());
+    if (cursor >= adapter_config_json_utf8.size() || adapter_config_json_utf8[cursor] != ':')
+    {
+        return {};
+    }
+
+    cursor = skip_json_whitespace(adapter_config_json_utf8, cursor + 1U);
+    if (cursor >= adapter_config_json_utf8.size() || adapter_config_json_utf8[cursor] != '"')
+    {
+        return {};
+    }
+
+    const std::size_t value_start = cursor + 1U;
+    const std::size_t value_end = find_json_string_end(adapter_config_json_utf8, value_start);
+    if (value_end == std::string_view::npos)
+    {
+        return {};
+    }
+
+    return std::filesystem::path {
+        unescape_json_string(adapter_config_json_utf8.substr(value_start, value_end - value_start))};
+}
 
 [[nodiscard]] const char* regional_site_state_label(Gs1SiteState state) noexcept
 {
@@ -1189,16 +1303,27 @@ GameRuntime::GameRuntime(Gs1RuntimeCreateDesc create_desc)
         fixed_step_seconds_ = create_desc_.fixed_step_seconds;
     }
 
-    if (create_desc_.project_config_root_utf8 != nullptr &&
-        create_desc_.project_config_root_utf8[0] != '\0')
-    {
-        set_prototype_content_root(
-            std::filesystem::path {create_desc_.project_config_root_utf8} / "content");
-    }
-
     if (create_desc_.adapter_config_json_utf8 != nullptr)
     {
         adapter_config_json_utf8_ = create_desc_.adapter_config_json_utf8;
+    }
+
+    std::filesystem::path resolved_project_config_root {};
+    if (!adapter_config_json_utf8_.empty())
+    {
+        resolved_project_config_root = extract_project_config_root_from_adapter_config_json(adapter_config_json_utf8_);
+    }
+
+    if (create_desc_.project_config_root_utf8 != nullptr &&
+        create_desc_.project_config_root_utf8[0] != '\0' &&
+        resolved_project_config_root.empty())
+    {
+        resolved_project_config_root = std::filesystem::path {create_desc_.project_config_root_utf8};
+    }
+
+    if (!resolved_project_config_root.empty())
+    {
+        set_prototype_content_root(resolved_project_config_root / "content");
     }
 
     initialize_subscription_tables();

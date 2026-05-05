@@ -1,5 +1,6 @@
 #include "smoke_engine_host.h"
 #include "host/runtime_dll_loader.h"
+#include "host/adapter_metadata_catalog.h"
 #include "smoke_log.h"
 #include "smoke_script_runner.h"
 
@@ -55,6 +56,7 @@ int main(int argc, char** argv)
     create_desc.api_version = api.get_api_version();
     create_desc.fixed_step_seconds = 1.0 / 60.0;
     const std::string project_config_root = (repo_root / "project").string();
+    load_adapter_metadata_catalog_from_project_root(project_config_root);
     create_desc.project_config_root_utf8 = project_config_root.c_str();
     create_desc.adapter_config_json_utf8 = nullptr;
 

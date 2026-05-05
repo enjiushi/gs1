@@ -305,6 +305,34 @@ bool SmokeLiveHttpServer::handle_client(std::uintptr_t client_socket_value)
         return false;
     }
 
+    if (method == "GET" && path == "/adapter-metadata/reputation_unlocks.toml")
+    {
+        const auto toml_text = load_text_file(repo_root_ / "project" / "adapter_metadata" / "reputation_unlocks.toml");
+        if (toml_text.empty())
+        {
+            send_response(client_socket, 404, "Not Found", "text/plain; charset=utf-8", "Missing reputation unlock metadata table.");
+        }
+        else
+        {
+            send_response(client_socket, 200, "OK", "text/plain; charset=utf-8", toml_text);
+        }
+        return false;
+    }
+
+    if (method == "GET" && path == "/adapter-metadata/technology_nodes.toml")
+    {
+        const auto toml_text = load_text_file(repo_root_ / "project" / "adapter_metadata" / "technology_nodes.toml");
+        if (toml_text.empty())
+        {
+            send_response(client_socket, 404, "Not Found", "text/plain; charset=utf-8", "Missing technology node metadata table.");
+        }
+        else
+        {
+            send_response(client_socket, 200, "OK", "text/plain; charset=utf-8", toml_text);
+        }
+        return false;
+    }
+
     if (method == "GET" && path == "/assets/main-menu-desert.png")
     {
         const auto image = load_text_file(repo_root_ / "tests" / "smoke" / "assets" / "main-menu-desert.png");

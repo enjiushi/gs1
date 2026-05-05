@@ -1,0 +1,89 @@
+[[reputation_unlocks]]
+unlock_id = 5001
+display_name = "Ephedra Stew"
+description = "Unlocks the first shared basic meal so Site 1 can turn starter Desert Ephedra into dependable nourishment."
+
+[[reputation_unlocks]]
+unlock_id = 5002
+display_name = "Ordos Wormwood"
+description = "Unlocks the first dedicated windbreak plant for exposed starter lanes."
+
+[[reputation_unlocks]]
+unlock_id = 5003
+display_name = "Wormwood Broth"
+description = "Unlocks a simple shared broth that cooks freshly unlocked wormwood into light field food."
+
+[[reputation_unlocks]]
+unlock_id = 5004
+display_name = "White Thorn"
+description = "Unlocks a salinity-tolerant shrub for harsher starter ground."
+
+[[reputation_unlocks]]
+unlock_id = 5005
+display_name = "Thornberry Cooler"
+description = "Unlocks a shared basic cooling drink built from White Thorn berries."
+
+[[reputation_unlocks]]
+unlock_id = 5006
+display_name = "Jiji Grass"
+description = "Unlocks a dedicated soil-support grass for fertility-led expansion."
+
+[[reputation_unlocks]]
+unlock_id = 5007
+display_name = "Field Tea"
+description = "Unlocks a shared basic tea for light hydration support using the earlier shared harvest layer."
+
+[[reputation_unlocks]]
+unlock_id = 5008
+display_name = "Spiced Stew"
+description = "Unlocks a shared basic stew that folds the early shared harvests into sturdier camp food."
+
+[[reputation_unlocks]]
+unlock_id = 5009
+display_name = "Field Rations"
+description = "Unlocks the shared basic ration recipe so dried grass can be packed into emergency food."
+
+[[reputation_unlocks]]
+unlock_id = 5010
+display_name = "Sea Buckthorn"
+description = "Unlocks a productive perimeter plant that mixes output with real protection."
+
+[[reputation_unlocks]]
+unlock_id = 5011
+display_name = "Buckthorn Tonic"
+description = "Unlocks a shared basic restorative drink that starts turning Buckthorn berries into stronger hydration."
+
+[[reputation_unlocks]]
+unlock_id = 5012
+display_name = "Korshinsk Peashrub"
+description = "Unlocks a deep soil-rehab specialist for long salty-ground conversion work."
+
+[[reputation_unlocks]]
+unlock_id = 5013
+display_name = "Peashrub Hotpot"
+description = "Unlocks a shared basic hot meal that combines Peashrub pods with the earlier shared harvest layer."
+
+[[reputation_unlocks]]
+unlock_id = 5014
+display_name = "Red Tamarisk"
+description = "Unlocks a heat-pocket protection plant for harsher hot zones."
+
+[[reputation_unlocks]]
+unlock_id = 5015
+display_name = "Desert Revival Draught"
+description = "Unlocks a shared basic revival drink that turns Tamarisk and Buckthorn harvests into steadier field recovery."
+
+[[reputation_unlocks]]
+unlock_id = 5016
+display_name = "Ningxia Wolfberry"
+description = "Unlocks a fragile high-payoff crop that depends on established support."
+
+[[reputation_unlocks]]
+unlock_id = 5017
+display_name = "Jadeleaf Stew"
+description = "Unlocks a shared basic late meal that combines Wolfberries with the starter Ephedra line."
+
+[[reputation_unlocks]]
+unlock_id = 5018
+display_name = "Saxaul"
+description = "Unlocks the late anchor canopy plant for turning a zone into a refuge core."
