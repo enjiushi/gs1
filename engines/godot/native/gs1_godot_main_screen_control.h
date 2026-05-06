@@ -1,7 +1,14 @@
 #pragma once
 
-#include "gs1_godot_main_screen_projection_cache.h"
+#include "gs1_godot_panel_state_reducers.h"
+#include "gs1_godot_craft_panel_controller.h"
+#include "gs1_godot_phone_panel_controller.h"
+#include "gs1_godot_inventory_panel_controller.h"
+#include "gs1_godot_overlay_panel_controller.h"
+#include "gs1_godot_regional_summary_panel_controller.h"
 #include "gs1_godot_runtime_node.h"
+#include "gs1_godot_site_summary_panel_controller.h"
+#include "gs1_godot_status_panel_controller.h"
 
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/grid_container.hpp>
@@ -168,12 +175,10 @@ private:
     void wire_static_buttons();
     void invalidate_all_ui();
     void update_visibility(int app_state);
-    void refresh_status_if_needed();
     void refresh_menu_if_needed(int app_state);
     void refresh_regional_map_if_needed(int app_state);
     void refresh_site_if_needed(int app_state);
     void refresh_selected_tile_if_needed();
-    void mark_status_dirty();
     void mark_menu_dirty();
     void mark_regional_map_dirty();
     void mark_regional_selection_dirty();
@@ -181,17 +186,14 @@ private:
     void mark_site_dirty();
     void mark_selected_tile_dirty();
 
-    void refresh_status();
     void refresh_menu(int app_state);
     void apply_fixed_panel_actions();
     void refresh_regional_map(int app_state);
     void refresh_site(int app_state);
 
-    void render_inventory(const Gs1RuntimeSiteProjection& site_state);
     void render_tasks(const Gs1RuntimeSiteProjection& site_state);
     void render_phone(const Gs1RuntimeSiteProjection& site_state);
     void render_craft(const Gs1RuntimeSiteProjection& site_state);
-    void render_overlay(const Gs1RuntimeSiteProjection& site_state);
     void reconcile_task_rows(const std::vector<Gs1RuntimeTaskProjection>& tasks);
     void reconcile_modifier_rows(const std::vector<Gs1RuntimeModifierProjection>& modifiers);
     void render_projected_ui_buttons(godot::VBoxContainer* container, const std::initializer_list<int>& allowed_action_types);
@@ -223,9 +225,6 @@ private:
     void reconcile_regional_sites(const std::vector<Gs1RuntimeRegionalMapSiteProjection>& sites);
     void position_regional_camera(const godot::Rect2i& bounds);
     void update_regional_site_visuals();
-    [[nodiscard]] godot::String build_regional_map_overview_text(
-        const std::vector<Gs1RuntimeRegionalMapSiteProjection>& sites,
-        const std::vector<Gs1RuntimeRegionalMapLinkProjection>& links) const;
     [[nodiscard]] const Gs1RuntimeProgressionViewProjection* find_progression_view(int view_id) const;
     [[nodiscard]] const Gs1RuntimeUiPanelProjection* find_ui_panel(int panel_id) const;
     [[nodiscard]] const Gs1RuntimeUiPanelSlotActionProjection* find_panel_slot_action(const Gs1RuntimeUiPanelProjection& panel, int slot_id) const;
@@ -288,7 +287,6 @@ private:
     void ensure_card_content_nodes(godot::Button* button, ProjectedButtonRecord& record);
     void apply_tech_tree_overlay_layout();
 
-    [[nodiscard]] const Gs1GodotMainScreenProjectionState* projection_state() const;
     [[nodiscard]] const Gs1RuntimeSiteProjection* active_site() const;
     [[nodiscard]] const Gs1RuntimeTileProjection* tile_at(const godot::Vector2i& tile_coord) const;
     [[nodiscard]] int find_worker_pack_storage_id() const;
@@ -452,7 +450,18 @@ private:
     godot::Vector2i selected_tile_ {0, 0};
     int selected_site_id_ {1};
     godot::String last_action_message_;
-    Gs1GodotMainScreenProjectionCache local_projection_cache_ {};
+    Gs1GodotStatusPanelController status_panel_controller_ {};
+    Gs1GodotInventoryPanelController inventory_panel_controller_ {};
+    Gs1GodotCraftPanelController craft_panel_controller_ {};
+    Gs1GodotOverlayPanelController overlay_panel_controller_ {};
+    Gs1GodotPhonePanelController phone_panel_controller_ {};
+    Gs1GodotRegionalSummaryPanelController regional_summary_panel_controller_ {};
+    Gs1GodotSiteSummaryPanelController site_summary_panel_controller_ {};
+    Gs1GodotUiSetupStateReducer ui_setup_state_reducer_ {};
+    Gs1GodotUiPanelStateReducer ui_panel_state_reducer_ {};
+    Gs1GodotProgressionViewStateReducer progression_view_state_reducer_ {};
+    Gs1GodotRegionalMapStateReducer regional_map_state_reducer_ {};
+    Gs1GodotSiteStateReducer site_state_reducer_ {};
     godot::Rect2i regional_map_bounds_ {-4, -3, 9, 7};
     int last_rendered_selected_site_id_ {-1};
     int last_app_state_ {-1};
@@ -465,7 +474,6 @@ private:
     bool buttons_wired_ {false};
     bool fixed_slot_bindings_cached_ {false};
     bool regional_menu_backdrop_active_ {false};
-    bool status_dirty_ {true};
     bool menu_dirty_ {true};
     bool regional_map_dirty_ {true};
     bool regional_selection_dirty_ {true};
@@ -501,11 +509,8 @@ private:
     mutable std::unordered_map<std::string, godot::Ref<godot::Texture2D>> texture_cache_;
     mutable std::unordered_map<std::string, godot::Ref<godot::Texture2D>> fallback_icon_texture_cache_;
 
-    godot::RichTextLabel* status_label_ {nullptr};
     godot::PanelContainer* menu_panel_ {nullptr};
     godot::PanelContainer* regional_map_panel_ {nullptr};
-    godot::RichTextLabel* regional_map_summary_ {nullptr};
-    godot::RichTextLabel* regional_map_graph_ {nullptr};
     godot::VBoxContainer* regional_action_buttons_ {nullptr};
     godot::PanelContainer* regional_selection_panel_ {nullptr};
     godot::Label* regional_selection_title_ {nullptr};
@@ -517,12 +522,9 @@ private:
     godot::ScrollContainer* regional_tech_tree_summary_ {nullptr};
     godot::GridContainer* regional_tech_tree_actions_ {nullptr};
     godot::PanelContainer* site_panel_ {nullptr};
-    godot::Label* site_title_ {nullptr};
-    godot::RichTextLabel* site_summary_ {nullptr};
     godot::Label* tile_label_ {nullptr};
     godot::VBoxContainer* site_controls_ {nullptr};
     godot::PanelContainer* inventory_panel_ {nullptr};
-    godot::RichTextLabel* inventory_summary_ {nullptr};
     godot::PanelContainer* task_panel_ {nullptr};
     godot::RichTextLabel* task_summary_ {nullptr};
     godot::VBoxContainer* task_rows_ {nullptr};
@@ -530,9 +532,6 @@ private:
     godot::PanelContainer* phone_panel_ {nullptr};
     godot::VBoxContainer* phone_listings_ {nullptr};
     godot::PanelContainer* craft_panel_ {nullptr};
-    godot::RichTextLabel* craft_summary_ {nullptr};
     godot::VBoxContainer* craft_options_ {nullptr};
     godot::PanelContainer* overlay_panel_ {nullptr};
-    godot::Label* phone_state_label_ {nullptr};
-    godot::Label* overlay_state_label_ {nullptr};
 };

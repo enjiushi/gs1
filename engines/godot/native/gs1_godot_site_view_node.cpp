@@ -1,6 +1,6 @@
 #include "gs1_godot_site_view_node.h"
 
-#include "gs1_godot_main_screen_projection_cache.h"
+#include "gs1_godot_projection_types.h"
 #include "godot_progression_resources.h"
 
 #include <godot_cpp/classes/box_mesh.hpp>

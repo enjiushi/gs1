@@ -330,20 +330,14 @@ void Gs1GodotMainScreenControl::_process(double delta)
 
     if (runtime_node_ == nullptr)
     {
-        if (status_label_ != nullptr)
-        {
-            status_label_->set_text("Runtime node not found");
-        }
+        status_panel_controller_.show_runtime_missing();
         return;
     }
 
-    const Gs1GodotMainScreenProjectionState* state = projection_state();
-    const int app_state = state != nullptr && state->current_app_state.has_value()
-        ? static_cast<int>(state->current_app_state.value())
-        : APP_STATE_BOOT;
+    const int app_state = status_panel_controller_.current_app_state_or(APP_STATE_BOOT);
 
     update_visibility(app_state);
-    refresh_status_if_needed();
+    status_panel_controller_.refresh_if_needed(runtime_node_ != nullptr, runtime_node_->last_error());
     refresh_menu_if_needed(app_state);
     refresh_regional_map_if_needed(app_state);
     refresh_site_if_needed(app_state);
@@ -414,6 +408,13 @@ void Gs1GodotMainScreenControl::cache_scene_references()
         if (runtime_node_ != nullptr)
         {
             runtime_node_->subscribe_engine_messages(*this);
+            runtime_node_->subscribe_engine_messages(status_panel_controller_);
+            runtime_node_->subscribe_engine_messages(inventory_panel_controller_);
+            runtime_node_->subscribe_engine_messages(craft_panel_controller_);
+            runtime_node_->subscribe_engine_messages(overlay_panel_controller_);
+            runtime_node_->subscribe_engine_messages(phone_panel_controller_);
+            runtime_node_->subscribe_engine_messages(regional_summary_panel_controller_);
+            runtime_node_->subscribe_engine_messages(site_summary_panel_controller_);
         }
     }
     if (site_view_ == nullptr)
@@ -444,10 +445,13 @@ void Gs1GodotMainScreenControl::cache_scene_references()
 
 void Gs1GodotMainScreenControl::cache_ui_references()
 {
-    if (status_label_ == nullptr)
-    {
-        status_label_ = Object::cast_to<RichTextLabel>(find_child("StatusLabel", true, false));
-    }
+    status_panel_controller_.cache_ui_references(*this);
+    inventory_panel_controller_.cache_ui_references(*this);
+    craft_panel_controller_.cache_ui_references(*this);
+    overlay_panel_controller_.cache_ui_references(*this);
+    phone_panel_controller_.cache_ui_references(*this);
+    regional_summary_panel_controller_.cache_ui_references(*this);
+    site_summary_panel_controller_.cache_ui_references(*this);
     if (menu_panel_ == nullptr)
     {
         menu_panel_ = Object::cast_to<PanelContainer>(find_child("MenuPanel", true, false));
@@ -455,14 +459,6 @@ void Gs1GodotMainScreenControl::cache_ui_references()
     if (regional_map_panel_ == nullptr)
     {
         regional_map_panel_ = Object::cast_to<PanelContainer>(find_child("RegionalMapPanel", true, false));
-    }
-    if (regional_map_summary_ == nullptr)
-    {
-        regional_map_summary_ = Object::cast_to<RichTextLabel>(find_child("RegionalMapSummary", true, false));
-    }
-    if (regional_map_graph_ == nullptr)
-    {
-        regional_map_graph_ = Object::cast_to<RichTextLabel>(find_child("RegionalMapGraph", true, false));
     }
     if (regional_action_buttons_ == nullptr)
     {
@@ -508,14 +504,6 @@ void Gs1GodotMainScreenControl::cache_ui_references()
     {
         site_panel_ = Object::cast_to<PanelContainer>(find_child("SitePanel", true, false));
     }
-    if (site_title_ == nullptr)
-    {
-        site_title_ = Object::cast_to<Label>(find_child("SiteTitle", true, false));
-    }
-    if (site_summary_ == nullptr)
-    {
-        site_summary_ = Object::cast_to<RichTextLabel>(find_child("SiteSummary", true, false));
-    }
     if (tile_label_ == nullptr)
     {
         tile_label_ = Object::cast_to<Label>(find_child("TileLabel", true, false));
@@ -527,10 +515,6 @@ void Gs1GodotMainScreenControl::cache_ui_references()
     if (inventory_panel_ == nullptr)
     {
         inventory_panel_ = Object::cast_to<PanelContainer>(find_child("InventoryPanel", true, false));
-    }
-    if (inventory_summary_ == nullptr)
-    {
-        inventory_summary_ = Object::cast_to<RichTextLabel>(find_child("InventorySummary", true, false));
     }
     if (task_panel_ == nullptr)
     {
@@ -560,10 +544,6 @@ void Gs1GodotMainScreenControl::cache_ui_references()
     {
         craft_panel_ = Object::cast_to<PanelContainer>(find_child("CraftPanel", true, false));
     }
-    if (craft_summary_ == nullptr)
-    {
-        craft_summary_ = Object::cast_to<RichTextLabel>(find_child("CraftSummary", true, false));
-    }
     if (craft_options_ == nullptr)
     {
         craft_options_ = Object::cast_to<VBoxContainer>(find_child("CraftOptions", true, false));
@@ -571,14 +551,6 @@ void Gs1GodotMainScreenControl::cache_ui_references()
     if (overlay_panel_ == nullptr)
     {
         overlay_panel_ = Object::cast_to<PanelContainer>(find_child("OverlayPanel", true, false));
-    }
-    if (phone_state_label_ == nullptr)
-    {
-        phone_state_label_ = Object::cast_to<Label>(find_child("PhoneStateLabel", true, false));
-    }
-    if (overlay_state_label_ == nullptr)
-    {
-        overlay_state_label_ = Object::cast_to<Label>(find_child("OverlayStateLabel", true, false));
     }
 }
 
@@ -712,24 +684,24 @@ bool Gs1GodotMainScreenControl::handles_engine_message(Gs1EngineMessageType type
 
 void Gs1GodotMainScreenControl::handle_engine_message(const Gs1EngineMessage& message)
 {
-    local_projection_cache_.apply_engine_message(message);
+    ui_setup_state_reducer_.apply_engine_message(message);
+    ui_panel_state_reducer_.apply_engine_message(message);
+    progression_view_state_reducer_.apply_engine_message(message);
+    regional_map_state_reducer_.apply_engine_message(message);
+    site_state_reducer_.apply_engine_message(message);
 
     switch (message.type)
     {
     case GS1_ENGINE_MESSAGE_SET_APP_STATE:
-        mark_status_dirty();
         mark_menu_dirty();
         mark_regional_map_dirty();
         mark_regional_selection_dirty();
         mark_regional_visuals_dirty();
         mark_site_dirty();
         mark_selected_tile_dirty();
-        if (const Gs1GodotMainScreenProjectionState* state = projection_state(); state != nullptr)
-        {
-            selected_site_id_ = state->selected_site_id.has_value()
-                ? static_cast<int>(state->selected_site_id.value())
-                : 0;
-        }
+        selected_site_id_ = regional_map_state_reducer_.state().selected_site_id.has_value()
+            ? static_cast<int>(regional_map_state_reducer_.state().selected_site_id.value())
+            : 0;
         break;
     case GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_MAP_SNAPSHOT:
     case GS1_ENGINE_MESSAGE_REGIONAL_MAP_SITE_UPSERT:
@@ -753,17 +725,13 @@ void Gs1GodotMainScreenControl::handle_engine_message(const Gs1EngineMessage& me
     case GS1_ENGINE_MESSAGE_END_UI_SETUP:
     case GS1_ENGINE_MESSAGE_CLOSE_UI_SETUP:
     case GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES:
-        mark_status_dirty();
         mark_menu_dirty();
         mark_regional_map_dirty();
         mark_regional_selection_dirty();
         mark_regional_visuals_dirty();
-        if (const Gs1GodotMainScreenProjectionState* state = projection_state(); state != nullptr)
-        {
-            selected_site_id_ = state->selected_site_id.has_value()
-                ? static_cast<int>(state->selected_site_id.value())
-                : 0;
-        }
+        selected_site_id_ = regional_map_state_reducer_.state().selected_site_id.has_value()
+            ? static_cast<int>(regional_map_state_reducer_.state().selected_site_id.value())
+            : 0;
         break;
     case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
     case GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT:
@@ -791,7 +759,6 @@ void Gs1GodotMainScreenControl::handle_engine_message(const Gs1EngineMessage& me
     case GS1_ENGINE_MESSAGE_SITE_RESULT_READY:
     case GS1_ENGINE_MESSAGE_HUD_STATE:
     case GS1_ENGINE_MESSAGE_END_SITE_SNAPSHOT:
-        mark_status_dirty();
         mark_site_dirty();
         mark_selected_tile_dirty();
         break;
@@ -802,7 +769,11 @@ void Gs1GodotMainScreenControl::handle_engine_message(const Gs1EngineMessage& me
 
 void Gs1GodotMainScreenControl::handle_runtime_message_reset()
 {
-    local_projection_cache_.reset();
+    ui_setup_state_reducer_.reset();
+    ui_panel_state_reducer_.reset();
+    progression_view_state_reducer_.reset();
+    regional_map_state_reducer_.reset();
+    site_state_reducer_.reset();
     selected_site_id_ = 1;
     cached_storage_lookup_.clear();
     invalidate_all_ui();
@@ -810,7 +781,6 @@ void Gs1GodotMainScreenControl::handle_runtime_message_reset()
 
 void Gs1GodotMainScreenControl::invalidate_all_ui()
 {
-    mark_status_dirty();
     mark_menu_dirty();
     mark_regional_map_dirty();
     mark_regional_selection_dirty();
@@ -914,16 +884,6 @@ void Gs1GodotMainScreenControl::update_visibility(int app_state)
     last_visible_app_state_ = app_state;
 }
 
-void Gs1GodotMainScreenControl::refresh_status_if_needed()
-{
-    if (!status_dirty_)
-    {
-        return;
-    }
-    refresh_status();
-    status_dirty_ = false;
-}
-
 void Gs1GodotMainScreenControl::refresh_menu_if_needed(int app_state)
 {
     if (!menu_dirty_)
@@ -1002,53 +962,12 @@ void Gs1GodotMainScreenControl::refresh_selected_tile_if_needed()
     selected_tile_dirty_ = false;
 }
 
-void Gs1GodotMainScreenControl::mark_status_dirty() { status_dirty_ = true; }
 void Gs1GodotMainScreenControl::mark_menu_dirty() { menu_dirty_ = true; }
 void Gs1GodotMainScreenControl::mark_regional_map_dirty() { regional_map_dirty_ = true; }
 void Gs1GodotMainScreenControl::mark_regional_selection_dirty() { regional_selection_dirty_ = true; }
 void Gs1GodotMainScreenControl::mark_regional_visuals_dirty() { regional_visuals_dirty_ = true; }
 void Gs1GodotMainScreenControl::mark_site_dirty() { site_dirty_ = true; }
 void Gs1GodotMainScreenControl::mark_selected_tile_dirty() { selected_tile_dirty_ = true; }
-
-void Gs1GodotMainScreenControl::refresh_status()
-{
-    if (status_label_ == nullptr)
-    {
-        return;
-    }
-
-    PackedStringArray lines;
-    lines.push_back("[b]Field Operations Feed[/b]");
-    const Gs1GodotMainScreenProjectionState* state = projection_state();
-    const int app_state = state != nullptr && state->current_app_state.has_value()
-        ? static_cast<int>(state->current_app_state.value())
-        : APP_STATE_BOOT;
-    lines.push_back(vformat("Runtime: %s", bool_text(runtime_node_ != nullptr, "linked", "idle")));
-    lines.push_back(vformat("Screen: %s", app_state_name(app_state)));
-
-    if (state != nullptr && state->campaign_resources.has_value())
-    {
-        const auto& campaign_resources = state->campaign_resources.value();
-        lines.push_back(vformat("Campaign Cash: %.2f", campaign_resources.current_money));
-        lines.push_back(vformat(
-            "Reputation T/V/B/U: %d / %d / %d / %d",
-            campaign_resources.total_reputation,
-            campaign_resources.village_reputation,
-            campaign_resources.forestry_reputation,
-            campaign_resources.university_reputation));
-    }
-    if (!last_action_message_.is_empty())
-    {
-        lines.push_back(vformat("Last Action: %s", last_action_message_));
-    }
-    const String last_error = runtime_node_ != nullptr ? string_from_view(runtime_node_->last_error()) : String();
-    if (!last_error.is_empty())
-    {
-        lines.push_back(vformat("Error: %s", last_error));
-    }
-
-    status_label_->set_text(String("\n").join(lines));
-}
 
 void Gs1GodotMainScreenControl::refresh_menu(int app_state)
 {
@@ -1077,9 +996,9 @@ void Gs1GodotMainScreenControl::refresh_regional_map(int app_state)
 
     const bool force_refresh = regional_map_dirty_;
 
-    const auto& runtime_state = local_projection_cache_.state();
-    const auto& sites = runtime_state.regional_map_sites;
-    const auto& links = runtime_state.regional_map_links;
+    const auto& regional_state = regional_map_state_reducer_.state();
+    const auto& sites = regional_state.sites;
+    const auto& links = regional_state.links;
 
     if (selected_site_id_ == 0 && !sites.empty())
     {
@@ -1101,28 +1020,8 @@ void Gs1GodotMainScreenControl::refresh_regional_map(int app_state)
         selected_site = &sites.front();
         selected_site_id_ = static_cast<int>(selected_site->site_id);
     }
-
-    PackedStringArray lines;
-    lines.push_back("[b]Campaign Planning Map[/b]");
-    lines.push_back(vformat("Revealed Sites: %d  Adjacency Links: %d", static_cast<int>(sites.size()), static_cast<int>(links.size())));
-    lines.push_back(selected_site_id_ != 0 ? vformat("Selected Site: Site %d", selected_site_id_) : String("Selected Site: None"));
-
-    if (projection_state() != nullptr && projection_state()->campaign_resources.has_value())
-    {
-        const auto& campaign_resources = projection_state()->campaign_resources.value();
-        lines.push_back(vformat("Campaign Cash: %.2f", campaign_resources.current_money));
-        lines.push_back(vformat("Total Reputation: %d", campaign_resources.total_reputation));
-    }
-    lines.push_back("Open the tech tree here, then choose a site marker to review support and deploy.");
-
-    if (regional_map_summary_ != nullptr)
-    {
-        regional_map_summary_->set_text(String("\n").join(lines));
-    }
-    if (regional_map_graph_ != nullptr)
-    {
-        regional_map_graph_->set_text(build_regional_map_overview_text(sites, links));
-    }
+    regional_summary_panel_controller_.set_selected_site_id(selected_site_id_);
+    regional_summary_panel_controller_.refresh_if_needed();
 
     if (force_refresh)
     {
@@ -1157,105 +1056,16 @@ void Gs1GodotMainScreenControl::refresh_site(int app_state)
     if (force_refresh)
     {
         cached_storage_lookup_.clear();
-        if (site_title_ != nullptr)
-        {
-            site_title_->set_text(vformat("Site %d", static_cast<int>(site_state->site_id)));
-        }
+        site_summary_panel_controller_.refresh_if_needed();
 
-        PackedStringArray site_lines;
-        site_lines.push_back(vformat("Size: %d x %d", static_cast<int>(site_state->width), static_cast<int>(site_state->height)));
-
-        if (site_state->worker.has_value())
-        {
-            const auto& worker = site_state->worker.value();
-            site_lines.push_back(vformat(
-                "Worker: (%.1f, %.1f)  Action %d",
-                worker.tile_x,
-                worker.tile_y,
-                static_cast<int>(worker.current_action_kind)));
-        }
-
-        if (site_state->weather.has_value())
-        {
-            const auto& weather = site_state->weather.value();
-            site_lines.push_back(vformat(
-                "Weather H/W/D: %.1f / %.1f / %.1f",
-                weather.heat,
-                weather.wind,
-                weather.dust));
-        }
-
-        if (projection_state() != nullptr && projection_state()->hud.has_value())
-        {
-            const auto& hud = projection_state()->hud.value();
-            site_lines.push_back(vformat(
-                "Meters HP/HY/NO/EN/MO: %.1f / %.1f / %.1f / %.1f / %.1f",
-                hud.player_health,
-                hud.player_hydration,
-                hud.player_nourishment,
-                hud.player_energy,
-                hud.player_morale));
-        }
-
-        if (projection_state() != nullptr && projection_state()->site_action.has_value())
-        {
-            const auto& site_action = projection_state()->site_action.value();
-            site_lines.push_back(vformat(
-                "Current Action: kind %d  progress %.2f",
-                static_cast<int>(site_action.action_kind),
-                site_action.progress_normalized));
-        }
-
-        if (site_summary_ != nullptr)
-        {
-            site_summary_->set_text(String("\n").join(site_lines));
-        }
-
-        render_inventory(*site_state);
+        inventory_panel_controller_.refresh_if_needed();
         render_tasks(*site_state);
         render_phone(*site_state);
+        craft_panel_controller_.refresh_if_needed();
         render_craft(*site_state);
-        render_overlay(*site_state);
+        overlay_panel_controller_.refresh_if_needed();
         render_projected_ui_buttons(site_controls_, {6, 7, 8, 10, 11, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26});
     }
-}
-
-void Gs1GodotMainScreenControl::render_inventory(const Gs1RuntimeSiteProjection& site_state)
-{
-    if (inventory_summary_ == nullptr)
-    {
-        return;
-    }
-
-    PackedStringArray lines;
-    lines.push_back("[b]Inventory[/b]");
-    lines.push_back(vformat("Worker Pack Open: %s", bool_text(site_state.worker_pack_open, "yes", "no")));
-
-    for (const auto& slot : site_state.worker_pack_slots)
-    {
-        lines.push_back(vformat(
-            "Pack %d: %s x%d",
-            static_cast<int>(slot.slot_index),
-            item_name_for(static_cast<int>(slot.item_id)),
-            static_cast<int>(slot.quantity)));
-    }
-
-    if (site_state.opened_storage.has_value())
-    {
-        const auto& opened_storage = site_state.opened_storage.value();
-        lines.push_back(String());
-        lines.push_back(vformat("Opened Storage %d", static_cast<int>(opened_storage.storage_id)));
-        for (const auto& slot : opened_storage.slots)
-        {
-            lines.push_back(vformat(
-                "Slot %d: %s x%d",
-                static_cast<int>(slot.slot_index),
-                item_name_for(static_cast<int>(slot.item_id)),
-                static_cast<int>(slot.quantity)));
-        }
-    }
-
-    inventory_summary_->set_text(String("\n").join(lines));
 }
 
 void Gs1GodotMainScreenControl::render_tasks(const Gs1RuntimeSiteProjection& site_state)
@@ -1284,14 +1094,7 @@ void Gs1GodotMainScreenControl::render_tasks(const Gs1RuntimeSiteProjection& sit
 
 void Gs1GodotMainScreenControl::render_phone(const Gs1RuntimeSiteProjection& site_state)
 {
-    if (phone_state_label_ != nullptr)
-    {
-        phone_state_label_->set_text(vformat(
-            "Phone Section: %d  Listings: buy %d sell %d",
-            static_cast<int>(site_state.phone_panel.active_section),
-            static_cast<int>(site_state.phone_panel.buy_listing_count),
-            static_cast<int>(site_state.phone_panel.sell_listing_count)));
-    }
+    phone_panel_controller_.refresh_if_needed();
 
     if (phone_listings_ == nullptr)
     {
@@ -1303,61 +1106,12 @@ void Gs1GodotMainScreenControl::render_phone(const Gs1RuntimeSiteProjection& sit
 
 void Gs1GodotMainScreenControl::render_craft(const Gs1RuntimeSiteProjection& site_state)
 {
-    if (craft_summary_ == nullptr)
-    {
-        return;
-    }
-
-    PackedStringArray lines;
-    lines.push_back("[b]Craft / Placement[/b]");
-
-    if (site_state.placement_preview.has_value())
-    {
-        const auto& preview = site_state.placement_preview.value();
-        lines.push_back(vformat(
-            "Placement: %s at (%d, %d)  blocked %d",
-            item_name_for(static_cast<int>(preview.item_id)),
-            preview.tile_x,
-            preview.tile_y,
-            static_cast<int>(preview.blocked_mask)));
-    }
-
-    if (site_state.placement_failure.has_value())
-    {
-        const auto& failure = site_state.placement_failure.value();
-        lines.push_back(vformat(
-            "Placement Failure: tile (%d, %d) flags %d",
-            failure.tile_x,
-            failure.tile_y,
-            static_cast<int>(failure.flags)));
-    }
-
-    if (site_state.craft_context.has_value())
-    {
-        const auto& craft_context = site_state.craft_context.value();
-        lines.push_back(vformat(
-            "Craft Context @ (%d, %d)",
-            craft_context.tile_x,
-            craft_context.tile_y));
-    }
-
-    craft_summary_->set_text(String("\n").join(lines));
     if (craft_options_ == nullptr)
     {
         return;
     }
 
     reconcile_craft_option_buttons(site_state.craft_context.has_value() ? &site_state.craft_context.value() : nullptr);
-}
-
-void Gs1GodotMainScreenControl::render_overlay(const Gs1RuntimeSiteProjection& site_state)
-{
-    if (overlay_state_label_ == nullptr)
-    {
-        return;
-    }
-
-    overlay_state_label_->set_text(vformat("Overlay Mode: %d", static_cast<int>(site_state.protection_overlay.mode)));
 }
 
 void Gs1GodotMainScreenControl::reconcile_task_rows(const std::vector<Gs1RuntimeTaskProjection>& tasks)
@@ -1478,8 +1232,8 @@ void Gs1GodotMainScreenControl::render_projected_ui_buttons(VBoxContainer* conta
     }
 
     Array button_specs;
-    const Gs1GodotMainScreenProjectionState* state = projection_state();
-    if (state == nullptr)
+    const auto& setups = ui_setup_state_reducer_.setups();
+    if (setups.empty())
     {
         reconcile_projected_action_buttons(
             container,
@@ -1489,7 +1243,7 @@ void Gs1GodotMainScreenControl::render_projected_ui_buttons(VBoxContainer* conta
         return;
     }
 
-    for (const auto& setup : state->active_ui_setups)
+    for (const auto& setup : setups)
     {
         for (const auto& element : setup.elements)
         {
@@ -2166,47 +1920,6 @@ void Gs1GodotMainScreenControl::update_regional_site_visuals()
     }
 }
 
-String Gs1GodotMainScreenControl::build_regional_map_overview_text(
-    const std::vector<Gs1RuntimeRegionalMapSiteProjection>& sites,
-    const std::vector<Gs1RuntimeRegionalMapLinkProjection>& links) const
-{
-    PackedStringArray lines;
-    lines.push_back("[b]Regional Situation[/b]");
-    if (sites.empty())
-    {
-        lines.push_back("No revealed sites yet.");
-        return String("\n").join(lines);
-    }
-
-    int available_count = 0;
-    int completed_count = 0;
-    for (const auto& site : sites)
-    {
-        if (site.site_state == GS1_SITE_STATE_AVAILABLE)
-        {
-            ++available_count;
-        }
-        else if (site.site_state == GS1_SITE_STATE_COMPLETED)
-        {
-            ++completed_count;
-        }
-    }
-
-    lines.push_back(vformat("Available: %d  Completed Support Sites: %d", available_count, completed_count));
-    lines.push_back("Known routes cut across the dune basin, with marked camp outposts standing in for active support sites.");
-    lines.push_back(String());
-    lines.push_back("[b]Adjacency[/b]");
-
-    for (const auto& link : links)
-    {
-        lines.push_back(vformat(
-            "Site %d <-> Site %d",
-            static_cast<int>(link.from_site_id),
-            static_cast<int>(link.to_site_id)));
-    }
-    return String("\n").join(lines);
-}
-
 String Gs1GodotMainScreenControl::regional_site_deployment_summary(const Gs1RuntimeRegionalMapSiteProjection& site) const
 {
     const String state_name = regional_site_state_name(static_cast<int>(site.site_state));
@@ -2323,12 +2036,12 @@ Ref<StandardMaterial3D> Gs1GodotMainScreenControl::get_material(const String& ke
 
 const Gs1RuntimeProgressionViewProjection* Gs1GodotMainScreenControl::find_progression_view(int view_id) const
 {
-    return local_projection_cache_.find_progression_view(static_cast<Gs1ProgressionViewId>(view_id));
+    return progression_view_state_reducer_.find_view(static_cast<Gs1ProgressionViewId>(view_id));
 }
 
 const Gs1RuntimeUiPanelProjection* Gs1GodotMainScreenControl::find_ui_panel(int panel_id) const
 {
-    return local_projection_cache_.find_ui_panel(static_cast<Gs1UiPanelId>(panel_id));
+    return ui_panel_state_reducer_.find_panel(static_cast<Gs1UiPanelId>(panel_id));
 }
 
 const Gs1RuntimeUiPanelSlotActionProjection* Gs1GodotMainScreenControl::find_panel_slot_action(
@@ -3474,19 +3187,13 @@ void Gs1GodotMainScreenControl::ensure_card_content_nodes(Button* button, Projec
     }
 }
 
-const Gs1GodotMainScreenProjectionState* Gs1GodotMainScreenControl::projection_state() const
-{
-    return &local_projection_cache_.state();
-}
-
 const Gs1RuntimeSiteProjection* Gs1GodotMainScreenControl::active_site() const
 {
-    const Gs1GodotMainScreenProjectionState* state = projection_state();
-    if (state == nullptr || !state->active_site.has_value())
+    if (!site_state_reducer_.state().has_value())
     {
         return nullptr;
     }
-    return &state->active_site.value();
+    return &site_state_reducer_.state().value();
 }
 
 const Gs1RuntimeTileProjection* Gs1GodotMainScreenControl::tile_at(const Vector2i& tile_coord) const
@@ -4177,7 +3884,11 @@ NodePath Gs1GodotMainScreenControl::get_regional_site_root_path() const { return
 
 void Gs1GodotMainScreenControl::on_start_campaign_pressed() { submit_ui_action(UI_ACTION_START_NEW_CAMPAIGN); }
 void Gs1GodotMainScreenControl::on_continue_campaign_pressed() { submit_ui_action(UI_ACTION_START_NEW_CAMPAIGN); }
-void Gs1GodotMainScreenControl::on_menu_settings_pressed() { last_action_message_ = "Settings are not wired yet in the prototype"; mark_status_dirty(); }
+void Gs1GodotMainScreenControl::on_menu_settings_pressed()
+{
+    last_action_message_ = "Settings are not wired yet in the prototype";
+    status_panel_controller_.set_last_action_message(last_action_message_);
+}
 void Gs1GodotMainScreenControl::on_quit_pressed() { if (SceneTree* tree = get_tree()) { tree->quit(); } }
 void Gs1GodotMainScreenControl::on_return_to_map_pressed() { submit_ui_action(UI_ACTION_RETURN_TO_REGIONAL_MAP); }
 void Gs1GodotMainScreenControl::on_move_north_pressed() { submit_move(0.0, 0.0, -1.0); mark_selected_tile_dirty(); }
