@@ -5,9 +5,11 @@
 
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/core/object.hpp>
+#include <godot_cpp/variant/callable_method_pointer.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
 
+#include <cstdint>
 #include <string_view>
 
 using namespace godot;
@@ -54,6 +56,19 @@ int as_int(const Variant& value, int fallback = 0)
         return bool(value) ? 1 : 0;
     default:
         return fallback;
+    }
+}
+
+Gs1GodotRegionalSelectionPanelController* resolve_controller(std::int64_t controller_bits)
+{
+    return reinterpret_cast<Gs1GodotRegionalSelectionPanelController*>(static_cast<std::uintptr_t>(controller_bits));
+}
+
+void dispatch_selection_action_pressed(std::int64_t controller_bits, std::int64_t button_key)
+{
+    if (Gs1GodotRegionalSelectionPanelController* controller = resolve_controller(controller_bits))
+    {
+        controller->handle_action_pressed(button_key);
     }
 }
 }
@@ -358,10 +373,10 @@ void Gs1GodotRegionalSelectionPanelController::reconcile_action_buttons(const Ar
         button->set_meta("target_id", as_int(action.get("target_id", 0), 0));
         button->set_meta("arg0", as_int(action.get("arg0", 0), 0));
         button->set_meta("arg1", as_int(action.get("arg1", 0), 0));
-        const Callable callback = owner_control_ == nullptr
-            ? Callable()
-            : Callable(owner_control_, "on_dynamic_regional_selection_action_pressed").bind(static_cast<int64_t>(stable_key));
-        if (callback.is_valid() && !button->is_connected("pressed", callback))
+        const Callable callback = callable_mp_static(&dispatch_selection_action_pressed).bind(
+            static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(this)),
+            static_cast<std::int64_t>(stable_key));
+        if (!button->is_connected("pressed", callback))
         {
             button->connect("pressed", callback);
         }

@@ -6,9 +6,11 @@
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/core/object.hpp>
+#include <godot_cpp/variant/callable_method_pointer.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <string_view>
 
 using namespace godot;
@@ -48,6 +50,19 @@ std::uint64_t make_craft_option_key(int tile_x, int tile_y, int output_item_id) 
 String string_from_view(std::string_view value)
 {
     return String::utf8(value.data(), static_cast<int>(value.size()));
+}
+
+Gs1GodotCraftPanelController* resolve_controller(std::int64_t controller_bits)
+{
+    return reinterpret_cast<Gs1GodotCraftPanelController*>(static_cast<std::uintptr_t>(controller_bits));
+}
+
+void dispatch_craft_option_pressed(std::int64_t controller_bits, std::int64_t button_key)
+{
+    if (Gs1GodotCraftPanelController* controller = resolve_controller(controller_bits))
+    {
+        controller->handle_craft_option_pressed(button_key);
+    }
 }
 }
 
@@ -257,10 +272,10 @@ void Gs1GodotCraftPanelController::reconcile_craft_option_buttons()
             button->set_meta("tile_x", context_x);
             button->set_meta("tile_y", context_y);
             button->set_meta("output_item_id", output_item_id);
-            const Callable callback = owner_control_ == nullptr
-                ? Callable()
-                : Callable(owner_control_, "on_dynamic_craft_option_pressed").bind(static_cast<int64_t>(stable_key));
-            if (callback.is_valid() && !button->is_connected("pressed", callback))
+            const Callable callback = callable_mp_static(&dispatch_craft_option_pressed).bind(
+                static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(this)),
+                static_cast<std::int64_t>(stable_key));
+            if (!button->is_connected("pressed", callback))
             {
                 button->connect("pressed", callback);
             }
@@ -270,7 +285,7 @@ void Gs1GodotCraftPanelController::reconcile_craft_option_buttons()
     prune_button_registry(craft_option_buttons_, desired_keys);
 }
 
-void Gs1GodotCraftPanelController::on_dynamic_craft_option_pressed(std::int64_t button_key)
+void Gs1GodotCraftPanelController::handle_craft_option_pressed(std::int64_t button_key)
 {
     auto found = craft_option_buttons_.find(static_cast<std::uint64_t>(button_key));
     if (found == craft_option_buttons_.end())
@@ -288,11 +303,6 @@ void Gs1GodotCraftPanelController::on_dynamic_craft_option_pressed(std::int64_t 
         static_cast<int>(button->get_meta("tile_x", 0)),
         static_cast<int>(button->get_meta("tile_y", 0)),
         static_cast<int>(button->get_meta("output_item_id", 0)));
-}
-
-void Gs1GodotCraftPanelController::handle_craft_option_pressed(std::int64_t button_key)
-{
-    on_dynamic_craft_option_pressed(button_key);
 }
 
 Button* Gs1GodotCraftPanelController::upsert_button_node(

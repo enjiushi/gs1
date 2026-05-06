@@ -2,16 +2,23 @@
 
 #include "content/defs/item_defs.h"
 
+#include <godot_cpp/classes/button.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/core/object.hpp>
+#include <godot_cpp/variant/callable_method_pointer.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <string_view>
 
 using namespace godot;
 
 namespace
 {
+constexpr std::int64_t k_ui_action_buy_phone_listing = 8;
+constexpr std::int64_t k_ui_action_set_phone_panel_section = 17;
+constexpr std::int64_t k_ui_action_close_phone_panel = 22;
+
 template <typename T>
 T* resolve_object(const ObjectID object_id)
 {
@@ -21,6 +28,35 @@ T* resolve_object(const ObjectID object_id)
 String string_from_view(std::string_view value)
 {
     return String::utf8(value.data(), static_cast<int>(value.size()));
+}
+
+Gs1GodotPhonePanelController* resolve_controller(std::int64_t controller_bits)
+{
+    return reinterpret_cast<Gs1GodotPhonePanelController*>(static_cast<std::uintptr_t>(controller_bits));
+}
+
+void dispatch_phone_listing_pressed(std::int64_t controller_bits, std::int64_t button_key)
+{
+    if (Gs1GodotPhonePanelController* controller = resolve_controller(controller_bits))
+    {
+        controller->handle_phone_listing_pressed(button_key);
+    }
+}
+
+void dispatch_phone_section_pressed(std::int64_t controller_bits, std::int64_t section)
+{
+    if (Gs1GodotPhonePanelController* controller = resolve_controller(controller_bits))
+    {
+        controller->handle_phone_section_pressed(section);
+    }
+}
+
+void dispatch_close_phone_pressed(std::int64_t controller_bits)
+{
+    if (Gs1GodotPhonePanelController* controller = resolve_controller(controller_bits))
+    {
+        controller->handle_close_phone_pressed();
+    }
 }
 }
 
@@ -39,12 +75,42 @@ void Gs1GodotPhonePanelController::cache_ui_references(Control& owner)
     {
         phone_listings_ = Object::cast_to<VBoxContainer>(owner.find_child("PhoneListings", true, false));
     }
+    const std::int64_t controller_bits = static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(this));
+    const struct ButtonBinding final
+    {
+        const char* name;
+        std::int64_t section;
+    } section_bindings[] {
+        {"OpenPhoneHomeButton", 0},
+        {"OpenPhoneTasksButton", 1},
+        {"OpenPhoneBuyButton", 2},
+        {"OpenPhoneSellButton", 3},
+    };
+    for (const ButtonBinding& binding : section_bindings)
+    {
+        if (Button* button = Object::cast_to<Button>(owner.find_child(binding.name, true, false)))
+        {
+            const Callable callback = callable_mp_static(&dispatch_phone_section_pressed).bind(controller_bits, binding.section);
+            if (!button->is_connected("pressed", callback))
+            {
+                button->connect("pressed", callback);
+            }
+        }
+    }
+    if (Button* button = Object::cast_to<Button>(owner.find_child("ClosePhoneButton", true, false)))
+    {
+        const Callable callback = callable_mp_static(&dispatch_close_phone_pressed).bind(controller_bits);
+        if (!button->is_connected("pressed", callback))
+        {
+            button->connect("pressed", callback);
+        }
+    }
     refresh_if_needed();
 }
 
-void Gs1GodotPhonePanelController::set_submit_phone_listing_callback(SubmitPhoneListingFn callback)
+void Gs1GodotPhonePanelController::set_submit_ui_action_callback(SubmitUiActionFn callback)
 {
-    submit_phone_listing_ = std::move(callback);
+    submit_ui_action_ = std::move(callback);
 }
 
 bool Gs1GodotPhonePanelController::handles_engine_message(Gs1EngineMessageType type) const noexcept
@@ -206,12 +272,44 @@ void Gs1GodotPhonePanelController::handle_phone_listing_pressed(std::int64_t but
     }
 
     Button* button = resolve_object<Button>(found->second.object_id);
-    if (button == nullptr || !submit_phone_listing_)
+    if (button == nullptr || !submit_ui_action_)
     {
         return;
     }
 
-    submit_phone_listing_(static_cast<int>(button->get_meta("listing_id", 0)));
+    submit_ui_action_(
+        k_ui_action_buy_phone_listing,
+        static_cast<int>(button->get_meta("listing_id", 0)),
+        1,
+        0);
+}
+
+void Gs1GodotPhonePanelController::handle_phone_section_pressed(std::int64_t section)
+{
+    if (!submit_ui_action_)
+    {
+        return;
+    }
+
+    submit_ui_action_(
+        k_ui_action_set_phone_panel_section,
+        0,
+        section,
+        0);
+}
+
+void Gs1GodotPhonePanelController::handle_close_phone_pressed()
+{
+    if (!submit_ui_action_)
+    {
+        return;
+    }
+
+    submit_ui_action_(
+        k_ui_action_close_phone_panel,
+        0,
+        0,
+        0);
 }
 
 void Gs1GodotPhonePanelController::reconcile_phone_listing_buttons()
@@ -253,10 +351,10 @@ void Gs1GodotPhonePanelController::reconcile_phone_listing_buttons()
             static_cast<int>(listing.listing_kind),
             static_cast<int>(listing.item_or_unlockable_id)));
         button->set_meta("listing_id", listing_id);
-        const Callable callback = owner_control_ == nullptr
-            ? Callable()
-            : Callable(owner_control_, "on_dynamic_phone_listing_pressed").bind(static_cast<int64_t>(stable_key));
-        if (callback.is_valid() && !button->is_connected("pressed", callback))
+        const Callable callback = callable_mp_static(&dispatch_phone_listing_pressed).bind(
+            static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(this)),
+            static_cast<std::int64_t>(stable_key));
+        if (!button->is_connected("pressed", callback))
         {
             button->connect("pressed", callback);
         }

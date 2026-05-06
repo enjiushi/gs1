@@ -220,12 +220,7 @@ private:
     void on_transfer_selected_item_pressed();
     void on_plant_selected_seed_pressed();
     void on_dynamic_regional_site_pressed(int site_id);
-    void on_dynamic_phone_listing_pressed(int listing_id);
-    void on_dynamic_craft_option_pressed(std::int64_t button_key);
-    void on_dynamic_site_action_pressed(std::int64_t button_key);
-    void on_dynamic_regional_selection_action_pressed(std::int64_t button_key);
-    void on_dynamic_regional_tech_tree_action_pressed(std::int64_t button_key);
-    void on_fixed_slot_pressed(std::int64_t button_id);
+
 private:
     static constexpr int APP_STATE_BOOT = 0;
     static constexpr int APP_STATE_MAIN_MENU = 1;

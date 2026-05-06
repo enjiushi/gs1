@@ -14,6 +14,8 @@ using namespace godot;
 
 namespace
 {
+constexpr std::int64_t k_ui_action_open_site_protection_selector = 24;
+
 constexpr std::array<int, 15> k_allowed_site_action_types {
     6, 7, 8, 10, 11, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26
 };
@@ -52,6 +54,35 @@ int as_int(const Variant& value, int fallback = 0)
         return fallback;
     }
 }
+
+Gs1GodotActionPanelController* resolve_controller(std::int64_t controller_bits)
+{
+    return reinterpret_cast<Gs1GodotActionPanelController*>(static_cast<std::uintptr_t>(controller_bits));
+}
+
+void dispatch_fixed_slot_pressed(std::int64_t controller_bits, std::int64_t button_id)
+{
+    if (Gs1GodotActionPanelController* controller = resolve_controller(controller_bits))
+    {
+        controller->handle_fixed_slot_pressed(button_id);
+    }
+}
+
+void dispatch_site_control_pressed(std::int64_t controller_bits, std::int64_t button_key)
+{
+    if (Gs1GodotActionPanelController* controller = resolve_controller(controller_bits))
+    {
+        controller->handle_site_control_pressed(button_key);
+    }
+}
+
+void dispatch_open_protection_pressed(std::int64_t controller_bits)
+{
+    if (Gs1GodotActionPanelController* controller = resolve_controller(controller_bits))
+    {
+        controller->handle_open_protection_pressed();
+    }
+}
 }
 
 void Gs1GodotActionPanelController::cache_ui_references(Control& owner)
@@ -61,6 +92,15 @@ void Gs1GodotActionPanelController::cache_ui_references(Control& owner)
     {
         site_controls_ = Object::cast_to<VBoxContainer>(owner.find_child("SiteControls", true, false));
     }
+    if (Button* button = Object::cast_to<Button>(owner.find_child("OpenProtectionButton", true, false)))
+    {
+        const Callable callback = callable_mp_static(&dispatch_open_protection_pressed).bind(
+            static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(this)));
+        if (!button->is_connected("pressed", callback))
+        {
+            button->connect("pressed", callback);
+        }
+    }
     cache_fixed_slot_bindings();
     refresh_fixed_slot_actions_if_needed();
     refresh_site_controls_if_needed();
@@ -69,6 +109,20 @@ void Gs1GodotActionPanelController::cache_ui_references(Control& owner)
 void Gs1GodotActionPanelController::set_submit_ui_action_callback(SubmitUiActionFn callback)
 {
     submit_ui_action_ = std::move(callback);
+}
+
+void Gs1GodotActionPanelController::handle_open_protection_pressed()
+{
+    if (!submit_ui_action_)
+    {
+        return;
+    }
+
+    submit_ui_action_(
+        k_ui_action_open_site_protection_selector,
+        0,
+        0,
+        0);
 }
 
 bool Gs1GodotActionPanelController::handles_engine_message(Gs1EngineMessageType type) const noexcept
@@ -227,7 +281,9 @@ void Gs1GodotActionPanelController::cache_fixed_slot_bindings()
         }
 
         fixed_slot_bindings_.push_back(binding);
-        const Callable callback = Callable(owner_control_, "on_fixed_slot_pressed").bind(static_cast<std::int64_t>(binding.object_id));
+        const Callable callback = callable_mp_static(&dispatch_fixed_slot_pressed).bind(
+            static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(this)),
+            static_cast<std::int64_t>(binding.object_id));
         if (!button->is_connected("pressed", callback))
         {
             button->connect("pressed", callback);
@@ -417,10 +473,10 @@ void Gs1GodotActionPanelController::reconcile_projected_action_buttons(
         button->set_meta("target_id", as_int(action.get("target_id", 0), 0));
         button->set_meta("arg0", as_int(action.get("arg0", 0), 0));
         button->set_meta("arg1", as_int(action.get("arg1", 0), 0));
-        const Callable callback = owner_control_ == nullptr
-            ? Callable()
-            : Callable(owner_control_, "on_dynamic_site_action_pressed").bind(static_cast<int64_t>(stable_key));
-        if (callback.is_valid() && !button->is_connected("pressed", callback))
+        const Callable callback = callable_mp_static(&dispatch_site_control_pressed).bind(
+            static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(this)),
+            static_cast<std::int64_t>(stable_key));
+        if (!button->is_connected("pressed", callback))
         {
             button->connect("pressed", callback);
         }

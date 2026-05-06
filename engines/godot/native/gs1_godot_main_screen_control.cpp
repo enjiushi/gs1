@@ -224,12 +224,6 @@ void Gs1GodotMainScreenControl::_bind_methods()
     ClassDB::bind_method(D_METHOD("on_transfer_selected_item_pressed"), &Gs1GodotMainScreenControl::on_transfer_selected_item_pressed);
     ClassDB::bind_method(D_METHOD("on_plant_selected_seed_pressed"), &Gs1GodotMainScreenControl::on_plant_selected_seed_pressed);
     ClassDB::bind_method(D_METHOD("on_dynamic_regional_site_pressed", "site_id"), &Gs1GodotMainScreenControl::on_dynamic_regional_site_pressed);
-    ClassDB::bind_method(D_METHOD("on_dynamic_phone_listing_pressed", "listing_id"), &Gs1GodotMainScreenControl::on_dynamic_phone_listing_pressed);
-    ClassDB::bind_method(D_METHOD("on_dynamic_craft_option_pressed", "button_key"), &Gs1GodotMainScreenControl::on_dynamic_craft_option_pressed);
-    ClassDB::bind_method(D_METHOD("on_dynamic_site_action_pressed", "button_key"), &Gs1GodotMainScreenControl::on_dynamic_site_action_pressed);
-    ClassDB::bind_method(D_METHOD("on_dynamic_regional_selection_action_pressed", "button_key"), &Gs1GodotMainScreenControl::on_dynamic_regional_selection_action_pressed);
-    ClassDB::bind_method(D_METHOD("on_dynamic_regional_tech_tree_action_pressed", "button_key"), &Gs1GodotMainScreenControl::on_dynamic_regional_tech_tree_action_pressed);
-    ClassDB::bind_method(D_METHOD("on_fixed_slot_pressed", "button_id"), &Gs1GodotMainScreenControl::on_fixed_slot_pressed);
     ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "runtime_node_path"), "set_runtime_node_path", "get_runtime_node_path");
     ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "site_view_path"), "set_site_view_path", "get_site_view_path");
     ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "regional_world_path"), "set_regional_world_path", "get_regional_world_path");
@@ -244,6 +238,9 @@ void Gs1GodotMainScreenControl::_ready()
     cache_scene_references();
     cache_ui_references();
     action_panel_controller_.set_submit_ui_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
+        submit_ui_action(action_type, target_id, arg0, arg1);
+    });
+    overlay_panel_controller_.set_submit_ui_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
         submit_ui_action(action_type, target_id, arg0, arg1);
     });
     craft_panel_controller_.set_submit_craft_option_callback([this](int tile_x, int tile_y, int output_item_id) {
@@ -263,8 +260,8 @@ void Gs1GodotMainScreenControl::_ready()
     regional_tech_tree_panel_controller_.set_submit_ui_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
         submit_ui_action(action_type, target_id, arg0, arg1);
     });
-    phone_panel_controller_.set_submit_phone_listing_callback([this](int listing_id) {
-        submit_ui_action(UI_ACTION_BUY_PHONE_LISTING, listing_id, 1, 0);
+    phone_panel_controller_.set_submit_ui_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
+        submit_ui_action(action_type, target_id, arg0, arg1);
     });
     invalidate_all_ui();
     set_process(true);
@@ -470,19 +467,7 @@ void Gs1GodotMainScreenControl::wire_static_buttons()
     bind_button(Object::cast_to<BaseButton>(find_child("MoveEastButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_submit_move_pressed).bind(1.0, 0.0, 0.0));
     bind_button(Object::cast_to<BaseButton>(find_child("HoverTileButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_submit_selected_tile_context_pressed).bind(0));
     bind_button(Object::cast_to<BaseButton>(find_child("CancelActionButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_submit_site_action_cancel_pressed).bind(0, SITE_ACTION_CANCEL_FLAG_CURRENT_ACTION | SITE_ACTION_CANCEL_FLAG_PLACEMENT_MODE));
-    bind_button(Object::cast_to<BaseButton>(find_child("OpenProtectionButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_submit_ui_action_pressed).bind(static_cast<std::int64_t>(UI_ACTION_OPEN_SITE_PROTECTION_SELECTOR), static_cast<std::int64_t>(0), static_cast<std::int64_t>(0), static_cast<std::int64_t>(0)));
-    bind_button(Object::cast_to<BaseButton>(find_child("OverlayWindButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_submit_ui_action_pressed).bind(static_cast<std::int64_t>(UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE), static_cast<std::int64_t>(0), static_cast<std::int64_t>(PROTECTION_OVERLAY_WIND), static_cast<std::int64_t>(0)));
-    bind_button(Object::cast_to<BaseButton>(find_child("OverlayHeatButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_submit_ui_action_pressed).bind(static_cast<std::int64_t>(UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE), static_cast<std::int64_t>(0), static_cast<std::int64_t>(PROTECTION_OVERLAY_HEAT), static_cast<std::int64_t>(0)));
-    bind_button(Object::cast_to<BaseButton>(find_child("OverlayDustButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_submit_ui_action_pressed).bind(static_cast<std::int64_t>(UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE), static_cast<std::int64_t>(0), static_cast<std::int64_t>(PROTECTION_OVERLAY_DUST), static_cast<std::int64_t>(0)));
-    bind_button(Object::cast_to<BaseButton>(find_child("OverlayConditionButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_submit_ui_action_pressed).bind(static_cast<std::int64_t>(UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE), static_cast<std::int64_t>(0), static_cast<std::int64_t>(PROTECTION_OVERLAY_OCCUPANT_CONDITION), static_cast<std::int64_t>(0)));
-    bind_button(Object::cast_to<BaseButton>(find_child("OverlayClearButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_submit_ui_action_pressed).bind(static_cast<std::int64_t>(UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE), static_cast<std::int64_t>(0), static_cast<std::int64_t>(PROTECTION_OVERLAY_NONE), static_cast<std::int64_t>(0)));
-    bind_button(Object::cast_to<BaseButton>(find_child("OpenPhoneHomeButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_submit_ui_action_pressed).bind(static_cast<std::int64_t>(UI_ACTION_SET_PHONE_PANEL_SECTION), static_cast<std::int64_t>(0), static_cast<std::int64_t>(PHONE_PANEL_SECTION_HOME), static_cast<std::int64_t>(0)));
-    bind_button(Object::cast_to<BaseButton>(find_child("OpenPhoneTasksButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_submit_ui_action_pressed).bind(static_cast<std::int64_t>(UI_ACTION_SET_PHONE_PANEL_SECTION), static_cast<std::int64_t>(0), static_cast<std::int64_t>(PHONE_PANEL_SECTION_TASKS), static_cast<std::int64_t>(0)));
-    bind_button(Object::cast_to<BaseButton>(find_child("OpenPhoneBuyButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_submit_ui_action_pressed).bind(static_cast<std::int64_t>(UI_ACTION_SET_PHONE_PANEL_SECTION), static_cast<std::int64_t>(0), static_cast<std::int64_t>(PHONE_PANEL_SECTION_BUY), static_cast<std::int64_t>(0)));
-    bind_button(Object::cast_to<BaseButton>(find_child("OpenPhoneSellButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_submit_ui_action_pressed).bind(static_cast<std::int64_t>(UI_ACTION_SET_PHONE_PANEL_SECTION), static_cast<std::int64_t>(0), static_cast<std::int64_t>(PHONE_PANEL_SECTION_SELL), static_cast<std::int64_t>(0)));
     bind_button(Object::cast_to<BaseButton>(find_child("OpenTechTreeButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_toggle_regional_tech_tree_pressed));
-    bind_button(Object::cast_to<BaseButton>(find_child("RegionalTechTreeCloseButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_toggle_regional_tech_tree_pressed));
-    bind_button(Object::cast_to<BaseButton>(find_child("ClosePhoneButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_submit_ui_action_pressed).bind(static_cast<std::int64_t>(UI_ACTION_CLOSE_PHONE_PANEL), static_cast<std::int64_t>(0), static_cast<std::int64_t>(0), static_cast<std::int64_t>(0)));
     bind_button(Object::cast_to<BaseButton>(find_child("OpenWorkerPackButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_open_worker_pack_pressed));
     bind_button(Object::cast_to<BaseButton>(find_child("OpenNearestStorageButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_open_nearest_storage_pressed));
     bind_button(Object::cast_to<BaseButton>(find_child("CloseStorageButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_close_storage_pressed));
@@ -1821,30 +1806,3 @@ void Gs1GodotMainScreenControl::on_use_selected_item_pressed() { use_first_usabl
 void Gs1GodotMainScreenControl::on_transfer_selected_item_pressed() { transfer_first_storage_item_to_pack(); }
 void Gs1GodotMainScreenControl::on_plant_selected_seed_pressed() { plant_first_seed_on_selected_tile(); }
 void Gs1GodotMainScreenControl::on_dynamic_regional_site_pressed(int site_id) { select_regional_site(site_id, true); }
-void Gs1GodotMainScreenControl::on_dynamic_phone_listing_pressed(int listing_id)
-{
-    phone_panel_controller_.handle_phone_listing_pressed(listing_id);
-}
-void Gs1GodotMainScreenControl::on_dynamic_craft_option_pressed(std::int64_t button_key)
-{
-    craft_panel_controller_.handle_craft_option_pressed(button_key);
-}
-void Gs1GodotMainScreenControl::on_dynamic_site_action_pressed(std::int64_t button_key)
-{
-    action_panel_controller_.handle_site_control_pressed(button_key);
-}
-
-void Gs1GodotMainScreenControl::on_dynamic_regional_selection_action_pressed(std::int64_t button_key)
-{
-    regional_selection_panel_controller_.handle_action_pressed(button_key);
-}
-
-void Gs1GodotMainScreenControl::on_dynamic_regional_tech_tree_action_pressed(std::int64_t button_key)
-{
-    regional_tech_tree_panel_controller_.handle_action_pressed(button_key);
-}
-
-void Gs1GodotMainScreenControl::on_fixed_slot_pressed(std::int64_t button_id)
-{
-    action_panel_controller_.handle_fixed_slot_pressed(button_id);
-}

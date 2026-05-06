@@ -36,7 +36,6 @@ private:
     };
 
     void reconcile_craft_option_buttons();
-    void on_dynamic_craft_option_pressed(std::int64_t button_key);
     [[nodiscard]] godot::Button* upsert_button_node(
         godot::Node* container,
         std::unordered_map<std::uint64_t, ProjectedButtonRecord>& registry,

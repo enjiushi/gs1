@@ -1,9 +1,31 @@
 #include "gs1_godot_overlay_panel_controller.h"
 
+#include <godot_cpp/core/object.hpp>
+#include <godot_cpp/variant/callable_method_pointer.hpp>
+
 using namespace godot;
+
+namespace
+{
+constexpr std::int64_t k_ui_action_set_site_protection_overlay_mode = 26;
+
+Gs1GodotOverlayPanelController* resolve_controller(std::int64_t controller_bits)
+{
+    return reinterpret_cast<Gs1GodotOverlayPanelController*>(static_cast<std::uintptr_t>(controller_bits));
+}
+
+void dispatch_overlay_mode_pressed(std::int64_t controller_bits, std::int64_t mode)
+{
+    if (Gs1GodotOverlayPanelController* controller = resolve_controller(controller_bits))
+    {
+        controller->handle_overlay_mode_pressed(mode);
+    }
+}
+}
 
 void Gs1GodotOverlayPanelController::cache_ui_references(Control& owner)
 {
+    owner_control_ = &owner;
     if (panel_ == nullptr)
     {
         panel_ = Object::cast_to<Control>(owner.find_child("OverlayPanel", true, false));
@@ -12,7 +34,49 @@ void Gs1GodotOverlayPanelController::cache_ui_references(Control& owner)
     {
         overlay_state_label_ = Object::cast_to<Label>(owner.find_child("OverlayStateLabel", true, false));
     }
+    const std::int64_t controller_bits = static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(this));
+    const struct ButtonBinding final
+    {
+        const char* name;
+        std::int64_t mode;
+    } bindings[] {
+        {"OverlayWindButton", 1},
+        {"OverlayHeatButton", 2},
+        {"OverlayDustButton", 3},
+        {"OverlayConditionButton", 4},
+        {"OverlayClearButton", 0},
+    };
+    for (const ButtonBinding& binding : bindings)
+    {
+        if (Button* button = Object::cast_to<Button>(owner.find_child(binding.name, true, false)))
+        {
+            const Callable callback = callable_mp_static(&dispatch_overlay_mode_pressed).bind(controller_bits, binding.mode);
+            if (!button->is_connected("pressed", callback))
+            {
+                button->connect("pressed", callback);
+            }
+        }
+    }
     refresh_if_needed();
+}
+
+void Gs1GodotOverlayPanelController::set_submit_ui_action_callback(SubmitUiActionFn callback)
+{
+    submit_ui_action_ = std::move(callback);
+}
+
+void Gs1GodotOverlayPanelController::handle_overlay_mode_pressed(std::int64_t mode)
+{
+    if (!submit_ui_action_)
+    {
+        return;
+    }
+
+    submit_ui_action_(
+        k_ui_action_set_site_protection_overlay_mode,
+        0,
+        mode,
+        0);
 }
 
 bool Gs1GodotOverlayPanelController::handles_engine_message(Gs1EngineMessageType type) const noexcept

@@ -23,6 +23,7 @@ public:
 
     void cache_ui_references(godot::Control& owner);
     void set_submit_ui_action_callback(SubmitUiActionFn callback);
+    void handle_open_protection_pressed();
     void handle_fixed_slot_pressed(std::int64_t button_id);
     void handle_site_control_pressed(std::int64_t button_key);
     [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;

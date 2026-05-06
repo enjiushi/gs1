@@ -30,6 +30,8 @@ using namespace godot;
 
 namespace
 {
+constexpr std::int64_t k_ui_action_close_regional_map_tech_tree = 19;
+
 constexpr std::uint8_t k_unlockable_content_kind_plant = 0U;
 constexpr std::uint8_t k_unlockable_content_kind_item = 1U;
 constexpr std::uint8_t k_unlockable_content_kind_structure_recipe = 2U;
@@ -150,6 +152,27 @@ std::uint8_t unlockable_content_kind_from_def(const gs1::ReputationUnlockDef& un
         return k_unlockable_content_kind_item;
     }
 }
+
+Gs1GodotRegionalTechTreePanelController* resolve_controller(std::int64_t controller_bits)
+{
+    return reinterpret_cast<Gs1GodotRegionalTechTreePanelController*>(static_cast<std::uintptr_t>(controller_bits));
+}
+
+void dispatch_tech_tree_action_pressed(std::int64_t controller_bits, std::int64_t button_key)
+{
+    if (Gs1GodotRegionalTechTreePanelController* controller = resolve_controller(controller_bits))
+    {
+        controller->handle_action_pressed(button_key);
+    }
+}
+
+void dispatch_tech_tree_close_pressed(std::int64_t controller_bits)
+{
+    if (Gs1GodotRegionalTechTreePanelController* controller = resolve_controller(controller_bits))
+    {
+        controller->handle_close_pressed();
+    }
+}
 }
 
 void Gs1GodotRegionalTechTreePanelController::cache_ui_references(Control& owner)
@@ -174,6 +197,15 @@ void Gs1GodotRegionalTechTreePanelController::cache_ui_references(Control& owner
     if (actions_ == nullptr)
     {
         actions_ = Object::cast_to<GridContainer>(owner.find_child("RegionalTechTreeActions", true, false));
+    }
+    if (Button* button = Object::cast_to<Button>(owner.find_child("RegionalTechTreeCloseButton", true, false)))
+    {
+        const Callable callback = callable_mp_static(&dispatch_tech_tree_close_pressed).bind(
+            static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(this)));
+        if (!button->is_connected("pressed", callback))
+        {
+            button->connect("pressed", callback);
+        }
     }
     apply_overlay_layout();
     refresh_if_needed();
@@ -428,6 +460,20 @@ void Gs1GodotRegionalTechTreePanelController::handle_action_pressed(std::int64_t
         as_int(button->get_meta("arg1", 0), 0));
 }
 
+void Gs1GodotRegionalTechTreePanelController::handle_close_pressed()
+{
+    if (!submit_ui_action_)
+    {
+        return;
+    }
+
+    submit_ui_action_(
+        k_ui_action_close_regional_map_tech_tree,
+        0,
+        0,
+        0);
+}
+
 void Gs1GodotRegionalTechTreePanelController::apply_overlay_layout()
 {
     if (overlay_ == nullptr)
@@ -594,10 +640,10 @@ void Gs1GodotRegionalTechTreePanelController::reconcile_tech_tree_cards(const Ar
             }
         }
 
-        const Callable callback = owner_control_ == nullptr
-            ? Callable()
-            : Callable(owner_control_, "on_dynamic_regional_tech_tree_action_pressed").bind(static_cast<int64_t>(stable_key));
-        if (callback.is_valid() && !button->is_connected("pressed", callback))
+        const Callable callback = callable_mp_static(&dispatch_tech_tree_action_pressed).bind(
+            static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(this)),
+            static_cast<std::int64_t>(stable_key));
+        if (!button->is_connected("pressed", callback))
         {
             button->connect("pressed", callback);
         }

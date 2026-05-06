@@ -20,11 +20,13 @@
 class Gs1GodotPhonePanelController final : public IGs1GodotEngineMessageSubscriber
 {
 public:
-    using SubmitPhoneListingFn = std::function<void(int listing_id)>;
+    using SubmitUiActionFn = std::function<void(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)>;
 
     void cache_ui_references(godot::Control& owner);
-    void set_submit_phone_listing_callback(SubmitPhoneListingFn callback);
+    void set_submit_ui_action_callback(SubmitUiActionFn callback);
     void handle_phone_listing_pressed(std::int64_t button_key);
+    void handle_phone_section_pressed(std::int64_t section);
+    void handle_close_phone_pressed();
     [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
     void handle_engine_message(const Gs1EngineMessage& message) override;
     void handle_runtime_message_reset() override;
@@ -52,7 +54,7 @@ private:
     godot::Control* panel_ {nullptr};
     godot::Label* phone_state_label_ {nullptr};
     godot::VBoxContainer* phone_listings_ {nullptr};
-    SubmitPhoneListingFn submit_phone_listing_ {};
+    SubmitUiActionFn submit_ui_action_ {};
     std::optional<Gs1AppState> current_app_state_ {};
     std::optional<Gs1RuntimePhonePanelProjection> phone_panel_state_ {};
     std::vector<Gs1RuntimePhoneListingProjection> phone_listings_state_ {};

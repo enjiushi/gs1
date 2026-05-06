@@ -28,6 +28,7 @@ public:
     void cache_ui_references(godot::Control& owner);
     void set_submit_ui_action_callback(SubmitUiActionFn callback);
     void handle_action_pressed(std::int64_t button_key);
+    void handle_close_pressed();
     [[nodiscard]] bool is_panel_visible() const;
     [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
     void handle_engine_message(const Gs1EngineMessage& message) override;
