@@ -685,6 +685,52 @@ const Gs1EngineMessageUiElementData* find_ui_element_with_text_fragment(
     return nullptr;
 }
 
+bool contains_progression_view_begin(
+    const std::vector<Gs1EngineMessage>& messages,
+    Gs1ProgressionViewId view_id)
+{
+    for (const auto& message : messages)
+    {
+        if (message.type != GS1_ENGINE_MESSAGE_BEGIN_PROGRESSION_VIEW)
+        {
+            continue;
+        }
+
+        const auto& payload = message.payload_as<Gs1EngineMessageProgressionViewData>();
+        if (payload.view_id == view_id)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+const Gs1EngineMessageProgressionEntryData* find_progression_entry(
+    const std::vector<Gs1EngineMessage>& messages,
+    Gs1ProgressionEntryKind entry_kind,
+    std::uint16_t reputation_requirement,
+    std::uint8_t faction_id = 0U)
+{
+    for (const auto& message : messages)
+    {
+        if (message.type != GS1_ENGINE_MESSAGE_PROGRESSION_ENTRY_UPSERT)
+        {
+            continue;
+        }
+
+        const auto& payload = message.payload_as<Gs1EngineMessageProgressionEntryData>();
+        if (payload.entry_kind == entry_kind &&
+            payload.reputation_requirement == reputation_requirement &&
+            payload.faction_id == faction_id)
+        {
+            return &payload;
+        }
+    }
+
+    return nullptr;
+}
+
 const Gs1EngineMessage* find_regional_map_site_message(
     const std::vector<Gs1EngineMessage>& messages,
     std::uint32_t site_id)
@@ -798,19 +844,28 @@ int main()
     open_tech_tree_message.set_payload(gs1::OpenRegionalMapTechTreeMessage {});
     assert(runtime.handle_message(open_tech_tree_message) == GS1_STATUS_OK);
     const auto tech_tree_messages = drain_engine_messages(runtime);
-    assert(contains_ui_element_text(tech_tree_messages, "Prototype Tech Tree"));
-    assert(contains_ui_element_text(tech_tree_messages, "Starter Plants"));
-    assert(contains_ui_element_text(tech_tree_messages, "Reputation Unlocks"));
-    assert(contains_ui_element_text(tech_tree_messages, "Tier Tech Tree"));
-    assert(contains_ui_element_text(tech_tree_messages, "Checkerboard | Wormwood"));
-    assert(contains_ui_element_text_fragment(tech_tree_messages, "Ephedra Stew"));
-    assert(contains_ui_element_text_fragment(tech_tree_messages, "Ordos Wormwood"));
-    assert(contains_ui_element_text(tech_tree_messages, "Tab: Village"));
-    assert(contains_ui_element_text(tech_tree_messages, "Tab: University"));
+    assert(contains_progression_view_begin(
+        tech_tree_messages,
+        GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE));
     {
-        const auto* village_node = find_ui_element_with_text_fragment(tech_tree_messages, "TECHNODE|s=Need 200r");
+        const auto* unlock_entry = find_progression_entry(
+            tech_tree_messages,
+            GS1_PROGRESSION_ENTRY_REPUTATION_UNLOCK,
+            100U);
+        assert(unlock_entry != nullptr);
+        assert(unlock_entry->entry_id == 5001U);
+        assert(unlock_entry->content_id == 21U);
+    }
+    {
+        const auto* village_node = find_progression_entry(
+            tech_tree_messages,
+            GS1_PROGRESSION_ENTRY_TECHNOLOGY_NODE,
+            200U,
+            static_cast<std::uint8_t>(gs1::k_faction_village_committee));
         assert(village_node != nullptr);
         assert(village_node->action.arg0 == gs1::k_faction_village_committee);
+        assert(village_node->tech_node_id ==
+            gs1::base_technology_node_id(gs1::FactionId {gs1::k_faction_village_committee}, 1U));
     }
 
     GameMessage select_forestry_tab_message {};
@@ -819,7 +874,9 @@ int main()
         gs1::k_faction_forestry_bureau});
     assert(runtime.handle_message(select_forestry_tab_message) == GS1_STATUS_OK);
     const auto forestry_messages = drain_engine_messages(runtime);
-    assert(contains_ui_element_text(forestry_messages, "Tab: Forestry"));
+    assert(contains_progression_view_begin(
+        forestry_messages,
+        GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE));
 
     GameMessage select_university_tab_message {};
     select_university_tab_message.type = GameMessageType::SelectRegionalMapTechTreeFaction;
@@ -827,7 +884,9 @@ int main()
         gs1::k_faction_agricultural_university});
     assert(runtime.handle_message(select_university_tab_message) == GS1_STATUS_OK);
     const auto university_messages = drain_engine_messages(runtime);
-    assert(contains_ui_element_text(university_messages, "Tab: University"));
+    assert(contains_progression_view_begin(
+        university_messages,
+        GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE));
 
     GameMessage faction_reputation_award {};
     faction_reputation_award.type = GameMessageType::FactionReputationAwardRequested;
@@ -849,7 +908,9 @@ int main()
         gs1::k_faction_village_committee});
     assert(runtime.handle_message(select_village_tab_message) == GS1_STATUS_OK);
     const auto awarded_messages = drain_engine_messages(runtime);
-    assert(contains_ui_element_text(awarded_messages, "Tab: Village"));
+    assert(contains_progression_view_begin(
+        awarded_messages,
+        GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE));
 
     GameMessage claim_tech_node_message {};
     claim_tech_node_message.type = GameMessageType::TechnologyNodeClaimRequested;
@@ -858,7 +919,15 @@ int main()
         gs1::k_faction_village_committee});
     assert(runtime.handle_message(claim_tech_node_message) == GS1_STATUS_OK);
     const auto claimed_messages = drain_engine_messages(runtime);
-    assert(contains_ui_element_text(claimed_messages, "Prototype Tech Tree"));
+    {
+        const auto* claimed_node = find_progression_entry(
+            claimed_messages,
+            GS1_PROGRESSION_ENTRY_TECHNOLOGY_NODE,
+            200U,
+            static_cast<std::uint8_t>(gs1::k_faction_village_committee));
+        assert(claimed_node != nullptr);
+        assert((claimed_node->flags & GS1_PROGRESSION_ENTRY_FLAG_UNLOCKED) != 0U);
+    }
 
     GameRuntime support_runtime {create_desc};
     assert(support_runtime.handle_message(make_start_campaign_message()) == GS1_STATUS_OK);
@@ -904,13 +973,15 @@ int main()
 
     assert(support_runtime.handle_message(open_tech_tree_message) == GS1_STATUS_OK);
     const auto site_tech_tree_messages = drain_engine_messages(support_runtime);
-    assert(contains_ui_element_text(site_tech_tree_messages, "Prototype Tech Tree"));
-    assert(contains_ui_element_text(site_tech_tree_messages, "Tab: Village"));
-    assert(contains_ui_element_text(site_tech_tree_messages, "Tier Tech Tree"));
+    assert(contains_progression_view_begin(
+        site_tech_tree_messages,
+        GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE));
 
     assert(support_runtime.handle_message(select_forestry_tab_message) == GS1_STATUS_OK);
     const auto site_forestry_messages = drain_engine_messages(support_runtime);
-    assert(contains_ui_element_text(site_forestry_messages, "Tab: Forestry"));
+    assert(contains_progression_view_begin(
+        site_forestry_messages,
+        GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE));
 
     const auto first_site_id = campaign_site_id;
     const auto* first_site_content = gs1::find_prototype_site_content(gs1::SiteId {first_site_id});
@@ -1614,7 +1685,9 @@ int main()
             tech_tree_phone_panel_messages.back()->payload_as<Gs1EngineMessagePhonePanelData>();
         assert((payload.flags & GS1_PHONE_PANEL_FLAG_OPEN) == 0U);
     }
-    assert(contains_ui_element_text(open_site_tech_tree_messages, "Prototype Tech Tree"));
+    assert(contains_progression_view_begin(
+        open_site_tech_tree_messages,
+        GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE));
 
     assert(panel_state_runtime.submit_host_events(&open_worker_pack_event, 1U) == GS1_STATUS_OK);
     Gs1Phase1Result reopen_worker_pack_result {};
@@ -1626,6 +1699,24 @@ int main()
     assert(find_close_ui_setup_message(
                reopen_worker_pack_messages,
                GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE) != nullptr);
+    {
+        bool found_progression_close = false;
+        for (const auto& message : reopen_worker_pack_messages)
+        {
+            if (message.type != GS1_ENGINE_MESSAGE_CLOSE_PROGRESSION_VIEW)
+            {
+                continue;
+            }
+
+            const auto& payload = message.payload_as<Gs1EngineMessageCloseProgressionViewData>();
+            if (payload.view_id == GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE)
+            {
+                found_progression_close = true;
+                break;
+            }
+        }
+        assert(found_progression_close);
+    }
     assert(find_inventory_view_message(
                reopen_worker_pack_messages,
                panel_state_site_run.inventory.worker_pack_storage_id,

@@ -92,6 +92,28 @@ enum Gs1UiSetupPresentationType : std::uint8_t
     GS1_UI_SETUP_PRESENTATION_OVERLAY = 2
 };
 
+enum Gs1ProgressionViewId : std::uint8_t
+{
+    GS1_PROGRESSION_VIEW_NONE = 0,
+    GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE = 1
+};
+
+enum Gs1ProgressionEntryKind : std::uint8_t
+{
+    GS1_PROGRESSION_ENTRY_NONE = 0,
+    GS1_PROGRESSION_ENTRY_REPUTATION_UNLOCK = 1,
+    GS1_PROGRESSION_ENTRY_TECHNOLOGY_NODE = 2
+};
+
+enum Gs1ProgressionEntryFlags : std::uint8_t
+{
+    GS1_PROGRESSION_ENTRY_FLAG_NONE = 0,
+    GS1_PROGRESSION_ENTRY_FLAG_UNLOCKED = 1u << 0,
+    GS1_PROGRESSION_ENTRY_FLAG_LOCKED = 1u << 1,
+    GS1_PROGRESSION_ENTRY_FLAG_ACTIONABLE = 1u << 2,
+    GS1_PROGRESSION_ENTRY_FLAG_SELECTED = 1u << 3
+};
+
 enum Gs1UiPanelId : std::uint8_t
 {
     GS1_UI_PANEL_NONE = 0,
@@ -364,6 +386,11 @@ enum Gs1EngineMessageType : std::uint8_t
     GS1_ENGINE_MESSAGE_UI_PANEL_LIST_ACTION_UPSERT = 57,
     GS1_ENGINE_MESSAGE_END_UI_PANEL = 58,
     GS1_ENGINE_MESSAGE_CLOSE_UI_PANEL = 59,
+
+    GS1_ENGINE_MESSAGE_BEGIN_PROGRESSION_VIEW = 60,
+    GS1_ENGINE_MESSAGE_PROGRESSION_ENTRY_UPSERT = 61,
+    GS1_ENGINE_MESSAGE_END_PROGRESSION_VIEW = 62,
+    GS1_ENGINE_MESSAGE_CLOSE_PROGRESSION_VIEW = 63,
 
     GS1_ENGINE_MESSAGE_HUD_STATE = 44,
     GS1_ENGINE_MESSAGE_NOTIFICATION_PUSH = 45,
@@ -682,6 +709,35 @@ struct Gs1EngineMessageUiElementData
     Gs1UiElementType element_type;
     std::uint8_t flags;
     char text[26];
+};
+
+struct Gs1EngineMessageProgressionViewData
+{
+    std::uint32_t context_id;
+    std::uint16_t entry_count;
+    Gs1ProgressionViewId view_id;
+    Gs1ProjectionMode mode;
+};
+
+struct Gs1EngineMessageCloseProgressionViewData
+{
+    Gs1ProgressionViewId view_id;
+    std::uint8_t reserved0;
+};
+
+struct Gs1EngineMessageProgressionEntryData
+{
+    Gs1UiAction action;
+    std::uint16_t entry_id;
+    std::uint16_t reputation_requirement;
+    std::uint16_t content_id;
+    std::uint16_t tech_node_id;
+    std::uint8_t faction_id;
+    Gs1ProgressionEntryKind entry_kind;
+    std::uint8_t flags;
+    std::uint8_t content_kind;
+    std::uint8_t tier_index;
+    std::uint8_t reserved0[2];
 };
 
 struct Gs1EngineMessageSiteSnapshotData
@@ -1103,6 +1159,9 @@ GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageUiPanelSlotActionData, 56U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageUiPanelListItemData, 60U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageUiPanelListActionData, 32U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageUiElementData, 56U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageProgressionViewData, 8U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageCloseProgressionViewData, 2U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageProgressionEntryData, 40U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteSnapshotData, 16U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteTileData, 60U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageWorkerData, 40U);
@@ -1147,6 +1206,9 @@ static_assert(sizeof(Gs1EngineMessageUiPanelSlotActionData) <= GS1_MESSAGE_PAYLO
 static_assert(sizeof(Gs1EngineMessageUiPanelListItemData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageUiPanelListActionData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageUiElementData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageProgressionViewData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageCloseProgressionViewData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageProgressionEntryData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageSiteSnapshotData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageSiteTileData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageWorkerData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);

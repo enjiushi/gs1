@@ -75,6 +75,7 @@ private:
     [[nodiscard]] godot::Dictionary build_site_action_dictionary() const;
     [[nodiscard]] godot::Dictionary build_site_result_dictionary() const;
     [[nodiscard]] godot::Array build_ui_setups_array() const;
+    [[nodiscard]] godot::Array build_progression_views_array() const;
     [[nodiscard]] godot::Array build_ui_panels_array() const;
     [[nodiscard]] godot::Dictionary build_active_site_dictionary() const;
     [[nodiscard]] godot::Array build_recent_one_shot_cues_array() const;

@@ -27,6 +27,7 @@
 namespace godot
 {
 class BaseButton;
+class CenterContainer;
 class ColorRect;
 class Color;
 class Button;
@@ -39,6 +40,7 @@ class MeshInstance3D;
 class Node;
 class Node3D;
 class PanelContainer;
+class Panel;
 class RichTextLabel;
 class ScrollContainer;
 class StandardMaterial3D;
@@ -92,6 +94,7 @@ private:
     {
         godot::ObjectID object_id {};
         godot::ObjectID content_root_id {};
+        godot::ObjectID marker_label_id {};
         godot::ObjectID icon_texture_id {};
         godot::ObjectID icon_label_id {};
         godot::ObjectID title_label_id {};
@@ -156,6 +159,7 @@ private:
         std::unordered_map<std::uint64_t, ProjectedButtonRecord>& registry,
         const godot::Array& card_specs,
         bool allow_actions);
+    [[nodiscard]] godot::String tech_tree_marker_text(const godot::Dictionary& spec) const;
     void render_regional_selection(const Gs1RuntimeRegionalMapSiteProjection* selected_site);
     void render_regional_tech_tree();
 
@@ -174,6 +178,7 @@ private:
     [[nodiscard]] godot::String build_regional_map_overview_text(
         const std::vector<Gs1RuntimeRegionalMapSiteProjection>& sites,
         const std::vector<Gs1RuntimeRegionalMapLinkProjection>& links) const;
+    [[nodiscard]] godot::Dictionary find_progression_view(int view_id) const;
     [[nodiscard]] godot::Dictionary find_ui_panel(int panel_id) const;
     [[nodiscard]] godot::Dictionary find_panel_slot_action(const godot::Dictionary& panel, int slot_id) const;
     [[nodiscard]] godot::Dictionary find_panel_list_action(const godot::Dictionary& panel, int list_id, std::int64_t item_id, int role) const;
@@ -221,11 +226,9 @@ private:
     [[nodiscard]] godot::String regional_site_tooltip(const Gs1RuntimeRegionalMapSiteProjection& site) const;
     [[nodiscard]] godot::String regional_site_state_name(int site_state) const;
     [[nodiscard]] godot::String regional_selection_action_label(const godot::String& text, const godot::Dictionary& action) const;
-    [[nodiscard]] bool is_compact_tech_tree_node_text(const godot::String& text) const;
-    [[nodiscard]] godot::String tech_tree_status_text(const godot::String& text) const;
-    [[nodiscard]] godot::String regional_tech_tree_node_text(const godot::Dictionary& action, const godot::String& text) const;
-    [[nodiscard]] godot::String regional_unlockable_tooltip_text(const godot::String& text) const;
-    [[nodiscard]] godot::String regional_tech_tooltip_text(const godot::Dictionary& action, const godot::String& text) const;
+    [[nodiscard]] godot::String regional_unlockable_tooltip_text(const godot::Dictionary& spec) const;
+    [[nodiscard]] godot::String regional_tech_tooltip_text(const godot::Dictionary& spec) const;
+    [[nodiscard]] godot::String regional_row_requirement_text(const godot::Dictionary& spec) const;
     [[nodiscard]] godot::String regional_card_icon_text(const godot::Dictionary& spec) const;
     [[nodiscard]] godot::String regional_card_title_text(const godot::Dictionary& spec) const;
     [[nodiscard]] godot::String regional_card_subtitle_text(const godot::Dictionary& spec) const;
@@ -417,8 +420,6 @@ private:
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> modifier_buttons_;
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> site_control_buttons_;
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> regional_selection_action_buttons_;
-    std::unordered_map<std::uint64_t, ProjectedButtonRecord> regional_tech_tree_faction_tab_buttons_;
-    std::unordered_map<std::uint64_t, ProjectedButtonRecord> regional_tech_tree_unlockable_buttons_;
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> regional_tech_tree_action_buttons_;
 
     godot::RichTextLabel* status_label_ {nullptr};
@@ -435,9 +436,6 @@ private:
     godot::PanelContainer* regional_tech_tree_panel_ {nullptr};
     godot::Label* regional_tech_tree_title_ {nullptr};
     godot::ScrollContainer* regional_tech_tree_summary_ {nullptr};
-    godot::GridContainer* regional_tech_tree_unlockables_grid_ {nullptr};
-    godot::Node* regional_tech_tree_faction_tabs_ {nullptr};
-    godot::ScrollContainer* regional_tech_tree_tech_summary_ {nullptr};
     godot::GridContainer* regional_tech_tree_actions_ {nullptr};
     godot::PanelContainer* site_panel_ {nullptr};
     godot::Label* site_title_ {nullptr};

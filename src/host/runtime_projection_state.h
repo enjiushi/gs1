@@ -24,6 +24,27 @@ struct Gs1RuntimeUiSetupProjection final
     std::vector<Gs1RuntimeUiElementProjection> elements {};
 };
 
+struct Gs1RuntimeProgressionEntryProjection final
+{
+    std::uint16_t entry_id {0};
+    std::uint16_t reputation_requirement {0};
+    std::uint16_t content_id {0};
+    std::uint16_t tech_node_id {0};
+    std::uint8_t faction_id {0};
+    Gs1ProgressionEntryKind entry_kind {GS1_PROGRESSION_ENTRY_NONE};
+    std::uint32_t flags {0};
+    std::uint8_t content_kind {0};
+    std::uint8_t tier_index {0};
+    Gs1UiAction action {};
+};
+
+struct Gs1RuntimeProgressionViewProjection final
+{
+    Gs1ProgressionViewId view_id {GS1_PROGRESSION_VIEW_NONE};
+    std::uint32_t context_id {0};
+    std::vector<Gs1RuntimeProgressionEntryProjection> entries {};
+};
+
 struct Gs1RuntimeUiPanelTextProjection final
 {
     std::uint16_t line_id {0};
@@ -359,6 +380,7 @@ struct Gs1RuntimeProjectionState final
     std::optional<Gs1AppState> current_app_state {};
     std::optional<std::uint32_t> selected_site_id {};
     std::vector<Gs1RuntimeUiSetupProjection> active_ui_setups {};
+    std::vector<Gs1RuntimeProgressionViewProjection> active_progression_views {};
     std::vector<Gs1RuntimeUiPanelProjection> active_ui_panels {};
     std::vector<Gs1RuntimeRegionalMapSiteProjection> regional_map_sites {};
     std::vector<Gs1RuntimeRegionalMapLinkProjection> regional_map_links {};
@@ -397,6 +419,13 @@ private:
         std::vector<Gs1RuntimeUiPanelListActionProjection> list_actions {};
     };
 
+    struct PendingProgressionView final
+    {
+        Gs1ProgressionViewId view_id {GS1_PROGRESSION_VIEW_NONE};
+        std::uint32_t context_id {0};
+        std::vector<Gs1RuntimeProgressionEntryProjection> entries {};
+    };
+
     struct PendingRegionalMapState final
     {
         std::vector<Gs1RuntimeRegionalMapSiteProjection> sites {};
@@ -414,6 +443,10 @@ private:
     void apply_ui_element_upsert(const Gs1EngineMessageUiElementData& payload);
     void apply_ui_setup_end();
     void apply_ui_setup_close(const Gs1EngineMessageCloseUiSetupData& payload);
+    void apply_progression_view_begin(const Gs1EngineMessageProgressionViewData& payload);
+    void apply_progression_entry_upsert(const Gs1EngineMessageProgressionEntryData& payload);
+    void apply_progression_view_end();
+    void apply_progression_view_close(const Gs1EngineMessageCloseProgressionViewData& payload);
     void apply_ui_panel_begin(const Gs1EngineMessageUiPanelData& payload);
     void apply_ui_panel_text_upsert(const Gs1EngineMessageUiPanelTextData& payload);
     void apply_ui_panel_slot_action_upsert(const Gs1EngineMessageUiPanelSlotActionData& payload);
@@ -458,6 +491,7 @@ private:
 private:
     Gs1RuntimeProjectionState state_ {};
     std::optional<PendingUiSetup> pending_ui_setup_ {};
+    std::optional<PendingProgressionView> pending_progression_view_ {};
     std::optional<PendingUiPanel> pending_ui_panel_ {};
     std::optional<PendingRegionalMapState> pending_regional_map_ {};
     std::optional<Gs1RuntimeSiteProjection> pending_site_ {};

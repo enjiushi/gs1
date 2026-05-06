@@ -2192,6 +2192,7 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
     case GameMessageType::OpenMainMenu:
         queue_close_active_normal_ui_if_open();
         queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE);
+        queue_close_progression_view_if_open(GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE);
         queue_clear_ui_panel_messages(GS1_UI_PANEL_REGIONAL_MAP);
         queue_clear_ui_panel_messages(GS1_UI_PANEL_REGIONAL_MAP_SELECTION);
         queue_app_state_message(app_state_);
@@ -2243,6 +2244,7 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
     case GameMessageType::CloseRegionalMapTechTree:
         queue_regional_map_menu_ui_messages();
         queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE);
+        queue_close_progression_view_if_open(GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE);
         break;
 
     case GameMessageType::SelectRegionalMapTechTreeFaction:
@@ -2333,6 +2335,7 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
         queue_clear_ui_panel_messages(GS1_UI_PANEL_REGIONAL_MAP_SELECTION);
         queue_clear_ui_panel_messages(GS1_UI_PANEL_REGIONAL_MAP);
         queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE);
+        queue_close_progression_view_if_open(GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE);
         queue_app_state_message(app_state_);
         break;
 
@@ -2364,6 +2367,7 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
         close_site_protection_ui();
         queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
         queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE);
+        queue_close_progression_view_if_open(GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE);
         queue_app_state_message(app_state_);
         queue_site_result_ui_messages(payload.site_id, payload.result);
         queue_site_result_ready_message(
@@ -2605,6 +2609,28 @@ void GameRuntime::queue_ui_panel_close_message(Gs1UiPanelId panel_id)
     active_ui_panels_.erase(panel_id);
 }
 
+void GameRuntime::queue_progression_view_begin_message(
+    Gs1ProgressionViewId view_id,
+    std::uint32_t entry_count,
+    std::uint32_t context_id)
+{
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_BEGIN_PROGRESSION_VIEW);
+    auto& payload = message.emplace_payload<Gs1EngineMessageProgressionViewData>();
+    payload.view_id = view_id;
+    payload.mode = GS1_PROJECTION_MODE_SNAPSHOT;
+    payload.entry_count = static_cast<std::uint16_t>(std::min<std::uint32_t>(entry_count, 65535U));
+    payload.context_id = context_id;
+    engine_messages_.push_back(message);
+}
+
+void GameRuntime::queue_progression_view_close_message(Gs1ProgressionViewId view_id)
+{
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_CLOSE_PROGRESSION_VIEW);
+    auto& payload = message.emplace_payload<Gs1EngineMessageCloseProgressionViewData>();
+    payload.view_id = view_id;
+    engine_messages_.push_back(message);
+}
+
 void GameRuntime::queue_close_ui_setup_if_open(Gs1UiSetupId setup_id)
 {
     const auto it = active_ui_setups_.find(setup_id);
@@ -2624,6 +2650,11 @@ void GameRuntime::queue_close_ui_panel_if_open(Gs1UiPanelId panel_id)
     }
 
     queue_ui_panel_close_message(panel_id);
+}
+
+void GameRuntime::queue_close_progression_view_if_open(Gs1ProgressionViewId view_id)
+{
+    queue_progression_view_close_message(view_id);
 }
 
 void GameRuntime::queue_close_active_normal_ui_if_open()
@@ -2710,6 +2741,13 @@ void GameRuntime::queue_ui_element_message(
     engine_messages_.push_back(message);
 }
 
+void GameRuntime::queue_progression_entry_message(const Gs1EngineMessageProgressionEntryData& payload)
+{
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_PROGRESSION_ENTRY_UPSERT);
+    message.emplace_payload<Gs1EngineMessageProgressionEntryData>() = payload;
+    engine_messages_.push_back(message);
+}
+
 void GameRuntime::queue_ui_panel_text_message(
     std::uint16_t line_id,
     std::uint32_t flags,
@@ -2775,6 +2813,11 @@ void GameRuntime::queue_ui_panel_list_action_message(
 void GameRuntime::queue_ui_setup_end_message()
 {
     engine_messages_.push_back(make_engine_message(GS1_ENGINE_MESSAGE_END_UI_SETUP));
+}
+
+void GameRuntime::queue_progression_view_end_message()
+{
+    engine_messages_.push_back(make_engine_message(GS1_ENGINE_MESSAGE_END_PROGRESSION_VIEW));
 }
 
 void GameRuntime::queue_ui_panel_end_message()
@@ -3034,226 +3077,59 @@ void GameRuntime::queue_regional_map_tech_tree_ui_messages()
         return;
     }
 
-    const auto selected_faction_id = campaign_->regional_map_state.selected_tech_tree_faction_id.value != 0U
-        ? campaign_->regional_map_state.selected_tech_tree_faction_id
-        : FactionId {k_faction_village_committee};
-    const auto faction_tab_label = [](FactionId faction_id) noexcept -> const char*
-    {
-        switch (faction_id.value)
-        {
-        case k_faction_village_committee:
-            return "Village";
-        case k_faction_forestry_bureau:
-            return "Forestry";
-        case k_faction_agricultural_university:
-            return "University";
-        default:
-            return "Faction";
-        }
-    };
-    const auto reputation_unlock_defs = all_reputation_unlock_defs();
-    const auto technology_tier_defs = all_technology_tier_defs();
-    const auto technology_node_defs = all_technology_node_defs();
-    std::uint32_t element_count = 8U + static_cast<std::uint32_t>(k_prototype_faction_defs.size());
-    element_count += static_cast<std::uint32_t>(reputation_unlock_defs.size());
-    element_count += static_cast<std::uint32_t>(technology_tier_defs.size());
-    element_count += static_cast<std::uint32_t>(technology_node_defs.size());
-    element_count += 1U;
+    queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE);
 
-    queue_ui_setup_begin_message(
-        GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE,
-        GS1_UI_SETUP_PRESENTATION_OVERLAY,
-        element_count,
+    const auto reputation_unlock_defs = all_reputation_unlock_defs();
+    const auto technology_node_defs = all_technology_node_defs();
+    const std::uint32_t entry_count =
+        static_cast<std::uint32_t>(reputation_unlock_defs.size() + technology_node_defs.size() + 1U);
+    queue_progression_view_begin_message(
+        GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE,
+        entry_count,
         0U);
 
-    Gs1UiAction no_action {};
-    queue_ui_element_message(
-        1U,
-        GS1_UI_ELEMENT_LABEL,
-        GS1_UI_ELEMENT_FLAG_NONE,
-        no_action,
-        "Prototype Tech Tree");
-
-    char summary_text[64] {};
-    const float site_cash = active_site_run_.has_value()
-        ? cash_value_from_cash_points(active_site_run_->economy.current_cash)
-        : 0.0f;
-    std::snprintf(
-        summary_text,
-        sizeof(summary_text),
-        active_site_run_.has_value() ? "Total %d | Site $%.2f" : "Total %d | Auto Rep",
-        campaign_->technology_state.total_reputation,
-        site_cash);
-    queue_ui_element_message(
-        2U,
-        GS1_UI_ELEMENT_LABEL,
-        GS1_UI_ELEMENT_FLAG_NONE,
-        no_action,
-        summary_text);
-
-    char faction_text[96] {};
-    std::snprintf(
-        faction_text,
-        sizeof(faction_text),
-        "%s Rep %d",
-        faction_tab_label(selected_faction_id),
-        TechnologySystem::faction_reputation(*campaign_, selected_faction_id));
-    queue_ui_element_message(
-        3U,
-        GS1_UI_ELEMENT_LABEL,
-        GS1_UI_ELEMENT_FLAG_NONE,
-        no_action,
-        faction_text);
-
-    queue_ui_element_message(
-        4U,
-        GS1_UI_ELEMENT_LABEL,
-        GS1_UI_ELEMENT_FLAG_NONE,
-        no_action,
-        "Starter Plants");
-
-    queue_ui_element_message(
-        5U,
-        GS1_UI_ELEMENT_LABEL,
-        GS1_UI_ELEMENT_FLAG_NONE,
-        no_action,
-        "Checkerboard | Wormwood");
-
-    queue_ui_element_message(
-        6U,
-        GS1_UI_ELEMENT_LABEL,
-        GS1_UI_ELEMENT_FLAG_NONE,
-        no_action,
-        "Reputation Unlocks");
-
-    queue_ui_element_message(
-        7U,
-        GS1_UI_ELEMENT_LABEL,
-        GS1_UI_ELEMENT_FLAG_NONE,
-        no_action,
-        "Tier Tech Tree");
-
-    queue_ui_element_message(
-        8U,
-        GS1_UI_ELEMENT_LABEL,
-        GS1_UI_ELEMENT_FLAG_NONE,
-        no_action,
-        "32 linear tiers per faction");
-
-    std::uint32_t next_element_id = 9U;
+    Gs1EngineMessageProgressionEntryData starter_entry {};
+    starter_entry.entry_id = 0U;
+    starter_entry.reputation_requirement = 0U;
+    starter_entry.entry_kind = GS1_PROGRESSION_ENTRY_REPUTATION_UNLOCK;
+    starter_entry.flags = GS1_PROGRESSION_ENTRY_FLAG_UNLOCKED;
+    queue_progression_entry_message(starter_entry);
 
     for (const auto& unlock_def : reputation_unlock_defs)
     {
-        char unlock_text[96] {};
-        std::snprintf(
-            unlock_text,
-            sizeof(unlock_text),
-            "%.*s (%.*s) Need Total %d | %s",
-            static_cast<int>(unlock_def.display_name.size()),
-            unlock_def.display_name.data(),
-            static_cast<int>(reputation_unlock_kind_display_name(unlock_def.unlock_kind).size()),
-            reputation_unlock_kind_display_name(unlock_def.unlock_kind).data(),
-            unlock_def.reputation_requirement,
-            campaign_->technology_state.total_reputation >= unlock_def.reputation_requirement
-                ? "Ready"
-                : "Locked");
-        queue_ui_element_message(
-            next_element_id++,
-            GS1_UI_ELEMENT_LABEL,
-            GS1_UI_ELEMENT_FLAG_NONE,
-            no_action,
-            unlock_text);
+        Gs1EngineMessageProgressionEntryData entry {};
+        entry.entry_id = static_cast<std::uint16_t>(unlock_def.unlock_id);
+        entry.reputation_requirement = static_cast<std::uint16_t>(unlock_def.reputation_requirement);
+        entry.content_id = static_cast<std::uint16_t>(unlock_def.content_id);
+        entry.entry_kind = GS1_PROGRESSION_ENTRY_REPUTATION_UNLOCK;
+        entry.content_kind = static_cast<std::uint8_t>(unlock_def.unlock_kind);
+        entry.flags = campaign_->technology_state.total_reputation >= unlock_def.reputation_requirement
+            ? GS1_PROGRESSION_ENTRY_FLAG_UNLOCKED
+            : GS1_PROGRESSION_ENTRY_FLAG_LOCKED;
+        queue_progression_entry_message(entry);
     }
 
-    for (const auto& faction_def : k_prototype_faction_defs)
+    for (const auto& node_def : technology_node_defs)
     {
-        Gs1UiAction tab_action {};
-        tab_action.type = GS1_UI_ACTION_SELECT_TECH_TREE_FACTION_TAB;
-        tab_action.target_id = faction_def.faction_id.value;
-        const auto tab_flags =
-            faction_def.faction_id == selected_faction_id ? GS1_UI_ELEMENT_FLAG_PRIMARY : GS1_UI_ELEMENT_FLAG_NONE;
-        char tab_text[64] {};
-        std::snprintf(
-            tab_text,
-            sizeof(tab_text),
-            "Tab: %s",
-            faction_tab_label(faction_def.faction_id));
-        queue_ui_element_message(
-            next_element_id++,
-            GS1_UI_ELEMENT_BUTTON,
-            tab_flags,
-            tab_action,
-            tab_text);
+        const auto reputation_requirement = TechnologySystem::current_reputation_requirement(node_def);
+
+        Gs1EngineMessageProgressionEntryData entry {};
+        entry.entry_id = static_cast<std::uint16_t>(node_def.tech_node_id.value);
+        entry.reputation_requirement = static_cast<std::uint16_t>(reputation_requirement);
+        entry.tech_node_id = static_cast<std::uint16_t>(node_def.tech_node_id.value);
+        entry.faction_id = static_cast<std::uint8_t>(node_def.faction_id.value);
+        entry.entry_kind = GS1_PROGRESSION_ENTRY_TECHNOLOGY_NODE;
+        entry.tier_index = node_def.tier_index;
+        entry.action.type = GS1_UI_ACTION_NONE;
+        entry.action.target_id = node_def.tech_node_id.value;
+        entry.action.arg0 = node_def.faction_id.value;
+        entry.flags = TechnologySystem::node_purchased(*campaign_, node_def.tech_node_id)
+            ? GS1_PROGRESSION_ENTRY_FLAG_UNLOCKED
+            : GS1_PROGRESSION_ENTRY_FLAG_LOCKED;
+        queue_progression_entry_message(entry);
     }
 
-    for (const auto& tier_def : technology_tier_defs)
-    {
-        char tier_text[128] {};
-        std::snprintf(
-            tier_text,
-            sizeof(tier_text),
-            "Tier %u | %.*s",
-            static_cast<unsigned>(tier_def.tier_index),
-            static_cast<int>(tier_def.display_name.size()),
-            tier_def.display_name.data());
-        queue_ui_element_message(
-            next_element_id++,
-            GS1_UI_ELEMENT_LABEL,
-            GS1_UI_ELEMENT_FLAG_NONE,
-            no_action,
-            tier_text);
-
-        for (const auto& node_def : technology_node_defs)
-        {
-            if (node_def.tier_index != tier_def.tier_index)
-            {
-                continue;
-            }
-
-            const auto reputation_requirement =
-                TechnologySystem::current_reputation_requirement(node_def);
-
-            Gs1UiAction action {};
-            action.target_id = node_def.tech_node_id.value;
-            action.arg0 = node_def.faction_id.value;
-
-            char node_text[512] {};
-            std::uint32_t flags = GS1_UI_ELEMENT_FLAG_DISABLED;
-            if (TechnologySystem::node_purchased(*campaign_, node_def.tech_node_id))
-            {
-                std::snprintf(
-                    node_text,
-                    sizeof(node_text),
-                    "TECHNODE|s=Unlocked");
-            }
-            else
-            {
-                std::snprintf(
-                    node_text,
-                    sizeof(node_text),
-                    "TECHNODE|s=Need %dr",
-                    reputation_requirement);
-            }
-
-            queue_ui_element_message(
-                next_element_id++,
-                GS1_UI_ELEMENT_BUTTON,
-                flags,
-                action,
-                node_text);
-        }
-    }
-
-    Gs1UiAction close_action {};
-    close_action.type = GS1_UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE;
-    queue_ui_element_message(
-        next_element_id,
-        GS1_UI_ELEMENT_BUTTON,
-        GS1_UI_ELEMENT_FLAG_BACKGROUND_CLICK,
-        close_action,
-        "");
-
-    queue_ui_setup_end_message();
+    queue_progression_view_end_message();
 }
 
 void GameRuntime::queue_site_result_ui_messages(std::uint32_t site_id, Gs1SiteAttemptResult result)

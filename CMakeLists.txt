@@ -24,8 +24,13 @@ include(GNUInstallDirs)
 # Toggle test executable builds without affecting the gameplay DLL target.
 option(GS1_BUILD_TESTS "Build GS1 test executables" ON)
 option(GS1_BUILD_GODOT_ADAPTER "Build the scaffolded Godot runtime extension target" OFF)
+set(GS1_DEFAULT_GODOT_SOURCE_DIR
+    "${CMAKE_CURRENT_SOURCE_DIR}/../godot")
+if(NOT EXISTS "${GS1_DEFAULT_GODOT_SOURCE_DIR}/core/extension/gdextension_interface.gen.h")
+    set(GS1_DEFAULT_GODOT_SOURCE_DIR "E:/godot")
+endif()
 set(GS1_GODOT_SOURCE_DIR
-    "E:/godot"
+    "${GS1_DEFAULT_GODOT_SOURCE_DIR}"
     CACHE PATH
     "Path to a Godot source tree that provides core/extension/gdextension_interface.gen.h.")
 set(GS1_GODOT_CPP_SOURCE_DIR

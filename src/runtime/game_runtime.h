@@ -136,8 +136,14 @@ private:
         std::uint32_t list_item_count,
         std::uint32_t list_action_count);
     void queue_ui_panel_close_message(Gs1UiPanelId panel_id);
+    void queue_progression_view_begin_message(
+        Gs1ProgressionViewId view_id,
+        std::uint32_t entry_count,
+        std::uint32_t context_id);
+    void queue_progression_view_close_message(Gs1ProgressionViewId view_id);
     void queue_close_ui_setup_if_open(Gs1UiSetupId setup_id);
     void queue_close_ui_panel_if_open(Gs1UiPanelId panel_id);
+    void queue_close_progression_view_if_open(Gs1ProgressionViewId view_id);
     void queue_close_active_normal_ui_if_open();
     void queue_close_site_inventory_panels_if_open();
     void queue_close_site_phone_panel_if_open();
@@ -147,6 +153,7 @@ private:
         std::uint32_t flags,
         const Gs1UiAction& action,
         const char* text);
+    void queue_progression_entry_message(const Gs1EngineMessageProgressionEntryData& payload);
     void queue_ui_panel_text_message(
         std::uint16_t line_id,
         std::uint32_t flags,
@@ -169,6 +176,7 @@ private:
         std::uint32_t flags,
         const Gs1UiAction& action);
     void queue_ui_setup_end_message();
+    void queue_progression_view_end_message();
     void queue_ui_panel_end_message();
     void queue_clear_ui_setup_messages(Gs1UiSetupId setup_id);
     void queue_clear_ui_panel_messages(Gs1UiPanelId panel_id);

@@ -122,6 +122,22 @@ Dictionary ui_action_to_dictionary(const Gs1UiAction& action)
     return result;
 }
 
+Dictionary progression_entry_to_dictionary(const Gs1RuntimeProgressionEntryProjection& entry)
+{
+    Dictionary dict;
+    dict["entry_id"] = static_cast<int64_t>(entry.entry_id);
+    dict["reputation_requirement"] = static_cast<int>(entry.reputation_requirement);
+    dict["content_id"] = static_cast<int64_t>(entry.content_id);
+    dict["tech_node_id"] = static_cast<int64_t>(entry.tech_node_id);
+    dict["faction_id"] = static_cast<int>(entry.faction_id);
+    dict["entry_kind"] = static_cast<int>(entry.entry_kind);
+    dict["flags"] = static_cast<int64_t>(entry.flags);
+    dict["content_kind"] = static_cast<int>(entry.content_kind);
+    dict["tier_index"] = static_cast<int>(entry.tier_index);
+    dict["action"] = ui_action_to_dictionary(entry.action);
+    return dict;
+}
+
 const Gs1RuntimeTileProjection* find_tile_at(
     const Gs1RuntimeSiteProjection& site,
     std::int32_t x,
@@ -516,6 +532,7 @@ Dictionary Gs1RuntimeNode::build_projection_dictionary() const
     projection["selected_site_id"] = state.selected_site_id.has_value() ? static_cast<int64_t>(state.selected_site_id.value()) : static_cast<int64_t>(0);
     projection["last_error"] = to_godot_string(last_error_);
     projection["ui_setups"] = build_ui_setups_array();
+    projection["progression_views"] = build_progression_views_array();
     projection["ui_panels"] = build_ui_panels_array();
     projection["regional_map"] = build_regional_map_dictionary();
     projection["campaign_resources"] = build_campaign_resources_dictionary();
@@ -658,6 +675,27 @@ Array Gs1RuntimeNode::build_ui_setups_array() const
         setups.push_back(setup_dict);
     }
     return setups;
+}
+
+Array Gs1RuntimeNode::build_progression_views_array() const
+{
+    Array views;
+    for (const auto& view : projection_cache_.state().active_progression_views)
+    {
+        Dictionary view_dict;
+        view_dict["view_id"] = static_cast<int>(view.view_id);
+        view_dict["context_id"] = static_cast<int64_t>(view.context_id);
+
+        Array entries;
+        for (const auto& entry : view.entries)
+        {
+            entries.push_back(progression_entry_to_dictionary(entry));
+        }
+
+        view_dict["entries"] = entries;
+        views.push_back(view_dict);
+    }
+    return views;
 }
 
 Array Gs1RuntimeNode::build_ui_panels_array() const

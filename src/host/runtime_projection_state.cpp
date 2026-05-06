@@ -51,6 +51,32 @@ void sort_ui_setups(std::vector<Gs1RuntimeUiSetupProjection>& setups)
     });
 }
 
+void sort_progression_entries(std::vector<Gs1RuntimeProgressionEntryProjection>& entries)
+{
+    std::sort(entries.begin(), entries.end(), [](const auto& lhs, const auto& rhs) {
+        if (lhs.reputation_requirement != rhs.reputation_requirement)
+        {
+            return lhs.reputation_requirement < rhs.reputation_requirement;
+        }
+        if (lhs.entry_kind != rhs.entry_kind)
+        {
+            return lhs.entry_kind < rhs.entry_kind;
+        }
+        if (lhs.faction_id != rhs.faction_id)
+        {
+            return lhs.faction_id < rhs.faction_id;
+        }
+        return lhs.entry_id < rhs.entry_id;
+    });
+}
+
+void sort_progression_views(std::vector<Gs1RuntimeProgressionViewProjection>& views)
+{
+    std::sort(views.begin(), views.end(), [](const auto& lhs, const auto& rhs) {
+        return lhs.view_id < rhs.view_id;
+    });
+}
+
 void sort_ui_panels(std::vector<Gs1RuntimeUiPanelProjection>& panels)
 {
     std::sort(panels.begin(), panels.end(), [](const auto& lhs, const auto& rhs) {
@@ -184,6 +210,7 @@ void Gs1RuntimeProjectionCache::reset() noexcept
 {
     state_ = {};
     pending_ui_setup_.reset();
+    pending_progression_view_.reset();
     pending_ui_panel_.reset();
     pending_regional_map_.reset();
     pending_site_.reset();
@@ -226,6 +253,18 @@ void Gs1RuntimeProjectionCache::apply_engine_message(const Gs1EngineMessage& mes
         break;
     case GS1_ENGINE_MESSAGE_CLOSE_UI_SETUP:
         apply_ui_setup_close(message.payload_as<Gs1EngineMessageCloseUiSetupData>());
+        break;
+    case GS1_ENGINE_MESSAGE_BEGIN_PROGRESSION_VIEW:
+        apply_progression_view_begin(message.payload_as<Gs1EngineMessageProgressionViewData>());
+        break;
+    case GS1_ENGINE_MESSAGE_PROGRESSION_ENTRY_UPSERT:
+        apply_progression_entry_upsert(message.payload_as<Gs1EngineMessageProgressionEntryData>());
+        break;
+    case GS1_ENGINE_MESSAGE_END_PROGRESSION_VIEW:
+        apply_progression_view_end();
+        break;
+    case GS1_ENGINE_MESSAGE_CLOSE_PROGRESSION_VIEW:
+        apply_progression_view_close(message.payload_as<Gs1EngineMessageCloseProgressionViewData>());
         break;
     case GS1_ENGINE_MESSAGE_BEGIN_UI_PANEL:
         apply_ui_panel_begin(message.payload_as<Gs1EngineMessageUiPanelData>());
@@ -535,6 +574,65 @@ void Gs1RuntimeProjectionCache::apply_ui_setup_close(const Gs1EngineMessageClose
 {
     erase_projection_if(state_.active_ui_setups, [&](const auto& setup) {
         return setup.setup_id == payload.setup_id;
+    });
+}
+
+void Gs1RuntimeProjectionCache::apply_progression_view_begin(const Gs1EngineMessageProgressionViewData& payload)
+{
+    pending_progression_view_ = PendingProgressionView {};
+    pending_progression_view_->view_id = payload.view_id;
+    pending_progression_view_->context_id = payload.context_id;
+    pending_progression_view_->entries.clear();
+    pending_progression_view_->entries.reserve(payload.entry_count);
+}
+
+void Gs1RuntimeProjectionCache::apply_progression_entry_upsert(const Gs1EngineMessageProgressionEntryData& payload)
+{
+    if (!pending_progression_view_.has_value())
+    {
+        return;
+    }
+
+    Gs1RuntimeProgressionEntryProjection projection {};
+    projection.entry_id = payload.entry_id;
+    projection.reputation_requirement = payload.reputation_requirement;
+    projection.content_id = payload.content_id;
+    projection.tech_node_id = payload.tech_node_id;
+    projection.faction_id = payload.faction_id;
+    projection.entry_kind = payload.entry_kind;
+    projection.flags = payload.flags;
+    projection.content_kind = payload.content_kind;
+    projection.tier_index = payload.tier_index;
+    projection.action = payload.action;
+    pending_progression_view_->entries.push_back(std::move(projection));
+}
+
+void Gs1RuntimeProjectionCache::apply_progression_view_end()
+{
+    if (!pending_progression_view_.has_value())
+    {
+        return;
+    }
+
+    Gs1RuntimeProgressionViewProjection view {};
+    view.view_id = pending_progression_view_->view_id;
+    view.context_id = pending_progression_view_->context_id;
+    view.entries = std::move(pending_progression_view_->entries);
+    sort_progression_entries(view.entries);
+
+    upsert_projection(
+        state_.active_progression_views,
+        std::move(view),
+        pending_progression_view_->view_id,
+        [](const auto& existing) { return existing.view_id; });
+    sort_progression_views(state_.active_progression_views);
+    pending_progression_view_.reset();
+}
+
+void Gs1RuntimeProjectionCache::apply_progression_view_close(const Gs1EngineMessageCloseProgressionViewData& payload)
+{
+    erase_projection_if(state_.active_progression_views, [&](const auto& view) {
+        return view.view_id == payload.view_id;
     });
 }
 

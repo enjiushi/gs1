@@ -10,6 +10,7 @@
 #include <godot_cpp/classes/base_material3d.hpp>
 #include <godot_cpp/classes/box_mesh.hpp>
 #include <godot_cpp/classes/button.hpp>
+#include <godot_cpp/classes/center_container.hpp>
 #include <godot_cpp/classes/camera3d.hpp>
 #include <godot_cpp/classes/color_rect.hpp>
 #include <godot_cpp/classes/cylinder_mesh.hpp>
@@ -57,6 +58,7 @@
 
 #include <algorithm>
 #include <array>
+#include <map>
 #include <cstdint>
 #include <cmath>
 #include <limits>
@@ -82,6 +84,11 @@ constexpr int k_key_up = 4194320;
 constexpr int k_key_down = 4194321;
 constexpr int k_key_left = 4194319;
 constexpr int k_key_right = 4194322;
+constexpr int k_tech_tree_lane_count = 5;
+constexpr int k_tech_tree_unlockable_column = 1;
+constexpr int k_tech_tree_village_column = 2;
+constexpr int k_tech_tree_bureau_column = 3;
+constexpr int k_tech_tree_university_column = 4;
 
 String bool_text(bool value, const String& when_true, const String& when_false)
 {
@@ -174,6 +181,11 @@ std::uint64_t make_projected_button_key(int setup_id, int element_id) noexcept
     return pack_u32_pair(static_cast<std::uint32_t>(setup_id), static_cast<std::uint32_t>(element_id));
 }
 
+std::uint64_t make_tech_tree_marker_key(std::uint32_t row_requirement, std::uint32_t column_index) noexcept
+{
+    return pack_u32_pair(row_requirement, column_index);
+}
+
 std::uint64_t make_panel_list_row_key(int list_id, std::int64_t item_id) noexcept
 {
     return pack_u32_pair(static_cast<std::uint32_t>(list_id), static_cast<std::uint32_t>(item_id));
@@ -232,28 +244,6 @@ Ref<ImageTexture> make_solid_icon_texture(const Color& base_color)
     return ImageTexture::create_from_image(image);
 }
 
-const gs1::ReputationUnlockDef* find_unlockable_def_by_title(const String& title)
-{
-    const CharString title_utf8 = title.utf8();
-    const std::string_view title_view {title_utf8.get_data(), static_cast<std::size_t>(title_utf8.length())};
-    for (const auto& unlock_def : gs1::all_reputation_unlock_defs())
-    {
-        if (unlock_def.display_name == title_view)
-        {
-            return &unlock_def;
-        }
-    }
-    return nullptr;
-}
-
-const Gs1AdapterMetadataEntry* find_unlockable_metadata_by_title(const String& title)
-{
-    const auto* unlock_def = find_unlockable_def_by_title(title);
-    return unlock_def == nullptr
-        ? nullptr
-        : adapter_metadata_catalog().find(Gs1AdapterMetadataDomain::ReputationUnlock, unlock_def->unlock_id);
-}
-
 std::uint8_t unlockable_content_kind_from_def(const gs1::ReputationUnlockDef& unlock_def)
 {
     switch (unlock_def.unlock_kind)
@@ -269,16 +259,6 @@ std::uint8_t unlockable_content_kind_from_def(const gs1::ReputationUnlockDef& un
     default:
         return k_unlockable_content_kind_item;
     }
-}
-
-String trimmed_unlockable_title(const String& raw_text)
-{
-    const String trimmed = raw_text.strip_edges();
-    const int open_paren = trimmed.find("(");
-    const int need_index = trimmed.find(" Need ");
-    return (open_paren > 0 ? trimmed.substr(0, open_paren)
-                           : (need_index > 0 ? trimmed.substr(0, need_index) : trimmed))
-        .strip_edges();
 }
 }
 
@@ -522,18 +502,6 @@ void Gs1GodotMainScreenControl::cache_ui_references()
     if (regional_tech_tree_summary_ == nullptr)
     {
         regional_tech_tree_summary_ = Object::cast_to<ScrollContainer>(find_child("RegionalTechTreeSummary", true, false));
-    }
-    if (regional_tech_tree_unlockables_grid_ == nullptr)
-    {
-        regional_tech_tree_unlockables_grid_ = Object::cast_to<GridContainer>(find_child("RegionalTechTreeUnlockablesGrid", true, false));
-    }
-    if (regional_tech_tree_tech_summary_ == nullptr)
-    {
-        regional_tech_tree_tech_summary_ = Object::cast_to<ScrollContainer>(find_child("RegionalTechTreeTechSummary", true, false));
-    }
-    if (regional_tech_tree_faction_tabs_ == nullptr)
-    {
-        regional_tech_tree_faction_tabs_ = find_child("RegionalTechTreeFactionTabs", true, false);
     }
     if (regional_tech_tree_actions_ == nullptr)
     {
@@ -1424,172 +1392,163 @@ void Gs1GodotMainScreenControl::render_regional_tech_tree()
         return;
     }
 
-    const Dictionary tech_setup = find_ui_setup(5);
-    if (tech_setup.is_empty())
+    const Dictionary progression_view = find_progression_view(GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE);
+    if (progression_view.is_empty())
     {
         regional_tech_tree_overlay_->set_visible(false);
         regional_tech_tree_panel_->set_visible(false);
         return;
     }
 
-    bool has_close_action = false;
-    std::uint32_t selected_faction_id = 0U;
-    const Array elements = tech_setup.get("elements", Array());
-    for (int64_t index = 0; index < elements.size(); ++index)
-    {
-        const Dictionary element = elements[index];
-        const Dictionary action = element.get("action", Dictionary());
-        const int action_type = as_int(action.get("type", 0), 0);
-        if (action_type == UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE)
-        {
-            has_close_action = true;
-        }
-        if (action_type == UI_ACTION_SELECT_TECH_TREE_FACTION_TAB &&
-            (as_int(element.get("flags", 0), 0) & 1) != 0)
-        {
-            selected_faction_id = static_cast<std::uint32_t>(as_int(action.get("target_id", 0), 0));
-        }
-    }
-
-    regional_tech_tree_overlay_->set_visible(has_close_action);
-    regional_tech_tree_panel_->set_visible(has_close_action);
-    if (!has_close_action)
-    {
-        reconcile_projected_action_buttons(
-            regional_tech_tree_faction_tabs_,
-            regional_tech_tree_faction_tab_buttons_,
-            PROJECTED_ACTION_CONTAINER_REGIONAL_TECH_TREE,
-            Array {});
-        reconcile_tech_tree_cards(
-            regional_tech_tree_unlockables_grid_,
-            regional_tech_tree_unlockable_buttons_,
-            Array {},
-            false);
-        reconcile_tech_tree_cards(
-            regional_tech_tree_actions_,
-            regional_tech_tree_action_buttons_,
-            Array {},
-            true);
-        return;
-    }
+    regional_tech_tree_overlay_->set_visible(true);
+    regional_tech_tree_panel_->set_visible(true);
 
     if (regional_tech_tree_title_ != nullptr)
     {
         regional_tech_tree_title_->set_text("Research And Unlocks");
     }
 
-    Array faction_tab_specs;
-    Array unlockable_specs;
-    Array action_specs;
-    for (int64_t index = 0; index < elements.size(); ++index)
+    std::map<int, Dictionary> unlockable_specs_by_rep;
+    std::map<int, Dictionary> village_specs_by_rep;
+    std::map<int, Dictionary> bureau_specs_by_rep;
+    std::map<int, Dictionary> university_specs_by_rep;
+    std::vector<int> row_requirements;
+    const Array entries = progression_view.get("entries", Array());
+    for (int64_t index = 0; index < entries.size(); ++index)
     {
-        const Dictionary element = elements[index];
-        const String text = String(element.get("text", "")).strip_edges();
-        const Dictionary action = element.get("action", Dictionary());
-        const int action_type = as_int(action.get("type", 0), 0);
-        const int element_type = as_int(element.get("element_type", 0), 0);
-        const int element_flags = as_int(element.get("flags", 0), 0);
-        if (action_type == UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE)
+        const Dictionary entry = entries[index];
+        const int entry_kind = as_int(entry.get("entry_kind", 0), 0);
+        const int reputation_requirement = as_int(entry.get("reputation_requirement", 0), 0);
+        if (entry_kind == GS1_PROGRESSION_ENTRY_NONE)
         {
             continue;
         }
 
-        if (action_type == UI_ACTION_SELECT_TECH_TREE_FACTION_TAB)
+        if (reputation_requirement > 0)
         {
-            Dictionary spec;
-            spec["setup_id"] = as_int(tech_setup.get("setup_id", 0), 0);
-            spec["element_id"] = as_int(element.get("element_id", 0), 0);
-            spec["text"] = text.begins_with("Tab: ") ? text.substr(5) : text;
-            spec["flags"] = element_flags;
-            spec["action"] = action;
-            faction_tab_specs.push_back(spec);
-            continue;
+            row_requirements.push_back(reputation_requirement);
         }
 
-        const bool compact_tech_node = is_compact_tech_tree_node_text(text);
-        const auto* node_def = compact_tech_node ? find_tech_tree_node_def(action) : nullptr;
-        if (node_def != nullptr &&
-            selected_faction_id != 0U &&
-            node_def->faction_id.value != selected_faction_id)
-        {
-            continue;
-        }
-        const String compact_node_text =
-            compact_tech_node ? regional_tech_tree_node_text(action, text) : String();
-        if (compact_tech_node)
+        if (entry_kind == GS1_PROGRESSION_ENTRY_TECHNOLOGY_NODE)
         {
             Dictionary spec;
-            spec["setup_id"] = as_int(tech_setup.get("setup_id", 0), 0);
-            spec["element_id"] = as_int(element.get("element_id", 0), 0);
-            spec["text"] = text;
-            spec["flags"] = element_flags;
-            spec["action"] = action;
-            spec["card_text"] = compact_node_text;
-            spec["tooltip"] = regional_tech_tooltip_text(action, text);
-            action_specs.push_back(spec);
-            continue;
-        }
-        else if (action_type == 0 || element_type == 2)
-        {
-            if (!text.is_empty())
+            spec["setup_id"] = GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE;
+            spec["element_id"] = as_int(entry.get("entry_id", 0), 0);
+            spec["entry_kind"] = entry_kind;
+            spec["flags"] = as_int(entry.get("flags", 0), 0);
+            spec["action"] = entry.get("action", Dictionary());
+            spec["reputation_requirement"] = reputation_requirement;
+            spec["tech_node_id"] = as_int(entry.get("tech_node_id", 0), 0);
+            spec["faction_id"] = as_int(entry.get("faction_id", 0), 0);
+            spec["tier_index"] = as_int(entry.get("tier_index", 0), 0);
+            spec["tooltip"] = regional_tech_tooltip_text(spec);
+            switch (as_int(entry.get("faction_id", 0), 0))
             {
-                const bool is_tech_line =
-                    text == "Tier Tech Tree" ||
-                    text == "32 linear tiers per faction" ||
-                    text.begins_with("Tier ") ||
-                    text.begins_with("Village Rep ") ||
-                    text.begins_with("Forestry Rep ") ||
-                    text.begins_with("University Rep ");
-                if (is_tech_line)
-                {
-                    continue;
-                }
-                else
-                {
-                    Dictionary preview_spec;
-                    preview_spec["text"] = text;
-                    const String title_text = regional_card_title_text(preview_spec);
-                    if (!title_text.is_empty())
-                    {
-                        Dictionary spec;
-                        spec["setup_id"] = as_int(tech_setup.get("setup_id", 0), 0);
-                        spec["element_id"] = as_int(element.get("element_id", 0), 0);
-                        spec["text"] = text;
-                        spec["flags"] = element_flags;
-                        spec["tooltip"] = regional_unlockable_tooltip_text(text);
-                        unlockable_specs.push_back(spec);
-                    }
-                }
+            case gs1::k_faction_village_committee:
+                village_specs_by_rep[reputation_requirement] = spec;
+                break;
+            case gs1::k_faction_forestry_bureau:
+                bureau_specs_by_rep[reputation_requirement] = spec;
+                break;
+            case gs1::k_faction_agricultural_university:
+                university_specs_by_rep[reputation_requirement] = spec;
+                break;
+            default:
+                break;
             }
             continue;
         }
 
-        if (action_type != 0)
+        if (entry_kind == GS1_PROGRESSION_ENTRY_REPUTATION_UNLOCK && reputation_requirement > 0)
         {
             Dictionary spec;
-            spec["setup_id"] = as_int(tech_setup.get("setup_id", 0), 0);
-            spec["element_id"] = as_int(element.get("element_id", 0), 0);
-            spec["text"] = text.is_empty() ? String("Action") : text;
-            spec["flags"] = element_flags;
-            spec["action"] = action;
-            action_specs.push_back(spec);
+            spec["setup_id"] = GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE;
+            spec["element_id"] = as_int(entry.get("entry_id", 0), 0);
+            spec["entry_kind"] = entry_kind;
+            spec["flags"] = as_int(entry.get("flags", 0), 0);
+            spec["reputation_requirement"] = reputation_requirement;
+            spec["content_id"] = as_int(entry.get("content_id", 0), 0);
+            spec["content_kind"] = as_int(entry.get("content_kind", 0), 0);
+            spec["tooltip"] = regional_unlockable_tooltip_text(spec);
+            unlockable_specs_by_rep[reputation_requirement] = spec;
+            continue;
         }
     }
 
-    reconcile_projected_action_buttons(
-        regional_tech_tree_faction_tabs_,
-        regional_tech_tree_faction_tab_buttons_,
-        PROJECTED_ACTION_CONTAINER_REGIONAL_TECH_TREE,
-        faction_tab_specs);
-    reconcile_tech_tree_cards(
-        regional_tech_tree_unlockables_grid_,
-        regional_tech_tree_unlockable_buttons_,
-        unlockable_specs,
-        false);
+    std::sort(row_requirements.begin(), row_requirements.end());
+    row_requirements.erase(std::unique(row_requirements.begin(), row_requirements.end()), row_requirements.end());
+
+    Array ladder_specs;
+    for (std::size_t row_index = 0; row_index < row_requirements.size(); ++row_index)
+    {
+        const int requirement = row_requirements[row_index];
+
+        Dictionary rep_spec;
+        rep_spec["setup_id"] = 0;
+        rep_spec["element_id"] = 0;
+        rep_spec["rep_requirement"] = requirement;
+        rep_spec["cell_kind"] = String("rep_label");
+        rep_spec["marker_text"] = vformat("%d rep", requirement);
+        rep_spec["marker_key_high"] = requirement;
+        rep_spec["marker_key_low"] = 0;
+        ladder_specs.push_back(rep_spec);
+
+        auto push_lane = [&ladder_specs, requirement](const std::map<int, Dictionary>& specs, int column_index)
+        {
+            auto found = specs.find(requirement);
+            if (found != specs.end())
+            {
+                Dictionary spec = found->second;
+                spec["column_index"] = column_index;
+                ladder_specs.push_back(spec);
+                return;
+            }
+
+            Dictionary empty_spec;
+            empty_spec["setup_id"] = 0;
+            empty_spec["element_id"] = 0;
+            empty_spec["rep_requirement"] = requirement;
+            empty_spec["cell_kind"] = String("empty");
+            empty_spec["marker_key_high"] = requirement;
+            empty_spec["marker_key_low"] = column_index;
+            ladder_specs.push_back(empty_spec);
+        };
+
+        push_lane(unlockable_specs_by_rep, k_tech_tree_unlockable_column);
+        push_lane(village_specs_by_rep, k_tech_tree_village_column);
+        push_lane(bureau_specs_by_rep, k_tech_tree_bureau_column);
+        push_lane(university_specs_by_rep, k_tech_tree_university_column);
+
+        if (row_index + 1 < row_requirements.size())
+        {
+            Dictionary spacer_spec;
+            spacer_spec["setup_id"] = 0;
+            spacer_spec["element_id"] = 0;
+            spacer_spec["rep_requirement"] = requirement;
+            spacer_spec["cell_kind"] = String("spacer");
+            spacer_spec["marker_key_high"] = requirement;
+            spacer_spec["marker_key_low"] = 100;
+            ladder_specs.push_back(spacer_spec);
+
+            for (int column_index = 1; column_index < k_tech_tree_lane_count; ++column_index)
+            {
+                Dictionary arrow_spec;
+                arrow_spec["setup_id"] = 0;
+                arrow_spec["element_id"] = 0;
+                arrow_spec["rep_requirement"] = requirement;
+                arrow_spec["cell_kind"] = String("arrow");
+                arrow_spec["marker_text"] = String("|") + String("\n") + String("v");
+                arrow_spec["marker_key_high"] = requirement;
+                arrow_spec["marker_key_low"] = 100 + column_index;
+                ladder_specs.push_back(arrow_spec);
+            }
+        }
+    }
+
     reconcile_tech_tree_cards(
         regional_tech_tree_actions_,
         regional_tech_tree_action_buttons_,
-        action_specs,
+        ladder_specs,
         true);
 }
 
@@ -2102,6 +2061,20 @@ Dictionary Gs1GodotMainScreenControl::find_ui_setup(int setup_id) const
         if (as_int(setup.get("setup_id", 0), 0) == setup_id)
         {
             return setup;
+        }
+    }
+    return Dictionary();
+}
+
+Dictionary Gs1GodotMainScreenControl::find_progression_view(int view_id) const
+{
+    const Array views = projection_.get("progression_views", Array());
+    for (int64_t index = 0; index < views.size(); ++index)
+    {
+        const Dictionary view = views[index];
+        if (as_int(view.get("view_id", 0), 0) == view_id)
+        {
+            return view;
         }
     }
     return Dictionary();
@@ -2638,7 +2611,13 @@ void Gs1GodotMainScreenControl::reconcile_tech_tree_cards(
         const Dictionary spec = card_specs[index];
         const int setup_id = as_int(spec.get("setup_id", 0), 0);
         const int element_id = as_int(spec.get("element_id", 0), 0);
-        const std::uint64_t stable_key = make_projected_button_key(setup_id, element_id);
+        const String cell_kind = String(spec.get("cell_kind", "card"));
+        const std::uint64_t stable_key =
+            setup_id == 0 && element_id == 0
+                ? make_tech_tree_marker_key(
+                      static_cast<std::uint32_t>(as_int(spec.get("marker_key_high", as_int(spec.get("rep_requirement", 0), 0)), 0)),
+                      static_cast<std::uint32_t>(as_int(spec.get("marker_key_low", 0), 0)))
+                : make_projected_button_key(setup_id, element_id);
         desired_keys.insert(stable_key);
         Button* button = upsert_button_node(
             container,
@@ -2659,7 +2638,18 @@ void Gs1GodotMainScreenControl::reconcile_tech_tree_cards(
 
         button->set_text(String());
         button->set_tooltip_text(tooltip);
-        button->set_custom_minimum_size(Vector2(184, 148));
+        if (cell_kind == "card")
+        {
+            button->set_custom_minimum_size(Vector2(220, 206));
+        }
+        else if (cell_kind == "arrow")
+        {
+            button->set_custom_minimum_size(Vector2(220, 44));
+        }
+        else
+        {
+            button->set_custom_minimum_size(Vector2(cell_kind == "rep_label" ? 120 : 220, 44));
+        }
         button->set_clip_text(false);
         button->set_flat(true);
         button->set_text_alignment(HORIZONTAL_ALIGNMENT_CENTER);
@@ -2672,36 +2662,78 @@ void Gs1GodotMainScreenControl::reconcile_tech_tree_cards(
         button->set_meta("arg1", as_int(action.get("arg1", 0), 0));
         button->set_meta(
             "gs1_allow_action",
-            allow_actions && !locked && as_int(action.get("type", 0), 0) != 0);
+            cell_kind == "card" && allow_actions && !locked && as_int(action.get("type", 0), 0) != 0);
 
-        if (Label* icon_label = resolve_object<Label>(record.icon_label_id))
+        if (Panel* panel = Object::cast_to<Panel>(button->get_node_or_null(NodePath("CardPanel"))))
         {
-            icon_label->set_text(regional_card_icon_text(spec));
+            panel->set_visible(cell_kind == "card");
         }
-        if (TextureRect* icon_texture = resolve_object<TextureRect>(record.icon_texture_id))
+        if (CenterContainer* marker_center = Object::cast_to<CenterContainer>(button->get_node_or_null(NodePath("MarkerCenter"))))
         {
-            icon_texture->set_texture(regional_card_icon_texture(spec));
+            marker_center->set_visible(cell_kind != "card");
         }
-        if (Label* title_label = resolve_object<Label>(record.title_label_id))
+        if (Label* marker_label = resolve_object<Label>(record.marker_label_id))
         {
-            title_label->set_text(regional_card_title_text(spec));
+            marker_label->set_text(tech_tree_marker_text(spec));
+            if (cell_kind == "rep_label")
+            {
+                marker_label->add_theme_font_size_override("font_size", 16);
+                marker_label->add_theme_color_override("font_color", Color(0.94, 0.86, 0.71, 0.96));
+            }
+            else if (cell_kind == "arrow")
+            {
+                marker_label->add_theme_font_size_override("font_size", 20);
+                marker_label->add_theme_color_override("font_color", Color(0.72, 0.79, 0.71, 0.72));
+            }
+            else
+            {
+                marker_label->add_theme_font_size_override("font_size", 10);
+                marker_label->add_theme_color_override("font_color", Color(0.0, 0.0, 0.0, 0.0));
+            }
         }
-        if (Label* subtitle_label = resolve_object<Label>(record.subtitle_label_id))
+
+        if (cell_kind == "card")
         {
-            subtitle_label->set_text(regional_card_subtitle_text(spec));
+            if (Label* icon_label = resolve_object<Label>(record.icon_label_id))
+            {
+                icon_label->set_text(regional_card_icon_text(spec));
+            }
+            if (TextureRect* icon_texture = resolve_object<TextureRect>(record.icon_texture_id))
+            {
+                icon_texture->set_texture(regional_card_icon_texture(spec));
+            }
+            if (Label* title_label = resolve_object<Label>(record.title_label_id))
+            {
+                title_label->set_text(regional_card_title_text(spec));
+            }
+            if (Label* subtitle_label = resolve_object<Label>(record.subtitle_label_id))
+            {
+                subtitle_label->set_text(regional_card_subtitle_text(spec));
+            }
+            if (Label* status_label = resolve_object<Label>(record.status_label_id))
+            {
+                status_label->set_text(regional_card_status_text(spec));
+                status_label->add_theme_color_override("font_color", regional_card_status_color(spec));
+            }
+            if (ColorRect* lock_overlay = resolve_object<ColorRect>(record.lock_overlay_id))
+            {
+                lock_overlay->set_visible(locked);
+            }
+            if (Label* lock_label = resolve_object<Label>(record.lock_label_id))
+            {
+                lock_label->set_visible(locked);
+            }
         }
-        if (Label* status_label = resolve_object<Label>(record.status_label_id))
+        else
         {
-            status_label->set_text(regional_card_status_text(spec));
-            status_label->add_theme_color_override("font_color", regional_card_status_color(spec));
-        }
-        if (ColorRect* lock_overlay = resolve_object<ColorRect>(record.lock_overlay_id))
-        {
-            lock_overlay->set_visible(locked);
-        }
-        if (Label* lock_label = resolve_object<Label>(record.lock_label_id))
-        {
-            lock_label->set_visible(locked);
+            if (ColorRect* lock_overlay = resolve_object<ColorRect>(record.lock_overlay_id))
+            {
+                lock_overlay->set_visible(false);
+            }
+            if (Label* lock_label = resolve_object<Label>(record.lock_label_id))
+            {
+                lock_label->set_visible(false);
+            }
         }
 
         const Callable callback = callable_mp(this, &Gs1GodotMainScreenControl::on_dynamic_projected_action_pressed)
@@ -2781,89 +2813,31 @@ String Gs1GodotMainScreenControl::regional_selection_action_label(const String& 
     return text.is_empty() ? String("Action") : text;
 }
 
-bool Gs1GodotMainScreenControl::is_compact_tech_tree_node_text(const String& text) const
+String Gs1GodotMainScreenControl::regional_unlockable_tooltip_text(const Dictionary& spec) const
 {
-    return text.begins_with("TECHNODE|");
-}
-
-String Gs1GodotMainScreenControl::tech_tree_status_text(const String& text) const
-{
-    if (!is_compact_tech_tree_node_text(text))
-    {
-        return text;
-    }
-
-    const PackedStringArray parts = text.split("|");
-    for (int64_t index = 1; index < parts.size(); ++index)
-    {
-        const String part = String(parts[index]).strip_edges();
-        if (!part.begins_with("s="))
-        {
-            continue;
-        }
-
-        String status = part.substr(2).strip_edges();
-        if (status.ends_with("r"))
-        {
-            status = vformat("%s rep", status.substr(0, status.length() - 1));
-        }
-        return status;
-    }
-
-    return "Locked";
-}
-
-String Gs1GodotMainScreenControl::regional_tech_tree_node_text(const Dictionary& action, const String& text) const
-{
-    const auto* node_def = find_tech_tree_node_def(action);
-    const String status = tech_tree_status_text(text);
-    if (node_def == nullptr)
-    {
-        return status.is_empty() ? String("Technology") : status;
-    }
-
-    const auto* faction_def = gs1::find_faction_def(node_def->faction_id);
-    const String faction_name =
-        faction_def == nullptr ? String("Faction") : string_from_view(faction_def->display_name);
-    const String display_name =
-        node_def->display_name.empty() ? String("Technology") : string_from_view(node_def->display_name);
-    return vformat(
-        "Tier %d | %s | %s | %s",
-        static_cast<int>(node_def->tier_index),
-        faction_name,
-        display_name,
-        status);
-}
-
-String Gs1GodotMainScreenControl::regional_unlockable_tooltip_text(const String& text) const
-{
-    const String trimmed = text.strip_edges();
-    if (trimmed == "Checkerboard | Wormwood")
-    {
-        return "Starter Plants\nBasic Straw Checkerboard and Ordos Wormwood start available at campaign opening.";
-    }
-
-    const String title = trimmed_unlockable_title(trimmed);
-    if (const auto* unlock_def = find_unlockable_def_by_title(title))
+    const std::uint32_t unlock_id = static_cast<std::uint32_t>(as_int(spec.get("element_id", 0), 0));
+    if (const auto* unlock_def = gs1::find_reputation_unlock_def(unlock_id))
     {
         const auto* metadata = adapter_metadata_catalog().find(
             Gs1AdapterMetadataDomain::ReputationUnlock,
             unlock_def->unlock_id);
+        const String title = string_from_view(unlock_def->display_name);
         const String description = (metadata == nullptr || metadata->description.empty())
             ? String("No authored description yet.")
             : string_from_view(metadata->description);
         return vformat("%s\n%s\nNeed total reputation %d", title, description, unlock_def->reputation_requirement);
     }
 
-    return trimmed;
+    return String("Unlockable");
 }
 
-String Gs1GodotMainScreenControl::regional_tech_tooltip_text(const Dictionary& action, const String& text) const
+String Gs1GodotMainScreenControl::regional_tech_tooltip_text(const Dictionary& spec) const
 {
-    const auto* node_def = find_tech_tree_node_def(action);
+    const auto* node_def = gs1::find_technology_node_def(gs1::TechNodeId {
+        static_cast<std::uint32_t>(as_int(spec.get("tech_node_id", 0), 0))});
     if (node_def == nullptr)
     {
-        return regional_tech_tree_node_text(action, text);
+        return String("Technology");
     }
 
     const auto* faction_def = gs1::find_faction_def(node_def->faction_id);
@@ -2883,14 +2857,36 @@ String Gs1GodotMainScreenControl::regional_tech_tooltip_text(const Dictionary& a
         description);
 }
 
+String Gs1GodotMainScreenControl::regional_row_requirement_text(const Dictionary& spec) const
+{
+    const int requirement = as_int(spec.get("rep_requirement", 0), 0);
+    if (requirement <= 0)
+    {
+        return String();
+    }
+    return vformat("%d rep", requirement);
+}
+
+String Gs1GodotMainScreenControl::tech_tree_marker_text(const Dictionary& spec) const
+{
+    const String cell_kind = String(spec.get("cell_kind", "card"));
+    if (cell_kind == "rep_label")
+    {
+        return regional_row_requirement_text(spec);
+    }
+    if (cell_kind == "arrow")
+    {
+        return String(spec.get("marker_text", String("|\nv")));
+    }
+    return String(spec.get("marker_text", ""));
+}
+
 String Gs1GodotMainScreenControl::regional_card_icon_text(const Dictionary& spec) const
 {
-    const String source_text = String(spec.get("text", "")).strip_edges();
-    const Dictionary action = spec.get("action", Dictionary());
-    const auto* node_def = find_tech_tree_node_def(action);
-    if (node_def != nullptr)
+    const int entry_kind = as_int(spec.get("entry_kind", 0), 0);
+    if (entry_kind == GS1_PROGRESSION_ENTRY_TECHNOLOGY_NODE)
     {
-        switch (node_def->faction_id.value)
+        switch (as_int(spec.get("faction_id", 0), 0))
         {
         case gs1::k_faction_village_committee:
             return "VIL";
@@ -2903,81 +2899,68 @@ String Gs1GodotMainScreenControl::regional_card_icon_text(const Dictionary& spec
         }
     }
 
-    const String trimmed = source_text.is_empty() ? String(spec.get("card_text", "")).strip_edges() : source_text;
-    if (trimmed == "Checkerboard | Wormwood")
+    switch (as_int(spec.get("content_kind", -1), -1))
     {
+    case k_unlockable_content_kind_plant:
         return "PLT";
-    }
-
-    const int open_paren = trimmed.find("(");
-    const int close_paren = trimmed.find(")");
-    const String kind = (open_paren >= 0 && close_paren > open_paren)
-        ? trimmed.substr(open_paren + 1, close_paren - open_paren - 1).strip_edges()
-        : String();
-    if (kind.find("Plant") >= 0)
-    {
-        return "PLT";
-    }
-    if (kind.find("Item") >= 0)
-    {
+    case k_unlockable_content_kind_item:
         return "ITM";
-    }
-    if (kind.find("Recipe") >= 0)
-    {
+    case k_unlockable_content_kind_recipe:
         return "RCP";
-    }
-    if (kind.find("Device") >= 0 || kind.find("Structure") >= 0)
-    {
+    case k_unlockable_content_kind_structure_recipe:
         return "DEV";
+    default:
+        return "UNL";
     }
-    return "UNL";
 }
 
 String Gs1GodotMainScreenControl::regional_card_title_text(const Dictionary& spec) const
 {
-    const String source_text = String(spec.get("text", "")).strip_edges();
-    const Dictionary action = spec.get("action", Dictionary());
-    if (const auto* node_def = find_tech_tree_node_def(action))
+    const int entry_kind = as_int(spec.get("entry_kind", 0), 0);
+    if (entry_kind == GS1_PROGRESSION_ENTRY_TECHNOLOGY_NODE)
     {
-        return node_def->display_name.empty() ? String("Technology") : string_from_view(node_def->display_name);
+        if (const auto* node_def = gs1::find_technology_node_def(gs1::TechNodeId {
+                static_cast<std::uint32_t>(as_int(spec.get("tech_node_id", 0), 0))}))
+        {
+            return node_def->display_name.empty() ? String("Technology") : string_from_view(node_def->display_name);
+        }
+        return String("Technology");
     }
 
-    if (source_text == "Checkerboard | Wormwood")
+    if (entry_kind == GS1_PROGRESSION_ENTRY_REPUTATION_UNLOCK)
     {
-        return "Starter Plants";
+        if (const auto* unlock_def = gs1::find_reputation_unlock_def(static_cast<std::uint32_t>(as_int(spec.get("element_id", 0), 0))))
+        {
+            return string_from_view(unlock_def->display_name);
+        }
+        return String("Unlockable");
     }
-
-    const int open_paren = source_text.find("(");
-    const int need_index = source_text.find(" Need ");
-    return (open_paren > 0 ? source_text.substr(0, open_paren)
-                           : (need_index > 0 ? source_text.substr(0, need_index) : source_text))
-        .strip_edges();
+    return String();
 }
 
 String Gs1GodotMainScreenControl::regional_card_subtitle_text(const Dictionary& spec) const
 {
-    const String source_text = String(spec.get("text", "")).strip_edges();
-    const Dictionary action = spec.get("action", Dictionary());
-    if (const auto* node_def = find_tech_tree_node_def(action))
+    const int entry_kind = as_int(spec.get("entry_kind", 0), 0);
+    if (entry_kind == GS1_PROGRESSION_ENTRY_TECHNOLOGY_NODE)
     {
-        const auto* faction_def = gs1::find_faction_def(node_def->faction_id);
+        const auto* faction_def = gs1::find_faction_def(gs1::FactionId {static_cast<std::uint32_t>(as_int(spec.get("faction_id", 0), 0))});
         const String faction_name = faction_def == nullptr ? String("Faction") : string_from_view(faction_def->display_name);
-        return vformat("Tier %d | %s", static_cast<int>(node_def->tier_index), faction_name);
+        return vformat("Tier %d | %s", as_int(spec.get("tier_index", 0), 0), faction_name);
     }
 
-    if (source_text == "Checkerboard | Wormwood")
+    switch (as_int(spec.get("content_kind", -1), -1))
     {
-        return "Checkerboard / Wormwood";
+    case k_unlockable_content_kind_plant:
+        return "Plant";
+    case k_unlockable_content_kind_item:
+        return "Item";
+    case k_unlockable_content_kind_recipe:
+        return "Recipe";
+    case k_unlockable_content_kind_structure_recipe:
+        return "Device Recipe";
+    default:
+        return String("Unlockable");
     }
-
-    const int open_paren = source_text.find("(");
-    const int close_paren = source_text.find(")");
-    if (open_paren >= 0 && close_paren > open_paren)
-    {
-        return source_text.substr(open_paren + 1, close_paren - open_paren - 1).strip_edges();
-    }
-
-    return String("Unlockable");
 }
 
 String Gs1GodotMainScreenControl::regional_card_status_text(const Dictionary& spec) const
@@ -2988,10 +2971,9 @@ String Gs1GodotMainScreenControl::regional_card_status_text(const Dictionary& sp
         return "Locked";
     }
 
-    const Dictionary action = spec.get("action", Dictionary());
-    if (find_tech_tree_node_def(action) != nullptr)
+    if (as_int(spec.get("entry_kind", 0), 0) == GS1_PROGRESSION_ENTRY_TECHNOLOGY_NODE)
     {
-        return tech_tree_status_text(String(spec.get("text", "")));
+        return "Unlocked";
     }
 
     return "Available";
@@ -3005,8 +2987,7 @@ Color Gs1GodotMainScreenControl::regional_card_status_color(const Dictionary& sp
         return Color(0.87, 0.72, 0.48, 0.92);
     }
 
-    const Dictionary action = spec.get("action", Dictionary());
-    if (find_tech_tree_node_def(action) != nullptr)
+    if (as_int(spec.get("entry_kind", 0), 0) == GS1_PROGRESSION_ENTRY_TECHNOLOGY_NODE)
     {
         return Color(0.49, 0.86, 0.53, 0.95);
     }
@@ -3049,10 +3030,10 @@ Color Gs1GodotMainScreenControl::regional_card_icon_background_color(const Strin
 
 Ref<Texture2D> Gs1GodotMainScreenControl::regional_card_icon_texture(const Dictionary& spec) const
 {
-    if (const auto* node_def = find_tech_tree_node_def(spec.get("action", Dictionary())))
+    if (as_int(spec.get("entry_kind", 0), 0) == GS1_PROGRESSION_ENTRY_TECHNOLOGY_NODE)
     {
-        const String icon_path =
-            GodotProgressionResourceDatabase::instance().technology_icon_path(node_def->tech_node_id.value);
+        const String icon_path = GodotProgressionResourceDatabase::instance().technology_icon_path(
+            static_cast<std::uint32_t>(as_int(spec.get("tech_node_id", 0), 0)));
         if (ResourceLoader* loader = ResourceLoader::get_singleton())
         {
             const Ref<Resource> resource = loader->load(icon_path);
@@ -3065,22 +3046,18 @@ Ref<Texture2D> Gs1GodotMainScreenControl::regional_card_icon_texture(const Dicti
     }
     else
     {
-        const String title = trimmed_unlockable_title(String(spec.get("text", "")));
-        if (!title.is_empty())
+        if (const auto* unlock_def = gs1::find_reputation_unlock_def(static_cast<std::uint32_t>(as_int(spec.get("element_id", 0), 0))))
         {
-            if (const auto* unlock_def = find_unlockable_def_by_title(title))
+            const String icon_path = GodotProgressionResourceDatabase::instance().unlockable_icon_path(
+                unlockable_content_kind_from_def(*unlock_def),
+                unlock_def->content_id);
+            if (ResourceLoader* loader = ResourceLoader::get_singleton())
             {
-                const String icon_path = GodotProgressionResourceDatabase::instance().unlockable_icon_path(
-                    unlockable_content_kind_from_def(*unlock_def),
-                    unlock_def->content_id);
-                if (ResourceLoader* loader = ResourceLoader::get_singleton())
+                const Ref<Resource> resource = loader->load(icon_path);
+                const Ref<Texture2D> texture = resource;
+                if (texture.is_valid())
                 {
-                    const Ref<Resource> resource = loader->load(icon_path);
-                    const Ref<Texture2D> texture = resource;
-                    if (texture.is_valid())
-                    {
-                        return texture;
-                    }
+                    return texture;
                 }
             }
         }
@@ -3097,6 +3074,39 @@ void Gs1GodotMainScreenControl::ensure_card_content_nodes(Button* button, Projec
         return;
     }
 
+    Panel* card_panel = Object::cast_to<Panel>(button->get_node_or_null(NodePath("CardPanel")));
+    if (card_panel == nullptr)
+    {
+        card_panel = memnew(Panel);
+        card_panel->set_name("CardPanel");
+        card_panel->set_anchors_and_offsets_preset(Control::PRESET_FULL_RECT);
+        card_panel->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
+        button->add_child(card_panel);
+    }
+
+    CenterContainer* marker_center = Object::cast_to<CenterContainer>(button->get_node_or_null(NodePath("MarkerCenter")));
+    if (marker_center == nullptr)
+    {
+        marker_center = memnew(CenterContainer);
+        marker_center->set_name("MarkerCenter");
+        marker_center->set_anchors_and_offsets_preset(Control::PRESET_FULL_RECT);
+        marker_center->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
+        button->add_child(marker_center);
+    }
+
+    Label* marker_label = resolve_object<Label>(record.marker_label_id);
+    if (marker_label == nullptr)
+    {
+        marker_label = memnew(Label);
+        marker_label->set_name("MarkerLabel");
+        marker_label->set_horizontal_alignment(HORIZONTAL_ALIGNMENT_CENTER);
+        marker_label->set_vertical_alignment(VERTICAL_ALIGNMENT_CENTER);
+        marker_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+        marker_label->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
+        marker_center->add_child(marker_label);
+        record.marker_label_id = marker_label->get_instance_id();
+    }
+
     MarginContainer* content_root = resolve_object<MarginContainer>(record.content_root_id);
     if (content_root == nullptr)
     {
@@ -3108,7 +3118,7 @@ void Gs1GodotMainScreenControl::ensure_card_content_nodes(Button* button, Projec
         content_root->add_theme_constant_override("margin_top", 10);
         content_root->add_theme_constant_override("margin_right", 10);
         content_root->add_theme_constant_override("margin_bottom", 10);
-        button->add_child(content_root);
+        card_panel->add_child(content_root);
         record.content_root_id = content_root->get_instance_id();
     }
 
@@ -3128,7 +3138,7 @@ void Gs1GodotMainScreenControl::ensure_card_content_nodes(Button* button, Projec
     {
         icon_frame = memnew(MarginContainer);
         icon_frame->set_name("IconFrame");
-        icon_frame->set_custom_minimum_size(Vector2(0, 56));
+        icon_frame->set_custom_minimum_size(Vector2(0, 92));
         icon_frame->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
         content_vbox->add_child(icon_frame);
     }
@@ -3138,7 +3148,7 @@ void Gs1GodotMainScreenControl::ensure_card_content_nodes(Button* button, Projec
     {
         icon_texture = memnew(TextureRect);
         icon_texture->set_name("CardIconTexture");
-        icon_texture->set_custom_minimum_size(Vector2(48, 48));
+        icon_texture->set_custom_minimum_size(Vector2(84, 84));
         icon_texture->set_h_size_flags(Control::SIZE_SHRINK_CENTER);
         icon_texture->set_stretch_mode(TextureRect::STRETCH_KEEP_ASPECT_CENTERED);
         icon_texture->set_expand_mode(TextureRect::EXPAND_IGNORE_SIZE);
@@ -3155,7 +3165,7 @@ void Gs1GodotMainScreenControl::ensure_card_content_nodes(Button* button, Projec
         icon_label->set_anchors_and_offsets_preset(Control::PRESET_FULL_RECT);
         icon_label->set_horizontal_alignment(HORIZONTAL_ALIGNMENT_CENTER);
         icon_label->set_vertical_alignment(VERTICAL_ALIGNMENT_CENTER);
-        icon_label->add_theme_font_size_override("font_size", 24);
+        icon_label->add_theme_font_size_override("font_size", 28);
         icon_label->add_theme_color_override("font_color", Color(0.95, 0.92, 0.84, 0.98));
         icon_label->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
         icon_frame->add_child(icon_label);
@@ -3169,7 +3179,7 @@ void Gs1GodotMainScreenControl::ensure_card_content_nodes(Button* button, Projec
         title_label->set_name("CardTitleLabel");
         title_label->set_horizontal_alignment(HORIZONTAL_ALIGNMENT_CENTER);
         title_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
-        title_label->add_theme_font_size_override("font_size", 14);
+        title_label->add_theme_font_size_override("font_size", 17);
         title_label->add_theme_color_override("font_color", Color(0.97, 0.93, 0.83, 0.98));
         title_label->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
         content_vbox->add_child(title_label);
@@ -3183,7 +3193,7 @@ void Gs1GodotMainScreenControl::ensure_card_content_nodes(Button* button, Projec
         subtitle_label->set_name("CardSubtitleLabel");
         subtitle_label->set_horizontal_alignment(HORIZONTAL_ALIGNMENT_CENTER);
         subtitle_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
-        subtitle_label->add_theme_font_size_override("font_size", 12);
+        subtitle_label->add_theme_font_size_override("font_size", 13);
         subtitle_label->add_theme_color_override("font_color", Color(0.81, 0.78, 0.70, 0.92));
         subtitle_label->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
         content_vbox->add_child(subtitle_label);
@@ -3196,7 +3206,7 @@ void Gs1GodotMainScreenControl::ensure_card_content_nodes(Button* button, Projec
         status_label = memnew(Label);
         status_label->set_name("CardStatusLabel");
         status_label->set_horizontal_alignment(HORIZONTAL_ALIGNMENT_CENTER);
-        status_label->add_theme_font_size_override("font_size", 13);
+        status_label->add_theme_font_size_override("font_size", 14);
         status_label->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
         content_vbox->add_child(status_label);
         record.status_label_id = status_label->get_instance_id();
@@ -3210,7 +3220,7 @@ void Gs1GodotMainScreenControl::ensure_card_content_nodes(Button* button, Projec
         lock_overlay->set_anchors_and_offsets_preset(Control::PRESET_FULL_RECT);
         lock_overlay->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
         lock_overlay->set_color(Color(0.16, 0.11, 0.07, 0.38));
-        button->add_child(lock_overlay);
+        card_panel->add_child(lock_overlay);
         record.lock_overlay_id = lock_overlay->get_instance_id();
     }
 
@@ -3226,7 +3236,7 @@ void Gs1GodotMainScreenControl::ensure_card_content_nodes(Button* button, Projec
         lock_label->add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.7));
         lock_label->set_text("LOCK");
         lock_label->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
-        button->add_child(lock_label);
+        card_panel->add_child(lock_label);
         record.lock_label_id = lock_label->get_instance_id();
     }
 }
@@ -3733,11 +3743,6 @@ void Gs1GodotMainScreenControl::on_dynamic_projected_action_pressed(int containe
         break;
     case PROJECTED_ACTION_CONTAINER_REGIONAL_TECH_TREE:
         registry = &regional_tech_tree_action_buttons_;
-        if (regional_tech_tree_action_buttons_.find(static_cast<std::uint64_t>(button_key)) ==
-            regional_tech_tree_action_buttons_.end())
-        {
-            registry = &regional_tech_tree_faction_tab_buttons_;
-        }
         break;
     default:
         return;

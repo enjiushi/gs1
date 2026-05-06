@@ -9,6 +9,7 @@ PowerShell entry points for building targets and running smoke/system test workf
 
 ## Contents
 - `build_gameplay_dll.ps1`: Builds the gameplay DLL target.
+- `setup_godot_build.ps1`: Verifies the expected sibling Godot source tree plus `third_party/godot-cpp` checkout, configures a Godot-enabled CMake build directory with the required adapter variables, and can optionally build `gs1_godot_adapter` in the same step.
 - `build_smoke_host.ps1`: Builds the smoke-test host executable.
 - `build_system_test_host.ps1`: Builds the standalone system-test host executable.
 - `build_visual_smoke_host.ps1`: Builds the visual smoke host used by the live viewer.
