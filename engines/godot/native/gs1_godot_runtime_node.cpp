@@ -1,5 +1,6 @@
 #include "gs1_godot_runtime_node.h"
 
+#include "gs1_godot_main_screen_projection_cache.h"
 #include "godot_progression_resources.h"
 
 #include "host/adapter_metadata_catalog.h"
@@ -143,12 +144,6 @@ Gs1RuntimeNode::~Gs1RuntimeNode()
 void Gs1RuntimeNode::_bind_methods()
 {
     ClassDB::bind_method(D_METHOD("get_runtime_summary"), &Gs1RuntimeNode::get_runtime_summary);
-    ClassDB::bind_method(D_METHOD("has_active_site"), &Gs1RuntimeNode::has_active_site);
-    ClassDB::bind_method(D_METHOD("get_site_width"), &Gs1RuntimeNode::get_site_width);
-    ClassDB::bind_method(D_METHOD("get_site_height"), &Gs1RuntimeNode::get_site_height);
-    ClassDB::bind_method(D_METHOD("get_worker_tile_x"), &Gs1RuntimeNode::get_worker_tile_x);
-    ClassDB::bind_method(D_METHOD("get_worker_tile_y"), &Gs1RuntimeNode::get_worker_tile_y);
-    ClassDB::bind_method(D_METHOD("get_tile_count"), &Gs1RuntimeNode::get_tile_count);
 
     ClassDB::bind_method(
         D_METHOD("submit_ui_action", "action_type", "target_id", "arg0", "arg1"),
@@ -200,22 +195,17 @@ void Gs1RuntimeNode::ensure_runtime_started()
         project_config_root_,
         globalize_res_path("res://gs1/godot_config"));
 
-    projection_cache_.reset();
-    drained_messages_.clear();
+    notify_runtime_message_reset();
     if (!runtime_session_.start(gameplay_dll_path_, project_config_root_, &adapter_config_))
     {
         last_error_ = runtime_session_.last_error();
-        projection_revision_ += 1U;
         return;
     }
 
-    projection_revision_ += 1U;
     if (!drain_projection_messages())
     {
         runtime_session_.stop();
-        projection_cache_.reset();
-        drained_messages_.clear();
-        projection_revision_ += 1U;
+        notify_runtime_message_reset();
         return;
     }
 
@@ -235,18 +225,14 @@ void Gs1RuntimeNode::process_frame(double delta_seconds)
     {
         last_error_ = runtime_session_.last_error();
         runtime_session_.stop();
-        projection_cache_.reset();
-        drained_messages_.clear();
-        projection_revision_ += 1U;
+        notify_runtime_message_reset();
         return;
     }
 
     if (!drain_projection_messages())
     {
         runtime_session_.stop();
-        projection_cache_.reset();
-        drained_messages_.clear();
-        projection_revision_ += 1U;
+        notify_runtime_message_reset();
         return;
     }
 
@@ -255,32 +241,71 @@ void Gs1RuntimeNode::process_frame(double delta_seconds)
 
 bool Gs1RuntimeNode::drain_projection_messages()
 {
-    std::uint32_t message_count = 0;
-    std::string pump_error {};
-    if (!message_pump_.drain_runtime_messages(
-            runtime_session_,
-            projection_cache_,
-            &drained_messages_,
-            message_count,
-            pump_error))
+    const Gs1RuntimeApi* api = runtime_session_.api();
+    if (api == nullptr || api->pop_engine_message == nullptr || runtime_session_.runtime() == nullptr)
     {
-        last_error_ = std::move(pump_error);
+        last_error_ = "Runtime session is not ready to drain engine messages.";
         return false;
     }
 
-    if (message_count > 0U)
+    Gs1EngineMessage message {};
+    while (true)
     {
-        projection_revision_ += 1U;
+        const Gs1Status status = api->pop_engine_message(runtime_session_.runtime(), &message);
+        if (status == GS1_STATUS_BUFFER_EMPTY)
+        {
+            break;
+        }
+        if (status != GS1_STATUS_OK)
+        {
+            last_error_ = "gs1_pop_engine_message failed with status " + std::to_string(static_cast<unsigned>(status));
+            return false;
+        }
+
+        dispatch_engine_message(message);
     }
 
     return true;
 }
 
-std::vector<Gs1EngineMessage> Gs1RuntimeNode::take_drained_messages()
+void Gs1RuntimeNode::subscribe_engine_messages(IGs1GodotEngineMessageSubscriber& subscriber)
 {
-    std::vector<Gs1EngineMessage> messages;
-    messages.swap(drained_messages_);
-    return messages;
+    if (std::find(engine_message_subscribers_.begin(), engine_message_subscribers_.end(), &subscriber) != engine_message_subscribers_.end())
+    {
+        return;
+    }
+    engine_message_subscribers_.push_back(&subscriber);
+    subscriber.handle_runtime_message_reset();
+}
+
+void Gs1RuntimeNode::unsubscribe_engine_messages(IGs1GodotEngineMessageSubscriber& subscriber)
+{
+    engine_message_subscribers_.erase(
+        std::remove(engine_message_subscribers_.begin(), engine_message_subscribers_.end(), &subscriber),
+        engine_message_subscribers_.end());
+}
+
+void Gs1RuntimeNode::notify_runtime_message_reset()
+{
+    for (IGs1GodotEngineMessageSubscriber* subscriber : engine_message_subscribers_)
+    {
+        if (subscriber != nullptr)
+        {
+            subscriber->handle_runtime_message_reset();
+        }
+    }
+}
+
+void Gs1RuntimeNode::dispatch_engine_message(const Gs1EngineMessage& message)
+{
+    for (IGs1GodotEngineMessageSubscriber* subscriber : engine_message_subscribers_)
+    {
+        if (subscriber == nullptr || !subscriber->handles_engine_message(message.type))
+        {
+            continue;
+        }
+        subscriber->handle_engine_message(message);
+    }
 }
 
 bool Gs1RuntimeNode::submit_ui_action(const Gs1UiAction& action)
@@ -291,7 +316,6 @@ bool Gs1RuntimeNode::submit_ui_action(const Gs1UiAction& action)
     if (!runtime_session_.submit_host_events(&event, 1U))
     {
         last_error_ = runtime_session_.last_error();
-        projection_revision_ += 1U;
         return false;
     }
     return true;
@@ -317,7 +341,6 @@ bool Gs1RuntimeNode::submit_move_direction(double world_move_x, double world_mov
     if (!runtime_session_.submit_host_events(&event, 1U))
     {
         last_error_ = runtime_session_.last_error();
-        projection_revision_ += 1U;
         return false;
     }
     return true;
@@ -333,7 +356,6 @@ bool Gs1RuntimeNode::submit_site_context_request(std::int64_t tile_x, std::int64
     if (!runtime_session_.submit_host_events(&event, 1U))
     {
         last_error_ = runtime_session_.last_error();
-        projection_revision_ += 1U;
         return false;
     }
     return true;
@@ -362,7 +384,6 @@ bool Gs1RuntimeNode::submit_site_action_request(
     if (!runtime_session_.submit_host_events(&event, 1U))
     {
         last_error_ = runtime_session_.last_error();
-        projection_revision_ += 1U;
         return false;
     }
     return true;
@@ -377,7 +398,6 @@ bool Gs1RuntimeNode::submit_site_action_cancel(std::int64_t action_id, std::int6
     if (!runtime_session_.submit_host_events(&event, 1U))
     {
         last_error_ = runtime_session_.last_error();
-        projection_revision_ += 1U;
         return false;
     }
     return true;
@@ -392,7 +412,6 @@ bool Gs1RuntimeNode::submit_site_storage_view(std::int64_t storage_id, std::int6
     if (!runtime_session_.submit_host_events(&event, 1U))
     {
         last_error_ = runtime_session_.last_error();
-        projection_revision_ += 1U;
         return false;
     }
     return true;
@@ -407,46 +426,6 @@ String Gs1RuntimeNode::get_runtime_summary() const
         summary += String(" | Error: ") + to_godot_string(last_error_);
     }
     return summary;
-}
-
-bool Gs1RuntimeNode::has_active_site() const
-{
-    return projection_cache_.state().active_site.has_value();
-}
-
-int Gs1RuntimeNode::get_site_width() const
-{
-    return projection_cache_.state().active_site.has_value() ? projection_cache_.state().active_site->width : 0;
-}
-
-int Gs1RuntimeNode::get_site_height() const
-{
-    return projection_cache_.state().active_site.has_value() ? projection_cache_.state().active_site->height : 0;
-}
-
-double Gs1RuntimeNode::get_worker_tile_x() const
-{
-    if (!projection_cache_.state().active_site.has_value() || !projection_cache_.state().active_site->worker.has_value())
-    {
-        return -1.0;
-    }
-    return projection_cache_.state().active_site->worker->tile_x;
-}
-
-double Gs1RuntimeNode::get_worker_tile_y() const
-{
-    if (!projection_cache_.state().active_site.has_value() || !projection_cache_.state().active_site->worker.has_value())
-    {
-        return -1.0;
-    }
-    return projection_cache_.state().active_site->worker->tile_y;
-}
-
-int Gs1RuntimeNode::get_tile_count() const
-{
-    return projection_cache_.state().active_site.has_value()
-        ? static_cast<int>(projection_cache_.state().active_site->tiles.size())
-        : 0;
 }
 
 void Gs1RuntimeNode::refresh_gameplay_dll_path()

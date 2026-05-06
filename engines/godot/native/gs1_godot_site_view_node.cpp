@@ -1,5 +1,6 @@
 #include "gs1_godot_site_view_node.h"
 
+#include "gs1_godot_main_screen_projection_cache.h"
 #include "godot_progression_resources.h"
 
 #include <godot_cpp/classes/box_mesh.hpp>
@@ -96,13 +97,7 @@ void Gs1SiteViewNode::_process(double delta)
 {
     (void)delta;
     ensure_presenter_created();
-    Gs1RuntimeNode* runtime_node = resolve_runtime_node();
-    if (runtime_node == nullptr)
-    {
-        return;
-    }
-
-    consume_runtime_messages(*runtime_node);
+    (void)resolve_runtime_node();
 }
 
 void Gs1SiteViewNode::ensure_presenter_created()
@@ -158,6 +153,10 @@ Gs1RuntimeNode* Gs1SiteViewNode::resolve_runtime_node() const
     if (runtime_node_ == nullptr)
     {
         runtime_node_ = Object::cast_to<Gs1RuntimeNode>(get_node_or_null(runtime_node_path_));
+        if (runtime_node_ != nullptr)
+        {
+            runtime_node_->subscribe_engine_messages(*const_cast<Gs1SiteViewNode*>(this));
+        }
     }
     if (runtime_node_ != nullptr)
     {
@@ -191,6 +190,10 @@ Gs1RuntimeNode* Gs1SiteViewNode::resolve_runtime_node() const
 
 void Gs1SiteViewNode::set_runtime_node_path(const NodePath& path)
 {
+    if (runtime_node_ != nullptr)
+    {
+        runtime_node_->unsubscribe_engine_messages(*this);
+    }
     runtime_node_path_ = path;
     runtime_node_ = nullptr;
 }
@@ -200,45 +203,69 @@ NodePath Gs1SiteViewNode::get_runtime_node_path() const
     return runtime_node_path_;
 }
 
-void Gs1SiteViewNode::consume_runtime_messages(Gs1RuntimeNode& runtime_node)
+bool Gs1SiteViewNode::handles_engine_message(Gs1EngineMessageType type) const noexcept
 {
-    const auto messages = runtime_node.take_drained_messages();
-    if (messages.empty())
+    switch (type)
     {
-        return;
+    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_WORKER_UPDATE:
+    case GS1_ENGINE_MESSAGE_SITE_PLANT_VISUAL_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_PLANT_VISUAL_REMOVE:
+    case GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_REMOVE:
+    case GS1_ENGINE_MESSAGE_END_SITE_SNAPSHOT:
+        return true;
+    default:
+        return false;
     }
+}
 
-    for (const Gs1EngineMessage& message : messages)
+void Gs1SiteViewNode::handle_engine_message(const Gs1EngineMessage& message)
+{
+    switch (message.type)
     {
-        switch (message.type)
-        {
-        case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
-            apply_site_snapshot_begin(message.payload_as<Gs1EngineMessageSiteSnapshotData>());
-            break;
-        case GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT:
-            apply_site_tile_upsert(message.payload_as<Gs1EngineMessageSiteTileData>());
-            break;
-        case GS1_ENGINE_MESSAGE_SITE_WORKER_UPDATE:
-            apply_site_worker_update(message.payload_as<Gs1EngineMessageWorkerData>());
-            break;
-        case GS1_ENGINE_MESSAGE_SITE_PLANT_VISUAL_UPSERT:
-            apply_site_plant_visual_upsert(message.payload_as<Gs1EngineMessageSitePlantVisualData>());
-            break;
-        case GS1_ENGINE_MESSAGE_SITE_PLANT_VISUAL_REMOVE:
-            apply_site_plant_visual_remove(message.payload_as<Gs1EngineMessageSiteVisualRemoveData>());
-            break;
-        case GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_UPSERT:
-            apply_site_device_visual_upsert(message.payload_as<Gs1EngineMessageSiteDeviceVisualData>());
-            break;
-        case GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_REMOVE:
-            apply_site_device_visual_remove(message.payload_as<Gs1EngineMessageSiteVisualRemoveData>());
-            break;
-        case GS1_ENGINE_MESSAGE_END_SITE_SNAPSHOT:
-            apply_site_snapshot_end();
-            break;
-        default:
-            break;
-        }
+    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
+        apply_site_snapshot_begin(message.payload_as<Gs1EngineMessageSiteSnapshotData>());
+        break;
+    case GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT:
+        apply_site_tile_upsert(message.payload_as<Gs1EngineMessageSiteTileData>());
+        break;
+    case GS1_ENGINE_MESSAGE_SITE_WORKER_UPDATE:
+        apply_site_worker_update(message.payload_as<Gs1EngineMessageWorkerData>());
+        break;
+    case GS1_ENGINE_MESSAGE_SITE_PLANT_VISUAL_UPSERT:
+        apply_site_plant_visual_upsert(message.payload_as<Gs1EngineMessageSitePlantVisualData>());
+        break;
+    case GS1_ENGINE_MESSAGE_SITE_PLANT_VISUAL_REMOVE:
+        apply_site_plant_visual_remove(message.payload_as<Gs1EngineMessageSiteVisualRemoveData>());
+        break;
+    case GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_UPSERT:
+        apply_site_device_visual_upsert(message.payload_as<Gs1EngineMessageSiteDeviceVisualData>());
+        break;
+    case GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_REMOVE:
+        apply_site_device_visual_remove(message.payload_as<Gs1EngineMessageSiteVisualRemoveData>());
+        break;
+    case GS1_ENGINE_MESSAGE_END_SITE_SNAPSHOT:
+        apply_site_snapshot_end();
+        break;
+    default:
+        break;
+    }
+}
+
+void Gs1SiteViewNode::handle_runtime_message_reset()
+{
+    clear_visuals();
+    clear_tiles();
+    active_snapshot_serial_ = 0U;
+    reconcile_full_snapshot_ = false;
+    worker_seen_in_snapshot_ = false;
+    last_width_ = -1;
+    last_height_ = -1;
+    if (worker_marker_ != nullptr)
+    {
+        worker_marker_->set_visible(false);
     }
 }
 

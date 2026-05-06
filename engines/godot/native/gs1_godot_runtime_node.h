@@ -1,7 +1,5 @@
 #pragma once
 
-#include "host/runtime_message_pump.h"
-#include "host/runtime_projection_state.h"
 #include "host/runtime_session.h"
 
 #include <godot_cpp/classes/node.hpp>
@@ -11,6 +9,16 @@
 #include <filesystem>
 #include <string>
 #include <vector>
+
+class IGs1GodotEngineMessageSubscriber
+{
+public:
+    virtual ~IGs1GodotEngineMessageSubscriber() = default;
+
+    [[nodiscard]] virtual bool handles_engine_message(Gs1EngineMessageType type) const noexcept = 0;
+    virtual void handle_engine_message(const Gs1EngineMessage& message) = 0;
+    virtual void handle_runtime_message_reset() = 0;
+};
 
 class Gs1RuntimeNode final : public godot::Node
 {
@@ -24,13 +32,6 @@ public:
     void _process(double delta) override;
 
     [[nodiscard]] godot::String get_runtime_summary() const;
-    [[nodiscard]] std::uint64_t projection_revision() const noexcept { return projection_revision_; }
-    [[nodiscard]] bool has_active_site() const;
-    [[nodiscard]] int get_site_width() const;
-    [[nodiscard]] int get_site_height() const;
-    [[nodiscard]] double get_worker_tile_x() const;
-    [[nodiscard]] double get_worker_tile_y() const;
-    [[nodiscard]] int get_tile_count() const;
 
     [[nodiscard]] bool submit_ui_action(std::int64_t action_type, std::int64_t target_id = 0, std::int64_t arg0 = 0, std::int64_t arg1 = 0);
     [[nodiscard]] bool submit_move_direction(double world_move_x, double world_move_y, double world_move_z);
@@ -48,9 +49,8 @@ public:
     [[nodiscard]] bool submit_site_storage_view(std::int64_t storage_id, std::int64_t event_kind);
 
     [[nodiscard]] const std::string& last_error() const noexcept { return last_error_; }
-    [[nodiscard]] const Gs1RuntimeProjectionCache& projection_cache() const noexcept { return projection_cache_; }
-    [[nodiscard]] const Gs1RuntimeProjectionState& projection_state() const noexcept { return projection_cache_.state(); }
-    [[nodiscard]] std::vector<Gs1EngineMessage> take_drained_messages();
+    void subscribe_engine_messages(IGs1GodotEngineMessageSubscriber& subscriber);
+    void unsubscribe_engine_messages(IGs1GodotEngineMessageSubscriber& subscriber);
 
 protected:
     static void _bind_methods();
@@ -59,6 +59,8 @@ private:
     void ensure_runtime_started();
     void process_frame(double delta_seconds);
     bool drain_projection_messages();
+    void notify_runtime_message_reset();
+    void dispatch_engine_message(const Gs1EngineMessage& message);
     [[nodiscard]] bool submit_ui_action(const Gs1UiAction& action);
     void refresh_gameplay_dll_path();
     void refresh_project_config_root();
@@ -70,10 +72,7 @@ private:
     std::filesystem::path project_config_root_ {};
     Gs1AdapterConfigBlob adapter_config_ {};
     Gs1RuntimeSession runtime_session_ {};
-    Gs1RuntimeProjectionCache projection_cache_ {};
-    Gs1RuntimeMessagePump message_pump_ {};
-    std::vector<Gs1EngineMessage> drained_messages_ {};
-    std::uint64_t projection_revision_ {0};
+    std::vector<IGs1GodotEngineMessageSubscriber*> engine_message_subscribers_ {};
     std::string last_error_ {};
 };
 

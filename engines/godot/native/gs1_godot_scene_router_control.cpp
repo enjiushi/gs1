@@ -50,6 +50,10 @@ void Gs1GodotSceneRouterControl::cache_nodes()
     if (runtime_node_ == nullptr)
     {
         runtime_node_ = Object::cast_to<Gs1RuntimeNode>(get_node_or_null(runtime_node_path_));
+        if (runtime_node_ != nullptr)
+        {
+            runtime_node_->subscribe_engine_messages(*this);
+        }
     }
     if (scene_host_ == nullptr)
     {
@@ -64,10 +68,7 @@ void Gs1GodotSceneRouterControl::ensure_active_scene()
         return;
     }
 
-    const auto& projection_state = runtime_node_->projection_state();
-    const int app_state = projection_state.current_app_state.has_value()
-        ? static_cast<int>(projection_state.current_app_state.value())
-        : APP_STATE_BOOT;
+    int app_state = last_app_state_ >= 0 ? last_app_state_ : APP_STATE_BOOT;
     const ScreenKind desired_kind = desired_screen_kind(app_state);
     Node* active_scene = Object::cast_to<Node>(ObjectDB::get_instance(active_scene_id_));
     if (active_scene != nullptr && desired_kind == active_screen_kind_ && app_state == last_app_state_)
@@ -77,6 +78,25 @@ void Gs1GodotSceneRouterControl::ensure_active_scene()
 
     switch_to_scene(desired_kind);
     last_app_state_ = app_state;
+}
+
+bool Gs1GodotSceneRouterControl::handles_engine_message(Gs1EngineMessageType type) const noexcept
+{
+    return type == GS1_ENGINE_MESSAGE_SET_APP_STATE;
+}
+
+void Gs1GodotSceneRouterControl::handle_engine_message(const Gs1EngineMessage& message)
+{
+    if (message.type != GS1_ENGINE_MESSAGE_SET_APP_STATE)
+    {
+        return;
+    }
+    last_app_state_ = static_cast<int>(message.payload_as<Gs1EngineMessageSetAppStateData>().app_state);
+}
+
+void Gs1GodotSceneRouterControl::handle_runtime_message_reset()
+{
+    last_app_state_ = APP_STATE_BOOT;
 }
 
 Gs1GodotSceneRouterControl::ScreenKind Gs1GodotSceneRouterControl::desired_screen_kind(int app_state) const noexcept
@@ -193,6 +213,10 @@ void Gs1GodotSceneRouterControl::configure_scene_instance(Node* instance) const
 
 void Gs1GodotSceneRouterControl::set_runtime_node_path(const NodePath& path)
 {
+    if (runtime_node_ != nullptr)
+    {
+        runtime_node_->unsubscribe_engine_messages(*this);
+    }
     runtime_node_path_ = path;
     runtime_node_ = nullptr;
 }
