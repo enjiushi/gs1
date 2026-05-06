@@ -182,6 +182,10 @@ private:
     [[nodiscard]] godot::Dictionary find_ui_panel(int panel_id) const;
     [[nodiscard]] godot::Dictionary find_panel_slot_action(const godot::Dictionary& panel, int slot_id) const;
     [[nodiscard]] godot::Dictionary find_panel_list_action(const godot::Dictionary& panel, int list_id, std::int64_t item_id, int role) const;
+    [[nodiscard]] godot::String regional_panel_text_line(const godot::Dictionary& line) const;
+    [[nodiscard]] godot::String regional_panel_slot_label(const godot::Dictionary& slot_action) const;
+    [[nodiscard]] godot::String regional_panel_list_primary_text(const godot::Dictionary& item) const;
+    [[nodiscard]] godot::String regional_panel_list_secondary_text(const godot::Dictionary& item) const;
     void cache_fixed_slot_bindings();
     void clear_fixed_slot_actions();
     void bind_fixed_slot_actions(const godot::Dictionary& panel, int panel_id);

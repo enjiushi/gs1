@@ -152,23 +152,38 @@ private:
         Gs1UiElementType element_type,
         std::uint32_t flags,
         const Gs1UiAction& action,
-        const char* text);
+        std::uint8_t content_kind,
+        std::uint32_t primary_id = 0U,
+        std::uint32_t secondary_id = 0U,
+        std::uint32_t quantity = 0U);
     void queue_progression_entry_message(const Gs1EngineMessageProgressionEntryData& payload);
     void queue_ui_panel_text_message(
         std::uint16_t line_id,
         std::uint32_t flags,
-        const char* text);
+        std::uint8_t text_kind,
+        std::uint32_t primary_id = 0U,
+        std::uint32_t secondary_id = 0U,
+        std::uint32_t quantity = 0U,
+        std::uint32_t aux_value = 0U);
     void queue_ui_panel_slot_action_message(
         Gs1UiPanelSlotId slot_id,
         std::uint32_t flags,
         const Gs1UiAction& action,
-        const char* label);
+        std::uint8_t label_kind,
+        std::uint32_t primary_id = 0U,
+        std::uint32_t secondary_id = 0U,
+        std::uint32_t quantity = 0U);
     void queue_ui_panel_list_item_message(
         Gs1UiPanelListId list_id,
         std::uint32_t item_id,
         std::uint32_t flags,
-        const char* primary_text,
-        const char* secondary_text);
+        std::uint8_t primary_kind,
+        std::uint8_t secondary_kind,
+        std::uint32_t primary_id = 0U,
+        std::uint32_t secondary_id = 0U,
+        std::uint32_t quantity = 0U,
+        std::int32_t map_x = 0,
+        std::int32_t map_y = 0);
     void queue_ui_panel_list_action_message(
         Gs1UiPanelListId list_id,
         std::uint32_t item_id,

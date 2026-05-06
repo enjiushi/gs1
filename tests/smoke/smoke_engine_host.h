@@ -35,25 +35,26 @@ public:
         LiveStatePatchField_SelectedSiteId = 1U << 1,
         LiveStatePatchField_ScriptFailed = 1U << 2,
         LiveStatePatchField_UiSetups = 1U << 3,
-        LiveStatePatchField_RegionalMap = 1U << 4,
-        LiveStatePatchField_SiteBootstrap = 1U << 5,
-        LiveStatePatchField_SiteState = 1U << 6,
-        LiveStatePatchField_Hud = 1U << 7,
-        LiveStatePatchField_SiteResult = 1U << 8,
-        LiveStatePatchField_SiteAction = 1U << 9,
-        LiveStatePatchField_SiteStateWorker = 1U << 10,
-        LiveStatePatchField_SiteStateCamp = 1U << 11,
-        LiveStatePatchField_SiteStateWeather = 1U << 12,
-        LiveStatePatchField_SiteStateInventory = 1U << 13,
-        LiveStatePatchField_SiteStateTasks = 1U << 14,
-        LiveStatePatchField_SiteStatePhone = 1U << 15,
-        LiveStatePatchField_SiteStateCraftContext = 1U << 16,
-        LiveStatePatchField_SiteStatePlacementPreview = 1U << 17,
-        LiveStatePatchField_SitePlacementFailure = 1U << 18,
-        LiveStatePatchField_CampaignResources = 1U << 19,
-        LiveStatePatchField_SiteStateProtectionOverlay = 1U << 20,
-        LiveStatePatchField_SiteStateModifiers = 1U << 21,
-        LiveStatePatchField_AudioCues = 1U << 22
+        LiveStatePatchField_ProgressionViews = 1U << 4,
+        LiveStatePatchField_RegionalMap = 1U << 5,
+        LiveStatePatchField_SiteBootstrap = 1U << 6,
+        LiveStatePatchField_SiteState = 1U << 7,
+        LiveStatePatchField_Hud = 1U << 8,
+        LiveStatePatchField_SiteResult = 1U << 9,
+        LiveStatePatchField_SiteAction = 1U << 10,
+        LiveStatePatchField_SiteStateWorker = 1U << 11,
+        LiveStatePatchField_SiteStateCamp = 1U << 12,
+        LiveStatePatchField_SiteStateWeather = 1U << 13,
+        LiveStatePatchField_SiteStateInventory = 1U << 14,
+        LiveStatePatchField_SiteStateTasks = 1U << 15,
+        LiveStatePatchField_SiteStatePhone = 1U << 16,
+        LiveStatePatchField_SiteStateCraftContext = 1U << 17,
+        LiveStatePatchField_SiteStatePlacementPreview = 1U << 18,
+        LiveStatePatchField_SitePlacementFailure = 1U << 19,
+        LiveStatePatchField_CampaignResources = 1U << 20,
+        LiveStatePatchField_SiteStateProtectionOverlay = 1U << 21,
+        LiveStatePatchField_SiteStateModifiers = 1U << 22,
+        LiveStatePatchField_AudioCues = 1U << 23
     };
 
     struct LiveStateSnapshot;
@@ -107,7 +108,10 @@ public:
         Gs1UiElementType element_type {GS1_UI_ELEMENT_NONE};
         std::uint32_t flags {0};
         Gs1UiAction action {};
-        std::string text {};
+        std::uint32_t content_kind {0};
+        std::uint32_t primary_id {0};
+        std::uint32_t secondary_id {0};
+        std::uint32_t quantity {0};
     };
 
     struct ActiveUiSetup final
@@ -116,6 +120,34 @@ public:
         Gs1UiSetupPresentationType presentation_type {GS1_UI_SETUP_PRESENTATION_NONE};
         std::uint32_t context_id {0};
         std::vector<ActiveUiElement> elements {};
+    };
+
+    struct ProgressionEntryProjection final
+    {
+        std::uint32_t entry_id {0};
+        std::uint32_t reputation_requirement {0};
+        std::uint32_t content_id {0};
+        std::uint32_t tech_node_id {0};
+        std::uint32_t faction_id {0};
+        Gs1ProgressionEntryKind entry_kind {GS1_PROGRESSION_ENTRY_NONE};
+        std::uint32_t flags {0};
+        std::uint32_t content_kind {0};
+        std::uint32_t tier_index {0};
+        Gs1UiAction action {};
+    };
+
+    struct ActiveProgressionView final
+    {
+        Gs1ProgressionViewId view_id {GS1_PROGRESSION_VIEW_NONE};
+        std::uint32_t context_id {0};
+        std::vector<ProgressionEntryProjection> entries {};
+    };
+
+    struct PendingProgressionView final
+    {
+        Gs1ProgressionViewId view_id {GS1_PROGRESSION_VIEW_NONE};
+        std::uint32_t context_id {0};
+        std::vector<ProgressionEntryProjection> entries {};
     };
 
     struct PendingUiSetup final
@@ -423,6 +455,7 @@ public:
         std::vector<std::string> current_frame_message_entries {};
         std::vector<std::string> message_log_tail {};
         std::vector<ActiveUiSetup> active_ui_setups {};
+        std::vector<ActiveProgressionView> active_progression_views {};
         std::vector<RegionalMapSiteProjection> regional_map_sites {};
         std::vector<RegionalMapLinkProjection> regional_map_links {};
         std::optional<SiteSnapshotProjection> active_site_snapshot {};
@@ -453,6 +486,10 @@ private:
     void apply_ui_setup_close(const Gs1EngineMessage& message);
     void apply_ui_element_upsert(const Gs1EngineMessage& message);
     void apply_ui_setup_end();
+    void apply_progression_view_begin(const Gs1EngineMessage& message);
+    void apply_progression_view_close(const Gs1EngineMessage& message);
+    void apply_progression_entry_upsert(const Gs1EngineMessage& message);
+    void apply_progression_view_end();
     void apply_regional_map_snapshot_begin(const Gs1EngineMessage& message);
     void apply_regional_map_site_upsert(const Gs1EngineMessage& message);
     void apply_regional_map_site_remove(const Gs1EngineMessage& message);
@@ -490,6 +527,7 @@ private:
     [[nodiscard]] LiveStateSnapshot capture_frame_live_state_snapshot() const;
     static void write_json_string(std::string& destination, std::string_view value);
     [[nodiscard]] std::vector<ActiveUiSetup> snapshot_active_ui_setups() const;
+    [[nodiscard]] std::vector<ActiveProgressionView> snapshot_active_progression_views() const;
     [[nodiscard]] std::vector<RegionalMapSiteProjection> snapshot_regional_map_sites() const;
     [[nodiscard]] std::vector<RegionalMapLinkProjection> snapshot_regional_map_links() const;
     [[nodiscard]] static std::uint64_t make_regional_map_link_key(
@@ -521,6 +559,8 @@ private:
     std::vector<Gs1EngineMessageType> seen_messages_ {};
     std::map<Gs1UiSetupId, ActiveUiSetup> active_ui_setups_ {};
     std::optional<PendingUiSetup> pending_ui_setup_ {};
+    std::map<Gs1ProgressionViewId, ActiveProgressionView> active_progression_views_ {};
+    std::optional<PendingProgressionView> pending_progression_view_ {};
     std::map<std::uint32_t, RegionalMapSiteProjection> regional_map_sites_ {};
     std::map<std::uint64_t, RegionalMapLinkProjection> regional_map_links_ {};
     std::uint32_t pending_regional_map_patch_mask_ {0U};

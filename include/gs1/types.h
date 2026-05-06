@@ -669,8 +669,12 @@ struct Gs1EngineMessageUiPanelTextData
 {
     std::uint16_t line_id;
     std::uint8_t flags;
-    std::uint8_t reserved0;
-    char text[56];
+    std::uint8_t text_kind;
+    std::uint32_t primary_id;
+    std::uint32_t secondary_id;
+    std::uint32_t quantity;
+    std::uint32_t aux_value;
+    std::uint8_t reserved0[40];
 };
 
 struct Gs1EngineMessageUiPanelSlotActionData
@@ -678,8 +682,11 @@ struct Gs1EngineMessageUiPanelSlotActionData
     Gs1UiAction action;
     Gs1UiPanelSlotId slot_id;
     std::uint8_t flags;
-    std::uint8_t reserved0[2];
-    char label[28];
+    std::uint8_t label_kind;
+    std::uint32_t primary_id;
+    std::uint32_t secondary_id;
+    std::uint32_t quantity;
+    std::uint8_t reserved0[16];
 };
 
 struct Gs1EngineMessageUiPanelListItemData
@@ -687,9 +694,14 @@ struct Gs1EngineMessageUiPanelListItemData
     std::uint32_t item_id;
     Gs1UiPanelListId list_id;
     std::uint8_t flags;
-    std::uint8_t reserved0[2];
-    char primary_text[24];
-    char secondary_text[28];
+    std::uint8_t primary_kind;
+    std::uint8_t secondary_kind;
+    std::uint32_t primary_id;
+    std::uint32_t secondary_id;
+    std::uint32_t quantity;
+    std::int32_t map_x;
+    std::int32_t map_y;
+    std::uint8_t reserved0[32];
 };
 
 struct Gs1EngineMessageUiPanelListActionData
@@ -708,7 +720,11 @@ struct Gs1EngineMessageUiElementData
     std::uint32_t element_id;
     Gs1UiElementType element_type;
     std::uint8_t flags;
-    char text[26];
+    std::uint8_t content_kind;
+    std::uint32_t primary_id;
+    std::uint32_t secondary_id;
+    std::uint32_t quantity;
+    std::uint8_t reserved0[12];
 };
 
 struct Gs1EngineMessageProgressionViewData

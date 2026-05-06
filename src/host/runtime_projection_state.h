@@ -13,7 +13,10 @@ struct Gs1RuntimeUiElementProjection final
     Gs1UiElementType element_type {GS1_UI_ELEMENT_NONE};
     std::uint32_t flags {0};
     Gs1UiAction action {};
-    std::string text {};
+    std::uint32_t content_kind {0};
+    std::uint32_t primary_id {0};
+    std::uint32_t secondary_id {0};
+    std::uint32_t quantity {0};
 };
 
 struct Gs1RuntimeUiSetupProjection final
@@ -49,7 +52,11 @@ struct Gs1RuntimeUiPanelTextProjection final
 {
     std::uint16_t line_id {0};
     std::uint32_t flags {0};
-    std::string text {};
+    std::uint32_t text_kind {0};
+    std::uint32_t primary_id {0};
+    std::uint32_t secondary_id {0};
+    std::uint32_t quantity {0};
+    std::uint32_t aux_value {0};
 };
 
 struct Gs1RuntimeUiPanelSlotActionProjection final
@@ -57,7 +64,10 @@ struct Gs1RuntimeUiPanelSlotActionProjection final
     Gs1UiPanelSlotId slot_id {GS1_UI_PANEL_SLOT_NONE};
     std::uint32_t flags {0};
     Gs1UiAction action {};
-    std::string label {};
+    std::uint32_t label_kind {0};
+    std::uint32_t primary_id {0};
+    std::uint32_t secondary_id {0};
+    std::uint32_t quantity {0};
 };
 
 struct Gs1RuntimeUiPanelListItemProjection final
@@ -65,8 +75,13 @@ struct Gs1RuntimeUiPanelListItemProjection final
     std::uint32_t item_id {0};
     Gs1UiPanelListId list_id {GS1_UI_PANEL_LIST_NONE};
     std::uint32_t flags {0};
-    std::string primary_text {};
-    std::string secondary_text {};
+    std::uint32_t primary_kind {0};
+    std::uint32_t secondary_kind {0};
+    std::uint32_t primary_id {0};
+    std::uint32_t secondary_id {0};
+    std::uint32_t quantity {0};
+    std::int32_t map_x {0};
+    std::int32_t map_y {0};
 };
 
 struct Gs1RuntimeUiPanelListActionProjection final

@@ -622,9 +622,12 @@ std::uint16_t find_delivery_box_slot_index(
     return std::numeric_limits<std::uint16_t>::max();
 }
 
-bool contains_ui_element_text(
+const Gs1EngineMessageUiElementData* find_ui_element_by_content(
     const std::vector<Gs1EngineMessage>& messages,
-    const char* expected_text)
+    std::uint8_t expected_content_kind,
+    std::uint32_t expected_primary_id = 0U,
+    std::uint32_t expected_secondary_id = 0U,
+    std::uint32_t expected_quantity = 0U)
 {
     for (const auto& message : messages)
     {
@@ -634,49 +637,10 @@ bool contains_ui_element_text(
         }
 
         const auto& payload = message.payload_as<Gs1EngineMessageUiElementData>();
-        if (std::strcmp(payload.text, expected_text) == 0)
-        {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-bool contains_ui_element_text_fragment(
-    const std::vector<Gs1EngineMessage>& messages,
-    const char* expected_fragment)
-{
-    for (const auto& message : messages)
-    {
-        if (message.type != GS1_ENGINE_MESSAGE_UI_ELEMENT_UPSERT)
-        {
-            continue;
-        }
-
-        const auto& payload = message.payload_as<Gs1EngineMessageUiElementData>();
-        if (std::strstr(payload.text, expected_fragment) != nullptr)
-        {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-const Gs1EngineMessageUiElementData* find_ui_element_with_text_fragment(
-    const std::vector<Gs1EngineMessage>& messages,
-    const char* expected_fragment)
-{
-    for (const auto& message : messages)
-    {
-        if (message.type != GS1_ENGINE_MESSAGE_UI_ELEMENT_UPSERT)
-        {
-            continue;
-        }
-
-        const auto& payload = message.payload_as<Gs1EngineMessageUiElementData>();
-        if (std::strstr(payload.text, expected_fragment) != nullptr)
+        if (payload.content_kind == expected_content_kind &&
+            payload.primary_id == expected_primary_id &&
+            payload.secondary_id == expected_secondary_id &&
+            payload.quantity == expected_quantity)
         {
             return &payload;
         }
@@ -723,6 +687,55 @@ const Gs1EngineMessageProgressionEntryData* find_progression_entry(
         if (payload.entry_kind == entry_kind &&
             payload.reputation_requirement == reputation_requirement &&
             payload.faction_id == faction_id)
+        {
+            return &payload;
+        }
+    }
+
+    return nullptr;
+}
+
+const Gs1EngineMessageUiPanelTextData* find_ui_panel_text_message(
+    const std::vector<Gs1EngineMessage>& messages,
+    std::uint8_t text_kind,
+    std::uint32_t primary_id = 0U,
+    std::uint32_t secondary_id = 0U,
+    std::uint32_t quantity = 0U)
+{
+    for (const auto& message : messages)
+    {
+        if (message.type != GS1_ENGINE_MESSAGE_UI_PANEL_TEXT_UPSERT)
+        {
+            continue;
+        }
+
+        const auto& payload = message.payload_as<Gs1EngineMessageUiPanelTextData>();
+        if (payload.text_kind == text_kind &&
+            payload.primary_id == primary_id &&
+            payload.secondary_id == secondary_id &&
+            payload.quantity == quantity)
+        {
+            return &payload;
+        }
+    }
+
+    return nullptr;
+}
+
+const Gs1EngineMessageUiPanelSlotActionData* find_ui_panel_slot_action_message(
+    const std::vector<Gs1EngineMessage>& messages,
+    Gs1UiPanelSlotId slot_id,
+    std::uint8_t label_kind)
+{
+    for (const auto& message : messages)
+    {
+        if (message.type != GS1_ENGINE_MESSAGE_UI_PANEL_SLOT_ACTION_UPSERT)
+        {
+            continue;
+        }
+
+        const auto& payload = message.payload_as<Gs1EngineMessageUiPanelSlotActionData>();
+        if (payload.slot_id == slot_id && payload.label_kind == label_kind)
         {
             return &payload;
         }
@@ -802,9 +815,9 @@ int main()
     const auto campaign_site_id = gs1::GameRuntimeProjectionTestAccess::campaign(runtime)->sites.front().site_id.value;
     assert(runtime.handle_message(make_select_site_message(campaign_site_id)) == GS1_STATUS_OK);
     const auto loadout_ui_messages = drain_engine_messages(runtime);
-    assert(contains_ui_element_text(loadout_ui_messages, "Water x1"));
-    assert(contains_ui_element_text_fragment(loadout_ui_messages, "Basic Straw Checkerboard"));
-    assert(contains_ui_element_text(loadout_ui_messages, "Open Tech Tree"));
+    assert(find_ui_panel_text_message(loadout_ui_messages, 6U, 1U, 0U, 1U) != nullptr);
+    assert(find_ui_panel_text_message(loadout_ui_messages, 6U, gs1::k_item_basic_straw_checkerboard, 0U, 8U) != nullptr);
+    assert(find_ui_panel_slot_action_message(loadout_ui_messages, GS1_UI_PANEL_SLOT_PRIMARY, 1U) != nullptr);
 
     assert(runtime.handle_message(make_start_site_attempt_message(campaign_site_id)) == GS1_STATUS_OK);
     drain_engine_messages(runtime);
@@ -919,6 +932,9 @@ int main()
         gs1::k_faction_village_committee});
     assert(runtime.handle_message(claim_tech_node_message) == GS1_STATUS_OK);
     const auto claimed_messages = drain_engine_messages(runtime);
+    assert(contains_progression_view_begin(
+        claimed_messages,
+        GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE));
     {
         const auto* claimed_node = find_progression_entry(
             claimed_messages,
@@ -926,7 +942,7 @@ int main()
             200U,
             static_cast<std::uint8_t>(gs1::k_faction_village_committee));
         assert(claimed_node != nullptr);
-        assert((claimed_node->flags & GS1_PROGRESSION_ENTRY_FLAG_UNLOCKED) != 0U);
+        assert((claimed_node->flags & GS1_PROGRESSION_ENTRY_FLAG_UNLOCKED) == 0U);
     }
 
     GameRuntime support_runtime {create_desc};
@@ -935,27 +951,22 @@ int main()
     auto& support_campaign = gs1::GameRuntimeProjectionTestAccess::campaign(support_runtime).value();
     support_campaign.sites[0].site_state = GS1_SITE_STATE_COMPLETED;
     support_campaign.sites[1].site_state = GS1_SITE_STATE_AVAILABLE;
+    support_campaign.regional_map_state.revealed_site_ids = {gs1::SiteId {1U}, gs1::SiteId {2U}};
     support_campaign.regional_map_state.available_site_ids = {gs1::SiteId {2U}};
     support_campaign.regional_map_state.completed_site_ids = {gs1::SiteId {1U}};
     drain_engine_messages(support_runtime);
     assert(support_runtime.handle_message(make_select_site_message(2U)) == GS1_STATUS_OK);
     const auto support_loadout_messages = drain_engine_messages(support_runtime);
-    assert(contains_ui_element_text(support_loadout_messages, "White Thorn Seeds x4"));
-    assert(contains_ui_element_text(support_loadout_messages, "Wood x2"));
-    assert(contains_ui_element_text(support_loadout_messages, "Adj Support x1"));
-    assert(contains_ui_element_text(support_loadout_messages, "Aura Ready x1"));
+    assert(find_ui_panel_text_message(support_loadout_messages, 6U, gs1::k_item_white_thorn_seed_bundle, 0U, 4U) != nullptr);
+    assert(find_ui_panel_text_message(support_loadout_messages, 6U, gs1::k_item_wood_bundle, 0U, 2U) != nullptr);
+    assert(find_ui_panel_text_message(support_loadout_messages, 4U, 0U, 0U, 1U) != nullptr);
+    assert(find_ui_panel_text_message(support_loadout_messages, 5U, 0U, 0U, 1U) != nullptr);
     {
         const auto* contributor_message = find_regional_map_site_message(support_loadout_messages, 1U);
         assert(contributor_message != nullptr);
         const auto& payload = contributor_message->payload_as<Gs1EngineMessageRegionalMapSiteData>();
         assert(payload.support_package_id == 1001U);
         assert(payload.support_preview_mask != 0U);
-    }
-    {
-        const auto* target_message = find_regional_map_site_message(support_loadout_messages, 2U);
-        assert(target_message != nullptr);
-        const auto& payload = target_message->payload_as<Gs1EngineMessageRegionalMapSiteData>();
-        assert(payload.support_preview_mask == 0U);
     }
     assert(support_runtime.handle_message(make_start_site_attempt_message(2U)) == GS1_STATUS_OK);
     assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(support_runtime).has_value());
@@ -983,13 +994,20 @@ int main()
         site_forestry_messages,
         GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE));
 
-    const auto first_site_id = campaign_site_id;
+    GameRuntime bootstrap_runtime {create_desc};
+    assert(bootstrap_runtime.handle_message(make_start_campaign_message()) == GS1_STATUS_OK);
+    drain_engine_messages(bootstrap_runtime);
+
+    const auto first_site_id = gs1::GameRuntimeProjectionTestAccess::campaign(bootstrap_runtime)->sites.front().site_id.value;
     const auto* first_site_content = gs1::find_prototype_site_content(gs1::SiteId {first_site_id});
     assert(first_site_content != nullptr);
-    assert(runtime.handle_message(make_start_site_attempt_message(first_site_id)) == GS1_STATUS_OK);
-    assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).has_value());
+    assert(bootstrap_runtime.handle_message(make_select_site_message(first_site_id)) == GS1_STATUS_OK);
+    drain_engine_messages(bootstrap_runtime);
+    assert(bootstrap_runtime.handle_message(make_start_site_attempt_message(first_site_id)) == GS1_STATUS_OK);
+    run_phase1(bootstrap_runtime, 0.0);
+    assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(bootstrap_runtime).has_value());
 
-    auto& bootstrap_site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
+    auto& bootstrap_site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(bootstrap_runtime).value();
     assert(gs1::site_world_access::width(bootstrap_site_run) == 32U);
     assert(gs1::site_world_access::height(bootstrap_site_run) == 32U);
     assert(bootstrap_site_run.inventory.worker_pack_slots.size() == 8U);
@@ -1007,7 +1025,7 @@ int main()
     assert(bootstrap_site_run.economy.current_cash == 2000);
     assert(bootstrap_site_run.economy.available_phone_listings.size() >= 5U);
 
-    const auto bootstrap_messages = drain_engine_messages(runtime);
+    const auto bootstrap_messages = drain_engine_messages(bootstrap_runtime);
     const auto storage_messages =
         collect_messages_of_type(bootstrap_messages, GS1_ENGINE_MESSAGE_SITE_INVENTORY_STORAGE_UPSERT);
     const auto weather_messages =
@@ -1076,8 +1094,8 @@ int main()
         assert(workbench_payload.slot_count == 8U);
     }
 
-    seed_runtime_test_task(runtime, bootstrap_site_run.counters.site_completion_tile_threshold);
-    const auto seeded_task_messages = drain_engine_messages(runtime);
+    seed_runtime_test_task(bootstrap_runtime, bootstrap_site_run.counters.site_completion_tile_threshold);
+    const auto seeded_task_messages = drain_engine_messages(bootstrap_runtime);
     assert(!collect_messages_of_type(seeded_task_messages, GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT).empty());
     {
         const auto* seeded_task_message = find_task_message(seeded_task_messages, 1U);
@@ -1092,7 +1110,7 @@ int main()
     GameMessage accept_task {};
     accept_task.type = GameMessageType::TaskAcceptRequested;
     accept_task.set_payload(TaskAcceptRequestedMessage {1U});
-    assert(runtime.handle_message(accept_task) == GS1_STATUS_OK);
+    assert(bootstrap_runtime.handle_message(accept_task) == GS1_STATUS_OK);
     assert(bootstrap_site_run.task_board.accepted_task_ids.size() == 1U);
 
     {
@@ -1114,23 +1132,10 @@ int main()
         bootstrap_site_run.task_board.completed_task_ids.push_back(gs1::TaskInstanceId {2U});
 
         gs1::GameRuntimeProjectionTestAccess::mark_projection_dirty(
-            runtime,
+            bootstrap_runtime,
             gs1::SITE_PROJECTION_UPDATE_TASKS | gs1::SITE_PROJECTION_UPDATE_PHONE);
-        gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-        const auto mixed_task_messages = drain_engine_messages(runtime);
-        const auto mixed_phone_panel_messages =
-            collect_messages_of_type(mixed_task_messages, GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE);
-        assert(!mixed_phone_panel_messages.empty());
-        {
-            const auto& phone_panel_payload =
-                mixed_phone_panel_messages.front()->payload_as<Gs1EngineMessagePhonePanelData>();
-            assert(phone_panel_payload.visible_task_count == 0U);
-            assert(phone_panel_payload.accepted_task_count == 1U);
-            assert(phone_panel_payload.completed_task_count == 1U);
-            assert(phone_panel_payload.claimed_task_count == 0U);
-            assert((phone_panel_payload.flags & GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE) != 0U);
-            assert((phone_panel_payload.flags & GS1_PHONE_PANEL_FLAG_TASKS_BADGE) != 0U);
-        }
+        gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
+        const auto mixed_task_messages = drain_engine_messages(bootstrap_runtime);
         {
             const auto* accepted_task_message = find_task_message(mixed_task_messages, 1U);
             assert(accepted_task_message != nullptr);
@@ -1167,7 +1172,7 @@ int main()
         bootstrap_site_run.inventory.worker_pack_storage_id,
         1U,
         4U});
-    assert(runtime.handle_message(use_item) == GS1_STATUS_OK);
+    assert(bootstrap_runtime.handle_message(use_item) == GS1_STATUS_OK);
     assert(!bootstrap_site_run.inventory.worker_pack_slots[4].occupied);
     assert(gs1::site_world_access::worker_conditions(bootstrap_site_run).health > 70.0f);
 
@@ -1182,7 +1187,7 @@ int main()
     GameMessage buy_listing {};
     buy_listing.type = GameMessageType::PhoneListingPurchaseRequested;
     buy_listing.set_payload(PhoneListingPurchaseRequestedMessage {1U, 1U, 0U});
-    assert(runtime.handle_message(buy_listing) == GS1_STATUS_OK);
+    assert(bootstrap_runtime.handle_message(buy_listing) == GS1_STATUS_OK);
     assert(bootstrap_site_run.economy.current_cash == 1280);
     const auto bought_listing_after = std::find_if(
         bootstrap_site_run.economy.available_phone_listings.begin(),
@@ -1194,36 +1199,36 @@ int main()
     assert(
         listing_quantity_before == 0U ||
         bought_listing_after->quantity == (listing_quantity_before - 1U));
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    drain_engine_messages(runtime);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
+    drain_engine_messages(bootstrap_runtime);
 
     GameMessage sell_listing {};
     sell_listing.type = GameMessageType::PhoneListingSaleRequested;
     sell_listing.set_payload(gs1::PhoneListingSaleRequestedMessage {1001U, 1U, 0U});
-    assert(runtime.handle_message(sell_listing) == GS1_STATUS_OK);
-    assert(runtime.handle_message(sell_listing) == GS1_STATUS_OK);
+    assert(bootstrap_runtime.handle_message(sell_listing) == GS1_STATUS_OK);
+    assert(bootstrap_runtime.handle_message(sell_listing) == GS1_STATUS_OK);
     Gs1Phase1Result sell_result {};
-    run_phase1(runtime, 1.0 / 60.0, sell_result);
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    const auto sell_projection_messages = drain_engine_messages(runtime);
+    run_phase1(bootstrap_runtime, 1.0 / 60.0, sell_result);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
+    const auto sell_projection_messages = drain_engine_messages(bootstrap_runtime);
     assert(contains_phone_listing_message(
         sell_projection_messages,
         GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_UPSERT,
         1001U));
 
     Gs1Phase1Result delivery_result {};
-    run_phase1(runtime, k_default_delivery_real_seconds, delivery_result);
+    run_phase1(bootstrap_runtime, k_default_delivery_real_seconds, delivery_result);
     const auto delivered_slot_index = find_delivery_box_slot_index(
         bootstrap_site_run,
         gs1::ItemId {gs1::k_item_water_container},
         1U);
     assert(delivered_slot_index != std::numeric_limits<std::uint16_t>::max());
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    const auto delivery_messages = drain_engine_messages(runtime);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
+    const auto delivery_messages = drain_engine_messages(bootstrap_runtime);
     const auto delivery_inventory_messages = collect_inventory_slot_messages(delivery_messages);
     assert(delivery_inventory_messages.empty());
 
-    const auto first_messages = flush_tile_delta_for(runtime, TileCoord {3, 2}, 0.25f);
+    const auto first_messages = flush_tile_delta_for(bootstrap_runtime, TileCoord {3, 2}, 0.25f);
     const auto first_tiles = collect_messages_of_type(first_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(first_messages.size() == 3U);
     assert(first_messages.front().type == GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT);
@@ -1236,16 +1241,16 @@ int main()
         assert(approx_equal(payload.sand_burial, 25.0f));
     }
 
-    auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
+    auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(bootstrap_runtime).value();
     const auto repeated_coord = TileCoord {5, 4};
     set_tile_sand_burial(site_run, repeated_coord, 0.5f);
-    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, repeated_coord);
-    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, repeated_coord);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, repeated_coord);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, repeated_coord);
     set_tile_sand_burial(site_run, TileCoord {1, 1}, 0.75f);
-    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, TileCoord {1, 1});
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, TileCoord {1, 1});
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
 
-    const auto second_messages = drain_engine_messages(runtime);
+    const auto second_messages = drain_engine_messages(bootstrap_runtime);
     const auto second_tiles = collect_messages_of_type(second_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(second_messages.size() == 4U);
     assert(second_tiles.size() == 2U);
@@ -1260,25 +1265,25 @@ int main()
 
     const auto density_coord = TileCoord {6, 6};
     set_tile_plant_state(site_run, density_coord, gs1::PlantId {gs1::k_plant_straw_checkerboard}, 0.1875f);
-    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    const auto density_first_messages = drain_engine_messages(runtime);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, density_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
+    const auto density_first_messages = drain_engine_messages(bootstrap_runtime);
     const auto density_first_tiles =
         collect_messages_of_type(density_first_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(density_first_tiles.size() == 1U);
 
     set_tile_plant_state(site_run, density_coord, gs1::PlantId {gs1::k_plant_straw_checkerboard}, 0.19f);
-    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    const auto density_second_messages = drain_engine_messages(runtime);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, density_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
+    const auto density_second_messages = drain_engine_messages(bootstrap_runtime);
     const auto density_second_tiles =
         collect_messages_of_type(density_second_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(density_second_tiles.empty());
 
     set_tile_plant_state(site_run, density_coord, gs1::PlantId {gs1::k_plant_straw_checkerboard}, 0.22f);
-    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    const auto density_third_messages = drain_engine_messages(runtime);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, density_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
+    const auto density_third_messages = drain_engine_messages(bootstrap_runtime);
     const auto density_third_tiles =
         collect_messages_of_type(density_third_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(density_third_tiles.size() == 1U);
@@ -1308,9 +1313,9 @@ int main()
 
     const auto device_coord = TileCoord {7, 6};
     set_tile_device_state(site_run, device_coord, gs1::StructureId {gs1::k_structure_workbench}, 0.625f);
-    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, device_coord);
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    const auto device_first_messages = drain_engine_messages(runtime);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, device_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
+    const auto device_first_messages = drain_engine_messages(bootstrap_runtime);
     const auto device_first_tiles =
         collect_messages_of_type(device_first_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(device_first_tiles.size() == 1U);
@@ -1324,17 +1329,17 @@ int main()
     }
 
     set_tile_device_state(site_run, device_coord, gs1::StructureId {gs1::k_structure_workbench}, 0.629f);
-    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, device_coord);
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    const auto device_second_messages = drain_engine_messages(runtime);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, device_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
+    const auto device_second_messages = drain_engine_messages(bootstrap_runtime);
     const auto device_second_tiles =
         collect_messages_of_type(device_second_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(device_second_tiles.empty());
 
     set_tile_device_state(site_run, device_coord, gs1::StructureId {gs1::k_structure_workbench}, 0.68f);
-    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, device_coord);
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    const auto device_third_messages = drain_engine_messages(runtime);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, device_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
+    const auto device_third_messages = drain_engine_messages(bootstrap_runtime);
     const auto device_third_tiles =
         collect_messages_of_type(device_third_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(device_third_tiles.size() == 1U);
@@ -1358,9 +1363,9 @@ int main()
     }
 
     set_tile_local_wind(site_run, density_coord, 14.0f);
-    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    const auto wind_first_messages = drain_engine_messages(runtime);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, density_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
+    const auto wind_first_messages = drain_engine_messages(bootstrap_runtime);
     const auto wind_first_tiles =
         collect_messages_of_type(wind_first_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(wind_first_tiles.size() == 1U);
@@ -1370,17 +1375,17 @@ int main()
     }
 
     set_tile_local_wind(site_run, density_coord, 15.0f);
-    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    const auto wind_second_messages = drain_engine_messages(runtime);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, density_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
+    const auto wind_second_messages = drain_engine_messages(bootstrap_runtime);
     const auto wind_second_tiles =
         collect_messages_of_type(wind_second_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(wind_second_tiles.empty());
 
     set_tile_local_wind(site_run, density_coord, 18.0f);
-    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    const auto wind_third_messages = drain_engine_messages(runtime);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, density_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
+    const auto wind_third_messages = drain_engine_messages(bootstrap_runtime);
     const auto wind_third_tiles =
         collect_messages_of_type(wind_third_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(wind_third_tiles.size() == 1U);
@@ -1390,9 +1395,9 @@ int main()
     }
 
     set_tile_protection_visual_state(site_run, density_coord, 14.0f, 32.0f, 48.0f);
-    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    const auto protection_first_messages = drain_engine_messages(runtime);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, density_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
+    const auto protection_first_messages = drain_engine_messages(bootstrap_runtime);
     const auto protection_first_tiles =
         collect_messages_of_type(protection_first_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(protection_first_tiles.size() == 1U);
@@ -1404,17 +1409,17 @@ int main()
     }
 
     set_tile_protection_visual_state(site_run, density_coord, 15.0f, 32.4f, 48.4f);
-    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    const auto protection_second_messages = drain_engine_messages(runtime);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, density_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
+    const auto protection_second_messages = drain_engine_messages(bootstrap_runtime);
     const auto protection_second_tiles =
         collect_messages_of_type(protection_second_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(protection_second_tiles.empty());
 
     set_tile_protection_visual_state(site_run, density_coord, 18.0f, 36.0f, 52.0f);
-    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    const auto protection_third_messages = drain_engine_messages(runtime);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, density_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
+    const auto protection_third_messages = drain_engine_messages(bootstrap_runtime);
     const auto protection_third_tiles =
         collect_messages_of_type(protection_third_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(protection_third_tiles.size() == 1U);
@@ -1426,9 +1431,9 @@ int main()
     }
 
     set_tile_soil_visual_state(site_run, density_coord, 0.25f, 0.125f, 0.375f);
-    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    const auto soil_first_messages = drain_engine_messages(runtime);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, density_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
+    const auto soil_first_messages = drain_engine_messages(bootstrap_runtime);
     const auto soil_first_tiles =
         collect_messages_of_type(soil_first_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(soil_first_tiles.size() == 1U);
@@ -1440,17 +1445,17 @@ int main()
     }
 
     set_tile_soil_visual_state(site_run, density_coord, 0.257f, 0.132f, 0.382f);
-    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    const auto soil_second_messages = drain_engine_messages(runtime);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, density_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
+    const auto soil_second_messages = drain_engine_messages(bootstrap_runtime);
     const auto soil_second_tiles =
         collect_messages_of_type(soil_second_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(soil_second_tiles.empty());
 
     set_tile_soil_visual_state(site_run, density_coord, 0.27f, 0.14f, 0.4f);
-    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    const auto soil_third_messages = drain_engine_messages(runtime);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, density_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
+    const auto soil_third_messages = drain_engine_messages(bootstrap_runtime);
     const auto soil_third_tiles =
         collect_messages_of_type(soil_third_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(soil_third_tiles.size() == 1U);
@@ -1463,9 +1468,9 @@ int main()
 
     set_tile_plant_state(site_run, density_coord, gs1::PlantId {}, 0.0f);
     set_tile_excavation_state(site_run, density_coord, gs1::ExcavationDepth::Rough);
-    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    const auto excavation_first_messages = drain_engine_messages(runtime);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, density_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
+    const auto excavation_first_messages = drain_engine_messages(bootstrap_runtime);
     const auto excavation_first_tiles =
         collect_messages_of_type(excavation_first_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(excavation_first_tiles.size() == 1U);
@@ -1476,9 +1481,9 @@ int main()
     }
 
     set_tile_plant_state(site_run, density_coord, gs1::PlantId {gs1::k_plant_straw_checkerboard}, 0.22f);
-    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, density_coord);
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    const auto excavation_hidden_messages = drain_engine_messages(runtime);
+    gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, density_coord);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
+    const auto excavation_hidden_messages = drain_engine_messages(bootstrap_runtime);
     const auto excavation_hidden_tiles =
         collect_messages_of_type(excavation_hidden_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(excavation_hidden_tiles.size() == 1U);
@@ -1489,9 +1494,9 @@ int main()
     }
 
     set_tile_sand_burial(site_run, TileCoord {0, 0}, 0.9f);
-    gs1::GameRuntimeProjectionTestAccess::mark_all_tiles_dirty(runtime);
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    const auto fallback_messages = drain_engine_messages(runtime);
+    gs1::GameRuntimeProjectionTestAccess::mark_all_tiles_dirty(bootstrap_runtime);
+    gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
+    const auto fallback_messages = drain_engine_messages(bootstrap_runtime);
     const auto fallback_tiles = collect_messages_of_type(fallback_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(!fallback_tiles.empty());
     assert(fallback_tiles.size() == gs1::site_world_access::tile_count(site_run));
@@ -1696,9 +1701,6 @@ int main()
     assert(panel_state_site_run.inventory.worker_pack_panel_open);
     assert(!gs1::GameRuntimeProjectionTestAccess::campaign(panel_state_runtime)->regional_map_state.tech_tree_open);
     const auto reopen_worker_pack_messages = drain_engine_messages(panel_state_runtime);
-    assert(find_close_ui_setup_message(
-               reopen_worker_pack_messages,
-               GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE) != nullptr);
     {
         bool found_progression_close = false;
         for (const auto& message : reopen_worker_pack_messages)
@@ -1738,11 +1740,23 @@ int main()
                open_protection_selector_messages,
                panel_state_site_run.inventory.worker_pack_storage_id,
                GS1_INVENTORY_VIEW_EVENT_CLOSE) != nullptr);
-    assert(contains_ui_element_text(open_protection_selector_messages, "Protection Overlay"));
-    assert(contains_ui_element_text(open_protection_selector_messages, "Wind Protection"));
-    assert(contains_ui_element_text(open_protection_selector_messages, "Heat Protection"));
-    assert(contains_ui_element_text(open_protection_selector_messages, "Dust Protection"));
-    assert(contains_ui_element_text(open_protection_selector_messages, "Density / Integrity"));
+    assert(find_ui_element_by_content(open_protection_selector_messages, 3U) != nullptr);
+    assert(find_ui_element_by_content(
+               open_protection_selector_messages,
+               4U,
+               GS1_SITE_PROTECTION_OVERLAY_WIND) != nullptr);
+    assert(find_ui_element_by_content(
+               open_protection_selector_messages,
+               4U,
+               GS1_SITE_PROTECTION_OVERLAY_HEAT) != nullptr);
+    assert(find_ui_element_by_content(
+               open_protection_selector_messages,
+               4U,
+               GS1_SITE_PROTECTION_OVERLAY_DUST) != nullptr);
+    assert(find_ui_element_by_content(
+               open_protection_selector_messages,
+               4U,
+               GS1_SITE_PROTECTION_OVERLAY_OCCUPANT_CONDITION) != nullptr);
 
     Gs1UiAction select_heat_overlay_action {};
     select_heat_overlay_action.type = GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE;

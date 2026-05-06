@@ -534,10 +534,69 @@ void append_ui_setups_json(std::string& json, const std::vector<SmokeEngineHost:
             append_json_string(json, ui_element_type_name(element.element_type));
             json += ",\"flags\":";
             json += std::to_string(element.flags);
-            json += ",\"text\":";
-            append_json_string(json, element.text);
+            json += ",\"contentKind\":";
+            json += std::to_string(element.content_kind);
+            json += ",\"primaryId\":";
+            json += std::to_string(element.primary_id);
+            json += ",\"secondaryId\":";
+            json += std::to_string(element.secondary_id);
+            json += ",\"quantity\":";
+            json += std::to_string(element.quantity);
             json += ",\"action\":";
             append_ui_action_json(json, element.action);
+            json += '}';
+        }
+
+        json += "]}";
+    }
+    json += ']';
+}
+
+void append_progression_views_json(std::string& json, const std::vector<SmokeEngineHost::ActiveProgressionView>& views)
+{
+    json += '[';
+    for (std::size_t view_index = 0; view_index < views.size(); ++view_index)
+    {
+        const auto& view = views[view_index];
+        if (view_index > 0U)
+        {
+            json.push_back(',');
+        }
+
+        json += "{\"viewId\":";
+        json += std::to_string(static_cast<unsigned>(view.view_id));
+        json += ",\"contextId\":";
+        json += std::to_string(view.context_id);
+        json += ",\"entries\":[";
+
+        for (std::size_t entry_index = 0; entry_index < view.entries.size(); ++entry_index)
+        {
+            const auto& entry = view.entries[entry_index];
+            if (entry_index > 0U)
+            {
+                json.push_back(',');
+            }
+
+            json += "{\"entryId\":";
+            json += std::to_string(entry.entry_id);
+            json += ",\"reputationRequirement\":";
+            json += std::to_string(entry.reputation_requirement);
+            json += ",\"contentId\":";
+            json += std::to_string(entry.content_id);
+            json += ",\"techNodeId\":";
+            json += std::to_string(entry.tech_node_id);
+            json += ",\"factionId\":";
+            json += std::to_string(entry.faction_id);
+            json += ",\"entryKind\":";
+            json += std::to_string(static_cast<unsigned>(entry.entry_kind));
+            json += ",\"flags\":";
+            json += std::to_string(entry.flags);
+            json += ",\"contentKind\":";
+            json += std::to_string(entry.content_kind);
+            json += ",\"tierIndex\":";
+            json += std::to_string(entry.tier_index);
+            json += ",\"action\":";
+            append_ui_action_json(json, entry.action);
             json += '}';
         }
 
@@ -1436,6 +1495,8 @@ std::string SmokeEngineHost::build_live_state_json(const LiveStateSnapshot& live
     append_message_entries_json(json, live_state.message_log_tail);
     json += ",\"uiSetups\":";
     append_ui_setups_json(json, live_state.active_ui_setups);
+    json += ",\"progressionViews\":";
+    append_progression_views_json(json, live_state.active_progression_views);
     json += ",\"regionalMap\":";
     append_regional_map_json(json, live_state.regional_map_sites, live_state.regional_map_links);
     json += ",\"siteBootstrap\":";
@@ -1518,6 +1579,12 @@ std::string SmokeEngineHost::build_live_state_patch_json(
     {
         append_field("uiSetups", [&](std::string& destination) {
             append_ui_setups_json(destination, snapshot.active_ui_setups);
+        });
+    }
+    if ((field_mask & LiveStatePatchField_ProgressionViews) != 0U)
+    {
+        append_field("progressionViews", [&](std::string& destination) {
+            append_progression_views_json(destination, snapshot.active_progression_views);
         });
     }
     if ((field_mask & LiveStatePatchField_RegionalMap) != 0U)

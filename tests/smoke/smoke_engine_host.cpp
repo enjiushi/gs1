@@ -618,6 +618,7 @@ SmokeEngineHost::LiveStateSnapshot SmokeEngineHost::capture_frame_live_state_sna
     }
 
     snapshot.active_ui_setups = snapshot_active_ui_setups();
+    snapshot.active_progression_views = snapshot_active_progression_views();
     snapshot.regional_map_sites = snapshot_regional_map_sites();
     snapshot.regional_map_links = snapshot_regional_map_links();
     snapshot.active_site_snapshot = active_site_snapshot_;
@@ -963,6 +964,20 @@ void SmokeEngineHost::flush_engine_messages(const char* stage_label)
             apply_ui_setup_end();
             live_state_patch_mask = LiveStatePatchField_UiSetups;
             break;
+        case GS1_ENGINE_MESSAGE_BEGIN_PROGRESSION_VIEW:
+            apply_progression_view_begin(message);
+            break;
+        case GS1_ENGINE_MESSAGE_PROGRESSION_ENTRY_UPSERT:
+            apply_progression_entry_upsert(message);
+            break;
+        case GS1_ENGINE_MESSAGE_END_PROGRESSION_VIEW:
+            apply_progression_view_end();
+            live_state_patch_mask = LiveStatePatchField_ProgressionViews;
+            break;
+        case GS1_ENGINE_MESSAGE_CLOSE_PROGRESSION_VIEW:
+            apply_progression_view_close(message);
+            live_state_patch_mask = LiveStatePatchField_ProgressionViews;
+            break;
 
         case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
             apply_site_snapshot_begin(message);
@@ -1165,6 +1180,25 @@ bool SmokeEngineHost::resolve_available_ui_action(
         }
     }
 
+    for (const auto& [view_id, view] : active_progression_views_)
+    {
+        (void)view_id;
+        for (const auto& entry : view.entries)
+        {
+            if ((entry.flags & GS1_PROGRESSION_ENTRY_FLAG_LOCKED) != 0U ||
+                entry.action.type == GS1_UI_ACTION_NONE)
+            {
+                continue;
+            }
+
+            if (ui_action_matches(requested_action, entry.action))
+            {
+                out_action = entry.action;
+                return true;
+            }
+        }
+    }
+
     return false;
 }
 
@@ -1202,7 +1236,10 @@ void SmokeEngineHost::apply_ui_element_upsert(const Gs1EngineMessage& message)
     element.element_type = payload.element_type;
     element.flags = payload.flags;
     element.action = payload.action;
-    element.text = payload.text;
+    element.content_kind = payload.content_kind;
+    element.primary_id = payload.primary_id;
+    element.secondary_id = payload.secondary_id;
+    element.quantity = payload.quantity;
     pending_ui_setup_->elements.push_back(std::move(element));
 }
 
@@ -1243,6 +1280,64 @@ void SmokeEngineHost::apply_ui_setup_end()
 
     active_ui_setups_[setup.setup_id] = std::move(setup);
     pending_ui_setup_.reset();
+}
+
+void SmokeEngineHost::apply_progression_view_begin(const Gs1EngineMessage& message)
+{
+    const auto& payload = message.payload_as<Gs1EngineMessageProgressionViewData>();
+    pending_progression_view_ = PendingProgressionView {};
+    pending_progression_view_->view_id = payload.view_id;
+    pending_progression_view_->context_id = payload.context_id;
+    pending_progression_view_->entries.clear();
+    pending_progression_view_->entries.reserve(payload.entry_count);
+}
+
+void SmokeEngineHost::apply_progression_view_close(const Gs1EngineMessage& message)
+{
+    const auto& payload = message.payload_as<Gs1EngineMessageCloseProgressionViewData>();
+    active_progression_views_.erase(payload.view_id);
+
+    if (pending_progression_view_.has_value() && pending_progression_view_->view_id == payload.view_id)
+    {
+        pending_progression_view_.reset();
+    }
+}
+
+void SmokeEngineHost::apply_progression_entry_upsert(const Gs1EngineMessage& message)
+{
+    if (!pending_progression_view_.has_value())
+    {
+        return;
+    }
+
+    const auto& payload = message.payload_as<Gs1EngineMessageProgressionEntryData>();
+    ProgressionEntryProjection projection {};
+    projection.entry_id = payload.entry_id;
+    projection.reputation_requirement = payload.reputation_requirement;
+    projection.content_id = payload.content_id;
+    projection.tech_node_id = payload.tech_node_id;
+    projection.faction_id = payload.faction_id;
+    projection.entry_kind = payload.entry_kind;
+    projection.flags = payload.flags;
+    projection.content_kind = payload.content_kind;
+    projection.tier_index = payload.tier_index;
+    projection.action = payload.action;
+    pending_progression_view_->entries.push_back(projection);
+}
+
+void SmokeEngineHost::apply_progression_view_end()
+{
+    if (!pending_progression_view_.has_value())
+    {
+        return;
+    }
+
+    ActiveProgressionView view {};
+    view.view_id = pending_progression_view_->view_id;
+    view.context_id = pending_progression_view_->context_id;
+    view.entries = std::move(pending_progression_view_->entries);
+    active_progression_views_[view.view_id] = std::move(view);
+    pending_progression_view_.reset();
 }
 
 void SmokeEngineHost::apply_regional_map_snapshot_begin(const Gs1EngineMessage& message)
@@ -2074,6 +2169,20 @@ std::vector<SmokeEngineHost::ActiveUiSetup> SmokeEngineHost::snapshot_active_ui_
     return setups;
 }
 
+std::vector<SmokeEngineHost::ActiveProgressionView> SmokeEngineHost::snapshot_active_progression_views() const
+{
+    std::vector<ActiveProgressionView> views {};
+    views.reserve(active_progression_views_.size());
+
+    for (const auto& [view_id, view] : active_progression_views_)
+    {
+        (void)view_id;
+        views.push_back(view);
+    }
+
+    return views;
+}
+
 std::vector<SmokeEngineHost::RegionalMapSiteProjection> SmokeEngineHost::snapshot_regional_map_sites() const
 {
     std::vector<RegionalMapSiteProjection> sites {};
@@ -2211,8 +2320,10 @@ std::string SmokeEngineHost::describe_message(const Gs1EngineMessage& message)
     case GS1_ENGINE_MESSAGE_UI_ELEMENT_UPSERT:
     {
         const auto& payload = message.payload_as<Gs1EngineMessageUiElementData>();
-        description += " text=";
-        description += payload.text;
+        description += " contentKind=" + std::to_string(payload.content_kind);
+        description += " primary=" + std::to_string(payload.primary_id);
+        description += " secondary=" + std::to_string(payload.secondary_id);
+        description += " quantity=" + std::to_string(payload.quantity);
         description += " action=";
         description += ui_action_name(payload.action.type);
         description += " target=" + std::to_string(payload.action.target_id);

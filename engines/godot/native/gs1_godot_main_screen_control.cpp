@@ -1295,37 +1295,39 @@ void Gs1GodotMainScreenControl::render_regional_selection(const Gs1RuntimeRegion
 
     PackedStringArray label_lines;
     Array button_specs;
-    const Array elements = selection_setup.get("elements", Array());
-    for (int64_t index = 0; index < elements.size(); ++index)
+    const Array text_lines = selection_setup.get("text_lines", Array());
+    for (int64_t index = 0; index < text_lines.size(); ++index)
     {
-        const Dictionary element = elements[index];
-        const int element_type = as_int(element.get("element_type", 0), 0);
-        const String text = String(element.get("text", "")).strip_edges();
-        if (element_type == 2)
+        const Dictionary line = text_lines[index];
+        const String text = regional_panel_text_line(line).strip_edges();
+        if (!text.is_empty())
         {
-            if (!text.is_empty())
-            {
-                label_lines.push_back(text);
-            }
-            continue;
+            label_lines.push_back(text);
         }
-        if (element_type != 1 || regional_selection_actions_ == nullptr)
+    }
+
+    const Array slot_actions = selection_setup.get("slot_actions", Array());
+    for (int64_t index = 0; index < slot_actions.size(); ++index)
+    {
+        const Dictionary slot_action = slot_actions[index];
+        if (regional_selection_actions_ == nullptr)
         {
             continue;
         }
 
-        const Dictionary action = element.get("action", Dictionary());
+        const Dictionary action = slot_action.get("action", Dictionary());
         const int action_type = as_int(action.get("type", 0), 0);
+        const String text = regional_panel_slot_label(slot_action);
         if (action_type == UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION && text.is_empty())
         {
             continue;
         }
 
         Dictionary spec;
-        spec["setup_id"] = as_int(selection_setup.get("setup_id", 0), 0);
-        spec["element_id"] = as_int(element.get("element_id", 0), 0);
+        spec["setup_id"] = as_int(selection_setup.get("panel_id", 0), 0);
+        spec["element_id"] = as_int(slot_action.get("slot_id", 0), 0);
         spec["text"] = regional_selection_action_label(text, action);
-        spec["flags"] = as_int(element.get("flags", 0), 0);
+        spec["flags"] = as_int(slot_action.get("flags", 0), 0);
         spec["action"] = action;
         button_specs.push_back(spec);
     }
@@ -2130,6 +2132,82 @@ Dictionary Gs1GodotMainScreenControl::find_panel_list_action(const Dictionary& p
     return Dictionary();
 }
 
+String Gs1GodotMainScreenControl::regional_panel_text_line(const Dictionary& line) const
+{
+    const int kind = as_int(line.get("text_kind", 0), 0);
+    const int primary_id = as_int(line.get("primary_id", 0), 0);
+    const int quantity = as_int(line.get("quantity", 0), 0);
+
+    switch (kind)
+    {
+    case 1:
+    {
+        const auto* faction_def = gs1::find_faction_def(gs1::FactionId {static_cast<std::uint32_t>(primary_id)});
+        const String faction_name = faction_def == nullptr ? String("Faction") : string_from_view(faction_def->display_name);
+        return vformat("%s Rep %d", faction_name, quantity);
+    }
+    case 3:
+        return vformat("Selected Site %d", primary_id);
+    case 4:
+        return vformat("Adj Support x%d", quantity);
+    case 5:
+        return vformat("Aura Ready x%d", quantity);
+    case 6:
+    {
+        if (const auto* item_def = gs1::find_item_def(gs1::ItemId {static_cast<std::uint32_t>(primary_id)}))
+        {
+            return vformat("%s x%d", string_from_view(item_def->display_name), quantity);
+        }
+        return vformat("Item %d x%d", primary_id, quantity);
+    }
+    default:
+        return String();
+    }
+}
+
+String Gs1GodotMainScreenControl::regional_panel_slot_label(const Dictionary& slot_action) const
+{
+    const int kind = as_int(slot_action.get("label_kind", 0), 0);
+    const int primary_id = as_int(slot_action.get("primary_id", 0), 0);
+    switch (kind)
+    {
+    case 1:
+        return "Research & Unlocks";
+    case 2:
+        return "Close Research";
+    case 3:
+        return vformat("Deploy To Site %d", primary_id);
+    case 4:
+        return "Clear Selection";
+    default:
+        return String();
+    }
+}
+
+String Gs1GodotMainScreenControl::regional_panel_list_primary_text(const Dictionary& item) const
+{
+    const int kind = as_int(item.get("primary_kind", 0), 0);
+    const int primary_id = as_int(item.get("primary_id", 0), 0);
+    if (kind == 1)
+    {
+        return vformat("Site %d", primary_id);
+    }
+    return String();
+}
+
+String Gs1GodotMainScreenControl::regional_panel_list_secondary_text(const Dictionary& item) const
+{
+    const int kind = as_int(item.get("secondary_kind", 0), 0);
+    const int secondary_id = as_int(item.get("secondary_id", 0), 0);
+    const int map_x = as_int(item.get("map_x", 0), 0);
+    const int map_y = as_int(item.get("map_y", 0), 0);
+    if (kind == 2)
+    {
+        return vformat("%s  (%d, %d)", regional_site_state_name(secondary_id), map_x, map_y);
+    }
+    return String();
+}
+
 void Gs1GodotMainScreenControl::cache_fixed_slot_bindings()
 {
     if (fixed_slot_bindings_cached_)
@@ -2206,7 +2284,8 @@ void Gs1GodotMainScreenControl::bind_fixed_slot_actions(const Dictionary& panel,
         const String fallback_label = Object::cast_to<Button>(button) != nullptr
             ? Object::cast_to<Button>(button)->get_text()
             : String();
-        apply_action_to_button(button, slot_action, String(slot_action.get("label", fallback_label)));
+        const String resolved_label = regional_panel_slot_label(slot_action);
+        apply_action_to_button(button, slot_action, resolved_label.is_empty() ? fallback_label : resolved_label);
     }
 }
 
@@ -3557,19 +3636,6 @@ int Gs1GodotMainScreenControl::as_int(const Variant& value, int fallback) const
         return static_cast<int>(Math::round(double(value)));
     case Variant::BOOL:
         return bool(value) ? 1 : 0;
-    case Variant::STRING:
-    {
-        const String text = value;
-        if (text.is_valid_int())
-        {
-            return static_cast<int>(text.to_int());
-        }
-        if (text.is_valid_float())
-        {
-            return static_cast<int>(Math::round(text.to_float()));
-        }
-        return fallback;
-    }
     default:
         return fallback;
     }
@@ -3589,11 +3655,6 @@ double Gs1GodotMainScreenControl::as_float(const Variant& value, double fallback
         return static_cast<double>(int64_t(value));
     case Variant::BOOL:
         return bool(value) ? 1.0 : 0.0;
-    case Variant::STRING:
-    {
-        const String text = value;
-        return text.is_valid_float() ? text.to_float() : fallback;
-    }
     default:
         return fallback;
     }
@@ -3613,19 +3674,6 @@ bool Gs1GodotMainScreenControl::as_bool(const Variant& value, bool fallback) con
         return int64_t(value) != 0;
     case Variant::FLOAT:
         return Math::abs(double(value)) > 0.0001;
-    case Variant::STRING:
-    {
-        const String text = String(value).to_lower();
-        if (text == "true" || text == "1")
-        {
-            return true;
-        }
-        if (text == "false" || text == "0")
-        {
-            return false;
-        }
-        return fallback;
-    }
     default:
         return fallback;
     }

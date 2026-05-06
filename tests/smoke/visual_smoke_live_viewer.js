@@ -1277,6 +1277,68 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return setup.elements.filter((element) => !element.action || element.action.type === "NONE");
     }
 
+    function siteResultElementText(element) {
+        if (!element) {
+            return "";
+        }
+        const contentKind = Number(element.contentKind || 0);
+        if (contentKind === 1) {
+            const siteId = Number(element.primaryId || 0);
+            const result = Number(element.secondaryId || 0);
+            return "Site " + siteId + " " + (result === 1 ? "completed" : "failed");
+        }
+        if (contentKind === 2) {
+            return "OK";
+        }
+        return "";
+    }
+
+    function protectionSelectorElementText(element) {
+        if (!element) {
+            return "";
+        }
+        const contentKind = Number(element.contentKind || 0);
+        if (contentKind === 3) {
+            return "Protection Overlay";
+        }
+        if (contentKind === 4) {
+            const mode = Number(element.primaryId || 0);
+            switch (mode) {
+            case 1:
+                return "Wind Protection";
+            case 2:
+                return "Heat Protection";
+            case 3:
+                return "Dust Protection";
+            case 4:
+                return "Density / Integrity";
+            default:
+                return "Protection";
+            }
+        }
+        return "";
+    }
+
+    function getPanel(state, panelId) {
+        return (state.uiPanels || []).find((panel) => Number(panel.panelId) === panelId) || null;
+    }
+
+    function getPanelSlotActions(panel) {
+        return panel && Array.isArray(panel.slotActions) ? panel.slotActions : [];
+    }
+
+    function getPanelTextLines(panel) {
+        return panel && Array.isArray(panel.textLines) ? panel.textLines : [];
+    }
+
+    function getPanelListItems(panel) {
+        return panel && Array.isArray(panel.listItems) ? panel.listItems : [];
+    }
+
+    function getPanelListActions(panel) {
+        return panel && Array.isArray(panel.listActions) ? panel.listActions : [];
+    }
+
     function setTechTreeOverlayActive(active) {
         stageFrame.classList.toggle("tech-tree-overlay-active", !!active);
         selectionChip.classList.toggle("tech-tree-overlay", !!active);
@@ -1322,15 +1384,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function getTechTreeCloseAction(techTreeSetup) {
-        const backgroundElement = getBackgroundClickElement(techTreeSetup);
-        if (backgroundElement && backgroundElement.action) {
-            return backgroundElement.action;
-        }
         return makeUiAction("CLOSE_REGIONAL_MAP_TECH_TREE", 0, 0, 0);
     }
 
-    function getTechTreeSetup(state) {
-        return getSetup(state, "REGIONAL_MAP_TECH_TREE");
+    function getTechTreeView(state) {
+        const views = state && Array.isArray(state.progressionViews) ? state.progressionViews : [];
+        return views.find((view) => Number(view.viewId) === 1) || null;
     }
 
     function getSiteProtectionSelectorSetup(state) {
@@ -4669,45 +4728,35 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         container.appendChild(sectionParts.section);
     }
 
-    function parseRegionalLoadoutSlots(labels) {
-        return labels
-            .map((entry) => {
-                if (!entry || typeof entry.text !== "string") {
+    function parseRegionalLoadoutSlots(textLines) {
+        return (textLines || [])
+            .map((entry, index) => {
+                if (!entry || Number(entry.textKind || 0) !== 6) {
                     return null;
                 }
 
-                const match = /^(.*)\sx(\d+)$/.exec(entry.text.trim());
-                if (!match) {
-                    return null;
-                }
-
-                const itemName = match[1].trim();
-                const quantity = Number(match[2]) || 0;
-                const itemId = findItemIdByLabel(itemName);
+                const itemId = Number(entry.primaryId || 0);
+                const quantity = Number(entry.quantity || 0);
                 return {
                     containerKind: "LOADOUT",
                     containerOwnerId: 0,
                     containerTileX: 0,
                     containerTileY: 0,
-                    slotIndex: 0,
+                    slotIndex: index,
                     itemId: itemId,
-                    itemName: itemName,
+                    itemName: getItemLabel(itemId),
                     quantity: quantity,
                     flags: quantity > 0 ? 1 : 0,
                     condition: 1,
                     freshness: 1
                 };
             })
-            .filter((slot) => !!slot)
-            .map((slot, index) => ({
-                ...slot,
-                slotIndex: index
-            }));
+            .filter((slot) => !!slot && slot.itemId > 0 && slot.quantity > 0);
     }
 
-    function renderRegionalMapLoadoutPanel(state, selectionSetup, primaryLabelText) {
-        const labels = getLabelElements(selectionSetup);
-        const loadoutSlots = parseRegionalLoadoutSlots(labels);
+    function renderRegionalMapLoadoutPanel(state, selectionPanel, primaryLabelText) {
+        const textLines = getPanelTextLines(selectionPanel);
+        const loadoutSlots = parseRegionalLoadoutSlots(textLines);
 
         setTechTreeOverlayActive(false);
         selectionInventory.innerHTML = "";
@@ -5221,152 +5270,100 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return technologyCatalogPromise;
     }
 
-    function isPotentialTechnologyNodeElement(element) {
-        if (!element || element.elementType !== "BUTTON" || (element.flags & 4) !== 0) {
-            return false;
-        }
-
-        const text = String(element.text || "").trim();
-        if (!text) {
-            return false;
-        }
-
-        if (/^Tab:\s+/i.test(text)) {
-            return false;
-        }
-
-        return /^TECHNODE\|/i.test(text) || /\bT\d+\b/i.test(text) || /\bRefund\b/i.test(text);
-    }
-
-    function parseTechTreeActionElement(element) {
-        if (!element) {
+    function parseTechTreeEntry(entry) {
+        if (!entry) {
             return null;
         }
 
-        const text = String(element.text || "").trim();
-        if (/^TECHNODE\|/i.test(text)) {
-            const fields = {};
-            text.split("|").slice(1).forEach((part) => {
-                const separatorIndex = part.indexOf("=");
-                if (separatorIndex <= 0) {
-                    return;
-                }
-                const key = part.slice(0, separatorIndex).trim().toLowerCase();
-                const value = part.slice(separatorIndex + 1).trim();
-                fields[key] = value;
-            });
-            const parsedTierNumber = Number(fields.tier || 0);
-            const targetId = element.action && typeof element.action.targetId === "number" ? element.action.targetId : 0;
-            const catalogNode =
-                technologyCatalog && targetId ? technologyCatalog.nodesById.get(targetId) : null;
-            const compactStatusText = fields.status || fields.s || "";
-            const statusTextFromAction = (() => {
-                if (element.action && element.action.type === "REFUND_TECHNOLOGY_NODE") {
-                    return "Refund";
-                }
-                if (element.action && element.action.type === "CLAIM_TECHNOLOGY_NODE") {
-                    const repRequirement = catalogNode ? catalogNode.reputationRequirement : 0;
-                    return "Need " + repRequirement + " rep";
-                }
-                return (element.flags & 2) !== 0 ? "Locked" : "Unavailable";
-            })();
-            const resolvedStatusText = expandCompactTechStatus(compactStatusText) || statusTextFromAction;
+        const entryKind = Number(entry.entryKind || 0);
+        const reputationRequirement = Number(entry.reputationRequirement || 0);
+        const flags = Number(entry.flags || 0);
+        const action = entry.action || makeUiAction("NONE", 0, 0, 0);
+        const techNodeId = Number(entry.techNodeId || 0);
+        const contentId = Number(entry.contentId || 0);
+        const factionId = Number(entry.factionId || 0);
+        const tierIndex = Number(entry.tierIndex || 0);
+        const contentKind = Number(entry.contentKind || 0);
+        const catalogNode =
+            technologyCatalog && techNodeId ? technologyCatalog.nodesById.get(techNodeId) : null;
+        const catalogUnlock =
+            technologyCatalog && contentId
+                ? technologyCatalog.unlocksById.get(contentId) || technologyCatalog.unlocksById.get(Number(entry.entryId || 0))
+                : null;
+        const isUnlocked = (flags & 1) !== 0;
+        const isLockedFlag = (flags & 2) !== 0;
+        const isActionable = (flags & 4) !== 0;
+        const isClaimable = action && action.type === "CLAIM_TECHNOLOGY_NODE" && isActionable && !isLockedFlag;
+        const isRefundable = action && action.type === "REFUND_TECHNOLOGY_NODE" && !isLockedFlag;
+        const statusText = isRefundable
+            ? "Refund"
+            : (isUnlocked
+                ? "Claimed"
+                : (isLockedFlag ? ("Need " + reputationRequirement + " rep") : "Available"));
+
+        if (entryKind === 2) {
+            const displayName =
+                (catalogNode && catalogNode.displayName) ||
+                ("Technology " + (techNodeId || Number(entry.entryId || 0)));
+            const factionText =
+                ({
+                    1: "Village Committee",
+                    2: "Forestry Bureau",
+                    3: "Agricultural University"
+                }[catalogNode ? Number(catalogNode.factionId || factionId) : factionId]) || "";
+            const effectiveTier =
+                Number(catalogNode && catalogNode.tierIndex ? catalogNode.tierIndex : tierIndex || 0);
             return {
-                element: element,
-                titleText: (catalogNode && catalogNode.displayName) || fields.title || text,
-                kindText: fields.kind || "Tech",
-                factionText:
-                    (catalogNode
-                        ? ({
-                            1: "Village Committee",
-                            2: "Forestry Bureau",
-                            3: "Agricultural University"
-                        }[catalogNode.factionId] || "")
-                        : (fields.faction || "")),
-                tierNumber:
-                    (catalogNode && catalogNode.tierIndex) ||
-                    (Number.isFinite(parsedTierNumber) ? parsedTierNumber : 0),
-                descriptionText: (catalogNode && catalogNode.description) || fields.desc || "",
-                statusText: resolvedStatusText,
-                reputationRequirement: catalogNode ? Number(catalogNode.reputationRequirement || 0) : 0,
+                entry: entry,
+                action: action,
+                titleText: displayName,
+                kindText: "Tech",
+                factionText: factionText,
+                tierNumber: effectiveTier,
+                descriptionText: (catalogNode && catalogNode.description) || "",
+                statusText: statusText,
+                reputationRequirement: reputationRequirement,
                 cashCostText:
                     catalogNode && Number(catalogNode.internalCostCashPoints || 0) > 0
                         ? ("$" + formatMoney((catalogNode.internalCostCashPoints || 0) / 100))
                         : "",
                 enhancementChoiceIndex: 0,
                 isEnhancement: false,
-                costText: (() => {
-                    const effectiveStatus = resolvedStatusText;
-                    const matchedCash = effectiveStatus.match(/\$\d+(?:\.\d{2})?/);
-                    const matchedRep = effectiveStatus.match(/Need\s+(\d+)\s+rep/i);
-                    if (matchedCash) {
-                        return matchedCash[0];
-                    }
-                    if (matchedRep && matchedRep[1]) {
-                        return "Rep " + matchedRep[1];
-                    }
-                    return catalogNode ? ("T" + String(catalogNode.tierIndex || "")) : ("T" + String(fields.tier || ""));
-                })(),
-                isClaimable: (element.flags & 1) !== 0,
-                isDisabled: (element.flags & 2) !== 0,
-                isClaimed: /Claimed/i.test(resolvedStatusText),
-                isLocked: /Locked|Unavailable|Need/i.test(resolvedStatusText)
+                costText: reputationRequirement > 0 ? ("Rep " + reputationRequirement) : ("T" + String(effectiveTier || "")),
+                isClaimable: isClaimable,
+                isDisabled: isLockedFlag,
+                isClaimed: isUnlocked,
+                isLocked: !isUnlocked && (isLockedFlag || !isActionable)
             };
         }
 
-        const parts = text
-            .split("|")
-            .map((part) => part.trim())
-            .filter(Boolean);
-        const leftText = parts[0] || "";
-        const detailParts = parts.length > 1 ? parts.slice(1) : [];
-        const leftMatch = leftText.match(/^(.*?)\s+T(\d+)(?:\s+(.*))?$/i);
-        const factionText = leftMatch ? leftMatch[1].trim() : "";
-        const kindText = "Tech";
-        const tierNumber = leftMatch ? Number(leftMatch[2]) : 0;
-        const primaryStatusText = leftMatch && leftMatch[3] ? leftMatch[3].trim() : leftText;
-        let titleText = "";
-        let descriptionText = "";
-        const filteredDetailParts = [];
-        detailParts.forEach((part) => {
-            if (/^About\s+/i.test(part)) {
-                descriptionText = part.replace(/^About\s+/i, "").trim();
-            } else if (!titleText &&
-                !/^(Param|Unlock|Need|Claimed|Refund|\+\$|Unavailable|Other enhancement|Need paired)/i.test(part))
-            {
-                titleText = part.trim();
-            } else {
-                filteredDetailParts.push(part);
-            }
-        });
-        if (!titleText) {
-            titleText = leftText;
+        if (entryKind === 1 && reputationRequirement > 0) {
+            const displayName =
+                (catalogUnlock && catalogUnlock.displayName) ||
+                ("Unlock " + (contentId || Number(entry.entryId || 0)));
+            return {
+                entry: entry,
+                action: action,
+                titleText: displayName,
+                kindText: "Unlock",
+                factionText: "",
+                tierNumber: 0,
+                descriptionText: (catalogUnlock && catalogUnlock.description) || "",
+                statusText: isUnlocked ? "Claimed" : (isLockedFlag ? ("Need " + reputationRequirement + " rep") : "Available"),
+                reputationRequirement: reputationRequirement,
+                cashCostText: "",
+                enhancementChoiceIndex: 0,
+                isEnhancement: false,
+                costText: "Rep " + reputationRequirement,
+                isClaimable: false,
+                isDisabled: true,
+                isClaimed: isUnlocked,
+                isLocked: !isUnlocked,
+                contentKind: contentKind
+            };
         }
-        const statusText = [primaryStatusText].concat(filteredDetailParts).filter(Boolean).join(" | ");
-        const costCashMatch = statusText.match(/\$\d+(?:\.\d{2})?/);
-        const costRepMatch = statusText.match(/Need\s+(\d+)\s+rep/i);
-        const costText = costCashMatch
-            ? costCashMatch[0]
-            : (costRepMatch ? ("Rep " + costRepMatch[1]) : ("T" + String(tierNumber || "")));
 
-        return {
-            element: element,
-            titleText: titleText,
-            kindText: kindText,
-            factionText: factionText,
-            tierNumber: tierNumber,
-            descriptionText: descriptionText,
-            statusText: statusText,
-            reputationRequirement: 0,
-            cashCostText: "",
-            enhancementChoiceIndex: 0,
-            isEnhancement: false,
-            costText: costText,
-            isClaimable: (element.flags & 1) !== 0,
-            isDisabled: (element.flags & 2) !== 0,
-            isClaimed: /Claimed/i.test(statusText),
-            isLocked: /Locked/i.test(statusText)
-        };
+        return null;
     }
 
     function buildTechTreeNodeButton(nodeModel, extraClassName) {
@@ -5460,69 +5457,45 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return requirementCell;
     }
 
-    function parseTechTreeStructure(techTreeSetup) {
+    function parseTechTreeStructure(techTreeView) {
         const parsed = {
-            factionTabs: [],
             tiers: [],
             selectedFactionName: ""
         };
-        if (!techTreeSetup || !Array.isArray(techTreeSetup.elements)) {
+        if (!techTreeView || !Array.isArray(techTreeView.entries)) {
             return parsed;
         }
 
-        let activeTier = null;
-        techTreeSetup.elements.forEach((element) => {
-            if (!element) {
+        const unlockablesByRep = new Map();
+        const nodesByRep = new Map();
+        techTreeView.entries.forEach((entry) => {
+            const model = parseTechTreeEntry(entry);
+            if (!model) {
                 return;
             }
-
-            const text = String(element.text || "").trim();
-            const actionType = element.action ? element.action.type : "NONE";
-            if (!text || (element.flags & 4) !== 0) {
+            if (model.kindText === "Unlock") {
+                unlockablesByRep.set(Number(model.reputationRequirement || 0), model);
                 return;
             }
-
-            if (actionType === "SELECT_TECH_TREE_FACTION_TAB") {
-                const label = text.replace(/^Tab:\s*/i, "").trim();
-                const tabModel = {
-                    element: element,
-                    label: label,
-                    isActive: (element.flags & 1) !== 0
-                };
-                parsed.factionTabs.push(tabModel);
-                if (tabModel.isActive && label) {
-                    parsed.selectedFactionName = label;
-                }
-                activeTier = null;
-                return;
+            const rep = Number(model.reputationRequirement || 0);
+            if (!nodesByRep.has(rep)) {
+                nodesByRep.set(rep, []);
             }
-
-            const tierMatch = text.match(/^Tier\s+(\d+)\s+\|\s+(.*)$/i);
-            if (element.elementType === "LABEL" || !element.action) {
-                if (tierMatch) {
-                    activeTier = {
-                        tierNumber: Number(tierMatch[1]),
-                        titleText: tierMatch[2].trim(),
-                        nodes: []
-                    };
-                    parsed.tiers.push(activeTier);
-                }
-                return;
-            }
-
-            if (!activeTier || !isPotentialTechnologyNodeElement(element)) {
-                return;
-            }
-
-            const nodeModel = parseTechTreeActionElement(element);
-            if (nodeModel) {
-                activeTier.nodes.push(nodeModel);
-            }
+            nodesByRep.get(rep).push(model);
         });
 
-        if (!parsed.selectedFactionName && parsed.factionTabs.length > 0) {
-            parsed.selectedFactionName = parsed.factionTabs[0].label;
-        }
+        const requirements = Array.from(new Set(
+            Array.from(unlockablesByRep.keys()).concat(Array.from(nodesByRep.keys()))
+        )).filter((value) => value > 0).sort((left, right) => left - right);
+
+        parsed.tiers = requirements.map((requirement) => {
+            return {
+                tierNumber: requirement,
+                titleText: "Tier " + requirement,
+                unlockable: unlockablesByRep.get(requirement) || null,
+                nodes: nodesByRep.get(requirement) || []
+            };
+        });
         return parsed;
     }
 
@@ -5628,25 +5601,17 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         }
     }
 
-    function renderTechTreePanel(techTreeSetup, options) {
-        if (!techTreeSetup) {
+    function renderTechTreePanel(techTreeView, options) {
+        if (!techTreeView) {
             return false;
         }
 
         const panelOptions = options || {};
-        const closeAction = getTechTreeCloseAction(techTreeSetup);
-        const labelElements = getLabelElements(techTreeSetup);
-        const title = labelElements[0];
-        const subtitle = labelElements[1];
-        const factionSummary = labelElements[2];
-        const titleText = title ? title.text : "Prototype Tech Tree";
-        const subtitleText = subtitle ? subtitle.text : "Tech rows auto-unlock from available faction reputation.";
-        const summaryParts = splitInfoParts(subtitleText);
-        if (factionSummary && factionSummary.text) {
-            summaryParts.push(factionSummary.text);
-        }
+        const closeAction = getTechTreeCloseAction(techTreeView);
+        const titleText = "Research And Unlocks";
+        const summaryParts = ["Tech rows auto-unlock from available faction reputation."];
         const unlockableTiers = parseTechTreeUnlockableTiers(latestState || {});
-        const parsedTree = parseTechTreeStructure(techTreeSetup);
+        const parsedTree = parseTechTreeStructure(techTreeView);
         if (activeTechTreePanelTabId !== "unlockables" && activeTechTreePanelTabId !== "tech-tree") {
             activeTechTreePanelTabId = "unlockables";
         }
@@ -5740,14 +5705,14 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return true;
     }
 
-    function appendSiteTechTreeToggleAction(techTreeSetup) {
+    function appendSiteTechTreeToggleAction(techTreeView) {
         if (!siteTechTreeActions) {
             return;
         }
 
-        const isOpen = !!techTreeSetup;
+        const isOpen = !!techTreeView;
         const action = isOpen
-            ? getTechTreeCloseAction(techTreeSetup)
+            ? getTechTreeCloseAction(techTreeView)
             : makeUiAction("OPEN_REGIONAL_MAP_TECH_TREE", 0, 0, 0);
 
         siteTechTreeActions.appendChild(
@@ -6201,9 +6166,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             });
         }
 
-        const techTreeSetup = getTechTreeSetup(state);
-        if (techTreeSetup) {
-            const closeAction = getTechTreeCloseAction(techTreeSetup);
+        const techTreeView = getTechTreeView(state);
+        if (techTreeView) {
+            const closeAction = getTechTreeCloseAction(techTreeView);
             if (closeAction) {
                 return postJson("/ui-action", closeAction).then(() => true).catch(() => {
                     statusChip.textContent = "Failed to close tech-tree panel.";
@@ -7442,7 +7407,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             const label =
                 element.action && element.action.type === "START_NEW_CAMPAIGN"
                     ? "Begin Campaign"
-                    : (element.text || element.action.type);
+                    : (element.action ? element.action.type : "ACTION");
             menuActions.appendChild(
                 makeButton(
                     label,
@@ -7475,13 +7440,14 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
     }
 
     function renderRegionalMapOverlay(state) {
-        const menuSetup = getSetup(state, "REGIONAL_MAP_MENU");
-        const selectionSetup = getSetup(state, "REGIONAL_MAP_SELECTION");
-        const techTreeSetup = getTechTreeSetup(state);
-        const labels = getLabelElements(selectionSetup);
-        const actions = getVisibleActionElements(selectionSetup);
-        const menuActions = getVisibleActionElements(menuSetup);
-        const primaryLabel = labels.length > 0 ? labels[0].text : "";
+        const menuPanelState = getPanel(state, 2);
+        const selectionPanelState = getPanel(state, 3);
+        const techTreeView = getTechTreeView(state);
+        const textLines = getPanelTextLines(selectionPanelState);
+        const actions = getPanelSlotActions(selectionPanelState);
+        const menuActions = getPanelSlotActions(menuPanelState);
+        const primaryLine = textLines.find((line) => Number(line.textKind || 0) === 3) || null;
+        const primaryLabel = primaryLine ? ("Selected Site " + Number(primaryLine.primaryId || 0)) : "";
 
         menuPanel.hidden = true;
         if (siteTechTreeActions) {
@@ -7491,11 +7457,11 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             siteTechTreeAnchor.hidden = true;
         }
 
-        if (techTreeSetup) {
+        if (techTreeView) {
             selectionEyebrow.textContent = "Campaign Research";
             selectionText.hidden = true;
             selectionText.textContent = "";
-            renderTechTreePanel(techTreeSetup, {
+            renderTechTreePanel(techTreeView, {
                 kickerText: "Regional Research Board"
             });
             renderStoragePanel(null, null);
@@ -7513,29 +7479,36 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             selectionText.textContent = "Review the campaign survey and choose the next exposed site to stabilize.";
         }
 
-        renderRegionalMapLoadoutPanel(state, selectionSetup, primaryLabel);
+        renderRegionalMapLoadoutPanel(state, selectionPanelState, primaryLabel);
         renderStoragePanel(null, null);
 
         contextActions.innerHTML = "";
         menuActions.forEach((element) => {
+            const action = element.action || null;
+            const label =
+                Number(element.labelKind || 0) === 2
+                    ? "Close Research"
+                    : "Research & Unlocks";
             contextActions.appendChild(
                 makeButton(
-                    element.text || element.action.type,
+                    label,
                     function () {
-                        postJson("/ui-action", element.action).catch(() => {
+                        postJson("/ui-action", action).catch(() => {
                             statusChip.textContent = "Failed to send UI action.";
                         });
                     },
                     false,
-                    (element.flags & 2) !== 0
+                    (Number(element.flags || 0) & 2) !== 0
                 )
             );
         });
         actions.forEach((element) => {
-            let label = element.text || element.action.type;
-            if (element.action && element.action.type === "START_SITE_ATTEMPT") {
-                label = "Deploy To Site " + element.action.targetId;
-            } else if (element.action && element.action.type === "CLEAR_DEPLOYMENT_SITE_SELECTION") {
+            const action = element.action || null;
+            const labelKind = Number(element.labelKind || 0);
+            let label = action ? action.type : "ACTION";
+            if (labelKind === 3 && action) {
+                label = "Deploy To Site " + Number(element.primaryId || action.targetId || 0);
+            } else if (labelKind === 4) {
                 label = "Clear Route";
             }
 
@@ -7543,12 +7516,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                 makeButton(
                     label,
                     function () {
-                        postJson("/ui-action", element.action).catch(() => {
+                        postJson("/ui-action", action).catch(() => {
                             statusChip.textContent = "Failed to send UI action.";
                         });
                     },
                     false,
-                    (element.flags & 2) !== 0
+                    (Number(element.flags || 0) & 2) !== 0
                 )
             );
         });
@@ -7578,10 +7551,9 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function renderSiteResultOverlay(state) {
         const resultSetup = getSetup(state, "SITE_RESULT");
-        const labels = getLabelElements(resultSetup);
         const actions = getVisibleActionElements(resultSetup);
         const siteResult = getSiteResult(state);
-        const primaryLabel = labels.length > 0 ? labels[0].text : "";
+        const primaryLabel = siteResultElementText(getLabelElements(resultSetup)[0] || null);
         const resultCompleted = !!siteResult && siteResult.result === "COMPLETED";
         const resultLine =
             primaryLabel ||
@@ -7625,7 +7597,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         selectionInventory.appendChild(actionGroup);
 
         actions.forEach((element) => {
-            let label = element.text || element.action.type;
+            let label = siteResultElementText(element) || (element.action ? element.action.type : "ACTION");
             if (element.action && element.action.type === "RETURN_TO_REGIONAL_MAP") {
                 label = "OK";
             }
@@ -7679,7 +7651,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
         const title = document.createElement("div");
         title.className = "protection-selector-title";
-        title.textContent = "Protection Overlay";
+        title.textContent = protectionSelectorElementText(getLabelElements(setup)[0] || null) || "Protection Overlay";
         panel.appendChild(title);
 
         const copy = document.createElement("div");
@@ -7720,7 +7692,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
             const titleElement = document.createElement("div");
             titleElement.className = "protection-selector-button-title";
-            titleElement.textContent = presentation.title;
+            titleElement.textContent = protectionSelectorElementText(element) || presentation.title;
             button.appendChild(titleElement);
 
             const subtitle = document.createElement("div");
@@ -7737,7 +7709,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
 
     function renderSiteOverlay(state) {
         const protectionSelectorSetup = getSiteProtectionSelectorSetup(state);
-        const techTreeSetup = getTechTreeSetup(state);
+        const techTreeView = getTechTreeView(state);
         const workerPackSlots = getInventorySlotsByKind(state, "WORKER_PACK");
 
         menuPanel.hidden = true;
@@ -7763,14 +7735,14 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             return;
         }
 
-        if (techTreeSetup) {
+        if (techTreeView) {
             if (siteTechTreeAnchor) {
                 siteTechTreeAnchor.hidden = true;
             }
             selectionEyebrow.textContent = "Campaign Research";
             selectionText.hidden = true;
             selectionText.textContent = "";
-            renderTechTreePanel(techTreeSetup, {
+            renderTechTreePanel(techTreeView, {
                 kickerText: "Site Session Research"
             });
             renderStoragePanel(null, null);
@@ -7783,7 +7755,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         selectionText.textContent = "";
         renderSiteInventoryPanel(state, workerPackSlots);
         renderStoragePanel(state, openedContainerInfo);
-        appendSiteTechTreeToggleAction(techTreeSetup);
+        appendSiteTechTreeToggleAction(techTreeView);
     }
 
     function updateOverlay(state, options) {
@@ -12667,7 +12639,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
                     renderSiteHudChrome(normalizedState);
                 }
                 if (lightweightPatchParts.hud) {
-                    if (getTechTreeSetup(normalizedState) || getSiteProtectionSelectorSetup(normalizedState)) {
+                    if (getTechTreeView(normalizedState) || getSiteProtectionSelectorSetup(normalizedState)) {
                         renderSiteOverlay(normalizedState);
                     } else {
                         renderSiteInventoryPanel(

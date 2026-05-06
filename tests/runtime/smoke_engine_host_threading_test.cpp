@@ -235,6 +235,16 @@ Gs1EngineMessage make_campaign_resources_message(
 std::string load_text_file(const std::filesystem::path& path)
 {
     std::ifstream stream(path, std::ios::binary);
+    if (!stream.is_open())
+    {
+        const auto alt_path = std::filesystem::path("..") / path;
+        stream.open(alt_path, std::ios::binary);
+    }
+    if (!stream.is_open())
+    {
+        const auto alt_path = std::filesystem::path("..") / std::filesystem::path("..") / path;
+        stream.open(alt_path, std::ios::binary);
+    }
     assert(stream.is_open());
     return std::string(
         std::istreambuf_iterator<char>(stream),

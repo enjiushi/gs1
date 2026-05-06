@@ -666,7 +666,10 @@ Array Gs1RuntimeNode::build_ui_setups_array() const
             element_dict["element_id"] = static_cast<int64_t>(element.element_id);
             element_dict["element_type"] = static_cast<int>(element.element_type);
             element_dict["flags"] = static_cast<int64_t>(element.flags);
-            element_dict["text"] = to_godot_string(element.text);
+            element_dict["content_kind"] = static_cast<int64_t>(element.content_kind);
+            element_dict["primary_id"] = static_cast<int64_t>(element.primary_id);
+            element_dict["secondary_id"] = static_cast<int64_t>(element.secondary_id);
+            element_dict["quantity"] = static_cast<int64_t>(element.quantity);
             element_dict["action"] = ui_action_to_dictionary(element.action);
             elements.push_back(element_dict);
         }
@@ -713,7 +716,11 @@ Array Gs1RuntimeNode::build_ui_panels_array() const
             Dictionary line_dict;
             line_dict["line_id"] = static_cast<int>(text_line.line_id);
             line_dict["flags"] = static_cast<int64_t>(text_line.flags);
-            line_dict["text"] = to_godot_string(text_line.text);
+            line_dict["text_kind"] = static_cast<int64_t>(text_line.text_kind);
+            line_dict["primary_id"] = static_cast<int64_t>(text_line.primary_id);
+            line_dict["secondary_id"] = static_cast<int64_t>(text_line.secondary_id);
+            line_dict["quantity"] = static_cast<int64_t>(text_line.quantity);
+            line_dict["aux_value"] = static_cast<int64_t>(text_line.aux_value);
             text_lines.push_back(line_dict);
         }
         panel_dict["text_lines"] = text_lines;
@@ -724,7 +731,10 @@ Array Gs1RuntimeNode::build_ui_panels_array() const
             Dictionary action_dict;
             action_dict["slot_id"] = static_cast<int>(slot_action.slot_id);
             action_dict["flags"] = static_cast<int64_t>(slot_action.flags);
-            action_dict["label"] = to_godot_string(slot_action.label);
+            action_dict["label_kind"] = static_cast<int64_t>(slot_action.label_kind);
+            action_dict["primary_id"] = static_cast<int64_t>(slot_action.primary_id);
+            action_dict["secondary_id"] = static_cast<int64_t>(slot_action.secondary_id);
+            action_dict["quantity"] = static_cast<int64_t>(slot_action.quantity);
             action_dict["action"] = ui_action_to_dictionary(slot_action.action);
             slot_actions.push_back(action_dict);
         }
@@ -737,8 +747,13 @@ Array Gs1RuntimeNode::build_ui_panels_array() const
             item_dict["item_id"] = static_cast<int64_t>(list_item.item_id);
             item_dict["list_id"] = static_cast<int>(list_item.list_id);
             item_dict["flags"] = static_cast<int64_t>(list_item.flags);
-            item_dict["primary_text"] = to_godot_string(list_item.primary_text);
-            item_dict["secondary_text"] = to_godot_string(list_item.secondary_text);
+            item_dict["primary_kind"] = static_cast<int64_t>(list_item.primary_kind);
+            item_dict["secondary_kind"] = static_cast<int64_t>(list_item.secondary_kind);
+            item_dict["primary_id"] = static_cast<int64_t>(list_item.primary_id);
+            item_dict["secondary_id"] = static_cast<int64_t>(list_item.secondary_id);
+            item_dict["quantity"] = static_cast<int64_t>(list_item.quantity);
+            item_dict["map_x"] = static_cast<int64_t>(list_item.map_x);
+            item_dict["map_y"] = static_cast<int64_t>(list_item.map_y);
             list_items.push_back(item_dict);
         }
         panel_dict["list_items"] = list_items;

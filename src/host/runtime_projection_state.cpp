@@ -537,7 +537,10 @@ void Gs1RuntimeProjectionCache::apply_ui_element_upsert(const Gs1EngineMessageUi
     projection.element_type = payload.element_type;
     projection.flags = payload.flags;
     projection.action = payload.action;
-    projection.text = message_text_to_string(payload.text, sizeof(payload.text));
+    projection.content_kind = payload.content_kind;
+    projection.primary_id = payload.primary_id;
+    projection.secondary_id = payload.secondary_id;
+    projection.quantity = payload.quantity;
     pending_ui_setup_->elements.push_back(std::move(projection));
 }
 
@@ -661,7 +664,11 @@ void Gs1RuntimeProjectionCache::apply_ui_panel_text_upsert(const Gs1EngineMessag
     Gs1RuntimeUiPanelTextProjection projection {};
     projection.line_id = payload.line_id;
     projection.flags = payload.flags;
-    projection.text = message_text_to_string(payload.text, sizeof(payload.text));
+    projection.text_kind = payload.text_kind;
+    projection.primary_id = payload.primary_id;
+    projection.secondary_id = payload.secondary_id;
+    projection.quantity = payload.quantity;
+    projection.aux_value = payload.aux_value;
     pending_ui_panel_->text_lines.push_back(std::move(projection));
 }
 
@@ -676,7 +683,10 @@ void Gs1RuntimeProjectionCache::apply_ui_panel_slot_action_upsert(const Gs1Engin
     projection.slot_id = payload.slot_id;
     projection.flags = payload.flags;
     projection.action = payload.action;
-    projection.label = message_text_to_string(payload.label, sizeof(payload.label));
+    projection.label_kind = payload.label_kind;
+    projection.primary_id = payload.primary_id;
+    projection.secondary_id = payload.secondary_id;
+    projection.quantity = payload.quantity;
     pending_ui_panel_->slot_actions.push_back(std::move(projection));
 }
 
@@ -691,8 +701,13 @@ void Gs1RuntimeProjectionCache::apply_ui_panel_list_item_upsert(const Gs1EngineM
     projection.item_id = payload.item_id;
     projection.list_id = payload.list_id;
     projection.flags = payload.flags;
-    projection.primary_text = message_text_to_string(payload.primary_text, sizeof(payload.primary_text));
-    projection.secondary_text = message_text_to_string(payload.secondary_text, sizeof(payload.secondary_text));
+    projection.primary_kind = payload.primary_kind;
+    projection.secondary_kind = payload.secondary_kind;
+    projection.primary_id = payload.primary_id;
+    projection.secondary_id = payload.secondary_id;
+    projection.quantity = payload.quantity;
+    projection.map_x = payload.map_x;
+    projection.map_y = payload.map_y;
     pending_ui_panel_->list_items.push_back(std::move(projection));
 }
 

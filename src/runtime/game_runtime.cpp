@@ -2725,7 +2725,10 @@ void GameRuntime::queue_ui_element_message(
     Gs1UiElementType element_type,
     std::uint32_t flags,
     const Gs1UiAction& action,
-    const char* text)
+    std::uint8_t content_kind,
+    std::uint32_t primary_id,
+    std::uint32_t secondary_id,
+    std::uint32_t quantity)
 {
     auto message = make_engine_message(GS1_ENGINE_MESSAGE_UI_ELEMENT_UPSERT);
     auto& payload = message.emplace_payload<Gs1EngineMessageUiElementData>();
@@ -2733,11 +2736,10 @@ void GameRuntime::queue_ui_element_message(
     payload.element_type = element_type;
     payload.flags = static_cast<std::uint8_t>(flags);
     payload.action = action;
-    strncpy_s(
-        payload.text,
-        sizeof(payload.text),
-        text,
-        _TRUNCATE);
+    payload.content_kind = content_kind;
+    payload.primary_id = primary_id;
+    payload.secondary_id = secondary_id;
+    payload.quantity = quantity;
     engine_messages_.push_back(message);
 }
 
@@ -2751,13 +2753,21 @@ void GameRuntime::queue_progression_entry_message(const Gs1EngineMessageProgress
 void GameRuntime::queue_ui_panel_text_message(
     std::uint16_t line_id,
     std::uint32_t flags,
-    const char* text)
+    std::uint8_t text_kind,
+    std::uint32_t primary_id,
+    std::uint32_t secondary_id,
+    std::uint32_t quantity,
+    std::uint32_t aux_value)
 {
     auto message = make_engine_message(GS1_ENGINE_MESSAGE_UI_PANEL_TEXT_UPSERT);
     auto& payload = message.emplace_payload<Gs1EngineMessageUiPanelTextData>();
     payload.line_id = line_id;
     payload.flags = static_cast<std::uint8_t>(flags);
-    strncpy_s(payload.text, sizeof(payload.text), text, _TRUNCATE);
+    payload.text_kind = text_kind;
+    payload.primary_id = primary_id;
+    payload.secondary_id = secondary_id;
+    payload.quantity = quantity;
+    payload.aux_value = aux_value;
     engine_messages_.push_back(message);
 }
 
@@ -2765,14 +2775,20 @@ void GameRuntime::queue_ui_panel_slot_action_message(
     Gs1UiPanelSlotId slot_id,
     std::uint32_t flags,
     const Gs1UiAction& action,
-    const char* label)
+    std::uint8_t label_kind,
+    std::uint32_t primary_id,
+    std::uint32_t secondary_id,
+    std::uint32_t quantity)
 {
     auto message = make_engine_message(GS1_ENGINE_MESSAGE_UI_PANEL_SLOT_ACTION_UPSERT);
     auto& payload = message.emplace_payload<Gs1EngineMessageUiPanelSlotActionData>();
     payload.slot_id = slot_id;
     payload.flags = static_cast<std::uint8_t>(flags);
     payload.action = action;
-    strncpy_s(payload.label, sizeof(payload.label), label, _TRUNCATE);
+    payload.label_kind = label_kind;
+    payload.primary_id = primary_id;
+    payload.secondary_id = secondary_id;
+    payload.quantity = quantity;
     engine_messages_.push_back(message);
 }
 
@@ -2780,16 +2796,26 @@ void GameRuntime::queue_ui_panel_list_item_message(
     Gs1UiPanelListId list_id,
     std::uint32_t item_id,
     std::uint32_t flags,
-    const char* primary_text,
-    const char* secondary_text)
+    std::uint8_t primary_kind,
+    std::uint8_t secondary_kind,
+    std::uint32_t primary_id,
+    std::uint32_t secondary_id,
+    std::uint32_t quantity,
+    std::int32_t map_x,
+    std::int32_t map_y)
 {
     auto message = make_engine_message(GS1_ENGINE_MESSAGE_UI_PANEL_LIST_ITEM_UPSERT);
     auto& payload = message.emplace_payload<Gs1EngineMessageUiPanelListItemData>();
     payload.item_id = item_id;
     payload.list_id = list_id;
     payload.flags = static_cast<std::uint8_t>(flags);
-    strncpy_s(payload.primary_text, sizeof(payload.primary_text), primary_text, _TRUNCATE);
-    strncpy_s(payload.secondary_text, sizeof(payload.secondary_text), secondary_text, _TRUNCATE);
+    payload.primary_kind = primary_kind;
+    payload.secondary_kind = secondary_kind;
+    payload.primary_id = primary_id;
+    payload.secondary_id = secondary_id;
+    payload.quantity = quantity;
+    payload.map_x = map_x;
+    payload.map_y = map_y;
     engine_messages_.push_back(message);
 }
 
@@ -2852,7 +2878,7 @@ void GameRuntime::queue_main_menu_ui_messages()
         GS1_UI_PANEL_SLOT_PRIMARY,
         GS1_UI_PANEL_SLOT_FLAG_PRIMARY,
         action,
-        "Start New Campaign");
+        10U);
     queue_ui_panel_end_message();
 }
 
@@ -2882,15 +2908,6 @@ void GameRuntime::queue_regional_map_menu_ui_messages()
         }
     };
     const auto* selected_faction_def = find_faction_def(selected_faction_id);
-    char summary_text[96] {};
-    std::snprintf(
-        summary_text,
-        sizeof(summary_text),
-        "%.*s Rep %d",
-        selected_faction_def == nullptr ? 0 : static_cast<int>(selected_faction_def->display_name.size()),
-        selected_faction_def == nullptr ? "" : selected_faction_def->display_name.data(),
-        TechnologySystem::faction_reputation(*campaign_, selected_faction_id));
-
     Gs1UiAction toggle_action {};
     toggle_action.type = campaign_->regional_map_state.tech_tree_open
         ? GS1_UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE
@@ -2912,12 +2929,17 @@ void GameRuntime::queue_regional_map_menu_ui_messages()
         1U,
         site_row_count,
         site_row_count);
-    queue_ui_panel_text_message(1U, 0U, summary_text);
+    queue_ui_panel_text_message(
+        1U,
+        0U,
+        1U,
+        selected_faction_id.value,
+        static_cast<std::uint32_t>(TechnologySystem::faction_reputation(*campaign_, selected_faction_id)));
     queue_ui_panel_slot_action_message(
         GS1_UI_PANEL_SLOT_PRIMARY,
         GS1_UI_PANEL_SLOT_FLAG_PRIMARY,
         toggle_action,
-        campaign_->regional_map_state.tech_tree_open ? "Close Research" : "Research & Unlocks");
+        campaign_->regional_map_state.tech_tree_open ? 2U : 1U);
 
     for (const auto revealed_site_id : campaign_->regional_map_state.revealed_site_ids)
     {
@@ -2927,18 +2949,6 @@ void GameRuntime::queue_regional_map_menu_ui_messages()
             continue;
         }
 
-        char primary_text[24] {};
-        std::snprintf(primary_text, sizeof(primary_text), "Site %u", static_cast<unsigned>(site->site_id.value));
-
-        char secondary_text[28] {};
-        std::snprintf(
-            secondary_text,
-            sizeof(secondary_text),
-            "%s  (%d, %d)",
-            regional_site_state_label(site->site_state),
-            static_cast<int>(site->regional_map_tile.x),
-            static_cast<int>(site->regional_map_tile.y));
-
         const bool selected = campaign_->regional_map_state.selected_site_id.has_value() &&
             campaign_->regional_map_state.selected_site_id->value == site->site_id.value;
         const std::uint32_t item_flags = selected ? GS1_UI_PANEL_LIST_ITEM_FLAG_SELECTED : GS1_UI_PANEL_LIST_ITEM_FLAG_NONE;
@@ -2947,8 +2957,13 @@ void GameRuntime::queue_regional_map_menu_ui_messages()
             GS1_UI_PANEL_LIST_REGIONAL_SITES,
             site->site_id.value,
             item_flags,
-            primary_text,
-            secondary_text);
+            1U,
+            2U,
+            site->site_id.value,
+            static_cast<std::uint32_t>(site->site_state),
+            0U,
+            static_cast<std::int32_t>(site->regional_map_tile.x),
+            static_cast<std::int32_t>(site->regional_map_tile.y));
 
         Gs1UiAction select_action {};
         select_action.type = GS1_UI_ACTION_SELECT_DEPLOYMENT_SITE;
@@ -2989,30 +3004,28 @@ void GameRuntime::queue_regional_map_selection_ui_messages()
         0U);
 
     std::uint16_t next_line_id = 1U;
-    char label_text[64] {};
-    std::snprintf(label_text, sizeof(label_text), "Selected Site %u", static_cast<unsigned>(site_id));
-    queue_ui_panel_text_message(next_line_id++, 0U, label_text);
+    queue_ui_panel_text_message(next_line_id++, 0U, 3U, site_id);
 
     if (has_support_contributors)
     {
-        char support_text[64] {};
-        std::snprintf(
-            support_text,
-            sizeof(support_text),
-            "Adj Support x%u",
-            static_cast<unsigned>(campaign_->loadout_planner_state.support_quota));
-        queue_ui_panel_text_message(next_line_id++, 0U, support_text);
+        queue_ui_panel_text_message(
+            next_line_id++,
+            0U,
+            4U,
+            0U,
+            0U,
+            campaign_->loadout_planner_state.support_quota);
     }
 
     if (has_aura_support)
     {
-        char aura_text[64] {};
-        std::snprintf(
-            aura_text,
-            sizeof(aura_text),
-            "Aura Ready x%u",
-            static_cast<unsigned>(campaign_->loadout_planner_state.active_nearby_aura_modifier_ids.size()));
-        queue_ui_panel_text_message(next_line_id++, 0U, aura_text);
+        queue_ui_panel_text_message(
+            next_line_id++,
+            0U,
+            5U,
+            0U,
+            0U,
+            static_cast<std::uint32_t>(campaign_->loadout_planner_state.active_nearby_aura_modifier_ids.size()));
     }
 
     for (const auto& slot : campaign_->loadout_planner_state.selected_loadout_slots)
@@ -3022,40 +3035,24 @@ void GameRuntime::queue_regional_map_selection_ui_messages()
             continue;
         }
 
-        char loadout_text[64] {};
-        if (const auto* item_def = find_item_def(slot.item_id); item_def != nullptr)
-        {
-            std::snprintf(
-                loadout_text,
-                sizeof(loadout_text),
-                "%.*s x%u",
-                static_cast<int>(item_def->display_name.size()),
-                item_def->display_name.data(),
-                static_cast<unsigned>(slot.quantity));
-        }
-        else
-        {
-            std::snprintf(
-                loadout_text,
-                sizeof(loadout_text),
-                "Item %u x%u",
-                static_cast<unsigned>(slot.item_id.value),
-                static_cast<unsigned>(slot.quantity));
-        }
-
-        queue_ui_panel_text_message(next_line_id++, 0U, loadout_text);
+        queue_ui_panel_text_message(
+            next_line_id++,
+            0U,
+            6U,
+            slot.item_id.value,
+            0U,
+            slot.quantity);
     }
 
     Gs1UiAction deploy_action {};
     deploy_action.type = GS1_UI_ACTION_START_SITE_ATTEMPT;
     deploy_action.target_id = site_id;
-    char button_text[64] {};
-    std::snprintf(button_text, sizeof(button_text), "Start Site %u", static_cast<unsigned>(site_id));
     queue_ui_panel_slot_action_message(
         GS1_UI_PANEL_SLOT_PRIMARY,
         GS1_UI_PANEL_SLOT_FLAG_PRIMARY,
         deploy_action,
-        button_text);
+        3U,
+        site_id);
 
     Gs1UiAction clear_selection_action {};
     clear_selection_action.type = GS1_UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION;
@@ -3063,7 +3060,7 @@ void GameRuntime::queue_regional_map_selection_ui_messages()
         GS1_UI_PANEL_SLOT_SECONDARY,
         GS1_UI_PANEL_SLOT_FLAG_NONE,
         clear_selection_action,
-        "Clear Selection");
+        4U);
 
     queue_ui_panel_end_message();
 }
@@ -3141,20 +3138,14 @@ void GameRuntime::queue_site_result_ui_messages(std::uint32_t site_id, Gs1SiteAt
         site_id);
 
     Gs1UiAction no_action {};
-    char label_text[64] {};
-    const char* result_text = result == GS1_SITE_ATTEMPT_RESULT_COMPLETED ? "completed" : "failed";
-    std::snprintf(
-        label_text,
-        sizeof(label_text),
-        "Site %u %s",
-        static_cast<unsigned>(site_id),
-        result_text);
     queue_ui_element_message(
         1U,
         GS1_UI_ELEMENT_LABEL,
         GS1_UI_ELEMENT_FLAG_NONE,
         no_action,
-        label_text);
+        1U,
+        site_id,
+        static_cast<std::uint32_t>(result));
 
     Gs1UiAction return_action {};
     return_action.type = GS1_UI_ACTION_RETURN_TO_REGIONAL_MAP;
@@ -3163,7 +3154,7 @@ void GameRuntime::queue_site_result_ui_messages(std::uint32_t site_id, Gs1SiteAt
         GS1_UI_ELEMENT_BUTTON,
         GS1_UI_ELEMENT_FLAG_PRIMARY,
         return_action,
-        "OK");
+        2U);
 
     queue_ui_setup_end_message();
 }
@@ -3188,7 +3179,7 @@ void GameRuntime::queue_site_protection_selector_ui_messages()
         GS1_UI_ELEMENT_LABEL,
         GS1_UI_ELEMENT_FLAG_NONE,
         no_action,
-        "Protection Overlay");
+        3U);
 
     Gs1UiAction wind_action {};
     wind_action.type = GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE;
@@ -3198,7 +3189,8 @@ void GameRuntime::queue_site_protection_selector_ui_messages()
         GS1_UI_ELEMENT_BUTTON,
         GS1_UI_ELEMENT_FLAG_PRIMARY,
         wind_action,
-        "Wind Protection");
+        4U,
+        GS1_SITE_PROTECTION_OVERLAY_WIND);
 
     Gs1UiAction heat_action {};
     heat_action.type = GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE;
@@ -3208,7 +3200,8 @@ void GameRuntime::queue_site_protection_selector_ui_messages()
         GS1_UI_ELEMENT_BUTTON,
         GS1_UI_ELEMENT_FLAG_PRIMARY,
         heat_action,
-        "Heat Protection");
+        4U,
+        GS1_SITE_PROTECTION_OVERLAY_HEAT);
 
     Gs1UiAction dust_action {};
     dust_action.type = GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE;
@@ -3218,7 +3211,8 @@ void GameRuntime::queue_site_protection_selector_ui_messages()
         GS1_UI_ELEMENT_BUTTON,
         GS1_UI_ELEMENT_FLAG_PRIMARY,
         dust_action,
-        "Dust Protection");
+        4U,
+        GS1_SITE_PROTECTION_OVERLAY_DUST);
 
     Gs1UiAction occupant_condition_action {};
     occupant_condition_action.type = GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE;
@@ -3228,7 +3222,8 @@ void GameRuntime::queue_site_protection_selector_ui_messages()
         GS1_UI_ELEMENT_BUTTON,
         GS1_UI_ELEMENT_FLAG_PRIMARY,
         occupant_condition_action,
-        "Density / Integrity");
+        4U,
+        GS1_SITE_PROTECTION_OVERLAY_OCCUPANT_CONDITION);
 
     Gs1UiAction close_action {};
     close_action.type = GS1_UI_ACTION_CLOSE_SITE_PROTECTION_UI;
@@ -3237,7 +3232,7 @@ void GameRuntime::queue_site_protection_selector_ui_messages()
         GS1_UI_ELEMENT_BUTTON,
         GS1_UI_ELEMENT_FLAG_BACKGROUND_CLICK,
         close_action,
-        "");
+        5U);
 
     queue_ui_setup_end_message();
 }
