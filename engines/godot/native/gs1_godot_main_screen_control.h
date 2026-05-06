@@ -101,6 +101,8 @@ public:
     [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
     void handle_engine_message(const Gs1EngineMessage& message) override;
     void handle_runtime_message_reset() override;
+    void disconnect_runtime_subscriptions();
+    void apply_bootstrap_app_state(int app_state);
 
 protected:
     static void _bind_methods();

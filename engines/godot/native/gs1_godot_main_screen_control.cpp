@@ -586,6 +586,49 @@ void Gs1GodotMainScreenControl::handle_runtime_message_reset()
     invalidate_all_ui();
 }
 
+void Gs1GodotMainScreenControl::disconnect_runtime_subscriptions()
+{
+    if (runtime_node_ == nullptr)
+    {
+        return;
+    }
+
+    runtime_node_->unsubscribe_engine_messages(*this);
+    runtime_node_->unsubscribe_engine_messages(status_panel_controller_);
+    runtime_node_->unsubscribe_engine_messages(inventory_panel_controller_);
+    runtime_node_->unsubscribe_engine_messages(craft_panel_controller_);
+    runtime_node_->unsubscribe_engine_messages(action_panel_controller_);
+    runtime_node_->unsubscribe_engine_messages(overlay_panel_controller_);
+    runtime_node_->unsubscribe_engine_messages(phone_panel_controller_);
+    runtime_node_->unsubscribe_engine_messages(regional_selection_panel_controller_);
+    runtime_node_->unsubscribe_engine_messages(regional_summary_panel_controller_);
+    runtime_node_->unsubscribe_engine_messages(regional_tech_tree_panel_controller_);
+    runtime_node_->unsubscribe_engine_messages(site_summary_panel_controller_);
+    runtime_node_->unsubscribe_engine_messages(task_panel_controller_);
+    runtime_node_ = nullptr;
+}
+
+void Gs1GodotMainScreenControl::apply_bootstrap_app_state(int app_state)
+{
+    Gs1EngineMessage message {};
+    message.type = GS1_ENGINE_MESSAGE_SET_APP_STATE;
+    auto& payload = message.emplace_payload<Gs1EngineMessageSetAppStateData>();
+    payload.app_state = static_cast<Gs1AppState>(app_state);
+
+    handle_engine_message(message);
+    status_panel_controller_.handle_engine_message(message);
+    inventory_panel_controller_.handle_engine_message(message);
+    craft_panel_controller_.handle_engine_message(message);
+    action_panel_controller_.handle_engine_message(message);
+    overlay_panel_controller_.handle_engine_message(message);
+    phone_panel_controller_.handle_engine_message(message);
+    regional_selection_panel_controller_.handle_engine_message(message);
+    regional_summary_panel_controller_.handle_engine_message(message);
+    regional_tech_tree_panel_controller_.handle_engine_message(message);
+    site_summary_panel_controller_.handle_engine_message(message);
+    task_panel_controller_.handle_engine_message(message);
+}
+
 void Gs1GodotMainScreenControl::invalidate_all_ui()
 {
     mark_regional_map_dirty();
@@ -1739,12 +1782,8 @@ String Gs1GodotMainScreenControl::app_state_name(int app_state) const
 
 void Gs1GodotMainScreenControl::set_runtime_node_path(const NodePath& path)
 {
-    if (runtime_node_ != nullptr)
-    {
-        runtime_node_->unsubscribe_engine_messages(*this);
-    }
+    disconnect_runtime_subscriptions();
     runtime_node_path_ = path;
-    runtime_node_ = nullptr;
 }
 NodePath Gs1GodotMainScreenControl::get_runtime_node_path() const { return runtime_node_path_; }
 void Gs1GodotMainScreenControl::set_site_view_path(const NodePath& path) { site_view_path_ = path; site_view_ = nullptr; }

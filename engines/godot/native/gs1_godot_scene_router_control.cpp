@@ -92,6 +92,7 @@ void Gs1GodotSceneRouterControl::handle_engine_message(const Gs1EngineMessage& m
         return;
     }
     last_app_state_ = static_cast<int>(message.payload_as<Gs1EngineMessageSetAppStateData>().app_state);
+    ensure_active_scene();
 }
 
 void Gs1GodotSceneRouterControl::handle_runtime_message_reset()
@@ -144,6 +145,14 @@ void Gs1GodotSceneRouterControl::switch_to_scene(ScreenKind kind)
 
     if (Node* active_scene = Object::cast_to<Node>(ObjectDB::get_instance(active_scene_id_)))
     {
+        if (auto* screen = Object::cast_to<Gs1GodotMainScreenControl>(active_scene))
+        {
+            screen->disconnect_runtime_subscriptions();
+        }
+        if (auto* site_view = Object::cast_to<Gs1SiteViewNode>(active_scene->find_child("SiteView", true, false)))
+        {
+            site_view->set_runtime_node_path(NodePath());
+        }
         scene_host_->remove_child(active_scene);
         active_scene->queue_free();
     }
@@ -203,6 +212,7 @@ void Gs1GodotSceneRouterControl::configure_scene_instance(Node* instance) const
     if (auto* screen = Object::cast_to<Gs1GodotMainScreenControl>(instance))
     {
         screen->set_runtime_node_path(NodePath("../../Runtime"));
+        screen->apply_bootstrap_app_state(last_app_state_ >= 0 ? last_app_state_ : APP_STATE_BOOT);
     }
 
     if (auto* site_view = Object::cast_to<Gs1SiteViewNode>(instance->find_child("SiteView", true, false)))

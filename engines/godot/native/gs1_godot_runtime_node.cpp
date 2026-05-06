@@ -298,7 +298,8 @@ void Gs1RuntimeNode::notify_runtime_message_reset()
 
 void Gs1RuntimeNode::dispatch_engine_message(const Gs1EngineMessage& message)
 {
-    for (IGs1GodotEngineMessageSubscriber* subscriber : engine_message_subscribers_)
+    const std::vector<IGs1GodotEngineMessageSubscriber*> subscribers = engine_message_subscribers_;
+    for (IGs1GodotEngineMessageSubscriber* subscriber : subscribers)
     {
         if (subscriber == nullptr || !subscriber->handles_engine_message(message.type))
         {
