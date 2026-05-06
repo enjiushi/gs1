@@ -42,6 +42,9 @@ if ($missing.Count -gt 0) {
     Write-Host " - Repo:        $repoRoot"
     Write-Host " - Godot:       $defaultGodotSourceDir"
     Write-Host " - godot-cpp:   $defaultGodotCppSourceDir"
+    Write-Host ""
+    Write-Host "If third_party/godot-cpp is missing, run:" -ForegroundColor Cyan
+    Write-Host " - git submodule update --init --recursive"
     exit 1
 }
 
