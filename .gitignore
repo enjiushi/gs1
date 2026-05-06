@@ -1,6 +1,8 @@
 build/
 build-godot/
+build_godot/
 build-godot-cpp/
+build_godot_submodule/
 out/
 .agent-progress/
 engines/godot/project/.godot/

@@ -15,6 +15,8 @@ This file is a quick orientation guide for agents working in this repository.
 
 - `.agent-progress/`: Session-progress and merge-coordination scratch area used by worktree/session rules.
 - `build/`: Local CMake build tree and IDE-generated build artifacts.
+- `build_godot/`: Local Godot-enabled CMake build tree generated for adapter/runtime verification and ignored from source control.
+- `build_godot_submodule/`: Local helper build tree for Godot-related dependency or submodule setup work and ignored from source control.
 - `engines/`: First-party engine client shells and engine-specific adapter scaffolding. Read `engines/guideline.md` before drilling deeper.
 - `include/`: Public headers exposed to the gameplay DLL host boundary. Read `include/guideline.md` before drilling deeper.
 - `out/`: Generated binaries, logs, exported headers, and local browser/debug profiles.
