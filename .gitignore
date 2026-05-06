@@ -5,6 +5,7 @@ out/
 .agent-progress/
 engines/godot/project/.godot/
 engines/godot/project/bin/
+engines/godot/project/gs1/
 engines/godot/project/assets/**
 !engines/godot/project/assets/
 !engines/godot/project/assets/guideline.md

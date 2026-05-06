@@ -1,11 +1,12 @@
 # engines/godot/project/config/
 
-Engine-specific Godot presentation config loaded by the native adapter.
+Engine-specific Godot presentation config authored in-source and staged into the Godot package for the native adapter to load at runtime.
 
 ## Usage
 - Read this file before scanning the folder in detail.
 - Keep gameplay-authored names, descriptions, and progression meaning in the shared repo-level `project/content/` tables.
 - Use this folder only for Godot-specific resource bindings such as icon texture paths.
+- The Godot build stages this folder into the ignored `engines/godot/project/gs1/godot_config/` package root; treat this source-controlled folder as the authored source of truth.
 - When files or folders in this directory change, update this file in the same change.
 
 ## Contents

@@ -12,6 +12,7 @@
 #include "content/defs/task_defs.h"
 
 #include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/string.hpp>
@@ -36,6 +37,19 @@ String to_godot_string(const std::string& value)
 String to_godot_string(std::string_view value)
 {
     return String::utf8(value.data(), static_cast<int64_t>(value.size()));
+}
+
+std::filesystem::path globalize_res_path(std::string_view res_path)
+{
+    godot::ProjectSettings* project_settings = godot::ProjectSettings::get_singleton();
+    if (project_settings == nullptr)
+    {
+        return std::filesystem::path {res_path};
+    }
+
+    const godot::String absolute_path = project_settings->globalize_path(
+        String::utf8(res_path.data(), static_cast<int64_t>(res_path.size())));
+    return std::filesystem::path {absolute_path.utf8().get_data()};
 }
 
 String item_display_name(std::uint32_t item_id)
@@ -199,7 +213,7 @@ void Gs1RuntimeNode::ensure_runtime_started()
 
     adapter_config_ = load_adapter_config_blob(
         project_config_root_,
-        std::filesystem::path {"project"} / "config");
+        globalize_res_path("res://gs1/godot_config"));
 
     projection_cache_.reset();
     drained_messages_.clear();
@@ -1041,10 +1055,10 @@ void Gs1RuntimeNode::refresh_project_config_root()
 
 std::string Gs1RuntimeNode::compute_default_gameplay_dll_path() const
 {
-    return "bin/win64/gs1_game.dll";
+    return globalize_res_path("res://bin/win64/gs1_game.dll").string();
 }
 
 std::string Gs1RuntimeNode::compute_default_project_config_root() const
 {
-    return "project";
+    return globalize_res_path("res://gs1/runtime").string();
 }

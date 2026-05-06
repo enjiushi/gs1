@@ -2,6 +2,7 @@
 
 #include "toml.hpp"
 
+#include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/core/error_macros.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
@@ -47,6 +48,19 @@ std::uint32_t require_u32(
     }
 
     ERR_FAIL_V_MSG(0U, vformat("Missing integer field '%s' in %s", key, String(path.string().c_str())));
+}
+
+std::filesystem::path globalize_res_path(std::string_view res_path)
+{
+    godot::ProjectSettings* project_settings = godot::ProjectSettings::get_singleton();
+    if (project_settings == nullptr)
+    {
+        return std::filesystem::path {res_path};
+    }
+
+    const godot::String absolute_path = project_settings->globalize_path(
+        String::utf8(res_path.data(), static_cast<int64_t>(res_path.size())));
+    return std::filesystem::path {absolute_path.utf8().get_data()};
 }
 }
 
@@ -172,9 +186,10 @@ String GodotProgressionResourceDatabase::content_scene_path(
 
 GodotProgressionResourceDatabase::GodotProgressionResourceDatabase()
 {
-    load(std::filesystem::path {"project"} / "config" / "progression_resources.toml");
-    load(std::filesystem::path {"project"} / "config" / "content_resources.toml");
-    load(std::filesystem::path {"project"} / "config" / "render_resources.toml");
+    const std::filesystem::path godot_config_root = globalize_res_path("res://gs1/godot_config");
+    load(godot_config_root / "progression_resources.toml");
+    load(godot_config_root / "content_resources.toml");
+    load(godot_config_root / "render_resources.toml");
 }
 
 const GodotContentResourceDef* GodotProgressionResourceDatabase::find_resource(

@@ -8,6 +8,12 @@ if(POLICY CMP0091)
     cmake_policy(SET CMP0091 NEW)
 endif()
 
+function(gs1_stage_directory target_name source_dir dest_dir)
+    add_custom_command(TARGET ${target_name} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${dest_dir}
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${source_dir} ${dest_dir})
+endfunction()
+
 # Build definition for the gameplay DLL plus the smoke host executable.
 project(gs1_game
     VERSION 0.1.0
@@ -463,6 +469,16 @@ if(GS1_BUILD_GODOT_ADAPTER)
 
     set(GS1_GODOT_PROJECT_BIN_DIR
         ${CMAKE_CURRENT_SOURCE_DIR}/engines/godot/project/bin/win64)
+    set(GS1_GODOT_PROJECT_PACKAGE_DIR
+        ${CMAKE_CURRENT_SOURCE_DIR}/engines/godot/project/gs1)
+    set(GS1_GODOT_RUNTIME_PACKAGE_DIR
+        ${GS1_GODOT_PROJECT_PACKAGE_DIR}/runtime)
+    set(GS1_GODOT_RUNTIME_CONTENT_DIR
+        ${GS1_GODOT_RUNTIME_PACKAGE_DIR}/content)
+    set(GS1_GODOT_RUNTIME_ADAPTER_METADATA_DIR
+        ${GS1_GODOT_RUNTIME_PACKAGE_DIR}/adapter_metadata)
+    set(GS1_GODOT_CONFIG_DIR
+        ${GS1_GODOT_PROJECT_PACKAGE_DIR}/godot_config)
 
     add_library(gs1_godot_adapter SHARED
         engines/godot/native/gs1_godot_extension_entry.cpp
@@ -512,6 +528,16 @@ if(GS1_BUILD_GODOT_ADAPTER)
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             $<TARGET_FILE:gs1_game>
             ${GS1_GODOT_PROJECT_BIN_DIR}/gs1_game.dll)
+
+    gs1_stage_directory(gs1_godot_adapter
+        ${CMAKE_CURRENT_SOURCE_DIR}/project/content
+        ${GS1_GODOT_RUNTIME_CONTENT_DIR})
+    gs1_stage_directory(gs1_godot_adapter
+        ${CMAKE_CURRENT_SOURCE_DIR}/project/adapter_metadata
+        ${GS1_GODOT_RUNTIME_ADAPTER_METADATA_DIR})
+    gs1_stage_directory(gs1_godot_adapter
+        ${CMAKE_CURRENT_SOURCE_DIR}/engines/godot/project/config
+        ${GS1_GODOT_CONFIG_DIR})
 
     gs1_enable_strict_warnings(gs1_godot_adapter)
 endif()
