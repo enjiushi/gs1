@@ -17,7 +17,7 @@ class Label3D;
 class StandardMaterial3D;
 }
 
-class Gs1SiteViewNode final : public godot::Node3D
+class Gs1SiteViewNode final : public godot::Node3D, public IGs1GodotEngineMessageSubscriber
 {
     GDCLASS(Gs1SiteViewNode, godot::Node3D)
 
@@ -30,6 +30,10 @@ public:
 
     void set_runtime_node_path(const godot::NodePath& path);
     [[nodiscard]] godot::NodePath get_runtime_node_path() const;
+
+    [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
+    void handle_engine_message(const Gs1EngineMessage& message) override;
+    void handle_runtime_message_reset() override;
 
 protected:
     static void _bind_methods();
@@ -56,7 +60,6 @@ private:
 
     void ensure_presenter_created();
     [[nodiscard]] Gs1RuntimeNode* resolve_runtime_node() const;
-    void consume_runtime_messages(Gs1RuntimeNode& runtime_node);
 
     void apply_site_snapshot_begin(const Gs1EngineMessageSiteSnapshotData& payload);
     void apply_site_snapshot_end();

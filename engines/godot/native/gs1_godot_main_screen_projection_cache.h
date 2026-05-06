@@ -179,7 +179,7 @@ struct Gs1RuntimeSiteProjection final
     std::optional<Gs1RuntimeWeatherProjection> weather {};
 };
 
-struct Gs1RuntimeProjectionState final
+struct Gs1GodotMainScreenProjectionState final
 {
     std::optional<Gs1AppState> current_app_state {};
     std::optional<std::uint32_t> selected_site_id {};
@@ -196,13 +196,13 @@ struct Gs1RuntimeProjectionState final
     std::vector<Gs1RuntimeOneShotCueProjection> recent_one_shot_cues {};
 };
 
-class Gs1RuntimeProjectionCache final
+class Gs1GodotMainScreenProjectionCache final
 {
 public:
     void reset() noexcept;
     void apply_engine_message(const Gs1EngineMessage& message);
 
-    [[nodiscard]] const Gs1RuntimeProjectionState& state() const noexcept { return state_; }
+    [[nodiscard]] const Gs1GodotMainScreenProjectionState& state() const noexcept { return state_; }
     [[nodiscard]] const Gs1RuntimeProgressionViewProjection* find_progression_view(Gs1ProgressionViewId view_id) const noexcept;
     [[nodiscard]] const Gs1RuntimeUiPanelProjection* find_ui_panel(Gs1UiPanelId panel_id) const noexcept;
 
@@ -298,7 +298,7 @@ private:
     void rebuild_ui_panel_indices() noexcept;
 
 private:
-    Gs1RuntimeProjectionState state_ {};
+    Gs1GodotMainScreenProjectionState state_ {};
     std::optional<PendingUiSetup> pending_ui_setup_ {};
     std::optional<PendingProgressionView> pending_progression_view_ {};
     std::optional<PendingUiPanel> pending_ui_panel_ {};

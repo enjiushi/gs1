@@ -1,6 +1,5 @@
 #include "runtime/game_runtime.h"
 #include "runtime/runtime_clock.h"
-#include "host/runtime_projection_state.h"
 #include "content/defs/faction_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/task_defs.h"
@@ -2025,24 +2024,7 @@ int main()
         });
     assert(projected_action_tile != action_tile_messages.end());
 
-    Gs1RuntimeProjectionCache dense_projection_cache {};
-    for (const Gs1EngineMessage& message : action_messages)
-    {
-        dense_projection_cache.apply_engine_message(message);
-    }
-    assert(dense_projection_cache.state().active_site.has_value());
-    assert(
-        dense_projection_cache.state().active_site->tiles.size() ==
-        static_cast<std::size_t>(dense_projection_cache.state().active_site->width) *
-            static_cast<std::size_t>(dense_projection_cache.state().active_site->height));
-
     const auto dirty_tile_messages = flush_tile_delta_for(action_runtime, action_target, 42.0f);
-    for (const Gs1EngineMessage& message : dirty_tile_messages)
-    {
-        dense_projection_cache.apply_engine_message(message);
-    }
-
-    assert(dense_projection_cache.state().active_site.has_value());
     const auto dirty_tile_upserts = collect_messages_of_type(dirty_tile_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(dirty_tile_upserts.size() == 1U);
     {
@@ -2051,16 +2033,6 @@ int main()
         assert(payload.y == static_cast<std::uint32_t>(action_target.y));
         assert(approx_equal(payload.sand_burial, 42.0f));
     }
-
-    const auto dirty_tile_index =
-        static_cast<std::size_t>(action_target.y) *
-            static_cast<std::size_t>(dense_projection_cache.state().active_site->width) +
-        static_cast<std::size_t>(action_target.x);
-    assert(dirty_tile_index < dense_projection_cache.state().active_site->tiles.size());
-    const auto& dirty_tile_projection = dense_projection_cache.state().active_site->tiles[dirty_tile_index];
-    assert(dirty_tile_projection.x == static_cast<std::uint16_t>(action_target.x));
-    assert(dirty_tile_projection.y == static_cast<std::uint16_t>(action_target.y));
-    assert(approx_equal(dirty_tile_projection.sand_burial, 42.0f));
 
     Gs1RuntimeCreateDesc placement_preview_desc {};
     placement_preview_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);

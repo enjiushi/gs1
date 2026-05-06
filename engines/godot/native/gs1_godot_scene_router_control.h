@@ -10,7 +10,7 @@
 #include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/variant/string.hpp>
 
-class Gs1GodotSceneRouterControl final : public godot::Control
+class Gs1GodotSceneRouterControl final : public godot::Control, public IGs1GodotEngineMessageSubscriber
 {
     GDCLASS(Gs1GodotSceneRouterControl, godot::Control)
 
@@ -35,6 +35,10 @@ public:
 
     void set_site_session_scene_path(const godot::String& path);
     [[nodiscard]] godot::String get_site_session_scene_path() const;
+
+    [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
+    void handle_engine_message(const Gs1EngineMessage& message) override;
+    void handle_runtime_message_reset() override;
 
 protected:
     static void _bind_methods();

@@ -1,6 +1,7 @@
 #pragma once
 
-#include "host/runtime_projection_state.h"
+#include "gs1_godot_main_screen_projection_cache.h"
+#include "gs1_godot_runtime_node.h"
 
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/grid_container.hpp>
@@ -53,7 +54,7 @@ class ScrollContainer;
 
 class Gs1RuntimeNode;
 
-class Gs1GodotMainScreenControl final : public godot::Control
+class Gs1GodotMainScreenControl final : public godot::Control, public IGs1GodotEngineMessageSubscriber
 {
     GDCLASS(Gs1GodotMainScreenControl, godot::Control)
 
@@ -85,6 +86,10 @@ public:
 
     void set_regional_site_root_path(const godot::NodePath& path);
     [[nodiscard]] godot::NodePath get_regional_site_root_path() const;
+
+    [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
+    void handle_engine_message(const Gs1EngineMessage& message) override;
+    void handle_runtime_message_reset() override;
 
 protected:
     static void _bind_methods();
@@ -161,13 +166,12 @@ private:
     void cache_scene_references();
     void cache_ui_references();
     void wire_static_buttons();
-    [[nodiscard]] bool sync_projection_from_runtime();
     void invalidate_all_ui();
     void update_visibility(int app_state);
     void refresh_status_if_needed();
-    void refresh_menu_if_needed(int app_state, bool projection_changed);
-    void refresh_regional_map_if_needed(int app_state, bool projection_changed);
-    void refresh_site_if_needed(int app_state, bool projection_changed);
+    void refresh_menu_if_needed(int app_state);
+    void refresh_regional_map_if_needed(int app_state);
+    void refresh_site_if_needed(int app_state);
     void refresh_selected_tile_if_needed();
     void mark_status_dirty();
     void mark_menu_dirty();
@@ -180,8 +184,8 @@ private:
     void refresh_status();
     void refresh_menu(int app_state);
     void apply_fixed_panel_actions();
-    void refresh_regional_map(int app_state, bool projection_changed);
-    void refresh_site(int app_state, bool projection_changed);
+    void refresh_regional_map(int app_state);
+    void refresh_site(int app_state);
 
     void render_inventory(const Gs1RuntimeSiteProjection& site_state);
     void render_tasks(const Gs1RuntimeSiteProjection& site_state);
@@ -284,7 +288,7 @@ private:
     void ensure_card_content_nodes(godot::Button* button, ProjectedButtonRecord& record);
     void apply_tech_tree_overlay_layout();
 
-    [[nodiscard]] const Gs1RuntimeProjectionState* projection_state() const;
+    [[nodiscard]] const Gs1GodotMainScreenProjectionState* projection_state() const;
     [[nodiscard]] const Gs1RuntimeSiteProjection* active_site() const;
     [[nodiscard]] const Gs1RuntimeTileProjection* tile_at(const godot::Vector2i& tile_coord) const;
     [[nodiscard]] int find_worker_pack_storage_id() const;
@@ -448,7 +452,7 @@ private:
     godot::Vector2i selected_tile_ {0, 0};
     int selected_site_id_ {1};
     godot::String last_action_message_;
-    std::uint64_t last_projection_revision_ {0};
+    Gs1GodotMainScreenProjectionCache local_projection_cache_ {};
     godot::Rect2i regional_map_bounds_ {-4, -3, 9, 7};
     int last_rendered_selected_site_id_ {-1};
     int last_app_state_ {-1};

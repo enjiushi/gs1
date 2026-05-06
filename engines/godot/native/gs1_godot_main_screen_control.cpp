@@ -337,17 +337,16 @@ void Gs1GodotMainScreenControl::_process(double delta)
         return;
     }
 
-    const bool projection_changed = sync_projection_from_runtime();
-    const Gs1RuntimeProjectionState* state = projection_state();
+    const Gs1GodotMainScreenProjectionState* state = projection_state();
     const int app_state = state != nullptr && state->current_app_state.has_value()
         ? static_cast<int>(state->current_app_state.value())
         : APP_STATE_BOOT;
 
     update_visibility(app_state);
     refresh_status_if_needed();
-    refresh_menu_if_needed(app_state, projection_changed);
-    refresh_regional_map_if_needed(app_state, projection_changed);
-    refresh_site_if_needed(app_state, projection_changed);
+    refresh_menu_if_needed(app_state);
+    refresh_regional_map_if_needed(app_state);
+    refresh_site_if_needed(app_state);
     refresh_selected_tile_if_needed();
     update_background_presentation(app_state, delta);
     last_app_state_ = app_state;
@@ -412,6 +411,10 @@ void Gs1GodotMainScreenControl::cache_scene_references()
     if (runtime_node_ == nullptr)
     {
         runtime_node_ = Object::cast_to<Gs1RuntimeNode>(get_node_or_null(runtime_node_path_));
+        if (runtime_node_ != nullptr)
+        {
+            runtime_node_->subscribe_engine_messages(*this);
+        }
     }
     if (site_view_ == nullptr)
     {
@@ -648,33 +651,161 @@ void Gs1GodotMainScreenControl::wire_static_buttons()
     buttons_wired_ = true;
 }
 
-bool Gs1GodotMainScreenControl::sync_projection_from_runtime()
+bool Gs1GodotMainScreenControl::handles_engine_message(Gs1EngineMessageType type) const noexcept
 {
-    if (runtime_node_ == nullptr)
+    switch (type)
     {
+    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
+    case GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_MAP_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_REGIONAL_MAP_SITE_UPSERT:
+    case GS1_ENGINE_MESSAGE_REGIONAL_MAP_SITE_REMOVE:
+    case GS1_ENGINE_MESSAGE_REGIONAL_MAP_LINK_UPSERT:
+    case GS1_ENGINE_MESSAGE_REGIONAL_MAP_LINK_REMOVE:
+    case GS1_ENGINE_MESSAGE_END_REGIONAL_MAP_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_BEGIN_UI_SETUP:
+    case GS1_ENGINE_MESSAGE_UI_ELEMENT_UPSERT:
+    case GS1_ENGINE_MESSAGE_END_UI_SETUP:
+    case GS1_ENGINE_MESSAGE_CLOSE_UI_SETUP:
+    case GS1_ENGINE_MESSAGE_BEGIN_UI_PANEL:
+    case GS1_ENGINE_MESSAGE_UI_PANEL_TEXT_UPSERT:
+    case GS1_ENGINE_MESSAGE_UI_PANEL_SLOT_ACTION_UPSERT:
+    case GS1_ENGINE_MESSAGE_UI_PANEL_LIST_ITEM_UPSERT:
+    case GS1_ENGINE_MESSAGE_UI_PANEL_LIST_ACTION_UPSERT:
+    case GS1_ENGINE_MESSAGE_END_UI_PANEL:
+    case GS1_ENGINE_MESSAGE_CLOSE_UI_PANEL:
+    case GS1_ENGINE_MESSAGE_BEGIN_PROGRESSION_VIEW:
+    case GS1_ENGINE_MESSAGE_PROGRESSION_ENTRY_UPSERT:
+    case GS1_ENGINE_MESSAGE_END_PROGRESSION_VIEW:
+    case GS1_ENGINE_MESSAGE_CLOSE_PROGRESSION_VIEW:
+    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_WORKER_UPDATE:
+    case GS1_ENGINE_MESSAGE_SITE_CAMP_UPDATE:
+    case GS1_ENGINE_MESSAGE_SITE_WEATHER_UPDATE:
+    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_STORAGE_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_SLOT_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_VIEW_STATE:
+    case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_BEGIN:
+    case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_OPTION_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_END:
+    case GS1_ENGINE_MESSAGE_SITE_PLACEMENT_PREVIEW:
+    case GS1_ENGINE_MESSAGE_SITE_PLACEMENT_PREVIEW_TILE_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_PLACEMENT_FAILURE:
+    case GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_TASK_REMOVE:
+    case GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_REMOVE:
+    case GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE:
+    case GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE:
+    case GS1_ENGINE_MESSAGE_SITE_MODIFIER_LIST_BEGIN:
+    case GS1_ENGINE_MESSAGE_SITE_MODIFIER_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_ACTION_UPDATE:
+    case GS1_ENGINE_MESSAGE_HUD_STATE:
+    case GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES:
+    case GS1_ENGINE_MESSAGE_SITE_RESULT_READY:
+    case GS1_ENGINE_MESSAGE_END_SITE_SNAPSHOT:
+        return true;
+    default:
         return false;
     }
+}
 
-    const std::uint64_t runtime_revision = runtime_node_->projection_revision();
-    if (runtime_revision == last_projection_revision_)
-    {
-        return false;
-    }
+void Gs1GodotMainScreenControl::handle_engine_message(const Gs1EngineMessage& message)
+{
+    local_projection_cache_.apply_engine_message(message);
 
-    last_projection_revision_ = runtime_revision;
-    mark_status_dirty();
-    mark_menu_dirty();
-    mark_regional_map_dirty();
-    mark_regional_selection_dirty();
-    mark_regional_visuals_dirty();
-    mark_site_dirty();
-    mark_selected_tile_dirty();
-    if (const Gs1RuntimeProjectionState* state = projection_state();
-        state != nullptr && state->selected_site_id.has_value())
+    switch (message.type)
     {
-        selected_site_id_ = static_cast<int>(state->selected_site_id.value());
+    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
+        mark_status_dirty();
+        mark_menu_dirty();
+        mark_regional_map_dirty();
+        mark_regional_selection_dirty();
+        mark_regional_visuals_dirty();
+        mark_site_dirty();
+        mark_selected_tile_dirty();
+        if (const Gs1GodotMainScreenProjectionState* state = projection_state(); state != nullptr)
+        {
+            selected_site_id_ = state->selected_site_id.has_value()
+                ? static_cast<int>(state->selected_site_id.value())
+                : 0;
+        }
+        break;
+    case GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_MAP_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_REGIONAL_MAP_SITE_UPSERT:
+    case GS1_ENGINE_MESSAGE_REGIONAL_MAP_SITE_REMOVE:
+    case GS1_ENGINE_MESSAGE_REGIONAL_MAP_LINK_UPSERT:
+    case GS1_ENGINE_MESSAGE_REGIONAL_MAP_LINK_REMOVE:
+    case GS1_ENGINE_MESSAGE_END_REGIONAL_MAP_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_BEGIN_UI_PANEL:
+    case GS1_ENGINE_MESSAGE_UI_PANEL_TEXT_UPSERT:
+    case GS1_ENGINE_MESSAGE_UI_PANEL_SLOT_ACTION_UPSERT:
+    case GS1_ENGINE_MESSAGE_UI_PANEL_LIST_ITEM_UPSERT:
+    case GS1_ENGINE_MESSAGE_UI_PANEL_LIST_ACTION_UPSERT:
+    case GS1_ENGINE_MESSAGE_END_UI_PANEL:
+    case GS1_ENGINE_MESSAGE_CLOSE_UI_PANEL:
+    case GS1_ENGINE_MESSAGE_BEGIN_PROGRESSION_VIEW:
+    case GS1_ENGINE_MESSAGE_PROGRESSION_ENTRY_UPSERT:
+    case GS1_ENGINE_MESSAGE_END_PROGRESSION_VIEW:
+    case GS1_ENGINE_MESSAGE_CLOSE_PROGRESSION_VIEW:
+    case GS1_ENGINE_MESSAGE_BEGIN_UI_SETUP:
+    case GS1_ENGINE_MESSAGE_UI_ELEMENT_UPSERT:
+    case GS1_ENGINE_MESSAGE_END_UI_SETUP:
+    case GS1_ENGINE_MESSAGE_CLOSE_UI_SETUP:
+    case GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES:
+        mark_status_dirty();
+        mark_menu_dirty();
+        mark_regional_map_dirty();
+        mark_regional_selection_dirty();
+        mark_regional_visuals_dirty();
+        if (const Gs1GodotMainScreenProjectionState* state = projection_state(); state != nullptr)
+        {
+            selected_site_id_ = state->selected_site_id.has_value()
+                ? static_cast<int>(state->selected_site_id.value())
+                : 0;
+        }
+        break;
+    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_WORKER_UPDATE:
+    case GS1_ENGINE_MESSAGE_SITE_CAMP_UPDATE:
+    case GS1_ENGINE_MESSAGE_SITE_WEATHER_UPDATE:
+    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_STORAGE_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_SLOT_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_VIEW_STATE:
+    case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_BEGIN:
+    case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_OPTION_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_END:
+    case GS1_ENGINE_MESSAGE_SITE_PLACEMENT_PREVIEW:
+    case GS1_ENGINE_MESSAGE_SITE_PLACEMENT_PREVIEW_TILE_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_PLACEMENT_FAILURE:
+    case GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_TASK_REMOVE:
+    case GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_REMOVE:
+    case GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE:
+    case GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE:
+    case GS1_ENGINE_MESSAGE_SITE_MODIFIER_LIST_BEGIN:
+    case GS1_ENGINE_MESSAGE_SITE_MODIFIER_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_ACTION_UPDATE:
+    case GS1_ENGINE_MESSAGE_SITE_RESULT_READY:
+    case GS1_ENGINE_MESSAGE_HUD_STATE:
+    case GS1_ENGINE_MESSAGE_END_SITE_SNAPSHOT:
+        mark_status_dirty();
+        mark_site_dirty();
+        mark_selected_tile_dirty();
+        break;
+    default:
+        break;
     }
-    return true;
+}
+
+void Gs1GodotMainScreenControl::handle_runtime_message_reset()
+{
+    local_projection_cache_.reset();
+    selected_site_id_ = 1;
+    cached_storage_lookup_.clear();
+    invalidate_all_ui();
 }
 
 void Gs1GodotMainScreenControl::invalidate_all_ui()
@@ -793,9 +924,9 @@ void Gs1GodotMainScreenControl::refresh_status_if_needed()
     status_dirty_ = false;
 }
 
-void Gs1GodotMainScreenControl::refresh_menu_if_needed(int app_state, bool projection_changed)
+void Gs1GodotMainScreenControl::refresh_menu_if_needed(int app_state)
 {
-    if (!menu_dirty_ && !projection_changed)
+    if (!menu_dirty_)
     {
         return;
     }
@@ -803,33 +934,33 @@ void Gs1GodotMainScreenControl::refresh_menu_if_needed(int app_state, bool proje
     menu_dirty_ = false;
 }
 
-void Gs1GodotMainScreenControl::refresh_regional_map_if_needed(int app_state, bool projection_changed)
+void Gs1GodotMainScreenControl::refresh_regional_map_if_needed(int app_state)
 {
     if (!regional_map_visible_)
     {
         return;
     }
-    if (!regional_map_dirty_ && !regional_selection_dirty_ && !regional_visuals_dirty_ && !projection_changed)
+    if (!regional_map_dirty_ && !regional_selection_dirty_ && !regional_visuals_dirty_)
     {
         return;
     }
-    refresh_regional_map(app_state, projection_changed);
+    refresh_regional_map(app_state);
     regional_map_dirty_ = false;
     regional_selection_dirty_ = false;
     regional_visuals_dirty_ = false;
 }
 
-void Gs1GodotMainScreenControl::refresh_site_if_needed(int app_state, bool projection_changed)
+void Gs1GodotMainScreenControl::refresh_site_if_needed(int app_state)
 {
     if (!site_panel_visible_)
     {
         return;
     }
-    if (!site_dirty_ && !projection_changed)
+    if (!site_dirty_)
     {
         return;
     }
-    refresh_site(app_state, projection_changed);
+    refresh_site(app_state);
     site_dirty_ = false;
 }
 
@@ -888,7 +1019,7 @@ void Gs1GodotMainScreenControl::refresh_status()
 
     PackedStringArray lines;
     lines.push_back("[b]Field Operations Feed[/b]");
-    const Gs1RuntimeProjectionState* state = projection_state();
+    const Gs1GodotMainScreenProjectionState* state = projection_state();
     const int app_state = state != nullptr && state->current_app_state.has_value()
         ? static_cast<int>(state->current_app_state.value())
         : APP_STATE_BOOT;
@@ -936,7 +1067,7 @@ void Gs1GodotMainScreenControl::apply_fixed_panel_actions()
     bind_fixed_slot_actions(find_ui_panel(3), 3);
 }
 
-void Gs1GodotMainScreenControl::refresh_regional_map(int app_state, bool projection_changed)
+void Gs1GodotMainScreenControl::refresh_regional_map(int app_state)
 {
     const bool panel_visible = app_state == APP_STATE_REGIONAL_MAP || app_state == APP_STATE_SITE_LOADING;
     if (!panel_visible)
@@ -944,9 +1075,9 @@ void Gs1GodotMainScreenControl::refresh_regional_map(int app_state, bool project
         return;
     }
 
-    const bool force_refresh = projection_changed || regional_map_dirty_;
+    const bool force_refresh = regional_map_dirty_;
 
-    const auto& runtime_state = runtime_node_->projection_state();
+    const auto& runtime_state = local_projection_cache_.state();
     const auto& sites = runtime_state.regional_map_sites;
     const auto& links = runtime_state.regional_map_links;
 
@@ -1012,7 +1143,7 @@ void Gs1GodotMainScreenControl::refresh_regional_map(int app_state, bool project
     }
 }
 
-void Gs1GodotMainScreenControl::refresh_site(int app_state, bool projection_changed)
+void Gs1GodotMainScreenControl::refresh_site(int app_state)
 {
     const Gs1RuntimeSiteProjection* site_state = active_site();
     const bool panel_visible = site_state != nullptr && app_state >= APP_STATE_SITE_LOADING && app_state <= APP_STATE_SITE_RESULT;
@@ -1021,7 +1152,7 @@ void Gs1GodotMainScreenControl::refresh_site(int app_state, bool projection_chan
         return;
     }
 
-    const bool force_refresh = projection_changed || site_dirty_;
+    const bool force_refresh = site_dirty_;
 
     if (force_refresh)
     {
@@ -1347,7 +1478,7 @@ void Gs1GodotMainScreenControl::render_projected_ui_buttons(VBoxContainer* conta
     }
 
     Array button_specs;
-    const Gs1RuntimeProjectionState* state = projection_state();
+    const Gs1GodotMainScreenProjectionState* state = projection_state();
     if (state == nullptr)
     {
         reconcile_projected_action_buttons(
@@ -2192,22 +2323,12 @@ Ref<StandardMaterial3D> Gs1GodotMainScreenControl::get_material(const String& ke
 
 const Gs1RuntimeProgressionViewProjection* Gs1GodotMainScreenControl::find_progression_view(int view_id) const
 {
-    const Gs1RuntimeProjectionState* state = projection_state();
-    if (state == nullptr || runtime_node_ == nullptr)
-    {
-        return nullptr;
-    }
-    return runtime_node_->projection_cache().find_progression_view(static_cast<Gs1ProgressionViewId>(view_id));
+    return local_projection_cache_.find_progression_view(static_cast<Gs1ProgressionViewId>(view_id));
 }
 
 const Gs1RuntimeUiPanelProjection* Gs1GodotMainScreenControl::find_ui_panel(int panel_id) const
 {
-    const Gs1RuntimeProjectionState* state = projection_state();
-    if (state == nullptr || runtime_node_ == nullptr)
-    {
-        return nullptr;
-    }
-    return runtime_node_->projection_cache().find_ui_panel(static_cast<Gs1UiPanelId>(panel_id));
+    return local_projection_cache_.find_ui_panel(static_cast<Gs1UiPanelId>(panel_id));
 }
 
 const Gs1RuntimeUiPanelSlotActionProjection* Gs1GodotMainScreenControl::find_panel_slot_action(
@@ -3353,14 +3474,14 @@ void Gs1GodotMainScreenControl::ensure_card_content_nodes(Button* button, Projec
     }
 }
 
-const Gs1RuntimeProjectionState* Gs1GodotMainScreenControl::projection_state() const
+const Gs1GodotMainScreenProjectionState* Gs1GodotMainScreenControl::projection_state() const
 {
-    return runtime_node_ != nullptr ? &runtime_node_->projection_state() : nullptr;
+    return &local_projection_cache_.state();
 }
 
 const Gs1RuntimeSiteProjection* Gs1GodotMainScreenControl::active_site() const
 {
-    const Gs1RuntimeProjectionState* state = projection_state();
+    const Gs1GodotMainScreenProjectionState* state = projection_state();
     if (state == nullptr || !state->active_site.has_value())
     {
         return nullptr;
@@ -4031,7 +4152,15 @@ String Gs1GodotMainScreenControl::app_state_name(int app_state) const
     }
 }
 
-void Gs1GodotMainScreenControl::set_runtime_node_path(const NodePath& path) { runtime_node_path_ = path; runtime_node_ = nullptr; }
+void Gs1GodotMainScreenControl::set_runtime_node_path(const NodePath& path)
+{
+    if (runtime_node_ != nullptr)
+    {
+        runtime_node_->unsubscribe_engine_messages(*this);
+    }
+    runtime_node_path_ = path;
+    runtime_node_ = nullptr;
+}
 NodePath Gs1GodotMainScreenControl::get_runtime_node_path() const { return runtime_node_path_; }
 void Gs1GodotMainScreenControl::set_site_view_path(const NodePath& path) { site_view_path_ = path; site_view_ = nullptr; }
 NodePath Gs1GodotMainScreenControl::get_site_view_path() const { return site_view_path_; }

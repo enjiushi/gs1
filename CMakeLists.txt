@@ -156,8 +156,6 @@ add_library(gs1_host_bridge STATIC
     src/host/adapter_config_loader.cpp
     src/host/adapter_metadata_catalog.cpp
     src/host/runtime_dll_loader.cpp
-    src/host/runtime_message_pump.cpp
-    src/host/runtime_projection_state.cpp
     src/host/runtime_session.cpp)
 
 target_include_directories(gs1_host_bridge
@@ -488,6 +486,7 @@ if(GS1_BUILD_GODOT_ADAPTER)
     add_library(gs1_godot_adapter SHARED
         engines/godot/native/gs1_godot_extension_entry.cpp
         engines/godot/native/godot_progression_resources.cpp
+        engines/godot/native/gs1_godot_main_screen_projection_cache.cpp
         engines/godot/native/gs1_godot_main_screen_control.cpp
         engines/godot/native/gs1_godot_runtime_node.cpp
         engines/godot/native/gs1_godot_scene_router_control.cpp

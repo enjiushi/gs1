@@ -1,4 +1,4 @@
-#include "host/runtime_projection_state.h"
+#include "gs1_godot_main_screen_projection_cache.h"
 
 #include <algorithm>
 #include <cstring>
@@ -221,7 +221,7 @@ void sort_placement_preview_tiles(std::vector<Gs1RuntimePlacementPreviewTileProj
 }
 }  // namespace
 
-void Gs1RuntimeProjectionCache::reset() noexcept
+void Gs1GodotMainScreenProjectionCache::reset() noexcept
 {
     state_ = {};
     pending_ui_setup_.reset();
@@ -247,7 +247,7 @@ void Gs1RuntimeProjectionCache::reset() noexcept
     next_one_shot_cue_sequence_id_ = 1U;
 }
 
-const Gs1RuntimeProgressionViewProjection* Gs1RuntimeProjectionCache::find_progression_view(
+const Gs1RuntimeProgressionViewProjection* Gs1GodotMainScreenProjectionCache::find_progression_view(
     Gs1ProgressionViewId view_id) const noexcept
 {
     const auto found = progression_view_indices_.find(static_cast<std::uint16_t>(view_id));
@@ -258,7 +258,7 @@ const Gs1RuntimeProgressionViewProjection* Gs1RuntimeProjectionCache::find_progr
     return &state_.active_progression_views[found->second];
 }
 
-const Gs1RuntimeUiPanelProjection* Gs1RuntimeProjectionCache::find_ui_panel(
+const Gs1RuntimeUiPanelProjection* Gs1GodotMainScreenProjectionCache::find_ui_panel(
     Gs1UiPanelId panel_id) const noexcept
 {
     const auto found = ui_panel_indices_.find(static_cast<std::uint16_t>(panel_id));
@@ -269,7 +269,7 @@ const Gs1RuntimeUiPanelProjection* Gs1RuntimeProjectionCache::find_ui_panel(
     return &state_.active_ui_panels[found->second];
 }
 
-void Gs1RuntimeProjectionCache::rebuild_progression_view_indices() noexcept
+void Gs1GodotMainScreenProjectionCache::rebuild_progression_view_indices() noexcept
 {
     progression_view_indices_.clear();
     progression_view_indices_.reserve(state_.active_progression_views.size());
@@ -279,7 +279,7 @@ void Gs1RuntimeProjectionCache::rebuild_progression_view_indices() noexcept
     }
 }
 
-void Gs1RuntimeProjectionCache::rebuild_ui_setup_indices() noexcept
+void Gs1GodotMainScreenProjectionCache::rebuild_ui_setup_indices() noexcept
 {
     ui_setup_indices_.clear();
     ui_setup_indices_.reserve(state_.active_ui_setups.size());
@@ -289,7 +289,7 @@ void Gs1RuntimeProjectionCache::rebuild_ui_setup_indices() noexcept
     }
 }
 
-void Gs1RuntimeProjectionCache::rebuild_ui_panel_indices() noexcept
+void Gs1GodotMainScreenProjectionCache::rebuild_ui_panel_indices() noexcept
 {
     ui_panel_indices_.clear();
     ui_panel_indices_.reserve(state_.active_ui_panels.size());
@@ -299,7 +299,7 @@ void Gs1RuntimeProjectionCache::rebuild_ui_panel_indices() noexcept
     }
 }
 
-void Gs1RuntimeProjectionCache::apply_engine_message(const Gs1EngineMessage& message)
+void Gs1GodotMainScreenProjectionCache::apply_engine_message(const Gs1EngineMessage& message)
 {
     switch (message.type)
     {
@@ -458,7 +458,7 @@ void Gs1RuntimeProjectionCache::apply_engine_message(const Gs1EngineMessage& mes
     }
 }
 
-void Gs1RuntimeProjectionCache::apply_set_app_state(const Gs1EngineMessageSetAppStateData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_set_app_state(const Gs1EngineMessageSetAppStateData& payload)
 {
     state_.current_app_state = payload.app_state;
 
@@ -487,7 +487,7 @@ void Gs1RuntimeProjectionCache::apply_set_app_state(const Gs1EngineMessageSetApp
     }
 }
 
-void Gs1RuntimeProjectionCache::apply_regional_map_snapshot_begin(const Gs1EngineMessageRegionalMapSnapshotData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_regional_map_snapshot_begin(const Gs1EngineMessageRegionalMapSnapshotData& payload)
 {
     if (payload.mode == GS1_PROJECTION_MODE_DELTA)
     {
@@ -508,7 +508,7 @@ void Gs1RuntimeProjectionCache::apply_regional_map_snapshot_begin(const Gs1Engin
     }
 }
 
-void Gs1RuntimeProjectionCache::apply_regional_map_site_upsert(const Gs1EngineMessageRegionalMapSiteData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_regional_map_site_upsert(const Gs1EngineMessageRegionalMapSiteData& payload)
 {
     if (!pending_regional_map_.has_value())
     {
@@ -528,7 +528,7 @@ void Gs1RuntimeProjectionCache::apply_regional_map_site_upsert(const Gs1EngineMe
     }
 }
 
-void Gs1RuntimeProjectionCache::apply_regional_map_site_remove(const Gs1EngineMessageRegionalMapSiteData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_regional_map_site_remove(const Gs1EngineMessageRegionalMapSiteData& payload)
 {
     if (!pending_regional_map_.has_value())
     {
@@ -544,7 +544,7 @@ void Gs1RuntimeProjectionCache::apply_regional_map_site_remove(const Gs1EngineMe
     }
 }
 
-void Gs1RuntimeProjectionCache::apply_regional_map_link_upsert(const Gs1EngineMessageRegionalMapLinkData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_regional_map_link_upsert(const Gs1EngineMessageRegionalMapLinkData& payload)
 {
     if (!pending_regional_map_.has_value())
     {
@@ -559,7 +559,7 @@ void Gs1RuntimeProjectionCache::apply_regional_map_link_upsert(const Gs1EngineMe
         [](const auto& link) { return regional_map_link_key(link.from_site_id, link.to_site_id); });
 }
 
-void Gs1RuntimeProjectionCache::apply_regional_map_link_remove(const Gs1EngineMessageRegionalMapLinkData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_regional_map_link_remove(const Gs1EngineMessageRegionalMapLinkData& payload)
 {
     if (!pending_regional_map_.has_value())
     {
@@ -572,7 +572,7 @@ void Gs1RuntimeProjectionCache::apply_regional_map_link_remove(const Gs1EngineMe
     });
 }
 
-void Gs1RuntimeProjectionCache::apply_regional_map_snapshot_end()
+void Gs1GodotMainScreenProjectionCache::apply_regional_map_snapshot_end()
 {
     if (!pending_regional_map_.has_value())
     {
@@ -586,7 +586,7 @@ void Gs1RuntimeProjectionCache::apply_regional_map_snapshot_end()
     pending_regional_map_.reset();
 }
 
-void Gs1RuntimeProjectionCache::apply_ui_setup_begin(const Gs1EngineMessageUiSetupData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_ui_setup_begin(const Gs1EngineMessageUiSetupData& payload)
 {
     pending_ui_setup_element_indices_.clear();
     if (payload.mode == GS1_PROJECTION_MODE_DELTA)
@@ -626,7 +626,7 @@ void Gs1RuntimeProjectionCache::apply_ui_setup_begin(const Gs1EngineMessageUiSet
     pending_ui_setup_->elements.reserve(std::max<std::size_t>(pending_ui_setup_->elements.size(), payload.element_count));
 }
 
-void Gs1RuntimeProjectionCache::apply_ui_element_upsert(const Gs1EngineMessageUiElementData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_ui_element_upsert(const Gs1EngineMessageUiElementData& payload)
 {
     if (!pending_ui_setup_.has_value())
     {
@@ -653,7 +653,7 @@ void Gs1RuntimeProjectionCache::apply_ui_element_upsert(const Gs1EngineMessageUi
     pending_ui_setup_->elements.push_back(std::move(projection));
 }
 
-void Gs1RuntimeProjectionCache::apply_ui_setup_end()
+void Gs1GodotMainScreenProjectionCache::apply_ui_setup_end()
 {
     if (!pending_ui_setup_.has_value())
     {
@@ -684,7 +684,7 @@ void Gs1RuntimeProjectionCache::apply_ui_setup_end()
     pending_ui_setup_element_indices_.clear();
 }
 
-void Gs1RuntimeProjectionCache::apply_ui_setup_close(const Gs1EngineMessageCloseUiSetupData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_ui_setup_close(const Gs1EngineMessageCloseUiSetupData& payload)
 {
     erase_projection_if(state_.active_ui_setups, [&](const auto& setup) {
         return setup.setup_id == payload.setup_id;
@@ -692,7 +692,7 @@ void Gs1RuntimeProjectionCache::apply_ui_setup_close(const Gs1EngineMessageClose
     rebuild_ui_setup_indices();
 }
 
-void Gs1RuntimeProjectionCache::apply_progression_view_begin(const Gs1EngineMessageProgressionViewData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_progression_view_begin(const Gs1EngineMessageProgressionViewData& payload)
 {
     pending_progression_entry_indices_.clear();
     if (payload.mode == GS1_PROJECTION_MODE_DELTA)
@@ -730,7 +730,7 @@ void Gs1RuntimeProjectionCache::apply_progression_view_begin(const Gs1EngineMess
     pending_progression_view_->entries.reserve(std::max<std::size_t>(pending_progression_view_->entries.size(), payload.entry_count));
 }
 
-void Gs1RuntimeProjectionCache::apply_progression_entry_upsert(const Gs1EngineMessageProgressionEntryData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_progression_entry_upsert(const Gs1EngineMessageProgressionEntryData& payload)
 {
     if (!pending_progression_view_.has_value())
     {
@@ -759,7 +759,7 @@ void Gs1RuntimeProjectionCache::apply_progression_entry_upsert(const Gs1EngineMe
     pending_progression_view_->entries.push_back(std::move(projection));
 }
 
-void Gs1RuntimeProjectionCache::apply_progression_view_end()
+void Gs1GodotMainScreenProjectionCache::apply_progression_view_end()
 {
     if (!pending_progression_view_.has_value())
     {
@@ -783,7 +783,7 @@ void Gs1RuntimeProjectionCache::apply_progression_view_end()
     pending_progression_entry_indices_.clear();
 }
 
-void Gs1RuntimeProjectionCache::apply_progression_view_close(const Gs1EngineMessageCloseProgressionViewData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_progression_view_close(const Gs1EngineMessageCloseProgressionViewData& payload)
 {
     erase_projection_if(state_.active_progression_views, [&](const auto& view) {
         return view.view_id == payload.view_id;
@@ -791,7 +791,7 @@ void Gs1RuntimeProjectionCache::apply_progression_view_close(const Gs1EngineMess
     rebuild_progression_view_indices();
 }
 
-void Gs1RuntimeProjectionCache::apply_ui_panel_begin(const Gs1EngineMessageUiPanelData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_ui_panel_begin(const Gs1EngineMessageUiPanelData& payload)
 {
     pending_ui_panel_text_line_indices_.clear();
     pending_ui_panel_slot_action_indices_.clear();
@@ -861,7 +861,7 @@ void Gs1RuntimeProjectionCache::apply_ui_panel_begin(const Gs1EngineMessageUiPan
     pending_ui_panel_->list_actions.reserve(std::max<std::size_t>(pending_ui_panel_->list_actions.size(), payload.list_action_count));
 }
 
-void Gs1RuntimeProjectionCache::apply_ui_panel_text_upsert(const Gs1EngineMessageUiPanelTextData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_ui_panel_text_upsert(const Gs1EngineMessageUiPanelTextData& payload)
 {
     if (!pending_ui_panel_.has_value())
     {
@@ -887,7 +887,7 @@ void Gs1RuntimeProjectionCache::apply_ui_panel_text_upsert(const Gs1EngineMessag
     pending_ui_panel_->text_lines.push_back(std::move(projection));
 }
 
-void Gs1RuntimeProjectionCache::apply_ui_panel_slot_action_upsert(const Gs1EngineMessageUiPanelSlotActionData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_ui_panel_slot_action_upsert(const Gs1EngineMessageUiPanelSlotActionData& payload)
 {
     if (!pending_ui_panel_.has_value())
     {
@@ -914,7 +914,7 @@ void Gs1RuntimeProjectionCache::apply_ui_panel_slot_action_upsert(const Gs1Engin
     pending_ui_panel_->slot_actions.push_back(std::move(projection));
 }
 
-void Gs1RuntimeProjectionCache::apply_ui_panel_list_item_upsert(const Gs1EngineMessageUiPanelListItemData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_ui_panel_list_item_upsert(const Gs1EngineMessageUiPanelListItemData& payload)
 {
     if (!pending_ui_panel_.has_value())
     {
@@ -944,7 +944,7 @@ void Gs1RuntimeProjectionCache::apply_ui_panel_list_item_upsert(const Gs1EngineM
     pending_ui_panel_->list_items.push_back(std::move(projection));
 }
 
-void Gs1RuntimeProjectionCache::apply_ui_panel_list_action_upsert(const Gs1EngineMessageUiPanelListActionData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_ui_panel_list_action_upsert(const Gs1EngineMessageUiPanelListActionData& payload)
 {
     if (!pending_ui_panel_.has_value())
     {
@@ -969,7 +969,7 @@ void Gs1RuntimeProjectionCache::apply_ui_panel_list_action_upsert(const Gs1Engin
     pending_ui_panel_->list_actions.push_back(std::move(projection));
 }
 
-void Gs1RuntimeProjectionCache::apply_ui_panel_end()
+void Gs1GodotMainScreenProjectionCache::apply_ui_panel_end()
 {
     if (!pending_ui_panel_.has_value())
     {
@@ -1003,7 +1003,7 @@ void Gs1RuntimeProjectionCache::apply_ui_panel_end()
     pending_ui_panel_list_action_indices_.clear();
 }
 
-void Gs1RuntimeProjectionCache::apply_ui_panel_close(const Gs1EngineMessageCloseUiPanelData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_ui_panel_close(const Gs1EngineMessageCloseUiPanelData& payload)
 {
     erase_projection_if(state_.active_ui_panels, [&](const auto& panel) {
         return panel.panel_id == payload.panel_id;
@@ -1011,7 +1011,7 @@ void Gs1RuntimeProjectionCache::apply_ui_panel_close(const Gs1EngineMessageClose
     rebuild_ui_panel_indices();
 }
 
-void Gs1RuntimeProjectionCache::apply_site_snapshot_begin(const Gs1EngineMessageSiteSnapshotData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_site_snapshot_begin(const Gs1EngineMessageSiteSnapshotData& payload)
 {
     if (payload.mode == GS1_PROJECTION_MODE_DELTA && state_.active_site.has_value())
     {
@@ -1069,7 +1069,7 @@ void Gs1RuntimeProjectionCache::apply_site_snapshot_begin(const Gs1EngineMessage
     }
 }
 
-void Gs1RuntimeProjectionCache::apply_site_tile_upsert(const Gs1EngineMessageSiteTileData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_site_tile_upsert(const Gs1EngineMessageSiteTileData& payload)
 {
     if (!pending_site_.has_value())
     {
@@ -1087,7 +1087,7 @@ void Gs1RuntimeProjectionCache::apply_site_tile_upsert(const Gs1EngineMessageSit
     pending_site_->tiles[*tile_index] = projection;
 }
 
-void Gs1RuntimeProjectionCache::apply_site_worker_update(const Gs1EngineMessageWorkerData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_site_worker_update(const Gs1EngineMessageWorkerData& payload)
 {
     if (!pending_site_.has_value())
     {
@@ -1098,7 +1098,7 @@ void Gs1RuntimeProjectionCache::apply_site_worker_update(const Gs1EngineMessageW
     pending_site_->worker = projection;
 }
 
-void Gs1RuntimeProjectionCache::apply_site_camp_update(const Gs1EngineMessageCampData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_site_camp_update(const Gs1EngineMessageCampData& payload)
 {
     if (!pending_site_.has_value())
     {
@@ -1109,7 +1109,7 @@ void Gs1RuntimeProjectionCache::apply_site_camp_update(const Gs1EngineMessageCam
     pending_site_->camp = projection;
 }
 
-void Gs1RuntimeProjectionCache::apply_site_weather_update(const Gs1EngineMessageWeatherData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_site_weather_update(const Gs1EngineMessageWeatherData& payload)
 {
     if (!pending_site_.has_value())
     {
@@ -1120,7 +1120,7 @@ void Gs1RuntimeProjectionCache::apply_site_weather_update(const Gs1EngineMessage
     pending_site_->weather = projection;
 }
 
-void Gs1RuntimeProjectionCache::apply_site_inventory_storage_upsert(const Gs1EngineMessageInventoryStorageData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_site_inventory_storage_upsert(const Gs1EngineMessageInventoryStorageData& payload)
 {
     if (!pending_site_.has_value())
     {
@@ -1139,7 +1139,7 @@ void Gs1RuntimeProjectionCache::apply_site_inventory_storage_upsert(const Gs1Eng
     pending_site_->inventory_storages.push_back(projection);
 }
 
-void Gs1RuntimeProjectionCache::apply_site_inventory_slot_upsert(const Gs1EngineMessageInventorySlotData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_site_inventory_slot_upsert(const Gs1EngineMessageInventorySlotData& payload)
 {
     if (!pending_site_.has_value())
     {
@@ -1178,7 +1178,7 @@ void Gs1RuntimeProjectionCache::apply_site_inventory_slot_upsert(const Gs1Engine
     slots->push_back(projection);
 }
 
-void Gs1RuntimeProjectionCache::apply_site_inventory_view_state(const Gs1EngineMessageInventoryViewData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_site_inventory_view_state(const Gs1EngineMessageInventoryViewData& payload)
 {
     if (!pending_site_.has_value())
     {
@@ -1218,7 +1218,7 @@ void Gs1RuntimeProjectionCache::apply_site_inventory_view_state(const Gs1EngineM
     }
 }
 
-void Gs1RuntimeProjectionCache::apply_site_craft_context_begin(const Gs1EngineMessageCraftContextData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_site_craft_context_begin(const Gs1EngineMessageCraftContextData& payload)
 {
     if (!pending_site_.has_value())
     {
@@ -1233,7 +1233,7 @@ void Gs1RuntimeProjectionCache::apply_site_craft_context_begin(const Gs1EngineMe
     pending_site_->craft_context->options.reserve(payload.option_count);
 }
 
-void Gs1RuntimeProjectionCache::apply_site_craft_context_option_upsert(const Gs1EngineMessageCraftContextOptionData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_site_craft_context_option_upsert(const Gs1EngineMessageCraftContextOptionData& payload)
 {
     if (!pending_site_.has_value() || !pending_site_->craft_context.has_value())
     {
@@ -1243,7 +1243,7 @@ void Gs1RuntimeProjectionCache::apply_site_craft_context_option_upsert(const Gs1
     pending_site_->craft_context->options.push_back(payload);
 }
 
-void Gs1RuntimeProjectionCache::apply_site_craft_context_end()
+void Gs1GodotMainScreenProjectionCache::apply_site_craft_context_end()
 {
     if (!pending_site_.has_value() || !pending_site_->craft_context.has_value())
     {
@@ -1253,7 +1253,7 @@ void Gs1RuntimeProjectionCache::apply_site_craft_context_end()
     sort_craft_options(pending_site_->craft_context->options);
 }
 
-void Gs1RuntimeProjectionCache::apply_site_placement_preview(const Gs1EngineMessagePlacementPreviewData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_site_placement_preview(const Gs1EngineMessagePlacementPreviewData& payload)
 {
     if (!pending_site_.has_value())
     {
@@ -1271,7 +1271,7 @@ void Gs1RuntimeProjectionCache::apply_site_placement_preview(const Gs1EngineMess
     pending_site_->placement_preview_tiles.clear();
 }
 
-void Gs1RuntimeProjectionCache::apply_site_placement_preview_tile_upsert(const Gs1EngineMessagePlacementPreviewTileData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_site_placement_preview_tile_upsert(const Gs1EngineMessagePlacementPreviewTileData& payload)
 {
     if (!pending_site_.has_value())
     {
@@ -1290,7 +1290,7 @@ void Gs1RuntimeProjectionCache::apply_site_placement_preview_tile_upsert(const G
         });
 }
 
-void Gs1RuntimeProjectionCache::apply_site_placement_failure(const Gs1EngineMessagePlacementFailureData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_site_placement_failure(const Gs1EngineMessagePlacementFailureData& payload)
 {
     auto* site = pending_site_.has_value() ? &pending_site_.value() : (state_.active_site.has_value() ? &state_.active_site.value() : nullptr);
     if (site == nullptr)
@@ -1301,7 +1301,7 @@ void Gs1RuntimeProjectionCache::apply_site_placement_failure(const Gs1EngineMess
     site->placement_failure = payload;
 }
 
-void Gs1RuntimeProjectionCache::apply_site_task_upsert(const Gs1EngineMessageTaskData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_site_task_upsert(const Gs1EngineMessageTaskData& payload)
 {
     if (!pending_site_.has_value())
     {
@@ -1320,7 +1320,7 @@ void Gs1RuntimeProjectionCache::apply_site_task_upsert(const Gs1EngineMessageTas
     pending_site_->tasks.push_back(projection);
 }
 
-void Gs1RuntimeProjectionCache::apply_site_task_remove(const Gs1EngineMessageTaskData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_site_task_remove(const Gs1EngineMessageTaskData& payload)
 {
     if (!pending_site_.has_value())
     {
@@ -1344,7 +1344,7 @@ void Gs1RuntimeProjectionCache::apply_site_task_remove(const Gs1EngineMessageTas
     pending_task_indices_.erase(found);
 }
 
-void Gs1RuntimeProjectionCache::apply_site_phone_listing_upsert(const Gs1EngineMessagePhoneListingData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_site_phone_listing_upsert(const Gs1EngineMessagePhoneListingData& payload)
 {
     if (!pending_site_.has_value())
     {
@@ -1363,7 +1363,7 @@ void Gs1RuntimeProjectionCache::apply_site_phone_listing_upsert(const Gs1EngineM
     pending_site_->phone_listings.push_back(projection);
 }
 
-void Gs1RuntimeProjectionCache::apply_site_phone_listing_remove(const Gs1EngineMessagePhoneListingData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_site_phone_listing_remove(const Gs1EngineMessagePhoneListingData& payload)
 {
     if (!pending_site_.has_value())
     {
@@ -1387,7 +1387,7 @@ void Gs1RuntimeProjectionCache::apply_site_phone_listing_remove(const Gs1EngineM
     pending_phone_listing_indices_.erase(found);
 }
 
-void Gs1RuntimeProjectionCache::apply_site_phone_panel_state(const Gs1EngineMessagePhonePanelData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_site_phone_panel_state(const Gs1EngineMessagePhonePanelData& payload)
 {
     if (!pending_site_.has_value())
     {
@@ -1397,7 +1397,7 @@ void Gs1RuntimeProjectionCache::apply_site_phone_panel_state(const Gs1EngineMess
     pending_site_->phone_panel = payload;
 }
 
-void Gs1RuntimeProjectionCache::apply_site_modifier_list_begin(const Gs1EngineMessageSiteModifierListData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_site_modifier_list_begin(const Gs1EngineMessageSiteModifierListData& payload)
 {
     if (!pending_site_.has_value())
     {
@@ -1411,7 +1411,7 @@ void Gs1RuntimeProjectionCache::apply_site_modifier_list_begin(const Gs1EngineMe
     pending_site_->active_modifiers.reserve(payload.modifier_count);
 }
 
-void Gs1RuntimeProjectionCache::apply_site_modifier_upsert(const Gs1EngineMessageSiteModifierData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_site_modifier_upsert(const Gs1EngineMessageSiteModifierData& payload)
 {
     if (!pending_site_.has_value())
     {
@@ -1430,7 +1430,7 @@ void Gs1RuntimeProjectionCache::apply_site_modifier_upsert(const Gs1EngineMessag
     pending_site_->active_modifiers.push_back(projection);
 }
 
-void Gs1RuntimeProjectionCache::apply_site_protection_overlay_state(const Gs1EngineMessageSiteProtectionOverlayData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_site_protection_overlay_state(const Gs1EngineMessageSiteProtectionOverlayData& payload)
 {
     auto* site = pending_site_.has_value() ? &pending_site_.value() : (state_.active_site.has_value() ? &state_.active_site.value() : nullptr);
     if (site == nullptr)
@@ -1441,7 +1441,7 @@ void Gs1RuntimeProjectionCache::apply_site_protection_overlay_state(const Gs1Eng
     site->protection_overlay = payload;
 }
 
-void Gs1RuntimeProjectionCache::apply_site_snapshot_end()
+void Gs1GodotMainScreenProjectionCache::apply_site_snapshot_end()
 {
     if (!pending_site_.has_value())
     {
@@ -1469,17 +1469,17 @@ void Gs1RuntimeProjectionCache::apply_site_snapshot_end()
     pending_modifier_indices_.clear();
 }
 
-void Gs1RuntimeProjectionCache::apply_hud_state(const Gs1EngineMessageHudStateData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_hud_state(const Gs1EngineMessageHudStateData& payload)
 {
     state_.hud = payload;
 }
 
-void Gs1RuntimeProjectionCache::apply_campaign_resources(const Gs1EngineMessageCampaignResourcesData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_campaign_resources(const Gs1EngineMessageCampaignResourcesData& payload)
 {
     state_.campaign_resources = payload;
 }
 
-void Gs1RuntimeProjectionCache::apply_site_action_update(const Gs1EngineMessageSiteActionData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_site_action_update(const Gs1EngineMessageSiteActionData& payload)
 {
     if ((payload.flags & GS1_SITE_ACTION_PRESENTATION_FLAG_CLEAR) != 0U)
     {
@@ -1490,12 +1490,12 @@ void Gs1RuntimeProjectionCache::apply_site_action_update(const Gs1EngineMessageS
     state_.site_action = payload;
 }
 
-void Gs1RuntimeProjectionCache::apply_site_result_ready(const Gs1EngineMessageSiteResultData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_site_result_ready(const Gs1EngineMessageSiteResultData& payload)
 {
     state_.site_result = payload;
 }
 
-void Gs1RuntimeProjectionCache::apply_one_shot_cue(const Gs1EngineMessageOneShotCueData& payload)
+void Gs1GodotMainScreenProjectionCache::apply_one_shot_cue(const Gs1EngineMessageOneShotCueData& payload)
 {
     Gs1RuntimeOneShotCueProjection projection {};
     projection.sequence_id = next_one_shot_cue_sequence_id_;
@@ -1513,12 +1513,12 @@ void Gs1RuntimeProjectionCache::apply_one_shot_cue(const Gs1EngineMessageOneShot
     }
 }
 
-std::size_t Gs1RuntimeProjectionCache::site_tile_capacity(const Gs1RuntimeSiteProjection& site) const noexcept
+std::size_t Gs1GodotMainScreenProjectionCache::site_tile_capacity(const Gs1RuntimeSiteProjection& site) const noexcept
 {
     return static_cast<std::size_t>(site.width) * static_cast<std::size_t>(site.height);
 }
 
-std::optional<std::uint32_t> Gs1RuntimeProjectionCache::site_tile_index(
+std::optional<std::uint32_t> Gs1GodotMainScreenProjectionCache::site_tile_index(
     const Gs1RuntimeSiteProjection& site,
     std::uint16_t x,
     std::uint16_t y) const noexcept
