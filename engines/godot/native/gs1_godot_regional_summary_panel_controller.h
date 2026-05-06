@@ -15,7 +15,6 @@ public:
     [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
     void handle_engine_message(const Gs1EngineMessage& message) override;
     void handle_runtime_message_reset() override;
-    void set_selected_site_id(int site_id);
     void refresh_if_needed();
 
 private:
@@ -28,6 +27,5 @@ private:
     Gs1GodotRegionalMapStateReducer regional_map_state_reducer_ {};
     std::optional<Gs1AppState> current_app_state_ {};
     std::optional<Gs1RuntimeCampaignResourcesProjection> campaign_resources_ {};
-    int selected_site_id_ {0};
     bool dirty_ {true};
 };

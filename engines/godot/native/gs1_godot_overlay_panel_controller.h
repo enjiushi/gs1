@@ -18,7 +18,9 @@ public:
     void refresh_if_needed();
 
 private:
+    godot::Control* panel_ {nullptr};
     godot::Label* overlay_state_label_ {nullptr};
+    std::optional<Gs1AppState> current_app_state_ {};
     std::optional<Gs1RuntimeProtectionOverlayProjection> overlay_state_ {};
     bool dirty_ {true};
 };

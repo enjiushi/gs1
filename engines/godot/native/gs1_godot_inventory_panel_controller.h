@@ -21,7 +21,9 @@ public:
 private:
     [[nodiscard]] godot::String item_name_for(int item_id) const;
 
+    godot::Control* panel_ {nullptr};
     godot::RichTextLabel* inventory_summary_ {nullptr};
+    std::optional<Gs1AppState> current_app_state_ {};
     std::vector<Gs1RuntimeInventoryStorageProjection> inventory_storages_ {};
     std::vector<Gs1RuntimeInventorySlotProjection> worker_pack_slots_ {};
     std::optional<Gs1RuntimeInventoryViewProjection> opened_storage_ {};

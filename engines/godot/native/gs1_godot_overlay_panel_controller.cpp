@@ -4,10 +4,15 @@ using namespace godot;
 
 void Gs1GodotOverlayPanelController::cache_ui_references(Control& owner)
 {
+    if (panel_ == nullptr)
+    {
+        panel_ = Object::cast_to<Control>(owner.find_child("OverlayPanel", true, false));
+    }
     if (overlay_state_label_ == nullptr)
     {
         overlay_state_label_ = Object::cast_to<Label>(owner.find_child("OverlayStateLabel", true, false));
     }
+    refresh_if_needed();
 }
 
 bool Gs1GodotOverlayPanelController::handles_engine_message(Gs1EngineMessageType type) const noexcept
@@ -26,6 +31,7 @@ void Gs1GodotOverlayPanelController::handle_engine_message(const Gs1EngineMessag
     case GS1_ENGINE_MESSAGE_SET_APP_STATE:
     {
         const auto& payload = message.payload_as<Gs1EngineMessageSetAppStateData>();
+        current_app_state_ = payload.app_state;
         if (payload.app_state == GS1_APP_STATE_MAIN_MENU ||
             payload.app_state == GS1_APP_STATE_REGIONAL_MAP ||
             payload.app_state == GS1_APP_STATE_CAMPAIGN_END)
@@ -38,17 +44,36 @@ void Gs1GodotOverlayPanelController::handle_engine_message(const Gs1EngineMessag
         break;
     }
     dirty_ = true;
+    refresh_if_needed();
 }
 
 void Gs1GodotOverlayPanelController::handle_runtime_message_reset()
 {
+    current_app_state_.reset();
     overlay_state_.reset();
     dirty_ = true;
+    refresh_if_needed();
 }
 
 void Gs1GodotOverlayPanelController::refresh_if_needed()
 {
-    if (!dirty_ || overlay_state_label_ == nullptr)
+    if (!dirty_)
+    {
+        return;
+    }
+
+    const int app_state = current_app_state_.has_value() ? static_cast<int>(current_app_state_.value()) : 0;
+    const bool panel_visible = app_state >= GS1_APP_STATE_SITE_LOADING && app_state <= GS1_APP_STATE_SITE_RESULT;
+    if (panel_ != nullptr)
+    {
+        panel_->set_visible(panel_visible);
+    }
+    if (!panel_visible)
+    {
+        dirty_ = false;
+        return;
+    }
+    if (overlay_state_label_ == nullptr)
     {
         return;
     }

@@ -14,6 +14,7 @@ void Gs1GodotSiteSummaryPanelController::cache_ui_references(Control& owner)
     {
         site_summary_ = Object::cast_to<RichTextLabel>(owner.find_child("SiteSummary", true, false));
     }
+    refresh_if_needed();
 }
 
 bool Gs1GodotSiteSummaryPanelController::handles_engine_message(Gs1EngineMessageType type) const noexcept
@@ -98,6 +99,7 @@ void Gs1GodotSiteSummaryPanelController::handle_engine_message(const Gs1EngineMe
         break;
     }
     dirty_ = true;
+    refresh_if_needed();
 }
 
 void Gs1GodotSiteSummaryPanelController::handle_runtime_message_reset()
@@ -105,6 +107,7 @@ void Gs1GodotSiteSummaryPanelController::handle_runtime_message_reset()
     current_app_state_.reset();
     state_.reset();
     dirty_ = true;
+    refresh_if_needed();
 }
 
 void Gs1GodotSiteSummaryPanelController::refresh_if_needed()

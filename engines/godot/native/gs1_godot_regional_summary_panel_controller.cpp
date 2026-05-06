@@ -14,6 +14,7 @@ void Gs1GodotRegionalSummaryPanelController::cache_ui_references(Control& owner)
     {
         regional_map_graph_ = Object::cast_to<RichTextLabel>(owner.find_child("RegionalMapGraph", true, false));
     }
+    refresh_if_needed();
 }
 
 bool Gs1GodotRegionalSummaryPanelController::handles_engine_message(Gs1EngineMessageType type) const noexcept
@@ -50,6 +51,7 @@ void Gs1GodotRegionalSummaryPanelController::handle_engine_message(const Gs1Engi
         break;
     }
     dirty_ = true;
+    refresh_if_needed();
 }
 
 void Gs1GodotRegionalSummaryPanelController::handle_runtime_message_reset()
@@ -57,18 +59,8 @@ void Gs1GodotRegionalSummaryPanelController::handle_runtime_message_reset()
     regional_map_state_reducer_.reset();
     current_app_state_.reset();
     campaign_resources_.reset();
-    selected_site_id_ = 0;
     dirty_ = true;
-}
-
-void Gs1GodotRegionalSummaryPanelController::set_selected_site_id(int site_id)
-{
-    if (selected_site_id_ == site_id)
-    {
-        return;
-    }
-    selected_site_id_ = site_id;
-    dirty_ = true;
+    refresh_if_needed();
 }
 
 void Gs1GodotRegionalSummaryPanelController::refresh_if_needed()
@@ -88,11 +80,14 @@ void Gs1GodotRegionalSummaryPanelController::refresh_if_needed()
     const auto& regional_state = regional_map_state_reducer_.state();
     const auto& sites = regional_state.sites;
     const auto& links = regional_state.links;
+    const int selected_site_id = regional_state.selected_site_id.has_value()
+        ? static_cast<int>(regional_state.selected_site_id.value())
+        : (sites.empty() ? 0 : static_cast<int>(sites.front().site_id));
 
     PackedStringArray lines;
     lines.push_back("[b]Campaign Planning Map[/b]");
     lines.push_back(vformat("Revealed Sites: %d  Adjacency Links: %d", static_cast<int>(sites.size()), static_cast<int>(links.size())));
-    lines.push_back(selected_site_id_ != 0 ? vformat("Selected Site: Site %d", selected_site_id_) : String("Selected Site: None"));
+    lines.push_back(selected_site_id != 0 ? vformat("Selected Site: Site %d", selected_site_id) : String("Selected Site: None"));
     if (campaign_resources_.has_value())
     {
         lines.push_back(vformat("Campaign Cash: %.2f", campaign_resources_->current_money));

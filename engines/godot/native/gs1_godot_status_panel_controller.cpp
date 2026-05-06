@@ -51,6 +51,7 @@ void Gs1GodotStatusPanelController::cache_ui_references(Control& owner)
     {
         status_label_ = Object::cast_to<RichTextLabel>(owner.find_child("StatusLabel", true, false));
     }
+    refresh(runtime_linked_, last_error_);
 }
 
 bool Gs1GodotStatusPanelController::handles_engine_message(Gs1EngineMessageType type) const noexcept
@@ -114,6 +115,7 @@ void Gs1GodotStatusPanelController::handle_engine_message(const Gs1EngineMessage
         break;
     }
     dirty_ = true;
+    refresh(runtime_linked_, last_error_);
 }
 
 void Gs1GodotStatusPanelController::handle_runtime_message_reset()
@@ -123,63 +125,36 @@ void Gs1GodotStatusPanelController::handle_runtime_message_reset()
     hud_state_.reset();
     site_action_state_.reset();
     dirty_ = true;
+    refresh(runtime_linked_, last_error_);
 }
 
 void Gs1GodotStatusPanelController::set_last_action_message(const String& message)
 {
     last_action_message_ = message;
     dirty_ = true;
+    refresh(runtime_linked_, last_error_);
+}
+
+void Gs1GodotStatusPanelController::set_runtime_status(bool runtime_linked, const std::string& last_error)
+{
+    if (runtime_linked_ == runtime_linked && last_error_ == last_error)
+    {
+        return;
+    }
+    runtime_linked_ = runtime_linked;
+    last_error_ = last_error;
+    dirty_ = true;
+    refresh(runtime_linked_, last_error_);
 }
 
 void Gs1GodotStatusPanelController::show_runtime_missing()
 {
-    if (status_label_ != nullptr)
-    {
-        status_label_->set_text("Runtime node not found");
-    }
-}
-
-void Gs1GodotStatusPanelController::refresh_if_needed(bool runtime_linked, const std::string& last_error)
-{
-    if (!dirty_)
-    {
-        return;
-    }
-    refresh(runtime_linked, last_error);
-    dirty_ = false;
-}
-
-int Gs1GodotStatusPanelController::current_app_state_or(int fallback) const noexcept
-{
-    return current_app_state_.has_value()
-        ? static_cast<int>(current_app_state_.value())
-        : fallback;
-}
-
-const Gs1RuntimeCampaignResourcesProjection* Gs1GodotStatusPanelController::campaign_resources() const noexcept
-{
-    return campaign_resources_.has_value()
-        ? &campaign_resources_.value()
-        : nullptr;
-}
-
-const Gs1RuntimeHudProjection* Gs1GodotStatusPanelController::hud_state() const noexcept
-{
-    return hud_state_.has_value()
-        ? &hud_state_.value()
-        : nullptr;
-}
-
-const Gs1RuntimeSiteActionProjection* Gs1GodotStatusPanelController::site_action_state() const noexcept
-{
-    return site_action_state_.has_value()
-        ? &site_action_state_.value()
-        : nullptr;
+    set_runtime_status(false, std::string {});
 }
 
 void Gs1GodotStatusPanelController::refresh(bool runtime_linked, const std::string& last_error)
 {
-    if (status_label_ == nullptr)
+    if (!dirty_ || status_label_ == nullptr)
     {
         return;
     }
@@ -187,18 +162,20 @@ void Gs1GodotStatusPanelController::refresh(bool runtime_linked, const std::stri
     PackedStringArray lines;
     lines.push_back("[b]Field Operations Feed[/b]");
     lines.push_back(vformat("Runtime: %s", bool_text(runtime_linked, "linked", "idle")));
-    lines.push_back(vformat("Screen: %s", app_state_name(current_app_state_or(0))));
+    lines.push_back(vformat(
+        "Screen: %s",
+        app_state_name(current_app_state_.has_value() ? static_cast<int>(current_app_state_.value()) : 0)));
 
-    if (const Gs1RuntimeCampaignResourcesProjection* current_campaign_resources = campaign_resources();
-        current_campaign_resources != nullptr)
+    if (campaign_resources_.has_value())
     {
-        lines.push_back(vformat("Campaign Cash: %.2f", current_campaign_resources->current_money));
+        const auto& current_campaign_resources = campaign_resources_.value();
+        lines.push_back(vformat("Campaign Cash: %.2f", current_campaign_resources.current_money));
         lines.push_back(vformat(
             "Reputation T/V/B/U: %d / %d / %d / %d",
-            current_campaign_resources->total_reputation,
-            current_campaign_resources->village_reputation,
-            current_campaign_resources->forestry_reputation,
-            current_campaign_resources->university_reputation));
+            current_campaign_resources.total_reputation,
+            current_campaign_resources.village_reputation,
+            current_campaign_resources.forestry_reputation,
+            current_campaign_resources.university_reputation));
     }
     if (!last_action_message_.is_empty())
     {
@@ -211,4 +188,5 @@ void Gs1GodotStatusPanelController::refresh(bool runtime_linked, const std::stri
     }
 
     status_label_->set_text(String("\n").join(lines));
+    dirty_ = false;
 }

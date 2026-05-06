@@ -16,13 +16,8 @@ public:
     void handle_runtime_message_reset() override;
     void mark_dirty() noexcept { dirty_ = true; }
     void set_last_action_message(const godot::String& message);
+    void set_runtime_status(bool runtime_linked, const std::string& last_error);
     void show_runtime_missing();
-    void refresh_if_needed(bool runtime_linked, const std::string& last_error);
-
-    [[nodiscard]] int current_app_state_or(int fallback) const noexcept;
-    [[nodiscard]] const Gs1RuntimeCampaignResourcesProjection* campaign_resources() const noexcept;
-    [[nodiscard]] const Gs1RuntimeHudProjection* hud_state() const noexcept;
-    [[nodiscard]] const Gs1RuntimeSiteActionProjection* site_action_state() const noexcept;
 
 private:
     void refresh(bool runtime_linked, const std::string& last_error);
@@ -33,5 +28,7 @@ private:
     std::optional<Gs1RuntimeSiteActionProjection> site_action_state_ {};
     godot::RichTextLabel* status_label_ {nullptr};
     godot::String last_action_message_ {};
+    std::string last_error_ {};
+    bool runtime_linked_ {false};
     bool dirty_ {true};
 };
