@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 struct Gs1RuntimeUiElementProjection final
@@ -103,107 +104,14 @@ struct Gs1RuntimeUiPanelProjection final
     std::vector<Gs1RuntimeUiPanelListActionProjection> list_actions {};
 };
 
-struct Gs1RuntimeRegionalMapSiteProjection final
-{
-    std::uint32_t site_id {0};
-    Gs1SiteState site_state {GS1_SITE_STATE_LOCKED};
-    std::uint32_t site_archetype_id {0};
-    std::uint32_t flags {0};
-    std::int32_t map_x {0};
-    std::int32_t map_y {0};
-    std::uint32_t support_package_id {0};
-    std::uint32_t support_preview_mask {0};
-};
-
-struct Gs1RuntimeRegionalMapLinkProjection final
-{
-    std::uint32_t from_site_id {0};
-    std::uint32_t to_site_id {0};
-    std::uint32_t flags {0};
-};
-
-struct Gs1RuntimeTileProjection final
-{
-    std::uint16_t x {0};
-    std::uint16_t y {0};
-    std::uint32_t terrain_type_id {0};
-    std::uint32_t plant_type_id {0};
-    std::uint32_t structure_type_id {0};
-    std::uint32_t ground_cover_type_id {0};
-    float plant_density {0.0f};
-    float sand_burial {0.0f};
-    float local_wind {0.0f};
-    float wind_protection {0.0f};
-    float heat_protection {0.0f};
-    float dust_protection {0.0f};
-    float moisture {0.0f};
-    float soil_fertility {0.0f};
-    float soil_salinity {0.0f};
-    std::uint16_t device_integrity_quantized {0};
-    std::uint8_t excavation_depth {0};
-    std::uint8_t visible_excavation_depth {0};
-};
-
-struct Gs1RuntimeWorkerProjection final
-{
-    std::uint64_t entity_id {0};
-    float tile_x {0.0f};
-    float tile_y {0.0f};
-    float facing_degrees {0.0f};
-    float health_normalized {0.0f};
-    float hydration_normalized {0.0f};
-    float energy_normalized {0.0f};
-    std::uint8_t flags {0};
-    Gs1SiteActionKind current_action_kind {GS1_SITE_ACTION_NONE};
-};
-
-struct Gs1RuntimeCampProjection final
-{
-    std::int32_t tile_x {0};
-    std::int32_t tile_y {0};
-    float durability_normalized {0.0f};
-    std::uint32_t flags {0};
-};
-
-struct Gs1RuntimeWeatherProjection final
-{
-    float heat {0.0f};
-    float wind {0.0f};
-    float dust {0.0f};
-    float wind_direction_degrees {0.0f};
-    std::uint32_t event_template_id {0};
-    float event_start_time_minutes {0.0f};
-    float event_peak_time_minutes {0.0f};
-    float event_peak_duration_minutes {0.0f};
-    float event_end_time_minutes {0.0f};
-};
-
-struct Gs1RuntimeInventoryStorageProjection final
-{
-    std::uint32_t storage_id {0};
-    std::uint32_t owner_entity_id {0};
-    std::uint16_t slot_count {0};
-    std::int16_t tile_x {0};
-    std::int16_t tile_y {0};
-    Gs1InventoryContainerKind container_kind {GS1_INVENTORY_CONTAINER_WORKER_PACK};
-    std::uint32_t flags {0};
-};
-
-struct Gs1RuntimeInventorySlotProjection final
-{
-    std::uint32_t item_id {0};
-    std::uint32_t item_instance_id {0};
-    float condition {0.0f};
-    float freshness {0.0f};
-    std::uint32_t storage_id {0};
-    std::uint32_t container_owner_id {0};
-    std::uint16_t quantity {0};
-    std::uint16_t slot_index {0};
-    std::int16_t container_tile_x {0};
-    std::int16_t container_tile_y {0};
-    Gs1InventoryContainerKind container_kind {GS1_INVENTORY_CONTAINER_WORKER_PACK};
-    std::uint32_t flags {0};
-};
+using Gs1RuntimeRegionalMapSiteProjection = Gs1EngineMessageRegionalMapSiteData;
+using Gs1RuntimeRegionalMapLinkProjection = Gs1EngineMessageRegionalMapLinkData;
+using Gs1RuntimeTileProjection = Gs1EngineMessageSiteTileData;
+using Gs1RuntimeWorkerProjection = Gs1EngineMessageWorkerData;
+using Gs1RuntimeCampProjection = Gs1EngineMessageCampData;
+using Gs1RuntimeWeatherProjection = Gs1EngineMessageWeatherData;
+using Gs1RuntimeInventoryStorageProjection = Gs1EngineMessageInventoryStorageData;
+using Gs1RuntimeInventorySlotProjection = Gs1EngineMessageInventorySlotData;
 
 struct Gs1RuntimeInventoryViewProjection final
 {
@@ -212,12 +120,7 @@ struct Gs1RuntimeInventoryViewProjection final
     std::vector<Gs1RuntimeInventorySlotProjection> slots {};
 };
 
-struct Gs1RuntimeCraftContextOptionProjection final
-{
-    std::uint32_t recipe_id {0};
-    std::uint32_t output_item_id {0};
-    std::uint32_t flags {0};
-};
+using Gs1RuntimeCraftContextOptionProjection = Gs1EngineMessageCraftContextOptionData;
 
 struct Gs1RuntimeCraftContextProjection final
 {
@@ -227,132 +130,18 @@ struct Gs1RuntimeCraftContextProjection final
     std::vector<Gs1RuntimeCraftContextOptionProjection> options {};
 };
 
-struct Gs1RuntimePlacementPreviewProjection final
-{
-    std::int32_t tile_x {0};
-    std::int32_t tile_y {0};
-    std::uint64_t blocked_mask {0ULL};
-    std::uint32_t item_id {0};
-    std::uint32_t preview_tile_count {0};
-    std::uint32_t footprint_width {1U};
-    std::uint32_t footprint_height {1U};
-    Gs1SiteActionKind action_kind {GS1_SITE_ACTION_NONE};
-    std::uint32_t flags {0};
-};
-
-struct Gs1RuntimePlacementPreviewTileProjection final
-{
-    std::int16_t x {0};
-    std::int16_t y {0};
-    std::uint32_t flags {0};
-    float wind_protection {0.0f};
-    float heat_protection {0.0f};
-    float dust_protection {0.0f};
-    float final_wind_protection {0.0f};
-    float final_heat_protection {0.0f};
-    float final_dust_protection {0.0f};
-    float occupant_condition {0.0f};
-};
-
-struct Gs1RuntimePlacementFailureProjection final
-{
-    std::int32_t tile_x {0};
-    std::int32_t tile_y {0};
-    std::uint64_t blocked_mask {0ULL};
-    std::uint32_t sequence_id {0};
-    Gs1SiteActionKind action_kind {GS1_SITE_ACTION_NONE};
-    std::uint32_t flags {0};
-};
-
-struct Gs1RuntimeTaskProjection final
-{
-    std::uint32_t task_instance_id {0};
-    std::uint32_t task_template_id {0};
-    std::uint32_t publisher_faction_id {0};
-    std::uint16_t current_progress {0};
-    std::uint16_t target_progress {0};
-    Gs1TaskPresentationListKind list_kind {GS1_TASK_PRESENTATION_LIST_VISIBLE};
-    std::uint32_t flags {0};
-};
-
-struct Gs1RuntimePhoneListingProjection final
-{
-    std::uint32_t listing_id {0};
-    std::uint32_t item_or_unlockable_id {0};
-    float price {0.0f};
-    std::uint32_t related_site_id {0};
-    std::uint16_t quantity {0};
-    std::uint16_t cart_quantity {0};
-    Gs1PhoneListingPresentationKind listing_kind {GS1_PHONE_LISTING_PRESENTATION_BUY_ITEM};
-    std::uint32_t flags {0};
-};
-
-struct Gs1RuntimePhonePanelProjection final
-{
-    Gs1PhonePanelSection active_section {GS1_PHONE_PANEL_SECTION_HOME};
-    std::uint32_t visible_task_count {0};
-    std::uint32_t accepted_task_count {0};
-    std::uint32_t completed_task_count {0};
-    std::uint32_t claimed_task_count {0};
-    std::uint32_t buy_listing_count {0};
-    std::uint32_t sell_listing_count {0};
-    std::uint32_t service_listing_count {0};
-    std::uint32_t cart_item_count {0};
-    std::uint32_t flags {0};
-};
-
-struct Gs1RuntimeProtectionOverlayProjection final
-{
-    Gs1SiteProtectionOverlayMode mode {GS1_SITE_PROTECTION_OVERLAY_NONE};
-};
-
-struct Gs1RuntimeModifierProjection final
-{
-    std::uint32_t modifier_id {0};
-    std::uint16_t remaining_game_hours {0};
-    std::uint32_t flags {0};
-};
-
-struct Gs1RuntimeHudProjection final
-{
-    float player_health {0.0f};
-    float player_hydration {0.0f};
-    float player_nourishment {0.0f};
-    float player_energy {0.0f};
-    float player_morale {0.0f};
-    float current_money {0.0f};
-    float site_completion_normalized {0.0f};
-    std::uint16_t active_task_count {0};
-    std::uint16_t warning_code {0};
-    Gs1SiteActionKind current_action_kind {GS1_SITE_ACTION_NONE};
-};
-
-struct Gs1RuntimeCampaignResourcesProjection final
-{
-    float current_money {0.0f};
-    std::int32_t total_reputation {0};
-    std::int32_t village_reputation {0};
-    std::int32_t forestry_reputation {0};
-    std::int32_t university_reputation {0};
-};
-
-struct Gs1RuntimeSiteActionProjection final
-{
-    std::uint32_t action_id {0};
-    std::int32_t target_tile_x {0};
-    std::int32_t target_tile_y {0};
-    Gs1SiteActionKind action_kind {GS1_SITE_ACTION_NONE};
-    std::uint32_t flags {0};
-    float progress_normalized {0.0f};
-    float duration_minutes {0.0f};
-};
-
-struct Gs1RuntimeSiteResultProjection final
-{
-    std::uint32_t site_id {0};
-    Gs1SiteAttemptResult result {GS1_SITE_ATTEMPT_RESULT_NONE};
-    std::uint16_t newly_revealed_site_count {0};
-};
+using Gs1RuntimePlacementPreviewProjection = Gs1EngineMessagePlacementPreviewData;
+using Gs1RuntimePlacementPreviewTileProjection = Gs1EngineMessagePlacementPreviewTileData;
+using Gs1RuntimePlacementFailureProjection = Gs1EngineMessagePlacementFailureData;
+using Gs1RuntimeTaskProjection = Gs1EngineMessageTaskData;
+using Gs1RuntimePhoneListingProjection = Gs1EngineMessagePhoneListingData;
+using Gs1RuntimePhonePanelProjection = Gs1EngineMessagePhonePanelData;
+using Gs1RuntimeProtectionOverlayProjection = Gs1EngineMessageSiteProtectionOverlayData;
+using Gs1RuntimeModifierProjection = Gs1EngineMessageSiteModifierData;
+using Gs1RuntimeHudProjection = Gs1EngineMessageHudStateData;
+using Gs1RuntimeCampaignResourcesProjection = Gs1EngineMessageCampaignResourcesData;
+using Gs1RuntimeSiteActionProjection = Gs1EngineMessageSiteActionData;
+using Gs1RuntimeSiteResultProjection = Gs1EngineMessageSiteResultData;
 
 struct Gs1RuntimeOneShotCueProjection final
 {
@@ -414,6 +203,8 @@ public:
     void apply_engine_message(const Gs1EngineMessage& message);
 
     [[nodiscard]] const Gs1RuntimeProjectionState& state() const noexcept { return state_; }
+    [[nodiscard]] const Gs1RuntimeProgressionViewProjection* find_progression_view(Gs1ProgressionViewId view_id) const noexcept;
+    [[nodiscard]] const Gs1RuntimeUiPanelProjection* find_ui_panel(Gs1UiPanelId panel_id) const noexcept;
 
 private:
     struct PendingUiSetup final
@@ -502,6 +293,9 @@ private:
         const Gs1RuntimeSiteProjection& site,
         std::uint16_t x,
         std::uint16_t y) const noexcept;
+    void rebuild_ui_setup_indices() noexcept;
+    void rebuild_progression_view_indices() noexcept;
+    void rebuild_ui_panel_indices() noexcept;
 
 private:
     Gs1RuntimeProjectionState state_ {};
@@ -510,5 +304,20 @@ private:
     std::optional<PendingUiPanel> pending_ui_panel_ {};
     std::optional<PendingRegionalMapState> pending_regional_map_ {};
     std::optional<Gs1RuntimeSiteProjection> pending_site_ {};
+    std::unordered_map<std::uint32_t, std::size_t> pending_ui_setup_element_indices_ {};
+    std::unordered_map<std::uint16_t, std::size_t> pending_progression_entry_indices_ {};
+    std::unordered_map<std::uint16_t, std::size_t> pending_ui_panel_text_line_indices_ {};
+    std::unordered_map<std::uint16_t, std::size_t> pending_ui_panel_slot_action_indices_ {};
+    std::unordered_map<std::uint64_t, std::size_t> pending_ui_panel_list_item_indices_ {};
+    std::unordered_map<std::uint64_t, std::size_t> pending_ui_panel_list_action_indices_ {};
+    std::unordered_map<std::uint32_t, std::size_t> pending_inventory_storage_indices_ {};
+    std::unordered_map<std::uint64_t, std::size_t> pending_worker_pack_slot_indices_ {};
+    std::unordered_map<std::uint64_t, std::size_t> pending_opened_storage_slot_indices_ {};
+    std::unordered_map<std::uint32_t, std::size_t> pending_task_indices_ {};
+    std::unordered_map<std::uint32_t, std::size_t> pending_phone_listing_indices_ {};
+    std::unordered_map<std::uint32_t, std::size_t> pending_modifier_indices_ {};
+    std::unordered_map<std::uint16_t, std::size_t> ui_setup_indices_ {};
+    std::unordered_map<std::uint16_t, std::size_t> progression_view_indices_ {};
+    std::unordered_map<std::uint16_t, std::size_t> ui_panel_indices_ {};
     std::uint64_t next_one_shot_cue_sequence_id_ {1U};
 };

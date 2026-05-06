@@ -9,6 +9,21 @@ namespace
 {
 constexpr std::uint16_t k_invalid_tile_coordinate = std::numeric_limits<std::uint16_t>::max();
 
+constexpr std::uint64_t ui_panel_list_item_key(Gs1UiPanelListId list_id, std::uint32_t item_id) noexcept
+{
+    return (static_cast<std::uint64_t>(static_cast<std::uint32_t>(list_id)) << 32U) | static_cast<std::uint64_t>(item_id);
+}
+
+constexpr std::uint64_t ui_panel_list_action_key(
+    Gs1UiPanelListId list_id,
+    std::uint32_t item_id,
+    Gs1UiPanelListActionRole role) noexcept
+{
+    return (static_cast<std::uint64_t>(static_cast<std::uint32_t>(list_id)) << 32U) |
+        (static_cast<std::uint64_t>(item_id) << 8U) |
+        static_cast<std::uint64_t>(static_cast<std::uint8_t>(role));
+}
+
 template <typename Projection, typename Key, typename KeyFn>
 void upsert_projection(std::vector<Projection>& projections, Projection projection, Key key, KeyFn&& key_fn)
 {
@@ -214,7 +229,74 @@ void Gs1RuntimeProjectionCache::reset() noexcept
     pending_ui_panel_.reset();
     pending_regional_map_.reset();
     pending_site_.reset();
+    pending_ui_setup_element_indices_.clear();
+    pending_progression_entry_indices_.clear();
+    pending_ui_panel_text_line_indices_.clear();
+    pending_ui_panel_slot_action_indices_.clear();
+    pending_ui_panel_list_item_indices_.clear();
+    pending_ui_panel_list_action_indices_.clear();
+    pending_inventory_storage_indices_.clear();
+    pending_worker_pack_slot_indices_.clear();
+    pending_opened_storage_slot_indices_.clear();
+    pending_task_indices_.clear();
+    pending_phone_listing_indices_.clear();
+    pending_modifier_indices_.clear();
+    ui_setup_indices_.clear();
+    progression_view_indices_.clear();
+    ui_panel_indices_.clear();
     next_one_shot_cue_sequence_id_ = 1U;
+}
+
+const Gs1RuntimeProgressionViewProjection* Gs1RuntimeProjectionCache::find_progression_view(
+    Gs1ProgressionViewId view_id) const noexcept
+{
+    const auto found = progression_view_indices_.find(static_cast<std::uint16_t>(view_id));
+    if (found == progression_view_indices_.end() || found->second >= state_.active_progression_views.size())
+    {
+        return nullptr;
+    }
+    return &state_.active_progression_views[found->second];
+}
+
+const Gs1RuntimeUiPanelProjection* Gs1RuntimeProjectionCache::find_ui_panel(
+    Gs1UiPanelId panel_id) const noexcept
+{
+    const auto found = ui_panel_indices_.find(static_cast<std::uint16_t>(panel_id));
+    if (found == ui_panel_indices_.end() || found->second >= state_.active_ui_panels.size())
+    {
+        return nullptr;
+    }
+    return &state_.active_ui_panels[found->second];
+}
+
+void Gs1RuntimeProjectionCache::rebuild_progression_view_indices() noexcept
+{
+    progression_view_indices_.clear();
+    progression_view_indices_.reserve(state_.active_progression_views.size());
+    for (std::size_t index = 0; index < state_.active_progression_views.size(); ++index)
+    {
+        progression_view_indices_[static_cast<std::uint16_t>(state_.active_progression_views[index].view_id)] = index;
+    }
+}
+
+void Gs1RuntimeProjectionCache::rebuild_ui_setup_indices() noexcept
+{
+    ui_setup_indices_.clear();
+    ui_setup_indices_.reserve(state_.active_ui_setups.size());
+    for (std::size_t index = 0; index < state_.active_ui_setups.size(); ++index)
+    {
+        ui_setup_indices_[static_cast<std::uint16_t>(state_.active_ui_setups[index].setup_id)] = index;
+    }
+}
+
+void Gs1RuntimeProjectionCache::rebuild_ui_panel_indices() noexcept
+{
+    ui_panel_indices_.clear();
+    ui_panel_indices_.reserve(state_.active_ui_panels.size());
+    for (std::size_t index = 0; index < state_.active_ui_panels.size(); ++index)
+    {
+        ui_panel_indices_[static_cast<std::uint16_t>(state_.active_ui_panels[index].panel_id)] = index;
+    }
 }
 
 void Gs1RuntimeProjectionCache::apply_engine_message(const Gs1EngineMessage& message)
@@ -433,15 +515,7 @@ void Gs1RuntimeProjectionCache::apply_regional_map_site_upsert(const Gs1EngineMe
         return;
     }
 
-    Gs1RuntimeRegionalMapSiteProjection projection {};
-    projection.site_id = payload.site_id;
-    projection.site_state = payload.site_state;
-    projection.site_archetype_id = payload.site_archetype_id;
-    projection.flags = payload.flags;
-    projection.map_x = payload.map_x;
-    projection.map_y = payload.map_y;
-    projection.support_package_id = payload.support_package_id;
-    projection.support_preview_mask = payload.support_preview_mask;
+    Gs1RuntimeRegionalMapSiteProjection projection = payload;
     upsert_projection(
         pending_regional_map_->sites,
         projection,
@@ -477,10 +551,7 @@ void Gs1RuntimeProjectionCache::apply_regional_map_link_upsert(const Gs1EngineMe
         return;
     }
 
-    Gs1RuntimeRegionalMapLinkProjection projection {};
-    projection.from_site_id = payload.from_site_id;
-    projection.to_site_id = payload.to_site_id;
-    projection.flags = payload.flags;
+    Gs1RuntimeRegionalMapLinkProjection projection = payload;
     upsert_projection(
         pending_regional_map_->links,
         projection,
@@ -517,12 +588,42 @@ void Gs1RuntimeProjectionCache::apply_regional_map_snapshot_end()
 
 void Gs1RuntimeProjectionCache::apply_ui_setup_begin(const Gs1EngineMessageUiSetupData& payload)
 {
-    pending_ui_setup_ = PendingUiSetup {};
+    pending_ui_setup_element_indices_.clear();
+    if (payload.mode == GS1_PROJECTION_MODE_DELTA)
+    {
+        const auto found = ui_setup_indices_.find(static_cast<std::uint16_t>(payload.setup_id));
+        if (found != ui_setup_indices_.end() && found->second < state_.active_ui_setups.size())
+        {
+            const Gs1RuntimeUiSetupProjection& existing = state_.active_ui_setups[found->second];
+            pending_ui_setup_ = PendingUiSetup {};
+            pending_ui_setup_->setup_id = existing.setup_id;
+            pending_ui_setup_->presentation_type = existing.presentation_type;
+            pending_ui_setup_->context_id = existing.context_id;
+            pending_ui_setup_->elements = existing.elements;
+            pending_ui_setup_element_indices_.reserve(pending_ui_setup_->elements.size());
+            for (std::size_t index = 0; index < pending_ui_setup_->elements.size(); ++index)
+            {
+                pending_ui_setup_element_indices_[pending_ui_setup_->elements[index].element_id] = index;
+            }
+        }
+        else
+        {
+            pending_ui_setup_ = PendingUiSetup {};
+        }
+    }
+    else
+    {
+        pending_ui_setup_ = PendingUiSetup {};
+    }
+
     pending_ui_setup_->setup_id = payload.setup_id;
     pending_ui_setup_->presentation_type = payload.presentation_type;
     pending_ui_setup_->context_id = payload.context_id;
-    pending_ui_setup_->elements.clear();
-    pending_ui_setup_->elements.reserve(payload.element_count);
+    if (payload.mode == GS1_PROJECTION_MODE_SNAPSHOT)
+    {
+        pending_ui_setup_->elements.clear();
+    }
+    pending_ui_setup_->elements.reserve(std::max<std::size_t>(pending_ui_setup_->elements.size(), payload.element_count));
 }
 
 void Gs1RuntimeProjectionCache::apply_ui_element_upsert(const Gs1EngineMessageUiElementData& payload)
@@ -541,6 +642,14 @@ void Gs1RuntimeProjectionCache::apply_ui_element_upsert(const Gs1EngineMessageUi
     projection.primary_id = payload.primary_id;
     projection.secondary_id = payload.secondary_id;
     projection.quantity = payload.quantity;
+    const auto found = pending_ui_setup_element_indices_.find(projection.element_id);
+    if (found != pending_ui_setup_element_indices_.end() && found->second < pending_ui_setup_->elements.size())
+    {
+        pending_ui_setup_->elements[found->second] = projection;
+        return;
+    }
+
+    pending_ui_setup_element_indices_[projection.element_id] = pending_ui_setup_->elements.size();
     pending_ui_setup_->elements.push_back(std::move(projection));
 }
 
@@ -570,7 +679,9 @@ void Gs1RuntimeProjectionCache::apply_ui_setup_end()
         pending_ui_setup_->setup_id,
         [](const auto& existing) { return existing.setup_id; });
     sort_ui_setups(state_.active_ui_setups);
+    rebuild_ui_setup_indices();
     pending_ui_setup_.reset();
+    pending_ui_setup_element_indices_.clear();
 }
 
 void Gs1RuntimeProjectionCache::apply_ui_setup_close(const Gs1EngineMessageCloseUiSetupData& payload)
@@ -578,15 +689,45 @@ void Gs1RuntimeProjectionCache::apply_ui_setup_close(const Gs1EngineMessageClose
     erase_projection_if(state_.active_ui_setups, [&](const auto& setup) {
         return setup.setup_id == payload.setup_id;
     });
+    rebuild_ui_setup_indices();
 }
 
 void Gs1RuntimeProjectionCache::apply_progression_view_begin(const Gs1EngineMessageProgressionViewData& payload)
 {
-    pending_progression_view_ = PendingProgressionView {};
+    pending_progression_entry_indices_.clear();
+    if (payload.mode == GS1_PROJECTION_MODE_DELTA)
+    {
+        const auto found = progression_view_indices_.find(static_cast<std::uint16_t>(payload.view_id));
+        if (found != progression_view_indices_.end() && found->second < state_.active_progression_views.size())
+        {
+            const Gs1RuntimeProgressionViewProjection& existing = state_.active_progression_views[found->second];
+            pending_progression_view_ = PendingProgressionView {};
+            pending_progression_view_->view_id = existing.view_id;
+            pending_progression_view_->context_id = existing.context_id;
+            pending_progression_view_->entries = existing.entries;
+            pending_progression_entry_indices_.reserve(pending_progression_view_->entries.size());
+            for (std::size_t index = 0; index < pending_progression_view_->entries.size(); ++index)
+            {
+                pending_progression_entry_indices_[pending_progression_view_->entries[index].entry_id] = index;
+            }
+        }
+        else
+        {
+            pending_progression_view_ = PendingProgressionView {};
+        }
+    }
+    else
+    {
+        pending_progression_view_ = PendingProgressionView {};
+    }
+
     pending_progression_view_->view_id = payload.view_id;
     pending_progression_view_->context_id = payload.context_id;
-    pending_progression_view_->entries.clear();
-    pending_progression_view_->entries.reserve(payload.entry_count);
+    if (payload.mode == GS1_PROJECTION_MODE_SNAPSHOT)
+    {
+        pending_progression_view_->entries.clear();
+    }
+    pending_progression_view_->entries.reserve(std::max<std::size_t>(pending_progression_view_->entries.size(), payload.entry_count));
 }
 
 void Gs1RuntimeProjectionCache::apply_progression_entry_upsert(const Gs1EngineMessageProgressionEntryData& payload)
@@ -607,6 +748,14 @@ void Gs1RuntimeProjectionCache::apply_progression_entry_upsert(const Gs1EngineMe
     projection.content_kind = payload.content_kind;
     projection.tier_index = payload.tier_index;
     projection.action = payload.action;
+    const auto found = pending_progression_entry_indices_.find(projection.entry_id);
+    if (found != pending_progression_entry_indices_.end() && found->second < pending_progression_view_->entries.size())
+    {
+        pending_progression_view_->entries[found->second] = projection;
+        return;
+    }
+
+    pending_progression_entry_indices_[projection.entry_id] = pending_progression_view_->entries.size();
     pending_progression_view_->entries.push_back(std::move(projection));
 }
 
@@ -629,7 +778,9 @@ void Gs1RuntimeProjectionCache::apply_progression_view_end()
         pending_progression_view_->view_id,
         [](const auto& existing) { return existing.view_id; });
     sort_progression_views(state_.active_progression_views);
+    rebuild_progression_view_indices();
     pending_progression_view_.reset();
+    pending_progression_entry_indices_.clear();
 }
 
 void Gs1RuntimeProjectionCache::apply_progression_view_close(const Gs1EngineMessageCloseProgressionViewData& payload)
@@ -637,21 +788,77 @@ void Gs1RuntimeProjectionCache::apply_progression_view_close(const Gs1EngineMess
     erase_projection_if(state_.active_progression_views, [&](const auto& view) {
         return view.view_id == payload.view_id;
     });
+    rebuild_progression_view_indices();
 }
 
 void Gs1RuntimeProjectionCache::apply_ui_panel_begin(const Gs1EngineMessageUiPanelData& payload)
 {
-    pending_ui_panel_ = PendingUiPanel {};
+    pending_ui_panel_text_line_indices_.clear();
+    pending_ui_panel_slot_action_indices_.clear();
+    pending_ui_panel_list_item_indices_.clear();
+    pending_ui_panel_list_action_indices_.clear();
+    if (payload.mode == GS1_PROJECTION_MODE_DELTA)
+    {
+        const auto found = ui_panel_indices_.find(static_cast<std::uint16_t>(payload.panel_id));
+        if (found != ui_panel_indices_.end() && found->second < state_.active_ui_panels.size())
+        {
+            const Gs1RuntimeUiPanelProjection& existing = state_.active_ui_panels[found->second];
+            pending_ui_panel_ = PendingUiPanel {};
+            pending_ui_panel_->panel_id = existing.panel_id;
+            pending_ui_panel_->context_id = existing.context_id;
+            pending_ui_panel_->text_lines = existing.text_lines;
+            pending_ui_panel_->slot_actions = existing.slot_actions;
+            pending_ui_panel_->list_items = existing.list_items;
+            pending_ui_panel_->list_actions = existing.list_actions;
+            pending_ui_panel_text_line_indices_.reserve(pending_ui_panel_->text_lines.size());
+            for (std::size_t index = 0; index < pending_ui_panel_->text_lines.size(); ++index)
+            {
+                pending_ui_panel_text_line_indices_[pending_ui_panel_->text_lines[index].line_id] = index;
+            }
+            pending_ui_panel_slot_action_indices_.reserve(pending_ui_panel_->slot_actions.size());
+            for (std::size_t index = 0; index < pending_ui_panel_->slot_actions.size(); ++index)
+            {
+                pending_ui_panel_slot_action_indices_[static_cast<std::uint16_t>(pending_ui_panel_->slot_actions[index].slot_id)] = index;
+            }
+            pending_ui_panel_list_item_indices_.reserve(pending_ui_panel_->list_items.size());
+            for (std::size_t index = 0; index < pending_ui_panel_->list_items.size(); ++index)
+            {
+                pending_ui_panel_list_item_indices_[ui_panel_list_item_key(
+                    pending_ui_panel_->list_items[index].list_id,
+                    pending_ui_panel_->list_items[index].item_id)] = index;
+            }
+            pending_ui_panel_list_action_indices_.reserve(pending_ui_panel_->list_actions.size());
+            for (std::size_t index = 0; index < pending_ui_panel_->list_actions.size(); ++index)
+            {
+                pending_ui_panel_list_action_indices_[ui_panel_list_action_key(
+                    pending_ui_panel_->list_actions[index].list_id,
+                    pending_ui_panel_->list_actions[index].item_id,
+                    pending_ui_panel_->list_actions[index].role)] = index;
+            }
+        }
+        else
+        {
+            pending_ui_panel_ = PendingUiPanel {};
+        }
+    }
+    else
+    {
+        pending_ui_panel_ = PendingUiPanel {};
+    }
+
     pending_ui_panel_->panel_id = payload.panel_id;
     pending_ui_panel_->context_id = payload.context_id;
-    pending_ui_panel_->text_lines.clear();
-    pending_ui_panel_->slot_actions.clear();
-    pending_ui_panel_->list_items.clear();
-    pending_ui_panel_->list_actions.clear();
-    pending_ui_panel_->text_lines.reserve(payload.text_line_count);
-    pending_ui_panel_->slot_actions.reserve(payload.slot_action_count);
-    pending_ui_panel_->list_items.reserve(payload.list_item_count);
-    pending_ui_panel_->list_actions.reserve(payload.list_action_count);
+    if (payload.mode == GS1_PROJECTION_MODE_SNAPSHOT)
+    {
+        pending_ui_panel_->text_lines.clear();
+        pending_ui_panel_->slot_actions.clear();
+        pending_ui_panel_->list_items.clear();
+        pending_ui_panel_->list_actions.clear();
+    }
+    pending_ui_panel_->text_lines.reserve(std::max<std::size_t>(pending_ui_panel_->text_lines.size(), payload.text_line_count));
+    pending_ui_panel_->slot_actions.reserve(std::max<std::size_t>(pending_ui_panel_->slot_actions.size(), payload.slot_action_count));
+    pending_ui_panel_->list_items.reserve(std::max<std::size_t>(pending_ui_panel_->list_items.size(), payload.list_item_count));
+    pending_ui_panel_->list_actions.reserve(std::max<std::size_t>(pending_ui_panel_->list_actions.size(), payload.list_action_count));
 }
 
 void Gs1RuntimeProjectionCache::apply_ui_panel_text_upsert(const Gs1EngineMessageUiPanelTextData& payload)
@@ -669,6 +876,14 @@ void Gs1RuntimeProjectionCache::apply_ui_panel_text_upsert(const Gs1EngineMessag
     projection.secondary_id = payload.secondary_id;
     projection.quantity = payload.quantity;
     projection.aux_value = payload.aux_value;
+    const auto found = pending_ui_panel_text_line_indices_.find(projection.line_id);
+    if (found != pending_ui_panel_text_line_indices_.end() && found->second < pending_ui_panel_->text_lines.size())
+    {
+        pending_ui_panel_->text_lines[found->second] = projection;
+        return;
+    }
+
+    pending_ui_panel_text_line_indices_[projection.line_id] = pending_ui_panel_->text_lines.size();
     pending_ui_panel_->text_lines.push_back(std::move(projection));
 }
 
@@ -687,6 +902,15 @@ void Gs1RuntimeProjectionCache::apply_ui_panel_slot_action_upsert(const Gs1Engin
     projection.primary_id = payload.primary_id;
     projection.secondary_id = payload.secondary_id;
     projection.quantity = payload.quantity;
+    const auto key = static_cast<std::uint16_t>(projection.slot_id);
+    const auto found = pending_ui_panel_slot_action_indices_.find(key);
+    if (found != pending_ui_panel_slot_action_indices_.end() && found->second < pending_ui_panel_->slot_actions.size())
+    {
+        pending_ui_panel_->slot_actions[found->second] = projection;
+        return;
+    }
+
+    pending_ui_panel_slot_action_indices_[key] = pending_ui_panel_->slot_actions.size();
     pending_ui_panel_->slot_actions.push_back(std::move(projection));
 }
 
@@ -708,6 +932,15 @@ void Gs1RuntimeProjectionCache::apply_ui_panel_list_item_upsert(const Gs1EngineM
     projection.quantity = payload.quantity;
     projection.map_x = payload.map_x;
     projection.map_y = payload.map_y;
+    const auto key = ui_panel_list_item_key(projection.list_id, projection.item_id);
+    const auto found = pending_ui_panel_list_item_indices_.find(key);
+    if (found != pending_ui_panel_list_item_indices_.end() && found->second < pending_ui_panel_->list_items.size())
+    {
+        pending_ui_panel_->list_items[found->second] = projection;
+        return;
+    }
+
+    pending_ui_panel_list_item_indices_[key] = pending_ui_panel_->list_items.size();
     pending_ui_panel_->list_items.push_back(std::move(projection));
 }
 
@@ -724,6 +957,15 @@ void Gs1RuntimeProjectionCache::apply_ui_panel_list_action_upsert(const Gs1Engin
     projection.role = payload.role;
     projection.flags = payload.flags;
     projection.action = payload.action;
+    const auto key = ui_panel_list_action_key(projection.list_id, projection.item_id, projection.role);
+    const auto found = pending_ui_panel_list_action_indices_.find(key);
+    if (found != pending_ui_panel_list_action_indices_.end() && found->second < pending_ui_panel_->list_actions.size())
+    {
+        pending_ui_panel_->list_actions[found->second] = projection;
+        return;
+    }
+
+    pending_ui_panel_list_action_indices_[key] = pending_ui_panel_->list_actions.size();
     pending_ui_panel_->list_actions.push_back(std::move(projection));
 }
 
@@ -753,7 +995,12 @@ void Gs1RuntimeProjectionCache::apply_ui_panel_end()
         pending_ui_panel_->panel_id,
         [](const auto& existing) { return existing.panel_id; });
     sort_ui_panels(state_.active_ui_panels);
+    rebuild_ui_panel_indices();
     pending_ui_panel_.reset();
+    pending_ui_panel_text_line_indices_.clear();
+    pending_ui_panel_slot_action_indices_.clear();
+    pending_ui_panel_list_item_indices_.clear();
+    pending_ui_panel_list_action_indices_.clear();
 }
 
 void Gs1RuntimeProjectionCache::apply_ui_panel_close(const Gs1EngineMessageCloseUiPanelData& payload)
@@ -761,6 +1008,7 @@ void Gs1RuntimeProjectionCache::apply_ui_panel_close(const Gs1EngineMessageClose
     erase_projection_if(state_.active_ui_panels, [&](const auto& panel) {
         return panel.panel_id == payload.panel_id;
     });
+    rebuild_ui_panel_indices();
 }
 
 void Gs1RuntimeProjectionCache::apply_site_snapshot_begin(const Gs1EngineMessageSiteSnapshotData& payload)
@@ -778,6 +1026,12 @@ void Gs1RuntimeProjectionCache::apply_site_snapshot_begin(const Gs1EngineMessage
     pending_site_->site_archetype_id = payload.site_archetype_id;
     pending_site_->width = payload.width;
     pending_site_->height = payload.height;
+    pending_inventory_storage_indices_.clear();
+    pending_worker_pack_slot_indices_.clear();
+    pending_opened_storage_slot_indices_.clear();
+    pending_task_indices_.clear();
+    pending_phone_listing_indices_.clear();
+    pending_modifier_indices_.clear();
 
     if (payload.mode == GS1_PROJECTION_MODE_SNAPSHOT)
     {
@@ -822,25 +1076,7 @@ void Gs1RuntimeProjectionCache::apply_site_tile_upsert(const Gs1EngineMessageSit
         return;
     }
 
-    Gs1RuntimeTileProjection projection {};
-    projection.x = payload.x;
-    projection.y = payload.y;
-    projection.terrain_type_id = payload.terrain_type_id;
-    projection.plant_type_id = payload.plant_type_id;
-    projection.structure_type_id = payload.structure_type_id;
-    projection.ground_cover_type_id = payload.ground_cover_type_id;
-    projection.plant_density = payload.plant_density;
-    projection.sand_burial = payload.sand_burial;
-    projection.local_wind = payload.local_wind;
-    projection.wind_protection = payload.wind_protection;
-    projection.heat_protection = payload.heat_protection;
-    projection.dust_protection = payload.dust_protection;
-    projection.moisture = payload.moisture;
-    projection.soil_fertility = payload.soil_fertility;
-    projection.soil_salinity = payload.soil_salinity;
-    projection.device_integrity_quantized = payload.device_integrity_quantized;
-    projection.excavation_depth = payload.excavation_depth;
-    projection.visible_excavation_depth = payload.visible_excavation_depth;
+    Gs1RuntimeTileProjection projection = payload;
 
     const auto tile_index = site_tile_index(*pending_site_, projection.x, projection.y);
     if (!tile_index.has_value())
@@ -858,16 +1094,7 @@ void Gs1RuntimeProjectionCache::apply_site_worker_update(const Gs1EngineMessageW
         return;
     }
 
-    Gs1RuntimeWorkerProjection projection {};
-    projection.entity_id = payload.entity_id;
-    projection.tile_x = payload.tile_x;
-    projection.tile_y = payload.tile_y;
-    projection.facing_degrees = payload.facing_degrees;
-    projection.health_normalized = payload.health_normalized;
-    projection.hydration_normalized = payload.hydration_normalized;
-    projection.energy_normalized = payload.energy_normalized;
-    projection.flags = payload.flags;
-    projection.current_action_kind = payload.current_action_kind;
+    Gs1RuntimeWorkerProjection projection = payload;
     pending_site_->worker = projection;
 }
 
@@ -878,11 +1105,7 @@ void Gs1RuntimeProjectionCache::apply_site_camp_update(const Gs1EngineMessageCam
         return;
     }
 
-    Gs1RuntimeCampProjection projection {};
-    projection.tile_x = payload.tile_x;
-    projection.tile_y = payload.tile_y;
-    projection.durability_normalized = payload.durability_normalized;
-    projection.flags = payload.flags;
+    Gs1RuntimeCampProjection projection = payload;
     pending_site_->camp = projection;
 }
 
@@ -893,16 +1116,7 @@ void Gs1RuntimeProjectionCache::apply_site_weather_update(const Gs1EngineMessage
         return;
     }
 
-    Gs1RuntimeWeatherProjection projection {};
-    projection.heat = payload.heat;
-    projection.wind = payload.wind;
-    projection.dust = payload.dust;
-    projection.wind_direction_degrees = payload.wind_direction_degrees;
-    projection.event_template_id = payload.event_template_id;
-    projection.event_start_time_minutes = payload.event_start_time_minutes;
-    projection.event_peak_time_minutes = payload.event_peak_time_minutes;
-    projection.event_peak_duration_minutes = payload.event_peak_duration_minutes;
-    projection.event_end_time_minutes = payload.event_end_time_minutes;
+    Gs1RuntimeWeatherProjection projection = payload;
     pending_site_->weather = projection;
 }
 
@@ -913,19 +1127,16 @@ void Gs1RuntimeProjectionCache::apply_site_inventory_storage_upsert(const Gs1Eng
         return;
     }
 
-    Gs1RuntimeInventoryStorageProjection projection {};
-    projection.storage_id = payload.storage_id;
-    projection.owner_entity_id = payload.owner_entity_id;
-    projection.slot_count = payload.slot_count;
-    projection.tile_x = payload.tile_x;
-    projection.tile_y = payload.tile_y;
-    projection.container_kind = payload.container_kind;
-    projection.flags = payload.flags;
-    upsert_projection(
-        pending_site_->inventory_storages,
-        projection,
-        projection.storage_id,
-        [](const auto& storage) { return storage.storage_id; });
+    Gs1RuntimeInventoryStorageProjection projection = payload;
+    const auto found = pending_inventory_storage_indices_.find(projection.storage_id);
+    if (found != pending_inventory_storage_indices_.end() && found->second < pending_site_->inventory_storages.size())
+    {
+        pending_site_->inventory_storages[found->second] = projection;
+        return;
+    }
+
+    pending_inventory_storage_indices_[projection.storage_id] = pending_site_->inventory_storages.size();
+    pending_site_->inventory_storages.push_back(projection);
 }
 
 void Gs1RuntimeProjectionCache::apply_site_inventory_slot_upsert(const Gs1EngineMessageInventorySlotData& payload)
@@ -935,19 +1146,7 @@ void Gs1RuntimeProjectionCache::apply_site_inventory_slot_upsert(const Gs1Engine
         return;
     }
 
-    Gs1RuntimeInventorySlotProjection projection {};
-    projection.item_id = payload.item_id;
-    projection.item_instance_id = payload.item_instance_id;
-    projection.condition = payload.condition;
-    projection.freshness = payload.freshness;
-    projection.storage_id = payload.storage_id;
-    projection.container_owner_id = payload.container_owner_id;
-    projection.quantity = payload.quantity;
-    projection.slot_index = payload.slot_index;
-    projection.container_tile_x = payload.container_tile_x;
-    projection.container_tile_y = payload.container_tile_y;
-    projection.container_kind = payload.container_kind;
-    projection.flags = payload.flags;
+    Gs1RuntimeInventorySlotProjection projection = payload;
 
     std::vector<Gs1RuntimeInventorySlotProjection>* slots = nullptr;
     if (projection.container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK)
@@ -964,13 +1163,19 @@ void Gs1RuntimeProjectionCache::apply_site_inventory_slot_upsert(const Gs1Engine
         return;
     }
 
-    upsert_projection(
-        *slots,
-        projection,
-        (static_cast<std::uint64_t>(projection.storage_id) << 32U) | projection.slot_index,
-        [](const auto& slot) {
-            return (static_cast<std::uint64_t>(slot.storage_id) << 32U) | slot.slot_index;
-        });
+    const std::uint64_t slot_key = (static_cast<std::uint64_t>(projection.storage_id) << 32U) | projection.slot_index;
+    auto& slot_indices = slots == &pending_site_->worker_pack_slots
+        ? pending_worker_pack_slot_indices_
+        : pending_opened_storage_slot_indices_;
+    const auto found = slot_indices.find(slot_key);
+    if (found != slot_indices.end() && found->second < slots->size())
+    {
+        (*slots)[found->second] = projection;
+        return;
+    }
+
+    slot_indices[slot_key] = slots->size();
+    slots->push_back(projection);
 }
 
 void Gs1RuntimeProjectionCache::apply_site_inventory_view_state(const Gs1EngineMessageInventoryViewData& payload)
@@ -1009,6 +1214,7 @@ void Gs1RuntimeProjectionCache::apply_site_inventory_view_state(const Gs1EngineM
         pending_site_->opened_storage->storage_id = payload.storage_id;
         pending_site_->opened_storage->slot_count = payload.slot_count;
         pending_site_->opened_storage->slots.clear();
+        pending_opened_storage_slot_indices_.clear();
     }
 }
 
@@ -1034,10 +1240,7 @@ void Gs1RuntimeProjectionCache::apply_site_craft_context_option_upsert(const Gs1
         return;
     }
 
-    pending_site_->craft_context->options.push_back(Gs1RuntimeCraftContextOptionProjection {
-        payload.recipe_id,
-        payload.output_item_id,
-        payload.flags});
+    pending_site_->craft_context->options.push_back(payload);
 }
 
 void Gs1RuntimeProjectionCache::apply_site_craft_context_end()
@@ -1064,16 +1267,7 @@ void Gs1RuntimeProjectionCache::apply_site_placement_preview(const Gs1EngineMess
         return;
     }
 
-    pending_site_->placement_preview = Gs1RuntimePlacementPreviewProjection {
-        payload.tile_x,
-        payload.tile_y,
-        payload.blocked_mask,
-        payload.item_id,
-        payload.preview_tile_count,
-        payload.footprint_width,
-        payload.footprint_height,
-        payload.action_kind,
-        payload.flags};
+    pending_site_->placement_preview = payload;
     pending_site_->placement_preview_tiles.clear();
 }
 
@@ -1084,17 +1278,7 @@ void Gs1RuntimeProjectionCache::apply_site_placement_preview_tile_upsert(const G
         return;
     }
 
-    Gs1RuntimePlacementPreviewTileProjection projection {};
-    projection.x = payload.x;
-    projection.y = payload.y;
-    projection.flags = payload.flags;
-    projection.wind_protection = payload.wind_protection;
-    projection.heat_protection = payload.heat_protection;
-    projection.dust_protection = payload.dust_protection;
-    projection.final_wind_protection = payload.final_wind_protection;
-    projection.final_heat_protection = payload.final_heat_protection;
-    projection.final_dust_protection = payload.final_dust_protection;
-    projection.occupant_condition = payload.occupant_condition;
+    Gs1RuntimePlacementPreviewTileProjection projection = payload;
     upsert_projection(
         pending_site_->placement_preview_tiles,
         projection,
@@ -1114,13 +1298,7 @@ void Gs1RuntimeProjectionCache::apply_site_placement_failure(const Gs1EngineMess
         return;
     }
 
-    site->placement_failure = Gs1RuntimePlacementFailureProjection {
-        payload.tile_x,
-        payload.tile_y,
-        payload.blocked_mask,
-        payload.sequence_id,
-        payload.action_kind,
-        payload.flags};
+    site->placement_failure = payload;
 }
 
 void Gs1RuntimeProjectionCache::apply_site_task_upsert(const Gs1EngineMessageTaskData& payload)
@@ -1130,19 +1308,16 @@ void Gs1RuntimeProjectionCache::apply_site_task_upsert(const Gs1EngineMessageTas
         return;
     }
 
-    Gs1RuntimeTaskProjection projection {};
-    projection.task_instance_id = payload.task_instance_id;
-    projection.task_template_id = payload.task_template_id;
-    projection.publisher_faction_id = payload.publisher_faction_id;
-    projection.current_progress = payload.current_progress;
-    projection.target_progress = payload.target_progress;
-    projection.list_kind = payload.list_kind;
-    projection.flags = payload.flags;
-    upsert_projection(
-        pending_site_->tasks,
-        projection,
-        projection.task_instance_id,
-        [](const auto& task) { return task.task_instance_id; });
+    Gs1RuntimeTaskProjection projection = payload;
+    const auto found = pending_task_indices_.find(projection.task_instance_id);
+    if (found != pending_task_indices_.end() && found->second < pending_site_->tasks.size())
+    {
+        pending_site_->tasks[found->second] = projection;
+        return;
+    }
+
+    pending_task_indices_[projection.task_instance_id] = pending_site_->tasks.size();
+    pending_site_->tasks.push_back(projection);
 }
 
 void Gs1RuntimeProjectionCache::apply_site_task_remove(const Gs1EngineMessageTaskData& payload)
@@ -1152,9 +1327,21 @@ void Gs1RuntimeProjectionCache::apply_site_task_remove(const Gs1EngineMessageTas
         return;
     }
 
-    erase_projection_if(pending_site_->tasks, [&](const auto& task) {
-        return task.task_instance_id == payload.task_instance_id;
-    });
+    const auto found = pending_task_indices_.find(payload.task_instance_id);
+    if (found == pending_task_indices_.end() || found->second >= pending_site_->tasks.size())
+    {
+        return;
+    }
+
+    const std::size_t index = found->second;
+    const std::size_t last_index = pending_site_->tasks.size() - 1U;
+    if (index != last_index)
+    {
+        pending_site_->tasks[index] = std::move(pending_site_->tasks[last_index]);
+        pending_task_indices_[pending_site_->tasks[index].task_instance_id] = index;
+    }
+    pending_site_->tasks.pop_back();
+    pending_task_indices_.erase(found);
 }
 
 void Gs1RuntimeProjectionCache::apply_site_phone_listing_upsert(const Gs1EngineMessagePhoneListingData& payload)
@@ -1164,20 +1351,16 @@ void Gs1RuntimeProjectionCache::apply_site_phone_listing_upsert(const Gs1EngineM
         return;
     }
 
-    Gs1RuntimePhoneListingProjection projection {};
-    projection.listing_id = payload.listing_id;
-    projection.item_or_unlockable_id = payload.item_or_unlockable_id;
-    projection.price = payload.price;
-    projection.related_site_id = payload.related_site_id;
-    projection.quantity = payload.quantity;
-    projection.cart_quantity = payload.cart_quantity;
-    projection.listing_kind = payload.listing_kind;
-    projection.flags = payload.flags;
-    upsert_projection(
-        pending_site_->phone_listings,
-        projection,
-        projection.listing_id,
-        [](const auto& listing) { return listing.listing_id; });
+    Gs1RuntimePhoneListingProjection projection = payload;
+    const auto found = pending_phone_listing_indices_.find(projection.listing_id);
+    if (found != pending_phone_listing_indices_.end() && found->second < pending_site_->phone_listings.size())
+    {
+        pending_site_->phone_listings[found->second] = projection;
+        return;
+    }
+
+    pending_phone_listing_indices_[projection.listing_id] = pending_site_->phone_listings.size();
+    pending_site_->phone_listings.push_back(projection);
 }
 
 void Gs1RuntimeProjectionCache::apply_site_phone_listing_remove(const Gs1EngineMessagePhoneListingData& payload)
@@ -1187,9 +1370,21 @@ void Gs1RuntimeProjectionCache::apply_site_phone_listing_remove(const Gs1EngineM
         return;
     }
 
-    erase_projection_if(pending_site_->phone_listings, [&](const auto& listing) {
-        return listing.listing_id == payload.listing_id;
-    });
+    const auto found = pending_phone_listing_indices_.find(payload.listing_id);
+    if (found == pending_phone_listing_indices_.end() || found->second >= pending_site_->phone_listings.size())
+    {
+        return;
+    }
+
+    const std::size_t index = found->second;
+    const std::size_t last_index = pending_site_->phone_listings.size() - 1U;
+    if (index != last_index)
+    {
+        pending_site_->phone_listings[index] = std::move(pending_site_->phone_listings[last_index]);
+        pending_phone_listing_indices_[pending_site_->phone_listings[index].listing_id] = index;
+    }
+    pending_site_->phone_listings.pop_back();
+    pending_phone_listing_indices_.erase(found);
 }
 
 void Gs1RuntimeProjectionCache::apply_site_phone_panel_state(const Gs1EngineMessagePhonePanelData& payload)
@@ -1199,17 +1394,7 @@ void Gs1RuntimeProjectionCache::apply_site_phone_panel_state(const Gs1EngineMess
         return;
     }
 
-    pending_site_->phone_panel = Gs1RuntimePhonePanelProjection {
-        payload.active_section,
-        payload.visible_task_count,
-        payload.accepted_task_count,
-        payload.completed_task_count,
-        payload.claimed_task_count,
-        payload.buy_listing_count,
-        payload.sell_listing_count,
-        payload.service_listing_count,
-        payload.cart_item_count,
-        payload.flags};
+    pending_site_->phone_panel = payload;
 }
 
 void Gs1RuntimeProjectionCache::apply_site_modifier_list_begin(const Gs1EngineMessageSiteModifierListData& payload)
@@ -1233,15 +1418,16 @@ void Gs1RuntimeProjectionCache::apply_site_modifier_upsert(const Gs1EngineMessag
         return;
     }
 
-    Gs1RuntimeModifierProjection projection {};
-    projection.modifier_id = payload.modifier_id;
-    projection.remaining_game_hours = payload.remaining_game_hours;
-    projection.flags = payload.flags;
-    upsert_projection(
-        pending_site_->active_modifiers,
-        projection,
-        projection.modifier_id,
-        [](const auto& modifier) { return modifier.modifier_id; });
+    Gs1RuntimeModifierProjection projection = payload;
+    const auto found = pending_modifier_indices_.find(projection.modifier_id);
+    if (found != pending_modifier_indices_.end() && found->second < pending_site_->active_modifiers.size())
+    {
+        pending_site_->active_modifiers[found->second] = projection;
+        return;
+    }
+
+    pending_modifier_indices_[projection.modifier_id] = pending_site_->active_modifiers.size();
+    pending_site_->active_modifiers.push_back(projection);
 }
 
 void Gs1RuntimeProjectionCache::apply_site_protection_overlay_state(const Gs1EngineMessageSiteProtectionOverlayData& payload)
@@ -1252,7 +1438,7 @@ void Gs1RuntimeProjectionCache::apply_site_protection_overlay_state(const Gs1Eng
         return;
     }
 
-    site->protection_overlay = Gs1RuntimeProtectionOverlayProjection {payload.mode};
+    site->protection_overlay = payload;
 }
 
 void Gs1RuntimeProjectionCache::apply_site_snapshot_end()
@@ -1275,33 +1461,22 @@ void Gs1RuntimeProjectionCache::apply_site_snapshot_end()
 
     state_.active_site = std::move(pending_site_);
     pending_site_.reset();
+    pending_inventory_storage_indices_.clear();
+    pending_worker_pack_slot_indices_.clear();
+    pending_opened_storage_slot_indices_.clear();
+    pending_task_indices_.clear();
+    pending_phone_listing_indices_.clear();
+    pending_modifier_indices_.clear();
 }
 
 void Gs1RuntimeProjectionCache::apply_hud_state(const Gs1EngineMessageHudStateData& payload)
 {
-    Gs1RuntimeHudProjection projection {};
-    projection.player_health = payload.player_health;
-    projection.player_hydration = payload.player_hydration;
-    projection.player_nourishment = payload.player_nourishment;
-    projection.player_energy = payload.player_energy;
-    projection.player_morale = payload.player_morale;
-    projection.current_money = payload.current_money;
-    projection.site_completion_normalized = payload.site_completion_normalized;
-    projection.active_task_count = payload.active_task_count;
-    projection.warning_code = payload.warning_code;
-    projection.current_action_kind = payload.current_action_kind;
-    state_.hud = projection;
+    state_.hud = payload;
 }
 
 void Gs1RuntimeProjectionCache::apply_campaign_resources(const Gs1EngineMessageCampaignResourcesData& payload)
 {
-    Gs1RuntimeCampaignResourcesProjection projection {};
-    projection.current_money = payload.current_money;
-    projection.total_reputation = payload.total_reputation;
-    projection.village_reputation = payload.village_reputation;
-    projection.forestry_reputation = payload.forestry_reputation;
-    projection.university_reputation = payload.university_reputation;
-    state_.campaign_resources = projection;
+    state_.campaign_resources = payload;
 }
 
 void Gs1RuntimeProjectionCache::apply_site_action_update(const Gs1EngineMessageSiteActionData& payload)
@@ -1312,24 +1487,12 @@ void Gs1RuntimeProjectionCache::apply_site_action_update(const Gs1EngineMessageS
         return;
     }
 
-    Gs1RuntimeSiteActionProjection projection {};
-    projection.action_id = payload.action_id;
-    projection.target_tile_x = payload.target_tile_x;
-    projection.target_tile_y = payload.target_tile_y;
-    projection.action_kind = payload.action_kind;
-    projection.flags = payload.flags;
-    projection.progress_normalized = payload.progress_normalized;
-    projection.duration_minutes = payload.duration_minutes;
-    state_.site_action = projection;
+    state_.site_action = payload;
 }
 
 void Gs1RuntimeProjectionCache::apply_site_result_ready(const Gs1EngineMessageSiteResultData& payload)
 {
-    Gs1RuntimeSiteResultProjection projection {};
-    projection.site_id = payload.site_id;
-    projection.result = payload.result;
-    projection.newly_revealed_site_count = payload.newly_revealed_site_count;
-    state_.site_result = projection;
+    state_.site_result = payload;
 }
 
 void Gs1RuntimeProjectionCache::apply_one_shot_cue(const Gs1EngineMessageOneShotCueData& payload)

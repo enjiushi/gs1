@@ -2,7 +2,12 @@
 #include "gs1_godot_main_screen_control.h"
 #include "gs1_godot_runtime_node.h"
 
+#include "content/defs/craft_recipe_defs.h"
 #include "content/defs/faction_defs.h"
+#include "content/defs/item_defs.h"
+#include "content/defs/plant_defs.h"
+#include "content/defs/structure_defs.h"
+#include "content/defs/task_defs.h"
 #include "content/defs/technology_defs.h"
 #include "host/adapter_metadata_catalog.h"
 
@@ -118,23 +123,6 @@ Label3D* make_label3d()
 String string_from_view(std::string_view value)
 {
     return String::utf8(value.data(), static_cast<int>(value.size()));
-}
-
-const gs1::TechnologyNodeDef* find_tech_tree_node_def(const Dictionary& action)
-{
-    const Variant raw_target_id = action.get("target_id", Variant());
-    if (raw_target_id.get_type() != Variant::INT)
-    {
-        return nullptr;
-    }
-
-    const auto target_id = static_cast<std::uint32_t>(static_cast<std::int64_t>(raw_target_id));
-    if (target_id == 0U)
-    {
-        return nullptr;
-    }
-
-    return gs1::find_technology_node_def(gs1::TechNodeId {target_id});
 }
 
 constexpr std::uint64_t k_fnv_offset_basis = 1469598103934665603ULL;
@@ -349,7 +337,10 @@ void Gs1GodotMainScreenControl::_process(double delta)
     }
 
     const bool projection_changed = sync_projection_from_runtime();
-    const int app_state = as_int(projection_.get("app_state", APP_STATE_BOOT), APP_STATE_BOOT);
+    const Gs1RuntimeProjectionState* state = projection_state();
+    const int app_state = state != nullptr && state->current_app_state.has_value()
+        ? static_cast<int>(state->current_app_state.value())
+        : APP_STATE_BOOT;
 
     refresh_status();
     refresh_menu(app_state);
@@ -667,9 +658,12 @@ bool Gs1GodotMainScreenControl::sync_projection_from_runtime()
         return false;
     }
 
-    projection_ = runtime_node_->get_projection();
     last_projection_revision_ = runtime_revision;
-    selected_site_id_ = as_int(projection_.get("selected_site_id", selected_site_id_), selected_site_id_);
+    if (const Gs1RuntimeProjectionState* state = projection_state();
+        state != nullptr && state->selected_site_id.has_value())
+    {
+        selected_site_id_ = static_cast<int>(state->selected_site_id.value());
+    }
     return true;
 }
 
@@ -682,25 +676,29 @@ void Gs1GodotMainScreenControl::refresh_status()
 
     PackedStringArray lines;
     lines.push_back("[b]Field Operations Feed[/b]");
-    lines.push_back(vformat("Runtime: %s", bool_text(as_bool(projection_.get("running", false), false), "linked", "idle")));
-    lines.push_back(vformat("Screen: %s", app_state_name(as_int(projection_.get("app_state", APP_STATE_BOOT), APP_STATE_BOOT))));
+    const Gs1RuntimeProjectionState* state = projection_state();
+    const int app_state = state != nullptr && state->current_app_state.has_value()
+        ? static_cast<int>(state->current_app_state.value())
+        : APP_STATE_BOOT;
+    lines.push_back(vformat("Runtime: %s", bool_text(runtime_node_ != nullptr, "linked", "idle")));
+    lines.push_back(vformat("Screen: %s", app_state_name(app_state)));
 
-    Dictionary campaign_resources = projection_.get("campaign_resources", Dictionary());
-    if (!campaign_resources.is_empty())
+    if (state != nullptr && state->campaign_resources.has_value())
     {
-        lines.push_back(vformat("Campaign Cash: %.2f", as_float(campaign_resources.get("current_money", 0.0), 0.0)));
+        const auto& campaign_resources = state->campaign_resources.value();
+        lines.push_back(vformat("Campaign Cash: %.2f", campaign_resources.current_money));
         lines.push_back(vformat(
             "Reputation T/V/B/U: %d / %d / %d / %d",
-            as_int(campaign_resources.get("total_reputation", 0), 0),
-            as_int(campaign_resources.get("village_reputation", 0), 0),
-            as_int(campaign_resources.get("forestry_reputation", 0), 0),
-            as_int(campaign_resources.get("university_reputation", 0), 0)));
+            campaign_resources.total_reputation,
+            campaign_resources.village_reputation,
+            campaign_resources.forestry_reputation,
+            campaign_resources.university_reputation));
     }
     if (!last_action_message_.is_empty())
     {
         lines.push_back(vformat("Last Action: %s", last_action_message_));
     }
-    const String last_error = projection_.get("last_error", String());
+    const String last_error = runtime_node_ != nullptr ? string_from_view(runtime_node_->last_error()) : String();
     if (!last_error.is_empty())
     {
         lines.push_back(vformat("Error: %s", last_error));
@@ -766,9 +764,9 @@ void Gs1GodotMainScreenControl::refresh_regional_map(int app_state, bool project
     const bool force_refresh = projection_changed || !regional_map_visible_;
     regional_map_visible_ = true;
 
-    const auto& projection_state = runtime_node_->projection_state();
-    const auto& sites = projection_state.regional_map_sites;
-    const auto& links = projection_state.regional_map_links;
+    const auto& runtime_state = runtime_node_->projection_state();
+    const auto& sites = runtime_state.regional_map_sites;
+    const auto& links = runtime_state.regional_map_links;
 
     if (selected_site_id_ == 0 && !sites.empty())
     {
@@ -796,11 +794,11 @@ void Gs1GodotMainScreenControl::refresh_regional_map(int app_state, bool project
     lines.push_back(vformat("Revealed Sites: %d  Adjacency Links: %d", static_cast<int>(sites.size()), static_cast<int>(links.size())));
     lines.push_back(selected_site_id_ != 0 ? vformat("Selected Site: Site %d", selected_site_id_) : String("Selected Site: None"));
 
-    const Dictionary campaign_resources = projection_.get("campaign_resources", Dictionary());
-    if (!campaign_resources.is_empty())
+    if (projection_state() != nullptr && projection_state()->campaign_resources.has_value())
     {
-        lines.push_back(vformat("Campaign Cash: %.2f", as_float(campaign_resources.get("current_money", 0.0), 0.0)));
-        lines.push_back(vformat("Total Reputation: %d", as_int(campaign_resources.get("total_reputation", 0), 0)));
+        const auto& campaign_resources = projection_state()->campaign_resources.value();
+        lines.push_back(vformat("Campaign Cash: %.2f", campaign_resources.current_money));
+        lines.push_back(vformat("Total Reputation: %d", campaign_resources.total_reputation));
     }
     lines.push_back("Open the tech tree here, then choose a site marker to review support and deploy.");
 
@@ -831,8 +829,8 @@ void Gs1GodotMainScreenControl::refresh_regional_map(int app_state, bool project
 
 void Gs1GodotMainScreenControl::refresh_site(int app_state, bool projection_changed)
 {
-    const Dictionary site_state = active_site();
-    const bool panel_visible = !site_state.is_empty() && app_state >= APP_STATE_SITE_LOADING && app_state <= APP_STATE_SITE_RESULT;
+    const Gs1RuntimeSiteProjection* site_state = active_site();
+    const bool panel_visible = site_state != nullptr && app_state >= APP_STATE_SITE_LOADING && app_state <= APP_STATE_SITE_RESULT;
 
     if (site_panel_ != nullptr)
     {
@@ -880,51 +878,51 @@ void Gs1GodotMainScreenControl::refresh_site(int app_state, bool projection_chan
         cached_storage_lookup_.clear();
         if (site_title_ != nullptr)
         {
-            site_title_->set_text(vformat("Site %d", as_int(site_state.get("site_id", 0), 0)));
+            site_title_->set_text(vformat("Site %d", static_cast<int>(site_state->site_id)));
         }
 
         PackedStringArray site_lines;
-        site_lines.push_back(vformat("Size: %d x %d", as_int(site_state.get("width", 0), 0), as_int(site_state.get("height", 0), 0)));
+        site_lines.push_back(vformat("Size: %d x %d", static_cast<int>(site_state->width), static_cast<int>(site_state->height)));
 
-        const Dictionary worker = site_state.get("worker", Dictionary());
-        if (!worker.is_empty())
+        if (site_state->worker.has_value())
         {
+            const auto& worker = site_state->worker.value();
             site_lines.push_back(vformat(
                 "Worker: (%.1f, %.1f)  Action %d",
-                as_float(worker.get("tile_x", 0.0), 0.0),
-                as_float(worker.get("tile_y", 0.0), 0.0),
-                as_int(worker.get("current_action_kind", 0), 0)));
+                worker.tile_x,
+                worker.tile_y,
+                static_cast<int>(worker.current_action_kind)));
         }
 
-        const Dictionary weather = site_state.get("weather", Dictionary());
-        if (!weather.is_empty())
+        if (site_state->weather.has_value())
         {
+            const auto& weather = site_state->weather.value();
             site_lines.push_back(vformat(
                 "Weather H/W/D: %.1f / %.1f / %.1f",
-                as_float(weather.get("heat", 0.0), 0.0),
-                as_float(weather.get("wind", 0.0), 0.0),
-                as_float(weather.get("dust", 0.0), 0.0)));
+                weather.heat,
+                weather.wind,
+                weather.dust));
         }
 
-        const Dictionary hud = projection_.get("hud", Dictionary());
-        if (!hud.is_empty())
+        if (projection_state() != nullptr && projection_state()->hud.has_value())
         {
+            const auto& hud = projection_state()->hud.value();
             site_lines.push_back(vformat(
                 "Meters HP/HY/NO/EN/MO: %.1f / %.1f / %.1f / %.1f / %.1f",
-                as_float(hud.get("player_health", 0.0), 0.0),
-                as_float(hud.get("player_hydration", 0.0), 0.0),
-                as_float(hud.get("player_nourishment", 0.0), 0.0),
-                as_float(hud.get("player_energy", 0.0), 0.0),
-                as_float(hud.get("player_morale", 0.0), 0.0)));
+                hud.player_health,
+                hud.player_hydration,
+                hud.player_nourishment,
+                hud.player_energy,
+                hud.player_morale));
         }
 
-        const Dictionary site_action = projection_.get("site_action", Dictionary());
-        if (!site_action.is_empty())
+        if (projection_state() != nullptr && projection_state()->site_action.has_value())
         {
+            const auto& site_action = projection_state()->site_action.value();
             site_lines.push_back(vformat(
                 "Current Action: kind %d  progress %.2f",
-                as_int(site_action.get("action_kind", 0), 0),
-                as_float(site_action.get("progress_normalized", 0.0), 0.0)));
+                static_cast<int>(site_action.action_kind),
+                site_action.progress_normalized));
         }
 
         if (site_summary_ != nullptr)
@@ -932,37 +930,37 @@ void Gs1GodotMainScreenControl::refresh_site(int app_state, bool projection_chan
             site_summary_->set_text(String("\n").join(site_lines));
         }
 
-        render_inventory(site_state);
-        render_tasks(site_state);
-        render_phone(site_state);
-        render_craft(site_state);
-        render_overlay(site_state);
+        render_inventory(*site_state);
+        render_tasks(*site_state);
+        render_phone(*site_state);
+        render_craft(*site_state);
+        render_overlay(*site_state);
         render_projected_ui_buttons(site_controls_, {6, 7, 8, 10, 11, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26});
     }
 
     clamp_selected_tile();
-    const Dictionary selected_tile = tile_at(selected_tile_);
+    const Gs1RuntimeTileProjection* selected_tile = tile_at(selected_tile_);
     if (tile_label_ != nullptr)
     {
         String tile_text = vformat(
             "Selected Tile: (%d, %d)  Plant: %s  Structure: %s",
             selected_tile_.x,
             selected_tile_.y,
-            String(selected_tile.get("plant_name", "None")),
-            String(selected_tile.get("structure_name", "None")));
-        if (!selected_tile.is_empty())
+            selected_tile != nullptr && selected_tile->plant_type_id != 0U ? plant_name_for(static_cast<int>(selected_tile->plant_type_id)) : String("None"),
+            selected_tile != nullptr && selected_tile->structure_type_id != 0U ? structure_name_for(static_cast<int>(selected_tile->structure_type_id)) : String("None"));
+        if (selected_tile != nullptr)
         {
             tile_text += vformat(
                 "  Wind %.2f  Moisture %.2f  Fertility %.2f",
-                as_float(selected_tile.get("local_wind", 0.0), 0.0),
-                as_float(selected_tile.get("moisture", 0.0), 0.0),
-                as_float(selected_tile.get("soil_fertility", 0.0), 0.0));
+                selected_tile->local_wind,
+                selected_tile->moisture,
+                selected_tile->soil_fertility);
         }
         tile_label_->set_text(tile_text);
     }
 }
 
-void Gs1GodotMainScreenControl::render_inventory(const Dictionary& site_state)
+void Gs1GodotMainScreenControl::render_inventory(const Gs1RuntimeSiteProjection& site_state)
 {
     if (inventory_summary_ == nullptr)
     {
@@ -971,40 +969,36 @@ void Gs1GodotMainScreenControl::render_inventory(const Dictionary& site_state)
 
     PackedStringArray lines;
     lines.push_back("[b]Inventory[/b]");
-    lines.push_back(vformat("Worker Pack Open: %s", bool_text(as_bool(site_state.get("worker_pack_open", false), false), "yes", "no")));
+    lines.push_back(vformat("Worker Pack Open: %s", bool_text(site_state.worker_pack_open, "yes", "no")));
 
-    const Array worker_pack_slots = site_state.get("worker_pack_slots", Array());
-    for (int64_t index = 0; index < worker_pack_slots.size(); ++index)
+    for (const auto& slot : site_state.worker_pack_slots)
     {
-        const Dictionary slot = worker_pack_slots[index];
         lines.push_back(vformat(
             "Pack %d: %s x%d",
-            as_int(slot.get("slot_index", 0), 0),
-            String(slot.get("item_name", "Empty")),
-            as_int(slot.get("quantity", 0), 0)));
+            static_cast<int>(slot.slot_index),
+            item_name_for(static_cast<int>(slot.item_id)),
+            static_cast<int>(slot.quantity)));
     }
 
-    const Dictionary opened_storage = site_state.get("opened_storage", Dictionary());
-    if (!opened_storage.is_empty())
+    if (site_state.opened_storage.has_value())
     {
+        const auto& opened_storage = site_state.opened_storage.value();
         lines.push_back(String());
-        lines.push_back(vformat("Opened Storage %d", as_int(opened_storage.get("storage_id", 0), 0)));
-        const Array slots = opened_storage.get("slots", Array());
-        for (int64_t index = 0; index < slots.size(); ++index)
+        lines.push_back(vformat("Opened Storage %d", static_cast<int>(opened_storage.storage_id)));
+        for (const auto& slot : opened_storage.slots)
         {
-            const Dictionary slot = slots[index];
             lines.push_back(vformat(
                 "Slot %d: %s x%d",
-                as_int(slot.get("slot_index", 0), 0),
-                String(slot.get("item_name", "Empty")),
-                as_int(slot.get("quantity", 0), 0)));
+                static_cast<int>(slot.slot_index),
+                item_name_for(static_cast<int>(slot.item_id)),
+                static_cast<int>(slot.quantity)));
         }
     }
 
     inventory_summary_->set_text(String("\n").join(lines));
 }
 
-void Gs1GodotMainScreenControl::render_tasks(const Dictionary& site_state)
+void Gs1GodotMainScreenControl::render_tasks(const Gs1RuntimeSiteProjection& site_state)
 {
     if (task_summary_ == nullptr)
     {
@@ -1013,33 +1007,30 @@ void Gs1GodotMainScreenControl::render_tasks(const Dictionary& site_state)
 
     PackedStringArray lines;
     lines.push_back("[b]Tasks[/b]");
-    const Array tasks = site_state.get("tasks", Array());
-    for (int64_t index = 0; index < tasks.size(); ++index)
+    for (const auto& task : site_state.tasks)
     {
-        const Dictionary task = tasks[index];
         lines.push_back(vformat(
             "Task %d  progress %d / %d  list %d",
-            as_int(task.get("task_template_id", 0), 0),
-            as_int(task.get("current_progress", 0), 0),
-            as_int(task.get("target_progress", 0), 0),
-            as_int(task.get("list_kind", 0), 0)));
+            static_cast<int>(task.task_template_id),
+            static_cast<int>(task.current_progress),
+            static_cast<int>(task.target_progress),
+            static_cast<int>(task.list_kind)));
     }
 
     task_summary_->set_text(String("\n").join(lines));
-    reconcile_task_rows(tasks);
-    reconcile_modifier_rows(site_state.get("active_modifiers", Array()));
+    reconcile_task_rows(site_state.tasks);
+    reconcile_modifier_rows(site_state.active_modifiers);
 }
 
-void Gs1GodotMainScreenControl::render_phone(const Dictionary& site_state)
+void Gs1GodotMainScreenControl::render_phone(const Gs1RuntimeSiteProjection& site_state)
 {
-    const Dictionary phone_panel = site_state.get("phone_panel", Dictionary());
     if (phone_state_label_ != nullptr)
     {
         phone_state_label_->set_text(vformat(
             "Phone Section: %d  Listings: buy %d sell %d",
-            as_int(phone_panel.get("active_section", 0), 0),
-            as_int(phone_panel.get("buy_listing_count", 0), 0),
-            as_int(phone_panel.get("sell_listing_count", 0), 0)));
+            static_cast<int>(site_state.phone_panel.active_section),
+            static_cast<int>(site_state.phone_panel.buy_listing_count),
+            static_cast<int>(site_state.phone_panel.sell_listing_count)));
     }
 
     if (phone_listings_ == nullptr)
@@ -1047,11 +1038,10 @@ void Gs1GodotMainScreenControl::render_phone(const Dictionary& site_state)
         return;
     }
 
-    const Array phone_listings = site_state.get("phone_listings", Array());
-    reconcile_phone_listing_buttons(phone_listings);
+    reconcile_phone_listing_buttons(site_state.phone_listings);
 }
 
-void Gs1GodotMainScreenControl::render_craft(const Dictionary& site_state)
+void Gs1GodotMainScreenControl::render_craft(const Gs1RuntimeSiteProjection& site_state)
 {
     if (craft_summary_ == nullptr)
     {
@@ -1061,34 +1051,34 @@ void Gs1GodotMainScreenControl::render_craft(const Dictionary& site_state)
     PackedStringArray lines;
     lines.push_back("[b]Craft / Placement[/b]");
 
-    const Dictionary preview = site_state.get("placement_preview", Dictionary());
-    if (!preview.is_empty())
+    if (site_state.placement_preview.has_value())
     {
+        const auto& preview = site_state.placement_preview.value();
         lines.push_back(vformat(
             "Placement: %s at (%d, %d)  blocked %d",
-            String(preview.get("item_name", "Item")),
-            as_int(preview.get("tile_x", 0), 0),
-            as_int(preview.get("tile_y", 0), 0),
-            as_int(preview.get("blocked_mask", 0), 0)));
+            item_name_for(static_cast<int>(preview.item_id)),
+            preview.tile_x,
+            preview.tile_y,
+            static_cast<int>(preview.blocked_mask)));
     }
 
-    const Dictionary failure = site_state.get("placement_failure", Dictionary());
-    if (!failure.is_empty())
+    if (site_state.placement_failure.has_value())
     {
+        const auto& failure = site_state.placement_failure.value();
         lines.push_back(vformat(
             "Placement Failure: tile (%d, %d) flags %d",
-            as_int(failure.get("tile_x", 0), 0),
-            as_int(failure.get("tile_y", 0), 0),
-            as_int(failure.get("flags", 0), 0)));
+            failure.tile_x,
+            failure.tile_y,
+            static_cast<int>(failure.flags)));
     }
 
-    const Dictionary craft_context = site_state.get("craft_context", Dictionary());
-    if (!craft_context.is_empty())
+    if (site_state.craft_context.has_value())
     {
+        const auto& craft_context = site_state.craft_context.value();
         lines.push_back(vformat(
             "Craft Context @ (%d, %d)",
-            as_int(craft_context.get("tile_x", 0), 0),
-            as_int(craft_context.get("tile_y", 0), 0)));
+            craft_context.tile_x,
+            craft_context.tile_y));
     }
 
     craft_summary_->set_text(String("\n").join(lines));
@@ -1097,21 +1087,20 @@ void Gs1GodotMainScreenControl::render_craft(const Dictionary& site_state)
         return;
     }
 
-    reconcile_craft_option_buttons(craft_context);
+    reconcile_craft_option_buttons(site_state.craft_context.has_value() ? &site_state.craft_context.value() : nullptr);
 }
 
-void Gs1GodotMainScreenControl::render_overlay(const Dictionary& site_state)
+void Gs1GodotMainScreenControl::render_overlay(const Gs1RuntimeSiteProjection& site_state)
 {
     if (overlay_state_label_ == nullptr)
     {
         return;
     }
 
-    const Dictionary overlay = site_state.get("protection_overlay", Dictionary());
-    overlay_state_label_->set_text(vformat("Overlay Mode: %d", as_int(overlay.get("mode", 0), 0)));
+    overlay_state_label_->set_text(vformat("Overlay Mode: %d", static_cast<int>(site_state.protection_overlay.mode)));
 }
 
-void Gs1GodotMainScreenControl::reconcile_task_rows(const Array& tasks)
+void Gs1GodotMainScreenControl::reconcile_task_rows(const std::vector<Gs1RuntimeTaskProjection>& tasks)
 {
     if (task_rows_ == nullptr)
     {
@@ -1120,10 +1109,9 @@ void Gs1GodotMainScreenControl::reconcile_task_rows(const Array& tasks)
 
     std::unordered_set<std::uint64_t> desired_keys;
     int desired_index = 0;
-    for (int64_t index = 0; index < tasks.size(); ++index)
+    for (const auto& task : tasks)
     {
-        const Dictionary task = tasks[index];
-        const int task_instance_id = as_int(task.get("task_instance_id", 0), 0);
+        const int task_instance_id = static_cast<int>(task.task_instance_id);
         const std::uint64_t stable_key = static_cast<std::uint64_t>(task_instance_id);
         desired_keys.insert(stable_key);
         Button* button = upsert_button_node(
@@ -1137,11 +1125,10 @@ void Gs1GodotMainScreenControl::reconcile_task_rows(const Array& tasks)
             continue;
         }
 
-        const String icon_path = String(task.get("resource_icon_path", String()));
-        const Ref<Texture2D> icon_texture = load_texture_2d(icon_path);
-        if (icon_texture.is_valid())
+        const TaskTemplateUiCacheEntry& ui_entry = task_template_ui_for(task.task_template_id);
+        if (ui_entry.icon_texture.is_valid())
         {
-            button->set_button_icon(icon_texture);
+            button->set_button_icon(ui_entry.icon_texture);
         }
         else
         {
@@ -1150,15 +1137,15 @@ void Gs1GodotMainScreenControl::reconcile_task_rows(const Array& tasks)
 
         button->set_text(vformat(
             "Task %d  progress %d/%d  tier %d",
-            as_int(task.get("task_template_id", 0), 0),
-            as_int(task.get("current_progress", 0), 0),
-            as_int(task.get("target_progress", 0), 0),
-            as_int(task.get("task_tier_id", 0), 0)));
+            static_cast<int>(task.task_template_id),
+            static_cast<int>(task.current_progress),
+            static_cast<int>(task.target_progress),
+            ui_entry.task_tier_id));
         button->set_tooltip_text(vformat(
             "Task template %d, progress kind %d, list %d",
-            as_int(task.get("task_template_id", 0), 0),
-            as_int(task.get("progress_kind", 0), 0),
-            as_int(task.get("list_kind", 0), 0)));
+            static_cast<int>(task.task_template_id),
+            ui_entry.progress_kind,
+            static_cast<int>(task.list_kind)));
         button->set_disabled(true);
         button->set_focus_mode(Control::FOCUS_NONE);
     }
@@ -1166,7 +1153,7 @@ void Gs1GodotMainScreenControl::reconcile_task_rows(const Array& tasks)
     prune_button_registry(task_buttons_, desired_keys);
 }
 
-void Gs1GodotMainScreenControl::reconcile_modifier_rows(const Array& modifiers)
+void Gs1GodotMainScreenControl::reconcile_modifier_rows(const std::vector<Gs1RuntimeModifierProjection>& modifiers)
 {
     if (modifier_rows_ == nullptr)
     {
@@ -1175,10 +1162,10 @@ void Gs1GodotMainScreenControl::reconcile_modifier_rows(const Array& modifiers)
 
     std::unordered_set<std::uint64_t> desired_keys;
     int desired_index = 0;
-    for (int64_t index = 0; index < modifiers.size(); ++index)
+    for (std::size_t index = 0; index < modifiers.size(); ++index)
     {
-        const Dictionary modifier = modifiers[index];
-        const int modifier_id = as_int(modifier.get("modifier_id", 0), 0);
+        const auto& modifier = modifiers[index];
+        const int modifier_id = static_cast<int>(modifier.modifier_id);
         const std::uint64_t stable_key = pack_u32_pair(
             static_cast<std::uint32_t>(modifier_id),
             static_cast<std::uint32_t>(index));
@@ -1194,27 +1181,28 @@ void Gs1GodotMainScreenControl::reconcile_modifier_rows(const Array& modifiers)
             continue;
         }
 
-        const String icon_path = String(modifier.get("resource_icon_path", String()));
-        const Ref<Texture2D> icon_texture = load_texture_2d(icon_path);
-        if (icon_texture.is_valid())
+        const ModifierUiCacheEntry& ui_entry = modifier_ui_for(modifier.modifier_id);
+        if (ui_entry.icon_texture.is_valid())
         {
-            button->set_button_icon(icon_texture);
+            button->set_button_icon(ui_entry.icon_texture);
         }
         else
         {
             button->set_button_icon(Ref<Texture2D> {});
         }
-
-        const String label = String(modifier.get("display_name", String())).is_empty()
-            ? vformat("Modifier %d", modifier_id)
-            : String(modifier.get("display_name", String()));
         button->set_text(vformat(
             "%s  %s",
-            label,
-            (as_int(modifier.get("flags", 0), 0) & 1) != 0
-                ? vformat("%dh left", as_int(modifier.get("remaining_game_hours", 0), 0))
+            ui_entry.label,
+            (modifier.flags & 1U) != 0
+                ? vformat("%dh left", static_cast<int>(modifier.remaining_game_hours))
                 : String("Permanent")));
-        button->set_tooltip_text(String(modifier.get("description", String())));
+        const auto* metadata = adapter_metadata_catalog().find(
+            Gs1AdapterMetadataDomain::Modifier,
+            modifier.modifier_id);
+        button->set_tooltip_text(
+            metadata == nullptr || metadata->description.empty()
+                ? String()
+                : string_from_view(metadata->description));
         button->set_disabled(true);
         button->set_focus_mode(Control::FOCUS_NONE);
     }
@@ -1230,30 +1218,42 @@ void Gs1GodotMainScreenControl::render_projected_ui_buttons(VBoxContainer* conta
     }
 
     Array button_specs;
-    const Array ui_setups = projection_.get("ui_setups", Array());
-    for (int64_t setup_index = 0; setup_index < ui_setups.size(); ++setup_index)
+    const Gs1RuntimeProjectionState* state = projection_state();
+    if (state == nullptr)
     {
-        const Dictionary setup = ui_setups[setup_index];
-        const Array elements = setup.get("elements", Array());
-        for (int64_t element_index = 0; element_index < elements.size(); ++element_index)
+        reconcile_projected_action_buttons(
+            container,
+            site_control_buttons_,
+            PROJECTED_ACTION_CONTAINER_SITE_CONTROLS,
+            button_specs);
+        return;
+    }
+
+    for (const auto& setup : state->active_ui_setups)
+    {
+        for (const auto& element : setup.elements)
         {
-            const Dictionary element = elements[element_index];
-            const Dictionary action = element.get("action", Dictionary());
-            const int action_type = as_int(action.get("type", 0), 0);
+            const int action_type = static_cast<int>(element.action.type);
             if (std::find(allowed_action_types.begin(), allowed_action_types.end(), action_type) == allowed_action_types.end())
             {
                 continue;
             }
-            if (as_int(element.get("element_type", 0), 0) != 1)
+            if (element.element_type != GS1_UI_ELEMENT_BUTTON)
             {
                 continue;
             }
 
+            Dictionary action;
+            action["type"] = action_type;
+            action["target_id"] = static_cast<int64_t>(element.action.target_id);
+            action["arg0"] = static_cast<int64_t>(element.action.arg0);
+            action["arg1"] = static_cast<int64_t>(element.action.arg1);
+
             Dictionary spec;
-            spec["setup_id"] = as_int(setup.get("setup_id", 0), 0);
-            spec["element_id"] = as_int(element.get("element_id", 0), 0);
-            spec["text"] = String(element.get("text", "Action"));
-            spec["flags"] = as_int(element.get("flags", 0), 0);
+            spec["setup_id"] = static_cast<int>(setup.setup_id);
+            spec["element_id"] = static_cast<int>(element.element_id);
+            spec["text"] = String("Action");
+            spec["flags"] = static_cast<int>(element.flags);
             spec["action"] = action;
             button_specs.push_back(spec);
         }
@@ -1273,7 +1273,7 @@ void Gs1GodotMainScreenControl::render_regional_selection(const Gs1RuntimeRegion
         return;
     }
 
-    const Dictionary selection_setup = find_ui_setup(2);
+    const Gs1RuntimeUiPanelProjection* selection_setup = find_ui_panel(2);
     if (selected_site == nullptr)
     {
         regional_selection_panel_->set_visible(false);
@@ -1295,41 +1295,44 @@ void Gs1GodotMainScreenControl::render_regional_selection(const Gs1RuntimeRegion
 
     PackedStringArray label_lines;
     Array button_specs;
-    const Array text_lines = selection_setup.get("text_lines", Array());
-    for (int64_t index = 0; index < text_lines.size(); ++index)
+    if (selection_setup != nullptr)
     {
-        const Dictionary line = text_lines[index];
-        const String text = regional_panel_text_line(line).strip_edges();
-        if (!text.is_empty())
+        for (const auto& line : selection_setup->text_lines)
         {
-            label_lines.push_back(text);
-        }
-    }
-
-    const Array slot_actions = selection_setup.get("slot_actions", Array());
-    for (int64_t index = 0; index < slot_actions.size(); ++index)
-    {
-        const Dictionary slot_action = slot_actions[index];
-        if (regional_selection_actions_ == nullptr)
-        {
-            continue;
+            const String text = regional_panel_text_line(line).strip_edges();
+            if (!text.is_empty())
+            {
+                label_lines.push_back(text);
+            }
         }
 
-        const Dictionary action = slot_action.get("action", Dictionary());
-        const int action_type = as_int(action.get("type", 0), 0);
-        const String text = regional_panel_slot_label(slot_action);
-        if (action_type == UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION && text.is_empty())
+        for (const auto& slot_action : selection_setup->slot_actions)
         {
-            continue;
-        }
+            if (regional_selection_actions_ == nullptr)
+            {
+                continue;
+            }
 
-        Dictionary spec;
-        spec["setup_id"] = as_int(selection_setup.get("panel_id", 0), 0);
-        spec["element_id"] = as_int(slot_action.get("slot_id", 0), 0);
-        spec["text"] = regional_selection_action_label(text, action);
-        spec["flags"] = as_int(slot_action.get("flags", 0), 0);
-        spec["action"] = action;
-        button_specs.push_back(spec);
+            Dictionary action;
+            action["type"] = static_cast<int>(slot_action.action.type);
+            action["target_id"] = static_cast<int64_t>(slot_action.action.target_id);
+            action["arg0"] = static_cast<int64_t>(slot_action.action.arg0);
+            action["arg1"] = static_cast<int64_t>(slot_action.action.arg1);
+            const int action_type = static_cast<int>(slot_action.action.type);
+            const String text = regional_panel_slot_label(slot_action);
+            if (action_type == UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION && text.is_empty())
+            {
+                continue;
+            }
+
+            Dictionary spec;
+            spec["setup_id"] = static_cast<int>(selection_setup->panel_id);
+            spec["element_id"] = static_cast<int>(slot_action.slot_id);
+            spec["text"] = regional_selection_action_label(text, action);
+            spec["flags"] = static_cast<int>(slot_action.flags);
+            spec["action"] = action;
+            button_specs.push_back(spec);
+        }
     }
 
     if (button_specs.is_empty())
@@ -1394,8 +1397,8 @@ void Gs1GodotMainScreenControl::render_regional_tech_tree()
         return;
     }
 
-    const Dictionary progression_view = find_progression_view(GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE);
-    if (progression_view.is_empty())
+    const Gs1RuntimeProgressionViewProjection* progression_view = find_progression_view(GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE);
+    if (progression_view == nullptr)
     {
         regional_tech_tree_overlay_->set_visible(false);
         regional_tech_tree_panel_->set_visible(false);
@@ -1415,12 +1418,10 @@ void Gs1GodotMainScreenControl::render_regional_tech_tree()
     std::map<int, Dictionary> bureau_specs_by_rep;
     std::map<int, Dictionary> university_specs_by_rep;
     std::vector<int> row_requirements;
-    const Array entries = progression_view.get("entries", Array());
-    for (int64_t index = 0; index < entries.size(); ++index)
+    for (const auto& entry : progression_view->entries)
     {
-        const Dictionary entry = entries[index];
-        const int entry_kind = as_int(entry.get("entry_kind", 0), 0);
-        const int reputation_requirement = as_int(entry.get("reputation_requirement", 0), 0);
+        const int entry_kind = static_cast<int>(entry.entry_kind);
+        const int reputation_requirement = static_cast<int>(entry.reputation_requirement);
         if (entry_kind == GS1_PROGRESSION_ENTRY_NONE)
         {
             continue;
@@ -1433,18 +1434,23 @@ void Gs1GodotMainScreenControl::render_regional_tech_tree()
 
         if (entry_kind == GS1_PROGRESSION_ENTRY_TECHNOLOGY_NODE)
         {
+            Dictionary action;
+            action["type"] = static_cast<int>(entry.action.type);
+            action["target_id"] = static_cast<int64_t>(entry.action.target_id);
+            action["arg0"] = static_cast<int64_t>(entry.action.arg0);
+            action["arg1"] = static_cast<int64_t>(entry.action.arg1);
             Dictionary spec;
             spec["setup_id"] = GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE;
-            spec["element_id"] = as_int(entry.get("entry_id", 0), 0);
+            spec["element_id"] = static_cast<int>(entry.entry_id);
             spec["entry_kind"] = entry_kind;
-            spec["flags"] = as_int(entry.get("flags", 0), 0);
-            spec["action"] = entry.get("action", Dictionary());
+            spec["flags"] = static_cast<int>(entry.flags);
+            spec["action"] = action;
             spec["reputation_requirement"] = reputation_requirement;
-            spec["tech_node_id"] = as_int(entry.get("tech_node_id", 0), 0);
-            spec["faction_id"] = as_int(entry.get("faction_id", 0), 0);
-            spec["tier_index"] = as_int(entry.get("tier_index", 0), 0);
+            spec["tech_node_id"] = static_cast<int>(entry.tech_node_id);
+            spec["faction_id"] = static_cast<int>(entry.faction_id);
+            spec["tier_index"] = static_cast<int>(entry.tier_index);
             spec["tooltip"] = regional_tech_tooltip_text(spec);
-            switch (as_int(entry.get("faction_id", 0), 0))
+            switch (static_cast<int>(entry.faction_id))
             {
             case gs1::k_faction_village_committee:
                 village_specs_by_rep[reputation_requirement] = spec;
@@ -1465,12 +1471,12 @@ void Gs1GodotMainScreenControl::render_regional_tech_tree()
         {
             Dictionary spec;
             spec["setup_id"] = GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE;
-            spec["element_id"] = as_int(entry.get("entry_id", 0), 0);
+            spec["element_id"] = static_cast<int>(entry.entry_id);
             spec["entry_kind"] = entry_kind;
-            spec["flags"] = as_int(entry.get("flags", 0), 0);
+            spec["flags"] = static_cast<int>(entry.flags);
             spec["reputation_requirement"] = reputation_requirement;
-            spec["content_id"] = as_int(entry.get("content_id", 0), 0);
-            spec["content_kind"] = as_int(entry.get("content_kind", 0), 0);
+            spec["content_id"] = static_cast<int>(entry.content_id);
+            spec["content_kind"] = static_cast<int>(entry.content_kind);
             spec["tooltip"] = regional_unlockable_tooltip_text(spec);
             unlockable_specs_by_rep[reputation_requirement] = spec;
             continue;
@@ -2054,97 +2060,51 @@ Ref<StandardMaterial3D> Gs1GodotMainScreenControl::get_material(const String& ke
     return standard_material;
 }
 
-Dictionary Gs1GodotMainScreenControl::find_ui_setup(int setup_id) const
+const Gs1RuntimeProgressionViewProjection* Gs1GodotMainScreenControl::find_progression_view(int view_id) const
 {
-    const Array setups = projection_.get("ui_setups", Array());
-    for (int64_t index = 0; index < setups.size(); ++index)
+    const Gs1RuntimeProjectionState* state = projection_state();
+    if (state == nullptr || runtime_node_ == nullptr)
     {
-        const Dictionary setup = setups[index];
-        if (as_int(setup.get("setup_id", 0), 0) == setup_id)
-        {
-            return setup;
-        }
+        return nullptr;
     }
-    return Dictionary();
+    return runtime_node_->projection_cache().find_progression_view(static_cast<Gs1ProgressionViewId>(view_id));
 }
 
-Dictionary Gs1GodotMainScreenControl::find_progression_view(int view_id) const
+const Gs1RuntimeUiPanelProjection* Gs1GodotMainScreenControl::find_ui_panel(int panel_id) const
 {
-    const Array views = projection_.get("progression_views", Array());
-    for (int64_t index = 0; index < views.size(); ++index)
+    const Gs1RuntimeProjectionState* state = projection_state();
+    if (state == nullptr || runtime_node_ == nullptr)
     {
-        const Dictionary view = views[index];
-        if (as_int(view.get("view_id", 0), 0) == view_id)
-        {
-            return view;
-        }
+        return nullptr;
     }
-    return Dictionary();
+    return runtime_node_->projection_cache().find_ui_panel(static_cast<Gs1UiPanelId>(panel_id));
 }
 
-Dictionary Gs1GodotMainScreenControl::find_ui_panel(int panel_id) const
+const Gs1RuntimeUiPanelSlotActionProjection* Gs1GodotMainScreenControl::find_panel_slot_action(
+    const Gs1RuntimeUiPanelProjection& panel,
+    int slot_id) const
 {
-    const Array panels = projection_.get("ui_panels", Array());
-    for (int64_t index = 0; index < panels.size(); ++index)
+    for (const auto& action : panel.slot_actions)
     {
-        const Dictionary panel = panels[index];
-        if (as_int(panel.get("panel_id", 0), 0) == panel_id)
+        if (static_cast<int>(action.slot_id) == slot_id)
         {
-            return panel;
+            return &action;
         }
     }
-    return Dictionary();
+    return nullptr;
 }
 
-Dictionary Gs1GodotMainScreenControl::find_panel_slot_action(const Dictionary& panel, int slot_id) const
+String Gs1GodotMainScreenControl::regional_panel_text_line(const Gs1RuntimeUiPanelTextProjection& line) const
 {
-    const Array actions = panel.get("slot_actions", Array());
-    for (int64_t index = 0; index < actions.size(); ++index)
-    {
-        const Dictionary action = actions[index];
-        if (as_int(action.get("slot_id", 0), 0) == slot_id)
-        {
-            return action;
-        }
-    }
-    return Dictionary();
-}
-
-Dictionary Gs1GodotMainScreenControl::find_panel_list_action(const Dictionary& panel, int list_id, std::int64_t item_id, int role) const
-{
-    const Array actions = panel.get("list_actions", Array());
-    for (int64_t index = 0; index < actions.size(); ++index)
-    {
-        const Dictionary action = actions[index];
-        if (as_int(action.get("list_id", 0), 0) != list_id)
-        {
-            continue;
-        }
-        if (static_cast<std::int64_t>(as_int(action.get("item_id", 0), 0)) != item_id)
-        {
-            continue;
-        }
-        if (as_int(action.get("role", 0), 0) == role)
-        {
-            return action;
-        }
-    }
-    return Dictionary();
-}
-
-String Gs1GodotMainScreenControl::regional_panel_text_line(const Dictionary& line) const
-{
-    const int kind = as_int(line.get("text_kind", 0), 0);
-    const int primary_id = as_int(line.get("primary_id", 0), 0);
-    const int quantity = as_int(line.get("quantity", 0), 0);
+    const int kind = static_cast<int>(line.text_kind);
+    const int primary_id = static_cast<int>(line.primary_id);
+    const int quantity = static_cast<int>(line.quantity);
 
     switch (kind)
     {
     case 1:
     {
-        const auto* faction_def = gs1::find_faction_def(gs1::FactionId {static_cast<std::uint32_t>(primary_id)});
-        const String faction_name = faction_def == nullptr ? String("Faction") : string_from_view(faction_def->display_name);
-        return vformat("%s Rep %d", faction_name, quantity);
+        return vformat("%s Rep %d", faction_name_for(primary_id), quantity);
     }
     case 3:
         return vformat("Selected Site %d", primary_id);
@@ -2154,21 +2114,17 @@ String Gs1GodotMainScreenControl::regional_panel_text_line(const Dictionary& lin
         return vformat("Aura Ready x%d", quantity);
     case 6:
     {
-        if (const auto* item_def = gs1::find_item_def(gs1::ItemId {static_cast<std::uint32_t>(primary_id)}))
-        {
-            return vformat("%s x%d", string_from_view(item_def->display_name), quantity);
-        }
-        return vformat("Item %d x%d", primary_id, quantity);
+        return vformat("%s x%d", item_name_for(primary_id), quantity);
     }
     default:
         return String();
     }
 }
 
-String Gs1GodotMainScreenControl::regional_panel_slot_label(const Dictionary& slot_action) const
+String Gs1GodotMainScreenControl::regional_panel_slot_label(const Gs1RuntimeUiPanelSlotActionProjection& slot_action) const
 {
-    const int kind = as_int(slot_action.get("label_kind", 0), 0);
-    const int primary_id = as_int(slot_action.get("primary_id", 0), 0);
+    const int kind = static_cast<int>(slot_action.label_kind);
+    const int primary_id = static_cast<int>(slot_action.primary_id);
     switch (kind)
     {
     case 1:
@@ -2184,10 +2140,10 @@ String Gs1GodotMainScreenControl::regional_panel_slot_label(const Dictionary& sl
     }
 }
 
-String Gs1GodotMainScreenControl::regional_panel_list_primary_text(const Dictionary& item) const
+String Gs1GodotMainScreenControl::regional_panel_list_primary_text(const Gs1RuntimeUiPanelListItemProjection& item) const
 {
-    const int kind = as_int(item.get("primary_kind", 0), 0);
-    const int primary_id = as_int(item.get("primary_id", 0), 0);
+    const int kind = static_cast<int>(item.primary_kind);
+    const int primary_id = static_cast<int>(item.primary_id);
     if (kind == 1)
     {
         return vformat("Site %d", primary_id);
@@ -2195,12 +2151,12 @@ String Gs1GodotMainScreenControl::regional_panel_list_primary_text(const Diction
     return String();
 }
 
-String Gs1GodotMainScreenControl::regional_panel_list_secondary_text(const Dictionary& item) const
+String Gs1GodotMainScreenControl::regional_panel_list_secondary_text(const Gs1RuntimeUiPanelListItemProjection& item) const
 {
-    const int kind = as_int(item.get("secondary_kind", 0), 0);
-    const int secondary_id = as_int(item.get("secondary_id", 0), 0);
-    const int map_x = as_int(item.get("map_x", 0), 0);
-    const int map_y = as_int(item.get("map_y", 0), 0);
+    const int kind = static_cast<int>(item.secondary_kind);
+    const int secondary_id = static_cast<int>(item.secondary_id);
+    const int map_x = item.map_x;
+    const int map_y = item.map_y;
     if (kind == 2)
     {
         return vformat("%s  (%d, %d)", regional_site_state_name(secondary_id), map_x, map_y);
@@ -2259,7 +2215,7 @@ void Gs1GodotMainScreenControl::clear_fixed_slot_actions()
     }
 }
 
-void Gs1GodotMainScreenControl::bind_fixed_slot_actions(const Dictionary& panel, int panel_id)
+void Gs1GodotMainScreenControl::bind_fixed_slot_actions(const Gs1RuntimeUiPanelProjection* panel, int panel_id)
 {
     for (const FixedSlotBinding& binding : fixed_slot_bindings_)
     {
@@ -2274,18 +2230,33 @@ void Gs1GodotMainScreenControl::bind_fixed_slot_actions(const Dictionary& panel,
             continue;
         }
 
-        const Dictionary slot_action = find_panel_slot_action(panel, binding.slot_id);
-        if (slot_action.is_empty())
+        if (panel == nullptr)
         {
             clear_action_from_button(button);
             continue;
         }
 
+        const Gs1RuntimeUiPanelSlotActionProjection* slot_action = find_panel_slot_action(*panel, binding.slot_id);
+        if (slot_action == nullptr)
+        {
+            clear_action_from_button(button);
+            continue;
+        }
+
+        Dictionary action;
+        action["type"] = static_cast<int>(slot_action->action.type);
+        action["target_id"] = static_cast<int64_t>(slot_action->action.target_id);
+        action["arg0"] = static_cast<int64_t>(slot_action->action.arg0);
+        action["arg1"] = static_cast<int64_t>(slot_action->action.arg1);
+
+        Dictionary slot_action_dict;
+        slot_action_dict["flags"] = static_cast<int>(slot_action->flags);
+        slot_action_dict["action"] = action;
         const String fallback_label = Object::cast_to<Button>(button) != nullptr
             ? Object::cast_to<Button>(button)->get_text()
             : String();
-        const String resolved_label = regional_panel_slot_label(slot_action);
-        apply_action_to_button(button, slot_action, resolved_label.is_empty() ? fallback_label : resolved_label);
+        const String resolved_label = regional_panel_slot_label(*slot_action);
+        apply_action_to_button(button, slot_action_dict, resolved_label.is_empty() ? fallback_label : resolved_label);
     }
 }
 
@@ -2329,20 +2300,6 @@ void Gs1GodotMainScreenControl::clear_action_from_button(BaseButton* button, boo
             text_button->set_text(String());
         }
     }
-}
-
-std::uint64_t Gs1GodotMainScreenControl::ui_action_hash(const Dictionary& action) const
-{
-    std::uint64_t hash = k_fnv_offset_basis;
-    const int type = as_int(action.get("type", 0), 0);
-    const int target_id = as_int(action.get("target_id", 0), 0);
-    const int arg0 = as_int(action.get("arg0", 0), 0);
-    const int arg1 = as_int(action.get("arg1", 0), 0);
-    hash_value(hash, type);
-    hash_value(hash, target_id);
-    hash_value(hash, arg0);
-    hash_value(hash, arg1);
-    return hash;
 }
 
 void Gs1GodotMainScreenControl::clear_dynamic_children(Node* container, const String& prefix)
@@ -2527,7 +2484,7 @@ void Gs1GodotMainScreenControl::prune_regional_site_registry(const std::unordere
     }
 }
 
-void Gs1GodotMainScreenControl::reconcile_phone_listing_buttons(const Array& phone_listings)
+void Gs1GodotMainScreenControl::reconcile_phone_listing_buttons(const std::vector<Gs1RuntimePhoneListingProjection>& phone_listings)
 {
     if (phone_listings_ == nullptr)
     {
@@ -2536,10 +2493,9 @@ void Gs1GodotMainScreenControl::reconcile_phone_listing_buttons(const Array& pho
 
     std::unordered_set<std::uint64_t> desired_keys;
     int desired_index = 0;
-    for (int64_t index = 0; index < phone_listings.size(); ++index)
+    for (const auto& listing : phone_listings)
     {
-        const Dictionary listing = phone_listings[index];
-        const int listing_id = as_int(listing.get("listing_id", 0), 0);
+        const int listing_id = static_cast<int>(listing.listing_id);
         const std::uint64_t stable_key = static_cast<std::uint64_t>(listing_id);
         desired_keys.insert(stable_key);
         Button* button = upsert_button_node(
@@ -2553,18 +2509,19 @@ void Gs1GodotMainScreenControl::reconcile_phone_listing_buttons(const Array& pho
             continue;
         }
 
-        const String icon_text = as_bool(listing.get("is_unlockable", false), false) ? String("[UNL]") : String("[ITM]");
+        const bool is_unlockable = listing.listing_kind == GS1_PHONE_LISTING_PRESENTATION_PURCHASE_UNLOCKABLE;
+        const String icon_text = is_unlockable ? String("[UNL]") : String("[ITM]");
         button->set_text(vformat(
             "%s %s  x%d  price %.2f",
             icon_text,
-            String(listing.get("label", "Listing")),
-            as_int(listing.get("quantity", 0), 0),
-            as_float(listing.get("price", 0.0), 0.0)));
+            item_name_for(static_cast<int>(listing.item_or_unlockable_id)),
+            static_cast<int>(listing.quantity),
+            listing.price));
         button->set_tooltip_text(vformat(
             "listing %d kind %d id %d",
             listing_id,
-            as_int(listing.get("listing_kind", 0), 0),
-            as_int(listing.get("item_or_unlockable_id", 0), 0)));
+            static_cast<int>(listing.listing_kind),
+            static_cast<int>(listing.item_or_unlockable_id)));
         const Callable callback = callable_mp(this, &Gs1GodotMainScreenControl::on_dynamic_phone_listing_pressed).bind(listing_id);
         if (!button->is_connected("pressed", callback))
         {
@@ -2575,7 +2532,7 @@ void Gs1GodotMainScreenControl::reconcile_phone_listing_buttons(const Array& pho
     prune_button_registry(phone_listing_buttons_, desired_keys);
 }
 
-void Gs1GodotMainScreenControl::reconcile_craft_option_buttons(const Dictionary& craft_context)
+void Gs1GodotMainScreenControl::reconcile_craft_option_buttons(const Gs1RuntimeCraftContextProjection* craft_context)
 {
     if (craft_options_ == nullptr)
     {
@@ -2583,16 +2540,14 @@ void Gs1GodotMainScreenControl::reconcile_craft_option_buttons(const Dictionary&
     }
 
     std::unordered_set<std::uint64_t> desired_keys;
-    if (!craft_context.is_empty())
+    if (craft_context != nullptr)
     {
-        const Array options = craft_context.get("options", Array());
-        const int context_x = as_int(craft_context.get("tile_x", selected_tile_.x), selected_tile_.x);
-        const int context_y = as_int(craft_context.get("tile_y", selected_tile_.y), selected_tile_.y);
+        const int context_x = craft_context->tile_x;
+        const int context_y = craft_context->tile_y;
         int desired_index = 0;
-        for (int64_t index = 0; index < options.size(); ++index)
+        for (const auto& option : craft_context->options)
         {
-            const Dictionary option = options[index];
-            const int output_item_id = as_int(option.get("output_item_id", 0), 0);
+            const int output_item_id = static_cast<int>(option.output_item_id);
             const std::uint64_t stable_key = make_craft_option_key(context_x, context_y, output_item_id);
             desired_keys.insert(stable_key);
             Button* button = upsert_button_node(
@@ -2606,7 +2561,11 @@ void Gs1GodotMainScreenControl::reconcile_craft_option_buttons(const Dictionary&
                 continue;
             }
 
-            button->set_text(vformat("[ITM] Craft %s", String(option.get("output_item_name", "Output"))));
+            button->set_text(vformat(
+                "[ITM] Craft %s",
+                recipe_output_name_for(
+                    static_cast<int>(option.recipe_id),
+                    static_cast<int>(option.output_item_id))));
             button->set_tooltip_text(String());
             button->set_meta("tile_x", context_x);
             button->set_meta("tile_y", context_y);
@@ -2895,45 +2854,12 @@ String Gs1GodotMainScreenControl::regional_selection_action_label(const String& 
 String Gs1GodotMainScreenControl::regional_unlockable_tooltip_text(const Dictionary& spec) const
 {
     const std::uint32_t unlock_id = static_cast<std::uint32_t>(as_int(spec.get("element_id", 0), 0));
-    if (const auto* unlock_def = gs1::find_reputation_unlock_def(unlock_id))
-    {
-        const auto* metadata = adapter_metadata_catalog().find(
-            Gs1AdapterMetadataDomain::ReputationUnlock,
-            unlock_def->unlock_id);
-        const String title = string_from_view(unlock_def->display_name);
-        const String description = (metadata == nullptr || metadata->description.empty())
-            ? String("No authored description yet.")
-            : string_from_view(metadata->description);
-        return vformat("%s\n%s\nNeed total reputation %d", title, description, unlock_def->reputation_requirement);
-    }
-
-    return String("Unlockable");
+    return unlockable_ui_for(unlock_id).tooltip;
 }
 
 String Gs1GodotMainScreenControl::regional_tech_tooltip_text(const Dictionary& spec) const
 {
-    const auto* node_def = gs1::find_technology_node_def(gs1::TechNodeId {
-        static_cast<std::uint32_t>(as_int(spec.get("tech_node_id", 0), 0))});
-    if (node_def == nullptr)
-    {
-        return String("Technology");
-    }
-
-    const auto* faction_def = gs1::find_faction_def(node_def->faction_id);
-    const String faction_name = faction_def == nullptr ? String("Faction") : string_from_view(faction_def->display_name);
-    const String title = node_def->display_name.empty() ? String("Technology") : string_from_view(node_def->display_name);
-    const auto* metadata = adapter_metadata_catalog().find(
-        Gs1AdapterMetadataDomain::TechnologyNode,
-        node_def->tech_node_id.value);
-    const String description = (metadata == nullptr || metadata->description.empty())
-        ? String("No authored description yet.")
-        : string_from_view(metadata->description);
-    return vformat(
-        "%s\n%s Tier %d\n%s",
-        title,
-        faction_name,
-        static_cast<int>(node_def->tier_index),
-        description);
+    return technology_ui_for(static_cast<std::uint32_t>(as_int(spec.get("tech_node_id", 0), 0))).tooltip;
 }
 
 String Gs1GodotMainScreenControl::regional_row_requirement_text(const Dictionary& spec) const
@@ -2998,21 +2924,12 @@ String Gs1GodotMainScreenControl::regional_card_title_text(const Dictionary& spe
     const int entry_kind = as_int(spec.get("entry_kind", 0), 0);
     if (entry_kind == GS1_PROGRESSION_ENTRY_TECHNOLOGY_NODE)
     {
-        if (const auto* node_def = gs1::find_technology_node_def(gs1::TechNodeId {
-                static_cast<std::uint32_t>(as_int(spec.get("tech_node_id", 0), 0))}))
-        {
-            return node_def->display_name.empty() ? String("Technology") : string_from_view(node_def->display_name);
-        }
-        return String("Technology");
+        return technology_ui_for(static_cast<std::uint32_t>(as_int(spec.get("tech_node_id", 0), 0))).title;
     }
 
     if (entry_kind == GS1_PROGRESSION_ENTRY_REPUTATION_UNLOCK)
     {
-        if (const auto* unlock_def = gs1::find_reputation_unlock_def(static_cast<std::uint32_t>(as_int(spec.get("element_id", 0), 0))))
-        {
-            return string_from_view(unlock_def->display_name);
-        }
-        return String("Unlockable");
+        return unlockable_ui_for(static_cast<std::uint32_t>(as_int(spec.get("element_id", 0), 0))).title;
     }
     return String();
 }
@@ -3022,12 +2939,13 @@ String Gs1GodotMainScreenControl::regional_card_subtitle_text(const Dictionary& 
     const int entry_kind = as_int(spec.get("entry_kind", 0), 0);
     if (entry_kind == GS1_PROGRESSION_ENTRY_TECHNOLOGY_NODE)
     {
-        const auto* faction_def = gs1::find_faction_def(gs1::FactionId {static_cast<std::uint32_t>(as_int(spec.get("faction_id", 0), 0))});
-        const String faction_name = faction_def == nullptr ? String("Faction") : string_from_view(faction_def->display_name);
-        return vformat("Tier %d | %s", as_int(spec.get("tier_index", 0), 0), faction_name);
+        return vformat(
+            "Tier %d | %s",
+            as_int(spec.get("tier_index", 0), 0),
+            technology_ui_for(static_cast<std::uint32_t>(as_int(spec.get("tech_node_id", 0), 0))).faction_name);
     }
 
-    switch (as_int(spec.get("content_kind", -1), -1))
+    switch (unlockable_ui_for(static_cast<std::uint32_t>(as_int(spec.get("element_id", 0), 0))).content_kind)
     {
     case k_unlockable_content_kind_plant:
         return "Plant";
@@ -3111,39 +3029,24 @@ Ref<Texture2D> Gs1GodotMainScreenControl::regional_card_icon_texture(const Dicti
 {
     if (as_int(spec.get("entry_kind", 0), 0) == GS1_PROGRESSION_ENTRY_TECHNOLOGY_NODE)
     {
-        const String icon_path = GodotProgressionResourceDatabase::instance().technology_icon_path(
-            static_cast<std::uint32_t>(as_int(spec.get("tech_node_id", 0), 0)));
-        if (ResourceLoader* loader = ResourceLoader::get_singleton())
+        const Ref<Texture2D> icon_texture =
+            technology_ui_for(static_cast<std::uint32_t>(as_int(spec.get("tech_node_id", 0), 0))).icon_texture;
+        if (icon_texture.is_valid())
         {
-            const Ref<Resource> resource = loader->load(icon_path);
-            const Ref<Texture2D> texture = resource;
-            if (texture.is_valid())
-            {
-                return texture;
-            }
+            return icon_texture;
         }
     }
     else
     {
-        if (const auto* unlock_def = gs1::find_reputation_unlock_def(static_cast<std::uint32_t>(as_int(spec.get("element_id", 0), 0))))
+        const Ref<Texture2D> icon_texture =
+            unlockable_ui_for(static_cast<std::uint32_t>(as_int(spec.get("element_id", 0), 0))).icon_texture;
+        if (icon_texture.is_valid())
         {
-            const String icon_path = GodotProgressionResourceDatabase::instance().unlockable_icon_path(
-                unlockable_content_kind_from_def(*unlock_def),
-                unlock_def->content_id);
-            if (ResourceLoader* loader = ResourceLoader::get_singleton())
-            {
-                const Ref<Resource> resource = loader->load(icon_path);
-                const Ref<Texture2D> texture = resource;
-                if (texture.is_valid())
-                {
-                    return texture;
-                }
-            }
+            return icon_texture;
         }
     }
 
-    const String icon_text = regional_card_icon_text(spec);
-    return make_solid_icon_texture(regional_card_icon_background_color(icon_text));
+    return fallback_icon_texture(regional_card_icon_text(spec));
 }
 
 void Gs1GodotMainScreenControl::ensure_card_content_nodes(Button* button, ProjectedButtonRecord& record)
@@ -3320,43 +3223,57 @@ void Gs1GodotMainScreenControl::ensure_card_content_nodes(Button* button, Projec
     }
 }
 
-Dictionary Gs1GodotMainScreenControl::active_site() const
+const Gs1RuntimeProjectionState* Gs1GodotMainScreenControl::projection_state() const
 {
-    return projection_.get("active_site", Dictionary());
+    return runtime_node_ != nullptr ? &runtime_node_->projection_state() : nullptr;
 }
 
-Dictionary Gs1GodotMainScreenControl::tile_at(const Vector2i& tile_coord) const
+const Gs1RuntimeSiteProjection* Gs1GodotMainScreenControl::active_site() const
 {
-    const Dictionary site_state = active_site();
-    const int width = as_int(site_state.get("width", 0), 0);
-    const int height = as_int(site_state.get("height", 0), 0);
-    const Array tiles = site_state.get("tiles", Array());
-    if (width <= 0 || height <= 0)
+    const Gs1RuntimeProjectionState* state = projection_state();
+    if (state == nullptr || !state->active_site.has_value())
     {
-        return Dictionary();
+        return nullptr;
     }
-    if (tile_coord.x < 0 || tile_coord.y < 0 || tile_coord.x >= width || tile_coord.y >= height)
+    return &state->active_site.value();
+}
+
+const Gs1RuntimeTileProjection* Gs1GodotMainScreenControl::tile_at(const Vector2i& tile_coord) const
+{
+    const Gs1RuntimeSiteProjection* site_state = active_site();
+    if (site_state == nullptr || site_state->width == 0 || site_state->height == 0)
     {
-        return Dictionary();
+        return nullptr;
+    }
+    if (tile_coord.x < 0 || tile_coord.y < 0 ||
+        tile_coord.x >= site_state->width || tile_coord.y >= site_state->height)
+    {
+        return nullptr;
     }
 
-    const int index = tile_coord.y * width + tile_coord.x;
-    if (index < 0 || index >= tiles.size())
+    const std::size_t index = static_cast<std::size_t>(tile_coord.y) * static_cast<std::size_t>(site_state->width)
+        + static_cast<std::size_t>(tile_coord.x);
+    if (index >= site_state->tiles.size())
     {
-        return Dictionary();
+        return nullptr;
     }
-    return tiles[index];
+
+    return &site_state->tiles[index];
 }
 
 int Gs1GodotMainScreenControl::find_worker_pack_storage_id() const
 {
-    const Array inventory_storages = active_site().get("inventory_storages", Array());
-    for (int64_t index = 0; index < inventory_storages.size(); ++index)
+    const Gs1RuntimeSiteProjection* site_state = active_site();
+    if (site_state == nullptr)
     {
-        const Dictionary storage = inventory_storages[index];
-        if (as_int(storage.get("container_kind", -1), -1) == CONTAINER_WORKER_PACK)
+        return 0;
+    }
+
+    for (const auto& storage : site_state->inventory_storages)
+    {
+        if (static_cast<int>(storage.container_kind) == CONTAINER_WORKER_PACK)
         {
-            return as_int(storage.get("storage_id", 0), 0);
+            return static_cast<int>(storage.storage_id);
         }
     }
     return 0;
@@ -3364,13 +3281,17 @@ int Gs1GodotMainScreenControl::find_worker_pack_storage_id() const
 
 int Gs1GodotMainScreenControl::find_selected_tile_storage_id()
 {
-    const Array inventory_storages = active_site().get("inventory_storages", Array());
-    for (int64_t index = 0; index < inventory_storages.size(); ++index)
+    const Gs1RuntimeSiteProjection* site_state = active_site();
+    if (site_state == nullptr)
     {
-        const Dictionary storage = inventory_storages[index];
-        const int tile_x = as_int(storage.get("tile_x", 0), 0);
-        const int tile_y = as_int(storage.get("tile_y", 0), 0);
-        const int storage_id = as_int(storage.get("storage_id", 0), 0);
+        return 0;
+    }
+
+    for (const auto& storage : site_state->inventory_storages)
+    {
+        const int tile_x = storage.tile_x;
+        const int tile_y = storage.tile_y;
+        const int storage_id = static_cast<int>(storage.storage_id);
         cached_storage_lookup_[tile_y * 100000 + tile_x] = storage_id;
         if (tile_x == selected_tile_.x && tile_y == selected_tile_.y)
         {
@@ -3380,30 +3301,295 @@ int Gs1GodotMainScreenControl::find_selected_tile_storage_id()
     return 0;
 }
 
+String Gs1GodotMainScreenControl::item_name_for(int item_id) const
+{
+    auto found = item_name_cache_.find(item_id);
+    if (found != item_name_cache_.end())
+    {
+        return found->second;
+    }
+
+    String display_name = String("Item #") + String::num_int64(item_id);
+    if (const auto* item_def = gs1::find_item_def(gs1::ItemId {static_cast<std::uint32_t>(item_id)}))
+    {
+        display_name = string_from_view(item_def->display_name);
+    }
+
+    return item_name_cache_.emplace(item_id, display_name).first->second;
+}
+
+String Gs1GodotMainScreenControl::faction_name_for(int faction_id) const
+{
+    auto found = faction_name_cache_.find(faction_id);
+    if (found != faction_name_cache_.end())
+    {
+        return found->second;
+    }
+
+    String display_name {"Faction"};
+    if (const auto* faction_def = gs1::find_faction_def(gs1::FactionId {static_cast<std::uint32_t>(faction_id)}))
+    {
+        display_name = string_from_view(faction_def->display_name);
+    }
+
+    return faction_name_cache_.emplace(faction_id, display_name).first->second;
+}
+
+String Gs1GodotMainScreenControl::plant_name_for(int plant_id) const
+{
+    auto found = plant_name_cache_.find(plant_id);
+    if (found != plant_name_cache_.end())
+    {
+        return found->second;
+    }
+
+    String display_name = String("Plant #") + String::num_int64(plant_id);
+    if (const auto* plant_def = gs1::find_plant_def(gs1::PlantId {static_cast<std::uint32_t>(plant_id)}))
+    {
+        display_name = string_from_view(plant_def->display_name);
+    }
+
+    return plant_name_cache_.emplace(plant_id, display_name).first->second;
+}
+
+String Gs1GodotMainScreenControl::structure_name_for(int structure_id) const
+{
+    auto found = structure_name_cache_.find(structure_id);
+    if (found != structure_name_cache_.end())
+    {
+        return found->second;
+    }
+
+    String display_name = String("Structure #") + String::num_int64(structure_id);
+    if (const auto* structure_def = gs1::find_structure_def(gs1::StructureId {static_cast<std::uint32_t>(structure_id)}))
+    {
+        display_name = string_from_view(structure_def->display_name);
+    }
+
+    return structure_name_cache_.emplace(structure_id, display_name).first->second;
+}
+
+String Gs1GodotMainScreenControl::recipe_output_name_for(int recipe_id, int output_item_id) const
+{
+    const std::uint64_t cache_key = pack_u32_pair(
+        static_cast<std::uint32_t>(recipe_id),
+        static_cast<std::uint32_t>(output_item_id));
+    auto found = recipe_output_name_cache_.find(cache_key);
+    if (found != recipe_output_name_cache_.end())
+    {
+        return found->second;
+    }
+
+    String display_name = item_name_for(output_item_id);
+    if (const auto* recipe_def = gs1::find_craft_recipe_def(gs1::RecipeId {static_cast<std::uint32_t>(recipe_id)}))
+    {
+        display_name = item_name_for(static_cast<int>(recipe_def->output_item_id.value));
+    }
+
+    return recipe_output_name_cache_.emplace(cache_key, display_name).first->second;
+}
+
+Ref<Texture2D> Gs1GodotMainScreenControl::load_cached_texture(const String& path) const
+{
+    if (path.is_empty())
+    {
+        return Ref<Texture2D> {};
+    }
+
+    const std::string key = path.utf8().get_data();
+    auto found = texture_cache_.find(key);
+    if (found != texture_cache_.end())
+    {
+        return found->second;
+    }
+
+    return texture_cache_.emplace(key, load_texture_2d(path)).first->second;
+}
+
+Ref<Texture2D> Gs1GodotMainScreenControl::fallback_icon_texture(const String& icon_text) const
+{
+    const std::string key = icon_text.utf8().get_data();
+    auto found = fallback_icon_texture_cache_.find(key);
+    if (found != fallback_icon_texture_cache_.end())
+    {
+        return found->second;
+    }
+
+    return fallback_icon_texture_cache_.emplace(
+        key,
+        make_solid_icon_texture(regional_card_icon_background_color(icon_text))).first->second;
+}
+
+const Gs1GodotMainScreenControl::TaskTemplateUiCacheEntry&
+Gs1GodotMainScreenControl::task_template_ui_for(std::uint32_t task_template_id) const
+{
+    auto found = task_template_ui_cache_.find(task_template_id);
+    if (found != task_template_ui_cache_.end())
+    {
+        return found->second;
+    }
+
+    TaskTemplateUiCacheEntry entry {};
+    entry.icon_texture = load_cached_texture(
+        GodotProgressionResourceDatabase::instance().task_template_icon_path(task_template_id));
+    if (const auto* task_def = gs1::find_task_template_def(gs1::TaskTemplateId {task_template_id}))
+    {
+        entry.task_tier_id = static_cast<int>(task_def->task_tier_id);
+        entry.progress_kind = static_cast<int>(task_def->progress_kind);
+    }
+
+    return task_template_ui_cache_.emplace(task_template_id, std::move(entry)).first->second;
+}
+
+const Gs1GodotMainScreenControl::ModifierUiCacheEntry&
+Gs1GodotMainScreenControl::modifier_ui_for(std::uint32_t modifier_id) const
+{
+    auto found = modifier_ui_cache_.find(modifier_id);
+    if (found != modifier_ui_cache_.end())
+    {
+        return found->second;
+    }
+
+    ModifierUiCacheEntry entry {};
+    entry.icon_texture = load_cached_texture(
+        GodotProgressionResourceDatabase::instance().modifier_icon_path(modifier_id));
+    const auto* metadata = adapter_metadata_catalog().find(
+        Gs1AdapterMetadataDomain::Modifier,
+        modifier_id);
+    entry.label = metadata == nullptr || metadata->display_name.empty()
+        ? vformat("Modifier %d", static_cast<int>(modifier_id))
+        : string_from_view(metadata->display_name);
+    return modifier_ui_cache_.emplace(modifier_id, std::move(entry)).first->second;
+}
+
+const Gs1GodotMainScreenControl::TechnologyUiCacheEntry&
+Gs1GodotMainScreenControl::technology_ui_for(std::uint32_t tech_node_id) const
+{
+    auto found = technology_ui_cache_.find(tech_node_id);
+    if (found != technology_ui_cache_.end())
+    {
+        return found->second;
+    }
+
+    TechnologyUiCacheEntry entry {};
+    entry.title = "Technology";
+    entry.faction_name = "Faction";
+    entry.tooltip = "Technology";
+    entry.icon_texture = load_cached_texture(
+        GodotProgressionResourceDatabase::instance().technology_icon_path(tech_node_id));
+
+    if (const auto* node_def = gs1::find_technology_node_def(gs1::TechNodeId {tech_node_id}))
+    {
+        entry.title = node_def->display_name.empty() ? String("Technology") : string_from_view(node_def->display_name);
+        entry.faction_name = faction_name_for(static_cast<int>(node_def->faction_id.value));
+        const auto* metadata = adapter_metadata_catalog().find(
+            Gs1AdapterMetadataDomain::TechnologyNode,
+            node_def->tech_node_id.value);
+        const String description = (metadata == nullptr || metadata->description.empty())
+            ? String("No authored description yet.")
+            : string_from_view(metadata->description);
+        entry.tooltip = vformat(
+            "%s\n%s Tier %d\n%s",
+            entry.title,
+            entry.faction_name,
+            static_cast<int>(node_def->tier_index),
+            description);
+    }
+
+    return technology_ui_cache_.emplace(tech_node_id, std::move(entry)).first->second;
+}
+
+const Gs1GodotMainScreenControl::UnlockableUiCacheEntry&
+Gs1GodotMainScreenControl::unlockable_ui_for(std::uint32_t unlock_id) const
+{
+    auto found = unlockable_ui_cache_.find(unlock_id);
+    if (found != unlockable_ui_cache_.end())
+    {
+        return found->second;
+    }
+
+    UnlockableUiCacheEntry entry {};
+    entry.title = "Unlockable";
+    entry.subtitle = "Unlockable";
+    entry.tooltip = "Unlockable";
+
+    if (const auto* unlock_def = gs1::find_reputation_unlock_def(unlock_id))
+    {
+        entry.title = string_from_view(unlock_def->display_name);
+        entry.content_kind = static_cast<int>(unlockable_content_kind_from_def(*unlock_def));
+        const auto* metadata = adapter_metadata_catalog().find(
+            Gs1AdapterMetadataDomain::ReputationUnlock,
+            unlock_def->unlock_id);
+        const String description = (metadata == nullptr || metadata->description.empty())
+            ? String("No authored description yet.")
+            : string_from_view(metadata->description);
+        entry.tooltip = vformat(
+            "%s\n%s\nNeed total reputation %d",
+            entry.title,
+            description,
+            unlock_def->reputation_requirement);
+        switch (entry.content_kind)
+        {
+        case k_unlockable_content_kind_plant:
+            entry.subtitle = "Plant";
+            break;
+        case k_unlockable_content_kind_item:
+            entry.subtitle = "Item";
+            break;
+        case k_unlockable_content_kind_recipe:
+            entry.subtitle = "Recipe";
+            break;
+        case k_unlockable_content_kind_structure_recipe:
+            entry.subtitle = "Device Recipe";
+            break;
+        default:
+            entry.subtitle = "Unlockable";
+            break;
+        }
+        entry.icon_texture = load_cached_texture(
+            GodotProgressionResourceDatabase::instance().unlockable_icon_path(
+                static_cast<std::uint8_t>(entry.content_kind),
+                unlock_def->content_id));
+    }
+
+    return unlockable_ui_cache_.emplace(unlock_id, std::move(entry)).first->second;
+}
+
 void Gs1GodotMainScreenControl::use_first_usable_item()
 {
-    const Array worker_pack_slots = active_site().get("worker_pack_slots", Array());
-    for (int64_t index = 0; index < worker_pack_slots.size(); ++index)
+    const Gs1RuntimeSiteProjection* site_state = active_site();
+    if (site_state == nullptr)
     {
-        const Dictionary slot = worker_pack_slots[index];
-        const int capability_flags = as_int(slot.get("capability_flags", 0), 0);
+        return;
+    }
+
+    for (const auto& slot : site_state->worker_pack_slots)
+    {
+        const auto* item_def = gs1::find_item_def(gs1::ItemId {slot.item_id});
+        const int capability_flags = item_def != nullptr ? static_cast<int>(item_def->capability_flags) : 0;
         if (capability_flags == 0)
         {
             continue;
         }
-        const int storage_id = as_int(slot.get("storage_id", 0), 0);
-        const int slot_index = as_int(slot.get("slot_index", 0), 0);
-        const int quantity = std::max(1, as_int(slot.get("quantity", 1), 1));
+        const int storage_id = static_cast<int>(slot.storage_id);
+        const int slot_index = static_cast<int>(slot.slot_index);
+        const int quantity = std::max(1, static_cast<int>(slot.quantity));
         const int packed_arg0 = CONTAINER_WORKER_PACK | (slot_index << 8) | (quantity << 16);
-        submit_ui_action(UI_ACTION_USE_INVENTORY_ITEM, as_int(slot.get("item_instance_id", 0), 0), packed_arg0, storage_id);
+        submit_ui_action(UI_ACTION_USE_INVENTORY_ITEM, static_cast<int>(slot.item_instance_id), packed_arg0, storage_id);
         return;
     }
 }
 
 void Gs1GodotMainScreenControl::transfer_first_storage_item_to_pack()
 {
-    const Dictionary opened_storage = active_site().get("opened_storage", Dictionary());
-    if (opened_storage.is_empty())
+    const Gs1RuntimeSiteProjection* site_state = active_site();
+    if (site_state == nullptr || !site_state->opened_storage.has_value())
+    {
+        return;
+    }
+
+    const auto& opened_storage = site_state->opened_storage.value();
+    if (opened_storage.slots.empty())
     {
         return;
     }
@@ -3414,28 +3600,28 @@ void Gs1GodotMainScreenControl::transfer_first_storage_item_to_pack()
         return;
     }
 
-    const Array slots = opened_storage.get("slots", Array());
-    for (int64_t index = 0; index < slots.size(); ++index)
-    {
-        const Dictionary slot = slots[index];
-        const std::uint32_t source_storage_id = static_cast<std::uint32_t>(as_int(slot.get("storage_id", 0), 0));
-        const int source_slot_index = as_int(slot.get("slot_index", 0), 0);
-        const int quantity = std::max(1, as_int(slot.get("quantity", 1), 1));
-        const int packed_arg0 = CONTAINER_DEVICE_STORAGE | (source_slot_index << 8) | (CONTAINER_WORKER_PACK << 16) | (quantity << 24);
-        const std::uint64_t packed_arg1 = static_cast<std::uint64_t>(source_storage_id)
-            | (static_cast<std::uint64_t>(static_cast<std::uint32_t>(destination_storage_id)) << 32U);
-        submit_ui_action(UI_ACTION_TRANSFER_INVENTORY_ITEM, 0, packed_arg0, packed_arg1);
-        return;
-    }
+    const auto& slot = opened_storage.slots.front();
+    const std::uint32_t source_storage_id = slot.storage_id;
+    const int source_slot_index = static_cast<int>(slot.slot_index);
+    const int quantity = std::max(1, static_cast<int>(slot.quantity));
+    const int packed_arg0 = CONTAINER_DEVICE_STORAGE | (source_slot_index << 8) | (CONTAINER_WORKER_PACK << 16) | (quantity << 24);
+    const std::uint64_t packed_arg1 = static_cast<std::uint64_t>(source_storage_id)
+        | (static_cast<std::uint64_t>(static_cast<std::uint32_t>(destination_storage_id)) << 32U);
+    submit_ui_action(UI_ACTION_TRANSFER_INVENTORY_ITEM, 0, packed_arg0, packed_arg1);
 }
 
 void Gs1GodotMainScreenControl::plant_first_seed_on_selected_tile()
 {
-    const Array worker_pack_slots = active_site().get("worker_pack_slots", Array());
-    for (int64_t index = 0; index < worker_pack_slots.size(); ++index)
+    const Gs1RuntimeSiteProjection* site_state = active_site();
+    if (site_state == nullptr)
     {
-        const Dictionary slot = worker_pack_slots[index];
-        if (as_int(slot.get("linked_plant_id", 0), 0) == 0)
+        return;
+    }
+
+    for (const auto& slot : site_state->worker_pack_slots)
+    {
+        const auto* item_def = gs1::find_item_def(gs1::ItemId {slot.item_id});
+        if (item_def == nullptr || item_def->linked_plant_id.value == 0U)
         {
             continue;
         }
@@ -3448,7 +3634,7 @@ void Gs1GodotMainScreenControl::plant_first_seed_on_selected_tile()
             selected_tile_.y,
             0,
             0,
-            as_int(slot.get("item_id", 0), 0));
+            static_cast<int>(slot.item_id));
         return;
     }
 }
@@ -3539,9 +3725,9 @@ void Gs1GodotMainScreenControl::bind_button(BaseButton* button, const Callable& 
 
 void Gs1GodotMainScreenControl::clamp_selected_tile()
 {
-    const Dictionary site_state = active_site();
-    const int width = std::max(1, as_int(site_state.get("width", 1), 1));
-    const int height = std::max(1, as_int(site_state.get("height", 1), 1));
+    const Gs1RuntimeSiteProjection* site_state = active_site();
+    const int width = std::max(1, site_state != nullptr ? static_cast<int>(site_state->width) : 1);
+    const int height = std::max(1, site_state != nullptr ? static_cast<int>(site_state->height) : 1);
     selected_tile_.x = std::clamp(selected_tile_.x, 0, width - 1);
     selected_tile_.y = std::clamp(selected_tile_.y, 0, height - 1);
 }
@@ -3746,7 +3932,14 @@ void Gs1GodotMainScreenControl::on_open_tech_tree_pressed() { toggle_regional_te
 void Gs1GodotMainScreenControl::on_close_phone_pressed() { submit_ui_action(UI_ACTION_CLOSE_PHONE_PANEL); }
 void Gs1GodotMainScreenControl::on_open_worker_pack_pressed() { const int id = find_worker_pack_storage_id(); if (id != 0) { submit_storage_view(id, INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT); } }
 void Gs1GodotMainScreenControl::on_open_nearest_storage_pressed() { const int id = find_selected_tile_storage_id(); if (id != 0) { submit_storage_view(id, INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT); } }
-void Gs1GodotMainScreenControl::on_close_storage_pressed() { const Dictionary opened_storage = active_site().get("opened_storage", Dictionary()); if (!opened_storage.is_empty()) { submit_storage_view(as_int(opened_storage.get("storage_id", 0), 0), INVENTORY_VIEW_EVENT_CLOSE); } }
+void Gs1GodotMainScreenControl::on_close_storage_pressed()
+{
+    const Gs1RuntimeSiteProjection* site_state = active_site();
+    if (site_state != nullptr && site_state->opened_storage.has_value())
+    {
+        submit_storage_view(static_cast<int>(site_state->opened_storage->storage_id), INVENTORY_VIEW_EVENT_CLOSE);
+    }
+}
 void Gs1GodotMainScreenControl::on_use_selected_item_pressed() { use_first_usable_item(); }
 void Gs1GodotMainScreenControl::on_transfer_selected_item_pressed() { transfer_first_storage_item_to_pack(); }
 void Gs1GodotMainScreenControl::on_plant_selected_seed_pressed() { plant_first_seed_on_selected_tile(); }

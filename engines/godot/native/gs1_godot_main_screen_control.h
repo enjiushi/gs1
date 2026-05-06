@@ -128,6 +128,36 @@ private:
         float sway_scale {1.0F};
     };
 
+    struct TaskTemplateUiCacheEntry final
+    {
+        int task_tier_id {0};
+        int progress_kind {0};
+        godot::Ref<godot::Texture2D> icon_texture {};
+    };
+
+    struct ModifierUiCacheEntry final
+    {
+        godot::String label {};
+        godot::Ref<godot::Texture2D> icon_texture {};
+    };
+
+    struct TechnologyUiCacheEntry final
+    {
+        godot::String title {};
+        godot::String faction_name {};
+        godot::String tooltip {};
+        godot::Ref<godot::Texture2D> icon_texture {};
+    };
+
+    struct UnlockableUiCacheEntry final
+    {
+        godot::String title {};
+        godot::String subtitle {};
+        godot::String tooltip {};
+        int content_kind {-1};
+        godot::Ref<godot::Texture2D> icon_texture {};
+    };
+
     void cache_scene_references();
     void cache_ui_references();
     void wire_static_buttons();
@@ -139,16 +169,16 @@ private:
     void refresh_regional_map(int app_state, bool projection_changed);
     void refresh_site(int app_state, bool projection_changed);
 
-    void render_inventory(const godot::Dictionary& site_state);
-    void render_tasks(const godot::Dictionary& site_state);
-    void render_phone(const godot::Dictionary& site_state);
-    void render_craft(const godot::Dictionary& site_state);
-    void render_overlay(const godot::Dictionary& site_state);
-    void reconcile_task_rows(const godot::Array& tasks);
-    void reconcile_modifier_rows(const godot::Array& modifiers);
+    void render_inventory(const Gs1RuntimeSiteProjection& site_state);
+    void render_tasks(const Gs1RuntimeSiteProjection& site_state);
+    void render_phone(const Gs1RuntimeSiteProjection& site_state);
+    void render_craft(const Gs1RuntimeSiteProjection& site_state);
+    void render_overlay(const Gs1RuntimeSiteProjection& site_state);
+    void reconcile_task_rows(const std::vector<Gs1RuntimeTaskProjection>& tasks);
+    void reconcile_modifier_rows(const std::vector<Gs1RuntimeModifierProjection>& modifiers);
     void render_projected_ui_buttons(godot::VBoxContainer* container, const std::initializer_list<int>& allowed_action_types);
-    void reconcile_phone_listing_buttons(const godot::Array& phone_listings);
-    void reconcile_craft_option_buttons(const godot::Dictionary& craft_context);
+    void reconcile_phone_listing_buttons(const std::vector<Gs1RuntimePhoneListingProjection>& phone_listings);
+    void reconcile_craft_option_buttons(const Gs1RuntimeCraftContextProjection* craft_context);
     void reconcile_projected_action_buttons(
         godot::Node* container,
         std::unordered_map<std::uint64_t, ProjectedButtonRecord>& registry,
@@ -178,20 +208,18 @@ private:
     [[nodiscard]] godot::String build_regional_map_overview_text(
         const std::vector<Gs1RuntimeRegionalMapSiteProjection>& sites,
         const std::vector<Gs1RuntimeRegionalMapLinkProjection>& links) const;
-    [[nodiscard]] godot::Dictionary find_progression_view(int view_id) const;
-    [[nodiscard]] godot::Dictionary find_ui_panel(int panel_id) const;
-    [[nodiscard]] godot::Dictionary find_panel_slot_action(const godot::Dictionary& panel, int slot_id) const;
-    [[nodiscard]] godot::Dictionary find_panel_list_action(const godot::Dictionary& panel, int list_id, std::int64_t item_id, int role) const;
-    [[nodiscard]] godot::String regional_panel_text_line(const godot::Dictionary& line) const;
-    [[nodiscard]] godot::String regional_panel_slot_label(const godot::Dictionary& slot_action) const;
-    [[nodiscard]] godot::String regional_panel_list_primary_text(const godot::Dictionary& item) const;
-    [[nodiscard]] godot::String regional_panel_list_secondary_text(const godot::Dictionary& item) const;
+    [[nodiscard]] const Gs1RuntimeProgressionViewProjection* find_progression_view(int view_id) const;
+    [[nodiscard]] const Gs1RuntimeUiPanelProjection* find_ui_panel(int panel_id) const;
+    [[nodiscard]] const Gs1RuntimeUiPanelSlotActionProjection* find_panel_slot_action(const Gs1RuntimeUiPanelProjection& panel, int slot_id) const;
+    [[nodiscard]] godot::String regional_panel_text_line(const Gs1RuntimeUiPanelTextProjection& line) const;
+    [[nodiscard]] godot::String regional_panel_slot_label(const Gs1RuntimeUiPanelSlotActionProjection& slot_action) const;
+    [[nodiscard]] godot::String regional_panel_list_primary_text(const Gs1RuntimeUiPanelListItemProjection& item) const;
+    [[nodiscard]] godot::String regional_panel_list_secondary_text(const Gs1RuntimeUiPanelListItemProjection& item) const;
     void cache_fixed_slot_bindings();
     void clear_fixed_slot_actions();
-    void bind_fixed_slot_actions(const godot::Dictionary& panel, int panel_id);
+    void bind_fixed_slot_actions(const Gs1RuntimeUiPanelProjection* panel, int panel_id);
     void apply_action_to_button(godot::BaseButton* button, const godot::Dictionary& action, const godot::String& fallback_label);
     void clear_action_from_button(godot::BaseButton* button, bool preserve_text = true);
-    [[nodiscard]] std::uint64_t ui_action_hash(const godot::Dictionary& action) const;
     [[nodiscard]] godot::String regional_site_deployment_summary(const Gs1RuntimeRegionalMapSiteProjection& site) const;
     [[nodiscard]] godot::String regional_support_preview_text(int preview_mask) const;
     [[nodiscard]] godot::Vector2i regional_grid_coord(const Gs1RuntimeRegionalMapSiteProjection& site) const;
@@ -205,7 +233,6 @@ private:
         double metallic,
         bool emission = false);
 
-    [[nodiscard]] godot::Dictionary find_ui_setup(int setup_id) const;
     void clear_dynamic_children(godot::Node* container, const godot::String& prefix = godot::String("Dynamic"));
     [[nodiscard]] godot::Button* upsert_button_node(
         godot::Node* container,
@@ -243,15 +270,25 @@ private:
     void ensure_card_content_nodes(godot::Button* button, ProjectedButtonRecord& record);
     void apply_tech_tree_overlay_layout();
 
-    [[nodiscard]] godot::Dictionary active_site() const;
-    [[nodiscard]] godot::Dictionary tile_at(const godot::Vector2i& tile_coord) const;
+    [[nodiscard]] const Gs1RuntimeProjectionState* projection_state() const;
+    [[nodiscard]] const Gs1RuntimeSiteProjection* active_site() const;
+    [[nodiscard]] const Gs1RuntimeTileProjection* tile_at(const godot::Vector2i& tile_coord) const;
     [[nodiscard]] int find_worker_pack_storage_id() const;
     [[nodiscard]] int find_selected_tile_storage_id();
+    [[nodiscard]] godot::String item_name_for(int item_id) const;
     void use_first_usable_item();
     void transfer_first_storage_item_to_pack();
     void plant_first_seed_on_selected_tile();
+    [[nodiscard]] godot::String faction_name_for(int faction_id) const;
     [[nodiscard]] godot::String plant_name_for(int plant_id) const;
     [[nodiscard]] godot::String structure_name_for(int structure_id) const;
+    [[nodiscard]] godot::String recipe_output_name_for(int recipe_id, int output_item_id) const;
+    [[nodiscard]] godot::Ref<godot::Texture2D> load_cached_texture(const godot::String& path) const;
+    [[nodiscard]] godot::Ref<godot::Texture2D> fallback_icon_texture(const godot::String& icon_text) const;
+    [[nodiscard]] const TaskTemplateUiCacheEntry& task_template_ui_for(std::uint32_t task_template_id) const;
+    [[nodiscard]] const ModifierUiCacheEntry& modifier_ui_for(std::uint32_t modifier_id) const;
+    [[nodiscard]] const TechnologyUiCacheEntry& technology_ui_for(std::uint32_t tech_node_id) const;
+    [[nodiscard]] const UnlockableUiCacheEntry& unlockable_ui_for(std::uint32_t unlock_id) const;
 
     void submit_ui_action(std::int64_t action_type, std::int64_t target_id = 0, std::int64_t arg0 = 0, std::int64_t arg1 = 0);
     void submit_move(double x, double y, double z);
@@ -394,7 +431,6 @@ private:
     godot::Node3D* regional_link_root_ {nullptr};
     godot::Node3D* regional_site_root_ {nullptr};
 
-    godot::Dictionary projection_;
     godot::Vector2i selected_tile_ {0, 0};
     int selected_site_id_ {1};
     godot::String last_action_message_;
@@ -425,6 +461,17 @@ private:
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> site_control_buttons_;
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> regional_selection_action_buttons_;
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> regional_tech_tree_action_buttons_;
+    mutable std::unordered_map<int, godot::String> item_name_cache_;
+    mutable std::unordered_map<int, godot::String> plant_name_cache_;
+    mutable std::unordered_map<int, godot::String> structure_name_cache_;
+    mutable std::unordered_map<int, godot::String> faction_name_cache_;
+    mutable std::unordered_map<std::uint64_t, godot::String> recipe_output_name_cache_;
+    mutable std::unordered_map<std::uint32_t, TaskTemplateUiCacheEntry> task_template_ui_cache_;
+    mutable std::unordered_map<std::uint32_t, ModifierUiCacheEntry> modifier_ui_cache_;
+    mutable std::unordered_map<std::uint32_t, TechnologyUiCacheEntry> technology_ui_cache_;
+    mutable std::unordered_map<std::uint32_t, UnlockableUiCacheEntry> unlockable_ui_cache_;
+    mutable std::unordered_map<std::string, godot::Ref<godot::Texture2D>> texture_cache_;
+    mutable std::unordered_map<std::string, godot::Ref<godot::Texture2D>> fallback_icon_texture_cache_;
 
     godot::RichTextLabel* status_label_ {nullptr};
     godot::PanelContainer* menu_panel_ {nullptr};
