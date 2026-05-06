@@ -317,6 +317,7 @@ void Gs1GodotMainScreenControl::_ready()
     cache_ui_references();
     apply_tech_tree_overlay_layout();
     cache_fixed_slot_bindings();
+    invalidate_all_ui();
     set_process(true);
     set_process_input(true);
     wire_static_buttons();
@@ -342,10 +343,12 @@ void Gs1GodotMainScreenControl::_process(double delta)
         ? static_cast<int>(state->current_app_state.value())
         : APP_STATE_BOOT;
 
-    refresh_status();
-    refresh_menu(app_state);
-    refresh_regional_map(app_state, projection_changed);
-    refresh_site(app_state, projection_changed);
+    update_visibility(app_state);
+    refresh_status_if_needed();
+    refresh_menu_if_needed(app_state, projection_changed);
+    refresh_regional_map_if_needed(app_state, projection_changed);
+    refresh_site_if_needed(app_state, projection_changed);
+    refresh_selected_tile_if_needed();
     update_background_presentation(app_state, delta);
     last_app_state_ = app_state;
 }
@@ -659,6 +662,13 @@ bool Gs1GodotMainScreenControl::sync_projection_from_runtime()
     }
 
     last_projection_revision_ = runtime_revision;
+    mark_status_dirty();
+    mark_menu_dirty();
+    mark_regional_map_dirty();
+    mark_regional_selection_dirty();
+    mark_regional_visuals_dirty();
+    mark_site_dirty();
+    mark_selected_tile_dirty();
     if (const Gs1RuntimeProjectionState* state = projection_state();
         state != nullptr && state->selected_site_id.has_value())
     {
@@ -666,6 +676,208 @@ bool Gs1GodotMainScreenControl::sync_projection_from_runtime()
     }
     return true;
 }
+
+void Gs1GodotMainScreenControl::invalidate_all_ui()
+{
+    mark_status_dirty();
+    mark_menu_dirty();
+    mark_regional_map_dirty();
+    mark_regional_selection_dirty();
+    mark_regional_visuals_dirty();
+    mark_site_dirty();
+    mark_selected_tile_dirty();
+    last_rendered_selected_site_id_ = -1;
+    last_tile_label_x_ = -1;
+    last_tile_label_y_ = -1;
+}
+
+void Gs1GodotMainScreenControl::update_visibility(int app_state)
+{
+    const bool menu_visible = app_state == APP_STATE_MAIN_MENU || app_state == APP_STATE_BOOT;
+    const bool regional_visible = app_state == APP_STATE_REGIONAL_MAP || app_state == APP_STATE_SITE_LOADING;
+    const Gs1RuntimeSiteProjection* site_state = active_site();
+    const bool site_visible = site_state != nullptr && app_state >= APP_STATE_SITE_LOADING && app_state <= APP_STATE_SITE_RESULT;
+
+    if (menu_panel_ != nullptr)
+    {
+        menu_panel_->set_visible(menu_visible);
+    }
+    if (regional_map_panel_ != nullptr)
+    {
+        regional_map_panel_->set_visible(regional_visible);
+    }
+    if (regional_map_world_ != nullptr)
+    {
+        regional_map_world_->set_visible(regional_visible);
+    }
+    if (regional_selection_panel_ != nullptr)
+    {
+        regional_selection_panel_->set_visible(regional_visible);
+    }
+    if (site_panel_ != nullptr)
+    {
+        site_panel_->set_visible(site_visible);
+    }
+    if (inventory_panel_ != nullptr)
+    {
+        inventory_panel_->set_visible(site_visible);
+    }
+    if (task_panel_ != nullptr)
+    {
+        task_panel_->set_visible(site_visible);
+    }
+    if (phone_panel_ != nullptr)
+    {
+        phone_panel_->set_visible(site_visible);
+    }
+    if (craft_panel_ != nullptr)
+    {
+        craft_panel_->set_visible(site_visible);
+    }
+    if (overlay_panel_ != nullptr)
+    {
+        overlay_panel_->set_visible(site_visible);
+    }
+    if (site_view_ != nullptr)
+    {
+        site_view_->set_visible(site_visible);
+    }
+    if (site_view_ != nullptr && regional_visible)
+    {
+        site_view_->set_visible(false);
+    }
+    if (regional_map_world_ != nullptr && site_visible)
+    {
+        regional_map_world_->set_visible(false);
+    }
+    if (!regional_visible)
+    {
+        if (regional_tech_tree_overlay_ != nullptr)
+        {
+            regional_tech_tree_overlay_->set_visible(false);
+        }
+        if (regional_tech_tree_panel_ != nullptr)
+        {
+            regional_tech_tree_panel_->set_visible(false);
+        }
+    }
+
+    const bool regional_visibility_changed = regional_visible != regional_map_visible_;
+    const bool site_visibility_changed = site_visible != site_panel_visible_;
+    const bool app_state_changed = app_state != last_visible_app_state_;
+    if (regional_visibility_changed || app_state_changed)
+    {
+        mark_menu_dirty();
+        mark_regional_map_dirty();
+        mark_regional_selection_dirty();
+        mark_regional_visuals_dirty();
+    }
+    if (site_visibility_changed || app_state_changed)
+    {
+        mark_site_dirty();
+        mark_selected_tile_dirty();
+    }
+
+    regional_map_visible_ = regional_visible;
+    site_panel_visible_ = site_visible;
+    last_visible_app_state_ = app_state;
+}
+
+void Gs1GodotMainScreenControl::refresh_status_if_needed()
+{
+    if (!status_dirty_)
+    {
+        return;
+    }
+    refresh_status();
+    status_dirty_ = false;
+}
+
+void Gs1GodotMainScreenControl::refresh_menu_if_needed(int app_state, bool projection_changed)
+{
+    if (!menu_dirty_ && !projection_changed)
+    {
+        return;
+    }
+    refresh_menu(app_state);
+    menu_dirty_ = false;
+}
+
+void Gs1GodotMainScreenControl::refresh_regional_map_if_needed(int app_state, bool projection_changed)
+{
+    if (!regional_map_visible_)
+    {
+        return;
+    }
+    if (!regional_map_dirty_ && !regional_selection_dirty_ && !regional_visuals_dirty_ && !projection_changed)
+    {
+        return;
+    }
+    refresh_regional_map(app_state, projection_changed);
+    regional_map_dirty_ = false;
+    regional_selection_dirty_ = false;
+    regional_visuals_dirty_ = false;
+}
+
+void Gs1GodotMainScreenControl::refresh_site_if_needed(int app_state, bool projection_changed)
+{
+    if (!site_panel_visible_)
+    {
+        return;
+    }
+    if (!site_dirty_ && !projection_changed)
+    {
+        return;
+    }
+    refresh_site(app_state, projection_changed);
+    site_dirty_ = false;
+}
+
+void Gs1GodotMainScreenControl::refresh_selected_tile_if_needed()
+{
+    if (!site_panel_visible_)
+    {
+        return;
+    }
+    if (!selected_tile_dirty_ &&
+        selected_tile_.x == last_tile_label_x_ &&
+        selected_tile_.y == last_tile_label_y_)
+    {
+        return;
+    }
+
+    clamp_selected_tile();
+    const Gs1RuntimeTileProjection* selected_tile = tile_at(selected_tile_);
+    if (tile_label_ != nullptr)
+    {
+        String tile_text = vformat(
+            "Selected Tile: (%d, %d)  Plant: %s  Structure: %s",
+            selected_tile_.x,
+            selected_tile_.y,
+            selected_tile != nullptr && selected_tile->plant_type_id != 0U ? plant_name_for(static_cast<int>(selected_tile->plant_type_id)) : String("None"),
+            selected_tile != nullptr && selected_tile->structure_type_id != 0U ? structure_name_for(static_cast<int>(selected_tile->structure_type_id)) : String("None"));
+        if (selected_tile != nullptr)
+        {
+            tile_text += vformat(
+                "  Wind %.2f  Moisture %.2f  Fertility %.2f",
+                selected_tile->local_wind,
+                selected_tile->moisture,
+                selected_tile->soil_fertility);
+        }
+        tile_label_->set_text(tile_text);
+    }
+    last_tile_label_x_ = selected_tile_.x;
+    last_tile_label_y_ = selected_tile_.y;
+    selected_tile_dirty_ = false;
+}
+
+void Gs1GodotMainScreenControl::mark_status_dirty() { status_dirty_ = true; }
+void Gs1GodotMainScreenControl::mark_menu_dirty() { menu_dirty_ = true; }
+void Gs1GodotMainScreenControl::mark_regional_map_dirty() { regional_map_dirty_ = true; }
+void Gs1GodotMainScreenControl::mark_regional_selection_dirty() { regional_selection_dirty_ = true; }
+void Gs1GodotMainScreenControl::mark_regional_visuals_dirty() { regional_visuals_dirty_ = true; }
+void Gs1GodotMainScreenControl::mark_site_dirty() { site_dirty_ = true; }
+void Gs1GodotMainScreenControl::mark_selected_tile_dirty() { selected_tile_dirty_ = true; }
 
 void Gs1GodotMainScreenControl::refresh_status()
 {
@@ -710,11 +922,7 @@ void Gs1GodotMainScreenControl::refresh_status()
 void Gs1GodotMainScreenControl::refresh_menu(int app_state)
 {
     const bool visible = app_state == APP_STATE_MAIN_MENU || app_state == APP_STATE_BOOT;
-    if (menu_panel_ != nullptr)
-    {
-        menu_panel_->set_visible(visible);
-    }
-    if (visible)
+    if (visible && menu_dirty_)
     {
         apply_fixed_panel_actions();
     }
@@ -731,38 +939,12 @@ void Gs1GodotMainScreenControl::apply_fixed_panel_actions()
 void Gs1GodotMainScreenControl::refresh_regional_map(int app_state, bool projection_changed)
 {
     const bool panel_visible = app_state == APP_STATE_REGIONAL_MAP || app_state == APP_STATE_SITE_LOADING;
-    if (regional_map_panel_ != nullptr)
-    {
-        regional_map_panel_->set_visible(panel_visible);
-    }
-    if (regional_map_world_ != nullptr)
-    {
-        regional_map_world_->set_visible(panel_visible);
-    }
-    if (site_view_ != nullptr && panel_visible)
-    {
-        site_view_->set_visible(false);
-    }
-    if (regional_selection_panel_ != nullptr)
-    {
-        regional_selection_panel_->set_visible(panel_visible);
-    }
     if (!panel_visible)
     {
-        regional_map_visible_ = false;
-        if (regional_tech_tree_overlay_ != nullptr)
-        {
-            regional_tech_tree_overlay_->set_visible(false);
-        }
-        if (regional_tech_tree_panel_ != nullptr)
-        {
-            regional_tech_tree_panel_->set_visible(false);
-        }
         return;
     }
 
-    const bool force_refresh = projection_changed || !regional_map_visible_;
-    regional_map_visible_ = true;
+    const bool force_refresh = projection_changed || regional_map_dirty_;
 
     const auto& runtime_state = runtime_node_->projection_state();
     const auto& sites = runtime_state.regional_map_sites;
@@ -818,60 +1000,28 @@ void Gs1GodotMainScreenControl::refresh_regional_map(int app_state, bool project
         render_regional_tech_tree();
     }
 
-    if (force_refresh || selected_site_id_ != last_rendered_selected_site_id_)
+    if (force_refresh || regional_selection_dirty_ || selected_site_id_ != last_rendered_selected_site_id_)
     {
         render_regional_selection(selected_site);
         last_rendered_selected_site_id_ = selected_site_id_;
     }
 
-    update_regional_site_visuals();
+    if (force_refresh || regional_visuals_dirty_)
+    {
+        update_regional_site_visuals();
+    }
 }
 
 void Gs1GodotMainScreenControl::refresh_site(int app_state, bool projection_changed)
 {
     const Gs1RuntimeSiteProjection* site_state = active_site();
     const bool panel_visible = site_state != nullptr && app_state >= APP_STATE_SITE_LOADING && app_state <= APP_STATE_SITE_RESULT;
-
-    if (site_panel_ != nullptr)
-    {
-        site_panel_->set_visible(panel_visible);
-    }
-    if (inventory_panel_ != nullptr)
-    {
-        inventory_panel_->set_visible(panel_visible);
-    }
-    if (task_panel_ != nullptr)
-    {
-        task_panel_->set_visible(panel_visible);
-    }
-    if (phone_panel_ != nullptr)
-    {
-        phone_panel_->set_visible(panel_visible);
-    }
-    if (craft_panel_ != nullptr)
-    {
-        craft_panel_->set_visible(panel_visible);
-    }
-    if (overlay_panel_ != nullptr)
-    {
-        overlay_panel_->set_visible(panel_visible);
-    }
-    if (site_view_ != nullptr)
-    {
-        site_view_->set_visible(panel_visible);
-    }
-    if (regional_map_world_ != nullptr && panel_visible)
-    {
-        regional_map_world_->set_visible(false);
-    }
     if (!panel_visible)
     {
-        site_panel_visible_ = false;
         return;
     }
 
-    const bool force_refresh = projection_changed || !site_panel_visible_;
-    site_panel_visible_ = true;
+    const bool force_refresh = projection_changed || site_dirty_;
 
     if (force_refresh)
     {
@@ -936,27 +1086,6 @@ void Gs1GodotMainScreenControl::refresh_site(int app_state, bool projection_chan
         render_craft(*site_state);
         render_overlay(*site_state);
         render_projected_ui_buttons(site_controls_, {6, 7, 8, 10, 11, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26});
-    }
-
-    clamp_selected_tile();
-    const Gs1RuntimeTileProjection* selected_tile = tile_at(selected_tile_);
-    if (tile_label_ != nullptr)
-    {
-        String tile_text = vformat(
-            "Selected Tile: (%d, %d)  Plant: %s  Structure: %s",
-            selected_tile_.x,
-            selected_tile_.y,
-            selected_tile != nullptr && selected_tile->plant_type_id != 0U ? plant_name_for(static_cast<int>(selected_tile->plant_type_id)) : String("None"),
-            selected_tile != nullptr && selected_tile->structure_type_id != 0U ? structure_name_for(static_cast<int>(selected_tile->structure_type_id)) : String("None"));
-        if (selected_tile != nullptr)
-        {
-            tile_text += vformat(
-                "  Wind %.2f  Moisture %.2f  Fertility %.2f",
-                selected_tile->local_wind,
-                selected_tile->moisture,
-                selected_tile->soil_fertility);
-        }
-        tile_label_->set_text(tile_text);
     }
 }
 
@@ -1575,11 +1704,12 @@ void Gs1GodotMainScreenControl::toggle_regional_tech_tree()
 void Gs1GodotMainScreenControl::select_regional_site(int site_id, bool submit_runtime)
 {
     selected_site_id_ = site_id;
+    mark_regional_selection_dirty();
+    mark_regional_visuals_dirty();
     if (submit_runtime)
     {
         submit_ui_action(UI_ACTION_SELECT_DEPLOYMENT_SITE, selected_site_id_);
     }
-    update_regional_site_visuals();
 }
 
 void Gs1GodotMainScreenControl::rebuild_regional_map_world(
@@ -3728,8 +3858,17 @@ void Gs1GodotMainScreenControl::clamp_selected_tile()
     const Gs1RuntimeSiteProjection* site_state = active_site();
     const int width = std::max(1, site_state != nullptr ? static_cast<int>(site_state->width) : 1);
     const int height = std::max(1, site_state != nullptr ? static_cast<int>(site_state->height) : 1);
-    selected_tile_.x = std::clamp(selected_tile_.x, 0, width - 1);
-    selected_tile_.y = std::clamp(selected_tile_.y, 0, height - 1);
+    const int clamped_x = std::clamp(selected_tile_.x, 0, width - 1);
+    const int clamped_y = std::clamp(selected_tile_.y, 0, height - 1);
+    if (clamped_x != selected_tile_.x || clamped_y != selected_tile_.y)
+    {
+        selected_tile_.x = clamped_x;
+        selected_tile_.y = clamped_y;
+        mark_selected_tile_dirty();
+        return;
+    }
+    selected_tile_.x = clamped_x;
+    selected_tile_.y = clamped_y;
 }
 
 bool Gs1GodotMainScreenControl::regional_map_ui_contains_screen_point(const Vector2& screen_position) const
@@ -3909,13 +4048,13 @@ NodePath Gs1GodotMainScreenControl::get_regional_site_root_path() const { return
 
 void Gs1GodotMainScreenControl::on_start_campaign_pressed() { submit_ui_action(UI_ACTION_START_NEW_CAMPAIGN); }
 void Gs1GodotMainScreenControl::on_continue_campaign_pressed() { submit_ui_action(UI_ACTION_START_NEW_CAMPAIGN); }
-void Gs1GodotMainScreenControl::on_menu_settings_pressed() { last_action_message_ = "Settings are not wired yet in the prototype"; }
+void Gs1GodotMainScreenControl::on_menu_settings_pressed() { last_action_message_ = "Settings are not wired yet in the prototype"; mark_status_dirty(); }
 void Gs1GodotMainScreenControl::on_quit_pressed() { if (SceneTree* tree = get_tree()) { tree->quit(); } }
 void Gs1GodotMainScreenControl::on_return_to_map_pressed() { submit_ui_action(UI_ACTION_RETURN_TO_REGIONAL_MAP); }
-void Gs1GodotMainScreenControl::on_move_north_pressed() { submit_move(0.0, 0.0, -1.0); }
-void Gs1GodotMainScreenControl::on_move_south_pressed() { submit_move(0.0, 0.0, 1.0); }
-void Gs1GodotMainScreenControl::on_move_west_pressed() { submit_move(-1.0, 0.0, 0.0); }
-void Gs1GodotMainScreenControl::on_move_east_pressed() { submit_move(1.0, 0.0, 0.0); }
+void Gs1GodotMainScreenControl::on_move_north_pressed() { submit_move(0.0, 0.0, -1.0); mark_selected_tile_dirty(); }
+void Gs1GodotMainScreenControl::on_move_south_pressed() { submit_move(0.0, 0.0, 1.0); mark_selected_tile_dirty(); }
+void Gs1GodotMainScreenControl::on_move_west_pressed() { submit_move(-1.0, 0.0, 0.0); mark_selected_tile_dirty(); }
+void Gs1GodotMainScreenControl::on_move_east_pressed() { submit_move(1.0, 0.0, 0.0); mark_selected_tile_dirty(); }
 void Gs1GodotMainScreenControl::on_hover_tile_pressed() { submit_site_context_request(selected_tile_.x, selected_tile_.y, 0); }
 void Gs1GodotMainScreenControl::on_cancel_action_pressed() { submit_site_action_cancel(0, SITE_ACTION_CANCEL_FLAG_CURRENT_ACTION | SITE_ACTION_CANCEL_FLAG_PLACEMENT_MODE); }
 void Gs1GodotMainScreenControl::on_open_protection_pressed() { submit_ui_action(UI_ACTION_OPEN_SITE_PROTECTION_SELECTOR); }

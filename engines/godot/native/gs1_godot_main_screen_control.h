@@ -162,6 +162,20 @@ private:
     void cache_ui_references();
     void wire_static_buttons();
     [[nodiscard]] bool sync_projection_from_runtime();
+    void invalidate_all_ui();
+    void update_visibility(int app_state);
+    void refresh_status_if_needed();
+    void refresh_menu_if_needed(int app_state, bool projection_changed);
+    void refresh_regional_map_if_needed(int app_state, bool projection_changed);
+    void refresh_site_if_needed(int app_state, bool projection_changed);
+    void refresh_selected_tile_if_needed();
+    void mark_status_dirty();
+    void mark_menu_dirty();
+    void mark_regional_map_dirty();
+    void mark_regional_selection_dirty();
+    void mark_regional_visuals_dirty();
+    void mark_site_dirty();
+    void mark_selected_tile_dirty();
 
     void refresh_status();
     void refresh_menu(int app_state);
@@ -438,12 +452,22 @@ private:
     godot::Rect2i regional_map_bounds_ {-4, -3, 9, 7};
     int last_rendered_selected_site_id_ {-1};
     int last_app_state_ {-1};
+    int last_visible_app_state_ {-1};
+    int last_tile_label_x_ {-1};
+    int last_tile_label_y_ {-1};
     double menu_backdrop_time_ {0.0};
     bool regional_map_visible_ {false};
     bool site_panel_visible_ {false};
     bool buttons_wired_ {false};
     bool fixed_slot_bindings_cached_ {false};
     bool regional_menu_backdrop_active_ {false};
+    bool status_dirty_ {true};
+    bool menu_dirty_ {true};
+    bool regional_map_dirty_ {true};
+    bool regional_selection_dirty_ {true};
+    bool regional_visuals_dirty_ {true};
+    bool site_dirty_ {true};
+    bool selected_tile_dirty_ {true};
 
     std::unordered_map<int, int> cached_storage_lookup_;
     std::unordered_map<int, RegionalSiteNodeRecord> regional_site_nodes_;
