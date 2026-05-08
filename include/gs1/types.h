@@ -133,7 +133,8 @@ enum Gs1UiPanelSlotId : std::uint8_t
 enum Gs1UiPanelListId : std::uint8_t
 {
     GS1_UI_PANEL_LIST_NONE = 0,
-    GS1_UI_PANEL_LIST_REGIONAL_SITES = 1
+    GS1_UI_PANEL_LIST_REGIONAL_SITES = 1,
+    GS1_UI_PANEL_LIST_REGIONAL_LOADOUT = 2
 };
 
 enum Gs1UiPanelSlotFlags : std::uint8_t

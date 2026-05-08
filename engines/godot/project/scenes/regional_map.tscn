@@ -4,6 +4,7 @@
 [ext_resource type="Shader" uid="uid://dtyhkexr3uqhr" path="res://assets/shaders/menu_heat_haze.gdshader" id="3_heat"]
 [ext_resource type="PackedScene" path="res://scenes/regional_map_backdrop.tscn" id="4_backdrop"]
 [ext_resource type="PackedScene" path="res://scenes/tech_tree_overlay.tscn" id="5_tech_tree_overlay"]
+[ext_resource type="PackedScene" uid="uid://cdsp05r0nrx8n" path="res://scenes/regional_map_hud.tscn" id="6_regional_map_hud"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_heat"]
 shader = ExtResource("3_heat")
@@ -69,43 +70,9 @@ layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 16
 
-[node name="RegionalMapPanel" type="PanelContainer" parent="HudMargin/RootVBox/MainColumns/LeftColumn" unique_id=221750624]
+[node name="RegionalMapHud" parent="HudMargin/RootVBox/MainColumns/LeftColumn" unique_id=221750624 instance=ExtResource("6_regional_map_hud")]
 layout_mode = 2
 size_flags_vertical = 3
-
-[node name="RegionalVBox" type="VBoxContainer" parent="HudMargin/RootVBox/MainColumns/LeftColumn/RegionalMapPanel" unique_id=309312984]
-layout_mode = 2
-theme_override_constants/separation = 14
-
-[node name="RegionalHeader" type="Label" parent="HudMargin/RootVBox/MainColumns/LeftColumn/RegionalMapPanel/RegionalVBox" unique_id=2039314139]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.490196, 0.862745, 0.529412, 1)
-theme_override_font_sizes/font_size = 18
-text = "CAMPAIGN OVERWATCH"
-
-[node name="RegionalMapSummary" type="RichTextLabel" parent="HudMargin/RootVBox/MainColumns/LeftColumn/RegionalMapPanel/RegionalVBox" unique_id=69339313]
-custom_minimum_size = Vector2(0, 112)
-layout_mode = 2
-bbcode_enabled = true
-fit_content = true
-scroll_active = false
-
-[node name="RegionalMapGraph" type="RichTextLabel" parent="HudMargin/RootVBox/MainColumns/LeftColumn/RegionalMapPanel/RegionalVBox" unique_id=985671525]
-custom_minimum_size = Vector2(0, 162)
-layout_mode = 2
-bbcode_enabled = true
-
-[node name="RegionalActions" type="VBoxContainer" parent="HudMargin/RootVBox/MainColumns/LeftColumn/RegionalMapPanel/RegionalVBox" unique_id=603922482]
-layout_mode = 2
-theme_override_constants/separation = 10
-
-[node name="OpenTechTreeButton" type="Button" parent="HudMargin/RootVBox/MainColumns/LeftColumn/RegionalMapPanel/RegionalVBox/RegionalActions" unique_id=2105511076]
-custom_minimum_size = Vector2(0, 48)
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Research & Unlocks"
-metadata/gs1_panel_id = 2
-metadata/gs1_slot_id = 1
 
 [node name="WorldSpacer" type="Control" parent="HudMargin/RootVBox/MainColumns" unique_id=535032526]
 layout_mode = 2
@@ -135,7 +102,28 @@ theme_override_font_sizes/font_size = 18
 text = "SITE BRIEF"
 
 [node name="RegionalSelectionSummary" type="RichTextLabel" parent="HudMargin/RootVBox/MainColumns/RightColumn/RegionalSelectionPanel/RegionalSelectionVBox" unique_id=504756649]
-custom_minimum_size = Vector2(0, 238)
+custom_minimum_size = Vector2(0, 122)
+layout_mode = 2
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+
+[node name="RegionalSupportPanel" type="PanelContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn/RegionalSelectionPanel/RegionalSelectionVBox" unique_id=181417297]
+layout_mode = 2
+
+[node name="RegionalSupportSummary" type="RichTextLabel" parent="HudMargin/RootVBox/MainColumns/RightColumn/RegionalSelectionPanel/RegionalSelectionVBox/RegionalSupportPanel" unique_id=1001924748]
+custom_minimum_size = Vector2(0, 92)
+layout_mode = 2
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+
+[node name="RegionalLoadoutPanel" type="PanelContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn/RegionalSelectionPanel/RegionalSelectionVBox" unique_id=1858080570]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RegionalLoadoutSummary" type="RichTextLabel" parent="HudMargin/RootVBox/MainColumns/RightColumn/RegionalSelectionPanel/RegionalSelectionVBox/RegionalLoadoutPanel" unique_id=1404948212]
+custom_minimum_size = Vector2(0, 128)
 layout_mode = 2
 size_flags_vertical = 3
 bbcode_enabled = true

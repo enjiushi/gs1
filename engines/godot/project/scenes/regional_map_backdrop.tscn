@@ -1,4 +1,4 @@
-[gd_scene load_steps=17 format=3]
+[gd_scene load_steps=27 format=3]
 
 [ext_resource type="Texture2D" path="res://assets/menu_backdrop/hdri/qwantani_afternoon_puresky_4k.hdr" id="1_hdri"]
 [ext_resource type="PackedScene" path="res://assets/menu_backdrop/canyonterrain/fbx_unity/Tile_Ground.fbx" id="2_ground"]
@@ -9,6 +9,10 @@
 [ext_resource type="PackedScene" path="res://assets/menu_backdrop/canyonterrain/fbx_unity/Cactus_Small_4.fbx" id="7_cactus_small"]
 [ext_resource type="PackedScene" path="res://assets/menu_backdrop/canyonterrain/fbx_unity/Grass_7.fbx" id="8_grass"]
 [ext_resource type="PackedScene" path="res://assets/menu_backdrop/desert_props/FBX/rock_1.001.fbx" id="9_desert_rock"]
+[ext_resource type="Texture2D" path="res://assets/terrain/textures/g_pal_00_color.png" id="10_terrain_a"]
+[ext_resource type="Texture2D" path="res://assets/terrain/textures/dirt (2).png" id="11_terrain_b"]
+[ext_resource type="Texture2D" path="res://assets/terrain/textures/dirt (1).png" id="12_terrain_c"]
+[ext_resource type="Texture2D" path="res://assets/terrain/textures/dirt (3).png" id="13_terrain_d"]
 
 [sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_regional"]
 panorama = ExtResource("1_hdri")
@@ -22,6 +26,113 @@ sky = SubResource("Sky_regional")
 ambient_light_source = 2
 ambient_light_sky_contribution = 1.0
 tonemap_exposure = 0.98
+
+[sub_resource type="Gradient" id="Gradient_regional"]
+offsets = PackedFloat32Array(0.2, 1)
+colors = PackedColorArray(1, 1, 1, 1, 0, 0, 0, 1)
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_regional"]
+noise_type = 2
+frequency = 0.03
+cellular_jitter = 3.0
+cellular_return_type = 0
+domain_warp_enabled = true
+domain_warp_type = 1
+domain_warp_amplitude = 50.0
+domain_warp_fractal_type = 2
+domain_warp_fractal_lacunarity = 1.5
+domain_warp_fractal_gain = 1.0
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_regional"]
+noise = SubResource("FastNoiseLite_regional")
+color_ramp = SubResource("Gradient_regional")
+seamless = true
+
+[sub_resource type="Terrain3DMaterial" id="Terrain3DMaterial_regional"]
+_shader_parameters = {
+&"bias_distance": 512.0,
+&"blend_sharpness": 0.87,
+&"depth_blur": 0.0,
+&"enable_macro_variation": true,
+&"enable_projection": true,
+&"height_blending": true,
+&"macro_variation1": Color(1, 1, 1, 1),
+&"macro_variation2": Color(1, 1, 1, 1),
+&"macro_variation_slope": 0.333,
+&"mipmap_bias": 1.0,
+&"noise1_angle": 0.0,
+&"noise1_offset": Vector2(0.5, 0.5),
+&"noise1_scale": 0.04,
+&"noise2_scale": 0.076,
+&"noise3_scale": 0.225,
+&"noise_texture": SubResource("NoiseTexture2D_regional"),
+&"projection_angular_division": 2.0,
+&"projection_threshold": 0.8,
+&"world_noise_fragment_normals": false,
+&"world_noise_height": 64.0,
+&"world_noise_lod_distance": 7500.0,
+&"world_noise_max_octaves": 4,
+&"world_noise_min_octaves": 2,
+&"world_noise_offset": Vector3(0, 0, 0),
+&"world_noise_region_blend": 0.33,
+&"world_noise_scale": 2.93999993987312,
+&"world_space_normal_blend": true
+}
+world_background = 2
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_regional"]
+transparency = 4
+cull_mode = 2
+vertex_color_use_as_albedo = true
+backlight_enabled = true
+backlight = Color(0.5, 0.5, 0.5, 1)
+distance_fade_mode = 1
+distance_fade_min_distance = 128.0
+distance_fade_max_distance = 96.0
+
+[sub_resource type="Terrain3DMeshAsset" id="Terrain3DMeshAsset_regional"]
+generated_type = 1
+height_offset = 0.5
+material_override = SubResource("StandardMaterial3D_regional")
+last_lod = 0
+last_shadow_lod = 0
+lod0_range = 128.0
+
+[sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_regional_a"]
+name = "g_pal_00_color"
+albedo_texture = ExtResource("10_terrain_a")
+ao_strength = 0.533
+uv_scale = 0.55
+detiling_rotation = 0.25
+detiling_shift = 0.265
+
+[sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_regional_b"]
+name = "dirt (2)"
+id = 1
+albedo_texture = ExtResource("11_terrain_b")
+uv_scale = 0.555
+detiling_rotation = 0.25
+detiling_shift = 0.25
+
+[sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_regional_c"]
+name = "dirt (1)"
+id = 2
+albedo_texture = ExtResource("12_terrain_c")
+uv_scale = 0.55
+detiling_rotation = 0.25
+detiling_shift = 0.25
+
+[sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_regional_d"]
+name = "dirt (3)"
+id = 3
+albedo_texture = ExtResource("13_terrain_d")
+uv_scale = 0.55
+detiling_rotation = 0.25
+detiling_shift = 0.25
+
+[sub_resource type="Terrain3DAssets" id="Terrain3DAssets_regional"]
+mesh_list = Array[Terrain3DMeshAsset]([SubResource("Terrain3DMeshAsset_regional")])
+texture_list = Array[Terrain3DTextureAsset]([SubResource("Terrain3DTextureAsset_regional_a"), SubResource("Terrain3DTextureAsset_regional_b"), SubResource("Terrain3DTextureAsset_regional_c"), SubResource("Terrain3DTextureAsset_regional_d")])
 
 [node name="RegionalMapWorld" type="Node3D"]
 
@@ -177,3 +288,11 @@ scale = Vector3(0.94, 0.94, 0.94)
 [node name="LinkRoot" type="Node3D" parent="."]
 
 [node name="SiteRoot" type="Node3D" parent="."]
+
+[node name="Terrain3D" type="Terrain3D" parent="."]
+data_directory = "res://assets/terrain"
+material = SubResource("Terrain3DMaterial_regional")
+assets = SubResource("Terrain3DAssets_regional")
+free_editor_textures = false
+top_level = true
+metadata/_edit_lock_ = true

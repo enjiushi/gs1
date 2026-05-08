@@ -511,6 +511,7 @@ if(GS1_BUILD_GODOT_ADAPTER)
         engines/godot/native/gs1_godot_inventory_panel_controller.cpp
         engines/godot/native/gs1_godot_overlay_panel_controller.cpp
         engines/godot/native/gs1_godot_phone_panel_controller.cpp
+        engines/godot/native/gs1_godot_regional_map_hud_controller.cpp
         engines/godot/native/gs1_godot_regional_selection_panel_controller.cpp
         engines/godot/native/gs1_godot_regional_summary_panel_controller.cpp
         engines/godot/native/gs1_godot_regional_tech_tree_panel_controller.cpp

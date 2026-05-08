@@ -257,6 +257,9 @@ void Gs1GodotMainScreenControl::_ready()
     regional_selection_panel_controller_.set_submit_ui_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
         submit_ui_action(action_type, target_id, arg0, arg1);
     });
+    regional_map_hud_controller_.set_submit_ui_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
+        submit_ui_action(action_type, target_id, arg0, arg1);
+    });
     regional_tech_tree_panel_controller_.set_submit_ui_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
         submit_ui_action(action_type, target_id, arg0, arg1);
     });
@@ -357,6 +360,7 @@ void Gs1GodotMainScreenControl::cache_scene_references()
             runtime_node_->subscribe_engine_messages(action_panel_controller_);
             runtime_node_->subscribe_engine_messages(overlay_panel_controller_);
             runtime_node_->subscribe_engine_messages(phone_panel_controller_);
+            runtime_node_->subscribe_engine_messages(regional_map_hud_controller_);
             runtime_node_->subscribe_engine_messages(regional_selection_panel_controller_);
             runtime_node_->subscribe_engine_messages(regional_summary_panel_controller_);
             runtime_node_->subscribe_engine_messages(regional_tech_tree_panel_controller_);
@@ -398,6 +402,7 @@ void Gs1GodotMainScreenControl::cache_ui_references()
     action_panel_controller_.cache_ui_references(*this);
     overlay_panel_controller_.cache_ui_references(*this);
     phone_panel_controller_.cache_ui_references(*this);
+    regional_map_hud_controller_.cache_ui_references(*this);
     regional_selection_panel_controller_.cache_ui_references(*this);
     regional_summary_panel_controller_.cache_ui_references(*this);
     regional_tech_tree_panel_controller_.cache_ui_references(*this);
@@ -409,7 +414,11 @@ void Gs1GodotMainScreenControl::cache_ui_references()
     }
     if (regional_map_panel_ == nullptr)
     {
-        regional_map_panel_ = Object::cast_to<PanelContainer>(find_child("RegionalMapPanel", true, false));
+        regional_map_panel_ = Object::cast_to<PanelContainer>(find_child("RegionalMapHud", true, false));
+        if (regional_map_panel_ == nullptr)
+        {
+            regional_map_panel_ = Object::cast_to<PanelContainer>(find_child("RegionalMapPanel", true, false));
+        }
     }
     if (regional_selection_panel_ == nullptr)
     {
@@ -600,6 +609,7 @@ void Gs1GodotMainScreenControl::disconnect_runtime_subscriptions()
     runtime_node_->unsubscribe_engine_messages(action_panel_controller_);
     runtime_node_->unsubscribe_engine_messages(overlay_panel_controller_);
     runtime_node_->unsubscribe_engine_messages(phone_panel_controller_);
+    runtime_node_->unsubscribe_engine_messages(regional_map_hud_controller_);
     runtime_node_->unsubscribe_engine_messages(regional_selection_panel_controller_);
     runtime_node_->unsubscribe_engine_messages(regional_summary_panel_controller_);
     runtime_node_->unsubscribe_engine_messages(regional_tech_tree_panel_controller_);
@@ -622,6 +632,7 @@ void Gs1GodotMainScreenControl::apply_bootstrap_app_state(int app_state)
     action_panel_controller_.handle_engine_message(message);
     overlay_panel_controller_.handle_engine_message(message);
     phone_panel_controller_.handle_engine_message(message);
+    regional_map_hud_controller_.handle_engine_message(message);
     regional_selection_panel_controller_.handle_engine_message(message);
     regional_summary_panel_controller_.handle_engine_message(message);
     regional_tech_tree_panel_controller_.handle_engine_message(message);
@@ -1026,6 +1037,29 @@ void Gs1GodotMainScreenControl::reconcile_regional_sites(const std::vector<Gs1Ru
         beacon->set_mesh(beacon_mesh);
         beacon->set_position(Vector3(0.0, 2.05, 0.0));
 
+        MeshInstance3D* selection_ring = resolve_object<MeshInstance3D>(record.selection_ring_id);
+        if (selection_ring == nullptr)
+        {
+            selection_ring = Object::cast_to<MeshInstance3D>(root->find_child("SelectionRing", true, false));
+            if (selection_ring != nullptr)
+            {
+                record.selection_ring_id = selection_ring->get_instance_id();
+            }
+        }
+        if (selection_ring == nullptr)
+        {
+            selection_ring = make_mesh_instance3d();
+            root->add_child(selection_ring);
+            record.selection_ring_id = selection_ring->get_instance_id();
+        }
+        Ref<CylinderMesh> selection_ring_mesh;
+        selection_ring_mesh.instantiate();
+        selection_ring_mesh->set_top_radius(1.82);
+        selection_ring_mesh->set_bottom_radius(2.08);
+        selection_ring_mesh->set_height(0.06);
+        selection_ring->set_mesh(selection_ring_mesh);
+        selection_ring->set_position(Vector3(0.0, 0.03, 0.0));
+
         Label3D* nameplate = resolve_object<Label3D>(record.label_id);
         if (nameplate == nullptr)
         {
@@ -1046,6 +1080,28 @@ void Gs1GodotMainScreenControl::reconcile_regional_sites(const std::vector<Gs1Ru
         nameplate->set_font_size(46);
         nameplate->set_modulate(Color(0.93, 0.88, 0.77));
         nameplate->set_position(Vector3(0.0, 2.85, 0.0));
+
+        Label3D* selected_hint = resolve_object<Label3D>(record.selected_hint_id);
+        if (selected_hint == nullptr)
+        {
+            selected_hint = Object::cast_to<Label3D>(root->find_child("SelectedHint", true, false));
+            if (selected_hint != nullptr)
+            {
+                record.selected_hint_id = selected_hint->get_instance_id();
+            }
+        }
+        if (selected_hint == nullptr)
+        {
+            selected_hint = make_label3d();
+            root->add_child(selected_hint);
+            record.selected_hint_id = selected_hint->get_instance_id();
+        }
+        selected_hint->set_name("SelectedHint");
+        selected_hint->set_text("SELECTED");
+        selected_hint->set_billboard_mode(BaseMaterial3D::BILLBOARD_ENABLED);
+        selected_hint->set_font_size(34);
+        selected_hint->set_position(Vector3(0.0, 3.45, 0.0));
+        selected_hint->set_visible(false);
     }
 
     prune_regional_site_registry(desired_site_ids);
@@ -1085,7 +1141,9 @@ void Gs1GodotMainScreenControl::update_regional_site_visuals()
         MeshInstance3D* base = resolve_object<MeshInstance3D>(record.base_id);
         MeshInstance3D* tower = resolve_object<MeshInstance3D>(record.tower_id);
         MeshInstance3D* beacon = resolve_object<MeshInstance3D>(record.beacon_id);
+        MeshInstance3D* selection_ring = resolve_object<MeshInstance3D>(record.selection_ring_id);
         Label3D* label = resolve_object<Label3D>(record.label_id);
+        Label3D* selected_hint = resolve_object<Label3D>(record.selected_hint_id);
         if (root == nullptr || site_it == regional_site_data_.end())
         {
             continue;
@@ -1118,9 +1176,24 @@ void Gs1GodotMainScreenControl::update_regional_site_visuals()
         {
             beacon->set_material_override(get_material(vformat("site_beacon_%d_%s", site_id, selected ? "1" : "0"), glow_color, 0.22, 0.0, selected));
         }
+        if (selection_ring != nullptr)
+        {
+            selection_ring->set_visible(selected);
+            selection_ring->set_material_override(get_material(
+                vformat("site_ring_%d_%s", site_id, selected ? "1" : "0"),
+                selected ? Color(0.96, 0.81, 0.45) : Color(0.45, 0.38, 0.26),
+                0.38,
+                0.0,
+                selected));
+        }
         if (label != nullptr)
         {
             label->set_modulate(glow_color.lightened(0.18));
+        }
+        if (selected_hint != nullptr)
+        {
+            selected_hint->set_visible(selected);
+            selected_hint->set_modulate(Color(0.98, 0.88, 0.62));
         }
     }
 }

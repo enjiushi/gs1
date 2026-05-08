@@ -57,11 +57,15 @@ private:
     [[nodiscard]] godot::String site_deployment_summary(const Gs1RuntimeRegionalMapSiteProjection& site) const;
     [[nodiscard]] godot::String support_preview_text(int preview_mask) const;
     [[nodiscard]] godot::Vector2i regional_grid_coord(const Gs1RuntimeRegionalMapSiteProjection& site) const;
+    void refresh_support_summary(const Gs1RuntimeUiPanelProjection* selection_panel);
+    void refresh_loadout_summary(const Gs1RuntimeUiPanelProjection* selection_panel);
 
     godot::Control* owner_control_ {nullptr};
     godot::Control* panel_ {nullptr};
     godot::Label* title_ {nullptr};
     godot::RichTextLabel* summary_ {nullptr};
+    godot::RichTextLabel* support_summary_ {nullptr};
+    godot::RichTextLabel* loadout_summary_ {nullptr};
     godot::VBoxContainer* actions_ {nullptr};
     SubmitUiActionFn submit_ui_action_ {};
     Gs1GodotUiPanelStateReducer ui_panel_state_reducer_ {};

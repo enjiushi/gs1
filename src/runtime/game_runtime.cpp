@@ -2988,19 +2988,19 @@ void GameRuntime::queue_regional_map_selection_ui_messages()
     }
 
     const auto site_id = campaign_->regional_map_state.selected_site_id->value;
-    const auto loadout_label_count = visible_loadout_slot_count(campaign_->loadout_planner_state);
+    const auto loadout_item_count = visible_loadout_slot_count(campaign_->loadout_planner_state);
     const bool has_support_contributors = campaign_->loadout_planner_state.support_quota > 0U;
     const bool has_aura_support = !campaign_->loadout_planner_state.active_nearby_aura_modifier_ids.empty();
     const std::uint32_t summary_label_count =
         (has_support_contributors ? 1U : 0U) + (has_aura_support ? 1U : 0U);
 
-    const std::uint32_t text_line_count = 1U + summary_label_count + loadout_label_count;
+    const std::uint32_t text_line_count = 1U + summary_label_count;
     queue_ui_panel_begin_message(
         GS1_UI_PANEL_REGIONAL_MAP_SELECTION,
         site_id,
         text_line_count,
         2U,
-        0U,
+        loadout_item_count,
         0U);
 
     std::uint16_t next_line_id = 1U;
@@ -3028,6 +3028,7 @@ void GameRuntime::queue_regional_map_selection_ui_messages()
             static_cast<std::uint32_t>(campaign_->loadout_planner_state.active_nearby_aura_modifier_ids.size()));
     }
 
+    std::uint32_t next_loadout_item_id = 1U;
     for (const auto& slot : campaign_->loadout_planner_state.selected_loadout_slots)
     {
         if (!slot.occupied || slot.item_id.value == 0U || slot.quantity == 0U)
@@ -3035,13 +3036,17 @@ void GameRuntime::queue_regional_map_selection_ui_messages()
             continue;
         }
 
-        queue_ui_panel_text_message(
-            next_line_id++,
-            0U,
+        queue_ui_panel_list_item_message(
+            GS1_UI_PANEL_LIST_REGIONAL_LOADOUT,
+            next_loadout_item_id++,
+            GS1_UI_PANEL_LIST_ITEM_FLAG_NONE,
             6U,
+            0U,
             slot.item_id.value,
             0U,
-            slot.quantity);
+            slot.quantity,
+            0,
+            0);
     }
 
     Gs1UiAction deploy_action {};

@@ -6,6 +6,7 @@
 #include "gs1_godot_phone_panel_controller.h"
 #include "gs1_godot_inventory_panel_controller.h"
 #include "gs1_godot_overlay_panel_controller.h"
+#include "gs1_godot_regional_map_hud_controller.h"
 #include "gs1_godot_regional_selection_panel_controller.h"
 #include "gs1_godot_regional_summary_panel_controller.h"
 #include "gs1_godot_regional_tech_tree_panel_controller.h"
@@ -114,7 +115,9 @@ private:
         godot::ObjectID base_id {};
         godot::ObjectID tower_id {};
         godot::ObjectID beacon_id {};
+        godot::ObjectID selection_ring_id {};
         godot::ObjectID label_id {};
+        godot::ObjectID selected_hint_id {};
     };
 
     struct MenuBackdropPlantRecord final
@@ -306,6 +309,7 @@ private:
     Gs1GodotActionPanelController action_panel_controller_ {};
     Gs1GodotOverlayPanelController overlay_panel_controller_ {};
     Gs1GodotPhonePanelController phone_panel_controller_ {};
+    Gs1GodotRegionalMapHudController regional_map_hud_controller_ {};
     Gs1GodotRegionalSelectionPanelController regional_selection_panel_controller_ {};
     Gs1GodotRegionalSummaryPanelController regional_summary_panel_controller_ {};
     Gs1GodotRegionalTechTreePanelController regional_tech_tree_panel_controller_ {};

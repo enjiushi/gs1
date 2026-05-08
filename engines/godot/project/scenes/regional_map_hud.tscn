@@ -1,0 +1,43 @@
+[gd_scene format=3 uid="uid://cdsp05r0nrx8n"]
+
+[node name="RegionalMapHud" type="PanelContainer"]
+custom_minimum_size = Vector2(420, 0)
+
+[node name="RegionalHudVBox" type="VBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="RegionalHudTitle" type="Label" parent="RegionalHudVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.490196, 0.862745, 0.529412, 1)
+theme_override_font_sizes/font_size = 18
+text = "REGIONAL COMMAND"
+
+[node name="RegionalHudCampaignSummary" type="RichTextLabel" parent="RegionalHudVBox"]
+custom_minimum_size = Vector2(0, 86)
+layout_mode = 2
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+text = "Revealed: --  Available: --"
+
+[node name="RegionalHudSelectedSiteSummary" type="RichTextLabel" parent="RegionalHudVBox"]
+custom_minimum_size = Vector2(0, 126)
+layout_mode = 2
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+text = "[b]Selected Site[/b]
+None"
+
+[node name="RegionalHudActions" type="VBoxContainer" parent="RegionalHudVBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="RegionalHudTechButton" type="Button" parent="RegionalHudVBox/RegionalHudActions"]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Research & Unlocks"
+metadata/gs1_panel_id = 2
+metadata/gs1_slot_id = 1

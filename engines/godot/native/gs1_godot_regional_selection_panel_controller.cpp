@@ -88,6 +88,14 @@ void Gs1GodotRegionalSelectionPanelController::cache_ui_references(Control& owne
     {
         summary_ = Object::cast_to<RichTextLabel>(owner.find_child("RegionalSelectionSummary", true, false));
     }
+    if (support_summary_ == nullptr)
+    {
+        support_summary_ = Object::cast_to<RichTextLabel>(owner.find_child("RegionalSupportSummary", true, false));
+    }
+    if (loadout_summary_ == nullptr)
+    {
+        loadout_summary_ = Object::cast_to<RichTextLabel>(owner.find_child("RegionalLoadoutSummary", true, false));
+    }
     if (actions_ == nullptr)
     {
         actions_ = Object::cast_to<VBoxContainer>(owner.find_child("RegionalSelectionActions", true, false));
@@ -222,20 +230,11 @@ void Gs1GodotRegionalSelectionPanelController::refresh_if_needed()
     summary_lines.push_back("[b]Deployment Brief[/b]");
     summary_lines.push_back(site_deployment_summary(*selected_site));
 
-    PackedStringArray label_lines;
     Array button_specs;
-    if (const Gs1RuntimeUiPanelProjection* selection_setup = ui_panel_state_reducer_.find_panel(GS1_UI_PANEL_REGIONAL_MAP_SELECTION))
+    const Gs1RuntimeUiPanelProjection* selection_panel = ui_panel_state_reducer_.find_panel(GS1_UI_PANEL_REGIONAL_MAP_SELECTION);
+    if (selection_panel != nullptr)
     {
-        for (const auto& line : selection_setup->text_lines)
-        {
-            const String text = panel_text_line(line).strip_edges();
-            if (!text.is_empty())
-            {
-                label_lines.push_back(text);
-            }
-        }
-
-        for (const auto& slot_action : selection_setup->slot_actions)
+        for (const auto& slot_action : selection_panel->slot_actions)
         {
             if (actions_ == nullptr)
             {
@@ -255,7 +254,7 @@ void Gs1GodotRegionalSelectionPanelController::refresh_if_needed()
             }
 
             Dictionary spec;
-            spec["setup_id"] = static_cast<int>(selection_setup->panel_id);
+            spec["setup_id"] = static_cast<int>(selection_panel->panel_id);
             spec["element_id"] = static_cast<int>(slot_action.slot_id);
             spec["text"] = selection_action_label(text, action);
             spec["flags"] = static_cast<int>(slot_action.flags);
@@ -299,20 +298,12 @@ void Gs1GodotRegionalSelectionPanelController::refresh_if_needed()
 
     reconcile_action_buttons(button_specs);
 
-    if (label_lines.size() > 0)
-    {
-        summary_lines.push_back(String());
-        summary_lines.push_back("[b]Loadout And Support[/b]");
-        for (int64_t index = 0; index < label_lines.size(); ++index)
-        {
-            summary_lines.push_back(label_lines[index]);
-        }
-    }
-
     if (summary_ != nullptr)
     {
         summary_->set_text(String("\n").join(summary_lines));
     }
+    refresh_support_summary(selection_panel);
+    refresh_loadout_summary(selection_panel);
 
     dirty_ = false;
 }
@@ -623,4 +614,78 @@ String Gs1GodotRegionalSelectionPanelController::support_preview_text(int previe
 Vector2i Gs1GodotRegionalSelectionPanelController::regional_grid_coord(const Gs1RuntimeRegionalMapSiteProjection& site) const
 {
     return Vector2i(Math::round(site.map_x / 160.0), Math::round(site.map_y / 160.0));
+}
+
+void Gs1GodotRegionalSelectionPanelController::refresh_support_summary(
+    const Gs1RuntimeUiPanelProjection* selection_panel)
+{
+    if (support_summary_ == nullptr)
+    {
+        return;
+    }
+
+    PackedStringArray lines;
+    lines.push_back("[b]Support Feed[/b]");
+    bool has_content = false;
+    if (selection_panel != nullptr)
+    {
+        for (const auto& line : selection_panel->text_lines)
+        {
+            const int kind = static_cast<int>(line.text_kind);
+            if (kind != 4 && kind != 5)
+            {
+                continue;
+            }
+
+            const String text = panel_text_line(line).strip_edges();
+            if (text.is_empty())
+            {
+                continue;
+            }
+            lines.push_back(text);
+            has_content = true;
+        }
+    }
+
+    if (!has_content)
+    {
+        lines.push_back("No adjacent support contributors or aura boosts are projected for this route.");
+    }
+
+    support_summary_->set_text(String("\n").join(lines));
+}
+
+void Gs1GodotRegionalSelectionPanelController::refresh_loadout_summary(
+    const Gs1RuntimeUiPanelProjection* selection_panel)
+{
+    if (loadout_summary_ == nullptr)
+    {
+        return;
+    }
+
+    PackedStringArray lines;
+    lines.push_back("[b]Provided Loadout[/b]");
+    bool has_content = false;
+    if (selection_panel != nullptr)
+    {
+        for (const auto& item : selection_panel->list_items)
+        {
+            if (item.list_id != GS1_UI_PANEL_LIST_REGIONAL_LOADOUT)
+            {
+                continue;
+            }
+
+            const String item_name = item_name_for(static_cast<int>(item.primary_id));
+            const int quantity = static_cast<int>(item.quantity);
+            lines.push_back(vformat("Slot %d: %s x%d", static_cast<int>(item.item_id), item_name, quantity));
+            has_content = true;
+        }
+    }
+
+    if (!has_content)
+    {
+        lines.push_back("No extra loadout items are projected for the currently selected site.");
+    }
+
+    loadout_summary_->set_text(String("\n").join(lines));
 }
