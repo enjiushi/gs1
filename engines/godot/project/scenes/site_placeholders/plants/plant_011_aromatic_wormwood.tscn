@@ -1,0 +1,40 @@
+[gd_scene load_steps=7 format=3]
+
+[sub_resource type="StandardMaterial3D" id="mat_leaf"]
+albedo_color = Color(0.42, 0.5, 0.36, 1)
+roughness = 0.88
+
+[sub_resource type="StandardMaterial3D" id="mat_flower"]
+albedo_color = Color(0.58, 0.36, 0.72, 1)
+roughness = 0.7
+
+[sub_resource type="SphereMesh" id="mesh_leaf"]
+radius = 0.27
+height = 0.32
+
+[sub_resource type="SphereMesh" id="mesh_flower"]
+radius = 0.05
+height = 0.1
+
+[node name="Plant011AromaticWormwood" type="Node3D"]
+
+[node name="LeafMass" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_leaf")
+material_override = SubResource("mat_leaf")
+position = Vector3(0, 0.2, 0)
+scale = Vector3(1.3, 0.72, 1.05)
+
+[node name="FlowerA" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_flower")
+material_override = SubResource("mat_flower")
+position = Vector3(-0.16, 0.34, 0.1)
+
+[node name="FlowerB" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_flower")
+material_override = SubResource("mat_flower")
+position = Vector3(0.15, 0.31, -0.12)
+
+[node name="FlowerC" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_flower")
+material_override = SubResource("mat_flower")
+position = Vector3(0.02, 0.38, 0.03)

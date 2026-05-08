@@ -350,106 +350,127 @@ icon_texture_path = "res://assets/field_command/progression_placeholder.png"
 content_kind = "Plant"
 content_id = 1
 icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+scene_path = "res://scenes/site_placeholders/plants/plant_001_ordos_wormwood.tscn"
 
 [[content_resources]]
 content_kind = "Plant"
 content_id = 2
 icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+scene_path = "res://scenes/site_placeholders/plants/plant_002_white_thorn.tscn"
 
 [[content_resources]]
 content_kind = "Plant"
 content_id = 3
 icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+scene_path = "res://scenes/site_placeholders/plants/plant_003_red_tamarisk.tscn"
 
 [[content_resources]]
 content_kind = "Plant"
 content_id = 4
 icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+scene_path = "res://scenes/site_placeholders/plants/plant_004_ningxia_wolfberry.tscn"
 
 [[content_resources]]
 content_kind = "Plant"
 content_id = 5
 icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+scene_path = "res://scenes/site_placeholders/plants/plant_005_straw_checkerboard.tscn"
 
 [[content_resources]]
 content_kind = "Plant"
 content_id = 6
 icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+scene_path = "res://scenes/site_placeholders/plants/plant_006_korshinsk_peashrub.tscn"
 
 [[content_resources]]
 content_kind = "Plant"
 content_id = 7
 icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+scene_path = "res://scenes/site_placeholders/plants/plant_007_jiji_grass.tscn"
 
 [[content_resources]]
 content_kind = "Plant"
 content_id = 8
 icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+scene_path = "res://scenes/site_placeholders/plants/plant_008_sea_buckthorn.tscn"
 
 [[content_resources]]
 content_kind = "Plant"
 content_id = 9
 icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+scene_path = "res://scenes/site_placeholders/plants/plant_009_desert_ephedra.tscn"
 
 [[content_resources]]
 content_kind = "Plant"
 content_id = 10
 icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+scene_path = "res://scenes/site_placeholders/plants/plant_010_saxaul.tscn"
 
 [[content_resources]]
 content_kind = "Plant"
 content_id = 11
 icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+scene_path = "res://scenes/site_placeholders/plants/plant_011_aromatic_wormwood.tscn"
 
 [[content_resources]]
 content_kind = "Plant"
 content_id = 12
 icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+scene_path = "res://scenes/site_placeholders/plants/plant_012_sweet_white_thorn.tscn"
 
 [[content_resources]]
 content_kind = "Plant"
 content_id = 13
 icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+scene_path = "res://scenes/site_placeholders/plants/plant_013_high_oil_buckthorn.tscn"
 
 [[content_resources]]
 content_kind = "Plant"
 content_id = 14
 icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+scene_path = "res://scenes/site_placeholders/plants/plant_014_potent_desert_ephedra.tscn"
 
 [[content_resources]]
 content_kind = "Plant"
 content_id = 15
 icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+scene_path = "res://scenes/site_placeholders/plants/plant_015_dense_pod_peashrub.tscn"
 
 [[content_resources]]
 content_kind = "Plant"
 content_id = 16
 icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+scene_path = "res://scenes/site_placeholders/plants/plant_016_selected_wolfberry.tscn"
 
 [[content_resources]]
 content_kind = "Structure"
 content_id = 201
 icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+scene_path = "res://scenes/site_placeholders/devices/device_201_field_kitchen.tscn"
 
 [[content_resources]]
 content_kind = "Structure"
 content_id = 202
 icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+scene_path = "res://scenes/site_placeholders/devices/device_202_workbench.tscn"
 
 [[content_resources]]
 content_kind = "Structure"
 content_id = 203
 icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+scene_path = "res://scenes/site_placeholders/devices/device_203_storage_crate.tscn"
 
 [[content_resources]]
 content_kind = "Structure"
 content_id = 204
 icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+scene_path = "res://scenes/site_placeholders/devices/device_204_wind_fence.tscn"
 
 [[content_resources]]
 content_kind = "Structure"
 content_id = 205
 icon_texture_path = "res://assets/field_command/progression_placeholder.png"
+scene_path = "res://scenes/site_placeholders/devices/device_205_chemistry_station.tscn"
 
 [[content_resources]]
 content_kind = "Recipe"

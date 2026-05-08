@@ -1,0 +1,37 @@
+[gd_scene load_steps=5 format=3]
+
+[sub_resource type="StandardMaterial3D" id="mat_straw"]
+albedo_color = Color(0.78, 0.65, 0.36, 1)
+roughness = 0.93
+
+[sub_resource type="StandardMaterial3D" id="mat_shadow"]
+albedo_color = Color(0.45, 0.36, 0.2, 1)
+roughness = 0.95
+
+[sub_resource type="BoxMesh" id="mesh_strip_long"]
+size = Vector3(0.88, 0.045, 0.08)
+
+[sub_resource type="BoxMesh" id="mesh_strip_cross"]
+size = Vector3(0.08, 0.045, 0.88)
+
+[node name="Plant005StrawCheckerboard" type="Node3D"]
+
+[node name="StrawNorth" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_strip_long")
+material_override = SubResource("mat_straw")
+position = Vector3(0, 0, -0.28)
+
+[node name="StrawSouth" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_strip_long")
+material_override = SubResource("mat_shadow")
+position = Vector3(0, 0, 0.28)
+
+[node name="StrawWest" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_strip_cross")
+material_override = SubResource("mat_shadow")
+position = Vector3(-0.28, 0.01, 0)
+
+[node name="StrawEast" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_strip_cross")
+material_override = SubResource("mat_straw")
+position = Vector3(0.28, 0.01, 0)

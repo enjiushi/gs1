@@ -1,0 +1,37 @@
+[gd_scene load_steps=6 format=3]
+
+[sub_resource type="StandardMaterial3D" id="mat_post"]
+albedo_color = Color(0.49, 0.36, 0.2, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="mat_cloth"]
+albedo_color = Color(0.74, 0.61, 0.36, 1)
+roughness = 0.93
+
+[sub_resource type="BoxMesh" id="mesh_post"]
+size = Vector3(0.08, 0.74, 0.08)
+
+[sub_resource type="BoxMesh" id="mesh_slat"]
+size = Vector3(0.8, 0.08, 0.06)
+
+[node name="Device204WindFence" type="Node3D"]
+
+[node name="PostA" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_post")
+material_override = SubResource("mat_post")
+position = Vector3(-0.42, 0.16, 0)
+
+[node name="PostB" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_post")
+material_override = SubResource("mat_post")
+position = Vector3(0.42, 0.16, 0)
+
+[node name="SlatA" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_slat")
+material_override = SubResource("mat_cloth")
+position = Vector3(0, 0.36, 0)
+
+[node name="SlatB" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_slat")
+material_override = SubResource("mat_cloth")
+position = Vector3(0, 0.16, 0)

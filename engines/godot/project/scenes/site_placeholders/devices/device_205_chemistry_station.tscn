@@ -1,0 +1,51 @@
+[gd_scene load_steps=8 format=3]
+
+[sub_resource type="StandardMaterial3D" id="mat_table"]
+albedo_color = Color(0.38, 0.31, 0.25, 1)
+roughness = 0.84
+
+[sub_resource type="StandardMaterial3D" id="mat_glass"]
+albedo_color = Color(0.4, 0.8, 0.9, 0.55)
+transparency = 1
+roughness = 0.18
+
+[sub_resource type="StandardMaterial3D" id="mat_liquid"]
+albedo_color = Color(0.2, 0.78, 0.52, 1)
+roughness = 0.5
+
+[sub_resource type="BoxMesh" id="mesh_table"]
+size = Vector3(0.78, 0.16, 0.5)
+
+[sub_resource type="CylinderMesh" id="mesh_flask"]
+top_radius = 0.08
+bottom_radius = 0.16
+height = 0.36
+
+[sub_resource type="CylinderMesh" id="mesh_tube"]
+top_radius = 0.035
+bottom_radius = 0.035
+height = 0.5
+
+[node name="Device205ChemistryStation" type="Node3D"]
+
+[node name="Table" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_table")
+material_override = SubResource("mat_table")
+position = Vector3(0, 0.12, 0)
+
+[node name="Flask" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_flask")
+material_override = SubResource("mat_glass")
+position = Vector3(-0.18, 0.42, 0.04)
+
+[node name="LiquidHint" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_flask")
+material_override = SubResource("mat_liquid")
+position = Vector3(-0.18, 0.34, 0.04)
+scale = Vector3(0.72, 0.28, 0.72)
+
+[node name="Tube" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_tube")
+material_override = SubResource("mat_glass")
+position = Vector3(0.18, 0.48, -0.02)
+rotation_degrees = Vector3(0, 0, 18)

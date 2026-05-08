@@ -1,0 +1,39 @@
+[gd_scene load_steps=5 format=3]
+
+[sub_resource type="StandardMaterial3D" id="mat_grass"]
+albedo_color = Color(0.52, 0.63, 0.28, 1)
+roughness = 0.91
+
+[sub_resource type="StandardMaterial3D" id="mat_dry"]
+albedo_color = Color(0.74, 0.61, 0.32, 1)
+roughness = 0.95
+
+[sub_resource type="CylinderMesh" id="mesh_blade"]
+top_radius = 0.018
+bottom_radius = 0.045
+height = 0.62
+
+[node name="Plant007JijiGrass" type="Node3D"]
+
+[node name="BladeA" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_blade")
+material_override = SubResource("mat_grass")
+position = Vector3(-0.18, 0.14, 0)
+rotation_degrees = Vector3(0, 0, -20)
+
+[node name="BladeB" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_blade")
+material_override = SubResource("mat_grass")
+position = Vector3(0, 0.16, 0.02)
+
+[node name="BladeC" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_blade")
+material_override = SubResource("mat_dry")
+position = Vector3(0.17, 0.14, -0.03)
+rotation_degrees = Vector3(0, 0, 22)
+
+[node name="BladeD" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_blade")
+material_override = SubResource("mat_grass")
+position = Vector3(0.04, 0.13, 0.16)
+rotation_degrees = Vector3(18, 0, 10)

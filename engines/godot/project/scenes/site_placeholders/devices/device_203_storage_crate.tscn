@@ -1,0 +1,35 @@
+[gd_scene load_steps=6 format=3]
+
+[sub_resource type="StandardMaterial3D" id="mat_crate"]
+albedo_color = Color(0.55, 0.39, 0.2, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="mat_strap"]
+albedo_color = Color(0.25, 0.21, 0.16, 1)
+roughness = 0.88
+
+[sub_resource type="BoxMesh" id="mesh_crate"]
+size = Vector3(0.7, 0.52, 0.58)
+
+[sub_resource type="BoxMesh" id="mesh_strap_x"]
+size = Vector3(0.76, 0.06, 0.08)
+
+[sub_resource type="BoxMesh" id="mesh_strap_z"]
+size = Vector3(0.08, 0.06, 0.64)
+
+[node name="Device203StorageCrate" type="Node3D"]
+
+[node name="Crate" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_crate")
+material_override = SubResource("mat_crate")
+position = Vector3(0, 0.06, 0)
+
+[node name="StrapX" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_strap_x")
+material_override = SubResource("mat_strap")
+position = Vector3(0, 0.35, 0)
+
+[node name="StrapZ" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_strap_z")
+material_override = SubResource("mat_strap")
+position = Vector3(0, 0.36, 0)

@@ -1,0 +1,39 @@
+[gd_scene load_steps=7 format=3]
+
+[sub_resource type="StandardMaterial3D" id="mat_metal"]
+albedo_color = Color(0.36, 0.36, 0.34, 1)
+roughness = 0.65
+
+[sub_resource type="StandardMaterial3D" id="mat_fire"]
+albedo_color = Color(0.95, 0.35, 0.08, 1)
+roughness = 0.55
+
+[sub_resource type="BoxMesh" id="mesh_base"]
+size = Vector3(0.7, 0.18, 0.48)
+
+[sub_resource type="CylinderMesh" id="mesh_pot"]
+top_radius = 0.22
+bottom_radius = 0.2
+height = 0.28
+
+[sub_resource type="SphereMesh" id="mesh_fire"]
+radius = 0.12
+height = 0.18
+
+[node name="Device201FieldKitchen" type="Node3D"]
+
+[node name="StoveBase" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_base")
+material_override = SubResource("mat_metal")
+position = Vector3(0, 0, 0)
+
+[node name="CookPot" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_pot")
+material_override = SubResource("mat_metal")
+position = Vector3(0, 0.23, 0)
+
+[node name="FireHint" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_fire")
+material_override = SubResource("mat_fire")
+position = Vector3(0, 0.12, 0.2)
+scale = Vector3(1, 0.6, 1)

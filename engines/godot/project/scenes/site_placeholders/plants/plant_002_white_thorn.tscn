@@ -1,0 +1,47 @@
+[gd_scene load_steps=7 format=3]
+
+[sub_resource type="StandardMaterial3D" id="mat_leaf"]
+albedo_color = Color(0.7, 0.76, 0.58, 1)
+roughness = 0.92
+
+[sub_resource type="StandardMaterial3D" id="mat_thorn"]
+albedo_color = Color(0.82, 0.78, 0.62, 1)
+roughness = 0.78
+
+[sub_resource type="CylinderMesh" id="mesh_branch"]
+top_radius = 0.025
+bottom_radius = 0.045
+height = 0.64
+
+[sub_resource type="SphereMesh" id="mesh_leaf"]
+radius = 0.22
+height = 0.28
+
+[sub_resource type="BoxMesh" id="mesh_thorn"]
+size = Vector3(0.08, 0.08, 0.34)
+
+[node name="Plant002WhiteThorn" type="Node3D"]
+
+[node name="BranchA" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_branch")
+material_override = SubResource("mat_thorn")
+position = Vector3(-0.08, 0.17, 0)
+rotation_degrees = Vector3(0, 0, -18)
+
+[node name="BranchB" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_branch")
+material_override = SubResource("mat_thorn")
+position = Vector3(0.08, 0.17, 0)
+rotation_degrees = Vector3(0, 0, 18)
+
+[node name="PaleLeafMass" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_leaf")
+material_override = SubResource("mat_leaf")
+position = Vector3(0, 0.24, 0)
+scale = Vector3(1.45, 0.7, 1.2)
+
+[node name="ThornAccent" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_thorn")
+material_override = SubResource("mat_thorn")
+position = Vector3(0.25, 0.24, 0)
+rotation_degrees = Vector3(0, 34, 58)

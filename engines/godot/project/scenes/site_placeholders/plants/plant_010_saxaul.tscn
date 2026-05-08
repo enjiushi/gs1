@@ -1,0 +1,37 @@
+[gd_scene load_steps=7 format=3]
+
+[sub_resource type="StandardMaterial3D" id="mat_trunk"]
+albedo_color = Color(0.36, 0.24, 0.16, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="mat_canopy"]
+albedo_color = Color(0.24, 0.43, 0.3, 1)
+roughness = 0.88
+
+[sub_resource type="CylinderMesh" id="mesh_trunk"]
+top_radius = 0.09
+bottom_radius = 0.14
+height = 0.8
+
+[sub_resource type="SphereMesh" id="mesh_canopy"]
+radius = 0.32
+height = 0.42
+
+[node name="Plant010Saxaul" type="Node3D"]
+
+[node name="Trunk" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_trunk")
+material_override = SubResource("mat_trunk")
+position = Vector3(0, 0.23, 0)
+
+[node name="CanopyA" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_canopy")
+material_override = SubResource("mat_canopy")
+position = Vector3(-0.1, 0.62, 0)
+scale = Vector3(1, 0.85, 0.85)
+
+[node name="CanopyB" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_canopy")
+material_override = SubResource("mat_canopy")
+position = Vector3(0.16, 0.56, 0.08)
+scale = Vector3(0.8, 0.7, 0.78)

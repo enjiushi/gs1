@@ -1,0 +1,45 @@
+[gd_scene load_steps=7 format=3]
+
+[sub_resource type="StandardMaterial3D" id="mat_leaf"]
+albedo_color = Color(0.21, 0.58, 0.27, 1)
+roughness = 0.88
+
+[sub_resource type="StandardMaterial3D" id="mat_berry"]
+albedo_color = Color(1, 0.12, 0.1, 1)
+roughness = 0.52
+
+[sub_resource type="SphereMesh" id="mesh_leaf"]
+radius = 0.28
+height = 0.34
+
+[sub_resource type="SphereMesh" id="mesh_berry"]
+radius = 0.055
+height = 0.11
+
+[node name="Plant016SelectedWolfberry" type="Node3D"]
+
+[node name="LeafMass" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_leaf")
+material_override = SubResource("mat_leaf")
+position = Vector3(0, 0.3, 0)
+scale = Vector3(1.45, 0.9, 1.18)
+
+[node name="BerryA" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_berry")
+material_override = SubResource("mat_berry")
+position = Vector3(-0.18, 0.36, 0.16)
+
+[node name="BerryB" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_berry")
+material_override = SubResource("mat_berry")
+position = Vector3(0.18, 0.29, -0.18)
+
+[node name="BerryC" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_berry")
+material_override = SubResource("mat_berry")
+position = Vector3(0.08, 0.47, 0.09)
+
+[node name="BerryD" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_berry")
+material_override = SubResource("mat_berry")
+position = Vector3(-0.08, 0.25, -0.14)

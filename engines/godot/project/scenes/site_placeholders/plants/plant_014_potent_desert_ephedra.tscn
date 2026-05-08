@@ -1,0 +1,39 @@
+[gd_scene load_steps=5 format=3]
+
+[sub_resource type="StandardMaterial3D" id="mat_reed"]
+albedo_color = Color(0.18, 0.72, 0.48, 1)
+roughness = 0.82
+
+[sub_resource type="StandardMaterial3D" id="mat_tip"]
+albedo_color = Color(0.82, 0.9, 0.44, 1)
+roughness = 0.78
+
+[sub_resource type="CylinderMesh" id="mesh_reed"]
+top_radius = 0.025
+bottom_radius = 0.05
+height = 1.05
+
+[node name="Plant014PotentDesertEphedra" type="Node3D"]
+
+[node name="ReedA" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_reed")
+material_override = SubResource("mat_reed")
+position = Vector3(-0.18, 0.36, 0.02)
+rotation_degrees = Vector3(0, 0, -10)
+
+[node name="ReedB" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_reed")
+material_override = SubResource("mat_reed")
+position = Vector3(0, 0.42, 0)
+
+[node name="ReedC" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_reed")
+material_override = SubResource("mat_reed")
+position = Vector3(0.18, 0.35, -0.02)
+rotation_degrees = Vector3(0, 0, 11)
+
+[node name="BrightTip" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_reed")
+material_override = SubResource("mat_tip")
+position = Vector3(0.02, 0.78, 0.05)
+scale = Vector3(0.7, 0.28, 0.7)

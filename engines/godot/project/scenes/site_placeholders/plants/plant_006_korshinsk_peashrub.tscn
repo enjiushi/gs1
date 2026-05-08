@@ -1,0 +1,43 @@
+[gd_scene load_steps=7 format=3]
+
+[sub_resource type="StandardMaterial3D" id="mat_leaf"]
+albedo_color = Color(0.2, 0.58, 0.32, 1)
+roughness = 0.88
+
+[sub_resource type="StandardMaterial3D" id="mat_pod"]
+albedo_color = Color(0.5, 0.35, 0.14, 1)
+roughness = 0.82
+
+[sub_resource type="SphereMesh" id="mesh_canopy"]
+radius = 0.31
+height = 0.34
+
+[sub_resource type="CapsuleMesh" id="mesh_pod"]
+radius = 0.035
+height = 0.22
+
+[node name="Plant006KorshinskPeashrub" type="Node3D"]
+
+[node name="CanopyA" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_canopy")
+material_override = SubResource("mat_leaf")
+position = Vector3(-0.08, 0.2, 0.04)
+scale = Vector3(1.1, 0.78, 0.9)
+
+[node name="CanopyB" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_canopy")
+material_override = SubResource("mat_leaf")
+position = Vector3(0.16, 0.17, -0.06)
+scale = Vector3(0.95, 0.68, 0.9)
+
+[node name="PodA" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_pod")
+material_override = SubResource("mat_pod")
+position = Vector3(0.04, 0.28, 0.18)
+rotation_degrees = Vector3(64, 0, 20)
+
+[node name="PodB" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_pod")
+material_override = SubResource("mat_pod")
+position = Vector3(-0.18, 0.22, -0.08)
+rotation_degrees = Vector3(72, 0, -34)

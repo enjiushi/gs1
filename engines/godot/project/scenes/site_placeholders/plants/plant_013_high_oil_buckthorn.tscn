@@ -1,0 +1,45 @@
+[gd_scene load_steps=7 format=3]
+
+[sub_resource type="StandardMaterial3D" id="mat_leaf"]
+albedo_color = Color(0.24, 0.5, 0.24, 1)
+roughness = 0.86
+
+[sub_resource type="StandardMaterial3D" id="mat_fruit"]
+albedo_color = Color(1, 0.62, 0.06, 1)
+roughness = 0.5
+
+[sub_resource type="SphereMesh" id="mesh_leaf"]
+radius = 0.3
+height = 0.36
+
+[sub_resource type="SphereMesh" id="mesh_fruit"]
+radius = 0.06
+height = 0.12
+
+[node name="Plant013HighOilBuckthorn" type="Node3D"]
+
+[node name="LeafMass" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_leaf")
+material_override = SubResource("mat_leaf")
+position = Vector3(0, 0.28, 0)
+scale = Vector3(1.45, 0.95, 1.15)
+
+[node name="FruitA" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_fruit")
+material_override = SubResource("mat_fruit")
+position = Vector3(-0.2, 0.34, 0.16)
+
+[node name="FruitB" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_fruit")
+material_override = SubResource("mat_fruit")
+position = Vector3(0.24, 0.3, -0.12)
+
+[node name="FruitC" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_fruit")
+material_override = SubResource("mat_fruit")
+position = Vector3(0.06, 0.45, 0.13)
+
+[node name="FruitD" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_fruit")
+material_override = SubResource("mat_fruit")
+position = Vector3(-0.02, 0.22, -0.2)
