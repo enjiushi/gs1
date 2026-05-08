@@ -295,6 +295,10 @@ if(GS1_BUILD_TESTS)
         tests/smoke/visual_smoke_host_main.cpp
         tests/smoke/smoke_live_http_server.cpp)
 
+    add_executable(gs1_game_process_test_host
+        tests/process/game_process_test_host_main.cpp
+        tests/process/game_process_registry.cpp)
+
     add_executable(gs1_system_test_host
         tests/system/system_test_host_main.cpp
         $<TARGET_OBJECTS:gs1_system_test_suite>)
@@ -322,6 +326,7 @@ if(GS1_BUILD_TESTS)
 
     target_link_libraries(gs1_smoke_host PRIVATE gs1_smoke_support)
     target_link_libraries(gs1_visual_smoke_host PRIVATE gs1_smoke_support ws2_32 winmm)
+    target_link_libraries(gs1_game_process_test_host PRIVATE gs1_smoke_support)
     target_link_libraries(gs1_runtime_projection_test PRIVATE gs1_gameplay_core gs1_host_bridge)
     target_link_libraries(gs1_runtime_message_chain_test PRIVATE gs1_gameplay_core)
     target_link_libraries(gs1_timed_modifier_projection_test PRIVATE gs1_gameplay_core)
@@ -335,7 +340,9 @@ if(GS1_BUILD_TESTS)
     # This is a build-order dependency, not a link-time dependency.
     add_dependencies(gs1_smoke_host gs1_game)
     add_dependencies(gs1_visual_smoke_host gs1_game)
+    add_dependencies(gs1_game_process_test_host gs1_game)
 
+    gs1_enable_strict_warnings(gs1_game_process_test_host)
     gs1_enable_strict_warnings(gs1_system_test_host)
     gs1_enable_strict_warnings(gs1_runtime_projection_test)
     gs1_enable_strict_warnings(gs1_runtime_message_chain_test)
@@ -379,6 +386,13 @@ if(GS1_BUILD_TESTS)
             --silent-onboarding
             --max-frames 18000)
 
+    add_test(
+        NAME gs1_game_process_site1_onboarding
+        COMMAND gs1_game_process_test_host
+            $<TARGET_FILE:gs1_game>
+            --scenario site1_onboarding
+            --max-frames 18000)
+
     set(GS1_SYSTEM_TEST_HOST_COMMAND
         gs1_system_test_host)
     if(GS1_SYSTEM_TEST_SYSTEMS)
@@ -407,6 +421,10 @@ if(GS1_BUILD_TESTS)
     set_tests_properties(gs1_visual_smoke_silent_onboarding PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         TIMEOUT 120)
+    set_tests_properties(gs1_game_process_site1_onboarding PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        TIMEOUT 120
+        LABELS "process;dll")
     set_tests_properties(gs1_system_test_host PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         LABELS "system;dll")
