@@ -265,7 +265,9 @@ void Gs1GodotRegionalTechTreePanelController::refresh_if_needed()
     }
 
     const int app_state = current_app_state_.has_value() ? static_cast<int>(current_app_state_.value()) : 0;
-    if (app_state != GS1_APP_STATE_REGIONAL_MAP && app_state != GS1_APP_STATE_SITE_LOADING)
+    if (app_state != GS1_APP_STATE_REGIONAL_MAP &&
+        app_state != GS1_APP_STATE_SITE_LOADING &&
+        app_state != GS1_APP_STATE_SITE_ACTIVE)
     {
         overlay_->set_visible(false);
         panel_->set_visible(false);

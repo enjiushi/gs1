@@ -11,6 +11,7 @@
 #include "gs1_godot_regional_summary_panel_controller.h"
 #include "gs1_godot_regional_tech_tree_panel_controller.h"
 #include "gs1_godot_runtime_node.h"
+#include "gs1_godot_site_hud_controller.h"
 #include "gs1_godot_site_summary_panel_controller.h"
 #include "gs1_godot_status_panel_controller.h"
 #include "gs1_godot_task_panel_controller.h"
@@ -313,6 +314,7 @@ private:
     Gs1GodotRegionalSelectionPanelController regional_selection_panel_controller_ {};
     Gs1GodotRegionalSummaryPanelController regional_summary_panel_controller_ {};
     Gs1GodotRegionalTechTreePanelController regional_tech_tree_panel_controller_ {};
+    Gs1GodotSiteHudController site_hud_controller_ {};
     Gs1GodotSiteSummaryPanelController site_summary_panel_controller_ {};
     Gs1GodotTaskPanelController task_panel_controller_ {};
     Gs1GodotRegionalMapStateReducer regional_map_state_reducer_ {};

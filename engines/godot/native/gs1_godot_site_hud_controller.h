@@ -1,0 +1,80 @@
+#pragma once
+
+#include "gs1_godot_projection_types.h"
+#include "gs1_godot_runtime_node.h"
+
+#include <godot_cpp/classes/button.hpp>
+#include <godot_cpp/classes/control.hpp>
+#include <godot_cpp/classes/label.hpp>
+#include <godot_cpp/classes/progress_bar.hpp>
+
+#include <cstdint>
+#include <functional>
+#include <optional>
+#include <vector>
+
+class Gs1GodotSiteHudController final : public IGs1GodotEngineMessageSubscriber
+{
+public:
+    using SubmitUiActionFn = std::function<void(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)>;
+    using SubmitStorageViewFn = std::function<void(int storage_id, int event_kind)>;
+    using SubmitContextRequestFn = std::function<void(int tile_x, int tile_y, int flags)>;
+
+    void cache_ui_references(godot::Control& owner);
+    void set_submit_ui_action_callback(SubmitUiActionFn callback);
+    void set_submit_storage_view_callback(SubmitStorageViewFn callback);
+    void set_submit_context_request_callback(SubmitContextRequestFn callback);
+    void set_selected_tile(int tile_x, int tile_y);
+
+    void handle_phone_pressed();
+    void handle_pack_pressed();
+    void handle_tasks_pressed();
+    void handle_craft_pressed();
+    void handle_protection_pressed();
+    void handle_tech_pressed();
+
+    [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
+    void handle_engine_message(const Gs1EngineMessage& message) override;
+    void handle_runtime_message_reset() override;
+    void refresh_if_needed();
+
+private:
+    [[nodiscard]] int worker_pack_storage_id() const noexcept;
+    [[nodiscard]] bool site_visible() const noexcept;
+    void refresh_meter(godot::ProgressBar* bar, godot::Label* label, const char* name, float value);
+    void refresh_button_badges();
+
+    godot::Control* hud_root_ {nullptr};
+    godot::ProgressBar* health_bar_ {nullptr};
+    godot::ProgressBar* hydration_bar_ {nullptr};
+    godot::ProgressBar* nourishment_bar_ {nullptr};
+    godot::ProgressBar* energy_bar_ {nullptr};
+    godot::ProgressBar* morale_bar_ {nullptr};
+    godot::Label* health_label_ {nullptr};
+    godot::Label* hydration_label_ {nullptr};
+    godot::Label* nourishment_label_ {nullptr};
+    godot::Label* energy_label_ {nullptr};
+    godot::Label* morale_label_ {nullptr};
+    godot::Label* cash_label_ {nullptr};
+    godot::Label* completion_label_ {nullptr};
+    godot::Label* phone_badge_label_ {nullptr};
+    godot::Label* task_badge_label_ {nullptr};
+    godot::Button* phone_button_ {nullptr};
+    godot::Button* pack_button_ {nullptr};
+    godot::Button* tasks_button_ {nullptr};
+    godot::Button* craft_button_ {nullptr};
+    godot::Button* protection_button_ {nullptr};
+    godot::Button* tech_button_ {nullptr};
+
+    SubmitUiActionFn submit_ui_action_ {};
+    SubmitStorageViewFn submit_storage_view_ {};
+    SubmitContextRequestFn submit_context_request_ {};
+    std::optional<Gs1AppState> current_app_state_ {};
+    std::optional<Gs1RuntimeHudProjection> hud_ {};
+    std::optional<Gs1RuntimePhonePanelProjection> phone_panel_ {};
+    std::optional<Gs1RuntimeProtectionOverlayProjection> protection_overlay_ {};
+    std::vector<Gs1RuntimeInventoryStorageProjection> inventory_storages_ {};
+    int selected_tile_x_ {0};
+    int selected_tile_y_ {0};
+    bool dirty_ {true};
+};

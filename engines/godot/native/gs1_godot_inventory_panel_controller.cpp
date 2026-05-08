@@ -190,7 +190,8 @@ void Gs1GodotInventoryPanelController::refresh_if_needed()
     }
 
     const int app_state = current_app_state_.has_value() ? static_cast<int>(current_app_state_.value()) : 0;
-    const bool panel_visible = app_state >= GS1_APP_STATE_SITE_LOADING && app_state <= GS1_APP_STATE_SITE_RESULT;
+    const bool site_visible = app_state >= GS1_APP_STATE_SITE_LOADING && app_state <= GS1_APP_STATE_SITE_RESULT;
+    const bool panel_visible = site_visible && (worker_pack_open_ || opened_storage_.has_value());
     if (panel_ != nullptr)
     {
         panel_->set_visible(panel_visible);

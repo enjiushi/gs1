@@ -402,6 +402,10 @@ void Gs1GodotActionPanelController::reconcile_site_control_buttons()
             const auto& setups = ui_setup_state_reducer_.setups();
             for (const auto& setup : setups)
             {
+                if (setup.presentation_type == GS1_UI_SETUP_PRESENTATION_OVERLAY)
+                {
+                    continue;
+                }
                 for (const auto& element : setup.elements)
                 {
                     const int action_type = static_cast<int>(element.action.type);

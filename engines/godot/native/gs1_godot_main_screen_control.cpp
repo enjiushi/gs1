@@ -266,6 +266,15 @@ void Gs1GodotMainScreenControl::_ready()
     phone_panel_controller_.set_submit_ui_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
         submit_ui_action(action_type, target_id, arg0, arg1);
     });
+    site_hud_controller_.set_submit_ui_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
+        submit_ui_action(action_type, target_id, arg0, arg1);
+    });
+    site_hud_controller_.set_submit_storage_view_callback([this](int storage_id, int event_kind) {
+        submit_storage_view(storage_id, event_kind);
+    });
+    site_hud_controller_.set_submit_context_request_callback([this](int tile_x, int tile_y, int flags) {
+        submit_site_context_request(tile_x, tile_y, flags);
+    });
     invalidate_all_ui();
     set_process(true);
     set_process_input(true);
@@ -364,6 +373,7 @@ void Gs1GodotMainScreenControl::cache_scene_references()
             runtime_node_->subscribe_engine_messages(regional_selection_panel_controller_);
             runtime_node_->subscribe_engine_messages(regional_summary_panel_controller_);
             runtime_node_->subscribe_engine_messages(regional_tech_tree_panel_controller_);
+            runtime_node_->subscribe_engine_messages(site_hud_controller_);
             runtime_node_->subscribe_engine_messages(site_summary_panel_controller_);
             runtime_node_->subscribe_engine_messages(task_panel_controller_);
         }
@@ -406,6 +416,7 @@ void Gs1GodotMainScreenControl::cache_ui_references()
     regional_selection_panel_controller_.cache_ui_references(*this);
     regional_summary_panel_controller_.cache_ui_references(*this);
     regional_tech_tree_panel_controller_.cache_ui_references(*this);
+    site_hud_controller_.cache_ui_references(*this);
     site_summary_panel_controller_.cache_ui_references(*this);
     task_panel_controller_.cache_ui_references(*this);
     if (menu_panel_ == nullptr)
@@ -613,6 +624,7 @@ void Gs1GodotMainScreenControl::disconnect_runtime_subscriptions()
     runtime_node_->unsubscribe_engine_messages(regional_selection_panel_controller_);
     runtime_node_->unsubscribe_engine_messages(regional_summary_panel_controller_);
     runtime_node_->unsubscribe_engine_messages(regional_tech_tree_panel_controller_);
+    runtime_node_->unsubscribe_engine_messages(site_hud_controller_);
     runtime_node_->unsubscribe_engine_messages(site_summary_panel_controller_);
     runtime_node_->unsubscribe_engine_messages(task_panel_controller_);
     runtime_node_ = nullptr;
@@ -636,6 +648,7 @@ void Gs1GodotMainScreenControl::apply_bootstrap_app_state(int app_state)
     regional_selection_panel_controller_.handle_engine_message(message);
     regional_summary_panel_controller_.handle_engine_message(message);
     regional_tech_tree_panel_controller_.handle_engine_message(message);
+    site_hud_controller_.handle_engine_message(message);
     site_summary_panel_controller_.handle_engine_message(message);
     task_panel_controller_.handle_engine_message(message);
 }
@@ -719,6 +732,7 @@ void Gs1GodotMainScreenControl::refresh_regional_map_if_needed(int app_state)
 
 void Gs1GodotMainScreenControl::refresh_selected_tile_if_needed()
 {
+    site_hud_controller_.set_selected_tile(selected_tile_.x, selected_tile_.y);
     if (!site_panel_visible_)
     {
         return;

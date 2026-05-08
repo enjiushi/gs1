@@ -1,8 +1,9 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="GDExtension" path="res://extensions/gs1_adapter/gs1_adapter.gdextension" id="1_ext"]
 [ext_resource type="Theme" path="res://assets/field_command_theme.tres" id="2_theme"]
 [ext_resource type="PackedScene" path="res://scenes/tech_tree_overlay.tscn" id="3_tech_tree_overlay"]
+[ext_resource type="PackedScene" path="res://scenes/site_hud.tscn" id="4_site_hud"]
 
 [node name="SiteSession" type="Gs1GodotMainScreenControl"]
 layout_mode = 3
@@ -87,6 +88,8 @@ layout_mode = 2
 theme_override_colors/font_color = Color(0.8, 0.729412, 0.619608, 1)
 text = "Tile Brief"
 
+[node name="SiteHud" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox" instance=ExtResource("4_site_hud")]
+
 [node name="SiteControls" type="VBoxContainer" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox"]
 layout_mode = 2
 theme_override_constants/separation = 8
@@ -130,18 +133,6 @@ text = "Cancel Current Order"
 [node name="ReturnToMapButton" type="Button" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox/SiteControls"]
 layout_mode = 2
 text = "Leave Site"
-
-[node name="OpenProtectionButton" type="Button" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox/SiteControls"]
-layout_mode = 2
-text = "Protection Overlay"
-
-[node name="OpenTechTreeButton" type="Button" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox/SiteControls"]
-layout_mode = 2
-text = "Research & Unlocks"
-
-[node name="OpenWorkerPackButton" type="Button" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox/SiteControls"]
-layout_mode = 2
-text = "Open Worker Pack"
 
 [node name="OpenNearestStorageButton" type="Button" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox/SiteControls"]
 layout_mode = 2
@@ -231,6 +222,14 @@ text = "Procure"
 layout_mode = 2
 text = "Sell"
 
+[node name="OpenPhoneHireButton" type="Button" parent="HudMargin/RootVBox/MainColumns/RightColumn/PhonePanel/PhoneVBox/PhoneTabs"]
+layout_mode = 2
+text = "Hire"
+
+[node name="OpenPhoneCartButton" type="Button" parent="HudMargin/RootVBox/MainColumns/RightColumn/PhonePanel/PhoneVBox/PhoneTabs"]
+layout_mode = 2
+text = "Cart"
+
 [node name="ClosePhoneButton" type="Button" parent="HudMargin/RootVBox/MainColumns/RightColumn/PhonePanel/PhoneVBox/PhoneTabs"]
 layout_mode = 2
 text = "Close"
@@ -303,6 +302,67 @@ text = "Condition"
 [node name="OverlayClearButton" type="Button" parent="HudMargin/RootVBox/MainColumns/RightColumn/OverlayPanel/OverlayVBox/OverlayButtons"]
 layout_mode = 2
 text = "Clear"
+
+[node name="SiteProtectionSelectorOverlay" type="CenterContainer" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+
+[node name="SiteProtectionSelectorPanel" type="PanelContainer" parent="SiteProtectionSelectorOverlay"]
+custom_minimum_size = Vector2(420, 0)
+layout_mode = 2
+
+[node name="SiteProtectionSelectorVBox" type="VBoxContainer" parent="SiteProtectionSelectorOverlay/SiteProtectionSelectorPanel"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="SiteProtectionSelectorTitle" type="Label" parent="SiteProtectionSelectorOverlay/SiteProtectionSelectorPanel/SiteProtectionSelectorVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.878431, 0.686275, 0.380392, 1)
+theme_override_font_sizes/font_size = 22
+text = "Protection Overlay"
+
+[node name="SiteProtectionSelectorButtons" type="VBoxContainer" parent="SiteProtectionSelectorOverlay/SiteProtectionSelectorPanel/SiteProtectionSelectorVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="SiteResultOverlay" type="CenterContainer" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+
+[node name="SiteResultPanel" type="PanelContainer" parent="SiteResultOverlay"]
+custom_minimum_size = Vector2(460, 0)
+layout_mode = 2
+
+[node name="SiteResultVBox" type="VBoxContainer" parent="SiteResultOverlay/SiteResultPanel"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="SiteResultTitle" type="Label" parent="SiteResultOverlay/SiteResultPanel/SiteResultVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.878431, 0.686275, 0.380392, 1)
+theme_override_font_sizes/font_size = 24
+text = "Field Report"
+
+[node name="SiteResultSummary" type="Label" parent="SiteResultOverlay/SiteResultPanel/SiteResultVBox"]
+layout_mode = 2
+autowrap_mode = 3
+text = "Site result received."
+
+[node name="SiteResultActions" type="VBoxContainer" parent="SiteResultOverlay/SiteResultPanel/SiteResultVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
 
 [node name="TechOverlay" parent="." instance=ExtResource("3_tech_tree_overlay")]
 metadata/gs1_overlay_margin_left = 96.0

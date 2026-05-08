@@ -1,0 +1,134 @@
+[gd_scene format=3]
+
+[node name="SiteHud" type="PanelContainer"]
+visible = false
+layout_mode = 2
+
+[node name="HudVBox" type="VBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="HudHeader" type="HBoxContainer" parent="HudVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="HudCashLabel" type="Label" parent="HudVBox/HudHeader"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.878431, 0.686275, 0.380392, 1)
+text = "$0.00"
+
+[node name="HudCompletionLabel" type="Label" parent="HudVBox/HudHeader"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.729412, 0.619608, 1)
+text = "Site 0%"
+
+[node name="HudMetersGrid" type="GridContainer" parent="HudVBox"]
+layout_mode = 2
+columns = 2
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 6
+
+[node name="HudHealthLabel" type="Label" parent="HudVBox/HudMetersGrid"]
+layout_mode = 2
+text = "Health 0"
+
+[node name="HudHealthBar" type="ProgressBar" parent="HudVBox/HudMetersGrid"]
+custom_minimum_size = Vector2(170, 16)
+layout_mode = 2
+max_value = 100.0
+show_percentage = false
+
+[node name="HudHydrationLabel" type="Label" parent="HudVBox/HudMetersGrid"]
+layout_mode = 2
+text = "Water 0"
+
+[node name="HudHydrationBar" type="ProgressBar" parent="HudVBox/HudMetersGrid"]
+custom_minimum_size = Vector2(170, 16)
+layout_mode = 2
+max_value = 100.0
+show_percentage = false
+
+[node name="HudNourishmentLabel" type="Label" parent="HudVBox/HudMetersGrid"]
+layout_mode = 2
+text = "Food 0"
+
+[node name="HudNourishmentBar" type="ProgressBar" parent="HudVBox/HudMetersGrid"]
+custom_minimum_size = Vector2(170, 16)
+layout_mode = 2
+max_value = 100.0
+show_percentage = false
+
+[node name="HudEnergyLabel" type="Label" parent="HudVBox/HudMetersGrid"]
+layout_mode = 2
+text = "Energy 0"
+
+[node name="HudEnergyBar" type="ProgressBar" parent="HudVBox/HudMetersGrid"]
+custom_minimum_size = Vector2(170, 16)
+layout_mode = 2
+max_value = 100.0
+show_percentage = false
+
+[node name="HudMoraleLabel" type="Label" parent="HudVBox/HudMetersGrid"]
+layout_mode = 2
+text = "Morale 0"
+
+[node name="HudMoraleBar" type="ProgressBar" parent="HudVBox/HudMetersGrid"]
+custom_minimum_size = Vector2(170, 16)
+layout_mode = 2
+max_value = 100.0
+show_percentage = false
+
+[node name="HudActions" type="GridContainer" parent="HudVBox"]
+layout_mode = 2
+columns = 3
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+
+[node name="HudPhoneButton" type="Button" parent="HudVBox/HudActions"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+toggle_mode = true
+text = "Phone"
+
+[node name="HudPackButton" type="Button" parent="HudVBox/HudActions"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "Pack"
+
+[node name="HudTasksButton" type="Button" parent="HudVBox/HudActions"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "Tasks"
+
+[node name="HudCraftButton" type="Button" parent="HudVBox/HudActions"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "Craft"
+
+[node name="HudProtectionButton" type="Button" parent="HudVBox/HudActions"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+toggle_mode = true
+text = "Shelter"
+
+[node name="HudTechButton" type="Button" parent="HudVBox/HudActions"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "Research"
+
+[node name="HudBadgeRow" type="HBoxContainer" parent="HudVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="HudPhoneBadgeLabel" type="Label" parent="HudVBox/HudBadgeRow"]
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(0.878431, 0.686275, 0.380392, 1)
+text = "Phone notice"
+
+[node name="HudTaskBadgeLabel" type="Label" parent="HudVBox/HudBadgeRow"]
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(0.878431, 0.686275, 0.380392, 1)
+text = "!"

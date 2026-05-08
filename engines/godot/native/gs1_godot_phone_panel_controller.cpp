@@ -16,6 +16,9 @@ using namespace godot;
 namespace
 {
 constexpr std::int64_t k_ui_action_buy_phone_listing = 8;
+constexpr std::int64_t k_ui_action_sell_phone_listing = 9;
+constexpr std::int64_t k_ui_action_hire_contractor = 12;
+constexpr std::int64_t k_ui_action_purchase_site_unlockable = 13;
 constexpr std::int64_t k_ui_action_set_phone_panel_section = 17;
 constexpr std::int64_t k_ui_action_close_phone_panel = 22;
 
@@ -85,6 +88,8 @@ void Gs1GodotPhonePanelController::cache_ui_references(Control& owner)
         {"OpenPhoneTasksButton", 1},
         {"OpenPhoneBuyButton", 2},
         {"OpenPhoneSellButton", 3},
+        {"OpenPhoneHireButton", 4},
+        {"OpenPhoneCartButton", 5},
     };
     for (const ButtonBinding& binding : section_bindings)
     {
@@ -231,7 +236,10 @@ void Gs1GodotPhonePanelController::refresh_if_needed()
     }
 
     const int app_state = current_app_state_.has_value() ? static_cast<int>(current_app_state_.value()) : 0;
-    const bool panel_visible = app_state >= GS1_APP_STATE_SITE_LOADING && app_state <= GS1_APP_STATE_SITE_RESULT;
+    const bool site_visible = app_state >= GS1_APP_STATE_SITE_LOADING && app_state <= GS1_APP_STATE_SITE_RESULT;
+    const bool panel_visible = site_visible &&
+        phone_panel_state_.has_value() &&
+        (phone_panel_state_->flags & GS1_PHONE_PANEL_FLAG_OPEN) != 0U;
     if (panel_ != nullptr)
     {
         panel_->set_visible(panel_visible);
@@ -249,10 +257,12 @@ void Gs1GodotPhonePanelController::refresh_if_needed()
     if (phone_panel_state_.has_value())
     {
         phone_state_label_->set_text(vformat(
-            "Phone Section: %d  Listings: buy %d sell %d",
+            "Phone Section: %d  Buy %d  Sell %d  Services %d  Cart %d",
             static_cast<int>(phone_panel_state_->active_section),
             static_cast<int>(phone_panel_state_->buy_listing_count),
-            static_cast<int>(phone_panel_state_->sell_listing_count)));
+            static_cast<int>(phone_panel_state_->sell_listing_count),
+            static_cast<int>(phone_panel_state_->service_listing_count),
+            static_cast<int>(phone_panel_state_->cart_item_count)));
     }
     else
     {
@@ -278,7 +288,7 @@ void Gs1GodotPhonePanelController::handle_phone_listing_pressed(std::int64_t but
     }
 
     submit_ui_action_(
-        k_ui_action_buy_phone_listing,
+        static_cast<int>(button->get_meta("action_type", k_ui_action_buy_phone_listing)),
         static_cast<int>(button->get_meta("listing_id", 0)),
         1,
         0);
@@ -351,6 +361,24 @@ void Gs1GodotPhonePanelController::reconcile_phone_listing_buttons()
             static_cast<int>(listing.listing_kind),
             static_cast<int>(listing.item_or_unlockable_id)));
         button->set_meta("listing_id", listing_id);
+        std::int64_t action_type = k_ui_action_buy_phone_listing;
+        switch (listing.listing_kind)
+        {
+        case GS1_PHONE_LISTING_PRESENTATION_SELL_ITEM:
+            action_type = k_ui_action_sell_phone_listing;
+            break;
+        case GS1_PHONE_LISTING_PRESENTATION_HIRE_CONTRACTOR:
+            action_type = k_ui_action_hire_contractor;
+            break;
+        case GS1_PHONE_LISTING_PRESENTATION_PURCHASE_UNLOCKABLE:
+            action_type = k_ui_action_purchase_site_unlockable;
+            break;
+        case GS1_PHONE_LISTING_PRESENTATION_BUY_ITEM:
+        default:
+            action_type = k_ui_action_buy_phone_listing;
+            break;
+        }
+        button->set_meta("action_type", action_type);
         const Callable callback = callable_mp_static(&dispatch_phone_listing_pressed).bind(
             static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(this)),
             static_cast<std::int64_t>(stable_key));
