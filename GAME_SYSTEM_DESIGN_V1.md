@@ -564,7 +564,7 @@ Rules:
 - `siteCash` is transient per active site session and pays for local buying, hiring, and revealed unlockable purchases
 - tech rows now auto-unlock from faction reputation; the authored internal cash-point values stay at `0`, while site-session money still uses the standard `100` cash points = `1` cash display rule
 - technology progression does not spend down total reputation or faction reputation
-- each faction branch should expose a linear `32`-tier tech ladder gated by matching faction-reputation tiers `1-32`
+- each faction branch should expose a linear `32`-tier tech ladder gated by matching faction-reputation thresholds on the shared `200 * tier` scale
 - faction reputation thresholds are authoritative for linear tech ownership
 
 ### 6.7 `LoadoutPlannerState`
@@ -1412,6 +1412,7 @@ Rules:
 - the engine adapter owns layout, sizing, styling, animation, focus behavior, and actual rendering
 - when the player activates a host-rendered UI element, the adapter sends the matching DLL-defined UI action back through the host-event contract
 - UI action events may be submitted in the pre-`phase1` host-event window or in the between-phase host-event window depending on when the host resolved the interaction
+- the current runtime also supports a lighter panel-slot/list projection path and a typed progression-view path alongside the older semantic UI-setup batches so hosts can drive authored menu/regional panels and tech-tree surfaces without inferring layout from generic text alone
 
 Current v1 message shape:
 
@@ -1453,9 +1454,11 @@ The HUD must always show:
 
 - `playerHealth`
 - `playerHydration`
+- `playerNourishment`
 - `playerEnergy`
-- current money
-- current action
+- `playerMorale`
+- current site-session money
+- current action when one is active
 - current weather warning
 - task summary
 - site progress summary
@@ -1464,13 +1467,15 @@ The HUD must always show:
 
 The phone must expose:
 
+- phone home plus app-panel state
+- unread-badge state for the launcher and individual apps
 - visible tasks
 - accepted tasks
+- pending-claim and claimed-task state
 - reward preview for visible tasks
 - buy listings
 - sellable camp inventory
-- contractor hire option
-- revealed unlockables
+- section navigation state and task counts
 
 ### 12.5 Regional Map UI Minimum Fields
 
@@ -1479,9 +1484,10 @@ The regional map must expose:
 - all revealed sites
 - current site states
 - adjacency
+- current total and per-faction reputation
 - support contributors to the selected site
 - loadout planning view
-- tech claim screen
+- tech-tree progression view
 
 Regional-map note:
 
@@ -1505,6 +1511,7 @@ The host-side engine integration layer must provide:
 The gameplay DLL should expose only the minimum engine-agnostic runtime boundary:
 
 - runtime lifecycle: create and destroy
+- runtime creation with a host-supplied shared `project/` config root plus optional adapter-config JSON payload
 - host-event submission for gameplay/app requests
 - translated feedback-event submission for engine execution observations
 - `phase1` runtime entry
@@ -1560,10 +1567,10 @@ Engine-message examples:
 
 Current implementation note:
 
-- the public header now defines a richer engine-message schema centered on app-state projection, regional-map projection, semantic UI setup projection, site projection, HUD/UI projection, site results, and one-shot cues
-- the current runtime now emits a practical prototype subset of that richer contract: log text, set app state, UI setup batches for menu/panel surfaces, regional-map snapshot messages, site bootstrap snapshots on site entry/resync, authoritative site partial-update batches after bootstrap, HUD state, and site result ready
+- the public header now defines a richer engine-message schema centered on app-state projection, regional-map projection, semantic UI setup projection, typed progression-view projection, site projection, HUD/UI projection, site results, and one-shot cues
+- the current runtime now emits more than the early prototype subset: log text, set app state, UI setup batches, panel-slot/list actions for authored menu/regional panels, regional-map snapshot messages, typed progression-view messages for the tech/unlock ladder, site bootstrap snapshots on site entry/resync, authoritative site partial-update batches after bootstrap, phone home/app-panel state, inventory/task/phone-listing projections, HUD state, campaign-resource projection, site protection overlay state, placement-preview impact overlays, active site-modifier projection, weather-event timeline projection, site-result ready, and one-shot cue messages for reward claims, crafted outputs, and campaign unlock celebrations
 - the current runtime also emits `SITE_ACTION_UPDATE` when a site action execution actually starts and again when it clears, so adapters can drive bottom-middle progress bars locally without polling gameplay every frame
-- inventory/task/phone/notification/one-shot cue messages are defined in the schema now but are not fully emitted yet by gameplay runtime code
+- the current tech-tree surface is informational and read-only: gameplay emits authoritative unlock-state data, while hosts own presentation, tabs, tooltips, and card layout
 
 ### 13.2 Engine Message Contract Shape
 
@@ -1573,8 +1580,9 @@ The required shape is:
 
 - snapshot begin/end messages for long-lived surfaces such as regional map and active site
 - snapshot begin/end plus element upsert messages for semantic UI surfaces owned by gameplay
+- typed progression-view begin/entry/end plus close messages for read-only unlock and technology ladders
 - upsert/remove messages for list-like state such as sites, links, tasks, phone listings, and inventory slots
-- direct state-update messages for singleton surfaces such as app state, worker state, camp state, weather state, HUD state, and site result state
+- direct state-update messages for singleton surfaces such as app state, worker state, camp state, weather state, HUD state, campaign resources, phone panel state, site protection overlay state, and site result state
 - one-shot cue messages for transient presentation hints
 
 Regional-map message contract:
@@ -1591,13 +1599,19 @@ Semantic UI setup contract:
 - `END_UI_SETUP` closes the batch
 - UI setup data intentionally omits host-owned layout, size, animation, and style details
 
+Panel-slot/list and progression contract:
+
+- panel-slot/list messages carry semantic button or row meaning for authored menu/regional shells without forcing gameplay to own widget layout
+- progression-view messages carry compact unlock/technology facts such as entry kind, shared ids, faction, tier index, reputation requirement, and locked/unlocked state
+- hosts should merge those typed facts with adapter-owned labels, descriptions, icons, and scene resources when richer presentation is required
+
 Site message contract:
 
 - `BEGIN_SITE_SNAPSHOT` with `SNAPSHOT` mode starts a full authoritative site bootstrap/resync batch
 - `BEGIN_SITE_SNAPSHOT` with `DELTA` mode starts an authoritative partial site-update batch against an already projected site world
 - `SITE_TILE_UPSERT` projects one tile cell or changed tile cell
 - `SITE_WORKER_UPDATE`, `SITE_CAMP_UPDATE`, and `SITE_WEATHER_UPDATE` project authoritative site-state slices
-- `SITE_INVENTORY_SLOT_UPSERT`, `SITE_TASK_UPSERT`, and `SITE_PHONE_LISTING_UPSERT` project host-side UI collections when those systems are active
+- `SITE_INVENTORY_SLOT_UPSERT`, `SITE_TASK_UPSERT`, and `SITE_PHONE_LISTING_UPSERT` project host-side UI collections when those systems are active, while separate inventory-view and phone-panel-state messages describe which surfaces are currently open and how they should behave
 - `SITE_ACTION_UPDATE` projects transient action-execution UI state such as action id, action kind, target tile, authored total duration, and an optional bootstrap progress hint
 - `END_SITE_SNAPSHOT` closes the batch
 
@@ -1613,6 +1627,7 @@ Projection rules:
 - if a specific typed projection message already describes the changed presentation slice, prefer that over emitting an extra generic dirty notification
 - delta-mode site updates should carry authoritative changed state, not arithmetic change amounts; for example worker movement should send the worker's new transform state, not a movement delta to be accumulated by the host
 - adapters should build the long-lived site world from the bootstrap batch, maintain stable object mappings, and apply later site-state slices onto those existing projected objects
+- shared hosts or adapters may stage adapter-owned config and metadata outside gameplay, but gameplay remains authoritative for the projected facts and object lifecycles
 
 ### 13.3 Mock Engine Update Loop
 

@@ -19,6 +19,7 @@ Boundary rule:
 - Prototype path: ready to move into system design.
 - Full-campaign path: not fully ready yet.
 - Current strength: the core site loop is already coherent across survival, hazards, planting, devices, tasks, faction reputation, and small tech growth; the global ECS/message architecture is explicitly defined; and the missing authoring-side content contract is now formalized.
+- Current strength: the shared host/runtime boundary is also now concrete in code, with the runtime create contract taking a shared project-config root plus optional adapter-config payload, the host/session layer owning staged adapter metadata/config loading, and the Godot adapter proving the persistent-object, routed-scene, message-subscriber projection path against that boundary.
 - Current risk: save/load boundaries remain an intentional later TODO, so full long-session architecture should still avoid pretending persistence is already solved.
 
 ## What Is Already Stable Enough
@@ -28,7 +29,9 @@ These areas are defined strongly enough to start module design and runtime-struc
 - Global world-first ECS architecture
 - Message/event-driven cross-system communication
 - World-level engine-message boundary and engine-adapter boundary
+- Shared runtime-startup contract around the repo-level `project/` root plus optional adapter-owned config payloads
 - Shared schema layering direction from global to feature to game-specific data
+- Read-only progression, panel-slot/list, phone, inventory, and protection-overlay projection contracts for current hosts/adapters
 - Core gameplay loop and site loop
 - Fixed-step simulation contract and high-level update order
 - Multiple site objective modes, with dense-restoration and highway-protection runtime paths ready to formalize first and green-wall/pure-survival behavior design-locked for later implementation
@@ -61,7 +64,7 @@ These areas are the main missing formal sections if we want a safe full-game arc
 
 | Area | Status | Why |
 |---|---|---|
-| Global framework and engine boundary | `Ready` | `GAME_STRUCTURE.md` now defines the ECS-world-first architecture, message/event flow, world-level engine messages, engine-adapter responsibilities, the semantic host-event intake contract, and the bootstrap-plus-partial-update adapter projection rule for long-lived presentation surfaces. |
+| Global framework and engine boundary | `Ready` | `GAME_STRUCTURE.md` now defines the ECS-world-first architecture, message/event flow, world-level engine messages, engine-adapter responsibilities, the semantic host-event intake contract, the bootstrap-plus-partial-update adapter projection rule for long-lived presentation surfaces, and that contract is now exercised in code through the shared runtime-session path plus the Godot routed-scene adapter. |
 | Site runtime simulation | `Ready` | Update order, meters, causal loop, and tile/runtime state categories are already defined. |
 | Terrain and ecology runtime | `Ready` | Terrain, plant, weather, device, and meter relationships are clear enough for module and struct design. |
 | Inventory and item runtime | `Ready` | Shared item model, item meters, storage flow, and hazard interaction are already explicit. |

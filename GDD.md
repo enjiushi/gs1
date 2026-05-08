@@ -50,13 +50,13 @@ These terms are stable and should be used consistently in future design and impl
 | Term | Definition |
 |---|---|
 | `Site` | A playable restoration area on the regional map with its own terrain, hazards, task goals, local resources, and camp state. |
-| `Regional Map` | The campaign-level planning layer containing multiple connected `Site`s, their adjacency, regional conditions, available site starts, support links, and access to faction-tech selection. |
+| `Regional Map` | The campaign-level planning layer containing multiple connected `Site`s, their adjacency, regional conditions, available site starts, support links, and access to the read-only faction-tech progression view. |
 | `Contract Board` | The on-site progression system available only during an active `Site` session; it contains the current site's faction-published `Site Task` pool that drives site progression and rewards. |
 | `Field Phone` | The player's in-world access point for money-related actions during a `Site` session; it supports the on-site `Contract Board` plus buying, selling, hiring, and related field planning actions. |
 | `Reputation` | The cumulative campaign-level government standing resource earned progressively from official work; it is never spent and instead gates faction-tech tiers and broader program trust. |
 | `Persistent Tech Tree` | The long-term campaign progression layer formed by three faction branches, each with one linear `32`-tier ladder. |
 | `Faction` | One of the three institutional backers on the `Contract Board`; each `Faction` has its own play style, task bias, random events, assistant support, and tech branch. |
-| `Faction Reputation` | The cumulative standing value with one specific `Faction`, earned mainly through that faction's tasks and events; it unlocks that faction's matching `1-32` tech tiers and improves post-event help. |
+| `Faction Reputation` | The cumulative standing value with one specific `Faction`, earned mainly through that faction's tasks and events; it unlocks that faction's matching `32`-tier ladder at `200 * tier` thresholds and improves post-event help. |
 | `Faction Assistant` | A temporary signature support package provided by a `Faction`. In the current design, each faction should expose only one clear assistant package: `Workforce Support`, `Plant-Water Support`, or `Device Upgrade Support`. |
 | `Concept Unlock` | A real progression gate used during onboarding, where a new gameplay concept becomes available only after the player has meaningfully used the previous one; this is not just a tutorial popup or hidden full system. |
 | `Learning Budget` | The maximum amount of genuinely new gameplay the player is expected to absorb from one site game's rewards and unlocks; reputation pacing should keep this budget small. |
@@ -3122,7 +3122,7 @@ To make the game more compelling without feeling manipulative, these systems wou
 - `Reputation`: total campaign standing with the restoration program, earned progressively from official work and never spent
 - `Faction Reputation`: cumulative standing with each individual `Faction`, earned mainly from that faction's `Site Task`s, faction events, and aligned follow-through
 
-`Reputation` should function as thresholded trust, not consumable currency. `Faction Reputation` should also remain cumulative. In the prototype, `Reputation` now drives a shared `32`-step unlock ladder across plants/items/recipes/device-build recipes, while each faction's long-term tech branch is gated by that faction's `Faction Reputation`: tiers `1-32` auto-unlock the branch's linear tech rows as soon as that faction reaches the matching tier.
+`Reputation` should function as thresholded trust, not consumable currency. `Faction Reputation` should also remain cumulative. In the prototype, `Reputation` now drives a shared `100`-step baseline unlock ladder across non-starter plants plus the basic food/drink recipe line, while each faction's long-term tech branch is gated by that faction's `Faction Reputation`: the branch's linear `32` tech rows auto-unlock as soon as that faction reaches the matching `200 * tier` threshold.
 
 Tech therefore never lowers the visible total trust value. Trust unlocks access directly, while money remains a site-session tactical currency for local spending only. Site money values should be authored internally in cash points, with `100` cash points equal to `1` displayed cash, so balancing can stay granular while the player still sees normal whole-cash costs.
 
@@ -3310,10 +3310,11 @@ What persists globally across the campaign:
 
 - `Reputation`
 - `Faction Reputation`
-- `Persistent Tech Tree` unlocks and chosen faction-tech nodes
-- Village recipe unlocks and recipe updates
-- Forestry plant unlocks and plant updates
-- University device unlocks and device updates
+- `Persistent Tech Tree` visibility and faction-tech ownership derived directly from reached reputation tiers
+- shared total-reputation unlocks that currently interleave non-starter plants with the baseline food/drink recipe ladder at `100`-reputation steps
+- `Village Committee` recipe unlocks plus excavation, worker-sustain, pack-size, and timed-buff-cap upgrades
+- `Forestry Bureau of Autonomous Region` practical device, medicine, and processing unlocks plus related modifier improvements
+- `Autonomous Region Agricultural University` improved cultivar plant unlocks plus premium harvest-value progression
 - `Regional Support Output` from stabilized sites
 
 What mostly resets when entering a new site:
@@ -3342,18 +3343,18 @@ High replay value depends on making progression choices meaningfully different a
 
 ### Faction Technology
 
-The `Persistent Tech Tree` is the long-term campaign progression layer. In the current design, it should stay readable, data-driven, and split by faction tab. Each faction tab should show one linear `32`-tier ladder with one claimable tech row per tier.
+The `Persistent Tech Tree` is the long-term campaign progression layer. In the current implemented prototype it is readable, data-driven, split by faction tab, and shown as a read-only progression surface rather than a purchase screen. Each faction tab currently shows one linear `32`-tier ladder with one authored tech row per tier, and each row unlocks automatically as soon as the matching faction-reputation threshold is reached.
 
 #### Technology Design Rules
 
 - the current prototype tech panel should show `3` faction tabs, one for each faction branch
-- each faction branch should contain `32` linear tech tiers gated by that faction's `Faction Reputation` tiers `1-32`
-- reaching a later tier threshold should immediately auto-unlock that tier's tech row; it should not require previous-tier purchases
-- tech rows should spend no money
+- each faction branch should contain `32` linear tech tiers gated by that faction's `Faction Reputation` at `200 * tier`
+- reaching a later tier threshold should immediately auto-unlock that tier's tech row; it should not require previous-tier purchases, cash claims, or a separate claim action
+- tech rows should spend no money and currently carry `0` internal cash-point claim costs
 - site money should continue to use internal cash-point values converted to player-facing cash at `100` points per `1` cash
 - `Reputation` and `Faction Reputation` unlock access but are never spent
-- branch identity should still come from signature content family plus incremental improvement direction rather than bespoke code per faction
-- content access such as plants/items/recipes/device-build recipes should come from the shared total-reputation unlock ladder, while faction tech rows focus on modifier or mechanism improvements
+- branch identity should come from the authored content and effect rows on that ladder rather than bespoke code per faction
+- the shared total-reputation ladder currently carries the broad baseline access path for plants and food/drink recipes, while faction tech rows auto-grant their own authored content rows plus modifier/mechanism effects
 
 #### Technology Progression Meters
 
@@ -3362,7 +3363,7 @@ Technology should remain tied to a tiny set of progression meters:
 | Meter | Meaning |
 |---|---|
 | `reputation` | Campaign-wide trust that unlocks the shared total-reputation access ladder |
-| `factionReputation[factionId]` | Total trust earned with one faction and used for that faction branch's linear tech tiers `1-32` |
+| `factionReputation[factionId]` | Total trust earned with one faction and used for that faction branch's linear `32`-tier ladder at `200 * tier` requirements |
 | `siteCash` | Transient money owned by the current site session and spent on local buying, hiring, and revealed unlockable purchases |
 
 Important rule:
@@ -3377,17 +3378,17 @@ Important rule:
 
 Each faction should still own one signature unlock family, but its techs and enhancements should push a broader branch identity around that family:
 
-| Faction | Signature unlock family | Assistant | Secondary tech focus | Core branch promise |
+| Faction | Current authored unlock family | Assistant | Secondary tech focus | Core branch promise |
 |---|---|---|---|---|
 | `Village Committee` | `recipe` | `Workforce Support` | player-meter resilience, harsh-weather resistance, work-efficiency sustain, excavation tempo / depth support | Better field food, worker buffs, and practical labor/excavation improvements that keep the player functional through rough weather and long work chains |
-| `Forestry Bureau of Autonomous Region` | `plant` | `Plant-Water Support` | plant-meter improvement, support reach, wind protection, harvest upgrades, rare harvest outcomes, plant-linked sale goods | Better restoration plants plus plant-linked harvest and product upgrades that make the land safer, more productive, and more commercially valuable |
-| `Autonomous Region Agricultural University` | `device` | `Device Upgrade Support` | structure/device upgrades, irrigation, protection, well-water handling, salinity treatment, advanced tools, solar utility | Better technical structures and devices that improve field support quality, survive hazards better, and build steady utility-backed income |
+| `Forestry Bureau of Autonomous Region` | `item` / `structure` / `recipe` | `Plant-Water Support` | device deployment, medicine/processing unlocks, practical protection tools, and harvest-side utility | Better practical field support and processing tools that turn site work into steadier survival and sale-value gains without moving the whole branch into a pure plant ladder |
+| `Autonomous Region Agricultural University` | `plant` | `Device Upgrade Support` | cultivar quality, stronger focused plant-meter pools, and premium harvest-value growth | Better research-driven cultivars that improve the quality and value of the restoration roster rather than adding a second recipe-focused branch |
 
 Delivery rule:
 
-- village recipe unlocks should add permanent recipes to the `Field Workshop` or other camp crafting access, while village modifier/mechanism techs may also improve harsh-weather handling, work tempo, and excavation depth/efficiency
-- forestry plant unlocks should add new tech-eligible plant options to the `Site Unlockable` pool, and forestry techs may also grant plant-linked harvest upgrades, rare-harvest behavior, or sale-only processing recipes
-- university device unlocks should add new tech-eligible device or support-structure options to the `Site Unlockable` pool, and university techs may also grant advanced tool recipes or utility-behavior upgrades around those devices
+- village recipe unlocks should add permanent recipes to the shared crafting access, while village modifier/mechanism techs also improve harsh-weather handling, work tempo, excavation depth/efficiency, worker-pack capacity, and timed-buff capacity
+- forestry unlocks currently add practical device, medicine, stimulant, and protection content such as `Chemistry Station`, `Herbal Poultice`, `Focus Tonic`, and `Wind Fence`, while its modifier effects support stronger harvest-side field tempo
+- university unlocks currently add improved cultivar plants and their premium harvest rows, pushing branch value through better plant stats and stronger harvest outputs rather than through device claims
 - if a faction branch wants to influence other content later, it should usually do so through modifier bundles, mechanism unlocks, or optional payload grants rather than by stealing another branch's main unlock family
 
 #### Faction Economy Identity
@@ -3395,8 +3396,8 @@ Delivery rule:
 The factions should also feel economically different, and faction-focused income should be treated as the long-term main source mix rather than as pure side flavor:
 
 - `Village Committee` should be the branch that most improves excavation as a main cash source through better worker sustain, harsh-weather resilience, lower dig cost, higher dig reliability, and access to deeper excavation passes
-- `Forestry Bureau of Autonomous Region` should be the branch that most improves harvest-side value through stronger output, occasional rare harvest items, and plant-linked commercial-product recipes that produce sell-only goods with higher internal cash-point value
-- `Autonomous Region Agricultural University` should be the branch that most improves structure/device-backed steady income, especially through stronger solar output and better utility efficiency once a support pocket is established
+- `Forestry Bureau of Autonomous Region` should be the branch that most improves practical field support and processing-side value through sturdier protection tools, medicines, and better conversion of harvested materials into useful outputs
+- `Autonomous Region Agricultural University` should be the branch that most improves harvest-side value through higher-quality cultivars and better premium harvest outputs once the player can support them
 - task income should remain one meaningful line of income, but it should not be treated as the main source once faction-economic identities are fully resolved
 - current prototype caution: the broader sell economy is still less resolved than excavation and faction-tech identity, so short-term implementation/design effort should prioritize `Village Committee` first, then `Forestry Bureau of Autonomous Region`, and leave `Autonomous Region Agricultural University` for later passes because it is the most difficult branch to resolve cleanly
 
@@ -3406,13 +3407,13 @@ Use this shared prototype structure in the current design:
 
 | Tier element | Count | Rule |
 |---|---|---|
-| Base techs per faction tier | `1` | Each faction tier owns one base tech claim. |
-| Enhancements per base tech in the prototype | `2` | Each one belongs to the same faction+tier and forms an exclusive pair around that base tech. |
-| Unlock requirement for any tech row | matching faction-reputation tier | Base tech rows auto-unlock at the matching faction `Faction Reputation` tiers, and the prototype no longer requires a separate cash claim step. |
+| Base tech rows per faction tier | `1` | Each faction tier currently owns one authored auto-unlock row. |
+| Enhancements per base tech in the current prototype | `0` | The current shipped prototype ladder does not yet expose per-tier amplification choices or refund flows. |
+| Unlock requirement for any tech row | matching `200 * tier` faction reputation | Base tech rows auto-unlock at the matching faction `Faction Reputation` thresholds, and the current prototype has no separate cash claim step. |
 
-#### Per-Unlockable Update Rule
+#### Per-Unlockable Update Rule For Later Expansion
 
-Every base tech should use its `2` amplification choices to push that base tech in two different strategic directions. These amplification families should be reusable templates driven by data, not unique one-off hand-coded logic.
+If the ladder later reintroduces per-tier amplification choices, every base tech should use its `2` amplification choices to push that base tech in two different strategic directions. These amplification families should be reusable templates driven by data, not unique one-off hand-coded logic.
 
 | Faction | Signature content | Update family | Main target meters / values | Design intent |
 |---|---|---|---|---|
@@ -3434,18 +3435,22 @@ Important rule:
 
 #### Prototype Technology Slice
 
-For the prototype, keep the branch content count small but structurally complete:
+For the current implemented prototype, the branch content is already broad in tier count but still intentionally simple in interaction shape:
 
-- each faction should expose `4` temporary prototype tiers in the first playable implementation
-- each tier should already use the full `3` base tech + `2` amplification choices per base tech structure
-- this is enough to prove faction tabs, tier gating, amplification lockout, and escalating per-tier occupied-reputation cost
+- each faction now exposes the full authored `32`-tier ladder
+- each tier currently exposes one authored auto-unlock row rather than a claim-plus-amplification tree
+- this is enough to prove faction tabs, tier gating, read-only progression projection, automatic unlock visibility, and branch-specific content grants without adding purchase-state complexity yet
 
 This is enough to show:
 
 - that each faction has a different identity
 - that tier order matters
-- that amplification choice meaningfully specializes one claimed base tech
-- that technology modifies existing meters instead of inventing a parallel stat game
+- that technology modifies existing meters and unlockable content without inventing a parallel stat game
+
+Current implementation note:
+
+- the detailed tier-map tables below are longer-term branch-direction references, not the authoritative current ladder schema
+- the authoritative current prototype implementation is the authored `32`-tier auto-unlock ladder described above and in the shared content tables
 
 #### Starter Technology Map
 
@@ -4166,21 +4171,22 @@ This preserves the key promise that reputation matters during crisis recovery.
 
 - money must exist and matter
 - task payouts should be one meaningful income line, but not the default long-term main source
-- the intended main cash focus should come mostly from each faction's play pattern: excavation for `Village Committee`, commercial plant-product selling for `Forestry Bureau of Autonomous Region`, and steady solar-electricity utility income for `Autonomous Region Agricultural University`
-- current resolution priority should stay on `Village Committee` first, then `Forestry Bureau of Autonomous Region`, with `Autonomous Region Agricultural University` left for later because its device/water/electricity design space is the hardest to settle cleanly
+- the intended main cash focus should come mostly from each faction's play pattern: excavation for `Village Committee`, practical field support plus processing value for `Forestry Bureau of Autonomous Region`, and higher-quality cultivar harvest value for `Autonomous Region Agricultural University`
+- current resolution priority should stay on `Village Committee` first, then `Forestry Bureau of Autonomous Region`, with `Autonomous Region Agricultural University` still intentionally later because the premium-cultivar and harvest-value branch needs the most downstream economy tuning
 - the player only needs a very small shop list such as water and a few field supplies
 - a broad sell economy, contractor market, and trade simulation can be deferred
 
 #### Progression
 
 - keep a tiny between-site `Persistent Tech Tree`
-- the player should usually unlock only `1` major node or `2` minor nodes after a site
+- the player should usually unlock only a small number of new rows after a site even though the authored ladders are already broad
 - tech can introduce new things, but the `Learning Budget` must stay low
-- recommended minimum node count:
-- `1` neutral starter node
-- `1` `Village Committee` recipe unlock plus `3` recipe update nodes
-- `1` `Forestry Bureau of Autonomous Region` plant unlock plus `3` plant update nodes
-- `1` `Autonomous Region Agricultural University` device unlock plus `3` device update nodes
+- current authored baseline:
+- `1` neutral starter entry
+- shared `100`-reputation baseline unlock steps across non-starter plants and basic food/drink recipes
+- `32` authored `Village Committee` rows centered on recipes plus excavation/worker-support effects
+- `32` authored `Forestry Bureau of Autonomous Region` rows centered on practical device, medicine, and processing unlocks
+- `32` authored `Autonomous Region Agricultural University` rows centered on improved cultivar plants and premium harvest-value upgrades
 
 This is enough to make reputation and site completion feel forward-looking without building a full long-form metagame.
 

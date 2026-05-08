@@ -72,6 +72,14 @@ The runtime regression layer currently verifies:
   SiteAttemptEnded -> CampaignFlowSystem` completes a site-one restoration
   chain, transitions the app to `SITE_RESULT`, reveals the adjacent site, and
   emits site-result engine messages.
+- Reward-claim flow keeps pending-claim versus claimed task projection aligned,
+  allows the host-submitted `CLAIM_TASK_REWARD` action path, and emits the
+  expected celebration cue.
+- Craft completion reopens the authoritative output storage view and emits the
+  dedicated crafted-output cue instead of requiring the host to infer it.
+- Campaign progression projection covers the read-only tech-tree ladder from
+  both the regional map and active site sessions, including shared
+  total-reputation unlock entries plus faction-tech auto-unlock entries.
 
 ## Campaign Systems
 
@@ -122,11 +130,11 @@ Implemented behavior coverage should verify:
 
 - Faction reputation awards never decrease a faction's lifetime total reputation.
 - Campaign-wide total reputation unlocks the authored multi-kind progression ladder without being spent.
-- Each faction exposes a linear `32`-tier tech ladder gated by authored faction-reputation requirements `1-32`.
+- Each faction exposes a linear `32`-tier tech ladder gated by authored faction-reputation requirements on the shared `200 * tier` scale.
 - Reaching a total-reputation tier threshold unlocks that tier's authored content access without spending reputation.
-- Faction technologies become claimable as soon as the matching faction-reputation tier threshold is met; they do not require previous-tier purchases.
-- Prototype technologies cover placeholder linear-tier modifier/mechanism effects, all with authored per-node internal cash-point values that convert to player-facing cash costs.
-- Purchased tech state is stored as node ownership, not as unspent pick inventory.
+- Faction technologies auto-unlock as soon as the matching faction-reputation threshold is met; they do not require previous-tier purchases, claim actions, or cash spending.
+- Prototype technologies cover authored linear-tier modifier/mechanism effects plus faction-granted content rows, with current per-node internal cash-point values kept at `0` because the ladder is not a purchase surface.
+- Tech ownership is derived from reached reputation tiers rather than from unspent pick inventory or separately stored manual-claim state.
 
 ### `regional_support`
 
