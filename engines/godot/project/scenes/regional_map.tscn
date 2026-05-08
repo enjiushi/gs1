@@ -13,7 +13,7 @@ shader_parameter/shimmer_speed = 1.42
 shader_parameter/band_density = 46.0
 shader_parameter/edge_falloff = 0.88
 
-[node name="RegionalMap" type="Gs1GodotRegionalMapScreenControl" unique_id=1236848156]
+[node name="RegionalMap" type="Gs1GodotRegionalMapSceneController" unique_id=1236848156]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -156,3 +156,13 @@ metadata/gs1_overlay_margin_right = -72.0
 metadata/gs1_overlay_margin_bottom = -48.0
 metadata/gs1_panel_min_width = 980.0
 metadata/gs1_panel_min_height = 620.0
+
+[node name="UiController" type="Gs1GodotRegionalMapUiController" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+ui_root_path = NodePath("..")

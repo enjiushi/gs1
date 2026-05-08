@@ -2525,6 +2525,10 @@ void GameRuntime::queue_ui_panel_begin_message(
     payload.list_item_count = static_cast<std::uint8_t>(std::min<std::uint32_t>(list_item_count, 255U));
     payload.list_action_count = static_cast<std::uint8_t>(std::min<std::uint32_t>(list_action_count, 255U));
     engine_messages_.push_back(message);
+    if (panel_id == GS1_UI_PANEL_REGIONAL_MAP_SELECTION)
+    {
+        queue_ui_surface_visibility_message(GS1_UI_SURFACE_REGIONAL_SELECTION_PANEL, true);
+    }
     active_ui_panels_.insert(panel_id);
 }
 
@@ -2534,7 +2538,26 @@ void GameRuntime::queue_ui_panel_close_message(Gs1UiPanelId panel_id)
     auto& payload = message.emplace_payload<Gs1EngineMessageCloseUiPanelData>();
     payload.panel_id = panel_id;
     engine_messages_.push_back(message);
+    if (panel_id == GS1_UI_PANEL_REGIONAL_MAP_SELECTION)
+    {
+        queue_ui_surface_visibility_message(GS1_UI_SURFACE_REGIONAL_SELECTION_PANEL, false);
+    }
     active_ui_panels_.erase(panel_id);
+}
+
+void GameRuntime::queue_ui_surface_visibility_message(Gs1UiSurfaceId surface_id, bool visible)
+{
+    if (surface_id == GS1_UI_SURFACE_NONE)
+    {
+        return;
+    }
+
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SET_UI_SURFACE_VISIBILITY);
+    auto& payload = message.emplace_payload<Gs1EngineMessageUiSurfaceVisibilityData>();
+    payload.surface_id = surface_id;
+    payload.visible = visible ? 1U : 0U;
+    payload.reserved0 = 0U;
+    engine_messages_.push_back(message);
 }
 
 void GameRuntime::queue_progression_view_begin_message(
@@ -2549,6 +2572,10 @@ void GameRuntime::queue_progression_view_begin_message(
     payload.entry_count = static_cast<std::uint16_t>(std::min<std::uint32_t>(entry_count, 65535U));
     payload.context_id = context_id;
     engine_messages_.push_back(message);
+    if (view_id == GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE)
+    {
+        queue_ui_surface_visibility_message(GS1_UI_SURFACE_REGIONAL_TECH_TREE_OVERLAY, true);
+    }
 }
 
 void GameRuntime::queue_progression_view_close_message(Gs1ProgressionViewId view_id)
@@ -2557,6 +2584,10 @@ void GameRuntime::queue_progression_view_close_message(Gs1ProgressionViewId view
     auto& payload = message.emplace_payload<Gs1EngineMessageCloseProgressionViewData>();
     payload.view_id = view_id;
     engine_messages_.push_back(message);
+    if (view_id == GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE)
+    {
+        queue_ui_surface_visibility_message(GS1_UI_SURFACE_REGIONAL_TECH_TREE_OVERLAY, false);
+    }
 }
 
 void GameRuntime::queue_close_ui_setup_if_open(Gs1UiSetupId setup_id)
@@ -3938,6 +3969,9 @@ void GameRuntime::queue_site_inventory_view_state_message(
     payload.event_kind = event_kind;
     payload.flags = 0U;
     engine_messages_.push_back(message);
+    queue_ui_surface_visibility_message(
+        GS1_UI_SURFACE_SITE_INVENTORY_PANEL,
+        event_kind == GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT);
 }
 
 void GameRuntime::queue_all_site_inventory_slot_upsert_messages()
@@ -4330,6 +4364,9 @@ void GameRuntime::queue_site_phone_panel_state_message()
     payload.flags = phone_panel.badge_flags |
         (phone_panel.open ? GS1_PHONE_PANEL_FLAG_OPEN : 0U);
     engine_messages_.push_back(message);
+    queue_ui_surface_visibility_message(
+        GS1_UI_SURFACE_SITE_PHONE_PANEL,
+        phone_panel.open);
 }
 
 void GameRuntime::queue_site_protection_overlay_state_message()
@@ -4346,6 +4383,9 @@ void GameRuntime::queue_site_protection_overlay_state_message()
     payload.reserved0[1] = 0U;
     payload.reserved0[2] = 0U;
     engine_messages_.push_back(message);
+    queue_ui_surface_visibility_message(
+        GS1_UI_SURFACE_SITE_OVERLAY_PANEL,
+        site_protection_overlay_mode_ != GS1_SITE_PROTECTION_OVERLAY_NONE);
 }
 
 void GameRuntime::queue_site_phone_listing_remove_message(std::uint32_t listing_id)

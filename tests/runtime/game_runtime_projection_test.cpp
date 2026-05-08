@@ -542,6 +542,28 @@ const Gs1EngineMessage* find_close_ui_setup_message(
     return nullptr;
 }
 
+const Gs1EngineMessage* find_ui_surface_visibility_message(
+    const std::vector<Gs1EngineMessage>& messages,
+    Gs1UiSurfaceId surface_id,
+    bool visible)
+{
+    for (const auto& message : messages)
+    {
+        if (message.type != GS1_ENGINE_MESSAGE_SET_UI_SURFACE_VISIBILITY)
+        {
+            continue;
+        }
+
+        const auto& payload = message.payload_as<Gs1EngineMessageUiSurfaceVisibilityData>();
+        if (payload.surface_id == surface_id && payload.visible == (visible ? 1U : 0U))
+        {
+            return &message;
+        }
+    }
+
+    return nullptr;
+}
+
 bool contains_phone_listing_message(
     const std::vector<Gs1EngineMessage>& messages,
     Gs1EngineMessageType message_type,
@@ -1635,6 +1657,10 @@ int main()
                open_panel_storage_messages,
                starter_storage_id(panel_state_site_run),
                GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT) != nullptr);
+    assert(find_ui_surface_visibility_message(
+               open_panel_storage_messages,
+               GS1_UI_SURFACE_SITE_INVENTORY_PANEL,
+               true) != nullptr);
 
     auto open_worker_pack_event = make_storage_view_event(
         panel_state_site_run.inventory.worker_pack_storage_id,
@@ -1654,6 +1680,10 @@ int main()
                open_worker_pack_messages,
                starter_storage_id(panel_state_site_run),
                GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT) == nullptr);
+    assert(find_ui_surface_visibility_message(
+               open_worker_pack_messages,
+               GS1_UI_SURFACE_SITE_INVENTORY_PANEL,
+               true) != nullptr);
 
     Gs1UiAction open_phone_action {};
     open_phone_action.type = GS1_UI_ACTION_SET_PHONE_PANEL_SECTION;
@@ -1675,6 +1705,14 @@ int main()
                open_phone_messages,
                starter_storage_id(panel_state_site_run),
                GS1_INVENTORY_VIEW_EVENT_CLOSE) != nullptr);
+    assert(find_ui_surface_visibility_message(
+               open_phone_messages,
+               GS1_UI_SURFACE_SITE_INVENTORY_PANEL,
+               false) != nullptr);
+    assert(find_ui_surface_visibility_message(
+               open_phone_messages,
+               GS1_UI_SURFACE_SITE_PHONE_PANEL,
+               true) != nullptr);
     const auto open_phone_panel_messages =
         collect_messages_of_type(open_phone_messages, GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE);
     assert(!open_phone_panel_messages.empty());
@@ -1695,6 +1733,14 @@ int main()
     const auto open_site_tech_tree_messages = drain_engine_messages(panel_state_runtime);
     assert(gs1::GameRuntimeProjectionTestAccess::campaign(panel_state_runtime)->regional_map_state.tech_tree_open);
     assert(!panel_state_site_run.phone_panel.open);
+    assert(find_ui_surface_visibility_message(
+               open_site_tech_tree_messages,
+               GS1_UI_SURFACE_SITE_PHONE_PANEL,
+               false) != nullptr);
+    assert(find_ui_surface_visibility_message(
+               open_site_tech_tree_messages,
+               GS1_UI_SURFACE_REGIONAL_TECH_TREE_OVERLAY,
+               true) != nullptr);
     const auto tech_tree_phone_panel_messages =
         collect_messages_of_type(open_site_tech_tree_messages, GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE);
     assert(!tech_tree_phone_panel_messages.empty());
@@ -1714,6 +1760,14 @@ int main()
     assert(panel_state_site_run.inventory.worker_pack_panel_open);
     assert(!gs1::GameRuntimeProjectionTestAccess::campaign(panel_state_runtime)->regional_map_state.tech_tree_open);
     const auto reopen_worker_pack_messages = drain_engine_messages(panel_state_runtime);
+    assert(find_ui_surface_visibility_message(
+               reopen_worker_pack_messages,
+               GS1_UI_SURFACE_REGIONAL_TECH_TREE_OVERLAY,
+               false) != nullptr);
+    assert(find_ui_surface_visibility_message(
+               reopen_worker_pack_messages,
+               GS1_UI_SURFACE_SITE_INVENTORY_PANEL,
+               true) != nullptr);
     {
         bool found_progression_close = false;
         for (const auto& message : reopen_worker_pack_messages)
@@ -1787,6 +1841,10 @@ int main()
     assert(find_close_ui_setup_message(
                select_heat_overlay_messages,
                GS1_UI_SETUP_SITE_PROTECTION_SELECTOR) != nullptr);
+    assert(find_ui_surface_visibility_message(
+               select_heat_overlay_messages,
+               GS1_UI_SURFACE_SITE_OVERLAY_PANEL,
+               true) != nullptr);
     const auto protection_overlay_messages =
         collect_messages_of_type(select_heat_overlay_messages, GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE);
     assert(protection_overlay_messages.size() == 1U);
@@ -1801,6 +1859,14 @@ int main()
     run_phase1(panel_state_runtime, 0.0, reopen_phone_result);
     assert(reopen_phone_result.processed_host_event_count == 1U);
     const auto reopen_phone_messages = drain_engine_messages(panel_state_runtime);
+    assert(find_ui_surface_visibility_message(
+               reopen_phone_messages,
+               GS1_UI_SURFACE_SITE_OVERLAY_PANEL,
+               false) != nullptr);
+    assert(find_ui_surface_visibility_message(
+               reopen_phone_messages,
+               GS1_UI_SURFACE_SITE_PHONE_PANEL,
+               true) != nullptr);
     const auto cleared_overlay_messages =
         collect_messages_of_type(reopen_phone_messages, GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE);
     assert(cleared_overlay_messages.size() == 1U);

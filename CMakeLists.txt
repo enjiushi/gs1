@@ -504,23 +504,27 @@ if(GS1_BUILD_GODOT_ADAPTER)
     add_library(gs1_godot_adapter SHARED
         engines/godot/native/gs1_godot_extension_entry.cpp
         engines/godot/native/godot_progression_resources.cpp
+        engines/godot/native/gs1_godot_director_control.cpp
+        engines/godot/native/gs1_godot_main_menu_ui_controller.cpp
         engines/godot/native/gs1_godot_panel_state_reducers.cpp
-        engines/godot/native/gs1_godot_routed_screen_control.cpp
         engines/godot/native/gs1_godot_action_panel_controller.cpp
         engines/godot/native/gs1_godot_craft_panel_controller.cpp
         engines/godot/native/gs1_godot_inventory_panel_controller.cpp
         engines/godot/native/gs1_godot_overlay_panel_controller.cpp
+        engines/godot/native/gs1_godot_regional_map_scene_controller.cpp
+        engines/godot/native/gs1_godot_regional_map_ui_controller.cpp
         engines/godot/native/gs1_godot_phone_panel_controller.cpp
         engines/godot/native/gs1_godot_regional_map_hud_controller.cpp
         engines/godot/native/gs1_godot_regional_selection_panel_controller.cpp
         engines/godot/native/gs1_godot_regional_summary_panel_controller.cpp
         engines/godot/native/gs1_godot_regional_tech_tree_panel_controller.cpp
+        engines/godot/native/gs1_godot_site_scene_controller.cpp
         engines/godot/native/gs1_godot_site_hud_controller.cpp
+        engines/godot/native/gs1_godot_site_session_ui_controller.cpp
         engines/godot/native/gs1_godot_site_summary_panel_controller.cpp
         engines/godot/native/gs1_godot_status_panel_controller.cpp
         engines/godot/native/gs1_godot_task_panel_controller.cpp
         engines/godot/native/gs1_godot_runtime_node.cpp
-        engines/godot/native/gs1_godot_scene_router_control.cpp
         engines/godot/native/gs1_godot_site_view_node.cpp)
 
     target_include_directories(gs1_godot_adapter

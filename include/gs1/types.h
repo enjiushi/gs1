@@ -115,6 +115,18 @@ enum Gs1ProgressionEntryFlags : std::uint8_t
     GS1_PROGRESSION_ENTRY_FLAG_SELECTED = 1u << 3
 };
 
+enum Gs1UiSurfaceId : std::uint16_t
+{
+    GS1_UI_SURFACE_NONE = 0,
+    GS1_UI_SURFACE_REGIONAL_SELECTION_PANEL = 1,
+    GS1_UI_SURFACE_REGIONAL_TECH_TREE_OVERLAY = 2,
+    GS1_UI_SURFACE_SITE_INVENTORY_PANEL = 3,
+    GS1_UI_SURFACE_SITE_PHONE_PANEL = 4,
+    GS1_UI_SURFACE_SITE_OVERLAY_PANEL = 5,
+    GS1_UI_SURFACE_SITE_TASK_PANEL = 6,
+    GS1_UI_SURFACE_SITE_CRAFT_PANEL = 7
+};
+
 enum Gs1UiPanelId : std::uint8_t
 {
     GS1_UI_PANEL_NONE = 0,
@@ -391,6 +403,7 @@ enum Gs1EngineMessageType : std::uint8_t
     GS1_ENGINE_MESSAGE_PROGRESSION_ENTRY_UPSERT = 61,
     GS1_ENGINE_MESSAGE_END_PROGRESSION_VIEW = 62,
     GS1_ENGINE_MESSAGE_CLOSE_PROGRESSION_VIEW = 63,
+    GS1_ENGINE_MESSAGE_SET_UI_SURFACE_VISIBILITY = 64,
 
     GS1_ENGINE_MESSAGE_HUD_STATE = 44,
     GS1_ENGINE_MESSAGE_NOTIFICATION_PUSH = 45,
@@ -981,6 +994,13 @@ struct Gs1EngineMessageSiteProtectionOverlayData
     std::uint8_t reserved0[3];
 };
 
+struct Gs1EngineMessageUiSurfaceVisibilityData
+{
+    Gs1UiSurfaceId surface_id;
+    std::uint8_t visible;
+    std::uint8_t reserved0;
+};
+
 struct Gs1EngineMessageSiteModifierListData
 {
     Gs1ProjectionMode mode;
@@ -1206,6 +1226,7 @@ GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageTaskData, 20U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePhoneListingData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePhonePanelData, 40U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteProtectionOverlayData, 4U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageUiSurfaceVisibilityData, 4U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteModifierListData, 4U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteModifierData, 8U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteActionData, 24U);
@@ -1254,6 +1275,7 @@ static_assert(sizeof(Gs1EngineMessageTaskData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT
 static_assert(sizeof(Gs1EngineMessagePhoneListingData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessagePhonePanelData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageSiteProtectionOverlayData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+static_assert(sizeof(Gs1EngineMessageUiSurfaceVisibilityData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageSiteModifierListData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageSiteModifierData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageSiteActionData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);

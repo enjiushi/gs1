@@ -1,6 +1,10 @@
-#include "gs1_godot_routed_screen_control.h"
+#include "gs1_godot_director_control.h"
+#include "gs1_godot_main_menu_ui_controller.h"
+#include "gs1_godot_regional_map_scene_controller.h"
+#include "gs1_godot_regional_map_ui_controller.h"
 #include "gs1_godot_runtime_node.h"
-#include "gs1_godot_scene_router_control.h"
+#include "gs1_godot_site_scene_controller.h"
+#include "gs1_godot_site_session_ui_controller.h"
 #include "gs1_godot_site_view_node.h"
 
 #include <godot_cpp/core/class_db.hpp>
@@ -20,11 +24,12 @@ void initialize_gs1_godot_adapter(ModuleInitializationLevel level)
 
     GDREGISTER_CLASS(Gs1RuntimeNode);
     GDREGISTER_CLASS(Gs1SiteViewNode);
-    GDREGISTER_ABSTRACT_CLASS(Gs1GodotRoutedScreenControl);
-    GDREGISTER_CLASS(Gs1GodotMainMenuScreenControl);
-    GDREGISTER_CLASS(Gs1GodotRegionalMapScreenControl);
-    GDREGISTER_CLASS(Gs1GodotSiteSessionScreenControl);
-    GDREGISTER_CLASS(Gs1GodotSceneRouterControl);
+    GDREGISTER_CLASS(Gs1GodotMainMenuUiController);
+    GDREGISTER_CLASS(Gs1GodotRegionalMapSceneController);
+    GDREGISTER_CLASS(Gs1GodotRegionalMapUiController);
+    GDREGISTER_CLASS(Gs1GodotSiteSceneController);
+    GDREGISTER_CLASS(Gs1GodotSiteSessionUiController);
+    GDREGISTER_CLASS(Gs1GodotDirectorControl);
 }
 
 void uninitialize_gs1_godot_adapter(ModuleInitializationLevel level)

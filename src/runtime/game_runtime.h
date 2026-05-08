@@ -136,6 +136,7 @@ private:
         std::uint32_t list_item_count,
         std::uint32_t list_action_count);
     void queue_ui_panel_close_message(Gs1UiPanelId panel_id);
+    void queue_ui_surface_visibility_message(Gs1UiSurfaceId surface_id, bool visible);
     void queue_progression_view_begin_message(
         Gs1ProgressionViewId view_id,
         std::uint32_t entry_count,

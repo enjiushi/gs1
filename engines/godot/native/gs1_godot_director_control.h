@@ -1,7 +1,11 @@
 #pragma once
 
-#include "gs1_godot_routed_screen_control.h"
+#include "gs1_godot_main_menu_ui_controller.h"
+#include "gs1_godot_regional_map_scene_controller.h"
+#include "gs1_godot_regional_map_ui_controller.h"
 #include "gs1_godot_runtime_node.h"
+#include "gs1_godot_site_scene_controller.h"
+#include "gs1_godot_site_session_ui_controller.h"
 #include "gs1_godot_site_view_node.h"
 
 #include <godot_cpp/classes/control.hpp>
@@ -10,13 +14,13 @@
 #include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/variant/string.hpp>
 
-class Gs1GodotSceneRouterControl final : public godot::Control, public IGs1GodotEngineMessageSubscriber
+class Gs1GodotDirectorControl final : public godot::Control, public IGs1GodotEngineMessageSubscriber
 {
-    GDCLASS(Gs1GodotSceneRouterControl, godot::Control)
+    GDCLASS(Gs1GodotDirectorControl, godot::Control)
 
 public:
-    Gs1GodotSceneRouterControl() = default;
-    ~Gs1GodotSceneRouterControl() override = default;
+    Gs1GodotDirectorControl() = default;
+    ~Gs1GodotDirectorControl() override = default;
 
     void _ready() override;
     void _process(double delta) override;
