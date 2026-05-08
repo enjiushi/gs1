@@ -1,6 +1,6 @@
 #pragma once
 
-#include "gs1_godot_main_screen_control.h"
+#include "gs1_godot_routed_screen_control.h"
 #include "gs1_godot_runtime_node.h"
 #include "gs1_godot_site_view_node.h"
 

@@ -1,5 +1,5 @@
 #include "godot_progression_resources.h"
-#include "gs1_godot_main_screen_control.h"
+#include "gs1_godot_routed_screen_control.h"
 #include "gs1_godot_runtime_node.h"
 
 #include "content/defs/faction_defs.h"
@@ -198,32 +198,32 @@ std::uint8_t unlockable_content_kind_from_def(const gs1::ReputationUnlockDef& un
 }
 }
 
-void Gs1GodotMainScreenControl::_bind_methods()
+void Gs1GodotRoutedScreenControl::_bind_methods()
 {
-    ClassDB::bind_method(D_METHOD("set_runtime_node_path", "path"), &Gs1GodotMainScreenControl::set_runtime_node_path);
-    ClassDB::bind_method(D_METHOD("get_runtime_node_path"), &Gs1GodotMainScreenControl::get_runtime_node_path);
-    ClassDB::bind_method(D_METHOD("set_site_view_path", "path"), &Gs1GodotMainScreenControl::set_site_view_path);
-    ClassDB::bind_method(D_METHOD("get_site_view_path"), &Gs1GodotMainScreenControl::get_site_view_path);
-    ClassDB::bind_method(D_METHOD("set_regional_world_path", "path"), &Gs1GodotMainScreenControl::set_regional_world_path);
-    ClassDB::bind_method(D_METHOD("get_regional_world_path"), &Gs1GodotMainScreenControl::get_regional_world_path);
-    ClassDB::bind_method(D_METHOD("set_regional_camera_path", "path"), &Gs1GodotMainScreenControl::set_regional_camera_path);
-    ClassDB::bind_method(D_METHOD("get_regional_camera_path"), &Gs1GodotMainScreenControl::get_regional_camera_path);
-    ClassDB::bind_method(D_METHOD("set_regional_terrain_root_path", "path"), &Gs1GodotMainScreenControl::set_regional_terrain_root_path);
-    ClassDB::bind_method(D_METHOD("get_regional_terrain_root_path"), &Gs1GodotMainScreenControl::get_regional_terrain_root_path);
-    ClassDB::bind_method(D_METHOD("set_regional_link_root_path", "path"), &Gs1GodotMainScreenControl::set_regional_link_root_path);
-    ClassDB::bind_method(D_METHOD("get_regional_link_root_path"), &Gs1GodotMainScreenControl::get_regional_link_root_path);
-    ClassDB::bind_method(D_METHOD("set_regional_site_root_path", "path"), &Gs1GodotMainScreenControl::set_regional_site_root_path);
-    ClassDB::bind_method(D_METHOD("get_regional_site_root_path"), &Gs1GodotMainScreenControl::get_regional_site_root_path);
+    ClassDB::bind_method(D_METHOD("set_runtime_node_path", "path"), &Gs1GodotRoutedScreenControl::set_runtime_node_path);
+    ClassDB::bind_method(D_METHOD("get_runtime_node_path"), &Gs1GodotRoutedScreenControl::get_runtime_node_path);
+    ClassDB::bind_method(D_METHOD("set_site_view_path", "path"), &Gs1GodotRoutedScreenControl::set_site_view_path);
+    ClassDB::bind_method(D_METHOD("get_site_view_path"), &Gs1GodotRoutedScreenControl::get_site_view_path);
+    ClassDB::bind_method(D_METHOD("set_regional_world_path", "path"), &Gs1GodotRoutedScreenControl::set_regional_world_path);
+    ClassDB::bind_method(D_METHOD("get_regional_world_path"), &Gs1GodotRoutedScreenControl::get_regional_world_path);
+    ClassDB::bind_method(D_METHOD("set_regional_camera_path", "path"), &Gs1GodotRoutedScreenControl::set_regional_camera_path);
+    ClassDB::bind_method(D_METHOD("get_regional_camera_path"), &Gs1GodotRoutedScreenControl::get_regional_camera_path);
+    ClassDB::bind_method(D_METHOD("set_regional_terrain_root_path", "path"), &Gs1GodotRoutedScreenControl::set_regional_terrain_root_path);
+    ClassDB::bind_method(D_METHOD("get_regional_terrain_root_path"), &Gs1GodotRoutedScreenControl::get_regional_terrain_root_path);
+    ClassDB::bind_method(D_METHOD("set_regional_link_root_path", "path"), &Gs1GodotRoutedScreenControl::set_regional_link_root_path);
+    ClassDB::bind_method(D_METHOD("get_regional_link_root_path"), &Gs1GodotRoutedScreenControl::get_regional_link_root_path);
+    ClassDB::bind_method(D_METHOD("set_regional_site_root_path", "path"), &Gs1GodotRoutedScreenControl::set_regional_site_root_path);
+    ClassDB::bind_method(D_METHOD("get_regional_site_root_path"), &Gs1GodotRoutedScreenControl::get_regional_site_root_path);
 
-    ClassDB::bind_method(D_METHOD("on_menu_settings_pressed"), &Gs1GodotMainScreenControl::on_menu_settings_pressed);
-    ClassDB::bind_method(D_METHOD("on_quit_pressed"), &Gs1GodotMainScreenControl::on_quit_pressed);
-    ClassDB::bind_method(D_METHOD("on_open_worker_pack_pressed"), &Gs1GodotMainScreenControl::on_open_worker_pack_pressed);
-    ClassDB::bind_method(D_METHOD("on_open_nearest_storage_pressed"), &Gs1GodotMainScreenControl::on_open_nearest_storage_pressed);
-    ClassDB::bind_method(D_METHOD("on_close_storage_pressed"), &Gs1GodotMainScreenControl::on_close_storage_pressed);
-    ClassDB::bind_method(D_METHOD("on_use_selected_item_pressed"), &Gs1GodotMainScreenControl::on_use_selected_item_pressed);
-    ClassDB::bind_method(D_METHOD("on_transfer_selected_item_pressed"), &Gs1GodotMainScreenControl::on_transfer_selected_item_pressed);
-    ClassDB::bind_method(D_METHOD("on_plant_selected_seed_pressed"), &Gs1GodotMainScreenControl::on_plant_selected_seed_pressed);
-    ClassDB::bind_method(D_METHOD("on_dynamic_regional_site_pressed", "site_id"), &Gs1GodotMainScreenControl::on_dynamic_regional_site_pressed);
+    ClassDB::bind_method(D_METHOD("on_menu_settings_pressed"), &Gs1GodotRoutedScreenControl::on_menu_settings_pressed);
+    ClassDB::bind_method(D_METHOD("on_quit_pressed"), &Gs1GodotRoutedScreenControl::on_quit_pressed);
+    ClassDB::bind_method(D_METHOD("on_open_worker_pack_pressed"), &Gs1GodotRoutedScreenControl::on_open_worker_pack_pressed);
+    ClassDB::bind_method(D_METHOD("on_open_nearest_storage_pressed"), &Gs1GodotRoutedScreenControl::on_open_nearest_storage_pressed);
+    ClassDB::bind_method(D_METHOD("on_close_storage_pressed"), &Gs1GodotRoutedScreenControl::on_close_storage_pressed);
+    ClassDB::bind_method(D_METHOD("on_use_selected_item_pressed"), &Gs1GodotRoutedScreenControl::on_use_selected_item_pressed);
+    ClassDB::bind_method(D_METHOD("on_transfer_selected_item_pressed"), &Gs1GodotRoutedScreenControl::on_transfer_selected_item_pressed);
+    ClassDB::bind_method(D_METHOD("on_plant_selected_seed_pressed"), &Gs1GodotRoutedScreenControl::on_plant_selected_seed_pressed);
+    ClassDB::bind_method(D_METHOD("on_dynamic_regional_site_pressed", "site_id"), &Gs1GodotRoutedScreenControl::on_dynamic_regional_site_pressed);
     ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "runtime_node_path"), "set_runtime_node_path", "get_runtime_node_path");
     ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "site_view_path"), "set_site_view_path", "get_site_view_path");
     ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "regional_world_path"), "set_regional_world_path", "get_regional_world_path");
@@ -233,7 +233,13 @@ void Gs1GodotMainScreenControl::_bind_methods()
     ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "regional_site_root_path"), "set_regional_site_root_path", "get_regional_site_root_path");
 }
 
-void Gs1GodotMainScreenControl::_ready()
+void Gs1GodotMainMenuScreenControl::_bind_methods() {}
+
+void Gs1GodotRegionalMapScreenControl::_bind_methods() {}
+
+void Gs1GodotSiteSessionScreenControl::_bind_methods() {}
+
+void Gs1GodotRoutedScreenControl::_ready()
 {
     cache_scene_references();
     cache_ui_references();
@@ -281,7 +287,7 @@ void Gs1GodotMainScreenControl::_ready()
     wire_static_buttons();
 }
 
-void Gs1GodotMainScreenControl::_process(double delta)
+void Gs1GodotRoutedScreenControl::_process(double delta)
 {
     cache_scene_references();
     cache_ui_references();
@@ -301,7 +307,7 @@ void Gs1GodotMainScreenControl::_process(double delta)
     update_background_presentation(app_state, delta);
 }
 
-void Gs1GodotMainScreenControl::_input(const Ref<InputEvent>& event)
+void Gs1GodotRoutedScreenControl::_input(const Ref<InputEvent>& event)
 {
     if (event.is_null())
     {
@@ -355,7 +361,7 @@ void Gs1GodotMainScreenControl::_input(const Ref<InputEvent>& event)
     clamp_selected_tile();
 }
 
-void Gs1GodotMainScreenControl::cache_scene_references()
+void Gs1GodotRoutedScreenControl::cache_scene_references()
 {
     if (runtime_node_ == nullptr)
     {
@@ -404,7 +410,7 @@ void Gs1GodotMainScreenControl::cache_scene_references()
     }
 }
 
-void Gs1GodotMainScreenControl::cache_ui_references()
+void Gs1GodotRoutedScreenControl::cache_ui_references()
 {
     status_panel_controller_.cache_ui_references(*this);
     inventory_panel_controller_.cache_ui_references(*this);
@@ -469,37 +475,37 @@ void Gs1GodotMainScreenControl::cache_ui_references()
     }
 }
 
-void Gs1GodotMainScreenControl::wire_static_buttons()
+void Gs1GodotRoutedScreenControl::wire_static_buttons()
 {
     if (buttons_wired_)
     {
         return;
     }
 
-    bind_button(Object::cast_to<BaseButton>(find_child("StartCampaignButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_submit_ui_action_pressed).bind(static_cast<std::int64_t>(UI_ACTION_START_NEW_CAMPAIGN), static_cast<std::int64_t>(0), static_cast<std::int64_t>(0), static_cast<std::int64_t>(0)));
-    bind_button(Object::cast_to<BaseButton>(find_child("ContinueCampaignButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_submit_ui_action_pressed).bind(static_cast<std::int64_t>(UI_ACTION_START_NEW_CAMPAIGN), static_cast<std::int64_t>(0), static_cast<std::int64_t>(0), static_cast<std::int64_t>(0)));
-    bind_button(Object::cast_to<BaseButton>(find_child("MenuSettingsButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_menu_settings_pressed));
-    bind_button(Object::cast_to<BaseButton>(find_child("QuitButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_quit_pressed));
-    bind_button(Object::cast_to<BaseButton>(find_child("ReturnToMapButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_submit_ui_action_pressed).bind(static_cast<std::int64_t>(UI_ACTION_RETURN_TO_REGIONAL_MAP), static_cast<std::int64_t>(0), static_cast<std::int64_t>(0), static_cast<std::int64_t>(0)));
-    bind_button(Object::cast_to<BaseButton>(find_child("MoveNorthButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_submit_move_pressed).bind(0.0, 0.0, -1.0));
-    bind_button(Object::cast_to<BaseButton>(find_child("MoveSouthButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_submit_move_pressed).bind(0.0, 0.0, 1.0));
-    bind_button(Object::cast_to<BaseButton>(find_child("MoveWestButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_submit_move_pressed).bind(-1.0, 0.0, 0.0));
-    bind_button(Object::cast_to<BaseButton>(find_child("MoveEastButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_submit_move_pressed).bind(1.0, 0.0, 0.0));
-    bind_button(Object::cast_to<BaseButton>(find_child("HoverTileButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_submit_selected_tile_context_pressed).bind(0));
-    bind_button(Object::cast_to<BaseButton>(find_child("CancelActionButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_submit_site_action_cancel_pressed).bind(0, SITE_ACTION_CANCEL_FLAG_CURRENT_ACTION | SITE_ACTION_CANCEL_FLAG_PLACEMENT_MODE));
-    bind_button(Object::cast_to<BaseButton>(find_child("OpenTechTreeButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_toggle_regional_tech_tree_pressed));
-    bind_button(Object::cast_to<BaseButton>(find_child("OpenWorkerPackButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_open_worker_pack_pressed));
-    bind_button(Object::cast_to<BaseButton>(find_child("OpenNearestStorageButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_open_nearest_storage_pressed));
-    bind_button(Object::cast_to<BaseButton>(find_child("CloseStorageButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_close_storage_pressed));
-    bind_button(Object::cast_to<BaseButton>(find_child("UseSelectedItemButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_use_selected_item_pressed));
-    bind_button(Object::cast_to<BaseButton>(find_child("TransferSelectedItemButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_transfer_selected_item_pressed));
-    bind_button(Object::cast_to<BaseButton>(find_child("PlantSelectedSeedButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_plant_selected_seed_pressed));
-    bind_button(Object::cast_to<BaseButton>(find_child("CraftAtSelectedTileButton", true, false)), callable_mp(this, &Gs1GodotMainScreenControl::on_submit_selected_tile_context_pressed).bind(0));
+    bind_button(Object::cast_to<BaseButton>(find_child("StartCampaignButton", true, false)), callable_mp(this, &Gs1GodotRoutedScreenControl::on_submit_ui_action_pressed).bind(static_cast<std::int64_t>(UI_ACTION_START_NEW_CAMPAIGN), static_cast<std::int64_t>(0), static_cast<std::int64_t>(0), static_cast<std::int64_t>(0)));
+    bind_button(Object::cast_to<BaseButton>(find_child("ContinueCampaignButton", true, false)), callable_mp(this, &Gs1GodotRoutedScreenControl::on_submit_ui_action_pressed).bind(static_cast<std::int64_t>(UI_ACTION_START_NEW_CAMPAIGN), static_cast<std::int64_t>(0), static_cast<std::int64_t>(0), static_cast<std::int64_t>(0)));
+    bind_button(Object::cast_to<BaseButton>(find_child("MenuSettingsButton", true, false)), callable_mp(this, &Gs1GodotRoutedScreenControl::on_menu_settings_pressed));
+    bind_button(Object::cast_to<BaseButton>(find_child("QuitButton", true, false)), callable_mp(this, &Gs1GodotRoutedScreenControl::on_quit_pressed));
+    bind_button(Object::cast_to<BaseButton>(find_child("ReturnToMapButton", true, false)), callable_mp(this, &Gs1GodotRoutedScreenControl::on_submit_ui_action_pressed).bind(static_cast<std::int64_t>(UI_ACTION_RETURN_TO_REGIONAL_MAP), static_cast<std::int64_t>(0), static_cast<std::int64_t>(0), static_cast<std::int64_t>(0)));
+    bind_button(Object::cast_to<BaseButton>(find_child("MoveNorthButton", true, false)), callable_mp(this, &Gs1GodotRoutedScreenControl::on_submit_move_pressed).bind(0.0, 0.0, -1.0));
+    bind_button(Object::cast_to<BaseButton>(find_child("MoveSouthButton", true, false)), callable_mp(this, &Gs1GodotRoutedScreenControl::on_submit_move_pressed).bind(0.0, 0.0, 1.0));
+    bind_button(Object::cast_to<BaseButton>(find_child("MoveWestButton", true, false)), callable_mp(this, &Gs1GodotRoutedScreenControl::on_submit_move_pressed).bind(-1.0, 0.0, 0.0));
+    bind_button(Object::cast_to<BaseButton>(find_child("MoveEastButton", true, false)), callable_mp(this, &Gs1GodotRoutedScreenControl::on_submit_move_pressed).bind(1.0, 0.0, 0.0));
+    bind_button(Object::cast_to<BaseButton>(find_child("HoverTileButton", true, false)), callable_mp(this, &Gs1GodotRoutedScreenControl::on_submit_selected_tile_context_pressed).bind(0));
+    bind_button(Object::cast_to<BaseButton>(find_child("CancelActionButton", true, false)), callable_mp(this, &Gs1GodotRoutedScreenControl::on_submit_site_action_cancel_pressed).bind(0, SITE_ACTION_CANCEL_FLAG_CURRENT_ACTION | SITE_ACTION_CANCEL_FLAG_PLACEMENT_MODE));
+    bind_button(Object::cast_to<BaseButton>(find_child("OpenTechTreeButton", true, false)), callable_mp(this, &Gs1GodotRoutedScreenControl::on_toggle_regional_tech_tree_pressed));
+    bind_button(Object::cast_to<BaseButton>(find_child("OpenWorkerPackButton", true, false)), callable_mp(this, &Gs1GodotRoutedScreenControl::on_open_worker_pack_pressed));
+    bind_button(Object::cast_to<BaseButton>(find_child("OpenNearestStorageButton", true, false)), callable_mp(this, &Gs1GodotRoutedScreenControl::on_open_nearest_storage_pressed));
+    bind_button(Object::cast_to<BaseButton>(find_child("CloseStorageButton", true, false)), callable_mp(this, &Gs1GodotRoutedScreenControl::on_close_storage_pressed));
+    bind_button(Object::cast_to<BaseButton>(find_child("UseSelectedItemButton", true, false)), callable_mp(this, &Gs1GodotRoutedScreenControl::on_use_selected_item_pressed));
+    bind_button(Object::cast_to<BaseButton>(find_child("TransferSelectedItemButton", true, false)), callable_mp(this, &Gs1GodotRoutedScreenControl::on_transfer_selected_item_pressed));
+    bind_button(Object::cast_to<BaseButton>(find_child("PlantSelectedSeedButton", true, false)), callable_mp(this, &Gs1GodotRoutedScreenControl::on_plant_selected_seed_pressed));
+    bind_button(Object::cast_to<BaseButton>(find_child("CraftAtSelectedTileButton", true, false)), callable_mp(this, &Gs1GodotRoutedScreenControl::on_submit_selected_tile_context_pressed).bind(0));
 
     buttons_wired_ = true;
 }
 
-bool Gs1GodotMainScreenControl::handles_engine_message(Gs1EngineMessageType type) const noexcept
+bool Gs1GodotRoutedScreenControl::handles_engine_message(Gs1EngineMessageType type) const noexcept
 {
     switch (type)
     {
@@ -542,7 +548,7 @@ bool Gs1GodotMainScreenControl::handles_engine_message(Gs1EngineMessageType type
     }
 }
 
-void Gs1GodotMainScreenControl::handle_engine_message(const Gs1EngineMessage& message)
+void Gs1GodotRoutedScreenControl::handle_engine_message(const Gs1EngineMessage& message)
 {
     regional_map_state_reducer_.apply_engine_message(message);
     site_state_reducer_.apply_engine_message(message);
@@ -597,7 +603,7 @@ void Gs1GodotMainScreenControl::handle_engine_message(const Gs1EngineMessage& me
     }
 }
 
-void Gs1GodotMainScreenControl::handle_runtime_message_reset()
+void Gs1GodotRoutedScreenControl::handle_runtime_message_reset()
 {
     regional_map_state_reducer_.reset();
     site_state_reducer_.reset();
@@ -606,7 +612,7 @@ void Gs1GodotMainScreenControl::handle_runtime_message_reset()
     invalidate_all_ui();
 }
 
-void Gs1GodotMainScreenControl::disconnect_runtime_subscriptions()
+void Gs1GodotRoutedScreenControl::disconnect_runtime_subscriptions()
 {
     if (runtime_node_ == nullptr)
     {
@@ -630,7 +636,7 @@ void Gs1GodotMainScreenControl::disconnect_runtime_subscriptions()
     runtime_node_ = nullptr;
 }
 
-void Gs1GodotMainScreenControl::apply_bootstrap_app_state(int app_state)
+void Gs1GodotRoutedScreenControl::apply_bootstrap_app_state(int app_state)
 {
     Gs1EngineMessage message {};
     message.type = GS1_ENGINE_MESSAGE_SET_APP_STATE;
@@ -653,7 +659,7 @@ void Gs1GodotMainScreenControl::apply_bootstrap_app_state(int app_state)
     task_panel_controller_.handle_engine_message(message);
 }
 
-void Gs1GodotMainScreenControl::invalidate_all_ui()
+void Gs1GodotRoutedScreenControl::invalidate_all_ui()
 {
     mark_regional_map_dirty();
     mark_regional_visuals_dirty();
@@ -662,7 +668,7 @@ void Gs1GodotMainScreenControl::invalidate_all_ui()
     last_tile_label_y_ = -1;
 }
 
-void Gs1GodotMainScreenControl::update_visibility(int app_state)
+void Gs1GodotRoutedScreenControl::update_visibility(int app_state)
 {
     const bool menu_visible = app_state == APP_STATE_MAIN_MENU || app_state == APP_STATE_BOOT;
     const bool regional_visible = app_state == APP_STATE_REGIONAL_MAP || app_state == APP_STATE_SITE_LOADING;
@@ -715,7 +721,7 @@ void Gs1GodotMainScreenControl::update_visibility(int app_state)
     last_visible_app_state_ = app_state;
 }
 
-void Gs1GodotMainScreenControl::refresh_regional_map_if_needed(int app_state)
+void Gs1GodotRoutedScreenControl::refresh_regional_map_if_needed(int app_state)
 {
     if (!regional_map_visible_)
     {
@@ -730,7 +736,7 @@ void Gs1GodotMainScreenControl::refresh_regional_map_if_needed(int app_state)
     regional_visuals_dirty_ = false;
 }
 
-void Gs1GodotMainScreenControl::refresh_selected_tile_if_needed()
+void Gs1GodotRoutedScreenControl::refresh_selected_tile_if_needed()
 {
     site_hud_controller_.set_selected_tile(selected_tile_.x, selected_tile_.y);
     if (!site_panel_visible_)
@@ -769,11 +775,11 @@ void Gs1GodotMainScreenControl::refresh_selected_tile_if_needed()
     selected_tile_dirty_ = false;
 }
 
-void Gs1GodotMainScreenControl::mark_regional_map_dirty() { regional_map_dirty_ = true; }
-void Gs1GodotMainScreenControl::mark_regional_visuals_dirty() { regional_visuals_dirty_ = true; }
-void Gs1GodotMainScreenControl::mark_selected_tile_dirty() { selected_tile_dirty_ = true; }
+void Gs1GodotRoutedScreenControl::mark_regional_map_dirty() { regional_map_dirty_ = true; }
+void Gs1GodotRoutedScreenControl::mark_regional_visuals_dirty() { regional_visuals_dirty_ = true; }
+void Gs1GodotRoutedScreenControl::mark_selected_tile_dirty() { selected_tile_dirty_ = true; }
 
-void Gs1GodotMainScreenControl::refresh_regional_map(int app_state)
+void Gs1GodotRoutedScreenControl::refresh_regional_map(int app_state)
 {
     const bool panel_visible = app_state == APP_STATE_REGIONAL_MAP || app_state == APP_STATE_SITE_LOADING;
     if (!panel_visible)
@@ -798,7 +804,7 @@ void Gs1GodotMainScreenControl::refresh_regional_map(int app_state)
     }
 }
 
-void Gs1GodotMainScreenControl::toggle_regional_tech_tree()
+void Gs1GodotRoutedScreenControl::toggle_regional_tech_tree()
 {
     if (regional_tech_tree_panel_controller_.is_panel_visible())
     {
@@ -810,7 +816,7 @@ void Gs1GodotMainScreenControl::toggle_regional_tech_tree()
     }
 }
 
-void Gs1GodotMainScreenControl::select_regional_site(int site_id, bool submit_runtime)
+void Gs1GodotRoutedScreenControl::select_regional_site(int site_id, bool submit_runtime)
 {
     if (submit_runtime)
     {
@@ -818,7 +824,7 @@ void Gs1GodotMainScreenControl::select_regional_site(int site_id, bool submit_ru
     }
 }
 
-void Gs1GodotMainScreenControl::rebuild_regional_map_world(
+void Gs1GodotRoutedScreenControl::rebuild_regional_map_world(
     const std::vector<Gs1RuntimeRegionalMapSiteProjection>& sites,
     const std::vector<Gs1RuntimeRegionalMapLinkProjection>& links)
 {
@@ -869,7 +875,7 @@ void Gs1GodotMainScreenControl::rebuild_regional_map_world(
     update_regional_site_visuals();
 }
 
-void Gs1GodotMainScreenControl::clear_regional_projection_world()
+void Gs1GodotRoutedScreenControl::clear_regional_projection_world()
 {
     clear_dynamic_children(regional_terrain_root_, String());
     clear_dynamic_children(regional_link_root_, String());
@@ -883,14 +889,14 @@ void Gs1GodotMainScreenControl::clear_regional_projection_world()
     menu_backdrop_time_ = 0.0;
 }
 
-void Gs1GodotMainScreenControl::build_menu_backdrop()
+void Gs1GodotRoutedScreenControl::build_menu_backdrop()
 {
     regional_menu_backdrop_active_ = false;
     menu_backdrop_plants_.clear();
     menu_backdrop_time_ = 0.0;
 }
 
-void Gs1GodotMainScreenControl::reconcile_desert_tiles(const Rect2i& bounds, bool include_grid_lines)
+void Gs1GodotRoutedScreenControl::reconcile_desert_tiles(const Rect2i& bounds, bool include_grid_lines)
 {
     if (regional_terrain_root_ == nullptr)
     {
@@ -905,7 +911,7 @@ void Gs1GodotMainScreenControl::reconcile_desert_tiles(const Rect2i& bounds, boo
     prune_regional_node_registry(regional_terrain_grid_line_nodes_, desired_grid_line_keys);
 }
 
-void Gs1GodotMainScreenControl::reconcile_regional_links(const std::vector<Gs1RuntimeRegionalMapLinkProjection>& links)
+void Gs1GodotRoutedScreenControl::reconcile_regional_links(const std::vector<Gs1RuntimeRegionalMapLinkProjection>& links)
 {
     if (regional_link_root_ == nullptr)
     {
@@ -949,7 +955,7 @@ void Gs1GodotMainScreenControl::reconcile_regional_links(const std::vector<Gs1Ru
     prune_regional_node_registry(regional_link_nodes_, desired_link_keys);
 }
 
-void Gs1GodotMainScreenControl::reconcile_regional_sites(const std::vector<Gs1RuntimeRegionalMapSiteProjection>& sites)
+void Gs1GodotRoutedScreenControl::reconcile_regional_sites(const std::vector<Gs1RuntimeRegionalMapSiteProjection>& sites)
 {
     if (regional_site_root_ == nullptr)
     {
@@ -1121,7 +1127,7 @@ void Gs1GodotMainScreenControl::reconcile_regional_sites(const std::vector<Gs1Ru
     prune_regional_site_registry(desired_site_ids);
 }
 
-void Gs1GodotMainScreenControl::position_regional_camera(const Rect2i& bounds)
+void Gs1GodotRoutedScreenControl::position_regional_camera(const Rect2i& bounds)
 {
     if (regional_camera_ == nullptr)
     {
@@ -1137,7 +1143,7 @@ void Gs1GodotMainScreenControl::position_regional_camera(const Rect2i& bounds)
     regional_camera_->look_at(center + Vector3(0.0, 1.6, 0.0), Vector3(0.0, 1.0, 0.0));
 }
 
-void Gs1GodotMainScreenControl::update_regional_site_visuals()
+void Gs1GodotRoutedScreenControl::update_regional_site_visuals()
 {
     const auto& regional_state = regional_map_state_reducer_.state();
     int selected_site_id = regional_state.selected_site_id.has_value()
@@ -1212,19 +1218,19 @@ void Gs1GodotMainScreenControl::update_regional_site_visuals()
     }
 }
 
-Vector2i Gs1GodotMainScreenControl::regional_grid_coord(const Gs1RuntimeRegionalMapSiteProjection& site) const
+Vector2i Gs1GodotRoutedScreenControl::regional_grid_coord(const Gs1RuntimeRegionalMapSiteProjection& site) const
 {
     return Vector2i(
         Math::round(site.map_x / 160.0),
         Math::round(site.map_y / 160.0));
 }
 
-Vector3 Gs1GodotMainScreenControl::regional_world_position(const Vector2i& grid) const
+Vector3 Gs1GodotRoutedScreenControl::regional_world_position(const Vector2i& grid) const
 {
     return Vector3(static_cast<double>(grid.x) * REGIONAL_TILE_SIZE, 0.0, static_cast<double>(grid.y) * REGIONAL_TILE_SIZE);
 }
 
-Color Gs1GodotMainScreenControl::regional_site_state_color(int site_state) const
+Color Gs1GodotRoutedScreenControl::regional_site_state_color(int site_state) const
 {
     switch (site_state)
     {
@@ -1237,7 +1243,7 @@ Color Gs1GodotMainScreenControl::regional_site_state_color(int site_state) const
     }
 }
 
-void Gs1GodotMainScreenControl::update_background_presentation(int app_state, double delta)
+void Gs1GodotRoutedScreenControl::update_background_presentation(int app_state, double delta)
 {
     const bool show_regional_world = app_state == APP_STATE_MAIN_MENU || app_state == APP_STATE_BOOT || app_state == APP_STATE_REGIONAL_MAP || app_state == APP_STATE_SITE_LOADING;
     if (regional_map_world_ != nullptr)
@@ -1259,7 +1265,7 @@ void Gs1GodotMainScreenControl::update_background_presentation(int app_state, do
     }
 }
 
-Ref<StandardMaterial3D> Gs1GodotMainScreenControl::get_material(const String& key, const Color& color, double roughness, double metallic, bool emission)
+Ref<StandardMaterial3D> Gs1GodotRoutedScreenControl::get_material(const String& key, const Color& color, double roughness, double metallic, bool emission)
 {
     const std::string cache_key = key.utf8().get_data();
     auto it = regional_material_cache_.find(cache_key);
@@ -1289,7 +1295,7 @@ Ref<StandardMaterial3D> Gs1GodotMainScreenControl::get_material(const String& ke
     return standard_material;
 }
 
-void Gs1GodotMainScreenControl::clear_dynamic_children(Node* container, const String& prefix)
+void Gs1GodotRoutedScreenControl::clear_dynamic_children(Node* container, const String& prefix)
 {
     if (container == nullptr)
     {
@@ -1311,7 +1317,7 @@ void Gs1GodotMainScreenControl::clear_dynamic_children(Node* container, const St
     }
 }
 
-MeshInstance3D* Gs1GodotMainScreenControl::upsert_regional_mesh_node(
+MeshInstance3D* Gs1GodotRoutedScreenControl::upsert_regional_mesh_node(
     Node3D* container,
     std::unordered_map<std::uint64_t, ObjectID>& registry,
     std::uint64_t stable_key,
@@ -1346,7 +1352,7 @@ MeshInstance3D* Gs1GodotMainScreenControl::upsert_regional_mesh_node(
     return mesh_instance;
 }
 
-void Gs1GodotMainScreenControl::prune_regional_node_registry(
+void Gs1GodotRoutedScreenControl::prune_regional_node_registry(
     std::unordered_map<std::uint64_t, ObjectID>& registry,
     const std::unordered_set<std::uint64_t>& desired_keys)
 {
@@ -1376,7 +1382,7 @@ void Gs1GodotMainScreenControl::prune_regional_node_registry(
     }
 }
 
-void Gs1GodotMainScreenControl::prune_regional_site_registry(const std::unordered_set<int>& desired_site_ids)
+void Gs1GodotRoutedScreenControl::prune_regional_site_registry(const std::unordered_set<int>& desired_site_ids)
 {
     std::vector<int> stale_site_ids;
     stale_site_ids.reserve(regional_site_nodes_.size());
@@ -1404,7 +1410,7 @@ void Gs1GodotMainScreenControl::prune_regional_site_registry(const std::unordere
     }
 }
 
-const Gs1RuntimeSiteProjection* Gs1GodotMainScreenControl::active_site() const
+const Gs1RuntimeSiteProjection* Gs1GodotRoutedScreenControl::active_site() const
 {
     if (!site_state_reducer_.state().has_value())
     {
@@ -1413,7 +1419,7 @@ const Gs1RuntimeSiteProjection* Gs1GodotMainScreenControl::active_site() const
     return &site_state_reducer_.state().value();
 }
 
-const Gs1RuntimeTileProjection* Gs1GodotMainScreenControl::tile_at(const Vector2i& tile_coord) const
+const Gs1RuntimeTileProjection* Gs1GodotRoutedScreenControl::tile_at(const Vector2i& tile_coord) const
 {
     const Gs1RuntimeSiteProjection* site_state = active_site();
     if (site_state == nullptr || site_state->width == 0 || site_state->height == 0)
@@ -1436,7 +1442,7 @@ const Gs1RuntimeTileProjection* Gs1GodotMainScreenControl::tile_at(const Vector2
     return &site_state->tiles[index];
 }
 
-int Gs1GodotMainScreenControl::find_worker_pack_storage_id() const
+int Gs1GodotRoutedScreenControl::find_worker_pack_storage_id() const
 {
     const Gs1RuntimeSiteProjection* site_state = active_site();
     if (site_state == nullptr)
@@ -1454,7 +1460,7 @@ int Gs1GodotMainScreenControl::find_worker_pack_storage_id() const
     return 0;
 }
 
-int Gs1GodotMainScreenControl::find_selected_tile_storage_id()
+int Gs1GodotRoutedScreenControl::find_selected_tile_storage_id()
 {
     const Gs1RuntimeSiteProjection* site_state = active_site();
     if (site_state == nullptr)
@@ -1476,7 +1482,7 @@ int Gs1GodotMainScreenControl::find_selected_tile_storage_id()
     return 0;
 }
 
-String Gs1GodotMainScreenControl::plant_name_for(int plant_id) const
+String Gs1GodotRoutedScreenControl::plant_name_for(int plant_id) const
 {
     auto found = plant_name_cache_.find(plant_id);
     if (found != plant_name_cache_.end())
@@ -1493,7 +1499,7 @@ String Gs1GodotMainScreenControl::plant_name_for(int plant_id) const
     return plant_name_cache_.emplace(plant_id, display_name).first->second;
 }
 
-String Gs1GodotMainScreenControl::structure_name_for(int structure_id) const
+String Gs1GodotRoutedScreenControl::structure_name_for(int structure_id) const
 {
     auto found = structure_name_cache_.find(structure_id);
     if (found != structure_name_cache_.end())
@@ -1510,7 +1516,7 @@ String Gs1GodotMainScreenControl::structure_name_for(int structure_id) const
     return structure_name_cache_.emplace(structure_id, display_name).first->second;
 }
 
-void Gs1GodotMainScreenControl::use_first_usable_item()
+void Gs1GodotRoutedScreenControl::use_first_usable_item()
 {
     const Gs1RuntimeSiteProjection* site_state = active_site();
     if (site_state == nullptr)
@@ -1535,7 +1541,7 @@ void Gs1GodotMainScreenControl::use_first_usable_item()
     }
 }
 
-void Gs1GodotMainScreenControl::transfer_first_storage_item_to_pack()
+void Gs1GodotRoutedScreenControl::transfer_first_storage_item_to_pack()
 {
     const Gs1RuntimeSiteProjection* site_state = active_site();
     if (site_state == nullptr || !site_state->opened_storage.has_value())
@@ -1565,7 +1571,7 @@ void Gs1GodotMainScreenControl::transfer_first_storage_item_to_pack()
     submit_ui_action(UI_ACTION_TRANSFER_INVENTORY_ITEM, 0, packed_arg0, packed_arg1);
 }
 
-void Gs1GodotMainScreenControl::plant_first_seed_on_selected_tile()
+void Gs1GodotRoutedScreenControl::plant_first_seed_on_selected_tile()
 {
     const Gs1RuntimeSiteProjection* site_state = active_site();
     if (site_state == nullptr)
@@ -1594,7 +1600,7 @@ void Gs1GodotMainScreenControl::plant_first_seed_on_selected_tile()
     }
 }
 
-void Gs1GodotMainScreenControl::submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)
+void Gs1GodotRoutedScreenControl::submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)
 {
     if (runtime_node_ == nullptr)
     {
@@ -1605,7 +1611,7 @@ void Gs1GodotMainScreenControl::submit_ui_action(std::int64_t action_type, std::
     publish_last_action_message();
 }
 
-void Gs1GodotMainScreenControl::submit_move(double x, double y, double z)
+void Gs1GodotRoutedScreenControl::submit_move(double x, double y, double z)
 {
     if (runtime_node_ == nullptr)
     {
@@ -1616,7 +1622,7 @@ void Gs1GodotMainScreenControl::submit_move(double x, double y, double z)
     publish_last_action_message();
 }
 
-void Gs1GodotMainScreenControl::submit_site_context_request(int tile_x, int tile_y, int flags)
+void Gs1GodotRoutedScreenControl::submit_site_context_request(int tile_x, int tile_y, int flags)
 {
     if (runtime_node_ == nullptr)
     {
@@ -1627,7 +1633,7 @@ void Gs1GodotMainScreenControl::submit_site_context_request(int tile_x, int tile
     publish_last_action_message();
 }
 
-void Gs1GodotMainScreenControl::submit_site_action_request(
+void Gs1GodotRoutedScreenControl::submit_site_action_request(
     int action_kind,
     int flags,
     int quantity,
@@ -1654,7 +1660,7 @@ void Gs1GodotMainScreenControl::submit_site_action_request(
     publish_last_action_message();
 }
 
-void Gs1GodotMainScreenControl::submit_site_action_cancel(int action_id, int flags)
+void Gs1GodotRoutedScreenControl::submit_site_action_cancel(int action_id, int flags)
 {
     if (runtime_node_ == nullptr)
     {
@@ -1665,7 +1671,7 @@ void Gs1GodotMainScreenControl::submit_site_action_cancel(int action_id, int fla
     publish_last_action_message();
 }
 
-void Gs1GodotMainScreenControl::submit_storage_view(int storage_id, int event_kind)
+void Gs1GodotRoutedScreenControl::submit_storage_view(int storage_id, int event_kind)
 {
     if (runtime_node_ == nullptr)
     {
@@ -1676,12 +1682,12 @@ void Gs1GodotMainScreenControl::submit_storage_view(int storage_id, int event_ki
     publish_last_action_message();
 }
 
-void Gs1GodotMainScreenControl::publish_last_action_message()
+void Gs1GodotRoutedScreenControl::publish_last_action_message()
 {
     status_panel_controller_.set_last_action_message(last_action_message_);
 }
 
-void Gs1GodotMainScreenControl::bind_button(BaseButton* button, const Callable& callback)
+void Gs1GodotRoutedScreenControl::bind_button(BaseButton* button, const Callable& callback)
 {
     if (button != nullptr)
     {
@@ -1689,7 +1695,7 @@ void Gs1GodotMainScreenControl::bind_button(BaseButton* button, const Callable& 
     }
 }
 
-void Gs1GodotMainScreenControl::clamp_selected_tile()
+void Gs1GodotRoutedScreenControl::clamp_selected_tile()
 {
     const Gs1RuntimeSiteProjection* site_state = active_site();
     const int width = std::max(1, site_state != nullptr ? static_cast<int>(site_state->width) : 1);
@@ -1707,7 +1713,7 @@ void Gs1GodotMainScreenControl::clamp_selected_tile()
     selected_tile_.y = clamped_y;
 }
 
-bool Gs1GodotMainScreenControl::regional_map_ui_contains_screen_point(const Vector2& screen_position) const
+bool Gs1GodotRoutedScreenControl::regional_map_ui_contains_screen_point(const Vector2& screen_position) const
 {
     const auto contains_screen_point = [&screen_position](const Control* control) -> bool
     {
@@ -1729,7 +1735,7 @@ bool Gs1GodotMainScreenControl::regional_map_ui_contains_screen_point(const Vect
         contains_screen_point(overlay_panel_);
 }
 
-bool Gs1GodotMainScreenControl::try_select_regional_site_from_screen(const Vector2& screen_position)
+bool Gs1GodotRoutedScreenControl::try_select_regional_site_from_screen(const Vector2& screen_position)
 {
     if (regional_map_world_ == nullptr || !regional_map_world_->is_visible() || regional_camera_ == nullptr)
     {
@@ -1783,7 +1789,7 @@ bool Gs1GodotMainScreenControl::try_select_regional_site_from_screen(const Vecto
     return true;
 }
 
-int Gs1GodotMainScreenControl::as_int(const Variant& value, int fallback) const
+int Gs1GodotRoutedScreenControl::as_int(const Variant& value, int fallback) const
 {
     if (value.get_type() == Variant::NIL)
     {
@@ -1802,7 +1808,7 @@ int Gs1GodotMainScreenControl::as_int(const Variant& value, int fallback) const
     }
 }
 
-double Gs1GodotMainScreenControl::as_float(const Variant& value, double fallback) const
+double Gs1GodotRoutedScreenControl::as_float(const Variant& value, double fallback) const
 {
     if (value.get_type() == Variant::NIL)
     {
@@ -1821,7 +1827,7 @@ double Gs1GodotMainScreenControl::as_float(const Variant& value, double fallback
     }
 }
 
-bool Gs1GodotMainScreenControl::as_bool(const Variant& value, bool fallback) const
+bool Gs1GodotRoutedScreenControl::as_bool(const Variant& value, bool fallback) const
 {
     if (value.get_type() == Variant::NIL)
     {
@@ -1840,7 +1846,7 @@ bool Gs1GodotMainScreenControl::as_bool(const Variant& value, bool fallback) con
     }
 }
 
-String Gs1GodotMainScreenControl::app_state_name(int app_state) const
+String Gs1GodotRoutedScreenControl::app_state_name(int app_state) const
 {
     switch (app_state)
     {
@@ -1867,60 +1873,60 @@ String Gs1GodotMainScreenControl::app_state_name(int app_state) const
     }
 }
 
-void Gs1GodotMainScreenControl::set_runtime_node_path(const NodePath& path)
+void Gs1GodotRoutedScreenControl::set_runtime_node_path(const NodePath& path)
 {
     disconnect_runtime_subscriptions();
     runtime_node_path_ = path;
 }
-NodePath Gs1GodotMainScreenControl::get_runtime_node_path() const { return runtime_node_path_; }
-void Gs1GodotMainScreenControl::set_site_view_path(const NodePath& path) { site_view_path_ = path; site_view_ = nullptr; }
-NodePath Gs1GodotMainScreenControl::get_site_view_path() const { return site_view_path_; }
-void Gs1GodotMainScreenControl::set_regional_world_path(const NodePath& path) { regional_world_path_ = path; regional_map_world_ = nullptr; }
-NodePath Gs1GodotMainScreenControl::get_regional_world_path() const { return regional_world_path_; }
-void Gs1GodotMainScreenControl::set_regional_camera_path(const NodePath& path) { regional_camera_path_ = path; regional_camera_ = nullptr; }
-NodePath Gs1GodotMainScreenControl::get_regional_camera_path() const { return regional_camera_path_; }
-void Gs1GodotMainScreenControl::set_regional_terrain_root_path(const NodePath& path) { regional_terrain_root_path_ = path; regional_terrain_root_ = nullptr; }
-NodePath Gs1GodotMainScreenControl::get_regional_terrain_root_path() const { return regional_terrain_root_path_; }
-void Gs1GodotMainScreenControl::set_regional_link_root_path(const NodePath& path) { regional_link_root_path_ = path; regional_link_root_ = nullptr; }
-NodePath Gs1GodotMainScreenControl::get_regional_link_root_path() const { return regional_link_root_path_; }
-void Gs1GodotMainScreenControl::set_regional_site_root_path(const NodePath& path) { regional_site_root_path_ = path; regional_site_root_ = nullptr; }
-NodePath Gs1GodotMainScreenControl::get_regional_site_root_path() const { return regional_site_root_path_; }
+NodePath Gs1GodotRoutedScreenControl::get_runtime_node_path() const { return runtime_node_path_; }
+void Gs1GodotRoutedScreenControl::set_site_view_path(const NodePath& path) { site_view_path_ = path; site_view_ = nullptr; }
+NodePath Gs1GodotRoutedScreenControl::get_site_view_path() const { return site_view_path_; }
+void Gs1GodotRoutedScreenControl::set_regional_world_path(const NodePath& path) { regional_world_path_ = path; regional_map_world_ = nullptr; }
+NodePath Gs1GodotRoutedScreenControl::get_regional_world_path() const { return regional_world_path_; }
+void Gs1GodotRoutedScreenControl::set_regional_camera_path(const NodePath& path) { regional_camera_path_ = path; regional_camera_ = nullptr; }
+NodePath Gs1GodotRoutedScreenControl::get_regional_camera_path() const { return regional_camera_path_; }
+void Gs1GodotRoutedScreenControl::set_regional_terrain_root_path(const NodePath& path) { regional_terrain_root_path_ = path; regional_terrain_root_ = nullptr; }
+NodePath Gs1GodotRoutedScreenControl::get_regional_terrain_root_path() const { return regional_terrain_root_path_; }
+void Gs1GodotRoutedScreenControl::set_regional_link_root_path(const NodePath& path) { regional_link_root_path_ = path; regional_link_root_ = nullptr; }
+NodePath Gs1GodotRoutedScreenControl::get_regional_link_root_path() const { return regional_link_root_path_; }
+void Gs1GodotRoutedScreenControl::set_regional_site_root_path(const NodePath& path) { regional_site_root_path_ = path; regional_site_root_ = nullptr; }
+NodePath Gs1GodotRoutedScreenControl::get_regional_site_root_path() const { return regional_site_root_path_; }
 
-void Gs1GodotMainScreenControl::on_submit_ui_action_pressed(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)
+void Gs1GodotRoutedScreenControl::on_submit_ui_action_pressed(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)
 {
     submit_ui_action(action_type, target_id, arg0, arg1);
 }
 
-void Gs1GodotMainScreenControl::on_submit_move_pressed(double x, double y, double z)
+void Gs1GodotRoutedScreenControl::on_submit_move_pressed(double x, double y, double z)
 {
     submit_move(x, y, z);
     mark_selected_tile_dirty();
 }
 
-void Gs1GodotMainScreenControl::on_submit_selected_tile_context_pressed(int flags)
+void Gs1GodotRoutedScreenControl::on_submit_selected_tile_context_pressed(int flags)
 {
     submit_site_context_request(selected_tile_.x, selected_tile_.y, flags);
 }
 
-void Gs1GodotMainScreenControl::on_submit_site_action_cancel_pressed(int action_id, int flags)
+void Gs1GodotRoutedScreenControl::on_submit_site_action_cancel_pressed(int action_id, int flags)
 {
     submit_site_action_cancel(action_id, flags);
 }
 
-void Gs1GodotMainScreenControl::on_toggle_regional_tech_tree_pressed()
+void Gs1GodotRoutedScreenControl::on_toggle_regional_tech_tree_pressed()
 {
     toggle_regional_tech_tree();
 }
 
-void Gs1GodotMainScreenControl::on_menu_settings_pressed()
+void Gs1GodotRoutedScreenControl::on_menu_settings_pressed()
 {
     last_action_message_ = "Settings are not wired yet in the prototype";
     publish_last_action_message();
 }
-void Gs1GodotMainScreenControl::on_quit_pressed() { if (SceneTree* tree = get_tree()) { tree->quit(); } }
-void Gs1GodotMainScreenControl::on_open_worker_pack_pressed() { const int id = find_worker_pack_storage_id(); if (id != 0) { submit_storage_view(id, INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT); } }
-void Gs1GodotMainScreenControl::on_open_nearest_storage_pressed() { const int id = find_selected_tile_storage_id(); if (id != 0) { submit_storage_view(id, INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT); } }
-void Gs1GodotMainScreenControl::on_close_storage_pressed()
+void Gs1GodotRoutedScreenControl::on_quit_pressed() { if (SceneTree* tree = get_tree()) { tree->quit(); } }
+void Gs1GodotRoutedScreenControl::on_open_worker_pack_pressed() { const int id = find_worker_pack_storage_id(); if (id != 0) { submit_storage_view(id, INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT); } }
+void Gs1GodotRoutedScreenControl::on_open_nearest_storage_pressed() { const int id = find_selected_tile_storage_id(); if (id != 0) { submit_storage_view(id, INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT); } }
+void Gs1GodotRoutedScreenControl::on_close_storage_pressed()
 {
     const Gs1RuntimeSiteProjection* site_state = active_site();
     if (site_state != nullptr && site_state->opened_storage.has_value())
@@ -1928,7 +1934,8 @@ void Gs1GodotMainScreenControl::on_close_storage_pressed()
         submit_storage_view(static_cast<int>(site_state->opened_storage->storage_id), INVENTORY_VIEW_EVENT_CLOSE);
     }
 }
-void Gs1GodotMainScreenControl::on_use_selected_item_pressed() { use_first_usable_item(); }
-void Gs1GodotMainScreenControl::on_transfer_selected_item_pressed() { transfer_first_storage_item_to_pack(); }
-void Gs1GodotMainScreenControl::on_plant_selected_seed_pressed() { plant_first_seed_on_selected_tile(); }
-void Gs1GodotMainScreenControl::on_dynamic_regional_site_pressed(int site_id) { select_regional_site(site_id, true); }
+void Gs1GodotRoutedScreenControl::on_use_selected_item_pressed() { use_first_usable_item(); }
+void Gs1GodotRoutedScreenControl::on_transfer_selected_item_pressed() { transfer_first_storage_item_to_pack(); }
+void Gs1GodotRoutedScreenControl::on_plant_selected_seed_pressed() { plant_first_seed_on_selected_tile(); }
+void Gs1GodotRoutedScreenControl::on_dynamic_regional_site_pressed(int site_id) { select_regional_site(site_id, true); }
+

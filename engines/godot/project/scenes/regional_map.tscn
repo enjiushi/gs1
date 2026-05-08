@@ -13,7 +13,7 @@ shader_parameter/shimmer_speed = 1.42
 shader_parameter/band_density = 46.0
 shader_parameter/edge_falloff = 0.88
 
-[node name="RegionalMap" type="Gs1GodotMainScreenControl" unique_id=1236848156]
+[node name="RegionalMap" type="Gs1GodotRegionalMapScreenControl" unique_id=1236848156]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0

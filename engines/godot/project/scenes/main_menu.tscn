@@ -22,7 +22,7 @@ shadow_color = Color(0.0784314, 0.0509804, 0.0196078, 0.26)
 shadow_size = 16
 anti_aliasing_size = 2.0
 
-[node name="MainMenu" type="Gs1GodotMainScreenControl" unique_id=1957236222]
+[node name="MainMenu" type="Gs1GodotMainMenuScreenControl" unique_id=1957236222]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0

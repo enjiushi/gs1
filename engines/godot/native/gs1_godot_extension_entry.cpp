@@ -1,4 +1,4 @@
-#include "gs1_godot_main_screen_control.h"
+#include "gs1_godot_routed_screen_control.h"
 #include "gs1_godot_runtime_node.h"
 #include "gs1_godot_scene_router_control.h"
 #include "gs1_godot_site_view_node.h"
@@ -20,7 +20,10 @@ void initialize_gs1_godot_adapter(ModuleInitializationLevel level)
 
     GDREGISTER_CLASS(Gs1RuntimeNode);
     GDREGISTER_CLASS(Gs1SiteViewNode);
-    GDREGISTER_CLASS(Gs1GodotMainScreenControl);
+    GDREGISTER_ABSTRACT_CLASS(Gs1GodotRoutedScreenControl);
+    GDREGISTER_CLASS(Gs1GodotMainMenuScreenControl);
+    GDREGISTER_CLASS(Gs1GodotRegionalMapScreenControl);
+    GDREGISTER_CLASS(Gs1GodotSiteSessionScreenControl);
     GDREGISTER_CLASS(Gs1GodotSceneRouterControl);
 }
 

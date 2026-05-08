@@ -67,13 +67,13 @@ class ScrollContainer;
 
 class Gs1RuntimeNode;
 
-class Gs1GodotMainScreenControl final : public godot::Control, public IGs1GodotEngineMessageSubscriber
+class Gs1GodotRoutedScreenControl : public godot::Control, public IGs1GodotEngineMessageSubscriber
 {
-    GDCLASS(Gs1GodotMainScreenControl, godot::Control)
+    GDCLASS(Gs1GodotRoutedScreenControl, godot::Control)
 
 public:
-    Gs1GodotMainScreenControl() = default;
-    ~Gs1GodotMainScreenControl() override = default;
+    Gs1GodotRoutedScreenControl() = default;
+    ~Gs1GodotRoutedScreenControl() override = default;
 
     void _ready() override;
     void _process(double delta) override;
@@ -356,3 +356,40 @@ private:
     godot::PanelContainer* craft_panel_ {nullptr};
     godot::PanelContainer* overlay_panel_ {nullptr};
 };
+
+class Gs1GodotMainMenuScreenControl final : public Gs1GodotRoutedScreenControl
+{
+    GDCLASS(Gs1GodotMainMenuScreenControl, Gs1GodotRoutedScreenControl)
+
+public:
+    Gs1GodotMainMenuScreenControl() = default;
+    ~Gs1GodotMainMenuScreenControl() override = default;
+
+protected:
+    static void _bind_methods();
+};
+
+class Gs1GodotRegionalMapScreenControl final : public Gs1GodotRoutedScreenControl
+{
+    GDCLASS(Gs1GodotRegionalMapScreenControl, Gs1GodotRoutedScreenControl)
+
+public:
+    Gs1GodotRegionalMapScreenControl() = default;
+    ~Gs1GodotRegionalMapScreenControl() override = default;
+
+protected:
+    static void _bind_methods();
+};
+
+class Gs1GodotSiteSessionScreenControl final : public Gs1GodotRoutedScreenControl
+{
+    GDCLASS(Gs1GodotSiteSessionScreenControl, Gs1GodotRoutedScreenControl)
+
+public:
+    Gs1GodotSiteSessionScreenControl() = default;
+    ~Gs1GodotSiteSessionScreenControl() override = default;
+
+protected:
+    static void _bind_methods();
+};
+

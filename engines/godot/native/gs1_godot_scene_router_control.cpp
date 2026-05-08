@@ -145,7 +145,7 @@ void Gs1GodotSceneRouterControl::switch_to_scene(ScreenKind kind)
 
     if (Node* active_scene = Object::cast_to<Node>(ObjectDB::get_instance(active_scene_id_)))
     {
-        if (auto* screen = Object::cast_to<Gs1GodotMainScreenControl>(active_scene))
+        if (auto* screen = Object::cast_to<Gs1GodotRoutedScreenControl>(active_scene))
         {
             screen->disconnect_runtime_subscriptions();
         }
@@ -209,7 +209,7 @@ void Gs1GodotSceneRouterControl::configure_scene_instance(Node* instance) const
         return;
     }
 
-    if (auto* screen = Object::cast_to<Gs1GodotMainScreenControl>(instance))
+    if (auto* screen = Object::cast_to<Gs1GodotRoutedScreenControl>(instance))
     {
         screen->set_runtime_node_path(NodePath("../../Runtime"));
         screen->apply_bootstrap_app_state(last_app_state_ >= 0 ? last_app_state_ : APP_STATE_BOOT);
