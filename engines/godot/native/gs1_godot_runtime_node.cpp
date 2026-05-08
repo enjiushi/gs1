@@ -156,6 +156,7 @@ void Gs1RuntimeNode::_bind_methods()
     ClassDB::bind_method(D_METHOD("submit_site_action_request", "action_kind", "flags", "quantity", "tile_x", "tile_y", "primary_subject_id", "secondary_subject_id", "item_id"), &Gs1RuntimeNode::submit_site_action_request);
     ClassDB::bind_method(D_METHOD("submit_site_action_cancel", "action_id", "flags"), &Gs1RuntimeNode::submit_site_action_cancel);
     ClassDB::bind_method(D_METHOD("submit_site_storage_view", "storage_id", "event_kind"), &Gs1RuntimeNode::submit_site_storage_view);
+    ClassDB::bind_method(D_METHOD("submit_site_inventory_slot_tap", "storage_id", "container_kind", "slot_index", "item_instance_id"), &Gs1RuntimeNode::submit_site_inventory_slot_tap);
 }
 
 void Gs1RuntimeNode::_ready()
@@ -410,6 +411,28 @@ bool Gs1RuntimeNode::submit_site_storage_view(std::int64_t storage_id, std::int6
     event.type = GS1_HOST_EVENT_SITE_STORAGE_VIEW;
     event.payload.site_storage_view.storage_id = static_cast<std::uint32_t>(storage_id);
     event.payload.site_storage_view.event_kind = static_cast<Gs1InventoryViewEventKind>(event_kind);
+    if (!runtime_session_.submit_host_events(&event, 1U))
+    {
+        last_error_ = runtime_session_.last_error();
+        return false;
+    }
+    return true;
+}
+
+bool Gs1RuntimeNode::submit_site_inventory_slot_tap(
+    std::int64_t storage_id,
+    std::int64_t container_kind,
+    std::int64_t slot_index,
+    std::int64_t item_instance_id)
+{
+    Gs1HostEvent event {};
+    event.type = GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP;
+    event.payload.site_inventory_slot_tap.storage_id = static_cast<std::uint32_t>(storage_id);
+    event.payload.site_inventory_slot_tap.container_kind =
+        static_cast<Gs1InventoryContainerKind>(container_kind);
+    event.payload.site_inventory_slot_tap.slot_index = static_cast<std::uint16_t>(slot_index);
+    event.payload.site_inventory_slot_tap.item_instance_id =
+        static_cast<std::uint32_t>(item_instance_id);
     if (!runtime_session_.submit_host_events(&event, 1U))
     {
         last_error_ = runtime_session_.last_error();

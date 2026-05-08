@@ -131,10 +131,6 @@ const char* ui_action_name(Gs1UiActionType action_type)
         return "CLAIM_TECHNOLOGY_NODE";
     case GS1_UI_ACTION_SELECT_TECH_TREE_FACTION_TAB:
         return "SELECT_TECH_TREE_FACTION_TAB";
-    case GS1_UI_ACTION_USE_INVENTORY_ITEM:
-        return "USE_INVENTORY_ITEM";
-    case GS1_UI_ACTION_TRANSFER_INVENTORY_ITEM:
-        return "TRANSFER_INVENTORY_ITEM";
     case GS1_UI_ACTION_HIRE_CONTRACTOR:
         return "HIRE_CONTRACTOR";
     case GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE:

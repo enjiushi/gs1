@@ -220,8 +220,6 @@ void Gs1GodotRoutedScreenControl::_bind_methods()
     ClassDB::bind_method(D_METHOD("on_open_worker_pack_pressed"), &Gs1GodotRoutedScreenControl::on_open_worker_pack_pressed);
     ClassDB::bind_method(D_METHOD("on_open_nearest_storage_pressed"), &Gs1GodotRoutedScreenControl::on_open_nearest_storage_pressed);
     ClassDB::bind_method(D_METHOD("on_close_storage_pressed"), &Gs1GodotRoutedScreenControl::on_close_storage_pressed);
-    ClassDB::bind_method(D_METHOD("on_use_selected_item_pressed"), &Gs1GodotRoutedScreenControl::on_use_selected_item_pressed);
-    ClassDB::bind_method(D_METHOD("on_transfer_selected_item_pressed"), &Gs1GodotRoutedScreenControl::on_transfer_selected_item_pressed);
     ClassDB::bind_method(D_METHOD("on_plant_selected_seed_pressed"), &Gs1GodotRoutedScreenControl::on_plant_selected_seed_pressed);
     ClassDB::bind_method(D_METHOD("on_dynamic_regional_site_pressed", "site_id"), &Gs1GodotRoutedScreenControl::on_dynamic_regional_site_pressed);
     ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "runtime_node_path"), "set_runtime_node_path", "get_runtime_node_path");
@@ -271,6 +269,12 @@ void Gs1GodotRoutedScreenControl::_ready()
     });
     phone_panel_controller_.set_submit_ui_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
         submit_ui_action(action_type, target_id, arg0, arg1);
+    });
+    inventory_panel_controller_.set_submit_inventory_slot_tap_callback([this](int storage_id, int container_kind, int slot_index, int item_instance_id) {
+        if (runtime_node_ != nullptr)
+        {
+            runtime_node_->submit_site_inventory_slot_tap(storage_id, container_kind, slot_index, item_instance_id);
+        }
     });
     site_hud_controller_.set_submit_ui_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
         submit_ui_action(action_type, target_id, arg0, arg1);
@@ -497,8 +501,6 @@ void Gs1GodotRoutedScreenControl::wire_static_buttons()
     bind_button(Object::cast_to<BaseButton>(find_child("OpenWorkerPackButton", true, false)), callable_mp(this, &Gs1GodotRoutedScreenControl::on_open_worker_pack_pressed));
     bind_button(Object::cast_to<BaseButton>(find_child("OpenNearestStorageButton", true, false)), callable_mp(this, &Gs1GodotRoutedScreenControl::on_open_nearest_storage_pressed));
     bind_button(Object::cast_to<BaseButton>(find_child("CloseStorageButton", true, false)), callable_mp(this, &Gs1GodotRoutedScreenControl::on_close_storage_pressed));
-    bind_button(Object::cast_to<BaseButton>(find_child("UseSelectedItemButton", true, false)), callable_mp(this, &Gs1GodotRoutedScreenControl::on_use_selected_item_pressed));
-    bind_button(Object::cast_to<BaseButton>(find_child("TransferSelectedItemButton", true, false)), callable_mp(this, &Gs1GodotRoutedScreenControl::on_transfer_selected_item_pressed));
     bind_button(Object::cast_to<BaseButton>(find_child("PlantSelectedSeedButton", true, false)), callable_mp(this, &Gs1GodotRoutedScreenControl::on_plant_selected_seed_pressed));
     bind_button(Object::cast_to<BaseButton>(find_child("CraftAtSelectedTileButton", true, false)), callable_mp(this, &Gs1GodotRoutedScreenControl::on_submit_selected_tile_context_pressed).bind(0));
 
@@ -1516,61 +1518,6 @@ String Gs1GodotRoutedScreenControl::structure_name_for(int structure_id) const
     return structure_name_cache_.emplace(structure_id, display_name).first->second;
 }
 
-void Gs1GodotRoutedScreenControl::use_first_usable_item()
-{
-    const Gs1RuntimeSiteProjection* site_state = active_site();
-    if (site_state == nullptr)
-    {
-        return;
-    }
-
-    for (const auto& slot : site_state->worker_pack_slots)
-    {
-        const auto* item_def = gs1::find_item_def(gs1::ItemId {slot.item_id});
-        const int capability_flags = item_def != nullptr ? static_cast<int>(item_def->capability_flags) : 0;
-        if (capability_flags == 0)
-        {
-            continue;
-        }
-        const int storage_id = static_cast<int>(slot.storage_id);
-        const int slot_index = static_cast<int>(slot.slot_index);
-        const int quantity = std::max(1, static_cast<int>(slot.quantity));
-        const int packed_arg0 = CONTAINER_WORKER_PACK | (slot_index << 8) | (quantity << 16);
-        submit_ui_action(UI_ACTION_USE_INVENTORY_ITEM, static_cast<int>(slot.item_instance_id), packed_arg0, storage_id);
-        return;
-    }
-}
-
-void Gs1GodotRoutedScreenControl::transfer_first_storage_item_to_pack()
-{
-    const Gs1RuntimeSiteProjection* site_state = active_site();
-    if (site_state == nullptr || !site_state->opened_storage.has_value())
-    {
-        return;
-    }
-
-    const auto& opened_storage = site_state->opened_storage.value();
-    if (opened_storage.slots.empty())
-    {
-        return;
-    }
-
-    const int destination_storage_id = find_worker_pack_storage_id();
-    if (destination_storage_id == 0)
-    {
-        return;
-    }
-
-    const auto& slot = opened_storage.slots.front();
-    const std::uint32_t source_storage_id = slot.storage_id;
-    const int source_slot_index = static_cast<int>(slot.slot_index);
-    const int quantity = std::max(1, static_cast<int>(slot.quantity));
-    const int packed_arg0 = CONTAINER_DEVICE_STORAGE | (source_slot_index << 8) | (CONTAINER_WORKER_PACK << 16) | (quantity << 24);
-    const std::uint64_t packed_arg1 = static_cast<std::uint64_t>(source_storage_id)
-        | (static_cast<std::uint64_t>(static_cast<std::uint32_t>(destination_storage_id)) << 32U);
-    submit_ui_action(UI_ACTION_TRANSFER_INVENTORY_ITEM, 0, packed_arg0, packed_arg1);
-}
-
 void Gs1GodotRoutedScreenControl::plant_first_seed_on_selected_tile()
 {
     const Gs1RuntimeSiteProjection* site_state = active_site();
@@ -1934,8 +1881,6 @@ void Gs1GodotRoutedScreenControl::on_close_storage_pressed()
         submit_storage_view(static_cast<int>(site_state->opened_storage->storage_id), INVENTORY_VIEW_EVENT_CLOSE);
     }
 }
-void Gs1GodotRoutedScreenControl::on_use_selected_item_pressed() { use_first_usable_item(); }
-void Gs1GodotRoutedScreenControl::on_transfer_selected_item_pressed() { transfer_first_storage_item_to_pack(); }
 void Gs1GodotRoutedScreenControl::on_plant_selected_seed_pressed() { plant_first_seed_on_selected_tile(); }
 void Gs1GodotRoutedScreenControl::on_dynamic_regional_site_pressed(int site_id) { select_regional_site(site_id, true); }
 

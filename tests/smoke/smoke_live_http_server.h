@@ -23,6 +23,7 @@ public:
         PostBodyCallback site_action_callback,
         PostBodyCallback site_action_cancel_callback,
         PostBodyCallback site_storage_view_callback,
+        PostBodyCallback site_inventory_slot_tap_callback,
         PostBodyCallback site_context_callback,
         PostBodyCallback site_control_callback,
         PostBodyCallback client_log_callback);
@@ -60,6 +61,7 @@ private:
     PostBodyCallback site_action_callback_ {};
     PostBodyCallback site_action_cancel_callback_ {};
     PostBodyCallback site_storage_view_callback_ {};
+    PostBodyCallback site_inventory_slot_tap_callback_ {};
     PostBodyCallback site_context_callback_ {};
     PostBodyCallback site_control_callback_ {};
     PostBodyCallback client_log_callback_ {};

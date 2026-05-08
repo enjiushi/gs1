@@ -285,6 +285,9 @@ private:
     [[nodiscard]] Gs1Status translate_site_storage_view_to_message(
         const Gs1HostEventSiteStorageViewData& request,
         GameMessage& out_message) const;
+    [[nodiscard]] Gs1Status translate_site_inventory_slot_tap_to_message(
+        const Gs1HostEventSiteInventorySlotTapData& request,
+        GameMessage& out_message) const;
     [[nodiscard]] Gs1Status translate_site_context_request_to_message(
         const Gs1HostEventSiteContextRequestData& request,
         GameMessage& out_message) const;

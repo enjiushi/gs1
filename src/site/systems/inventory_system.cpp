@@ -41,6 +41,11 @@ std::uint32_t normalize_quantity(std::uint32_t quantity) noexcept
     return quantity == 0U ? 1U : quantity;
 }
 
+Gs1Status resolve_inventory_item_use(
+    SiteSystemContext<InventorySystem>& context,
+    flecs::entity item_entity,
+    std::uint32_t quantity) noexcept;
+
 bool has_supported_inventory_transfer_route(const InventoryTransferRequestedMessage& payload) noexcept
 {
     return payload.source_storage_id != 0U && payload.destination_storage_id != 0U;
@@ -667,46 +672,60 @@ Gs1Status handle_inventory_item_use(
             return GS1_STATUS_INVALID_ARGUMENT;
         }
 
-        const auto* item_def = find_item_def(stack->item_id);
-        if (item_def == nullptr)
-        {
-            return GS1_STATUS_NOT_FOUND;
-        }
-
-        if (!item_is_directly_usable(*item_def))
-        {
-            return GS1_STATUS_INVALID_STATE;
-        }
-
-        const auto requested_quantity = normalize_quantity(payload.quantity);
-        if (requested_quantity > stack->quantity)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-
-        const ActionKind consume_action_kind = consume_action_kind_for_item(*item_def);
-        if (consume_action_kind != ActionKind::None)
-        {
-            emit_item_use_action_request(
-                context,
-                consume_action_kind,
-                *item_def,
-                static_cast<std::uint16_t>(requested_quantity));
-            return GS1_STATUS_OK;
-        }
-
-        if (!inventory_storage::consume_quantity_from_item_entity(
-                context.site_run,
-                item_entity,
-                requested_quantity))
-        {
-            return GS1_STATUS_INVALID_STATE;
-        }
-
-        emit_item_use_completed(context, stack->item_id, requested_quantity);
-        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_HUD);
-        return GS1_STATUS_OK;
+        return resolve_inventory_item_use(context, item_entity, payload.quantity);
     });
+}
+
+Gs1Status resolve_inventory_item_use(
+    SiteSystemContext<InventorySystem>& context,
+    flecs::entity item_entity,
+    std::uint32_t quantity) noexcept
+{
+    const auto* stack = inventory_storage::stack_data(context.site_run, item_entity);
+    if (stack == nullptr || stack->quantity == 0U)
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    const auto* item_def = find_item_def(stack->item_id);
+    if (item_def == nullptr)
+    {
+        return GS1_STATUS_NOT_FOUND;
+    }
+
+    if (!item_is_directly_usable(*item_def))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    const auto requested_quantity = normalize_quantity(quantity);
+    if (requested_quantity > stack->quantity)
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    const ActionKind consume_action_kind = consume_action_kind_for_item(*item_def);
+    if (consume_action_kind != ActionKind::None)
+    {
+        emit_item_use_action_request(
+            context,
+            consume_action_kind,
+            *item_def,
+            static_cast<std::uint16_t>(requested_quantity));
+        return GS1_STATUS_OK;
+    }
+
+    if (!inventory_storage::consume_quantity_from_item_entity(
+            context.site_run,
+            item_entity,
+            requested_quantity))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    emit_item_use_completed(context, stack->item_id, requested_quantity);
+    context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_HUD);
+    return GS1_STATUS_OK;
 }
 
 Gs1Status handle_inventory_item_consume(
@@ -941,7 +960,7 @@ Gs1Status handle_site_device_broken(
     });
 }
 
-Gs1Status handle_inventory_transfer(
+Gs1Status resolve_inventory_transfer(
     SiteSystemContext<InventorySystem>& context,
     const InventoryTransferRequestedMessage& payload) noexcept
 {
@@ -960,117 +979,51 @@ Gs1Status handle_inventory_transfer(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    return mutate_inventory_storage(context, [&]() -> Gs1Status {
-        const auto* source_storage = storage_state_for_transfer(context.site_run, payload.source_storage_id);
-        const auto* destination_storage =
-            storage_state_for_transfer(context.site_run, payload.destination_storage_id);
-        if (source_storage == nullptr || destination_storage == nullptr)
+    const auto* source_storage = storage_state_for_transfer(context.site_run, payload.source_storage_id);
+    const auto* destination_storage =
+        storage_state_for_transfer(context.site_run, payload.destination_storage_id);
+    if (source_storage == nullptr || destination_storage == nullptr)
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    const bool source_is_worker_pack =
+        source_storage->container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK;
+    const bool destination_is_worker_pack =
+        destination_storage->container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK;
+    const bool source_is_device_storage =
+        source_storage->container_kind == GS1_INVENTORY_CONTAINER_DEVICE_STORAGE;
+    const bool destination_is_device_storage =
+        destination_storage->container_kind == GS1_INVENTORY_CONTAINER_DEVICE_STORAGE;
+    if (!((source_is_worker_pack && destination_is_worker_pack) ||
+            (source_is_worker_pack && destination_is_device_storage) ||
+            (source_is_device_storage && destination_is_worker_pack)))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    if (source_is_worker_pack && source_storage->container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK &&
+        destination_is_device_storage && storage_is_retrieval_only(*destination_storage))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    if (auto_resolve_destination)
+    {
+        if (same_container)
         {
             return GS1_STATUS_INVALID_STATE;
-        }
-
-        const bool source_is_worker_pack =
-            source_storage->container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK;
-        const bool destination_is_worker_pack =
-            destination_storage->container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK;
-        const bool source_is_device_storage =
-            source_storage->container_kind == GS1_INVENTORY_CONTAINER_DEVICE_STORAGE;
-        const bool destination_is_device_storage =
-            destination_storage->container_kind == GS1_INVENTORY_CONTAINER_DEVICE_STORAGE;
-        if (!((source_is_worker_pack && destination_is_worker_pack) ||
-                (source_is_worker_pack && destination_is_device_storage) ||
-                (source_is_device_storage && destination_is_worker_pack)))
-        {
-            return GS1_STATUS_INVALID_STATE;
-        }
-
-        if (source_is_worker_pack && source_storage->container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK &&
-            destination_is_device_storage && storage_is_retrieval_only(*destination_storage))
-        {
-            return GS1_STATUS_INVALID_STATE;
-        }
-
-        if (auto_resolve_destination)
-        {
-            if (same_container)
-            {
-                return GS1_STATUS_INVALID_STATE;
-            }
-
-            const auto source_container =
-                inventory_storage::container_for_storage_id(context.site_run, payload.source_storage_id);
-            const auto destination_container =
-                inventory_storage::container_for_storage_id(context.site_run, payload.destination_storage_id);
-            if (!source_container.is_valid() || !destination_container.is_valid())
-            {
-                return GS1_STATUS_INVALID_STATE;
-            }
-
-            const auto source_item = inventory_storage::item_entity_for_slot(
-                context.site_run,
-                source_container,
-                payload.source_slot_index);
-            const auto* source_stack = inventory_storage::stack_data(context.site_run, source_item);
-            if (source_stack == nullptr || source_stack->quantity == 0U)
-            {
-                return GS1_STATUS_INVALID_STATE;
-            }
-
-            const auto requested_quantity =
-                payload.quantity == 0U
-                    ? source_stack->quantity
-                    : std::min<std::uint32_t>(normalize_quantity(payload.quantity), source_stack->quantity);
-            const auto source_reserved = reserved_item_quantity_in_container(
-                context.world.read_action(),
-                source_storage->container_kind,
-                source_stack->item_id);
-            if (source_reserved > 0U)
-            {
-                const auto source_available = inventory_storage::available_item_quantity_in_container_kind(
-                    context.site_run,
-                    source_storage->container_kind,
-                    source_stack->item_id);
-                if (source_available < requested_quantity ||
-                    source_available - requested_quantity < source_reserved)
-                {
-                    return GS1_STATUS_INVALID_STATE;
-                }
-            }
-            const auto remaining_quantity = inventory_storage::add_item_to_container(
-                context.site_run,
-                destination_container,
-                source_stack->item_id,
-                requested_quantity,
-                source_stack->condition,
-                source_stack->freshness);
-            if (remaining_quantity == requested_quantity)
-            {
-                return GS1_STATUS_INVALID_STATE;
-            }
-
-            const auto transferred_quantity = requested_quantity - remaining_quantity;
-            if (!inventory_storage::consume_quantity_from_item_entity(
-                    context.site_run,
-                    source_item,
-                    transferred_quantity))
-            {
-                return GS1_STATUS_INVALID_STATE;
-            }
-
-            GameMessage completed_message {};
-            completed_message.type = GameMessageType::InventoryTransferCompleted;
-            completed_message.set_payload(InventoryTransferCompletedMessage {
-                payload.source_storage_id,
-                payload.destination_storage_id,
-                source_stack->item_id.value,
-                static_cast<std::uint16_t>(transferred_quantity),
-                payload.flags});
-            context.message_queue.push_back(completed_message);
-            return GS1_STATUS_OK;
         }
 
         const auto source_container =
             inventory_storage::container_for_storage_id(context.site_run, payload.source_storage_id);
+        const auto destination_container =
+            inventory_storage::container_for_storage_id(context.site_run, payload.destination_storage_id);
+        if (!source_container.is_valid() || !destination_container.is_valid())
+        {
+            return GS1_STATUS_INVALID_STATE;
+        }
+
         const auto source_item = inventory_storage::item_entity_for_slot(
             context.site_run,
             source_container,
@@ -1081,38 +1034,43 @@ Gs1Status handle_inventory_transfer(
             return GS1_STATUS_INVALID_STATE;
         }
 
+        const auto requested_quantity =
+            payload.quantity == 0U
+                ? source_stack->quantity
+                : std::min<std::uint32_t>(normalize_quantity(payload.quantity), source_stack->quantity);
         const auto source_reserved = reserved_item_quantity_in_container(
             context.world.read_action(),
             source_storage->container_kind,
             source_stack->item_id);
         if (source_reserved > 0U)
         {
-            const auto transfer_quantity =
-                std::min<std::uint32_t>(normalize_quantity(payload.quantity), source_stack->quantity);
             const auto source_available = inventory_storage::available_item_quantity_in_container_kind(
                 context.site_run,
                 source_storage->container_kind,
                 source_stack->item_id);
-            if (source_available < transfer_quantity ||
-                source_available - transfer_quantity < source_reserved)
+            if (source_available < requested_quantity ||
+                source_available - requested_quantity < source_reserved)
             {
                 return GS1_STATUS_INVALID_STATE;
             }
         }
-
-        const auto transferred_quantity =
-            std::min<std::uint32_t>(normalize_quantity(payload.quantity), source_stack->quantity);
-
-        const bool transferred = inventory_storage::transfer_between_slots(
+        const auto remaining_quantity = inventory_storage::add_item_to_container(
             context.site_run,
-            source_storage->container_kind,
-            payload.source_slot_index,
-            destination_storage->container_kind,
-            payload.destination_slot_index,
-            transferred_quantity,
-            source_storage->owner_device_entity_id,
-            destination_storage->owner_device_entity_id);
-        if (!transferred)
+            destination_container,
+            source_stack->item_id,
+            requested_quantity,
+            source_stack->condition,
+            source_stack->freshness);
+        if (remaining_quantity == requested_quantity)
+        {
+            return GS1_STATUS_INVALID_STATE;
+        }
+
+        const auto transferred_quantity = requested_quantity - remaining_quantity;
+        if (!inventory_storage::consume_quantity_from_item_entity(
+                context.site_run,
+                source_item,
+                transferred_quantity))
         {
             return GS1_STATUS_INVALID_STATE;
         }
@@ -1127,6 +1085,174 @@ Gs1Status handle_inventory_transfer(
             payload.flags});
         context.message_queue.push_back(completed_message);
         return GS1_STATUS_OK;
+    }
+
+    const auto source_container =
+        inventory_storage::container_for_storage_id(context.site_run, payload.source_storage_id);
+    const auto source_item = inventory_storage::item_entity_for_slot(
+        context.site_run,
+        source_container,
+        payload.source_slot_index);
+    const auto* source_stack = inventory_storage::stack_data(context.site_run, source_item);
+    if (source_stack == nullptr || source_stack->quantity == 0U)
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    const auto source_reserved = reserved_item_quantity_in_container(
+        context.world.read_action(),
+        source_storage->container_kind,
+        source_stack->item_id);
+    if (source_reserved > 0U)
+    {
+        const auto transfer_quantity =
+            std::min<std::uint32_t>(normalize_quantity(payload.quantity), source_stack->quantity);
+        const auto source_available = inventory_storage::available_item_quantity_in_container_kind(
+            context.site_run,
+            source_storage->container_kind,
+            source_stack->item_id);
+        if (source_available < transfer_quantity ||
+            source_available - transfer_quantity < source_reserved)
+        {
+            return GS1_STATUS_INVALID_STATE;
+        }
+    }
+
+    const auto transferred_quantity =
+        std::min<std::uint32_t>(normalize_quantity(payload.quantity), source_stack->quantity);
+
+    const bool transferred = inventory_storage::transfer_between_slots(
+        context.site_run,
+        source_storage->container_kind,
+        payload.source_slot_index,
+        destination_storage->container_kind,
+        payload.destination_slot_index,
+        transferred_quantity,
+        source_storage->owner_device_entity_id,
+        destination_storage->owner_device_entity_id);
+    if (!transferred)
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    GameMessage completed_message {};
+    completed_message.type = GameMessageType::InventoryTransferCompleted;
+    completed_message.set_payload(InventoryTransferCompletedMessage {
+        payload.source_storage_id,
+        payload.destination_storage_id,
+        source_stack->item_id.value,
+        static_cast<std::uint16_t>(transferred_quantity),
+        payload.flags});
+    context.message_queue.push_back(completed_message);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status handle_inventory_transfer(
+    SiteSystemContext<InventorySystem>& context,
+    const InventoryTransferRequestedMessage& payload) noexcept
+{
+    return mutate_inventory_storage(context, [&]() -> Gs1Status {
+        return resolve_inventory_transfer(context, payload);
+    });
+}
+
+Gs1Status handle_inventory_slot_tapped(
+    SiteSystemContext<InventorySystem>& context,
+    const InventorySlotTappedMessage& payload) noexcept
+{
+    if (payload.storage_id == 0U ||
+        (payload.container_kind != GS1_INVENTORY_CONTAINER_WORKER_PACK &&
+            payload.container_kind != GS1_INVENTORY_CONTAINER_DEVICE_STORAGE))
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    return mutate_inventory_storage(context, [&]() -> Gs1Status {
+        const auto* source_storage =
+            inventory_storage::storage_container_state_for_storage_id(
+                context.site_run,
+                payload.storage_id);
+        if (source_storage == nullptr ||
+            source_storage->container_kind != payload.container_kind)
+        {
+            return GS1_STATUS_OK;
+        }
+
+        const auto source_container =
+            inventory_storage::container_for_storage_id(context.site_run, payload.storage_id);
+        const auto source_item = inventory_storage::item_entity_for_slot(
+            context.site_run,
+            source_container,
+            payload.slot_index);
+        const auto* source_stack = inventory_storage::stack_data(context.site_run, source_item);
+        if (source_stack == nullptr || source_stack->quantity == 0U)
+        {
+            return GS1_STATUS_OK;
+        }
+
+        if (payload.item_instance_id != 0U &&
+            payload.item_instance_id != static_cast<std::uint32_t>(source_item.id()))
+        {
+            return GS1_STATUS_OK;
+        }
+
+        if (payload.container_kind == GS1_INVENTORY_CONTAINER_DEVICE_STORAGE)
+        {
+            const auto destination_storage_id = context.world.read_inventory().worker_pack_storage_id;
+            if (destination_storage_id == 0U ||
+                destination_storage_id == payload.storage_id)
+            {
+                return GS1_STATUS_OK;
+            }
+
+            InventoryTransferRequestedMessage transfer {};
+            transfer.source_storage_id = payload.storage_id;
+            transfer.destination_storage_id = destination_storage_id;
+            transfer.source_slot_index = payload.slot_index;
+            transfer.quantity = static_cast<std::uint16_t>(
+                std::min<std::uint32_t>(source_stack->quantity, 65535U));
+            transfer.flags = k_inventory_transfer_flag_resolve_destination_in_dll;
+            return resolve_inventory_transfer(context, transfer);
+        }
+
+        if (payload.container_kind != GS1_INVENTORY_CONTAINER_WORKER_PACK)
+        {
+            return GS1_STATUS_OK;
+        }
+
+        const auto opened_storage_id = context.world.read_inventory().opened_device_storage_id;
+        if (opened_storage_id != 0U &&
+            opened_storage_id != payload.storage_id)
+        {
+            const auto* destination_storage =
+                inventory_storage::storage_container_state_for_storage_id(
+                    context.site_run,
+                    opened_storage_id);
+            if (destination_storage != nullptr &&
+                destination_storage->container_kind == GS1_INVENTORY_CONTAINER_DEVICE_STORAGE &&
+                !storage_is_retrieval_only(*destination_storage))
+            {
+                InventoryTransferRequestedMessage transfer {};
+                transfer.source_storage_id = payload.storage_id;
+                transfer.destination_storage_id = opened_storage_id;
+                transfer.source_slot_index = payload.slot_index;
+                transfer.quantity = static_cast<std::uint16_t>(
+                    std::min<std::uint32_t>(source_stack->quantity, 65535U));
+                transfer.flags = k_inventory_transfer_flag_resolve_destination_in_dll;
+                return resolve_inventory_transfer(context, transfer);
+            }
+        }
+
+        const auto* item_def = find_item_def(source_stack->item_id);
+        if (item_def == nullptr || !item_is_directly_usable(*item_def))
+        {
+            return GS1_STATUS_OK;
+        }
+
+        return resolve_inventory_item_use(
+            context,
+            source_item,
+            1U);
     });
 }
 
@@ -1438,6 +1564,7 @@ bool InventorySystem::subscribes_to(GameMessageType type) noexcept
     case GameMessageType::InventoryTransferRequested:
     case GameMessageType::InventoryItemSubmitRequested:
     case GameMessageType::InventoryStorageViewRequest:
+    case GameMessageType::InventorySlotTapped:
     case GameMessageType::InventoryCraftCommitRequested:
         return true;
     default:
@@ -1517,6 +1644,11 @@ Gs1Status InventorySystem::process_message(
         return handle_inventory_storage_view_request(
             context,
             message.payload_as<InventoryStorageViewRequestMessage>());
+
+    case GameMessageType::InventorySlotTapped:
+        return handle_inventory_slot_tapped(
+            context,
+            message.payload_as<InventorySlotTappedMessage>());
 
     case GameMessageType::InventoryCraftCommitRequested:
         return handle_inventory_craft_commit(

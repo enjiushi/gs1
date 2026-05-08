@@ -2851,29 +2851,6 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         return containerKey(containerKind, containerOwnerId) + ":" + slotIndex;
     }
 
-    function encodeInventoryTransferOwnersArg(sourceOwnerId, destinationOwnerId) {
-        return (sourceOwnerId >>> 0) + ((destinationOwnerId >>> 0) * 0x100000000);
-    }
-
-    function encodeInventoryUseArg(containerKind, slotIndex, quantity) {
-        const containerCode = inventoryContainerCodes[containerKind] || 0;
-        return containerCode + ((slotIndex & 0xff) << 8) + ((quantity & 0xffff) << 16);
-    }
-
-    function encodeInventoryTransferArg(
-        sourceContainerKind,
-        sourceSlotIndex,
-        destinationContainerKind,
-        quantity
-    ) {
-        const sourceContainerCode = inventoryContainerCodes[sourceContainerKind] || 0;
-        const destinationContainerCode = inventoryContainerCodes[destinationContainerKind] || 0;
-        return sourceContainerCode +
-            ((sourceSlotIndex & 0xff) << 8) +
-            ((destinationContainerCode & 0xff) << 16) +
-            ((quantity & 0xffff) * 0x1000000);
-    }
-
     function getInventoryContainers(state) {
         return inventoryCache.containers.map((containerInfo) => ({
             key: containerInfo.key,
@@ -3123,69 +3100,12 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         });
     }
 
-    function slotUsesPrimaryTransferClick(state, sourceSlot) {
-        if (!state || state.appState !== "SITE_ACTIVE" || !isOccupiedSlot(sourceSlot)) {
-            return false;
-        }
-
-        if (sourceSlot.containerKind === "WORKER_PACK") {
-            const openedContainer = findOpenedInventoryContainer(state);
-            return !!(
-                openedContainer &&
-                openedContainer.containerKind === "DEVICE_STORAGE" &&
-                (openedContainer.flags & inventoryStorageFlags.retrievalOnly) === 0
-            );
-        }
-
-        if (sourceSlot.containerKind === "DEVICE_STORAGE") {
-            const openedContainer = findOpenedInventoryContainer(state);
-            return !!openedContainer &&
-                openedContainer.containerKind === sourceSlot.containerKind &&
-                (openedContainer.containerOwnerId || 0) === (sourceSlot.containerOwnerId || 0);
-        }
-
-        return false;
-    }
-
-    function findPrimaryTransferTargetContainer(state, sourceSlot) {
-        if (!slotUsesPrimaryTransferClick(state, sourceSlot)) {
-            return null;
-        }
-
-        if (sourceSlot.containerKind === "WORKER_PACK") {
-            return findOpenedInventoryContainer(state);
-        }
-
-        if (sourceSlot.containerKind === "DEVICE_STORAGE") {
-            return findWorkerPackInventoryContainer(state);
-        }
-
-        return null;
-    }
-
-    function postInventoryUse(slot) {
-        return postJson("/ui-action", {
-            type: "USE_INVENTORY_ITEM",
-            targetId: slot.itemInstanceId || slot.itemId,
-            arg0: encodeInventoryUseArg(slot.containerKind, slot.slotIndex, 1),
-            arg1: slot.storageId || 0
-        });
-    }
-
-    function postInventoryTransfer(sourceSlot, destinationKind, destinationOwnerId) {
-        return postJson("/ui-action", {
-            type: "TRANSFER_INVENTORY_ITEM",
-            targetId: sourceSlot.itemInstanceId || sourceSlot.itemId,
-            arg0: encodeInventoryTransferArg(
-                sourceSlot.containerKind,
-                sourceSlot.slotIndex,
-                destinationKind,
-                0
-            ),
-            arg1: encodeInventoryTransferOwnersArg(
-                sourceSlot.storageId || 0,
-                destinationOwnerId || 0
-            )
+    function postInventorySlotTap(slot) {
+        return postJson("/site-inventory-slot-tap", {
+            storageId: slot.storageId || 0,
+            itemInstanceId: slot.itemInstanceId || 0,
+            slotIndex: slot.slotIndex || 0,
+            containerKind: slot.containerKind || "WORKER_PACK"
         });
     }
 
@@ -4051,14 +3971,8 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             containerTileX: slot.containerTileX || 0,
             containerTileY: slot.containerTileY || 0
         });
-        let actionHint = "No direct left-click action";
-        if (slotUsesPrimaryTransferClick(latestState, slot)) {
-            actionHint = slot.containerKind === "WORKER_PACK"
-                ? "Click to move into the opened storage"
-                : "Click to move into the worker pack";
-        } else if (slot.containerKind === "WORKER_PACK" && itemMeta && itemMeta.canUse) {
-            actionHint = "Click to use or consume";
-        } else if (slot.containerKind === "WORKER_PACK" && itemMeta && (itemMeta.canPlant || itemMeta.canDeploy)) {
+        let actionHint = "Click to act on this stack";
+        if (slot.containerKind === "WORKER_PACK" && itemMeta && (itemMeta.canPlant || itemMeta.canDeploy)) {
             actionHint = "Carry this item and use the tile menu to place it";
         }
 
@@ -4597,35 +4511,13 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
         event.preventDefault();
         event.stopPropagation();
 
-        const primaryTransferClick = slotUsesPrimaryTransferClick(latestState, slot);
-        const transferTargetContainer = findPrimaryTransferTargetContainer(latestState, slot);
-        const itemMeta = getItemMeta(slot.itemId);
-
-        if (transferTargetContainer) {
-            selectedInventorySlotKey = "";
-            postInventoryTransfer(
-                slot,
-                transferTargetContainer.containerKind,
-                transferTargetContainer.containerOwnerId).catch(() => {
-                statusChip.textContent = "Failed to move inventory item.";
-            });
-            if (latestState) {
-                renderSiteOverlay(latestState);
-            }
-            return;
-        }
-
-        if (primaryTransferClick) {
-            return;
-        }
-
-        if (slot.containerKind !== "WORKER_PACK" || !itemMeta || !itemMeta.canUse) {
+        if (!isOccupiedSlot(slot)) {
             return;
         }
 
         selectedInventorySlotKey = "";
-        postInventoryUse(slot).catch(() => {
-            statusChip.textContent = "Failed to use inventory item.";
+        postInventorySlotTap(slot).catch(() => {
+            statusChip.textContent = "Failed to submit inventory item.";
         });
     }
 
@@ -4656,7 +4548,7 @@ import * as THREE_NS from "https://unpkg.com/three@0.165.0/build/three.module.js
             slotClasses.push("reward-highlighted");
         }
         card.className = slotClasses.join(" ");
-        card.title = occupied ? getInventoryItemLabel(slot) : label;
+        card.title = occupied ? "Tap " + getInventoryItemLabel(slot) : label;
 
         const icon = document.createElement("div");
         icon.className = "inventory-slot-icon";

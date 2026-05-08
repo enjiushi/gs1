@@ -117,6 +117,20 @@ std::optional<std::string> extract_string_field(const std::string& body, const c
     return body.substr(first_quote + 1U, second_quote - first_quote - 1U);
 }
 
+Gs1InventoryContainerKind inventory_container_kind_from_string(const std::string& value)
+{
+    if (value == "DEVICE_STORAGE")
+    {
+        return GS1_INVENTORY_CONTAINER_DEVICE_STORAGE;
+    }
+    if (value == "WORKER_PACK")
+    {
+        return GS1_INVENTORY_CONTAINER_WORKER_PACK;
+    }
+
+    throw std::runtime_error("Unsupported inventory container kind: " + value);
+}
+
 template <typename NumberType>
 std::optional<NumberType> extract_number_field(const std::string& body, const char* key)
 {
@@ -246,14 +260,6 @@ std::optional<Gs1UiActionType> parse_ui_action_type(const std::string& value)
     if (value == "SELECT_TECH_TREE_FACTION_TAB")
     {
         return GS1_UI_ACTION_SELECT_TECH_TREE_FACTION_TAB;
-    }
-    if (value == "USE_INVENTORY_ITEM")
-    {
-        return GS1_UI_ACTION_USE_INVENTORY_ITEM;
-    }
-    if (value == "TRANSFER_INVENTORY_ITEM")
-    {
-        return GS1_UI_ACTION_TRANSFER_INVENTORY_ITEM;
     }
     if (value == "HIRE_CONTRACTOR")
     {
@@ -421,6 +427,23 @@ void run_live_mode(
             request.event_kind = event_kind.value();
 
             session.host.queue_site_storage_view(request);
+        },
+        [&session](const std::string& body) {
+            const auto container_kind_name = extract_string_field(body, "containerKind");
+            if (!container_kind_name.has_value())
+            {
+                return;
+            }
+
+            Gs1HostEventSiteInventorySlotTapData request {};
+            request.storage_id = extract_number_field<std::uint32_t>(body, "storageId").value_or(0U);
+            request.item_instance_id =
+                extract_number_field<std::uint32_t>(body, "itemInstanceId").value_or(0U);
+            request.slot_index = static_cast<std::uint16_t>(
+                extract_number_field<std::uint32_t>(body, "slotIndex").value_or(0U));
+            request.container_kind = inventory_container_kind_from_string(container_kind_name.value());
+
+            session.host.queue_site_inventory_slot_tap(request);
         },
         [&session](const std::string& body) {
             Gs1HostEventSiteContextRequestData request {};

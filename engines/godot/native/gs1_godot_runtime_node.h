@@ -47,6 +47,11 @@ public:
         std::int64_t item_id);
     [[nodiscard]] bool submit_site_action_cancel(std::int64_t action_id, std::int64_t flags);
     [[nodiscard]] bool submit_site_storage_view(std::int64_t storage_id, std::int64_t event_kind);
+    [[nodiscard]] bool submit_site_inventory_slot_tap(
+        std::int64_t storage_id,
+        std::int64_t container_kind,
+        std::int64_t slot_index,
+        std::int64_t item_instance_id);
 
     [[nodiscard]] const std::string& last_error() const noexcept { return last_error_; }
     void subscribe_engine_messages(IGs1GodotEngineMessageSubscriber& subscriber);

@@ -112,14 +112,6 @@ std::optional<Gs1UiActionType> parse_ui_action_type(const std::string& value)
     {
         return GS1_UI_ACTION_SELECT_TECH_TREE_FACTION_TAB;
     }
-    if (value == "USE_INVENTORY_ITEM")
-    {
-        return GS1_UI_ACTION_USE_INVENTORY_ITEM;
-    }
-    if (value == "TRANSFER_INVENTORY_ITEM")
-    {
-        return GS1_UI_ACTION_TRANSFER_INVENTORY_ITEM;
-    }
     if (value == "HIRE_CONTRACTOR")
     {
         return GS1_UI_ACTION_HIRE_CONTRACTOR;

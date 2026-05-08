@@ -1117,78 +1117,6 @@ std::uint16_t resolve_hud_warning_code(const SiteRunState& site_run) noexcept
     return k_hud_warning_none;
 }
 
-std::uint64_t pack_inventory_use_arg(
-    Gs1InventoryContainerKind container_kind,
-    std::uint32_t slot_index,
-    std::uint32_t quantity) noexcept
-{
-    return static_cast<std::uint64_t>(container_kind) |
-        (static_cast<std::uint64_t>(slot_index & 0xffU) << 8U) |
-        (static_cast<std::uint64_t>(quantity & 0xffffU) << 16U);
-}
-
-Gs1InventoryContainerKind unpack_inventory_container(std::uint64_t packed) noexcept
-{
-    return static_cast<Gs1InventoryContainerKind>(packed & 0xffU);
-}
-
-std::uint32_t unpack_inventory_slot_index(std::uint64_t packed) noexcept
-{
-    return static_cast<std::uint32_t>((packed >> 8U) & 0xffU);
-}
-
-std::uint32_t unpack_inventory_quantity(std::uint64_t packed) noexcept
-{
-    return static_cast<std::uint32_t>((packed >> 16U) & 0xffffU);
-}
-
-std::uint32_t unpack_inventory_storage_id(std::uint64_t packed) noexcept
-{
-    return static_cast<std::uint32_t>(packed & 0xffffffffULL);
-}
-
-std::uint64_t pack_inventory_transfer_arg(
-    Gs1InventoryContainerKind source_container_kind,
-    std::uint32_t source_slot_index,
-    Gs1InventoryContainerKind destination_container_kind,
-    std::uint32_t quantity) noexcept
-{
-    return static_cast<std::uint64_t>(source_container_kind) |
-        (static_cast<std::uint64_t>(source_slot_index & 0xffU) << 8U) |
-        (static_cast<std::uint64_t>(destination_container_kind) << 16U) |
-        (static_cast<std::uint64_t>(quantity & 0xffffU) << 24U);
-}
-
-Gs1InventoryContainerKind unpack_transfer_source_container(std::uint64_t packed) noexcept
-{
-    return static_cast<Gs1InventoryContainerKind>(packed & 0xffU);
-}
-
-std::uint32_t unpack_transfer_source_slot(std::uint64_t packed) noexcept
-{
-    return static_cast<std::uint32_t>((packed >> 8U) & 0xffU);
-}
-
-Gs1InventoryContainerKind unpack_transfer_destination_container(std::uint64_t packed) noexcept
-{
-    return static_cast<Gs1InventoryContainerKind>((packed >> 16U) & 0xffU);
-}
-
-std::uint32_t unpack_transfer_quantity(std::uint64_t packed) noexcept
-{
-    return static_cast<std::uint32_t>((packed >> 24U) & 0xffffU);
-}
-
-std::uint32_t unpack_transfer_source_owner(std::uint64_t packed) noexcept
-{
-    return static_cast<std::uint32_t>(packed & 0xffffffffULL);
-}
-
-std::uint32_t unpack_transfer_destination_owner(std::uint64_t packed) noexcept
-{
-    return static_cast<std::uint32_t>((packed >> 32U) & 0xffffffffULL);
-}
-
 bool action_has_started(const ActionState& action_state) noexcept
 {
     return action_state.current_action_id.has_value() &&
@@ -5161,33 +5089,6 @@ Gs1Status GameRuntime::translate_ui_action_to_message(const Gs1UiAction& action,
         out_message.set_payload(SiteUnlockablePurchaseRequestedMessage {action.target_id});
         return GS1_STATUS_OK;
 
-    case GS1_UI_ACTION_USE_INVENTORY_ITEM:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        out_message.type = GameMessageType::InventoryItemUseRequested;
-        out_message.set_payload(InventoryItemUseRequestedMessage {
-            action.target_id,
-            unpack_inventory_storage_id(action.arg1),
-            static_cast<std::uint16_t>(unpack_inventory_quantity(action.arg0) == 0U
-                    ? 1U
-                    : unpack_inventory_quantity(action.arg0)),
-            static_cast<std::uint16_t>(unpack_inventory_slot_index(action.arg0))});
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_TRANSFER_INVENTORY_ITEM:
-        out_message.type = GameMessageType::InventoryTransferRequested;
-        out_message.set_payload(InventoryTransferRequestedMessage {
-            unpack_transfer_source_owner(action.arg1),
-            unpack_transfer_destination_owner(action.arg1),
-            static_cast<std::uint16_t>(unpack_transfer_source_slot(action.arg0)),
-            0U,
-            static_cast<std::uint16_t>(unpack_transfer_quantity(action.arg0)),
-            k_inventory_transfer_flag_resolve_destination_in_dll,
-            0U});
-        return GS1_STATUS_OK;
-
     case GS1_UI_ACTION_NONE:
     default:
         return GS1_STATUS_INVALID_ARGUMENT;
@@ -5249,6 +5150,30 @@ Gs1Status GameRuntime::translate_site_storage_view_to_message(
         request.storage_id,
         request.event_kind,
         {0U, 0U, 0U}});
+    return GS1_STATUS_OK;
+}
+
+Gs1Status GameRuntime::translate_site_inventory_slot_tap_to_message(
+    const Gs1HostEventSiteInventorySlotTapData& request,
+    GameMessage& out_message) const
+{
+    if (request.storage_id == 0U)
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+    if (request.container_kind != GS1_INVENTORY_CONTAINER_WORKER_PACK &&
+        request.container_kind != GS1_INVENTORY_CONTAINER_DEVICE_STORAGE)
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    out_message.type = GameMessageType::InventorySlotTapped;
+    out_message.set_payload(InventorySlotTappedMessage {
+        request.storage_id,
+        request.item_instance_id,
+        request.slot_index,
+        request.container_kind,
+        0U});
     return GS1_STATUS_OK;
 }
 
@@ -5410,6 +5335,25 @@ Gs1Status GameRuntime::dispatch_host_events(
             GameMessage message {};
             const auto status =
                 translate_site_storage_view_to_message(event.payload.site_storage_view, message);
+            if (status != GS1_STATUS_OK)
+            {
+                return status;
+            }
+
+            message_queue_.push_back(message);
+            const auto dispatch_status = dispatch_queued_messages();
+            if (dispatch_status != GS1_STATUS_OK)
+            {
+                return dispatch_status;
+            }
+            break;
+        }
+
+        case GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP:
+        {
+            GameMessage message {};
+            const auto status =
+                translate_site_inventory_slot_tap_to_message(event.payload.site_inventory_slot_tap, message);
             if (status != GS1_STATUS_OK)
             {
                 return status;

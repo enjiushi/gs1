@@ -103,6 +103,7 @@ enum class GameMessageType : std::uint8_t
     InventoryTransferRequested,
     InventoryItemSubmitRequested,
     InventoryStorageViewRequest,
+    InventorySlotTapped,
     InventoryCraftContextRequested,
     PlacementModeCursorMoved,
     PlacementModeCommitRejected,
@@ -767,6 +768,15 @@ struct InventoryStorageViewRequestMessage final
     std::uint8_t reserved0[3];
 };
 
+struct InventorySlotTappedMessage final
+{
+    std::uint32_t storage_id;
+    std::uint32_t item_instance_id;
+    std::uint16_t slot_index;
+    Gs1InventoryContainerKind container_kind;
+    std::uint8_t reserved0;
+};
+
 struct CraftContextRequestedMessage final
 {
     std::int32_t tile_x;
@@ -887,6 +897,7 @@ GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryGlobalItemConsumeRequestedMessage, 8U
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryTransferRequestedMessage, 16U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryItemSubmitRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryStorageViewRequestMessage, 8U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventorySlotTappedMessage, 12U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(CraftContextRequestedMessage, 12U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PlacementModeCursorMovedMessage, 12U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PlacementModeCommitRejectedMessage, 24U);

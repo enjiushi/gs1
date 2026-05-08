@@ -245,10 +245,6 @@ const char* ui_action_name(Gs1UiActionType action_type)
         return "CLAIM_TECHNOLOGY_NODE";
     case GS1_UI_ACTION_SELECT_TECH_TREE_FACTION_TAB:
         return "SELECT_TECH_TREE_FACTION_TAB";
-    case GS1_UI_ACTION_USE_INVENTORY_ITEM:
-        return "USE_INVENTORY_ITEM";
-    case GS1_UI_ACTION_TRANSFER_INVENTORY_ITEM:
-        return "TRANSFER_INVENTORY_ITEM";
     case GS1_UI_ACTION_HIRE_CONTRACTOR:
         return "HIRE_CONTRACTOR";
     case GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE:
@@ -553,6 +549,15 @@ void SmokeEngineHost::queue_site_storage_view(const Gs1HostEventSiteStorageViewD
     Gs1HostEvent event {};
     event.type = GS1_HOST_EVENT_SITE_STORAGE_VIEW;
     event.payload.site_storage_view = request;
+    std::scoped_lock lock {incoming_commands_mutex_};
+    incoming_pre_phase1_host_events_.push_back(event);
+}
+
+void SmokeEngineHost::queue_site_inventory_slot_tap(const Gs1HostEventSiteInventorySlotTapData& request)
+{
+    Gs1HostEvent event {};
+    event.type = GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP;
+    event.payload.site_inventory_slot_tap = request;
     std::scoped_lock lock {incoming_commands_mutex_};
     incoming_pre_phase1_host_events_.push_back(event);
 }

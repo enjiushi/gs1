@@ -142,14 +142,6 @@ text = "Open Nearby Storage"
 layout_mode = 2
 text = "Close Open Storage"
 
-[node name="UseSelectedItemButton" type="Button" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox/SiteControls"]
-layout_mode = 2
-text = "Use Pack Item"
-
-[node name="TransferSelectedItemButton" type="Button" parent="HudMargin/RootVBox/MainColumns/LeftColumn/SitePanel/SiteVBox/SiteControls"]
-layout_mode = 2
-text = "Move Storage Item To Pack"
-
 [node name="ViewSpacer" type="Control" parent="HudMargin/RootVBox/MainColumns"]
 layout_mode = 2
 size_flags_horizontal = 3
@@ -165,11 +157,29 @@ theme_override_constants/separation = 14
 visible = false
 layout_mode = 2
 
-[node name="InventorySummary" type="RichTextLabel" parent="HudMargin/RootVBox/MainColumns/RightColumn/InventoryPanel"]
-custom_minimum_size = Vector2(0, 170)
-bbcode_enabled = true
-fit_content = true
-scroll_active = true
+[node name="InventoryVBox" type="VBoxContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn/InventoryPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="InventoryTitle" type="Label" parent="HudMargin/RootVBox/MainColumns/RightColumn/InventoryPanel/InventoryVBox"]
+layout_mode = 2
+text = "Inventory"
+
+[node name="WorkerPackTitle" type="Label" parent="HudMargin/RootVBox/MainColumns/RightColumn/InventoryPanel/InventoryVBox"]
+layout_mode = 2
+text = "Worker Pack"
+
+[node name="WorkerPackSlots" type="GridContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn/InventoryPanel/InventoryVBox"]
+layout_mode = 2
+columns = 4
+
+[node name="OpenedStorageTitle" type="Label" parent="HudMargin/RootVBox/MainColumns/RightColumn/InventoryPanel/InventoryVBox"]
+layout_mode = 2
+text = "Storage"
+
+[node name="OpenedStorageSlots" type="GridContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn/InventoryPanel/InventoryVBox"]
+layout_mode = 2
+columns = 4
 
 [node name="TaskPanel" type="PanelContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn"]
 visible = false

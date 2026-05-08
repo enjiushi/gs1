@@ -452,8 +452,8 @@ void visual_smoke_assets_keep_hidden_regional_map_panels_collapsed()
     assert(viewer.find("if (state.appState !== \"SITE_ACTIVE\") {") != std::string::npos);
     assert(viewer.find("renderSiteTaskPanel(null);") != std::string::npos);
     assert(viewer.find("renderSiteModifiers(null);") != std::string::npos);
-    assert(viewer.find("postInventoryUse(slot).catch(() => {") != std::string::npos);
-    assert(viewer.find("Click to use or consume") != std::string::npos);
+    assert(viewer.find("postInventorySlotTap(slot).catch(() => {") != std::string::npos);
+    assert(viewer.find("Click to act on this stack") != std::string::npos);
     assert(viewer.find("Click to select and use/store") == std::string::npos);
     assert(viewer.find("siteTechTreeActions.appendChild(") != std::string::npos);
     assert(viewer.find("function getViewportDimensions() {") != std::string::npos);

@@ -56,7 +56,8 @@ enum Gs1HostEventType : std::uint8_t
     GS1_HOST_EVENT_SITE_ACTION_REQUEST = 3,
     GS1_HOST_EVENT_SITE_ACTION_CANCEL = 4,
     GS1_HOST_EVENT_SITE_STORAGE_VIEW = 5,
-    GS1_HOST_EVENT_SITE_CONTEXT_REQUEST = 6
+    GS1_HOST_EVENT_SITE_CONTEXT_REQUEST = 6,
+    GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP = 7
 };
 
 enum Gs1UiSetupId : std::uint8_t
@@ -170,8 +171,6 @@ enum Gs1UiActionType : std::uint8_t
     GS1_UI_ACTION_CLAIM_TASK_REWARD = 7,
     GS1_UI_ACTION_BUY_PHONE_LISTING = 8,
     GS1_UI_ACTION_SELL_PHONE_LISTING = 9,
-    GS1_UI_ACTION_USE_INVENTORY_ITEM = 10,
-    GS1_UI_ACTION_TRANSFER_INVENTORY_ITEM = 11,
     GS1_UI_ACTION_HIRE_CONTRACTOR = 12,
     GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE = 13,
     GS1_UI_ACTION_ADD_PHONE_LISTING_TO_CART = 14,
@@ -524,6 +523,16 @@ struct Gs1HostEventSiteContextRequestData
     std::uint64_t reserved1;
 };
 
+struct Gs1HostEventSiteInventorySlotTapData
+{
+    std::uint32_t storage_id;
+    std::uint32_t item_instance_id;
+    std::uint16_t slot_index;
+    Gs1InventoryContainerKind container_kind;
+    std::uint8_t reserved0;
+    std::uint64_t reserved1;
+};
+
 struct Gs1HostEventEmptyData
 {
     std::uint64_t reserved0;
@@ -538,6 +547,7 @@ union Gs1HostEventPayload
     Gs1HostEventSiteActionCancelData site_action_cancel;
     Gs1HostEventSiteStorageViewData site_storage_view;
     Gs1HostEventSiteContextRequestData site_context_request;
+    Gs1HostEventSiteInventorySlotTapData site_inventory_slot_tap;
     Gs1HostEventEmptyData empty;
 };
 
@@ -1149,6 +1159,7 @@ GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteActionRequestData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteActionCancelData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteStorageViewData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteContextRequestData, 24U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteInventorySlotTapData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventEmptyData, 16U);
 static_assert(std::is_standard_layout_v<Gs1HostEventPayload>, "Gs1HostEventPayload must remain standard layout.");
 static_assert(std::is_trivial_v<Gs1HostEventPayload>, "Gs1HostEventPayload must remain trivial.");

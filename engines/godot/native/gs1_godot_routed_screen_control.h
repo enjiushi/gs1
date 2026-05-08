@@ -180,8 +180,6 @@ private:
     [[nodiscard]] const Gs1RuntimeTileProjection* tile_at(const godot::Vector2i& tile_coord) const;
     [[nodiscard]] int find_worker_pack_storage_id() const;
     [[nodiscard]] int find_selected_tile_storage_id();
-    void use_first_usable_item();
-    void transfer_first_storage_item_to_pack();
     void plant_first_seed_on_selected_tile();
     [[nodiscard]] godot::String plant_name_for(int plant_id) const;
     [[nodiscard]] godot::String structure_name_for(int structure_id) const;
@@ -222,8 +220,6 @@ private:
     void on_open_worker_pack_pressed();
     void on_open_nearest_storage_pressed();
     void on_close_storage_pressed();
-    void on_use_selected_item_pressed();
-    void on_transfer_selected_item_pressed();
     void on_plant_selected_seed_pressed();
     void on_dynamic_regional_site_pressed(int site_id);
 
@@ -246,8 +242,6 @@ private:
     static constexpr int UI_ACTION_ACCEPT_TASK = 6;
     static constexpr int UI_ACTION_CLAIM_TASK_REWARD = 7;
     static constexpr int UI_ACTION_BUY_PHONE_LISTING = 8;
-    static constexpr int UI_ACTION_USE_INVENTORY_ITEM = 10;
-    static constexpr int UI_ACTION_TRANSFER_INVENTORY_ITEM = 11;
     static constexpr int UI_ACTION_SET_PHONE_PANEL_SECTION = 17;
     static constexpr int UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE = 18;
     static constexpr int UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE = 19;

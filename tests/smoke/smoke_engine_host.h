@@ -71,6 +71,7 @@ public:
     void queue_site_action_request(const Gs1HostEventSiteActionRequestData& action);
     void queue_site_action_cancel(const Gs1HostEventSiteActionCancelData& action);
     void queue_site_storage_view(const Gs1HostEventSiteStorageViewData& request);
+    void queue_site_inventory_slot_tap(const Gs1HostEventSiteInventorySlotTapData& request);
     void queue_site_context_request(const Gs1HostEventSiteContextRequestData& request);
     void queue_site_move_direction(float world_move_x, float world_move_y, float world_move_z);
     [[nodiscard]] std::vector<std::string> consume_pending_live_state_patches();

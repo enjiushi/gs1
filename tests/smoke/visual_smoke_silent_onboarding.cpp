@@ -163,26 +163,6 @@ const char* onboarding_task_label(std::uint32_t task_template_id) noexcept
     }
 }
 
-std::uint64_t encode_inventory_transfer_owners_arg(
-    std::uint32_t source_owner_id,
-    std::uint32_t destination_owner_id) noexcept
-{
-    return static_cast<std::uint64_t>(source_owner_id) |
-        (static_cast<std::uint64_t>(destination_owner_id) << 32U);
-}
-
-std::uint64_t encode_inventory_transfer_arg(
-    Gs1InventoryContainerKind source_container_kind,
-    std::uint16_t source_slot_index,
-    Gs1InventoryContainerKind destination_container_kind,
-    std::uint16_t quantity) noexcept
-{
-    return static_cast<std::uint64_t>(source_container_kind) |
-        (static_cast<std::uint64_t>(source_slot_index & 0xffU) << 8U) |
-        (static_cast<std::uint64_t>(destination_container_kind & 0xffU) << 16U) |
-        (static_cast<std::uint64_t>(quantity) << 24U);
-}
-
 std::optional<std::pair<std::int32_t, std::int32_t>> find_structure_tile(
     const SiteSnapshotProjection& site_snapshot,
     std::uint32_t structure_id)
@@ -986,20 +966,12 @@ private:
             return;
         }
 
-        Gs1UiAction action {};
-        action.type = GS1_UI_ACTION_TRANSFER_INVENTORY_ITEM;
-        action.target_id = storage_slot->item_instance_id != 0U
-            ? storage_slot->item_instance_id
-            : storage_slot->item_id;
-        action.arg0 = encode_inventory_transfer_arg(
-            storage_slot->container_kind,
-            static_cast<std::uint16_t>(storage_slot->slot_index),
-            GS1_INVENTORY_CONTAINER_WORKER_PACK,
-            0U);
-        action.arg1 = encode_inventory_transfer_owners_arg(
-            storage_slot->storage_id,
-            resolve_worker_pack_storage_id(snapshot));
-        host.queue_ui_action(action);
+        Gs1HostEventSiteInventorySlotTapData request {};
+        request.storage_id = storage_slot->storage_id;
+        request.item_instance_id = storage_slot->item_instance_id;
+        request.slot_index = static_cast<std::uint16_t>(storage_slot->slot_index);
+        request.container_kind = storage_slot->container_kind;
+        host.queue_site_inventory_slot_tap(request);
         note_command(host.frame_number(), "transfer_item_to_worker_pack");
     }
 

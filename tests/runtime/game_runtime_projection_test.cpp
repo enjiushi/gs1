@@ -192,36 +192,6 @@ Gs1HostEvent make_site_action_cancel_event(std::uint32_t flags)
     return event;
 }
 
-std::uint64_t pack_inventory_use_arg(
-    Gs1InventoryContainerKind container_kind,
-    std::uint32_t slot_index,
-    std::uint32_t quantity)
-{
-    return static_cast<std::uint64_t>(container_kind) |
-        (static_cast<std::uint64_t>(slot_index & 0xffU) << 8U) |
-        (static_cast<std::uint64_t>(quantity & 0xffffU) << 16U);
-}
-
-std::uint64_t pack_inventory_transfer_arg(
-    Gs1InventoryContainerKind source_container_kind,
-    std::uint32_t source_slot_index,
-    Gs1InventoryContainerKind destination_container_kind,
-    std::uint32_t quantity)
-{
-    return static_cast<std::uint64_t>(source_container_kind) |
-        (static_cast<std::uint64_t>(source_slot_index & 0xffU) << 8U) |
-        (static_cast<std::uint64_t>(destination_container_kind) << 16U) |
-        (static_cast<std::uint64_t>(quantity & 0xffffU) << 24U);
-}
-
-std::uint64_t pack_inventory_transfer_owner_arg(
-    std::uint32_t source_owner_id,
-    std::uint32_t destination_owner_id)
-{
-    return static_cast<std::uint64_t>(source_owner_id) |
-        (static_cast<std::uint64_t>(destination_owner_id) << 32U);
-}
-
 Gs1HostEvent make_ui_action_event(const Gs1UiAction& action)
 {
     Gs1HostEvent event {};
@@ -238,6 +208,21 @@ Gs1HostEvent make_storage_view_event(
     event.type = GS1_HOST_EVENT_SITE_STORAGE_VIEW;
     event.payload.site_storage_view.storage_id = storage_id;
     event.payload.site_storage_view.event_kind = event_kind;
+    return event;
+}
+
+Gs1HostEvent make_inventory_slot_tap_event(
+    std::uint32_t storage_id,
+    Gs1InventoryContainerKind container_kind,
+    std::uint16_t slot_index,
+    std::uint32_t item_instance_id = 0U)
+{
+    Gs1HostEvent event {};
+    event.type = GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP;
+    event.payload.site_inventory_slot_tap.storage_id = storage_id;
+    event.payload.site_inventory_slot_tap.container_kind = container_kind;
+    event.payload.site_inventory_slot_tap.slot_index = slot_index;
+    event.payload.site_inventory_slot_tap.item_instance_id = item_instance_id;
     return event;
 }
 
@@ -743,6 +728,35 @@ const Gs1EngineMessageUiPanelSlotActionData* find_ui_panel_slot_action_message(
     return nullptr;
 }
 
+const Gs1EngineMessageUiPanelListItemData* find_ui_panel_list_item_message(
+    const std::vector<Gs1EngineMessage>& messages,
+    Gs1UiPanelListId list_id,
+    std::uint8_t primary_kind,
+    std::uint32_t primary_id,
+    std::uint32_t secondary_id = 0U,
+    std::uint32_t quantity = 0U)
+{
+    for (const auto& message : messages)
+    {
+        if (message.type != GS1_ENGINE_MESSAGE_UI_PANEL_LIST_ITEM_UPSERT)
+        {
+            continue;
+        }
+
+        const auto& payload = message.payload_as<Gs1EngineMessageUiPanelListItemData>();
+        if (payload.list_id == list_id &&
+            payload.primary_kind == primary_kind &&
+            payload.primary_id == primary_id &&
+            payload.secondary_id == secondary_id &&
+            payload.quantity == quantity)
+        {
+            return &payload;
+        }
+    }
+
+    return nullptr;
+}
+
 const Gs1EngineMessage* find_regional_map_site_message(
     const std::vector<Gs1EngineMessage>& messages,
     std::uint32_t site_id)
@@ -814,8 +828,8 @@ int main()
     const auto campaign_site_id = gs1::GameRuntimeProjectionTestAccess::campaign(runtime)->sites.front().site_id.value;
     assert(runtime.handle_message(make_select_site_message(campaign_site_id)) == GS1_STATUS_OK);
     const auto loadout_ui_messages = drain_engine_messages(runtime);
-    assert(find_ui_panel_text_message(loadout_ui_messages, 6U, 1U, 0U, 1U) != nullptr);
-    assert(find_ui_panel_text_message(loadout_ui_messages, 6U, gs1::k_item_basic_straw_checkerboard, 0U, 8U) != nullptr);
+    assert(find_ui_panel_list_item_message(loadout_ui_messages, GS1_UI_PANEL_LIST_REGIONAL_LOADOUT, 6U, 1U, 0U, 1U) != nullptr);
+    assert(find_ui_panel_list_item_message(loadout_ui_messages, GS1_UI_PANEL_LIST_REGIONAL_LOADOUT, 6U, gs1::k_item_basic_straw_checkerboard, 0U, 8U) != nullptr);
     assert(find_ui_panel_slot_action_message(loadout_ui_messages, GS1_UI_PANEL_SLOT_PRIMARY, 1U) != nullptr);
 
     assert(runtime.handle_message(make_start_site_attempt_message(campaign_site_id)) == GS1_STATUS_OK);
@@ -956,8 +970,8 @@ int main()
     drain_engine_messages(support_runtime);
     assert(support_runtime.handle_message(make_select_site_message(2U)) == GS1_STATUS_OK);
     const auto support_loadout_messages = drain_engine_messages(support_runtime);
-    assert(find_ui_panel_text_message(support_loadout_messages, 6U, gs1::k_item_white_thorn_seed_bundle, 0U, 4U) != nullptr);
-    assert(find_ui_panel_text_message(support_loadout_messages, 6U, gs1::k_item_wood_bundle, 0U, 2U) != nullptr);
+    assert(find_ui_panel_list_item_message(support_loadout_messages, GS1_UI_PANEL_LIST_REGIONAL_LOADOUT, 6U, gs1::k_item_white_thorn_seed_bundle, 0U, 4U) != nullptr);
+    assert(find_ui_panel_list_item_message(support_loadout_messages, GS1_UI_PANEL_LIST_REGIONAL_LOADOUT, 6U, gs1::k_item_wood_bundle, 0U, 2U) != nullptr);
     assert(find_ui_panel_text_message(support_loadout_messages, 4U, 0U, 0U, 1U) != nullptr);
     assert(find_ui_panel_text_message(support_loadout_messages, 5U, 0U, 0U, 1U) != nullptr);
     {
@@ -1830,17 +1844,10 @@ int main()
     ui_worker.hydration = 70.0f;
     gs1::site_world_access::set_worker_conditions(ui_site_run, ui_worker);
 
-    Gs1UiAction transfer_action {};
-    transfer_action.type = GS1_UI_ACTION_TRANSFER_INVENTORY_ITEM;
-    transfer_action.arg0 = pack_inventory_transfer_arg(
-        GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
-        0U,
-        GS1_INVENTORY_CONTAINER_WORKER_PACK,
-        0U);
-    transfer_action.arg1 = pack_inventory_transfer_owner_arg(
+    auto transfer_event = make_inventory_slot_tap_event(
         starter_storage_id(ui_site_run),
-        ui_site_run.inventory.worker_pack_storage_id);
-    auto transfer_event = make_ui_action_event(transfer_action);
+        GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
+        0U);
 
     Gs1Phase1Result transfer_result {};
     assert(ui_runtime.submit_host_events(&transfer_event, 1U) == GS1_STATUS_OK);
@@ -1867,15 +1874,11 @@ int main()
                ui_site_run.inventory.worker_pack_storage_id,
                0U) != nullptr);
 
-    Gs1UiAction use_action {};
-    use_action.type = GS1_UI_ACTION_USE_INVENTORY_ITEM;
-    use_action.target_id = ui_site_run.inventory.worker_pack_slots[0].item_instance_id;
-    use_action.arg0 = pack_inventory_use_arg(
+    auto use_event = make_inventory_slot_tap_event(
+        ui_site_run.inventory.worker_pack_storage_id,
         GS1_INVENTORY_CONTAINER_WORKER_PACK,
         0U,
-        1U);
-    use_action.arg1 = ui_site_run.inventory.worker_pack_storage_id;
-    auto use_event = make_ui_action_event(use_action);
+        ui_site_run.inventory.worker_pack_slots[0].item_instance_id);
 
     Gs1Phase1Result use_result {};
     assert(ui_runtime.submit_host_events(&use_event, 1U) == GS1_STATUS_OK);
