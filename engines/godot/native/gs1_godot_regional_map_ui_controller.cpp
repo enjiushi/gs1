@@ -18,13 +18,6 @@ void Gs1GodotRegionalMapUiController::_bind_methods()
 void Gs1GodotRegionalMapUiController::_ready()
 {
     cache_adapter_service();
-    set_process(true);
-}
-
-void Gs1GodotRegionalMapUiController::_process(double delta)
-{
-    (void)delta;
-    cache_adapter_service();
     refresh_visibility();
 }
 

@@ -19,7 +19,6 @@ public:
     ~Gs1GodotRegionalMapUiController() override = default;
 
     void _ready() override;
-    void _process(double delta) override;
     void _exit_tree() override;
     void set_ui_root_path(const godot::NodePath& path);
     [[nodiscard]] godot::NodePath get_ui_root_path() const;

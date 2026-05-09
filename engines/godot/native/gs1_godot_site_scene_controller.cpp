@@ -141,14 +141,6 @@ void Gs1GodotSiteSceneController::_bind_methods()
 
 void Gs1GodotSiteSceneController::_ready()
 {
-    set_process(true);
-    ensure_presenter_created();
-    cache_adapter_service();
-}
-
-void Gs1GodotSiteSceneController::_process(double delta)
-{
-    (void)delta;
     ensure_presenter_created();
     cache_adapter_service();
 }

@@ -65,7 +65,6 @@ void Gs1GodotStatusPanelController::_ready()
 void Gs1GodotStatusPanelController::_process(double delta)
 {
     (void)delta;
-    cache_adapter_service();
     if (adapter_service_ == nullptr)
     {
         show_runtime_missing();
@@ -73,10 +72,6 @@ void Gs1GodotStatusPanelController::_process(double delta)
     else
     {
         set_runtime_status(true, adapter_service_->last_error());
-    }
-    if (Control* owner = resolve_owner_control())
-    {
-        cache_ui_references(*owner);
     }
 }
 

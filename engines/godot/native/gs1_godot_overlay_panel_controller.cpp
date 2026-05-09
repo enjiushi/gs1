@@ -87,11 +87,6 @@ void Gs1GodotOverlayPanelController::_ready()
 void Gs1GodotOverlayPanelController::_process(double delta)
 {
     (void)delta;
-    cache_adapter_service();
-    if (Control* owner = resolve_owner_control())
-    {
-        cache_ui_references(*owner);
-    }
     refresh_if_needed();
 }
 

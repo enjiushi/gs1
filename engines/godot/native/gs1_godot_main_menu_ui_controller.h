@@ -19,7 +19,6 @@ public:
     ~Gs1GodotMainMenuUiController() override = default;
 
     void _ready() override;
-    void _process(double delta) override;
 
 protected:
     static void _bind_methods();

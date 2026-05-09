@@ -1,6 +1,6 @@
 # engines/godot/native/
 
-Native C++ source for the Godot runtime extension target, now owned by a `godot-cpp`-first adapter that talks to the engine through normal `godot-cpp` classes and APIs while keeping the gameplay DLL boundary in the shared host/session layer.
+Native C++ source for the Godot runtime extension target, now owned by a `godot-cpp`-first adapter that talks to the engine through normal `godot-cpp` classes and APIs while keeping the gameplay DLL boundary in the shared host/session layer, with controller setup expected to happen through lifecycle entry points such as `_ready()` instead of being retried from per-frame ticks.
 
 ## Usage
 - Read this file before scanning the folder in detail.

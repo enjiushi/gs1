@@ -24,11 +24,6 @@ void Gs1GodotSiteSummaryPanelController::_ready()
 void Gs1GodotSiteSummaryPanelController::_process(double delta)
 {
     (void)delta;
-    cache_adapter_service();
-    if (Control* owner = resolve_owner_control())
-    {
-        cache_ui_references(*owner);
-    }
     refresh_if_needed();
 }
 

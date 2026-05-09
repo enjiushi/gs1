@@ -108,11 +108,6 @@ void Gs1GodotActionPanelController::_ready()
 void Gs1GodotActionPanelController::_process(double delta)
 {
     (void)delta;
-    cache_adapter_service();
-    if (Control* owner = resolve_owner_control())
-    {
-        cache_ui_references(*owner);
-    }
     refresh_fixed_slot_actions_if_needed();
     refresh_site_controls_if_needed();
 }

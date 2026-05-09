@@ -96,9 +96,6 @@ void Gs1GodotRegionalMapSceneController::_ready()
 void Gs1GodotRegionalMapSceneController::_process(double delta)
 {
     (void)delta;
-    cache_adapter_service();
-    cache_scene_references();
-    cache_ui_references();
     refresh_regional_map_if_needed();
 }
 

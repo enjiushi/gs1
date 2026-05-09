@@ -52,9 +52,6 @@ void Gs1GodotSiteSessionUiController::_ready()
 void Gs1GodotSiteSessionUiController::_process(double delta)
 {
     (void)delta;
-    cache_adapter_service();
-    cache_ui_references();
-
     if (adapter_service_ == nullptr)
     {
         return;

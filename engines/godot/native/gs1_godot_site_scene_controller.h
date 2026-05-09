@@ -34,7 +34,6 @@ public:
     ~Gs1GodotSiteSceneController() override = default;
 
     void _ready() override;
-    void _process(double delta) override;
     void _exit_tree() override;
 
     [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;

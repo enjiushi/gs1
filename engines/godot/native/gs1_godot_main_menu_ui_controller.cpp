@@ -23,13 +23,6 @@ void Gs1GodotMainMenuUiController::_ready()
 {
     cache_adapter_service();
     wire_static_buttons();
-    set_process(true);
-}
-
-void Gs1GodotMainMenuUiController::_process(double delta)
-{
-    (void)delta;
-    cache_adapter_service();
 }
 
 void Gs1GodotMainMenuUiController::cache_adapter_service()
