@@ -13,6 +13,7 @@
 #include <godot_cpp/core/property_info.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
+#include <algorithm>
 #include <string>
 #include <unordered_set>
 
@@ -172,6 +173,8 @@ void Gs1GodotDirectorControl::poll_async_scene_switch()
         return;
     }
 
+    refresh_loading_scene_progress(*resource_loader);
+
     if (!async_resource_preloads_complete(*resource_loader))
     {
         return;
@@ -205,6 +208,65 @@ void Gs1GodotDirectorControl::poll_async_scene_switch()
 
     switch_to_scene(target_kind, packed_scene);
     adapter_service_.flush_buffered_engine_messages();
+}
+
+void Gs1GodotDirectorControl::cache_loading_scene_nodes()
+{
+    if (active_screen_kind_ != SCREEN_KIND_LOADING)
+    {
+        loading_progress_bar_ = nullptr;
+        loading_progress_label_ = nullptr;
+        return;
+    }
+
+    Node* active_scene = Object::cast_to<Node>(ObjectDB::get_instance(active_scene_id_));
+    if (active_scene == nullptr)
+    {
+        return;
+    }
+
+    if (loading_progress_bar_ == nullptr)
+    {
+        loading_progress_bar_ = Object::cast_to<ProgressBar>(active_scene->find_child("ProgressBar", true, false));
+    }
+    if (loading_progress_label_ == nullptr)
+    {
+        loading_progress_label_ = Object::cast_to<Label>(active_scene->find_child("ProgressLabel", true, false));
+    }
+}
+
+void Gs1GodotDirectorControl::refresh_loading_scene_progress(ResourceLoader& resource_loader)
+{
+    if (pending_async_target_kind_ == SCREEN_KIND_NONE || active_screen_kind_ != SCREEN_KIND_LOADING)
+    {
+        return;
+    }
+
+    cache_loading_scene_nodes();
+    if (loading_progress_bar_ == nullptr && loading_progress_label_ == nullptr)
+    {
+        return;
+    }
+
+    // Combine the threaded target-scene load with each queued preload request so the loading screen
+    // reflects the actual Godot work this transition is waiting on rather than a fake timer.
+    double completed_work = threaded_load_progress(resource_loader, pending_async_scene_path_);
+    double total_work = 1.0;
+    for (const String& path : pending_async_resource_paths_)
+    {
+        completed_work += threaded_load_progress(resource_loader, path);
+        total_work += 1.0;
+    }
+
+    const double clamped_progress = std::clamp(total_work > 0.0 ? (completed_work / total_work) : 0.0, 0.0, 1.0);
+    if (loading_progress_bar_ != nullptr)
+    {
+        loading_progress_bar_->set_value(clamped_progress * 100.0);
+    }
+    if (loading_progress_label_ != nullptr)
+    {
+        loading_progress_label_->set_text(vformat("%.0f%% complete", clamped_progress * 100.0));
+    }
 }
 
 void Gs1GodotDirectorControl::begin_async_resource_preloads(ScreenKind kind)
@@ -279,6 +341,35 @@ std::vector<String> Gs1GodotDirectorControl::build_async_preload_paths(ScreenKin
     }
 
     return paths;
+}
+
+double Gs1GodotDirectorControl::threaded_load_progress(
+    ResourceLoader& resource_loader,
+    const String& path,
+    ResourceLoader::ThreadLoadStatus* out_status) const
+{
+    Array progress {};
+    const ResourceLoader::ThreadLoadStatus status = resource_loader.load_threaded_get_status(path, progress);
+    if (out_status != nullptr)
+    {
+        *out_status = status;
+    }
+
+    switch (status)
+    {
+    case ResourceLoader::THREAD_LOAD_LOADED:
+    case ResourceLoader::THREAD_LOAD_FAILED:
+    case ResourceLoader::THREAD_LOAD_INVALID_RESOURCE:
+        return 1.0;
+    case ResourceLoader::THREAD_LOAD_IN_PROGRESS:
+        if (progress.size() > 0)
+        {
+            return std::clamp(static_cast<double>(progress[0]), 0.0, 1.0);
+        }
+        return 0.0;
+    default:
+        return 0.0;
+    }
 }
 
 bool Gs1GodotDirectorControl::async_resource_preloads_complete(ResourceLoader& resource_loader)
@@ -403,6 +494,8 @@ void Gs1GodotDirectorControl::switch_to_scene(ScreenKind kind, const Ref<PackedS
 
     active_scene_id_ = ObjectID();
     active_screen_kind_ = SCREEN_KIND_NONE;
+    loading_progress_bar_ = nullptr;
+    loading_progress_label_ = nullptr;
 
     const String scene_path = scene_path_for(kind);
     if (scene_path.is_empty())

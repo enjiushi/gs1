@@ -8,11 +8,14 @@
 #include "gs1_godot_site_session_ui_controller.h"
 
 #include <godot_cpp/classes/control.hpp>
+#include <godot_cpp/classes/label.hpp>
 #include <godot_cpp/classes/packed_scene.hpp>
+#include <godot_cpp/classes/progress_bar.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/core/binder_common.hpp>
 #include <godot_cpp/core/object_id.hpp>
 #include <godot_cpp/classes/ref.hpp>
+#include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/variant/string.hpp>
 
@@ -68,8 +71,14 @@ private:
     void ensure_active_scene();
     void begin_async_scene_switch(ScreenKind kind);
     void poll_async_scene_switch();
+    void cache_loading_scene_nodes();
+    void refresh_loading_scene_progress(godot::ResourceLoader& resource_loader);
     void begin_async_resource_preloads(ScreenKind kind);
     [[nodiscard]] std::vector<godot::String> build_async_preload_paths(ScreenKind kind) const;
+    [[nodiscard]] double threaded_load_progress(
+        godot::ResourceLoader& resource_loader,
+        const godot::String& path,
+        godot::ResourceLoader::ThreadLoadStatus* out_status = nullptr) const;
     [[nodiscard]] bool async_resource_preloads_complete(godot::ResourceLoader& resource_loader);
     void clear_async_scene_switch_state() noexcept;
     [[nodiscard]] bool should_async_load_transition(ScreenKind kind) const noexcept;
@@ -100,6 +109,8 @@ private:
 
     Gs1GodotAdapterService adapter_service_ {};
     godot::Control* scene_host_ {nullptr};
+    godot::ProgressBar* loading_progress_bar_ {nullptr};
+    godot::Label* loading_progress_label_ {nullptr};
     godot::ObjectID active_scene_id_ {};
     ScreenKind active_screen_kind_ {SCREEN_KIND_NONE};
     ScreenKind pending_async_target_kind_ {SCREEN_KIND_NONE};
