@@ -510,6 +510,7 @@ void Gs1GodotRegionalTechTreePanelController::handle_runtime_message_reset()
 {
     reset_progression_view_state();
     apply_progression_view_visibility();
+    rebuild_tech_tree_cards();
 }
 
 void Gs1GodotRegionalTechTreePanelController::apply_progression_view_visibility()
@@ -528,16 +529,21 @@ void Gs1GodotRegionalTechTreePanelController::apply_progression_view_visibility(
 
 void Gs1GodotRegionalTechTreePanelController::rebuild_tech_tree_cards()
 {
-    const Gs1RuntimeProgressionViewProjection* progression_view =
-        find_progression_view(GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE);
-    if (progression_view == nullptr)
-    {
-        return;
-    }
-
     if (title_ != nullptr)
     {
         title_->set_text("Research And Unlocks");
+    }
+
+    std::unordered_map<std::uint16_t, Gs1RuntimeProgressionEntryProjection> entry_state_by_id;
+    if (const Gs1RuntimeProgressionViewProjection* progression_view =
+            find_progression_view(GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE);
+        progression_view != nullptr)
+    {
+        entry_state_by_id.reserve(progression_view->entries.size());
+        for (const auto& entry : progression_view->entries)
+        {
+            entry_state_by_id.insert_or_assign(entry.entry_id, entry);
+        }
     }
 
     std::map<int, Dictionary> unlockable_specs_by_rep;
@@ -545,67 +551,85 @@ void Gs1GodotRegionalTechTreePanelController::rebuild_tech_tree_cards()
     std::map<int, Dictionary> bureau_specs_by_rep;
     std::map<int, Dictionary> university_specs_by_rep;
     std::vector<int> row_requirements;
-    for (const auto& entry : progression_view->entries)
+
+    row_requirements.reserve(gs1::all_reputation_unlock_defs().size() + gs1::all_technology_node_defs().size());
+
+    for (const auto& unlock_def : gs1::all_reputation_unlock_defs())
     {
-        const int entry_kind = static_cast<int>(entry.entry_kind);
-        const int reputation_requirement = static_cast<int>(entry.reputation_requirement);
-        if (entry_kind == GS1_PROGRESSION_ENTRY_NONE)
+        const int reputation_requirement = static_cast<int>(unlock_def.reputation_requirement);
+        if (reputation_requirement <= 0)
         {
             continue;
         }
 
-        if (reputation_requirement > 0)
-        {
-            row_requirements.push_back(reputation_requirement);
-        }
+        row_requirements.push_back(reputation_requirement);
+        Dictionary spec;
+        spec["setup_id"] = GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE;
+        spec["element_id"] = static_cast<int>(unlock_def.unlock_id);
+        spec["entry_kind"] = GS1_PROGRESSION_ENTRY_REPUTATION_UNLOCK;
+        const auto found_state = entry_state_by_id.find(static_cast<std::uint16_t>(unlock_def.unlock_id));
+        spec["flags"] = static_cast<int>(
+            found_state != entry_state_by_id.end()
+                ? found_state->second.flags
+                : GS1_PROGRESSION_ENTRY_FLAG_LOCKED);
+        spec["reputation_requirement"] = reputation_requirement;
+        spec["content_id"] = static_cast<int>(unlock_def.content_id);
+        spec["content_kind"] = static_cast<int>(unlockable_content_kind_from_def(unlock_def));
+        spec["tooltip"] = unlockable_tooltip_text(spec);
+        unlockable_specs_by_rep[reputation_requirement] = spec;
+    }
 
-        if (entry_kind == GS1_PROGRESSION_ENTRY_TECHNOLOGY_NODE)
+    for (const auto& node_def : gs1::all_technology_node_defs())
+    {
+        const int reputation_requirement = node_def.reputation_requirement;
+        if (reputation_requirement <= 0)
         {
-            Dictionary action;
-            action["type"] = static_cast<int>(entry.action.type);
-            action["target_id"] = static_cast<int64_t>(entry.action.target_id);
-            action["arg0"] = static_cast<int64_t>(entry.action.arg0);
-            action["arg1"] = static_cast<int64_t>(entry.action.arg1);
-            Dictionary spec;
-            spec["setup_id"] = GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE;
-            spec["element_id"] = static_cast<int>(entry.entry_id);
-            spec["entry_kind"] = entry_kind;
-            spec["flags"] = static_cast<int>(entry.flags);
-            spec["action"] = action;
-            spec["reputation_requirement"] = reputation_requirement;
-            spec["tech_node_id"] = static_cast<int>(entry.tech_node_id);
-            spec["faction_id"] = static_cast<int>(entry.faction_id);
-            spec["tier_index"] = static_cast<int>(entry.tier_index);
-            spec["tooltip"] = tech_tooltip_text(spec);
-            switch (static_cast<int>(entry.faction_id))
-            {
-            case gs1::k_faction_village_committee:
-                village_specs_by_rep[reputation_requirement] = spec;
-                break;
-            case gs1::k_faction_forestry_bureau:
-                bureau_specs_by_rep[reputation_requirement] = spec;
-                break;
-            case gs1::k_faction_agricultural_university:
-                university_specs_by_rep[reputation_requirement] = spec;
-                break;
-            default:
-                break;
-            }
             continue;
         }
 
-        if (entry_kind == GS1_PROGRESSION_ENTRY_REPUTATION_UNLOCK && reputation_requirement > 0)
+        row_requirements.push_back(reputation_requirement);
+        Dictionary action;
+        action["type"] = static_cast<int>(GS1_UI_ACTION_NONE);
+        action["target_id"] = static_cast<int64_t>(node_def.tech_node_id.value);
+        action["arg0"] = static_cast<int64_t>(node_def.faction_id.value);
+        action["arg1"] = 0;
+
+        if (const auto found_state = entry_state_by_id.find(static_cast<std::uint16_t>(node_def.tech_node_id.value));
+            found_state != entry_state_by_id.end())
         {
-            Dictionary spec;
-            spec["setup_id"] = GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE;
-            spec["element_id"] = static_cast<int>(entry.entry_id);
-            spec["entry_kind"] = entry_kind;
-            spec["flags"] = static_cast<int>(entry.flags);
-            spec["reputation_requirement"] = reputation_requirement;
-            spec["content_id"] = static_cast<int>(entry.content_id);
-            spec["content_kind"] = static_cast<int>(entry.content_kind);
-            spec["tooltip"] = unlockable_tooltip_text(spec);
-            unlockable_specs_by_rep[reputation_requirement] = spec;
+            action["type"] = static_cast<int>(found_state->second.action.type);
+            action["target_id"] = static_cast<int64_t>(found_state->second.action.target_id);
+            action["arg0"] = static_cast<int64_t>(found_state->second.action.arg0);
+            action["arg1"] = static_cast<int64_t>(found_state->second.action.arg1);
+        }
+
+        Dictionary spec;
+        spec["setup_id"] = GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE;
+        spec["element_id"] = static_cast<int>(node_def.tech_node_id.value);
+        spec["entry_kind"] = GS1_PROGRESSION_ENTRY_TECHNOLOGY_NODE;
+        spec["flags"] = static_cast<int>(
+            entry_state_by_id.contains(static_cast<std::uint16_t>(node_def.tech_node_id.value))
+                ? entry_state_by_id[static_cast<std::uint16_t>(node_def.tech_node_id.value)].flags
+                : GS1_PROGRESSION_ENTRY_FLAG_LOCKED);
+        spec["action"] = action;
+        spec["reputation_requirement"] = reputation_requirement;
+        spec["tech_node_id"] = static_cast<int>(node_def.tech_node_id.value);
+        spec["faction_id"] = static_cast<int>(node_def.faction_id.value);
+        spec["tier_index"] = static_cast<int>(node_def.tier_index);
+        spec["tooltip"] = tech_tooltip_text(spec);
+        switch (static_cast<int>(node_def.faction_id.value))
+        {
+        case gs1::k_faction_village_committee:
+            village_specs_by_rep[reputation_requirement] = spec;
+            break;
+        case gs1::k_faction_forestry_bureau:
+            bureau_specs_by_rep[reputation_requirement] = spec;
+            break;
+        case gs1::k_faction_agricultural_university:
+            university_specs_by_rep[reputation_requirement] = spec;
+            break;
+        default:
+            break;
         }
     }
 
@@ -756,7 +780,8 @@ void Gs1GodotRegionalTechTreePanelController::reconcile_tech_tree_cards(const Ar
         return;
     }
 
-    std::unordered_set<std::uint64_t> desired_keys;
+    std::unordered_set<std::uint64_t> desired_card_keys;
+    std::unordered_set<std::uint64_t> desired_marker_keys;
     int desired_index = 0;
     for (int64_t index = 0; index < card_specs.size(); ++index)
     {
@@ -770,82 +795,46 @@ void Gs1GodotRegionalTechTreePanelController::reconcile_tech_tree_cards(const Ar
                       static_cast<std::uint32_t>(as_int(spec.get("marker_key_high", as_int(spec.get("rep_requirement", 0), 0)), 0)),
                       static_cast<std::uint32_t>(as_int(spec.get("marker_key_low", 0), 0)))
                 : make_projected_button_key(setup_id, element_id);
-        desired_keys.insert(stable_key);
-        Button* button = upsert_button_node(
-            actions_,
-            action_buttons_,
-            stable_key,
-            vformat("Projected_%d_%d", setup_id, element_id),
-            desired_index++);
-        if (button == nullptr)
-        {
-            continue;
-        }
-
         const String tooltip = String(spec.get("tooltip", ""));
         const int flags = as_int(spec.get("flags", 0), 0);
         const Dictionary action = spec.get("action", Dictionary());
-        ProjectedButtonRecord& record = action_buttons_[stable_key];
-        ensure_card_content_nodes(button, record);
-
-        button->set_text(String());
-        button->set_tooltip_text(tooltip);
         if (cell_kind == "card")
         {
+            desired_card_keys.insert(stable_key);
+            Button* button = upsert_button_node(
+                actions_,
+                action_buttons_,
+                stable_key,
+                vformat("Projected_%d_%d", setup_id, element_id),
+                desired_index++);
+            if (button == nullptr)
+            {
+                continue;
+            }
+
+            ProjectedButtonRecord& record = action_buttons_[stable_key];
+            ensure_card_content_nodes(button, record);
             button->set_custom_minimum_size(Vector2(220, 206));
-        }
-        else if (cell_kind == "arrow")
-        {
-            button->set_custom_minimum_size(Vector2(220, 44));
-        }
-        else
-        {
-            button->set_custom_minimum_size(Vector2(cell_kind == "rep_label" ? 120 : 220, 44));
-        }
-        button->set_clip_text(false);
-        button->set_flat(true);
-        button->set_text_alignment(HORIZONTAL_ALIGNMENT_CENTER);
-        const bool locked = (flags & 2) != 0;
-        button->set_disabled(false);
-        button->set_focus_mode(Control::FOCUS_NONE);
-        button->set_meta("action_type", as_int(action.get("type", 0), 0));
-        button->set_meta("target_id", as_int(action.get("target_id", 0), 0));
-        button->set_meta("arg0", as_int(action.get("arg0", 0), 0));
-        button->set_meta("arg1", as_int(action.get("arg1", 0), 0));
-        button->set_meta(
-            "gs1_allow_action",
-            cell_kind == "card" && !locked && as_int(action.get("type", 0), 0) != 0);
+            button->set_text(String());
+            button->set_tooltip_text(tooltip);
+            button->set_clip_text(false);
+            button->set_flat(true);
+            button->set_text_alignment(HORIZONTAL_ALIGNMENT_CENTER);
+            const bool locked = (flags & 2) != 0;
+            button->set_disabled(false);
+            button->set_focus_mode(Control::FOCUS_NONE);
+            button->set_meta("action_type", as_int(action.get("type", 0), 0));
+            button->set_meta("target_id", as_int(action.get("target_id", 0), 0));
+            button->set_meta("arg0", as_int(action.get("arg0", 0), 0));
+            button->set_meta("arg1", as_int(action.get("arg1", 0), 0));
+            button->set_meta(
+                "gs1_allow_action",
+                !locked && as_int(action.get("type", 0), 0) != 0);
 
-        if (Panel* card_panel = Object::cast_to<Panel>(button->get_node_or_null(NodePath("CardPanel"))))
-        {
-            card_panel->set_visible(cell_kind == "card");
-        }
-        if (CenterContainer* marker_center = Object::cast_to<CenterContainer>(button->get_node_or_null(NodePath("MarkerCenter"))))
-        {
-            marker_center->set_visible(cell_kind != "card");
-        }
-        if (Label* marker_label = resolve_object<Label>(record.marker_label_id))
-        {
-            marker_label->set_text(tech_tree_marker_text(spec));
-            if (cell_kind == "rep_label")
+            if (Panel* card_panel = Object::cast_to<Panel>(button->get_node_or_null(NodePath("CardPanel"))))
             {
-                marker_label->add_theme_font_size_override("font_size", 16);
-                marker_label->add_theme_color_override("font_color", Color(0.94, 0.86, 0.71, 0.96));
+                card_panel->set_visible(true);
             }
-            else if (cell_kind == "arrow")
-            {
-                marker_label->add_theme_font_size_override("font_size", 20);
-                marker_label->add_theme_color_override("font_color", Color(0.72, 0.79, 0.71, 0.72));
-            }
-            else
-            {
-                marker_label->add_theme_font_size_override("font_size", 10);
-                marker_label->add_theme_color_override("font_color", Color(0.0, 0.0, 0.0, 0.0));
-            }
-        }
-
-        if (cell_kind == "card")
-        {
             if (Label* icon_label = resolve_object<Label>(record.icon_label_id))
             {
                 icon_label->set_text(card_icon_text(spec));
@@ -875,29 +864,65 @@ void Gs1GodotRegionalTechTreePanelController::reconcile_tech_tree_cards(const Ar
             {
                 lock_label->set_visible(locked);
             }
+
+            const Callable callback = callable_mp_static(&dispatch_tech_tree_action_pressed).bind(
+                static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(this)),
+                static_cast<std::int64_t>(stable_key));
+            if (!button->is_connected("pressed", callback))
+            {
+                button->connect("pressed", callback);
+            }
+            continue;
+        }
+
+        desired_marker_keys.insert(stable_key);
+        Control* marker = upsert_marker_node(
+            actions_,
+            marker_cells_,
+            stable_key,
+            vformat("Projected_%d_%d", setup_id, element_id),
+            desired_index++);
+        if (marker == nullptr)
+        {
+            continue;
+        }
+
+        ProjectedButtonRecord& record = marker_cells_[stable_key];
+        ensure_marker_content_nodes(marker, record);
+        marker->set_tooltip_text(tooltip);
+        marker->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
+        marker->set_focus_mode(Control::FOCUS_NONE);
+        if (cell_kind == "arrow")
+        {
+            marker->set_custom_minimum_size(Vector2(220, 44));
         }
         else
         {
-            if (ColorRect* lock_overlay = resolve_object<ColorRect>(record.lock_overlay_id))
-            {
-                lock_overlay->set_visible(false);
-            }
-            if (Label* lock_label = resolve_object<Label>(record.lock_label_id))
-            {
-                lock_label->set_visible(false);
-            }
+            marker->set_custom_minimum_size(Vector2(cell_kind == "rep_label" ? 120 : 220, 44));
         }
-
-        const Callable callback = callable_mp_static(&dispatch_tech_tree_action_pressed).bind(
-            static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(this)),
-            static_cast<std::int64_t>(stable_key));
-        if (!button->is_connected("pressed", callback))
+        if (Label* marker_label = resolve_object<Label>(record.marker_label_id))
         {
-            button->connect("pressed", callback);
+            marker_label->set_text(tech_tree_marker_text(spec));
+            if (cell_kind == "rep_label")
+            {
+                marker_label->add_theme_font_size_override("font_size", 16);
+                marker_label->add_theme_color_override("font_color", Color(0.94, 0.86, 0.71, 0.96));
+            }
+            else if (cell_kind == "arrow")
+            {
+                marker_label->add_theme_font_size_override("font_size", 20);
+                marker_label->add_theme_color_override("font_color", Color(0.72, 0.79, 0.71, 0.72));
+            }
+            else
+            {
+                marker_label->add_theme_font_size_override("font_size", 10);
+                marker_label->add_theme_color_override("font_color", Color(0.0, 0.0, 0.0, 0.0));
+            }
         }
     }
 
-    prune_button_registry(action_buttons_, desired_keys);
+    prune_cell_registry(action_buttons_, desired_card_keys);
+    prune_cell_registry(marker_cells_, desired_marker_keys);
 }
 
 String Gs1GodotRegionalTechTreePanelController::tech_tooltip_text(const Dictionary& spec) const
@@ -1097,6 +1122,27 @@ Ref<Texture2D> Gs1GodotRegionalTechTreePanelController::card_icon_texture(const 
     return fallback_icon_texture(card_icon_text(spec));
 }
 
+void Gs1GodotRegionalTechTreePanelController::ensure_marker_content_nodes(Control* control, ProjectedButtonRecord& record)
+{
+    if (control == nullptr)
+    {
+        return;
+    }
+
+    Label* marker_label = resolve_object<Label>(record.marker_label_id);
+    if (marker_label == nullptr)
+    {
+        marker_label = memnew(Label);
+        marker_label->set_name("MarkerLabel");
+        marker_label->set_horizontal_alignment(HORIZONTAL_ALIGNMENT_CENTER);
+        marker_label->set_vertical_alignment(VERTICAL_ALIGNMENT_CENTER);
+        marker_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+        marker_label->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
+        control->add_child(marker_label);
+        record.marker_label_id = marker_label->get_instance_id();
+    }
+}
+
 void Gs1GodotRegionalTechTreePanelController::ensure_card_content_nodes(Button* button, ProjectedButtonRecord& record)
 {
     if (button == nullptr)
@@ -1112,29 +1158,6 @@ void Gs1GodotRegionalTechTreePanelController::ensure_card_content_nodes(Button* 
         card_panel->set_anchors_and_offsets_preset(Control::PRESET_FULL_RECT);
         card_panel->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
         button->add_child(card_panel);
-    }
-
-    CenterContainer* marker_center = Object::cast_to<CenterContainer>(button->get_node_or_null(NodePath("MarkerCenter")));
-    if (marker_center == nullptr)
-    {
-        marker_center = memnew(CenterContainer);
-        marker_center->set_name("MarkerCenter");
-        marker_center->set_anchors_and_offsets_preset(Control::PRESET_FULL_RECT);
-        marker_center->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
-        button->add_child(marker_center);
-    }
-
-    Label* marker_label = resolve_object<Label>(record.marker_label_id);
-    if (marker_label == nullptr)
-    {
-        marker_label = memnew(Label);
-        marker_label->set_name("MarkerLabel");
-        marker_label->set_horizontal_alignment(HORIZONTAL_ALIGNMENT_CENTER);
-        marker_label->set_vertical_alignment(VERTICAL_ALIGNMENT_CENTER);
-        marker_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
-        marker_label->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
-        marker_center->add_child(marker_label);
-        record.marker_label_id = marker_label->get_instance_id();
     }
 
     MarginContainer* content_root = resolve_object<MarginContainer>(record.content_root_id);
@@ -1447,7 +1470,43 @@ Button* Gs1GodotRegionalTechTreePanelController::upsert_button_node(
     return button;
 }
 
-void Gs1GodotRegionalTechTreePanelController::prune_button_registry(
+Control* Gs1GodotRegionalTechTreePanelController::upsert_marker_node(
+    Node* container,
+    std::unordered_map<std::uint64_t, ProjectedButtonRecord>& registry,
+    std::uint64_t stable_key,
+    const String& node_name,
+    int desired_index)
+{
+    if (container == nullptr)
+    {
+        return nullptr;
+    }
+
+    Control* control = nullptr;
+    auto found = registry.find(stable_key);
+    if (found != registry.end())
+    {
+        control = resolve_object<Control>(found->second.object_id);
+    }
+
+    if (control == nullptr)
+    {
+        CenterContainer* marker = memnew(CenterContainer);
+        container->add_child(marker);
+        control = marker;
+        registry[stable_key].object_id = control->get_instance_id();
+    }
+
+    control->set_name(node_name);
+    const int target_index = std::min(desired_index, container->get_child_count() - 1);
+    if (control->get_index() != target_index)
+    {
+        container->move_child(control, target_index);
+    }
+    return control;
+}
+
+void Gs1GodotRegionalTechTreePanelController::prune_cell_registry(
     std::unordered_map<std::uint64_t, ProjectedButtonRecord>& registry,
     const std::unordered_set<std::uint64_t>& desired_keys)
 {
@@ -1459,9 +1518,9 @@ void Gs1GodotRegionalTechTreePanelController::prune_button_registry(
             continue;
         }
 
-        if (Button* button = resolve_object<Button>(it->second.object_id))
+        if (Node* node = resolve_object<Node>(it->second.object_id))
         {
-            button->queue_free();
+            node->queue_free();
         }
         it = registry.erase(it);
     }

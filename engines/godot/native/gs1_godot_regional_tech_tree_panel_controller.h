@@ -110,6 +110,7 @@ private:
     [[nodiscard]] godot::Color card_status_color(const godot::Dictionary& spec) const;
     [[nodiscard]] godot::Color card_icon_background_color(const godot::String& icon_text) const;
     [[nodiscard]] godot::Ref<godot::Texture2D> card_icon_texture(const godot::Dictionary& spec) const;
+    void ensure_marker_content_nodes(godot::Control* control, ProjectedButtonRecord& record);
     void ensure_card_content_nodes(godot::Button* button, ProjectedButtonRecord& record);
     [[nodiscard]] godot::Ref<godot::Texture2D> load_cached_texture(const godot::String& path) const;
     [[nodiscard]] godot::Ref<godot::Texture2D> fallback_icon_texture(const godot::String& icon_text) const;
@@ -122,7 +123,13 @@ private:
         std::uint64_t stable_key,
         const godot::String& node_name,
         int desired_index);
-    void prune_button_registry(
+    [[nodiscard]] godot::Control* upsert_marker_node(
+        godot::Node* container,
+        std::unordered_map<std::uint64_t, ProjectedButtonRecord>& registry,
+        std::uint64_t stable_key,
+        const godot::String& node_name,
+        int desired_index);
+    void prune_cell_registry(
         std::unordered_map<std::uint64_t, ProjectedButtonRecord>& registry,
         const std::unordered_set<std::uint64_t>& desired_keys);
 
@@ -139,6 +146,7 @@ private:
     std::unordered_map<std::uint16_t, std::size_t> progression_view_indices_ {};
     std::unordered_map<std::uint32_t, std::size_t> pending_progression_entry_indices_ {};
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> action_buttons_ {};
+    std::unordered_map<std::uint64_t, ProjectedButtonRecord> marker_cells_ {};
     mutable std::unordered_map<int, godot::String> faction_name_cache_ {};
     mutable std::unordered_map<std::uint32_t, TechnologyUiCacheEntry> technology_ui_cache_ {};
     mutable std::unordered_map<std::uint32_t, UnlockableUiCacheEntry> unlockable_ui_cache_ {};
