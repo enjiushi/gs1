@@ -4,9 +4,11 @@
 
 #include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/variant/string.hpp>
+#include <godot_cpp/variant/utility_functions.hpp>
 
 #include <algorithm>
 #include <cassert>
+#include <cstdlib>
 #include <string_view>
 
 using namespace godot;
@@ -137,12 +139,21 @@ Gs1GodotAdapterService::~Gs1GodotAdapterService()
 
 void Gs1GodotAdapterService::process_frame(double delta_seconds)
 {
+    ensure_debug_http_server_initialized();
+
     if (!runtime_session_.is_running())
     {
         ensure_runtime_started();
     }
     if (!runtime_session_.is_running())
     {
+        return;
+    }
+
+    if (!drain_debug_http_commands())
+    {
+        runtime_session_.stop();
+        notify_runtime_message_reset();
         return;
     }
 
@@ -226,6 +237,48 @@ void Gs1GodotAdapterService::unsubscribe_all(IGs1GodotEngineMessageSubscriber& s
     known_subscribers_.erase(&subscriber);
 }
 
+void Gs1GodotAdapterService::ensure_debug_http_server_initialized()
+{
+    if (debug_http_server_checked_)
+    {
+        return;
+    }
+
+    debug_http_server_checked_ = true;
+
+    const char* raw_port = std::getenv("GS1_GODOT_DEBUG_HTTP_PORT");
+    if (raw_port == nullptr || raw_port[0] == '\0')
+    {
+        return;
+    }
+
+    char* parse_end = nullptr;
+    const unsigned long configured_port = std::strtoul(raw_port, &parse_end, 10);
+    if (parse_end == raw_port || parse_end == nullptr || parse_end[0] != '\0' || configured_port > 65535UL)
+    {
+        UtilityFunctions::push_warning(
+            String("GS1_GODOT_DEBUG_HTTP_PORT must be an integer in the 0-65535 range."));
+        return;
+    }
+
+    std::string start_error {};
+    if (!debug_http_server_.start(
+            static_cast<std::uint16_t>(configured_port),
+            [this](std::string_view path, const std::string& body, std::string& out_error) {
+                return queue_debug_http_command(path, body, out_error);
+            },
+            start_error))
+    {
+        UtilityFunctions::push_warning(
+            String("GS1 Godot debug HTTP control failed to start: ") + String(start_error.c_str()));
+        return;
+    }
+
+    UtilityFunctions::print(
+        String("GS1 Godot debug HTTP control listening at http://127.0.0.1:") +
+        String::num_int64(static_cast<std::int64_t>(debug_http_server_.port())));
+}
+
 void Gs1GodotAdapterService::ensure_runtime_started()
 {
     if (runtime_session_.is_running())
@@ -261,6 +314,66 @@ void Gs1GodotAdapterService::ensure_runtime_started()
     }
 
     last_error_.clear();
+}
+
+bool Gs1GodotAdapterService::drain_debug_http_commands()
+{
+    std::vector<Gs1GodotDebugHttpCommand> pending_commands {};
+    {
+        std::scoped_lock lock {pending_debug_http_commands_mutex_};
+        pending_commands.swap(pending_debug_http_commands_);
+    }
+
+    for (const Gs1GodotDebugHttpCommand& command : pending_commands)
+    {
+        bool ok = false;
+        switch (command.kind)
+        {
+        case Gs1GodotDebugHttpCommandKind::UiAction:
+            ok = submit_ui_action(command.action_type, command.target_id, command.arg0, command.arg1);
+            break;
+        case Gs1GodotDebugHttpCommandKind::SiteAction:
+            ok = submit_site_action_request(
+                command.action_kind,
+                command.flags,
+                command.quantity,
+                command.tile_x,
+                command.tile_y,
+                command.primary_subject_id,
+                command.secondary_subject_id,
+                command.item_id);
+            break;
+        case Gs1GodotDebugHttpCommandKind::SiteActionCancel:
+            ok = submit_site_action_cancel(command.action_id, command.flags);
+            break;
+        case Gs1GodotDebugHttpCommandKind::SiteStorageView:
+            ok = submit_site_storage_view(command.storage_id, command.event_kind);
+            break;
+        case Gs1GodotDebugHttpCommandKind::SiteInventorySlotTap:
+            ok = submit_site_inventory_slot_tap(
+                command.storage_id,
+                command.container_kind,
+                command.slot_index,
+                command.item_instance_id);
+            break;
+        case Gs1GodotDebugHttpCommandKind::SiteContextRequest:
+            ok = submit_site_context_request(command.tile_x, command.tile_y, command.flags);
+            break;
+        case Gs1GodotDebugHttpCommandKind::SiteMoveDirection:
+            ok = submit_move_direction(command.world_move_x, command.world_move_y, command.world_move_z);
+            break;
+        default:
+            last_error_ = "Unknown queued Godot debug HTTP command kind.";
+            return false;
+        }
+
+        if (!ok)
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 bool Gs1GodotAdapterService::drain_projection_messages()
@@ -443,6 +556,22 @@ bool Gs1GodotAdapterService::submit_site_inventory_slot_tap(
         last_error_ = runtime_session_.last_error();
         return false;
     }
+    return true;
+}
+
+bool Gs1GodotAdapterService::queue_debug_http_command(
+    std::string_view path,
+    const std::string& body,
+    std::string& out_error)
+{
+    Gs1GodotDebugHttpCommand command {};
+    if (!gs1_parse_godot_debug_http_command(path, body, command, &out_error))
+    {
+        return false;
+    }
+
+    std::scoped_lock lock {pending_debug_http_commands_mutex_};
+    pending_debug_http_commands_.push_back(command);
     return true;
 }
 

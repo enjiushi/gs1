@@ -1,10 +1,13 @@
 #pragma once
 
+#include "gs1_godot_debug_http_protocol.h"
+#include "gs1_godot_debug_http_server.h"
 #include "host/runtime_session.h"
 
 #include <array>
 #include <cstdint>
 #include <filesystem>
+#include <mutex>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -59,11 +62,14 @@ public:
 private:
     static constexpr std::size_t k_message_bucket_count = 256U;
 
+    void ensure_debug_http_server_initialized();
     void ensure_runtime_started();
+    [[nodiscard]] bool drain_debug_http_commands();
     bool drain_projection_messages();
     void notify_runtime_message_reset();
     void dispatch_engine_message(Gs1EngineMessage&& message);
     [[nodiscard]] bool submit_ui_action(const Gs1UiAction& action);
+    [[nodiscard]] bool queue_debug_http_command(std::string_view path, const std::string& body, std::string& out_error);
     void refresh_gameplay_dll_path();
     void refresh_project_config_root();
     [[nodiscard]] std::string compute_default_gameplay_dll_path() const;
@@ -78,5 +84,9 @@ private:
     Gs1RuntimeSession runtime_session_ {};
     std::array<std::vector<IGs1GodotEngineMessageSubscriber*>, k_message_bucket_count> subscribers_by_message_ {};
     std::unordered_set<IGs1GodotEngineMessageSubscriber*> known_subscribers_ {};
+    Gs1GodotDebugHttpServer debug_http_server_ {};
+    bool debug_http_server_checked_ {false};
+    std::mutex pending_debug_http_commands_mutex_ {};
+    std::vector<Gs1GodotDebugHttpCommand> pending_debug_http_commands_ {};
     std::string last_error_ {};
 };

@@ -306,6 +306,10 @@ if(GS1_BUILD_TESTS)
     add_executable(gs1_runtime_projection_test
         tests/runtime/game_runtime_projection_test.cpp)
 
+    add_executable(gs1_godot_debug_http_protocol_test
+        tests/runtime/godot_debug_http_protocol_test.cpp
+        engines/godot/native/gs1_godot_debug_http_protocol.cpp)
+
     add_executable(gs1_runtime_message_chain_test
         tests/runtime/game_runtime_message_chain_test.cpp)
 
@@ -327,6 +331,10 @@ if(GS1_BUILD_TESTS)
     target_link_libraries(gs1_smoke_host PRIVATE gs1_smoke_support)
     target_link_libraries(gs1_visual_smoke_host PRIVATE gs1_smoke_support ws2_32 winmm)
     target_link_libraries(gs1_game_process_test_host PRIVATE gs1_smoke_support)
+    target_include_directories(gs1_godot_debug_http_protocol_test
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/engines/godot/native)
     target_link_libraries(gs1_runtime_projection_test PRIVATE gs1_gameplay_core gs1_host_bridge)
     target_link_libraries(gs1_runtime_message_chain_test PRIVATE gs1_gameplay_core)
     target_link_libraries(gs1_timed_modifier_projection_test PRIVATE gs1_gameplay_core)
@@ -344,6 +352,7 @@ if(GS1_BUILD_TESTS)
 
     gs1_enable_strict_warnings(gs1_game_process_test_host)
     gs1_enable_strict_warnings(gs1_system_test_host)
+    gs1_enable_strict_warnings(gs1_godot_debug_http_protocol_test)
     gs1_enable_strict_warnings(gs1_runtime_projection_test)
     gs1_enable_strict_warnings(gs1_runtime_message_chain_test)
     gs1_enable_strict_warnings(gs1_timed_modifier_projection_test)
@@ -358,6 +367,10 @@ if(GS1_BUILD_TESTS)
         COMMAND gs1_smoke_host
             $<TARGET_FILE:gs1_game>
             tests/smoke/scripts/main_menu_to_site_active.smoke)
+
+    add_test(
+        NAME gs1_godot_debug_http_protocol_test
+        COMMAND gs1_godot_debug_http_protocol_test)
 
     add_test(
         NAME gs1_runtime_projection_test
@@ -411,6 +424,8 @@ if(GS1_BUILD_TESTS)
     set_tests_properties(gs1_smoke_host PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(gs1_runtime_projection_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(gs1_godot_debug_http_protocol_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(gs1_runtime_message_chain_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -505,6 +520,8 @@ if(GS1_BUILD_GODOT_ADAPTER)
         engines/godot/native/gs1_godot_extension_entry.cpp
         engines/godot/native/gs1_godot_adapter_service.cpp
         engines/godot/native/gs1_godot_controller_context.cpp
+        engines/godot/native/gs1_godot_debug_http_protocol.cpp
+        engines/godot/native/gs1_godot_debug_http_server.cpp
         engines/godot/native/godot_progression_resources.cpp
         engines/godot/native/gs1_godot_director_control.cpp
         engines/godot/native/gs1_godot_main_menu_ui_controller.cpp
@@ -539,6 +556,10 @@ if(GS1_BUILD_GODOT_ADAPTER)
             godot::cpp
             gs1_host_bridge
             gs1_gameplay_core)
+
+    if(WIN32)
+        target_link_libraries(gs1_godot_adapter PRIVATE ws2_32)
+    endif()
 
     add_dependencies(gs1_godot_adapter gs1_game)
 
