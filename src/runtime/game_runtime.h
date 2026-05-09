@@ -203,51 +203,101 @@ private:
     void queue_site_result_ui_messages(std::uint32_t site_id, Gs1SiteAttemptResult result);
     void queue_site_protection_selector_ui_messages();
     void queue_regional_map_snapshot_messages();
-    void queue_regional_map_site_upsert_message(const SiteMetaState& site);
-    void queue_site_snapshot_begin_message(Gs1ProjectionMode mode);
-    void queue_site_snapshot_end_message();
-    void queue_site_tile_upsert_message(std::uint32_t x, std::uint32_t y);
-    void queue_all_site_tile_upsert_messages();
-    void queue_pending_site_tile_upsert_messages();
-    void queue_site_worker_update_message();
+    void queue_regional_map_site_upsert_message(
+        const SiteMetaState& site,
+        Gs1EngineMessageType message_type = GS1_ENGINE_MESSAGE_REGIONAL_MAP_SITE_UPSERT);
+    void queue_site_snapshot_begin_message(
+        Gs1ProjectionMode mode,
+        Gs1EngineMessageType message_type = GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT);
+    void queue_site_snapshot_end_message(
+        Gs1EngineMessageType message_type = GS1_ENGINE_MESSAGE_END_SITE_SNAPSHOT);
+    void queue_site_tile_upsert_message(
+        std::uint32_t x,
+        std::uint32_t y,
+        Gs1EngineMessageType message_type = GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
+    void queue_all_site_tile_upsert_messages(
+        Gs1EngineMessageType message_type = GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
+    void queue_pending_site_tile_upsert_messages(
+        Gs1EngineMessageType message_type = GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
+    void queue_site_worker_update_message(
+        Gs1EngineMessageType message_type = GS1_ENGINE_MESSAGE_SITE_WORKER_UPDATE);
     void queue_site_camp_update_message();
     void queue_site_weather_update_message();
-    void queue_site_inventory_storage_upsert_message(std::uint32_t storage_id);
-    void queue_all_site_inventory_storage_upsert_messages();
+    void queue_site_inventory_storage_upsert_message(
+        std::uint32_t storage_id,
+        Gs1EngineMessageType message_type = GS1_ENGINE_MESSAGE_SITE_INVENTORY_STORAGE_UPSERT);
+    void queue_all_site_inventory_storage_upsert_messages(
+        Gs1EngineMessageType message_type = GS1_ENGINE_MESSAGE_SITE_INVENTORY_STORAGE_UPSERT);
     void queue_site_inventory_slot_upsert_message(
         Gs1InventoryContainerKind container_kind,
         std::uint32_t slot_index,
         std::uint32_t storage_id = 0U,
         std::uint64_t container_owner_id = 0U,
-        TileCoord container_tile = TileCoord {});
+        TileCoord container_tile = TileCoord {},
+        Gs1EngineMessageType message_type = GS1_ENGINE_MESSAGE_SITE_INVENTORY_SLOT_UPSERT);
     void queue_site_inventory_view_state_message(
         std::uint32_t storage_id,
         Gs1InventoryViewEventKind event_kind,
-        std::uint32_t slot_count = 0U);
-    void queue_all_site_inventory_slot_upsert_messages();
-    void queue_pending_site_inventory_slot_upsert_messages();
+        std::uint32_t slot_count = 0U,
+        Gs1EngineMessageType message_type = GS1_ENGINE_MESSAGE_SITE_INVENTORY_VIEW_STATE);
+    void queue_all_site_inventory_slot_upsert_messages(
+        Gs1EngineMessageType message_type = GS1_ENGINE_MESSAGE_SITE_INVENTORY_SLOT_UPSERT);
+    void queue_pending_site_inventory_slot_upsert_messages(
+        Gs1EngineMessageType storage_message_type = GS1_ENGINE_MESSAGE_SITE_INVENTORY_STORAGE_UPSERT,
+        Gs1EngineMessageType slot_message_type = GS1_ENGINE_MESSAGE_SITE_INVENTORY_SLOT_UPSERT,
+        Gs1EngineMessageType view_state_message_type = GS1_ENGINE_MESSAGE_SITE_INVENTORY_VIEW_STATE);
     void queue_site_craft_context_messages();
     void queue_site_placement_preview_message();
     void queue_site_placement_preview_tile_upsert_message(const Gs1EngineMessagePlacementPreviewTileData& payload);
     void queue_site_placement_failure_message(const PlacementModeCommitRejectedMessage& payload);
-    void queue_site_task_upsert_message(std::size_t task_index);
-    void queue_all_site_task_upsert_messages();
-    void queue_site_modifier_list_begin_message(Gs1ProjectionMode mode);
-    void queue_site_modifier_upsert_message(std::size_t modifier_index);
-    void queue_all_site_modifier_upsert_messages(Gs1ProjectionMode mode);
-    void queue_site_plant_visual_upsert_message(TileCoord coord);
-    void queue_site_plant_visual_remove_message(std::uint64_t visual_id);
-    void queue_all_site_plant_visual_messages();
-    void queue_pending_site_plant_visual_messages();
-    void queue_site_device_visual_upsert_message(TileCoord coord);
-    void queue_site_device_visual_remove_message(std::uint64_t visual_id);
-    void queue_all_site_device_visual_messages();
-    void queue_pending_site_device_visual_messages();
+    void queue_site_task_upsert_message(
+        std::size_t task_index,
+        Gs1EngineMessageType message_type = GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT);
+    void queue_all_site_task_upsert_messages(
+        Gs1EngineMessageType message_type = GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT);
+    void queue_site_modifier_list_begin_message(
+        Gs1ProjectionMode mode,
+        Gs1EngineMessageType message_type = GS1_ENGINE_MESSAGE_SITE_MODIFIER_LIST_BEGIN);
+    void queue_site_modifier_upsert_message(
+        std::size_t modifier_index,
+        Gs1EngineMessageType message_type = GS1_ENGINE_MESSAGE_SITE_MODIFIER_UPSERT);
+    void queue_all_site_modifier_upsert_messages(
+        Gs1ProjectionMode mode,
+        Gs1EngineMessageType begin_message_type = GS1_ENGINE_MESSAGE_SITE_MODIFIER_LIST_BEGIN,
+        Gs1EngineMessageType upsert_message_type = GS1_ENGINE_MESSAGE_SITE_MODIFIER_UPSERT);
+    void queue_site_plant_visual_upsert_message(
+        TileCoord coord,
+        Gs1EngineMessageType message_type = GS1_ENGINE_MESSAGE_SITE_PLANT_VISUAL_UPSERT);
+    void queue_site_plant_visual_remove_message(
+        std::uint64_t visual_id,
+        Gs1EngineMessageType message_type = GS1_ENGINE_MESSAGE_SITE_PLANT_VISUAL_REMOVE);
+    void queue_all_site_plant_visual_messages(
+        Gs1EngineMessageType message_type = GS1_ENGINE_MESSAGE_SITE_PLANT_VISUAL_UPSERT);
+    void queue_pending_site_plant_visual_messages(
+        Gs1EngineMessageType upsert_message_type = GS1_ENGINE_MESSAGE_SITE_PLANT_VISUAL_UPSERT,
+        Gs1EngineMessageType remove_message_type = GS1_ENGINE_MESSAGE_SITE_PLANT_VISUAL_REMOVE);
+    void queue_site_device_visual_upsert_message(
+        TileCoord coord,
+        Gs1EngineMessageType message_type = GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_UPSERT);
+    void queue_site_device_visual_remove_message(
+        std::uint64_t visual_id,
+        Gs1EngineMessageType message_type = GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_REMOVE);
+    void queue_all_site_device_visual_messages(
+        Gs1EngineMessageType message_type = GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_UPSERT);
+    void queue_pending_site_device_visual_messages(
+        Gs1EngineMessageType upsert_message_type = GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_UPSERT,
+        Gs1EngineMessageType remove_message_type = GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_REMOVE);
     void queue_site_phone_panel_state_message();
     void queue_site_protection_overlay_state_message();
-    void queue_site_phone_listing_remove_message(std::uint32_t listing_id);
-    void queue_site_phone_listing_upsert_message(std::size_t listing_index);
-    void queue_all_site_phone_listing_upsert_messages();
+    void queue_site_phone_listing_remove_message(
+        std::uint32_t listing_id,
+        Gs1EngineMessageType message_type = GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_REMOVE);
+    void queue_site_phone_listing_upsert_message(
+        std::size_t listing_index,
+        Gs1EngineMessageType message_type = GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_UPSERT);
+    void queue_all_site_phone_listing_upsert_messages(
+        Gs1EngineMessageType upsert_message_type = GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_UPSERT,
+        Gs1EngineMessageType remove_message_type = GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_REMOVE);
     void queue_site_bootstrap_messages();
     void queue_site_delta_messages(std::uint64_t dirty_flags);
     void queue_site_action_update_message();

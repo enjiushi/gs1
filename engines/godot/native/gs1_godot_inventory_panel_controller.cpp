@@ -171,11 +171,11 @@ bool Gs1GodotInventoryPanelController::handles_engine_message(Gs1EngineMessageTy
 {
     switch (type)
     {
-    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
-    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_STORAGE_UPSERT:
-    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_SLOT_UPSERT:
-    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_VIEW_STATE:
-    case GS1_ENGINE_MESSAGE_END_SITE_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_BEGIN_SITE_INVENTORY_PANEL_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_PANEL_STORAGE_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_PANEL_SLOT_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_PANEL_VIEW_STATE:
+    case GS1_ENGINE_MESSAGE_END_SITE_INVENTORY_PANEL_SNAPSHOT:
         return true;
     default:
         return false;
@@ -186,7 +186,7 @@ void Gs1GodotInventoryPanelController::handle_engine_message(const Gs1EngineMess
 {
     switch (message.type)
     {
-    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_BEGIN_SITE_INVENTORY_PANEL_SNAPSHOT:
     {
         const auto& payload = message.payload_as<Gs1EngineMessageSiteSnapshotData>();
         in_site_snapshot_ = true;
@@ -199,7 +199,7 @@ void Gs1GodotInventoryPanelController::handle_engine_message(const Gs1EngineMess
         }
         break;
     }
-    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_STORAGE_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_PANEL_STORAGE_UPSERT:
     {
         const auto projection = message.payload_as<Gs1EngineMessageInventoryStorageData>();
         const auto found = std::find_if(
@@ -216,7 +216,7 @@ void Gs1GodotInventoryPanelController::handle_engine_message(const Gs1EngineMess
         }
         break;
     }
-    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_SLOT_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_PANEL_SLOT_UPSERT:
     {
         const auto projection = message.payload_as<Gs1EngineMessageInventorySlotData>();
         std::vector<Gs1RuntimeInventorySlotProjection>* slots = nullptr;
@@ -248,7 +248,7 @@ void Gs1GodotInventoryPanelController::handle_engine_message(const Gs1EngineMess
         }
         break;
     }
-    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_VIEW_STATE:
+    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_PANEL_VIEW_STATE:
     {
         const auto& payload = message.payload_as<Gs1EngineMessageInventoryViewData>();
         const auto* storage = find_storage(payload.storage_id);
@@ -279,7 +279,7 @@ void Gs1GodotInventoryPanelController::handle_engine_message(const Gs1EngineMess
         }
         break;
     }
-    case GS1_ENGINE_MESSAGE_END_SITE_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_END_SITE_INVENTORY_PANEL_SNAPSHOT:
         in_site_snapshot_ = false;
         break;
     default:

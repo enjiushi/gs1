@@ -197,11 +197,11 @@ bool Gs1GodotPhonePanelController::handles_engine_message(Gs1EngineMessageType t
 {
     switch (type)
     {
-    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
-    case GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_UPSERT:
-    case GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_REMOVE:
+    case GS1_ENGINE_MESSAGE_BEGIN_SITE_PHONE_PANEL_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_LISTING_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_LISTING_REMOVE:
     case GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE:
-    case GS1_ENGINE_MESSAGE_END_SITE_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_END_SITE_PHONE_PANEL_SNAPSHOT:
         return true;
     default:
         return false;
@@ -215,7 +215,7 @@ void Gs1GodotPhonePanelController::handle_engine_message(const Gs1EngineMessage&
     case GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE:
         phone_panel_state_ = message.payload_as<Gs1EngineMessagePhonePanelData>();
         break;
-    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_BEGIN_SITE_PHONE_PANEL_SNAPSHOT:
     {
         const auto& payload = message.payload_as<Gs1EngineMessageSiteSnapshotData>();
         pending_listing_indices_.clear();
@@ -232,7 +232,7 @@ void Gs1GodotPhonePanelController::handle_engine_message(const Gs1EngineMessage&
         }
         break;
     }
-    case GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_LISTING_UPSERT:
     {
         Gs1RuntimePhoneListingProjection projection = message.payload_as<Gs1EngineMessagePhoneListingData>();
         const auto found = pending_listing_indices_.find(projection.listing_id);
@@ -247,7 +247,7 @@ void Gs1GodotPhonePanelController::handle_engine_message(const Gs1EngineMessage&
         }
         break;
     }
-    case GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_REMOVE:
+    case GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_LISTING_REMOVE:
     {
         const auto& payload = message.payload_as<Gs1EngineMessagePhoneListingData>();
         const auto found = pending_listing_indices_.find(payload.listing_id);
@@ -265,7 +265,7 @@ void Gs1GodotPhonePanelController::handle_engine_message(const Gs1EngineMessage&
         }
         break;
     }
-    case GS1_ENGINE_MESSAGE_END_SITE_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_END_SITE_PHONE_PANEL_SNAPSHOT:
         std::sort(phone_listings_state_.begin(), phone_listings_state_.end(), [](const auto& lhs, const auto& rhs) {
             return lhs.listing_id < rhs.listing_id;
         });

@@ -206,10 +206,6 @@ bool Gs1GodotActionPanelController::handles_engine_message(Gs1EngineMessageType 
 {
     switch (type)
     {
-    case GS1_ENGINE_MESSAGE_BEGIN_UI_SETUP:
-    case GS1_ENGINE_MESSAGE_UI_ELEMENT_UPSERT:
-    case GS1_ENGINE_MESSAGE_END_UI_SETUP:
-    case GS1_ENGINE_MESSAGE_CLOSE_UI_SETUP:
     case GS1_ENGINE_MESSAGE_BEGIN_UI_PANEL:
     case GS1_ENGINE_MESSAGE_UI_PANEL_SLOT_ACTION_UPSERT:
     case GS1_ENGINE_MESSAGE_END_UI_PANEL:

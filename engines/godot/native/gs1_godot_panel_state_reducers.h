@@ -7,6 +7,60 @@
 #include <unordered_map>
 #include <vector>
 
+struct Gs1GodotUiPanelStateReducerMessageFamily final
+{
+    Gs1EngineMessageType begin_message {GS1_ENGINE_MESSAGE_BEGIN_UI_PANEL};
+    Gs1EngineMessageType text_upsert_message {GS1_ENGINE_MESSAGE_UI_PANEL_TEXT_UPSERT};
+    Gs1EngineMessageType slot_action_upsert_message {GS1_ENGINE_MESSAGE_UI_PANEL_SLOT_ACTION_UPSERT};
+    Gs1EngineMessageType list_item_upsert_message {GS1_ENGINE_MESSAGE_UI_PANEL_LIST_ITEM_UPSERT};
+    Gs1EngineMessageType list_action_upsert_message {GS1_ENGINE_MESSAGE_UI_PANEL_LIST_ACTION_UPSERT};
+    Gs1EngineMessageType end_message {GS1_ENGINE_MESSAGE_END_UI_PANEL};
+    Gs1EngineMessageType close_message {GS1_ENGINE_MESSAGE_CLOSE_UI_PANEL};
+};
+
+inline constexpr Gs1GodotUiPanelStateReducerMessageFamily k_gs1_action_panel_ui_panel_message_family {};
+inline constexpr Gs1GodotUiPanelStateReducerMessageFamily k_gs1_regional_selection_ui_panel_message_family {
+    GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_SELECTION_UI_PANEL,
+    GS1_ENGINE_MESSAGE_REGIONAL_SELECTION_UI_PANEL_TEXT_UPSERT,
+    GS1_ENGINE_MESSAGE_REGIONAL_SELECTION_UI_PANEL_SLOT_ACTION_UPSERT,
+    GS1_ENGINE_MESSAGE_REGIONAL_SELECTION_UI_PANEL_LIST_ITEM_UPSERT,
+    GS1_ENGINE_MESSAGE_REGIONAL_SELECTION_UI_PANEL_LIST_ACTION_UPSERT,
+    GS1_ENGINE_MESSAGE_END_REGIONAL_SELECTION_UI_PANEL,
+    GS1_ENGINE_MESSAGE_CLOSE_REGIONAL_SELECTION_UI_PANEL};
+
+struct Gs1GodotRegionalMapStateReducerMessageFamily final
+{
+    Gs1EngineMessageType begin_message {GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_MAP_SNAPSHOT};
+    Gs1EngineMessageType site_upsert_message {GS1_ENGINE_MESSAGE_REGIONAL_MAP_SITE_UPSERT};
+    Gs1EngineMessageType site_remove_message {GS1_ENGINE_MESSAGE_REGIONAL_MAP_SITE_REMOVE};
+    Gs1EngineMessageType link_upsert_message {GS1_ENGINE_MESSAGE_REGIONAL_MAP_LINK_UPSERT};
+    Gs1EngineMessageType link_remove_message {GS1_ENGINE_MESSAGE_REGIONAL_MAP_LINK_REMOVE};
+    Gs1EngineMessageType end_message {GS1_ENGINE_MESSAGE_END_REGIONAL_MAP_SNAPSHOT};
+};
+
+inline constexpr Gs1GodotRegionalMapStateReducerMessageFamily k_gs1_regional_map_scene_message_family {};
+inline constexpr Gs1GodotRegionalMapStateReducerMessageFamily k_gs1_regional_map_hud_message_family {
+    GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_MAP_HUD_SNAPSHOT,
+    GS1_ENGINE_MESSAGE_REGIONAL_MAP_HUD_SITE_UPSERT,
+    GS1_ENGINE_MESSAGE_REGIONAL_MAP_HUD_SITE_REMOVE,
+    GS1_ENGINE_MESSAGE_REGIONAL_MAP_HUD_LINK_UPSERT,
+    GS1_ENGINE_MESSAGE_REGIONAL_MAP_HUD_LINK_REMOVE,
+    GS1_ENGINE_MESSAGE_END_REGIONAL_MAP_HUD_SNAPSHOT};
+inline constexpr Gs1GodotRegionalMapStateReducerMessageFamily k_gs1_regional_summary_message_family {
+    GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_SUMMARY_SNAPSHOT,
+    GS1_ENGINE_MESSAGE_REGIONAL_SUMMARY_SITE_UPSERT,
+    GS1_ENGINE_MESSAGE_REGIONAL_SUMMARY_SITE_REMOVE,
+    GS1_ENGINE_MESSAGE_REGIONAL_SUMMARY_LINK_UPSERT,
+    GS1_ENGINE_MESSAGE_REGIONAL_SUMMARY_LINK_REMOVE,
+    GS1_ENGINE_MESSAGE_END_REGIONAL_SUMMARY_SNAPSHOT};
+inline constexpr Gs1GodotRegionalMapStateReducerMessageFamily k_gs1_regional_selection_message_family {
+    GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_SELECTION_SNAPSHOT,
+    GS1_ENGINE_MESSAGE_REGIONAL_SELECTION_SITE_UPSERT,
+    GS1_ENGINE_MESSAGE_REGIONAL_SELECTION_SITE_REMOVE,
+    GS1_ENGINE_MESSAGE_REGIONAL_SELECTION_LINK_UPSERT,
+    GS1_ENGINE_MESSAGE_REGIONAL_SELECTION_LINK_REMOVE,
+    GS1_ENGINE_MESSAGE_END_REGIONAL_SELECTION_SNAPSHOT};
+
 class Gs1GodotStatusStateReducer final
 {
 public:
@@ -56,6 +110,12 @@ private:
 class Gs1GodotUiPanelStateReducer final
 {
 public:
+    explicit Gs1GodotUiPanelStateReducer(
+        Gs1GodotUiPanelStateReducerMessageFamily family = k_gs1_action_panel_ui_panel_message_family) noexcept
+        : family_(family)
+    {
+    }
+
     void reset() noexcept;
     void apply_engine_message(const Gs1EngineMessage& message);
     [[nodiscard]] const Gs1RuntimeUiPanelProjection* find_panel(Gs1UiPanelId panel_id) const noexcept;
@@ -80,6 +140,7 @@ private:
     std::unordered_map<std::uint16_t, std::size_t> pending_slot_action_indices_ {};
     std::unordered_map<std::uint64_t, std::size_t> pending_list_item_indices_ {};
     std::unordered_map<std::uint64_t, std::size_t> pending_list_action_indices_ {};
+    Gs1GodotUiPanelStateReducerMessageFamily family_ {};
 };
 
 class Gs1GodotProgressionViewStateReducer final
@@ -115,6 +176,12 @@ public:
         std::vector<Gs1RuntimeRegionalMapLinkProjection> links {};
     };
 
+    explicit Gs1GodotRegionalMapStateReducer(
+        Gs1GodotRegionalMapStateReducerMessageFamily family = k_gs1_regional_map_scene_message_family) noexcept
+        : family_(family)
+    {
+    }
+
     void reset() noexcept;
     void apply_engine_message(const Gs1EngineMessage& message);
     [[nodiscard]] const State& state() const noexcept { return state_; }
@@ -128,6 +195,7 @@ private:
 
     State state_ {};
     std::optional<PendingRegionalMapState> pending_ {};
+    Gs1GodotRegionalMapStateReducerMessageFamily family_ {};
 };
 
 class Gs1GodotSiteStateReducer final

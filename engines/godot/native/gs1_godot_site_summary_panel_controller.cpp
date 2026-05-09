@@ -81,12 +81,12 @@ bool Gs1GodotSiteSummaryPanelController::handles_engine_message(Gs1EngineMessage
 {
     switch (type)
     {
-    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SUMMARY_SNAPSHOT:
     case GS1_ENGINE_MESSAGE_SITE_WORKER_UPDATE:
     case GS1_ENGINE_MESSAGE_SITE_WEATHER_UPDATE:
     case GS1_ENGINE_MESSAGE_HUD_STATE:
     case GS1_ENGINE_MESSAGE_SITE_ACTION_UPDATE:
-    case GS1_ENGINE_MESSAGE_END_SITE_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_END_SITE_SUMMARY_SNAPSHOT:
         return true;
     default:
         return false;
@@ -97,7 +97,7 @@ void Gs1GodotSiteSummaryPanelController::handle_engine_message(const Gs1EngineMe
 {
     switch (message.type)
     {
-    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SUMMARY_SNAPSHOT:
     {
         const auto& payload = message.payload_as<Gs1EngineMessageSiteSnapshotData>();
         if (!state_.has_value())
@@ -140,7 +140,7 @@ void Gs1GodotSiteSummaryPanelController::handle_engine_message(const Gs1EngineMe
         }
         break;
     }
-    case GS1_ENGINE_MESSAGE_END_SITE_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_END_SITE_SUMMARY_SNAPSHOT:
         break;
     default:
         break;

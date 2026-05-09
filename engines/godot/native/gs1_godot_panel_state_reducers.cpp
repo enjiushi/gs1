@@ -457,9 +457,8 @@ const Gs1RuntimeUiPanelProjection* Gs1GodotUiPanelStateReducer::find_panel(Gs1Ui
 
 void Gs1GodotUiPanelStateReducer::apply_engine_message(const Gs1EngineMessage& message)
 {
-    switch (message.type)
-    {
-    case GS1_ENGINE_MESSAGE_BEGIN_UI_PANEL:
+    const Gs1EngineMessageType type = message.type;
+    if (type == family_.begin_message)
     {
         const auto& payload = message.payload_as<Gs1EngineMessageUiPanelData>();
         pending_text_line_indices_.clear();
@@ -520,13 +519,12 @@ void Gs1GodotUiPanelStateReducer::apply_engine_message(const Gs1EngineMessage& m
             pending_->list_items.clear();
             pending_->list_actions.clear();
         }
-        break;
     }
-    case GS1_ENGINE_MESSAGE_UI_PANEL_TEXT_UPSERT:
+    else if (type == family_.text_upsert_message)
     {
         if (!pending_.has_value())
         {
-            break;
+            return;
         }
         const auto& payload = message.payload_as<Gs1EngineMessageUiPanelTextData>();
         Gs1RuntimeUiPanelTextProjection projection {};
@@ -547,13 +545,12 @@ void Gs1GodotUiPanelStateReducer::apply_engine_message(const Gs1EngineMessage& m
             pending_text_line_indices_[projection.line_id] = pending_->text_lines.size();
             pending_->text_lines.push_back(std::move(projection));
         }
-        break;
     }
-    case GS1_ENGINE_MESSAGE_UI_PANEL_SLOT_ACTION_UPSERT:
+    else if (type == family_.slot_action_upsert_message)
     {
         if (!pending_.has_value())
         {
-            break;
+            return;
         }
         const auto& payload = message.payload_as<Gs1EngineMessageUiPanelSlotActionData>();
         Gs1RuntimeUiPanelSlotActionProjection projection {};
@@ -575,13 +572,12 @@ void Gs1GodotUiPanelStateReducer::apply_engine_message(const Gs1EngineMessage& m
             pending_slot_action_indices_[key] = pending_->slot_actions.size();
             pending_->slot_actions.push_back(std::move(projection));
         }
-        break;
     }
-    case GS1_ENGINE_MESSAGE_UI_PANEL_LIST_ITEM_UPSERT:
+    else if (type == family_.list_item_upsert_message)
     {
         if (!pending_.has_value())
         {
-            break;
+            return;
         }
         const auto& payload = message.payload_as<Gs1EngineMessageUiPanelListItemData>();
         Gs1RuntimeUiPanelListItemProjection projection {};
@@ -606,13 +602,12 @@ void Gs1GodotUiPanelStateReducer::apply_engine_message(const Gs1EngineMessage& m
             pending_list_item_indices_[key] = pending_->list_items.size();
             pending_->list_items.push_back(std::move(projection));
         }
-        break;
     }
-    case GS1_ENGINE_MESSAGE_UI_PANEL_LIST_ACTION_UPSERT:
+    else if (type == family_.list_action_upsert_message)
     {
         if (!pending_.has_value())
         {
-            break;
+            return;
         }
         const auto& payload = message.payload_as<Gs1EngineMessageUiPanelListActionData>();
         Gs1RuntimeUiPanelListActionProjection projection {};
@@ -632,13 +627,12 @@ void Gs1GodotUiPanelStateReducer::apply_engine_message(const Gs1EngineMessage& m
             pending_list_action_indices_[key] = pending_->list_actions.size();
             pending_->list_actions.push_back(std::move(projection));
         }
-        break;
     }
-    case GS1_ENGINE_MESSAGE_END_UI_PANEL:
+    else if (type == family_.end_message)
     {
         if (!pending_.has_value())
         {
-            break;
+            return;
         }
         Gs1RuntimeUiPanelProjection panel {};
         panel.panel_id = pending_->panel_id;
@@ -661,19 +655,14 @@ void Gs1GodotUiPanelStateReducer::apply_engine_message(const Gs1EngineMessage& m
         pending_slot_action_indices_.clear();
         pending_list_item_indices_.clear();
         pending_list_action_indices_.clear();
-        break;
     }
-    case GS1_ENGINE_MESSAGE_CLOSE_UI_PANEL:
+    else if (type == family_.close_message)
     {
         const auto& payload = message.payload_as<Gs1EngineMessageCloseUiPanelData>();
         erase_projection_if(panels_, [&](const auto& panel) {
             return panel.panel_id == payload.panel_id;
         });
         rebuild_indices();
-        break;
-    }
-    default:
-        break;
     }
 }
 
@@ -819,9 +808,7 @@ void Gs1GodotRegionalMapStateReducer::reset() noexcept
 
 void Gs1GodotRegionalMapStateReducer::apply_engine_message(const Gs1EngineMessage& message)
 {
-    switch (message.type)
-    {
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
+    if (message.type == GS1_ENGINE_MESSAGE_SET_APP_STATE)
     {
         const auto& payload = message.payload_as<Gs1EngineMessageSetAppStateData>();
         if (payload.app_state == GS1_APP_STATE_MAIN_MENU)
@@ -830,9 +817,8 @@ void Gs1GodotRegionalMapStateReducer::apply_engine_message(const Gs1EngineMessag
             state_.sites.clear();
             state_.links.clear();
         }
-        break;
     }
-    case GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_MAP_SNAPSHOT:
+    else if (message.type == family_.begin_message)
     {
         const auto& payload = message.payload_as<Gs1EngineMessageRegionalMapSnapshotData>();
         if (payload.mode == GS1_PROJECTION_MODE_DELTA)
@@ -852,13 +838,12 @@ void Gs1GodotRegionalMapStateReducer::apply_engine_message(const Gs1EngineMessag
         {
             state_.selected_site_id.reset();
         }
-        break;
     }
-    case GS1_ENGINE_MESSAGE_REGIONAL_MAP_SITE_UPSERT:
+    else if (message.type == family_.site_upsert_message)
     {
         if (!pending_.has_value())
         {
-            break;
+            return;
         }
         Gs1RuntimeRegionalMapSiteProjection projection = message.payload_as<Gs1EngineMessageRegionalMapSiteData>();
         upsert_projection(pending_->sites, projection, projection.site_id, [](const auto& site) {
@@ -868,13 +853,12 @@ void Gs1GodotRegionalMapStateReducer::apply_engine_message(const Gs1EngineMessag
         {
             state_.selected_site_id = projection.site_id;
         }
-        break;
     }
-    case GS1_ENGINE_MESSAGE_REGIONAL_MAP_SITE_REMOVE:
+    else if (message.type == family_.site_remove_message)
     {
         if (!pending_.has_value())
         {
-            break;
+            return;
         }
         const auto& payload = message.payload_as<Gs1EngineMessageRegionalMapSiteData>();
         erase_projection_if(pending_->sites, [&](const auto& site) {
@@ -884,48 +868,41 @@ void Gs1GodotRegionalMapStateReducer::apply_engine_message(const Gs1EngineMessag
         {
             state_.selected_site_id.reset();
         }
-        break;
     }
-    case GS1_ENGINE_MESSAGE_REGIONAL_MAP_LINK_UPSERT:
+    else if (message.type == family_.link_upsert_message)
     {
         if (!pending_.has_value())
         {
-            break;
+            return;
         }
         Gs1RuntimeRegionalMapLinkProjection projection = message.payload_as<Gs1EngineMessageRegionalMapLinkData>();
         upsert_projection(pending_->links, projection, regional_map_link_key(projection.from_site_id, projection.to_site_id), [](const auto& link) {
             return regional_map_link_key(link.from_site_id, link.to_site_id);
         });
-        break;
     }
-    case GS1_ENGINE_MESSAGE_REGIONAL_MAP_LINK_REMOVE:
+    else if (message.type == family_.link_remove_message)
     {
         if (!pending_.has_value())
         {
-            break;
+            return;
         }
         const auto& payload = message.payload_as<Gs1EngineMessageRegionalMapLinkData>();
         const auto key = regional_map_link_key(payload.from_site_id, payload.to_site_id);
         erase_projection_if(pending_->links, [&](const auto& link) {
             return regional_map_link_key(link.from_site_id, link.to_site_id) == key;
         });
-        break;
     }
-    case GS1_ENGINE_MESSAGE_END_REGIONAL_MAP_SNAPSHOT:
+    else if (message.type == family_.end_message)
     {
         if (!pending_.has_value())
         {
-            break;
+            return;
         }
         sort_regional_map_sites(pending_->sites);
         sort_regional_map_links(pending_->links);
         state_.sites = std::move(pending_->sites);
         state_.links = std::move(pending_->links);
         pending_.reset();
-        break;
-    }
-    default:
-        break;
     }
 }
 

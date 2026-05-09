@@ -134,12 +134,12 @@ bool Gs1GodotTaskPanelController::handles_engine_message(Gs1EngineMessageType ty
 {
     switch (type)
     {
-    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
-    case GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT:
-    case GS1_ENGINE_MESSAGE_SITE_TASK_REMOVE:
-    case GS1_ENGINE_MESSAGE_SITE_MODIFIER_LIST_BEGIN:
-    case GS1_ENGINE_MESSAGE_SITE_MODIFIER_UPSERT:
-    case GS1_ENGINE_MESSAGE_END_SITE_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_BEGIN_SITE_TASK_PANEL_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_SITE_TASK_PANEL_TASK_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_TASK_PANEL_TASK_REMOVE:
+    case GS1_ENGINE_MESSAGE_SITE_TASK_PANEL_MODIFIER_LIST_BEGIN:
+    case GS1_ENGINE_MESSAGE_SITE_TASK_PANEL_MODIFIER_UPSERT:
+    case GS1_ENGINE_MESSAGE_END_SITE_TASK_PANEL_SNAPSHOT:
         return true;
     default:
         return false;
@@ -150,7 +150,7 @@ void Gs1GodotTaskPanelController::handle_engine_message(const Gs1EngineMessage& 
 {
     switch (message.type)
     {
-    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_BEGIN_SITE_TASK_PANEL_SNAPSHOT:
     {
         const auto& payload = message.payload_as<Gs1EngineMessageSiteSnapshotData>();
         in_site_snapshot_ = true;
@@ -174,7 +174,7 @@ void Gs1GodotTaskPanelController::handle_engine_message(const Gs1EngineMessage& 
         }
         break;
     }
-    case GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_TASK_PANEL_TASK_UPSERT:
     {
         Gs1RuntimeTaskProjection projection = message.payload_as<Gs1EngineMessageTaskData>();
         const auto found = pending_task_indices_.find(projection.task_instance_id);
@@ -189,7 +189,7 @@ void Gs1GodotTaskPanelController::handle_engine_message(const Gs1EngineMessage& 
         }
         break;
     }
-    case GS1_ENGINE_MESSAGE_SITE_TASK_REMOVE:
+    case GS1_ENGINE_MESSAGE_SITE_TASK_PANEL_TASK_REMOVE:
     {
         const auto& payload = message.payload_as<Gs1EngineMessageTaskData>();
         const auto found = pending_task_indices_.find(payload.task_instance_id);
@@ -207,7 +207,7 @@ void Gs1GodotTaskPanelController::handle_engine_message(const Gs1EngineMessage& 
         }
         break;
     }
-    case GS1_ENGINE_MESSAGE_SITE_MODIFIER_LIST_BEGIN:
+    case GS1_ENGINE_MESSAGE_SITE_TASK_PANEL_MODIFIER_LIST_BEGIN:
     {
         const auto& payload = message.payload_as<Gs1EngineMessageSiteModifierListData>();
         pending_modifier_indices_.clear();
@@ -225,7 +225,7 @@ void Gs1GodotTaskPanelController::handle_engine_message(const Gs1EngineMessage& 
         active_modifiers_.reserve(payload.modifier_count);
         break;
     }
-    case GS1_ENGINE_MESSAGE_SITE_MODIFIER_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_TASK_PANEL_MODIFIER_UPSERT:
     {
         Gs1RuntimeModifierProjection projection = message.payload_as<Gs1EngineMessageSiteModifierData>();
         const auto found = pending_modifier_indices_.find(projection.modifier_id);
@@ -240,7 +240,7 @@ void Gs1GodotTaskPanelController::handle_engine_message(const Gs1EngineMessage& 
         }
         break;
     }
-    case GS1_ENGINE_MESSAGE_END_SITE_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_END_SITE_TASK_PANEL_SNAPSHOT:
         std::sort(tasks_.begin(), tasks_.end(), [](const auto& lhs, const auto& rhs) {
             if (lhs.list_kind != rhs.list_kind)
             {

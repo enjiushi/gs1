@@ -220,14 +220,14 @@ bool Gs1GodotSiteSceneController::handles_engine_message(Gs1EngineMessageType ty
 {
     switch (type)
     {
-    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
-    case GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT:
-    case GS1_ENGINE_MESSAGE_SITE_WORKER_UPDATE:
-    case GS1_ENGINE_MESSAGE_SITE_PLANT_VISUAL_UPSERT:
-    case GS1_ENGINE_MESSAGE_SITE_PLANT_VISUAL_REMOVE:
-    case GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_UPSERT:
-    case GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_REMOVE:
-    case GS1_ENGINE_MESSAGE_END_SITE_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SCENE_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_SITE_SCENE_TILE_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_SCENE_WORKER_UPDATE:
+    case GS1_ENGINE_MESSAGE_SITE_SCENE_PLANT_VISUAL_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_SCENE_PLANT_VISUAL_REMOVE:
+    case GS1_ENGINE_MESSAGE_SITE_SCENE_DEVICE_VISUAL_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_SCENE_DEVICE_VISUAL_REMOVE:
+    case GS1_ENGINE_MESSAGE_END_SITE_SCENE_SNAPSHOT:
         return true;
     default:
         return false;
@@ -238,28 +238,28 @@ void Gs1GodotSiteSceneController::handle_engine_message(const Gs1EngineMessage& 
 {
     switch (message.type)
     {
-    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SCENE_SNAPSHOT:
         apply_site_snapshot_begin(message.payload_as<Gs1EngineMessageSiteSnapshotData>());
         break;
-    case GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_SCENE_TILE_UPSERT:
         apply_site_tile_upsert(message.payload_as<Gs1EngineMessageSiteTileData>());
         break;
-    case GS1_ENGINE_MESSAGE_SITE_WORKER_UPDATE:
+    case GS1_ENGINE_MESSAGE_SITE_SCENE_WORKER_UPDATE:
         apply_site_worker_update(message.payload_as<Gs1EngineMessageWorkerData>());
         break;
-    case GS1_ENGINE_MESSAGE_SITE_PLANT_VISUAL_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_SCENE_PLANT_VISUAL_UPSERT:
         apply_site_plant_visual_upsert(message.payload_as<Gs1EngineMessageSitePlantVisualData>());
         break;
-    case GS1_ENGINE_MESSAGE_SITE_PLANT_VISUAL_REMOVE:
+    case GS1_ENGINE_MESSAGE_SITE_SCENE_PLANT_VISUAL_REMOVE:
         apply_site_plant_visual_remove(message.payload_as<Gs1EngineMessageSiteVisualRemoveData>());
         break;
-    case GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_SCENE_DEVICE_VISUAL_UPSERT:
         apply_site_device_visual_upsert(message.payload_as<Gs1EngineMessageSiteDeviceVisualData>());
         break;
-    case GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_REMOVE:
+    case GS1_ENGINE_MESSAGE_SITE_SCENE_DEVICE_VISUAL_REMOVE:
         apply_site_device_visual_remove(message.payload_as<Gs1EngineMessageSiteVisualRemoveData>());
         break;
-    case GS1_ENGINE_MESSAGE_END_SITE_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_END_SITE_SCENE_SNAPSHOT:
         apply_site_snapshot_end();
         break;
     default:

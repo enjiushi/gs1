@@ -151,20 +151,14 @@ bool Gs1GodotRegionalMapHudController::handles_engine_message(Gs1EngineMessageTy
 {
     switch (type)
     {
-    case GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_MAP_SNAPSHOT:
-    case GS1_ENGINE_MESSAGE_REGIONAL_MAP_SITE_UPSERT:
-    case GS1_ENGINE_MESSAGE_REGIONAL_MAP_SITE_REMOVE:
-    case GS1_ENGINE_MESSAGE_REGIONAL_MAP_LINK_UPSERT:
-    case GS1_ENGINE_MESSAGE_REGIONAL_MAP_LINK_REMOVE:
-    case GS1_ENGINE_MESSAGE_END_REGIONAL_MAP_SNAPSHOT:
-    case GS1_ENGINE_MESSAGE_BEGIN_UI_PANEL:
-    case GS1_ENGINE_MESSAGE_UI_PANEL_TEXT_UPSERT:
-    case GS1_ENGINE_MESSAGE_UI_PANEL_SLOT_ACTION_UPSERT:
-    case GS1_ENGINE_MESSAGE_UI_PANEL_LIST_ITEM_UPSERT:
-    case GS1_ENGINE_MESSAGE_UI_PANEL_LIST_ACTION_UPSERT:
-    case GS1_ENGINE_MESSAGE_END_UI_PANEL:
-    case GS1_ENGINE_MESSAGE_CLOSE_UI_PANEL:
+    case GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_MAP_HUD_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_REGIONAL_MAP_HUD_SITE_UPSERT:
+    case GS1_ENGINE_MESSAGE_REGIONAL_MAP_HUD_SITE_REMOVE:
+    case GS1_ENGINE_MESSAGE_REGIONAL_MAP_HUD_LINK_UPSERT:
+    case GS1_ENGINE_MESSAGE_REGIONAL_MAP_HUD_LINK_REMOVE:
+    case GS1_ENGINE_MESSAGE_END_REGIONAL_MAP_HUD_SNAPSHOT:
     case GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES:
+    case GS1_ENGINE_MESSAGE_SET_UI_SURFACE_VISIBILITY:
         return true;
     default:
         return false;
@@ -174,13 +168,21 @@ bool Gs1GodotRegionalMapHudController::handles_engine_message(Gs1EngineMessageTy
 void Gs1GodotRegionalMapHudController::handle_engine_message(const Gs1EngineMessage& message)
 {
     regional_map_state_reducer_.apply_engine_message(message);
-    ui_panel_state_reducer_.apply_engine_message(message);
 
     switch (message.type)
     {
     case GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES:
         campaign_resources_ = message.payload_as<Gs1EngineMessageCampaignResourcesData>();
         break;
+    case GS1_ENGINE_MESSAGE_SET_UI_SURFACE_VISIBILITY:
+    {
+        const auto& payload = message.payload_as<Gs1EngineMessageUiSurfaceVisibilityData>();
+        if (payload.surface_id == GS1_UI_SURFACE_REGIONAL_TECH_TREE_OVERLAY)
+        {
+            tech_tree_visible_ = payload.visible != 0U;
+        }
+        break;
+    }
     default:
         break;
     }
@@ -191,8 +193,8 @@ void Gs1GodotRegionalMapHudController::handle_engine_message(const Gs1EngineMess
 void Gs1GodotRegionalMapHudController::handle_runtime_message_reset()
 {
     regional_map_state_reducer_.reset();
-    ui_panel_state_reducer_.reset();
     campaign_resources_.reset();
+    tech_tree_visible_ = false;
     rebuild_hud();
 }
 
@@ -300,38 +302,15 @@ String Gs1GodotRegionalMapHudController::support_preview_text(int preview_mask) 
 
 String Gs1GodotRegionalMapHudController::tech_button_label() const
 {
-    const Gs1RuntimeUiPanelProjection* panel = ui_panel_state_reducer_.find_panel(GS1_UI_PANEL_REGIONAL_MAP);
-    if (panel == nullptr || panel->slot_actions.empty())
-    {
-        return "Research & Unlocks";
-    }
-
-    for (const auto& slot_action : panel->slot_actions)
-    {
-        if (slot_action.slot_id == GS1_UI_PANEL_SLOT_PRIMARY)
-        {
-            return static_cast<int>(slot_action.label_kind) == 2 ? String("Close Research") : String("Research & Unlocks");
-        }
-    }
-    return "Research & Unlocks";
+    return tech_tree_visible_ ? String("Close Research") : String("Research & Unlocks");
 }
 
 Gs1UiAction Gs1GodotRegionalMapHudController::tech_button_action() const
 {
-    const Gs1RuntimeUiPanelProjection* panel = ui_panel_state_reducer_.find_panel(GS1_UI_PANEL_REGIONAL_MAP);
-    if (panel != nullptr)
-    {
-        for (const auto& slot_action : panel->slot_actions)
-        {
-            if (slot_action.slot_id == GS1_UI_PANEL_SLOT_PRIMARY)
-            {
-                return slot_action.action;
-            }
-        }
-    }
-
     Gs1UiAction action {};
-    action.type = GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE;
+    action.type = tech_tree_visible_
+        ? GS1_UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE
+        : GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE;
     return action;
 }
 

@@ -43,6 +43,6 @@ private:
     Gs1GodotAdapterService* adapter_service_ {nullptr};
     godot::RichTextLabel* regional_map_summary_ {nullptr};
     godot::RichTextLabel* regional_map_graph_ {nullptr};
-    Gs1GodotRegionalMapStateReducer regional_map_state_reducer_ {};
+    Gs1GodotRegionalMapStateReducer regional_map_state_reducer_ {k_gs1_regional_summary_message_family};
     std::optional<Gs1RuntimeCampaignResourcesProjection> campaign_resources_ {};
 };

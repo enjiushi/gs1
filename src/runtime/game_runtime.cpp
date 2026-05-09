@@ -67,6 +67,35 @@ constexpr float k_visible_tile_device_integrity_projection_step = 100.0f / 128.0
 constexpr double k_site_one_probe_window_minutes = 0.25;
 constexpr std::int32_t k_regional_map_tile_spacing = 160;
 
+struct RegionalMapSnapshotMessageFamily final
+{
+    Gs1EngineMessageType begin_message;
+    Gs1EngineMessageType site_upsert_message;
+    Gs1EngineMessageType link_upsert_message;
+    Gs1EngineMessageType end_message;
+};
+
+inline constexpr RegionalMapSnapshotMessageFamily k_regional_map_scene_snapshot_family {
+    GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_MAP_SNAPSHOT,
+    GS1_ENGINE_MESSAGE_REGIONAL_MAP_SITE_UPSERT,
+    GS1_ENGINE_MESSAGE_REGIONAL_MAP_LINK_UPSERT,
+    GS1_ENGINE_MESSAGE_END_REGIONAL_MAP_SNAPSHOT};
+inline constexpr RegionalMapSnapshotMessageFamily k_regional_map_hud_snapshot_family {
+    GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_MAP_HUD_SNAPSHOT,
+    GS1_ENGINE_MESSAGE_REGIONAL_MAP_HUD_SITE_UPSERT,
+    GS1_ENGINE_MESSAGE_REGIONAL_MAP_HUD_LINK_UPSERT,
+    GS1_ENGINE_MESSAGE_END_REGIONAL_MAP_HUD_SNAPSHOT};
+inline constexpr RegionalMapSnapshotMessageFamily k_regional_summary_snapshot_family {
+    GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_SUMMARY_SNAPSHOT,
+    GS1_ENGINE_MESSAGE_REGIONAL_SUMMARY_SITE_UPSERT,
+    GS1_ENGINE_MESSAGE_REGIONAL_SUMMARY_LINK_UPSERT,
+    GS1_ENGINE_MESSAGE_END_REGIONAL_SUMMARY_SNAPSHOT};
+inline constexpr RegionalMapSnapshotMessageFamily k_regional_selection_snapshot_family {
+    GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_SELECTION_SNAPSHOT,
+    GS1_ENGINE_MESSAGE_REGIONAL_SELECTION_SITE_UPSERT,
+    GS1_ENGINE_MESSAGE_REGIONAL_SELECTION_LINK_UPSERT,
+    GS1_ENGINE_MESSAGE_END_REGIONAL_SELECTION_SNAPSHOT};
+
 [[nodiscard]] std::string unescape_json_string(std::string_view value)
 {
     std::string result;
@@ -2534,7 +2563,10 @@ void GameRuntime::queue_ui_panel_begin_message(
 
 void GameRuntime::queue_ui_panel_close_message(Gs1UiPanelId panel_id)
 {
-    auto message = make_engine_message(GS1_ENGINE_MESSAGE_CLOSE_UI_PANEL);
+    auto message = make_engine_message(
+        panel_id == GS1_UI_PANEL_REGIONAL_MAP_SELECTION
+            ? GS1_ENGINE_MESSAGE_CLOSE_REGIONAL_SELECTION_UI_PANEL
+            : GS1_ENGINE_MESSAGE_CLOSE_UI_PANEL);
     auto& payload = message.emplace_payload<Gs1EngineMessageCloseUiPanelData>();
     payload.panel_id = panel_id;
     engine_messages_.push_back(message);
@@ -2942,7 +2974,15 @@ void GameRuntime::queue_regional_map_selection_ui_messages()
 {
     if (!campaign_.has_value() || !campaign_->regional_map_state.selected_site_id.has_value())
     {
-        queue_clear_ui_panel_messages(GS1_UI_PANEL_REGIONAL_MAP_SELECTION);
+        if (active_ui_panels_.contains(GS1_UI_PANEL_REGIONAL_MAP_SELECTION))
+        {
+            auto close = make_engine_message(GS1_ENGINE_MESSAGE_CLOSE_REGIONAL_SELECTION_UI_PANEL);
+            auto& close_payload = close.emplace_payload<Gs1EngineMessageCloseUiPanelData>();
+            close_payload.panel_id = GS1_UI_PANEL_REGIONAL_MAP_SELECTION;
+            engine_messages_.push_back(close);
+            queue_ui_surface_visibility_message(GS1_UI_SURFACE_REGIONAL_SELECTION_PANEL, false);
+            active_ui_panels_.erase(GS1_UI_PANEL_REGIONAL_MAP_SELECTION);
+        }
         return;
     }
 
@@ -2954,20 +2994,92 @@ void GameRuntime::queue_regional_map_selection_ui_messages()
         (has_support_contributors ? 1U : 0U) + (has_aura_support ? 1U : 0U);
 
     const std::uint32_t text_line_count = 1U + summary_label_count;
-    queue_ui_panel_begin_message(
-        GS1_UI_PANEL_REGIONAL_MAP_SELECTION,
-        site_id,
-        text_line_count,
-        2U,
-        loadout_item_count,
-        0U);
+    auto begin = make_engine_message(GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_SELECTION_UI_PANEL);
+    auto& begin_payload = begin.emplace_payload<Gs1EngineMessageUiPanelData>();
+    begin_payload.panel_id = GS1_UI_PANEL_REGIONAL_MAP_SELECTION;
+    begin_payload.mode = GS1_PROJECTION_MODE_SNAPSHOT;
+    begin_payload.context_id = site_id;
+    begin_payload.text_line_count = static_cast<std::uint8_t>(std::min<std::uint32_t>(text_line_count, 255U));
+    begin_payload.slot_action_count = 2U;
+    begin_payload.list_item_count = static_cast<std::uint8_t>(std::min<std::uint32_t>(loadout_item_count, 255U));
+    begin_payload.list_action_count = 0U;
+    engine_messages_.push_back(begin);
+    queue_ui_surface_visibility_message(GS1_UI_SURFACE_REGIONAL_SELECTION_PANEL, true);
+    active_ui_panels_.insert(GS1_UI_PANEL_REGIONAL_MAP_SELECTION);
+
+    const auto queue_selection_text_message = [this](
+                                                std::uint16_t line_id,
+                                                std::uint32_t flags,
+                                                std::uint8_t text_kind,
+                                                std::uint32_t primary_id = 0U,
+                                                std::uint32_t secondary_id = 0U,
+                                                std::uint32_t quantity = 0U,
+                                                std::uint32_t aux_value = 0U)
+    {
+        auto message = make_engine_message(GS1_ENGINE_MESSAGE_REGIONAL_SELECTION_UI_PANEL_TEXT_UPSERT);
+        auto& payload = message.emplace_payload<Gs1EngineMessageUiPanelTextData>();
+        payload.line_id = line_id;
+        payload.flags = static_cast<std::uint8_t>(flags);
+        payload.text_kind = text_kind;
+        payload.primary_id = primary_id;
+        payload.secondary_id = secondary_id;
+        payload.quantity = quantity;
+        payload.aux_value = aux_value;
+        engine_messages_.push_back(message);
+    };
+    const auto queue_selection_slot_action_message = [this](
+                                                       Gs1UiPanelSlotId slot_id,
+                                                       std::uint32_t flags,
+                                                       const Gs1UiAction& action,
+                                                       std::uint8_t label_kind,
+                                                       std::uint32_t primary_id = 0U,
+                                                       std::uint32_t secondary_id = 0U,
+                                                       std::uint32_t quantity = 0U)
+    {
+        auto message = make_engine_message(GS1_ENGINE_MESSAGE_REGIONAL_SELECTION_UI_PANEL_SLOT_ACTION_UPSERT);
+        auto& payload = message.emplace_payload<Gs1EngineMessageUiPanelSlotActionData>();
+        payload.slot_id = slot_id;
+        payload.flags = static_cast<std::uint8_t>(flags);
+        payload.action = action;
+        payload.label_kind = label_kind;
+        payload.primary_id = primary_id;
+        payload.secondary_id = secondary_id;
+        payload.quantity = quantity;
+        engine_messages_.push_back(message);
+    };
+    const auto queue_selection_list_item_message = [this](
+                                                     Gs1UiPanelListId list_id,
+                                                     std::uint32_t item_id,
+                                                     std::uint32_t flags,
+                                                     std::uint8_t primary_kind,
+                                                     std::uint8_t secondary_kind,
+                                                     std::uint32_t primary_id = 0U,
+                                                     std::uint32_t secondary_id = 0U,
+                                                     std::uint32_t quantity = 0U,
+                                                     std::int32_t map_x = 0,
+                                                     std::int32_t map_y = 0)
+    {
+        auto message = make_engine_message(GS1_ENGINE_MESSAGE_REGIONAL_SELECTION_UI_PANEL_LIST_ITEM_UPSERT);
+        auto& payload = message.emplace_payload<Gs1EngineMessageUiPanelListItemData>();
+        payload.item_id = item_id;
+        payload.list_id = list_id;
+        payload.flags = static_cast<std::uint8_t>(flags);
+        payload.primary_kind = primary_kind;
+        payload.secondary_kind = secondary_kind;
+        payload.primary_id = primary_id;
+        payload.secondary_id = secondary_id;
+        payload.quantity = quantity;
+        payload.map_x = map_x;
+        payload.map_y = map_y;
+        engine_messages_.push_back(message);
+    };
 
     std::uint16_t next_line_id = 1U;
-    queue_ui_panel_text_message(next_line_id++, 0U, 3U, site_id);
+    queue_selection_text_message(next_line_id++, 0U, 3U, site_id);
 
     if (has_support_contributors)
     {
-        queue_ui_panel_text_message(
+        queue_selection_text_message(
             next_line_id++,
             0U,
             4U,
@@ -2978,7 +3090,7 @@ void GameRuntime::queue_regional_map_selection_ui_messages()
 
     if (has_aura_support)
     {
-        queue_ui_panel_text_message(
+        queue_selection_text_message(
             next_line_id++,
             0U,
             5U,
@@ -2995,7 +3107,7 @@ void GameRuntime::queue_regional_map_selection_ui_messages()
             continue;
         }
 
-        queue_ui_panel_list_item_message(
+        queue_selection_list_item_message(
             GS1_UI_PANEL_LIST_REGIONAL_LOADOUT,
             next_loadout_item_id++,
             GS1_UI_PANEL_LIST_ITEM_FLAG_NONE,
@@ -3011,7 +3123,7 @@ void GameRuntime::queue_regional_map_selection_ui_messages()
     Gs1UiAction deploy_action {};
     deploy_action.type = GS1_UI_ACTION_START_SITE_ATTEMPT;
     deploy_action.target_id = site_id;
-    queue_ui_panel_slot_action_message(
+    queue_selection_slot_action_message(
         GS1_UI_PANEL_SLOT_PRIMARY,
         GS1_UI_PANEL_SLOT_FLAG_PRIMARY,
         deploy_action,
@@ -3020,13 +3132,13 @@ void GameRuntime::queue_regional_map_selection_ui_messages()
 
     Gs1UiAction clear_selection_action {};
     clear_selection_action.type = GS1_UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION;
-    queue_ui_panel_slot_action_message(
+    queue_selection_slot_action_message(
         GS1_UI_PANEL_SLOT_SECONDARY,
         GS1_UI_PANEL_SLOT_FLAG_NONE,
         clear_selection_action,
         4U);
 
-    queue_ui_panel_end_message();
+    engine_messages_.push_back(make_engine_message(GS1_ENGINE_MESSAGE_END_REGIONAL_SELECTION_UI_PANEL));
 }
 
 void GameRuntime::queue_regional_map_tech_tree_ui_messages()
@@ -3208,11 +3320,6 @@ void GameRuntime::queue_regional_map_snapshot_messages()
         return;
     }
 
-    auto begin = make_engine_message(GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_MAP_SNAPSHOT);
-    auto& begin_payload = begin.emplace_payload<Gs1EngineMessageRegionalMapSnapshotData>();
-    begin_payload.mode = GS1_PROJECTION_MODE_SNAPSHOT;
-    begin_payload.site_count = static_cast<std::uint32_t>(campaign_->sites.size());
-
     std::set<std::pair<std::uint32_t, std::uint32_t>> unique_links;
     for (const auto& site : campaign_->sites)
     {
@@ -3244,50 +3351,64 @@ void GameRuntime::queue_regional_map_snapshot_messages()
         revealed_link_count += 1U;
     }
 
-    begin_payload.link_count = revealed_link_count;
-    begin_payload.selected_site_id =
-        campaign_->regional_map_state.selected_site_id.has_value()
-            ? campaign_->regional_map_state.selected_site_id->value
-            : 0U;
-    begin_payload.site_count = revealed_site_count;
-    engine_messages_.push_back(begin);
-
-    for (const auto& site : campaign_->sites)
+    const auto queue_family = [this, &unique_links, revealed_link_count, revealed_site_count](
+                                  const RegionalMapSnapshotMessageFamily& family)
     {
-        if (!is_site_revealed(*campaign_, site.site_id))
+        auto begin = make_engine_message(family.begin_message);
+        auto& begin_payload = begin.emplace_payload<Gs1EngineMessageRegionalMapSnapshotData>();
+        begin_payload.mode = GS1_PROJECTION_MODE_SNAPSHOT;
+        begin_payload.link_count = revealed_link_count;
+        begin_payload.selected_site_id =
+            campaign_->regional_map_state.selected_site_id.has_value()
+                ? campaign_->regional_map_state.selected_site_id->value
+                : 0U;
+        begin_payload.site_count = revealed_site_count;
+        engine_messages_.push_back(begin);
+
+        for (const auto& site : campaign_->sites)
         {
-            continue;
+            if (!is_site_revealed(*campaign_, site.site_id))
+            {
+                continue;
+            }
+
+            queue_regional_map_site_upsert_message(site, family.site_upsert_message);
         }
 
-        queue_regional_map_site_upsert_message(site);
-    }
-
-    for (const auto& link : unique_links)
-    {
-        if (!is_site_revealed(*campaign_, SiteId {link.first}) ||
-            !is_site_revealed(*campaign_, SiteId {link.second}))
+        for (const auto& link : unique_links)
         {
-            continue;
+            if (!is_site_revealed(*campaign_, SiteId {link.first}) ||
+                !is_site_revealed(*campaign_, SiteId {link.second}))
+            {
+                continue;
+            }
+
+            auto link_message = make_engine_message(family.link_upsert_message);
+            auto& payload = link_message.emplace_payload<Gs1EngineMessageRegionalMapLinkData>();
+            payload.from_site_id = link.first;
+            payload.to_site_id = link.second;
+            engine_messages_.push_back(link_message);
         }
 
-        auto link_message = make_engine_message(GS1_ENGINE_MESSAGE_REGIONAL_MAP_LINK_UPSERT);
-        auto& payload = link_message.emplace_payload<Gs1EngineMessageRegionalMapLinkData>();
-        payload.from_site_id = link.first;
-        payload.to_site_id = link.second;
-        engine_messages_.push_back(link_message);
-    }
+        engine_messages_.push_back(make_engine_message(family.end_message));
+    };
 
-    engine_messages_.push_back(make_engine_message(GS1_ENGINE_MESSAGE_END_REGIONAL_MAP_SNAPSHOT));
+    queue_family(k_regional_map_scene_snapshot_family);
+    queue_family(k_regional_map_hud_snapshot_family);
+    queue_family(k_regional_summary_snapshot_family);
+    queue_family(k_regional_selection_snapshot_family);
 }
 
-void GameRuntime::queue_regional_map_site_upsert_message(const SiteMetaState& site)
+void GameRuntime::queue_regional_map_site_upsert_message(
+    const SiteMetaState& site,
+    Gs1EngineMessageType message_type)
 {
     if (!campaign_.has_value())
     {
         return;
     }
 
-    auto site_message = make_engine_message(GS1_ENGINE_MESSAGE_REGIONAL_MAP_SITE_UPSERT);
+    auto site_message = make_engine_message(message_type);
     auto& payload = site_message.emplace_payload<Gs1EngineMessageRegionalMapSiteData>();
     payload.site_id = site.site_id.value;
     payload.site_state = site.site_state;
@@ -3309,14 +3430,16 @@ void GameRuntime::queue_regional_map_site_upsert_message(const SiteMetaState& si
     engine_messages_.push_back(site_message);
 }
 
-void GameRuntime::queue_site_snapshot_begin_message(Gs1ProjectionMode mode)
+void GameRuntime::queue_site_snapshot_begin_message(
+    Gs1ProjectionMode mode,
+    Gs1EngineMessageType message_type)
 {
     if (!active_site_run_.has_value())
     {
         return;
     }
 
-    auto begin = make_engine_message(GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT);
+    auto begin = make_engine_message(message_type);
     auto& begin_payload = begin.emplace_payload<Gs1EngineMessageSiteSnapshotData>();
     begin_payload.mode = mode;
     begin_payload.site_id = active_site_run_->site_id.value;
@@ -3326,12 +3449,15 @@ void GameRuntime::queue_site_snapshot_begin_message(Gs1ProjectionMode mode)
     engine_messages_.push_back(begin);
 }
 
-void GameRuntime::queue_site_snapshot_end_message()
+void GameRuntime::queue_site_snapshot_end_message(Gs1EngineMessageType message_type)
 {
-    engine_messages_.push_back(make_engine_message(GS1_ENGINE_MESSAGE_END_SITE_SNAPSHOT));
+    engine_messages_.push_back(make_engine_message(message_type));
 }
 
-void GameRuntime::queue_site_tile_upsert_message(std::uint32_t x, std::uint32_t y)
+void GameRuntime::queue_site_tile_upsert_message(
+    std::uint32_t x,
+    std::uint32_t y,
+    Gs1EngineMessageType message_type)
 {
     if (!active_site_run_.has_value())
     {
@@ -3378,7 +3504,7 @@ void GameRuntime::queue_site_tile_upsert_message(std::uint32_t x, std::uint32_t 
         return;
     }
 
-    auto tile_message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
+    auto tile_message = make_engine_message(message_type);
     auto& payload = tile_message.emplace_payload<Gs1EngineMessageSiteTileData>();
     payload.x = static_cast<std::uint16_t>(x);
     payload.y = static_cast<std::uint16_t>(y);
@@ -3421,7 +3547,7 @@ void GameRuntime::queue_site_tile_upsert_message(std::uint32_t x, std::uint32_t 
     }
 }
 
-void GameRuntime::queue_all_site_tile_upsert_messages()
+void GameRuntime::queue_all_site_tile_upsert_messages(Gs1EngineMessageType message_type)
 {
     if (!active_site_run_.has_value())
     {
@@ -3438,12 +3564,12 @@ void GameRuntime::queue_all_site_tile_upsert_messages()
     {
         for (std::uint32_t x = 0; x < width; ++x)
         {
-            queue_site_tile_upsert_message(x, y);
+            queue_site_tile_upsert_message(x, y, message_type);
         }
     }
 }
 
-void GameRuntime::queue_pending_site_tile_upsert_messages()
+void GameRuntime::queue_pending_site_tile_upsert_messages(Gs1EngineMessageType message_type)
 {
     if (!active_site_run_.has_value())
     {
@@ -3453,7 +3579,7 @@ void GameRuntime::queue_pending_site_tile_upsert_messages()
     auto& site_run = active_site_run_.value();
     if (site_run.pending_full_tile_projection_update || site_run.pending_tile_projection_updates.empty())
     {
-        queue_all_site_tile_upsert_messages();
+        queue_all_site_tile_upsert_messages(message_type);
         return;
     }
 
@@ -3472,11 +3598,12 @@ void GameRuntime::queue_pending_site_tile_upsert_messages()
     {
         queue_site_tile_upsert_message(
             static_cast<std::uint32_t>(coord.x),
-            static_cast<std::uint32_t>(coord.y));
+            static_cast<std::uint32_t>(coord.y),
+            message_type);
     }
 }
 
-void GameRuntime::queue_site_worker_update_message()
+void GameRuntime::queue_site_worker_update_message(Gs1EngineMessageType message_type)
 {
     if (!active_site_run_.has_value())
     {
@@ -3486,7 +3613,7 @@ void GameRuntime::queue_site_worker_update_message()
     const auto worker_position = site_world_access::worker_position(active_site_run_.value());
     const auto worker_conditions = site_world_access::worker_conditions(active_site_run_.value());
 
-    auto worker_message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_WORKER_UPDATE);
+    auto worker_message = make_engine_message(message_type);
     auto& worker_payload = worker_message.emplace_payload<Gs1EngineMessageWorkerData>();
     worker_payload.entity_id = active_site_run_->site_world != nullptr
         ? active_site_run_->site_world->worker_entity_id()
@@ -3506,7 +3633,9 @@ void GameRuntime::queue_site_worker_update_message()
     engine_messages_.push_back(worker_message);
 }
 
-void GameRuntime::queue_site_plant_visual_upsert_message(TileCoord coord)
+void GameRuntime::queue_site_plant_visual_upsert_message(
+    TileCoord coord,
+    Gs1EngineMessageType message_type)
 {
     if (!active_site_run_.has_value() || active_site_run_->site_world == nullptr)
     {
@@ -3537,7 +3666,7 @@ void GameRuntime::queue_site_plant_visual_upsert_message(TileCoord coord)
         return;
     }
 
-    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_PLANT_VISUAL_UPSERT);
+    auto message = make_engine_message(message_type);
     auto& payload = message.emplace_payload<Gs1EngineMessageSitePlantVisualData>();
     payload.visual_id = plant_visual_id_for_anchor(site_run, anchor);
     payload.plant_type_id = ecology.plant_id.value;
@@ -3554,20 +3683,22 @@ void GameRuntime::queue_site_plant_visual_upsert_message(TileCoord coord)
     engine_messages_.push_back(message);
 }
 
-void GameRuntime::queue_site_plant_visual_remove_message(std::uint64_t visual_id)
+void GameRuntime::queue_site_plant_visual_remove_message(
+    std::uint64_t visual_id,
+    Gs1EngineMessageType message_type)
 {
     if (visual_id == 0U)
     {
         return;
     }
 
-    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_PLANT_VISUAL_REMOVE);
+    auto message = make_engine_message(message_type);
     auto& payload = message.emplace_payload<Gs1EngineMessageSiteVisualRemoveData>();
     payload.visual_id = visual_id;
     engine_messages_.push_back(message);
 }
 
-void GameRuntime::queue_all_site_plant_visual_messages()
+void GameRuntime::queue_all_site_plant_visual_messages(Gs1EngineMessageType message_type)
 {
     if (!active_site_run_.has_value() || active_site_run_->site_world == nullptr)
     {
@@ -3581,12 +3712,16 @@ void GameRuntime::queue_all_site_plant_visual_messages()
     {
         for (std::uint32_t x = 0; x < width; ++x)
         {
-            queue_site_plant_visual_upsert_message(TileCoord {static_cast<std::int32_t>(x), static_cast<std::int32_t>(y)});
+            queue_site_plant_visual_upsert_message(
+                TileCoord {static_cast<std::int32_t>(x), static_cast<std::int32_t>(y)},
+                message_type);
         }
     }
 }
 
-void GameRuntime::queue_pending_site_plant_visual_messages()
+void GameRuntime::queue_pending_site_plant_visual_messages(
+    Gs1EngineMessageType upsert_message_type,
+    Gs1EngineMessageType remove_message_type)
 {
     if (!active_site_run_.has_value() || active_site_run_->site_world == nullptr)
     {
@@ -3596,7 +3731,7 @@ void GameRuntime::queue_pending_site_plant_visual_messages()
     auto& site_run = active_site_run_.value();
     if (site_run.pending_full_tile_projection_update || site_run.pending_tile_projection_updates.empty())
     {
-        queue_all_site_plant_visual_messages();
+        queue_all_site_plant_visual_messages(upsert_message_type);
         return;
     }
 
@@ -3622,7 +3757,7 @@ void GameRuntime::queue_pending_site_plant_visual_messages()
             const std::uint64_t visual_id = plant_visual_id_for_anchor(site_run, anchor);
             if (emitted_visual_ids.insert(visual_id).second)
             {
-                queue_site_plant_visual_upsert_message(anchor);
+                queue_site_plant_visual_upsert_message(anchor, upsert_message_type);
             }
 
             if (previous_projection.plant_type_id != 0U && previous_projection.plant_type_id != ecology.plant_id.value)
@@ -3633,7 +3768,7 @@ void GameRuntime::queue_pending_site_plant_visual_messages()
                 const std::uint64_t previous_visual_id = plant_visual_id_for_anchor(site_run, previous_anchor);
                 if (previous_visual_id != visual_id && emitted_visual_ids.insert(previous_visual_id).second)
                 {
-                    queue_site_plant_visual_remove_message(previous_visual_id);
+                    queue_site_plant_visual_remove_message(previous_visual_id, remove_message_type);
                 }
             }
             continue;
@@ -3650,12 +3785,14 @@ void GameRuntime::queue_pending_site_plant_visual_messages()
         const std::uint64_t visual_id = plant_visual_id_for_anchor(site_run, previous_anchor);
         if (emitted_visual_ids.insert(visual_id).second)
         {
-            queue_site_plant_visual_remove_message(visual_id);
+            queue_site_plant_visual_remove_message(visual_id, remove_message_type);
         }
     }
 }
 
-void GameRuntime::queue_site_device_visual_upsert_message(TileCoord coord)
+void GameRuntime::queue_site_device_visual_upsert_message(
+    TileCoord coord,
+    Gs1EngineMessageType message_type)
 {
     if (!active_site_run_.has_value() || active_site_run_->site_world == nullptr)
     {
@@ -3686,7 +3823,7 @@ void GameRuntime::queue_site_device_visual_upsert_message(TileCoord coord)
         return;
     }
 
-    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_UPSERT);
+    auto message = make_engine_message(message_type);
     auto& payload = message.emplace_payload<Gs1EngineMessageSiteDeviceVisualData>();
     payload.visual_id = device_visual_id_for_anchor(site_run, anchor);
     payload.structure_type_id = device.structure_id.value;
@@ -3701,20 +3838,22 @@ void GameRuntime::queue_site_device_visual_upsert_message(TileCoord coord)
     engine_messages_.push_back(message);
 }
 
-void GameRuntime::queue_site_device_visual_remove_message(std::uint64_t visual_id)
+void GameRuntime::queue_site_device_visual_remove_message(
+    std::uint64_t visual_id,
+    Gs1EngineMessageType message_type)
 {
     if (visual_id == 0U)
     {
         return;
     }
 
-    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_REMOVE);
+    auto message = make_engine_message(message_type);
     auto& payload = message.emplace_payload<Gs1EngineMessageSiteVisualRemoveData>();
     payload.visual_id = visual_id;
     engine_messages_.push_back(message);
 }
 
-void GameRuntime::queue_all_site_device_visual_messages()
+void GameRuntime::queue_all_site_device_visual_messages(Gs1EngineMessageType message_type)
 {
     if (!active_site_run_.has_value() || active_site_run_->site_world == nullptr)
     {
@@ -3728,12 +3867,16 @@ void GameRuntime::queue_all_site_device_visual_messages()
     {
         for (std::uint32_t x = 0; x < width; ++x)
         {
-            queue_site_device_visual_upsert_message(TileCoord {static_cast<std::int32_t>(x), static_cast<std::int32_t>(y)});
+            queue_site_device_visual_upsert_message(
+                TileCoord {static_cast<std::int32_t>(x), static_cast<std::int32_t>(y)},
+                message_type);
         }
     }
 }
 
-void GameRuntime::queue_pending_site_device_visual_messages()
+void GameRuntime::queue_pending_site_device_visual_messages(
+    Gs1EngineMessageType upsert_message_type,
+    Gs1EngineMessageType remove_message_type)
 {
     if (!active_site_run_.has_value() || active_site_run_->site_world == nullptr)
     {
@@ -3743,7 +3886,7 @@ void GameRuntime::queue_pending_site_device_visual_messages()
     auto& site_run = active_site_run_.value();
     if (site_run.pending_full_tile_projection_update || site_run.pending_tile_projection_updates.empty())
     {
-        queue_all_site_device_visual_messages();
+        queue_all_site_device_visual_messages(upsert_message_type);
         return;
     }
 
@@ -3769,7 +3912,7 @@ void GameRuntime::queue_pending_site_device_visual_messages()
             const std::uint64_t visual_id = device_visual_id_for_anchor(site_run, anchor);
             if (emitted_visual_ids.insert(visual_id).second)
             {
-                queue_site_device_visual_upsert_message(anchor);
+                queue_site_device_visual_upsert_message(anchor, upsert_message_type);
             }
 
             if (previous_projection.structure_type_id != 0U &&
@@ -3781,7 +3924,7 @@ void GameRuntime::queue_pending_site_device_visual_messages()
                 const std::uint64_t previous_visual_id = device_visual_id_for_anchor(site_run, previous_anchor);
                 if (previous_visual_id != visual_id && emitted_visual_ids.insert(previous_visual_id).second)
                 {
-                    queue_site_device_visual_remove_message(previous_visual_id);
+                    queue_site_device_visual_remove_message(previous_visual_id, remove_message_type);
                 }
             }
             continue;
@@ -3798,7 +3941,7 @@ void GameRuntime::queue_pending_site_device_visual_messages()
         const std::uint64_t visual_id = device_visual_id_for_anchor(site_run, previous_anchor);
         if (emitted_visual_ids.insert(visual_id).second)
         {
-            queue_site_device_visual_remove_message(visual_id);
+            queue_site_device_visual_remove_message(visual_id, remove_message_type);
         }
     }
 }
@@ -3854,7 +3997,8 @@ void GameRuntime::queue_site_inventory_slot_upsert_message(
     std::uint32_t slot_index,
     std::uint32_t storage_id,
     std::uint64_t container_owner_id,
-    TileCoord container_tile)
+    TileCoord container_tile,
+    Gs1EngineMessageType message_type)
 {
     if (!active_site_run_.has_value())
     {
@@ -3899,7 +4043,7 @@ void GameRuntime::queue_site_inventory_slot_upsert_message(
         return;
     }
 
-    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_INVENTORY_SLOT_UPSERT);
+    auto message = make_engine_message(message_type);
     auto& payload = message.emplace_payload<Gs1EngineMessageInventorySlotData>();
     payload.item_id = slot.item_id.value;
     payload.item_instance_id = slot.item_instance_id;
@@ -3916,7 +4060,9 @@ void GameRuntime::queue_site_inventory_slot_upsert_message(
     engine_messages_.push_back(message);
 }
 
-void GameRuntime::queue_site_inventory_storage_upsert_message(std::uint32_t storage_id)
+void GameRuntime::queue_site_inventory_storage_upsert_message(
+    std::uint32_t storage_id,
+    Gs1EngineMessageType message_type)
 {
     if (!active_site_run_.has_value())
     {
@@ -3930,7 +4076,7 @@ void GameRuntime::queue_site_inventory_storage_upsert_message(std::uint32_t stor
         return;
     }
 
-    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_INVENTORY_STORAGE_UPSERT);
+    auto message = make_engine_message(message_type);
     auto& payload = message.emplace_payload<Gs1EngineMessageInventoryStorageData>();
     payload.storage_id = storage_state->storage_id;
     payload.owner_entity_id = static_cast<std::uint32_t>(storage_state->owner_device_entity_id);
@@ -3944,7 +4090,7 @@ void GameRuntime::queue_site_inventory_storage_upsert_message(std::uint32_t stor
     engine_messages_.push_back(message);
 }
 
-void GameRuntime::queue_all_site_inventory_storage_upsert_messages()
+void GameRuntime::queue_all_site_inventory_storage_upsert_messages(Gs1EngineMessageType message_type)
 {
     if (!active_site_run_.has_value())
     {
@@ -3953,16 +4099,17 @@ void GameRuntime::queue_all_site_inventory_storage_upsert_messages()
 
     for (const auto& storage : active_site_run_->inventory.storage_containers)
     {
-        queue_site_inventory_storage_upsert_message(storage.storage_id);
+        queue_site_inventory_storage_upsert_message(storage.storage_id, message_type);
     }
 }
 
 void GameRuntime::queue_site_inventory_view_state_message(
     std::uint32_t storage_id,
     Gs1InventoryViewEventKind event_kind,
-    std::uint32_t slot_count)
+    std::uint32_t slot_count,
+    Gs1EngineMessageType message_type)
 {
-    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_INVENTORY_VIEW_STATE);
+    auto message = make_engine_message(message_type);
     auto& payload = message.emplace_payload<Gs1EngineMessageInventoryViewData>();
     payload.storage_id = storage_id;
     payload.slot_count = static_cast<std::uint16_t>(std::min<std::uint32_t>(slot_count, 65535U));
@@ -3974,7 +4121,7 @@ void GameRuntime::queue_site_inventory_view_state_message(
         event_kind == GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT);
 }
 
-void GameRuntime::queue_all_site_inventory_slot_upsert_messages()
+void GameRuntime::queue_all_site_inventory_slot_upsert_messages(Gs1EngineMessageType message_type)
 {
     if (!active_site_run_.has_value())
     {
@@ -3986,11 +4133,17 @@ void GameRuntime::queue_all_site_inventory_slot_upsert_messages()
         queue_site_inventory_slot_upsert_message(
             GS1_INVENTORY_CONTAINER_WORKER_PACK,
             index,
-            active_site_run_->inventory.worker_pack_storage_id);
+            active_site_run_->inventory.worker_pack_storage_id,
+            0U,
+            TileCoord {},
+            message_type);
     }
 }
 
-void GameRuntime::queue_pending_site_inventory_slot_upsert_messages()
+void GameRuntime::queue_pending_site_inventory_slot_upsert_messages(
+    Gs1EngineMessageType storage_message_type,
+    Gs1EngineMessageType slot_message_type,
+    Gs1EngineMessageType view_state_message_type)
 {
     if (!active_site_run_.has_value())
     {
@@ -4001,13 +4154,13 @@ void GameRuntime::queue_pending_site_inventory_slot_upsert_messages()
     if (site_run.pending_inventory_storage_descriptor_projection_update ||
         site_run.pending_full_inventory_projection_update)
     {
-        queue_all_site_inventory_storage_upsert_messages();
+        queue_all_site_inventory_storage_upsert_messages(storage_message_type);
     }
 
     if (site_run.pending_full_inventory_projection_update ||
         site_run.pending_worker_pack_inventory_projection_updates.empty())
     {
-        queue_all_site_inventory_slot_upsert_messages();
+        queue_all_site_inventory_slot_upsert_messages(slot_message_type);
     }
     else
     {
@@ -4019,7 +4172,10 @@ void GameRuntime::queue_pending_site_inventory_slot_upsert_messages()
             queue_site_inventory_slot_upsert_message(
                 GS1_INVENTORY_CONTAINER_WORKER_PACK,
                 slot_index,
-                site_run.inventory.worker_pack_storage_id);
+                site_run.inventory.worker_pack_storage_id,
+                0U,
+                TileCoord {},
+                slot_message_type);
         }
     }
 
@@ -4031,21 +4187,28 @@ void GameRuntime::queue_pending_site_inventory_slot_upsert_messages()
         {
             queue_site_inventory_view_state_message(
                 site_run.inventory.worker_pack_storage_id,
-                GS1_INVENTORY_VIEW_EVENT_CLOSE);
+                GS1_INVENTORY_VIEW_EVENT_CLOSE,
+                0U,
+                view_state_message_type);
         }
         else if (!previous_worker_pack_open && current_worker_pack_open)
         {
             queue_site_inventory_view_state_message(
                 site_run.inventory.worker_pack_storage_id,
                 GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT,
-                static_cast<std::uint32_t>(site_run.inventory.worker_pack_slots.size()));
+                static_cast<std::uint32_t>(site_run.inventory.worker_pack_slots.size()),
+                view_state_message_type);
         }
 
         const auto previous_storage_id = site_run.inventory.last_projected_opened_device_storage_id;
         const auto current_storage_id = site_run.inventory.opened_device_storage_id;
         if (previous_storage_id != 0U && previous_storage_id != current_storage_id)
         {
-            queue_site_inventory_view_state_message(previous_storage_id, GS1_INVENTORY_VIEW_EVENT_CLOSE);
+            queue_site_inventory_view_state_message(
+                previous_storage_id,
+                GS1_INVENTORY_VIEW_EVENT_CLOSE,
+                0U,
+                view_state_message_type);
         }
         if (current_storage_id != 0U && current_storage_id != previous_storage_id)
         {
@@ -4056,7 +4219,8 @@ void GameRuntime::queue_pending_site_inventory_slot_upsert_messages()
                 GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT,
                 storage_state == nullptr
                     ? 0U
-                    : static_cast<std::uint32_t>(storage_state->slot_item_instance_ids.size()));
+                    : static_cast<std::uint32_t>(storage_state->slot_item_instance_ids.size()),
+                view_state_message_type);
         }
         site_run.inventory.last_projected_opened_device_storage_id = current_storage_id;
         site_run.inventory.last_projected_worker_pack_panel_open = current_worker_pack_open;
@@ -4085,7 +4249,8 @@ void GameRuntime::queue_pending_site_inventory_slot_upsert_messages()
                 slot_index,
                 opened_storage->storage_id,
                 opened_storage->owner_device_entity_id,
-                opened_storage->tile_coord);
+                opened_storage->tile_coord,
+                slot_message_type);
         }
         return;
     }
@@ -4100,7 +4265,8 @@ void GameRuntime::queue_pending_site_inventory_slot_upsert_messages()
             slot_index,
             opened_storage->storage_id,
             opened_storage->owner_device_entity_id,
-            opened_storage->tile_coord);
+            opened_storage->tile_coord,
+            slot_message_type);
     }
 }
 
@@ -4221,7 +4387,9 @@ void GameRuntime::queue_site_placement_failure_message(const PlacementModeCommit
     engine_messages_.push_back(message);
 }
 
-void GameRuntime::queue_site_task_upsert_message(std::size_t task_index)
+void GameRuntime::queue_site_task_upsert_message(
+    std::size_t task_index,
+    Gs1EngineMessageType message_type)
 {
     if (!active_site_run_.has_value())
     {
@@ -4235,7 +4403,7 @@ void GameRuntime::queue_site_task_upsert_message(std::size_t task_index)
     }
 
     const auto& task = tasks[task_index];
-    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT);
+    auto message = make_engine_message(message_type);
     auto& payload = message.emplace_payload<Gs1EngineMessageTaskData>();
     payload.task_instance_id = task.task_instance_id.value;
     payload.task_template_id = task.task_template_id.value;
@@ -4247,7 +4415,7 @@ void GameRuntime::queue_site_task_upsert_message(std::size_t task_index)
     engine_messages_.push_back(message);
 }
 
-void GameRuntime::queue_all_site_task_upsert_messages()
+void GameRuntime::queue_all_site_task_upsert_messages(Gs1EngineMessageType message_type)
 {
     if (!active_site_run_.has_value())
     {
@@ -4256,18 +4424,20 @@ void GameRuntime::queue_all_site_task_upsert_messages()
 
     for (std::size_t index = 0; index < active_site_run_->task_board.visible_tasks.size(); ++index)
     {
-        queue_site_task_upsert_message(index);
+        queue_site_task_upsert_message(index, message_type);
     }
 }
 
-void GameRuntime::queue_site_modifier_list_begin_message(Gs1ProjectionMode mode)
+void GameRuntime::queue_site_modifier_list_begin_message(
+    Gs1ProjectionMode mode,
+    Gs1EngineMessageType message_type)
 {
     if (!active_site_run_.has_value())
     {
         return;
     }
 
-    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_MODIFIER_LIST_BEGIN);
+    auto message = make_engine_message(message_type);
     auto& payload = message.emplace_payload<Gs1EngineMessageSiteModifierListData>();
     payload.mode = mode;
     payload.reserved0 = 0U;
@@ -4277,7 +4447,9 @@ void GameRuntime::queue_site_modifier_list_begin_message(Gs1ProjectionMode mode)
     engine_messages_.push_back(message);
 }
 
-void GameRuntime::queue_site_modifier_upsert_message(std::size_t modifier_index)
+void GameRuntime::queue_site_modifier_upsert_message(
+    std::size_t modifier_index,
+    Gs1EngineMessageType message_type)
 {
     if (!active_site_run_.has_value() ||
         modifier_index >= active_site_run_->modifier.active_site_modifiers.size())
@@ -4287,7 +4459,7 @@ void GameRuntime::queue_site_modifier_upsert_message(std::size_t modifier_index)
 
     const auto& active_modifier =
         active_site_run_->modifier.active_site_modifiers[modifier_index];
-    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_MODIFIER_UPSERT);
+    auto message = make_engine_message(message_type);
     auto& payload = message.emplace_payload<Gs1EngineMessageSiteModifierData>();
     payload.modifier_id = active_modifier.modifier_id.value;
     payload.remaining_game_hours =
@@ -4298,21 +4470,26 @@ void GameRuntime::queue_site_modifier_upsert_message(std::size_t modifier_index)
     engine_messages_.push_back(message);
 }
 
-void GameRuntime::queue_all_site_modifier_upsert_messages(Gs1ProjectionMode mode)
+void GameRuntime::queue_all_site_modifier_upsert_messages(
+    Gs1ProjectionMode mode,
+    Gs1EngineMessageType begin_message_type,
+    Gs1EngineMessageType upsert_message_type)
 {
     if (!active_site_run_.has_value())
     {
         return;
     }
 
-    queue_site_modifier_list_begin_message(mode);
+    queue_site_modifier_list_begin_message(mode, begin_message_type);
     for (std::size_t index = 0U; index < active_site_run_->modifier.active_site_modifiers.size(); ++index)
     {
-        queue_site_modifier_upsert_message(index);
+        queue_site_modifier_upsert_message(index, upsert_message_type);
     }
 }
 
-void GameRuntime::queue_site_phone_listing_upsert_message(std::size_t listing_index)
+void GameRuntime::queue_site_phone_listing_upsert_message(
+    std::size_t listing_index,
+    Gs1EngineMessageType message_type)
 {
     if (!active_site_run_.has_value())
     {
@@ -4326,7 +4503,7 @@ void GameRuntime::queue_site_phone_listing_upsert_message(std::size_t listing_in
     }
 
     const auto& listing = listings[listing_index];
-    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_UPSERT);
+    auto message = make_engine_message(message_type);
     auto& payload = message.emplace_payload<Gs1EngineMessagePhoneListingData>();
     payload.listing_id = listing.listing_id;
     payload.item_or_unlockable_id = listing.item_id.value;
@@ -4388,14 +4565,16 @@ void GameRuntime::queue_site_protection_overlay_state_message()
         site_protection_overlay_mode_ != GS1_SITE_PROTECTION_OVERLAY_NONE);
 }
 
-void GameRuntime::queue_site_phone_listing_remove_message(std::uint32_t listing_id)
+void GameRuntime::queue_site_phone_listing_remove_message(
+    std::uint32_t listing_id,
+    Gs1EngineMessageType message_type)
 {
     if (!active_site_run_.has_value() || listing_id == 0U)
     {
         return;
     }
 
-    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_REMOVE);
+    auto message = make_engine_message(message_type);
     auto& payload = message.emplace_payload<Gs1EngineMessagePhoneListingData>();
     payload.listing_id = listing_id;
     payload.item_or_unlockable_id = 0U;
@@ -4408,7 +4587,9 @@ void GameRuntime::queue_site_phone_listing_remove_message(std::uint32_t listing_
     engine_messages_.push_back(message);
 }
 
-void GameRuntime::queue_all_site_phone_listing_upsert_messages()
+void GameRuntime::queue_all_site_phone_listing_upsert_messages(
+    Gs1EngineMessageType upsert_message_type,
+    Gs1EngineMessageType remove_message_type)
 {
     if (!active_site_run_.has_value())
     {
@@ -4427,13 +4608,13 @@ void GameRuntime::queue_all_site_phone_listing_upsert_messages()
         if (std::find(current_listing_ids.begin(), current_listing_ids.end(), previous_listing_id) ==
             current_listing_ids.end())
         {
-            queue_site_phone_listing_remove_message(previous_listing_id);
+            queue_site_phone_listing_remove_message(previous_listing_id, remove_message_type);
         }
     }
 
     for (std::size_t index = 0; index < active_site_run_->phone_panel.listings.size(); ++index)
     {
-        queue_site_phone_listing_upsert_message(index);
+        queue_site_phone_listing_upsert_message(index, upsert_message_type);
     }
 
     last_emitted_phone_listing_ids_ = std::move(current_listing_ids);
@@ -4461,6 +4642,73 @@ void GameRuntime::queue_site_bootstrap_messages()
     queue_all_site_phone_listing_upsert_messages();
     queue_site_protection_overlay_state_message();
     queue_site_snapshot_end_message();
+
+    queue_site_snapshot_begin_message(
+        GS1_PROJECTION_MODE_SNAPSHOT,
+        GS1_ENGINE_MESSAGE_BEGIN_SITE_SCENE_SNAPSHOT);
+    queue_all_site_tile_upsert_messages(GS1_ENGINE_MESSAGE_SITE_SCENE_TILE_UPSERT);
+    queue_site_worker_update_message(GS1_ENGINE_MESSAGE_SITE_SCENE_WORKER_UPDATE);
+    queue_all_site_plant_visual_messages(GS1_ENGINE_MESSAGE_SITE_SCENE_PLANT_VISUAL_UPSERT);
+    queue_all_site_device_visual_messages(GS1_ENGINE_MESSAGE_SITE_SCENE_DEVICE_VISUAL_UPSERT);
+    queue_site_snapshot_end_message(GS1_ENGINE_MESSAGE_END_SITE_SCENE_SNAPSHOT);
+
+    queue_site_snapshot_begin_message(
+        GS1_PROJECTION_MODE_SNAPSHOT,
+        GS1_ENGINE_MESSAGE_BEGIN_SITE_INVENTORY_PANEL_SNAPSHOT);
+    queue_all_site_inventory_storage_upsert_messages(GS1_ENGINE_MESSAGE_SITE_INVENTORY_PANEL_STORAGE_UPSERT);
+    queue_all_site_inventory_slot_upsert_messages(GS1_ENGINE_MESSAGE_SITE_INVENTORY_PANEL_SLOT_UPSERT);
+    if (active_site_run_->inventory.worker_pack_panel_open)
+    {
+        queue_site_inventory_view_state_message(
+            active_site_run_->inventory.worker_pack_storage_id,
+            GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT,
+            static_cast<std::uint32_t>(active_site_run_->inventory.worker_pack_slots.size()),
+            GS1_ENGINE_MESSAGE_SITE_INVENTORY_PANEL_VIEW_STATE);
+    }
+    if (active_site_run_->inventory.opened_device_storage_id != 0U)
+    {
+        const auto* opened_storage =
+            inventory_storage::storage_container_state_for_storage_id(
+                active_site_run_.value(),
+                active_site_run_->inventory.opened_device_storage_id);
+        queue_site_inventory_view_state_message(
+            active_site_run_->inventory.opened_device_storage_id,
+            GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT,
+            opened_storage == nullptr
+                ? 0U
+                : static_cast<std::uint32_t>(opened_storage->slot_item_instance_ids.size()),
+            GS1_ENGINE_MESSAGE_SITE_INVENTORY_PANEL_VIEW_STATE);
+    }
+    queue_site_snapshot_end_message(GS1_ENGINE_MESSAGE_END_SITE_INVENTORY_PANEL_SNAPSHOT);
+
+    queue_site_snapshot_begin_message(
+        GS1_PROJECTION_MODE_SNAPSHOT,
+        GS1_ENGINE_MESSAGE_BEGIN_SITE_PHONE_PANEL_SNAPSHOT);
+    queue_all_site_phone_listing_upsert_messages(
+        GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_LISTING_UPSERT,
+        GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_LISTING_REMOVE);
+    queue_site_snapshot_end_message(GS1_ENGINE_MESSAGE_END_SITE_PHONE_PANEL_SNAPSHOT);
+
+    queue_site_snapshot_begin_message(
+        GS1_PROJECTION_MODE_SNAPSHOT,
+        GS1_ENGINE_MESSAGE_BEGIN_SITE_TASK_PANEL_SNAPSHOT);
+    queue_all_site_task_upsert_messages(GS1_ENGINE_MESSAGE_SITE_TASK_PANEL_TASK_UPSERT);
+    queue_all_site_modifier_upsert_messages(
+        GS1_PROJECTION_MODE_SNAPSHOT,
+        GS1_ENGINE_MESSAGE_SITE_TASK_PANEL_MODIFIER_LIST_BEGIN,
+        GS1_ENGINE_MESSAGE_SITE_TASK_PANEL_MODIFIER_UPSERT);
+    queue_site_snapshot_end_message(GS1_ENGINE_MESSAGE_END_SITE_TASK_PANEL_SNAPSHOT);
+
+    queue_site_snapshot_begin_message(
+        GS1_PROJECTION_MODE_SNAPSHOT,
+        GS1_ENGINE_MESSAGE_BEGIN_SITE_SUMMARY_SNAPSHOT);
+    queue_site_snapshot_end_message(GS1_ENGINE_MESSAGE_END_SITE_SUMMARY_SNAPSHOT);
+
+    queue_site_snapshot_begin_message(
+        GS1_PROJECTION_MODE_SNAPSHOT,
+        GS1_ENGINE_MESSAGE_BEGIN_SITE_HUD_SNAPSHOT);
+    queue_all_site_inventory_storage_upsert_messages(GS1_ENGINE_MESSAGE_SITE_HUD_STORAGE_UPSERT);
+    queue_site_snapshot_end_message(GS1_ENGINE_MESSAGE_END_SITE_HUD_SNAPSHOT);
 
     active_site_run_->pending_projection_update_flags = 0U;
     clear_pending_site_tile_projection_updates();
@@ -4546,6 +4794,76 @@ void GameRuntime::queue_site_delta_messages(std::uint64_t dirty_flags)
     }
 
     queue_site_snapshot_end_message();
+
+    if ((site_dirty_flags & (SITE_PROJECTION_UPDATE_TILES | SITE_PROJECTION_UPDATE_WORKER)) != 0U)
+    {
+        queue_site_snapshot_begin_message(
+            GS1_PROJECTION_MODE_DELTA,
+            GS1_ENGINE_MESSAGE_BEGIN_SITE_SCENE_SNAPSHOT);
+        if ((site_dirty_flags & SITE_PROJECTION_UPDATE_TILES) != 0U)
+        {
+            queue_pending_site_plant_visual_messages(
+                GS1_ENGINE_MESSAGE_SITE_SCENE_PLANT_VISUAL_UPSERT,
+                GS1_ENGINE_MESSAGE_SITE_SCENE_PLANT_VISUAL_REMOVE);
+            queue_pending_site_device_visual_messages(
+                GS1_ENGINE_MESSAGE_SITE_SCENE_DEVICE_VISUAL_UPSERT,
+                GS1_ENGINE_MESSAGE_SITE_SCENE_DEVICE_VISUAL_REMOVE);
+            queue_pending_site_tile_upsert_messages(GS1_ENGINE_MESSAGE_SITE_SCENE_TILE_UPSERT);
+        }
+        if ((site_dirty_flags & SITE_PROJECTION_UPDATE_WORKER) != 0U)
+        {
+            queue_site_worker_update_message(GS1_ENGINE_MESSAGE_SITE_SCENE_WORKER_UPDATE);
+        }
+        queue_site_snapshot_end_message(GS1_ENGINE_MESSAGE_END_SITE_SCENE_SNAPSHOT);
+    }
+
+    if ((site_dirty_flags & SITE_PROJECTION_UPDATE_INVENTORY) != 0U)
+    {
+        queue_site_snapshot_begin_message(
+            GS1_PROJECTION_MODE_DELTA,
+            GS1_ENGINE_MESSAGE_BEGIN_SITE_INVENTORY_PANEL_SNAPSHOT);
+        queue_pending_site_inventory_slot_upsert_messages(
+            GS1_ENGINE_MESSAGE_SITE_INVENTORY_PANEL_STORAGE_UPSERT,
+            GS1_ENGINE_MESSAGE_SITE_INVENTORY_PANEL_SLOT_UPSERT,
+            GS1_ENGINE_MESSAGE_SITE_INVENTORY_PANEL_VIEW_STATE);
+        queue_site_snapshot_end_message(GS1_ENGINE_MESSAGE_END_SITE_INVENTORY_PANEL_SNAPSHOT);
+
+        queue_site_snapshot_begin_message(
+            GS1_PROJECTION_MODE_DELTA,
+            GS1_ENGINE_MESSAGE_BEGIN_SITE_HUD_SNAPSHOT);
+        queue_all_site_inventory_storage_upsert_messages(GS1_ENGINE_MESSAGE_SITE_HUD_STORAGE_UPSERT);
+        queue_site_snapshot_end_message(GS1_ENGINE_MESSAGE_END_SITE_HUD_SNAPSHOT);
+    }
+
+    if ((site_dirty_flags & SITE_PROJECTION_UPDATE_PHONE) != 0U)
+    {
+        queue_site_snapshot_begin_message(
+            GS1_PROJECTION_MODE_DELTA,
+            GS1_ENGINE_MESSAGE_BEGIN_SITE_PHONE_PANEL_SNAPSHOT);
+        queue_all_site_phone_listing_upsert_messages(
+            GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_LISTING_UPSERT,
+            GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_LISTING_REMOVE);
+        queue_site_snapshot_end_message(GS1_ENGINE_MESSAGE_END_SITE_PHONE_PANEL_SNAPSHOT);
+    }
+
+    if ((site_dirty_flags & (SITE_PROJECTION_UPDATE_TASKS | SITE_PROJECTION_UPDATE_MODIFIERS)) != 0U)
+    {
+        queue_site_snapshot_begin_message(
+            GS1_PROJECTION_MODE_DELTA,
+            GS1_ENGINE_MESSAGE_BEGIN_SITE_TASK_PANEL_SNAPSHOT);
+        if ((site_dirty_flags & SITE_PROJECTION_UPDATE_TASKS) != 0U)
+        {
+            queue_all_site_task_upsert_messages(GS1_ENGINE_MESSAGE_SITE_TASK_PANEL_TASK_UPSERT);
+        }
+        if ((site_dirty_flags & SITE_PROJECTION_UPDATE_MODIFIERS) != 0U)
+        {
+            queue_all_site_modifier_upsert_messages(
+                GS1_PROJECTION_MODE_DELTA,
+                GS1_ENGINE_MESSAGE_SITE_TASK_PANEL_MODIFIER_LIST_BEGIN,
+                GS1_ENGINE_MESSAGE_SITE_TASK_PANEL_MODIFIER_UPSERT);
+        }
+        queue_site_snapshot_end_message(GS1_ENGINE_MESSAGE_END_SITE_TASK_PANEL_SNAPSHOT);
+    }
 }
 
 void GameRuntime::queue_site_action_update_message()

@@ -58,8 +58,8 @@ private:
     godot::RichTextLabel* campaign_summary_ {nullptr};
     godot::Button* tech_button_ {nullptr};
     SubmitUiActionFn submit_ui_action_ {};
-    Gs1GodotRegionalMapStateReducer regional_map_state_reducer_ {};
-    Gs1GodotUiPanelStateReducer ui_panel_state_reducer_ {};
+    Gs1GodotRegionalMapStateReducer regional_map_state_reducer_ {k_gs1_regional_map_hud_message_family};
     std::optional<Gs1RuntimeCampaignResourcesProjection> campaign_resources_ {};
+    bool tech_tree_visible_ {false};
     bool tech_button_connected_ {false};
 };

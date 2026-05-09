@@ -87,8 +87,8 @@ private:
     godot::RichTextLabel* loadout_summary_ {nullptr};
     godot::VBoxContainer* actions_ {nullptr};
     SubmitUiActionFn submit_ui_action_ {};
-    Gs1GodotUiPanelStateReducer ui_panel_state_reducer_ {};
-    Gs1GodotRegionalMapStateReducer regional_map_state_reducer_ {};
+    Gs1GodotUiPanelStateReducer ui_panel_state_reducer_ {k_gs1_regional_selection_ui_panel_message_family};
+    Gs1GodotRegionalMapStateReducer regional_map_state_reducer_ {k_gs1_regional_selection_message_family};
     int selected_site_id_ {0};
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> action_buttons_ {};
     mutable std::unordered_map<int, godot::String> item_name_cache_ {};

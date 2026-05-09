@@ -301,9 +301,9 @@ bool Gs1GodotSiteHudController::handles_engine_message(Gs1EngineMessageType type
     case GS1_ENGINE_MESSAGE_HUD_STATE:
     case GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE:
     case GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE:
-    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
-    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_STORAGE_UPSERT:
-    case GS1_ENGINE_MESSAGE_END_SITE_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_BEGIN_SITE_HUD_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_SITE_HUD_STORAGE_UPSERT:
+    case GS1_ENGINE_MESSAGE_END_SITE_HUD_SNAPSHOT:
         return true;
     default:
         return false;
@@ -323,7 +323,7 @@ void Gs1GodotSiteHudController::handle_engine_message(const Gs1EngineMessage& me
     case GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE:
         protection_overlay_ = message.payload_as<Gs1EngineMessageSiteProtectionOverlayData>();
         break;
-    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_BEGIN_SITE_HUD_SNAPSHOT:
     {
         const auto& payload = message.payload_as<Gs1EngineMessageSiteSnapshotData>();
         if (payload.mode == GS1_PROJECTION_MODE_SNAPSHOT)
@@ -332,7 +332,7 @@ void Gs1GodotSiteHudController::handle_engine_message(const Gs1EngineMessage& me
         }
         break;
     }
-    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_STORAGE_UPSERT:
+    case GS1_ENGINE_MESSAGE_SITE_HUD_STORAGE_UPSERT:
     {
         const auto projection = message.payload_as<Gs1EngineMessageInventoryStorageData>();
         const auto found = std::find_if(inventory_storages_.begin(), inventory_storages_.end(), [&](const auto& existing) {
