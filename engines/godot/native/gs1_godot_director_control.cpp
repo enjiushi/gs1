@@ -32,6 +32,8 @@ void Gs1GodotDirectorControl::_bind_methods()
 {
     ClassDB::bind_method(D_METHOD("set_scene_host_path", "path"), &Gs1GodotDirectorControl::set_scene_host_path);
     ClassDB::bind_method(D_METHOD("get_scene_host_path"), &Gs1GodotDirectorControl::get_scene_host_path);
+    ClassDB::bind_method(D_METHOD("set_loading_scene_path", "path"), &Gs1GodotDirectorControl::set_loading_scene_path);
+    ClassDB::bind_method(D_METHOD("get_loading_scene_path"), &Gs1GodotDirectorControl::get_loading_scene_path);
     ClassDB::bind_method(D_METHOD("set_main_menu_scene_path", "path"), &Gs1GodotDirectorControl::set_main_menu_scene_path);
     ClassDB::bind_method(D_METHOD("get_main_menu_scene_path"), &Gs1GodotDirectorControl::get_main_menu_scene_path);
     ClassDB::bind_method(D_METHOD("set_regional_map_scene_path", "path"), &Gs1GodotDirectorControl::set_regional_map_scene_path);
@@ -40,6 +42,7 @@ void Gs1GodotDirectorControl::_bind_methods()
     ClassDB::bind_method(D_METHOD("get_site_session_scene_path"), &Gs1GodotDirectorControl::get_site_session_scene_path);
 
     ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "scene_host_path"), "set_scene_host_path", "get_scene_host_path");
+    ADD_PROPERTY(PropertyInfo(Variant::STRING, "loading_scene_path"), "set_loading_scene_path", "get_loading_scene_path");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "main_menu_scene_path"), "set_main_menu_scene_path", "get_main_menu_scene_path");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "regional_map_scene_path"), "set_regional_map_scene_path", "get_regional_map_scene_path");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "site_session_scene_path"), "set_site_session_scene_path", "get_site_session_scene_path");
@@ -57,6 +60,7 @@ void Gs1GodotDirectorControl::_process(double delta)
 {
     adapter_service_.process_frame(delta);
     cache_nodes();
+    poll_async_scene_switch();
     ensure_active_scene();
 }
 
@@ -77,14 +81,104 @@ void Gs1GodotDirectorControl::ensure_active_scene()
 
     const int app_state = last_app_state_ >= 0 ? last_app_state_ : APP_STATE_BOOT;
     const ScreenKind desired_kind = desired_screen_kind(app_state);
+    if (pending_async_target_kind_ != SCREEN_KIND_NONE)
+    {
+        return;
+    }
+
     Node* active_scene = Object::cast_to<Node>(ObjectDB::get_instance(active_scene_id_));
     if (active_scene != nullptr && desired_kind == active_screen_kind_ && app_state == last_app_state_)
     {
         return;
     }
 
+    if (should_async_load_transition(desired_kind))
+    {
+        begin_async_scene_switch(desired_kind);
+        last_app_state_ = app_state;
+        return;
+    }
+
     switch_to_scene(desired_kind);
     last_app_state_ = app_state;
+}
+
+void Gs1GodotDirectorControl::begin_async_scene_switch(ScreenKind kind)
+{
+    ResourceLoader* resource_loader = ResourceLoader::get_singleton();
+    const String scene_path = scene_path_for(kind);
+    if (resource_loader == nullptr || scene_path.is_empty())
+    {
+        switch_to_scene(kind);
+        return;
+    }
+
+    const Error status = resource_loader->load_threaded_request(
+        scene_path,
+        "PackedScene",
+        true,
+        ResourceLoader::CACHE_MODE_REUSE);
+    if (status != OK)
+    {
+        switch_to_scene(kind);
+        return;
+    }
+
+    pending_async_target_kind_ = kind;
+    pending_async_scene_path_ = scene_path;
+    switch_to_scene(SCREEN_KIND_LOADING);
+}
+
+void Gs1GodotDirectorControl::poll_async_scene_switch()
+{
+    if (pending_async_target_kind_ == SCREEN_KIND_NONE || pending_async_scene_path_.is_empty())
+    {
+        return;
+    }
+
+    ResourceLoader* resource_loader = ResourceLoader::get_singleton();
+    if (resource_loader == nullptr)
+    {
+        const ScreenKind target_kind = pending_async_target_kind_;
+        pending_async_target_kind_ = SCREEN_KIND_NONE;
+        pending_async_scene_path_ = String();
+        switch_to_scene(target_kind);
+        return;
+    }
+
+    const ResourceLoader::ThreadLoadStatus status = resource_loader->load_threaded_get_status(pending_async_scene_path_);
+    if (status == ResourceLoader::THREAD_LOAD_IN_PROGRESS)
+    {
+        return;
+    }
+
+    const ScreenKind target_kind = pending_async_target_kind_;
+    const String target_path = pending_async_scene_path_;
+    pending_async_target_kind_ = SCREEN_KIND_NONE;
+    pending_async_scene_path_ = String();
+
+    if (status != ResourceLoader::THREAD_LOAD_LOADED)
+    {
+        switch_to_scene(target_kind);
+        return;
+    }
+
+    Ref<Resource> resource = resource_loader->load_threaded_get(target_path);
+    Ref<PackedScene> packed_scene = resource;
+    if (packed_scene.is_null())
+    {
+        switch_to_scene(target_kind);
+        return;
+    }
+
+    switch_to_scene(target_kind, packed_scene);
+}
+
+bool Gs1GodotDirectorControl::should_async_load_transition(ScreenKind kind) const noexcept
+{
+    return kind == SCREEN_KIND_REGIONAL_MAP &&
+        active_screen_kind_ == SCREEN_KIND_MAIN_MENU &&
+        !loading_scene_path_.is_empty();
 }
 
 bool Gs1GodotDirectorControl::handles_engine_message(Gs1EngineMessageType type) const noexcept
@@ -131,6 +225,8 @@ String Gs1GodotDirectorControl::scene_path_for(ScreenKind kind) const
 {
     switch (kind)
     {
+    case SCREEN_KIND_LOADING:
+        return loading_scene_path_;
     case SCREEN_KIND_MAIN_MENU:
         return main_menu_scene_path_;
     case SCREEN_KIND_REGIONAL_MAP:
@@ -143,7 +239,7 @@ String Gs1GodotDirectorControl::scene_path_for(ScreenKind kind) const
     }
 }
 
-void Gs1GodotDirectorControl::switch_to_scene(ScreenKind kind)
+void Gs1GodotDirectorControl::switch_to_scene(ScreenKind kind, const Ref<PackedScene>& prefetched_scene)
 {
     if (scene_host_ == nullptr)
     {
@@ -165,7 +261,9 @@ void Gs1GodotDirectorControl::switch_to_scene(ScreenKind kind)
         return;
     }
 
-    Node* instance = instantiate_scene(scene_path);
+    Node* instance = prefetched_scene.is_null()
+        ? instantiate_scene(scene_path)
+        : instantiate_scene(prefetched_scene);
     if (instance == nullptr)
     {
         UtilityFunctions::push_warning(vformat("GS1 Godot director could not load scene: %s", scene_path));
@@ -197,6 +295,16 @@ Node* Gs1GodotDirectorControl::instantiate_scene(const String& scene_path) const
         return nullptr;
     }
 
+    return instantiate_scene(packed_scene);
+}
+
+Node* Gs1GodotDirectorControl::instantiate_scene(const Ref<PackedScene>& packed_scene) const
+{
+    if (packed_scene.is_null())
+    {
+        return nullptr;
+    }
+
     return packed_scene->instantiate();
 }
 
@@ -209,6 +317,16 @@ void Gs1GodotDirectorControl::set_scene_host_path(const NodePath& path)
 NodePath Gs1GodotDirectorControl::get_scene_host_path() const
 {
     return scene_host_path_;
+}
+
+void Gs1GodotDirectorControl::set_loading_scene_path(const String& path)
+{
+    loading_scene_path_ = path;
+}
+
+String Gs1GodotDirectorControl::get_loading_scene_path() const
+{
+    return loading_scene_path_;
 }
 
 void Gs1GodotDirectorControl::set_main_menu_scene_path(const String& path)

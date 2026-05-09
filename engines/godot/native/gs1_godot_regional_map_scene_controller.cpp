@@ -361,7 +361,6 @@ void Gs1GodotRegionalMapSceneController::refresh_regional_map()
     }
 
     rebuild_regional_map_world(sites_, links_);
-    update_regional_site_visuals();
 }
 
 void Gs1GodotRegionalMapSceneController::rebuild_regional_map_world(
