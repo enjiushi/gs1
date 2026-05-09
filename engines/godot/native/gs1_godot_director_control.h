@@ -9,11 +9,14 @@
 
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/packed_scene.hpp>
+#include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/core/binder_common.hpp>
 #include <godot_cpp/core/object_id.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/variant/string.hpp>
+
+#include <vector>
 
 class Gs1GodotDirectorControl final : public godot::Control, public IGs1GodotEngineMessageSubscriber
 {
@@ -65,6 +68,10 @@ private:
     void ensure_active_scene();
     void begin_async_scene_switch(ScreenKind kind);
     void poll_async_scene_switch();
+    void begin_async_resource_preloads(ScreenKind kind);
+    [[nodiscard]] std::vector<godot::String> build_async_preload_paths(ScreenKind kind) const;
+    [[nodiscard]] bool async_resource_preloads_complete(godot::ResourceLoader& resource_loader);
+    void clear_async_scene_switch_state() noexcept;
     [[nodiscard]] bool should_async_load_transition(ScreenKind kind) const noexcept;
     [[nodiscard]] ScreenKind desired_screen_kind(int app_state) const noexcept;
     [[nodiscard]] godot::String scene_path_for(ScreenKind kind) const;
@@ -97,5 +104,6 @@ private:
     ScreenKind active_screen_kind_ {SCREEN_KIND_NONE};
     ScreenKind pending_async_target_kind_ {SCREEN_KIND_NONE};
     godot::String pending_async_scene_path_ {};
+    std::vector<godot::String> pending_async_resource_paths_ {};
     int last_app_state_ {-1};
 };

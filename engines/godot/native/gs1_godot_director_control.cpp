@@ -1,5 +1,9 @@
 #include "gs1_godot_director_control.h"
 
+#include "godot_progression_resources.h"
+
+#include "content/defs/technology_defs.h"
+
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/packed_scene.hpp>
 #include <godot_cpp/classes/resource.hpp>
@@ -8,6 +12,9 @@
 #include <godot_cpp/core/object.hpp>
 #include <godot_cpp/core/property_info.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
+
+#include <string>
+#include <unordered_set>
 
 using namespace godot;
 
@@ -25,6 +32,23 @@ T* find_controller(Node* scene_root, const char* node_name)
         return direct;
     }
     return Object::cast_to<T>(scene_root->find_child(node_name, true, false));
+}
+
+std::uint8_t unlockable_content_kind_from_def(const gs1::ReputationUnlockDef& unlock_def) noexcept
+{
+    switch (unlock_def.unlock_kind)
+    {
+    case gs1::ReputationUnlockKind::Plant:
+        return 0U;
+    case gs1::ReputationUnlockKind::Item:
+        return 1U;
+    case gs1::ReputationUnlockKind::StructureRecipe:
+        return 2U;
+    case gs1::ReputationUnlockKind::Recipe:
+        return 3U;
+    default:
+        return 1U;
+    }
 }
 }
 
@@ -126,6 +150,7 @@ void Gs1GodotDirectorControl::begin_async_scene_switch(ScreenKind kind)
 
     pending_async_target_kind_ = kind;
     pending_async_scene_path_ = scene_path;
+    begin_async_resource_preloads(kind);
     switch_to_scene(SCREEN_KIND_LOADING);
 }
 
@@ -140,9 +165,13 @@ void Gs1GodotDirectorControl::poll_async_scene_switch()
     if (resource_loader == nullptr)
     {
         const ScreenKind target_kind = pending_async_target_kind_;
-        pending_async_target_kind_ = SCREEN_KIND_NONE;
-        pending_async_scene_path_ = String();
+        clear_async_scene_switch_state();
         switch_to_scene(target_kind);
+        return;
+    }
+
+    if (!async_resource_preloads_complete(*resource_loader))
+    {
         return;
     }
 
@@ -154,8 +183,7 @@ void Gs1GodotDirectorControl::poll_async_scene_switch()
 
     const ScreenKind target_kind = pending_async_target_kind_;
     const String target_path = pending_async_scene_path_;
-    pending_async_target_kind_ = SCREEN_KIND_NONE;
-    pending_async_scene_path_ = String();
+    clear_async_scene_switch_state();
 
     if (status != ResourceLoader::THREAD_LOAD_LOADED)
     {
@@ -172,6 +200,121 @@ void Gs1GodotDirectorControl::poll_async_scene_switch()
     }
 
     switch_to_scene(target_kind, packed_scene);
+}
+
+void Gs1GodotDirectorControl::begin_async_resource_preloads(ScreenKind kind)
+{
+    pending_async_resource_paths_ = build_async_preload_paths(kind);
+    if (pending_async_resource_paths_.empty())
+    {
+        return;
+    }
+
+    ResourceLoader* resource_loader = ResourceLoader::get_singleton();
+    if (resource_loader == nullptr)
+    {
+        pending_async_resource_paths_.clear();
+        return;
+    }
+
+    auto it = pending_async_resource_paths_.begin();
+    while (it != pending_async_resource_paths_.end())
+    {
+        const Error status = resource_loader->load_threaded_request(
+            *it,
+            "Texture2D",
+            false,
+            ResourceLoader::CACHE_MODE_REUSE);
+        if (status == OK || status == ERR_BUSY)
+        {
+            ++it;
+            continue;
+        }
+
+        UtilityFunctions::push_warning(vformat(
+            "GS1 Godot director could not queue async preload for %s",
+            *it));
+        it = pending_async_resource_paths_.erase(it);
+    }
+}
+
+std::vector<String> Gs1GodotDirectorControl::build_async_preload_paths(ScreenKind kind) const
+{
+    std::vector<String> paths {};
+    if (kind != SCREEN_KIND_REGIONAL_MAP)
+    {
+        return paths;
+    }
+
+    std::unordered_set<std::string> dedupe {};
+    const auto add_path = [&](const String& path) {
+        if (path.is_empty())
+        {
+            return;
+        }
+
+        const std::string key = path.utf8().get_data();
+        if (dedupe.insert(key).second)
+        {
+            paths.push_back(path);
+        }
+    };
+
+    const auto& resource_database = GodotProgressionResourceDatabase::instance();
+    for (const auto& node_def : gs1::all_technology_node_defs())
+    {
+        add_path(resource_database.technology_icon_path(node_def.tech_node_id.value));
+    }
+
+    for (const auto& unlock_def : gs1::all_reputation_unlock_defs())
+    {
+        add_path(resource_database.unlockable_icon_path(
+            unlockable_content_kind_from_def(unlock_def),
+            unlock_def.content_id));
+    }
+
+    return paths;
+}
+
+bool Gs1GodotDirectorControl::async_resource_preloads_complete(ResourceLoader& resource_loader)
+{
+    for (const String& path : pending_async_resource_paths_)
+    {
+        const ResourceLoader::ThreadLoadStatus status = resource_loader.load_threaded_get_status(path);
+        if (status == ResourceLoader::THREAD_LOAD_IN_PROGRESS)
+        {
+            return false;
+        }
+    }
+
+    for (const String& path : pending_async_resource_paths_)
+    {
+        const ResourceLoader::ThreadLoadStatus status = resource_loader.load_threaded_get_status(path);
+        if (status == ResourceLoader::THREAD_LOAD_LOADED)
+        {
+            resource_loader.load_threaded_get(path);
+            continue;
+        }
+
+        if (status != ResourceLoader::THREAD_LOAD_FAILED &&
+            status != ResourceLoader::THREAD_LOAD_INVALID_RESOURCE)
+        {
+            UtilityFunctions::push_warning(vformat(
+                "GS1 Godot director saw unexpected async preload status %d for %s",
+                static_cast<int>(status),
+                path));
+        }
+    }
+
+    pending_async_resource_paths_.clear();
+    return true;
+}
+
+void Gs1GodotDirectorControl::clear_async_scene_switch_state() noexcept
+{
+    pending_async_target_kind_ = SCREEN_KIND_NONE;
+    pending_async_scene_path_ = String();
+    pending_async_resource_paths_.clear();
 }
 
 bool Gs1GodotDirectorControl::should_async_load_transition(ScreenKind kind) const noexcept
@@ -198,6 +341,7 @@ void Gs1GodotDirectorControl::handle_engine_message(const Gs1EngineMessage& mess
 
 void Gs1GodotDirectorControl::handle_runtime_message_reset()
 {
+    clear_async_scene_switch_state();
     last_app_state_ = APP_STATE_BOOT;
 }
 
