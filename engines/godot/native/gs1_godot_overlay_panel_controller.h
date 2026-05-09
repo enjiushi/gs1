@@ -1,8 +1,8 @@
 #pragma once
 
+#include "gs1_godot_adapter_service.h"
 #include "gs1_godot_panel_state_reducers.h"
 #include "gs1_godot_projection_types.h"
-#include "gs1_godot_runtime_node.h"
 
 #include <godot_cpp/classes/button.hpp>
 #include <godot_cpp/classes/center_container.hpp>
@@ -11,6 +11,7 @@
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/panel_container.hpp>
 #include <godot_cpp/classes/v_box_container.hpp>
+#include <godot_cpp/core/binder_common.hpp>
 #include <godot_cpp/core/object_id.hpp>
 #include <godot_cpp/variant/array.hpp>
 
@@ -20,10 +21,21 @@
 #include <unordered_map>
 #include <unordered_set>
 
-class Gs1GodotOverlayPanelController final : public IGs1GodotEngineMessageSubscriber
+class Gs1GodotOverlayPanelController final
+    : public godot::Control
+    , public IGs1GodotEngineMessageSubscriber
 {
+    GDCLASS(Gs1GodotOverlayPanelController, godot::Control)
+
 public:
     using SubmitUiActionFn = std::function<void(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)>;
+
+    Gs1GodotOverlayPanelController() = default;
+    ~Gs1GodotOverlayPanelController() override = default;
+
+    void _ready() override;
+    void _process(double delta) override;
+    void _exit_tree() override;
 
     void cache_ui_references(godot::Control& owner);
     void set_submit_ui_action_callback(SubmitUiActionFn callback);
@@ -34,12 +46,18 @@ public:
     void handle_runtime_message_reset() override;
     void refresh_if_needed();
 
+protected:
+    static void _bind_methods();
+
 private:
     struct ProjectedButtonRecord final
     {
         godot::ObjectID object_id {};
     };
 
+    void cache_adapter_service();
+    [[nodiscard]] godot::Control* resolve_owner_control();
+    void submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);
     void refresh_protection_selector(const Gs1RuntimeUiSetupProjection* setup);
     void refresh_site_result(const Gs1RuntimeUiSetupProjection* setup);
     void reconcile_projected_buttons(
@@ -59,6 +77,7 @@ private:
     [[nodiscard]] godot::String site_result_text(const Gs1RuntimeUiElementProjection& element) const;
 
     godot::Control* owner_control_ {nullptr};
+    Gs1GodotAdapterService* adapter_service_ {nullptr};
     godot::Control* panel_ {nullptr};
     godot::Label* overlay_state_label_ {nullptr};
     godot::CenterContainer* protection_selector_overlay_ {nullptr};

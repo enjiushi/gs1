@@ -1,24 +1,36 @@
 #pragma once
 
+#include "gs1_godot_adapter_service.h"
 #include "gs1_godot_projection_types.h"
-#include "gs1_godot_runtime_node.h"
 
 #include <godot_cpp/classes/button.hpp>
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/label.hpp>
 #include <godot_cpp/classes/progress_bar.hpp>
+#include <godot_cpp/core/binder_common.hpp>
 
 #include <cstdint>
 #include <functional>
 #include <optional>
 #include <vector>
 
-class Gs1GodotSiteHudController final : public IGs1GodotEngineMessageSubscriber
+class Gs1GodotSiteHudController final
+    : public godot::Control
+    , public IGs1GodotEngineMessageSubscriber
 {
+    GDCLASS(Gs1GodotSiteHudController, godot::Control)
+
 public:
     using SubmitUiActionFn = std::function<void(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)>;
     using SubmitStorageViewFn = std::function<void(int storage_id, int event_kind)>;
     using SubmitContextRequestFn = std::function<void(int tile_x, int tile_y, int flags)>;
+
+    Gs1GodotSiteHudController() = default;
+    ~Gs1GodotSiteHudController() override = default;
+
+    void _ready() override;
+    void _process(double delta) override;
+    void _exit_tree() override;
 
     void cache_ui_references(godot::Control& owner);
     void set_submit_ui_action_callback(SubmitUiActionFn callback);
@@ -38,13 +50,23 @@ public:
     void handle_runtime_message_reset() override;
     void refresh_if_needed();
 
+protected:
+    static void _bind_methods();
+
 private:
+    void cache_adapter_service();
+    [[nodiscard]] godot::Control* resolve_owner_control();
+    void submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);
+    void submit_storage_view(int storage_id, int event_kind);
+    void submit_context_request(int tile_x, int tile_y, int flags);
     [[nodiscard]] int worker_pack_storage_id() const noexcept;
     [[nodiscard]] bool site_visible() const noexcept;
     void refresh_meter(godot::ProgressBar* bar, godot::Label* label, const char* name, float value);
     void refresh_button_badges();
 
     godot::Control* hud_root_ {nullptr};
+    godot::Control* owner_control_ {nullptr};
+    Gs1GodotAdapterService* adapter_service_ {nullptr};
     godot::ProgressBar* health_bar_ {nullptr};
     godot::ProgressBar* hydration_bar_ {nullptr};
     godot::ProgressBar* nourishment_bar_ {nullptr};

@@ -1,6 +1,8 @@
 #include "godot_progression_resources.h"
 #include "gs1_godot_regional_map_scene_controller.h"
 
+#include "gs1_godot_controller_context.h"
+
 #include <godot_cpp/classes/base_material3d.hpp>
 #include <godot_cpp/classes/box_mesh.hpp>
 #include <godot_cpp/classes/camera3d.hpp>
@@ -80,17 +82,13 @@ Ref<PackedScene> load_packed_scene(const String& path)
 
 void Gs1GodotRegionalMapSceneController::_bind_methods()
 {
-    ClassDB::bind_method(D_METHOD("set_runtime_node_path", "path"), &Gs1GodotRegionalMapSceneController::set_runtime_node_path);
-    ClassDB::bind_method(D_METHOD("get_runtime_node_path"), &Gs1GodotRegionalMapSceneController::get_runtime_node_path);
-    ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "runtime_node_path"), "set_runtime_node_path", "get_runtime_node_path");
 }
 
 void Gs1GodotRegionalMapSceneController::_ready()
 {
-    cache_runtime_reference();
+    cache_adapter_service();
     cache_scene_references();
     cache_ui_references();
-    input_dispatcher_.subscribe(*this);
     set_process(true);
     set_process_input(true);
 }
@@ -98,18 +96,22 @@ void Gs1GodotRegionalMapSceneController::_ready()
 void Gs1GodotRegionalMapSceneController::_process(double delta)
 {
     (void)delta;
-    cache_runtime_reference();
+    cache_adapter_service();
     cache_scene_references();
     cache_ui_references();
     refresh_regional_map_if_needed();
 }
 
-void Gs1GodotRegionalMapSceneController::_input(const Ref<InputEvent>& event)
+void Gs1GodotRegionalMapSceneController::_exit_tree()
 {
-    input_dispatcher_.dispatch(event);
+    if (adapter_service_ != nullptr)
+    {
+        adapter_service_->unsubscribe_all(*this);
+        adapter_service_ = nullptr;
+    }
 }
 
-void Gs1GodotRegionalMapSceneController::handle_input_event(const Ref<InputEvent>& event)
+void Gs1GodotRegionalMapSceneController::_input(const Ref<InputEvent>& event)
 {
     const auto* mouse_event = event.is_null() ? nullptr : Object::cast_to<InputEventMouseButton>(*event);
     if (mouse_event == nullptr || !mouse_event->is_pressed() || mouse_event->get_button_index() != MOUSE_BUTTON_LEFT)
@@ -127,17 +129,17 @@ void Gs1GodotRegionalMapSceneController::handle_input_event(const Ref<InputEvent
     }
 }
 
-void Gs1GodotRegionalMapSceneController::cache_runtime_reference()
+void Gs1GodotRegionalMapSceneController::cache_adapter_service()
 {
-    if (runtime_node_ != nullptr || runtime_node_path_.is_empty())
+    if (adapter_service_ != nullptr)
     {
         return;
     }
 
-    runtime_node_ = Object::cast_to<Gs1RuntimeNode>(get_node_or_null(runtime_node_path_));
-    if (runtime_node_ != nullptr)
+    adapter_service_ = gs1_resolve_adapter_service(this);
+    if (adapter_service_ != nullptr)
     {
-        runtime_node_->subscribe_engine_messages(*this);
+        adapter_service_->subscribe_matching_messages(*this);
     }
 }
 
@@ -230,16 +232,6 @@ void Gs1GodotRegionalMapSceneController::handle_runtime_message_reset()
     mark_regional_visuals_dirty();
 }
 
-void Gs1GodotRegionalMapSceneController::disconnect_runtime_subscriptions()
-{
-    input_dispatcher_.unsubscribe(*this);
-    if (runtime_node_ != nullptr)
-    {
-        runtime_node_->unsubscribe_engine_messages(*this);
-        runtime_node_ = nullptr;
-    }
-}
-
 void Gs1GodotRegionalMapSceneController::refresh_regional_map_if_needed()
 {
     if (!regional_map_dirty_ && !regional_visuals_dirty_)
@@ -264,9 +256,9 @@ void Gs1GodotRegionalMapSceneController::mark_regional_visuals_dirty()
 
 void Gs1GodotRegionalMapSceneController::submit_ui_action(std::int64_t action_type, std::int64_t target_id)
 {
-    if (runtime_node_ != nullptr)
+    if (adapter_service_ != nullptr)
     {
-        runtime_node_->submit_ui_action(action_type, target_id, 0, 0);
+        adapter_service_->submit_ui_action(action_type, target_id, 0, 0);
     }
 }
 
@@ -847,13 +839,3 @@ bool Gs1GodotRegionalMapSceneController::try_select_regional_site_from_screen(co
     return true;
 }
 
-void Gs1GodotRegionalMapSceneController::set_runtime_node_path(const NodePath& path)
-{
-    disconnect_runtime_subscriptions();
-    runtime_node_path_ = path;
-}
-
-NodePath Gs1GodotRegionalMapSceneController::get_runtime_node_path() const
-{
-    return runtime_node_path_;
-}

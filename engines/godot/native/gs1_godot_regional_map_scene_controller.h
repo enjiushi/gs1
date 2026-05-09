@@ -1,8 +1,7 @@
 #pragma once
 
-#include "gs1_godot_input_dispatcher.h"
+#include "gs1_godot_adapter_service.h"
 #include "gs1_godot_panel_state_reducers.h"
-#include "gs1_godot_runtime_node.h"
 
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/input_event.hpp>
@@ -36,7 +35,6 @@ class StandardMaterial3D;
 class Gs1GodotRegionalMapSceneController final
     : public godot::Control
     , public IGs1GodotEngineMessageSubscriber
-    , public IGs1GodotInputSubscriber
 {
     GDCLASS(Gs1GodotRegionalMapSceneController, godot::Control)
 
@@ -46,17 +44,12 @@ public:
 
     void _ready() override;
     void _process(double delta) override;
+    void _exit_tree() override;
     void _input(const godot::Ref<godot::InputEvent>& event) override;
-
-    void set_runtime_node_path(const godot::NodePath& path);
-    [[nodiscard]] godot::NodePath get_runtime_node_path() const;
 
     [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
     void handle_engine_message(const Gs1EngineMessage& message) override;
     void handle_runtime_message_reset() override;
-    void handle_input_event(const godot::Ref<godot::InputEvent>& event) override;
-
-    void disconnect_runtime_subscriptions();
 
 protected:
     static void _bind_methods();
@@ -71,7 +64,7 @@ private:
         godot::ObjectID label_id {};
     };
 
-    void cache_runtime_reference();
+    void cache_adapter_service();
     void cache_scene_references();
     void cache_ui_references();
     void refresh_regional_map_if_needed();
@@ -119,14 +112,13 @@ private:
     static constexpr double REGIONAL_PICK_DISTANCE = 400.0;
     static constexpr int MOUSE_BUTTON_LEFT = 1;
 
-    godot::NodePath runtime_node_path_ {};
     godot::NodePath regional_world_path_ {"RegionalMapWorld"};
     godot::NodePath regional_camera_path_ {"RegionalMapWorld/RegionalMapCamera"};
     godot::NodePath regional_terrain_root_path_ {"RegionalMapWorld/TerrainRoot"};
     godot::NodePath regional_link_root_path_ {"RegionalMapWorld/LinkRoot"};
     godot::NodePath regional_site_root_path_ {"RegionalMapWorld/SiteRoot"};
 
-    Gs1RuntimeNode* runtime_node_ {nullptr};
+    Gs1GodotAdapterService* adapter_service_ {nullptr};
     godot::Node3D* regional_map_world_ {nullptr};
     godot::Camera3D* regional_camera_ {nullptr};
     godot::Node3D* regional_terrain_root_ {nullptr};
@@ -137,7 +129,6 @@ private:
     godot::Rect2i regional_map_bounds_ {-4, -3, 9, 7};
     bool regional_map_dirty_ {true};
     bool regional_visuals_dirty_ {true};
-    Gs1GodotInputDispatcher input_dispatcher_ {};
 
     std::unordered_map<int, RegionalSiteNodeRecord> regional_site_nodes_ {};
     std::unordered_map<int, Gs1RuntimeRegionalMapSiteProjection> regional_site_data_ {};

@@ -1,10 +1,12 @@
 #include "gs1_godot_inventory_panel_controller.h"
 
+#include "gs1_godot_controller_context.h"
 #include "content/defs/item_defs.h"
 #include "godot_progression_resources.h"
 
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/object.hpp>
+#include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/core/object.hpp>
 #include <godot_cpp/variant/string.hpp>
@@ -59,6 +61,43 @@ void dispatch_slot_pressed(std::int64_t controller_bits, std::int64_t slot_key)
 }
 }
 
+void Gs1GodotInventoryPanelController::_bind_methods()
+{
+}
+
+void Gs1GodotInventoryPanelController::_ready()
+{
+    set_submit_inventory_slot_tap_callback([this](int storage_id, int container_kind, int slot_index, int item_instance_id) {
+        submit_inventory_slot_tap(storage_id, container_kind, slot_index, item_instance_id);
+    });
+    cache_adapter_service();
+    if (Control* owner = resolve_owner_control())
+    {
+        cache_ui_references(*owner);
+    }
+    set_process(true);
+}
+
+void Gs1GodotInventoryPanelController::_process(double delta)
+{
+    (void)delta;
+    cache_adapter_service();
+    if (Control* owner = resolve_owner_control())
+    {
+        cache_ui_references(*owner);
+    }
+    refresh_if_needed();
+}
+
+void Gs1GodotInventoryPanelController::_exit_tree()
+{
+    if (adapter_service_ != nullptr)
+    {
+        adapter_service_->unsubscribe_all(*this);
+        adapter_service_ = nullptr;
+    }
+}
+
 void Gs1GodotInventoryPanelController::cache_ui_references(Control& owner)
 {
     if (panel_ == nullptr)
@@ -91,6 +130,46 @@ void Gs1GodotInventoryPanelController::cache_ui_references(Control& owner)
 void Gs1GodotInventoryPanelController::set_submit_inventory_slot_tap_callback(SubmitInventorySlotTapFn callback)
 {
     submit_inventory_slot_tap_ = std::move(callback);
+}
+
+void Gs1GodotInventoryPanelController::cache_adapter_service()
+{
+    if (adapter_service_ != nullptr)
+    {
+        return;
+    }
+
+    adapter_service_ = gs1_resolve_adapter_service(this);
+    if (adapter_service_ != nullptr)
+    {
+        adapter_service_->subscribe_matching_messages(*this);
+    }
+}
+
+Control* Gs1GodotInventoryPanelController::resolve_owner_control()
+{
+    if (owner_control_ != nullptr)
+    {
+        return owner_control_;
+    }
+    owner_control_ = Object::cast_to<Control>(get_parent());
+    if (owner_control_ == nullptr)
+    {
+        owner_control_ = this;
+    }
+    return owner_control_;
+}
+
+void Gs1GodotInventoryPanelController::submit_inventory_slot_tap(
+    int storage_id,
+    int container_kind,
+    int slot_index,
+    int item_instance_id)
+{
+    if (adapter_service_ != nullptr)
+    {
+        adapter_service_->submit_site_inventory_slot_tap(storage_id, container_kind, slot_index, item_instance_id);
+    }
 }
 
 bool Gs1GodotInventoryPanelController::handles_engine_message(Gs1EngineMessageType type) const noexcept

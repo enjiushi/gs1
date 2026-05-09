@@ -1,5 +1,6 @@
 #include "gs1_godot_regional_tech_tree_panel_controller.h"
 
+#include "gs1_godot_controller_context.h"
 #include "godot_progression_resources.h"
 
 #include "content/defs/faction_defs.h"
@@ -17,6 +18,7 @@
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/texture_rect.hpp>
 #include <godot_cpp/classes/v_box_container.hpp>
+#include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/core/object.hpp>
 #include <godot_cpp/variant/callable_method_pointer.hpp>
@@ -175,6 +177,43 @@ void dispatch_tech_tree_close_pressed(std::int64_t controller_bits)
 }
 }
 
+void Gs1GodotRegionalTechTreePanelController::_bind_methods()
+{
+}
+
+void Gs1GodotRegionalTechTreePanelController::_ready()
+{
+    set_submit_ui_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
+        submit_ui_action(action_type, target_id, arg0, arg1);
+    });
+    cache_adapter_service();
+    if (Control* owner = resolve_owner_control())
+    {
+        cache_ui_references(*owner);
+    }
+    set_process(true);
+}
+
+void Gs1GodotRegionalTechTreePanelController::_process(double delta)
+{
+    (void)delta;
+    cache_adapter_service();
+    if (Control* owner = resolve_owner_control())
+    {
+        cache_ui_references(*owner);
+    }
+    refresh_if_needed();
+}
+
+void Gs1GodotRegionalTechTreePanelController::_exit_tree()
+{
+    if (adapter_service_ != nullptr)
+    {
+        adapter_service_->unsubscribe_all(*this);
+        adapter_service_ = nullptr;
+    }
+}
+
 void Gs1GodotRegionalTechTreePanelController::cache_ui_references(Control& owner)
 {
     owner_control_ = &owner;
@@ -214,6 +253,46 @@ void Gs1GodotRegionalTechTreePanelController::cache_ui_references(Control& owner
 void Gs1GodotRegionalTechTreePanelController::set_submit_ui_action_callback(SubmitUiActionFn callback)
 {
     submit_ui_action_ = std::move(callback);
+}
+
+void Gs1GodotRegionalTechTreePanelController::cache_adapter_service()
+{
+    if (adapter_service_ != nullptr)
+    {
+        return;
+    }
+
+    adapter_service_ = gs1_resolve_adapter_service(this);
+    if (adapter_service_ != nullptr)
+    {
+        adapter_service_->subscribe_matching_messages(*this);
+    }
+}
+
+Control* Gs1GodotRegionalTechTreePanelController::resolve_owner_control()
+{
+    if (owner_control_ != nullptr)
+    {
+        return owner_control_;
+    }
+    owner_control_ = Object::cast_to<Control>(get_parent());
+    if (owner_control_ == nullptr)
+    {
+        owner_control_ = this;
+    }
+    return owner_control_;
+}
+
+void Gs1GodotRegionalTechTreePanelController::submit_ui_action(
+    std::int64_t action_type,
+    std::int64_t target_id,
+    std::int64_t arg0,
+    std::int64_t arg1)
+{
+    if (adapter_service_ != nullptr)
+    {
+        adapter_service_->submit_ui_action(action_type, target_id, arg0, arg1);
+    }
 }
 
 bool Gs1GodotRegionalTechTreePanelController::is_panel_visible() const

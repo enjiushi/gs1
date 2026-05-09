@@ -1,11 +1,49 @@
 #include "gs1_godot_regional_summary_panel_controller.h"
 
+#include "gs1_godot_controller_context.h"
+
+#include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
 
 using namespace godot;
 
+void Gs1GodotRegionalSummaryPanelController::_bind_methods()
+{
+}
+
+void Gs1GodotRegionalSummaryPanelController::_ready()
+{
+    cache_adapter_service();
+    if (Control* owner = resolve_owner_control())
+    {
+        cache_ui_references(*owner);
+    }
+    set_process(true);
+}
+
+void Gs1GodotRegionalSummaryPanelController::_process(double delta)
+{
+    (void)delta;
+    cache_adapter_service();
+    if (Control* owner = resolve_owner_control())
+    {
+        cache_ui_references(*owner);
+    }
+    refresh_if_needed();
+}
+
+void Gs1GodotRegionalSummaryPanelController::_exit_tree()
+{
+    if (adapter_service_ != nullptr)
+    {
+        adapter_service_->unsubscribe_all(*this);
+        adapter_service_ = nullptr;
+    }
+}
+
 void Gs1GodotRegionalSummaryPanelController::cache_ui_references(Control& owner)
 {
+    owner_control_ = &owner;
     if (regional_map_summary_ == nullptr)
     {
         regional_map_summary_ = Object::cast_to<RichTextLabel>(owner.find_child("RegionalMapSummary", true, false));
@@ -15,6 +53,34 @@ void Gs1GodotRegionalSummaryPanelController::cache_ui_references(Control& owner)
         regional_map_graph_ = Object::cast_to<RichTextLabel>(owner.find_child("RegionalMapGraph", true, false));
     }
     refresh_if_needed();
+}
+
+void Gs1GodotRegionalSummaryPanelController::cache_adapter_service()
+{
+    if (adapter_service_ != nullptr)
+    {
+        return;
+    }
+
+    adapter_service_ = gs1_resolve_adapter_service(this);
+    if (adapter_service_ != nullptr)
+    {
+        adapter_service_->subscribe_matching_messages(*this);
+    }
+}
+
+Control* Gs1GodotRegionalSummaryPanelController::resolve_owner_control()
+{
+    if (owner_control_ != nullptr)
+    {
+        return owner_control_;
+    }
+    owner_control_ = Object::cast_to<Control>(get_parent());
+    if (owner_control_ == nullptr)
+    {
+        owner_control_ = this;
+    }
+    return owner_control_;
 }
 
 bool Gs1GodotRegionalSummaryPanelController::handles_engine_message(Gs1EngineMessageType type) const noexcept

@@ -1,7 +1,7 @@
 #pragma once
 
+#include "gs1_godot_adapter_service.h"
 #include "gs1_godot_panel_state_reducers.h"
-#include "gs1_godot_runtime_node.h"
 
 #include <godot_cpp/classes/button.hpp>
 #include <godot_cpp/classes/control.hpp>
@@ -9,6 +9,7 @@
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/rich_text_label.hpp>
 #include <godot_cpp/classes/v_box_container.hpp>
+#include <godot_cpp/core/binder_common.hpp>
 #include <godot_cpp/core/object_id.hpp>
 
 #include <cstdint>
@@ -17,10 +18,21 @@
 #include <unordered_map>
 #include <unordered_set>
 
-class Gs1GodotRegionalSelectionPanelController final : public IGs1GodotEngineMessageSubscriber
+class Gs1GodotRegionalSelectionPanelController final
+    : public godot::Control
+    , public IGs1GodotEngineMessageSubscriber
 {
+    GDCLASS(Gs1GodotRegionalSelectionPanelController, godot::Control)
+
 public:
     using SubmitUiActionFn = std::function<void(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)>;
+
+    Gs1GodotRegionalSelectionPanelController() = default;
+    ~Gs1GodotRegionalSelectionPanelController() override = default;
+
+    void _ready() override;
+    void _process(double delta) override;
+    void _exit_tree() override;
 
     void cache_ui_references(godot::Control& owner);
     void set_submit_ui_action_callback(SubmitUiActionFn callback);
@@ -30,12 +42,18 @@ public:
     void handle_runtime_message_reset() override;
     void refresh_if_needed();
 
+protected:
+    static void _bind_methods();
+
 private:
     struct ProjectedButtonRecord final
     {
         godot::ObjectID object_id {};
     };
 
+    void cache_adapter_service();
+    [[nodiscard]] godot::Control* resolve_owner_control();
+    void submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);
     void reconcile_action_buttons(const godot::Array& button_specs);
     [[nodiscard]] godot::Button* upsert_button_node(
         godot::Node* container,
@@ -61,6 +79,7 @@ private:
     void refresh_loadout_summary(const Gs1RuntimeUiPanelProjection* selection_panel);
 
     godot::Control* owner_control_ {nullptr};
+    Gs1GodotAdapterService* adapter_service_ {nullptr};
     godot::Control* panel_ {nullptr};
     godot::Label* title_ {nullptr};
     godot::RichTextLabel* summary_ {nullptr};

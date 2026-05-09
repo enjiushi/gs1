@@ -1,5 +1,8 @@
 #include "gs1_godot_status_panel_controller.h"
 
+#include "gs1_godot_controller_context.h"
+
+#include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
@@ -45,13 +48,83 @@ String string_from_view(const std::string& value)
 }
 }
 
+void Gs1GodotStatusPanelController::_bind_methods()
+{
+}
+
+void Gs1GodotStatusPanelController::_ready()
+{
+    cache_adapter_service();
+    if (Control* owner = resolve_owner_control())
+    {
+        cache_ui_references(*owner);
+    }
+    set_process(true);
+}
+
+void Gs1GodotStatusPanelController::_process(double delta)
+{
+    (void)delta;
+    cache_adapter_service();
+    if (adapter_service_ == nullptr)
+    {
+        show_runtime_missing();
+    }
+    else
+    {
+        set_runtime_status(true, adapter_service_->last_error());
+    }
+    if (Control* owner = resolve_owner_control())
+    {
+        cache_ui_references(*owner);
+    }
+}
+
+void Gs1GodotStatusPanelController::_exit_tree()
+{
+    if (adapter_service_ != nullptr)
+    {
+        adapter_service_->unsubscribe_all(*this);
+        adapter_service_ = nullptr;
+    }
+}
+
 void Gs1GodotStatusPanelController::cache_ui_references(Control& owner)
 {
+    owner_control_ = &owner;
     if (status_label_ == nullptr)
     {
         status_label_ = Object::cast_to<RichTextLabel>(owner.find_child("StatusLabel", true, false));
     }
     refresh(runtime_linked_, last_error_);
+}
+
+void Gs1GodotStatusPanelController::cache_adapter_service()
+{
+    if (adapter_service_ != nullptr)
+    {
+        return;
+    }
+
+    adapter_service_ = gs1_resolve_adapter_service(this);
+    if (adapter_service_ != nullptr)
+    {
+        adapter_service_->subscribe_matching_messages(*this);
+    }
+}
+
+Control* Gs1GodotStatusPanelController::resolve_owner_control()
+{
+    if (owner_control_ != nullptr)
+    {
+        return owner_control_;
+    }
+    owner_control_ = Object::cast_to<Control>(get_parent());
+    if (owner_control_ == nullptr)
+    {
+        owner_control_ = this;
+    }
+    return owner_control_;
 }
 
 bool Gs1GodotStatusPanelController::handles_engine_message(Gs1EngineMessageType type) const noexcept

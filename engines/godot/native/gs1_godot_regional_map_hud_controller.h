@@ -1,20 +1,32 @@
 #pragma once
 
+#include "gs1_godot_adapter_service.h"
 #include "gs1_godot_panel_state_reducers.h"
-#include "gs1_godot_runtime_node.h"
 
 #include <godot_cpp/classes/button.hpp>
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/rich_text_label.hpp>
+#include <godot_cpp/core/binder_common.hpp>
 
 #include <cstdint>
 #include <functional>
 #include <optional>
 
-class Gs1GodotRegionalMapHudController final : public IGs1GodotEngineMessageSubscriber
+class Gs1GodotRegionalMapHudController final
+    : public godot::Control
+    , public IGs1GodotEngineMessageSubscriber
 {
+    GDCLASS(Gs1GodotRegionalMapHudController, godot::Control)
+
 public:
     using SubmitUiActionFn = std::function<void(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)>;
+
+    Gs1GodotRegionalMapHudController() = default;
+    ~Gs1GodotRegionalMapHudController() override = default;
+
+    void _ready() override;
+    void _process(double delta) override;
+    void _exit_tree() override;
 
     void cache_ui_references(godot::Control& owner);
     void set_submit_ui_action_callback(SubmitUiActionFn callback);
@@ -24,7 +36,13 @@ public:
     void handle_runtime_message_reset() override;
     void refresh_if_needed();
 
+protected:
+    static void _bind_methods();
+
 private:
+    void cache_adapter_service();
+    [[nodiscard]] godot::Control* resolve_owner_control();
+    void submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);
     [[nodiscard]] godot::String selected_site_text() const;
     [[nodiscard]] godot::String campaign_summary_text() const;
     [[nodiscard]] godot::String site_state_name(int site_state) const;
@@ -33,6 +51,8 @@ private:
     [[nodiscard]] Gs1UiAction tech_button_action() const;
     [[nodiscard]] const Gs1RuntimeRegionalMapSiteProjection* selected_site() const;
 
+    godot::Control* owner_control_ {nullptr};
+    Gs1GodotAdapterService* adapter_service_ {nullptr};
     godot::Control* hud_ {nullptr};
     godot::RichTextLabel* selected_site_summary_ {nullptr};
     godot::RichTextLabel* campaign_summary_ {nullptr};

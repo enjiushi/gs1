@@ -1,5 +1,7 @@
 #include "gs1_godot_site_session_ui_controller.h"
 
+#include "gs1_godot_controller_context.h"
+
 #include "content/defs/item_defs.h"
 #include "content/defs/plant_defs.h"
 #include "content/defs/structure_defs.h"
@@ -26,8 +28,6 @@ String string_from_view(std::string_view value)
 
 void Gs1GodotSiteSessionUiController::_bind_methods()
 {
-    ClassDB::bind_method(D_METHOD("set_runtime_node_path", "path"), &Gs1GodotSiteSessionUiController::set_runtime_node_path);
-    ClassDB::bind_method(D_METHOD("get_runtime_node_path"), &Gs1GodotSiteSessionUiController::get_runtime_node_path);
     ClassDB::bind_method(D_METHOD("set_ui_root_path", "path"), &Gs1GodotSiteSessionUiController::set_ui_root_path);
     ClassDB::bind_method(D_METHOD("get_ui_root_path"), &Gs1GodotSiteSessionUiController::get_ui_root_path);
     ClassDB::bind_method(D_METHOD("on_return_to_map_pressed"), &Gs1GodotSiteSessionUiController::on_return_to_map_pressed);
@@ -37,86 +37,45 @@ void Gs1GodotSiteSessionUiController::_bind_methods()
     ClassDB::bind_method(D_METHOD("on_open_nearest_storage_pressed"), &Gs1GodotSiteSessionUiController::on_open_nearest_storage_pressed);
     ClassDB::bind_method(D_METHOD("on_close_storage_pressed"), &Gs1GodotSiteSessionUiController::on_close_storage_pressed);
     ClassDB::bind_method(D_METHOD("on_plant_selected_seed_pressed"), &Gs1GodotSiteSessionUiController::on_plant_selected_seed_pressed);
-
-    ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "runtime_node_path"), "set_runtime_node_path", "get_runtime_node_path");
     ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "ui_root_path"), "set_ui_root_path", "get_ui_root_path");
 }
 
 void Gs1GodotSiteSessionUiController::_ready()
 {
-    cache_runtime_reference();
+    cache_adapter_service();
     cache_ui_references();
-
-    action_panel_controller_.set_submit_ui_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
-        submit_ui_action(action_type, target_id, arg0, arg1);
-    });
-    overlay_panel_controller_.set_submit_ui_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
-        submit_ui_action(action_type, target_id, arg0, arg1);
-    });
-    craft_panel_controller_.set_submit_craft_option_callback([this](int tile_x, int tile_y, int output_item_id) {
-        submit_site_action_request(
-            SITE_ACTION_CRAFT,
-            SITE_ACTION_REQUEST_FLAG_HAS_ITEM,
-            1,
-            tile_x,
-            tile_y,
-            0,
-            0,
-            output_item_id);
-    });
-    phone_panel_controller_.set_submit_ui_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
-        submit_ui_action(action_type, target_id, arg0, arg1);
-    });
-    inventory_panel_controller_.set_submit_inventory_slot_tap_callback([this](int storage_id, int container_kind, int slot_index, int item_instance_id) {
-        if (runtime_node_ != nullptr)
-        {
-            runtime_node_->submit_site_inventory_slot_tap(storage_id, container_kind, slot_index, item_instance_id);
-        }
-    });
-    site_hud_controller_.set_submit_ui_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
-        submit_ui_action(action_type, target_id, arg0, arg1);
-    });
-    site_hud_controller_.set_submit_storage_view_callback([this](int storage_id, int event_kind) {
-        submit_storage_view(storage_id, event_kind);
-    });
-    site_hud_controller_.set_submit_context_request_callback([this](int tile_x, int tile_y, int flags) {
-        submit_site_context_request(tile_x, tile_y, flags);
-    });
-    regional_tech_tree_panel_controller_.set_submit_ui_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
-        submit_ui_action(action_type, target_id, arg0, arg1);
-    });
-
     wire_static_buttons();
     set_process(true);
+    set_process_input(true);
 }
 
 void Gs1GodotSiteSessionUiController::_process(double delta)
 {
     (void)delta;
-    cache_runtime_reference();
+    cache_adapter_service();
     cache_ui_references();
 
-    if (runtime_node_ == nullptr)
+    if (adapter_service_ == nullptr)
     {
-        status_panel_controller_.show_runtime_missing();
         return;
     }
 
-    status_panel_controller_.set_runtime_status(true, runtime_node_->last_error());
     refresh_visibility();
-    site_hud_controller_.set_selected_tile(selected_tile_.x, selected_tile_.y);
     refresh_selected_tile_if_needed();
 }
 
-void Gs1GodotSiteSessionUiController::set_runtime_node_path(const NodePath& path)
+void Gs1GodotSiteSessionUiController::_input(const Ref<InputEvent>& event)
 {
-    disconnect_runtime_subscriptions();
-    runtime_node_path_ = path;
+    handle_input_event(event);
 }
 
-NodePath Gs1GodotSiteSessionUiController::get_runtime_node_path() const
+void Gs1GodotSiteSessionUiController::_exit_tree()
 {
-    return runtime_node_path_;
+    if (adapter_service_ != nullptr)
+    {
+        adapter_service_->unsubscribe_all(*this);
+        adapter_service_ = nullptr;
+    }
 }
 
 void Gs1GodotSiteSessionUiController::set_ui_root_path(const NodePath& path)
@@ -130,50 +89,20 @@ NodePath Gs1GodotSiteSessionUiController::get_ui_root_path() const
     return ui_root_path_;
 }
 
-void Gs1GodotSiteSessionUiController::attach_input_dispatcher(Gs1GodotInputDispatcher& dispatcher)
+void Gs1GodotSiteSessionUiController::cache_adapter_service()
 {
-    if (input_dispatcher_ == &dispatcher)
-    {
-        return;
-    }
-    detach_input_dispatcher();
-    input_dispatcher_ = &dispatcher;
-    input_dispatcher_->subscribe(*this);
-}
-
-void Gs1GodotSiteSessionUiController::detach_input_dispatcher()
-{
-    if (input_dispatcher_ != nullptr)
-    {
-        input_dispatcher_->unsubscribe(*this);
-        input_dispatcher_ = nullptr;
-    }
-}
-
-void Gs1GodotSiteSessionUiController::cache_runtime_reference()
-{
-    if (runtime_node_ != nullptr || runtime_node_path_.is_empty())
+    if (adapter_service_ != nullptr)
     {
         return;
     }
 
-    runtime_node_ = Object::cast_to<Gs1RuntimeNode>(get_node_or_null(runtime_node_path_));
-    if (runtime_node_ == nullptr)
+    adapter_service_ = gs1_resolve_adapter_service(this);
+    if (adapter_service_ == nullptr)
     {
         return;
     }
 
-    runtime_node_->subscribe_engine_messages(*this);
-    runtime_node_->subscribe_engine_messages(status_panel_controller_);
-    runtime_node_->subscribe_engine_messages(inventory_panel_controller_);
-    runtime_node_->subscribe_engine_messages(craft_panel_controller_);
-    runtime_node_->subscribe_engine_messages(action_panel_controller_);
-    runtime_node_->subscribe_engine_messages(overlay_panel_controller_);
-    runtime_node_->subscribe_engine_messages(phone_panel_controller_);
-    runtime_node_->subscribe_engine_messages(regional_tech_tree_panel_controller_);
-    runtime_node_->subscribe_engine_messages(site_hud_controller_);
-    runtime_node_->subscribe_engine_messages(site_summary_panel_controller_);
-    runtime_node_->subscribe_engine_messages(task_panel_controller_);
+    adapter_service_->subscribe_matching_messages(*this);
 }
 
 Control* Gs1GodotSiteSessionUiController::resolve_ui_root()
@@ -204,17 +133,6 @@ void Gs1GodotSiteSessionUiController::cache_ui_references()
     {
         return;
     }
-
-    status_panel_controller_.cache_ui_references(*ui_root);
-    inventory_panel_controller_.cache_ui_references(*ui_root);
-    craft_panel_controller_.cache_ui_references(*ui_root);
-    action_panel_controller_.cache_ui_references(*ui_root);
-    overlay_panel_controller_.cache_ui_references(*ui_root);
-    phone_panel_controller_.cache_ui_references(*ui_root);
-    regional_tech_tree_panel_controller_.cache_ui_references(*ui_root);
-    site_hud_controller_.cache_ui_references(*ui_root);
-    site_summary_panel_controller_.cache_ui_references(*ui_root);
-    task_panel_controller_.cache_ui_references(*ui_root);
 
     if (site_panel_ == nullptr)
     {
@@ -358,46 +276,6 @@ void Gs1GodotSiteSessionUiController::handle_input_event(const Ref<InputEvent>& 
 
     mark_selected_tile_dirty();
     clamp_selected_tile();
-}
-
-void Gs1GodotSiteSessionUiController::disconnect_runtime_subscriptions()
-{
-    detach_input_dispatcher();
-    if (runtime_node_ != nullptr)
-    {
-        runtime_node_->unsubscribe_engine_messages(*this);
-        runtime_node_->unsubscribe_engine_messages(status_panel_controller_);
-        runtime_node_->unsubscribe_engine_messages(inventory_panel_controller_);
-        runtime_node_->unsubscribe_engine_messages(craft_panel_controller_);
-        runtime_node_->unsubscribe_engine_messages(action_panel_controller_);
-        runtime_node_->unsubscribe_engine_messages(overlay_panel_controller_);
-        runtime_node_->unsubscribe_engine_messages(phone_panel_controller_);
-        runtime_node_->unsubscribe_engine_messages(regional_tech_tree_panel_controller_);
-        runtime_node_->unsubscribe_engine_messages(site_hud_controller_);
-        runtime_node_->unsubscribe_engine_messages(site_summary_panel_controller_);
-        runtime_node_->unsubscribe_engine_messages(task_panel_controller_);
-        runtime_node_ = nullptr;
-    }
-}
-
-void Gs1GodotSiteSessionUiController::apply_bootstrap_app_state(int app_state)
-{
-    Gs1EngineMessage message {};
-    message.type = GS1_ENGINE_MESSAGE_SET_APP_STATE;
-    auto& payload = message.emplace_payload<Gs1EngineMessageSetAppStateData>();
-    payload.app_state = static_cast<Gs1AppState>(app_state);
-
-    handle_engine_message(message);
-    status_panel_controller_.handle_engine_message(message);
-    inventory_panel_controller_.handle_engine_message(message);
-    craft_panel_controller_.handle_engine_message(message);
-    action_panel_controller_.handle_engine_message(message);
-    overlay_panel_controller_.handle_engine_message(message);
-    phone_panel_controller_.handle_engine_message(message);
-    regional_tech_tree_panel_controller_.handle_engine_message(message);
-    site_hud_controller_.handle_engine_message(message);
-    site_summary_panel_controller_.handle_engine_message(message);
-    task_panel_controller_.handle_engine_message(message);
 }
 
 void Gs1GodotSiteSessionUiController::refresh_visibility()
@@ -600,39 +478,34 @@ String Gs1GodotSiteSessionUiController::structure_name_for(int structure_id) con
     return structure_name_cache_.emplace(structure_id, display_name).first->second;
 }
 
-void Gs1GodotSiteSessionUiController::publish_last_action_message(const String& message)
-{
-    status_panel_controller_.set_last_action_message(message);
-}
-
 void Gs1GodotSiteSessionUiController::submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)
 {
-    if (runtime_node_ == nullptr)
+    if (adapter_service_ == nullptr)
     {
         return;
     }
-    const bool ok = runtime_node_->submit_ui_action(action_type, target_id, arg0, arg1);
-    publish_last_action_message(vformat("UI action %d (%s)", action_type, ok ? "ok" : "failed"));
+    const bool ok = adapter_service_->submit_ui_action(action_type, target_id, arg0, arg1);
+    (void)ok;
 }
 
 void Gs1GodotSiteSessionUiController::submit_move(double x, double y, double z)
 {
-    if (runtime_node_ == nullptr)
+    if (adapter_service_ == nullptr)
     {
         return;
     }
-    const bool ok = runtime_node_->submit_move_direction(x, y, z);
-    publish_last_action_message(vformat("Move (%s)", ok ? "ok" : "failed"));
+    const bool ok = adapter_service_->submit_move_direction(x, y, z);
+    (void)ok;
 }
 
 void Gs1GodotSiteSessionUiController::submit_site_context_request(int tile_x, int tile_y, int flags)
 {
-    if (runtime_node_ == nullptr)
+    if (adapter_service_ == nullptr)
     {
         return;
     }
-    const bool ok = runtime_node_->submit_site_context_request(tile_x, tile_y, flags);
-    publish_last_action_message(vformat("Context (%d, %d) %s", tile_x, tile_y, ok ? "ok" : "failed"));
+    const bool ok = adapter_service_->submit_site_context_request(tile_x, tile_y, flags);
+    (void)ok;
 }
 
 void Gs1GodotSiteSessionUiController::submit_site_action_request(
@@ -645,11 +518,11 @@ void Gs1GodotSiteSessionUiController::submit_site_action_request(
     int secondary_subject_id,
     int item_id)
 {
-    if (runtime_node_ == nullptr)
+    if (adapter_service_ == nullptr)
     {
         return;
     }
-    const bool ok = runtime_node_->submit_site_action_request(
+    const bool ok = adapter_service_->submit_site_action_request(
         action_kind,
         flags,
         quantity,
@@ -658,27 +531,27 @@ void Gs1GodotSiteSessionUiController::submit_site_action_request(
         primary_subject_id,
         secondary_subject_id,
         item_id);
-    publish_last_action_message(vformat("Site action %d (%s)", action_kind, ok ? "ok" : "failed"));
+    (void)ok;
 }
 
 void Gs1GodotSiteSessionUiController::submit_site_action_cancel(int action_id, int flags)
 {
-    if (runtime_node_ == nullptr)
+    if (adapter_service_ == nullptr)
     {
         return;
     }
-    const bool ok = runtime_node_->submit_site_action_cancel(action_id, flags);
-    publish_last_action_message(vformat("Cancel action (%s)", ok ? "ok" : "failed"));
+    const bool ok = adapter_service_->submit_site_action_cancel(action_id, flags);
+    (void)ok;
 }
 
 void Gs1GodotSiteSessionUiController::submit_storage_view(int storage_id, int event_kind)
 {
-    if (runtime_node_ == nullptr)
+    if (adapter_service_ == nullptr)
     {
         return;
     }
-    const bool ok = runtime_node_->submit_site_storage_view(storage_id, event_kind);
-    publish_last_action_message(vformat("Storage %d (%s)", storage_id, ok ? "ok" : "failed"));
+    const bool ok = adapter_service_->submit_site_storage_view(storage_id, event_kind);
+    (void)ok;
 }
 
 void Gs1GodotSiteSessionUiController::on_return_to_map_pressed()

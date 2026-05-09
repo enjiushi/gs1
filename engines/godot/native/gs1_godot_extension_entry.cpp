@@ -1,11 +1,23 @@
+#include "gs1_godot_action_panel_controller.h"
+#include "gs1_godot_craft_panel_controller.h"
 #include "gs1_godot_director_control.h"
+#include "gs1_godot_inventory_panel_controller.h"
 #include "gs1_godot_main_menu_ui_controller.h"
+#include "gs1_godot_overlay_panel_controller.h"
+#include "gs1_godot_phone_panel_controller.h"
+#include "gs1_godot_regional_map_hud_controller.h"
 #include "gs1_godot_regional_map_scene_controller.h"
 #include "gs1_godot_regional_map_ui_controller.h"
-#include "gs1_godot_runtime_node.h"
+#include "gs1_godot_regional_selection_panel_controller.h"
+#include "gs1_godot_regional_summary_panel_controller.h"
+#include "gs1_godot_regional_tech_tree_panel_controller.h"
+#include "gs1_godot_adapter_service.h"
+#include "gs1_godot_site_hud_controller.h"
 #include "gs1_godot_site_scene_controller.h"
 #include "gs1_godot_site_session_ui_controller.h"
-#include "gs1_godot_site_view_node.h"
+#include "gs1_godot_site_summary_panel_controller.h"
+#include "gs1_godot_status_panel_controller.h"
+#include "gs1_godot_task_panel_controller.h"
 
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/defs.hpp>
@@ -22,13 +34,24 @@ void initialize_gs1_godot_adapter(ModuleInitializationLevel level)
         return;
     }
 
-    GDREGISTER_CLASS(Gs1RuntimeNode);
-    GDREGISTER_CLASS(Gs1SiteViewNode);
+    GDREGISTER_CLASS(Gs1GodotActionPanelController);
+    GDREGISTER_CLASS(Gs1GodotCraftPanelController);
+    GDREGISTER_CLASS(Gs1GodotInventoryPanelController);
     GDREGISTER_CLASS(Gs1GodotMainMenuUiController);
+    GDREGISTER_CLASS(Gs1GodotOverlayPanelController);
+    GDREGISTER_CLASS(Gs1GodotPhonePanelController);
+    GDREGISTER_CLASS(Gs1GodotRegionalMapHudController);
     GDREGISTER_CLASS(Gs1GodotRegionalMapSceneController);
     GDREGISTER_CLASS(Gs1GodotRegionalMapUiController);
+    GDREGISTER_CLASS(Gs1GodotRegionalSelectionPanelController);
+    GDREGISTER_CLASS(Gs1GodotRegionalSummaryPanelController);
+    GDREGISTER_CLASS(Gs1GodotRegionalTechTreePanelController);
+    GDREGISTER_CLASS(Gs1GodotSiteHudController);
     GDREGISTER_CLASS(Gs1GodotSiteSceneController);
     GDREGISTER_CLASS(Gs1GodotSiteSessionUiController);
+    GDREGISTER_CLASS(Gs1GodotSiteSummaryPanelController);
+    GDREGISTER_CLASS(Gs1GodotStatusPanelController);
+    GDREGISTER_CLASS(Gs1GodotTaskPanelController);
     GDREGISTER_CLASS(Gs1GodotDirectorControl);
 }
 

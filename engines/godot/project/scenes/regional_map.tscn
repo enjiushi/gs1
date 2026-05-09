@@ -166,3 +166,19 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 ui_root_path = NodePath("..")
+
+[node name="RegionalMapHudController" type="Gs1GodotRegionalMapHudController" parent="."]
+layout_mode = 1
+mouse_filter = 2
+
+[node name="RegionalSelectionPanelController" type="Gs1GodotRegionalSelectionPanelController" parent="."]
+layout_mode = 1
+mouse_filter = 2
+
+[node name="RegionalSummaryPanelController" type="Gs1GodotRegionalSummaryPanelController" parent="."]
+layout_mode = 1
+mouse_filter = 2
+
+[node name="RegionalTechTreePanelController" type="Gs1GodotRegionalTechTreePanelController" parent="."]
+layout_mode = 1
+mouse_filter = 2

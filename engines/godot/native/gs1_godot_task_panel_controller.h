@@ -1,7 +1,7 @@
 #pragma once
 
+#include "gs1_godot_adapter_service.h"
 #include "gs1_godot_projection_types.h"
-#include "gs1_godot_runtime_node.h"
 
 #include <godot_cpp/classes/button.hpp>
 #include <godot_cpp/classes/control.hpp>
@@ -9,6 +9,7 @@
 #include <godot_cpp/classes/rich_text_label.hpp>
 #include <godot_cpp/classes/texture2d.hpp>
 #include <godot_cpp/classes/v_box_container.hpp>
+#include <godot_cpp/core/binder_common.hpp>
 #include <godot_cpp/core/object_id.hpp>
 
 #include <cstdint>
@@ -17,14 +18,28 @@
 #include <unordered_set>
 #include <vector>
 
-class Gs1GodotTaskPanelController final : public IGs1GodotEngineMessageSubscriber
+class Gs1GodotTaskPanelController final
+    : public godot::Control
+    , public IGs1GodotEngineMessageSubscriber
 {
+    GDCLASS(Gs1GodotTaskPanelController, godot::Control)
+
 public:
+    Gs1GodotTaskPanelController() = default;
+    ~Gs1GodotTaskPanelController() override = default;
+
+    void _ready() override;
+    void _process(double delta) override;
+    void _exit_tree() override;
+
     void cache_ui_references(godot::Control& owner);
     [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
     void handle_engine_message(const Gs1EngineMessage& message) override;
     void handle_runtime_message_reset() override;
     void refresh_if_needed();
+
+protected:
+    static void _bind_methods();
 
 private:
     struct ProjectedButtonRecord final
@@ -45,6 +60,8 @@ private:
         godot::Ref<godot::Texture2D> icon_texture {};
     };
 
+    void cache_adapter_service();
+    [[nodiscard]] godot::Control* resolve_owner_control();
     void reconcile_task_rows();
     void reconcile_modifier_rows();
     [[nodiscard]] godot::Button* upsert_button_node(
@@ -61,6 +78,8 @@ private:
     [[nodiscard]] const ModifierUiCacheEntry& modifier_ui_for(std::uint32_t modifier_id) const;
 
     godot::Control* panel_ {nullptr};
+    godot::Control* owner_control_ {nullptr};
+    Gs1GodotAdapterService* adapter_service_ {nullptr};
     godot::RichTextLabel* task_summary_ {nullptr};
     godot::VBoxContainer* task_rows_ {nullptr};
     godot::VBoxContainer* modifier_rows_ {nullptr};

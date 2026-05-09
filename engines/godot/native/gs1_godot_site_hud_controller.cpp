@@ -1,5 +1,8 @@
 #include "gs1_godot_site_hud_controller.h"
 
+#include "gs1_godot_controller_context.h"
+
+#include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/callable_method_pointer.hpp>
 
 #include <algorithm>
@@ -87,8 +90,52 @@ void bind_hud_button(Button*& button, Control& owner, const char* name, std::int
 }
 }
 
+void Gs1GodotSiteHudController::_bind_methods()
+{
+}
+
+void Gs1GodotSiteHudController::_ready()
+{
+    set_submit_ui_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
+        submit_ui_action(action_type, target_id, arg0, arg1);
+    });
+    set_submit_storage_view_callback([this](int storage_id, int event_kind) {
+        submit_storage_view(storage_id, event_kind);
+    });
+    set_submit_context_request_callback([this](int tile_x, int tile_y, int flags) {
+        submit_context_request(tile_x, tile_y, flags);
+    });
+    cache_adapter_service();
+    if (Control* owner = resolve_owner_control())
+    {
+        cache_ui_references(*owner);
+    }
+    set_process(true);
+}
+
+void Gs1GodotSiteHudController::_process(double delta)
+{
+    (void)delta;
+    cache_adapter_service();
+    if (Control* owner = resolve_owner_control())
+    {
+        cache_ui_references(*owner);
+    }
+    refresh_if_needed();
+}
+
+void Gs1GodotSiteHudController::_exit_tree()
+{
+    if (adapter_service_ != nullptr)
+    {
+        adapter_service_->unsubscribe_all(*this);
+        adapter_service_ = nullptr;
+    }
+}
+
 void Gs1GodotSiteHudController::cache_ui_references(Control& owner)
 {
+    owner_control_ = &owner;
     if (hud_root_ == nullptr)
     {
         hud_root_ = Object::cast_to<Control>(owner.find_child("SiteHud", true, false));
@@ -141,6 +188,62 @@ void Gs1GodotSiteHudController::set_selected_tile(int tile_x, int tile_y)
     }
     selected_tile_x_ = tile_x;
     selected_tile_y_ = tile_y;
+}
+
+void Gs1GodotSiteHudController::cache_adapter_service()
+{
+    if (adapter_service_ != nullptr)
+    {
+        return;
+    }
+
+    adapter_service_ = gs1_resolve_adapter_service(this);
+    if (adapter_service_ != nullptr)
+    {
+        adapter_service_->subscribe_matching_messages(*this);
+    }
+}
+
+Control* Gs1GodotSiteHudController::resolve_owner_control()
+{
+    if (owner_control_ != nullptr)
+    {
+        return owner_control_;
+    }
+    owner_control_ = Object::cast_to<Control>(get_parent());
+    if (owner_control_ == nullptr)
+    {
+        owner_control_ = this;
+    }
+    return owner_control_;
+}
+
+void Gs1GodotSiteHudController::submit_ui_action(
+    std::int64_t action_type,
+    std::int64_t target_id,
+    std::int64_t arg0,
+    std::int64_t arg1)
+{
+    if (adapter_service_ != nullptr)
+    {
+        adapter_service_->submit_ui_action(action_type, target_id, arg0, arg1);
+    }
+}
+
+void Gs1GodotSiteHudController::submit_storage_view(int storage_id, int event_kind)
+{
+    if (adapter_service_ != nullptr)
+    {
+        adapter_service_->submit_site_storage_view(storage_id, event_kind);
+    }
+}
+
+void Gs1GodotSiteHudController::submit_context_request(int tile_x, int tile_y, int flags)
+{
+    if (adapter_service_ != nullptr)
+    {
+        adapter_service_->submit_site_context_request(tile_x, tile_y, flags);
+    }
 }
 
 void Gs1GodotSiteHudController::handle_phone_pressed()

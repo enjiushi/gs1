@@ -1,24 +1,13 @@
 #pragma once
 
-#include "gs1_godot_action_panel_controller.h"
-#include "gs1_godot_craft_panel_controller.h"
-#include "gs1_godot_input_dispatcher.h"
-#include "gs1_godot_inventory_panel_controller.h"
-#include "gs1_godot_overlay_panel_controller.h"
+#include "gs1_godot_adapter_service.h"
 #include "gs1_godot_panel_state_reducers.h"
-#include "gs1_godot_phone_panel_controller.h"
-#include "gs1_godot_regional_tech_tree_panel_controller.h"
-#include "gs1_godot_runtime_node.h"
-#include "gs1_godot_site_hud_controller.h"
-#include "gs1_godot_site_summary_panel_controller.h"
-#include "gs1_godot_status_panel_controller.h"
-#include "gs1_godot_task_panel_controller.h"
 
 #include <godot_cpp/classes/base_button.hpp>
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/input_event.hpp>
+#include <godot_cpp/classes/label.hpp>
 #include <godot_cpp/classes/ref.hpp>
-#include <godot_cpp/classes/rich_text_label.hpp>
 #include <godot_cpp/core/binder_common.hpp>
 #include <godot_cpp/variant/callable.hpp>
 #include <godot_cpp/variant/node_path.hpp>
@@ -31,7 +20,6 @@
 class Gs1GodotSiteSessionUiController final
     : public godot::Control
     , public IGs1GodotEngineMessageSubscriber
-    , public IGs1GodotInputSubscriber
 {
     GDCLASS(Gs1GodotSiteSessionUiController, godot::Control)
 
@@ -41,27 +29,21 @@ public:
 
     void _ready() override;
     void _process(double delta) override;
-
-    void set_runtime_node_path(const godot::NodePath& path);
-    [[nodiscard]] godot::NodePath get_runtime_node_path() const;
+    void _input(const godot::Ref<godot::InputEvent>& event) override;
+    void _exit_tree() override;
     void set_ui_root_path(const godot::NodePath& path);
     [[nodiscard]] godot::NodePath get_ui_root_path() const;
-
-    void attach_input_dispatcher(Gs1GodotInputDispatcher& dispatcher);
-    void detach_input_dispatcher();
-    void disconnect_runtime_subscriptions();
-    void apply_bootstrap_app_state(int app_state);
 
     [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
     void handle_engine_message(const Gs1EngineMessage& message) override;
     void handle_runtime_message_reset() override;
-    void handle_input_event(const godot::Ref<godot::InputEvent>& event) override;
+    void handle_input_event(const godot::Ref<godot::InputEvent>& event);
 
 protected:
     static void _bind_methods();
 
 private:
-    void cache_runtime_reference();
+    void cache_adapter_service();
     void cache_ui_references();
     [[nodiscard]] godot::Control* resolve_ui_root();
     void wire_static_buttons();
@@ -77,7 +59,6 @@ private:
     void plant_first_seed_on_selected_tile();
     [[nodiscard]] godot::String plant_name_for(int plant_id) const;
     [[nodiscard]] godot::String structure_name_for(int structure_id) const;
-    void publish_last_action_message(const godot::String& message);
     void submit_ui_action(std::int64_t action_type, std::int64_t target_id = 0, std::int64_t arg0 = 0, std::int64_t arg1 = 0);
     void submit_move(double x, double y, double z);
     void submit_site_context_request(int tile_x, int tile_y, int flags);
@@ -122,11 +103,9 @@ private:
     static constexpr int KEY_LEFT = 4194319;
     static constexpr int KEY_RIGHT = 4194322;
 
-    godot::NodePath runtime_node_path_ {};
     godot::NodePath ui_root_path_ {".."};
-    Gs1RuntimeNode* runtime_node_ {nullptr};
+    Gs1GodotAdapterService* adapter_service_ {nullptr};
     godot::Control* ui_root_ {nullptr};
-    Gs1GodotInputDispatcher* input_dispatcher_ {nullptr};
     int current_app_state_ {APP_STATE_BOOT};
     godot::Vector2i selected_tile_ {0, 0};
     int last_tile_label_x_ {-1};
@@ -138,16 +117,6 @@ private:
     mutable std::unordered_map<int, godot::String> plant_name_cache_ {};
     mutable std::unordered_map<int, godot::String> structure_name_cache_ {};
 
-    Gs1GodotStatusPanelController status_panel_controller_ {};
-    Gs1GodotInventoryPanelController inventory_panel_controller_ {};
-    Gs1GodotCraftPanelController craft_panel_controller_ {};
-    Gs1GodotActionPanelController action_panel_controller_ {};
-    Gs1GodotOverlayPanelController overlay_panel_controller_ {};
-    Gs1GodotPhonePanelController phone_panel_controller_ {};
-    Gs1GodotRegionalTechTreePanelController regional_tech_tree_panel_controller_ {};
-    Gs1GodotSiteHudController site_hud_controller_ {};
-    Gs1GodotSiteSummaryPanelController site_summary_panel_controller_ {};
-    Gs1GodotTaskPanelController task_panel_controller_ {};
     Gs1GodotSiteStateReducer site_state_reducer_ {};
 
     godot::Control* site_panel_ {nullptr};

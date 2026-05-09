@@ -30,8 +30,6 @@ T* find_controller(Node* scene_root, const char* node_name)
 
 void Gs1GodotDirectorControl::_bind_methods()
 {
-    ClassDB::bind_method(D_METHOD("set_runtime_node_path", "path"), &Gs1GodotDirectorControl::set_runtime_node_path);
-    ClassDB::bind_method(D_METHOD("get_runtime_node_path"), &Gs1GodotDirectorControl::get_runtime_node_path);
     ClassDB::bind_method(D_METHOD("set_scene_host_path", "path"), &Gs1GodotDirectorControl::set_scene_host_path);
     ClassDB::bind_method(D_METHOD("get_scene_host_path"), &Gs1GodotDirectorControl::get_scene_host_path);
     ClassDB::bind_method(D_METHOD("set_main_menu_scene_path", "path"), &Gs1GodotDirectorControl::set_main_menu_scene_path);
@@ -41,7 +39,6 @@ void Gs1GodotDirectorControl::_bind_methods()
     ClassDB::bind_method(D_METHOD("set_site_session_scene_path", "path"), &Gs1GodotDirectorControl::set_site_session_scene_path);
     ClassDB::bind_method(D_METHOD("get_site_session_scene_path"), &Gs1GodotDirectorControl::get_site_session_scene_path);
 
-    ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "runtime_node_path"), "set_runtime_node_path", "get_runtime_node_path");
     ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "scene_host_path"), "set_scene_host_path", "get_scene_host_path");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "main_menu_scene_path"), "set_main_menu_scene_path", "get_main_menu_scene_path");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "regional_map_scene_path"), "set_regional_map_scene_path", "get_regional_map_scene_path");
@@ -51,27 +48,20 @@ void Gs1GodotDirectorControl::_bind_methods()
 void Gs1GodotDirectorControl::_ready()
 {
     set_process(true);
+    adapter_service_.subscribe(GS1_ENGINE_MESSAGE_SET_APP_STATE, *this);
     cache_nodes();
     ensure_active_scene();
 }
 
 void Gs1GodotDirectorControl::_process(double delta)
 {
-    (void)delta;
+    adapter_service_.process_frame(delta);
     cache_nodes();
     ensure_active_scene();
 }
 
 void Gs1GodotDirectorControl::cache_nodes()
 {
-    if (runtime_node_ == nullptr)
-    {
-        runtime_node_ = Object::cast_to<Gs1RuntimeNode>(get_node_or_null(runtime_node_path_));
-        if (runtime_node_ != nullptr)
-        {
-            runtime_node_->subscribe_engine_messages(*this);
-        }
-    }
     if (scene_host_ == nullptr)
     {
         scene_host_ = Object::cast_to<Control>(get_node_or_null(scene_host_path_));
@@ -80,7 +70,7 @@ void Gs1GodotDirectorControl::cache_nodes()
 
 void Gs1GodotDirectorControl::ensure_active_scene()
 {
-    if (runtime_node_ == nullptr || scene_host_ == nullptr)
+    if (scene_host_ == nullptr)
     {
         return;
     }
@@ -162,30 +152,6 @@ void Gs1GodotDirectorControl::switch_to_scene(ScreenKind kind)
 
     if (Node* active_scene = Object::cast_to<Node>(ObjectDB::get_instance(active_scene_id_)))
     {
-        if (auto* menu_ui = find_controller<Gs1GodotMainMenuUiController>(active_scene, "MainMenu"))
-        {
-            menu_ui->disconnect_runtime_subscriptions();
-        }
-        if (auto* regional_ui = find_controller<Gs1GodotRegionalMapUiController>(active_scene, "UiController"))
-        {
-            regional_ui->disconnect_runtime_subscriptions();
-        }
-        if (auto* site_ui = find_controller<Gs1GodotSiteSessionUiController>(active_scene, "SiteUiController"))
-        {
-            site_ui->disconnect_runtime_subscriptions();
-        }
-        if (auto* regional_scene = find_controller<Gs1GodotRegionalMapSceneController>(active_scene, "RegionalMap"))
-        {
-            regional_scene->disconnect_runtime_subscriptions();
-        }
-        if (auto* site_scene = find_controller<Gs1GodotSiteSceneController>(active_scene, "SiteSession"))
-        {
-            (void)site_scene;
-        }
-        if (auto* site_view = Object::cast_to<Gs1SiteViewNode>(active_scene->find_child("SiteView", true, false)))
-        {
-            site_view->set_runtime_node_path(NodePath());
-        }
         scene_host_->remove_child(active_scene);
         active_scene->queue_free();
     }
@@ -206,7 +172,6 @@ void Gs1GodotDirectorControl::switch_to_scene(ScreenKind kind)
         return;
     }
 
-    configure_scene_instance(instance);
     scene_host_->add_child(instance);
     if (auto* control = Object::cast_to<Control>(instance))
     {
@@ -233,56 +198,6 @@ Node* Gs1GodotDirectorControl::instantiate_scene(const String& scene_path) const
     }
 
     return packed_scene->instantiate();
-}
-
-void Gs1GodotDirectorControl::configure_scene_instance(Node* instance) const
-{
-    if (instance == nullptr || runtime_node_ == nullptr)
-    {
-        return;
-    }
-
-    const NodePath runtime_path = runtime_node_->get_path();
-    const int app_state = last_app_state_ >= 0 ? last_app_state_ : APP_STATE_BOOT;
-
-    if (auto* menu_ui = find_controller<Gs1GodotMainMenuUiController>(instance, "MainMenu"))
-    {
-        menu_ui->set_runtime_node_path(runtime_path);
-        menu_ui->apply_bootstrap_app_state(app_state);
-    }
-    if (auto* regional_ui = find_controller<Gs1GodotRegionalMapUiController>(instance, "UiController"))
-    {
-        regional_ui->set_runtime_node_path(runtime_path);
-        regional_ui->apply_bootstrap_app_state(app_state);
-    }
-    if (auto* regional_scene = find_controller<Gs1GodotRegionalMapSceneController>(instance, "RegionalMap"))
-    {
-        regional_scene->set_runtime_node_path(runtime_path);
-    }
-    if (auto* site_ui = find_controller<Gs1GodotSiteSessionUiController>(instance, "SiteUiController"))
-    {
-        site_ui->set_runtime_node_path(runtime_path);
-        site_ui->apply_bootstrap_app_state(app_state);
-    }
-    if (auto* site_view = Object::cast_to<Gs1SiteViewNode>(instance->find_child("SiteView", true, false)))
-    {
-        site_view->set_runtime_node_path(runtime_path);
-    }
-}
-
-void Gs1GodotDirectorControl::set_runtime_node_path(const NodePath& path)
-{
-    if (runtime_node_ != nullptr)
-    {
-        runtime_node_->unsubscribe_engine_messages(*this);
-    }
-    runtime_node_path_ = path;
-    runtime_node_ = nullptr;
-}
-
-NodePath Gs1GodotDirectorControl::get_runtime_node_path() const
-{
-    return runtime_node_path_;
 }
 
 void Gs1GodotDirectorControl::set_scene_host_path(const NodePath& path)

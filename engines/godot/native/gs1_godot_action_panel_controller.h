@@ -1,13 +1,14 @@
 #pragma once
 
+#include "gs1_godot_adapter_service.h"
 #include "gs1_godot_panel_state_reducers.h"
-#include "gs1_godot_runtime_node.h"
 
 #include <godot_cpp/classes/base_button.hpp>
 #include <godot_cpp/classes/button.hpp>
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/v_box_container.hpp>
+#include <godot_cpp/core/binder_common.hpp>
 #include <godot_cpp/core/object_id.hpp>
 
 #include <cstdint>
@@ -16,10 +17,21 @@
 #include <unordered_map>
 #include <unordered_set>
 
-class Gs1GodotActionPanelController final : public IGs1GodotEngineMessageSubscriber
+class Gs1GodotActionPanelController final
+    : public godot::Control
+    , public IGs1GodotEngineMessageSubscriber
 {
+    GDCLASS(Gs1GodotActionPanelController, godot::Control)
+
 public:
     using SubmitUiActionFn = std::function<void(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)>;
+
+    Gs1GodotActionPanelController() = default;
+    ~Gs1GodotActionPanelController() override = default;
+
+    void _ready() override;
+    void _process(double delta) override;
+    void _exit_tree() override;
 
     void cache_ui_references(godot::Control& owner);
     void set_submit_ui_action_callback(SubmitUiActionFn callback);
@@ -31,6 +43,9 @@ public:
     void handle_runtime_message_reset() override;
     void refresh_fixed_slot_actions_if_needed();
     void refresh_site_controls_if_needed();
+
+protected:
+    static void _bind_methods();
 
 private:
     struct ProjectedButtonRecord final
@@ -45,6 +60,9 @@ private:
         int slot_id {0};
     };
 
+    void cache_adapter_service();
+    [[nodiscard]] godot::Control* resolve_owner_control();
+    void submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);
     void cache_fixed_slot_bindings();
     void clear_fixed_slot_actions();
     void bind_fixed_slot_actions(const Gs1RuntimeUiPanelProjection* panel, int panel_id);
@@ -72,6 +90,7 @@ private:
 
     godot::Control* owner_control_ {nullptr};
     godot::VBoxContainer* site_controls_ {nullptr};
+    Gs1GodotAdapterService* adapter_service_ {nullptr};
     SubmitUiActionFn submit_ui_action_ {};
     Gs1GodotUiSetupStateReducer ui_setup_state_reducer_ {};
     Gs1GodotUiPanelStateReducer ui_panel_state_reducer_ {};

@@ -503,6 +503,8 @@ if(GS1_BUILD_GODOT_ADAPTER)
 
     add_library(gs1_godot_adapter SHARED
         engines/godot/native/gs1_godot_extension_entry.cpp
+        engines/godot/native/gs1_godot_adapter_service.cpp
+        engines/godot/native/gs1_godot_controller_context.cpp
         engines/godot/native/godot_progression_resources.cpp
         engines/godot/native/gs1_godot_director_control.cpp
         engines/godot/native/gs1_godot_main_menu_ui_controller.cpp
@@ -523,9 +525,7 @@ if(GS1_BUILD_GODOT_ADAPTER)
         engines/godot/native/gs1_godot_site_session_ui_controller.cpp
         engines/godot/native/gs1_godot_site_summary_panel_controller.cpp
         engines/godot/native/gs1_godot_status_panel_controller.cpp
-        engines/godot/native/gs1_godot_task_panel_controller.cpp
-        engines/godot/native/gs1_godot_runtime_node.cpp
-        engines/godot/native/gs1_godot_site_view_node.cpp)
+        engines/godot/native/gs1_godot_task_panel_controller.cpp)
 
     target_include_directories(gs1_godot_adapter
         PRIVATE

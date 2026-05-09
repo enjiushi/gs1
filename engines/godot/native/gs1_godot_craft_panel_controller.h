@@ -1,13 +1,14 @@
 #pragma once
 
+#include "gs1_godot_adapter_service.h"
 #include "gs1_godot_projection_types.h"
-#include "gs1_godot_runtime_node.h"
 
 #include <godot_cpp/classes/button.hpp>
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/rich_text_label.hpp>
 #include <godot_cpp/classes/v_box_container.hpp>
+#include <godot_cpp/core/binder_common.hpp>
 #include <godot_cpp/core/object_id.hpp>
 
 #include <cstdint>
@@ -16,10 +17,21 @@
 #include <unordered_map>
 #include <unordered_set>
 
-class Gs1GodotCraftPanelController final : public IGs1GodotEngineMessageSubscriber
+class Gs1GodotCraftPanelController final
+    : public godot::Control
+    , public IGs1GodotEngineMessageSubscriber
 {
+    GDCLASS(Gs1GodotCraftPanelController, godot::Control)
+
 public:
     using SubmitCraftOptionFn = std::function<void(int tile_x, int tile_y, int output_item_id)>;
+
+    Gs1GodotCraftPanelController() = default;
+    ~Gs1GodotCraftPanelController() override = default;
+
+    void _ready() override;
+    void _process(double delta) override;
+    void _exit_tree() override;
 
     void cache_ui_references(godot::Control& owner);
     void set_submit_craft_option_callback(SubmitCraftOptionFn callback);
@@ -29,12 +41,18 @@ public:
     void handle_runtime_message_reset() override;
     void refresh_if_needed();
 
+protected:
+    static void _bind_methods();
+
 private:
     struct ProjectedButtonRecord final
     {
         godot::ObjectID object_id {};
     };
 
+    void cache_adapter_service();
+    [[nodiscard]] godot::Control* resolve_owner_control();
+    void submit_craft_option(int tile_x, int tile_y, int output_item_id);
     void reconcile_craft_option_buttons();
     [[nodiscard]] godot::Button* upsert_button_node(
         godot::Node* container,
@@ -52,6 +70,7 @@ private:
     godot::RichTextLabel* craft_summary_ {nullptr};
     godot::VBoxContainer* craft_options_ {nullptr};
     godot::Control* owner_control_ {nullptr};
+    Gs1GodotAdapterService* adapter_service_ {nullptr};
     std::optional<Gs1AppState> current_app_state_ {};
     std::optional<Gs1RuntimePlacementPreviewProjection> placement_preview_ {};
     std::optional<Gs1RuntimePlacementFailureProjection> placement_failure_ {};

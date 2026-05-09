@@ -30,6 +30,10 @@ grow_horizontal = 2
 grow_vertical = 2
 theme = ExtResource("2_theme")
 
+[node name="ActionPanelController" type="Gs1GodotActionPanelController" parent="."]
+layout_mode = 1
+mouse_filter = 2
+
 [node name="BackdropViewport" type="SubViewportContainer" parent="." unique_id=27601693]
 layout_mode = 1
 anchors_preset = 15

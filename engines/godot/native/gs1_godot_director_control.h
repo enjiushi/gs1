@@ -1,12 +1,11 @@
 #pragma once
 
+#include "gs1_godot_adapter_service.h"
 #include "gs1_godot_main_menu_ui_controller.h"
 #include "gs1_godot_regional_map_scene_controller.h"
 #include "gs1_godot_regional_map_ui_controller.h"
-#include "gs1_godot_runtime_node.h"
 #include "gs1_godot_site_scene_controller.h"
 #include "gs1_godot_site_session_ui_controller.h"
-#include "gs1_godot_site_view_node.h"
 
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/core/binder_common.hpp>
@@ -25,9 +24,6 @@ public:
     void _ready() override;
     void _process(double delta) override;
 
-    void set_runtime_node_path(const godot::NodePath& path);
-    [[nodiscard]] godot::NodePath get_runtime_node_path() const;
-
     void set_scene_host_path(const godot::NodePath& path);
     [[nodiscard]] godot::NodePath get_scene_host_path() const;
 
@@ -39,6 +35,9 @@ public:
 
     void set_site_session_scene_path(const godot::String& path);
     [[nodiscard]] godot::String get_site_session_scene_path() const;
+
+    [[nodiscard]] Gs1GodotAdapterService& adapter_service() noexcept { return adapter_service_; }
+    [[nodiscard]] const Gs1GodotAdapterService& adapter_service() const noexcept { return adapter_service_; }
 
     [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
     void handle_engine_message(const Gs1EngineMessage& message) override;
@@ -62,7 +61,6 @@ private:
     [[nodiscard]] godot::String scene_path_for(ScreenKind kind) const;
     void switch_to_scene(ScreenKind kind);
     [[nodiscard]] godot::Node* instantiate_scene(const godot::String& scene_path) const;
-    void configure_scene_instance(godot::Node* instance) const;
 
 private:
     static constexpr int APP_STATE_BOOT = 0;
@@ -75,13 +73,12 @@ private:
     static constexpr int APP_STATE_SITE_RESULT = 7;
     static constexpr int APP_STATE_CAMPAIGN_END = 8;
 
-    godot::NodePath runtime_node_path_ {"Runtime"};
     godot::NodePath scene_host_path_ {"SceneHost"};
     godot::String main_menu_scene_path_ {"res://scenes/main_menu.tscn"};
     godot::String regional_map_scene_path_ {"res://scenes/regional_map.tscn"};
     godot::String site_session_scene_path_ {"res://scenes/site_session.tscn"};
 
-    Gs1RuntimeNode* runtime_node_ {nullptr};
+    Gs1GodotAdapterService adapter_service_ {};
     godot::Control* scene_host_ {nullptr};
     godot::ObjectID active_scene_id_ {};
     ScreenKind active_screen_kind_ {SCREEN_KIND_NONE};

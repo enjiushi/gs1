@@ -24,7 +24,45 @@ grow_vertical = 2
 mouse_filter = 2
 ui_root_path = NodePath("..")
 
-[node name="SiteView" type="Gs1SiteViewNode" parent="."]
+[node name="StatusPanelController" type="Gs1GodotStatusPanelController" parent="."]
+layout_mode = 1
+mouse_filter = 2
+
+[node name="SiteSummaryPanelController" type="Gs1GodotSiteSummaryPanelController" parent="."]
+layout_mode = 1
+mouse_filter = 2
+
+[node name="SiteHudController" type="Gs1GodotSiteHudController" parent="."]
+layout_mode = 1
+mouse_filter = 2
+
+[node name="InventoryPanelController" type="Gs1GodotInventoryPanelController" parent="."]
+layout_mode = 1
+mouse_filter = 2
+
+[node name="CraftPanelController" type="Gs1GodotCraftPanelController" parent="."]
+layout_mode = 1
+mouse_filter = 2
+
+[node name="ActionPanelController" type="Gs1GodotActionPanelController" parent="."]
+layout_mode = 1
+mouse_filter = 2
+
+[node name="OverlayPanelController" type="Gs1GodotOverlayPanelController" parent="."]
+layout_mode = 1
+mouse_filter = 2
+
+[node name="PhonePanelController" type="Gs1GodotPhonePanelController" parent="."]
+layout_mode = 1
+mouse_filter = 2
+
+[node name="TechTreePanelController" type="Gs1GodotRegionalTechTreePanelController" parent="."]
+layout_mode = 1
+mouse_filter = 2
+
+[node name="TaskPanelController" type="Gs1GodotTaskPanelController" parent="."]
+layout_mode = 1
+mouse_filter = 2
 
 [node name="BackdropTint" type="ColorRect" parent="."]
 layout_mode = 1

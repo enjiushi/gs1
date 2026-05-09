@@ -4,7 +4,7 @@ Placeholder site-session world visuals keyed from gameplay content IDs through `
 
 ## Usage
 - Read this file before editing placeholder site visuals.
-- Keep placeholder scenes script-free and rooted at `Node3D` so the native `Gs1SiteViewNode` can instance them directly.
+- Keep placeholder scenes script-free and rooted at `Node3D` so the native `Gs1GodotSiteSceneController` can instance them directly.
 - When files or folders in this directory change, update this file in the same change.
 
 ## Contents

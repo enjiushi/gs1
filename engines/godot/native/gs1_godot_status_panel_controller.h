@@ -1,15 +1,27 @@
 #pragma once
 
+#include "gs1_godot_adapter_service.h"
 #include "gs1_godot_projection_types.h"
-#include "gs1_godot_runtime_node.h"
 
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/rich_text_label.hpp>
+#include <godot_cpp/core/binder_common.hpp>
 #include <godot_cpp/variant/string.hpp>
 
-class Gs1GodotStatusPanelController final : public IGs1GodotEngineMessageSubscriber
+class Gs1GodotStatusPanelController final
+    : public godot::Control
+    , public IGs1GodotEngineMessageSubscriber
 {
+    GDCLASS(Gs1GodotStatusPanelController, godot::Control)
+
 public:
+    Gs1GodotStatusPanelController() = default;
+    ~Gs1GodotStatusPanelController() override = default;
+
+    void _ready() override;
+    void _process(double delta) override;
+    void _exit_tree() override;
+
     void cache_ui_references(godot::Control& owner);
     [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
     void handle_engine_message(const Gs1EngineMessage& message) override;
@@ -19,9 +31,16 @@ public:
     void set_runtime_status(bool runtime_linked, const std::string& last_error);
     void show_runtime_missing();
 
+protected:
+    static void _bind_methods();
+
 private:
+    void cache_adapter_service();
+    [[nodiscard]] godot::Control* resolve_owner_control();
     void refresh(bool runtime_linked, const std::string& last_error);
 
+    godot::Control* owner_control_ {nullptr};
+    Gs1GodotAdapterService* adapter_service_ {nullptr};
     std::optional<Gs1AppState> current_app_state_ {};
     std::optional<Gs1RuntimeCampaignResourcesProjection> campaign_resources_ {};
     std::optional<Gs1RuntimeHudProjection> hud_state_ {};

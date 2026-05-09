@@ -1,7 +1,7 @@
 #pragma once
 
+#include "gs1_godot_adapter_service.h"
 #include "gs1_godot_projection_types.h"
-#include "gs1_godot_runtime_node.h"
 
 #include <godot_cpp/classes/button.hpp>
 #include <godot_cpp/classes/control.hpp>
@@ -9,6 +9,7 @@
 #include <godot_cpp/classes/label.hpp>
 #include <godot_cpp/classes/rich_text_label.hpp>
 #include <godot_cpp/classes/texture2d.hpp>
+#include <godot_cpp/core/binder_common.hpp>
 #include <godot_cpp/core/object_id.hpp>
 #include <godot_cpp/classes/ref.hpp>
 
@@ -19,10 +20,21 @@
 #include <optional>
 #include <vector>
 
-class Gs1GodotInventoryPanelController final : public IGs1GodotEngineMessageSubscriber
+class Gs1GodotInventoryPanelController final
+    : public godot::Control
+    , public IGs1GodotEngineMessageSubscriber
 {
+    GDCLASS(Gs1GodotInventoryPanelController, godot::Control)
+
 public:
     using SubmitInventorySlotTapFn = std::function<void(int storage_id, int container_kind, int slot_index, int item_instance_id)>;
+
+    Gs1GodotInventoryPanelController() = default;
+    ~Gs1GodotInventoryPanelController() override = default;
+
+    void _ready() override;
+    void _process(double delta) override;
+    void _exit_tree() override;
 
     void cache_ui_references(godot::Control& owner);
     void set_submit_inventory_slot_tap_callback(SubmitInventorySlotTapFn callback);
@@ -32,12 +44,18 @@ public:
     void refresh_if_needed();
     void handle_slot_pressed(std::int64_t slot_key);
 
+protected:
+    static void _bind_methods();
+
 private:
     struct SlotButtonRecord final
     {
         godot::ObjectID object_id {};
     };
 
+    void cache_adapter_service();
+    [[nodiscard]] godot::Control* resolve_owner_control();
+    void submit_inventory_slot_tap(int storage_id, int container_kind, int slot_index, int item_instance_id);
     [[nodiscard]] godot::String item_name_for(int item_id) const;
     [[nodiscard]] godot::Ref<godot::Texture2D> item_icon_for(std::uint32_t item_id) const;
     [[nodiscard]] godot::Ref<godot::Texture2D> load_cached_texture(const godot::String& path) const;
@@ -70,6 +88,8 @@ private:
         const std::unordered_set<std::uint64_t>& desired_keys);
 
     godot::Control* panel_ {nullptr};
+    godot::Control* owner_control_ {nullptr};
+    Gs1GodotAdapterService* adapter_service_ {nullptr};
     godot::Label* inventory_title_ {nullptr};
     godot::Label* worker_pack_title_ {nullptr};
     godot::GridContainer* worker_pack_slots_grid_ {nullptr};

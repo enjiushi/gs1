@@ -1,5 +1,6 @@
 #include "gs1_godot_task_panel_controller.h"
 
+#include "gs1_godot_controller_context.h"
 #include "godot_progression_resources.h"
 
 #include "content/defs/task_defs.h"
@@ -9,6 +10,7 @@
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/object.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
+#include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/core/object.hpp>
 #include <godot_cpp/variant/callable.hpp>
@@ -48,8 +50,43 @@ Ref<Texture2D> load_texture_2d(const String& path)
 }
 }
 
+void Gs1GodotTaskPanelController::_bind_methods()
+{
+}
+
+void Gs1GodotTaskPanelController::_ready()
+{
+    cache_adapter_service();
+    if (Control* owner = resolve_owner_control())
+    {
+        cache_ui_references(*owner);
+    }
+    set_process(true);
+}
+
+void Gs1GodotTaskPanelController::_process(double delta)
+{
+    (void)delta;
+    cache_adapter_service();
+    if (Control* owner = resolve_owner_control())
+    {
+        cache_ui_references(*owner);
+    }
+    refresh_if_needed();
+}
+
+void Gs1GodotTaskPanelController::_exit_tree()
+{
+    if (adapter_service_ != nullptr)
+    {
+        adapter_service_->unsubscribe_all(*this);
+        adapter_service_ = nullptr;
+    }
+}
+
 void Gs1GodotTaskPanelController::cache_ui_references(Control& owner)
 {
+    owner_control_ = &owner;
     if (panel_ == nullptr)
     {
         panel_ = Object::cast_to<Control>(owner.find_child("TaskPanel", true, false));
@@ -67,6 +104,34 @@ void Gs1GodotTaskPanelController::cache_ui_references(Control& owner)
         modifier_rows_ = Object::cast_to<VBoxContainer>(owner.find_child("ModifierRows", true, false));
     }
     refresh_if_needed();
+}
+
+void Gs1GodotTaskPanelController::cache_adapter_service()
+{
+    if (adapter_service_ != nullptr)
+    {
+        return;
+    }
+
+    adapter_service_ = gs1_resolve_adapter_service(this);
+    if (adapter_service_ != nullptr)
+    {
+        adapter_service_->subscribe_matching_messages(*this);
+    }
+}
+
+Control* Gs1GodotTaskPanelController::resolve_owner_control()
+{
+    if (owner_control_ != nullptr)
+    {
+        return owner_control_;
+    }
+    owner_control_ = Object::cast_to<Control>(get_parent());
+    if (owner_control_ == nullptr)
+    {
+        owner_control_ = this;
+    }
+    return owner_control_;
 }
 
 bool Gs1GodotTaskPanelController::handles_engine_message(Gs1EngineMessageType type) const noexcept

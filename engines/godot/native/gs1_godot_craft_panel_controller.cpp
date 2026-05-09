@@ -1,9 +1,12 @@
 #include "gs1_godot_craft_panel_controller.h"
 
+#include "gs1_godot_controller_context.h"
+
 #include "content/defs/craft_recipe_defs.h"
 #include "content/defs/item_defs.h"
 
 #include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/core/object.hpp>
 #include <godot_cpp/variant/callable_method_pointer.hpp>
@@ -66,6 +69,43 @@ void dispatch_craft_option_pressed(std::int64_t controller_bits, std::int64_t bu
 }
 }
 
+void Gs1GodotCraftPanelController::_bind_methods()
+{
+}
+
+void Gs1GodotCraftPanelController::_ready()
+{
+    set_submit_craft_option_callback([this](int tile_x, int tile_y, int output_item_id) {
+        submit_craft_option(tile_x, tile_y, output_item_id);
+    });
+    cache_adapter_service();
+    if (Control* owner = resolve_owner_control())
+    {
+        cache_ui_references(*owner);
+    }
+    set_process(true);
+}
+
+void Gs1GodotCraftPanelController::_process(double delta)
+{
+    (void)delta;
+    cache_adapter_service();
+    if (Control* owner = resolve_owner_control())
+    {
+        cache_ui_references(*owner);
+    }
+    refresh_if_needed();
+}
+
+void Gs1GodotCraftPanelController::_exit_tree()
+{
+    if (adapter_service_ != nullptr)
+    {
+        adapter_service_->unsubscribe_all(*this);
+        adapter_service_ = nullptr;
+    }
+}
+
 void Gs1GodotCraftPanelController::cache_ui_references(Control& owner)
 {
     owner_control_ = &owner;
@@ -87,6 +127,50 @@ void Gs1GodotCraftPanelController::cache_ui_references(Control& owner)
 void Gs1GodotCraftPanelController::set_submit_craft_option_callback(SubmitCraftOptionFn callback)
 {
     submit_craft_option_ = std::move(callback);
+}
+
+void Gs1GodotCraftPanelController::cache_adapter_service()
+{
+    if (adapter_service_ != nullptr)
+    {
+        return;
+    }
+
+    adapter_service_ = gs1_resolve_adapter_service(this);
+    if (adapter_service_ != nullptr)
+    {
+        adapter_service_->subscribe_matching_messages(*this);
+    }
+}
+
+Control* Gs1GodotCraftPanelController::resolve_owner_control()
+{
+    if (owner_control_ != nullptr)
+    {
+        return owner_control_;
+    }
+    owner_control_ = Object::cast_to<Control>(get_parent());
+    if (owner_control_ == nullptr)
+    {
+        owner_control_ = this;
+    }
+    return owner_control_;
+}
+
+void Gs1GodotCraftPanelController::submit_craft_option(int tile_x, int tile_y, int output_item_id)
+{
+    if (adapter_service_ != nullptr)
+    {
+        adapter_service_->submit_site_action_request(
+            GS1_SITE_ACTION_CRAFT,
+            GS1_SITE_ACTION_REQUEST_FLAG_HAS_ITEM,
+            1,
+            tile_x,
+            tile_y,
+            0,
+            0,
+            output_item_id);
+    }
 }
 
 bool Gs1GodotCraftPanelController::handles_engine_message(Gs1EngineMessageType type) const noexcept

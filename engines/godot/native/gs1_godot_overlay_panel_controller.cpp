@@ -1,5 +1,8 @@
 #include "gs1_godot_overlay_panel_controller.h"
 
+#include "gs1_godot_controller_context.h"
+
+#include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/object.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/variant/callable_method_pointer.hpp>
@@ -62,6 +65,43 @@ void dispatch_projected_button_pressed(std::int64_t controller_bits, std::int64_
         controller->handle_projected_button_pressed(button_key);
     }
 }
+}
+
+void Gs1GodotOverlayPanelController::_bind_methods()
+{
+}
+
+void Gs1GodotOverlayPanelController::_ready()
+{
+    set_submit_ui_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
+        submit_ui_action(action_type, target_id, arg0, arg1);
+    });
+    cache_adapter_service();
+    if (Control* owner = resolve_owner_control())
+    {
+        cache_ui_references(*owner);
+    }
+    set_process(true);
+}
+
+void Gs1GodotOverlayPanelController::_process(double delta)
+{
+    (void)delta;
+    cache_adapter_service();
+    if (Control* owner = resolve_owner_control())
+    {
+        cache_ui_references(*owner);
+    }
+    refresh_if_needed();
+}
+
+void Gs1GodotOverlayPanelController::_exit_tree()
+{
+    if (adapter_service_ != nullptr)
+    {
+        adapter_service_->unsubscribe_all(*this);
+        adapter_service_ = nullptr;
+    }
 }
 
 void Gs1GodotOverlayPanelController::cache_ui_references(Control& owner)
@@ -140,6 +180,46 @@ void Gs1GodotOverlayPanelController::cache_ui_references(Control& owner)
 void Gs1GodotOverlayPanelController::set_submit_ui_action_callback(SubmitUiActionFn callback)
 {
     submit_ui_action_ = std::move(callback);
+}
+
+void Gs1GodotOverlayPanelController::cache_adapter_service()
+{
+    if (adapter_service_ != nullptr)
+    {
+        return;
+    }
+
+    adapter_service_ = gs1_resolve_adapter_service(this);
+    if (adapter_service_ != nullptr)
+    {
+        adapter_service_->subscribe_matching_messages(*this);
+    }
+}
+
+Control* Gs1GodotOverlayPanelController::resolve_owner_control()
+{
+    if (owner_control_ != nullptr)
+    {
+        return owner_control_;
+    }
+    owner_control_ = Object::cast_to<Control>(get_parent());
+    if (owner_control_ == nullptr)
+    {
+        owner_control_ = this;
+    }
+    return owner_control_;
+}
+
+void Gs1GodotOverlayPanelController::submit_ui_action(
+    std::int64_t action_type,
+    std::int64_t target_id,
+    std::int64_t arg0,
+    std::int64_t arg1)
+{
+    if (adapter_service_ != nullptr)
+    {
+        adapter_service_->submit_ui_action(action_type, target_id, arg0, arg1);
+    }
 }
 
 void Gs1GodotOverlayPanelController::handle_overlay_mode_pressed(std::int64_t mode)

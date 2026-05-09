@@ -1,7 +1,7 @@
 #pragma once
 
+#include "gs1_godot_adapter_service.h"
 #include "gs1_godot_panel_state_reducers.h"
-#include "gs1_godot_runtime_node.h"
 
 #include <godot_cpp/classes/button.hpp>
 #include <godot_cpp/classes/control.hpp>
@@ -11,6 +11,7 @@
 #include <godot_cpp/classes/scroll_container.hpp>
 #include <godot_cpp/classes/standard_material3d.hpp>
 #include <godot_cpp/classes/texture2d.hpp>
+#include <godot_cpp/core/binder_common.hpp>
 #include <godot_cpp/core/object_id.hpp>
 
 #include <cstdint>
@@ -20,10 +21,21 @@
 #include <unordered_map>
 #include <unordered_set>
 
-class Gs1GodotRegionalTechTreePanelController final : public IGs1GodotEngineMessageSubscriber
+class Gs1GodotRegionalTechTreePanelController final
+    : public godot::Control
+    , public IGs1GodotEngineMessageSubscriber
 {
+    GDCLASS(Gs1GodotRegionalTechTreePanelController, godot::Control)
+
 public:
     using SubmitUiActionFn = std::function<void(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)>;
+
+    Gs1GodotRegionalTechTreePanelController() = default;
+    ~Gs1GodotRegionalTechTreePanelController() override = default;
+
+    void _ready() override;
+    void _process(double delta) override;
+    void _exit_tree() override;
 
     void cache_ui_references(godot::Control& owner);
     void set_submit_ui_action_callback(SubmitUiActionFn callback);
@@ -34,6 +46,9 @@ public:
     void handle_engine_message(const Gs1EngineMessage& message) override;
     void handle_runtime_message_reset() override;
     void refresh_if_needed();
+
+protected:
+    static void _bind_methods();
 
 private:
     struct ProjectedButtonRecord final
@@ -67,6 +82,9 @@ private:
         godot::Ref<godot::Texture2D> icon_texture {};
     };
 
+    void cache_adapter_service();
+    [[nodiscard]] godot::Control* resolve_owner_control();
+    void submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);
     void apply_overlay_layout();
     void reconcile_tech_tree_cards(const godot::Array& card_specs);
     [[nodiscard]] godot::String tech_tooltip_text(const godot::Dictionary& spec) const;
@@ -97,6 +115,7 @@ private:
         const std::unordered_set<std::uint64_t>& desired_keys);
 
     godot::Control* owner_control_ {nullptr};
+    Gs1GodotAdapterService* adapter_service_ {nullptr};
     godot::Control* overlay_ {nullptr};
     godot::PanelContainer* panel_ {nullptr};
     godot::Label* title_ {nullptr};
