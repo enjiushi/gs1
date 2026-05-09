@@ -15,6 +15,20 @@ namespace
         app_state == GS1_APP_STATE_SITE_ACTIVE;
 }
 
+[[nodiscard]] bool contains_site_id(
+    const std::vector<SiteId>& site_ids,
+    SiteId site_id) noexcept
+{
+    for (const auto candidate : site_ids)
+    {
+        if (candidate == site_id)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 void rebuild_regional_map_caches(CampaignState& campaign)
 {
     auto& map = campaign.regional_map_state;
@@ -293,8 +307,11 @@ Gs1Status CampaignFlowSystem::process_message(
                 if (adjacent_site != nullptr && adjacent_site->site_state == GS1_SITE_STATE_LOCKED)
                 {
                     adjacent_site->site_state = GS1_SITE_STATE_AVAILABLE;
-                    context.campaign->regional_map_state.revealed_site_ids.push_back(adjacent_site_id);
-                    context.active_site_run->result_newly_revealed_site_count += 1U;
+                    if (!contains_site_id(context.campaign->regional_map_state.revealed_site_ids, adjacent_site_id))
+                    {
+                        context.campaign->regional_map_state.revealed_site_ids.push_back(adjacent_site_id);
+                        context.active_site_run->result_newly_revealed_site_count += 1U;
+                    }
                 }
             }
 

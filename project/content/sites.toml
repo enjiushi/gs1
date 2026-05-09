@@ -64,7 +64,7 @@ phone_delivery_fee = 5
 phone_delivery_minutes = 0
 initial_revealed_unlockable_ids = []
 initial_direct_purchase_unlockable_ids = []
-initially_revealed = false
+initially_revealed = true
 initially_available = false
 
 [[sites]]
@@ -97,7 +97,7 @@ phone_delivery_fee = 5
 phone_delivery_minutes = 0
 initial_revealed_unlockable_ids = []
 initial_direct_purchase_unlockable_ids = []
-initially_revealed = false
+initially_revealed = true
 initially_available = false
 
 [[sites]]
@@ -130,5 +130,5 @@ phone_delivery_fee = 5
 phone_delivery_minutes = 0
 initial_revealed_unlockable_ids = []
 initial_direct_purchase_unlockable_ids = []
-initially_revealed = false
+initially_revealed = true
 initially_available = false

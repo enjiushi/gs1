@@ -112,7 +112,31 @@ void campaign_flow_start_new_campaign_initializes_state(gs1::testing::SystemTest
     GS1_SYSTEM_TEST_CHECK(context, campaign->campaign_seed == 77ULL);
     GS1_SYSTEM_TEST_CHECK(context, campaign->campaign_days_total == 18U);
     GS1_SYSTEM_TEST_CHECK(context, campaign->campaign_days_remaining == 18U);
-    GS1_SYSTEM_TEST_CHECK(context, campaign->regional_map_state.revealed_site_ids.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, campaign->regional_map_state.revealed_site_ids.size() == 4U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        std::find(
+            campaign->regional_map_state.revealed_site_ids.begin(),
+            campaign->regional_map_state.revealed_site_ids.end(),
+            SiteId {1U}) != campaign->regional_map_state.revealed_site_ids.end());
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        std::find(
+            campaign->regional_map_state.revealed_site_ids.begin(),
+            campaign->regional_map_state.revealed_site_ids.end(),
+            SiteId {2U}) != campaign->regional_map_state.revealed_site_ids.end());
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        std::find(
+            campaign->regional_map_state.revealed_site_ids.begin(),
+            campaign->regional_map_state.revealed_site_ids.end(),
+            SiteId {3U}) != campaign->regional_map_state.revealed_site_ids.end());
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        std::find(
+            campaign->regional_map_state.revealed_site_ids.begin(),
+            campaign->regional_map_state.revealed_site_ids.end(),
+            SiteId {4U}) != campaign->regional_map_state.revealed_site_ids.end());
     GS1_SYSTEM_TEST_CHECK(context, campaign->regional_map_state.available_site_ids.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, campaign->regional_map_state.available_site_ids.front().value == 1U);
     GS1_SYSTEM_TEST_CHECK(context, campaign->faction_progress.size() == 3U);
@@ -304,7 +328,7 @@ void campaign_flow_start_attempt_and_return_to_map(gs1::testing::SystemTestExecu
     GS1_SYSTEM_TEST_CHECK(context, queue.empty());
 }
 
-void campaign_flow_completed_attempt_reveals_adjacent_sites(gs1::testing::SystemTestExecutionContext& context)
+void campaign_flow_completed_attempt_unblocks_visible_adjacent_sites(gs1::testing::SystemTestExecutionContext& context)
 {
     std::optional<gs1::CampaignState> campaign {make_campaign()};
     std::optional<gs1::SiteRunState> active_site_run {};
@@ -334,11 +358,18 @@ void campaign_flow_completed_attempt_reveals_adjacent_sites(gs1::testing::System
         CampaignFlowSystem::process_message(flow_context, end_message) == GS1_STATUS_OK);
 
     GS1_SYSTEM_TEST_CHECK(context, active_site_run->run_status == SiteRunStatus::Completed);
-    GS1_SYSTEM_TEST_CHECK(context, active_site_run->result_newly_revealed_site_count == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, active_site_run->result_newly_revealed_site_count == 0U);
     GS1_SYSTEM_TEST_CHECK(context, app_state == GS1_APP_STATE_SITE_RESULT);
     GS1_SYSTEM_TEST_CHECK(context, campaign->app_state == GS1_APP_STATE_SITE_RESULT);
     GS1_SYSTEM_TEST_CHECK(context, find_site_meta(*campaign, 1U)->site_state == GS1_SITE_STATE_COMPLETED);
     GS1_SYSTEM_TEST_CHECK(context, find_site_meta(*campaign, 2U)->site_state == GS1_SITE_STATE_AVAILABLE);
+    GS1_SYSTEM_TEST_CHECK(context, campaign->regional_map_state.revealed_site_ids.size() == 4U);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        static_cast<std::uint32_t>(std::count(
+            campaign->regional_map_state.revealed_site_ids.begin(),
+            campaign->regional_map_state.revealed_site_ids.end(),
+            SiteId {2U})) == 1U);
     GS1_SYSTEM_TEST_CHECK(
         context,
         std::find(
@@ -1353,8 +1384,8 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     campaign_flow_start_attempt_and_return_to_map);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "campaign_flow",
-    "completed_attempt_reveals_adjacent_sites",
-    campaign_flow_completed_attempt_reveals_adjacent_sites);
+    "completed_attempt_unblocks_visible_adjacent_sites",
+    campaign_flow_completed_attempt_unblocks_visible_adjacent_sites);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "campaign_flow",
     "failed_attempt_preserves_locked_neighbors",

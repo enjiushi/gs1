@@ -840,14 +840,18 @@ int main()
         const auto* site_three_message = find_regional_map_site_message(initial_map_messages, 3U);
         const auto* site_four_message = find_regional_map_site_message(initial_map_messages, 4U);
         assert(site_one_message != nullptr);
-        assert(site_two_message == nullptr);
-        assert(site_three_message == nullptr);
-        assert(site_four_message == nullptr);
+        assert(site_two_message != nullptr);
+        assert(site_three_message != nullptr);
+        assert(site_four_message != nullptr);
         assert(site_one_message->payload_as<Gs1EngineMessageRegionalMapSiteData>().map_x == 0);
         assert(site_one_message->payload_as<Gs1EngineMessageRegionalMapSiteData>().map_y == 0);
-        assert(!contains_regional_map_link(initial_map_messages, 1U, 2U));
-        assert(!contains_regional_map_link(initial_map_messages, 2U, 3U));
-        assert(!contains_regional_map_link(initial_map_messages, 3U, 4U));
+        assert(site_one_message->payload_as<Gs1EngineMessageRegionalMapSiteData>().site_state == GS1_SITE_STATE_AVAILABLE);
+        assert(site_two_message->payload_as<Gs1EngineMessageRegionalMapSiteData>().site_state == GS1_SITE_STATE_LOCKED);
+        assert(site_three_message->payload_as<Gs1EngineMessageRegionalMapSiteData>().site_state == GS1_SITE_STATE_LOCKED);
+        assert(site_four_message->payload_as<Gs1EngineMessageRegionalMapSiteData>().site_state == GS1_SITE_STATE_LOCKED);
+        assert(contains_regional_map_link(initial_map_messages, 1U, 2U));
+        assert(contains_regional_map_link(initial_map_messages, 2U, 3U));
+        assert(contains_regional_map_link(initial_map_messages, 3U, 4U));
     }
 
     const auto campaign_site_id = gs1::GameRuntimeProjectionTestAccess::campaign(runtime)->sites.front().site_id.value;
@@ -862,7 +866,7 @@ int main()
 
     auto& completed_site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
     completed_site_run.run_status = gs1::SiteRunStatus::Completed;
-    completed_site_run.result_newly_revealed_site_count = 1U;
+    completed_site_run.result_newly_revealed_site_count = 0U;
 
     GameMessage site_completed_message {};
     site_completed_message.type = GameMessageType::SiteAttemptEnded;
@@ -881,13 +885,17 @@ int main()
         const auto* site_one_message = find_regional_map_site_message(reopened_map_messages, 1U);
         const auto* site_two_message = find_regional_map_site_message(reopened_map_messages, 2U);
         const auto* site_three_message = find_regional_map_site_message(reopened_map_messages, 3U);
+        const auto* site_four_message = find_regional_map_site_message(reopened_map_messages, 4U);
         assert(site_one_message != nullptr);
         assert(site_two_message != nullptr);
-        assert(site_three_message == nullptr);
+        assert(site_three_message != nullptr);
+        assert(site_four_message != nullptr);
         assert(site_two_message->payload_as<Gs1EngineMessageRegionalMapSiteData>().map_x == 160);
         assert(site_two_message->payload_as<Gs1EngineMessageRegionalMapSiteData>().map_y == 0);
+        assert(site_two_message->payload_as<Gs1EngineMessageRegionalMapSiteData>().site_state == GS1_SITE_STATE_AVAILABLE);
         assert(contains_regional_map_link(reopened_map_messages, 1U, 2U));
-        assert(!contains_regional_map_link(reopened_map_messages, 2U, 3U));
+        assert(contains_regional_map_link(reopened_map_messages, 2U, 3U));
+        assert(contains_regional_map_link(reopened_map_messages, 3U, 4U));
     }
 
     GameMessage open_tech_tree_message {};

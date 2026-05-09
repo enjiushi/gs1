@@ -8,6 +8,7 @@
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/input_event_mouse_button.hpp>
 #include <godot_cpp/classes/label3d.hpp>
+#include <godot_cpp/classes/material.hpp>
 #include <godot_cpp/classes/mesh_instance3d.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/node3d.hpp>
@@ -564,6 +565,7 @@ void Gs1GodotRegionalMapSceneController::update_regional_site_visuals()
 
         const auto& site = site_it->second;
         const bool selected = site_id == selected_site_id;
+        const bool blocked = site.site_state == GS1_SITE_STATE_LOCKED;
         const Vector3 world_position = regional_world_position(regional_grid_coord(site));
         Color base_color = regional_site_state_color(static_cast<int>(site.site_state));
         Color tower_color = base_color.lightened(0.12);
@@ -594,9 +596,38 @@ void Gs1GodotRegionalMapSceneController::update_regional_site_visuals()
             selection_ring->set_visible(selected);
             selection_ring->set_material_override(get_material(vformat("site_ring_%d_%s", site_id, selected ? "1" : "0"), Color(0.96, 0.84, 0.52), 0.18, 0.0, true));
         }
+        const Ref<StandardMaterial3D> blocked_overlay = blocked
+            ? get_material(
+                vformat("site_overlay_%s", selected ? "selected" : "blocked"),
+                selected ? Color(0.54, 0.54, 0.56, 0.52) : Color(0.43, 0.43, 0.45, 0.66),
+                1.0,
+                0.0)
+            : Ref<StandardMaterial3D> {};
+        const Array marker_meshes = root->find_children(String(), String("MeshInstance3D"), true, false);
+        for (int64_t mesh_index = 0; mesh_index < marker_meshes.size(); ++mesh_index)
+        {
+            MeshInstance3D* mesh = Object::cast_to<MeshInstance3D>(marker_meshes[mesh_index]);
+            if (mesh == nullptr ||
+                mesh == base ||
+                mesh == tower ||
+                mesh == beacon ||
+                mesh == selection_ring)
+            {
+                continue;
+            }
+
+            if (blocked)
+            {
+                mesh->set_material_overlay(blocked_overlay);
+            }
+            else
+            {
+                mesh->set_material_overlay(Ref<Material> {});
+            }
+        }
         if (label != nullptr)
         {
-            label->set_modulate(glow_color.lightened(0.18));
+            label->set_modulate(blocked ? Color(0.70, 0.70, 0.72) : glow_color.lightened(0.18));
         }
     }
 }
@@ -622,7 +653,7 @@ Color Gs1GodotRegionalMapSceneController::regional_site_state_color(int site_sta
     case GS1_SITE_STATE_COMPLETED:
         return Color(0.36, 0.58, 0.39);
     default:
-        return Color(0.38, 0.35, 0.32);
+        return Color(0.44, 0.45, 0.47);
     }
 }
 

@@ -283,7 +283,7 @@ void Gs1GodotRegionalSummaryPanelController::apply_summary_text()
 
     PackedStringArray lines;
     lines.push_back("[b]Campaign Planning Map[/b]");
-    lines.push_back(vformat("Revealed Sites: %d  Adjacency Links: %d", static_cast<int>(sites.size()), static_cast<int>(links.size())));
+    lines.push_back(vformat("Prototype Sites: %d  Adjacency Links: %d", static_cast<int>(sites.size()), static_cast<int>(links.size())));
     lines.push_back(selected_site_id != 0 ? vformat("Selected Site: Site %d", selected_site_id) : String("Selected Site: None"));
     if (campaign_resources_.has_value())
     {
@@ -319,6 +319,7 @@ String Gs1GodotRegionalSummaryPanelController::build_regional_map_overview_text(
     }
 
     int available_count = 0;
+    int blocked_count = 0;
     int completed_count = 0;
     for (const auto& site : sites)
     {
@@ -330,10 +331,18 @@ String Gs1GodotRegionalSummaryPanelController::build_regional_map_overview_text(
         {
             ++completed_count;
         }
+        else
+        {
+            ++blocked_count;
+        }
     }
 
-    lines.push_back(vformat("Available: %d  Completed Support Sites: %d", available_count, completed_count));
-    lines.push_back("Known routes cut across the dune basin, with marked camp outposts standing in for active support sites.");
+    lines.push_back(vformat(
+        "Available: %d  Blocked: %d  Completed Support Sites: %d",
+        available_count,
+        blocked_count,
+        completed_count));
+    lines.push_back("Known routes cut across the dune basin, with blocked outposts held on the map in a greyed reserve state.");
     lines.push_back(String());
     lines.push_back("[b]Adjacency[/b]");
 
