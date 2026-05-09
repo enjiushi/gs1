@@ -1,7 +1,7 @@
 #pragma once
 
 #include "gs1_godot_adapter_service.h"
-#include "gs1_godot_panel_state_reducers.h"
+#include "gs1_godot_projection_types.h"
 
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/input_event.hpp>
@@ -63,10 +63,18 @@ private:
         godot::ObjectID label_id {};
     };
 
+    struct PendingRegionalMapState final
+    {
+        std::vector<Gs1RuntimeRegionalMapSiteProjection> sites {};
+        std::vector<Gs1RuntimeRegionalMapLinkProjection> links {};
+    };
+
     void cache_adapter_service();
     void cache_scene_references();
     void cache_ui_references();
     void submit_ui_action(std::int64_t action_type, std::int64_t target_id = 0);
+    void reset_regional_map_state() noexcept;
+    void apply_regional_map_message(const Gs1EngineMessage& message);
     void select_regional_site(int site_id);
     void refresh_regional_map();
     void rebuild_regional_map_world(
@@ -106,7 +114,10 @@ private:
     godot::Camera3D* regional_camera_ {nullptr};
     godot::Node3D* regional_site_root_ {nullptr};
 
-    Gs1GodotRegionalMapStateReducer regional_map_state_reducer_ {};
+    std::optional<std::uint32_t> selected_site_id_ {};
+    std::vector<Gs1RuntimeRegionalMapSiteProjection> sites_ {};
+    std::vector<Gs1RuntimeRegionalMapLinkProjection> links_ {};
+    std::optional<PendingRegionalMapState> pending_regional_map_state_ {};
     godot::Rect2i regional_map_bounds_ {-4, -3, 9, 7};
 
     std::unordered_map<int, RegionalSiteNodeRecord> regional_site_nodes_ {};

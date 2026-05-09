@@ -508,7 +508,6 @@ if(GS1_BUILD_GODOT_ADAPTER)
         engines/godot/native/godot_progression_resources.cpp
         engines/godot/native/gs1_godot_director_control.cpp
         engines/godot/native/gs1_godot_main_menu_ui_controller.cpp
-        engines/godot/native/gs1_godot_panel_state_reducers.cpp
         engines/godot/native/gs1_godot_action_panel_controller.cpp
         engines/godot/native/gs1_godot_craft_panel_controller.cpp
         engines/godot/native/gs1_godot_inventory_panel_controller.cpp

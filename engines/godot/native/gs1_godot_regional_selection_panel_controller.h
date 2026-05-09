@@ -1,7 +1,7 @@
 #pragma once
 
 #include "gs1_godot_adapter_service.h"
-#include "gs1_godot_panel_state_reducers.h"
+#include "gs1_godot_projection_types.h"
 
 #include <godot_cpp/classes/button.hpp>
 #include <godot_cpp/classes/control.hpp>
@@ -17,6 +17,7 @@
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 class Gs1GodotRegionalSelectionPanelController final
     : public godot::Control
@@ -50,9 +51,31 @@ private:
         godot::ObjectID object_id {};
     };
 
+    struct PendingUiPanel final
+    {
+        Gs1UiPanelId panel_id {GS1_UI_PANEL_NONE};
+        std::uint32_t context_id {0};
+        std::vector<Gs1RuntimeUiPanelTextProjection> text_lines {};
+        std::vector<Gs1RuntimeUiPanelSlotActionProjection> slot_actions {};
+        std::vector<Gs1RuntimeUiPanelListItemProjection> list_items {};
+        std::vector<Gs1RuntimeUiPanelListActionProjection> list_actions {};
+    };
+
+    struct PendingRegionalMapState final
+    {
+        std::vector<Gs1RuntimeRegionalMapSiteProjection> sites {};
+        std::vector<Gs1RuntimeRegionalMapLinkProjection> links {};
+    };
+
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_owner_control();
     void submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);
+    void reset_ui_panel_state() noexcept;
+    void apply_ui_panel_message(const Gs1EngineMessage& message);
+    void rebuild_ui_panel_indices() noexcept;
+    [[nodiscard]] const Gs1RuntimeUiPanelProjection* find_ui_panel(Gs1UiPanelId panel_id) const noexcept;
+    void reset_regional_map_state() noexcept;
+    void apply_regional_map_message(const Gs1EngineMessage& message);
     void rebuild_selection_panel();
     void reconcile_action_buttons(const godot::Array& button_specs);
     [[nodiscard]] godot::Button* upsert_button_node(
@@ -87,8 +110,17 @@ private:
     godot::RichTextLabel* loadout_summary_ {nullptr};
     godot::VBoxContainer* actions_ {nullptr};
     SubmitUiActionFn submit_ui_action_ {};
-    Gs1GodotUiPanelStateReducer ui_panel_state_reducer_ {k_gs1_regional_selection_ui_panel_message_family};
-    Gs1GodotRegionalMapStateReducer regional_map_state_reducer_ {k_gs1_regional_selection_message_family};
+    std::vector<Gs1RuntimeUiPanelProjection> ui_panels_ {};
+    std::optional<PendingUiPanel> pending_ui_panel_ {};
+    std::unordered_map<std::uint16_t, std::size_t> ui_panel_indices_ {};
+    std::unordered_map<std::uint16_t, std::size_t> pending_ui_panel_text_line_indices_ {};
+    std::unordered_map<std::uint16_t, std::size_t> pending_ui_panel_slot_action_indices_ {};
+    std::unordered_map<std::uint64_t, std::size_t> pending_ui_panel_list_item_indices_ {};
+    std::unordered_map<std::uint64_t, std::size_t> pending_ui_panel_list_action_indices_ {};
+    std::optional<std::uint32_t> selected_site_projection_id_ {};
+    std::vector<Gs1RuntimeRegionalMapSiteProjection> sites_ {};
+    std::vector<Gs1RuntimeRegionalMapLinkProjection> links_ {};
+    std::optional<PendingRegionalMapState> pending_regional_map_state_ {};
     int selected_site_id_ {0};
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> action_buttons_ {};
     mutable std::unordered_map<int, godot::String> item_name_cache_ {};

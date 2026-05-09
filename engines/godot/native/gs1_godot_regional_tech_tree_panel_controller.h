@@ -1,7 +1,7 @@
 #pragma once
 
 #include "gs1_godot_adapter_service.h"
-#include "gs1_godot_panel_state_reducers.h"
+#include "gs1_godot_projection_types.h"
 
 #include <godot_cpp/classes/button.hpp>
 #include <godot_cpp/classes/control.hpp>
@@ -20,6 +20,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 class Gs1GodotRegionalTechTreePanelController final
     : public godot::Control
@@ -81,9 +82,20 @@ private:
         godot::Ref<godot::Texture2D> icon_texture {};
     };
 
+    struct PendingProgressionView final
+    {
+        Gs1ProgressionViewId view_id {GS1_PROGRESSION_VIEW_NONE};
+        std::uint32_t context_id {0};
+        std::vector<Gs1RuntimeProgressionEntryProjection> entries {};
+    };
+
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_owner_control();
     void submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);
+    void reset_progression_view_state() noexcept;
+    void apply_progression_view_message(const Gs1EngineMessage& message);
+    void rebuild_progression_view_indices() noexcept;
+    [[nodiscard]] const Gs1RuntimeProgressionViewProjection* find_progression_view(Gs1ProgressionViewId view_id) const noexcept;
     void apply_overlay_layout();
     void rebuild_tech_tree_panel();
     void reconcile_tech_tree_cards(const godot::Array& card_specs);
@@ -122,7 +134,10 @@ private:
     godot::ScrollContainer* summary_scroll_ {nullptr};
     godot::GridContainer* actions_ {nullptr};
     SubmitUiActionFn submit_ui_action_ {};
-    Gs1GodotProgressionViewStateReducer progression_view_state_reducer_ {};
+    std::vector<Gs1RuntimeProgressionViewProjection> progression_views_ {};
+    std::optional<PendingProgressionView> pending_progression_view_ {};
+    std::unordered_map<std::uint16_t, std::size_t> progression_view_indices_ {};
+    std::unordered_map<std::uint32_t, std::size_t> pending_progression_entry_indices_ {};
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> action_buttons_ {};
     mutable std::unordered_map<int, godot::String> faction_name_cache_ {};
     mutable std::unordered_map<std::uint32_t, TechnologyUiCacheEntry> technology_ui_cache_ {};

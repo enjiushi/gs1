@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <array>
+#include <utility>
 
 using namespace godot;
 
@@ -31,6 +32,99 @@ constexpr std::uint64_t pack_u32_pair(std::uint32_t high, std::uint32_t low) noe
 std::uint64_t make_projected_button_key(int setup_id, int element_id) noexcept
 {
     return pack_u32_pair(static_cast<std::uint32_t>(setup_id), static_cast<std::uint32_t>(element_id));
+}
+
+constexpr std::uint64_t ui_panel_list_item_key(Gs1UiPanelListId list_id, std::uint32_t item_id) noexcept
+{
+    return (static_cast<std::uint64_t>(static_cast<std::uint32_t>(list_id)) << 32U) | static_cast<std::uint64_t>(item_id);
+}
+
+constexpr std::uint64_t ui_panel_list_action_key(
+    Gs1UiPanelListId list_id,
+    std::uint32_t item_id,
+    Gs1UiPanelListActionRole role) noexcept
+{
+    return (static_cast<std::uint64_t>(static_cast<std::uint32_t>(list_id)) << 32U) |
+        (static_cast<std::uint64_t>(item_id) << 8U) |
+        static_cast<std::uint64_t>(static_cast<std::uint8_t>(role));
+}
+
+template <typename Projection, typename Key, typename KeyFn>
+void upsert_projection(std::vector<Projection>& projections, Projection projection, Key key, KeyFn&& key_fn)
+{
+    const auto existing = std::find_if(projections.begin(), projections.end(), [&](const Projection& item) {
+        return key_fn(item) == key;
+    });
+    if (existing != projections.end())
+    {
+        *existing = std::move(projection);
+    }
+    else
+    {
+        projections.push_back(std::move(projection));
+    }
+}
+
+template <typename Projection, typename Predicate>
+void erase_projection_if(std::vector<Projection>& projections, Predicate&& predicate)
+{
+    projections.erase(
+        std::remove_if(projections.begin(), projections.end(), std::forward<Predicate>(predicate)),
+        projections.end());
+}
+
+void sort_ui_setups(std::vector<Gs1RuntimeUiSetupProjection>& setups)
+{
+    std::sort(setups.begin(), setups.end(), [](const auto& lhs, const auto& rhs) {
+        return lhs.setup_id < rhs.setup_id;
+    });
+}
+
+void sort_ui_panels(std::vector<Gs1RuntimeUiPanelProjection>& panels)
+{
+    std::sort(panels.begin(), panels.end(), [](const auto& lhs, const auto& rhs) {
+        return lhs.panel_id < rhs.panel_id;
+    });
+}
+
+void sort_ui_panel_text_lines(std::vector<Gs1RuntimeUiPanelTextProjection>& lines)
+{
+    std::sort(lines.begin(), lines.end(), [](const auto& lhs, const auto& rhs) {
+        return lhs.line_id < rhs.line_id;
+    });
+}
+
+void sort_ui_panel_slot_actions(std::vector<Gs1RuntimeUiPanelSlotActionProjection>& actions)
+{
+    std::sort(actions.begin(), actions.end(), [](const auto& lhs, const auto& rhs) {
+        return lhs.slot_id < rhs.slot_id;
+    });
+}
+
+void sort_ui_panel_list_items(std::vector<Gs1RuntimeUiPanelListItemProjection>& items)
+{
+    std::sort(items.begin(), items.end(), [](const auto& lhs, const auto& rhs) {
+        if (lhs.list_id != rhs.list_id)
+        {
+            return lhs.list_id < rhs.list_id;
+        }
+        return lhs.item_id < rhs.item_id;
+    });
+}
+
+void sort_ui_panel_list_actions(std::vector<Gs1RuntimeUiPanelListActionProjection>& actions)
+{
+    std::sort(actions.begin(), actions.end(), [](const auto& lhs, const auto& rhs) {
+        if (lhs.list_id != rhs.list_id)
+        {
+            return lhs.list_id < rhs.list_id;
+        }
+        if (lhs.item_id != rhs.item_id)
+        {
+            return lhs.item_id < rhs.item_id;
+        }
+        return lhs.role < rhs.role;
+    });
 }
 
 template <typename T>
@@ -188,6 +282,372 @@ void Gs1GodotActionPanelController::submit_ui_action(
     }
 }
 
+void Gs1GodotActionPanelController::reset_ui_setup_state() noexcept
+{
+    ui_setups_.clear();
+    pending_ui_setup_.reset();
+    ui_setup_indices_.clear();
+    pending_ui_setup_element_indices_.clear();
+}
+
+void Gs1GodotActionPanelController::rebuild_ui_setup_indices() noexcept
+{
+    ui_setup_indices_.clear();
+    ui_setup_indices_.reserve(ui_setups_.size());
+    for (std::size_t index = 0; index < ui_setups_.size(); ++index)
+    {
+        ui_setup_indices_[static_cast<std::uint16_t>(ui_setups_[index].setup_id)] = index;
+    }
+}
+
+void Gs1GodotActionPanelController::apply_ui_setup_message(const Gs1EngineMessage& message)
+{
+    switch (message.type)
+    {
+    case GS1_ENGINE_MESSAGE_BEGIN_UI_SETUP:
+    {
+        const auto& payload = message.payload_as<Gs1EngineMessageUiSetupData>();
+        pending_ui_setup_element_indices_.clear();
+        if (payload.mode == GS1_PROJECTION_MODE_DELTA)
+        {
+            const auto found = ui_setup_indices_.find(static_cast<std::uint16_t>(payload.setup_id));
+            if (found != ui_setup_indices_.end() && found->second < ui_setups_.size())
+            {
+                const auto& existing = ui_setups_[found->second];
+                pending_ui_setup_ = PendingUiSetup {};
+                pending_ui_setup_->setup_id = existing.setup_id;
+                pending_ui_setup_->presentation_type = existing.presentation_type;
+                pending_ui_setup_->context_id = existing.context_id;
+                pending_ui_setup_->elements = existing.elements;
+                pending_ui_setup_element_indices_.reserve(pending_ui_setup_->elements.size());
+                for (std::size_t index = 0; index < pending_ui_setup_->elements.size(); ++index)
+                {
+                    pending_ui_setup_element_indices_[pending_ui_setup_->elements[index].element_id] = index;
+                }
+            }
+            else
+            {
+                pending_ui_setup_ = PendingUiSetup {};
+            }
+        }
+        else
+        {
+            pending_ui_setup_ = PendingUiSetup {};
+        }
+
+        pending_ui_setup_->setup_id = payload.setup_id;
+        pending_ui_setup_->presentation_type = payload.presentation_type;
+        pending_ui_setup_->context_id = payload.context_id;
+        if (payload.mode == GS1_PROJECTION_MODE_SNAPSHOT)
+        {
+            pending_ui_setup_->elements.clear();
+        }
+        pending_ui_setup_->elements.reserve(std::max<std::size_t>(pending_ui_setup_->elements.size(), payload.element_count));
+        break;
+    }
+    case GS1_ENGINE_MESSAGE_UI_ELEMENT_UPSERT:
+    {
+        if (!pending_ui_setup_.has_value())
+        {
+            break;
+        }
+        const auto& payload = message.payload_as<Gs1EngineMessageUiElementData>();
+        Gs1RuntimeUiElementProjection projection {};
+        projection.element_id = payload.element_id;
+        projection.element_type = payload.element_type;
+        projection.flags = payload.flags;
+        projection.action = payload.action;
+        projection.content_kind = payload.content_kind;
+        projection.primary_id = payload.primary_id;
+        projection.secondary_id = payload.secondary_id;
+        projection.quantity = payload.quantity;
+        const auto found = pending_ui_setup_element_indices_.find(projection.element_id);
+        if (found != pending_ui_setup_element_indices_.end() && found->second < pending_ui_setup_->elements.size())
+        {
+            pending_ui_setup_->elements[found->second] = projection;
+        }
+        else
+        {
+            pending_ui_setup_element_indices_[projection.element_id] = pending_ui_setup_->elements.size();
+            pending_ui_setup_->elements.push_back(std::move(projection));
+        }
+        break;
+    }
+    case GS1_ENGINE_MESSAGE_END_UI_SETUP:
+    {
+        if (!pending_ui_setup_.has_value())
+        {
+            break;
+        }
+
+        Gs1RuntimeUiSetupProjection setup {};
+        setup.setup_id = pending_ui_setup_->setup_id;
+        setup.presentation_type = pending_ui_setup_->presentation_type;
+        setup.context_id = pending_ui_setup_->context_id;
+        setup.elements = std::move(pending_ui_setup_->elements);
+
+        if (setup.presentation_type == GS1_UI_SETUP_PRESENTATION_NORMAL)
+        {
+            erase_projection_if(ui_setups_, [](const auto& existing) {
+                return existing.presentation_type == GS1_UI_SETUP_PRESENTATION_NORMAL;
+            });
+        }
+
+        upsert_projection(ui_setups_, std::move(setup), pending_ui_setup_->setup_id, [](const auto& existing) {
+            return existing.setup_id;
+        });
+        sort_ui_setups(ui_setups_);
+        rebuild_ui_setup_indices();
+        pending_ui_setup_.reset();
+        pending_ui_setup_element_indices_.clear();
+        break;
+    }
+    case GS1_ENGINE_MESSAGE_CLOSE_UI_SETUP:
+    {
+        const auto& payload = message.payload_as<Gs1EngineMessageCloseUiSetupData>();
+        erase_projection_if(ui_setups_, [&](const auto& setup) {
+            return setup.setup_id == payload.setup_id;
+        });
+        rebuild_ui_setup_indices();
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+void Gs1GodotActionPanelController::reset_ui_panel_state() noexcept
+{
+    ui_panels_.clear();
+    pending_ui_panel_.reset();
+    ui_panel_indices_.clear();
+    pending_ui_panel_text_line_indices_.clear();
+    pending_ui_panel_slot_action_indices_.clear();
+    pending_ui_panel_list_item_indices_.clear();
+    pending_ui_panel_list_action_indices_.clear();
+}
+
+void Gs1GodotActionPanelController::rebuild_ui_panel_indices() noexcept
+{
+    ui_panel_indices_.clear();
+    ui_panel_indices_.reserve(ui_panels_.size());
+    for (std::size_t index = 0; index < ui_panels_.size(); ++index)
+    {
+        ui_panel_indices_[static_cast<std::uint16_t>(ui_panels_[index].panel_id)] = index;
+    }
+}
+
+void Gs1GodotActionPanelController::apply_ui_panel_message(const Gs1EngineMessage& message)
+{
+    const Gs1EngineMessageType type = message.type;
+    if (type == GS1_ENGINE_MESSAGE_BEGIN_UI_PANEL)
+    {
+        const auto& payload = message.payload_as<Gs1EngineMessageUiPanelData>();
+        pending_ui_panel_text_line_indices_.clear();
+        pending_ui_panel_slot_action_indices_.clear();
+        pending_ui_panel_list_item_indices_.clear();
+        pending_ui_panel_list_action_indices_.clear();
+        if (payload.mode == GS1_PROJECTION_MODE_DELTA)
+        {
+            const auto found = ui_panel_indices_.find(static_cast<std::uint16_t>(payload.panel_id));
+            if (found != ui_panel_indices_.end() && found->second < ui_panels_.size())
+            {
+                const auto& existing = ui_panels_[found->second];
+                pending_ui_panel_ = PendingUiPanel {};
+                pending_ui_panel_->panel_id = existing.panel_id;
+                pending_ui_panel_->context_id = existing.context_id;
+                pending_ui_panel_->text_lines = existing.text_lines;
+                pending_ui_panel_->slot_actions = existing.slot_actions;
+                pending_ui_panel_->list_items = existing.list_items;
+                pending_ui_panel_->list_actions = existing.list_actions;
+                for (std::size_t index = 0; index < pending_ui_panel_->text_lines.size(); ++index)
+                {
+                    pending_ui_panel_text_line_indices_[pending_ui_panel_->text_lines[index].line_id] = index;
+                }
+                for (std::size_t index = 0; index < pending_ui_panel_->slot_actions.size(); ++index)
+                {
+                    pending_ui_panel_slot_action_indices_[static_cast<std::uint16_t>(pending_ui_panel_->slot_actions[index].slot_id)] = index;
+                }
+                for (std::size_t index = 0; index < pending_ui_panel_->list_items.size(); ++index)
+                {
+                    pending_ui_panel_list_item_indices_[ui_panel_list_item_key(
+                        pending_ui_panel_->list_items[index].list_id,
+                        pending_ui_panel_->list_items[index].item_id)] = index;
+                }
+                for (std::size_t index = 0; index < pending_ui_panel_->list_actions.size(); ++index)
+                {
+                    pending_ui_panel_list_action_indices_[ui_panel_list_action_key(
+                        pending_ui_panel_->list_actions[index].list_id,
+                        pending_ui_panel_->list_actions[index].item_id,
+                        pending_ui_panel_->list_actions[index].role)] = index;
+                }
+            }
+            else
+            {
+                pending_ui_panel_ = PendingUiPanel {};
+            }
+        }
+        else
+        {
+            pending_ui_panel_ = PendingUiPanel {};
+        }
+
+        pending_ui_panel_->panel_id = payload.panel_id;
+        pending_ui_panel_->context_id = payload.context_id;
+        if (payload.mode == GS1_PROJECTION_MODE_SNAPSHOT)
+        {
+            pending_ui_panel_->text_lines.clear();
+            pending_ui_panel_->slot_actions.clear();
+            pending_ui_panel_->list_items.clear();
+            pending_ui_panel_->list_actions.clear();
+        }
+    }
+    else if (type == GS1_ENGINE_MESSAGE_UI_PANEL_TEXT_UPSERT)
+    {
+        if (!pending_ui_panel_.has_value())
+        {
+            return;
+        }
+        const auto& payload = message.payload_as<Gs1EngineMessageUiPanelTextData>();
+        Gs1RuntimeUiPanelTextProjection projection {};
+        projection.line_id = payload.line_id;
+        projection.flags = payload.flags;
+        projection.text_kind = payload.text_kind;
+        projection.primary_id = payload.primary_id;
+        projection.secondary_id = payload.secondary_id;
+        projection.quantity = payload.quantity;
+        projection.aux_value = payload.aux_value;
+        const auto found = pending_ui_panel_text_line_indices_.find(projection.line_id);
+        if (found != pending_ui_panel_text_line_indices_.end() && found->second < pending_ui_panel_->text_lines.size())
+        {
+            pending_ui_panel_->text_lines[found->second] = projection;
+        }
+        else
+        {
+            pending_ui_panel_text_line_indices_[projection.line_id] = pending_ui_panel_->text_lines.size();
+            pending_ui_panel_->text_lines.push_back(std::move(projection));
+        }
+    }
+    else if (type == GS1_ENGINE_MESSAGE_UI_PANEL_SLOT_ACTION_UPSERT)
+    {
+        if (!pending_ui_panel_.has_value())
+        {
+            return;
+        }
+        const auto& payload = message.payload_as<Gs1EngineMessageUiPanelSlotActionData>();
+        Gs1RuntimeUiPanelSlotActionProjection projection {};
+        projection.slot_id = payload.slot_id;
+        projection.flags = payload.flags;
+        projection.action = payload.action;
+        projection.label_kind = payload.label_kind;
+        projection.primary_id = payload.primary_id;
+        projection.secondary_id = payload.secondary_id;
+        projection.quantity = payload.quantity;
+        const auto key = static_cast<std::uint16_t>(projection.slot_id);
+        const auto found = pending_ui_panel_slot_action_indices_.find(key);
+        if (found != pending_ui_panel_slot_action_indices_.end() && found->second < pending_ui_panel_->slot_actions.size())
+        {
+            pending_ui_panel_->slot_actions[found->second] = projection;
+        }
+        else
+        {
+            pending_ui_panel_slot_action_indices_[key] = pending_ui_panel_->slot_actions.size();
+            pending_ui_panel_->slot_actions.push_back(std::move(projection));
+        }
+    }
+    else if (type == GS1_ENGINE_MESSAGE_UI_PANEL_LIST_ITEM_UPSERT)
+    {
+        if (!pending_ui_panel_.has_value())
+        {
+            return;
+        }
+        const auto& payload = message.payload_as<Gs1EngineMessageUiPanelListItemData>();
+        Gs1RuntimeUiPanelListItemProjection projection {};
+        projection.item_id = payload.item_id;
+        projection.list_id = payload.list_id;
+        projection.flags = payload.flags;
+        projection.primary_kind = payload.primary_kind;
+        projection.secondary_kind = payload.secondary_kind;
+        projection.primary_id = payload.primary_id;
+        projection.secondary_id = payload.secondary_id;
+        projection.quantity = payload.quantity;
+        projection.map_x = payload.map_x;
+        projection.map_y = payload.map_y;
+        const auto key = ui_panel_list_item_key(projection.list_id, projection.item_id);
+        const auto found = pending_ui_panel_list_item_indices_.find(key);
+        if (found != pending_ui_panel_list_item_indices_.end() && found->second < pending_ui_panel_->list_items.size())
+        {
+            pending_ui_panel_->list_items[found->second] = projection;
+        }
+        else
+        {
+            pending_ui_panel_list_item_indices_[key] = pending_ui_panel_->list_items.size();
+            pending_ui_panel_->list_items.push_back(std::move(projection));
+        }
+    }
+    else if (type == GS1_ENGINE_MESSAGE_UI_PANEL_LIST_ACTION_UPSERT)
+    {
+        if (!pending_ui_panel_.has_value())
+        {
+            return;
+        }
+        const auto& payload = message.payload_as<Gs1EngineMessageUiPanelListActionData>();
+        Gs1RuntimeUiPanelListActionProjection projection {};
+        projection.item_id = payload.item_id;
+        projection.list_id = payload.list_id;
+        projection.role = payload.role;
+        projection.flags = payload.flags;
+        projection.action = payload.action;
+        const auto key = ui_panel_list_action_key(projection.list_id, projection.item_id, projection.role);
+        const auto found = pending_ui_panel_list_action_indices_.find(key);
+        if (found != pending_ui_panel_list_action_indices_.end() && found->second < pending_ui_panel_->list_actions.size())
+        {
+            pending_ui_panel_->list_actions[found->second] = projection;
+        }
+        else
+        {
+            pending_ui_panel_list_action_indices_[key] = pending_ui_panel_->list_actions.size();
+            pending_ui_panel_->list_actions.push_back(std::move(projection));
+        }
+    }
+    else if (type == GS1_ENGINE_MESSAGE_END_UI_PANEL)
+    {
+        if (!pending_ui_panel_.has_value())
+        {
+            return;
+        }
+        Gs1RuntimeUiPanelProjection panel {};
+        panel.panel_id = pending_ui_panel_->panel_id;
+        panel.context_id = pending_ui_panel_->context_id;
+        panel.text_lines = std::move(pending_ui_panel_->text_lines);
+        panel.slot_actions = std::move(pending_ui_panel_->slot_actions);
+        panel.list_items = std::move(pending_ui_panel_->list_items);
+        panel.list_actions = std::move(pending_ui_panel_->list_actions);
+        sort_ui_panel_text_lines(panel.text_lines);
+        sort_ui_panel_slot_actions(panel.slot_actions);
+        sort_ui_panel_list_items(panel.list_items);
+        sort_ui_panel_list_actions(panel.list_actions);
+        upsert_projection(ui_panels_, std::move(panel), pending_ui_panel_->panel_id, [](const auto& existing) {
+            return existing.panel_id;
+        });
+        sort_ui_panels(ui_panels_);
+        rebuild_ui_panel_indices();
+        pending_ui_panel_.reset();
+        pending_ui_panel_text_line_indices_.clear();
+        pending_ui_panel_slot_action_indices_.clear();
+        pending_ui_panel_list_item_indices_.clear();
+        pending_ui_panel_list_action_indices_.clear();
+    }
+    else if (type == GS1_ENGINE_MESSAGE_CLOSE_UI_PANEL)
+    {
+        const auto& payload = message.payload_as<Gs1EngineMessageCloseUiPanelData>();
+        erase_projection_if(ui_panels_, [&](const auto& panel) {
+            return panel.panel_id == payload.panel_id;
+        });
+        rebuild_ui_panel_indices();
+    }
+}
+
 void Gs1GodotActionPanelController::handle_open_protection_pressed()
 {
     if (!submit_ui_action_)
@@ -218,8 +678,8 @@ bool Gs1GodotActionPanelController::handles_engine_message(Gs1EngineMessageType 
 
 void Gs1GodotActionPanelController::handle_engine_message(const Gs1EngineMessage& message)
 {
-    ui_setup_state_reducer_.apply_engine_message(message);
-    ui_panel_state_reducer_.apply_engine_message(message);
+    apply_ui_setup_message(message);
+    apply_ui_panel_message(message);
 
     cache_fixed_slot_bindings();
     clear_fixed_slot_actions();
@@ -231,8 +691,8 @@ void Gs1GodotActionPanelController::handle_engine_message(const Gs1EngineMessage
 
 void Gs1GodotActionPanelController::handle_runtime_message_reset()
 {
-    ui_setup_state_reducer_.reset();
-    ui_panel_state_reducer_.reset();
+    reset_ui_setup_state();
+    reset_ui_panel_state();
     clear_fixed_slot_actions();
     prune_button_registry(site_control_buttons_, {});
 }
@@ -419,8 +879,7 @@ void Gs1GodotActionPanelController::clear_action_from_button(BaseButton* button,
 void Gs1GodotActionPanelController::reconcile_site_control_buttons()
 {
     Array button_specs;
-    const auto& setups = ui_setup_state_reducer_.setups();
-    for (const auto& setup : setups)
+    for (const auto& setup : ui_setups_)
     {
         if (setup.presentation_type == GS1_UI_SETUP_PRESENTATION_OVERLAY)
         {
@@ -566,7 +1025,12 @@ void Gs1GodotActionPanelController::prune_button_registry(
 
 const Gs1RuntimeUiPanelProjection* Gs1GodotActionPanelController::find_ui_panel(int panel_id) const
 {
-    return ui_panel_state_reducer_.find_panel(static_cast<Gs1UiPanelId>(panel_id));
+    const auto found = ui_panel_indices_.find(static_cast<std::uint16_t>(panel_id));
+    if (found == ui_panel_indices_.end() || found->second >= ui_panels_.size())
+    {
+        return nullptr;
+    }
+    return &ui_panels_[found->second];
 }
 
 const Gs1RuntimeUiPanelSlotActionProjection* Gs1GodotActionPanelController::find_panel_slot_action(

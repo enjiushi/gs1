@@ -1,7 +1,7 @@
 #pragma once
 
 #include "gs1_godot_adapter_service.h"
-#include "gs1_godot_panel_state_reducers.h"
+#include "gs1_godot_projection_types.h"
 
 #include <godot_cpp/classes/button.hpp>
 #include <godot_cpp/classes/control.hpp>
@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <vector>
 
 class Gs1GodotRegionalMapHudController final
     : public godot::Control
@@ -39,9 +40,17 @@ protected:
     static void _bind_methods();
 
 private:
+    struct PendingRegionalMapState final
+    {
+        std::vector<Gs1RuntimeRegionalMapSiteProjection> sites {};
+        std::vector<Gs1RuntimeRegionalMapLinkProjection> links {};
+    };
+
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_owner_control();
     void submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);
+    void reset_regional_map_state() noexcept;
+    void apply_regional_map_message(const Gs1EngineMessage& message);
     void rebuild_hud();
     [[nodiscard]] godot::String selected_site_text() const;
     [[nodiscard]] godot::String campaign_summary_text() const;
@@ -58,7 +67,10 @@ private:
     godot::RichTextLabel* campaign_summary_ {nullptr};
     godot::Button* tech_button_ {nullptr};
     SubmitUiActionFn submit_ui_action_ {};
-    Gs1GodotRegionalMapStateReducer regional_map_state_reducer_ {k_gs1_regional_map_hud_message_family};
+    std::optional<std::uint32_t> selected_site_id_ {};
+    std::vector<Gs1RuntimeRegionalMapSiteProjection> sites_ {};
+    std::vector<Gs1RuntimeRegionalMapLinkProjection> links_ {};
+    std::optional<PendingRegionalMapState> pending_regional_map_state_ {};
     std::optional<Gs1RuntimeCampaignResourcesProjection> campaign_resources_ {};
     bool tech_tree_visible_ {false};
     bool tech_button_connected_ {false};

@@ -21,11 +21,55 @@
 
 #include <algorithm>
 #include <limits>
+#include <utility>
 
 using namespace godot;
 
 namespace
 {
+template <typename Projection, typename Key, typename KeyFn>
+void upsert_projection(std::vector<Projection>& projections, Projection projection, Key key, KeyFn&& key_fn)
+{
+    const auto existing = std::find_if(projections.begin(), projections.end(), [&](const Projection& item) {
+        return key_fn(item) == key;
+    });
+    if (existing != projections.end())
+    {
+        *existing = std::move(projection);
+    }
+    else
+    {
+        projections.push_back(std::move(projection));
+    }
+}
+
+template <typename Projection, typename Predicate>
+void erase_projection_if(std::vector<Projection>& projections, Predicate&& predicate)
+{
+    projections.erase(
+        std::remove_if(projections.begin(), projections.end(), std::forward<Predicate>(predicate)),
+        projections.end());
+}
+
+std::uint64_t regional_map_link_key(std::uint32_t from_site_id, std::uint32_t to_site_id)
+{
+    return (static_cast<std::uint64_t>(from_site_id) << 32U) | static_cast<std::uint64_t>(to_site_id);
+}
+
+void sort_regional_map_sites(std::vector<Gs1RuntimeRegionalMapSiteProjection>& sites)
+{
+    std::sort(sites.begin(), sites.end(), [](const auto& lhs, const auto& rhs) {
+        return lhs.site_id < rhs.site_id;
+    });
+}
+
+void sort_regional_map_links(std::vector<Gs1RuntimeRegionalMapLinkProjection>& links)
+{
+    std::sort(links.begin(), links.end(), [](const auto& lhs, const auto& rhs) {
+        return regional_map_link_key(lhs.from_site_id, lhs.to_site_id) < regional_map_link_key(rhs.from_site_id, rhs.to_site_id);
+    });
+}
+
 Node3D* make_node3d()
 {
     return memnew(Node3D);
@@ -176,9 +220,117 @@ bool Gs1GodotRegionalMapSceneController::handles_engine_message(Gs1EngineMessage
     }
 }
 
+void Gs1GodotRegionalMapSceneController::reset_regional_map_state() noexcept
+{
+    selected_site_id_.reset();
+    sites_.clear();
+    links_.clear();
+    pending_regional_map_state_.reset();
+}
+
+void Gs1GodotRegionalMapSceneController::apply_regional_map_message(const Gs1EngineMessage& message)
+{
+    if (message.type == GS1_ENGINE_MESSAGE_SET_APP_STATE)
+    {
+        const auto& payload = message.payload_as<Gs1EngineMessageSetAppStateData>();
+        if (payload.app_state == GS1_APP_STATE_MAIN_MENU)
+        {
+            selected_site_id_.reset();
+            sites_.clear();
+            links_.clear();
+        }
+    }
+    else if (message.type == GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_MAP_SNAPSHOT)
+    {
+        const auto& payload = message.payload_as<Gs1EngineMessageRegionalMapSnapshotData>();
+        if (payload.mode == GS1_PROJECTION_MODE_DELTA)
+        {
+            pending_regional_map_state_ = PendingRegionalMapState {sites_, links_};
+        }
+        else
+        {
+            pending_regional_map_state_ = PendingRegionalMapState {};
+        }
+
+        if (payload.selected_site_id != 0U)
+        {
+            selected_site_id_ = payload.selected_site_id;
+        }
+        else
+        {
+            selected_site_id_.reset();
+        }
+    }
+    else if (message.type == GS1_ENGINE_MESSAGE_REGIONAL_MAP_SITE_UPSERT)
+    {
+        if (!pending_regional_map_state_.has_value())
+        {
+            return;
+        }
+        Gs1RuntimeRegionalMapSiteProjection projection = message.payload_as<Gs1EngineMessageRegionalMapSiteData>();
+        upsert_projection(pending_regional_map_state_->sites, projection, projection.site_id, [](const auto& site) {
+            return site.site_id;
+        });
+        if ((projection.flags & 1U) != 0U)
+        {
+            selected_site_id_ = projection.site_id;
+        }
+    }
+    else if (message.type == GS1_ENGINE_MESSAGE_REGIONAL_MAP_SITE_REMOVE)
+    {
+        if (!pending_regional_map_state_.has_value())
+        {
+            return;
+        }
+        const auto& payload = message.payload_as<Gs1EngineMessageRegionalMapSiteData>();
+        erase_projection_if(pending_regional_map_state_->sites, [&](const auto& site) {
+            return site.site_id == payload.site_id;
+        });
+        if (selected_site_id_.has_value() && selected_site_id_.value() == payload.site_id)
+        {
+            selected_site_id_.reset();
+        }
+    }
+    else if (message.type == GS1_ENGINE_MESSAGE_REGIONAL_MAP_LINK_UPSERT)
+    {
+        if (!pending_regional_map_state_.has_value())
+        {
+            return;
+        }
+        Gs1RuntimeRegionalMapLinkProjection projection = message.payload_as<Gs1EngineMessageRegionalMapLinkData>();
+        upsert_projection(pending_regional_map_state_->links, projection, regional_map_link_key(projection.from_site_id, projection.to_site_id), [](const auto& link) {
+            return regional_map_link_key(link.from_site_id, link.to_site_id);
+        });
+    }
+    else if (message.type == GS1_ENGINE_MESSAGE_REGIONAL_MAP_LINK_REMOVE)
+    {
+        if (!pending_regional_map_state_.has_value())
+        {
+            return;
+        }
+        const auto& payload = message.payload_as<Gs1EngineMessageRegionalMapLinkData>();
+        const auto key = regional_map_link_key(payload.from_site_id, payload.to_site_id);
+        erase_projection_if(pending_regional_map_state_->links, [&](const auto& link) {
+            return regional_map_link_key(link.from_site_id, link.to_site_id) == key;
+        });
+    }
+    else if (message.type == GS1_ENGINE_MESSAGE_END_REGIONAL_MAP_SNAPSHOT)
+    {
+        if (!pending_regional_map_state_.has_value())
+        {
+            return;
+        }
+        sort_regional_map_sites(pending_regional_map_state_->sites);
+        sort_regional_map_links(pending_regional_map_state_->links);
+        sites_ = std::move(pending_regional_map_state_->sites);
+        links_ = std::move(pending_regional_map_state_->links);
+        pending_regional_map_state_.reset();
+    }
+}
+
 void Gs1GodotRegionalMapSceneController::handle_engine_message(const Gs1EngineMessage& message)
 {
-    regional_map_state_reducer_.apply_engine_message(message);
+    apply_regional_map_message(message);
 
     if (message.type == GS1_ENGINE_MESSAGE_END_REGIONAL_MAP_SNAPSHOT)
     {
@@ -188,7 +340,7 @@ void Gs1GodotRegionalMapSceneController::handle_engine_message(const Gs1EngineMe
 
 void Gs1GodotRegionalMapSceneController::handle_runtime_message_reset()
 {
-    regional_map_state_reducer_.reset();
+    reset_regional_map_state();
     clear_regional_projection_world();
     regional_material_cache_.clear();
 }
@@ -208,14 +360,13 @@ void Gs1GodotRegionalMapSceneController::select_regional_site(int site_id)
 
 void Gs1GodotRegionalMapSceneController::refresh_regional_map()
 {
-    const auto& regional_state = regional_map_state_reducer_.state();
-    if (regional_state.sites.empty())
+    if (sites_.empty())
     {
         clear_regional_projection_world();
         return;
     }
 
-    rebuild_regional_map_world(regional_state.sites, regional_state.links);
+    rebuild_regional_map_world(sites_, links_);
     update_regional_site_visuals();
 }
 
@@ -371,13 +522,12 @@ void Gs1GodotRegionalMapSceneController::position_regional_camera(const Rect2i& 
 
 void Gs1GodotRegionalMapSceneController::update_regional_site_visuals()
 {
-    const auto& regional_state = regional_map_state_reducer_.state();
-    int selected_site_id = regional_state.selected_site_id.has_value()
-        ? static_cast<int>(regional_state.selected_site_id.value())
+    int selected_site_id = selected_site_id_.has_value()
+        ? static_cast<int>(selected_site_id_.value())
         : 0;
-    if (selected_site_id == 0 && !regional_state.sites.empty())
+    if (selected_site_id == 0 && !sites_.empty())
     {
-        selected_site_id = static_cast<int>(regional_state.sites.front().site_id);
+        selected_site_id = static_cast<int>(sites_.front().site_id);
     }
 
     for (auto& [site_id, record] : regional_site_nodes_)

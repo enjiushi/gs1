@@ -1,13 +1,14 @@
 #pragma once
 
 #include "gs1_godot_adapter_service.h"
-#include "gs1_godot_panel_state_reducers.h"
+#include "gs1_godot_projection_types.h"
 
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/rich_text_label.hpp>
 #include <godot_cpp/core/binder_common.hpp>
 
 #include <optional>
+#include <vector>
 
 class Gs1GodotRegionalSummaryPanelController final
     : public godot::Control
@@ -32,8 +33,16 @@ protected:
     static void _bind_methods();
 
 private:
+    struct PendingRegionalMapState final
+    {
+        std::vector<Gs1RuntimeRegionalMapSiteProjection> sites {};
+        std::vector<Gs1RuntimeRegionalMapLinkProjection> links {};
+    };
+
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_owner_control();
+    void reset_regional_map_state() noexcept;
+    void apply_regional_map_message(const Gs1EngineMessage& message);
     void rebuild_summary();
     [[nodiscard]] godot::String build_regional_map_overview_text(
         const std::vector<Gs1RuntimeRegionalMapSiteProjection>& sites,
@@ -43,6 +52,9 @@ private:
     Gs1GodotAdapterService* adapter_service_ {nullptr};
     godot::RichTextLabel* regional_map_summary_ {nullptr};
     godot::RichTextLabel* regional_map_graph_ {nullptr};
-    Gs1GodotRegionalMapStateReducer regional_map_state_reducer_ {k_gs1_regional_summary_message_family};
+    std::optional<std::uint32_t> selected_site_id_ {};
+    std::vector<Gs1RuntimeRegionalMapSiteProjection> sites_ {};
+    std::vector<Gs1RuntimeRegionalMapLinkProjection> links_ {};
+    std::optional<PendingRegionalMapState> pending_regional_map_state_ {};
     std::optional<Gs1RuntimeCampaignResourcesProjection> campaign_resources_ {};
 };

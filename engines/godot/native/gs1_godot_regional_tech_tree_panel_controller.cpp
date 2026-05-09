@@ -27,6 +27,7 @@
 #include <algorithm>
 #include <map>
 #include <string_view>
+#include <utility>
 
 using namespace godot;
 
@@ -58,6 +59,56 @@ std::uint64_t make_projected_button_key(int setup_id, int element_id) noexcept
 std::uint64_t make_tech_tree_marker_key(std::uint32_t row_requirement, std::uint32_t column_index) noexcept
 {
     return pack_u32_pair(row_requirement, column_index);
+}
+
+template <typename Projection, typename Key, typename KeyFn>
+void upsert_projection(std::vector<Projection>& projections, Projection projection, Key key, KeyFn&& key_fn)
+{
+    const auto existing = std::find_if(projections.begin(), projections.end(), [&](const Projection& item) {
+        return key_fn(item) == key;
+    });
+    if (existing != projections.end())
+    {
+        *existing = std::move(projection);
+    }
+    else
+    {
+        projections.push_back(std::move(projection));
+    }
+}
+
+template <typename Projection, typename Predicate>
+void erase_projection_if(std::vector<Projection>& projections, Predicate&& predicate)
+{
+    projections.erase(
+        std::remove_if(projections.begin(), projections.end(), std::forward<Predicate>(predicate)),
+        projections.end());
+}
+
+void sort_progression_entries(std::vector<Gs1RuntimeProgressionEntryProjection>& entries)
+{
+    std::sort(entries.begin(), entries.end(), [](const auto& lhs, const auto& rhs) {
+        if (lhs.reputation_requirement != rhs.reputation_requirement)
+        {
+            return lhs.reputation_requirement < rhs.reputation_requirement;
+        }
+        if (lhs.entry_kind != rhs.entry_kind)
+        {
+            return lhs.entry_kind < rhs.entry_kind;
+        }
+        if (lhs.faction_id != rhs.faction_id)
+        {
+            return lhs.faction_id < rhs.faction_id;
+        }
+        return lhs.entry_id < rhs.entry_id;
+    });
+}
+
+void sort_progression_views(std::vector<Gs1RuntimeProgressionViewProjection>& views)
+{
+    std::sort(views.begin(), views.end(), [](const auto& lhs, const auto& rhs) {
+        return lhs.view_id < rhs.view_id;
+    });
 }
 
 template <typename T>
@@ -308,16 +359,151 @@ bool Gs1GodotRegionalTechTreePanelController::handles_engine_message(Gs1EngineMe
     }
 }
 
+void Gs1GodotRegionalTechTreePanelController::reset_progression_view_state() noexcept
+{
+    progression_views_.clear();
+    pending_progression_view_.reset();
+    progression_view_indices_.clear();
+    pending_progression_entry_indices_.clear();
+}
+
+void Gs1GodotRegionalTechTreePanelController::rebuild_progression_view_indices() noexcept
+{
+    progression_view_indices_.clear();
+    progression_view_indices_.reserve(progression_views_.size());
+    for (std::size_t index = 0; index < progression_views_.size(); ++index)
+    {
+        progression_view_indices_[static_cast<std::uint16_t>(progression_views_[index].view_id)] = index;
+    }
+}
+
+const Gs1RuntimeProgressionViewProjection* Gs1GodotRegionalTechTreePanelController::find_progression_view(
+    Gs1ProgressionViewId view_id) const noexcept
+{
+    const auto found = progression_view_indices_.find(static_cast<std::uint16_t>(view_id));
+    if (found == progression_view_indices_.end() || found->second >= progression_views_.size())
+    {
+        return nullptr;
+    }
+    return &progression_views_[found->second];
+}
+
+void Gs1GodotRegionalTechTreePanelController::apply_progression_view_message(const Gs1EngineMessage& message)
+{
+    switch (message.type)
+    {
+    case GS1_ENGINE_MESSAGE_BEGIN_PROGRESSION_VIEW:
+    {
+        const auto& payload = message.payload_as<Gs1EngineMessageProgressionViewData>();
+        pending_progression_entry_indices_.clear();
+        if (payload.mode == GS1_PROJECTION_MODE_DELTA)
+        {
+            const auto found = progression_view_indices_.find(static_cast<std::uint16_t>(payload.view_id));
+            if (found != progression_view_indices_.end() && found->second < progression_views_.size())
+            {
+                const auto& existing = progression_views_[found->second];
+                pending_progression_view_ = PendingProgressionView {};
+                pending_progression_view_->view_id = existing.view_id;
+                pending_progression_view_->context_id = existing.context_id;
+                pending_progression_view_->entries = existing.entries;
+                pending_progression_entry_indices_.reserve(pending_progression_view_->entries.size());
+                for (std::size_t index = 0; index < pending_progression_view_->entries.size(); ++index)
+                {
+                    pending_progression_entry_indices_[pending_progression_view_->entries[index].entry_id] = index;
+                }
+            }
+            else
+            {
+                pending_progression_view_ = PendingProgressionView {};
+            }
+        }
+        else
+        {
+            pending_progression_view_ = PendingProgressionView {};
+        }
+        pending_progression_view_->view_id = payload.view_id;
+        pending_progression_view_->context_id = payload.context_id;
+        if (payload.mode == GS1_PROJECTION_MODE_SNAPSHOT)
+        {
+            pending_progression_view_->entries.clear();
+        }
+        pending_progression_view_->entries.reserve(std::max<std::size_t>(pending_progression_view_->entries.size(), payload.entry_count));
+        break;
+    }
+    case GS1_ENGINE_MESSAGE_PROGRESSION_ENTRY_UPSERT:
+    {
+        if (!pending_progression_view_.has_value())
+        {
+            break;
+        }
+        const auto& payload = message.payload_as<Gs1EngineMessageProgressionEntryData>();
+        Gs1RuntimeProgressionEntryProjection projection {};
+        projection.entry_id = payload.entry_id;
+        projection.reputation_requirement = payload.reputation_requirement;
+        projection.content_id = payload.content_id;
+        projection.tech_node_id = payload.tech_node_id;
+        projection.faction_id = payload.faction_id;
+        projection.entry_kind = payload.entry_kind;
+        projection.flags = payload.flags;
+        projection.content_kind = payload.content_kind;
+        projection.tier_index = payload.tier_index;
+        projection.action = payload.action;
+        const auto found = pending_progression_entry_indices_.find(projection.entry_id);
+        if (found != pending_progression_entry_indices_.end() && found->second < pending_progression_view_->entries.size())
+        {
+            pending_progression_view_->entries[found->second] = projection;
+        }
+        else
+        {
+            pending_progression_entry_indices_[projection.entry_id] = pending_progression_view_->entries.size();
+            pending_progression_view_->entries.push_back(std::move(projection));
+        }
+        break;
+    }
+    case GS1_ENGINE_MESSAGE_END_PROGRESSION_VIEW:
+    {
+        if (!pending_progression_view_.has_value())
+        {
+            break;
+        }
+        Gs1RuntimeProgressionViewProjection view {};
+        view.view_id = pending_progression_view_->view_id;
+        view.context_id = pending_progression_view_->context_id;
+        view.entries = std::move(pending_progression_view_->entries);
+        sort_progression_entries(view.entries);
+        upsert_projection(progression_views_, std::move(view), pending_progression_view_->view_id, [](const auto& existing) {
+            return existing.view_id;
+        });
+        sort_progression_views(progression_views_);
+        rebuild_progression_view_indices();
+        pending_progression_view_.reset();
+        pending_progression_entry_indices_.clear();
+        break;
+    }
+    case GS1_ENGINE_MESSAGE_CLOSE_PROGRESSION_VIEW:
+    {
+        const auto& payload = message.payload_as<Gs1EngineMessageCloseProgressionViewData>();
+        erase_projection_if(progression_views_, [&](const auto& view) {
+            return view.view_id == payload.view_id;
+        });
+        rebuild_progression_view_indices();
+        break;
+    }
+    default:
+        break;
+    }
+}
+
 void Gs1GodotRegionalTechTreePanelController::handle_engine_message(const Gs1EngineMessage& message)
 {
-    progression_view_state_reducer_.apply_engine_message(message);
+    apply_progression_view_message(message);
 
     rebuild_tech_tree_panel();
 }
 
 void Gs1GodotRegionalTechTreePanelController::handle_runtime_message_reset()
 {
-    progression_view_state_reducer_.reset();
+    reset_progression_view_state();
     rebuild_tech_tree_panel();
 }
 
@@ -329,7 +515,7 @@ void Gs1GodotRegionalTechTreePanelController::rebuild_tech_tree_panel()
     }
 
     const Gs1RuntimeProgressionViewProjection* progression_view =
-        progression_view_state_reducer_.find_view(GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE);
+        find_progression_view(GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE);
     if (progression_view == nullptr)
     {
         overlay_->set_visible(false);
