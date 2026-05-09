@@ -809,8 +809,12 @@ void Gs1GodotRegionalSelectionPanelController::refresh_selection_panel_actions_a
             action["arg0"] = static_cast<int64_t>(slot_action.action.arg0);
             action["arg1"] = static_cast<int64_t>(slot_action.action.arg1);
             const int action_type = static_cast<int>(slot_action.action.type);
+            if (action_type == k_ui_action_clear_deployment_site_selection)
+            {
+                continue;
+            }
             const String text = panel_slot_label(slot_action);
-            if (action_type == k_ui_action_clear_deployment_site_selection && text.is_empty())
+            if (text.is_empty())
             {
                 continue;
             }
@@ -842,20 +846,6 @@ void Gs1GodotRegionalSelectionPanelController::refresh_selection_panel_actions_a
         deploy_spec["flags"] = selected_site->site_state == GS1_SITE_STATE_LOCKED ? 2 : 0;
         deploy_spec["action"] = deploy_action;
         button_specs.push_back(deploy_spec);
-
-        Dictionary clear_action;
-        clear_action["type"] = k_ui_action_clear_deployment_site_selection;
-        clear_action["target_id"] = 0;
-        clear_action["arg0"] = 0;
-        clear_action["arg1"] = 0;
-
-        Dictionary clear_spec;
-        clear_spec["setup_id"] = -1;
-        clear_spec["element_id"] = k_ui_action_clear_deployment_site_selection;
-        clear_spec["text"] = "Clear Selection";
-        clear_spec["flags"] = 0;
-        clear_spec["action"] = clear_action;
-        button_specs.push_back(clear_spec);
     }
 
     reconcile_action_buttons(button_specs);

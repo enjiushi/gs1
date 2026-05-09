@@ -86,10 +86,14 @@ layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 14
 
-[node name="RegionalSelectionPanel" type="PanelContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn" unique_id=866392839]
+[node name="RegionalSelectionPanel" type="MarginContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn" unique_id=866392839]
 visible = false
 layout_mode = 2
 size_flags_vertical = 3
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 18
 
 [node name="RegionalSelectionVBox" type="VBoxContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn/RegionalSelectionPanel" unique_id=774269545]
 layout_mode = 2
@@ -150,22 +154,6 @@ text = "No extra loadout items are projected for the currently selected site."
 [node name="RegionalSelectionActions" type="VBoxContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn/RegionalSelectionPanel/RegionalSelectionVBox" unique_id=1358209216]
 layout_mode = 2
 theme_override_constants/separation = 10
-
-[node name="DeployButton" type="Button" parent="HudMargin/RootVBox/MainColumns/RightColumn/RegionalSelectionPanel/RegionalSelectionVBox/RegionalSelectionActions" unique_id=1032087152]
-custom_minimum_size = Vector2(0, 48)
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Deploy"
-metadata/gs1_panel_id = 3
-metadata/gs1_slot_id = 1
-
-[node name="ClearSelectionButton" type="Button" parent="HudMargin/RootVBox/MainColumns/RightColumn/RegionalSelectionPanel/RegionalSelectionVBox/RegionalSelectionActions" unique_id=728686955]
-custom_minimum_size = Vector2(0, 48)
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Clear Selection"
-metadata/gs1_panel_id = 3
-metadata/gs1_slot_id = 2
 
 [node name="TechOverlay" parent="." unique_id=1950611279 instance=ExtResource("5_tech_tree_overlay")]
 metadata/gs1_overlay_margin_left = 72.0

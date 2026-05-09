@@ -59,6 +59,7 @@ private:
         godot::ObjectID base_id {};
         godot::ObjectID tower_id {};
         godot::ObjectID beacon_id {};
+        godot::ObjectID selection_ring_id {};
         godot::ObjectID label_id {};
     };
 
@@ -75,6 +76,7 @@ private:
     void reset_regional_map_state() noexcept;
     void apply_regional_map_message(const Gs1EngineMessage& message);
     void select_regional_site(int site_id);
+    void clear_regional_site_selection();
     void refresh_regional_map();
     void rebuild_regional_map_world(
         const std::vector<Gs1RuntimeRegionalMapSiteProjection>& sites,
@@ -99,6 +101,7 @@ private:
 
 private:
     static constexpr std::int64_t UI_ACTION_SELECT_DEPLOYMENT_SITE = 2;
+    static constexpr std::int64_t UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION = 5;
     static constexpr double REGIONAL_TILE_SIZE = 4.5;
     static constexpr int REGIONAL_WORLD_PADDING = 2;
     static constexpr double REGIONAL_PICK_DISTANCE = 400.0;

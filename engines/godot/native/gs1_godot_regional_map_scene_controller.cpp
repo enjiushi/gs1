@@ -138,9 +138,23 @@ void Gs1GodotRegionalMapSceneController::_input(const Ref<InputEvent>& event)
         return;
     }
 
-    if (!regional_map_ui_contains_screen_point(mouse_event->get_position()) &&
-        try_select_regional_site_from_screen(mouse_event->get_position()))
+    if (regional_map_ui_contains_screen_point(mouse_event->get_position()))
     {
+        return;
+    }
+
+    if (try_select_regional_site_from_screen(mouse_event->get_position()))
+    {
+        if (Viewport* viewport = get_viewport())
+        {
+            viewport->set_input_as_handled();
+        }
+        return;
+    }
+
+    if (selected_site_id_.has_value())
+    {
+        clear_regional_site_selection();
         if (Viewport* viewport = get_viewport())
         {
             viewport->set_input_as_handled();
@@ -352,6 +366,11 @@ void Gs1GodotRegionalMapSceneController::select_regional_site(int site_id)
     submit_ui_action(UI_ACTION_SELECT_DEPLOYMENT_SITE, site_id);
 }
 
+void Gs1GodotRegionalMapSceneController::clear_regional_site_selection()
+{
+    submit_ui_action(UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION);
+}
+
 void Gs1GodotRegionalMapSceneController::refresh_regional_map()
 {
     if (sites_.empty())
@@ -478,6 +497,16 @@ void Gs1GodotRegionalMapSceneController::reconcile_regional_sites(const std::vec
             }
         }
 
+        MeshInstance3D* selection_ring = resolve_object<MeshInstance3D>(record.selection_ring_id);
+        if (selection_ring == nullptr)
+        {
+            selection_ring = Object::cast_to<MeshInstance3D>(root->find_child("SelectionRing", true, false));
+            if (selection_ring != nullptr)
+            {
+                record.selection_ring_id = selection_ring->get_instance_id();
+            }
+        }
+
         Label3D* nameplate = resolve_object<Label3D>(record.label_id);
         if (nameplate == nullptr)
         {
@@ -518,10 +547,6 @@ void Gs1GodotRegionalMapSceneController::update_regional_site_visuals()
     int selected_site_id = selected_site_id_.has_value()
         ? static_cast<int>(selected_site_id_.value())
         : 0;
-    if (selected_site_id == 0 && !sites_.empty())
-    {
-        selected_site_id = static_cast<int>(sites_.front().site_id);
-    }
 
     for (auto& [site_id, record] : regional_site_nodes_)
     {
@@ -530,6 +555,7 @@ void Gs1GodotRegionalMapSceneController::update_regional_site_visuals()
         MeshInstance3D* base = resolve_object<MeshInstance3D>(record.base_id);
         MeshInstance3D* tower = resolve_object<MeshInstance3D>(record.tower_id);
         MeshInstance3D* beacon = resolve_object<MeshInstance3D>(record.beacon_id);
+        MeshInstance3D* selection_ring = resolve_object<MeshInstance3D>(record.selection_ring_id);
         Label3D* label = resolve_object<Label3D>(record.label_id);
         if (root == nullptr || site_it == regional_site_data_.end())
         {
@@ -562,6 +588,11 @@ void Gs1GodotRegionalMapSceneController::update_regional_site_visuals()
         if (beacon != nullptr)
         {
             beacon->set_material_override(get_material(vformat("site_beacon_%d_%s", site_id, selected ? "1" : "0"), glow_color, 0.22, 0.0, selected));
+        }
+        if (selection_ring != nullptr)
+        {
+            selection_ring->set_visible(selected);
+            selection_ring->set_material_override(get_material(vformat("site_ring_%d_%s", site_id, selected ? "1" : "0"), Color(0.96, 0.84, 0.52), 0.18, 0.0, true));
         }
         if (label != nullptr)
         {

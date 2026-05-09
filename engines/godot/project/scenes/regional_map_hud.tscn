@@ -1,7 +1,11 @@
 [gd_scene format=3 uid="uid://cdsp05r0nrx8n"]
 
-[node name="RegionalMapHud" type="PanelContainer"]
+[node name="RegionalMapHud" type="MarginContainer"]
 custom_minimum_size = Vector2(420, 0)
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 18
 
 [node name="RegionalHudVBox" type="VBoxContainer" parent="."]
 layout_mode = 2

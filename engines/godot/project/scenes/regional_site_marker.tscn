@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="PackedScene" path="res://assets/menu_backdrop/desert_props/FBX/house1.002.fbx" id="1_house"]
 [ext_resource type="PackedScene" path="res://assets/menu_backdrop/water_tower/WaterTank.fbx" id="2_tower"]
@@ -17,6 +17,12 @@ height = 0.7
 [sub_resource type="SphereMesh" id="SphereMesh_state_beacon"]
 radius = 0.18
 height = 0.36
+
+[sub_resource type="TorusMesh" id="TorusMesh_selection_ring"]
+inner_radius = 1.18
+outer_radius = 1.44
+ring_sides = 32
+ring_segments = 24
 
 [node name="RegionalSiteMarker" type="Node3D"]
 
@@ -54,6 +60,12 @@ position = Vector3(0.06, 0.53, -0.08)
 [node name="StateBeacon" type="MeshInstance3D" parent="Camp"]
 mesh = SubResource("SphereMesh_state_beacon")
 position = Vector3(0.06, 0.99, -0.08)
+
+[node name="SelectionRing" type="MeshInstance3D" parent="Camp"]
+visible = false
+mesh = SubResource("TorusMesh_selection_ring")
+position = Vector3(0, 0.06, 0)
+rotation_degrees = Vector3(90, 0, 0)
 
 [node name="SiteLabel" type="Label3D" parent="Camp"]
 position = Vector3(0, 1.54, 0)
