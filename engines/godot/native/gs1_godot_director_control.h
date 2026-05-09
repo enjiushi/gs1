@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gs1_godot_adapter_service.h"
+#include "gs1_godot_director_scene_policy.h"
 #include "gs1_godot_main_menu_ui_controller.h"
 #include "gs1_godot_regional_map_scene_controller.h"
 #include "gs1_godot_regional_map_ui_controller.h"
@@ -58,14 +59,7 @@ protected:
     static void _bind_methods();
 
 private:
-    enum ScreenKind : std::uint8_t
-    {
-        SCREEN_KIND_NONE = 0,
-        SCREEN_KIND_LOADING = 1,
-        SCREEN_KIND_MAIN_MENU = 2,
-        SCREEN_KIND_REGIONAL_MAP = 3,
-        SCREEN_KIND_SITE_SESSION = 4
-    };
+    using ScreenKind = Gs1GodotDirectorScreenKind;
 
     void cache_nodes();
     void ensure_active_scene();
@@ -112,8 +106,8 @@ private:
     godot::ProgressBar* loading_progress_bar_ {nullptr};
     godot::Label* loading_progress_label_ {nullptr};
     godot::ObjectID active_scene_id_ {};
-    ScreenKind active_screen_kind_ {SCREEN_KIND_NONE};
-    ScreenKind pending_async_target_kind_ {SCREEN_KIND_NONE};
+    ScreenKind active_screen_kind_ {GS1_GODOT_SCREEN_KIND_NONE};
+    ScreenKind pending_async_target_kind_ {GS1_GODOT_SCREEN_KIND_NONE};
     godot::String pending_async_scene_path_ {};
     std::vector<godot::String> pending_async_resource_paths_ {};
     int last_app_state_ {-1};

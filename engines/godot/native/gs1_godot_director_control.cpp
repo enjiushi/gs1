@@ -106,14 +106,15 @@ void Gs1GodotDirectorControl::ensure_active_scene()
 
     const int app_state = last_app_state_ >= 0 ? last_app_state_ : APP_STATE_BOOT;
     const ScreenKind desired_kind = desired_screen_kind(app_state);
-    if (pending_async_target_kind_ != SCREEN_KIND_NONE)
+    if (pending_async_target_kind_ != GS1_GODOT_SCREEN_KIND_NONE)
     {
         return;
     }
 
     Node* active_scene = Object::cast_to<Node>(ObjectDB::get_instance(active_scene_id_));
-    if (active_scene != nullptr && desired_kind == active_screen_kind_ && app_state == last_app_state_)
+    if (!gs1_godot_director_requires_scene_switch(active_scene != nullptr, active_screen_kind_, desired_kind))
     {
+        last_app_state_ = app_state;
         return;
     }
 
@@ -153,12 +154,12 @@ void Gs1GodotDirectorControl::begin_async_scene_switch(ScreenKind kind)
     pending_async_scene_path_ = scene_path;
     begin_async_resource_preloads(kind);
     adapter_service_.begin_engine_message_buffering();
-    switch_to_scene(SCREEN_KIND_LOADING);
+    switch_to_scene(GS1_GODOT_SCREEN_KIND_LOADING);
 }
 
 void Gs1GodotDirectorControl::poll_async_scene_switch()
 {
-    if (pending_async_target_kind_ == SCREEN_KIND_NONE || pending_async_scene_path_.is_empty())
+    if (pending_async_target_kind_ == GS1_GODOT_SCREEN_KIND_NONE || pending_async_scene_path_.is_empty())
     {
         return;
     }
@@ -212,7 +213,7 @@ void Gs1GodotDirectorControl::poll_async_scene_switch()
 
 void Gs1GodotDirectorControl::cache_loading_scene_nodes()
 {
-    if (active_screen_kind_ != SCREEN_KIND_LOADING)
+    if (active_screen_kind_ != GS1_GODOT_SCREEN_KIND_LOADING)
     {
         loading_progress_bar_ = nullptr;
         loading_progress_label_ = nullptr;
@@ -237,7 +238,7 @@ void Gs1GodotDirectorControl::cache_loading_scene_nodes()
 
 void Gs1GodotDirectorControl::refresh_loading_scene_progress(ResourceLoader& resource_loader)
 {
-    if (pending_async_target_kind_ == SCREEN_KIND_NONE || active_screen_kind_ != SCREEN_KIND_LOADING)
+    if (pending_async_target_kind_ == GS1_GODOT_SCREEN_KIND_NONE || active_screen_kind_ != GS1_GODOT_SCREEN_KIND_LOADING)
     {
         return;
     }
@@ -308,7 +309,7 @@ void Gs1GodotDirectorControl::begin_async_resource_preloads(ScreenKind kind)
 std::vector<String> Gs1GodotDirectorControl::build_async_preload_paths(ScreenKind kind) const
 {
     std::vector<String> paths {};
-    if (kind != SCREEN_KIND_REGIONAL_MAP)
+    if (kind != GS1_GODOT_SCREEN_KIND_REGIONAL_MAP)
     {
         return paths;
     }
@@ -408,15 +409,15 @@ bool Gs1GodotDirectorControl::async_resource_preloads_complete(ResourceLoader& r
 
 void Gs1GodotDirectorControl::clear_async_scene_switch_state() noexcept
 {
-    pending_async_target_kind_ = SCREEN_KIND_NONE;
+    pending_async_target_kind_ = GS1_GODOT_SCREEN_KIND_NONE;
     pending_async_scene_path_ = String();
     pending_async_resource_paths_.clear();
 }
 
 bool Gs1GodotDirectorControl::should_async_load_transition(ScreenKind kind) const noexcept
 {
-    return kind == SCREEN_KIND_REGIONAL_MAP &&
-        active_screen_kind_ == SCREEN_KIND_MAIN_MENU &&
+    return kind == GS1_GODOT_SCREEN_KIND_REGIONAL_MAP &&
+        active_screen_kind_ == GS1_GODOT_SCREEN_KIND_MAIN_MENU &&
         !loading_scene_path_.is_empty();
 }
 
@@ -448,16 +449,16 @@ Gs1GodotDirectorControl::ScreenKind Gs1GodotDirectorControl::desired_screen_kind
     case APP_STATE_SITE_ACTIVE:
     case APP_STATE_SITE_PAUSED:
     case APP_STATE_SITE_RESULT:
-        return SCREEN_KIND_SITE_SESSION;
+        return GS1_GODOT_SCREEN_KIND_SITE_SESSION;
     case APP_STATE_CAMPAIGN_SETUP:
     case APP_STATE_REGIONAL_MAP:
     case APP_STATE_SITE_LOADING:
-        return SCREEN_KIND_REGIONAL_MAP;
+        return GS1_GODOT_SCREEN_KIND_REGIONAL_MAP;
     case APP_STATE_BOOT:
     case APP_STATE_MAIN_MENU:
     case APP_STATE_CAMPAIGN_END:
     default:
-        return SCREEN_KIND_MAIN_MENU;
+        return GS1_GODOT_SCREEN_KIND_MAIN_MENU;
     }
 }
 
@@ -465,15 +466,15 @@ String Gs1GodotDirectorControl::scene_path_for(ScreenKind kind) const
 {
     switch (kind)
     {
-    case SCREEN_KIND_LOADING:
+    case GS1_GODOT_SCREEN_KIND_LOADING:
         return loading_scene_path_;
-    case SCREEN_KIND_MAIN_MENU:
+    case GS1_GODOT_SCREEN_KIND_MAIN_MENU:
         return main_menu_scene_path_;
-    case SCREEN_KIND_REGIONAL_MAP:
+    case GS1_GODOT_SCREEN_KIND_REGIONAL_MAP:
         return regional_map_scene_path_;
-    case SCREEN_KIND_SITE_SESSION:
+    case GS1_GODOT_SCREEN_KIND_SITE_SESSION:
         return site_session_scene_path_;
-    case SCREEN_KIND_NONE:
+    case GS1_GODOT_SCREEN_KIND_NONE:
     default:
         return String();
     }
@@ -493,7 +494,7 @@ void Gs1GodotDirectorControl::switch_to_scene(ScreenKind kind, const Ref<PackedS
     }
 
     active_scene_id_ = ObjectID();
-    active_screen_kind_ = SCREEN_KIND_NONE;
+    active_screen_kind_ = GS1_GODOT_SCREEN_KIND_NONE;
     loading_progress_bar_ = nullptr;
     loading_progress_label_ = nullptr;
 
