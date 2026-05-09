@@ -151,6 +151,7 @@ void Gs1GodotDirectorControl::begin_async_scene_switch(ScreenKind kind)
     pending_async_target_kind_ = kind;
     pending_async_scene_path_ = scene_path;
     begin_async_resource_preloads(kind);
+    adapter_service_.begin_engine_message_buffering();
     switch_to_scene(SCREEN_KIND_LOADING);
 }
 
@@ -167,6 +168,7 @@ void Gs1GodotDirectorControl::poll_async_scene_switch()
         const ScreenKind target_kind = pending_async_target_kind_;
         clear_async_scene_switch_state();
         switch_to_scene(target_kind);
+        adapter_service_.flush_buffered_engine_messages();
         return;
     }
 
@@ -188,6 +190,7 @@ void Gs1GodotDirectorControl::poll_async_scene_switch()
     if (status != ResourceLoader::THREAD_LOAD_LOADED)
     {
         switch_to_scene(target_kind);
+        adapter_service_.flush_buffered_engine_messages();
         return;
     }
 
@@ -196,10 +199,12 @@ void Gs1GodotDirectorControl::poll_async_scene_switch()
     if (packed_scene.is_null())
     {
         switch_to_scene(target_kind);
+        adapter_service_.flush_buffered_engine_messages();
         return;
     }
 
     switch_to_scene(target_kind, packed_scene);
+    adapter_service_.flush_buffered_engine_messages();
 }
 
 void Gs1GodotDirectorControl::begin_async_resource_preloads(ScreenKind kind)

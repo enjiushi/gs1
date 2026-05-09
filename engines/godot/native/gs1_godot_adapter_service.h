@@ -29,6 +29,9 @@ public:
     ~Gs1GodotAdapterService();
 
     void process_frame(double delta_seconds);
+    void begin_engine_message_buffering();
+    void flush_buffered_engine_messages();
+    void clear_buffered_engine_messages() noexcept;
 
     void subscribe(Gs1EngineMessageType type, IGs1GodotEngineMessageSubscriber& subscriber);
     void subscribe_matching_messages(IGs1GodotEngineMessageSubscriber& subscriber);
@@ -68,6 +71,7 @@ private:
     bool drain_projection_messages();
     void notify_runtime_message_reset();
     void dispatch_engine_message(Gs1EngineMessage&& message);
+    void dispatch_or_buffer_engine_message(Gs1EngineMessage&& message);
     [[nodiscard]] bool submit_ui_action(const Gs1UiAction& action);
     [[nodiscard]] bool queue_debug_http_command(std::string_view path, const std::string& body, std::string& out_error);
     void refresh_gameplay_dll_path();
@@ -86,7 +90,9 @@ private:
     std::unordered_set<IGs1GodotEngineMessageSubscriber*> known_subscribers_ {};
     Gs1GodotDebugHttpServer debug_http_server_ {};
     bool debug_http_server_checked_ {false};
+    bool engine_message_buffering_active_ {false};
     std::mutex pending_debug_http_commands_mutex_ {};
     std::vector<Gs1GodotDebugHttpCommand> pending_debug_http_commands_ {};
+    std::vector<Gs1EngineMessage> buffered_engine_messages_ {};
     std::string last_error_ {};
 };

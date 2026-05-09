@@ -137,6 +137,33 @@ Gs1GodotAdapterService::~Gs1GodotAdapterService()
     runtime_session_.stop();
 }
 
+void Gs1GodotAdapterService::begin_engine_message_buffering()
+{
+    engine_message_buffering_active_ = true;
+}
+
+void Gs1GodotAdapterService::flush_buffered_engine_messages()
+{
+    engine_message_buffering_active_ = false;
+    if (buffered_engine_messages_.empty())
+    {
+        return;
+    }
+
+    std::vector<Gs1EngineMessage> buffered_messages {};
+    buffered_messages.swap(buffered_engine_messages_);
+    for (Gs1EngineMessage& message : buffered_messages)
+    {
+        dispatch_engine_message(std::move(message));
+    }
+}
+
+void Gs1GodotAdapterService::clear_buffered_engine_messages() noexcept
+{
+    engine_message_buffering_active_ = false;
+    buffered_engine_messages_.clear();
+}
+
 void Gs1GodotAdapterService::process_frame(double delta_seconds)
 {
     ensure_debug_http_server_initialized();
@@ -399,7 +426,7 @@ bool Gs1GodotAdapterService::drain_projection_messages()
             return false;
         }
 
-        dispatch_engine_message(std::move(message));
+        dispatch_or_buffer_engine_message(std::move(message));
     }
 
     return true;
@@ -407,6 +434,7 @@ bool Gs1GodotAdapterService::drain_projection_messages()
 
 void Gs1GodotAdapterService::notify_runtime_message_reset()
 {
+    clear_buffered_engine_messages();
     for (IGs1GodotEngineMessageSubscriber* subscriber : known_subscribers_)
     {
         if (subscriber != nullptr)
@@ -414,6 +442,17 @@ void Gs1GodotAdapterService::notify_runtime_message_reset()
             subscriber->handle_runtime_message_reset();
         }
     }
+}
+
+void Gs1GodotAdapterService::dispatch_or_buffer_engine_message(Gs1EngineMessage&& message)
+{
+    if (engine_message_buffering_active_)
+    {
+        buffered_engine_messages_.push_back(std::move(message));
+        return;
+    }
+
+    dispatch_engine_message(std::move(message));
 }
 
 void Gs1GodotAdapterService::dispatch_engine_message(Gs1EngineMessage&& message)
