@@ -36,7 +36,6 @@ public:
     [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
     void handle_engine_message(const Gs1EngineMessage& message) override;
     void handle_runtime_message_reset() override;
-    void refresh_if_needed();
 
 protected:
     static void _bind_methods();
@@ -62,6 +61,7 @@ private:
 
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_owner_control();
+    void update_task_summary();
     void reconcile_task_rows();
     void reconcile_modifier_rows();
     [[nodiscard]] godot::Button* upsert_button_node(
@@ -83,13 +83,11 @@ private:
     godot::RichTextLabel* task_summary_ {nullptr};
     godot::VBoxContainer* task_rows_ {nullptr};
     godot::VBoxContainer* modifier_rows_ {nullptr};
-    std::optional<Gs1AppState> current_app_state_ {};
     std::vector<Gs1RuntimeTaskProjection> tasks_ {};
     std::vector<Gs1RuntimeModifierProjection> active_modifiers_ {};
     std::unordered_map<std::uint32_t, std::size_t> pending_task_indices_ {};
     std::unordered_map<std::uint32_t, std::size_t> pending_modifier_indices_ {};
     bool in_site_snapshot_ {false};
-    bool dirty_ {true};
 
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> task_buttons_ {};
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> modifier_buttons_ {};

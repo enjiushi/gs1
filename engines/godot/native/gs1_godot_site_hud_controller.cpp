@@ -116,7 +116,6 @@ void Gs1GodotSiteHudController::_ready()
 void Gs1GodotSiteHudController::_process(double delta)
 {
     (void)delta;
-    refresh_if_needed();
 }
 
 void Gs1GodotSiteHudController::_exit_tree()
@@ -157,7 +156,7 @@ void Gs1GodotSiteHudController::cache_ui_references(Control& owner)
     bind_hud_button(craft_button_, owner, "HudCraftButton", controller_bits, &dispatch_craft_pressed);
     bind_hud_button(protection_button_, owner, "HudProtectionButton", controller_bits, &dispatch_protection_pressed);
     bind_hud_button(tech_button_, owner, "HudTechButton", controller_bits, &dispatch_tech_pressed);
-    refresh_if_needed();
+    rebuild_hud();
 }
 
 void Gs1GodotSiteHudController::set_submit_ui_action_callback(SubmitUiActionFn callback)
@@ -299,7 +298,6 @@ bool Gs1GodotSiteHudController::handles_engine_message(Gs1EngineMessageType type
 {
     switch (type)
     {
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
     case GS1_ENGINE_MESSAGE_HUD_STATE:
     case GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE:
     case GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE:
@@ -316,16 +314,6 @@ void Gs1GodotSiteHudController::handle_engine_message(const Gs1EngineMessage& me
 {
     switch (message.type)
     {
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
-        current_app_state_ = message.payload_as<Gs1EngineMessageSetAppStateData>().app_state;
-        if (!site_visible())
-        {
-            hud_.reset();
-            phone_panel_.reset();
-            protection_overlay_.reset();
-            inventory_storages_.clear();
-        }
-        break;
     case GS1_ENGINE_MESSAGE_HUD_STATE:
         hud_ = message.payload_as<Gs1EngineMessageHudStateData>();
         break;
@@ -363,37 +351,20 @@ void Gs1GodotSiteHudController::handle_engine_message(const Gs1EngineMessage& me
     default:
         break;
     }
-    dirty_ = true;
-    refresh_if_needed();
+    rebuild_hud();
 }
 
 void Gs1GodotSiteHudController::handle_runtime_message_reset()
 {
-    current_app_state_.reset();
     hud_.reset();
     phone_panel_.reset();
     protection_overlay_.reset();
     inventory_storages_.clear();
-    dirty_ = true;
-    refresh_if_needed();
+    rebuild_hud();
 }
 
-void Gs1GodotSiteHudController::refresh_if_needed()
+void Gs1GodotSiteHudController::rebuild_hud()
 {
-    if (!dirty_)
-    {
-        return;
-    }
-    if (hud_root_ != nullptr)
-    {
-        hud_root_->set_visible(site_visible());
-    }
-    if (!site_visible())
-    {
-        dirty_ = false;
-        return;
-    }
-
     const Gs1RuntimeHudProjection fallback {};
     const Gs1RuntimeHudProjection& hud = hud_.has_value() ? hud_.value() : fallback;
     refresh_meter(health_bar_, health_label_, "Health", hud.player_health);
@@ -410,7 +381,6 @@ void Gs1GodotSiteHudController::refresh_if_needed()
         completion_label_->set_text(vformat("Site %d%%", static_cast<int>(std::clamp(hud.site_completion_normalized, 0.0F, 1.0F) * 100.0F)));
     }
     refresh_button_badges();
-    dirty_ = false;
 }
 
 int Gs1GodotSiteHudController::worker_pack_storage_id() const noexcept
@@ -423,16 +393,6 @@ int Gs1GodotSiteHudController::worker_pack_storage_id() const noexcept
         }
     }
     return 0;
-}
-
-bool Gs1GodotSiteHudController::site_visible() const noexcept
-{
-    if (!current_app_state_.has_value())
-    {
-        return false;
-    }
-    return current_app_state_.value() >= GS1_APP_STATE_SITE_LOADING &&
-        current_app_state_.value() <= GS1_APP_STATE_SITE_RESULT;
 }
 
 void Gs1GodotSiteHudController::refresh_meter(ProgressBar* bar, Label* label, const char* name, float value)

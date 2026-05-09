@@ -32,13 +32,12 @@ protected:
 private:
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_ui_root();
-    void refresh_visibility();
+    void apply_surface_visibility();
 
 private:
     godot::NodePath ui_root_path_ {".."};
     Gs1GodotAdapterService* adapter_service_ {nullptr};
     godot::Control* ui_root_ {nullptr};
-    int last_app_state_ {0};
     bool selection_visible_ {false};
     bool tech_tree_visible_ {false};
 };

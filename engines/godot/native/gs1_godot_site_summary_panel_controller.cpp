@@ -24,7 +24,6 @@ void Gs1GodotSiteSummaryPanelController::_ready()
 void Gs1GodotSiteSummaryPanelController::_process(double delta)
 {
     (void)delta;
-    refresh_if_needed();
 }
 
 void Gs1GodotSiteSummaryPanelController::_exit_tree()
@@ -47,7 +46,7 @@ void Gs1GodotSiteSummaryPanelController::cache_ui_references(Control& owner)
     {
         site_summary_ = Object::cast_to<RichTextLabel>(owner.find_child("SiteSummary", true, false));
     }
-    refresh_if_needed();
+    rebuild_summary();
 }
 
 void Gs1GodotSiteSummaryPanelController::cache_adapter_service()
@@ -82,7 +81,6 @@ bool Gs1GodotSiteSummaryPanelController::handles_engine_message(Gs1EngineMessage
 {
     switch (type)
     {
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
     case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
     case GS1_ENGINE_MESSAGE_SITE_WORKER_UPDATE:
     case GS1_ENGINE_MESSAGE_SITE_WEATHER_UPDATE:
@@ -99,18 +97,6 @@ void Gs1GodotSiteSummaryPanelController::handle_engine_message(const Gs1EngineMe
 {
     switch (message.type)
     {
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
-    {
-        const auto& payload = message.payload_as<Gs1EngineMessageSetAppStateData>();
-        current_app_state_ = payload.app_state;
-        if (payload.app_state == GS1_APP_STATE_MAIN_MENU ||
-            payload.app_state == GS1_APP_STATE_REGIONAL_MAP ||
-            payload.app_state == GS1_APP_STATE_CAMPAIGN_END)
-        {
-            state_.reset();
-        }
-        break;
-    }
     case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
     {
         const auto& payload = message.payload_as<Gs1EngineMessageSiteSnapshotData>();
@@ -159,29 +145,19 @@ void Gs1GodotSiteSummaryPanelController::handle_engine_message(const Gs1EngineMe
     default:
         break;
     }
-    dirty_ = true;
-    refresh_if_needed();
+    rebuild_summary();
 }
 
 void Gs1GodotSiteSummaryPanelController::handle_runtime_message_reset()
 {
-    current_app_state_.reset();
     state_.reset();
-    dirty_ = true;
-    refresh_if_needed();
+    rebuild_summary();
 }
 
-void Gs1GodotSiteSummaryPanelController::refresh_if_needed()
+void Gs1GodotSiteSummaryPanelController::rebuild_summary()
 {
-    if (!dirty_)
+    if (!state_.has_value())
     {
-        return;
-    }
-
-    const int app_state = current_app_state_.has_value() ? static_cast<int>(current_app_state_.value()) : 0;
-    if ((app_state < 4 || app_state > 7) || !state_.has_value())
-    {
-        dirty_ = false;
         return;
     }
 
@@ -238,6 +214,4 @@ void Gs1GodotSiteSummaryPanelController::refresh_if_needed()
     {
         site_summary_->set_text(String("\n").join(site_lines));
     }
-
-    dirty_ = false;
 }

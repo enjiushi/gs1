@@ -85,7 +85,6 @@ void Gs1GodotPhonePanelController::_ready()
 void Gs1GodotPhonePanelController::_process(double delta)
 {
     (void)delta;
-    refresh_if_needed();
 }
 
 void Gs1GodotPhonePanelController::_exit_tree()
@@ -144,7 +143,9 @@ void Gs1GodotPhonePanelController::cache_ui_references(Control& owner)
             button->connect("pressed", callback);
         }
     }
-    refresh_if_needed();
+    apply_panel_visibility();
+    update_phone_state_label();
+    reconcile_phone_listing_buttons();
 }
 
 void Gs1GodotPhonePanelController::set_submit_ui_action_callback(SubmitUiActionFn callback)
@@ -196,7 +197,6 @@ bool Gs1GodotPhonePanelController::handles_engine_message(Gs1EngineMessageType t
 {
     switch (type)
     {
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
     case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
     case GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_UPSERT:
     case GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_REMOVE:
@@ -215,20 +215,6 @@ void Gs1GodotPhonePanelController::handle_engine_message(const Gs1EngineMessage&
     case GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE:
         phone_panel_state_ = message.payload_as<Gs1EngineMessagePhonePanelData>();
         break;
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
-    {
-        const auto& payload = message.payload_as<Gs1EngineMessageSetAppStateData>();
-        current_app_state_ = payload.app_state;
-        if (payload.app_state == GS1_APP_STATE_MAIN_MENU ||
-            payload.app_state == GS1_APP_STATE_REGIONAL_MAP ||
-            payload.app_state == GS1_APP_STATE_CAMPAIGN_END)
-        {
-            phone_panel_state_.reset();
-            phone_listings_state_.clear();
-            pending_listing_indices_.clear();
-        }
-        break;
-    }
     case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
     {
         const auto& payload = message.payload_as<Gs1EngineMessageSiteSnapshotData>();
@@ -288,42 +274,33 @@ void Gs1GodotPhonePanelController::handle_engine_message(const Gs1EngineMessage&
     default:
         break;
     }
-    dirty_ = true;
-    refresh_if_needed();
+    apply_panel_visibility();
+    update_phone_state_label();
+    reconcile_phone_listing_buttons();
 }
 
 void Gs1GodotPhonePanelController::handle_runtime_message_reset()
 {
-    current_app_state_.reset();
     phone_panel_state_.reset();
     phone_listings_state_.clear();
     pending_listing_indices_.clear();
-    dirty_ = true;
-    refresh_if_needed();
+    prune_button_registry(phone_listing_buttons_, {});
+    apply_panel_visibility();
 }
 
-void Gs1GodotPhonePanelController::refresh_if_needed()
+void Gs1GodotPhonePanelController::apply_panel_visibility()
 {
-    if (!dirty_)
-    {
-        return;
-    }
-
-    const int app_state = current_app_state_.has_value() ? static_cast<int>(current_app_state_.value()) : 0;
-    const bool site_visible = app_state >= GS1_APP_STATE_SITE_LOADING && app_state <= GS1_APP_STATE_SITE_RESULT;
-    const bool panel_visible = site_visible &&
-        phone_panel_state_.has_value() &&
+    const bool panel_visible = phone_panel_state_.has_value() &&
         (phone_panel_state_->flags & GS1_PHONE_PANEL_FLAG_OPEN) != 0U;
     if (panel_ != nullptr)
     {
         panel_->set_visible(panel_visible);
     }
-    if (!panel_visible)
-    {
-        dirty_ = false;
-        return;
-    }
-    if (phone_state_label_ == nullptr)
+}
+
+void Gs1GodotPhonePanelController::update_phone_state_label()
+{
+    if (panel_ == nullptr || !panel_->is_visible() || phone_state_label_ == nullptr)
     {
         return;
     }
@@ -342,9 +319,6 @@ void Gs1GodotPhonePanelController::refresh_if_needed()
     {
         phone_state_label_->set_text("Phone Section: 0  Listings: buy 0 sell 0");
     }
-
-    reconcile_phone_listing_buttons();
-    dirty_ = false;
 }
 
 void Gs1GodotPhonePanelController::handle_phone_listing_pressed(std::int64_t button_key)

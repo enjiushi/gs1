@@ -108,8 +108,6 @@ void Gs1GodotActionPanelController::_ready()
 void Gs1GodotActionPanelController::_process(double delta)
 {
     (void)delta;
-    refresh_fixed_slot_actions_if_needed();
-    refresh_site_controls_if_needed();
 }
 
 void Gs1GodotActionPanelController::_exit_tree()
@@ -138,8 +136,11 @@ void Gs1GodotActionPanelController::cache_ui_references(Control& owner)
         }
     }
     cache_fixed_slot_bindings();
-    refresh_fixed_slot_actions_if_needed();
-    refresh_site_controls_if_needed();
+    clear_fixed_slot_actions();
+    bind_fixed_slot_actions(find_ui_panel(1), 1);
+    bind_fixed_slot_actions(find_ui_panel(2), 2);
+    bind_fixed_slot_actions(find_ui_panel(3), 3);
+    reconcile_site_control_buttons();
 }
 
 void Gs1GodotActionPanelController::set_submit_ui_action_callback(SubmitUiActionFn callback)
@@ -205,7 +206,6 @@ bool Gs1GodotActionPanelController::handles_engine_message(Gs1EngineMessageType 
 {
     switch (type)
     {
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
     case GS1_ENGINE_MESSAGE_BEGIN_UI_SETUP:
     case GS1_ENGINE_MESSAGE_UI_ELEMENT_UPSERT:
     case GS1_ENGINE_MESSAGE_END_UI_SETUP:
@@ -225,67 +225,20 @@ void Gs1GodotActionPanelController::handle_engine_message(const Gs1EngineMessage
     ui_setup_state_reducer_.apply_engine_message(message);
     ui_panel_state_reducer_.apply_engine_message(message);
 
-    switch (message.type)
-    {
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
-        current_app_state_ = message.payload_as<Gs1EngineMessageSetAppStateData>().app_state;
-        fixed_slot_actions_dirty_ = true;
-        site_controls_dirty_ = true;
-        break;
-    case GS1_ENGINE_MESSAGE_BEGIN_UI_SETUP:
-    case GS1_ENGINE_MESSAGE_UI_ELEMENT_UPSERT:
-    case GS1_ENGINE_MESSAGE_END_UI_SETUP:
-    case GS1_ENGINE_MESSAGE_CLOSE_UI_SETUP:
-        site_controls_dirty_ = true;
-        break;
-    case GS1_ENGINE_MESSAGE_BEGIN_UI_PANEL:
-    case GS1_ENGINE_MESSAGE_UI_PANEL_SLOT_ACTION_UPSERT:
-    case GS1_ENGINE_MESSAGE_END_UI_PANEL:
-    case GS1_ENGINE_MESSAGE_CLOSE_UI_PANEL:
-        fixed_slot_actions_dirty_ = true;
-        break;
-    default:
-        break;
-    }
-    refresh_fixed_slot_actions_if_needed();
-    refresh_site_controls_if_needed();
+    cache_fixed_slot_bindings();
+    clear_fixed_slot_actions();
+    bind_fixed_slot_actions(find_ui_panel(1), 1);
+    bind_fixed_slot_actions(find_ui_panel(2), 2);
+    bind_fixed_slot_actions(find_ui_panel(3), 3);
+    reconcile_site_control_buttons();
 }
 
 void Gs1GodotActionPanelController::handle_runtime_message_reset()
 {
     ui_setup_state_reducer_.reset();
     ui_panel_state_reducer_.reset();
-    current_app_state_.reset();
-    fixed_slot_actions_dirty_ = true;
-    site_controls_dirty_ = true;
-    refresh_fixed_slot_actions_if_needed();
-    refresh_site_controls_if_needed();
-}
-
-void Gs1GodotActionPanelController::refresh_fixed_slot_actions_if_needed()
-{
-    cache_fixed_slot_bindings();
-    if (!fixed_slot_actions_dirty_)
-    {
-        return;
-    }
-
     clear_fixed_slot_actions();
-    bind_fixed_slot_actions(find_ui_panel(1), 1);
-    bind_fixed_slot_actions(find_ui_panel(2), 2);
-    bind_fixed_slot_actions(find_ui_panel(3), 3);
-    fixed_slot_actions_dirty_ = false;
-}
-
-void Gs1GodotActionPanelController::refresh_site_controls_if_needed()
-{
-    if (!site_controls_dirty_)
-    {
-        return;
-    }
-
-    reconcile_site_control_buttons();
-    site_controls_dirty_ = false;
+    prune_button_registry(site_control_buttons_, {});
 }
 
 void Gs1GodotActionPanelController::handle_fixed_slot_pressed(std::int64_t button_id)
@@ -470,45 +423,38 @@ void Gs1GodotActionPanelController::clear_action_from_button(BaseButton* button,
 void Gs1GodotActionPanelController::reconcile_site_control_buttons()
 {
     Array button_specs;
-    if (current_app_state_.has_value())
+    const auto& setups = ui_setup_state_reducer_.setups();
+    for (const auto& setup : setups)
     {
-        const int app_state = static_cast<int>(current_app_state_.value());
-        if (app_state >= GS1_APP_STATE_SITE_LOADING && app_state <= GS1_APP_STATE_SITE_RESULT)
+        if (setup.presentation_type == GS1_UI_SETUP_PRESENTATION_OVERLAY)
         {
-            const auto& setups = ui_setup_state_reducer_.setups();
-            for (const auto& setup : setups)
+            continue;
+        }
+        for (const auto& element : setup.elements)
+        {
+            const int action_type = static_cast<int>(element.action.type);
+            if (std::find(k_allowed_site_action_types.begin(), k_allowed_site_action_types.end(), action_type) == k_allowed_site_action_types.end())
             {
-                if (setup.presentation_type == GS1_UI_SETUP_PRESENTATION_OVERLAY)
-                {
-                    continue;
-                }
-                for (const auto& element : setup.elements)
-                {
-                    const int action_type = static_cast<int>(element.action.type);
-                    if (std::find(k_allowed_site_action_types.begin(), k_allowed_site_action_types.end(), action_type) == k_allowed_site_action_types.end())
-                    {
-                        continue;
-                    }
-                    if (element.element_type != GS1_UI_ELEMENT_BUTTON)
-                    {
-                        continue;
-                    }
-
-                    Dictionary action;
-                    action["type"] = action_type;
-                    action["target_id"] = static_cast<int64_t>(element.action.target_id);
-                    action["arg0"] = static_cast<int64_t>(element.action.arg0);
-                    action["arg1"] = static_cast<int64_t>(element.action.arg1);
-
-                    Dictionary spec;
-                    spec["setup_id"] = static_cast<int>(setup.setup_id);
-                    spec["element_id"] = static_cast<int>(element.element_id);
-                    spec["text"] = String("Action");
-                    spec["flags"] = static_cast<int>(element.flags);
-                    spec["action"] = action;
-                    button_specs.push_back(spec);
-                }
+                continue;
             }
+            if (element.element_type != GS1_UI_ELEMENT_BUTTON)
+            {
+                continue;
+            }
+
+            Dictionary action;
+            action["type"] = action_type;
+            action["target_id"] = static_cast<int64_t>(element.action.target_id);
+            action["arg0"] = static_cast<int64_t>(element.action.arg0);
+            action["arg1"] = static_cast<int64_t>(element.action.arg1);
+
+            Dictionary spec;
+            spec["setup_id"] = static_cast<int>(setup.setup_id);
+            spec["element_id"] = static_cast<int>(element.element_id);
+            spec["text"] = String("Action");
+            spec["flags"] = static_cast<int>(element.flags);
+            spec["action"] = action;
+            button_specs.push_back(spec);
         }
     }
 

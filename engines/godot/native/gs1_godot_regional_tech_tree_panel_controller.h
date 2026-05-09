@@ -45,7 +45,6 @@ public:
     [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
     void handle_engine_message(const Gs1EngineMessage& message) override;
     void handle_runtime_message_reset() override;
-    void refresh_if_needed();
 
 protected:
     static void _bind_methods();
@@ -86,6 +85,7 @@ private:
     [[nodiscard]] godot::Control* resolve_owner_control();
     void submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);
     void apply_overlay_layout();
+    void rebuild_tech_tree_panel();
     void reconcile_tech_tree_cards(const godot::Array& card_specs);
     [[nodiscard]] godot::String tech_tooltip_text(const godot::Dictionary& spec) const;
     [[nodiscard]] godot::String unlockable_tooltip_text(const godot::Dictionary& spec) const;
@@ -123,8 +123,6 @@ private:
     godot::GridContainer* actions_ {nullptr};
     SubmitUiActionFn submit_ui_action_ {};
     Gs1GodotProgressionViewStateReducer progression_view_state_reducer_ {};
-    std::optional<Gs1AppState> current_app_state_ {};
-    bool dirty_ {true};
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> action_buttons_ {};
     mutable std::unordered_map<int, godot::String> faction_name_cache_ {};
     mutable std::unordered_map<std::uint32_t, TechnologyUiCacheEntry> technology_ui_cache_ {};

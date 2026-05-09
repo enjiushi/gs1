@@ -48,7 +48,6 @@ void Gs1GodotRegionalMapHudController::_ready()
 void Gs1GodotRegionalMapHudController::_process(double delta)
 {
     (void)delta;
-    refresh_if_needed();
 }
 
 void Gs1GodotRegionalMapHudController::_exit_tree()
@@ -89,7 +88,7 @@ void Gs1GodotRegionalMapHudController::cache_ui_references(Control& owner)
         }
         tech_button_connected_ = true;
     }
-    refresh_if_needed();
+    rebuild_hud();
 }
 
 void Gs1GodotRegionalMapHudController::set_submit_ui_action_callback(SubmitUiActionFn callback)
@@ -152,7 +151,6 @@ bool Gs1GodotRegionalMapHudController::handles_engine_message(Gs1EngineMessageTy
 {
     switch (type)
     {
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
     case GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_MAP_SNAPSHOT:
     case GS1_ENGINE_MESSAGE_REGIONAL_MAP_SITE_UPSERT:
     case GS1_ENGINE_MESSAGE_REGIONAL_MAP_SITE_REMOVE:
@@ -180,9 +178,6 @@ void Gs1GodotRegionalMapHudController::handle_engine_message(const Gs1EngineMess
 
     switch (message.type)
     {
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
-        current_app_state_ = message.payload_as<Gs1EngineMessageSetAppStateData>().app_state;
-        break;
     case GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES:
         campaign_resources_ = message.payload_as<Gs1EngineMessageCampaignResourcesData>();
         break;
@@ -190,39 +185,19 @@ void Gs1GodotRegionalMapHudController::handle_engine_message(const Gs1EngineMess
         break;
     }
 
-    dirty_ = true;
-    refresh_if_needed();
+    rebuild_hud();
 }
 
 void Gs1GodotRegionalMapHudController::handle_runtime_message_reset()
 {
     regional_map_state_reducer_.reset();
     ui_panel_state_reducer_.reset();
-    current_app_state_.reset();
     campaign_resources_.reset();
-    dirty_ = true;
-    refresh_if_needed();
+    rebuild_hud();
 }
 
-void Gs1GodotRegionalMapHudController::refresh_if_needed()
+void Gs1GodotRegionalMapHudController::rebuild_hud()
 {
-    if (!dirty_)
-    {
-        return;
-    }
-
-    const int app_state = current_app_state_.has_value() ? static_cast<int>(current_app_state_.value()) : 0;
-    const bool visible = app_state == GS1_APP_STATE_REGIONAL_MAP || app_state == GS1_APP_STATE_SITE_LOADING;
-    if (hud_ != nullptr)
-    {
-        hud_->set_visible(visible);
-    }
-    if (!visible)
-    {
-        dirty_ = false;
-        return;
-    }
-
     if (selected_site_summary_ != nullptr)
     {
         selected_site_summary_->set_text(selected_site_text());
@@ -241,8 +216,6 @@ void Gs1GodotRegionalMapHudController::refresh_if_needed()
         tech_button_->set_meta("arg0", static_cast<std::int64_t>(action.arg0));
         tech_button_->set_meta("arg1", static_cast<std::int64_t>(action.arg1));
     }
-
-    dirty_ = false;
 }
 
 String Gs1GodotRegionalMapHudController::selected_site_text() const

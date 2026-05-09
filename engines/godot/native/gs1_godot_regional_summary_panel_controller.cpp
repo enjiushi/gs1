@@ -24,7 +24,6 @@ void Gs1GodotRegionalSummaryPanelController::_ready()
 void Gs1GodotRegionalSummaryPanelController::_process(double delta)
 {
     (void)delta;
-    refresh_if_needed();
 }
 
 void Gs1GodotRegionalSummaryPanelController::_exit_tree()
@@ -47,7 +46,7 @@ void Gs1GodotRegionalSummaryPanelController::cache_ui_references(Control& owner)
     {
         regional_map_graph_ = Object::cast_to<RichTextLabel>(owner.find_child("RegionalMapGraph", true, false));
     }
-    refresh_if_needed();
+    rebuild_summary();
 }
 
 void Gs1GodotRegionalSummaryPanelController::cache_adapter_service()
@@ -82,7 +81,6 @@ bool Gs1GodotRegionalSummaryPanelController::handles_engine_message(Gs1EngineMes
 {
     switch (type)
     {
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
     case GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_MAP_SNAPSHOT:
     case GS1_ENGINE_MESSAGE_REGIONAL_MAP_SITE_UPSERT:
     case GS1_ENGINE_MESSAGE_REGIONAL_MAP_SITE_REMOVE:
@@ -100,10 +98,6 @@ void Gs1GodotRegionalSummaryPanelController::handle_engine_message(const Gs1Engi
 {
     switch (message.type)
     {
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
-        current_app_state_ = message.payload_as<Gs1EngineMessageSetAppStateData>().app_state;
-        regional_map_state_reducer_.apply_engine_message(message);
-        break;
     case GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES:
         campaign_resources_ = message.payload_as<Gs1EngineMessageCampaignResourcesData>();
         break;
@@ -111,33 +105,18 @@ void Gs1GodotRegionalSummaryPanelController::handle_engine_message(const Gs1Engi
         regional_map_state_reducer_.apply_engine_message(message);
         break;
     }
-    dirty_ = true;
-    refresh_if_needed();
+    rebuild_summary();
 }
 
 void Gs1GodotRegionalSummaryPanelController::handle_runtime_message_reset()
 {
     regional_map_state_reducer_.reset();
-    current_app_state_.reset();
     campaign_resources_.reset();
-    dirty_ = true;
-    refresh_if_needed();
+    rebuild_summary();
 }
 
-void Gs1GodotRegionalSummaryPanelController::refresh_if_needed()
+void Gs1GodotRegionalSummaryPanelController::rebuild_summary()
 {
-    if (!dirty_)
-    {
-        return;
-    }
-
-    const int app_state = current_app_state_.has_value() ? static_cast<int>(current_app_state_.value()) : 0;
-    if (app_state != 3 && app_state != 4)
-    {
-        dirty_ = false;
-        return;
-    }
-
     const auto& regional_state = regional_map_state_reducer_.state();
     const auto& sites = regional_state.sites;
     const auto& links = regional_state.links;
@@ -164,8 +143,6 @@ void Gs1GodotRegionalSummaryPanelController::refresh_if_needed()
     {
         regional_map_graph_->set_text(build_regional_map_overview_text(sites, links));
     }
-
-    dirty_ = false;
 }
 
 String Gs1GodotRegionalSummaryPanelController::build_regional_map_overview_text(

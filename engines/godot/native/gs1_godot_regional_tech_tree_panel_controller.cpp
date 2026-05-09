@@ -197,7 +197,6 @@ void Gs1GodotRegionalTechTreePanelController::_ready()
 void Gs1GodotRegionalTechTreePanelController::_process(double delta)
 {
     (void)delta;
-    refresh_if_needed();
 }
 
 void Gs1GodotRegionalTechTreePanelController::_exit_tree()
@@ -242,7 +241,7 @@ void Gs1GodotRegionalTechTreePanelController::cache_ui_references(Control& owner
         }
     }
     apply_overlay_layout();
-    refresh_if_needed();
+    rebuild_tech_tree_panel();
 }
 
 void Gs1GodotRegionalTechTreePanelController::set_submit_ui_action_callback(SubmitUiActionFn callback)
@@ -299,7 +298,6 @@ bool Gs1GodotRegionalTechTreePanelController::handles_engine_message(Gs1EngineMe
 {
     switch (type)
     {
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
     case GS1_ENGINE_MESSAGE_BEGIN_PROGRESSION_VIEW:
     case GS1_ENGINE_MESSAGE_PROGRESSION_ENTRY_UPSERT:
     case GS1_ENGINE_MESSAGE_END_PROGRESSION_VIEW:
@@ -314,38 +312,19 @@ void Gs1GodotRegionalTechTreePanelController::handle_engine_message(const Gs1Eng
 {
     progression_view_state_reducer_.apply_engine_message(message);
 
-    if (message.type == GS1_ENGINE_MESSAGE_SET_APP_STATE)
-    {
-        current_app_state_ = message.payload_as<Gs1EngineMessageSetAppStateData>().app_state;
-    }
-
-    dirty_ = true;
-    refresh_if_needed();
+    rebuild_tech_tree_panel();
 }
 
 void Gs1GodotRegionalTechTreePanelController::handle_runtime_message_reset()
 {
     progression_view_state_reducer_.reset();
-    current_app_state_.reset();
-    dirty_ = true;
-    refresh_if_needed();
+    rebuild_tech_tree_panel();
 }
 
-void Gs1GodotRegionalTechTreePanelController::refresh_if_needed()
+void Gs1GodotRegionalTechTreePanelController::rebuild_tech_tree_panel()
 {
-    if (!dirty_ || overlay_ == nullptr || panel_ == nullptr)
+    if (overlay_ == nullptr || panel_ == nullptr)
     {
-        return;
-    }
-
-    const int app_state = current_app_state_.has_value() ? static_cast<int>(current_app_state_.value()) : 0;
-    if (app_state != GS1_APP_STATE_REGIONAL_MAP &&
-        app_state != GS1_APP_STATE_SITE_LOADING &&
-        app_state != GS1_APP_STATE_SITE_ACTIVE)
-    {
-        overlay_->set_visible(false);
-        panel_->set_visible(false);
-        dirty_ = false;
         return;
     }
 
@@ -355,7 +334,6 @@ void Gs1GodotRegionalTechTreePanelController::refresh_if_needed()
     {
         overlay_->set_visible(false);
         panel_->set_visible(false);
-        dirty_ = false;
         return;
     }
 
@@ -507,7 +485,6 @@ void Gs1GodotRegionalTechTreePanelController::refresh_if_needed()
     }
 
     reconcile_tech_tree_cards(ladder_specs);
-    dirty_ = false;
 }
 
 void Gs1GodotRegionalTechTreePanelController::handle_action_pressed(std::int64_t button_key)

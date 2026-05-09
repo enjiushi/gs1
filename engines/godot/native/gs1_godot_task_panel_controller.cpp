@@ -67,7 +67,6 @@ void Gs1GodotTaskPanelController::_ready()
 void Gs1GodotTaskPanelController::_process(double delta)
 {
     (void)delta;
-    refresh_if_needed();
 }
 
 void Gs1GodotTaskPanelController::_exit_tree()
@@ -98,7 +97,9 @@ void Gs1GodotTaskPanelController::cache_ui_references(Control& owner)
     {
         modifier_rows_ = Object::cast_to<VBoxContainer>(owner.find_child("ModifierRows", true, false));
     }
-    refresh_if_needed();
+    update_task_summary();
+    reconcile_task_rows();
+    reconcile_modifier_rows();
 }
 
 void Gs1GodotTaskPanelController::cache_adapter_service()
@@ -133,7 +134,6 @@ bool Gs1GodotTaskPanelController::handles_engine_message(Gs1EngineMessageType ty
 {
     switch (type)
     {
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
     case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
     case GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT:
     case GS1_ENGINE_MESSAGE_SITE_TASK_REMOVE:
@@ -150,21 +150,6 @@ void Gs1GodotTaskPanelController::handle_engine_message(const Gs1EngineMessage& 
 {
     switch (message.type)
     {
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
-    {
-        current_app_state_ = message.payload_as<Gs1EngineMessageSetAppStateData>().app_state;
-        if (current_app_state_ == GS1_APP_STATE_MAIN_MENU ||
-            current_app_state_ == GS1_APP_STATE_REGIONAL_MAP ||
-            current_app_state_ == GS1_APP_STATE_CAMPAIGN_END)
-        {
-            tasks_.clear();
-            active_modifiers_.clear();
-            pending_task_indices_.clear();
-            pending_modifier_indices_.clear();
-            in_site_snapshot_ = false;
-        }
-        break;
-    }
     case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
     {
         const auto& payload = message.payload_as<Gs1EngineMessageSiteSnapshotData>();
@@ -278,40 +263,25 @@ void Gs1GodotTaskPanelController::handle_engine_message(const Gs1EngineMessage& 
         break;
     }
 
-    dirty_ = true;
-    refresh_if_needed();
+    update_task_summary();
+    reconcile_task_rows();
+    reconcile_modifier_rows();
 }
 
 void Gs1GodotTaskPanelController::handle_runtime_message_reset()
 {
-    current_app_state_.reset();
     tasks_.clear();
     active_modifiers_.clear();
     pending_task_indices_.clear();
     pending_modifier_indices_.clear();
     in_site_snapshot_ = false;
-    dirty_ = true;
-    refresh_if_needed();
+    prune_button_registry(task_buttons_, {});
+    prune_button_registry(modifier_buttons_, {});
+    update_task_summary();
 }
 
-void Gs1GodotTaskPanelController::refresh_if_needed()
+void Gs1GodotTaskPanelController::update_task_summary()
 {
-    if (!dirty_)
-    {
-        return;
-    }
-
-    const int app_state = current_app_state_.has_value() ? static_cast<int>(current_app_state_.value()) : 0;
-    const bool panel_visible = app_state >= GS1_APP_STATE_SITE_LOADING && app_state <= GS1_APP_STATE_SITE_RESULT;
-    if (panel_ != nullptr)
-    {
-        panel_->set_visible(panel_visible);
-    }
-    if (!panel_visible)
-    {
-        dirty_ = false;
-        return;
-    }
     if (task_summary_ == nullptr)
     {
         return;
@@ -330,9 +300,6 @@ void Gs1GodotTaskPanelController::refresh_if_needed()
     }
 
     task_summary_->set_text(String("\n").join(lines));
-    reconcile_task_rows();
-    reconcile_modifier_rows();
-    dirty_ = false;
 }
 
 void Gs1GodotTaskPanelController::reconcile_task_rows()

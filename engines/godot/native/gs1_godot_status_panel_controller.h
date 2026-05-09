@@ -26,10 +26,7 @@ public:
     [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
     void handle_engine_message(const Gs1EngineMessage& message) override;
     void handle_runtime_message_reset() override;
-    void mark_dirty() noexcept { dirty_ = true; }
     void set_last_action_message(const godot::String& message);
-    void set_runtime_status(bool runtime_linked, const std::string& last_error);
-    void show_runtime_missing();
 
 protected:
     static void _bind_methods();
@@ -37,17 +34,13 @@ protected:
 private:
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_owner_control();
-    void refresh(bool runtime_linked, const std::string& last_error);
+    void rebuild_status_label();
 
     godot::Control* owner_control_ {nullptr};
     Gs1GodotAdapterService* adapter_service_ {nullptr};
-    std::optional<Gs1AppState> current_app_state_ {};
     std::optional<Gs1RuntimeCampaignResourcesProjection> campaign_resources_ {};
     std::optional<Gs1RuntimeHudProjection> hud_state_ {};
     std::optional<Gs1RuntimeSiteActionProjection> site_action_state_ {};
     godot::RichTextLabel* status_label_ {nullptr};
     godot::String last_action_message_ {};
-    std::string last_error_ {};
-    bool runtime_linked_ {false};
-    bool dirty_ {true};
 };

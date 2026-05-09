@@ -44,7 +44,6 @@ public:
     [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
     void handle_engine_message(const Gs1EngineMessage& message) override;
     void handle_runtime_message_reset() override;
-    void refresh_if_needed();
 
 protected:
     static void _bind_methods();
@@ -58,8 +57,9 @@ private:
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_owner_control();
     void submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);
-    void refresh_protection_selector(const Gs1RuntimeUiSetupProjection* setup);
-    void refresh_site_result(const Gs1RuntimeUiSetupProjection* setup);
+    void update_overlay_state_label();
+    void update_protection_selector(const Gs1RuntimeUiSetupProjection* setup);
+    void update_site_result(const Gs1RuntimeUiSetupProjection* setup);
     void reconcile_projected_buttons(
         godot::Node* container,
         std::unordered_map<std::uint64_t, ProjectedButtonRecord>& registry,
@@ -91,9 +91,7 @@ private:
     godot::VBoxContainer* site_result_actions_ {nullptr};
     SubmitUiActionFn submit_ui_action_ {};
     Gs1GodotUiSetupStateReducer ui_setup_state_reducer_ {};
-    std::optional<Gs1AppState> current_app_state_ {};
     std::optional<Gs1RuntimeProtectionOverlayProjection> overlay_state_ {};
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> protection_selector_buttons_registry_ {};
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> site_result_buttons_registry_ {};
-    bool dirty_ {true};
 };

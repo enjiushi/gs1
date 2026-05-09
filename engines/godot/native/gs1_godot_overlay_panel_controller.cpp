@@ -87,7 +87,6 @@ void Gs1GodotOverlayPanelController::_ready()
 void Gs1GodotOverlayPanelController::_process(double delta)
 {
     (void)delta;
-    refresh_if_needed();
 }
 
 void Gs1GodotOverlayPanelController::_exit_tree()
@@ -169,7 +168,17 @@ void Gs1GodotOverlayPanelController::cache_ui_references(Control& owner)
             }
         }
     }
-    refresh_if_needed();
+    update_overlay_state_label();
+    const auto& setups = ui_setup_state_reducer_.setups();
+    const auto find_setup = [&setups](Gs1UiSetupId setup_id) -> const Gs1RuntimeUiSetupProjection*
+    {
+        const auto found = std::find_if(setups.begin(), setups.end(), [&](const auto& setup) {
+            return setup.setup_id == setup_id;
+        });
+        return found != setups.end() ? &(*found) : nullptr;
+    };
+    update_protection_selector(find_setup(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR));
+    update_site_result(find_setup(GS1_UI_SETUP_SITE_RESULT));
 }
 
 void Gs1GodotOverlayPanelController::set_submit_ui_action_callback(SubmitUiActionFn callback)
@@ -266,8 +275,7 @@ bool Gs1GodotOverlayPanelController::handles_engine_message(Gs1EngineMessageType
         type == GS1_ENGINE_MESSAGE_BEGIN_UI_SETUP ||
         type == GS1_ENGINE_MESSAGE_UI_ELEMENT_UPSERT ||
         type == GS1_ENGINE_MESSAGE_END_UI_SETUP ||
-        type == GS1_ENGINE_MESSAGE_CLOSE_UI_SETUP ||
-        type == GS1_ENGINE_MESSAGE_SET_APP_STATE;
+        type == GS1_ENGINE_MESSAGE_CLOSE_UI_SETUP;
 }
 
 void Gs1GodotOverlayPanelController::handle_engine_message(const Gs1EngineMessage& message)
@@ -278,63 +286,35 @@ void Gs1GodotOverlayPanelController::handle_engine_message(const Gs1EngineMessag
     case GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE:
         overlay_state_ = message.payload_as<Gs1EngineMessageSiteProtectionOverlayData>();
         break;
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
-    {
-        const auto& payload = message.payload_as<Gs1EngineMessageSetAppStateData>();
-        current_app_state_ = payload.app_state;
-        if (payload.app_state == GS1_APP_STATE_MAIN_MENU ||
-            payload.app_state == GS1_APP_STATE_REGIONAL_MAP ||
-            payload.app_state == GS1_APP_STATE_CAMPAIGN_END)
-        {
-            overlay_state_.reset();
-            ui_setup_state_reducer_.reset();
-        }
-        break;
-    }
     default:
         break;
     }
-    dirty_ = true;
-    refresh_if_needed();
+    update_overlay_state_label();
+    const auto& setups = ui_setup_state_reducer_.setups();
+    const auto find_setup = [&setups](Gs1UiSetupId setup_id) -> const Gs1RuntimeUiSetupProjection*
+    {
+        const auto found = std::find_if(setups.begin(), setups.end(), [&](const auto& setup) {
+            return setup.setup_id == setup_id;
+        });
+        return found != setups.end() ? &(*found) : nullptr;
+    };
+    update_protection_selector(find_setup(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR));
+    update_site_result(find_setup(GS1_UI_SETUP_SITE_RESULT));
 }
 
 void Gs1GodotOverlayPanelController::handle_runtime_message_reset()
 {
-    current_app_state_.reset();
     overlay_state_.reset();
     ui_setup_state_reducer_.reset();
     protection_selector_buttons_registry_.clear();
     site_result_buttons_registry_.clear();
-    dirty_ = true;
-    refresh_if_needed();
+    update_overlay_state_label();
+    update_protection_selector(nullptr);
+    update_site_result(nullptr);
 }
 
-void Gs1GodotOverlayPanelController::refresh_if_needed()
+void Gs1GodotOverlayPanelController::update_overlay_state_label()
 {
-    if (!dirty_)
-    {
-        return;
-    }
-
-    const int app_state = current_app_state_.has_value() ? static_cast<int>(current_app_state_.value()) : 0;
-    const bool panel_visible = app_state >= GS1_APP_STATE_SITE_LOADING && app_state <= GS1_APP_STATE_SITE_RESULT;
-    if (panel_ != nullptr)
-    {
-        panel_->set_visible(panel_visible);
-    }
-    if (!panel_visible)
-    {
-        if (protection_selector_overlay_ != nullptr)
-        {
-            protection_selector_overlay_->set_visible(false);
-        }
-        if (site_result_overlay_ != nullptr)
-        {
-            site_result_overlay_->set_visible(false);
-        }
-        dirty_ = false;
-        return;
-    }
     if (overlay_state_label_ == nullptr)
     {
         return;
@@ -344,20 +324,9 @@ void Gs1GodotOverlayPanelController::refresh_if_needed()
         ? static_cast<int>(overlay_state_->mode)
         : 0;
     overlay_state_label_->set_text(vformat("Overlay Mode: %d", overlay_mode));
-    const auto& setups = ui_setup_state_reducer_.setups();
-    const auto find_setup = [&setups](Gs1UiSetupId setup_id) -> const Gs1RuntimeUiSetupProjection*
-    {
-        const auto found = std::find_if(setups.begin(), setups.end(), [&](const auto& setup) {
-            return setup.setup_id == setup_id;
-        });
-        return found != setups.end() ? &(*found) : nullptr;
-    };
-    refresh_protection_selector(find_setup(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR));
-    refresh_site_result(find_setup(GS1_UI_SETUP_SITE_RESULT));
-    dirty_ = false;
 }
 
-void Gs1GodotOverlayPanelController::refresh_protection_selector(const Gs1RuntimeUiSetupProjection* setup)
+void Gs1GodotOverlayPanelController::update_protection_selector(const Gs1RuntimeUiSetupProjection* setup)
 {
     if (protection_selector_overlay_ != nullptr)
     {
@@ -406,7 +375,7 @@ void Gs1GodotOverlayPanelController::refresh_protection_selector(const Gs1Runtim
     reconcile_projected_buttons(protection_selector_buttons_, protection_selector_buttons_registry_, button_specs);
 }
 
-void Gs1GodotOverlayPanelController::refresh_site_result(const Gs1RuntimeUiSetupProjection* setup)
+void Gs1GodotOverlayPanelController::update_site_result(const Gs1RuntimeUiSetupProjection* setup)
 {
     if (site_result_overlay_ != nullptr)
     {

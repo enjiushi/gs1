@@ -42,7 +42,6 @@ public:
     [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
     void handle_engine_message(const Gs1EngineMessage& message) override;
     void handle_runtime_message_reset() override;
-    void refresh_if_needed();
 
 protected:
     static void _bind_methods();
@@ -56,6 +55,8 @@ private:
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_owner_control();
     void submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);
+    void apply_panel_visibility();
+    void update_phone_state_label();
     void reconcile_phone_listing_buttons();
     [[nodiscard]] godot::Button* upsert_button_node(
         godot::Node* container,
@@ -74,11 +75,9 @@ private:
     godot::Label* phone_state_label_ {nullptr};
     godot::VBoxContainer* phone_listings_ {nullptr};
     SubmitUiActionFn submit_ui_action_ {};
-    std::optional<Gs1AppState> current_app_state_ {};
     std::optional<Gs1RuntimePhonePanelProjection> phone_panel_state_ {};
     std::vector<Gs1RuntimePhoneListingProjection> phone_listings_state_ {};
     std::unordered_map<std::uint32_t, std::size_t> pending_listing_indices_ {};
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> phone_listing_buttons_ {};
     mutable std::unordered_map<int, godot::String> item_name_cache_ {};
-    bool dirty_ {true};
 };

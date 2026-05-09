@@ -66,9 +66,6 @@ private:
     void cache_adapter_service();
     void cache_scene_references();
     void cache_ui_references();
-    void refresh_regional_map_if_needed();
-    void mark_regional_map_dirty();
-    void mark_regional_visuals_dirty();
     void submit_ui_action(std::int64_t action_type, std::int64_t target_id = 0);
     void select_regional_site(int site_id);
     void refresh_regional_map();
@@ -111,8 +108,6 @@ private:
 
     Gs1GodotRegionalMapStateReducer regional_map_state_reducer_ {};
     godot::Rect2i regional_map_bounds_ {-4, -3, 9, 7};
-    bool regional_map_dirty_ {true};
-    bool regional_visuals_dirty_ {true};
 
     std::unordered_map<int, RegionalSiteNodeRecord> regional_site_nodes_ {};
     std::unordered_map<int, Gs1RuntimeRegionalMapSiteProjection> regional_site_data_ {};

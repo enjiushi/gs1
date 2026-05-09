@@ -39,7 +39,6 @@ public:
     [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
     void handle_engine_message(const Gs1EngineMessage& message) override;
     void handle_runtime_message_reset() override;
-    void refresh_if_needed();
 
 protected:
     static void _bind_methods();
@@ -53,6 +52,8 @@ private:
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_owner_control();
     void submit_craft_option(int tile_x, int tile_y, int output_item_id);
+    void apply_panel_visibility();
+    void update_craft_summary();
     void reconcile_craft_option_buttons();
     [[nodiscard]] godot::Button* upsert_button_node(
         godot::Node* container,
@@ -71,11 +72,9 @@ private:
     godot::VBoxContainer* craft_options_ {nullptr};
     godot::Control* owner_control_ {nullptr};
     Gs1GodotAdapterService* adapter_service_ {nullptr};
-    std::optional<Gs1AppState> current_app_state_ {};
     std::optional<Gs1RuntimePlacementPreviewProjection> placement_preview_ {};
     std::optional<Gs1RuntimePlacementFailureProjection> placement_failure_ {};
     std::optional<Gs1RuntimeCraftContextProjection> craft_context_ {};
     SubmitCraftOptionFn submit_craft_option_ {};
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> craft_option_buttons_ {};
-    bool dirty_ {true};
 };

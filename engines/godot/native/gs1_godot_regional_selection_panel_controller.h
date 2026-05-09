@@ -40,7 +40,6 @@ public:
     [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
     void handle_engine_message(const Gs1EngineMessage& message) override;
     void handle_runtime_message_reset() override;
-    void refresh_if_needed();
 
 protected:
     static void _bind_methods();
@@ -54,6 +53,7 @@ private:
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_owner_control();
     void submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);
+    void rebuild_selection_panel();
     void reconcile_action_buttons(const godot::Array& button_specs);
     [[nodiscard]] godot::Button* upsert_button_node(
         godot::Node* container,
@@ -89,10 +89,8 @@ private:
     SubmitUiActionFn submit_ui_action_ {};
     Gs1GodotUiPanelStateReducer ui_panel_state_reducer_ {};
     Gs1GodotRegionalMapStateReducer regional_map_state_reducer_ {};
-    std::optional<Gs1AppState> current_app_state_ {};
     int selected_site_id_ {0};
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> action_buttons_ {};
     mutable std::unordered_map<int, godot::String> item_name_cache_ {};
     mutable std::unordered_map<int, godot::String> faction_name_cache_ {};
-    bool dirty_ {true};
 };

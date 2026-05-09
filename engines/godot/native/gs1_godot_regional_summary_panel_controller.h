@@ -27,7 +27,6 @@ public:
     [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
     void handle_engine_message(const Gs1EngineMessage& message) override;
     void handle_runtime_message_reset() override;
-    void refresh_if_needed();
 
 protected:
     static void _bind_methods();
@@ -35,6 +34,7 @@ protected:
 private:
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_owner_control();
+    void rebuild_summary();
     [[nodiscard]] godot::String build_regional_map_overview_text(
         const std::vector<Gs1RuntimeRegionalMapSiteProjection>& sites,
         const std::vector<Gs1RuntimeRegionalMapLinkProjection>& links) const;
@@ -44,7 +44,5 @@ private:
     godot::RichTextLabel* regional_map_summary_ {nullptr};
     godot::RichTextLabel* regional_map_graph_ {nullptr};
     Gs1GodotRegionalMapStateReducer regional_map_state_reducer_ {};
-    std::optional<Gs1AppState> current_app_state_ {};
     std::optional<Gs1RuntimeCampaignResourcesProjection> campaign_resources_ {};
-    bool dirty_ {true};
 };

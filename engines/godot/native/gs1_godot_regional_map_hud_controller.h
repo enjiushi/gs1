@@ -34,7 +34,6 @@ public:
     [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
     void handle_engine_message(const Gs1EngineMessage& message) override;
     void handle_runtime_message_reset() override;
-    void refresh_if_needed();
 
 protected:
     static void _bind_methods();
@@ -43,6 +42,7 @@ private:
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_owner_control();
     void submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);
+    void rebuild_hud();
     [[nodiscard]] godot::String selected_site_text() const;
     [[nodiscard]] godot::String campaign_summary_text() const;
     [[nodiscard]] godot::String site_state_name(int site_state) const;
@@ -60,8 +60,6 @@ private:
     SubmitUiActionFn submit_ui_action_ {};
     Gs1GodotRegionalMapStateReducer regional_map_state_reducer_ {};
     Gs1GodotUiPanelStateReducer ui_panel_state_reducer_ {};
-    std::optional<Gs1AppState> current_app_state_ {};
     std::optional<Gs1RuntimeCampaignResourcesProjection> campaign_resources_ {};
     bool tech_button_connected_ {false};
-    bool dirty_ {true};
 };

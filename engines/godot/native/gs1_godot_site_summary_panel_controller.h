@@ -28,7 +28,6 @@ public:
     [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
     void handle_engine_message(const Gs1EngineMessage& message) override;
     void handle_runtime_message_reset() override;
-    void refresh_if_needed();
 
 protected:
     static void _bind_methods();
@@ -47,12 +46,11 @@ private:
 
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_owner_control();
+    void rebuild_summary();
 
     godot::Control* owner_control_ {nullptr};
     Gs1GodotAdapterService* adapter_service_ {nullptr};
     godot::Label* site_title_ {nullptr};
     godot::RichTextLabel* site_summary_ {nullptr};
-    std::optional<Gs1AppState> current_app_state_ {};
     std::optional<State> state_ {};
-    bool dirty_ {true};
 };

@@ -81,7 +81,6 @@ void Gs1GodotRegionalMapSceneController::_ready()
 void Gs1GodotRegionalMapSceneController::_process(double delta)
 {
     (void)delta;
-    refresh_regional_map_if_needed();
 }
 
 void Gs1GodotRegionalMapSceneController::_exit_tree()
@@ -181,19 +180,9 @@ void Gs1GodotRegionalMapSceneController::handle_engine_message(const Gs1EngineMe
 {
     regional_map_state_reducer_.apply_engine_message(message);
 
-    switch (message.type)
+    if (message.type == GS1_ENGINE_MESSAGE_END_REGIONAL_MAP_SNAPSHOT)
     {
-    case GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_MAP_SNAPSHOT:
-    case GS1_ENGINE_MESSAGE_REGIONAL_MAP_SITE_UPSERT:
-    case GS1_ENGINE_MESSAGE_REGIONAL_MAP_SITE_REMOVE:
-    case GS1_ENGINE_MESSAGE_REGIONAL_MAP_LINK_UPSERT:
-    case GS1_ENGINE_MESSAGE_REGIONAL_MAP_LINK_REMOVE:
-    case GS1_ENGINE_MESSAGE_END_REGIONAL_MAP_SNAPSHOT:
-        mark_regional_map_dirty();
-        mark_regional_visuals_dirty();
-        break;
-    default:
-        break;
+        refresh_regional_map();
     }
 }
 
@@ -202,30 +191,6 @@ void Gs1GodotRegionalMapSceneController::handle_runtime_message_reset()
     regional_map_state_reducer_.reset();
     clear_regional_projection_world();
     regional_material_cache_.clear();
-    mark_regional_map_dirty();
-    mark_regional_visuals_dirty();
-}
-
-void Gs1GodotRegionalMapSceneController::refresh_regional_map_if_needed()
-{
-    if (!regional_map_dirty_ && !regional_visuals_dirty_)
-    {
-        return;
-    }
-
-    refresh_regional_map();
-    regional_map_dirty_ = false;
-    regional_visuals_dirty_ = false;
-}
-
-void Gs1GodotRegionalMapSceneController::mark_regional_map_dirty()
-{
-    regional_map_dirty_ = true;
-}
-
-void Gs1GodotRegionalMapSceneController::mark_regional_visuals_dirty()
-{
-    regional_visuals_dirty_ = true;
 }
 
 void Gs1GodotRegionalMapSceneController::submit_ui_action(std::int64_t action_type, std::int64_t target_id)
@@ -250,14 +215,8 @@ void Gs1GodotRegionalMapSceneController::refresh_regional_map()
         return;
     }
 
-    if (regional_map_dirty_)
-    {
-        rebuild_regional_map_world(regional_state.sites, regional_state.links);
-    }
-    if (regional_map_dirty_ || regional_visuals_dirty_)
-    {
-        update_regional_site_visuals();
-    }
+    rebuild_regional_map_world(regional_state.sites, regional_state.links);
+    update_regional_site_visuals();
 }
 
 void Gs1GodotRegionalMapSceneController::rebuild_regional_map_world(

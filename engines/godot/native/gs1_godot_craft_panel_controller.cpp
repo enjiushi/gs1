@@ -89,7 +89,6 @@ void Gs1GodotCraftPanelController::_ready()
 void Gs1GodotCraftPanelController::_process(double delta)
 {
     (void)delta;
-    refresh_if_needed();
 }
 
 void Gs1GodotCraftPanelController::_exit_tree()
@@ -116,7 +115,9 @@ void Gs1GodotCraftPanelController::cache_ui_references(Control& owner)
     {
         craft_options_ = Object::cast_to<VBoxContainer>(owner.find_child("CraftOptions", true, false));
     }
-    refresh_if_needed();
+    apply_panel_visibility();
+    update_craft_summary();
+    reconcile_craft_option_buttons();
 }
 
 void Gs1GodotCraftPanelController::set_submit_craft_option_callback(SubmitCraftOptionFn callback)
@@ -172,7 +173,6 @@ bool Gs1GodotCraftPanelController::handles_engine_message(Gs1EngineMessageType t
 {
     switch (type)
     {
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
     case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_BEGIN:
     case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_OPTION_UPSERT:
     case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_END:
@@ -188,20 +188,6 @@ void Gs1GodotCraftPanelController::handle_engine_message(const Gs1EngineMessage&
 {
     switch (message.type)
     {
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
-    {
-        const auto& payload = message.payload_as<Gs1EngineMessageSetAppStateData>();
-        current_app_state_ = payload.app_state;
-        if (payload.app_state == GS1_APP_STATE_MAIN_MENU ||
-            payload.app_state == GS1_APP_STATE_REGIONAL_MAP ||
-            payload.app_state == GS1_APP_STATE_CAMPAIGN_END)
-        {
-            placement_preview_.reset();
-            placement_failure_.reset();
-            craft_context_.reset();
-        }
-        break;
-    }
     case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_BEGIN:
     {
         const auto& payload = message.payload_as<Gs1EngineMessageCraftContextData>();
@@ -238,41 +224,33 @@ void Gs1GodotCraftPanelController::handle_engine_message(const Gs1EngineMessage&
         break;
     }
 
-    dirty_ = true;
-    refresh_if_needed();
+    apply_panel_visibility();
+    update_craft_summary();
+    reconcile_craft_option_buttons();
 }
 
 void Gs1GodotCraftPanelController::handle_runtime_message_reset()
 {
-    current_app_state_.reset();
     placement_preview_.reset();
     placement_failure_.reset();
     craft_context_.reset();
-    dirty_ = true;
-    refresh_if_needed();
+    prune_button_registry(craft_option_buttons_, {});
+    apply_panel_visibility();
 }
 
-void Gs1GodotCraftPanelController::refresh_if_needed()
+void Gs1GodotCraftPanelController::apply_panel_visibility()
 {
-    if (!dirty_)
-    {
-        return;
-    }
-
-    const int app_state = current_app_state_.has_value() ? static_cast<int>(current_app_state_.value()) : 0;
-    const bool site_visible = app_state >= GS1_APP_STATE_SITE_LOADING && app_state <= GS1_APP_STATE_SITE_RESULT;
-    const bool panel_visible = site_visible &&
+    const bool panel_visible =
         (placement_preview_.has_value() || placement_failure_.has_value() || craft_context_.has_value());
     if (panel_ != nullptr)
     {
         panel_->set_visible(panel_visible);
     }
-    if (!panel_visible)
-    {
-        dirty_ = false;
-        return;
-    }
-    if (craft_summary_ == nullptr)
+}
+
+void Gs1GodotCraftPanelController::update_craft_summary()
+{
+    if (panel_ == nullptr || !panel_->is_visible() || craft_summary_ == nullptr)
     {
         return;
     }
@@ -311,8 +289,6 @@ void Gs1GodotCraftPanelController::refresh_if_needed()
     }
 
     craft_summary_->set_text(String("\n").join(lines));
-    reconcile_craft_option_buttons();
-    dirty_ = false;
 }
 
 void Gs1GodotCraftPanelController::reconcile_craft_option_buttons()

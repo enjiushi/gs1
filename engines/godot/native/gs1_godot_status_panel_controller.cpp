@@ -10,11 +10,6 @@ using namespace godot;
 
 namespace
 {
-String bool_text(bool value, const String& when_true, const String& when_false)
-{
-    return value ? when_true : when_false;
-}
-
 String app_state_name(const int app_state)
 {
     switch (app_state)
@@ -42,10 +37,6 @@ String app_state_name(const int app_state)
     }
 }
 
-String string_from_view(const std::string& value)
-{
-    return String::utf8(value.c_str(), static_cast<int64_t>(value.size()));
-}
 }
 
 void Gs1GodotStatusPanelController::_bind_methods()
@@ -65,14 +56,6 @@ void Gs1GodotStatusPanelController::_ready()
 void Gs1GodotStatusPanelController::_process(double delta)
 {
     (void)delta;
-    if (adapter_service_ == nullptr)
-    {
-        show_runtime_missing();
-    }
-    else
-    {
-        set_runtime_status(true, adapter_service_->last_error());
-    }
 }
 
 void Gs1GodotStatusPanelController::_exit_tree()
@@ -91,7 +74,7 @@ void Gs1GodotStatusPanelController::cache_ui_references(Control& owner)
     {
         status_label_ = Object::cast_to<RichTextLabel>(owner.find_child("StatusLabel", true, false));
     }
-    refresh(runtime_linked_, last_error_);
+    rebuild_status_label();
 }
 
 void Gs1GodotStatusPanelController::cache_adapter_service()
@@ -126,7 +109,6 @@ bool Gs1GodotStatusPanelController::handles_engine_message(Gs1EngineMessageType 
 {
     switch (type)
     {
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
     case GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES:
     case GS1_ENGINE_MESSAGE_HUD_STATE:
     case GS1_ENGINE_MESSAGE_SITE_ACTION_UPDATE:
@@ -141,23 +123,6 @@ void Gs1GodotStatusPanelController::handle_engine_message(const Gs1EngineMessage
 {
     switch (message.type)
     {
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
-    {
-        const auto& payload = message.payload_as<Gs1EngineMessageSetAppStateData>();
-        current_app_state_ = payload.app_state;
-        if (payload.app_state == GS1_APP_STATE_MAIN_MENU ||
-            payload.app_state == GS1_APP_STATE_REGIONAL_MAP)
-        {
-            hud_state_.reset();
-            site_action_state_.reset();
-        }
-        else if (payload.app_state == GS1_APP_STATE_CAMPAIGN_END)
-        {
-            hud_state_.reset();
-            site_action_state_.reset();
-        }
-        break;
-    }
     case GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES:
         campaign_resources_ = message.payload_as<Gs1EngineMessageCampaignResourcesData>();
         break;
@@ -182,57 +147,33 @@ void Gs1GodotStatusPanelController::handle_engine_message(const Gs1EngineMessage
     default:
         break;
     }
-    dirty_ = true;
-    refresh(runtime_linked_, last_error_);
+    rebuild_status_label();
 }
 
 void Gs1GodotStatusPanelController::handle_runtime_message_reset()
 {
-    current_app_state_.reset();
     campaign_resources_.reset();
     hud_state_.reset();
     site_action_state_.reset();
-    dirty_ = true;
-    refresh(runtime_linked_, last_error_);
+    rebuild_status_label();
 }
 
 void Gs1GodotStatusPanelController::set_last_action_message(const String& message)
 {
     last_action_message_ = message;
-    dirty_ = true;
-    refresh(runtime_linked_, last_error_);
+    rebuild_status_label();
 }
 
-void Gs1GodotStatusPanelController::set_runtime_status(bool runtime_linked, const std::string& last_error)
+void Gs1GodotStatusPanelController::rebuild_status_label()
 {
-    if (runtime_linked_ == runtime_linked && last_error_ == last_error)
-    {
-        return;
-    }
-    runtime_linked_ = runtime_linked;
-    last_error_ = last_error;
-    dirty_ = true;
-    refresh(runtime_linked_, last_error_);
-}
-
-void Gs1GodotStatusPanelController::show_runtime_missing()
-{
-    set_runtime_status(false, std::string {});
-}
-
-void Gs1GodotStatusPanelController::refresh(bool runtime_linked, const std::string& last_error)
-{
-    if (!dirty_ || status_label_ == nullptr)
+    if (status_label_ == nullptr)
     {
         return;
     }
 
     PackedStringArray lines;
     lines.push_back("[b]Field Operations Feed[/b]");
-    lines.push_back(vformat("Runtime: %s", bool_text(runtime_linked, "linked", "idle")));
-    lines.push_back(vformat(
-        "Screen: %s",
-        app_state_name(current_app_state_.has_value() ? static_cast<int>(current_app_state_.value()) : 0)));
+    lines.push_back(vformat("Screen: %s", app_state_name(GS1_APP_STATE_SITE_ACTIVE)));
 
     if (campaign_resources_.has_value())
     {
@@ -249,12 +190,6 @@ void Gs1GodotStatusPanelController::refresh(bool runtime_linked, const std::stri
     {
         lines.push_back(vformat("Last Action: %s", last_action_message_));
     }
-    const String error_text = string_from_view(last_error);
-    if (!error_text.is_empty())
-    {
-        lines.push_back(vformat("Error: %s", error_text));
-    }
 
     status_label_->set_text(String("\n").join(lines));
-    dirty_ = false;
 }

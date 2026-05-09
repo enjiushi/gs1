@@ -48,7 +48,6 @@ public:
     [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
     void handle_engine_message(const Gs1EngineMessage& message) override;
     void handle_runtime_message_reset() override;
-    void refresh_if_needed();
 
 protected:
     static void _bind_methods();
@@ -60,7 +59,7 @@ private:
     void submit_storage_view(int storage_id, int event_kind);
     void submit_context_request(int tile_x, int tile_y, int flags);
     [[nodiscard]] int worker_pack_storage_id() const noexcept;
-    [[nodiscard]] bool site_visible() const noexcept;
+    void rebuild_hud();
     void refresh_meter(godot::ProgressBar* bar, godot::Label* label, const char* name, float value);
     void refresh_button_badges();
 
@@ -91,12 +90,10 @@ private:
     SubmitUiActionFn submit_ui_action_ {};
     SubmitStorageViewFn submit_storage_view_ {};
     SubmitContextRequestFn submit_context_request_ {};
-    std::optional<Gs1AppState> current_app_state_ {};
     std::optional<Gs1RuntimeHudProjection> hud_ {};
     std::optional<Gs1RuntimePhonePanelProjection> phone_panel_ {};
     std::optional<Gs1RuntimeProtectionOverlayProjection> protection_overlay_ {};
     std::vector<Gs1RuntimeInventoryStorageProjection> inventory_storages_ {};
     int selected_tile_x_ {0};
     int selected_tile_y_ {0};
-    bool dirty_ {true};
 };

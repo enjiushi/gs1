@@ -41,8 +41,6 @@ public:
     [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
     void handle_engine_message(const Gs1EngineMessage& message) override;
     void handle_runtime_message_reset() override;
-    void refresh_fixed_slot_actions_if_needed();
-    void refresh_site_controls_if_needed();
 
 protected:
     static void _bind_methods();
@@ -94,10 +92,7 @@ private:
     SubmitUiActionFn submit_ui_action_ {};
     Gs1GodotUiSetupStateReducer ui_setup_state_reducer_ {};
     Gs1GodotUiPanelStateReducer ui_panel_state_reducer_ {};
-    std::optional<Gs1AppState> current_app_state_ {};
     std::vector<FixedSlotBinding> fixed_slot_bindings_ {};
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> site_control_buttons_ {};
     bool fixed_slot_bindings_cached_ {false};
-    bool fixed_slot_actions_dirty_ {true};
-    bool site_controls_dirty_ {true};
 };

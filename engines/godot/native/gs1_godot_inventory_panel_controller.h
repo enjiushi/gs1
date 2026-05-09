@@ -41,7 +41,6 @@ public:
     [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
     void handle_engine_message(const Gs1EngineMessage& message) override;
     void handle_runtime_message_reset() override;
-    void refresh_if_needed();
     void handle_slot_pressed(std::int64_t slot_key);
 
 protected:
@@ -77,6 +76,8 @@ private:
         std::uint32_t storage_id,
         std::uint16_t slot_count,
         const std::vector<Gs1RuntimeInventorySlotProjection>& slots);
+    void apply_panel_visibility();
+    void rebuild_panel_contents();
     [[nodiscard]] godot::Button* upsert_slot_button(
         godot::GridContainer* grid,
         std::unordered_map<std::uint64_t, SlotButtonRecord>& registry,
@@ -95,7 +96,6 @@ private:
     godot::GridContainer* worker_pack_slots_grid_ {nullptr};
     godot::Label* opened_storage_title_ {nullptr};
     godot::GridContainer* opened_storage_slots_grid_ {nullptr};
-    std::optional<Gs1AppState> current_app_state_ {};
     std::vector<Gs1RuntimeInventoryStorageProjection> inventory_storages_ {};
     std::vector<Gs1RuntimeInventorySlotProjection> worker_pack_slots_ {};
     std::optional<Gs1RuntimeInventoryViewProjection> opened_storage_ {};
@@ -105,5 +105,4 @@ private:
     SubmitInventorySlotTapFn submit_inventory_slot_tap_ {};
     bool worker_pack_open_ {false};
     bool in_site_snapshot_ {false};
-    bool dirty_ {true};
 };

@@ -81,7 +81,6 @@ void Gs1GodotInventoryPanelController::_ready()
 void Gs1GodotInventoryPanelController::_process(double delta)
 {
     (void)delta;
-    refresh_if_needed();
 }
 
 void Gs1GodotInventoryPanelController::_exit_tree()
@@ -119,7 +118,8 @@ void Gs1GodotInventoryPanelController::cache_ui_references(Control& owner)
     {
         opened_storage_slots_grid_ = Object::cast_to<GridContainer>(owner.find_child("OpenedStorageSlots", true, false));
     }
-    refresh_if_needed();
+    apply_panel_visibility();
+    rebuild_panel_contents();
 }
 
 void Gs1GodotInventoryPanelController::set_submit_inventory_slot_tap_callback(SubmitInventorySlotTapFn callback)
@@ -171,7 +171,6 @@ bool Gs1GodotInventoryPanelController::handles_engine_message(Gs1EngineMessageTy
 {
     switch (type)
     {
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
     case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
     case GS1_ENGINE_MESSAGE_SITE_INVENTORY_STORAGE_UPSERT:
     case GS1_ENGINE_MESSAGE_SITE_INVENTORY_SLOT_UPSERT:
@@ -187,21 +186,6 @@ void Gs1GodotInventoryPanelController::handle_engine_message(const Gs1EngineMess
 {
     switch (message.type)
     {
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
-    {
-        const auto& payload = message.payload_as<Gs1EngineMessageSetAppStateData>();
-        current_app_state_ = payload.app_state;
-        if (payload.app_state == GS1_APP_STATE_MAIN_MENU ||
-            payload.app_state == GS1_APP_STATE_REGIONAL_MAP ||
-            payload.app_state == GS1_APP_STATE_CAMPAIGN_END)
-        {
-            inventory_storages_.clear();
-            worker_pack_slots_.clear();
-            opened_storage_.reset();
-            worker_pack_open_ = false;
-        }
-        break;
-    }
     case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
     {
         const auto& payload = message.payload_as<Gs1EngineMessageSiteSnapshotData>();
@@ -301,14 +285,12 @@ void Gs1GodotInventoryPanelController::handle_engine_message(const Gs1EngineMess
     default:
         break;
     }
-
-    dirty_ = true;
-    refresh_if_needed();
+    apply_panel_visibility();
+    rebuild_panel_contents();
 }
 
 void Gs1GodotInventoryPanelController::handle_runtime_message_reset()
 {
-    current_app_state_.reset();
     inventory_storages_.clear();
     worker_pack_slots_.clear();
     opened_storage_.reset();
@@ -316,20 +298,12 @@ void Gs1GodotInventoryPanelController::handle_runtime_message_reset()
     prune_slot_registry(opened_storage_slot_buttons_, {});
     worker_pack_open_ = false;
     in_site_snapshot_ = false;
-    dirty_ = true;
-    refresh_if_needed();
+    apply_panel_visibility();
 }
 
-void Gs1GodotInventoryPanelController::refresh_if_needed()
+void Gs1GodotInventoryPanelController::apply_panel_visibility()
 {
-    if (!dirty_)
-    {
-        return;
-    }
-
-    const int app_state = current_app_state_.has_value() ? static_cast<int>(current_app_state_.value()) : 0;
-    const bool site_visible = app_state >= GS1_APP_STATE_SITE_LOADING && app_state <= GS1_APP_STATE_SITE_RESULT;
-    const bool panel_visible = site_visible && (worker_pack_open_ || opened_storage_.has_value());
+    const bool panel_visible = worker_pack_open_ || opened_storage_.has_value();
     if (panel_ != nullptr)
     {
         panel_->set_visible(panel_visible);
@@ -338,10 +312,15 @@ void Gs1GodotInventoryPanelController::refresh_if_needed()
     {
         prune_slot_registry(worker_pack_slot_buttons_, {});
         prune_slot_registry(opened_storage_slot_buttons_, {});
-        dirty_ = false;
+    }
+}
+
+void Gs1GodotInventoryPanelController::rebuild_panel_contents()
+{
+    if (panel_ == nullptr || !panel_->is_visible())
+    {
         return;
     }
-
     if (inventory_title_ != nullptr)
     {
         inventory_title_->set_text("Inventory");
@@ -394,8 +373,6 @@ void Gs1GodotInventoryPanelController::refresh_if_needed()
         }
         prune_slot_registry(opened_storage_slot_buttons_, {});
     }
-
-    dirty_ = false;
 }
 
 void Gs1GodotInventoryPanelController::handle_slot_pressed(std::int64_t slot_key_value)
