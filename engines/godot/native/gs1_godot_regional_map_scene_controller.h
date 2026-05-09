@@ -26,7 +26,6 @@ namespace godot
 class Camera3D;
 class InputEvent;
 class Label3D;
-class MeshInstance3D;
 class Node;
 class Node3D;
 class StandardMaterial3D;
@@ -77,8 +76,6 @@ private:
         const std::vector<Gs1RuntimeRegionalMapSiteProjection>& sites,
         const std::vector<Gs1RuntimeRegionalMapLinkProjection>& links);
     void clear_regional_projection_world();
-    void reconcile_desert_tiles(const godot::Rect2i& bounds, bool include_grid_lines);
-    void reconcile_regional_links(const std::vector<Gs1RuntimeRegionalMapLinkProjection>& links);
     void reconcile_regional_sites(const std::vector<Gs1RuntimeRegionalMapSiteProjection>& sites);
     void position_regional_camera(const godot::Rect2i& bounds);
     void update_regional_site_visuals();
@@ -92,15 +89,6 @@ private:
         double metallic,
         bool emission = false);
     void clear_dynamic_children(godot::Node* container, const godot::String& prefix = godot::String("Dynamic"));
-    [[nodiscard]] godot::MeshInstance3D* upsert_regional_mesh_node(
-        godot::Node3D* container,
-        std::unordered_map<std::uint64_t, godot::ObjectID>& registry,
-        std::uint64_t stable_key,
-        const godot::String& node_name,
-        int desired_index);
-    void prune_regional_node_registry(
-        std::unordered_map<std::uint64_t, godot::ObjectID>& registry,
-        const std::unordered_set<std::uint64_t>& desired_keys);
     void prune_regional_site_registry(const std::unordered_set<int>& desired_site_ids);
     [[nodiscard]] bool regional_map_ui_contains_screen_point(const godot::Vector2& screen_position) const;
     [[nodiscard]] bool try_select_regional_site_from_screen(const godot::Vector2& screen_position);
@@ -114,15 +102,11 @@ private:
 
     godot::NodePath regional_world_path_ {"RegionalMapWorld"};
     godot::NodePath regional_camera_path_ {"RegionalMapWorld/RegionalMapCamera"};
-    godot::NodePath regional_terrain_root_path_ {"RegionalMapWorld/TerrainRoot"};
-    godot::NodePath regional_link_root_path_ {"RegionalMapWorld/LinkRoot"};
     godot::NodePath regional_site_root_path_ {"RegionalMapWorld/SiteRoot"};
 
     Gs1GodotAdapterService* adapter_service_ {nullptr};
     godot::Node3D* regional_map_world_ {nullptr};
     godot::Camera3D* regional_camera_ {nullptr};
-    godot::Node3D* regional_terrain_root_ {nullptr};
-    godot::Node3D* regional_link_root_ {nullptr};
     godot::Node3D* regional_site_root_ {nullptr};
 
     Gs1GodotRegionalMapStateReducer regional_map_state_reducer_ {};
@@ -132,9 +116,6 @@ private:
 
     std::unordered_map<int, RegionalSiteNodeRecord> regional_site_nodes_ {};
     std::unordered_map<int, Gs1RuntimeRegionalMapSiteProjection> regional_site_data_ {};
-    std::unordered_map<std::uint64_t, godot::ObjectID> regional_terrain_tile_nodes_ {};
-    std::unordered_map<std::uint64_t, godot::ObjectID> regional_terrain_grid_line_nodes_ {};
-    std::unordered_map<std::uint64_t, godot::ObjectID> regional_link_nodes_ {};
     std::unordered_map<std::string, godot::Ref<godot::StandardMaterial3D>> regional_material_cache_ {};
 
     godot::Control* regional_map_panel_ {nullptr};

@@ -4,10 +4,8 @@
 #include "gs1_godot_controller_context.h"
 
 #include <godot_cpp/classes/base_material3d.hpp>
-#include <godot_cpp/classes/box_mesh.hpp>
 #include <godot_cpp/classes/camera3d.hpp>
 #include <godot_cpp/classes/control.hpp>
-#include <godot_cpp/classes/cylinder_mesh.hpp>
 #include <godot_cpp/classes/input_event_mouse_button.hpp>
 #include <godot_cpp/classes/label3d.hpp>
 #include <godot_cpp/classes/mesh_instance3d.hpp>
@@ -15,13 +13,11 @@
 #include <godot_cpp/classes/node3d.hpp>
 #include <godot_cpp/classes/packed_scene.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
-#include <godot_cpp/classes/sphere_mesh.hpp>
 #include <godot_cpp/classes/standard_material3d.hpp>
 #include <godot_cpp/classes/viewport.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/core/object.hpp>
-#include <godot_cpp/core/property_info.hpp>
 
 #include <algorithm>
 #include <limits>
@@ -30,33 +26,9 @@ using namespace godot;
 
 namespace
 {
-MeshInstance3D* make_mesh_instance3d()
-{
-    return memnew(MeshInstance3D);
-}
-
 Node3D* make_node3d()
 {
     return memnew(Node3D);
-}
-
-Label3D* make_label3d()
-{
-    return memnew(Label3D);
-}
-
-constexpr std::uint64_t pack_u32_pair(std::uint32_t high, std::uint32_t low) noexcept
-{
-    return (static_cast<std::uint64_t>(high) << 32U) | static_cast<std::uint64_t>(low);
-}
-
-std::uint64_t make_regional_link_key(std::uint32_t from_site_id, std::uint32_t to_site_id) noexcept
-{
-    if (from_site_id > to_site_id)
-    {
-        std::swap(from_site_id, to_site_id);
-    }
-    return pack_u32_pair(from_site_id, to_site_id);
 }
 
 template <typename T>
@@ -64,6 +36,8 @@ T* resolve_object(const ObjectID object_id)
 {
     return Object::cast_to<T>(ObjectDB::get_instance(object_id));
 }
+
+constexpr char k_default_regional_site_marker_scene_path[] = "res://scenes/regional_site_marker.tscn";
 
 Ref<PackedScene> load_packed_scene(const String& path)
 {
@@ -77,6 +51,17 @@ Ref<PackedScene> load_packed_scene(const String& path)
         return loader->load(path);
     }
     return Ref<PackedScene> {};
+}
+
+Ref<PackedScene> load_regional_site_marker_scene(std::uint32_t site_id)
+{
+    Ref<PackedScene> marker_scene = load_packed_scene(
+        GodotProgressionResourceDatabase::instance().site_scene_path(site_id));
+    if (marker_scene.is_null())
+    {
+        marker_scene = load_packed_scene(String(k_default_regional_site_marker_scene_path));
+    }
+    return marker_scene;
 }
 }
 
@@ -149,14 +134,6 @@ void Gs1GodotRegionalMapSceneController::cache_scene_references()
     if (regional_camera_ == nullptr)
     {
         regional_camera_ = Object::cast_to<Camera3D>(get_node_or_null(regional_camera_path_));
-    }
-    if (regional_terrain_root_ == nullptr)
-    {
-        regional_terrain_root_ = Object::cast_to<Node3D>(get_node_or_null(regional_terrain_root_path_));
-    }
-    if (regional_link_root_ == nullptr)
-    {
-        regional_link_root_ = Object::cast_to<Node3D>(get_node_or_null(regional_link_root_path_));
     }
     if (regional_site_root_ == nullptr)
     {
@@ -287,7 +264,7 @@ void Gs1GodotRegionalMapSceneController::rebuild_regional_map_world(
     const std::vector<Gs1RuntimeRegionalMapSiteProjection>& sites,
     const std::vector<Gs1RuntimeRegionalMapLinkProjection>& links)
 {
-    if (regional_map_world_ == nullptr || regional_terrain_root_ == nullptr || regional_link_root_ == nullptr || regional_site_root_ == nullptr)
+    if (regional_map_world_ == nullptr || regional_site_root_ == nullptr)
     {
         return;
     }
@@ -320,80 +297,17 @@ void Gs1GodotRegionalMapSceneController::rebuild_regional_map_world(
         (max_x - min_x) + 1 + REGIONAL_WORLD_PADDING * 2,
         (max_y - min_y) + 1 + REGIONAL_WORLD_PADDING * 2);
 
-    reconcile_desert_tiles(regional_map_bounds_, true);
+    (void)links;
     reconcile_regional_sites(sites);
-    reconcile_regional_links(links);
     position_regional_camera(regional_map_bounds_);
     update_regional_site_visuals();
 }
 
 void Gs1GodotRegionalMapSceneController::clear_regional_projection_world()
 {
-    clear_dynamic_children(regional_terrain_root_, String());
-    clear_dynamic_children(regional_link_root_, String());
     clear_dynamic_children(regional_site_root_, String());
-    regional_terrain_tile_nodes_.clear();
-    regional_terrain_grid_line_nodes_.clear();
-    regional_link_nodes_.clear();
     regional_site_nodes_.clear();
     regional_site_data_.clear();
-}
-
-void Gs1GodotRegionalMapSceneController::reconcile_desert_tiles(const Rect2i& bounds, bool include_grid_lines)
-{
-    (void)bounds;
-    (void)include_grid_lines;
-    prune_regional_node_registry(regional_terrain_tile_nodes_, {});
-    prune_regional_node_registry(regional_terrain_grid_line_nodes_, {});
-}
-
-void Gs1GodotRegionalMapSceneController::reconcile_regional_links(const std::vector<Gs1RuntimeRegionalMapLinkProjection>& links)
-{
-    if (regional_link_root_ == nullptr)
-    {
-        return;
-    }
-
-    std::unordered_set<std::uint64_t> desired_link_keys {};
-    for (const auto& link : links)
-    {
-        const int from_site_id = static_cast<int>(link.from_site_id);
-        const int to_site_id = static_cast<int>(link.to_site_id);
-        const std::uint64_t link_key = make_regional_link_key(link.from_site_id, link.to_site_id);
-
-        const auto from_it = regional_site_data_.find(from_site_id);
-        const auto to_it = regional_site_data_.find(to_site_id);
-        if (from_it == regional_site_data_.end() || to_it == regional_site_data_.end())
-        {
-            continue;
-        }
-        desired_link_keys.insert(link_key);
-
-        const Vector3 from_position = regional_world_position(regional_grid_coord(from_it->second)) + Vector3(0.0, 0.22, 0.0);
-        const Vector3 to_position = regional_world_position(regional_grid_coord(to_it->second)) + Vector3(0.0, 0.22, 0.0);
-
-        MeshInstance3D* segment = upsert_regional_mesh_node(
-            regional_link_root_,
-            regional_link_nodes_,
-            link_key,
-            vformat("Link_%d_%d", from_site_id, to_site_id),
-            static_cast<int>(desired_link_keys.size()) - 1);
-        if (segment == nullptr)
-        {
-            continue;
-        }
-
-        Ref<BoxMesh> segment_mesh;
-        segment_mesh.instantiate();
-        segment_mesh->set_size(Vector3(0.42, 0.18, from_position.distance_to(to_position)));
-        segment->set_mesh(segment_mesh);
-        segment->set_position((from_position + to_position) * 0.5);
-        segment->look_at(to_position, Vector3(0.0, 1.0, 0.0), true);
-        segment->rotate_object_local(Vector3(1.0, 0.0, 0.0), Math::deg_to_rad(90.0));
-        segment->set_material_override(get_material("link_path", Color(0.42, 0.31, 0.22), 0.94, 0.02));
-    }
-
-    prune_regional_node_registry(regional_link_nodes_, desired_link_keys);
 }
 
 void Gs1GodotRegionalMapSceneController::reconcile_regional_sites(const std::vector<Gs1RuntimeRegionalMapSiteProjection>& sites)
@@ -413,8 +327,7 @@ void Gs1GodotRegionalMapSceneController::reconcile_regional_sites(const std::vec
         Node3D* root = resolve_object<Node3D>(record.root_id);
         if (root == nullptr)
         {
-            const String scene_path = GodotProgressionResourceDatabase::instance().site_scene_path(site.site_id);
-            const Ref<PackedScene> marker_scene = load_packed_scene(scene_path);
+            const Ref<PackedScene> marker_scene = load_regional_site_marker_scene(site.site_id);
             if (!marker_scene.is_null())
             {
                 root = Object::cast_to<Node3D>(marker_scene->instantiate());
@@ -441,20 +354,6 @@ void Gs1GodotRegionalMapSceneController::reconcile_regional_sites(const std::vec
                 record.base_id = base->get_instance_id();
             }
         }
-        if (base == nullptr)
-        {
-            base = make_mesh_instance3d();
-            root->add_child(base);
-            record.base_id = base->get_instance_id();
-        }
-
-        Ref<CylinderMesh> base_mesh;
-        base_mesh.instantiate();
-        base_mesh->set_top_radius(1.05);
-        base_mesh->set_bottom_radius(1.28);
-        base_mesh->set_height(0.42);
-        base->set_mesh(base_mesh);
-        base->set_position(Vector3(0.0, 0.2, 0.0));
 
         MeshInstance3D* tower = resolve_object<MeshInstance3D>(record.tower_id);
         if (tower == nullptr)
@@ -465,20 +364,6 @@ void Gs1GodotRegionalMapSceneController::reconcile_regional_sites(const std::vec
                 record.tower_id = tower->get_instance_id();
             }
         }
-        if (tower == nullptr)
-        {
-            tower = make_mesh_instance3d();
-            root->add_child(tower);
-            record.tower_id = tower->get_instance_id();
-        }
-
-        Ref<CylinderMesh> tower_mesh;
-        tower_mesh.instantiate();
-        tower_mesh->set_top_radius(0.42);
-        tower_mesh->set_bottom_radius(0.58);
-        tower_mesh->set_height(1.6);
-        tower->set_mesh(tower_mesh);
-        tower->set_position(Vector3(0.0, 1.1, 0.0));
 
         MeshInstance3D* beacon = resolve_object<MeshInstance3D>(record.beacon_id);
         if (beacon == nullptr)
@@ -489,19 +374,6 @@ void Gs1GodotRegionalMapSceneController::reconcile_regional_sites(const std::vec
                 record.beacon_id = beacon->get_instance_id();
             }
         }
-        if (beacon == nullptr)
-        {
-            beacon = make_mesh_instance3d();
-            root->add_child(beacon);
-            record.beacon_id = beacon->get_instance_id();
-        }
-
-        Ref<SphereMesh> beacon_mesh;
-        beacon_mesh.instantiate();
-        beacon_mesh->set_radius(0.34);
-        beacon_mesh->set_height(0.68);
-        beacon->set_mesh(beacon_mesh);
-        beacon->set_position(Vector3(0.0, 2.05, 0.0));
 
         Label3D* nameplate = resolve_object<Label3D>(record.label_id);
         if (nameplate == nullptr)
@@ -512,18 +384,11 @@ void Gs1GodotRegionalMapSceneController::reconcile_regional_sites(const std::vec
                 record.label_id = nameplate->get_instance_id();
             }
         }
-        if (nameplate == nullptr)
+        if (nameplate != nullptr)
         {
-            nameplate = make_label3d();
-            root->add_child(nameplate);
-            record.label_id = nameplate->get_instance_id();
+            nameplate->set_text(vformat("SITE %d", site_id));
+            nameplate->set_modulate(Color(0.93, 0.88, 0.77));
         }
-
-        nameplate->set_text(vformat("SITE %d", site_id));
-        nameplate->set_billboard_mode(BaseMaterial3D::BILLBOARD_ENABLED);
-        nameplate->set_font_size(46);
-        nameplate->set_modulate(Color(0.93, 0.88, 0.77));
-        nameplate->set_position(Vector3(0.0, 2.85, 0.0));
     }
 
     prune_regional_site_registry(desired_site_ids);
@@ -682,60 +547,6 @@ void Gs1GodotRegionalMapSceneController::clear_dynamic_children(Node* container,
         {
             child->queue_free();
         }
-    }
-}
-
-MeshInstance3D* Gs1GodotRegionalMapSceneController::upsert_regional_mesh_node(
-    Node3D* container,
-    std::unordered_map<std::uint64_t, ObjectID>& registry,
-    std::uint64_t stable_key,
-    const String& node_name,
-    int desired_index)
-{
-    MeshInstance3D* mesh_node = nullptr;
-    auto found = registry.find(stable_key);
-    if (found != registry.end())
-    {
-        mesh_node = resolve_object<MeshInstance3D>(found->second);
-    }
-    if (mesh_node == nullptr)
-    {
-        mesh_node = make_mesh_instance3d();
-        container->add_child(mesh_node);
-        registry[stable_key] = mesh_node->get_instance_id();
-    }
-    mesh_node->set_name(node_name);
-    container->move_child(mesh_node, desired_index);
-    return mesh_node;
-}
-
-void Gs1GodotRegionalMapSceneController::prune_regional_node_registry(
-    std::unordered_map<std::uint64_t, ObjectID>& registry,
-    const std::unordered_set<std::uint64_t>& desired_keys)
-{
-    std::vector<std::uint64_t> stale_keys {};
-    stale_keys.reserve(registry.size());
-    for (const auto& [stable_key, object_id] : registry)
-    {
-        (void)object_id;
-        if (!desired_keys.contains(stable_key))
-        {
-            stale_keys.push_back(stable_key);
-        }
-    }
-
-    for (const std::uint64_t stable_key : stale_keys)
-    {
-        auto found = registry.find(stable_key);
-        if (found == registry.end())
-        {
-            continue;
-        }
-        if (Node* node = resolve_object<Node>(found->second))
-        {
-            node->queue_free();
-        }
-        registry.erase(found);
     }
 }
 
