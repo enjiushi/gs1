@@ -1,6 +1,9 @@
 #include "gs1_godot_debug_http_protocol.h"
 
 #include <cassert>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <string>
 
 namespace
@@ -98,6 +101,27 @@ void invalid_ui_action_is_rejected()
     assert(!ok);
     assert(error == "Missing or invalid UI action type.");
 }
+
+void regional_map_scene_uses_inventory_style_loadout_nodes()
+{
+    namespace fs = std::filesystem;
+
+    const fs::path source_file {__FILE__};
+    const fs::path repo_root = source_file.parent_path().parent_path().parent_path();
+    const fs::path scene_path = repo_root / "engines" / "godot" / "project" / "scenes" / "regional_map.tscn";
+
+    std::ifstream input {scene_path};
+    assert(input.is_open());
+
+    const std::string scene_text {
+        std::istreambuf_iterator<char> {input},
+        std::istreambuf_iterator<char> {}};
+
+    assert(scene_text.find("RegionalLoadoutTitle") != std::string::npos);
+    assert(scene_text.find("RegionalLoadoutSlots") != std::string::npos);
+    assert(scene_text.find("RegionalLoadoutEmpty") != std::string::npos);
+    assert(scene_text.find("RegionalLoadoutSummary") == std::string::npos);
+}
 }
 
 int main()
@@ -107,5 +131,6 @@ int main()
     site_inventory_slot_tap_string_payload_parses();
     site_control_without_move_input_zeroes_direction();
     invalid_ui_action_is_rejected();
+    regional_map_scene_uses_inventory_style_loadout_nodes();
     return 0;
 }

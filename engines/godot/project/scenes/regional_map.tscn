@@ -122,12 +122,30 @@ scroll_active = false
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="RegionalLoadoutSummary" type="RichTextLabel" parent="HudMargin/RootVBox/MainColumns/RightColumn/RegionalSelectionPanel/RegionalSelectionVBox/RegionalLoadoutPanel" unique_id=1404948212]
-custom_minimum_size = Vector2(0, 128)
+[node name="RegionalLoadoutVBox" type="VBoxContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn/RegionalSelectionPanel/RegionalSelectionVBox/RegionalLoadoutPanel"]
 layout_mode = 2
 size_flags_vertical = 3
-bbcode_enabled = true
-fit_content = true
+theme_override_constants/separation = 10
+
+[node name="RegionalLoadoutTitle" type="Label" parent="HudMargin/RootVBox/MainColumns/RightColumn/RegionalSelectionPanel/RegionalSelectionVBox/RegionalLoadoutPanel/RegionalLoadoutVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.839216, 0.760784, 0.588235, 1)
+theme_override_font_sizes/font_size = 16
+text = "Provided Loadout"
+
+[node name="RegionalLoadoutSlots" type="GridContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn/RegionalSelectionPanel/RegionalSelectionVBox/RegionalLoadoutPanel/RegionalLoadoutVBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+
+[node name="RegionalLoadoutEmpty" type="Label" parent="HudMargin/RootVBox/MainColumns/RightColumn/RegionalSelectionPanel/RegionalSelectionVBox/RegionalLoadoutPanel/RegionalLoadoutVBox"]
+visible = false
+custom_minimum_size = Vector2(0, 72)
+layout_mode = 2
+autowrap_mode = 3
+size_flags_vertical = 3
+text = "No extra loadout items are projected for the currently selected site."
 
 [node name="RegionalSelectionActions" type="VBoxContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn/RegionalSelectionPanel/RegionalSelectionVBox" unique_id=1358209216]
 layout_mode = 2

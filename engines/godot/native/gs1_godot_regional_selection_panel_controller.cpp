@@ -1,9 +1,11 @@
 #include "gs1_godot_regional_selection_panel_controller.h"
 
+#include "godot_progression_resources.h"
 #include "gs1_godot_controller_context.h"
 #include "content/defs/faction_defs.h"
 #include "content/defs/item_defs.h"
 
+#include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/core/object.hpp>
@@ -13,6 +15,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <string>
 #include <string_view>
 #include <utility>
 
@@ -22,6 +25,7 @@ namespace
 {
 constexpr int k_ui_action_start_site_attempt = 3;
 constexpr int k_ui_action_clear_deployment_site_selection = 5;
+constexpr std::uint8_t k_content_resource_kind_item = 1U;
 
 constexpr std::uint64_t pack_u32_pair(std::uint32_t high, std::uint32_t low) noexcept
 {
@@ -149,6 +153,20 @@ String string_from_view(std::string_view value)
     return String::utf8(value.data(), static_cast<int>(value.size()));
 }
 
+Ref<Texture2D> load_texture_2d(const String& path)
+{
+    if (path.is_empty())
+    {
+        return Ref<Texture2D> {};
+    }
+
+    if (ResourceLoader* loader = ResourceLoader::get_singleton())
+    {
+        return loader->load(path);
+    }
+    return Ref<Texture2D> {};
+}
+
 int as_int(const Variant& value, int fallback = 0)
 {
     if (value.get_type() == Variant::NIL)
@@ -226,9 +244,17 @@ void Gs1GodotRegionalSelectionPanelController::cache_ui_references(Control& owne
     {
         support_summary_ = Object::cast_to<RichTextLabel>(owner.find_child("RegionalSupportSummary", true, false));
     }
-    if (loadout_summary_ == nullptr)
+    if (loadout_title_ == nullptr)
     {
-        loadout_summary_ = Object::cast_to<RichTextLabel>(owner.find_child("RegionalLoadoutSummary", true, false));
+        loadout_title_ = Object::cast_to<Label>(owner.find_child("RegionalLoadoutTitle", true, false));
+    }
+    if (loadout_slots_grid_ == nullptr)
+    {
+        loadout_slots_grid_ = Object::cast_to<GridContainer>(owner.find_child("RegionalLoadoutSlots", true, false));
+    }
+    if (loadout_empty_label_ == nullptr)
+    {
+        loadout_empty_label_ = Object::cast_to<Label>(owner.find_child("RegionalLoadoutEmpty", true, false));
     }
     if (actions_ == nullptr)
     {
@@ -702,6 +728,7 @@ void Gs1GodotRegionalSelectionPanelController::handle_runtime_message_reset()
     reset_ui_panel_state();
     reset_regional_map_state();
     selected_site_id_ = 0;
+    prune_loadout_slot_registry({});
     rebuild_selection_panel();
 }
 
@@ -833,7 +860,7 @@ void Gs1GodotRegionalSelectionPanelController::refresh_selection_panel_actions_a
 
     reconcile_action_buttons(button_specs);
     refresh_support_summary(selection_panel);
-    refresh_loadout_summary(selection_panel);
+    refresh_loadout_panel(selection_panel);
 }
 
 void Gs1GodotRegionalSelectionPanelController::rebuild_selection_panel()
@@ -1202,17 +1229,20 @@ void Gs1GodotRegionalSelectionPanelController::refresh_support_summary(
     support_summary_->set_text(String("\n").join(lines));
 }
 
-void Gs1GodotRegionalSelectionPanelController::refresh_loadout_summary(
+void Gs1GodotRegionalSelectionPanelController::refresh_loadout_panel(
     const Gs1RuntimeUiPanelProjection* selection_panel)
 {
-    if (loadout_summary_ == nullptr)
+    if (loadout_title_ != nullptr)
+    {
+        loadout_title_->set_text("Provided Loadout");
+    }
+
+    if (loadout_slots_grid_ == nullptr)
     {
         return;
     }
 
-    PackedStringArray lines;
-    lines.push_back("[b]Provided Loadout[/b]");
-    bool has_content = false;
+    std::vector<const Gs1RuntimeUiPanelListItemProjection*> loadout_items {};
     if (selection_panel != nullptr)
     {
         for (const auto& item : selection_panel->list_items)
@@ -1221,18 +1251,139 @@ void Gs1GodotRegionalSelectionPanelController::refresh_loadout_summary(
             {
                 continue;
             }
-
-            const String item_name = item_name_for(static_cast<int>(item.primary_id));
-            const int quantity = static_cast<int>(item.quantity);
-            lines.push_back(vformat("Slot %d: %s x%d", static_cast<int>(item.item_id), item_name, quantity));
-            has_content = true;
+            loadout_items.push_back(&item);
         }
+    }
+
+    const bool has_content = !loadout_items.empty();
+    loadout_slots_grid_->set_visible(has_content);
+    if (loadout_empty_label_ != nullptr)
+    {
+        loadout_empty_label_->set_visible(!has_content);
+        loadout_empty_label_->set_text("No extra loadout items are projected for the currently selected site.");
     }
 
     if (!has_content)
     {
-        lines.push_back("No extra loadout items are projected for the currently selected site.");
+        prune_loadout_slot_registry({});
+        return;
     }
 
-    loadout_summary_->set_text(String("\n").join(lines));
+    loadout_slots_grid_->set_columns(std::clamp<int>(static_cast<int>(loadout_items.size()), 1, 4));
+
+    std::unordered_set<std::uint64_t> desired_keys {};
+    for (std::size_t index = 0; index < loadout_items.size(); ++index)
+    {
+        const auto& item = *loadout_items[index];
+        const auto stable_key = loadout_slot_key(item.item_id);
+        desired_keys.insert(stable_key);
+        Button* button = upsert_loadout_slot_button(
+            stable_key,
+            vformat("LoadoutSlot_%d", static_cast<int>(item.item_id)),
+            static_cast<int>(index));
+        if (button == nullptr)
+        {
+            continue;
+        }
+
+        const String item_name = item_name_for(static_cast<int>(item.primary_id));
+        const String quantity_text = item.quantity > 1U
+            ? vformat("x%d", static_cast<int>(item.quantity))
+            : String();
+        button->set_text(quantity_text);
+        button->set_button_icon(item_icon_for(item.primary_id));
+        button->set_tooltip_text(vformat(
+            "Slot %d: %s x%d",
+            static_cast<int>(item.item_id),
+            item_name,
+            static_cast<int>(item.quantity)));
+    }
+
+    prune_loadout_slot_registry(desired_keys);
+}
+
+Ref<Texture2D> Gs1GodotRegionalSelectionPanelController::item_icon_for(std::uint32_t item_id) const
+{
+    return load_cached_texture(
+        GodotProgressionResourceDatabase::instance().content_icon_path(k_content_resource_kind_item, item_id));
+}
+
+Ref<Texture2D> Gs1GodotRegionalSelectionPanelController::load_cached_texture(const String& path) const
+{
+    if (path.is_empty())
+    {
+        return Ref<Texture2D> {};
+    }
+
+    const std::string key = path.utf8().get_data();
+    if (const auto found = texture_cache_.find(key); found != texture_cache_.end())
+    {
+        return found->second;
+    }
+
+    return texture_cache_.emplace(key, load_texture_2d(path)).first->second;
+}
+
+std::uint64_t Gs1GodotRegionalSelectionPanelController::loadout_slot_key(std::uint32_t slot_id) const noexcept
+{
+    return static_cast<std::uint64_t>(slot_id);
+}
+
+Button* Gs1GodotRegionalSelectionPanelController::upsert_loadout_slot_button(
+    std::uint64_t stable_key,
+    const String& node_name,
+    int desired_index)
+{
+    if (loadout_slots_grid_ == nullptr)
+    {
+        return nullptr;
+    }
+
+    Button* button = nullptr;
+    if (const auto found = loadout_slot_buttons_.find(stable_key); found != loadout_slot_buttons_.end())
+    {
+        button = resolve_object<Button>(found->second.object_id);
+    }
+
+    if (button == nullptr)
+    {
+        button = memnew(Button);
+        button->set_clip_text(true);
+        button->set_custom_minimum_size(Vector2(72.0F, 72.0F));
+        button->set_focus_mode(Control::FOCUS_NONE);
+        button->set_expand_icon(true);
+        button->set_icon_alignment(HORIZONTAL_ALIGNMENT_CENTER);
+        button->set_vertical_icon_alignment(VERTICAL_ALIGNMENT_CENTER);
+        button->set_text_alignment(HORIZONTAL_ALIGNMENT_CENTER);
+        loadout_slots_grid_->add_child(button);
+        loadout_slot_buttons_[stable_key].object_id = button->get_instance_id();
+    }
+
+    button->set_name(node_name);
+    const int child_count = loadout_slots_grid_->get_child_count();
+    const int target_index = std::clamp(desired_index, 0, child_count - 1);
+    if (button->get_index() != target_index)
+    {
+        loadout_slots_grid_->move_child(button, target_index);
+    }
+    return button;
+}
+
+void Gs1GodotRegionalSelectionPanelController::prune_loadout_slot_registry(
+    const std::unordered_set<std::uint64_t>& desired_keys)
+{
+    for (auto it = loadout_slot_buttons_.begin(); it != loadout_slot_buttons_.end();)
+    {
+        if (desired_keys.contains(it->first))
+        {
+            ++it;
+            continue;
+        }
+
+        if (Button* button = resolve_object<Button>(it->second.object_id))
+        {
+            button->queue_free();
+        }
+        it = loadout_slot_buttons_.erase(it);
+    }
 }

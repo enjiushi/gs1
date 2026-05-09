@@ -5,16 +5,19 @@
 
 #include <godot_cpp/classes/button.hpp>
 #include <godot_cpp/classes/control.hpp>
+#include <godot_cpp/classes/grid_container.hpp>
 #include <godot_cpp/classes/label.hpp>
 #include <godot_cpp/classes/node.hpp>
-#include <godot_cpp/classes/rich_text_label.hpp>
 #include <godot_cpp/classes/v_box_container.hpp>
 #include <godot_cpp/core/binder_common.hpp>
 #include <godot_cpp/core/object_id.hpp>
+#include <godot_cpp/classes/rich_text_label.hpp>
+#include <godot_cpp/classes/texture2d.hpp>
 
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -46,6 +49,11 @@ protected:
 
 private:
     struct ProjectedButtonRecord final
+    {
+        godot::ObjectID object_id {};
+    };
+
+    struct LoadoutSlotRecord final
     {
         godot::ObjectID object_id {};
     };
@@ -102,7 +110,15 @@ private:
     [[nodiscard]] godot::String support_preview_text(int preview_mask) const;
     [[nodiscard]] godot::Vector2i regional_grid_coord(const Gs1RuntimeRegionalMapSiteProjection& site) const;
     void refresh_support_summary(const Gs1RuntimeUiPanelProjection* selection_panel);
-    void refresh_loadout_summary(const Gs1RuntimeUiPanelProjection* selection_panel);
+    void refresh_loadout_panel(const Gs1RuntimeUiPanelProjection* selection_panel);
+    [[nodiscard]] godot::Ref<godot::Texture2D> item_icon_for(std::uint32_t item_id) const;
+    [[nodiscard]] godot::Ref<godot::Texture2D> load_cached_texture(const godot::String& path) const;
+    [[nodiscard]] std::uint64_t loadout_slot_key(std::uint32_t slot_id) const noexcept;
+    godot::Button* upsert_loadout_slot_button(
+        std::uint64_t stable_key,
+        const godot::String& node_name,
+        int desired_index);
+    void prune_loadout_slot_registry(const std::unordered_set<std::uint64_t>& desired_keys);
 
     godot::Control* owner_control_ {nullptr};
     Gs1GodotAdapterService* adapter_service_ {nullptr};
@@ -110,7 +126,9 @@ private:
     godot::Label* title_ {nullptr};
     godot::RichTextLabel* summary_ {nullptr};
     godot::RichTextLabel* support_summary_ {nullptr};
-    godot::RichTextLabel* loadout_summary_ {nullptr};
+    godot::Label* loadout_title_ {nullptr};
+    godot::GridContainer* loadout_slots_grid_ {nullptr};
+    godot::Label* loadout_empty_label_ {nullptr};
     godot::VBoxContainer* actions_ {nullptr};
     SubmitUiActionFn submit_ui_action_ {};
     std::vector<Gs1RuntimeUiPanelProjection> ui_panels_ {};
@@ -126,6 +144,8 @@ private:
     std::optional<PendingRegionalMapState> pending_regional_map_state_ {};
     int selected_site_id_ {0};
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> action_buttons_ {};
+    std::unordered_map<std::uint64_t, LoadoutSlotRecord> loadout_slot_buttons_ {};
     mutable std::unordered_map<int, godot::String> item_name_cache_ {};
     mutable std::unordered_map<int, godot::String> faction_name_cache_ {};
+    mutable std::unordered_map<std::string, godot::Ref<godot::Texture2D>> texture_cache_ {};
 };
