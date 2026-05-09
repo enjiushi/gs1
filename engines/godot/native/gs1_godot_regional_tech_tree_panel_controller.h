@@ -35,7 +35,6 @@ public:
     ~Gs1GodotRegionalTechTreePanelController() override = default;
 
     void _ready() override;
-    void _process(double delta) override;
     void _exit_tree() override;
 
     void cache_ui_references(godot::Control& owner);
@@ -97,7 +96,8 @@ private:
     void rebuild_progression_view_indices() noexcept;
     [[nodiscard]] const Gs1RuntimeProgressionViewProjection* find_progression_view(Gs1ProgressionViewId view_id) const noexcept;
     void apply_overlay_layout();
-    void rebuild_tech_tree_panel();
+    void apply_progression_view_visibility();
+    void rebuild_tech_tree_cards();
     void reconcile_tech_tree_cards(const godot::Array& card_specs);
     [[nodiscard]] godot::String tech_tooltip_text(const godot::Dictionary& spec) const;
     [[nodiscard]] godot::String unlockable_tooltip_text(const godot::Dictionary& spec) const;

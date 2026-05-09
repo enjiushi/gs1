@@ -21,7 +21,6 @@ public:
     ~Gs1GodotRegionalSummaryPanelController() override = default;
 
     void _ready() override;
-    void _process(double delta) override;
     void _exit_tree() override;
 
     void cache_ui_references(godot::Control& owner);
@@ -43,7 +42,8 @@ private:
     [[nodiscard]] godot::Control* resolve_owner_control();
     void reset_regional_map_state() noexcept;
     void apply_regional_map_message(const Gs1EngineMessage& message);
-    void rebuild_summary();
+    void apply_summary_text();
+    void apply_graph_text();
     [[nodiscard]] godot::String build_regional_map_overview_text(
         const std::vector<Gs1RuntimeRegionalMapSiteProjection>& sites,
         const std::vector<Gs1RuntimeRegionalMapLinkProjection>& links) const;

@@ -118,13 +118,7 @@ void Gs1GodotRegionalMapSceneController::_ready()
     cache_adapter_service();
     cache_scene_references();
     cache_ui_references();
-    set_process(true);
     set_process_input(true);
-}
-
-void Gs1GodotRegionalMapSceneController::_process(double delta)
-{
-    (void)delta;
 }
 
 void Gs1GodotRegionalMapSceneController::_exit_tree()

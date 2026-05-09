@@ -42,7 +42,6 @@ public:
     ~Gs1GodotRegionalMapSceneController() override = default;
 
     void _ready() override;
-    void _process(double delta) override;
     void _exit_tree() override;
     void _input(const godot::Ref<godot::InputEvent>& event) override;
 

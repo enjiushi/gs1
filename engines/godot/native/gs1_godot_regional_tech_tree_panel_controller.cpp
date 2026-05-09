@@ -242,12 +242,6 @@ void Gs1GodotRegionalTechTreePanelController::_ready()
     {
         cache_ui_references(*owner);
     }
-    set_process(true);
-}
-
-void Gs1GodotRegionalTechTreePanelController::_process(double delta)
-{
-    (void)delta;
 }
 
 void Gs1GodotRegionalTechTreePanelController::_exit_tree()
@@ -292,7 +286,8 @@ void Gs1GodotRegionalTechTreePanelController::cache_ui_references(Control& owner
         }
     }
     apply_overlay_layout();
-    rebuild_tech_tree_panel();
+    apply_progression_view_visibility();
+    rebuild_tech_tree_cards();
 }
 
 void Gs1GodotRegionalTechTreePanelController::set_submit_ui_action_callback(SubmitUiActionFn callback)
@@ -497,17 +492,27 @@ void Gs1GodotRegionalTechTreePanelController::apply_progression_view_message(con
 void Gs1GodotRegionalTechTreePanelController::handle_engine_message(const Gs1EngineMessage& message)
 {
     apply_progression_view_message(message);
-
-    rebuild_tech_tree_panel();
+    switch (message.type)
+    {
+    case GS1_ENGINE_MESSAGE_END_PROGRESSION_VIEW:
+        apply_progression_view_visibility();
+        rebuild_tech_tree_cards();
+        break;
+    case GS1_ENGINE_MESSAGE_CLOSE_PROGRESSION_VIEW:
+        apply_progression_view_visibility();
+        break;
+    default:
+        break;
+    }
 }
 
 void Gs1GodotRegionalTechTreePanelController::handle_runtime_message_reset()
 {
     reset_progression_view_state();
-    rebuild_tech_tree_panel();
+    apply_progression_view_visibility();
 }
 
-void Gs1GodotRegionalTechTreePanelController::rebuild_tech_tree_panel()
+void Gs1GodotRegionalTechTreePanelController::apply_progression_view_visibility()
 {
     if (overlay_ == nullptr || panel_ == nullptr)
     {
@@ -516,15 +521,19 @@ void Gs1GodotRegionalTechTreePanelController::rebuild_tech_tree_panel()
 
     const Gs1RuntimeProgressionViewProjection* progression_view =
         find_progression_view(GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE);
+    const bool visible = progression_view != nullptr;
+    overlay_->set_visible(visible);
+    panel_->set_visible(visible);
+}
+
+void Gs1GodotRegionalTechTreePanelController::rebuild_tech_tree_cards()
+{
+    const Gs1RuntimeProgressionViewProjection* progression_view =
+        find_progression_view(GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE);
     if (progression_view == nullptr)
     {
-        overlay_->set_visible(false);
-        panel_->set_visible(false);
         return;
     }
-
-    overlay_->set_visible(true);
-    panel_->set_visible(true);
 
     if (title_ != nullptr)
     {

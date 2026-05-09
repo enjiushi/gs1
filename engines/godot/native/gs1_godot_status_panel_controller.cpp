@@ -50,12 +50,6 @@ void Gs1GodotStatusPanelController::_ready()
     {
         cache_ui_references(*owner);
     }
-    set_process(true);
-}
-
-void Gs1GodotStatusPanelController::_process(double delta)
-{
-    (void)delta;
 }
 
 void Gs1GodotStatusPanelController::_exit_tree()

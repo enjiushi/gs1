@@ -86,12 +86,6 @@ void Gs1GodotRegionalMapHudController::_ready()
     {
         cache_ui_references(*owner);
     }
-    set_process(true);
-}
-
-void Gs1GodotRegionalMapHudController::_process(double delta)
-{
-    (void)delta;
 }
 
 void Gs1GodotRegionalMapHudController::_exit_tree()
@@ -132,7 +126,9 @@ void Gs1GodotRegionalMapHudController::cache_ui_references(Control& owner)
         }
         tech_button_connected_ = true;
     }
-    rebuild_hud();
+    apply_selected_site_summary();
+    apply_campaign_summary();
+    apply_tech_button();
 }
 
 void Gs1GodotRegionalMapHudController::set_submit_ui_action_callback(SubmitUiActionFn callback)
@@ -323,8 +319,13 @@ void Gs1GodotRegionalMapHudController::handle_engine_message(const Gs1EngineMess
 
     switch (message.type)
     {
+    case GS1_ENGINE_MESSAGE_END_REGIONAL_MAP_HUD_SNAPSHOT:
+        apply_selected_site_summary();
+        apply_campaign_summary();
+        break;
     case GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES:
         campaign_resources_ = message.payload_as<Gs1EngineMessageCampaignResourcesData>();
+        apply_campaign_summary();
         break;
     case GS1_ENGINE_MESSAGE_SET_UI_SURFACE_VISIBILITY:
     {
@@ -332,14 +333,13 @@ void Gs1GodotRegionalMapHudController::handle_engine_message(const Gs1EngineMess
         if (payload.surface_id == GS1_UI_SURFACE_REGIONAL_TECH_TREE_OVERLAY)
         {
             tech_tree_visible_ = payload.visible != 0U;
+            apply_tech_button();
         }
         break;
     }
     default:
         break;
     }
-
-    rebuild_hud();
 }
 
 void Gs1GodotRegionalMapHudController::handle_runtime_message_reset()
@@ -347,19 +347,29 @@ void Gs1GodotRegionalMapHudController::handle_runtime_message_reset()
     reset_regional_map_state();
     campaign_resources_.reset();
     tech_tree_visible_ = false;
-    rebuild_hud();
+    apply_selected_site_summary();
+    apply_campaign_summary();
+    apply_tech_button();
 }
 
-void Gs1GodotRegionalMapHudController::rebuild_hud()
+void Gs1GodotRegionalMapHudController::apply_selected_site_summary()
 {
     if (selected_site_summary_ != nullptr)
     {
         selected_site_summary_->set_text(selected_site_text());
     }
+}
+
+void Gs1GodotRegionalMapHudController::apply_campaign_summary()
+{
     if (campaign_summary_ != nullptr)
     {
         campaign_summary_->set_text(campaign_summary_text());
     }
+}
+
+void Gs1GodotRegionalMapHudController::apply_tech_button()
+{
     if (tech_button_ != nullptr)
     {
         const Gs1UiAction action = tech_button_action();

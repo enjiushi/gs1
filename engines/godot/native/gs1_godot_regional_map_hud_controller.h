@@ -26,7 +26,6 @@ public:
     ~Gs1GodotRegionalMapHudController() override = default;
 
     void _ready() override;
-    void _process(double delta) override;
     void _exit_tree() override;
 
     void cache_ui_references(godot::Control& owner);
@@ -51,7 +50,9 @@ private:
     void submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);
     void reset_regional_map_state() noexcept;
     void apply_regional_map_message(const Gs1EngineMessage& message);
-    void rebuild_hud();
+    void apply_selected_site_summary();
+    void apply_campaign_summary();
+    void apply_tech_button();
     [[nodiscard]] godot::String selected_site_text() const;
     [[nodiscard]] godot::String campaign_summary_text() const;
     [[nodiscard]] godot::String site_state_name(int site_state) const;

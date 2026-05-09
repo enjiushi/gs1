@@ -18,12 +18,6 @@ void Gs1GodotSiteSummaryPanelController::_ready()
     {
         cache_ui_references(*owner);
     }
-    set_process(true);
-}
-
-void Gs1GodotSiteSummaryPanelController::_process(double delta)
-{
-    (void)delta;
 }
 
 void Gs1GodotSiteSummaryPanelController::_exit_tree()

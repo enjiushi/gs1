@@ -110,12 +110,6 @@ void Gs1GodotSiteHudController::_ready()
     {
         cache_ui_references(*owner);
     }
-    set_process(true);
-}
-
-void Gs1GodotSiteHudController::_process(double delta)
-{
-    (void)delta;
 }
 
 void Gs1GodotSiteHudController::_exit_tree()

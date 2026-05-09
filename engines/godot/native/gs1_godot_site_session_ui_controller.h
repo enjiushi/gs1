@@ -29,7 +29,6 @@ public:
     ~Gs1GodotSiteSessionUiController() override = default;
 
     void _ready() override;
-    void _process(double delta) override;
     void _input(const godot::Ref<godot::InputEvent>& event) override;
     void _exit_tree() override;
     void set_ui_root_path(const godot::NodePath& path);
@@ -58,6 +57,7 @@ private:
     void bind_button(godot::BaseButton* button, const godot::Callable& callback);
     void refresh_visibility();
     void refresh_selected_tile_if_needed();
+    void apply_selected_tile_if_needed();
     void mark_selected_tile_dirty();
     void clamp_selected_tile();
     [[nodiscard]] const Gs1RuntimeSiteProjection* active_site() const;

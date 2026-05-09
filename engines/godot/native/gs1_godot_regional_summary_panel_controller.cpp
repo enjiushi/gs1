@@ -67,12 +67,6 @@ void Gs1GodotRegionalSummaryPanelController::_ready()
     {
         cache_ui_references(*owner);
     }
-    set_process(true);
-}
-
-void Gs1GodotRegionalSummaryPanelController::_process(double delta)
-{
-    (void)delta;
 }
 
 void Gs1GodotRegionalSummaryPanelController::_exit_tree()
@@ -95,7 +89,8 @@ void Gs1GodotRegionalSummaryPanelController::cache_ui_references(Control& owner)
     {
         regional_map_graph_ = Object::cast_to<RichTextLabel>(owner.find_child("RegionalMapGraph", true, false));
     }
-    rebuild_summary();
+    apply_summary_text();
+    apply_graph_text();
 }
 
 void Gs1GodotRegionalSummaryPanelController::cache_adapter_service()
@@ -255,24 +250,30 @@ void Gs1GodotRegionalSummaryPanelController::handle_engine_message(const Gs1Engi
 {
     switch (message.type)
     {
+    case GS1_ENGINE_MESSAGE_END_REGIONAL_SUMMARY_SNAPSHOT:
+        apply_regional_map_message(message);
+        apply_summary_text();
+        apply_graph_text();
+        break;
     case GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES:
         campaign_resources_ = message.payload_as<Gs1EngineMessageCampaignResourcesData>();
+        apply_summary_text();
         break;
     default:
         apply_regional_map_message(message);
         break;
     }
-    rebuild_summary();
 }
 
 void Gs1GodotRegionalSummaryPanelController::handle_runtime_message_reset()
 {
     reset_regional_map_state();
     campaign_resources_.reset();
-    rebuild_summary();
+    apply_summary_text();
+    apply_graph_text();
 }
 
-void Gs1GodotRegionalSummaryPanelController::rebuild_summary()
+void Gs1GodotRegionalSummaryPanelController::apply_summary_text()
 {
     const auto& sites = sites_;
     const auto& links = links_;
@@ -295,9 +296,13 @@ void Gs1GodotRegionalSummaryPanelController::rebuild_summary()
     {
         regional_map_summary_->set_text(String("\n").join(lines));
     }
+}
+
+void Gs1GodotRegionalSummaryPanelController::apply_graph_text()
+{
     if (regional_map_graph_ != nullptr)
     {
-        regional_map_graph_->set_text(build_regional_map_overview_text(sites, links));
+        regional_map_graph_->set_text(build_regional_map_overview_text(sites_, links_));
     }
 }
 

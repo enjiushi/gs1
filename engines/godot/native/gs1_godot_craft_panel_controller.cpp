@@ -83,12 +83,6 @@ void Gs1GodotCraftPanelController::_ready()
     {
         cache_ui_references(*owner);
     }
-    set_process(true);
-}
-
-void Gs1GodotCraftPanelController::_process(double delta)
-{
-    (void)delta;
 }
 
 void Gs1GodotCraftPanelController::_exit_tree()

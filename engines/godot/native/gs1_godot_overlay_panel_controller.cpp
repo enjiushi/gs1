@@ -113,12 +113,6 @@ void Gs1GodotOverlayPanelController::_ready()
     {
         cache_ui_references(*owner);
     }
-    set_process(true);
-}
-
-void Gs1GodotOverlayPanelController::_process(double delta)
-{
-    (void)delta;
 }
 
 void Gs1GodotOverlayPanelController::_exit_tree()

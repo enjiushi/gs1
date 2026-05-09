@@ -31,7 +31,6 @@ public:
     ~Gs1GodotActionPanelController() override = default;
 
     void _ready() override;
-    void _process(double delta) override;
     void _exit_tree() override;
 
     void cache_ui_references(godot::Control& owner);
@@ -81,16 +80,20 @@ private:
     [[nodiscard]] godot::Control* resolve_owner_control();
     void submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);
     void reset_ui_setup_state() noexcept;
-    void apply_ui_setup_message(const Gs1EngineMessage& message);
+    [[nodiscard]] bool apply_ui_setup_message(const Gs1EngineMessage& message);
     void rebuild_ui_setup_indices() noexcept;
     void reset_ui_panel_state() noexcept;
-    void apply_ui_panel_message(const Gs1EngineMessage& message);
+    [[nodiscard]] std::optional<int> apply_ui_panel_message(const Gs1EngineMessage& message);
     void rebuild_ui_panel_indices() noexcept;
     void cache_fixed_slot_bindings();
     void clear_fixed_slot_actions();
+    void clear_fixed_slot_actions(int panel_id);
+    void rebuild_fixed_slot_actions();
+    void rebuild_fixed_slot_panel(int panel_id);
     void bind_fixed_slot_actions(const Gs1RuntimeUiPanelProjection* panel, int panel_id);
     void apply_action_to_button(godot::BaseButton* button, const godot::Dictionary& action, const godot::String& fallback_label);
     void clear_action_from_button(godot::BaseButton* button, bool preserve_text = true);
+    [[nodiscard]] bool setup_has_site_controls(const Gs1RuntimeUiSetupProjection& setup) const;
     void reconcile_site_control_buttons();
     void reconcile_projected_action_buttons(
         godot::Node* container,

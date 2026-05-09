@@ -31,7 +31,6 @@ public:
     ~Gs1GodotPhonePanelController() override = default;
 
     void _ready() override;
-    void _process(double delta) override;
     void _exit_tree() override;
 
     void cache_ui_references(godot::Control& owner);

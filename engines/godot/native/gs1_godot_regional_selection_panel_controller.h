@@ -32,7 +32,6 @@ public:
     ~Gs1GodotRegionalSelectionPanelController() override = default;
 
     void _ready() override;
-    void _process(double delta) override;
     void _exit_tree() override;
 
     void cache_ui_references(godot::Control& owner);
@@ -76,6 +75,10 @@ private:
     [[nodiscard]] const Gs1RuntimeUiPanelProjection* find_ui_panel(Gs1UiPanelId panel_id) const noexcept;
     void reset_regional_map_state() noexcept;
     void apply_regional_map_message(const Gs1EngineMessage& message);
+    [[nodiscard]] const Gs1RuntimeRegionalMapSiteProjection* resolve_selected_site();
+    void apply_panel_visibility(const Gs1RuntimeRegionalMapSiteProjection* selected_site);
+    void apply_title_and_summary(const Gs1RuntimeRegionalMapSiteProjection* selected_site);
+    void refresh_selection_panel_actions_and_summaries(const Gs1RuntimeRegionalMapSiteProjection* selected_site);
     void rebuild_selection_panel();
     void reconcile_action_buttons(const godot::Array& button_specs);
     [[nodiscard]] godot::Button* upsert_button_node(

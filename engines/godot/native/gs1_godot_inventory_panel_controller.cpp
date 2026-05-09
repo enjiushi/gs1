@@ -75,12 +75,6 @@ void Gs1GodotInventoryPanelController::_ready()
     {
         cache_ui_references(*owner);
     }
-    set_process(true);
-}
-
-void Gs1GodotInventoryPanelController::_process(double delta)
-{
-    (void)delta;
 }
 
 void Gs1GodotInventoryPanelController::_exit_tree()

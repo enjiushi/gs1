@@ -196,12 +196,6 @@ void Gs1GodotRegionalSelectionPanelController::_ready()
     {
         cache_ui_references(*owner);
     }
-    set_process(true);
-}
-
-void Gs1GodotRegionalSelectionPanelController::_process(double delta)
-{
-    (void)delta;
 }
 
 void Gs1GodotRegionalSelectionPanelController::_exit_tree()
@@ -668,22 +662,39 @@ void Gs1GodotRegionalSelectionPanelController::handle_engine_message(const Gs1En
 
     switch (message.type)
     {
-    case GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_SELECTION_SNAPSHOT:
-    case GS1_ENGINE_MESSAGE_REGIONAL_SELECTION_SITE_UPSERT:
-    case GS1_ENGINE_MESSAGE_REGIONAL_SELECTION_SITE_REMOVE:
-    case GS1_ENGINE_MESSAGE_REGIONAL_SELECTION_LINK_UPSERT:
-    case GS1_ENGINE_MESSAGE_REGIONAL_SELECTION_LINK_REMOVE:
     case GS1_ENGINE_MESSAGE_END_REGIONAL_SELECTION_SNAPSHOT:
+    {
         if (selected_site_projection_id_.has_value())
         {
             selected_site_id_ = static_cast<int>(selected_site_projection_id_.value());
         }
+        else if (sites_.empty())
+        {
+            selected_site_id_ = 0;
+        }
+
+        const Gs1RuntimeRegionalMapSiteProjection* selected_site = resolve_selected_site();
+        apply_panel_visibility(selected_site);
+        if (selected_site == nullptr)
+        {
+            refresh_selection_panel_actions_and_summaries(nullptr);
+            break;
+        }
+
+        apply_title_and_summary(selected_site);
+        if (find_ui_panel(GS1_UI_PANEL_REGIONAL_MAP_SELECTION) == nullptr)
+        {
+            refresh_selection_panel_actions_and_summaries(selected_site);
+        }
+        break;
+    }
+    case GS1_ENGINE_MESSAGE_END_REGIONAL_SELECTION_UI_PANEL:
+    case GS1_ENGINE_MESSAGE_CLOSE_REGIONAL_SELECTION_UI_PANEL:
+        refresh_selection_panel_actions_and_summaries(resolve_selected_site());
         break;
     default:
         break;
     }
-
-    rebuild_selection_panel();
 }
 
 void Gs1GodotRegionalSelectionPanelController::handle_runtime_message_reset()
@@ -694,13 +705,8 @@ void Gs1GodotRegionalSelectionPanelController::handle_runtime_message_reset()
     rebuild_selection_panel();
 }
 
-void Gs1GodotRegionalSelectionPanelController::rebuild_selection_panel()
+const Gs1RuntimeRegionalMapSiteProjection* Gs1GodotRegionalSelectionPanelController::resolve_selected_site()
 {
-    if (panel_ == nullptr)
-    {
-        return;
-    }
-
     const Gs1RuntimeRegionalMapSiteProjection* selected_site = nullptr;
     for (const auto& site : sites_)
     {
@@ -717,13 +723,26 @@ void Gs1GodotRegionalSelectionPanelController::rebuild_selection_panel()
         selected_site_id_ = static_cast<int>(selected_site->site_id);
     }
 
+    return selected_site;
+}
+
+void Gs1GodotRegionalSelectionPanelController::apply_panel_visibility(
+    const Gs1RuntimeRegionalMapSiteProjection* selected_site)
+{
+    if (panel_ != nullptr)
+    {
+        panel_->set_visible(selected_site != nullptr);
+    }
+}
+
+void Gs1GodotRegionalSelectionPanelController::apply_title_and_summary(
+    const Gs1RuntimeRegionalMapSiteProjection* selected_site)
+{
     if (selected_site == nullptr)
     {
-        panel_->set_visible(false);
         return;
     }
 
-    panel_->set_visible(true);
     if (title_ != nullptr)
     {
         title_->set_text(vformat("Selected Site %d", static_cast<int>(selected_site->site_id)));
@@ -735,9 +754,19 @@ void Gs1GodotRegionalSelectionPanelController::rebuild_selection_panel()
     summary_lines.push_back(String());
     summary_lines.push_back("[b]Deployment Brief[/b]");
     summary_lines.push_back(site_deployment_summary(*selected_site));
+    if (summary_ != nullptr)
+    {
+        summary_->set_text(String("\n").join(summary_lines));
+    }
+}
 
+void Gs1GodotRegionalSelectionPanelController::refresh_selection_panel_actions_and_summaries(
+    const Gs1RuntimeRegionalMapSiteProjection* selected_site)
+{
     Array button_specs;
-    const Gs1RuntimeUiPanelProjection* selection_panel = find_ui_panel(GS1_UI_PANEL_REGIONAL_MAP_SELECTION);
+    const Gs1RuntimeUiPanelProjection* selection_panel = selected_site == nullptr
+        ? nullptr
+        : find_ui_panel(GS1_UI_PANEL_REGIONAL_MAP_SELECTION);
     if (selection_panel != nullptr)
     {
         for (const auto& slot_action : selection_panel->slot_actions)
@@ -769,7 +798,7 @@ void Gs1GodotRegionalSelectionPanelController::rebuild_selection_panel()
         }
     }
 
-    if (button_specs.is_empty())
+    if (selected_site != nullptr && button_specs.is_empty())
     {
         const int selected_site_id = static_cast<int>(selected_site->site_id);
 
@@ -803,13 +832,27 @@ void Gs1GodotRegionalSelectionPanelController::rebuild_selection_panel()
     }
 
     reconcile_action_buttons(button_specs);
-
-    if (summary_ != nullptr)
-    {
-        summary_->set_text(String("\n").join(summary_lines));
-    }
     refresh_support_summary(selection_panel);
     refresh_loadout_summary(selection_panel);
+}
+
+void Gs1GodotRegionalSelectionPanelController::rebuild_selection_panel()
+{
+    if (panel_ == nullptr)
+    {
+        return;
+    }
+
+    const Gs1RuntimeRegionalMapSiteProjection* selected_site = resolve_selected_site();
+    apply_panel_visibility(selected_site);
+    if (selected_site == nullptr)
+    {
+        refresh_selection_panel_actions_and_summaries(nullptr);
+        return;
+    }
+
+    apply_title_and_summary(selected_site);
+    refresh_selection_panel_actions_and_summaries(selected_site);
 }
 
 void Gs1GodotRegionalSelectionPanelController::handle_action_pressed(std::int64_t button_key)

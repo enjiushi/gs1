@@ -130,20 +130,7 @@ void Gs1GodotSiteSessionUiController::_ready()
     cache_adapter_service();
     cache_ui_references();
     wire_static_buttons();
-    set_process(true);
     set_process_input(true);
-}
-
-void Gs1GodotSiteSessionUiController::_process(double delta)
-{
-    (void)delta;
-    if (adapter_service_ == nullptr)
-    {
-        return;
-    }
-
-    refresh_visibility();
-    refresh_selected_tile_if_needed();
 }
 
 void Gs1GodotSiteSessionUiController::_input(const Ref<InputEvent>& event)
@@ -766,8 +753,9 @@ void Gs1GodotSiteSessionUiController::handle_engine_message(const Gs1EngineMessa
     }
 
     apply_site_message(message);
-    mark_selected_tile_dirty();
     refresh_visibility();
+    mark_selected_tile_dirty();
+    apply_selected_tile_if_needed();
 }
 
 void Gs1GodotSiteSessionUiController::handle_runtime_message_reset()
@@ -780,6 +768,7 @@ void Gs1GodotSiteSessionUiController::handle_runtime_message_reset()
     last_tile_label_y_ = -1;
     selected_tile_dirty_ = true;
     refresh_visibility();
+    apply_selected_tile_if_needed();
 }
 
 void Gs1GodotSiteSessionUiController::handle_input_event(const Ref<InputEvent>& event)
@@ -864,6 +853,11 @@ void Gs1GodotSiteSessionUiController::refresh_selected_tile_if_needed()
     last_tile_label_x_ = selected_tile_.x;
     last_tile_label_y_ = selected_tile_.y;
     selected_tile_dirty_ = false;
+}
+
+void Gs1GodotSiteSessionUiController::apply_selected_tile_if_needed()
+{
+    refresh_selected_tile_if_needed();
 }
 
 void Gs1GodotSiteSessionUiController::mark_selected_tile_dirty()
