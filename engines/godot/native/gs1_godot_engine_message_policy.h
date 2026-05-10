@@ -1,0 +1,25 @@
+#pragma once
+
+#include "../../../include/gs1/types.h"
+
+[[nodiscard]] constexpr bool gs1_godot_engine_message_requires_exclusive_subscriber(
+    Gs1EngineMessageType type) noexcept
+{
+    switch (type)
+    {
+    case GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_MAP_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_MAP_HUD_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_SUMMARY_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_SELECTION_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SCENE_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_BEGIN_SITE_INVENTORY_PANEL_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_BEGIN_SITE_PHONE_PANEL_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_BEGIN_SITE_TASK_PANEL_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SUMMARY_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_BEGIN_SITE_HUD_SNAPSHOT:
+        return true;
+    default:
+        return false;
+    }
+}
