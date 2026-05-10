@@ -51,6 +51,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 theme = ExtResource("2_theme")
 
 [node name="RegionalMapWorld" parent="." unique_id=326713988 instance=ExtResource("4_backdrop")]
@@ -86,25 +87,28 @@ offset_right = -24.0
 offset_bottom = -20.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 
 [node name="RootVBox" type="VBoxContainer" parent="HudMargin" unique_id=769428215]
 layout_mode = 2
+mouse_filter = 2
 theme_override_constants/separation = 18
 
 [node name="MainColumns" type="HBoxContainer" parent="HudMargin/RootVBox" unique_id=1415160725]
 layout_mode = 2
 size_flags_vertical = 3
+mouse_filter = 2
 theme_override_constants/separation = 24
 
 [node name="LeftColumn" type="VBoxContainer" parent="HudMargin/RootVBox/MainColumns" unique_id=1907747161]
 custom_minimum_size = Vector2(428, 0)
 layout_mode = 2
 size_flags_vertical = 3
+mouse_filter = 2
 theme_override_constants/separation = 16
 
 [node name="RegionalMapHud" parent="HudMargin/RootVBox/MainColumns/LeftColumn" unique_id=221750624 instance=ExtResource("6_regional_map_hud")]
 layout_mode = 2
-size_flags_vertical = 3
 
 [node name="WorldSpacer" type="Control" parent="HudMargin/RootVBox/MainColumns" unique_id=535032526]
 layout_mode = 2
@@ -116,12 +120,12 @@ mouse_filter = 2
 custom_minimum_size = Vector2(430, 0)
 layout_mode = 2
 size_flags_vertical = 3
+mouse_filter = 2
 theme_override_constants/separation = 14
 
 [node name="RegionalSelectionPanel" type="MarginContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn" unique_id=866392839]
 visible = false
 layout_mode = 2
-size_flags_vertical = 3
 theme_override_constants/margin_left = 18
 theme_override_constants/margin_top = 18
 theme_override_constants/margin_right = 18
