@@ -1,3 +1,4 @@
+#include "gs1_godot_regional_map_click_policy.h"
 #include "godot_progression_resources.h"
 #include "gs1_godot_regional_map_scene_controller.h"
 
@@ -144,7 +145,12 @@ void Gs1GodotRegionalMapSceneController::_input(const Ref<InputEvent>& event)
         return;
     }
 
-    if (try_select_regional_site_from_screen(mouse_event->get_position()))
+    const Gs1GodotRegionalMapWorldClickOutcome click_outcome =
+        gs1_godot_resolve_regional_map_world_click(
+            try_select_regional_site_from_screen(mouse_event->get_position()),
+            selected_site_id_.has_value());
+
+    if (click_outcome == GS1_GODOT_REGIONAL_MAP_WORLD_CLICK_SITE_PICKED)
     {
         if (Viewport* viewport = get_viewport())
         {
@@ -153,13 +159,14 @@ void Gs1GodotRegionalMapSceneController::_input(const Ref<InputEvent>& event)
         return;
     }
 
-    if (selected_site_id_.has_value())
+    if (click_outcome == GS1_GODOT_REGIONAL_MAP_WORLD_CLICK_CLEAR_SELECTION)
     {
         clear_regional_site_selection();
-        if (Viewport* viewport = get_viewport())
-        {
-            viewport->set_input_as_handled();
-        }
+    }
+
+    if (Viewport* viewport = get_viewport())
+    {
+        viewport->set_input_as_handled();
     }
 }
 
