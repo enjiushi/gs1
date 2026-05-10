@@ -184,13 +184,23 @@ void Gs1GodotSiteSceneController::ensure_presenter_created()
         add_child(worker_marker_);
     }
 
-    if (get_node_or_null("BootstrapCamera") == nullptr)
+    if (bootstrap_camera_ == nullptr)
+    {
+        bootstrap_camera_ = Object::cast_to<Camera3D>(get_node_or_null("BootstrapCamera"));
+    }
+    if (bootstrap_camera_ == nullptr)
     {
         auto* camera = memnew(Camera3D);
         camera->set_name("BootstrapCamera");
         camera->set_position(Vector3(6.0, 12.0, 10.0));
         camera->set_rotation_degrees(Vector3(-50.0, 30.0, 0.0));
+        camera->set_current(true);
         add_child(camera);
+        bootstrap_camera_ = camera;
+    }
+    else
+    {
+        bootstrap_camera_->set_current(true);
     }
 
     if (get_node_or_null("BootstrapLight") == nullptr)
@@ -200,6 +210,28 @@ void Gs1GodotSiteSceneController::ensure_presenter_created()
         light->set_rotation_degrees(Vector3(-55.0, 35.0, 0.0));
         add_child(light);
     }
+
+    position_bootstrap_camera();
+}
+
+void Gs1GodotSiteSceneController::position_bootstrap_camera()
+{
+    if (bootstrap_camera_ == nullptr || last_width_ <= 0 || last_height_ <= 0)
+    {
+        return;
+    }
+
+    const float width = static_cast<float>(std::max(last_width_, 1));
+    const float height = static_cast<float>(std::max(last_height_, 1));
+    const float longest_side = std::max(width, height) * tile_size_;
+    const Vector3 center(
+        ((width - 1.0f) * 0.5f) * tile_size_,
+        0.0f,
+        ((height - 1.0f) * 0.5f) * tile_size_);
+
+    bootstrap_camera_->set_position(center + Vector3(0.0f, 10.0f + (longest_side * 0.72f), 7.5f + (longest_side * 0.58f)));
+    bootstrap_camera_->look_at(center + Vector3(0.0f, 0.6f, 0.0f), Vector3(0.0f, 1.0f, 0.0f));
+    bootstrap_camera_->set_current(true);
 }
 
 void Gs1GodotSiteSceneController::cache_adapter_service()
@@ -286,6 +318,7 @@ void Gs1GodotSiteSceneController::apply_site_snapshot_begin(const Gs1EngineMessa
 {
     last_width_ = payload.width;
     last_height_ = payload.height;
+    position_bootstrap_camera();
     if (payload.mode != GS1_PROJECTION_MODE_SNAPSHOT)
     {
         return;

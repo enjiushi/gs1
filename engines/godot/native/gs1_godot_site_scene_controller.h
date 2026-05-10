@@ -89,6 +89,7 @@ private:
     };
 
     void ensure_presenter_created();
+    void position_bootstrap_camera();
     void cache_adapter_service();
 
     void apply_site_snapshot_begin(const Gs1EngineMessageSiteSnapshotData& payload);
@@ -164,6 +165,7 @@ private:
 private:
     godot::Node3D* grid_root_ {nullptr};
     godot::Node3D* visual_root_ {nullptr};
+    godot::Camera3D* bootstrap_camera_ {nullptr};
     godot::MeshInstance3D* worker_marker_ {nullptr};
     Gs1GodotAdapterService* adapter_service_ {nullptr};
     std::unordered_map<std::uint64_t, TileNodeRecord> tile_nodes_ {};

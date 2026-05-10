@@ -807,9 +807,11 @@ void Gs1GodotSiteSessionUiController::handle_input_event(const Ref<InputEvent>& 
 
 void Gs1GodotSiteSessionUiController::refresh_visibility()
 {
+    const bool has_site_projection = site_state_.has_value() || pending_site_state_.has_value();
     const bool site_visible =
-        current_app_state_ >= APP_STATE_SITE_LOADING &&
-        current_app_state_ <= APP_STATE_SITE_RESULT;
+        has_site_projection ||
+        (current_app_state_ >= APP_STATE_SITE_LOADING &&
+            current_app_state_ <= APP_STATE_SITE_RESULT);
     if (site_panel_ != nullptr)
     {
         site_panel_->set_visible(site_visible);
