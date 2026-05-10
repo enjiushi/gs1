@@ -31,6 +31,23 @@ std::filesystem::path globalize_res_path(std::string_view res_path)
 
 }
 
+void Gs1GodotAdapterService::fail_runtime_session(const char* fallback_error_message)
+{
+    if (last_error_.empty() && fallback_error_message != nullptr && fallback_error_message[0] != '\0')
+    {
+        last_error_ = fallback_error_message;
+    }
+
+#ifndef NDEBUG
+    UtilityFunctions::push_error(
+        String("GS1 Godot adapter runtime failure: ") + String(last_error_.c_str()));
+    assert(false && "GS1 Godot adapter hit an unexpected runtime/session failure; inspect last_error_.");
+#endif
+
+    runtime_session_.stop();
+    notify_runtime_message_reset();
+}
+
 Gs1GodotAdapterService::~Gs1GodotAdapterService()
 {
     runtime_session_.stop();
@@ -78,8 +95,7 @@ void Gs1GodotAdapterService::process_frame(double delta_seconds)
 
     if (!drain_debug_http_commands())
     {
-        runtime_session_.stop();
-        notify_runtime_message_reset();
+        fail_runtime_session("Failed to drain queued Godot debug HTTP commands.");
         return;
     }
 
@@ -88,15 +104,13 @@ void Gs1GodotAdapterService::process_frame(double delta_seconds)
     if (!runtime_session_.update(delta_seconds > 0.0 ? delta_seconds : (1.0 / 60.0), phase1, phase2))
     {
         last_error_ = runtime_session_.last_error();
-        runtime_session_.stop();
-        notify_runtime_message_reset();
+        fail_runtime_session("Runtime session update failed.");
         return;
     }
 
     if (!drain_projection_messages())
     {
-        runtime_session_.stop();
-        notify_runtime_message_reset();
+        fail_runtime_session("Failed to drain runtime projection messages.");
         return;
     }
 
@@ -234,8 +248,7 @@ void Gs1GodotAdapterService::ensure_runtime_started()
 
     if (!drain_projection_messages())
     {
-        runtime_session_.stop();
-        notify_runtime_message_reset();
+        fail_runtime_session("Failed to drain startup projection messages.");
         return;
     }
 

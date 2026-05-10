@@ -67,6 +67,7 @@ private:
 
     void ensure_debug_http_server_initialized();
     void ensure_runtime_started();
+    void fail_runtime_session(const char* fallback_error_message);
     [[nodiscard]] bool drain_debug_http_commands();
     bool drain_projection_messages();
     void notify_runtime_message_reset();

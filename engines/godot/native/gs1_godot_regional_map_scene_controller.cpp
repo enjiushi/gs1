@@ -120,7 +120,7 @@ void Gs1GodotRegionalMapSceneController::_ready()
     cache_adapter_service();
     cache_scene_references();
     cache_ui_references();
-    set_process_input(true);
+    set_process_unhandled_input(true);
 }
 
 void Gs1GodotRegionalMapSceneController::_exit_tree()
@@ -132,41 +132,45 @@ void Gs1GodotRegionalMapSceneController::_exit_tree()
     }
 }
 
-void Gs1GodotRegionalMapSceneController::_input(const Ref<InputEvent>& event)
+void Gs1GodotRegionalMapSceneController::_unhandled_input(const Ref<InputEvent>& event)
 {
     const auto* mouse_event = event.is_null() ? nullptr : Object::cast_to<InputEventMouseButton>(*event);
-    if (mouse_event == nullptr || !mouse_event->is_pressed() || mouse_event->get_button_index() != MOUSE_BUTTON_LEFT)
+    const bool left_mouse_pressed = mouse_event != nullptr &&
+        mouse_event->is_pressed() &&
+        mouse_event->get_button_index() == MOUSE_BUTTON_LEFT;
+    if (!left_mouse_pressed)
     {
         return;
     }
 
-    if (regional_map_ui_contains_screen_point(mouse_event->get_position()))
+    const Vector2 screen_position = mouse_event->get_position();
+    const bool ui_contains_screen_point = regional_map_ui_contains_screen_point(screen_position);
+    const bool picked_site = !ui_contains_screen_point && try_select_regional_site_from_screen(screen_position);
+    const Gs1GodotRegionalMapInputOutcome input_outcome = gs1_godot_resolve_regional_map_input(
+        left_mouse_pressed,
+        ui_contains_screen_point,
+        picked_site,
+        selected_site_id_.has_value());
+
+    if (input_outcome == GS1_GODOT_REGIONAL_MAP_INPUT_IGNORE)
     {
         return;
     }
 
-    const Gs1GodotRegionalMapWorldClickOutcome click_outcome =
-        gs1_godot_resolve_regional_map_world_click(
-            try_select_regional_site_from_screen(mouse_event->get_position()),
-            selected_site_id_.has_value());
+    if (input_outcome == GS1_GODOT_REGIONAL_MAP_INPUT_CLEAR_SELECTION)
+    {
+        clear_regional_site_selection();
+    }
 
-    if (click_outcome == GS1_GODOT_REGIONAL_MAP_WORLD_CLICK_SITE_PICKED)
+    if (input_outcome == GS1_GODOT_REGIONAL_MAP_INPUT_SITE_PICKED ||
+        input_outcome == GS1_GODOT_REGIONAL_MAP_INPUT_CLEAR_SELECTION ||
+        input_outcome == GS1_GODOT_REGIONAL_MAP_INPUT_CONSUME_BLANK ||
+        input_outcome == GS1_GODOT_REGIONAL_MAP_INPUT_CONSUME_UI)
     {
         if (Viewport* viewport = get_viewport())
         {
             viewport->set_input_as_handled();
         }
-        return;
-    }
-
-    if (click_outcome == GS1_GODOT_REGIONAL_MAP_WORLD_CLICK_CLEAR_SELECTION)
-    {
-        clear_regional_site_selection();
-    }
-
-    if (Viewport* viewport = get_viewport())
-    {
-        viewport->set_input_as_handled();
     }
 }
 

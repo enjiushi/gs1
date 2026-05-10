@@ -43,7 +43,7 @@ public:
 
     void _ready() override;
     void _exit_tree() override;
-    void _input(const godot::Ref<godot::InputEvent>& event) override;
+    void _unhandled_input(const godot::Ref<godot::InputEvent>& event) override;
 
     [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
     void handle_engine_message(const Gs1EngineMessage& message) override;
