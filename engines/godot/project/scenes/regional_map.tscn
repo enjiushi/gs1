@@ -13,6 +13,38 @@ shader_parameter/shimmer_speed = 1.42
 shader_parameter/band_density = 46.0
 shader_parameter/edge_falloff = 0.88
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_regional_summary_shell"]
+content_margin_left = 16.0
+content_margin_top = 14.0
+content_margin_right = 16.0
+content_margin_bottom = 14.0
+bg_color = Color(0.129412, 0.0862745, 0.0431373, 0.84)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.772549, 0.643137, 0.407843, 0.28)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_regional_detail_shell"]
+content_margin_left = 14.0
+content_margin_top = 12.0
+content_margin_right = 14.0
+content_margin_bottom = 12.0
+bg_color = Color(0.133333, 0.0901961, 0.0470588, 0.8)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.733333, 0.607843, 0.384314, 0.24)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
 [node name="RegionalMap" type="Gs1GodotRegionalMapSceneController" unique_id=1236848156]
 anchors_preset = 15
 anchor_right = 1.0
@@ -105,7 +137,11 @@ theme_override_colors/font_color = Color(0.490196, 0.862745, 0.529412, 1)
 theme_override_font_sizes/font_size = 18
 text = "SITE BRIEF"
 
-[node name="RegionalSelectionSummary" type="RichTextLabel" parent="HudMargin/RootVBox/MainColumns/RightColumn/RegionalSelectionPanel/RegionalSelectionVBox" unique_id=504756649]
+[node name="RegionalSelectionSummaryPanel" type="PanelContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn/RegionalSelectionPanel/RegionalSelectionVBox"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_regional_summary_shell")
+
+[node name="RegionalSelectionSummary" type="RichTextLabel" parent="HudMargin/RootVBox/MainColumns/RightColumn/RegionalSelectionPanel/RegionalSelectionVBox/RegionalSelectionSummaryPanel" unique_id=504756649]
 custom_minimum_size = Vector2(0, 122)
 layout_mode = 2
 bbcode_enabled = true
@@ -114,6 +150,7 @@ scroll_active = false
 
 [node name="RegionalSupportPanel" type="PanelContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn/RegionalSelectionPanel/RegionalSelectionVBox" unique_id=181417297]
 layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_regional_detail_shell")
 
 [node name="RegionalSupportSummary" type="RichTextLabel" parent="HudMargin/RootVBox/MainColumns/RightColumn/RegionalSelectionPanel/RegionalSelectionVBox/RegionalSupportPanel" unique_id=1001924748]
 custom_minimum_size = Vector2(0, 92)
@@ -125,6 +162,7 @@ scroll_active = false
 [node name="RegionalLoadoutPanel" type="PanelContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn/RegionalSelectionPanel/RegionalSelectionVBox" unique_id=1858080570]
 layout_mode = 2
 size_flags_vertical = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_regional_detail_shell")
 
 [node name="RegionalLoadoutVBox" type="VBoxContainer" parent="HudMargin/RootVBox/MainColumns/RightColumn/RegionalSelectionPanel/RegionalSelectionVBox/RegionalLoadoutPanel"]
 layout_mode = 2
@@ -156,11 +194,11 @@ layout_mode = 2
 theme_override_constants/separation = 10
 
 [node name="TechOverlay" parent="." unique_id=1950611279 instance=ExtResource("5_tech_tree_overlay")]
-metadata/gs1_overlay_margin_left = 72.0
-metadata/gs1_overlay_margin_top = 56.0
-metadata/gs1_overlay_margin_right = -72.0
+metadata/gs1_overlay_margin_left = 40.0
+metadata/gs1_overlay_margin_top = 44.0
+metadata/gs1_overlay_margin_right = -40.0
 metadata/gs1_overlay_margin_bottom = -48.0
-metadata/gs1_panel_min_width = 980.0
+metadata/gs1_panel_min_width = 1260.0
 metadata/gs1_panel_min_height = 620.0
 
 [node name="UiController" type="Gs1GodotRegionalMapUiController" parent="."]

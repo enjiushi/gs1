@@ -1,5 +1,21 @@
 [gd_scene format=3]
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_tech_overlay_panel"]
+content_margin_left = 22.0
+content_margin_top = 18.0
+content_margin_right = 22.0
+content_margin_bottom = 20.0
+bg_color = Color(0.109804, 0.0745098, 0.0392157, 0.96)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.776471, 0.654902, 0.403922, 0.34)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+
 [node name="TechOverlay" type="MarginContainer"]
 layout_mode = 1
 anchors_preset = 15
@@ -22,6 +38,7 @@ size_flags_vertical = 3
 visible = false
 custom_minimum_size = Vector2(1260, 760)
 layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_tech_overlay_panel")
 
 [node name="RegionalTechTreeVBox" type="VBoxContainer" parent="TechOverlayCenter/RegionalTechTreePanel"]
 layout_mode = 2
