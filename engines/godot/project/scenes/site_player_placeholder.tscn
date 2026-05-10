@@ -1,0 +1,53 @@
+[gd_scene load_steps=8 format=3]
+
+[sub_resource type="StandardMaterial3D" id="mat_cloth"]
+albedo_color = Color(0.596078, 0.447059, 0.27451, 1)
+roughness = 0.88
+
+[sub_resource type="StandardMaterial3D" id="mat_skin"]
+albedo_color = Color(0.890196, 0.776471, 0.631373, 1)
+roughness = 0.92
+
+[sub_resource type="StandardMaterial3D" id="mat_pack"]
+albedo_color = Color(0.337255, 0.258824, 0.164706, 1)
+roughness = 0.9
+
+[sub_resource type="BoxMesh" id="mesh_torso"]
+size = Vector3(0.38, 0.62, 0.24)
+
+[sub_resource type="SphereMesh" id="mesh_head"]
+radius = 0.16
+height = 0.32
+
+[sub_resource type="BoxMesh" id="mesh_leg"]
+size = Vector3(0.1, 0.4, 0.1)
+
+[sub_resource type="BoxMesh" id="mesh_pack"]
+size = Vector3(0.28, 0.34, 0.14)
+
+[node name="SitePlayerPlaceholder" type="Node3D"]
+
+[node name="Torso" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_torso")
+material_override = SubResource("mat_cloth")
+position = Vector3(0, 0.48, 0)
+
+[node name="Head" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_head")
+material_override = SubResource("mat_skin")
+position = Vector3(0, 0.9, 0)
+
+[node name="LeftLeg" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_leg")
+material_override = SubResource("mat_cloth")
+position = Vector3(-0.09, 0.18, 0)
+
+[node name="RightLeg" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_leg")
+material_override = SubResource("mat_cloth")
+position = Vector3(0.09, 0.18, 0)
+
+[node name="Pack" type="MeshInstance3D" parent="."]
+mesh = SubResource("mesh_pack")
+material_override = SubResource("mat_pack")
+position = Vector3(0, 0.5, -0.18)

@@ -17,6 +17,7 @@
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/sphere_mesh.hpp>
 #include <godot_cpp/classes/standard_material3d.hpp>
+#include <godot_cpp/classes/texture2d.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/object.hpp>
 #include <godot_cpp/core/object_id.hpp>
@@ -35,13 +36,27 @@ using namespace godot;
 namespace
 {
 constexpr float k_tile_height = 0.05f;
-constexpr float k_tile_y_offset = -0.025f;
-constexpr float k_worker_marker_height = 0.45f;
+constexpr float k_tile_min_height = 0.2f;
+constexpr float k_tile_height_from_fertility = 1.1f;
+constexpr float k_tile_excavation_depth_step = 0.08f;
+constexpr float k_worker_marker_height = 0.55f;
 constexpr float k_plant_y_offset = 0.35f;
 constexpr float k_device_y_offset = 0.4f;
-constexpr std::uint32_t k_tile_batch_key = 1U;
+constexpr std::uint32_t k_tile_batch_key_mask = 0x20000000U;
+constexpr std::uint32_t k_plant_batch_key_mask = 0x40000000U;
+constexpr std::uint32_t k_device_batch_key_mask = 0x80000000U;
+constexpr std::uint32_t k_tile_texture_band_count = 4U;
+constexpr std::uint32_t k_tile_band_highway = k_tile_texture_band_count;
+constexpr std::uint32_t k_highway_terrain_type_id = 9001U;
 constexpr std::uint16_t k_max_plant_instances_per_visual = 9U;
 constexpr std::uint16_t k_min_plant_instances_per_visual = 1U;
+constexpr const char* k_tile_texture_paths[k_tile_texture_band_count] = {
+    "res://assets/terrain/textures/g_pal_00_color.png",
+    "res://assets/terrain/textures/dirt (2).png",
+    "res://assets/terrain/textures/dirt (1).png",
+    "res://assets/terrain/textures/dirt (3).png"};
+constexpr const char* k_highway_texture_path = "res://assets/terrain/textures/road dirt.png";
+constexpr const char* k_worker_placeholder_scene_path = "res://scenes/site_player_placeholder.tscn";
 
 Color color_for_tile(const Gs1RuntimeTileProjection& tile) noexcept
 {
@@ -65,12 +80,19 @@ Color color_for_tile(const Gs1RuntimeTileProjection& tile) noexcept
     }
 
     const float moisture = std::clamp(tile.moisture / 100.0f, 0.0f, 1.0f);
+    const float fertility = std::clamp(tile.soil_fertility / 100.0f, 0.0f, 1.0f);
     const float salinity = std::clamp(tile.soil_salinity / 100.0f, 0.0f, 1.0f);
     const float burial = std::clamp(tile.sand_burial / 100.0f, 0.0f, 1.0f);
     const float excavation = std::clamp(static_cast<float>(tile.visible_excavation_depth) / 3.0f, 0.0f, 1.0f);
 
-    r = std::clamp(r + (0.05f * moisture) + (0.08f * salinity) - (0.10f * excavation), 0.10f, 0.95f);
-    g = std::clamp(g + (0.08f * moisture) - (0.06f * salinity) - (0.10f * excavation), 0.10f, 0.95f);
+    r = std::clamp(
+        r + (0.05f * moisture) + (0.03f * fertility) + (0.08f * salinity) - (0.10f * excavation),
+        0.10f,
+        0.95f);
+    g = std::clamp(
+        g + (0.08f * moisture) + (0.17f * fertility) - (0.06f * salinity) - (0.10f * excavation),
+        0.10f,
+        0.98f);
     b = std::clamp(b + (0.03f * moisture) - (0.08f * burial) - (0.06f * excavation), 0.08f, 0.90f);
     return Color(r, g, b, 1.0f);
 }
@@ -99,6 +121,28 @@ Ref<StandardMaterial3D> make_standard_material(const Color& color)
     material->set_roughness(0.92);
     material->set_flag(BaseMaterial3D::FLAG_ALBEDO_FROM_VERTEX_COLOR, true);
     return material;
+}
+
+Ref<StandardMaterial3D> make_textured_tile_material(const String& texture_path)
+{
+    Ref<StandardMaterial3D> material = make_standard_material(Color(1.0f, 1.0f, 1.0f, 1.0f));
+    ResourceLoader* loader = ResourceLoader::get_singleton();
+    if (loader == nullptr)
+    {
+        return material;
+    }
+
+    const Ref<Texture2D> texture = loader->load(texture_path);
+    if (texture.is_valid())
+    {
+        material->set_texture(BaseMaterial3D::TEXTURE_ALBEDO, texture);
+    }
+    return material;
+}
+
+float lerp_float(float lhs, float rhs, float t) noexcept
+{
+    return lhs + ((rhs - lhs) * t);
 }
 
 std::uint32_t combine_u32_hash(std::uint32_t lhs, std::uint32_t rhs) noexcept
@@ -132,6 +176,16 @@ Transform3D make_transform(const Vector3& position, const Vector3& scale, float 
 {
     Basis basis(Vector3(0.0f, 1.0f, 0.0f), yaw_radians, scale);
     return Transform3D(basis, position);
+}
+
+std::uint64_t tile_gameplay_id(std::uint16_t x, std::uint16_t y) noexcept
+{
+    return (static_cast<std::uint64_t>(y) << 32U) | x;
+}
+
+bool is_tile_batch_key(std::uint32_t batch_key) noexcept
+{
+    return (batch_key & 0xe0000000U) == k_tile_batch_key_mask;
 }
 }
 
@@ -170,28 +224,57 @@ void Gs1GodotSiteSceneController::ensure_presenter_created()
     }
     if (worker_marker_ == nullptr)
     {
-        worker_marker_ = memnew(MeshInstance3D);
-        Ref<SphereMesh> mesh;
-        mesh.instantiate();
-        mesh->set_radius(0.35);
-        mesh->set_height(0.7);
-        worker_marker_->set_mesh(mesh);
-        Ref<StandardMaterial3D> material;
-        material.instantiate();
-        material->set_albedo(Color(0.95, 0.32, 0.18));
-        worker_marker_->set_material_override(material);
+        worker_marker_ = memnew(Node3D);
+        worker_marker_->set_name("WorkerRoot");
         worker_marker_->set_visible(false);
-        add_child(worker_marker_);
+        if (ResourceLoader* loader = ResourceLoader::get_singleton())
+        {
+            const Ref<PackedScene> worker_scene = loader->load(k_worker_placeholder_scene_path);
+            if (worker_scene.is_valid())
+            {
+                if (Node* scene_instance = Object::cast_to<Node>(worker_scene->instantiate()))
+                {
+                    worker_marker_->add_child(scene_instance);
+                }
+            }
+        }
+        if (worker_marker_->get_child_count() == 0)
+        {
+            auto* fallback_body = make_box_visual(Vector3(0.42f, 0.62f, 0.28f), Color(0.79, 0.56, 0.41));
+            fallback_body->set_position(Vector3(0.0, 0.38, 0.0));
+            worker_marker_->add_child(fallback_body);
+
+            auto* fallback_head = memnew(MeshInstance3D);
+            Ref<SphereMesh> head_mesh;
+            head_mesh.instantiate();
+            head_mesh->set_radius(0.18);
+            head_mesh->set_height(0.36);
+            fallback_head->set_mesh(head_mesh);
+            fallback_head->set_material_override(make_standard_material(Color(0.92, 0.78, 0.63)));
+            fallback_head->set_position(Vector3(0.0, 0.84, 0.0));
+            worker_marker_->add_child(fallback_head);
+        }
+        if (visual_root_ != nullptr)
+        {
+            visual_root_->add_child(worker_marker_);
+        }
+        else
+        {
+            add_child(worker_marker_);
+        }
     }
 
-    if (get_node_or_null("BootstrapCamera") == nullptr)
+    if (bootstrap_camera_ == nullptr)
     {
-        auto* camera = memnew(Camera3D);
-        camera->set_name("BootstrapCamera");
-        camera->set_position(Vector3(6.0, 12.0, 10.0));
-        camera->set_rotation_degrees(Vector3(-50.0, 30.0, 0.0));
-        add_child(camera);
+        bootstrap_camera_ = Object::cast_to<Camera3D>(get_node_or_null("BootstrapCamera"));
+        if (bootstrap_camera_ == nullptr)
+        {
+            bootstrap_camera_ = memnew(Camera3D);
+            bootstrap_camera_->set_name("BootstrapCamera");
+            add_child(bootstrap_camera_);
+        }
     }
+    bootstrap_camera_->set_current(true);
 
     if (get_node_or_null("BootstrapLight") == nullptr)
     {
@@ -200,6 +283,8 @@ void Gs1GodotSiteSceneController::ensure_presenter_created()
         light->set_rotation_degrees(Vector3(-55.0, 35.0, 0.0));
         add_child(light);
     }
+
+    refresh_camera_frame();
 }
 
 void Gs1GodotSiteSceneController::cache_adapter_service()
@@ -280,12 +365,14 @@ void Gs1GodotSiteSceneController::handle_runtime_message_reset()
     {
         worker_marker_->set_visible(false);
     }
+    refresh_camera_frame();
 }
 
 void Gs1GodotSiteSceneController::apply_site_snapshot_begin(const Gs1EngineMessageSiteSnapshotData& payload)
 {
     last_width_ = payload.width;
     last_height_ = payload.height;
+    refresh_camera_frame();
     if (payload.mode != GS1_PROJECTION_MODE_SNAPSHOT)
     {
         return;
@@ -350,33 +437,15 @@ void Gs1GodotSiteSceneController::apply_site_snapshot_end()
     }
 
     reconcile_full_snapshot_ = false;
+    refresh_all_visual_transforms();
+    refresh_worker_transform();
 }
 
 void Gs1GodotSiteSceneController::apply_site_tile_upsert(const Gs1EngineMessageSiteTileData& payload)
 {
-    const std::uint64_t tile_id = (static_cast<std::uint64_t>(payload.y) << 32U) | payload.x;
-    Ref<BoxMesh> tile_mesh;
-    tile_mesh.instantiate();
-    tile_mesh->set_size(Vector3(tile_size_, k_tile_height, tile_size_));
-
-    InstancedMeshPart tile_part {};
-    tile_part.mesh = tile_mesh;
-    tile_part.material = make_standard_material(Color(1.0f, 1.0f, 1.0f, 1.0f));
-    tile_part.local_transform = Transform3D();
-    tile_part.part_index = 0U;
-    InstancedBatch& tile_batch = ensure_batch(tile_batches_, false, k_tile_batch_key, 0U, tile_part);
+    const std::uint64_t tile_id = tile_gameplay_id(payload.x, payload.y);
 
     auto tile_found = tile_nodes_.find(tile_id);
-    if (tile_found == tile_nodes_.end())
-    {
-        TileNodeRecord record {};
-        record.gameplay_id = tile_id;
-        record.batch_key = k_tile_batch_key;
-        record.instance_index = allocate_batch_slot(tile_batch);
-        record.last_seen_snapshot_serial = reconcile_full_snapshot_ ? active_snapshot_serial_ : 0U;
-        tile_found = tile_nodes_.emplace(tile_id, record).first;
-    }
-
     const Gs1RuntimeTileProjection tile {
         payload.x,
         payload.y,
@@ -397,14 +466,50 @@ void Gs1GodotSiteSceneController::apply_site_tile_upsert(const Gs1EngineMessageS
         payload.excavation_depth,
         payload.visible_excavation_depth};
 
-    tile_found->second.color = color_for_tile(tile);
-    write_tile_instance(
-        tile_found->second,
-        payload.x,
-        payload.y,
-        tile.terrain_type_id,
-        tile.visible_excavation_depth,
-        tile.plant_density);
+    TileNodeRecord updated_record {};
+    if (tile_found != tile_nodes_.end())
+    {
+        updated_record = tile_found->second;
+    }
+    updated_record.gameplay_id = tile_id;
+    updated_record.x = payload.x;
+    updated_record.y = payload.y;
+    updated_record.terrain_type_id = payload.terrain_type_id;
+    updated_record.soil_fertility = payload.soil_fertility;
+    updated_record.moisture = payload.moisture;
+    updated_record.soil_salinity = payload.soil_salinity;
+    updated_record.sand_burial = payload.sand_burial;
+    updated_record.plant_density = payload.plant_density;
+    updated_record.visible_excavation_depth = payload.visible_excavation_depth;
+    updated_record.color = color_for_tile(tile);
+    updated_record.last_seen_snapshot_serial = reconcile_full_snapshot_ ? active_snapshot_serial_ : 0U;
+
+    const std::uint32_t next_batch_key = tile_batch_key_for_record(updated_record);
+    if (tile_found != tile_nodes_.end() && tile_found->second.batch_key != next_batch_key)
+    {
+        remove_tile_instance(tile_id);
+        tile_found = tile_nodes_.end();
+    }
+
+    if (tile_found == tile_nodes_.end())
+    {
+        const auto tile_parts = resolve_tile_mesh_parts(next_batch_key);
+        if (tile_parts.empty())
+        {
+            return;
+        }
+
+        InstancedBatch& tile_batch = ensure_batch(tile_batches_, false, next_batch_key, 0U, tile_parts.front());
+        updated_record.batch_key = next_batch_key;
+        updated_record.instance_index = allocate_batch_slot(tile_batch);
+        tile_found = tile_nodes_.emplace(tile_id, updated_record).first;
+    }
+    else
+    {
+        tile_found->second = updated_record;
+    }
+
+    write_tile_instance(tile_found->second, !reconcile_full_snapshot_);
 
     if (reconcile_full_snapshot_)
     {
@@ -421,7 +526,11 @@ void Gs1GodotSiteSceneController::apply_site_worker_update(const Gs1EngineMessag
 
     worker_marker_->set_visible(payload.entity_id != 0U);
     worker_marker_->set_meta("gameplay_entity_id", static_cast<int64_t>(payload.entity_id));
-    worker_marker_->set_position(Vector3(payload.tile_x * tile_size_, k_worker_marker_height, payload.tile_y * tile_size_));
+    worker_marker_->set_position(
+        Vector3(
+            payload.tile_x * tile_size_,
+            terrain_surface_height_at(payload.tile_x, payload.tile_y) + k_worker_marker_height,
+            payload.tile_y * tile_size_));
     if (reconcile_full_snapshot_)
     {
         worker_seen_in_snapshot_ = true;
@@ -548,6 +657,46 @@ void Gs1GodotSiteSceneController::clear_tiles()
     }
     tile_nodes_.clear();
     tile_batches_.clear();
+}
+
+std::uint32_t Gs1GodotSiteSceneController::tile_texture_band(
+    std::uint32_t terrain_type_id,
+    float soil_fertility) const noexcept
+{
+    if (terrain_type_id == k_highway_terrain_type_id)
+    {
+        return k_tile_band_highway;
+    }
+
+    const float normalized_fertility = std::clamp(soil_fertility / 100.0f, 0.0f, 0.9999f);
+    return std::min<std::uint32_t>(
+        static_cast<std::uint32_t>(normalized_fertility * static_cast<float>(k_tile_texture_band_count)),
+        k_tile_texture_band_count - 1U);
+}
+
+std::uint32_t Gs1GodotSiteSceneController::tile_batch_key_for_record(const TileNodeRecord& record) const noexcept
+{
+    return k_tile_batch_key_mask | tile_texture_band(record.terrain_type_id, record.soil_fertility);
+}
+
+std::vector<Gs1GodotSiteSceneController::InstancedMeshPart> Gs1GodotSiteSceneController::resolve_tile_mesh_parts(
+    std::uint32_t batch_key) const
+{
+    std::vector<InstancedMeshPart> parts {};
+    Ref<BoxMesh> mesh;
+    mesh.instantiate();
+    mesh->set_size(Vector3(1.0f, 1.0f, 1.0f));
+
+    const std::uint32_t tile_band = batch_key & 0x0000ffffU;
+    const String texture_path = tile_band == k_tile_band_highway
+        ? String(k_highway_texture_path)
+        : String(k_tile_texture_paths[std::min<std::uint32_t>(tile_band, k_tile_texture_band_count - 1U)]);
+    parts.push_back(InstancedMeshPart {
+        mesh,
+        make_textured_tile_material(texture_path),
+        Transform3D(),
+        0U});
+    return parts;
 }
 
 void Gs1GodotSiteSceneController::upsert_instanced_visual(
@@ -762,10 +911,19 @@ Gs1GodotSiteSceneController::InstancedBatch& Gs1GodotSiteSceneController::ensure
     }
 
     auto* instance_node = memnew(MultiMeshInstance3D);
-    instance_node->set_name(vformat(
-        device_visual ? "DeviceInstancedBatch_%d_%d" : "PlantInstancedBatch_%d_%d",
-        static_cast<int64_t>(type_id),
-        static_cast<int64_t>(part.part_index)));
+    if (is_tile_batch_key(batch_key))
+    {
+        instance_node->set_name(vformat(
+            "TerrainInstancedBatch_%d",
+            static_cast<int64_t>(batch_key & 0x0000ffffU)));
+    }
+    else
+    {
+        instance_node->set_name(vformat(
+            device_visual ? "DeviceInstancedBatch_%d_%d" : "PlantInstancedBatch_%d_%d",
+            static_cast<int64_t>(type_id),
+            static_cast<int64_t>(part.part_index)));
+    }
     instance_node->set_material_override(part.material);
 
     Ref<MultiMesh> multi_mesh;
@@ -778,7 +936,7 @@ Gs1GodotSiteSceneController::InstancedBatch& Gs1GodotSiteSceneController::ensure
     multi_mesh->set_visible_instance_count(0);
     instance_node->set_multimesh(multi_mesh);
 
-    Node3D* parent = batch_key == k_tile_batch_key ? grid_root_ : visual_root_;
+    Node3D* parent = is_tile_batch_key(batch_key) ? grid_root_ : visual_root_;
     if (parent != nullptr)
     {
         parent->add_child(instance_node);
@@ -837,13 +995,54 @@ void Gs1GodotSiteSceneController::refresh_batch_visibility(InstancedBatch& batch
     }
 }
 
+float Gs1GodotSiteSceneController::terrain_surface_height_for_tile(const TileNodeRecord& record) const noexcept
+{
+    const float fertility_height =
+        std::clamp(record.soil_fertility / 100.0f, 0.0f, 1.0f) * k_tile_height_from_fertility;
+    const float burial_lift = std::clamp(record.sand_burial / 100.0f, 0.0f, 1.0f) * 0.18f;
+    const float excavation_cut =
+        std::clamp(static_cast<float>(record.visible_excavation_depth), 0.0f, 3.0f) * k_tile_excavation_depth_step;
+    return std::max(k_tile_height, k_tile_min_height + fertility_height + burial_lift - excavation_cut);
+}
+
+const Gs1GodotSiteSceneController::TileNodeRecord* Gs1GodotSiteSceneController::tile_record_at(
+    std::uint16_t x,
+    std::uint16_t y) const
+{
+    const auto found = tile_nodes_.find(tile_gameplay_id(x, y));
+    return found == tile_nodes_.end() ? nullptr : &found->second;
+}
+
+float Gs1GodotSiteSceneController::terrain_surface_height_at(std::uint16_t x, std::uint16_t y) const noexcept
+{
+    if (const TileNodeRecord* record = tile_record_at(x, y))
+    {
+        return terrain_surface_height_for_tile(*record);
+    }
+    return 0.0f;
+}
+
+float Gs1GodotSiteSceneController::terrain_surface_height_at(float tile_x, float tile_y) const noexcept
+{
+    const float clamped_x = std::max(0.0f, tile_x);
+    const float clamped_y = std::max(0.0f, tile_y);
+    const auto x0 = static_cast<std::uint16_t>(std::floor(clamped_x));
+    const auto y0 = static_cast<std::uint16_t>(std::floor(clamped_y));
+    const auto x1 = static_cast<std::uint16_t>(std::ceil(clamped_x));
+    const auto y1 = static_cast<std::uint16_t>(std::ceil(clamped_y));
+    const float tx = clamped_x - static_cast<float>(x0);
+    const float ty = clamped_y - static_cast<float>(y0);
+
+    const float h00 = terrain_surface_height_at(x0, y0);
+    const float h10 = terrain_surface_height_at(x1, y0);
+    const float h01 = terrain_surface_height_at(x0, y1);
+    const float h11 = terrain_surface_height_at(x1, y1);
+    return lerp_float(lerp_float(h00, h10, tx), lerp_float(h01, h11, tx), ty);
+}
+
 void Gs1GodotSiteSceneController::write_tile_instance(
     const TileNodeRecord& record,
-    std::uint16_t x,
-    std::uint16_t y,
-    std::uint32_t terrain_type_id,
-    std::uint8_t visible_excavation_depth,
-    std::uint8_t plant_density)
+    bool refresh_visual_dependents)
 {
     auto found = tile_batches_.find(record.batch_key);
     if (found == tile_batches_.end() || !found->second.multi_mesh.is_valid())
@@ -851,19 +1050,81 @@ void Gs1GodotSiteSceneController::write_tile_instance(
         return;
     }
 
+    const float terrain_height = terrain_surface_height_for_tile(record);
     found->second.multi_mesh->set_instance_transform(
         static_cast<int32_t>(record.instance_index),
-        Transform3D(Basis(), Vector3(x * tile_size_, k_tile_y_offset, y * tile_size_)));
+        make_transform(
+            Vector3(
+                record.x * tile_size_,
+                terrain_height * 0.5f,
+                record.y * tile_size_),
+            Vector3(tile_size_, terrain_height, tile_size_),
+            0.0f));
     found->second.multi_mesh->set_instance_color(
         static_cast<int32_t>(record.instance_index),
         record.color);
     found->second.multi_mesh->set_instance_custom_data(
         static_cast<int32_t>(record.instance_index),
         Color(
-            static_cast<float>(terrain_type_id),
-            static_cast<float>(visible_excavation_depth),
-            static_cast<float>(plant_density) / 255.0f,
-            1.0f));
+            static_cast<float>(tile_texture_band(record.terrain_type_id, record.soil_fertility)),
+            std::clamp(record.soil_fertility / 100.0f, 0.0f, 1.0f),
+            std::clamp(record.moisture / 100.0f, 0.0f, 1.0f),
+            std::clamp(record.soil_salinity / 100.0f, 0.0f, 1.0f)));
+
+    if (refresh_visual_dependents)
+    {
+        refresh_all_visual_transforms();
+        refresh_worker_transform();
+    }
+}
+
+void Gs1GodotSiteSceneController::refresh_all_visual_transforms()
+{
+    for (const auto& [_, record] : plant_visuals_)
+    {
+        set_visual_instance_transforms(record, false, 0U, record.instance_count);
+    }
+    for (const auto& [_, record] : device_visuals_)
+    {
+        set_visual_instance_transforms(record, true, 0U, record.instance_count);
+    }
+}
+
+void Gs1GodotSiteSceneController::refresh_worker_transform()
+{
+    if (worker_marker_ == nullptr || !worker_marker_->is_visible())
+    {
+        return;
+    }
+
+    const Vector3 position = worker_marker_->get_position();
+    worker_marker_->set_position(Vector3(
+        position.x,
+        terrain_surface_height_at(position.x / tile_size_, position.z / tile_size_) + k_worker_marker_height,
+        position.z));
+}
+
+void Gs1GodotSiteSceneController::refresh_camera_frame()
+{
+    if (bootstrap_camera_ == nullptr)
+    {
+        bootstrap_camera_ = Object::cast_to<Camera3D>(get_node_or_null("BootstrapCamera"));
+    }
+    if (bootstrap_camera_ == nullptr)
+    {
+        return;
+    }
+
+    bootstrap_camera_->set_current(true);
+    const float width = last_width_ > 0 ? static_cast<float>(last_width_) : 18.0f;
+    const float height = last_height_ > 0 ? static_cast<float>(last_height_) : 18.0f;
+    const float max_span = std::max(width, height);
+    const Vector3 target((width - 1.0f) * 0.5f, 0.45f, (height - 1.0f) * 0.5f);
+    bootstrap_camera_->set_position(Vector3(
+        target.x + (max_span * 0.22f),
+        std::max(11.0f, max_span * 0.78f),
+        target.z + (max_span * 0.78f)));
+    bootstrap_camera_->look_at(target, Vector3(0.0f, 1.0f, 0.0f));
 }
 
 void Gs1GodotSiteSceneController::set_visual_instance_transforms(
@@ -928,9 +1189,12 @@ Transform3D Gs1GodotSiteSceneController::visual_instance_transform(
     const float size_z = std::max(1.0f, static_cast<float>(footprint_height));
     const float size_y = std::clamp(height_scale, device_visual ? 0.2f : 0.12f, device_visual ? 2.4f : 2.0f);
     const float y_offset = device_visual ? k_device_y_offset : k_plant_y_offset;
+    const float ground_height = terrain_surface_height_at(
+        anchor_tile_x + ((size_x - 1.0f) * 0.5f),
+        anchor_tile_y + ((size_z - 1.0f) * 0.5f));
     const Vector3 tile_center(
         (anchor_tile_x + (size_x * 0.5f) - 0.5f) * tile_size_,
-        y_offset * size_y,
+        ground_height + (y_offset * size_y),
         (anchor_tile_y + (size_z * 0.5f) - 0.5f) * tile_size_);
 
     if (device_visual)
@@ -1067,7 +1331,7 @@ void Gs1GodotSiteSceneController::remove_visual_instance_range(
 
 std::uint32_t Gs1GodotSiteSceneController::visual_batch_key(bool device_visual, std::uint32_t type_id, std::uint32_t part_index) const noexcept
 {
-    std::uint32_t hash = device_visual ? 0x80000000U : 0x40000000U;
+    std::uint32_t hash = device_visual ? k_device_batch_key_mask : k_plant_batch_key_mask;
     hash = combine_u32_hash(hash, type_id);
     hash = combine_u32_hash(hash, part_index);
     return hash;

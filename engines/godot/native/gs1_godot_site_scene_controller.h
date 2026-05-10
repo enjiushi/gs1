@@ -65,6 +65,15 @@ private:
         std::uint64_t gameplay_id {0};
         std::uint32_t batch_key {0};
         std::uint32_t instance_index {0};
+        std::uint16_t x {0};
+        std::uint16_t y {0};
+        std::uint32_t terrain_type_id {0};
+        float soil_fertility {0.0f};
+        float moisture {0.0f};
+        float soil_salinity {0.0f};
+        float sand_burial {0.0f};
+        float plant_density {0.0f};
+        std::uint8_t visible_excavation_depth {0};
         godot::Color color {};
         std::uint64_t last_seen_snapshot_serial {0};
     };
@@ -134,11 +143,7 @@ private:
     void remove_tile_instance(std::uint64_t tile_id);
     void write_tile_instance(
         const TileNodeRecord& record,
-        std::uint16_t x,
-        std::uint16_t y,
-        std::uint32_t terrain_type_id,
-        std::uint8_t visible_excavation_depth,
-        std::uint8_t plant_density);
+        bool refresh_visual_dependents);
     void set_visual_instance_transforms(
         const VisualNodeRecord& record,
         bool device_visual,
@@ -160,11 +165,22 @@ private:
         std::unordered_map<std::uint64_t, VisualNodeRecord>& registry,
         std::uint32_t batch_key,
         std::uint32_t slot);
+    [[nodiscard]] std::uint32_t tile_batch_key_for_record(const TileNodeRecord& record) const noexcept;
+    [[nodiscard]] std::uint32_t tile_texture_band(std::uint32_t terrain_type_id, float soil_fertility) const noexcept;
+    [[nodiscard]] std::vector<InstancedMeshPart> resolve_tile_mesh_parts(std::uint32_t batch_key) const;
+    [[nodiscard]] float terrain_surface_height_for_tile(const TileNodeRecord& record) const noexcept;
+    [[nodiscard]] float terrain_surface_height_at(std::uint16_t x, std::uint16_t y) const noexcept;
+    [[nodiscard]] float terrain_surface_height_at(float tile_x, float tile_y) const noexcept;
+    [[nodiscard]] const TileNodeRecord* tile_record_at(std::uint16_t x, std::uint16_t y) const;
+    void refresh_all_visual_transforms();
+    void refresh_worker_transform();
+    void refresh_camera_frame();
 
 private:
     godot::Node3D* grid_root_ {nullptr};
     godot::Node3D* visual_root_ {nullptr};
-    godot::MeshInstance3D* worker_marker_ {nullptr};
+    godot::Node3D* worker_marker_ {nullptr};
+    godot::Camera3D* bootstrap_camera_ {nullptr};
     Gs1GodotAdapterService* adapter_service_ {nullptr};
     std::unordered_map<std::uint64_t, TileNodeRecord> tile_nodes_ {};
     std::unordered_map<std::uint64_t, VisualNodeRecord> plant_visuals_ {};

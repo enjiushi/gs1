@@ -161,6 +161,49 @@ void prototype_site_run_loads_cash_target_survival_objective_for_site_four(
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.counters.objective_progress_normalized, 20.0f / 45.0f, 0.001f));
 }
 
+void prototype_site_run_seeds_deterministic_coherent_tile_fertility(
+    gs1::testing::SystemTestExecutionContext& context)
+{
+    auto campaign = make_campaign();
+    const auto first_site_run = make_prototype_site_run(campaign, 1U);
+    const auto second_site_run = make_prototype_site_run(campaign, 1U);
+
+    GS1_SYSTEM_TEST_REQUIRE(context, first_site_run.site_world != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(context, second_site_run.site_world != nullptr);
+
+    const float origin_fertility = first_site_run.site_world->tile_at(TileCoord {0, 0}).ecology.soil_fertility;
+    const float nearby_fertility = first_site_run.site_world->tile_at(TileCoord {1, 0}).ecology.soil_fertility;
+    const float mid_fertility = first_site_run.site_world->tile_at(TileCoord {12, 15}).ecology.soil_fertility;
+    const float edge_fertility = first_site_run.site_world->tile_at(TileCoord {31, 31}).ecology.soil_fertility;
+
+    for (const float fertility : {origin_fertility, nearby_fertility, mid_fertility, edge_fertility})
+    {
+        GS1_SYSTEM_TEST_CHECK(context, fertility >= 0.0f);
+        GS1_SYSTEM_TEST_CHECK(context, fertility <= 100.0f);
+    }
+
+    GS1_SYSTEM_TEST_CHECK(context, !approx_equal(origin_fertility, mid_fertility));
+    GS1_SYSTEM_TEST_CHECK(context, !approx_equal(mid_fertility, edge_fertility));
+    GS1_SYSTEM_TEST_CHECK(context, std::fabs(origin_fertility - nearby_fertility) < 20.0f);
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        std::fabs(
+            mid_fertility -
+            first_site_run.site_world->tile_at(TileCoord {13, 15}).ecology.soil_fertility) < 20.0f);
+
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            origin_fertility,
+            second_site_run.site_world->tile_at(TileCoord {0, 0}).ecology.soil_fertility));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        approx_equal(
+            mid_fertility,
+            second_site_run.site_world->tile_at(TileCoord {12, 15}).ecology.soil_fertility));
+    GS1_SYSTEM_TEST_CHECK(context, mid_fertility >= 55.0f);
+}
+
 void weather_event_site_run_started_applies_site_one_background_conditions(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -1926,6 +1969,10 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "site_run_factory",
     "prototype_site_run_loads_cash_target_survival_objective_for_site_four",
     prototype_site_run_loads_cash_target_survival_objective_for_site_four);
+GS1_REGISTER_SOURCE_SYSTEM_TEST(
+    "site_run_factory",
+    "prototype_site_run_seeds_deterministic_coherent_tile_fertility",
+    prototype_site_run_seeds_deterministic_coherent_tile_fertility);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "weather_event",
     "site_run_started_applies_site_one_background_conditions",
