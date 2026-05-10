@@ -242,6 +242,7 @@ void Gs1GodotRegionalTechTreePanelController::_ready()
     {
         cache_ui_references(*owner);
     }
+    prewarm_resource_caches();
 }
 
 void Gs1GodotRegionalTechTreePanelController::_exit_tree()
@@ -680,6 +681,19 @@ void Gs1GodotRegionalTechTreePanelController::rebuild_tech_tree_cards()
     }
 
     reconcile_tech_tree_cards(ladder_specs);
+}
+
+void Gs1GodotRegionalTechTreePanelController::prewarm_resource_caches()
+{
+    for (const auto& node_def : gs1::all_technology_node_defs())
+    {
+        technology_ui_for(node_def.tech_node_id.value);
+    }
+
+    for (const auto& unlock_def : gs1::all_reputation_unlock_defs())
+    {
+        unlockable_ui_for(unlock_def.unlock_id);
+    }
 }
 
 void Gs1GodotRegionalTechTreePanelController::handle_action_pressed(std::int64_t button_key)

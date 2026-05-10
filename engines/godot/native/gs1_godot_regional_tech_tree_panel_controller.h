@@ -98,6 +98,7 @@ private:
     void apply_overlay_layout();
     void apply_progression_view_visibility();
     void rebuild_tech_tree_cards();
+    void prewarm_resource_caches();
     void reconcile_tech_tree_cards(const godot::Array& card_specs);
     [[nodiscard]] godot::String tech_tooltip_text(const godot::Dictionary& spec) const;
     [[nodiscard]] godot::String unlockable_tooltip_text(const godot::Dictionary& spec) const;
