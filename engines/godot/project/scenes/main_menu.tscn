@@ -3,25 +3,6 @@
 [ext_resource type="Theme" uid="uid://dolja7d2yu1v7" path="res://assets/desert_shell_theme.tres" id="2_theme"]
 [ext_resource type="PackedScene" uid="uid://bkd61semyccuw" path="res://scenes/main_menu_backdrop.tscn" id="4_backdrop"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_menu_shell"]
-content_margin_left = 8.0
-content_margin_top = 10.0
-content_margin_right = 8.0
-content_margin_bottom = 10.0
-bg_color = Color(0.2, 0.137255, 0.0627451, 0.18)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.968627, 0.862745, 0.639216, 0.18)
-corner_radius_top_left = 26
-corner_radius_top_right = 26
-corner_radius_bottom_right = 26
-corner_radius_bottom_left = 26
-shadow_color = Color(0.0784314, 0.0509804, 0.0196078, 0.26)
-shadow_size = 16
-anti_aliasing_size = 2.0
-
 [node name="MainMenu" type="Gs1GodotMainMenuUiController" unique_id=1957236222]
 anchors_preset = 15
 anchor_right = 1.0
@@ -72,10 +53,13 @@ layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 20
 
-[node name="MenuPanel" type="PanelContainer" parent="HudMargin/RootVBox/MenuWrap" unique_id=822259590]
+[node name="MenuPanel" type="MarginContainer" parent="HudMargin/RootVBox/MenuWrap" unique_id=822259590]
 custom_minimum_size = Vector2(432, 0)
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_menu_shell")
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 10
 
 [node name="MenuVBox" type="VBoxContainer" parent="HudMargin/RootVBox/MenuWrap/MenuPanel" unique_id=1992766354]
 layout_mode = 2
