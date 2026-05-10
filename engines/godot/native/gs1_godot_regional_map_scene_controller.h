@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gs1_godot_adapter_service.h"
+#include "gs1_godot_regional_map_click_policy.h"
 #include "gs1_godot_projection_types.h"
 
 #include <godot_cpp/classes/control.hpp>
@@ -97,7 +98,7 @@ private:
     void clear_dynamic_children(godot::Node* container, const godot::String& prefix = godot::String("Dynamic"));
     void prune_regional_site_registry(const std::unordered_set<int>& desired_site_ids);
     [[nodiscard]] bool regional_map_ui_contains_screen_point(const godot::Vector2& screen_position) const;
-    [[nodiscard]] bool try_select_regional_site_from_screen(const godot::Vector2& screen_position);
+    [[nodiscard]] Gs1GodotRegionalMapPickOutcome try_select_regional_site_from_screen(const godot::Vector2& screen_position);
 
 private:
     static constexpr std::int64_t UI_ACTION_SELECT_DEPLOYMENT_SITE = 2;

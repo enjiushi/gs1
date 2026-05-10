@@ -1,6 +1,7 @@
 #include "gs1_godot_regional_summary_panel_controller.h"
 
 #include "gs1_godot_controller_context.h"
+#include "gs1_godot_regional_site_selection_policy.h"
 
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
@@ -277,14 +278,15 @@ void Gs1GodotRegionalSummaryPanelController::apply_summary_text()
 {
     const auto& sites = sites_;
     const auto& links = links_;
-    const int selected_site_id = selected_site_id_.has_value()
-        ? static_cast<int>(selected_site_id_.value())
-        : (sites.empty() ? 0 : static_cast<int>(sites.front().site_id));
+    const auto* selected_site = gs1_godot_find_explicitly_selected_regional_site(sites, selected_site_id_);
 
     PackedStringArray lines;
     lines.push_back("[b]Campaign Planning Map[/b]");
     lines.push_back(vformat("Prototype Sites: %d  Adjacency Links: %d", static_cast<int>(sites.size()), static_cast<int>(links.size())));
-    lines.push_back(selected_site_id != 0 ? vformat("Selected Site: Site %d", selected_site_id) : String("Selected Site: None"));
+    lines.push_back(
+        selected_site != nullptr
+            ? vformat("Selected Site: Site %d", static_cast<int>(selected_site->site_id))
+            : String("Selected Site: None"));
     if (campaign_resources_.has_value())
     {
         lines.push_back(vformat("Campaign Cash: %.2f", campaign_resources_->current_money));

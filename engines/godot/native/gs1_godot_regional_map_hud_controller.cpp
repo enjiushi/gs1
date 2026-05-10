@@ -1,6 +1,7 @@
 #include "gs1_godot_regional_map_hud_controller.h"
 
 #include "gs1_godot_controller_context.h"
+#include "gs1_godot_regional_site_selection_policy.h"
 
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/object.hpp>
@@ -477,20 +478,5 @@ Gs1UiAction Gs1GodotRegionalMapHudController::tech_button_action() const
 
 const Gs1RuntimeRegionalMapSiteProjection* Gs1GodotRegionalMapHudController::selected_site() const
 {
-    if (sites_.empty())
-    {
-        return nullptr;
-    }
-
-    const std::uint32_t selected_site_id = selected_site_id_.has_value()
-        ? selected_site_id_.value()
-        : sites_.front().site_id;
-    for (const auto& site : sites_)
-    {
-        if (site.site_id == selected_site_id)
-        {
-            return &site;
-        }
-    }
-    return &sites_.front();
+    return gs1_godot_find_explicitly_selected_regional_site(sites_, selected_site_id_);
 }

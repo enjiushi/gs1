@@ -145,11 +145,13 @@ void Gs1GodotRegionalMapSceneController::_unhandled_input(const Ref<InputEvent>&
 
     const Vector2 screen_position = mouse_event->get_position();
     const bool ui_contains_screen_point = regional_map_ui_contains_screen_point(screen_position);
-    const bool picked_site = !ui_contains_screen_point && try_select_regional_site_from_screen(screen_position);
+    const Gs1GodotRegionalMapPickOutcome pick_outcome = !ui_contains_screen_point
+        ? try_select_regional_site_from_screen(screen_position)
+        : GS1_GODOT_REGIONAL_MAP_PICK_NONE;
     const Gs1GodotRegionalMapInputOutcome input_outcome = gs1_godot_resolve_regional_map_input(
         left_mouse_pressed,
         ui_contains_screen_point,
-        picked_site,
+        pick_outcome,
         selected_site_id_.has_value());
 
     if (input_outcome == GS1_GODOT_REGIONAL_MAP_INPUT_IGNORE)
@@ -165,6 +167,7 @@ void Gs1GodotRegionalMapSceneController::_unhandled_input(const Ref<InputEvent>&
     if (input_outcome == GS1_GODOT_REGIONAL_MAP_INPUT_SITE_PICKED ||
         input_outcome == GS1_GODOT_REGIONAL_MAP_INPUT_CLEAR_SELECTION ||
         input_outcome == GS1_GODOT_REGIONAL_MAP_INPUT_CONSUME_BLANK ||
+        input_outcome == GS1_GODOT_REGIONAL_MAP_INPUT_CONSUME_UNSELECTABLE_SITE ||
         input_outcome == GS1_GODOT_REGIONAL_MAP_INPUT_CONSUME_UI)
     {
         if (Viewport* viewport = get_viewport())
@@ -768,28 +771,28 @@ bool Gs1GodotRegionalMapSceneController::regional_map_ui_contains_screen_point(c
         contains_screen_point(regional_tech_tree_overlay_);
 }
 
-bool Gs1GodotRegionalMapSceneController::try_select_regional_site_from_screen(const Vector2& screen_position)
+Gs1GodotRegionalMapPickOutcome Gs1GodotRegionalMapSceneController::try_select_regional_site_from_screen(const Vector2& screen_position)
 {
     if (regional_map_world_ == nullptr || !regional_map_world_->is_visible() || regional_camera_ == nullptr)
     {
-        return false;
+        return GS1_GODOT_REGIONAL_MAP_PICK_NONE;
     }
     if (regional_map_panel_ == nullptr || !regional_map_panel_->is_visible())
     {
-        return false;
+        return GS1_GODOT_REGIONAL_MAP_PICK_NONE;
     }
 
     const Vector3 origin = regional_camera_->project_ray_origin(screen_position);
     const Vector3 normal = regional_camera_->project_ray_normal(screen_position);
     if (Math::abs(normal.y) < 0.0001)
     {
-        return false;
+        return GS1_GODOT_REGIONAL_MAP_PICK_NONE;
     }
 
     const double ground_distance = -origin.y / normal.y;
     if (ground_distance <= 0.0 || ground_distance > REGIONAL_PICK_DISTANCE)
     {
-        return false;
+        return GS1_GODOT_REGIONAL_MAP_PICK_NONE;
     }
 
     const Vector3 hit_position = origin + normal * ground_distance;
@@ -815,10 +818,20 @@ bool Gs1GodotRegionalMapSceneController::try_select_regional_site_from_screen(co
 
     if (nearest_site_id == 0)
     {
-        return false;
+        return GS1_GODOT_REGIONAL_MAP_PICK_NONE;
+    }
+
+    const auto site_it = regional_site_data_.find(nearest_site_id);
+    if (site_it == regional_site_data_.end())
+    {
+        return GS1_GODOT_REGIONAL_MAP_PICK_NONE;
+    }
+    if (!gs1_godot_regional_map_site_is_selectable(site_it->second.site_state))
+    {
+        return GS1_GODOT_REGIONAL_MAP_PICK_UNSELECTABLE_SITE;
     }
 
     select_regional_site(nearest_site_id);
-    return true;
+    return GS1_GODOT_REGIONAL_MAP_PICK_SELECTABLE_SITE;
 }
 

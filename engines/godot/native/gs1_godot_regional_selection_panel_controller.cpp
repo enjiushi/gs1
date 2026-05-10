@@ -2,6 +2,7 @@
 
 #include "godot_progression_resources.h"
 #include "gs1_godot_controller_context.h"
+#include "gs1_godot_regional_site_selection_policy.h"
 #include "content/defs/faction_defs.h"
 #include "content/defs/item_defs.h"
 
@@ -734,22 +735,13 @@ void Gs1GodotRegionalSelectionPanelController::handle_runtime_message_reset()
 
 const Gs1RuntimeRegionalMapSiteProjection* Gs1GodotRegionalSelectionPanelController::resolve_selected_site()
 {
-    const Gs1RuntimeRegionalMapSiteProjection* selected_site = nullptr;
-    for (const auto& site : sites_)
+    const auto* selected_site = gs1_godot_find_explicitly_selected_regional_site(
+        sites_,
+        selected_site_id_ != 0 ? std::optional<std::uint32_t> {static_cast<std::uint32_t>(selected_site_id_)} : std::nullopt);
+    if (selected_site == nullptr)
     {
-        if (static_cast<int>(site.site_id) == selected_site_id_)
-        {
-            selected_site = &site;
-            break;
-        }
+        selected_site_id_ = 0;
     }
-
-    if (selected_site == nullptr && !sites_.empty())
-    {
-        selected_site = &sites_.front();
-        selected_site_id_ = static_cast<int>(selected_site->site_id);
-    }
-
     return selected_site;
 }
 
