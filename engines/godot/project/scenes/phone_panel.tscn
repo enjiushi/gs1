@@ -1,0 +1,55 @@
+[gd_scene format=3]
+
+[node name="PhonePanel" type="PanelContainer"]
+visible = false
+layout_mode = 2
+
+[node name="PhoneVBox" type="VBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PhoneStateLabel" type="Label" parent="PhoneVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.878431, 0.686275, 0.380392, 1)
+text = "Field Phone"
+
+[node name="PhoneTabs" type="HBoxContainer" parent="PhoneVBox"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="OpenPhoneHomeButton" type="Button" parent="PhoneVBox/PhoneTabs"]
+layout_mode = 2
+text = "Feed"
+
+[node name="OpenPhoneTasksButton" type="Button" parent="PhoneVBox/PhoneTabs"]
+layout_mode = 2
+text = "Tasks"
+
+[node name="OpenPhoneBuyButton" type="Button" parent="PhoneVBox/PhoneTabs"]
+layout_mode = 2
+text = "Procure"
+
+[node name="OpenPhoneSellButton" type="Button" parent="PhoneVBox/PhoneTabs"]
+layout_mode = 2
+text = "Sell"
+
+[node name="OpenPhoneHireButton" type="Button" parent="PhoneVBox/PhoneTabs"]
+layout_mode = 2
+text = "Hire"
+
+[node name="OpenPhoneCartButton" type="Button" parent="PhoneVBox/PhoneTabs"]
+layout_mode = 2
+text = "Cart"
+
+[node name="ClosePhoneButton" type="Button" parent="PhoneVBox/PhoneTabs"]
+layout_mode = 2
+text = "Close"
+
+[node name="PhoneListingsScroll" type="ScrollContainer" parent="PhoneVBox"]
+custom_minimum_size = Vector2(0, 190)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="PhoneListings" type="VBoxContainer" parent="PhoneVBox/PhoneListingsScroll"]
+layout_mode = 2
+theme_override_constants/separation = 8

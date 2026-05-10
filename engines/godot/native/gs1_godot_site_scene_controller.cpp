@@ -264,15 +264,22 @@ void Gs1GodotSiteSceneController::ensure_presenter_created()
         }
     }
 
-    if (bootstrap_camera_ == nullptr)
     {
         bootstrap_camera_ = Object::cast_to<Camera3D>(get_node_or_null("BootstrapCamera"));
-        if (bootstrap_camera_ == nullptr)
-        {
-            bootstrap_camera_ = memnew(Camera3D);
-            bootstrap_camera_->set_name("BootstrapCamera");
-            add_child(bootstrap_camera_);
-        }
+    }
+    if (bootstrap_camera_ == nullptr)
+    {
+        auto* camera = memnew(Camera3D);
+        camera->set_name("BootstrapCamera");
+        camera->set_position(Vector3(6.0, 12.0, 10.0));
+        camera->set_rotation_degrees(Vector3(-50.0, 30.0, 0.0));
+        camera->set_current(true);
+        add_child(camera);
+        bootstrap_camera_ = camera;
+    }
+    else
+    {
+        bootstrap_camera_->set_current(true);
     }
     bootstrap_camera_->set_current(true);
 
@@ -1116,6 +1123,12 @@ void Gs1GodotSiteSceneController::refresh_camera_frame()
     }
 
     bootstrap_camera_->set_current(true);
+    if (last_width_ > 0 && last_height_ > 0)
+    {
+        position_bootstrap_camera();
+        return;
+    }
+
     const float width = last_width_ > 0 ? static_cast<float>(last_width_) : 18.0f;
     const float height = last_height_ > 0 ? static_cast<float>(last_height_) : 18.0f;
     const float max_span = std::max(width, height);
@@ -1125,6 +1138,26 @@ void Gs1GodotSiteSceneController::refresh_camera_frame()
         std::max(11.0f, max_span * 0.78f),
         target.z + (max_span * 0.78f)));
     bootstrap_camera_->look_at(target, Vector3(0.0f, 1.0f, 0.0f));
+}
+
+void Gs1GodotSiteSceneController::position_bootstrap_camera()
+{
+    if (bootstrap_camera_ == nullptr || last_width_ <= 0 || last_height_ <= 0)
+    {
+        return;
+    }
+
+    const float width = static_cast<float>(std::max(last_width_, 1));
+    const float height = static_cast<float>(std::max(last_height_, 1));
+    const float longest_side = std::max(width, height) * tile_size_;
+    const Vector3 center(
+        ((width - 1.0f) * 0.5f) * tile_size_,
+        0.0f,
+        ((height - 1.0f) * 0.5f) * tile_size_);
+
+    bootstrap_camera_->set_position(center + Vector3(0.0f, 10.0f + (longest_side * 0.72f), 7.5f + (longest_side * 0.58f)));
+    bootstrap_camera_->look_at(center + Vector3(0.0f, 0.6f, 0.0f), Vector3(0.0f, 1.0f, 0.0f));
+    bootstrap_camera_->set_current(true);
 }
 
 void Gs1GodotSiteSceneController::set_visual_instance_transforms(

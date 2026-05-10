@@ -98,6 +98,7 @@ private:
     };
 
     void ensure_presenter_created();
+    void position_bootstrap_camera();
     void cache_adapter_service();
 
     void apply_site_snapshot_begin(const Gs1EngineMessageSiteSnapshotData& payload);

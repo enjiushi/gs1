@@ -1,0 +1,16 @@
+[gd_scene format=3]
+
+[node name="WorkerPackPanel" type="PanelContainer"]
+layout_mode = 2
+
+[node name="WorkerPackVBox" type="VBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="WorkerPackTitle" type="Label" parent="WorkerPackVBox"]
+layout_mode = 2
+text = "Worker Pack"
+
+[node name="WorkerPackSlots" type="GridContainer" parent="WorkerPackVBox"]
+layout_mode = 2
+columns = 4
