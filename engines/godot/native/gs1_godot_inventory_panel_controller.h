@@ -91,8 +91,10 @@ private:
     godot::Control* owner_control_ {nullptr};
     Gs1GodotAdapterService* adapter_service_ {nullptr};
     godot::Label* inventory_title_ {nullptr};
+    godot::Control* worker_pack_panel_ {nullptr};
     godot::Label* worker_pack_title_ {nullptr};
     godot::GridContainer* worker_pack_slots_grid_ {nullptr};
+    godot::Control* opened_storage_panel_ {nullptr};
     godot::Label* opened_storage_title_ {nullptr};
     godot::GridContainer* opened_storage_slots_grid_ {nullptr};
     std::vector<Gs1RuntimeInventoryStorageProjection> inventory_storages_ {};

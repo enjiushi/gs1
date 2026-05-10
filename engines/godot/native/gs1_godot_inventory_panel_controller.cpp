@@ -96,6 +96,10 @@ void Gs1GodotInventoryPanelController::cache_ui_references(Control& owner)
     {
         inventory_title_ = Object::cast_to<Label>(owner.find_child("InventoryTitle", true, false));
     }
+    if (worker_pack_panel_ == nullptr)
+    {
+        worker_pack_panel_ = Object::cast_to<Control>(owner.find_child("WorkerPackPanel", true, false));
+    }
     if (worker_pack_title_ == nullptr)
     {
         worker_pack_title_ = Object::cast_to<Label>(owner.find_child("WorkerPackTitle", true, false));
@@ -103,6 +107,10 @@ void Gs1GodotInventoryPanelController::cache_ui_references(Control& owner)
     if (worker_pack_slots_grid_ == nullptr)
     {
         worker_pack_slots_grid_ = Object::cast_to<GridContainer>(owner.find_child("WorkerPackSlots", true, false));
+    }
+    if (opened_storage_panel_ == nullptr)
+    {
+        opened_storage_panel_ = Object::cast_to<Control>(owner.find_child("OpenedStoragePanel", true, false));
     }
     if (opened_storage_title_ == nullptr)
     {
@@ -327,6 +335,10 @@ void Gs1GodotInventoryPanelController::rebuild_panel_contents()
     {
         worker_pack_title_->set_text(container_title_for(worker_pack_storage));
     }
+    if (worker_pack_panel_ != nullptr)
+    {
+        worker_pack_panel_->set_visible(true);
+    }
     reconcile_slot_grid(
         worker_pack_slots_grid_,
         worker_pack_slot_buttons_,
@@ -338,6 +350,10 @@ void Gs1GodotInventoryPanelController::rebuild_panel_contents()
     if (opened_storage_.has_value())
     {
         const auto* storage = find_storage(opened_storage_->storage_id);
+        if (opened_storage_panel_ != nullptr)
+        {
+            opened_storage_panel_->set_visible(true);
+        }
         if (opened_storage_title_ != nullptr)
         {
             opened_storage_title_->set_visible(true);
@@ -357,6 +373,10 @@ void Gs1GodotInventoryPanelController::rebuild_panel_contents()
     }
     else
     {
+        if (opened_storage_panel_ != nullptr)
+        {
+            opened_storage_panel_->set_visible(false);
+        }
         if (opened_storage_title_ != nullptr)
         {
             opened_storage_title_->set_visible(false);
