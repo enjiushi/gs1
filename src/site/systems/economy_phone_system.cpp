@@ -3,6 +3,7 @@
 #include "content/defs/item_defs.h"
 #include "content/defs/task_defs.h"
 #include "content/prototype_content.h"
+#include "runtime/game_runtime.h"
 #include "site/craft_logic.h"
 #include "site/inventory_storage.h"
 #include "site/site_projection_update_flags.h"
@@ -1253,4 +1254,8 @@ void EconomyPhoneSystem::run(SiteSystemContext<EconomyPhoneSystem>& context)
 {
     refresh_dynamic_sell_listings(context);
 }
+GS1_IMPLEMENT_RUNTIME_SITE_HOST_AND_MESSAGE_SYSTEM(
+    EconomyPhoneSystem,
+    GS1_RUNTIME_PROFILE_SYSTEM_ECONOMY_PHONE,
+    17U)
 }  // namespace gs1

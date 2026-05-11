@@ -4,6 +4,7 @@
 #include "content/defs/gameplay_tuning_defs.h"
 #include "content/defs/plant_defs.h"
 #include "content/prototype_content.h"
+#include "runtime/game_runtime.h"
 #include "runtime/runtime_clock.h"
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
@@ -1662,6 +1663,10 @@ void EcologySystem::run(SiteSystemContext<EcologySystem>& context)
         any_tracked_plant_withering);
     update_restoration_progress(context, fully_grown_count);
 }
+GS1_IMPLEMENT_RUNTIME_SITE_MESSAGE_SYSTEM(
+    EcologySystem,
+    GS1_RUNTIME_PROFILE_SYSTEM_ECOLOGY,
+    13U)
 }  // namespace gs1
 
 #ifdef _MSC_VER

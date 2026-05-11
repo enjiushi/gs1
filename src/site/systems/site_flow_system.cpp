@@ -1,5 +1,6 @@
 #include "site/systems/site_flow_system.h"
 
+#include "runtime/game_runtime.h"
 #include "site/defs/site_action_defs.h"
 #include "site/site_projection_update_flags.h"
 
@@ -209,4 +210,8 @@ void SiteFlowSystem::run(SiteSystemContext<SiteFlowSystem>& context)
     context.world.write_worker(worker);
     context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WORKER);
 }
+GS1_IMPLEMENT_RUNTIME_SITE_HOST_ONLY_RUN_SYSTEM(
+    SiteFlowSystem,
+    GS1_RUNTIME_PROFILE_SYSTEM_SITE_FLOW,
+    2U)
 }  // namespace gs1

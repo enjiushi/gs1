@@ -1,6 +1,7 @@
 #include "site/systems/device_maintenance_system.h"
 
 #include "content/defs/structure_defs.h"
+#include "runtime/game_runtime.h"
 #include "site/site_run_state.h"
 #include "site/site_world_components.h"
 #include "site/tile_footprint.h"
@@ -297,6 +298,10 @@ void DeviceMaintenanceSystem::run(SiteSystemContext<DeviceMaintenanceSystem>& co
         }
     }
 }
+GS1_IMPLEMENT_RUNTIME_SITE_MESSAGE_SYSTEM(
+    DeviceMaintenanceSystem,
+    GS1_RUNTIME_PROFILE_SYSTEM_DEVICE_MAINTENANCE,
+    11U)
 }  // namespace gs1
 
 #ifdef _MSC_VER

@@ -1,6 +1,7 @@
 #include "site/systems/device_weather_contribution_system.h"
 
 #include "content/defs/structure_defs.h"
+#include "runtime/game_runtime.h"
 #include "site/site_world_components.h"
 #include "site/tile_footprint.h"
 #include "site/weather_contribution_logic.h"
@@ -337,6 +338,10 @@ void DeviceWeatherContributionSystem::run(SiteSystemContext<DeviceWeatherContrib
 
     clear_dirty_tiles(runtime);
 }
+GS1_IMPLEMENT_RUNTIME_SITE_MESSAGE_SYSTEM(
+    DeviceWeatherContributionSystem,
+    GS1_RUNTIME_PROFILE_SYSTEM_LOCAL_WEATHER_RESOLVE,
+    7U)
 }  // namespace gs1
 
 #ifdef _MSC_VER

@@ -4,6 +4,7 @@
 #include "app/site_run_factory.h"
 #include "campaign/campaign_state.h"
 #include "content/prototype_content.h"
+#include "runtime/game_runtime.h"
 
 namespace gs1
 {
@@ -431,4 +432,5 @@ Gs1Status CampaignFlowSystem::process_message(
     }
 }
 
+GS1_IMPLEMENT_RUNTIME_CAMPAIGN_FLOW_SYSTEM(CampaignFlowSystem)
 }  // namespace gs1

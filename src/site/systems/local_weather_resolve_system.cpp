@@ -1,5 +1,6 @@
 #include "site/systems/local_weather_resolve_system.h"
 
+#include "runtime/game_runtime.h"
 #include "site/site_run_state.h"
 #include "site/site_world_components.h"
 #include "site/weather_contribution_logic.h"
@@ -324,6 +325,10 @@ void LocalWeatherResolveSystem::run(SiteSystemContext<LocalWeatherResolveSystem>
             runtime.last_total_weather_contributions[index] = total_contribution;
         });
 }
+GS1_IMPLEMENT_RUNTIME_SITE_MESSAGE_SYSTEM(
+    LocalWeatherResolveSystem,
+    GS1_RUNTIME_PROFILE_SYSTEM_LOCAL_WEATHER_RESOLVE,
+    8U)
 }  // namespace gs1
 
 #ifdef _MSC_VER

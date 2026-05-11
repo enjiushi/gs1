@@ -2,6 +2,7 @@
 
 #include "content/defs/task_defs.h"
 #include "content/prototype_content.h"
+#include "runtime/game_runtime.h"
 #include "runtime/runtime_clock.h"
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
@@ -538,4 +539,8 @@ void WeatherEventSystem::run(SiteSystemContext<WeatherEventSystem>& context)
         std::clamp(baseline_weather.dust + event.event_dust_pressure, 0.0f, k_weather_meter_max),
         resolve_event_wind_direction(context));
 }
+GS1_IMPLEMENT_RUNTIME_SITE_MESSAGE_SYSTEM(
+    WeatherEventSystem,
+    GS1_RUNTIME_PROFILE_SYSTEM_WEATHER_EVENT,
+    4U)
 }  // namespace gs1

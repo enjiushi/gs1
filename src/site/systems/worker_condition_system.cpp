@@ -2,6 +2,7 @@
 
 #include "content/defs/item_defs.h"
 #include "content/defs/gameplay_tuning_defs.h"
+#include "runtime/game_runtime.h"
 #include "runtime/runtime_clock.h"
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
@@ -712,4 +713,8 @@ void WorkerConditionSystem::run(SiteSystemContext<WorkerConditionSystem>& contex
         emit_worker_meters_changed_if_needed(context);
     }
 }
+GS1_IMPLEMENT_RUNTIME_SITE_MESSAGE_SYSTEM(
+    WorkerConditionSystem,
+    GS1_RUNTIME_PROFILE_SYSTEM_WORKER_CONDITION,
+    9U)
 }  // namespace gs1

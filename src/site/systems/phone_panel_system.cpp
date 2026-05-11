@@ -1,6 +1,7 @@
 #include "site/systems/phone_panel_system.h"
 
 #include "content/defs/item_defs.h"
+#include "runtime/game_runtime.h"
 #include "site/craft_logic.h"
 #include "site/inventory_storage.h"
 #include "site/site_projection_update_flags.h"
@@ -574,4 +575,8 @@ void PhonePanelSystem::run(SiteSystemContext<PhonePanelSystem>& context)
 {
     sync_phone_panel_projection(context);
 }
+GS1_IMPLEMENT_RUNTIME_SITE_HOST_AND_MESSAGE_SYSTEM(
+    PhonePanelSystem,
+    GS1_RUNTIME_PROFILE_SYSTEM_PHONE_PANEL,
+    18U)
 }  // namespace gs1

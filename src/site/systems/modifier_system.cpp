@@ -6,6 +6,7 @@
 #include "content/defs/item_defs.h"
 #include "content/defs/modifier_defs.h"
 #include "content/defs/technology_defs.h"
+#include "runtime/game_runtime.h"
 #include "runtime/runtime_clock.h"
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
@@ -1153,4 +1154,8 @@ void ModifierSystem::run(SiteSystemContext<ModifierSystem>& context)
 
     resolve_modifier_totals(context);
 }
+GS1_IMPLEMENT_RUNTIME_SITE_HOST_AND_MESSAGE_SYSTEM(
+    ModifierSystem,
+    GS1_RUNTIME_PROFILE_SYSTEM_MODIFIER,
+    3U)
 }  // namespace gs1

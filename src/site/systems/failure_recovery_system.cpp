@@ -1,5 +1,6 @@
 #include "site/systems/failure_recovery_system.h"
 
+#include "runtime/game_runtime.h"
 #include "site/site_run_state.h"
 
 namespace gs1
@@ -47,4 +48,8 @@ void FailureRecoverySystem::run(SiteSystemContext<FailureRecoverySystem>& contex
         GS1_SITE_ATTEMPT_RESULT_FAILED});
     context.message_queue.push_back(message);
 }
+GS1_IMPLEMENT_RUNTIME_SITE_RUN_ONLY_SYSTEM(
+    FailureRecoverySystem,
+    GS1_RUNTIME_PROFILE_SYSTEM_FAILURE_RECOVERY,
+    19U)
 }  // namespace gs1

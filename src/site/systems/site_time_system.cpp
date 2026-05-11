@@ -2,6 +2,7 @@
 
 #include "content/defs/gameplay_tuning_defs.h"
 #include "messages/game_message.h"
+#include "runtime/game_runtime.h"
 #include "runtime/runtime_clock.h"
 
 #include <algorithm>
@@ -60,4 +61,8 @@ void SiteTimeSystem::run(SiteSystemContext<SiteTimeSystem>& context)
         context.message_queue.push_back(refresh_message);
     }
 }
+GS1_IMPLEMENT_RUNTIME_SITE_RUN_ONLY_SYSTEM(
+    SiteTimeSystem,
+    GS1_RUNTIME_PROFILE_SYSTEM_SITE_TIME,
+    1U)
 }  // namespace gs1

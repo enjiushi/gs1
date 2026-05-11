@@ -183,7 +183,7 @@ std::size_t feedback_event_type_index(Gs1FeedbackEventType type) noexcept
 
 bool is_valid_feedback_event_type(Gs1FeedbackEventType type) noexcept
 {
-    return feedback_event_type_index(type) < k_feedback_event_type_count;
+    return feedback_event_type_index(type) < k_runtime_feedback_event_type_count;
 }
 
 bool is_valid_profile_system_id(Gs1RuntimeProfileSystemId system_id) noexcept
@@ -288,7 +288,21 @@ GameRuntime::GameRuntime(Gs1RuntimeCreateDesc create_desc)
         set_prototype_content_root(resolved_project_config_root / "content");
     }
 
-    initialize_subscription_tables();
+    initialize_system_registry();
+}
+
+SiteMoveDirectionInput GameRuntimeTempBridge::current_move_direction() const noexcept
+{
+    if (!runtime_.active_site_run_.has_value())
+    {
+        return {};
+    }
+
+    return SiteMoveDirectionInput {
+        runtime_.active_site_run_->host_move_direction.world_move_x,
+        runtime_.active_site_run_->host_move_direction.world_move_y,
+        runtime_.active_site_run_->host_move_direction.world_move_z,
+        runtime_.active_site_run_->host_move_direction.present};
 }
 
 Gs1Status GameRuntime::get_profiling_snapshot(Gs1RuntimeProfilingSnapshot& out_snapshot) const noexcept
@@ -360,7 +374,7 @@ void GameRuntime::copy_timing_snapshot(
     destination.max_elapsed_ms = source.max_elapsed_ms;
 }
 
-void GameRuntime::initialize_subscription_tables()
+void GameRuntime::initialize_system_registry()
 {
 #ifndef NDEBUG
     const std::array site_system_access_registry {
@@ -403,172 +417,72 @@ void GameRuntime::initialize_subscription_tables()
     }
 #endif
 
-    for (std::size_t index = 0; index < host_message_subscribers_.size(); ++index)
+    systems_.clear();
+    fixed_step_systems_.clear();
+    for (auto& subscribers : host_message_subscribers_)
     {
-        const auto type = static_cast<Gs1HostMessageType>(index);
-        auto& subscribers = host_message_subscribers_[index];
+        subscribers.clear();
+    }
+    for (auto& subscribers : message_subscribers_)
+    {
+        subscribers.clear();
+    }
+    for (auto& subscribers : feedback_event_subscribers_)
+    {
+        subscribers.clear();
+    }
 
-        if (CampaignFlowSystem::subscribes_to_host_message(type))
-        {
-            subscribers.push_back(HostMessageSubscriberId::CampaignFlow);
-        }
+    systems_.push_back(std::make_unique<CampaignFlowSystem>());
+    systems_.push_back(std::make_unique<LoadoutPlannerSystem>());
+    systems_.push_back(std::make_unique<FactionReputationSystem>());
+    systems_.push_back(std::make_unique<TechnologySystem>());
+    systems_.push_back(std::make_unique<ActionExecutionSystem>());
+    systems_.push_back(std::make_unique<WeatherEventSystem>());
+    systems_.push_back(std::make_unique<WorkerConditionSystem>());
+    systems_.push_back(std::make_unique<EcologySystem>());
+    systems_.push_back(std::make_unique<PlantWeatherContributionSystem>());
+    systems_.push_back(std::make_unique<DeviceWeatherContributionSystem>());
+    systems_.push_back(std::make_unique<TaskBoardSystem>());
+    systems_.push_back(std::make_unique<PlacementValidationSystem>());
+    systems_.push_back(std::make_unique<LocalWeatherResolveSystem>());
+    systems_.push_back(std::make_unique<DeviceMaintenanceSystem>());
+    systems_.push_back(std::make_unique<InventorySystem>());
+    systems_.push_back(std::make_unique<CraftSystem>());
+    systems_.push_back(std::make_unique<EconomyPhoneSystem>());
+    systems_.push_back(std::make_unique<PhonePanelSystem>());
+    systems_.push_back(std::make_unique<CampDurabilitySystem>());
+    systems_.push_back(std::make_unique<DeviceSupportSystem>());
+    systems_.push_back(std::make_unique<ModifierSystem>());
+    systems_.push_back(std::make_unique<CampaignTimeSystem>());
+    systems_.push_back(std::make_unique<SiteTimeSystem>());
+    systems_.push_back(std::make_unique<SiteFlowSystem>());
+    systems_.push_back(std::make_unique<FailureRecoverySystem>());
+    systems_.push_back(std::make_unique<SiteCompletionSystem>());
 
-        if (ActionExecutionSystem::subscribes_to_host_message(type))
-        {
-            subscribers.push_back(HostMessageSubscriberId::ActionExecution);
-        }
+    RuntimeSystemRegistration registration {
+        message_subscribers_,
+        host_message_subscribers_,
+        feedback_event_subscribers_};
 
-        if (InventorySystem::subscribes_to_host_message(type))
+    for (const auto& system : systems_)
+    {
+        system->register_game_message_subscriptions(registration);
+        system->register_host_message_subscriptions(registration);
+        system->register_feedback_event_subscriptions(registration);
+        if (system->fixed_step_order().has_value())
         {
-            subscribers.push_back(HostMessageSubscriberId::Inventory);
-        }
-
-        if (CraftSystem::subscribes_to_host_message(type))
-        {
-            subscribers.push_back(HostMessageSubscriberId::Craft);
-        }
-
-        if (TaskBoardSystem::subscribes_to_host_message(type))
-        {
-            subscribers.push_back(HostMessageSubscriberId::TaskBoard);
-        }
-
-        if (EconomyPhoneSystem::subscribes_to_host_message(type))
-        {
-            subscribers.push_back(HostMessageSubscriberId::EconomyPhone);
-        }
-
-        if (PhonePanelSystem::subscribes_to_host_message(type))
-        {
-            subscribers.push_back(HostMessageSubscriberId::PhonePanel);
-        }
-
-        if (ModifierSystem::subscribes_to_host_message(type))
-        {
-            subscribers.push_back(HostMessageSubscriberId::Modifier);
-        }
-
-        if (SiteFlowSystem::subscribes_to_host_message(type))
-        {
-            subscribers.push_back(HostMessageSubscriberId::SiteFlow);
-        }
-
-        if (GamePresentationCoordinator::subscribes_to_host_message(type))
-        {
-            subscribers.push_back(HostMessageSubscriberId::Presentation);
+            fixed_step_systems_.push_back(system.get());
         }
     }
 
-    for (std::size_t index = 0; index < k_game_message_type_count; ++index)
-    {
-        const auto type = static_cast<GameMessageType>(index);
-        auto& subscribers = message_subscribers_[index];
-
-        if (CampaignFlowSystem::subscribes_to(type))
+    std::sort(
+        fixed_step_systems_.begin(),
+        fixed_step_systems_.end(),
+        [](const IRuntimeSystem* lhs, const IRuntimeSystem* rhs)
         {
-            subscribers.push_back(MessageSubscriberId::CampaignFlow);
-        }
-
-        if (LoadoutPlannerSystem::subscribes_to(type))
-        {
-            subscribers.push_back(MessageSubscriberId::LoadoutPlanner);
-        }
-
-        if (FactionReputationSystem::subscribes_to(type))
-        {
-            subscribers.push_back(MessageSubscriberId::FactionReputation);
-        }
-
-        if (TechnologySystem::subscribes_to(type))
-        {
-            subscribers.push_back(MessageSubscriberId::Technology);
-        }
-
-        if (ActionExecutionSystem::subscribes_to(type))
-        {
-            subscribers.push_back(MessageSubscriberId::ActionExecution);
-        }
-
-        if (WeatherEventSystem::subscribes_to(type))
-        {
-            subscribers.push_back(MessageSubscriberId::WeatherEvent);
-        }
-
-        if (WorkerConditionSystem::subscribes_to(type))
-        {
-            subscribers.push_back(MessageSubscriberId::WorkerCondition);
-        }
-
-        if (EcologySystem::subscribes_to(type))
-        {
-            subscribers.push_back(MessageSubscriberId::Ecology);
-        }
-
-        if (PlantWeatherContributionSystem::subscribes_to(type))
-        {
-            subscribers.push_back(MessageSubscriberId::PlantWeatherContribution);
-        }
-
-        if (DeviceWeatherContributionSystem::subscribes_to(type))
-        {
-            subscribers.push_back(MessageSubscriberId::DeviceWeatherContribution);
-        }
-
-        if (TaskBoardSystem::subscribes_to(type))
-        {
-            subscribers.push_back(MessageSubscriberId::TaskBoard);
-        }
-
-        if (PlacementValidationSystem::subscribes_to(type))
-        {
-            subscribers.push_back(MessageSubscriberId::PlacementValidation);
-        }
-
-        if (LocalWeatherResolveSystem::subscribes_to(type))
-        {
-            subscribers.push_back(MessageSubscriberId::LocalWeatherResolve);
-        }
-
-        if (DeviceMaintenanceSystem::subscribes_to(type))
-        {
-            subscribers.push_back(MessageSubscriberId::DeviceMaintenance);
-        }
-
-        if (InventorySystem::subscribes_to(type))
-        {
-            subscribers.push_back(MessageSubscriberId::Inventory);
-        }
-
-        if (CraftSystem::subscribes_to(type))
-        {
-            subscribers.push_back(MessageSubscriberId::Craft);
-        }
-
-        if (EconomyPhoneSystem::subscribes_to(type))
-        {
-            subscribers.push_back(MessageSubscriberId::EconomyPhone);
-        }
-
-        if (PhonePanelSystem::subscribes_to(type))
-        {
-            subscribers.push_back(MessageSubscriberId::PhonePanel);
-        }
-
-        if (CampDurabilitySystem::subscribes_to(type))
-        {
-            subscribers.push_back(MessageSubscriberId::CampDurability);
-        }
-
-        if (DeviceSupportSystem::subscribes_to(type))
-        {
-            subscribers.push_back(MessageSubscriberId::DeviceSupport);
-        }
-
-        if (ModifierSystem::subscribes_to(type))
-        {
-            subscribers.push_back(MessageSubscriberId::Modifier);
-        }
-    }
+            return lhs->fixed_step_order().value_or(std::numeric_limits<std::uint32_t>::max()) <
+                rhs->fixed_step_order().value_or(std::numeric_limits<std::uint32_t>::max());
+        });
 }
 
 Gs1Status GameRuntime::submit_host_messages(
@@ -764,433 +678,27 @@ Gs1Status GameRuntime::dispatch_subscribed_message(const GameMessage& message)
         return status;
     };
 
+    GameRuntimeTempBridge bridge {*this};
     const auto& subscribers = message_subscribers_[message_type_index(message.type)];
-    for (const auto subscriber : subscribers)
+    for (IRuntimeSystem* system : subscribers)
     {
-        switch (subscriber)
+        if (system == nullptr)
         {
-        case MessageSubscriberId::CampaignFlow:
-        {
-            CampaignFlowMessageContext context {
-                campaign_,
-                active_site_run_,
-                app_state_,
-                message_queue_};
-            const auto status = dispatch_profiled_message(
-                GS1_RUNTIME_PROFILE_SYSTEM_CAMPAIGN_FLOW,
-                [&]() -> Gs1Status {
-                    return CampaignFlowSystem::process_message(context, message);
-                });
-            if (status != GS1_STATUS_OK)
-            {
-                return status;
-            }
-            app_state_ = context.app_state;
-            break;
+            continue;
         }
 
-        case MessageSubscriberId::LoadoutPlanner:
+        const auto profile_id = system->profile_system_id();
+        const auto status = profile_id.has_value()
+            ? dispatch_profiled_message(
+                *profile_id,
+                [&]() -> Gs1Status
+                {
+                    return system->process_game_message(bridge, message);
+                })
+            : system->process_game_message(bridge, message);
+        if (status != GS1_STATUS_OK)
         {
-            if (!campaign_.has_value())
-            {
-                break;
-            }
-
-            const auto status = dispatch_profiled_message(
-                GS1_RUNTIME_PROFILE_SYSTEM_LOADOUT_PLANNER,
-                [&]() -> Gs1Status {
-                    CampaignSystemContext context {*campaign_};
-                    return LoadoutPlannerSystem::process_message(context, message);
-                });
-            if (status != GS1_STATUS_OK)
-            {
-                return status;
-            }
-            break;
-        }
-
-        case MessageSubscriberId::FactionReputation:
-        {
-            if (!campaign_.has_value())
-            {
-                break;
-            }
-
-            const auto status = dispatch_profiled_message(
-                GS1_RUNTIME_PROFILE_SYSTEM_FACTION_REPUTATION,
-                [&]() -> Gs1Status {
-                    CampaignSystemContext context {*campaign_};
-                    return FactionReputationSystem::process_message(context, message);
-                });
-            if (status != GS1_STATUS_OK)
-            {
-                return status;
-            }
-            break;
-        }
-
-        case MessageSubscriberId::Technology:
-        {
-            if (!campaign_.has_value())
-            {
-                break;
-            }
-
-            const auto status = dispatch_profiled_message(
-                GS1_RUNTIME_PROFILE_SYSTEM_TECHNOLOGY,
-                [&]() -> Gs1Status {
-                    CampaignSystemContext context {*campaign_};
-                    return TechnologySystem::process_message(context, message);
-                });
-            if (status != GS1_STATUS_OK)
-            {
-                return status;
-            }
-            break;
-        }
-
-        case MessageSubscriberId::ActionExecution:
-        {
-            const auto status = dispatch_profiled_message(
-                GS1_RUNTIME_PROFILE_SYSTEM_ACTION_EXECUTION,
-                [&]() -> Gs1Status {
-                    return dispatch_site_system_message<ActionExecutionSystem>(
-                        ActionExecutionSystem::process_message,
-                        message,
-                        campaign_,
-                        active_site_run_,
-                        message_queue_,
-                        fixed_step_seconds_);
-                });
-            if (status != GS1_STATUS_OK)
-            {
-                return status;
-            }
-            break;
-        }
-
-        case MessageSubscriberId::WeatherEvent:
-        {
-            const auto status = dispatch_profiled_message(
-                GS1_RUNTIME_PROFILE_SYSTEM_WEATHER_EVENT,
-                [&]() -> Gs1Status {
-                    return dispatch_site_system_message<WeatherEventSystem>(
-                        WeatherEventSystem::process_message,
-                        message,
-                        campaign_,
-                        active_site_run_,
-                        message_queue_,
-                        fixed_step_seconds_);
-                });
-            if (status != GS1_STATUS_OK)
-            {
-                return status;
-            }
-            break;
-        }
-
-        case MessageSubscriberId::WorkerCondition:
-        {
-            const auto status = dispatch_profiled_message(
-                GS1_RUNTIME_PROFILE_SYSTEM_WORKER_CONDITION,
-                [&]() -> Gs1Status {
-                    return dispatch_site_system_message<WorkerConditionSystem>(
-                        WorkerConditionSystem::process_message,
-                        message,
-                        campaign_,
-                        active_site_run_,
-                        message_queue_,
-                        fixed_step_seconds_);
-                });
-            if (status != GS1_STATUS_OK)
-            {
-                return status;
-            }
-            break;
-        }
-
-        case MessageSubscriberId::Ecology:
-        {
-            const auto status = dispatch_profiled_message(
-                GS1_RUNTIME_PROFILE_SYSTEM_ECOLOGY,
-                [&]() -> Gs1Status {
-                    return dispatch_site_system_message<EcologySystem>(
-                        EcologySystem::process_message,
-                        message,
-                        campaign_,
-                        active_site_run_,
-                        message_queue_,
-                        fixed_step_seconds_);
-                });
-            if (status != GS1_STATUS_OK)
-            {
-                return status;
-            }
-            break;
-        }
-
-        case MessageSubscriberId::TaskBoard:
-        {
-            const auto status = dispatch_profiled_message(
-                GS1_RUNTIME_PROFILE_SYSTEM_TASK_BOARD,
-                [&]() -> Gs1Status {
-                    return dispatch_site_system_message<TaskBoardSystem>(
-                        TaskBoardSystem::process_message,
-                        message,
-                        campaign_,
-                        active_site_run_,
-                        message_queue_,
-                        fixed_step_seconds_);
-                });
-            if (status != GS1_STATUS_OK)
-            {
-                return status;
-            }
-            break;
-        }
-
-        case MessageSubscriberId::PlantWeatherContribution:
-        {
-            const auto status = dispatch_profiled_message(
-                GS1_RUNTIME_PROFILE_SYSTEM_LOCAL_WEATHER_RESOLVE,
-                [&]() -> Gs1Status {
-                    return dispatch_site_system_message<PlantWeatherContributionSystem>(
-                        PlantWeatherContributionSystem::process_message,
-                        message,
-                        campaign_,
-                        active_site_run_,
-                        message_queue_,
-                        fixed_step_seconds_);
-                });
-            if (status != GS1_STATUS_OK)
-            {
-                return status;
-            }
-            break;
-        }
-
-        case MessageSubscriberId::DeviceWeatherContribution:
-        {
-            const auto status = dispatch_profiled_message(
-                GS1_RUNTIME_PROFILE_SYSTEM_LOCAL_WEATHER_RESOLVE,
-                [&]() -> Gs1Status {
-                    return dispatch_site_system_message<DeviceWeatherContributionSystem>(
-                        DeviceWeatherContributionSystem::process_message,
-                        message,
-                        campaign_,
-                        active_site_run_,
-                        message_queue_,
-                        fixed_step_seconds_);
-                });
-            if (status != GS1_STATUS_OK)
-            {
-                return status;
-            }
-            break;
-        }
-
-        case MessageSubscriberId::PlacementValidation:
-        {
-            const auto status = dispatch_profiled_message(
-                GS1_RUNTIME_PROFILE_SYSTEM_PLACEMENT_VALIDATION,
-                [&]() -> Gs1Status {
-                    return dispatch_site_system_message<PlacementValidationSystem>(
-                        PlacementValidationSystem::process_message,
-                        message,
-                        campaign_,
-                        active_site_run_,
-                        message_queue_,
-                        fixed_step_seconds_);
-                });
-            if (status != GS1_STATUS_OK)
-            {
-                return status;
-            }
-            break;
-        }
-
-        case MessageSubscriberId::LocalWeatherResolve:
-        {
-            const auto status = dispatch_profiled_message(
-                GS1_RUNTIME_PROFILE_SYSTEM_LOCAL_WEATHER_RESOLVE,
-                [&]() -> Gs1Status {
-                    return dispatch_site_system_message<LocalWeatherResolveSystem>(
-                        LocalWeatherResolveSystem::process_message,
-                        message,
-                        campaign_,
-                        active_site_run_,
-                        message_queue_,
-                        fixed_step_seconds_);
-                });
-            if (status != GS1_STATUS_OK)
-            {
-                return status;
-            }
-            break;
-        }
-
-        case MessageSubscriberId::Inventory:
-        {
-            const auto status = dispatch_profiled_message(
-                GS1_RUNTIME_PROFILE_SYSTEM_INVENTORY,
-                [&]() -> Gs1Status {
-                    return dispatch_site_system_message<InventorySystem>(
-                        InventorySystem::process_message,
-                        message,
-                        campaign_,
-                        active_site_run_,
-                        message_queue_,
-                        fixed_step_seconds_);
-                });
-            if (status != GS1_STATUS_OK)
-            {
-                return status;
-            }
-            break;
-        }
-
-        case MessageSubscriberId::Craft:
-        {
-            const auto status = dispatch_profiled_message(
-                GS1_RUNTIME_PROFILE_SYSTEM_CRAFT,
-                [&]() -> Gs1Status {
-                    return dispatch_site_system_message<CraftSystem>(
-                        CraftSystem::process_message,
-                        message,
-                        campaign_,
-                        active_site_run_,
-                        message_queue_,
-                        fixed_step_seconds_);
-                });
-            if (status != GS1_STATUS_OK)
-            {
-                return status;
-            }
-            break;
-        }
-
-        case MessageSubscriberId::EconomyPhone:
-        {
-            const auto status = dispatch_profiled_message(
-                GS1_RUNTIME_PROFILE_SYSTEM_ECONOMY_PHONE,
-                [&]() -> Gs1Status {
-                    return dispatch_site_system_message<EconomyPhoneSystem>(
-                        EconomyPhoneSystem::process_message,
-                        message,
-                        campaign_,
-                        active_site_run_,
-                        message_queue_,
-                        fixed_step_seconds_);
-                });
-            if (status != GS1_STATUS_OK)
-            {
-                return status;
-            }
-            break;
-        }
-
-        case MessageSubscriberId::PhonePanel:
-        {
-            const auto status = dispatch_profiled_message(
-                GS1_RUNTIME_PROFILE_SYSTEM_PHONE_PANEL,
-                [&]() -> Gs1Status {
-                    return dispatch_site_system_message<PhonePanelSystem>(
-                        PhonePanelSystem::process_message,
-                        message,
-                        campaign_,
-                        active_site_run_,
-                        message_queue_,
-                        fixed_step_seconds_);
-                });
-            if (status != GS1_STATUS_OK)
-            {
-                return status;
-            }
-            break;
-        }
-
-        case MessageSubscriberId::CampDurability:
-        {
-            const auto status = dispatch_profiled_message(
-                GS1_RUNTIME_PROFILE_SYSTEM_CAMP_DURABILITY,
-                [&]() -> Gs1Status {
-                    return dispatch_site_system_message<CampDurabilitySystem>(
-                        CampDurabilitySystem::process_message,
-                        message,
-                        campaign_,
-                        active_site_run_,
-                        message_queue_,
-                        fixed_step_seconds_);
-                });
-            if (status != GS1_STATUS_OK)
-            {
-                return status;
-            }
-            break;
-        }
-
-        case MessageSubscriberId::DeviceSupport:
-        {
-            const auto status = dispatch_profiled_message(
-                GS1_RUNTIME_PROFILE_SYSTEM_DEVICE_SUPPORT,
-                [&]() -> Gs1Status {
-                    return dispatch_site_system_message<DeviceSupportSystem>(
-                        DeviceSupportSystem::process_message,
-                        message,
-                        campaign_,
-                        active_site_run_,
-                        message_queue_,
-                        fixed_step_seconds_);
-                });
-            if (status != GS1_STATUS_OK)
-            {
-                return status;
-            }
-            break;
-        }
-
-        case MessageSubscriberId::DeviceMaintenance:
-        {
-            const auto status = dispatch_profiled_message(
-                GS1_RUNTIME_PROFILE_SYSTEM_DEVICE_MAINTENANCE,
-                [&]() -> Gs1Status {
-                    return dispatch_site_system_message<DeviceMaintenanceSystem>(
-                        DeviceMaintenanceSystem::process_message,
-                        message,
-                        campaign_,
-                        active_site_run_,
-                        message_queue_,
-                        fixed_step_seconds_);
-                });
-            if (status != GS1_STATUS_OK)
-            {
-                return status;
-            }
-            break;
-        }
-
-        case MessageSubscriberId::Modifier:
-        {
-            const auto status = dispatch_profiled_message(
-                GS1_RUNTIME_PROFILE_SYSTEM_MODIFIER,
-                [&]() -> Gs1Status {
-                    return dispatch_site_system_message<ModifierSystem>(
-                        ModifierSystem::process_message,
-                        message,
-                        campaign_,
-                        active_site_run_,
-                        message_queue_,
-                        fixed_step_seconds_);
-                });
-            if (status != GS1_STATUS_OK)
-            {
-                return status;
-            }
-            break;
-        }
-
-        default:
-            return GS1_STATUS_INVALID_ARGUMENT;
+            return status;
         }
     }
 
@@ -1205,9 +713,9 @@ Gs1Status GameRuntime::dispatch_subscribed_feedback_event(const Gs1FeedbackEvent
     }
 
     const auto& subscribers = feedback_event_subscribers_[feedback_event_type_index(event.type)];
-    for (const auto subscriber : subscribers)
+    for (IRuntimeSystem* system : subscribers)
     {
-        (void)subscriber;
+        (void)system;
     }
 
     return GS1_STATUS_OK;
@@ -1246,174 +754,32 @@ Gs1Status GameRuntime::dispatch_subscribed_host_message(const Gs1HostMessage& me
         return GS1_STATUS_INVALID_ARGUMENT;
     }
 
+    GameRuntimeTempBridge bridge {*this};
     const auto& subscribers = host_message_subscribers_[host_message_type_index(message.type)];
-    for (const auto subscriber : subscribers)
+    for (IRuntimeSystem* system : subscribers)
     {
-        switch (subscriber)
+        if (system == nullptr)
         {
-        case HostMessageSubscriberId::CampaignFlow:
-        {
-            CampaignFlowMessageContext context {
-                campaign_,
-                active_site_run_,
-                app_state_,
-                message_queue_};
-            const auto status = CampaignFlowSystem::process_host_message(context, message);
-            if (status != GS1_STATUS_OK)
-            {
-                return status;
-            }
-            app_state_ = context.app_state;
-            break;
+            continue;
         }
 
-        case HostMessageSubscriberId::ActionExecution:
+        const auto status = system->process_host_message(bridge, message);
+        if (status != GS1_STATUS_OK)
         {
-            const auto status = dispatch_site_system_host_message<ActionExecutionSystem>(
-                ActionExecutionSystem::process_host_message,
-                message,
-                campaign_,
-                active_site_run_,
-                message_queue_,
-                fixed_step_seconds_);
-            if (status != GS1_STATUS_OK && status != GS1_STATUS_INVALID_STATE)
-            {
-                return status;
-            }
-            break;
+            return status;
         }
+    }
 
-        case HostMessageSubscriberId::Inventory:
+    if (GamePresentationCoordinator::subscribes_to_host_message(message.type))
+    {
+        const auto status = bridge.with_presentation_context(
+            [&](GamePresentationRuntimeContext& context) -> Gs1Status
+            {
+                return presentation_.process_host_message(context, message);
+            });
+        if (status != GS1_STATUS_OK)
         {
-            const auto status = dispatch_site_system_host_message<InventorySystem>(
-                InventorySystem::process_host_message,
-                message,
-                campaign_,
-                active_site_run_,
-                message_queue_,
-                fixed_step_seconds_);
-            if (status != GS1_STATUS_OK && status != GS1_STATUS_INVALID_STATE)
-            {
-                return status;
-            }
-            break;
-        }
-
-        case HostMessageSubscriberId::Craft:
-        {
-            const auto status = dispatch_site_system_host_message<CraftSystem>(
-                CraftSystem::process_host_message,
-                message,
-                campaign_,
-                active_site_run_,
-                message_queue_,
-                fixed_step_seconds_);
-            if (status != GS1_STATUS_OK && status != GS1_STATUS_INVALID_STATE)
-            {
-                return status;
-            }
-            break;
-        }
-
-        case HostMessageSubscriberId::TaskBoard:
-        {
-            const auto status = dispatch_site_system_host_message<TaskBoardSystem>(
-                TaskBoardSystem::process_host_message,
-                message,
-                campaign_,
-                active_site_run_,
-                message_queue_,
-                fixed_step_seconds_);
-            if (status != GS1_STATUS_OK && status != GS1_STATUS_INVALID_STATE)
-            {
-                return status;
-            }
-            break;
-        }
-
-        case HostMessageSubscriberId::EconomyPhone:
-        {
-            const auto status = dispatch_site_system_host_message<EconomyPhoneSystem>(
-                EconomyPhoneSystem::process_host_message,
-                message,
-                campaign_,
-                active_site_run_,
-                message_queue_,
-                fixed_step_seconds_);
-            if (status != GS1_STATUS_OK && status != GS1_STATUS_INVALID_STATE)
-            {
-                return status;
-            }
-            break;
-        }
-
-        case HostMessageSubscriberId::PhonePanel:
-        {
-            const auto status = dispatch_site_system_host_message<PhonePanelSystem>(
-                PhonePanelSystem::process_host_message,
-                message,
-                campaign_,
-                active_site_run_,
-                message_queue_,
-                fixed_step_seconds_);
-            if (status != GS1_STATUS_OK && status != GS1_STATUS_INVALID_STATE)
-            {
-                return status;
-            }
-            break;
-        }
-
-        case HostMessageSubscriberId::Modifier:
-        {
-            const auto status = dispatch_site_system_host_message<ModifierSystem>(
-                ModifierSystem::process_host_message,
-                message,
-                campaign_,
-                active_site_run_,
-                message_queue_,
-                fixed_step_seconds_);
-            if (status != GS1_STATUS_OK && status != GS1_STATUS_INVALID_STATE)
-            {
-                return status;
-            }
-            break;
-        }
-
-        case HostMessageSubscriberId::SiteFlow:
-        {
-            const auto status = dispatch_site_system_host_message<SiteFlowSystem>(
-                SiteFlowSystem::process_host_message,
-                message,
-                campaign_,
-                active_site_run_,
-                message_queue_,
-                fixed_step_seconds_);
-            if (status != GS1_STATUS_OK && status != GS1_STATUS_INVALID_STATE)
-            {
-                return status;
-            }
-            break;
-        }
-
-        case HostMessageSubscriberId::Presentation:
-        {
-            GamePresentationRuntimeContext context {
-                app_state_,
-                campaign_,
-                active_site_run_,
-                message_queue_,
-                runtime_messages_,
-                fixed_step_seconds_};
-            const auto status = presentation_.process_host_message(context, message);
-            if (status != GS1_STATUS_OK)
-            {
-                return status;
-            }
-            break;
-        }
-
-        default:
-            break;
+            return status;
         }
     }
 
@@ -1467,233 +833,28 @@ void GameRuntime::run_fixed_step()
             elapsed_milliseconds_since(started_at));
     };
 
-    const SiteMoveDirectionInput move_direction {
-        active_site_run_->host_move_direction.world_move_x,
-        active_site_run_->host_move_direction.world_move_y,
-        active_site_run_->host_move_direction.world_move_z,
-        active_site_run_->host_move_direction.present};
-
-    run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_CAMPAIGN_TIME, [&]()
+    GameRuntimeTempBridge bridge {*this};
+    for (IRuntimeSystem* system : fixed_step_systems_)
     {
-        CampaignFixedStepContext campaign_context {*campaign_, fixed_step_seconds_};
-        CampaignTimeSystem::run(campaign_context);
-    });
+        if (system == nullptr)
+        {
+            continue;
+        }
 
-    run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_SITE_TIME, [&]()
-    {
-        auto site_time_context = make_site_system_context<SiteTimeSystem>(
-            *campaign_,
-            *active_site_run_,
-            message_queue_,
-            fixed_step_seconds_,
-            move_direction);
-        SiteTimeSystem::run(site_time_context);
-    });
+        const auto profile_id = system->profile_system_id();
+        if (!profile_id.has_value())
+        {
+            system->run(bridge);
+            continue;
+        }
 
-    run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_SITE_FLOW, [&]()
-    {
-        auto site_flow_context = make_site_system_context<SiteFlowSystem>(
-            *campaign_,
-            *active_site_run_,
-            message_queue_,
-            fixed_step_seconds_,
-            move_direction);
-        SiteFlowSystem::run(site_flow_context);
-    });
-
-    run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_MODIFIER, [&]()
-    {
-        auto modifier_context = make_site_system_context<ModifierSystem>(
-            *campaign_,
-            *active_site_run_,
-            message_queue_,
-            fixed_step_seconds_,
-            move_direction);
-        ModifierSystem::run(modifier_context);
-    });
-
-    run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_WEATHER_EVENT, [&]()
-    {
-        auto weather_event_context = make_site_system_context<WeatherEventSystem>(
-            *campaign_,
-            *active_site_run_,
-            message_queue_,
-            fixed_step_seconds_,
-            move_direction);
-        WeatherEventSystem::run(weather_event_context);
-    });
-
-    run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_ACTION_EXECUTION, [&]()
-    {
-        auto action_execution_context = make_site_system_context<ActionExecutionSystem>(
-            *campaign_,
-            *active_site_run_,
-            message_queue_,
-            fixed_step_seconds_,
-            move_direction);
-        ActionExecutionSystem::run(action_execution_context);
-    });
-
-    run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_LOCAL_WEATHER_RESOLVE, [&]()
-    {
-        auto plant_weather_contribution_context =
-            make_site_system_context<PlantWeatherContributionSystem>(
-                *campaign_,
-                *active_site_run_,
-                message_queue_,
-                fixed_step_seconds_,
-                move_direction);
-        PlantWeatherContributionSystem::run(plant_weather_contribution_context);
-
-        auto device_weather_contribution_context =
-            make_site_system_context<DeviceWeatherContributionSystem>(
-                *campaign_,
-                *active_site_run_,
-                message_queue_,
-                fixed_step_seconds_,
-                move_direction);
-        DeviceWeatherContributionSystem::run(device_weather_contribution_context);
-
-        auto local_weather_context = make_site_system_context<LocalWeatherResolveSystem>(
-            *campaign_,
-            *active_site_run_,
-            message_queue_,
-            fixed_step_seconds_,
-            move_direction);
-        LocalWeatherResolveSystem::run(local_weather_context);
-    });
-
-    run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_WORKER_CONDITION, [&]()
-    {
-        auto worker_condition_context = make_site_system_context<WorkerConditionSystem>(
-            *campaign_,
-            *active_site_run_,
-            message_queue_,
-            fixed_step_seconds_,
-            move_direction);
-        WorkerConditionSystem::run(worker_condition_context);
-    });
-
-    run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_CAMP_DURABILITY, [&]()
-    {
-        auto camp_durability_context = make_site_system_context<CampDurabilitySystem>(
-            *campaign_,
-            *active_site_run_,
-            message_queue_,
-            fixed_step_seconds_,
-            move_direction);
-        CampDurabilitySystem::run(camp_durability_context);
-    });
-
-    run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_DEVICE_MAINTENANCE, [&]()
-    {
-        auto device_maintenance_context = make_site_system_context<DeviceMaintenanceSystem>(
-            *campaign_,
-            *active_site_run_,
-            message_queue_,
-            fixed_step_seconds_,
-            move_direction);
-        DeviceMaintenanceSystem::run(device_maintenance_context);
-    });
-
-    run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_DEVICE_SUPPORT, [&]()
-    {
-        auto device_support_context = make_site_system_context<DeviceSupportSystem>(
-            *campaign_,
-            *active_site_run_,
-            message_queue_,
-            fixed_step_seconds_,
-            move_direction);
-        DeviceSupportSystem::run(device_support_context);
-    });
-
-    run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_ECOLOGY, [&]()
-    {
-        auto ecology_context = make_site_system_context<EcologySystem>(
-            *campaign_,
-            *active_site_run_,
-            message_queue_,
-            fixed_step_seconds_,
-            move_direction);
-        EcologySystem::run(ecology_context);
-    });
-
-    run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_INVENTORY, [&]()
-    {
-        auto inventory_context = make_site_system_context<InventorySystem>(
-            *campaign_,
-            *active_site_run_,
-            message_queue_,
-            fixed_step_seconds_,
-            move_direction);
-        InventorySystem::run(inventory_context);
-    });
-
-    run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_CRAFT, [&]()
-    {
-        auto craft_context = make_site_system_context<CraftSystem>(
-            *campaign_,
-            *active_site_run_,
-            message_queue_,
-            fixed_step_seconds_,
-            move_direction);
-        CraftSystem::run(craft_context);
-    });
-
-    run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_TASK_BOARD, [&]()
-    {
-        auto task_board_context = make_site_system_context<TaskBoardSystem>(
-            *campaign_,
-            *active_site_run_,
-            message_queue_,
-            fixed_step_seconds_,
-            move_direction);
-        TaskBoardSystem::run(task_board_context);
-    });
-
-    run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_ECONOMY_PHONE, [&]()
-    {
-        auto economy_context = make_site_system_context<EconomyPhoneSystem>(
-            *campaign_,
-            *active_site_run_,
-            message_queue_,
-            fixed_step_seconds_,
-            move_direction);
-        EconomyPhoneSystem::run(economy_context);
-    });
-
-    run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_PHONE_PANEL, [&]()
-    {
-        auto phone_panel_context = make_site_system_context<PhonePanelSystem>(
-            *campaign_,
-            *active_site_run_,
-            message_queue_,
-            fixed_step_seconds_,
-            move_direction);
-        PhonePanelSystem::run(phone_panel_context);
-    });
-
-    run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_FAILURE_RECOVERY, [&]()
-    {
-        auto failure_context = make_site_system_context<FailureRecoverySystem>(
-            *campaign_,
-            *active_site_run_,
-            message_queue_,
-            fixed_step_seconds_,
-            move_direction);
-        FailureRecoverySystem::run(failure_context);
-    });
-
-    run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_SITE_COMPLETION, [&]()
-    {
-        auto completion_context = make_site_system_context<SiteCompletionSystem>(
-            *campaign_,
-            *active_site_run_,
-            message_queue_,
-            fixed_step_seconds_,
-            move_direction);
-        SiteCompletionSystem::run(completion_context);
-    });
+        run_profiled_system(
+            *profile_id,
+            [&]()
+            {
+                system->run(bridge);
+            });
+    }
 
     record_timing_sample(fixed_step_timing_, elapsed_milliseconds_since(fixed_step_started_at));
 }

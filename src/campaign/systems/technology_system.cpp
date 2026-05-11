@@ -1,5 +1,6 @@
 #include "campaign/systems/technology_system.h"
 
+#include "runtime/game_runtime.h"
 #include "support/currency.h"
 
 #include <algorithm>
@@ -383,4 +384,8 @@ Gs1Status TechnologySystem::process_message(
         return GS1_STATUS_OK;
     }
 }
+
+GS1_IMPLEMENT_RUNTIME_CAMPAIGN_MESSAGE_SYSTEM(
+    TechnologySystem,
+    GS1_RUNTIME_PROFILE_SYSTEM_TECHNOLOGY)
 }  // namespace gs1

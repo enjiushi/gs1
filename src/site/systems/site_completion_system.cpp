@@ -1,5 +1,6 @@
 #include "site/systems/site_completion_system.h"
 
+#include "runtime/game_runtime.h"
 #include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
 
@@ -365,4 +366,8 @@ void SiteCompletionSystem::run(SiteSystemContext<SiteCompletionSystem>& context)
         return;
     }
 }
+GS1_IMPLEMENT_RUNTIME_SITE_RUN_ONLY_SYSTEM(
+    SiteCompletionSystem,
+    GS1_RUNTIME_PROFILE_SYSTEM_SITE_COMPLETION,
+    20U)
 }  // namespace gs1

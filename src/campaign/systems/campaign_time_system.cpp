@@ -1,6 +1,7 @@
 #include "campaign/systems/campaign_time_system.h"
 
 #include "campaign/campaign_state.h"
+#include "runtime/game_runtime.h"
 
 namespace gs1
 {
@@ -17,4 +18,10 @@ void CampaignTimeSystem::run(CampaignFixedStepContext& context)
             ? 0U
             : (context.campaign.campaign_days_total - elapsed_days);
 }
+
+GS1_IMPLEMENT_RUNTIME_CAMPAIGN_FIXED_STEP_SYSTEM(
+    CampaignTimeSystem,
+    GS1_RUNTIME_PROFILE_SYSTEM_CAMPAIGN_TIME,
+    0U,
+    CampaignFixedStepContext)
 }  // namespace gs1

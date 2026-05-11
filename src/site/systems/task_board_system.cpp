@@ -8,6 +8,7 @@
 #include "content/defs/structure_defs.h"
 #include "content/defs/task_defs.h"
 #include "content/prototype_content.h"
+#include "runtime/game_runtime.h"
 #include "runtime/runtime_clock.h"
 #include "site/defs/site_action_defs.h"
 #include "site/site_projection_update_flags.h"
@@ -2864,4 +2865,8 @@ void TaskBoardSystem::run(SiteSystemContext<TaskBoardSystem>& context)
         mark_task_projection_dirty(context);
     }
 }
+GS1_IMPLEMENT_RUNTIME_SITE_HOST_AND_MESSAGE_SYSTEM(
+    TaskBoardSystem,
+    GS1_RUNTIME_PROFILE_SYSTEM_TASK_BOARD,
+    16U)
 }  // namespace gs1

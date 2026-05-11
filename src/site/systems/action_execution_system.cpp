@@ -7,6 +7,7 @@
 #include "content/defs/item_defs.h"
 #include "content/defs/plant_defs.h"
 #include "content/defs/structure_defs.h"
+#include "runtime/game_runtime.h"
 #include "runtime/runtime_clock.h"
 #include "site/device_interaction_logic.h"
 #include "site/craft_logic.h"
@@ -3339,4 +3340,8 @@ void ActionExecutionSystem::run(SiteSystemContext<ActionExecutionSystem>& contex
     }
     context.world.mark_projection_dirty(dirty_flags);
 }
+GS1_IMPLEMENT_RUNTIME_SITE_HOST_AND_MESSAGE_SYSTEM(
+    ActionExecutionSystem,
+    GS1_RUNTIME_PROFILE_SYSTEM_ACTION_EXECUTION,
+    5U)
 }  // namespace gs1

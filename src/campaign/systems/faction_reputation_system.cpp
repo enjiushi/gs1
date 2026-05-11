@@ -2,6 +2,7 @@
 
 #include "campaign/campaign_state.h"
 #include "content/defs/faction_defs.h"
+#include "runtime/game_runtime.h"
 
 #include <algorithm>
 
@@ -64,4 +65,8 @@ Gs1Status FactionReputationSystem::process_message(
 
     return GS1_STATUS_OK;
 }
+
+GS1_IMPLEMENT_RUNTIME_CAMPAIGN_MESSAGE_SYSTEM(
+    FactionReputationSystem,
+    GS1_RUNTIME_PROFILE_SYSTEM_FACTION_REPUTATION)
 }  // namespace gs1

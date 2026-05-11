@@ -1,5 +1,6 @@
 #include "site/systems/placement_validation_system.h"
 
+#include "runtime/game_runtime.h"
 #include "site/site_run_state.h"
 #include "site/tile_footprint.h"
 
@@ -263,4 +264,8 @@ void PlacementValidationSystem::run(SiteSystemContext<PlacementValidationSystem>
 {
     (void)context;
 }
+GS1_IMPLEMENT_RUNTIME_SITE_MESSAGE_SYSTEM(
+    PlacementValidationSystem,
+    GS1_RUNTIME_PROFILE_SYSTEM_PLACEMENT_VALIDATION,
+    std::nullopt)
 }  // namespace gs1

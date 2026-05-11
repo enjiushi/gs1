@@ -1,6 +1,7 @@
 #include "site/systems/device_support_system.h"
 
 #include "content/defs/gameplay_tuning_defs.h"
+#include "runtime/game_runtime.h"
 #include "site/site_run_state.h"
 #include "site/site_world_components.h"
 
@@ -102,6 +103,10 @@ void DeviceSupportSystem::run(SiteSystemContext<DeviceSupportSystem>& context)
             }
         });
 }
+GS1_IMPLEMENT_RUNTIME_SITE_MESSAGE_SYSTEM(
+    DeviceSupportSystem,
+    GS1_RUNTIME_PROFILE_SYSTEM_DEVICE_SUPPORT,
+    12U)
 }  // namespace gs1
 
 #ifdef _MSC_VER

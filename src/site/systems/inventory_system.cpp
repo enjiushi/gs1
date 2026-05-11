@@ -5,6 +5,7 @@
 #include "content/defs/craft_recipe_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/structure_defs.h"
+#include "runtime/game_runtime.h"
 #include "site/craft_logic.h"
 #include "site/defs/site_action_defs.h"
 #include "site/device_interaction_logic.h"
@@ -1720,4 +1721,8 @@ void InventorySystem::run(SiteSystemContext<InventorySystem>& context)
     progress_pending_device_storage_open(context);
     progress_pending_deliveries(context);
 }
+GS1_IMPLEMENT_RUNTIME_SITE_HOST_AND_MESSAGE_SYSTEM(
+    InventorySystem,
+    GS1_RUNTIME_PROFILE_SYSTEM_INVENTORY,
+    14U)
 }  // namespace gs1

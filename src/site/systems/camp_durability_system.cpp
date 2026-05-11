@@ -2,6 +2,7 @@
 #include "site/site_run_state.h"
 #include "site/systems/camp_durability_system.h"
 #include "content/defs/gameplay_tuning_defs.h"
+#include "runtime/game_runtime.h"
 
 #include <algorithm>
 #include <cmath>
@@ -153,4 +154,8 @@ void CampDurabilitySystem::run(SiteSystemContext<CampDurabilitySystem>& context)
         delivery_operational,
         shared_storage_access_enabled);
 }
+GS1_IMPLEMENT_RUNTIME_SITE_MESSAGE_SYSTEM(
+    CampDurabilitySystem,
+    GS1_RUNTIME_PROFILE_SYSTEM_CAMP_DURABILITY,
+    10U)
 }  // namespace gs1

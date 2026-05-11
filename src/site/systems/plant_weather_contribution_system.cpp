@@ -2,6 +2,7 @@
 
 #include "content/defs/plant_defs.h"
 #include "content/defs/gameplay_tuning_defs.h"
+#include "runtime/game_runtime.h"
 #include "site/site_world_components.h"
 #include "site/tile_footprint.h"
 #include "site/weather_contribution_logic.h"
@@ -633,6 +634,10 @@ void PlantWeatherContributionSystem::run(SiteSystemContext<PlantWeatherContribut
 
     clear_dirty_tiles(runtime);
 }
+GS1_IMPLEMENT_RUNTIME_SITE_MESSAGE_SYSTEM(
+    PlantWeatherContributionSystem,
+    GS1_RUNTIME_PROFILE_SYSTEM_LOCAL_WEATHER_RESOLVE,
+    6U)
 }  // namespace gs1
 
 #ifdef _MSC_VER

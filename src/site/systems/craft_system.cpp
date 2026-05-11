@@ -1,6 +1,7 @@
 #include "site/systems/craft_system.h"
 
 #include "content/defs/structure_defs.h"
+#include "runtime/game_runtime.h"
 #include "site/craft_logic.h"
 #include "site/site_world_access.h"
 #include "site/site_world_components.h"
@@ -237,6 +238,10 @@ void CraftSystem::run(SiteSystemContext<CraftSystem>& context)
 
     refresh_device_caches(context, membership_revision, worker_tile);
 }
+GS1_IMPLEMENT_RUNTIME_SITE_HOST_AND_MESSAGE_SYSTEM(
+    CraftSystem,
+    GS1_RUNTIME_PROFILE_SYSTEM_CRAFT,
+    15U)
 }  // namespace gs1
 
 #ifdef _MSC_VER
