@@ -998,6 +998,102 @@ void seed_site_economy(SiteSystemContext<EconomyPhoneSystem>& context, std::uint
 }
 }  // namespace
 
+bool EconomyPhoneSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
+{
+    return type == GS1_HOST_EVENT_UI_ACTION;
+}
+
+Gs1Status EconomyPhoneSystem::process_host_message(
+    SiteSystemContext<EconomyPhoneSystem>& context,
+    const Gs1HostMessage& message)
+{
+    if (message.type != GS1_HOST_EVENT_UI_ACTION)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    const auto& action = message.payload.ui_action.action;
+    GameMessage translated {};
+    switch (action.type)
+    {
+    case GS1_UI_ACTION_BUY_PHONE_LISTING:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        translated.type = GameMessageType::PhoneListingPurchaseRequested;
+        translated.set_payload(PhoneListingPurchaseRequestedMessage {
+            action.target_id,
+            static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0),
+            0U});
+        return process_message(context, translated);
+
+    case GS1_UI_ACTION_ADD_PHONE_LISTING_TO_CART:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        translated.type = GameMessageType::PhoneListingCartAddRequested;
+        translated.set_payload(PhoneListingCartAddRequestedMessage {
+            action.target_id,
+            static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0),
+            0U});
+        return process_message(context, translated);
+
+    case GS1_UI_ACTION_REMOVE_PHONE_LISTING_FROM_CART:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        translated.type = GameMessageType::PhoneListingCartRemoveRequested;
+        translated.set_payload(PhoneListingCartRemoveRequestedMessage {
+            action.target_id,
+            static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0),
+            0U});
+        return process_message(context, translated);
+
+    case GS1_UI_ACTION_CHECKOUT_PHONE_CART:
+        translated.type = GameMessageType::PhoneCartCheckoutRequested;
+        translated.set_payload(PhoneCartCheckoutRequestedMessage {});
+        return process_message(context, translated);
+
+    case GS1_UI_ACTION_SELL_PHONE_LISTING:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        translated.type = GameMessageType::PhoneListingSaleRequested;
+        translated.set_payload(PhoneListingSaleRequestedMessage {
+            action.target_id,
+            static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0),
+            0U});
+        return process_message(context, translated);
+
+    case GS1_UI_ACTION_HIRE_CONTRACTOR:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        translated.type = GameMessageType::ContractorHireRequested;
+        translated.set_payload(ContractorHireRequestedMessage {
+            action.target_id,
+            static_cast<std::uint32_t>(action.arg0)});
+        return process_message(context, translated);
+
+    case GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        translated.type = GameMessageType::SiteUnlockablePurchaseRequested;
+        translated.set_payload(SiteUnlockablePurchaseRequestedMessage {action.target_id});
+        return process_message(context, translated);
+
+    default:
+        return GS1_STATUS_OK;
+    }
+}
+
 bool EconomyPhoneSystem::subscribes_to(GameMessageType type) noexcept
 {
     switch (type)

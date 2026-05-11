@@ -151,6 +151,29 @@ Gs1Status handle_craft_context_requested(
 }
 }  // namespace
 
+bool CraftSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
+{
+    return type == GS1_HOST_EVENT_SITE_CONTEXT_REQUEST;
+}
+
+Gs1Status CraftSystem::process_host_message(
+    SiteSystemContext<CraftSystem>& context,
+    const Gs1HostMessage& message)
+{
+    if (message.type != GS1_HOST_EVENT_SITE_CONTEXT_REQUEST ||
+        context.site_run.site_action.placement_mode.active)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    return handle_craft_context_requested(
+        context,
+        CraftContextRequestedMessage {
+            message.payload.site_context_request.tile_x,
+            message.payload.site_context_request.tile_y,
+            message.payload.site_context_request.flags});
+}
+
 bool CraftSystem::subscribes_to(GameMessageType type) noexcept
 {
     switch (type)

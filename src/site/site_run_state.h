@@ -99,6 +99,14 @@ struct ProjectedSiteTileState final
     bool valid {false};
 };
 
+struct SiteHostMoveDirectionState final
+{
+    float world_move_x {0.0f};
+    float world_move_y {0.0f};
+    float world_move_z {0.0f};
+    bool present {false};
+};
+
 struct SiteRunState final
 {
     SiteRunId site_run_id {};
@@ -120,6 +128,7 @@ struct SiteRunState final
     PhonePanelState phone_panel {};
     CraftState craft {};
     ActionState site_action {};
+    SiteHostMoveDirectionState host_move_direction {};
     SiteCounters counters {};
     SiteObjectiveState objective {};
     LocalWeatherResolveState local_weather_resolve {};

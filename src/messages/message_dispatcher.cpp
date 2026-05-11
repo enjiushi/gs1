@@ -17,7 +17,14 @@ Gs1Status MessageDispatcher::dispatch_all(GameRuntime& runtime)
             return status;
         }
 
-        runtime.sync_after_processed_message(message);
+        GamePresentationRuntimeContext context {
+            runtime.app_state_,
+            runtime.campaign_,
+            runtime.active_site_run_,
+            runtime.message_queue_,
+            runtime.runtime_messages_,
+            runtime.fixed_step_seconds_};
+        runtime.presentation_.on_message_processed(context, message);
     }
 
     return GS1_STATUS_OK;

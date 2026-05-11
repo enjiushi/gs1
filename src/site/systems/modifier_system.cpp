@@ -1067,6 +1067,37 @@ void handle_site_modifier_end_requested(
 }
 }  // namespace
 
+bool ModifierSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
+{
+    return type == GS1_HOST_EVENT_UI_ACTION;
+}
+
+Gs1Status ModifierSystem::process_host_message(
+    SiteSystemContext<ModifierSystem>& context,
+    const Gs1HostMessage& message)
+{
+    if (message.type != GS1_HOST_EVENT_UI_ACTION)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    const auto& action = message.payload.ui_action.action;
+    if (action.type != GS1_UI_ACTION_END_SITE_MODIFIER)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    if (action.target_id == 0U)
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    handle_site_modifier_end_requested(
+        context,
+        SiteModifierEndRequestedMessage {action.target_id});
+    return GS1_STATUS_OK;
+}
+
 bool ModifierSystem::subscribes_to(GameMessageType type) noexcept
 {
     return type == GameMessageType::SiteRunStarted ||

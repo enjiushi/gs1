@@ -52,6 +52,28 @@ float facing_degrees_for_direction(float direction_x, float direction_y) noexcep
 }
 }  // namespace
 
+bool SiteFlowSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
+{
+    return type == GS1_HOST_EVENT_SITE_MOVE_DIRECTION;
+}
+
+Gs1Status SiteFlowSystem::process_host_message(
+    SiteSystemContext<SiteFlowSystem>& context,
+    const Gs1HostMessage& message)
+{
+    if (message.type != GS1_HOST_EVENT_SITE_MOVE_DIRECTION)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    const auto& payload = message.payload.site_move_direction;
+    context.site_run.host_move_direction.world_move_x = payload.world_move_x;
+    context.site_run.host_move_direction.world_move_y = payload.world_move_y;
+    context.site_run.host_move_direction.world_move_z = payload.world_move_z;
+    context.site_run.host_move_direction.present = true;
+    return GS1_STATUS_OK;
+}
+
 void SiteFlowSystem::run(SiteSystemContext<SiteFlowSystem>& context)
 {
     const std::uint32_t width = context.world.tile_width();

@@ -642,6 +642,19 @@ struct Gs1HostEvent
     Gs1HostEventPayload payload;
 };
 
+using Gs1HostMessageType = Gs1HostEventType;
+using Gs1HostMessageUiActionData = Gs1HostEventUiActionData;
+using Gs1HostMessageSiteMoveDirectionData = Gs1HostEventSiteMoveDirectionData;
+using Gs1HostMessageSiteActionRequestData = Gs1HostEventSiteActionRequestData;
+using Gs1HostMessageSiteActionCancelData = Gs1HostEventSiteActionCancelData;
+using Gs1HostMessageSiteStorageViewData = Gs1HostEventSiteStorageViewData;
+using Gs1HostMessageSiteContextRequestData = Gs1HostEventSiteContextRequestData;
+using Gs1HostMessageSiteInventorySlotTapData = Gs1HostEventSiteInventorySlotTapData;
+using Gs1HostMessageSiteSceneReadyData = Gs1HostEventSiteSceneReadyData;
+using Gs1HostMessageEmptyData = Gs1HostEventEmptyData;
+using Gs1HostMessagePayload = Gs1HostEventPayload;
+using Gs1HostMessage = Gs1HostEvent;
+
 struct Gs1FeedbackEventData
 {
     std::uint32_t site_id;
@@ -1239,6 +1252,9 @@ private:
         static_assert(alignof(PayloadData) <= alignof(Gs1EngineMessage), "Engine message payload data requires stronger alignment than Gs1EngineMessage.");
     }
 };
+
+using Gs1RuntimeMessageType = Gs1EngineMessageType;
+using Gs1RuntimeMessage = Gs1EngineMessage;
 
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1RuntimeCreateDesc, 32U);
 GS1_ASSERT_TRIVIAL_SCHEMA(Gs1RuntimeTimingStats);

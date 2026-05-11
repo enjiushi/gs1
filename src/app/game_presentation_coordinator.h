@@ -4,6 +4,7 @@
 #include "messages/game_message.h"
 #include "runtime/message_queue.h"
 #include "site/site_run_state.h"
+#include "gs1/status.h"
 #include "gs1/types.h"
 
 #include <cstdint>
@@ -28,6 +29,10 @@ struct GamePresentationRuntimeContext final
 class GamePresentationCoordinator final
 {
 public:
+    [[nodiscard]] static bool subscribes_to_host_message(Gs1HostMessageType type) noexcept;
+    [[nodiscard]] Gs1Status process_host_message(
+        GamePresentationRuntimeContext& context,
+        const Gs1HostMessage& message);
     void on_message_processed(
         GamePresentationRuntimeContext& context,
         const GameMessage& message);

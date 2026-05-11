@@ -161,6 +161,16 @@ std::size_t message_type_index(GameMessageType type) noexcept
     return static_cast<std::size_t>(type);
 }
 
+std::size_t host_message_type_index(Gs1HostMessageType type) noexcept
+{
+    return static_cast<std::size_t>(type);
+}
+
+bool is_valid_host_message_type(Gs1HostMessageType type) noexcept
+{
+    return host_message_type_index(type) < (static_cast<std::size_t>(GS1_HOST_EVENT_SITE_SCENE_READY) + 1U);
+}
+
 bool is_valid_message_type(GameMessageType type) noexcept
 {
     return message_type_index(type) < k_game_message_type_count;
@@ -204,6 +214,29 @@ template <typename SiteSystemTag, typename ProcessMessageFn>
 Gs1Status dispatch_site_system_message(
     ProcessMessageFn process_message_fn,
     const GameMessage& message,
+    const std::optional<CampaignState>& campaign,
+    std::optional<SiteRunState>& active_site_run,
+    GameMessageQueue& message_queue,
+    double fixed_step_seconds)
+{
+    if (!campaign.has_value() || !active_site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    auto context = make_site_system_context<SiteSystemTag>(
+        *campaign,
+        *active_site_run,
+        message_queue,
+        fixed_step_seconds,
+        SiteMoveDirectionInput {});
+    return process_message_fn(context, message);
+}
+
+template <typename SiteSystemTag, typename ProcessHostMessageFn>
+Gs1Status dispatch_site_system_host_message(
+    ProcessHostMessageFn process_message_fn,
+    const Gs1HostMessage& message,
     const std::optional<CampaignState>& campaign,
     std::optional<SiteRunState>& active_site_run,
     GameMessageQueue& message_queue,
@@ -370,6 +403,62 @@ void GameRuntime::initialize_subscription_tables()
     }
 #endif
 
+    for (std::size_t index = 0; index < host_message_subscribers_.size(); ++index)
+    {
+        const auto type = static_cast<Gs1HostMessageType>(index);
+        auto& subscribers = host_message_subscribers_[index];
+
+        if (CampaignFlowSystem::subscribes_to_host_message(type))
+        {
+            subscribers.push_back(HostMessageSubscriberId::CampaignFlow);
+        }
+
+        if (ActionExecutionSystem::subscribes_to_host_message(type))
+        {
+            subscribers.push_back(HostMessageSubscriberId::ActionExecution);
+        }
+
+        if (InventorySystem::subscribes_to_host_message(type))
+        {
+            subscribers.push_back(HostMessageSubscriberId::Inventory);
+        }
+
+        if (CraftSystem::subscribes_to_host_message(type))
+        {
+            subscribers.push_back(HostMessageSubscriberId::Craft);
+        }
+
+        if (TaskBoardSystem::subscribes_to_host_message(type))
+        {
+            subscribers.push_back(HostMessageSubscriberId::TaskBoard);
+        }
+
+        if (EconomyPhoneSystem::subscribes_to_host_message(type))
+        {
+            subscribers.push_back(HostMessageSubscriberId::EconomyPhone);
+        }
+
+        if (PhonePanelSystem::subscribes_to_host_message(type))
+        {
+            subscribers.push_back(HostMessageSubscriberId::PhonePanel);
+        }
+
+        if (ModifierSystem::subscribes_to_host_message(type))
+        {
+            subscribers.push_back(HostMessageSubscriberId::Modifier);
+        }
+
+        if (SiteFlowSystem::subscribes_to_host_message(type))
+        {
+            subscribers.push_back(HostMessageSubscriberId::SiteFlow);
+        }
+
+        if (GamePresentationCoordinator::subscribes_to_host_message(type))
+        {
+            subscribers.push_back(HostMessageSubscriberId::Presentation);
+        }
+    }
+
     for (std::size_t index = 0; index < k_game_message_type_count; ++index)
     {
         const auto type = static_cast<GameMessageType>(index);
@@ -482,21 +571,28 @@ void GameRuntime::initialize_subscription_tables()
     }
 }
 
-Gs1Status GameRuntime::submit_host_events(
-    const Gs1HostEvent* events,
-    std::uint32_t event_count)
+Gs1Status GameRuntime::submit_host_messages(
+    const Gs1HostMessage* messages,
+    std::uint32_t message_count)
 {
-    if (event_count > 0U && events == nullptr)
+    if (message_count > 0U && messages == nullptr)
     {
         return GS1_STATUS_INVALID_ARGUMENT;
     }
 
-    for (std::uint32_t i = 0; i < event_count; ++i)
+    for (std::uint32_t i = 0; i < message_count; ++i)
     {
-        host_events_.push_back(events[i]);
+        host_messages_.push_back(messages[i]);
     }
 
     return GS1_STATUS_OK;
+}
+
+Gs1Status GameRuntime::submit_host_events(
+    const Gs1HostEvent* events,
+    std::uint32_t event_count)
+{
+    return submit_host_messages(events, event_count);
 }
 
 Gs1Status GameRuntime::submit_feedback_events(
@@ -531,8 +627,6 @@ Gs1Status GameRuntime::run_phase1(const Gs1Phase1Request& request, Gs1Phase1Resu
 
     out_result = {};
     out_result.struct_size = sizeof(Gs1Phase1Result);
-    phase1_site_move_direction_ = {};
-
     auto status = GS1_STATUS_OK;
     if (!boot_initialized_)
     {
@@ -554,26 +648,23 @@ Gs1Status GameRuntime::run_phase1(const Gs1Phase1Request& request, Gs1Phase1Resu
         boot_initialized_ = true;
     }
 
-    status = dispatch_host_events(HostEventDispatchStage::Phase1, out_result.processed_host_event_count);
+    status = dispatch_host_messages(out_result.processed_host_event_count);
     if (status != GS1_STATUS_OK)
     {
-        phase1_site_move_direction_ = {};
         finish_phase();
         return status;
     }
 
     if (!active_site_run_.has_value())
     {
-        phase1_site_move_direction_ = {};
-        out_result.engine_messages_queued = static_cast<std::uint32_t>(engine_messages_.size());
+        out_result.engine_messages_queued = static_cast<std::uint32_t>(runtime_messages_.size());
         finish_phase();
         return GS1_STATUS_OK;
     }
 
     if (app_state_ == GS1_APP_STATE_SITE_LOADING)
     {
-        phase1_site_move_direction_ = {};
-        out_result.engine_messages_queued = static_cast<std::uint32_t>(engine_messages_.size());
+        out_result.engine_messages_queued = static_cast<std::uint32_t>(runtime_messages_.size());
         finish_phase();
         return GS1_STATUS_OK;
     }
@@ -587,11 +678,18 @@ Gs1Status GameRuntime::run_phase1(const Gs1Phase1Request& request, Gs1Phase1Resu
         out_result.fixed_steps_executed += 1U;
     }
 
-    flush_site_presentation_if_dirty();
+    GamePresentationRuntimeContext presentation_context {
+        app_state_,
+        campaign_,
+        active_site_run_,
+        message_queue_,
+        runtime_messages_,
+        fixed_step_seconds_};
+    presentation_.flush_site_presentation_if_dirty(presentation_context);
 
     status = dispatch_queued_messages();
-    phase1_site_move_direction_ = {};
-    out_result.engine_messages_queued = static_cast<std::uint32_t>(engine_messages_.size());
+    active_site_run_->host_move_direction = {};
+    out_result.engine_messages_queued = static_cast<std::uint32_t>(runtime_messages_.size());
     finish_phase();
     return status;
 }
@@ -612,7 +710,7 @@ Gs1Status GameRuntime::run_phase2(const Gs1Phase2Request& request, Gs1Phase2Resu
     out_result = {};
     out_result.struct_size = sizeof(Gs1Phase2Result);
 
-    auto status = dispatch_host_events(HostEventDispatchStage::Phase2, out_result.processed_host_event_count);
+    auto status = dispatch_host_messages(out_result.processed_host_event_count);
     if (status != GS1_STATUS_OK)
     {
         finish_phase();
@@ -627,21 +725,26 @@ Gs1Status GameRuntime::run_phase2(const Gs1Phase2Request& request, Gs1Phase2Resu
     }
 
     status = dispatch_queued_messages();
-    out_result.engine_messages_queued = static_cast<std::uint32_t>(engine_messages_.size());
+    out_result.engine_messages_queued = static_cast<std::uint32_t>(runtime_messages_.size());
     finish_phase();
     return status;
 }
 
-Gs1Status GameRuntime::pop_engine_message(Gs1EngineMessage& out_message)
+Gs1Status GameRuntime::pop_runtime_message(Gs1RuntimeMessage& out_message)
 {
-    if (engine_messages_.empty())
+    if (runtime_messages_.empty())
     {
         return GS1_STATUS_BUFFER_EMPTY;
     }
 
-    out_message = engine_messages_.front();
-    engine_messages_.pop_front();
+    out_message = runtime_messages_.front();
+    runtime_messages_.pop_front();
     return GS1_STATUS_OK;
+}
+
+Gs1Status GameRuntime::pop_engine_message(Gs1EngineMessage& out_message)
+{
+    return pop_runtime_message(out_message);
 }
 
 Gs1Status GameRuntime::handle_message(const GameMessage& message)
@@ -1122,579 +1225,207 @@ Gs1Status GameRuntime::dispatch_subscribed_feedback_event(const Gs1FeedbackEvent
     return GS1_STATUS_OK;
 }
 
-
-GamePresentationRuntimeContext GameRuntime::make_presentation_context() noexcept
-{
-    return GamePresentationRuntimeContext {
-        app_state_,
-        campaign_,
-        active_site_run_,
-        message_queue_,
-        engine_messages_,
-        fixed_step_seconds_};
-}
-
-void GameRuntime::sync_after_processed_message(const GameMessage& message)
-{
-    auto context = make_presentation_context();
-    presentation_.on_message_processed(context, message);
-}
-
-void GameRuntime::activate_loaded_site_scene()
-{
-    auto context = make_presentation_context();
-    presentation_.activate_loaded_site_scene(context);
-}
-
-void GameRuntime::mark_site_projection_update_dirty(std::uint64_t dirty_flags) noexcept
-{
-    auto context = make_presentation_context();
-    presentation_.mark_site_projection_update_dirty(context, dirty_flags);
-}
-
-void GameRuntime::mark_site_tile_projection_dirty(TileCoord coord) noexcept
-{
-    auto context = make_presentation_context();
-    presentation_.mark_site_tile_projection_dirty(context, coord);
-}
-
-void GameRuntime::flush_site_presentation_if_dirty()
-{
-    auto context = make_presentation_context();
-    presentation_.flush_site_presentation_if_dirty(context);
-}
-
-Gs1Status GameRuntime::translate_ui_action_to_message(const Gs1UiAction& action, GameMessage& out_message) const
-{
-    switch (action.type)
-    {
-    case GS1_UI_ACTION_START_NEW_CAMPAIGN:
-        if (action.arg1 > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()))
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        out_message.type = GameMessageType::StartNewCampaign;
-        out_message.set_payload(StartNewCampaignMessage {
-            action.arg0,
-            static_cast<std::uint32_t>(action.arg1)});
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_SELECT_DEPLOYMENT_SITE:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        out_message.type = GameMessageType::SelectDeploymentSite;
-        out_message.set_payload(SelectDeploymentSiteMessage {action.target_id});
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION:
-        out_message.type = GameMessageType::ClearDeploymentSiteSelection;
-        out_message.set_payload(ClearDeploymentSiteSelectionMessage {});
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE:
-        out_message.type = GameMessageType::OpenRegionalMapTechTree;
-        out_message.set_payload(OpenRegionalMapTechTreeMessage {});
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE:
-        out_message.type = GameMessageType::CloseRegionalMapTechTree;
-        out_message.set_payload(CloseRegionalMapTechTreeMessage {});
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_SELECT_TECH_TREE_FACTION_TAB:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        out_message.type = GameMessageType::SelectRegionalMapTechTreeFaction;
-        out_message.set_payload(SelectRegionalMapTechTreeFactionMessage {action.target_id});
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_START_SITE_ATTEMPT:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        out_message.type = GameMessageType::StartSiteAttempt;
-        out_message.set_payload(StartSiteAttemptMessage {action.target_id});
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_RETURN_TO_REGIONAL_MAP:
-        out_message.type = GameMessageType::ReturnToRegionalMap;
-        out_message.set_payload(ReturnToRegionalMapMessage {});
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_ACCEPT_TASK:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        out_message.type = GameMessageType::TaskAcceptRequested;
-        out_message.set_payload(TaskAcceptRequestedMessage {action.target_id});
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_CLAIM_TASK_REWARD:
-        if (action.target_id == 0U ||
-            action.arg0 > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()))
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        out_message.type = GameMessageType::TaskRewardClaimRequested;
-        out_message.set_payload(TaskRewardClaimRequestedMessage {
-            action.target_id,
-            static_cast<std::uint32_t>(action.arg0)});
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_CLAIM_TECHNOLOGY_NODE:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        out_message.type = GameMessageType::TechnologyNodeClaimRequested;
-        out_message.set_payload(TechnologyNodeClaimRequestedMessage {
-            action.target_id,
-            static_cast<std::uint32_t>(action.arg0)});
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_REFUND_TECHNOLOGY_NODE:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        out_message.type = GameMessageType::TechnologyNodeRefundRequested;
-        out_message.set_payload(TechnologyNodeRefundRequestedMessage {action.target_id});
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_BUY_PHONE_LISTING:
-        if (action.target_id == 0U ||
-            action.arg0 > static_cast<std::uint64_t>(std::numeric_limits<std::uint16_t>::max()))
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        out_message.type = GameMessageType::PhoneListingPurchaseRequested;
-        out_message.set_payload(PhoneListingPurchaseRequestedMessage {
-            action.target_id,
-            static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0),
-            0U});
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_ADD_PHONE_LISTING_TO_CART:
-        if (action.target_id == 0U ||
-            action.arg0 > static_cast<std::uint64_t>(std::numeric_limits<std::uint16_t>::max()))
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        out_message.type = GameMessageType::PhoneListingCartAddRequested;
-        out_message.set_payload(PhoneListingCartAddRequestedMessage {
-            action.target_id,
-            static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0),
-            0U});
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_REMOVE_PHONE_LISTING_FROM_CART:
-        if (action.target_id == 0U ||
-            action.arg0 > static_cast<std::uint64_t>(std::numeric_limits<std::uint16_t>::max()))
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        out_message.type = GameMessageType::PhoneListingCartRemoveRequested;
-        out_message.set_payload(PhoneListingCartRemoveRequestedMessage {
-            action.target_id,
-            static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0),
-            0U});
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_CHECKOUT_PHONE_CART:
-        out_message.type = GameMessageType::PhoneCartCheckoutRequested;
-        out_message.set_payload(PhoneCartCheckoutRequestedMessage {});
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_SET_PHONE_PANEL_SECTION:
-        if (action.arg0 > static_cast<std::uint64_t>(GS1_PHONE_PANEL_SECTION_CART))
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        out_message.type = GameMessageType::PhonePanelSectionRequested;
-        out_message.set_payload(PhonePanelSectionRequestedMessage {
-            static_cast<Gs1PhonePanelSection>(action.arg0),
-            {0U, 0U, 0U}});
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_CLOSE_PHONE_PANEL:
-        out_message.type = GameMessageType::ClosePhonePanel;
-        out_message.set_payload(ClosePhonePanelMessage {});
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_OPEN_SITE_PROTECTION_SELECTOR:
-        out_message.type = GameMessageType::OpenSiteProtectionSelector;
-        out_message.set_payload(OpenSiteProtectionSelectorMessage {});
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_CLOSE_SITE_PROTECTION_UI:
-        out_message.type = GameMessageType::CloseSiteProtectionUi;
-        out_message.set_payload(CloseSiteProtectionUiMessage {});
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE:
-        if (action.arg0 > static_cast<std::uint64_t>(GS1_SITE_PROTECTION_OVERLAY_OCCUPANT_CONDITION))
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        out_message.type = GameMessageType::SetSiteProtectionOverlayMode;
-        out_message.set_payload(SetSiteProtectionOverlayModeMessage {
-            static_cast<Gs1SiteProtectionOverlayMode>(action.arg0),
-            {0U, 0U, 0U}});
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_END_SITE_MODIFIER:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        out_message.type = GameMessageType::SiteModifierEndRequested;
-        out_message.set_payload(SiteModifierEndRequestedMessage {action.target_id});
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_SELL_PHONE_LISTING:
-        if (action.target_id == 0U ||
-            action.arg0 > static_cast<std::uint64_t>(std::numeric_limits<std::uint16_t>::max()))
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        out_message.type = GameMessageType::PhoneListingSaleRequested;
-        out_message.set_payload(PhoneListingSaleRequestedMessage {
-            action.target_id,
-            static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0),
-            0U});
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_HIRE_CONTRACTOR:
-        if (action.target_id == 0U ||
-            action.arg0 > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()))
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        out_message.type = GameMessageType::ContractorHireRequested;
-        out_message.set_payload(ContractorHireRequestedMessage {
-            action.target_id,
-            static_cast<std::uint32_t>(action.arg0)});
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        out_message.type = GameMessageType::SiteUnlockablePurchaseRequested;
-        out_message.set_payload(SiteUnlockablePurchaseRequestedMessage {action.target_id});
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_NONE:
-    default:
-        return GS1_STATUS_INVALID_ARGUMENT;
-    }
-}
-
-Gs1Status GameRuntime::translate_site_action_request_to_message(
-    const Gs1HostEventSiteActionRequestData& action,
-    GameMessage& out_message) const
-{
-    if (action.action_kind == GS1_SITE_ACTION_NONE)
-    {
-        return GS1_STATUS_INVALID_ARGUMENT;
-    }
-
-    out_message.type = GameMessageType::StartSiteAction;
-    out_message.set_payload(StartSiteActionMessage {
-        action.action_kind,
-        action.flags,
-        action.quantity == 0U ? 1U : action.quantity,
-        action.target_tile_x,
-        action.target_tile_y,
-        action.primary_subject_id,
-        action.secondary_subject_id,
-        action.item_id});
-    return GS1_STATUS_OK;
-}
-
-Gs1Status GameRuntime::translate_site_action_cancel_to_message(
-    const Gs1HostEventSiteActionCancelData& action,
-    GameMessage& out_message) const
-{
-    if (action.action_id == 0U &&
-        (action.flags & (GS1_SITE_ACTION_CANCEL_FLAG_CURRENT_ACTION |
-            GS1_SITE_ACTION_CANCEL_FLAG_PLACEMENT_MODE)) == 0U)
-    {
-        return GS1_STATUS_INVALID_ARGUMENT;
-    }
-
-    out_message.type = GameMessageType::CancelSiteAction;
-    out_message.set_payload(CancelSiteActionMessage {
-        action.action_id,
-        action.flags});
-    return GS1_STATUS_OK;
-}
-
-Gs1Status GameRuntime::translate_site_storage_view_to_message(
-    const Gs1HostEventSiteStorageViewData& request,
-    GameMessage& out_message) const
-{
-    if (request.event_kind != GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT &&
-        request.event_kind != GS1_INVENTORY_VIEW_EVENT_CLOSE)
-    {
-        return GS1_STATUS_INVALID_ARGUMENT;
-    }
-
-    out_message.type = GameMessageType::InventoryStorageViewRequest;
-    out_message.set_payload(InventoryStorageViewRequestMessage {
-        request.storage_id,
-        request.event_kind,
-        {0U, 0U, 0U}});
-    return GS1_STATUS_OK;
-}
-
-Gs1Status GameRuntime::translate_site_inventory_slot_tap_to_message(
-    const Gs1HostEventSiteInventorySlotTapData& request,
-    GameMessage& out_message) const
-{
-    if (request.storage_id == 0U)
-    {
-        return GS1_STATUS_INVALID_ARGUMENT;
-    }
-    if (request.container_kind != GS1_INVENTORY_CONTAINER_WORKER_PACK &&
-        request.container_kind != GS1_INVENTORY_CONTAINER_DEVICE_STORAGE)
-    {
-        return GS1_STATUS_INVALID_ARGUMENT;
-    }
-
-    out_message.type = GameMessageType::InventorySlotTapped;
-    out_message.set_payload(InventorySlotTappedMessage {
-        request.storage_id,
-        request.item_instance_id,
-        request.slot_index,
-        request.container_kind,
-        0U});
-    return GS1_STATUS_OK;
-}
-
-Gs1Status GameRuntime::translate_site_context_request_to_message(
-    const Gs1HostEventSiteContextRequestData& request,
-    GameMessage& out_message) const
-{
-    const bool placement_mode_active =
-        active_site_run_.has_value() &&
-        active_site_run_->site_action.placement_mode.active;
-    if (placement_mode_active)
-    {
-        out_message.type = GameMessageType::PlacementModeCursorMoved;
-        out_message.set_payload(PlacementModeCursorMovedMessage {
-            request.tile_x,
-            request.tile_y,
-            request.flags});
-    }
-    else
-    {
-        out_message.type = GameMessageType::InventoryCraftContextRequested;
-        out_message.set_payload(CraftContextRequestedMessage {
-            request.tile_x,
-            request.tile_y,
-            request.flags});
-    }
-    return GS1_STATUS_OK;
-}
-
-Gs1Status GameRuntime::cancel_pending_device_storage_open_request()
-{
-    if (!active_site_run_.has_value() ||
-        !active_site_run_->inventory.pending_device_storage_open.active ||
-        active_site_run_->inventory.pending_device_storage_open.storage_id == 0U)
-    {
-        return GS1_STATUS_OK;
-    }
-
-    GameMessage message {};
-    message.type = GameMessageType::InventoryStorageViewRequest;
-    message.set_payload(InventoryStorageViewRequestMessage {
-        active_site_run_->inventory.pending_device_storage_open.storage_id,
-        GS1_INVENTORY_VIEW_EVENT_CLOSE,
-        {0U, 0U, 0U}});
-    message_queue_.push_back(message);
-    return dispatch_queued_messages();
-}
-
-Gs1Status GameRuntime::dispatch_host_events(
-    HostEventDispatchStage stage,
-    std::uint32_t& out_processed_count)
+Gs1Status GameRuntime::dispatch_host_messages(std::uint32_t& out_processed_count)
 {
     out_processed_count = 0U;
 
-    while (!host_events_.empty())
+    while (!host_messages_.empty())
     {
-        const auto event = host_events_.front();
-        host_events_.pop_front();
+        const auto message = host_messages_.front();
+        host_messages_.pop_front();
         out_processed_count += 1U;
 
-        switch (event.type)
+        const auto status = dispatch_subscribed_host_message(message);
+        if (status != GS1_STATUS_OK)
         {
-        case GS1_HOST_EVENT_UI_ACTION:
+            return status;
+        }
+
+        const auto dispatch_status = dispatch_queued_messages();
+        if (dispatch_status != GS1_STATUS_OK)
         {
-            GameMessage message {};
-            const auto status = translate_ui_action_to_message(event.payload.ui_action.action, message);
+            return dispatch_status;
+        }
+    }
+
+    return GS1_STATUS_OK;
+}
+
+Gs1Status GameRuntime::dispatch_subscribed_host_message(const Gs1HostMessage& message)
+{
+    if (!is_valid_host_message_type(message.type))
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    const auto& subscribers = host_message_subscribers_[host_message_type_index(message.type)];
+    for (const auto subscriber : subscribers)
+    {
+        switch (subscriber)
+        {
+        case HostMessageSubscriberId::CampaignFlow:
+        {
+            CampaignFlowMessageContext context {
+                campaign_,
+                active_site_run_,
+                app_state_,
+                message_queue_};
+            const auto status = CampaignFlowSystem::process_host_message(context, message);
             if (status != GS1_STATUS_OK)
             {
                 return status;
             }
-
-            message_queue_.push_back(message);
-            const auto dispatch_status = dispatch_queued_messages();
-            if (dispatch_status != GS1_STATUS_OK)
-            {
-                return dispatch_status;
-            }
+            app_state_ = context.app_state;
             break;
         }
 
-        case GS1_HOST_EVENT_SITE_MOVE_DIRECTION:
+        case HostMessageSubscriberId::ActionExecution:
         {
-            assert(stage == HostEventDispatchStage::Phase1);
-            if (stage != HostEventDispatchStage::Phase1)
-            {
-                return GS1_STATUS_INVALID_STATE;
-            }
-
-            assert(!phase1_site_move_direction_.present);
-            if (phase1_site_move_direction_.present)
-            {
-                return GS1_STATUS_INVALID_STATE;
-            }
-
-            const auto& payload = event.payload.site_move_direction;
-            const float move_length_squared =
-                payload.world_move_x * payload.world_move_x +
-                payload.world_move_y * payload.world_move_y +
-                payload.world_move_z * payload.world_move_z;
-            if (move_length_squared > 0.0001f)
-            {
-                const auto cancel_status = cancel_pending_device_storage_open_request();
-                if (cancel_status != GS1_STATUS_OK)
-                {
-                    return cancel_status;
-                }
-            }
-            if (!active_site_run_.has_value() || app_state_ != GS1_APP_STATE_SITE_ACTIVE)
-            {
-                break;
-            }
-            phase1_site_move_direction_.world_move_x = payload.world_move_x;
-            phase1_site_move_direction_.world_move_y = payload.world_move_y;
-            phase1_site_move_direction_.world_move_z = payload.world_move_z;
-            phase1_site_move_direction_.present = true;
-            break;
-        }
-
-        case GS1_HOST_EVENT_SITE_ACTION_REQUEST:
-        {
-            GameMessage message {};
-            const auto status =
-                translate_site_action_request_to_message(event.payload.site_action_request, message);
-            if (status != GS1_STATUS_OK)
+            const auto status = dispatch_site_system_host_message<ActionExecutionSystem>(
+                ActionExecutionSystem::process_host_message,
+                message,
+                campaign_,
+                active_site_run_,
+                message_queue_,
+                fixed_step_seconds_);
+            if (status != GS1_STATUS_OK && status != GS1_STATUS_INVALID_STATE)
             {
                 return status;
             }
+            break;
+        }
 
-            message_queue_.push_back(message);
-            const auto dispatch_status = dispatch_queued_messages();
-            if (dispatch_status != GS1_STATUS_OK)
+        case HostMessageSubscriberId::Inventory:
+        {
+            const auto status = dispatch_site_system_host_message<InventorySystem>(
+                InventorySystem::process_host_message,
+                message,
+                campaign_,
+                active_site_run_,
+                message_queue_,
+                fixed_step_seconds_);
+            if (status != GS1_STATUS_OK && status != GS1_STATUS_INVALID_STATE)
             {
-                return dispatch_status;
+                return status;
             }
             break;
         }
 
-        case GS1_HOST_EVENT_SITE_ACTION_CANCEL:
+        case HostMessageSubscriberId::Craft:
         {
-            GameMessage message {};
-            const auto status =
-                translate_site_action_cancel_to_message(event.payload.site_action_cancel, message);
-            if (status != GS1_STATUS_OK)
+            const auto status = dispatch_site_system_host_message<CraftSystem>(
+                CraftSystem::process_host_message,
+                message,
+                campaign_,
+                active_site_run_,
+                message_queue_,
+                fixed_step_seconds_);
+            if (status != GS1_STATUS_OK && status != GS1_STATUS_INVALID_STATE)
             {
                 return status;
-            }
-
-            message_queue_.push_back(message);
-            const auto dispatch_status = dispatch_queued_messages();
-            if (dispatch_status != GS1_STATUS_OK)
-            {
-                return dispatch_status;
             }
             break;
         }
 
-        case GS1_HOST_EVENT_SITE_STORAGE_VIEW:
+        case HostMessageSubscriberId::TaskBoard:
         {
-            GameMessage message {};
-            const auto status =
-                translate_site_storage_view_to_message(event.payload.site_storage_view, message);
-            if (status != GS1_STATUS_OK)
+            const auto status = dispatch_site_system_host_message<TaskBoardSystem>(
+                TaskBoardSystem::process_host_message,
+                message,
+                campaign_,
+                active_site_run_,
+                message_queue_,
+                fixed_step_seconds_);
+            if (status != GS1_STATUS_OK && status != GS1_STATUS_INVALID_STATE)
             {
                 return status;
-            }
-
-            message_queue_.push_back(message);
-            const auto dispatch_status = dispatch_queued_messages();
-            if (dispatch_status != GS1_STATUS_OK)
-            {
-                return dispatch_status;
             }
             break;
         }
 
-        case GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP:
+        case HostMessageSubscriberId::EconomyPhone:
         {
-            GameMessage message {};
-            const auto status =
-                translate_site_inventory_slot_tap_to_message(event.payload.site_inventory_slot_tap, message);
-            if (status != GS1_STATUS_OK)
+            const auto status = dispatch_site_system_host_message<EconomyPhoneSystem>(
+                EconomyPhoneSystem::process_host_message,
+                message,
+                campaign_,
+                active_site_run_,
+                message_queue_,
+                fixed_step_seconds_);
+            if (status != GS1_STATUS_OK && status != GS1_STATUS_INVALID_STATE)
             {
                 return status;
-            }
-
-            message_queue_.push_back(message);
-            const auto dispatch_status = dispatch_queued_messages();
-            if (dispatch_status != GS1_STATUS_OK)
-            {
-                return dispatch_status;
             }
             break;
         }
 
-        case GS1_HOST_EVENT_SITE_SCENE_READY:
-            activate_loaded_site_scene();
-            break;
-
-        case GS1_HOST_EVENT_SITE_CONTEXT_REQUEST:
+        case HostMessageSubscriberId::PhonePanel:
         {
-            GameMessage message {};
-            const auto status =
-                translate_site_context_request_to_message(event.payload.site_context_request, message);
-            if (status != GS1_STATUS_OK)
+            const auto status = dispatch_site_system_host_message<PhonePanelSystem>(
+                PhonePanelSystem::process_host_message,
+                message,
+                campaign_,
+                active_site_run_,
+                message_queue_,
+                fixed_step_seconds_);
+            if (status != GS1_STATUS_OK && status != GS1_STATUS_INVALID_STATE)
             {
                 return status;
             }
+            break;
+        }
 
-            message_queue_.push_back(message);
-            const auto dispatch_status = dispatch_queued_messages();
-            if (dispatch_status != GS1_STATUS_OK)
+        case HostMessageSubscriberId::Modifier:
+        {
+            const auto status = dispatch_site_system_host_message<ModifierSystem>(
+                ModifierSystem::process_host_message,
+                message,
+                campaign_,
+                active_site_run_,
+                message_queue_,
+                fixed_step_seconds_);
+            if (status != GS1_STATUS_OK && status != GS1_STATUS_INVALID_STATE)
             {
-                return dispatch_status;
+                return status;
+            }
+            break;
+        }
+
+        case HostMessageSubscriberId::SiteFlow:
+        {
+            const auto status = dispatch_site_system_host_message<SiteFlowSystem>(
+                SiteFlowSystem::process_host_message,
+                message,
+                campaign_,
+                active_site_run_,
+                message_queue_,
+                fixed_step_seconds_);
+            if (status != GS1_STATUS_OK && status != GS1_STATUS_INVALID_STATE)
+            {
+                return status;
+            }
+            break;
+        }
+
+        case HostMessageSubscriberId::Presentation:
+        {
+            GamePresentationRuntimeContext context {
+                app_state_,
+                campaign_,
+                active_site_run_,
+                message_queue_,
+                runtime_messages_,
+                fixed_step_seconds_};
+            const auto status = presentation_.process_host_message(context, message);
+            if (status != GS1_STATUS_OK)
+            {
+                return status;
             }
             break;
         }
 
         default:
-            return GS1_STATUS_INVALID_ARGUMENT;
+            break;
         }
     }
 
@@ -1749,10 +1480,10 @@ void GameRuntime::run_fixed_step()
     };
 
     const SiteMoveDirectionInput move_direction {
-        phase1_site_move_direction_.world_move_x,
-        phase1_site_move_direction_.world_move_y,
-        phase1_site_move_direction_.world_move_z,
-        phase1_site_move_direction_.present};
+        active_site_run_->host_move_direction.world_move_x,
+        active_site_run_->host_move_direction.world_move_y,
+        active_site_run_->host_move_direction.world_move_z,
+        active_site_run_->host_move_direction.present};
 
     run_profiled_system(GS1_RUNTIME_PROFILE_SYSTEM_CAMPAIGN_TIME, [&]()
     {

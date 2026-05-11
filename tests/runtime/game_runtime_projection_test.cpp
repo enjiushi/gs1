@@ -45,6 +45,17 @@ namespace gs1
 {
 struct GameRuntimeProjectionTestAccess
 {
+    static GamePresentationRuntimeContext presentation_context(GameRuntime& runtime)
+    {
+        return GamePresentationRuntimeContext {
+            runtime.app_state_,
+            runtime.campaign_,
+            runtime.active_site_run_,
+            runtime.message_queue_,
+            runtime.runtime_messages_,
+            runtime.fixed_step_seconds_};
+    }
+
     static std::optional<CampaignState>& campaign(GameRuntime& runtime)
     {
         return runtime.campaign_;
@@ -57,22 +68,26 @@ struct GameRuntimeProjectionTestAccess
 
     static void mark_tile_dirty(GameRuntime& runtime, TileCoord coord)
     {
-        runtime.mark_site_tile_projection_dirty(coord);
+        auto context = presentation_context(runtime);
+        runtime.presentation_.mark_site_tile_projection_dirty(context, coord);
     }
 
     static void mark_all_tiles_dirty(GameRuntime& runtime)
     {
-        runtime.mark_site_projection_update_dirty(1ULL << 0);
+        auto context = presentation_context(runtime);
+        runtime.presentation_.mark_site_projection_update_dirty(context, 1ULL << 0);
     }
 
     static void flush_projection(GameRuntime& runtime)
     {
-        runtime.flush_site_presentation_if_dirty();
+        auto context = presentation_context(runtime);
+        runtime.presentation_.flush_site_presentation_if_dirty(context);
     }
 
     static void mark_projection_dirty(GameRuntime& runtime, std::uint64_t dirty_flags)
     {
-        runtime.mark_site_projection_update_dirty(dirty_flags);
+        auto context = presentation_context(runtime);
+        runtime.presentation_.mark_site_projection_update_dirty(context, dirty_flags);
     }
 
     static bool site_protection_selector_open(const GameRuntime& runtime)

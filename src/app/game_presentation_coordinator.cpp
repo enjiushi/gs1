@@ -1047,6 +1047,105 @@ Gs1PhonePanelSection to_phone_panel_section(PhonePanelSection section) noexcept
 
 }  // namespace
 
+bool GamePresentationCoordinator::subscribes_to_host_message(Gs1HostMessageType type) noexcept
+{
+    return type == GS1_HOST_EVENT_UI_ACTION ||
+        type == GS1_HOST_EVENT_SITE_STORAGE_VIEW ||
+        type == GS1_HOST_EVENT_SITE_SCENE_READY;
+}
+
+Gs1Status GamePresentationCoordinator::process_host_message(
+    GamePresentationRuntimeContext& context,
+    const Gs1HostMessage& message)
+{
+    if (message.type == GS1_HOST_EVENT_SITE_SCENE_READY)
+    {
+        activate_loaded_site_scene(context);
+        return GS1_STATUS_OK;
+    }
+
+    GameMessage translated {};
+    if (message.type == GS1_HOST_EVENT_SITE_STORAGE_VIEW)
+    {
+        translated.type = GameMessageType::InventoryStorageViewRequest;
+        translated.set_payload(InventoryStorageViewRequestMessage {
+            message.payload.site_storage_view.storage_id,
+            message.payload.site_storage_view.event_kind,
+            {0U, 0U, 0U}});
+        on_message_processed(context, translated);
+        return GS1_STATUS_OK;
+    }
+
+    if (message.type != GS1_HOST_EVENT_UI_ACTION)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    const auto& action = message.payload.ui_action.action;
+    switch (action.type)
+    {
+    case GS1_UI_ACTION_START_NEW_CAMPAIGN:
+        translated.type = GameMessageType::StartNewCampaign;
+        translated.set_payload(StartNewCampaignMessage {
+            action.arg0,
+            static_cast<std::uint32_t>(action.arg1)});
+        break;
+    case GS1_UI_ACTION_SELECT_DEPLOYMENT_SITE:
+        translated.type = GameMessageType::SelectDeploymentSite;
+        translated.set_payload(SelectDeploymentSiteMessage {action.target_id});
+        break;
+    case GS1_UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION:
+        translated.type = GameMessageType::ClearDeploymentSiteSelection;
+        translated.set_payload(ClearDeploymentSiteSelectionMessage {});
+        break;
+    case GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE:
+        translated.type = GameMessageType::OpenRegionalMapTechTree;
+        translated.set_payload(OpenRegionalMapTechTreeMessage {});
+        break;
+    case GS1_UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE:
+        translated.type = GameMessageType::CloseRegionalMapTechTree;
+        translated.set_payload(CloseRegionalMapTechTreeMessage {});
+        break;
+    case GS1_UI_ACTION_SELECT_TECH_TREE_FACTION_TAB:
+        translated.type = GameMessageType::SelectRegionalMapTechTreeFaction;
+        translated.set_payload(SelectRegionalMapTechTreeFactionMessage {action.target_id});
+        break;
+    case GS1_UI_ACTION_START_SITE_ATTEMPT:
+        translated.type = GameMessageType::StartSiteAttempt;
+        translated.set_payload(StartSiteAttemptMessage {action.target_id});
+        break;
+    case GS1_UI_ACTION_RETURN_TO_REGIONAL_MAP:
+        translated.type = GameMessageType::ReturnToRegionalMap;
+        translated.set_payload(ReturnToRegionalMapMessage {});
+        break;
+    case GS1_UI_ACTION_SET_PHONE_PANEL_SECTION:
+        translated.type = GameMessageType::PhonePanelSectionRequested;
+        translated.set_payload(PhonePanelSectionRequestedMessage {
+            static_cast<Gs1PhonePanelSection>(action.arg0),
+            {0U, 0U, 0U}});
+        break;
+    case GS1_UI_ACTION_OPEN_SITE_PROTECTION_SELECTOR:
+        translated.type = GameMessageType::OpenSiteProtectionSelector;
+        translated.set_payload(OpenSiteProtectionSelectorMessage {});
+        break;
+    case GS1_UI_ACTION_CLOSE_SITE_PROTECTION_UI:
+        translated.type = GameMessageType::CloseSiteProtectionUi;
+        translated.set_payload(CloseSiteProtectionUiMessage {});
+        break;
+    case GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE:
+        translated.type = GameMessageType::SetSiteProtectionOverlayMode;
+        translated.set_payload(SetSiteProtectionOverlayModeMessage {
+            static_cast<Gs1SiteProtectionOverlayMode>(action.arg0),
+            {0U, 0U, 0U}});
+        break;
+    default:
+        return GS1_STATUS_OK;
+    }
+
+    on_message_processed(context, translated);
+    return GS1_STATUS_OK;
+}
+
 void GamePresentationCoordinator::on_message_processed(GamePresentationRuntimeContext& context, const GameMessage& message)
 {
     active_context_ = &context;

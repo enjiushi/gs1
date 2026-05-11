@@ -80,6 +80,83 @@ SiteMetaState* find_site_mut(CampaignState& campaign, std::uint32_t site_id) noe
 }
 }  // namespace
 
+bool CampaignFlowSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
+{
+    return type == GS1_HOST_EVENT_UI_ACTION;
+}
+
+Gs1Status CampaignFlowSystem::process_host_message(
+    CampaignFlowMessageContext& context,
+    const Gs1HostMessage& message)
+{
+    if (message.type != GS1_HOST_EVENT_UI_ACTION)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    const auto& action = message.payload.ui_action.action;
+    GameMessage game_message {};
+    switch (action.type)
+    {
+    case GS1_UI_ACTION_START_NEW_CAMPAIGN:
+        game_message.type = GameMessageType::StartNewCampaign;
+        game_message.set_payload(StartNewCampaignMessage {
+            action.arg0,
+            static_cast<std::uint32_t>(action.arg1)});
+        return process_message(context, game_message);
+
+    case GS1_UI_ACTION_SELECT_DEPLOYMENT_SITE:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        game_message.type = GameMessageType::SelectDeploymentSite;
+        game_message.set_payload(SelectDeploymentSiteMessage {action.target_id});
+        return process_message(context, game_message);
+
+    case GS1_UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION:
+        game_message.type = GameMessageType::ClearDeploymentSiteSelection;
+        game_message.set_payload(ClearDeploymentSiteSelectionMessage {});
+        return process_message(context, game_message);
+
+    case GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE:
+        game_message.type = GameMessageType::OpenRegionalMapTechTree;
+        game_message.set_payload(OpenRegionalMapTechTreeMessage {});
+        return process_message(context, game_message);
+
+    case GS1_UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE:
+        game_message.type = GameMessageType::CloseRegionalMapTechTree;
+        game_message.set_payload(CloseRegionalMapTechTreeMessage {});
+        return process_message(context, game_message);
+
+    case GS1_UI_ACTION_SELECT_TECH_TREE_FACTION_TAB:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        game_message.type = GameMessageType::SelectRegionalMapTechTreeFaction;
+        game_message.set_payload(SelectRegionalMapTechTreeFactionMessage {action.target_id});
+        return process_message(context, game_message);
+
+    case GS1_UI_ACTION_START_SITE_ATTEMPT:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        game_message.type = GameMessageType::StartSiteAttempt;
+        game_message.set_payload(StartSiteAttemptMessage {action.target_id});
+        return process_message(context, game_message);
+
+    case GS1_UI_ACTION_RETURN_TO_REGIONAL_MAP:
+        game_message.type = GameMessageType::ReturnToRegionalMap;
+        game_message.set_payload(ReturnToRegionalMapMessage {});
+        return process_message(context, game_message);
+
+    default:
+        return GS1_STATUS_OK;
+    }
+}
+
 bool CampaignFlowSystem::subscribes_to(GameMessageType type) noexcept
 {
     switch (type)

@@ -435,6 +435,52 @@ void sync_phone_panel_projection(
 }
 }  // namespace
 
+bool PhonePanelSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
+{
+    return type == GS1_HOST_EVENT_UI_ACTION;
+}
+
+Gs1Status PhonePanelSystem::process_host_message(
+    SiteSystemContext<PhonePanelSystem>& context,
+    const Gs1HostMessage& message)
+{
+    if (message.type != GS1_HOST_EVENT_UI_ACTION)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    const auto& action = message.payload.ui_action.action;
+    switch (action.type)
+    {
+    case GS1_UI_ACTION_SET_PHONE_PANEL_SECTION:
+    {
+        if (action.arg0 > static_cast<std::uint64_t>(GS1_PHONE_PANEL_SECTION_CART))
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+
+        const PhonePanelSectionRequestedMessage payload {
+            static_cast<Gs1PhonePanelSection>(action.arg0),
+            {0U, 0U, 0U}};
+        auto message_copy = GameMessage {};
+        message_copy.type = GameMessageType::PhonePanelSectionRequested;
+        message_copy.set_payload(payload);
+        return process_message(context, message_copy);
+    }
+
+    case GS1_UI_ACTION_CLOSE_PHONE_PANEL:
+    {
+        auto message_copy = GameMessage {};
+        message_copy.type = GameMessageType::ClosePhonePanel;
+        message_copy.set_payload(ClosePhonePanelMessage {});
+        return process_message(context, message_copy);
+    }
+
+    default:
+        return GS1_STATUS_OK;
+    }
+}
+
 bool PhonePanelSystem::subscribes_to(GameMessageType type) noexcept
 {
     switch (type)

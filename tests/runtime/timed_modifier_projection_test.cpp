@@ -22,6 +22,17 @@ namespace gs1
 {
 struct GameRuntimeProjectionTestAccess
 {
+    static GamePresentationRuntimeContext presentation_context(GameRuntime& runtime)
+    {
+        return GamePresentationRuntimeContext {
+            runtime.app_state_,
+            runtime.campaign_,
+            runtime.active_site_run_,
+            runtime.message_queue_,
+            runtime.runtime_messages_,
+            runtime.fixed_step_seconds_};
+    }
+
     static std::optional<CampaignState>& campaign(GameRuntime& runtime)
     {
         return runtime.campaign_;
@@ -34,7 +45,8 @@ struct GameRuntimeProjectionTestAccess
 
     static void flush_projection(GameRuntime& runtime)
     {
-        runtime.flush_site_presentation_if_dirty();
+        auto context = presentation_context(runtime);
+        runtime.presentation_.flush_site_presentation_if_dirty(context);
     }
 };
 }  // namespace gs1

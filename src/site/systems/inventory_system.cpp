@@ -1547,6 +1547,56 @@ void progress_pending_deliveries(SiteSystemContext<InventorySystem>& context) no
 
 }  // namespace
 
+bool InventorySystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
+{
+    return type == GS1_HOST_EVENT_SITE_MOVE_DIRECTION ||
+        type == GS1_HOST_EVENT_SITE_STORAGE_VIEW ||
+        type == GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP;
+}
+
+Gs1Status InventorySystem::process_host_message(
+    SiteSystemContext<InventorySystem>& context,
+    const Gs1HostMessage& message)
+{
+    switch (message.type)
+    {
+    case GS1_HOST_EVENT_SITE_MOVE_DIRECTION:
+    {
+        const auto& payload = message.payload.site_move_direction;
+        const float move_length_squared =
+            payload.world_move_x * payload.world_move_x +
+            payload.world_move_y * payload.world_move_y +
+            payload.world_move_z * payload.world_move_z;
+        if (move_length_squared > 0.0001f)
+        {
+            clear_pending_device_storage_open(context.world.own_inventory());
+        }
+        return GS1_STATUS_OK;
+    }
+
+    case GS1_HOST_EVENT_SITE_STORAGE_VIEW:
+        return handle_inventory_storage_view_request(
+            context,
+            InventoryStorageViewRequestMessage {
+                message.payload.site_storage_view.storage_id,
+                message.payload.site_storage_view.event_kind,
+                {0U, 0U, 0U}});
+
+    case GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP:
+        return handle_inventory_slot_tapped(
+            context,
+            InventorySlotTappedMessage {
+                message.payload.site_inventory_slot_tap.storage_id,
+                message.payload.site_inventory_slot_tap.item_instance_id,
+                message.payload.site_inventory_slot_tap.slot_index,
+                message.payload.site_inventory_slot_tap.container_kind,
+                0U});
+
+    default:
+        return GS1_STATUS_OK;
+    }
+}
+
 bool InventorySystem::subscribes_to(GameMessageType type) noexcept
 {
     switch (type)

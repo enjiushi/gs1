@@ -2511,6 +2511,68 @@ SiteActionFailureReason validate_excavation_completion(
 
 }  // namespace
 
+bool ActionExecutionSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
+{
+    return type == GS1_HOST_EVENT_SITE_ACTION_REQUEST ||
+        type == GS1_HOST_EVENT_SITE_ACTION_CANCEL ||
+        type == GS1_HOST_EVENT_SITE_CONTEXT_REQUEST;
+}
+
+Gs1Status ActionExecutionSystem::process_host_message(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    const Gs1HostMessage& message)
+{
+    GameMessage translated {};
+    switch (message.type)
+    {
+    case GS1_HOST_EVENT_SITE_ACTION_REQUEST:
+        if (message.payload.site_action_request.action_kind == GS1_SITE_ACTION_NONE)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        translated.type = GameMessageType::StartSiteAction;
+        translated.set_payload(StartSiteActionMessage {
+            message.payload.site_action_request.action_kind,
+            message.payload.site_action_request.flags,
+            message.payload.site_action_request.quantity == 0U ? 1U : message.payload.site_action_request.quantity,
+            message.payload.site_action_request.target_tile_x,
+            message.payload.site_action_request.target_tile_y,
+            message.payload.site_action_request.primary_subject_id,
+            message.payload.site_action_request.secondary_subject_id,
+            message.payload.site_action_request.item_id});
+        return process_message(context, translated);
+
+    case GS1_HOST_EVENT_SITE_ACTION_CANCEL:
+        if (message.payload.site_action_cancel.action_id == 0U &&
+            (message.payload.site_action_cancel.flags &
+                (GS1_SITE_ACTION_CANCEL_FLAG_CURRENT_ACTION |
+                    GS1_SITE_ACTION_CANCEL_FLAG_PLACEMENT_MODE)) == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        translated.type = GameMessageType::CancelSiteAction;
+        translated.set_payload(CancelSiteActionMessage {
+            message.payload.site_action_cancel.action_id,
+            message.payload.site_action_cancel.flags});
+        return process_message(context, translated);
+
+    case GS1_HOST_EVENT_SITE_CONTEXT_REQUEST:
+        if (!context.site_run.site_action.placement_mode.active)
+        {
+            return GS1_STATUS_OK;
+        }
+        translated.type = GameMessageType::PlacementModeCursorMoved;
+        translated.set_payload(PlacementModeCursorMovedMessage {
+            message.payload.site_context_request.tile_x,
+            message.payload.site_context_request.tile_y,
+            message.payload.site_context_request.flags});
+        return process_message(context, translated);
+
+    default:
+        return GS1_STATUS_OK;
+    }
+}
+
 bool ActionExecutionSystem::subscribes_to(GameMessageType type) noexcept
 {
     switch (type)
