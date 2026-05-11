@@ -69,9 +69,9 @@ GameMessage make_start_site_attempt_message(std::uint32_t site_id)
     return message;
 }
 
-Gs1HostEvent make_site_scene_ready_event()
+Gs1HostMessage make_site_scene_ready_event()
 {
-    Gs1HostEvent event {};
+    Gs1HostMessage event {};
     event.type = GS1_HOST_EVENT_SITE_SCENE_READY;
     return event;
 }
@@ -92,11 +92,11 @@ GameMessage make_inventory_use_message(
     return message;
 }
 
-std::vector<Gs1EngineMessage> drain_engine_messages(GameRuntime& runtime)
+std::vector<Gs1RuntimeMessage> drain_runtime_messages(GameRuntime& runtime)
 {
-    std::vector<Gs1EngineMessage> messages {};
-    Gs1EngineMessage message {};
-    while (runtime.pop_engine_message(message) == GS1_STATUS_OK)
+    std::vector<Gs1RuntimeMessage> messages {};
+    Gs1RuntimeMessage message {};
+    while (runtime.pop_runtime_message(message) == GS1_STATUS_OK)
     {
         messages.push_back(message);
     }
@@ -122,8 +122,8 @@ void run_phase2(GameRuntime& runtime, Gs1Phase2Result& out_result)
     assert(runtime.run_phase2(request, out_result) == GS1_STATUS_OK);
 }
 
-const Gs1EngineMessage* find_site_modifier_message(
-    const std::vector<Gs1EngineMessage>& messages,
+const Gs1RuntimeMessage* find_site_modifier_message(
+    const std::vector<Gs1RuntimeMessage>& messages,
     std::uint32_t modifier_id)
 {
     for (const auto& message : messages)
@@ -155,7 +155,7 @@ void bootstrap_site_one(GameRuntime& runtime)
     assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).has_value());
 
     const auto ready_event = make_site_scene_ready_event();
-    assert(runtime.submit_host_events(&ready_event, 1U) == GS1_STATUS_OK);
+    assert(runtime.submit_host_messages(&ready_event, 1U) == GS1_STATUS_OK);
     Gs1Phase2Result ready_result {};
     run_phase2(runtime, ready_result);
 }
@@ -172,7 +172,7 @@ void timed_modifier_projection_only_republishes_on_game_hour_boundaries()
     bootstrap_site_one(runtime);
 
     auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
-    drain_engine_messages(runtime);
+    drain_runtime_messages(runtime);
 
     site_run.inventory.worker_pack_slots[0].occupied = true;
     site_run.inventory.worker_pack_slots[0].item_id = gs1::ItemId {gs1::k_item_focus_tonic};
@@ -187,7 +187,7 @@ void timed_modifier_projection_only_republishes_on_game_hour_boundaries()
                0U)) == GS1_STATUS_OK);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
 
-    const auto activation_messages = drain_engine_messages(runtime);
+    const auto activation_messages = drain_runtime_messages(runtime);
     const auto* activation_modifier_message =
         find_site_modifier_message(activation_messages, 3003U);
     assert(activation_modifier_message != nullptr);
@@ -197,12 +197,12 @@ void timed_modifier_projection_only_republishes_on_game_hour_boundaries()
 
     Gs1Phase1Result first_tick_result {};
     run_phase1(runtime, 60.0, first_tick_result);
-    const auto first_tick_messages = drain_engine_messages(runtime);
+    const auto first_tick_messages = drain_runtime_messages(runtime);
     assert(find_site_modifier_message(first_tick_messages, 3003U) == nullptr);
 
     Gs1Phase1Result second_tick_result {};
     run_phase1(runtime, 60.0, second_tick_result);
-    const auto second_tick_messages = drain_engine_messages(runtime);
+    const auto second_tick_messages = drain_runtime_messages(runtime);
     const auto* hour_boundary_modifier_message =
         find_site_modifier_message(second_tick_messages, 3003U);
     assert(hour_boundary_modifier_message != nullptr);
@@ -217,3 +217,5 @@ int main()
     timed_modifier_projection_only_republishes_on_game_hour_boundaries();
     return 0;
 }
+
+

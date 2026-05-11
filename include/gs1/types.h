@@ -636,12 +636,6 @@ union Gs1HostEventPayload
     Gs1HostEventEmptyData empty;
 };
 
-struct Gs1HostEvent
-{
-    Gs1HostEventType type;
-    Gs1HostEventPayload payload;
-};
-
 using Gs1HostMessageType = Gs1HostEventType;
 using Gs1HostMessageUiActionData = Gs1HostEventUiActionData;
 using Gs1HostMessageSiteMoveDirectionData = Gs1HostEventSiteMoveDirectionData;
@@ -653,7 +647,12 @@ using Gs1HostMessageSiteInventorySlotTapData = Gs1HostEventSiteInventorySlotTapD
 using Gs1HostMessageSiteSceneReadyData = Gs1HostEventSiteSceneReadyData;
 using Gs1HostMessageEmptyData = Gs1HostEventEmptyData;
 using Gs1HostMessagePayload = Gs1HostEventPayload;
-using Gs1HostMessage = Gs1HostEvent;
+
+struct Gs1HostMessage
+{
+    Gs1HostMessageType type;
+    Gs1HostMessagePayload payload;
+};
 
 struct Gs1FeedbackEventData
 {
@@ -679,8 +678,8 @@ struct Gs1Phase1Result
 {
     std::uint32_t struct_size;
     std::uint32_t fixed_steps_executed;
-    std::uint32_t engine_messages_queued;
-    std::uint32_t processed_host_event_count;
+    std::uint32_t runtime_messages_queued;
+    std::uint32_t processed_host_message_count;
 };
 
 struct Gs1Phase2Request
@@ -691,9 +690,9 @@ struct Gs1Phase2Request
 struct Gs1Phase2Result
 {
     std::uint32_t struct_size;
-    std::uint32_t processed_host_event_count;
+    std::uint32_t processed_host_message_count;
     std::uint32_t processed_feedback_event_count;
-    std::uint32_t engine_messages_queued;
+    std::uint32_t runtime_messages_queued;
     std::uint32_t reserved;
 };
 
@@ -1208,10 +1207,12 @@ struct Gs1EngineMessageOneShotCueData
     Gs1OneShotCueKind cue_kind;
 };
 
-struct alignas(GS1_MESSAGE_CACHE_LINE_SIZE) Gs1EngineMessage
+using Gs1RuntimeMessageType = Gs1EngineMessageType;
+
+struct alignas(GS1_MESSAGE_CACHE_LINE_SIZE) Gs1RuntimeMessage
 {
     unsigned char payload[GS1_MESSAGE_PAYLOAD_BYTE_COUNT];
-    Gs1EngineMessageType type;
+    Gs1RuntimeMessageType type;
 
     template <typename PayloadData>
     [[nodiscard]] PayloadData& emplace_payload() noexcept
@@ -1248,13 +1249,10 @@ private:
     static constexpr void validate_payload_type() noexcept
     {
         GS1_ASSERT_TRIVIAL_SCHEMA(PayloadData);
-        static_assert(sizeof(PayloadData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT, "Engine message payload data exceeds message payload storage.");
-        static_assert(alignof(PayloadData) <= alignof(Gs1EngineMessage), "Engine message payload data requires stronger alignment than Gs1EngineMessage.");
+        static_assert(sizeof(PayloadData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT, "Runtime message payload data exceeds message payload storage.");
+        static_assert(alignof(PayloadData) <= alignof(Gs1RuntimeMessage), "Runtime message payload data requires stronger alignment than Gs1RuntimeMessage.");
     }
 };
-
-using Gs1RuntimeMessageType = Gs1EngineMessageType;
-using Gs1RuntimeMessage = Gs1EngineMessage;
 
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1RuntimeCreateDesc, 32U);
 GS1_ASSERT_TRIVIAL_SCHEMA(Gs1RuntimeTimingStats);
@@ -1274,7 +1272,7 @@ static_assert(std::is_standard_layout_v<Gs1HostEventPayload>, "Gs1HostEventPaylo
 static_assert(std::is_trivial_v<Gs1HostEventPayload>, "Gs1HostEventPayload must remain trivial.");
 static_assert(std::is_trivially_copyable_v<Gs1HostEventPayload>, "Gs1HostEventPayload must remain trivially copyable.");
 static_assert(sizeof(Gs1HostEventPayload) == 24U, "Gs1HostEventPayload size changed; revisit event packing.");
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEvent, 32U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostMessage, 32U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1FeedbackEventData, 16U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1FeedbackEvent, 20U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1Phase1Request, 16U);
@@ -1327,7 +1325,7 @@ GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageCampaignResourcesData, 20U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageNotificationData, 56U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteResultData, 8U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageOneShotCueData, 24U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessage, 64U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1RuntimeMessage, 64U);
 
 static_assert(sizeof(Gs1EngineMessageLogTextData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageSetAppStateData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
@@ -1376,10 +1374,10 @@ static_assert(sizeof(Gs1EngineMessageCampaignResourcesData) <= GS1_MESSAGE_PAYLO
 static_assert(sizeof(Gs1EngineMessageNotificationData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageSiteResultData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageOneShotCueData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineMessage) == GS1_MESSAGE_CACHE_LINE_SIZE, "Gs1EngineMessage must fit exactly one cache line.");
-static_assert(alignof(Gs1EngineMessage) == GS1_MESSAGE_CACHE_LINE_SIZE, "Gs1EngineMessage must be cache-line aligned.");
-static_assert(offsetof(Gs1EngineMessage, payload) == 0U, "Gs1EngineMessage payload must start at byte zero.");
-static_assert(offsetof(Gs1EngineMessage, type) == GS1_MESSAGE_PAYLOAD_BYTE_COUNT, "Gs1EngineMessage type must sit at the tail byte.");
+static_assert(sizeof(Gs1RuntimeMessage) == GS1_MESSAGE_CACHE_LINE_SIZE, "Gs1RuntimeMessage must fit exactly one cache line.");
+static_assert(alignof(Gs1RuntimeMessage) == GS1_MESSAGE_CACHE_LINE_SIZE, "Gs1RuntimeMessage must be cache-line aligned.");
+static_assert(offsetof(Gs1RuntimeMessage, payload) == 0U, "Gs1RuntimeMessage payload must start at byte zero.");
+static_assert(offsetof(Gs1RuntimeMessage, type) == GS1_MESSAGE_PAYLOAD_BYTE_COUNT, "Gs1RuntimeMessage type must sit at the tail byte.");
 
 #undef GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT
 #undef GS1_ASSERT_TRIVIAL_SCHEMA

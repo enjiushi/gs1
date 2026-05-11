@@ -15,8 +15,8 @@ namespace
 {
 struct FakeRuntimeState final
 {
-    std::deque<Gs1EngineMessage> engine_messages {};
-    std::vector<Gs1HostEvent> submitted_host_events {};
+    std::deque<Gs1RuntimeMessage> engine_messages {};
+    std::vector<Gs1HostMessage> submitted_host_events {};
     std::vector<Gs1FeedbackEvent> submitted_feedback_events {};
     std::uint32_t last_submitted_host_event_count {0};
     std::uint32_t last_submitted_feedback_event_count {0};
@@ -30,9 +30,9 @@ FakeRuntimeState& fake_runtime(Gs1RuntimeHandle* runtime) noexcept
     return *reinterpret_cast<FakeRuntimeState*>(runtime);
 }
 
-Gs1Status fake_submit_host_events(
+Gs1Status fake_submit_host_messages(
     Gs1RuntimeHandle* runtime,
-    const Gs1HostEvent* events,
+    const Gs1HostMessage* events,
     std::uint32_t event_count) noexcept
 {
     auto& state = fake_runtime(runtime);
@@ -71,8 +71,8 @@ Gs1Status fake_run_phase1(
 
     out_result->struct_size = sizeof(Gs1Phase1Result);
     out_result->fixed_steps_executed = request->real_delta_seconds > 0.0 ? 1U : 0U;
-    out_result->engine_messages_queued = static_cast<std::uint32_t>(state.engine_messages.size());
-    out_result->processed_host_event_count = state.last_submitted_host_event_count;
+    out_result->runtime_messages_queued = static_cast<std::uint32_t>(state.engine_messages.size());
+    out_result->processed_host_message_count = state.last_submitted_host_event_count;
     return GS1_STATUS_OK;
 }
 
@@ -88,16 +88,16 @@ Gs1Status fake_run_phase2(
     state.run_phase2_call_count += 1U;
 
     out_result->struct_size = sizeof(Gs1Phase2Result);
-    out_result->processed_host_event_count = 0U;
+    out_result->processed_host_message_count = 0U;
     out_result->processed_feedback_event_count = state.last_submitted_feedback_event_count;
-    out_result->engine_messages_queued = static_cast<std::uint32_t>(state.engine_messages.size());
+    out_result->runtime_messages_queued = static_cast<std::uint32_t>(state.engine_messages.size());
     out_result->reserved = 0U;
     return GS1_STATUS_OK;
 }
 
-Gs1Status fake_pop_engine_message(
+Gs1Status fake_pop_runtime_message(
     Gs1RuntimeHandle* runtime,
-    Gs1EngineMessage* out_message) noexcept
+    Gs1RuntimeMessage* out_message) noexcept
 {
     assert(out_message != nullptr);
 
@@ -115,25 +115,25 @@ Gs1Status fake_pop_engine_message(
 Gs1RuntimeApi make_fake_api() noexcept
 {
     Gs1RuntimeApi api {};
-    api.submit_host_events = &fake_submit_host_events;
+    api.submit_host_messages = &fake_submit_host_messages;
     api.submit_feedback_events = &fake_submit_feedback_events;
     api.run_phase1 = &fake_run_phase1;
     api.run_phase2 = &fake_run_phase2;
-    api.pop_engine_message = &fake_pop_engine_message;
+    api.pop_runtime_message = &fake_pop_runtime_message;
     return api;
 }
 
-Gs1EngineMessage make_set_app_state_message(Gs1AppState app_state)
+Gs1RuntimeMessage make_set_app_state_message(Gs1AppState app_state)
 {
-    Gs1EngineMessage message {};
+    Gs1RuntimeMessage message {};
     message.type = GS1_ENGINE_MESSAGE_SET_APP_STATE;
     (void)message.emplace_payload<Gs1EngineMessageSetAppStateData>(Gs1EngineMessageSetAppStateData {app_state});
     return message;
 }
 
-Gs1EngineMessage make_log_text_message(Gs1LogLevel level, const char* text)
+Gs1RuntimeMessage make_log_text_message(Gs1LogLevel level, const char* text)
 {
-    Gs1EngineMessage message {};
+    Gs1RuntimeMessage message {};
     message.type = GS1_ENGINE_MESSAGE_LOG_TEXT;
     auto& payload = message.emplace_payload<Gs1EngineMessageLogTextData>();
     payload.level = level;
@@ -143,14 +143,14 @@ Gs1EngineMessage make_log_text_message(Gs1LogLevel level, const char* text)
     return message;
 }
 
-Gs1EngineMessage make_begin_site_snapshot_message(
+Gs1RuntimeMessage make_begin_site_snapshot_message(
     std::uint32_t site_id,
     std::uint32_t site_archetype_id,
     std::uint16_t width,
     std::uint16_t height,
     Gs1ProjectionMode mode)
 {
-    Gs1EngineMessage message {};
+    Gs1RuntimeMessage message {};
     message.type = GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT;
     auto& payload = message.emplace_payload<Gs1EngineMessageSiteSnapshotData>();
     payload.site_id = site_id;
@@ -161,11 +161,11 @@ Gs1EngineMessage make_begin_site_snapshot_message(
     return message;
 }
 
-Gs1EngineMessage make_site_modifier_list_begin_message(
+Gs1RuntimeMessage make_site_modifier_list_begin_message(
     Gs1ProjectionMode mode,
     std::uint16_t modifier_count)
 {
-    Gs1EngineMessage message {};
+    Gs1RuntimeMessage message {};
     message.type = GS1_ENGINE_MESSAGE_SITE_MODIFIER_LIST_BEGIN;
     auto& payload = message.emplace_payload<Gs1EngineMessageSiteModifierListData>();
     payload.mode = mode;
@@ -174,12 +174,12 @@ Gs1EngineMessage make_site_modifier_list_begin_message(
     return message;
 }
 
-Gs1EngineMessage make_site_modifier_upsert_message(
+Gs1RuntimeMessage make_site_modifier_upsert_message(
     std::uint32_t modifier_id,
     std::uint16_t remaining_game_hours,
     std::uint8_t flags)
 {
-    Gs1EngineMessage message {};
+    Gs1RuntimeMessage message {};
     message.type = GS1_ENGINE_MESSAGE_SITE_MODIFIER_UPSERT;
     auto& payload = message.emplace_payload<Gs1EngineMessageSiteModifierData>();
     payload.modifier_id = modifier_id;
@@ -189,16 +189,16 @@ Gs1EngineMessage make_site_modifier_upsert_message(
     return message;
 }
 
-Gs1EngineMessage make_end_site_snapshot_message()
+Gs1RuntimeMessage make_end_site_snapshot_message()
 {
-    Gs1EngineMessage message {};
+    Gs1RuntimeMessage message {};
     message.type = GS1_ENGINE_MESSAGE_END_SITE_SNAPSHOT;
     return message;
 }
 
-Gs1EngineMessage make_hud_state_message(float money)
+Gs1RuntimeMessage make_hud_state_message(float money)
 {
-    Gs1EngineMessage message {};
+    Gs1RuntimeMessage message {};
     message.type = GS1_ENGINE_MESSAGE_HUD_STATE;
     auto& payload = message.emplace_payload<Gs1EngineMessageHudStateData>();
     payload.player_health = 90.0f;
@@ -214,14 +214,14 @@ Gs1EngineMessage make_hud_state_message(float money)
     return message;
 }
 
-Gs1EngineMessage make_campaign_resources_message(
+Gs1RuntimeMessage make_campaign_resources_message(
     float money,
     std::uint32_t reputation,
     std::uint32_t village_reputation,
     std::uint32_t forestry_reputation,
     std::uint32_t university_reputation)
 {
-    Gs1EngineMessage message {};
+    Gs1RuntimeMessage message {};
     message.type = GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES;
     auto& payload = message.emplace_payload<Gs1EngineMessageCampaignResourcesData>();
     payload.current_money = money;
@@ -476,3 +476,4 @@ int main()
     visual_smoke_assets_keep_hidden_regional_map_panels_collapsed();
     return 0;
 }
+

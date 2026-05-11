@@ -18,11 +18,6 @@ GS1_API Gs1Status gs1_create_runtime(
 GS1_API void gs1_destroy_runtime(
     Gs1RuntimeHandle* runtime) GS1_NOEXCEPT;
 
-GS1_API Gs1Status gs1_submit_host_events(
-    Gs1RuntimeHandle* runtime,
-    const Gs1HostEvent* events,
-    std::uint32_t event_count) GS1_NOEXCEPT;
-
 GS1_API Gs1Status gs1_submit_host_messages(
     Gs1RuntimeHandle* runtime,
     const Gs1HostMessage* messages,
@@ -42,10 +37,6 @@ GS1_API Gs1Status gs1_run_phase2(
     Gs1RuntimeHandle* runtime,
     const Gs1Phase2Request* request,
     Gs1Phase2Result* out_result) GS1_NOEXCEPT;
-
-GS1_API Gs1Status gs1_pop_engine_message(
-    Gs1RuntimeHandle* runtime,
-    Gs1EngineMessage* out_message) GS1_NOEXCEPT;
 
 GS1_API Gs1Status gs1_pop_runtime_message(
     Gs1RuntimeHandle* runtime,

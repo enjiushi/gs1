@@ -984,10 +984,10 @@ float action_progress_normalized(const ActionState& action_state) noexcept
     return static_cast<float>(std::clamp(normalized, 0.0, 1.0));
 }
 
-Gs1EngineMessage make_engine_message(
+Gs1RuntimeMessage make_engine_message(
     Gs1EngineMessageType type)
 {
-    Gs1EngineMessage message {};
+    Gs1RuntimeMessage message {};
     message.type = type;
     return message;
 }
@@ -4260,3 +4260,4 @@ void GamePresentationCoordinator::flush_site_presentation_if_dirty(GamePresentat
 }
 
 }  // namespace gs1
+

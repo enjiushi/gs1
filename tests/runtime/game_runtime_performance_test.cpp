@@ -171,17 +171,17 @@ GameMessage make_start_site_attempt_message(std::uint32_t site_id)
     return message;
 }
 
-Gs1HostEvent make_site_scene_ready_event()
+Gs1HostMessage make_site_scene_ready_event()
 {
-    Gs1HostEvent event {};
+    Gs1HostMessage event {};
     event.type = GS1_HOST_EVENT_SITE_SCENE_READY;
     return event;
 }
 
-void drain_engine_messages(GameRuntime& runtime)
+void drain_runtime_messages(GameRuntime& runtime)
 {
-    Gs1EngineMessage message {};
-    while (runtime.pop_engine_message(message) == GS1_STATUS_OK)
+    Gs1RuntimeMessage message {};
+    while (runtime.pop_runtime_message(message) == GS1_STATUS_OK)
     {
     }
 }
@@ -200,7 +200,7 @@ void bootstrap_site_one(GameRuntime& runtime)
         "active site run was not created");
 
     const auto ready_event = make_site_scene_ready_event();
-    require_ok(runtime.submit_host_events(&ready_event, 1U), "submitting site scene ready event");
+    require_ok(runtime.submit_host_messages(&ready_event, 1U), "submitting site scene ready message");
     Gs1Phase2Request phase2_request {};
     phase2_request.struct_size = sizeof(Gs1Phase2Request);
     Gs1Phase2Result phase2_result {};
@@ -220,7 +220,7 @@ void run_boot_phase(GameRuntime& runtime)
     Gs1Phase2Result phase2_result {};
     require_ok(runtime.run_phase1(phase1_request, phase1_result), "running boot phase1");
     require_ok(runtime.run_phase2(phase2_request, phase2_result), "running boot phase2");
-    drain_engine_messages(runtime);
+    drain_runtime_messages(runtime);
 }
 
 void seed_dense_cover(SiteRunState& site_run)
@@ -307,7 +307,7 @@ ScenarioResult run_scenario(const ScenarioConfig& config)
     auto& site_run = active_site_run.value();
     seed_dense_cover(site_run);
     seed_perf_plants(site_run);
-    drain_engine_messages(runtime);
+    drain_runtime_messages(runtime);
 
     for (const auto system_id : config.disabled_systems)
     {
@@ -329,7 +329,7 @@ ScenarioResult run_scenario(const ScenarioConfig& config)
         Gs1Phase2Result phase2_result {};
         require_ok(runtime.run_phase1(phase1_request, phase1_result), "running warmup phase1");
         require_ok(runtime.run_phase2(phase2_request, phase2_result), "running warmup phase2");
-        drain_engine_messages(runtime);
+        drain_runtime_messages(runtime);
     }
 
     runtime.reset_profiling();
@@ -355,7 +355,7 @@ ScenarioResult run_scenario(const ScenarioConfig& config)
         result.total_wall_ms += frame_wall_ms;
         result.max_wall_ms = std::max(result.max_wall_ms, frame_wall_ms);
         result.fixed_steps_executed += phase1_result.fixed_steps_executed;
-        drain_engine_messages(runtime);
+        drain_runtime_messages(runtime);
     }
 
     result.avg_wall_ms =
@@ -533,3 +533,5 @@ int main(int argc, char** argv)
 
     return 0;
 }
+
+

@@ -588,13 +588,6 @@ Gs1Status GameRuntime::submit_host_messages(
     return GS1_STATUS_OK;
 }
 
-Gs1Status GameRuntime::submit_host_events(
-    const Gs1HostEvent* events,
-    std::uint32_t event_count)
-{
-    return submit_host_messages(events, event_count);
-}
-
 Gs1Status GameRuntime::submit_feedback_events(
     const Gs1FeedbackEvent* events,
     std::uint32_t event_count)
@@ -648,7 +641,7 @@ Gs1Status GameRuntime::run_phase1(const Gs1Phase1Request& request, Gs1Phase1Resu
         boot_initialized_ = true;
     }
 
-    status = dispatch_host_messages(out_result.processed_host_event_count);
+    status = dispatch_host_messages(out_result.processed_host_message_count);
     if (status != GS1_STATUS_OK)
     {
         finish_phase();
@@ -657,14 +650,14 @@ Gs1Status GameRuntime::run_phase1(const Gs1Phase1Request& request, Gs1Phase1Resu
 
     if (!active_site_run_.has_value())
     {
-        out_result.engine_messages_queued = static_cast<std::uint32_t>(runtime_messages_.size());
+        out_result.runtime_messages_queued = static_cast<std::uint32_t>(runtime_messages_.size());
         finish_phase();
         return GS1_STATUS_OK;
     }
 
     if (app_state_ == GS1_APP_STATE_SITE_LOADING)
     {
-        out_result.engine_messages_queued = static_cast<std::uint32_t>(runtime_messages_.size());
+        out_result.runtime_messages_queued = static_cast<std::uint32_t>(runtime_messages_.size());
         finish_phase();
         return GS1_STATUS_OK;
     }
@@ -689,7 +682,7 @@ Gs1Status GameRuntime::run_phase1(const Gs1Phase1Request& request, Gs1Phase1Resu
 
     status = dispatch_queued_messages();
     active_site_run_->host_move_direction = {};
-    out_result.engine_messages_queued = static_cast<std::uint32_t>(runtime_messages_.size());
+    out_result.runtime_messages_queued = static_cast<std::uint32_t>(runtime_messages_.size());
     finish_phase();
     return status;
 }
@@ -710,7 +703,7 @@ Gs1Status GameRuntime::run_phase2(const Gs1Phase2Request& request, Gs1Phase2Resu
     out_result = {};
     out_result.struct_size = sizeof(Gs1Phase2Result);
 
-    auto status = dispatch_host_messages(out_result.processed_host_event_count);
+    auto status = dispatch_host_messages(out_result.processed_host_message_count);
     if (status != GS1_STATUS_OK)
     {
         finish_phase();
@@ -725,7 +718,7 @@ Gs1Status GameRuntime::run_phase2(const Gs1Phase2Request& request, Gs1Phase2Resu
     }
 
     status = dispatch_queued_messages();
-    out_result.engine_messages_queued = static_cast<std::uint32_t>(runtime_messages_.size());
+    out_result.runtime_messages_queued = static_cast<std::uint32_t>(runtime_messages_.size());
     finish_phase();
     return status;
 }
@@ -740,11 +733,6 @@ Gs1Status GameRuntime::pop_runtime_message(Gs1RuntimeMessage& out_message)
     out_message = runtime_messages_.front();
     runtime_messages_.pop_front();
     return GS1_STATUS_OK;
-}
-
-Gs1Status GameRuntime::pop_engine_message(Gs1EngineMessage& out_message)
-{
-    return pop_runtime_message(out_message);
 }
 
 Gs1Status GameRuntime::handle_message(const GameMessage& message)
@@ -1710,3 +1698,4 @@ void GameRuntime::run_fixed_step()
     record_timing_sample(fixed_step_timing_, elapsed_milliseconds_since(fixed_step_started_at));
 }
 }  // namespace gs1
+

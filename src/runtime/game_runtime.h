@@ -28,16 +28,12 @@ public:
     [[nodiscard]] Gs1Status submit_host_messages(
         const Gs1HostMessage* messages,
         std::uint32_t message_count);
-    [[nodiscard]] Gs1Status submit_host_events(
-        const Gs1HostEvent* events,
-        std::uint32_t event_count);
     [[nodiscard]] Gs1Status submit_feedback_events(
         const Gs1FeedbackEvent* events,
         std::uint32_t event_count);
     [[nodiscard]] Gs1Status run_phase1(const Gs1Phase1Request& request, Gs1Phase1Result& out_result);
     [[nodiscard]] Gs1Status run_phase2(const Gs1Phase2Request& request, Gs1Phase2Result& out_result);
     [[nodiscard]] Gs1Status pop_runtime_message(Gs1RuntimeMessage& out_message);
-    [[nodiscard]] Gs1Status pop_engine_message(Gs1EngineMessage& out_message);
     [[nodiscard]] Gs1Status get_profiling_snapshot(Gs1RuntimeProfilingSnapshot& out_snapshot) const noexcept;
     void reset_profiling() noexcept;
     [[nodiscard]] Gs1Status set_profiled_system_enabled(
@@ -152,3 +148,4 @@ private:
 };
 
 }  // namespace gs1
+

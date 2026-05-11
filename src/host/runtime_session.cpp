@@ -147,7 +147,7 @@ bool Gs1RuntimeSession::update(double delta_seconds, Gs1Phase1Result& out_phase1
     return true;
 }
 
-bool Gs1RuntimeSession::submit_host_events(const Gs1HostEvent* events, std::uint32_t event_count)
+bool Gs1RuntimeSession::submit_host_messages(const Gs1HostMessage* messages, std::uint32_t message_count)
 {
     if (runtime_ == nullptr)
     {
@@ -155,26 +155,27 @@ bool Gs1RuntimeSession::submit_host_events(const Gs1HostEvent* events, std::uint
         return false;
     }
 
-    if (event_count > 0U && events == nullptr)
+    if (message_count > 0U && messages == nullptr)
     {
-        last_error_ = "Host event buffer is null.";
+        last_error_ = "Host message buffer is null.";
         return false;
     }
 
     const Gs1RuntimeApi& api = loader_.api();
-    if (api.submit_host_events == nullptr)
+    if (api.submit_host_messages == nullptr)
     {
-        last_error_ = "Gameplay DLL is missing host event entry points.";
+        last_error_ = "Gameplay DLL is missing host message entry points.";
         return false;
     }
 
-    const Gs1Status status = api.submit_host_events(runtime_, events, event_count);
+    const Gs1Status status = api.submit_host_messages(runtime_, messages, message_count);
     if (status != GS1_STATUS_OK)
     {
-        last_error_ = "gs1_submit_host_events failed with status " + std::to_string(static_cast<unsigned>(status));
+        last_error_ = "gs1_submit_host_messages failed with status " + std::to_string(static_cast<unsigned>(status));
         return false;
     }
 
     last_error_.clear();
     return true;
 }
+

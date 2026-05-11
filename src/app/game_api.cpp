@@ -69,14 +69,6 @@ void gs1_destroy_runtime(Gs1RuntimeHandle* runtime) GS1_NOEXCEPT
     delete runtime;
 }
 
-Gs1Status gs1_submit_host_events(
-    Gs1RuntimeHandle* runtime,
-    const Gs1HostEvent* events,
-    std::uint32_t event_count) GS1_NOEXCEPT
-{
-    return gs1_submit_host_messages(runtime, events, event_count);
-}
-
 Gs1Status gs1_submit_host_messages(
     Gs1RuntimeHandle* runtime,
     const Gs1HostMessage* messages,
@@ -127,13 +119,6 @@ Gs1Status gs1_run_phase2(
     }
 
     return runtime->runtime.run_phase2(*request, *out_result);
-}
-
-Gs1Status gs1_pop_engine_message(
-    Gs1RuntimeHandle* runtime,
-    Gs1EngineMessage* out_message) GS1_NOEXCEPT
-{
-    return gs1_pop_runtime_message(runtime, out_message);
 }
 
 Gs1Status gs1_pop_runtime_message(

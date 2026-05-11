@@ -91,9 +91,9 @@ public:
 
     [[nodiscard]] const std::vector<std::string>& message_logs() const noexcept { return message_logs_; }
     [[nodiscard]] std::uint32_t phase1_fixed_steps_executed() const noexcept { return phase1_fixed_steps_executed_; }
-    [[nodiscard]] std::uint32_t phase2_processed_host_event_count() const noexcept
+    [[nodiscard]] std::uint32_t phase2_processed_host_message_count() const noexcept
     {
-        return phase2_processed_host_event_count_;
+        return phase2_processed_host_message_count_;
     }
     [[nodiscard]] std::uint64_t frame_number() const noexcept { return frame_number_; }
     [[nodiscard]] FrameTimingSnapshot last_frame_timing() const noexcept { return last_frame_timing_; }
@@ -472,58 +472,58 @@ private:
     void queue_pre_phase1_ui_action_if_ready();
     void queue_between_phase_ui_action_if_ready();
     void queue_between_phase_site_scene_ready_if_needed();
-    void submit_host_events(
-        std::vector<Gs1HostEvent>& events,
+    void submit_host_messages(
+        std::vector<Gs1HostMessage>& events,
         const char* stage_label);
     void apply_inflight_script_directive();
     void resolve_inflight_script_directive();
     void clear_inflight_script_directive();
     void fail_inflight_script_directive(const std::string& message);
     void flush_engine_messages(const char* stage_label);
-    [[nodiscard]] bool try_queue_ui_action_from_directive(std::vector<Gs1HostEvent>& destination);
+    [[nodiscard]] bool try_queue_ui_action_from_directive(std::vector<Gs1HostMessage>& destination);
     [[nodiscard]] bool resolve_available_ui_action(
         const Gs1UiAction& requested_action,
         Gs1UiAction& out_action) const;
-    void apply_ui_setup_begin(const Gs1EngineMessage& message);
-    void apply_ui_setup_close(const Gs1EngineMessage& message);
-    void apply_ui_element_upsert(const Gs1EngineMessage& message);
+    void apply_ui_setup_begin(const Gs1RuntimeMessage& message);
+    void apply_ui_setup_close(const Gs1RuntimeMessage& message);
+    void apply_ui_element_upsert(const Gs1RuntimeMessage& message);
     void apply_ui_setup_end();
-    void apply_progression_view_begin(const Gs1EngineMessage& message);
-    void apply_progression_view_close(const Gs1EngineMessage& message);
-    void apply_progression_entry_upsert(const Gs1EngineMessage& message);
+    void apply_progression_view_begin(const Gs1RuntimeMessage& message);
+    void apply_progression_view_close(const Gs1RuntimeMessage& message);
+    void apply_progression_entry_upsert(const Gs1RuntimeMessage& message);
     void apply_progression_view_end();
-    void apply_regional_map_snapshot_begin(const Gs1EngineMessage& message);
-    void apply_regional_map_site_upsert(const Gs1EngineMessage& message);
-    void apply_regional_map_site_remove(const Gs1EngineMessage& message);
-    void apply_regional_map_link_upsert(const Gs1EngineMessage& message);
-    void apply_regional_map_link_remove(const Gs1EngineMessage& message);
-    void apply_site_snapshot_begin(const Gs1EngineMessage& message);
-    void apply_site_tile_upsert(const Gs1EngineMessage& message);
-    void apply_site_worker_update(const Gs1EngineMessage& message);
-    void apply_site_camp_update(const Gs1EngineMessage& message);
-    void apply_site_weather_update(const Gs1EngineMessage& message);
-    void apply_site_inventory_storage_upsert(const Gs1EngineMessage& message);
-    void apply_site_inventory_slot_upsert(const Gs1EngineMessage& message);
-    void apply_site_inventory_view_state(const Gs1EngineMessage& message);
-    void apply_site_craft_context_begin(const Gs1EngineMessage& message);
-    void apply_site_craft_context_option_upsert(const Gs1EngineMessage& message);
+    void apply_regional_map_snapshot_begin(const Gs1RuntimeMessage& message);
+    void apply_regional_map_site_upsert(const Gs1RuntimeMessage& message);
+    void apply_regional_map_site_remove(const Gs1RuntimeMessage& message);
+    void apply_regional_map_link_upsert(const Gs1RuntimeMessage& message);
+    void apply_regional_map_link_remove(const Gs1RuntimeMessage& message);
+    void apply_site_snapshot_begin(const Gs1RuntimeMessage& message);
+    void apply_site_tile_upsert(const Gs1RuntimeMessage& message);
+    void apply_site_worker_update(const Gs1RuntimeMessage& message);
+    void apply_site_camp_update(const Gs1RuntimeMessage& message);
+    void apply_site_weather_update(const Gs1RuntimeMessage& message);
+    void apply_site_inventory_storage_upsert(const Gs1RuntimeMessage& message);
+    void apply_site_inventory_slot_upsert(const Gs1RuntimeMessage& message);
+    void apply_site_inventory_view_state(const Gs1RuntimeMessage& message);
+    void apply_site_craft_context_begin(const Gs1RuntimeMessage& message);
+    void apply_site_craft_context_option_upsert(const Gs1RuntimeMessage& message);
     void apply_site_craft_context_end();
-    void apply_site_placement_preview(const Gs1EngineMessage& message);
-    void apply_site_placement_preview_tile_upsert(const Gs1EngineMessage& message);
-    void apply_site_placement_failure(const Gs1EngineMessage& message);
-    void apply_site_task_upsert(const Gs1EngineMessage& message);
-    void apply_site_modifier_list_begin(const Gs1EngineMessage& message);
-    void apply_site_modifier_upsert(const Gs1EngineMessage& message);
-    void apply_site_phone_panel_state(const Gs1EngineMessage& message);
-    void apply_site_protection_overlay_state(const Gs1EngineMessage& message);
-    void apply_site_phone_listing_remove(const Gs1EngineMessage& message);
-    void apply_site_phone_listing_upsert(const Gs1EngineMessage& message);
+    void apply_site_placement_preview(const Gs1RuntimeMessage& message);
+    void apply_site_placement_preview_tile_upsert(const Gs1RuntimeMessage& message);
+    void apply_site_placement_failure(const Gs1RuntimeMessage& message);
+    void apply_site_task_upsert(const Gs1RuntimeMessage& message);
+    void apply_site_modifier_list_begin(const Gs1RuntimeMessage& message);
+    void apply_site_modifier_upsert(const Gs1RuntimeMessage& message);
+    void apply_site_phone_panel_state(const Gs1RuntimeMessage& message);
+    void apply_site_protection_overlay_state(const Gs1RuntimeMessage& message);
+    void apply_site_phone_listing_remove(const Gs1RuntimeMessage& message);
+    void apply_site_phone_listing_upsert(const Gs1RuntimeMessage& message);
     void apply_site_snapshot_end();
-    void apply_campaign_resources(const Gs1EngineMessage& message);
-    void apply_hud_state(const Gs1EngineMessage& message);
-    void apply_site_action_update(const Gs1EngineMessage& message);
-    void apply_site_result_ready(const Gs1EngineMessage& message);
-    void apply_one_shot_cue(const Gs1EngineMessage& message);
+    void apply_campaign_resources(const Gs1RuntimeMessage& message);
+    void apply_hud_state(const Gs1RuntimeMessage& message);
+    void apply_site_action_update(const Gs1RuntimeMessage& message);
+    void apply_site_result_ready(const Gs1RuntimeMessage& message);
+    void apply_one_shot_cue(const Gs1RuntimeMessage& message);
     void publish_live_state_snapshot();
     void queue_live_state_patch(std::uint32_t field_mask);
     [[nodiscard]] LiveStateSnapshot capture_frame_live_state_snapshot() const;
@@ -535,10 +535,10 @@ private:
     [[nodiscard]] static std::uint64_t make_regional_map_link_key(
         std::uint32_t from_site_id,
         std::uint32_t to_site_id) noexcept;
-    [[nodiscard]] static std::string describe_message(const Gs1EngineMessage& message);
-    static Gs1HostEvent make_ui_action_event(const Gs1UiAction& action) noexcept;
-    static Gs1HostEvent make_site_scene_ready_event() noexcept;
-    static Gs1HostEvent make_site_move_direction_event(
+    [[nodiscard]] static std::string describe_message(const Gs1RuntimeMessage& message);
+    static Gs1HostMessage make_ui_action_event(const Gs1UiAction& action) noexcept;
+    static Gs1HostMessage make_site_scene_ready_event() noexcept;
+    static Gs1HostMessage make_site_move_direction_event(
         float world_move_x,
         float world_move_y,
         float world_move_z) noexcept;
@@ -548,13 +548,13 @@ private:
     Gs1RuntimeHandle* runtime_ {nullptr};
     LogMode log_mode_ {LogMode::Verbose};
     mutable std::mutex incoming_commands_mutex_ {};
-    std::vector<Gs1HostEvent> incoming_pre_phase1_host_events_ {};
+    std::vector<Gs1HostMessage> incoming_pre_phase1_host_events_ {};
     std::vector<Gs1FeedbackEvent> incoming_feedback_events_ {};
     mutable std::mutex published_state_mutex_ {};
     LiveStateSnapshot published_live_state_snapshot_ {};
     std::vector<std::string> published_live_state_patches_ {};
-    std::vector<Gs1HostEvent> frame_pre_phase1_host_events_ {};
-    std::vector<Gs1HostEvent> pending_between_phase_host_events_ {};
+    std::vector<Gs1HostMessage> frame_pre_phase1_host_events_ {};
+    std::vector<Gs1HostMessage> pending_between_phase_host_events_ {};
     std::vector<Gs1FeedbackEvent> frame_feedback_events_ {};
     std::vector<std::string> message_logs_ {};
     std::vector<std::string> current_frame_message_entries_ {};
@@ -577,8 +577,8 @@ private:
     std::vector<OneShotCueProjection> recent_one_shot_cues_ {};
     std::uint64_t next_one_shot_cue_sequence_id_ {0};
     std::uint32_t phase1_fixed_steps_executed_ {0};
-    std::uint32_t phase1_processed_host_event_count_ {0};
-    std::uint32_t phase2_processed_host_event_count_ {0};
+    std::uint32_t phase1_processed_host_message_count_ {0};
+    std::uint32_t phase2_processed_host_message_count_ {0};
     std::uint64_t frame_number_ {0};
     double current_frame_gameplay_dll_seconds_ {0.0};
     FrameTimingSnapshot last_frame_timing_ {};
@@ -589,3 +589,5 @@ private:
     bool inflight_script_directive_started_ {false};
     bool script_failed_ {false};
 };
+
+

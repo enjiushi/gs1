@@ -22,7 +22,7 @@ struct GamePresentationRuntimeContext final
     std::optional<CampaignState>& campaign;
     std::optional<SiteRunState>& active_site_run;
     GameMessageQueue& message_queue;
-    std::deque<Gs1EngineMessage>& engine_messages;
+    std::deque<Gs1RuntimeMessage>& engine_messages;
     double fixed_step_seconds {0.0};
 };
 
@@ -62,7 +62,7 @@ private:
     [[nodiscard]] std::optional<CampaignState>& campaign() noexcept { return context().campaign; }
     [[nodiscard]] std::optional<SiteRunState>& active_site_run() noexcept { return context().active_site_run; }
     [[nodiscard]] GameMessageQueue& message_queue() noexcept { return context().message_queue; }
-    [[nodiscard]] std::deque<Gs1EngineMessage>& engine_messages() noexcept { return context().engine_messages; }
+    [[nodiscard]] std::deque<Gs1RuntimeMessage>& engine_messages() noexcept { return context().engine_messages; }
     [[nodiscard]] double fixed_step_seconds() const noexcept { return context().fixed_step_seconds; }
 
     struct CampaignUnlockSnapshot final
@@ -291,3 +291,4 @@ private:
     CampaignUnlockSnapshot last_campaign_unlock_snapshot_ {};
 };
 }  // namespace gs1
+

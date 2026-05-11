@@ -34,7 +34,7 @@ public:
     [[nodiscard]] bool run_phase1(double delta_seconds, Gs1Phase1Result& out_phase1);
     [[nodiscard]] bool run_phase2(Gs1Phase2Result& out_phase2);
     [[nodiscard]] bool update(double delta_seconds, Gs1Phase1Result& out_phase1, Gs1Phase2Result& out_phase2);
-    [[nodiscard]] bool submit_host_events(const Gs1HostEvent* events, std::uint32_t event_count);
+    [[nodiscard]] bool submit_host_messages(const Gs1HostMessage* messages, std::uint32_t message_count);
 
 private:
     RuntimeDllLoader loader_ {};
@@ -44,3 +44,4 @@ private:
     std::string adapter_config_json_utf8_ {};
     std::string last_error_ {};
 };
+

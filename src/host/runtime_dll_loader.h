@@ -10,11 +10,11 @@ struct Gs1RuntimeApi final
     decltype(&gs1_get_build_string) get_build_string {nullptr};
     decltype(&gs1_create_runtime) create_runtime {nullptr};
     decltype(&gs1_destroy_runtime) destroy_runtime {nullptr};
-    decltype(&gs1_submit_host_events) submit_host_events {nullptr};
+    decltype(&gs1_submit_host_messages) submit_host_messages {nullptr};
     decltype(&gs1_submit_feedback_events) submit_feedback_events {nullptr};
     decltype(&gs1_run_phase1) run_phase1 {nullptr};
     decltype(&gs1_run_phase2) run_phase2 {nullptr};
-    decltype(&gs1_pop_engine_message) pop_engine_message {nullptr};
+    decltype(&gs1_pop_runtime_message) pop_runtime_message {nullptr};
     decltype(&gs1_get_runtime_profiling_snapshot) get_runtime_profiling_snapshot {nullptr};
     decltype(&gs1_reset_runtime_profiling) reset_runtime_profiling {nullptr};
     decltype(&gs1_set_runtime_profile_system_enabled) set_runtime_profile_system_enabled {nullptr};
@@ -43,3 +43,4 @@ private:
     Gs1RuntimeApi api_ {};
     std::string last_error_ {};
 };
+

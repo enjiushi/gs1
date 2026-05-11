@@ -154,25 +154,25 @@ GameMessage make_select_site_message(std::uint32_t site_id)
     return message;
 }
 
-std::vector<Gs1EngineMessage> drain_engine_messages(GameRuntime& runtime)
+std::vector<Gs1RuntimeMessage> drain_runtime_messages(GameRuntime& runtime)
 {
-    std::vector<Gs1EngineMessage> messages {};
-    Gs1EngineMessage message {};
-    while (runtime.pop_engine_message(message) == GS1_STATUS_OK)
+    std::vector<Gs1RuntimeMessage> messages {};
+    Gs1RuntimeMessage message {};
+    while (runtime.pop_runtime_message(message) == GS1_STATUS_OK)
     {
         messages.push_back(message);
     }
     return messages;
 }
 
-Gs1HostEvent make_site_action_request_event(
+Gs1HostMessage make_site_action_request_event(
     Gs1SiteActionKind action_kind,
     TileCoord target_tile,
     std::uint32_t primary_subject_id,
     std::uint32_t item_id = 0U,
     std::uint8_t flags = 0U)
 {
-    Gs1HostEvent event {};
+    Gs1HostMessage event {};
     event.type = GS1_HOST_EVENT_SITE_ACTION_REQUEST;
     event.payload.site_action_request.action_kind = action_kind;
     event.payload.site_action_request.flags = flags != 0U
@@ -188,9 +188,9 @@ Gs1HostEvent make_site_action_request_event(
     return event;
 }
 
-Gs1HostEvent make_site_context_request_event(TileCoord target_tile)
+Gs1HostMessage make_site_context_request_event(TileCoord target_tile)
 {
-    Gs1HostEvent event {};
+    Gs1HostMessage event {};
     event.type = GS1_HOST_EVENT_SITE_CONTEXT_REQUEST;
     event.payload.site_context_request.tile_x = target_tile.x;
     event.payload.site_context_request.tile_y = target_tile.y;
@@ -198,48 +198,48 @@ Gs1HostEvent make_site_context_request_event(TileCoord target_tile)
     return event;
 }
 
-Gs1HostEvent make_site_action_cancel_event(std::uint32_t flags)
+Gs1HostMessage make_site_action_cancel_event(std::uint32_t flags)
 {
-    Gs1HostEvent event {};
+    Gs1HostMessage event {};
     event.type = GS1_HOST_EVENT_SITE_ACTION_CANCEL;
     event.payload.site_action_cancel.action_id = 0U;
     event.payload.site_action_cancel.flags = flags;
     return event;
 }
 
-Gs1HostEvent make_ui_action_event(const Gs1UiAction& action)
+Gs1HostMessage make_ui_action_event(const Gs1UiAction& action)
 {
-    Gs1HostEvent event {};
+    Gs1HostMessage event {};
     event.type = GS1_HOST_EVENT_UI_ACTION;
     event.payload.ui_action.action = action;
     return event;
 }
 
-Gs1HostEvent make_site_scene_ready_event()
+Gs1HostMessage make_site_scene_ready_event()
 {
-    Gs1HostEvent event {};
+    Gs1HostMessage event {};
     event.type = GS1_HOST_EVENT_SITE_SCENE_READY;
     return event;
 }
 
-Gs1HostEvent make_storage_view_event(
+Gs1HostMessage make_storage_view_event(
     std::uint32_t storage_id,
     Gs1InventoryViewEventKind event_kind)
 {
-    Gs1HostEvent event {};
+    Gs1HostMessage event {};
     event.type = GS1_HOST_EVENT_SITE_STORAGE_VIEW;
     event.payload.site_storage_view.storage_id = storage_id;
     event.payload.site_storage_view.event_kind = event_kind;
     return event;
 }
 
-Gs1HostEvent make_inventory_slot_tap_event(
+Gs1HostMessage make_inventory_slot_tap_event(
     std::uint32_t storage_id,
     Gs1InventoryContainerKind container_kind,
     std::uint16_t slot_index,
     std::uint32_t item_instance_id = 0U)
 {
-    Gs1HostEvent event {};
+    Gs1HostMessage event {};
     event.type = GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP;
     event.payload.site_inventory_slot_tap.storage_id = storage_id;
     event.payload.site_inventory_slot_tap.container_kind = container_kind;
@@ -248,9 +248,9 @@ Gs1HostEvent make_inventory_slot_tap_event(
     return event;
 }
 
-Gs1HostEvent make_move_direction_event(float world_move_x, float world_move_y, float world_move_z)
+Gs1HostMessage make_move_direction_event(float world_move_x, float world_move_y, float world_move_z)
 {
-    Gs1HostEvent event {};
+    Gs1HostMessage event {};
     event.type = GS1_HOST_EVENT_SITE_MOVE_DIRECTION;
     event.payload.site_move_direction.world_move_x = world_move_x;
     event.payload.site_move_direction.world_move_y = world_move_y;
@@ -286,7 +286,7 @@ void run_phase2(GameRuntime& runtime, Gs1Phase2Result& out_result)
 void complete_site_loading(GameRuntime& runtime)
 {
     const auto ready_event = make_site_scene_ready_event();
-    assert(runtime.submit_host_events(&ready_event, 1U) == GS1_STATUS_OK);
+    assert(runtime.submit_host_messages(&ready_event, 1U) == GS1_STATUS_OK);
     Gs1Phase2Result ready_result {};
     run_phase2(runtime, ready_result);
 }
@@ -387,7 +387,7 @@ void set_tile_device_state(
     gs1::site_world_access::set_tile_device(site_run, coord, device);
 }
 
-std::vector<Gs1EngineMessage> flush_tile_delta_for(
+std::vector<Gs1RuntimeMessage> flush_tile_delta_for(
     GameRuntime& runtime,
     TileCoord coord,
     float sand_burial)
@@ -396,14 +396,14 @@ std::vector<Gs1EngineMessage> flush_tile_delta_for(
     set_tile_sand_burial(site_run, coord, sand_burial);
     gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(runtime, coord);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    return drain_engine_messages(runtime);
+    return drain_runtime_messages(runtime);
 }
 
-std::vector<const Gs1EngineMessage*> collect_messages_of_type(
-    const std::vector<Gs1EngineMessage>& messages,
+std::vector<const Gs1RuntimeMessage*> collect_messages_of_type(
+    const std::vector<Gs1RuntimeMessage>& messages,
     Gs1EngineMessageType type)
 {
-    std::vector<const Gs1EngineMessage*> matches {};
+    std::vector<const Gs1RuntimeMessage*> matches {};
     for (const auto& message : messages)
     {
         if (message.type == type)
@@ -414,14 +414,14 @@ std::vector<const Gs1EngineMessage*> collect_messages_of_type(
     return matches;
 }
 
-std::vector<const Gs1EngineMessage*> collect_inventory_slot_messages(
-    const std::vector<Gs1EngineMessage>& messages)
+std::vector<const Gs1RuntimeMessage*> collect_inventory_slot_messages(
+    const std::vector<Gs1RuntimeMessage>& messages)
 {
     return collect_messages_of_type(messages, GS1_ENGINE_MESSAGE_SITE_INVENTORY_SLOT_UPSERT);
 }
 
-const Gs1EngineMessage* find_plant_visual_message(
-    const std::vector<Gs1EngineMessage>& messages,
+const Gs1RuntimeMessage* find_plant_visual_message(
+    const std::vector<Gs1RuntimeMessage>& messages,
     std::uint32_t plant_type_id,
     TileCoord anchor)
 {
@@ -444,8 +444,8 @@ const Gs1EngineMessage* find_plant_visual_message(
     return nullptr;
 }
 
-const Gs1EngineMessage* find_device_visual_message(
-    const std::vector<Gs1EngineMessage>& messages,
+const Gs1RuntimeMessage* find_device_visual_message(
+    const std::vector<Gs1RuntimeMessage>& messages,
     std::uint32_t structure_type_id,
     TileCoord anchor)
 {
@@ -468,8 +468,8 @@ const Gs1EngineMessage* find_device_visual_message(
     return nullptr;
 }
 
-const Gs1EngineMessage* find_inventory_storage_message(
-    const std::vector<Gs1EngineMessage>& messages,
+const Gs1RuntimeMessage* find_inventory_storage_message(
+    const std::vector<Gs1RuntimeMessage>& messages,
     Gs1InventoryContainerKind container_kind,
     TileCoord tile)
 {
@@ -492,8 +492,8 @@ const Gs1EngineMessage* find_inventory_storage_message(
     return nullptr;
 }
 
-const Gs1EngineMessage* find_inventory_slot_message(
-    const std::vector<Gs1EngineMessage>& messages,
+const Gs1RuntimeMessage* find_inventory_slot_message(
+    const std::vector<Gs1RuntimeMessage>& messages,
     Gs1InventoryContainerKind container_kind,
     std::uint32_t storage_id,
     std::uint16_t slot_index)
@@ -517,8 +517,8 @@ const Gs1EngineMessage* find_inventory_slot_message(
     return nullptr;
 }
 
-const Gs1EngineMessage* find_task_message(
-    const std::vector<Gs1EngineMessage>& messages,
+const Gs1RuntimeMessage* find_task_message(
+    const std::vector<Gs1RuntimeMessage>& messages,
     std::uint32_t task_instance_id)
 {
     for (const auto& message : messages)
@@ -538,8 +538,8 @@ const Gs1EngineMessage* find_task_message(
     return nullptr;
 }
 
-const Gs1EngineMessage* find_inventory_view_message(
-    const std::vector<Gs1EngineMessage>& messages,
+const Gs1RuntimeMessage* find_inventory_view_message(
+    const std::vector<Gs1RuntimeMessage>& messages,
     std::uint32_t storage_id,
     Gs1InventoryViewEventKind event_kind)
 {
@@ -560,8 +560,8 @@ const Gs1EngineMessage* find_inventory_view_message(
     return nullptr;
 }
 
-const Gs1EngineMessage* find_close_ui_setup_message(
-    const std::vector<Gs1EngineMessage>& messages,
+const Gs1RuntimeMessage* find_close_ui_setup_message(
+    const std::vector<Gs1RuntimeMessage>& messages,
     Gs1UiSetupId setup_id)
 {
     for (const auto& message : messages)
@@ -581,8 +581,8 @@ const Gs1EngineMessage* find_close_ui_setup_message(
     return nullptr;
 }
 
-const Gs1EngineMessage* find_ui_surface_visibility_message(
-    const std::vector<Gs1EngineMessage>& messages,
+const Gs1RuntimeMessage* find_ui_surface_visibility_message(
+    const std::vector<Gs1RuntimeMessage>& messages,
     Gs1UiSurfaceId surface_id,
     bool visible)
 {
@@ -604,11 +604,11 @@ const Gs1EngineMessage* find_ui_surface_visibility_message(
 }
 
 bool contains_phone_listing_message(
-    const std::vector<Gs1EngineMessage>& messages,
+    const std::vector<Gs1RuntimeMessage>& messages,
     Gs1EngineMessageType message_type,
     std::uint32_t listing_id)
 {
-    return std::any_of(messages.begin(), messages.end(), [&](const Gs1EngineMessage& message) {
+    return std::any_of(messages.begin(), messages.end(), [&](const Gs1RuntimeMessage& message) {
         return message.type == message_type &&
             message.payload_as<Gs1EngineMessagePhoneListingData>().listing_id == listing_id;
     });
@@ -668,7 +668,7 @@ std::uint16_t find_delivery_box_slot_index(
 }
 
 const Gs1EngineMessageUiElementData* find_ui_element_by_content(
-    const std::vector<Gs1EngineMessage>& messages,
+    const std::vector<Gs1RuntimeMessage>& messages,
     std::uint8_t expected_content_kind,
     std::uint32_t expected_primary_id = 0U,
     std::uint32_t expected_secondary_id = 0U,
@@ -695,7 +695,7 @@ const Gs1EngineMessageUiElementData* find_ui_element_by_content(
 }
 
 bool contains_progression_view_begin(
-    const std::vector<Gs1EngineMessage>& messages,
+    const std::vector<Gs1RuntimeMessage>& messages,
     Gs1ProgressionViewId view_id)
 {
     for (const auto& message : messages)
@@ -716,7 +716,7 @@ bool contains_progression_view_begin(
 }
 
 const Gs1EngineMessageProgressionEntryData* find_progression_entry(
-    const std::vector<Gs1EngineMessage>& messages,
+    const std::vector<Gs1RuntimeMessage>& messages,
     Gs1ProgressionEntryKind entry_kind,
     std::uint16_t reputation_requirement,
     std::uint8_t faction_id = 0U)
@@ -741,7 +741,7 @@ const Gs1EngineMessageProgressionEntryData* find_progression_entry(
 }
 
 const Gs1EngineMessageUiPanelTextData* find_ui_panel_text_message(
-    const std::vector<Gs1EngineMessage>& messages,
+    const std::vector<Gs1RuntimeMessage>& messages,
     std::uint8_t text_kind,
     std::uint32_t primary_id = 0U,
     std::uint32_t secondary_id = 0U,
@@ -769,7 +769,7 @@ const Gs1EngineMessageUiPanelTextData* find_ui_panel_text_message(
 }
 
 const Gs1EngineMessageUiPanelSlotActionData* find_ui_panel_slot_action_message(
-    const std::vector<Gs1EngineMessage>& messages,
+    const std::vector<Gs1RuntimeMessage>& messages,
     Gs1UiPanelSlotId slot_id,
     std::uint8_t label_kind)
 {
@@ -792,7 +792,7 @@ const Gs1EngineMessageUiPanelSlotActionData* find_ui_panel_slot_action_message(
 }
 
 const Gs1EngineMessageUiPanelListItemData* find_ui_panel_list_item_message(
-    const std::vector<Gs1EngineMessage>& messages,
+    const std::vector<Gs1RuntimeMessage>& messages,
     Gs1UiPanelListId list_id,
     std::uint8_t primary_kind,
     std::uint32_t primary_id,
@@ -821,8 +821,8 @@ const Gs1EngineMessageUiPanelListItemData* find_ui_panel_list_item_message(
     return nullptr;
 }
 
-const Gs1EngineMessage* find_regional_map_site_message(
-    const std::vector<Gs1EngineMessage>& messages,
+const Gs1RuntimeMessage* find_regional_map_site_message(
+    const std::vector<Gs1RuntimeMessage>& messages,
     std::uint32_t site_id)
 {
     for (const auto& message : messages)
@@ -843,11 +843,11 @@ const Gs1EngineMessage* find_regional_map_site_message(
 }
 
 bool contains_regional_map_link(
-    const std::vector<Gs1EngineMessage>& messages,
+    const std::vector<Gs1RuntimeMessage>& messages,
     std::uint32_t from_site_id,
     std::uint32_t to_site_id)
 {
-    return std::any_of(messages.begin(), messages.end(), [&](const Gs1EngineMessage& message) {
+    return std::any_of(messages.begin(), messages.end(), [&](const Gs1RuntimeMessage& message) {
         if (message.type != GS1_ENGINE_MESSAGE_REGIONAL_MAP_LINK_UPSERT)
         {
             return false;
@@ -872,7 +872,7 @@ int main()
 
     assert(runtime.handle_message(make_start_campaign_message()) == GS1_STATUS_OK);
     assert(gs1::GameRuntimeProjectionTestAccess::campaign(runtime).has_value());
-    const auto initial_map_messages = drain_engine_messages(runtime);
+    const auto initial_map_messages = drain_runtime_messages(runtime);
     {
         const auto* site_one_message = find_regional_map_site_message(initial_map_messages, 1U);
         const auto* site_two_message = find_regional_map_site_message(initial_map_messages, 2U);
@@ -895,14 +895,14 @@ int main()
 
     const auto campaign_site_id = gs1::GameRuntimeProjectionTestAccess::campaign(runtime)->sites.front().site_id.value;
     assert(runtime.handle_message(make_select_site_message(campaign_site_id)) == GS1_STATUS_OK);
-    const auto loadout_ui_messages = drain_engine_messages(runtime);
+    const auto loadout_ui_messages = drain_runtime_messages(runtime);
     assert(find_ui_panel_list_item_message(loadout_ui_messages, GS1_UI_PANEL_LIST_REGIONAL_LOADOUT, 6U, 1U, 0U, 1U) != nullptr);
     assert(find_ui_panel_list_item_message(loadout_ui_messages, GS1_UI_PANEL_LIST_REGIONAL_LOADOUT, 6U, gs1::k_item_basic_straw_checkerboard, 0U, 8U) != nullptr);
     assert(find_ui_panel_slot_action_message(loadout_ui_messages, GS1_UI_PANEL_SLOT_PRIMARY, 1U) != nullptr);
 
     assert(runtime.handle_message(make_start_site_attempt_message(campaign_site_id)) == GS1_STATUS_OK);
     complete_site_loading(runtime);
-    drain_engine_messages(runtime);
+    drain_runtime_messages(runtime);
 
     auto& completed_site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
     completed_site_run.run_status = gs1::SiteRunStatus::Completed;
@@ -914,13 +914,13 @@ int main()
         campaign_site_id,
         GS1_SITE_ATTEMPT_RESULT_COMPLETED});
     assert(runtime.handle_message(site_completed_message) == GS1_STATUS_OK);
-    drain_engine_messages(runtime);
+    drain_runtime_messages(runtime);
 
     GameMessage return_to_map_message {};
     return_to_map_message.type = GameMessageType::ReturnToRegionalMap;
     return_to_map_message.set_payload(gs1::ReturnToRegionalMapMessage {});
     assert(runtime.handle_message(return_to_map_message) == GS1_STATUS_OK);
-    const auto reopened_map_messages = drain_engine_messages(runtime);
+    const auto reopened_map_messages = drain_runtime_messages(runtime);
     {
         const auto* site_one_message = find_regional_map_site_message(reopened_map_messages, 1U);
         const auto* site_two_message = find_regional_map_site_message(reopened_map_messages, 2U);
@@ -942,7 +942,7 @@ int main()
     open_tech_tree_message.type = GameMessageType::OpenRegionalMapTechTree;
     open_tech_tree_message.set_payload(gs1::OpenRegionalMapTechTreeMessage {});
     assert(runtime.handle_message(open_tech_tree_message) == GS1_STATUS_OK);
-    const auto tech_tree_messages = drain_engine_messages(runtime);
+    const auto tech_tree_messages = drain_runtime_messages(runtime);
     assert(contains_progression_view_begin(
         tech_tree_messages,
         GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE));
@@ -972,7 +972,7 @@ int main()
     select_forestry_tab_message.set_payload(gs1::SelectRegionalMapTechTreeFactionMessage {
         gs1::k_faction_forestry_bureau});
     assert(runtime.handle_message(select_forestry_tab_message) == GS1_STATUS_OK);
-    const auto forestry_messages = drain_engine_messages(runtime);
+    const auto forestry_messages = drain_runtime_messages(runtime);
     assert(contains_progression_view_begin(
         forestry_messages,
         GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE));
@@ -982,7 +982,7 @@ int main()
     select_university_tab_message.set_payload(gs1::SelectRegionalMapTechTreeFactionMessage {
         gs1::k_faction_agricultural_university});
     assert(runtime.handle_message(select_university_tab_message) == GS1_STATUS_OK);
-    const auto university_messages = drain_engine_messages(runtime);
+    const auto university_messages = drain_runtime_messages(runtime);
     assert(contains_progression_view_begin(
         university_messages,
         GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE));
@@ -999,14 +999,14 @@ int main()
     total_reputation_award.set_payload(gs1::CampaignReputationAwardRequestedMessage {10});
     assert(runtime.handle_message(total_reputation_award) == GS1_STATUS_OK);
 
-    (void)drain_engine_messages(runtime);
+    (void)drain_runtime_messages(runtime);
 
     GameMessage select_village_tab_message {};
     select_village_tab_message.type = GameMessageType::SelectRegionalMapTechTreeFaction;
     select_village_tab_message.set_payload(gs1::SelectRegionalMapTechTreeFactionMessage {
         gs1::k_faction_village_committee});
     assert(runtime.handle_message(select_village_tab_message) == GS1_STATUS_OK);
-    const auto awarded_messages = drain_engine_messages(runtime);
+    const auto awarded_messages = drain_runtime_messages(runtime);
     assert(contains_progression_view_begin(
         awarded_messages,
         GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE));
@@ -1017,7 +1017,7 @@ int main()
         gs1::base_technology_node_id(gs1::FactionId {gs1::k_faction_village_committee}, 1U),
         gs1::k_faction_village_committee});
     assert(runtime.handle_message(claim_tech_node_message) == GS1_STATUS_OK);
-    const auto claimed_messages = drain_engine_messages(runtime);
+    const auto claimed_messages = drain_runtime_messages(runtime);
     assert(contains_progression_view_begin(
         claimed_messages,
         GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE));
@@ -1040,9 +1040,9 @@ int main()
     support_campaign.regional_map_state.revealed_site_ids = {gs1::SiteId {1U}, gs1::SiteId {2U}};
     support_campaign.regional_map_state.available_site_ids = {gs1::SiteId {2U}};
     support_campaign.regional_map_state.completed_site_ids = {gs1::SiteId {1U}};
-    drain_engine_messages(support_runtime);
+    drain_runtime_messages(support_runtime);
     assert(support_runtime.handle_message(make_select_site_message(2U)) == GS1_STATUS_OK);
-    const auto support_loadout_messages = drain_engine_messages(support_runtime);
+    const auto support_loadout_messages = drain_runtime_messages(support_runtime);
     assert(find_ui_panel_list_item_message(support_loadout_messages, GS1_UI_PANEL_LIST_REGIONAL_LOADOUT, 6U, gs1::k_item_white_thorn_seed_bundle, 0U, 4U) != nullptr);
     assert(find_ui_panel_list_item_message(support_loadout_messages, GS1_UI_PANEL_LIST_REGIONAL_LOADOUT, 6U, gs1::k_item_wood_bundle, 0U, 2U) != nullptr);
     assert(find_ui_panel_text_message(support_loadout_messages, 4U, 0U, 0U, 1U) != nullptr);
@@ -1067,29 +1067,29 @@ int main()
                supported_site_run,
                gs1::inventory_storage::starter_storage_container(supported_site_run),
                gs1::ItemId {gs1::k_item_wood_bundle}) == 2U);
-    drain_engine_messages(support_runtime);
+    drain_runtime_messages(support_runtime);
 
     assert(support_runtime.handle_message(open_tech_tree_message) == GS1_STATUS_OK);
-    const auto site_tech_tree_messages = drain_engine_messages(support_runtime);
+    const auto site_tech_tree_messages = drain_runtime_messages(support_runtime);
     assert(contains_progression_view_begin(
         site_tech_tree_messages,
         GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE));
 
     assert(support_runtime.handle_message(select_forestry_tab_message) == GS1_STATUS_OK);
-    const auto site_forestry_messages = drain_engine_messages(support_runtime);
+    const auto site_forestry_messages = drain_runtime_messages(support_runtime);
     assert(contains_progression_view_begin(
         site_forestry_messages,
         GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE));
 
     GameRuntime bootstrap_runtime {create_desc};
     assert(bootstrap_runtime.handle_message(make_start_campaign_message()) == GS1_STATUS_OK);
-    drain_engine_messages(bootstrap_runtime);
+    drain_runtime_messages(bootstrap_runtime);
 
     const auto first_site_id = gs1::GameRuntimeProjectionTestAccess::campaign(bootstrap_runtime)->sites.front().site_id.value;
     const auto* first_site_content = gs1::find_prototype_site_content(gs1::SiteId {first_site_id});
     assert(first_site_content != nullptr);
     assert(bootstrap_runtime.handle_message(make_select_site_message(first_site_id)) == GS1_STATUS_OK);
-    drain_engine_messages(bootstrap_runtime);
+    drain_runtime_messages(bootstrap_runtime);
     assert(bootstrap_runtime.handle_message(make_start_site_attempt_message(first_site_id)) == GS1_STATUS_OK);
     complete_site_loading(bootstrap_runtime);
     assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(bootstrap_runtime).has_value());
@@ -1112,7 +1112,7 @@ int main()
     assert(bootstrap_site_run.economy.current_cash == 2000);
     assert(bootstrap_site_run.economy.available_phone_listings.size() >= 5U);
 
-    const auto bootstrap_messages = drain_engine_messages(bootstrap_runtime);
+    const auto bootstrap_messages = drain_runtime_messages(bootstrap_runtime);
     const auto storage_messages =
         collect_messages_of_type(bootstrap_messages, GS1_ENGINE_MESSAGE_SITE_INVENTORY_STORAGE_UPSERT);
     const auto weather_messages =
@@ -1182,7 +1182,7 @@ int main()
     }
 
     seed_runtime_test_task(bootstrap_runtime, bootstrap_site_run.counters.site_completion_tile_threshold);
-    const auto seeded_task_messages = drain_engine_messages(bootstrap_runtime);
+    const auto seeded_task_messages = drain_runtime_messages(bootstrap_runtime);
     assert(!collect_messages_of_type(seeded_task_messages, GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT).empty());
     {
         const auto* seeded_task_message = find_task_message(seeded_task_messages, 1U);
@@ -1222,7 +1222,7 @@ int main()
             bootstrap_runtime,
             gs1::SITE_PROJECTION_UPDATE_TASKS | gs1::SITE_PROJECTION_UPDATE_PHONE);
         gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
-        const auto mixed_task_messages = drain_engine_messages(bootstrap_runtime);
+        const auto mixed_task_messages = drain_runtime_messages(bootstrap_runtime);
         {
             const auto* accepted_task_message = find_task_message(mixed_task_messages, 1U);
             assert(accepted_task_message != nullptr);
@@ -1287,7 +1287,7 @@ int main()
         listing_quantity_before == 0U ||
         bought_listing_after->quantity == (listing_quantity_before - 1U));
     gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
-    drain_engine_messages(bootstrap_runtime);
+    drain_runtime_messages(bootstrap_runtime);
 
     GameMessage sell_listing {};
     sell_listing.type = GameMessageType::PhoneListingSaleRequested;
@@ -1297,7 +1297,7 @@ int main()
     Gs1Phase1Result sell_result {};
     run_phase1(bootstrap_runtime, 1.0 / 60.0, sell_result);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
-    const auto sell_projection_messages = drain_engine_messages(bootstrap_runtime);
+    const auto sell_projection_messages = drain_runtime_messages(bootstrap_runtime);
     assert(contains_phone_listing_message(
         sell_projection_messages,
         GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_UPSERT,
@@ -1311,7 +1311,7 @@ int main()
         1U);
     assert(delivered_slot_index != std::numeric_limits<std::uint16_t>::max());
     gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
-    const auto delivery_messages = drain_engine_messages(bootstrap_runtime);
+    const auto delivery_messages = drain_runtime_messages(bootstrap_runtime);
     const auto delivery_inventory_messages = collect_inventory_slot_messages(delivery_messages);
     assert(delivery_inventory_messages.empty());
 
@@ -1339,7 +1339,7 @@ int main()
     gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, TileCoord {1, 1});
     gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
 
-    const auto second_messages = drain_engine_messages(bootstrap_runtime);
+    const auto second_messages = drain_runtime_messages(bootstrap_runtime);
     const auto second_tiles = collect_messages_of_type(second_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(!second_messages.empty());
     assert(second_tiles.size() == 2U);
@@ -1356,7 +1356,7 @@ int main()
     set_tile_plant_state(site_run, density_coord, gs1::PlantId {gs1::k_plant_straw_checkerboard}, 0.1875f);
     gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, density_coord);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
-    const auto density_first_messages = drain_engine_messages(bootstrap_runtime);
+    const auto density_first_messages = drain_runtime_messages(bootstrap_runtime);
     const auto density_first_tiles =
         collect_messages_of_type(density_first_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(density_first_tiles.size() == 1U);
@@ -1364,7 +1364,7 @@ int main()
     set_tile_plant_state(site_run, density_coord, gs1::PlantId {gs1::k_plant_straw_checkerboard}, 0.19f);
     gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, density_coord);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
-    const auto density_second_messages = drain_engine_messages(bootstrap_runtime);
+    const auto density_second_messages = drain_runtime_messages(bootstrap_runtime);
     const auto density_second_tiles =
         collect_messages_of_type(density_second_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(density_second_tiles.empty());
@@ -1372,7 +1372,7 @@ int main()
     set_tile_plant_state(site_run, density_coord, gs1::PlantId {gs1::k_plant_straw_checkerboard}, 0.22f);
     gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, density_coord);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
-    const auto density_third_messages = drain_engine_messages(bootstrap_runtime);
+    const auto density_third_messages = drain_runtime_messages(bootstrap_runtime);
     const auto density_third_tiles =
         collect_messages_of_type(density_third_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(density_third_tiles.size() == 1U);
@@ -1404,7 +1404,7 @@ int main()
     set_tile_device_state(site_run, device_coord, gs1::StructureId {gs1::k_structure_workbench}, 0.625f);
     gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, device_coord);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
-    const auto device_first_messages = drain_engine_messages(bootstrap_runtime);
+    const auto device_first_messages = drain_runtime_messages(bootstrap_runtime);
     const auto device_first_tiles =
         collect_messages_of_type(device_first_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(device_first_tiles.size() == 1U);
@@ -1420,7 +1420,7 @@ int main()
     set_tile_device_state(site_run, device_coord, gs1::StructureId {gs1::k_structure_workbench}, 0.629f);
     gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, device_coord);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
-    const auto device_second_messages = drain_engine_messages(bootstrap_runtime);
+    const auto device_second_messages = drain_runtime_messages(bootstrap_runtime);
     const auto device_second_tiles =
         collect_messages_of_type(device_second_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(device_second_tiles.empty());
@@ -1428,7 +1428,7 @@ int main()
     set_tile_device_state(site_run, device_coord, gs1::StructureId {gs1::k_structure_workbench}, 0.68f);
     gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, device_coord);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
-    const auto device_third_messages = drain_engine_messages(bootstrap_runtime);
+    const auto device_third_messages = drain_runtime_messages(bootstrap_runtime);
     const auto device_third_tiles =
         collect_messages_of_type(device_third_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(device_third_tiles.size() == 1U);
@@ -1454,7 +1454,7 @@ int main()
     set_tile_local_wind(site_run, density_coord, 14.0f);
     gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, density_coord);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
-    const auto wind_first_messages = drain_engine_messages(bootstrap_runtime);
+    const auto wind_first_messages = drain_runtime_messages(bootstrap_runtime);
     const auto wind_first_tiles =
         collect_messages_of_type(wind_first_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(wind_first_tiles.size() == 1U);
@@ -1466,7 +1466,7 @@ int main()
     set_tile_local_wind(site_run, density_coord, 15.0f);
     gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, density_coord);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
-    const auto wind_second_messages = drain_engine_messages(bootstrap_runtime);
+    const auto wind_second_messages = drain_runtime_messages(bootstrap_runtime);
     const auto wind_second_tiles =
         collect_messages_of_type(wind_second_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(wind_second_tiles.empty());
@@ -1474,7 +1474,7 @@ int main()
     set_tile_local_wind(site_run, density_coord, 18.0f);
     gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, density_coord);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
-    const auto wind_third_messages = drain_engine_messages(bootstrap_runtime);
+    const auto wind_third_messages = drain_runtime_messages(bootstrap_runtime);
     const auto wind_third_tiles =
         collect_messages_of_type(wind_third_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(wind_third_tiles.size() == 1U);
@@ -1486,7 +1486,7 @@ int main()
     set_tile_protection_visual_state(site_run, density_coord, 14.0f, 32.0f, 48.0f);
     gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, density_coord);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
-    const auto protection_first_messages = drain_engine_messages(bootstrap_runtime);
+    const auto protection_first_messages = drain_runtime_messages(bootstrap_runtime);
     const auto protection_first_tiles =
         collect_messages_of_type(protection_first_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(protection_first_tiles.size() == 1U);
@@ -1500,7 +1500,7 @@ int main()
     set_tile_protection_visual_state(site_run, density_coord, 15.0f, 32.4f, 48.4f);
     gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, density_coord);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
-    const auto protection_second_messages = drain_engine_messages(bootstrap_runtime);
+    const auto protection_second_messages = drain_runtime_messages(bootstrap_runtime);
     const auto protection_second_tiles =
         collect_messages_of_type(protection_second_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(protection_second_tiles.empty());
@@ -1508,7 +1508,7 @@ int main()
     set_tile_protection_visual_state(site_run, density_coord, 18.0f, 36.0f, 52.0f);
     gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, density_coord);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
-    const auto protection_third_messages = drain_engine_messages(bootstrap_runtime);
+    const auto protection_third_messages = drain_runtime_messages(bootstrap_runtime);
     const auto protection_third_tiles =
         collect_messages_of_type(protection_third_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(protection_third_tiles.size() == 1U);
@@ -1522,7 +1522,7 @@ int main()
     set_tile_soil_visual_state(site_run, density_coord, 0.25f, 0.125f, 0.375f);
     gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, density_coord);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
-    const auto soil_first_messages = drain_engine_messages(bootstrap_runtime);
+    const auto soil_first_messages = drain_runtime_messages(bootstrap_runtime);
     const auto soil_first_tiles =
         collect_messages_of_type(soil_first_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(soil_first_tiles.size() == 1U);
@@ -1536,7 +1536,7 @@ int main()
     set_tile_soil_visual_state(site_run, density_coord, 0.257f, 0.132f, 0.382f);
     gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, density_coord);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
-    const auto soil_second_messages = drain_engine_messages(bootstrap_runtime);
+    const auto soil_second_messages = drain_runtime_messages(bootstrap_runtime);
     const auto soil_second_tiles =
         collect_messages_of_type(soil_second_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(soil_second_tiles.empty());
@@ -1544,7 +1544,7 @@ int main()
     set_tile_soil_visual_state(site_run, density_coord, 0.27f, 0.14f, 0.4f);
     gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, density_coord);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
-    const auto soil_third_messages = drain_engine_messages(bootstrap_runtime);
+    const auto soil_third_messages = drain_runtime_messages(bootstrap_runtime);
     const auto soil_third_tiles =
         collect_messages_of_type(soil_third_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(soil_third_tiles.size() == 1U);
@@ -1559,7 +1559,7 @@ int main()
     set_tile_excavation_state(site_run, density_coord, gs1::ExcavationDepth::Rough);
     gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, density_coord);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
-    const auto excavation_first_messages = drain_engine_messages(bootstrap_runtime);
+    const auto excavation_first_messages = drain_runtime_messages(bootstrap_runtime);
     const auto excavation_first_tiles =
         collect_messages_of_type(excavation_first_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(excavation_first_tiles.size() == 1U);
@@ -1572,7 +1572,7 @@ int main()
     set_tile_plant_state(site_run, density_coord, gs1::PlantId {gs1::k_plant_straw_checkerboard}, 0.22f);
     gs1::GameRuntimeProjectionTestAccess::mark_tile_dirty(bootstrap_runtime, density_coord);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
-    const auto excavation_hidden_messages = drain_engine_messages(bootstrap_runtime);
+    const auto excavation_hidden_messages = drain_runtime_messages(bootstrap_runtime);
     const auto excavation_hidden_tiles =
         collect_messages_of_type(excavation_hidden_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(excavation_hidden_tiles.size() == 1U);
@@ -1585,7 +1585,7 @@ int main()
     set_tile_sand_burial(site_run, TileCoord {0, 0}, 0.9f);
     gs1::GameRuntimeProjectionTestAccess::mark_all_tiles_dirty(bootstrap_runtime);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(bootstrap_runtime);
-    const auto fallback_messages = drain_engine_messages(bootstrap_runtime);
+    const auto fallback_messages = drain_runtime_messages(bootstrap_runtime);
     const auto fallback_tiles = collect_messages_of_type(fallback_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     assert(!fallback_tiles.empty());
     assert(fallback_tiles.size() == gs1::site_world_access::tile_count(site_run));
@@ -1605,7 +1605,7 @@ int main()
     assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(phone_panel_runtime).has_value());
     auto& phone_panel_site_run =
         gs1::GameRuntimeProjectionTestAccess::active_site_run(phone_panel_runtime).value();
-    drain_engine_messages(phone_panel_runtime);
+    drain_runtime_messages(phone_panel_runtime);
 
     const auto buy_listing_it = std::find_if(
         phone_panel_site_run.economy.available_phone_listings.begin(),
@@ -1637,7 +1637,7 @@ int main()
         0U});
     assert(phone_panel_runtime.handle_message(buy_sellable_listing) == GS1_STATUS_OK);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(phone_panel_runtime);
-    drain_engine_messages(phone_panel_runtime);
+    drain_runtime_messages(phone_panel_runtime);
 
     Gs1Phase1Result phone_panel_delivery_result {};
     run_phase1(phone_panel_runtime, k_default_delivery_real_seconds, phone_panel_delivery_result);
@@ -1647,7 +1647,7 @@ int main()
         delivered_item_id);
     assert(delivery_quantity_after == delivery_quantity_before + 1U);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(phone_panel_runtime);
-    const auto phone_panel_delivery_messages = drain_engine_messages(phone_panel_runtime);
+    const auto phone_panel_delivery_messages = drain_runtime_messages(phone_panel_runtime);
     assert(contains_phone_listing_message(
         phone_panel_delivery_messages,
         GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_UPSERT,
@@ -1667,10 +1667,10 @@ int main()
     open_tasks_action.arg0 = GS1_PHONE_PANEL_SECTION_TASKS;
     const auto open_tasks_event = make_ui_action_event(open_tasks_action);
     Gs1Phase1Result open_tasks_result {};
-    assert(phone_panel_runtime.submit_host_events(&open_tasks_event, 1U) == GS1_STATUS_OK);
+    assert(phone_panel_runtime.submit_host_messages(&open_tasks_event, 1U) == GS1_STATUS_OK);
     run_phase1(phone_panel_runtime, 0.0, open_tasks_result);
-    assert(open_tasks_result.processed_host_event_count == 1U);
-    const auto open_tasks_messages = drain_engine_messages(phone_panel_runtime);
+    assert(open_tasks_result.processed_host_message_count == 1U);
+    const auto open_tasks_messages = drain_runtime_messages(phone_panel_runtime);
     const auto open_tasks_phone_panel_messages =
         collect_messages_of_type(open_tasks_messages, GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE);
     assert(open_tasks_phone_panel_messages.size() == 1U);
@@ -1690,7 +1690,7 @@ int main()
 
     GameRuntime panel_state_runtime {panel_state_desc};
     run_phase1(panel_state_runtime, 0.0);
-    drain_engine_messages(panel_state_runtime);
+    drain_runtime_messages(panel_state_runtime);
     assert(panel_state_runtime.handle_message(make_start_campaign_message()) == GS1_STATUS_OK);
     const auto panel_state_site_id =
         gs1::GameRuntimeProjectionTestAccess::campaign(panel_state_runtime)->sites.front().site_id.value;
@@ -1698,17 +1698,17 @@ int main()
     complete_site_loading(panel_state_runtime);
     auto& panel_state_site_run =
         gs1::GameRuntimeProjectionTestAccess::active_site_run(panel_state_runtime).value();
-    drain_engine_messages(panel_state_runtime);
+    drain_runtime_messages(panel_state_runtime);
 
     auto open_panel_storage_event = make_storage_view_event(
         starter_storage_id(panel_state_site_run),
         GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT);
     Gs1Phase1Result open_panel_storage_result {};
-    assert(panel_state_runtime.submit_host_events(&open_panel_storage_event, 1U) == GS1_STATUS_OK);
+    assert(panel_state_runtime.submit_host_messages(&open_panel_storage_event, 1U) == GS1_STATUS_OK);
     run_phase1(panel_state_runtime, 0.0, open_panel_storage_result);
-    assert(open_panel_storage_result.processed_host_event_count == 1U);
+    assert(open_panel_storage_result.processed_host_message_count == 1U);
     assert(panel_state_site_run.inventory.opened_device_storage_id == starter_storage_id(panel_state_site_run));
-    const auto open_panel_storage_messages = drain_engine_messages(panel_state_runtime);
+    const auto open_panel_storage_messages = drain_runtime_messages(panel_state_runtime);
     assert(find_inventory_view_message(
                open_panel_storage_messages,
                starter_storage_id(panel_state_site_run),
@@ -1722,12 +1722,12 @@ int main()
         panel_state_site_run.inventory.worker_pack_storage_id,
         GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT);
     Gs1Phase1Result open_worker_pack_result {};
-    assert(panel_state_runtime.submit_host_events(&open_worker_pack_event, 1U) == GS1_STATUS_OK);
+    assert(panel_state_runtime.submit_host_messages(&open_worker_pack_event, 1U) == GS1_STATUS_OK);
     run_phase1(panel_state_runtime, 0.0, open_worker_pack_result);
-    assert(open_worker_pack_result.processed_host_event_count == 1U);
+    assert(open_worker_pack_result.processed_host_message_count == 1U);
     assert(panel_state_site_run.inventory.worker_pack_panel_open);
     assert(panel_state_site_run.inventory.opened_device_storage_id == starter_storage_id(panel_state_site_run));
-    const auto open_worker_pack_messages = drain_engine_messages(panel_state_runtime);
+    const auto open_worker_pack_messages = drain_runtime_messages(panel_state_runtime);
     assert(find_inventory_view_message(
                open_worker_pack_messages,
                panel_state_site_run.inventory.worker_pack_storage_id,
@@ -1746,13 +1746,13 @@ int main()
     open_phone_action.arg0 = GS1_PHONE_PANEL_SECTION_BUY;
     const auto open_phone_event = make_ui_action_event(open_phone_action);
     Gs1Phase1Result open_phone_result {};
-    assert(panel_state_runtime.submit_host_events(&open_phone_event, 1U) == GS1_STATUS_OK);
+    assert(panel_state_runtime.submit_host_messages(&open_phone_event, 1U) == GS1_STATUS_OK);
     run_phase1(panel_state_runtime, 0.0, open_phone_result);
-    assert(open_phone_result.processed_host_event_count == 1U);
+    assert(open_phone_result.processed_host_message_count == 1U);
     assert(panel_state_site_run.phone_panel.open);
     assert(!panel_state_site_run.inventory.worker_pack_panel_open);
     assert(panel_state_site_run.inventory.opened_device_storage_id == 0U);
-    const auto open_phone_messages = drain_engine_messages(panel_state_runtime);
+    const auto open_phone_messages = drain_runtime_messages(panel_state_runtime);
     assert(find_inventory_view_message(
                open_phone_messages,
                panel_state_site_run.inventory.worker_pack_storage_id,
@@ -1783,10 +1783,10 @@ int main()
     open_site_tech_tree_action.type = GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE;
     const auto open_site_tech_tree_event = make_ui_action_event(open_site_tech_tree_action);
     Gs1Phase1Result open_site_tech_tree_result {};
-    assert(panel_state_runtime.submit_host_events(&open_site_tech_tree_event, 1U) == GS1_STATUS_OK);
+    assert(panel_state_runtime.submit_host_messages(&open_site_tech_tree_event, 1U) == GS1_STATUS_OK);
     run_phase1(panel_state_runtime, 0.0, open_site_tech_tree_result);
-    assert(open_site_tech_tree_result.processed_host_event_count == 1U);
-    const auto open_site_tech_tree_messages = drain_engine_messages(panel_state_runtime);
+    assert(open_site_tech_tree_result.processed_host_message_count == 1U);
+    const auto open_site_tech_tree_messages = drain_runtime_messages(panel_state_runtime);
     assert(gs1::GameRuntimeProjectionTestAccess::campaign(panel_state_runtime)->regional_map_state.tech_tree_open);
     assert(!panel_state_site_run.phone_panel.open);
     assert(find_ui_surface_visibility_message(
@@ -1809,13 +1809,13 @@ int main()
         open_site_tech_tree_messages,
         GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE));
 
-    assert(panel_state_runtime.submit_host_events(&open_worker_pack_event, 1U) == GS1_STATUS_OK);
+    assert(panel_state_runtime.submit_host_messages(&open_worker_pack_event, 1U) == GS1_STATUS_OK);
     Gs1Phase1Result reopen_worker_pack_result {};
     run_phase1(panel_state_runtime, 0.0, reopen_worker_pack_result);
-    assert(reopen_worker_pack_result.processed_host_event_count == 1U);
+    assert(reopen_worker_pack_result.processed_host_message_count == 1U);
     assert(panel_state_site_run.inventory.worker_pack_panel_open);
     assert(!gs1::GameRuntimeProjectionTestAccess::campaign(panel_state_runtime)->regional_map_state.tech_tree_open);
-    const auto reopen_worker_pack_messages = drain_engine_messages(panel_state_runtime);
+    const auto reopen_worker_pack_messages = drain_runtime_messages(panel_state_runtime);
     assert(find_ui_surface_visibility_message(
                reopen_worker_pack_messages,
                GS1_UI_SURFACE_REGIONAL_TECH_TREE_OVERLAY,
@@ -1851,14 +1851,14 @@ int main()
     open_protection_selector_action.type = GS1_UI_ACTION_OPEN_SITE_PROTECTION_SELECTOR;
     const auto open_protection_selector_event = make_ui_action_event(open_protection_selector_action);
     Gs1Phase1Result open_protection_selector_result {};
-    assert(panel_state_runtime.submit_host_events(&open_protection_selector_event, 1U) == GS1_STATUS_OK);
+    assert(panel_state_runtime.submit_host_messages(&open_protection_selector_event, 1U) == GS1_STATUS_OK);
     run_phase1(panel_state_runtime, 0.0, open_protection_selector_result);
-    assert(open_protection_selector_result.processed_host_event_count == 1U);
+    assert(open_protection_selector_result.processed_host_message_count == 1U);
     assert(gs1::GameRuntimeProjectionTestAccess::site_protection_selector_open(panel_state_runtime));
     assert(
         gs1::GameRuntimeProjectionTestAccess::site_protection_overlay_mode(panel_state_runtime) ==
         GS1_SITE_PROTECTION_OVERLAY_NONE);
-    const auto open_protection_selector_messages = drain_engine_messages(panel_state_runtime);
+    const auto open_protection_selector_messages = drain_runtime_messages(panel_state_runtime);
     assert(find_inventory_view_message(
                open_protection_selector_messages,
                panel_state_site_run.inventory.worker_pack_storage_id,
@@ -1886,14 +1886,14 @@ int main()
     select_heat_overlay_action.arg0 = GS1_SITE_PROTECTION_OVERLAY_HEAT;
     const auto select_heat_overlay_event = make_ui_action_event(select_heat_overlay_action);
     Gs1Phase1Result select_heat_overlay_result {};
-    assert(panel_state_runtime.submit_host_events(&select_heat_overlay_event, 1U) == GS1_STATUS_OK);
+    assert(panel_state_runtime.submit_host_messages(&select_heat_overlay_event, 1U) == GS1_STATUS_OK);
     run_phase1(panel_state_runtime, 0.0, select_heat_overlay_result);
-    assert(select_heat_overlay_result.processed_host_event_count == 1U);
+    assert(select_heat_overlay_result.processed_host_message_count == 1U);
     assert(!gs1::GameRuntimeProjectionTestAccess::site_protection_selector_open(panel_state_runtime));
     assert(
         gs1::GameRuntimeProjectionTestAccess::site_protection_overlay_mode(panel_state_runtime) ==
         GS1_SITE_PROTECTION_OVERLAY_HEAT);
-    const auto select_heat_overlay_messages = drain_engine_messages(panel_state_runtime);
+    const auto select_heat_overlay_messages = drain_runtime_messages(panel_state_runtime);
     assert(find_close_ui_setup_message(
                select_heat_overlay_messages,
                GS1_UI_SETUP_SITE_PROTECTION_SELECTOR) != nullptr);
@@ -1910,11 +1910,11 @@ int main()
         assert(payload.mode == GS1_SITE_PROTECTION_OVERLAY_HEAT);
     }
 
-    assert(panel_state_runtime.submit_host_events(&open_phone_event, 1U) == GS1_STATUS_OK);
+    assert(panel_state_runtime.submit_host_messages(&open_phone_event, 1U) == GS1_STATUS_OK);
     Gs1Phase1Result reopen_phone_result {};
     run_phase1(panel_state_runtime, 0.0, reopen_phone_result);
-    assert(reopen_phone_result.processed_host_event_count == 1U);
-    const auto reopen_phone_messages = drain_engine_messages(panel_state_runtime);
+    assert(reopen_phone_result.processed_host_message_count == 1U);
+    const auto reopen_phone_messages = drain_runtime_messages(panel_state_runtime);
     assert(find_ui_surface_visibility_message(
                reopen_phone_messages,
                GS1_UI_SURFACE_SITE_OVERLAY_PANEL,
@@ -1946,16 +1946,16 @@ int main()
     assert(ui_runtime.handle_message(make_start_site_attempt_message(ui_site_id)) == GS1_STATUS_OK);
     complete_site_loading(ui_runtime);
     auto& ui_site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(ui_runtime).value();
-    drain_engine_messages(ui_runtime);
+    drain_runtime_messages(ui_runtime);
 
     auto open_storage_event = make_storage_view_event(
         starter_storage_id(ui_site_run),
         GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT);
     Gs1Phase1Result open_storage_result {};
-    assert(ui_runtime.submit_host_events(&open_storage_event, 1U) == GS1_STATUS_OK);
+    assert(ui_runtime.submit_host_messages(&open_storage_event, 1U) == GS1_STATUS_OK);
     run_phase1(ui_runtime, 0.0, open_storage_result);
-    assert(open_storage_result.processed_host_event_count == 1U);
-    const auto open_storage_messages = drain_engine_messages(ui_runtime);
+    assert(open_storage_result.processed_host_message_count == 1U);
+    const auto open_storage_messages = drain_runtime_messages(ui_runtime);
     assert(!collect_messages_of_type(open_storage_messages, GS1_ENGINE_MESSAGE_SITE_INVENTORY_VIEW_STATE).empty());
     assert(find_inventory_slot_message(
                open_storage_messages,
@@ -1973,9 +1973,9 @@ int main()
         0U);
 
     Gs1Phase1Result transfer_result {};
-    assert(ui_runtime.submit_host_events(&transfer_event, 1U) == GS1_STATUS_OK);
+    assert(ui_runtime.submit_host_messages(&transfer_event, 1U) == GS1_STATUS_OK);
     run_phase1(ui_runtime, 0.0, transfer_result);
-    assert(transfer_result.processed_host_event_count == 1U);
+    assert(transfer_result.processed_host_message_count == 1U);
     assert(gs1::inventory_storage::available_item_quantity_in_container(
                ui_site_run,
                gs1::inventory_storage::starter_storage_container(ui_site_run),
@@ -1983,7 +1983,7 @@ int main()
     assert(ui_site_run.inventory.worker_pack_slots[0].occupied);
     assert(ui_site_run.inventory.worker_pack_slots[0].item_id.value == gs1::k_item_water_container);
     assert(ui_site_run.inventory.worker_pack_slots[0].item_quantity == 1U);
-    const auto transfer_messages = drain_engine_messages(ui_runtime);
+    const auto transfer_messages = drain_runtime_messages(ui_runtime);
     const auto transfer_inventory_messages = collect_inventory_slot_messages(transfer_messages);
     assert(!transfer_inventory_messages.empty());
     assert(find_inventory_slot_message(
@@ -2004,13 +2004,13 @@ int main()
         ui_site_run.inventory.worker_pack_slots[0].item_instance_id);
 
     Gs1Phase1Result use_result {};
-    assert(ui_runtime.submit_host_events(&use_event, 1U) == GS1_STATUS_OK);
+    assert(ui_runtime.submit_host_messages(&use_event, 1U) == GS1_STATUS_OK);
     run_phase1(ui_runtime, 0.0, use_result);
-    assert(use_result.processed_host_event_count == 1U);
+    assert(use_result.processed_host_message_count == 1U);
     assert(ui_site_run.inventory.worker_pack_slots[0].occupied);
     assert(ui_site_run.inventory.worker_pack_slots[0].item_quantity == 1U);
     assert(gs1::site_world_access::worker_conditions(ui_site_run).hydration == 70.0f);
-    const auto use_messages = drain_engine_messages(ui_runtime);
+    const auto use_messages = drain_runtime_messages(ui_runtime);
     const auto use_inventory_messages = collect_inventory_slot_messages(use_messages);
     assert(use_inventory_messages.empty());
     assert(!collect_messages_of_type(use_messages, GS1_ENGINE_MESSAGE_SITE_ACTION_UPDATE).empty());
@@ -2029,7 +2029,7 @@ int main()
         gs1::GameRuntimeProjectionTestAccess::campaign(water_action_runtime)->sites.front().site_id.value;
     assert(water_action_runtime.handle_message(make_start_site_attempt_message(water_action_site_id)) == GS1_STATUS_OK);
     complete_site_loading(water_action_runtime);
-    drain_engine_messages(water_action_runtime);
+    drain_runtime_messages(water_action_runtime);
 
     const TileCoord water_target {2, 2};
     auto& water_site_run =
@@ -2054,7 +2054,7 @@ int main()
         17U,
         0.75f});
     assert(water_action_runtime.handle_message(water_started) == GS1_STATUS_OK);
-    const auto water_start_messages = drain_engine_messages(water_action_runtime);
+    const auto water_start_messages = drain_runtime_messages(water_action_runtime);
     const auto water_action_updates =
         collect_messages_of_type(water_start_messages, GS1_ENGINE_MESSAGE_SITE_ACTION_UPDATE);
     assert(water_action_updates.size() == 1U);
@@ -2080,7 +2080,7 @@ int main()
         17U,
         0U});
     assert(water_action_runtime.handle_message(water_completed) == GS1_STATUS_OK);
-    const auto water_complete_messages = drain_engine_messages(water_action_runtime);
+    const auto water_complete_messages = drain_runtime_messages(water_action_runtime);
     const auto water_clear_updates =
         collect_messages_of_type(water_complete_messages, GS1_ENGINE_MESSAGE_SITE_ACTION_UPDATE);
     assert(water_clear_updates.size() == 1U);
@@ -2105,7 +2105,7 @@ int main()
     assert(action_runtime.handle_message(make_start_site_attempt_message(action_site_id)) == GS1_STATUS_OK);
     complete_site_loading(action_runtime);
     assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(action_runtime).has_value());
-    drain_engine_messages(action_runtime);
+    drain_runtime_messages(action_runtime);
     auto& action_site_run =
         gs1::GameRuntimeProjectionTestAccess::active_site_run(action_runtime).value();
     action_site_run.inventory.worker_pack_slots[3].occupied = true;
@@ -2120,7 +2120,7 @@ int main()
         action_target,
         0U,
         gs1::k_item_ordos_wormwood_seed_bundle);
-    assert(action_runtime.submit_host_events(&action_event, 1U) == GS1_STATUS_OK);
+    assert(action_runtime.submit_host_messages(&action_event, 1U) == GS1_STATUS_OK);
     gs1::SiteWorld::TileEcologyData action_ecology {};
     for (int step = 0; step < 10; ++step)
     {
@@ -2137,13 +2137,13 @@ int main()
     assert(action_site_run.inventory.worker_pack_slots[3].item_quantity == 1U);
 
     run_phase1(action_runtime, 0.0);
-    const auto action_messages = drain_engine_messages(action_runtime);
+    const auto action_messages = drain_runtime_messages(action_runtime);
     const auto action_tile_messages =
         collect_messages_of_type(action_messages, GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT);
     const auto projected_action_tile = std::find_if(
         action_tile_messages.begin(),
         action_tile_messages.end(),
-        [&](const Gs1EngineMessage* message) {
+        [&](const Gs1RuntimeMessage* message) {
             const auto& payload = message->payload_as<Gs1EngineMessageSiteTileData>();
             return payload.x == static_cast<std::uint32_t>(action_target.x) &&
                 payload.y == static_cast<std::uint32_t>(action_target.y) &&
@@ -2176,7 +2176,7 @@ int main()
     complete_site_loading(placement_preview_runtime);
     auto& placement_preview_site_run =
         gs1::GameRuntimeProjectionTestAccess::active_site_run(placement_preview_runtime).value();
-    drain_engine_messages(placement_preview_runtime);
+    drain_runtime_messages(placement_preview_runtime);
 
     placement_preview_site_run.inventory.worker_pack_slots[2].occupied = true;
     placement_preview_site_run.inventory.worker_pack_slots[2].item_id = gs1::ItemId {gs1::k_item_ordos_wormwood_seed_bundle};
@@ -2191,9 +2191,9 @@ int main()
         gs1::k_item_ordos_wormwood_seed_bundle,
         GS1_SITE_ACTION_REQUEST_FLAG_HAS_ITEM |
             GS1_SITE_ACTION_REQUEST_FLAG_DEFERRED_TARGET_SELECTION);
-    assert(placement_preview_runtime.submit_host_events(&placement_mode_event, 1U) == GS1_STATUS_OK);
+    assert(placement_preview_runtime.submit_host_messages(&placement_mode_event, 1U) == GS1_STATUS_OK);
     run_phase1(placement_preview_runtime, 0.0);
-    const auto placement_mode_messages = drain_engine_messages(placement_preview_runtime);
+    const auto placement_mode_messages = drain_runtime_messages(placement_preview_runtime);
     const auto placement_preview_messages =
         collect_messages_of_type(placement_mode_messages, GS1_ENGINE_MESSAGE_SITE_PLACEMENT_PREVIEW);
     assert(placement_preview_messages.size() == 1U);
@@ -2217,7 +2217,7 @@ int main()
     const auto preview_anchor_tile = std::find_if(
         preview_tile_messages.begin(),
         preview_tile_messages.end(),
-        [](const Gs1EngineMessage* message) {
+        [](const Gs1RuntimeMessage* message) {
             const auto& payload = message->payload_as<Gs1EngineMessagePlacementPreviewTileData>();
             return payload.x == 4 && payload.y == 4 &&
                 (payload.flags & GS1_PLACEMENT_PREVIEW_TILE_FLAG_OCCUPIED) != 0U &&
@@ -2230,24 +2230,24 @@ int main()
     placement_open_protection_selector_action.type = GS1_UI_ACTION_OPEN_SITE_PROTECTION_SELECTOR;
     const auto placement_open_protection_selector_event =
         make_ui_action_event(placement_open_protection_selector_action);
-    assert(placement_preview_runtime.submit_host_events(&placement_open_protection_selector_event, 1U) == GS1_STATUS_OK);
+    assert(placement_preview_runtime.submit_host_messages(&placement_open_protection_selector_event, 1U) == GS1_STATUS_OK);
     run_phase1(placement_preview_runtime, 0.0);
     assert(gs1::GameRuntimeProjectionTestAccess::site_protection_selector_open(placement_preview_runtime));
     assert(
         gs1::GameRuntimeProjectionTestAccess::site_protection_overlay_mode(placement_preview_runtime) ==
         GS1_SITE_PROTECTION_OVERLAY_NONE);
-    drain_engine_messages(placement_preview_runtime);
+    drain_runtime_messages(placement_preview_runtime);
 
     Gs1UiAction placement_select_heat_overlay_action {};
     placement_select_heat_overlay_action.type = GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE;
     placement_select_heat_overlay_action.arg0 = GS1_SITE_PROTECTION_OVERLAY_HEAT;
     const auto placement_select_heat_overlay_event = make_ui_action_event(placement_select_heat_overlay_action);
-    assert(placement_preview_runtime.submit_host_events(&placement_select_heat_overlay_event, 1U) == GS1_STATUS_OK);
+    assert(placement_preview_runtime.submit_host_messages(&placement_select_heat_overlay_event, 1U) == GS1_STATUS_OK);
     run_phase1(placement_preview_runtime, 0.0);
     assert(
         gs1::GameRuntimeProjectionTestAccess::site_protection_overlay_mode(placement_preview_runtime) ==
         GS1_SITE_PROTECTION_OVERLAY_HEAT);
-    const auto placement_overlay_messages = drain_engine_messages(placement_preview_runtime);
+    const auto placement_overlay_messages = drain_runtime_messages(placement_preview_runtime);
     const auto placement_overlay_state_messages =
         collect_messages_of_type(placement_overlay_messages, GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE);
     assert(placement_overlay_state_messages.size() == 1U);
@@ -2262,9 +2262,9 @@ int main()
     placement_preview_site_run.site_world->set_tile(TileCoord {5, 4}, blocked_tile);
 
     auto cursor_update_event = make_site_context_request_event(TileCoord {5, 5});
-    assert(placement_preview_runtime.submit_host_events(&cursor_update_event, 1U) == GS1_STATUS_OK);
+    assert(placement_preview_runtime.submit_host_messages(&cursor_update_event, 1U) == GS1_STATUS_OK);
     run_phase1(placement_preview_runtime, 0.0);
-    const auto cursor_update_messages = drain_engine_messages(placement_preview_runtime);
+    const auto cursor_update_messages = drain_runtime_messages(placement_preview_runtime);
     const auto blocked_preview_messages =
         collect_messages_of_type(cursor_update_messages, GS1_ENGINE_MESSAGE_SITE_PLACEMENT_PREVIEW);
     assert(blocked_preview_messages.size() == 1U);
@@ -2288,9 +2288,9 @@ int main()
         0U,
         gs1::k_item_ordos_wormwood_seed_bundle,
         GS1_SITE_ACTION_REQUEST_FLAG_HAS_ITEM);
-    assert(placement_preview_runtime.submit_host_events(&blocked_confirm_event, 1U) == GS1_STATUS_OK);
+    assert(placement_preview_runtime.submit_host_messages(&blocked_confirm_event, 1U) == GS1_STATUS_OK);
     run_phase1(placement_preview_runtime, 0.0);
-    const auto blocked_confirm_messages = drain_engine_messages(placement_preview_runtime);
+    const auto blocked_confirm_messages = drain_runtime_messages(placement_preview_runtime);
     const auto placement_failure_messages =
         collect_messages_of_type(blocked_confirm_messages, GS1_ENGINE_MESSAGE_SITE_PLACEMENT_FAILURE);
     assert(placement_failure_messages.size() == 1U);
@@ -2306,9 +2306,9 @@ int main()
     }
 
     auto cancel_placement_event = make_site_action_cancel_event(GS1_SITE_ACTION_CANCEL_FLAG_PLACEMENT_MODE);
-    assert(placement_preview_runtime.submit_host_events(&cancel_placement_event, 1U) == GS1_STATUS_OK);
+    assert(placement_preview_runtime.submit_host_messages(&cancel_placement_event, 1U) == GS1_STATUS_OK);
     run_phase1(placement_preview_runtime, 0.0);
-    const auto cancel_placement_messages = drain_engine_messages(placement_preview_runtime);
+    const auto cancel_placement_messages = drain_runtime_messages(placement_preview_runtime);
     const auto clear_preview_messages =
         collect_messages_of_type(cancel_placement_messages, GS1_ENGINE_MESSAGE_SITE_PLACEMENT_PREVIEW);
     assert(clear_preview_messages.size() == 1U);
@@ -2334,7 +2334,7 @@ int main()
     complete_site_loading(storage_walk_runtime);
     auto& storage_walk_site_run =
         gs1::GameRuntimeProjectionTestAccess::active_site_run(storage_walk_runtime).value();
-    drain_engine_messages(storage_walk_runtime);
+    drain_runtime_messages(storage_walk_runtime);
 
     auto worker_position = gs1::site_world_access::worker_position(storage_walk_site_run);
     worker_position.tile_coord = TileCoord {7, 7};
@@ -2346,13 +2346,13 @@ int main()
         starter_storage_id(storage_walk_site_run),
         GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT);
     Gs1Phase1Result distant_open_result {};
-    assert(storage_walk_runtime.submit_host_events(&distant_open_event, 1U) == GS1_STATUS_OK);
+    assert(storage_walk_runtime.submit_host_messages(&distant_open_event, 1U) == GS1_STATUS_OK);
     run_phase1(storage_walk_runtime, 0.1, distant_open_result);
     assert(distant_open_result.fixed_steps_executed == 1U);
-    assert(distant_open_result.processed_host_event_count == 1U);
+    assert(distant_open_result.processed_host_message_count == 1U);
     assert(storage_walk_site_run.inventory.opened_device_storage_id == 0U);
     assert(storage_walk_site_run.inventory.pending_device_storage_open.active);
-    const auto distant_open_messages = drain_engine_messages(storage_walk_runtime);
+    const auto distant_open_messages = drain_runtime_messages(storage_walk_runtime);
     assert(collect_messages_of_type(
                distant_open_messages,
                GS1_ENGINE_MESSAGE_SITE_INVENTORY_VIEW_STATE)
@@ -2364,13 +2364,13 @@ int main()
 
     auto move_cancel_event = make_move_direction_event(1.0f, 0.0f, 0.0f);
     Gs1Phase1Result move_cancel_result {};
-    assert(storage_walk_runtime.submit_host_events(&move_cancel_event, 1U) == GS1_STATUS_OK);
+    assert(storage_walk_runtime.submit_host_messages(&move_cancel_event, 1U) == GS1_STATUS_OK);
     run_phase1(storage_walk_runtime, 0.1, move_cancel_result);
     assert(move_cancel_result.fixed_steps_executed == 1U);
-    assert(move_cancel_result.processed_host_event_count == 1U);
+    assert(move_cancel_result.processed_host_message_count == 1U);
     assert(!storage_walk_site_run.inventory.pending_device_storage_open.active);
     assert(storage_walk_site_run.inventory.opened_device_storage_id == 0U);
-    drain_engine_messages(storage_walk_runtime);
+    drain_runtime_messages(storage_walk_runtime);
 
     for (int step = 0; step < 12; ++step)
     {
@@ -2394,7 +2394,7 @@ int main()
     complete_site_loading(storage_close_runtime);
     auto& storage_close_site_run =
         gs1::GameRuntimeProjectionTestAccess::active_site_run(storage_close_runtime).value();
-    drain_engine_messages(storage_close_runtime);
+    drain_runtime_messages(storage_close_runtime);
 
     auto close_worker_position = gs1::site_world_access::worker_position(storage_close_site_run);
     close_worker_position.tile_coord = TileCoord {
@@ -2408,11 +2408,11 @@ int main()
         starter_storage_id(storage_close_site_run),
         GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT);
     Gs1Phase1Result close_open_result {};
-    assert(storage_close_runtime.submit_host_events(&close_open_event, 1U) == GS1_STATUS_OK);
+    assert(storage_close_runtime.submit_host_messages(&close_open_event, 1U) == GS1_STATUS_OK);
     run_phase1(storage_close_runtime, 0.0, close_open_result);
-    assert(close_open_result.processed_host_event_count == 1U);
+    assert(close_open_result.processed_host_message_count == 1U);
     assert(storage_close_site_run.inventory.opened_device_storage_id == starter_storage_id(storage_close_site_run));
-    const auto close_open_messages = drain_engine_messages(storage_close_runtime);
+    const auto close_open_messages = drain_runtime_messages(storage_close_runtime);
     const auto close_open_view_messages =
         collect_messages_of_type(close_open_messages, GS1_ENGINE_MESSAGE_SITE_INVENTORY_VIEW_STATE);
     assert(!close_open_view_messages.empty());
@@ -2447,16 +2447,16 @@ int main()
     Gs1Phase1Result move_away_result {};
     run_phase1(storage_close_runtime, 1.0, move_away_result);
     assert(move_away_result.fixed_steps_executed == 1U);
-    assert(move_away_result.processed_host_event_count == 0U);
+    assert(move_away_result.processed_host_message_count == 0U);
     assert(storage_close_site_run.inventory.opened_device_storage_id == 0U);
 
-    const auto close_messages = drain_engine_messages(storage_close_runtime);
+    const auto close_messages = drain_runtime_messages(storage_close_runtime);
     const auto close_view_messages =
         collect_messages_of_type(close_messages, GS1_ENGINE_MESSAGE_SITE_INVENTORY_VIEW_STATE);
     const auto close_view_message = std::find_if(
         close_view_messages.begin(),
         close_view_messages.end(),
-        [&](const Gs1EngineMessage* message) {
+        [&](const Gs1RuntimeMessage* message) {
             const auto& payload = message->payload_as<Gs1EngineMessageInventoryViewData>();
             return payload.storage_id == starter_storage_id(storage_close_site_run) &&
                 payload.event_kind == GS1_INVENTORY_VIEW_EVENT_CLOSE;
@@ -2465,3 +2465,5 @@ int main()
 
     return 0;
 }
+
+
