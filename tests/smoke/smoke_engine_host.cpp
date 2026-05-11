@@ -398,12 +398,6 @@ SmokeEngineHost::SmokeEngineHost(
     smoke_log::infof("[ENGINE][BOOT] smoke host ready\n");
 }
 
-void SmokeEngineHost::queue_feedback_event(const Gs1FeedbackEvent& event)
-{
-    std::scoped_lock lock {incoming_commands_mutex_};
-    incoming_feedback_events_.push_back(event);
-}
-
 void SmokeEngineHost::drain_incoming_commands()
 {
     std::scoped_lock lock {incoming_commands_mutex_};
@@ -415,15 +409,6 @@ void SmokeEngineHost::drain_incoming_commands()
             incoming_pre_phase1_host_events_.begin(),
             incoming_pre_phase1_host_events_.end());
         incoming_pre_phase1_host_events_.clear();
-    }
-
-    if (!incoming_feedback_events_.empty())
-    {
-        frame_feedback_events_.insert(
-            frame_feedback_events_.end(),
-            incoming_feedback_events_.begin(),
-            incoming_feedback_events_.end());
-        incoming_feedback_events_.clear();
     }
 }
 
@@ -469,26 +454,6 @@ void SmokeEngineHost::update(double delta_seconds)
     queue_between_phase_ui_action_if_ready();
     submit_host_messages(pending_between_phase_host_events_, "between_phases");
 
-    if (!frame_feedback_events_.empty())
-    {
-        const auto feedback_submit_start = std::chrono::steady_clock::now();
-        const auto status = api_->submit_feedback_events(
-            runtime_,
-            frame_feedback_events_.data(),
-            static_cast<std::uint32_t>(frame_feedback_events_.size()));
-        current_frame_gameplay_dll_seconds_ +=
-            elapsed_seconds(feedback_submit_start, std::chrono::steady_clock::now());
-        assert(status == GS1_STATUS_OK);
-        if (log_mode_ == LogMode::Verbose)
-        {
-            smoke_log::infof("[ENGINE][FRAME %llu] submit_feedback_events status=%u count=%u\n",
-                static_cast<unsigned long long>(frame_number_),
-                static_cast<unsigned>(status),
-                static_cast<unsigned>(frame_feedback_events_.size()));
-        }
-        frame_feedback_events_.clear();
-    }
-
     Gs1Phase2Request phase2_request {};
     phase2_request.struct_size = sizeof(Gs1Phase2Request);
 
@@ -500,11 +465,10 @@ void SmokeEngineHost::update(double delta_seconds)
     const bool log_phase2_summary = log_mode_ == LogMode::Verbose;
     if (log_phase2_summary)
     {
-        smoke_log::infof("[ENGINE][FRAME %llu] phase2 status=%u host_events=%u feedback_events=%u queued=%u\n",
+        smoke_log::infof("[ENGINE][FRAME %llu] phase2 status=%u host_events=%u queued=%u\n",
             static_cast<unsigned long long>(frame_number_),
             static_cast<unsigned>(phase2_status),
             static_cast<unsigned>(phase2_result.processed_host_message_count),
-            static_cast<unsigned>(phase2_result.processed_feedback_event_count),
             static_cast<unsigned>(phase2_result.runtime_messages_queued));
     }
     phase2_processed_host_message_count_ = phase2_result.processed_host_message_count;

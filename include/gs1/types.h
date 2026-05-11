@@ -240,14 +240,6 @@ enum Gs1SiteActionPresentationFlags : std::uint8_t
     GS1_SITE_ACTION_PRESENTATION_FLAG_CLEAR = 1u << 1
 };
 
-enum Gs1FeedbackEventType : std::uint8_t
-{
-    GS1_FEEDBACK_EVENT_NONE = 0,
-    GS1_FEEDBACK_EVENT_PHYSICS_CONTACT = 1,
-    GS1_FEEDBACK_EVENT_TRACE_HIT = 2,
-    GS1_FEEDBACK_EVENT_ANIMATION_NOTIFY = 3
-};
-
 enum Gs1ProjectionMode : std::uint8_t
 {
     GS1_PROJECTION_MODE_SNAPSHOT = 0,
@@ -654,20 +646,6 @@ struct Gs1HostMessage
     Gs1HostMessagePayload payload;
 };
 
-struct Gs1FeedbackEventData
-{
-    std::uint32_t site_id;
-    std::uint32_t subject_id;
-    std::uint32_t other_id;
-    std::uint32_t code;
-};
-
-struct Gs1FeedbackEvent
-{
-    Gs1FeedbackEventType type;
-    Gs1FeedbackEventData data;
-};
-
 struct Gs1Phase1Request
 {
     std::uint32_t struct_size;
@@ -691,9 +669,9 @@ struct Gs1Phase2Result
 {
     std::uint32_t struct_size;
     std::uint32_t processed_host_message_count;
-    std::uint32_t processed_feedback_event_count;
+    std::uint32_t reserved0;
     std::uint32_t runtime_messages_queued;
-    std::uint32_t reserved;
+    std::uint32_t reserved1;
 };
 
 struct Gs1EngineMessageLogTextData
@@ -1273,8 +1251,6 @@ static_assert(std::is_trivial_v<Gs1HostEventPayload>, "Gs1HostEventPayload must 
 static_assert(std::is_trivially_copyable_v<Gs1HostEventPayload>, "Gs1HostEventPayload must remain trivially copyable.");
 static_assert(sizeof(Gs1HostEventPayload) == 24U, "Gs1HostEventPayload size changed; revisit event packing.");
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostMessage, 32U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1FeedbackEventData, 16U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1FeedbackEvent, 20U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1Phase1Request, 16U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1Phase1Result, 16U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1Phase2Request, 4U);

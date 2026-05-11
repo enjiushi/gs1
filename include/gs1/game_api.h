@@ -23,11 +23,6 @@ GS1_API Gs1Status gs1_submit_host_messages(
     const Gs1HostMessage* messages,
     std::uint32_t message_count) GS1_NOEXCEPT;
 
-GS1_API Gs1Status gs1_submit_feedback_events(
-    Gs1RuntimeHandle* runtime,
-    const Gs1FeedbackEvent* events,
-    std::uint32_t event_count) GS1_NOEXCEPT;
-
 GS1_API Gs1Status gs1_run_phase1(
     Gs1RuntimeHandle* runtime,
     const Gs1Phase1Request* request,

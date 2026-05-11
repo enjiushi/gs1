@@ -89,7 +89,6 @@ bool RuntimeDllLoader::load(const wchar_t* dll_path)
         load_symbol(api_.create_runtime, "gs1_create_runtime") &&
         load_symbol(api_.destroy_runtime, "gs1_destroy_runtime") &&
         load_symbol(api_.submit_host_messages, "gs1_submit_host_messages") &&
-        load_symbol(api_.submit_feedback_events, "gs1_submit_feedback_events") &&
         load_symbol(api_.run_phase1, "gs1_run_phase1") &&
         load_symbol(api_.run_phase2, "gs1_run_phase2") &&
         load_symbol(api_.pop_runtime_message, "gs1_pop_runtime_message") &&

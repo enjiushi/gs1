@@ -11,7 +11,6 @@ struct Gs1RuntimeApi final
     decltype(&gs1_create_runtime) create_runtime {nullptr};
     decltype(&gs1_destroy_runtime) destroy_runtime {nullptr};
     decltype(&gs1_submit_host_messages) submit_host_messages {nullptr};
-    decltype(&gs1_submit_feedback_events) submit_feedback_events {nullptr};
     decltype(&gs1_run_phase1) run_phase1 {nullptr};
     decltype(&gs1_run_phase2) run_phase2 {nullptr};
     decltype(&gs1_pop_runtime_message) pop_runtime_message {nullptr};

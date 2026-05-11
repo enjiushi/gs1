@@ -65,7 +65,6 @@ public:
         Gs1RuntimeHandle* runtime,
         LogMode log_mode = LogMode::Verbose) noexcept;
 
-    void queue_feedback_event(const Gs1FeedbackEvent& event);
     void update(double delta_seconds);
     void queue_ui_action(const Gs1UiAction& action);
     void queue_site_action_request(const Gs1HostEventSiteActionRequestData& action);
@@ -549,13 +548,11 @@ private:
     LogMode log_mode_ {LogMode::Verbose};
     mutable std::mutex incoming_commands_mutex_ {};
     std::vector<Gs1HostMessage> incoming_pre_phase1_host_events_ {};
-    std::vector<Gs1FeedbackEvent> incoming_feedback_events_ {};
     mutable std::mutex published_state_mutex_ {};
     LiveStateSnapshot published_live_state_snapshot_ {};
     std::vector<std::string> published_live_state_patches_ {};
     std::vector<Gs1HostMessage> frame_pre_phase1_host_events_ {};
     std::vector<Gs1HostMessage> pending_between_phase_host_events_ {};
-    std::vector<Gs1FeedbackEvent> frame_feedback_events_ {};
     std::vector<std::string> message_logs_ {};
     std::vector<std::string> current_frame_message_entries_ {};
     std::uint32_t frame_live_state_patch_mask_ {0U};

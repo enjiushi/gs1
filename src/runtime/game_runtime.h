@@ -23,7 +23,7 @@
 
 namespace gs1
 {
-inline constexpr std::uint32_t k_api_version = 6;
+inline constexpr std::uint32_t k_api_version = 7;
 
 class GameRuntime final
 {
@@ -33,9 +33,6 @@ public:
     [[nodiscard]] Gs1Status submit_host_messages(
         const Gs1HostMessage* messages,
         std::uint32_t message_count);
-    [[nodiscard]] Gs1Status submit_feedback_events(
-        const Gs1FeedbackEvent* events,
-        std::uint32_t event_count);
     [[nodiscard]] Gs1Status run_phase1(const Gs1Phase1Request& request, Gs1Phase1Result& out_result);
     [[nodiscard]] Gs1Status run_phase2(const Gs1Phase2Request& request, Gs1Phase2Result& out_result);
     [[nodiscard]] Gs1Status pop_runtime_message(Gs1RuntimeMessage& out_message);
@@ -71,11 +68,9 @@ private:
 
     void initialize_system_registry();
     [[nodiscard]] Gs1Status dispatch_host_messages(std::uint32_t& out_processed_count);
-    [[nodiscard]] Gs1Status dispatch_feedback_events(std::uint32_t& out_processed_count);
     [[nodiscard]] Gs1Status dispatch_queued_messages();
     [[nodiscard]] Gs1Status dispatch_subscribed_host_message(const Gs1HostMessage& message);
     [[nodiscard]] Gs1Status dispatch_subscribed_message(const GameMessage& message);
-    [[nodiscard]] Gs1Status dispatch_subscribed_feedback_event(const Gs1FeedbackEvent& event);
     void run_fixed_step();
     void copy_timing_snapshot(
         const TimingAccumulator& source,
@@ -89,13 +84,11 @@ private:
     std::optional<CampaignState> campaign_ {};
     std::optional<SiteRunState> active_site_run_ {};
     std::deque<Gs1HostMessage> host_messages_ {};
-    std::deque<Gs1FeedbackEvent> feedback_events_ {};
     GameMessageQueue message_queue_ {};
     std::vector<std::unique_ptr<IRuntimeSystem>> systems_ {};
     std::vector<IRuntimeSystem*> fixed_step_systems_ {};
     RuntimeHostMessageSubscribers host_message_subscribers_ {};
     RuntimeGameMessageSubscribers message_subscribers_ {};
-    RuntimeFeedbackEventSubscribers feedback_event_subscribers_ {};
     std::deque<Gs1RuntimeMessage> runtime_messages_ {};
     TimingAccumulator phase1_timing_ {};
     TimingAccumulator phase2_timing_ {};

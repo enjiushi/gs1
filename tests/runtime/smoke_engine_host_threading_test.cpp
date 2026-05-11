@@ -17,9 +17,7 @@ struct FakeRuntimeState final
 {
     std::deque<Gs1RuntimeMessage> engine_messages {};
     std::vector<Gs1HostMessage> submitted_host_events {};
-    std::vector<Gs1FeedbackEvent> submitted_feedback_events {};
     std::uint32_t last_submitted_host_event_count {0};
-    std::uint32_t last_submitted_feedback_event_count {0};
     std::uint32_t run_phase1_call_count {0};
     std::uint32_t run_phase2_call_count {0};
 };
@@ -40,20 +38,6 @@ Gs1Status fake_submit_host_messages(
     for (std::uint32_t index = 0; index < event_count; ++index)
     {
         state.submitted_host_events.push_back(events[index]);
-    }
-    return GS1_STATUS_OK;
-}
-
-Gs1Status fake_submit_feedback_events(
-    Gs1RuntimeHandle* runtime,
-    const Gs1FeedbackEvent* events,
-    std::uint32_t event_count) noexcept
-{
-    auto& state = fake_runtime(runtime);
-    state.last_submitted_feedback_event_count = event_count;
-    for (std::uint32_t index = 0; index < event_count; ++index)
-    {
-        state.submitted_feedback_events.push_back(events[index]);
     }
     return GS1_STATUS_OK;
 }
@@ -89,9 +73,9 @@ Gs1Status fake_run_phase2(
 
     out_result->struct_size = sizeof(Gs1Phase2Result);
     out_result->processed_host_message_count = 0U;
-    out_result->processed_feedback_event_count = state.last_submitted_feedback_event_count;
+    out_result->reserved0 = 0U;
     out_result->runtime_messages_queued = static_cast<std::uint32_t>(state.engine_messages.size());
-    out_result->reserved = 0U;
+    out_result->reserved1 = 0U;
     return GS1_STATUS_OK;
 }
 
@@ -116,7 +100,6 @@ Gs1RuntimeApi make_fake_api() noexcept
 {
     Gs1RuntimeApi api {};
     api.submit_host_messages = &fake_submit_host_messages;
-    api.submit_feedback_events = &fake_submit_feedback_events;
     api.run_phase1 = &fake_run_phase1;
     api.run_phase2 = &fake_run_phase2;
     api.pop_runtime_message = &fake_pop_runtime_message;
@@ -266,14 +249,6 @@ void queued_commands_only_publish_after_update()
     action.target_id = 41U;
     host.queue_ui_action(action);
 
-    Gs1FeedbackEvent feedback {};
-    feedback.type = GS1_FEEDBACK_EVENT_TRACE_HIT;
-    feedback.data.site_id = 7U;
-    feedback.data.subject_id = 8U;
-    feedback.data.other_id = 9U;
-    feedback.data.code = 10U;
-    host.queue_feedback_event(feedback);
-
     const auto before_update = host.capture_live_state_snapshot();
     assert(before_update.frame_number == 0U);
     assert(!before_update.current_app_state.has_value());
@@ -287,8 +262,6 @@ void queued_commands_only_publish_after_update()
     assert(runtime_state.submitted_host_events.size() == 1U);
     assert(runtime_state.submitted_host_events.front().type == GS1_HOST_EVENT_UI_ACTION);
     assert(runtime_state.submitted_host_events.front().payload.ui_action.action.type == GS1_UI_ACTION_START_NEW_CAMPAIGN);
-    assert(runtime_state.submitted_feedback_events.size() == 1U);
-    assert(runtime_state.submitted_feedback_events.front().type == GS1_FEEDBACK_EVENT_TRACE_HIT);
 
     const auto after_update = host.capture_live_state_snapshot();
     assert(after_update.frame_number == 1U);

@@ -50,11 +50,9 @@ private:
 
 inline constexpr std::size_t k_runtime_host_message_type_count =
     static_cast<std::size_t>(GS1_HOST_EVENT_SITE_SCENE_READY) + 1U;
-inline constexpr std::size_t k_runtime_feedback_event_type_count = 4U;
 
 using GameMessageSubscriptionSpan = std::span<const GameMessageType>;
 using HostMessageSubscriptionSpan = std::span<const Gs1HostMessageType>;
-using FeedbackEventSubscriptionSpan = std::span<const Gs1FeedbackEventType>;
 
 class IRuntimeSystem
 {
@@ -64,7 +62,6 @@ public:
     [[nodiscard]] virtual const char* name() const noexcept = 0;
     [[nodiscard]] virtual GameMessageSubscriptionSpan subscribed_game_messages() const noexcept = 0;
     [[nodiscard]] virtual HostMessageSubscriptionSpan subscribed_host_messages() const noexcept = 0;
-    [[nodiscard]] virtual FeedbackEventSubscriptionSpan subscribed_feedback_events() const noexcept = 0;
     [[nodiscard]] virtual std::optional<Gs1RuntimeProfileSystemId> profile_system_id() const noexcept = 0;
     [[nodiscard]] virtual std::optional<std::uint32_t> fixed_step_order() const noexcept = 0;
     [[nodiscard]] virtual Gs1Status process_game_message(
@@ -79,8 +76,6 @@ public:
 using RuntimeGameMessageSubscribers = std::array<std::vector<IRuntimeSystem*>, k_game_message_type_count>;
 using RuntimeHostMessageSubscribers =
     std::array<std::vector<IRuntimeSystem*>, k_runtime_host_message_type_count>;
-using RuntimeFeedbackEventSubscribers =
-    std::array<std::vector<IRuntimeSystem*>, k_runtime_feedback_event_type_count>;
 
 template <typename EnumType, std::size_t Count, auto Predicate>
 [[nodiscard]] std::span<const EnumType> runtime_subscription_list() noexcept
@@ -121,10 +116,6 @@ template <typename EnumType, std::size_t Count, auto Predicate>
             Gs1HostMessageType,                                                                                   \
             gs1::k_runtime_host_message_type_count,                                                               \
             &ClassName::subscribes_to_host_message>();                                                            \
-    }                                                                                                             \
-    gs1::FeedbackEventSubscriptionSpan ClassName::subscribed_feedback_events() const noexcept                     \
-    {                                                                                                             \
-        return {};                                                                                                \
     }                                                                                                             \
     std::optional<Gs1RuntimeProfileSystemId> ClassName::profile_system_id() const noexcept                       \
     {                                                                                                             \
@@ -170,10 +161,6 @@ template <typename EnumType, std::size_t Count, auto Predicate>
     {                                                                                                             \
         return {};                                                                                                \
     }                                                                                                             \
-    gs1::FeedbackEventSubscriptionSpan ClassName::subscribed_feedback_events() const noexcept                     \
-    {                                                                                                             \
-        return {};                                                                                                \
-    }                                                                                                             \
     std::optional<Gs1RuntimeProfileSystemId> ClassName::profile_system_id() const noexcept                       \
     {                                                                                                             \
         return ProfileId;                                                                                         \
@@ -208,10 +195,6 @@ template <typename EnumType, std::size_t Count, auto Predicate>
         return {};                                                                                                \
     }                                                                                                             \
     gs1::HostMessageSubscriptionSpan ClassName::subscribed_host_messages() const noexcept                         \
-    {                                                                                                             \
-        return {};                                                                                                \
-    }                                                                                                             \
-    gs1::FeedbackEventSubscriptionSpan ClassName::subscribed_feedback_events() const noexcept                     \
     {                                                                                                             \
         return {};                                                                                                \
     }                                                                                                             \
@@ -253,10 +236,6 @@ template <typename EnumType, std::size_t Count, auto Predicate>
             &ClassName::subscribes_to>();                                                                         \
     }                                                                                                             \
     gs1::HostMessageSubscriptionSpan ClassName::subscribed_host_messages() const noexcept                         \
-    {                                                                                                             \
-        return {};                                                                                                \
-    }                                                                                                             \
-    gs1::FeedbackEventSubscriptionSpan ClassName::subscribed_feedback_events() const noexcept                     \
     {                                                                                                             \
         return {};                                                                                                \
     }                                                                                                             \
@@ -310,10 +289,6 @@ template <typename EnumType, std::size_t Count, auto Predicate>
             gs1::k_runtime_host_message_type_count,                                                               \
             &ClassName::subscribes_to_host_message>();                                                            \
     }                                                                                                             \
-    gs1::FeedbackEventSubscriptionSpan ClassName::subscribed_feedback_events() const noexcept                     \
-    {                                                                                                             \
-        return {};                                                                                                \
-    }                                                                                                             \
     std::optional<Gs1RuntimeProfileSystemId> ClassName::profile_system_id() const noexcept                       \
     {                                                                                                             \
         return ProfileId;                                                                                         \
@@ -364,10 +339,6 @@ template <typename EnumType, std::size_t Count, auto Predicate>
     {                                                                                                             \
         return {};                                                                                                \
     }                                                                                                             \
-    gs1::FeedbackEventSubscriptionSpan ClassName::subscribed_feedback_events() const noexcept                     \
-    {                                                                                                             \
-        return {};                                                                                                \
-    }                                                                                                             \
     std::optional<Gs1RuntimeProfileSystemId> ClassName::profile_system_id() const noexcept                       \
     {                                                                                                             \
         return ProfileId;                                                                                         \
@@ -410,10 +381,6 @@ template <typename EnumType, std::size_t Count, auto Predicate>
             Gs1HostMessageType,                                                                                   \
             gs1::k_runtime_host_message_type_count,                                                               \
             &ClassName::subscribes_to_host_message>();                                                            \
-    }                                                                                                             \
-    gs1::FeedbackEventSubscriptionSpan ClassName::subscribed_feedback_events() const noexcept                     \
-    {                                                                                                             \
-        return {};                                                                                                \
     }                                                                                                             \
     std::optional<Gs1RuntimeProfileSystemId> ClassName::profile_system_id() const noexcept                       \
     {                                                                                                             \

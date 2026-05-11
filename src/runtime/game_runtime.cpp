@@ -176,16 +176,6 @@ bool is_valid_message_type(GameMessageType type) noexcept
     return message_type_index(type) < k_game_message_type_count;
 }
 
-std::size_t feedback_event_type_index(Gs1FeedbackEventType type) noexcept
-{
-    return static_cast<std::size_t>(type);
-}
-
-bool is_valid_feedback_event_type(Gs1FeedbackEventType type) noexcept
-{
-    return feedback_event_type_index(type) < k_runtime_feedback_event_type_count;
-}
-
 template <typename EnumType, typename SubscriberArray>
 void append_runtime_subscribers(
     SubscriberArray& subscribers_by_type,
@@ -443,10 +433,6 @@ void GameRuntime::initialize_system_registry()
     {
         subscribers.clear();
     }
-    for (auto& subscribers : feedback_event_subscribers_)
-    {
-        subscribers.clear();
-    }
 
     systems_.push_back(std::make_unique<CampaignFlowSystem>());
     systems_.push_back(std::make_unique<LoadoutPlannerSystem>());
@@ -479,10 +465,6 @@ void GameRuntime::initialize_system_registry()
     {
         append_runtime_subscribers(message_subscribers_, system->subscribed_game_messages(), *system);
         append_runtime_subscribers(host_message_subscribers_, system->subscribed_host_messages(), *system);
-        append_runtime_subscribers(
-            feedback_event_subscribers_,
-            system->subscribed_feedback_events(),
-            *system);
         if (system->fixed_step_order().has_value())
         {
             fixed_step_systems_.push_back(system.get());
@@ -511,23 +493,6 @@ Gs1Status GameRuntime::submit_host_messages(
     for (std::uint32_t i = 0; i < message_count; ++i)
     {
         host_messages_.push_back(messages[i]);
-    }
-
-    return GS1_STATUS_OK;
-}
-
-Gs1Status GameRuntime::submit_feedback_events(
-    const Gs1FeedbackEvent* events,
-    std::uint32_t event_count)
-{
-    if (event_count > 0U && events == nullptr)
-    {
-        return GS1_STATUS_INVALID_ARGUMENT;
-    }
-
-    for (std::uint32_t i = 0; i < event_count; ++i)
-    {
-        feedback_events_.push_back(events[i]);
     }
 
     return GS1_STATUS_OK;
@@ -638,13 +603,6 @@ Gs1Status GameRuntime::run_phase2(const Gs1Phase2Request& request, Gs1Phase2Resu
         return status;
     }
 
-    status = dispatch_feedback_events(out_result.processed_feedback_event_count);
-    if (status != GS1_STATUS_OK)
-    {
-        finish_phase();
-        return status;
-    }
-
     status = dispatch_queued_messages();
     out_result.runtime_messages_queued = static_cast<std::uint32_t>(runtime_messages_.size());
     finish_phase();
@@ -719,22 +677,6 @@ Gs1Status GameRuntime::dispatch_subscribed_message(const GameMessage& message)
     return GS1_STATUS_OK;
 }
 
-Gs1Status GameRuntime::dispatch_subscribed_feedback_event(const Gs1FeedbackEvent& event)
-{
-    if (!is_valid_feedback_event_type(event.type))
-    {
-        return GS1_STATUS_INVALID_ARGUMENT;
-    }
-
-    const auto& subscribers = feedback_event_subscribers_[feedback_event_type_index(event.type)];
-    for (IRuntimeSystem* system : subscribers)
-    {
-        (void)system;
-    }
-
-    return GS1_STATUS_OK;
-}
-
 Gs1Status GameRuntime::dispatch_host_messages(std::uint32_t& out_processed_count)
 {
     out_processed_count = 0U;
@@ -791,26 +733,6 @@ Gs1Status GameRuntime::dispatch_subscribed_host_message(const Gs1HostMessage& me
             {
                 return presentation_.process_host_message(context, message);
             });
-        if (status != GS1_STATUS_OK)
-        {
-            return status;
-        }
-    }
-
-    return GS1_STATUS_OK;
-}
-
-Gs1Status GameRuntime::dispatch_feedback_events(std::uint32_t& out_processed_count)
-{
-    out_processed_count = 0U;
-
-    while (!feedback_events_.empty())
-    {
-        const auto event = feedback_events_.front();
-        feedback_events_.pop_front();
-        out_processed_count += 1U;
-
-        const auto status = dispatch_subscribed_feedback_event(event);
         if (status != GS1_STATUS_OK)
         {
             return status;

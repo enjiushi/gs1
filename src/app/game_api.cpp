@@ -82,19 +82,6 @@ Gs1Status gs1_submit_host_messages(
     return runtime->runtime.submit_host_messages(messages, message_count);
 }
 
-Gs1Status gs1_submit_feedback_events(
-    Gs1RuntimeHandle* runtime,
-    const Gs1FeedbackEvent* events,
-    std::uint32_t event_count) GS1_NOEXCEPT
-{
-    if (runtime == nullptr)
-    {
-        return GS1_STATUS_INVALID_ARGUMENT;
-    }
-
-    return runtime->runtime.submit_feedback_events(events, event_count);
-}
-
 Gs1Status gs1_run_phase1(
     Gs1RuntimeHandle* runtime,
     const Gs1Phase1Request* request,
