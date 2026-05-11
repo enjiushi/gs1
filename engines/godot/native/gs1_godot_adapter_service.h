@@ -28,7 +28,8 @@ public:
     Gs1GodotAdapterService() = default;
     ~Gs1GodotAdapterService();
 
-    void process_frame(double delta_seconds);
+    void begin_frame(double delta_seconds);
+    void finish_frame();
     void begin_engine_message_buffering();
     void flush_buffered_engine_messages();
     void clear_buffered_engine_messages() noexcept;
@@ -93,6 +94,8 @@ private:
     Gs1GodotDebugHttpServer debug_http_server_ {};
     bool debug_http_server_checked_ {false};
     bool engine_message_buffering_active_ {false};
+    bool phase2_pending_ {false};
+    double pending_phase1_delta_seconds_ {1.0 / 60.0};
     std::mutex pending_debug_http_commands_mutex_ {};
     std::vector<Gs1GodotDebugHttpCommand> pending_debug_http_commands_ {};
     std::vector<Gs1EngineMessage> buffered_engine_messages_ {};

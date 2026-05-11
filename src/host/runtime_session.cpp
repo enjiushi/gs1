@@ -70,7 +70,7 @@ void Gs1RuntimeSession::stop() noexcept
     loader_.unload();
 }
 
-bool Gs1RuntimeSession::update(double delta_seconds, Gs1Phase1Result& out_phase1, Gs1Phase2Result& out_phase2)
+bool Gs1RuntimeSession::run_phase1(double delta_seconds, Gs1Phase1Result& out_phase1)
 {
     if (runtime_ == nullptr)
     {
@@ -79,9 +79,9 @@ bool Gs1RuntimeSession::update(double delta_seconds, Gs1Phase1Result& out_phase1
     }
 
     const Gs1RuntimeApi& api = loader_.api();
-    if (api.run_phase1 == nullptr || api.run_phase2 == nullptr)
+    if (api.run_phase1 == nullptr)
     {
-        last_error_ = "Gameplay DLL is missing phase entry points.";
+        last_error_ = "Gameplay DLL is missing phase 1 entry points.";
         return false;
     }
 
@@ -97,14 +97,49 @@ bool Gs1RuntimeSession::update(double delta_seconds, Gs1Phase1Result& out_phase1
         return false;
     }
 
+    last_error_.clear();
+    return true;
+}
+
+bool Gs1RuntimeSession::run_phase2(Gs1Phase2Result& out_phase2)
+{
+    if (runtime_ == nullptr)
+    {
+        last_error_ = "Runtime session is not running.";
+        return false;
+    }
+
+    const Gs1RuntimeApi& api = loader_.api();
+    if (api.run_phase2 == nullptr)
+    {
+        last_error_ = "Gameplay DLL is missing phase 2 entry points.";
+        return false;
+    }
+
     Gs1Phase2Request phase2_request {};
     phase2_request.struct_size = sizeof(Gs1Phase2Request);
 
     out_phase2 = {};
-    status = api.run_phase2(runtime_, &phase2_request, &out_phase2);
+    const Gs1Status status = api.run_phase2(runtime_, &phase2_request, &out_phase2);
     if (status != GS1_STATUS_OK)
     {
         last_error_ = "gs1_run_phase2 failed with status " + std::to_string(static_cast<unsigned>(status));
+        return false;
+    }
+
+    last_error_.clear();
+    return true;
+}
+
+bool Gs1RuntimeSession::update(double delta_seconds, Gs1Phase1Result& out_phase1, Gs1Phase2Result& out_phase2)
+{
+    if (!run_phase1(delta_seconds, out_phase1))
+    {
+        return false;
+    }
+
+    if (!run_phase2(out_phase2))
+    {
         return false;
     }
 

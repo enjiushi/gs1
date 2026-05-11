@@ -80,7 +80,7 @@ void Gs1GodotAdapterService::clear_buffered_engine_messages() noexcept
     buffered_engine_messages_.clear();
 }
 
-void Gs1GodotAdapterService::process_frame(double delta_seconds)
+void Gs1GodotAdapterService::begin_frame(double delta_seconds)
 {
     ensure_debug_http_server_initialized();
 
@@ -93,6 +93,11 @@ void Gs1GodotAdapterService::process_frame(double delta_seconds)
         return;
     }
 
+    if (phase2_pending_)
+    {
+        return;
+    }
+
     if (!drain_debug_http_commands())
     {
         fail_runtime_session("Failed to drain queued Godot debug HTTP commands.");
@@ -100,20 +105,46 @@ void Gs1GodotAdapterService::process_frame(double delta_seconds)
     }
 
     Gs1Phase1Result phase1 {};
-    Gs1Phase2Result phase2 {};
-    if (!runtime_session_.update(delta_seconds > 0.0 ? delta_seconds : (1.0 / 60.0), phase1, phase2))
+    pending_phase1_delta_seconds_ = delta_seconds > 0.0 ? delta_seconds : (1.0 / 60.0);
+    if (!runtime_session_.run_phase1(pending_phase1_delta_seconds_, phase1))
     {
         last_error_ = runtime_session_.last_error();
-        fail_runtime_session("Runtime session update failed.");
+        fail_runtime_session("Runtime session phase 1 failed.");
         return;
     }
 
     if (!drain_projection_messages())
     {
-        fail_runtime_session("Failed to drain runtime projection messages.");
+        fail_runtime_session("Failed to drain runtime phase 1 projection messages.");
         return;
     }
 
+    phase2_pending_ = true;
+    last_error_.clear();
+}
+
+void Gs1GodotAdapterService::finish_frame()
+{
+    if (!runtime_session_.is_running() || !phase2_pending_)
+    {
+        return;
+    }
+
+    if (!drain_debug_http_commands())
+    {
+        fail_runtime_session("Failed to drain queued Godot debug HTTP commands before phase 2.");
+        return;
+    }
+
+    Gs1Phase2Result phase2 {};
+    if (!runtime_session_.run_phase2(phase2))
+    {
+        last_error_ = runtime_session_.last_error();
+        fail_runtime_session("Runtime session phase 2 failed.");
+        return;
+    }
+
+    phase2_pending_ = false;
     last_error_.clear();
 }
 
@@ -347,6 +378,7 @@ bool Gs1GodotAdapterService::drain_projection_messages()
 void Gs1GodotAdapterService::notify_runtime_message_reset()
 {
     clear_buffered_engine_messages();
+    phase2_pending_ = false;
     for (IGs1GodotEngineMessageSubscriber* subscriber : known_subscribers_)
     {
         if (subscriber != nullptr)

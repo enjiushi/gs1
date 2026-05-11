@@ -83,10 +83,11 @@ void Gs1GodotDirectorControl::_ready()
 
 void Gs1GodotDirectorControl::_process(double delta)
 {
-    adapter_service_.process_frame(delta);
+    adapter_service_.begin_frame(delta);
     cache_nodes();
     poll_async_scene_switch();
     ensure_active_scene();
+    adapter_service_.finish_frame();
 }
 
 void Gs1GodotDirectorControl::cache_nodes()
