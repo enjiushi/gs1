@@ -186,6 +186,22 @@ bool is_valid_feedback_event_type(Gs1FeedbackEventType type) noexcept
     return feedback_event_type_index(type) < k_runtime_feedback_event_type_count;
 }
 
+template <typename EnumType, typename SubscriberArray>
+void append_runtime_subscribers(
+    SubscriberArray& subscribers_by_type,
+    std::span<const EnumType> subscribed_types,
+    IRuntimeSystem& system)
+{
+    for (const EnumType type : subscribed_types)
+    {
+        const auto index = static_cast<std::size_t>(type);
+        if (index < subscribers_by_type.size())
+        {
+            subscribers_by_type[index].push_back(&system);
+        }
+    }
+}
+
 bool is_valid_profile_system_id(Gs1RuntimeProfileSystemId system_id) noexcept
 {
     return static_cast<std::size_t>(system_id) <
@@ -459,16 +475,14 @@ void GameRuntime::initialize_system_registry()
     systems_.push_back(std::make_unique<FailureRecoverySystem>());
     systems_.push_back(std::make_unique<SiteCompletionSystem>());
 
-    RuntimeSystemRegistration registration {
-        message_subscribers_,
-        host_message_subscribers_,
-        feedback_event_subscribers_};
-
     for (const auto& system : systems_)
     {
-        system->register_game_message_subscriptions(registration);
-        system->register_host_message_subscriptions(registration);
-        system->register_feedback_event_subscriptions(registration);
+        append_runtime_subscribers(message_subscribers_, system->subscribed_game_messages(), *system);
+        append_runtime_subscribers(host_message_subscribers_, system->subscribed_host_messages(), *system);
+        append_runtime_subscribers(
+            feedback_event_subscribers_,
+            system->subscribed_feedback_events(),
+            *system);
         if (system->fixed_step_order().has_value())
         {
             fixed_step_systems_.push_back(system.get());

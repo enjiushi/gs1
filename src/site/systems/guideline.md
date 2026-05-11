@@ -1,6 +1,6 @@
 # src/site/systems/
 
-Site-owned systems that subscribe to messages/events and mutate only the state they own.
+Site-owned systems that declare direct message/host subscription lists and mutate only the state they own.
 
 ## Usage
 - Read this file before scanning the folder in detail.

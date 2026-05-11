@@ -93,9 +93,9 @@ private:
     GameMessageQueue message_queue_ {};
     std::vector<std::unique_ptr<IRuntimeSystem>> systems_ {};
     std::vector<IRuntimeSystem*> fixed_step_systems_ {};
-    RuntimeSystemRegistration::HostMessageSubscribers host_message_subscribers_ {};
-    RuntimeSystemRegistration::GameMessageSubscribers message_subscribers_ {};
-    RuntimeSystemRegistration::FeedbackEventSubscribers feedback_event_subscribers_ {};
+    RuntimeHostMessageSubscribers host_message_subscribers_ {};
+    RuntimeGameMessageSubscribers message_subscribers_ {};
+    RuntimeFeedbackEventSubscribers feedback_event_subscribers_ {};
     std::deque<Gs1RuntimeMessage> runtime_messages_ {};
     TimingAccumulator phase1_timing_ {};
     TimingAccumulator phase2_timing_ {};

@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <vector>
 
 namespace gs1
@@ -51,15 +52,19 @@ inline constexpr std::size_t k_runtime_host_message_type_count =
     static_cast<std::size_t>(GS1_HOST_EVENT_SITE_SCENE_READY) + 1U;
 inline constexpr std::size_t k_runtime_feedback_event_type_count = 4U;
 
+using GameMessageSubscriptionSpan = std::span<const GameMessageType>;
+using HostMessageSubscriptionSpan = std::span<const Gs1HostMessageType>;
+using FeedbackEventSubscriptionSpan = std::span<const Gs1FeedbackEventType>;
+
 class IRuntimeSystem
 {
 public:
     virtual ~IRuntimeSystem() = default;
 
     [[nodiscard]] virtual const char* name() const noexcept = 0;
-    virtual void register_game_message_subscriptions(class RuntimeSystemRegistration& registration) = 0;
-    virtual void register_host_message_subscriptions(class RuntimeSystemRegistration& registration) = 0;
-    virtual void register_feedback_event_subscriptions(class RuntimeSystemRegistration& registration) = 0;
+    [[nodiscard]] virtual GameMessageSubscriptionSpan subscribed_game_messages() const noexcept = 0;
+    [[nodiscard]] virtual HostMessageSubscriptionSpan subscribed_host_messages() const noexcept = 0;
+    [[nodiscard]] virtual FeedbackEventSubscriptionSpan subscribed_feedback_events() const noexcept = 0;
     [[nodiscard]] virtual std::optional<Gs1RuntimeProfileSystemId> profile_system_id() const noexcept = 0;
     [[nodiscard]] virtual std::optional<std::uint32_t> fixed_step_order() const noexcept = 0;
     [[nodiscard]] virtual Gs1Status process_game_message(
@@ -71,56 +76,31 @@ public:
     virtual void run(GameRuntimeTempBridge& bridge) = 0;
 };
 
-class RuntimeSystemRegistration final
+using RuntimeGameMessageSubscribers = std::array<std::vector<IRuntimeSystem*>, k_game_message_type_count>;
+using RuntimeHostMessageSubscribers =
+    std::array<std::vector<IRuntimeSystem*>, k_runtime_host_message_type_count>;
+using RuntimeFeedbackEventSubscribers =
+    std::array<std::vector<IRuntimeSystem*>, k_runtime_feedback_event_type_count>;
+
+template <typename EnumType, std::size_t Count, auto Predicate>
+[[nodiscard]] std::span<const EnumType> runtime_subscription_list() noexcept
 {
-public:
-    using GameMessageSubscribers = std::array<std::vector<IRuntimeSystem*>, k_game_message_type_count>;
-    using HostMessageSubscribers = std::array<std::vector<IRuntimeSystem*>, k_runtime_host_message_type_count>;
-    using FeedbackEventSubscribers =
-        std::array<std::vector<IRuntimeSystem*>, k_runtime_feedback_event_type_count>;
-
-    RuntimeSystemRegistration(
-        GameMessageSubscribers& game_message_subscribers,
-        HostMessageSubscribers& host_message_subscribers,
-        FeedbackEventSubscribers& feedback_event_subscribers) noexcept
-        : game_message_subscribers_(game_message_subscribers),
-          host_message_subscribers_(host_message_subscribers),
-          feedback_event_subscribers_(feedback_event_subscribers)
+    static const std::vector<EnumType> subscriptions = []()
     {
-    }
-
-    void subscribe_to(GameMessageType type, IRuntimeSystem& system)
-    {
-        const auto index = static_cast<std::size_t>(type);
-        if (index < game_message_subscribers_.size())
+        std::vector<EnumType> result;
+        result.reserve(Count);
+        for (std::size_t index = 0; index < Count; ++index)
         {
-            game_message_subscribers_[index].push_back(&system);
+            const auto type = static_cast<EnumType>(index);
+            if (Predicate(type))
+            {
+                result.push_back(type);
+            }
         }
-    }
-
-    void subscribe_to_host_message(Gs1HostMessageType type, IRuntimeSystem& system)
-    {
-        const auto index = static_cast<std::size_t>(type);
-        if (index < host_message_subscribers_.size())
-        {
-            host_message_subscribers_[index].push_back(&system);
-        }
-    }
-
-    void subscribe_to_feedback_event(Gs1FeedbackEventType type, IRuntimeSystem& system)
-    {
-        const auto index = static_cast<std::size_t>(type);
-        if (index < feedback_event_subscribers_.size())
-        {
-            feedback_event_subscribers_[index].push_back(&system);
-        }
-    }
-
-private:
-    GameMessageSubscribers& game_message_subscribers_;
-    HostMessageSubscribers& host_message_subscribers_;
-    FeedbackEventSubscribers& feedback_event_subscribers_;
-};
+        return result;
+    }();
+    return subscriptions;
+}
 }  // namespace gs1
 
 #define GS1_IMPLEMENT_RUNTIME_CAMPAIGN_FLOW_SYSTEM(ClassName)                                                     \
@@ -128,30 +108,23 @@ private:
     {                                                                                                             \
         return #ClassName;                                                                                        \
     }                                                                                                             \
-    void ClassName::register_game_message_subscriptions(gs1::RuntimeSystemRegistration& registration)             \
+    gs1::GameMessageSubscriptionSpan ClassName::subscribed_game_messages() const noexcept                         \
     {                                                                                                             \
-        for (std::size_t index = 0; index < gs1::k_game_message_type_count; ++index)                             \
-        {                                                                                                         \
-            const auto type = static_cast<gs1::GameMessageType>(index);                                           \
-            if (ClassName::subscribes_to(type))                                                                   \
-            {                                                                                                     \
-                registration.subscribe_to(type, *this);                                                           \
-            }                                                                                                     \
-        }                                                                                                         \
+        return gs1::runtime_subscription_list<                                                                    \
+            gs1::GameMessageType,                                                                                 \
+            gs1::k_game_message_type_count,                                                                       \
+            &ClassName::subscribes_to>();                                                                         \
     }                                                                                                             \
-    void ClassName::register_host_message_subscriptions(gs1::RuntimeSystemRegistration& registration)            \
+    gs1::HostMessageSubscriptionSpan ClassName::subscribed_host_messages() const noexcept                         \
     {                                                                                                             \
-        for (std::size_t index = 0; index < gs1::k_runtime_host_message_type_count; ++index)                     \
-        {                                                                                                         \
-            const auto type = static_cast<Gs1HostMessageType>(index);                                             \
-            if (ClassName::subscribes_to_host_message(type))                                                      \
-            {                                                                                                     \
-                registration.subscribe_to_host_message(type, *this);                                              \
-            }                                                                                                     \
-        }                                                                                                         \
+        return gs1::runtime_subscription_list<                                                                    \
+            Gs1HostMessageType,                                                                                   \
+            gs1::k_runtime_host_message_type_count,                                                               \
+            &ClassName::subscribes_to_host_message>();                                                            \
     }                                                                                                             \
-    void ClassName::register_feedback_event_subscriptions(gs1::RuntimeSystemRegistration&)                       \
+    gs1::FeedbackEventSubscriptionSpan ClassName::subscribed_feedback_events() const noexcept                     \
     {                                                                                                             \
+        return {};                                                                                                \
     }                                                                                                             \
     std::optional<Gs1RuntimeProfileSystemId> ClassName::profile_system_id() const noexcept                       \
     {                                                                                                             \
@@ -186,22 +159,20 @@ private:
     {                                                                                                             \
         return #ClassName;                                                                                        \
     }                                                                                                             \
-    void ClassName::register_game_message_subscriptions(gs1::RuntimeSystemRegistration& registration)             \
+    gs1::GameMessageSubscriptionSpan ClassName::subscribed_game_messages() const noexcept                         \
     {                                                                                                             \
-        for (std::size_t index = 0; index < gs1::k_game_message_type_count; ++index)                             \
-        {                                                                                                         \
-            const auto type = static_cast<gs1::GameMessageType>(index);                                           \
-            if (ClassName::subscribes_to(type))                                                                   \
-            {                                                                                                     \
-                registration.subscribe_to(type, *this);                                                           \
-            }                                                                                                     \
-        }                                                                                                         \
+        return gs1::runtime_subscription_list<                                                                    \
+            gs1::GameMessageType,                                                                                 \
+            gs1::k_game_message_type_count,                                                                       \
+            &ClassName::subscribes_to>();                                                                         \
     }                                                                                                             \
-    void ClassName::register_host_message_subscriptions(gs1::RuntimeSystemRegistration&)                         \
+    gs1::HostMessageSubscriptionSpan ClassName::subscribed_host_messages() const noexcept                         \
     {                                                                                                             \
+        return {};                                                                                                \
     }                                                                                                             \
-    void ClassName::register_feedback_event_subscriptions(gs1::RuntimeSystemRegistration&)                       \
+    gs1::FeedbackEventSubscriptionSpan ClassName::subscribed_feedback_events() const noexcept                     \
     {                                                                                                             \
+        return {};                                                                                                \
     }                                                                                                             \
     std::optional<Gs1RuntimeProfileSystemId> ClassName::profile_system_id() const noexcept                       \
     {                                                                                                             \
@@ -232,14 +203,17 @@ private:
     {                                                                                                             \
         return #ClassName;                                                                                        \
     }                                                                                                             \
-    void ClassName::register_game_message_subscriptions(gs1::RuntimeSystemRegistration&)                         \
+    gs1::GameMessageSubscriptionSpan ClassName::subscribed_game_messages() const noexcept                         \
     {                                                                                                             \
+        return {};                                                                                                \
     }                                                                                                             \
-    void ClassName::register_host_message_subscriptions(gs1::RuntimeSystemRegistration&)                         \
+    gs1::HostMessageSubscriptionSpan ClassName::subscribed_host_messages() const noexcept                         \
     {                                                                                                             \
+        return {};                                                                                                \
     }                                                                                                             \
-    void ClassName::register_feedback_event_subscriptions(gs1::RuntimeSystemRegistration&)                       \
+    gs1::FeedbackEventSubscriptionSpan ClassName::subscribed_feedback_events() const noexcept                     \
     {                                                                                                             \
+        return {};                                                                                                \
     }                                                                                                             \
     std::optional<Gs1RuntimeProfileSystemId> ClassName::profile_system_id() const noexcept                       \
     {                                                                                                             \
@@ -271,22 +245,20 @@ private:
     {                                                                                                             \
         return ClassName::access().system_name.data();                                                            \
     }                                                                                                             \
-    void ClassName::register_game_message_subscriptions(gs1::RuntimeSystemRegistration& registration)             \
+    gs1::GameMessageSubscriptionSpan ClassName::subscribed_game_messages() const noexcept                         \
     {                                                                                                             \
-        for (std::size_t index = 0; index < gs1::k_game_message_type_count; ++index)                             \
-        {                                                                                                         \
-            const auto type = static_cast<gs1::GameMessageType>(index);                                           \
-            if (ClassName::subscribes_to(type))                                                                   \
-            {                                                                                                     \
-                registration.subscribe_to(type, *this);                                                           \
-            }                                                                                                     \
-        }                                                                                                         \
+        return gs1::runtime_subscription_list<                                                                    \
+            gs1::GameMessageType,                                                                                 \
+            gs1::k_game_message_type_count,                                                                       \
+            &ClassName::subscribes_to>();                                                                         \
     }                                                                                                             \
-    void ClassName::register_host_message_subscriptions(gs1::RuntimeSystemRegistration&)                         \
+    gs1::HostMessageSubscriptionSpan ClassName::subscribed_host_messages() const noexcept                         \
     {                                                                                                             \
+        return {};                                                                                                \
     }                                                                                                             \
-    void ClassName::register_feedback_event_subscriptions(gs1::RuntimeSystemRegistration&)                       \
+    gs1::FeedbackEventSubscriptionSpan ClassName::subscribed_feedback_events() const noexcept                     \
     {                                                                                                             \
+        return {};                                                                                                \
     }                                                                                                             \
     std::optional<Gs1RuntimeProfileSystemId> ClassName::profile_system_id() const noexcept                       \
     {                                                                                                             \
@@ -324,30 +296,23 @@ private:
     {                                                                                                             \
         return ClassName::access().system_name.data();                                                            \
     }                                                                                                             \
-    void ClassName::register_game_message_subscriptions(gs1::RuntimeSystemRegistration& registration)             \
+    gs1::GameMessageSubscriptionSpan ClassName::subscribed_game_messages() const noexcept                         \
     {                                                                                                             \
-        for (std::size_t index = 0; index < gs1::k_game_message_type_count; ++index)                             \
-        {                                                                                                         \
-            const auto type = static_cast<gs1::GameMessageType>(index);                                           \
-            if (ClassName::subscribes_to(type))                                                                   \
-            {                                                                                                     \
-                registration.subscribe_to(type, *this);                                                           \
-            }                                                                                                     \
-        }                                                                                                         \
+        return gs1::runtime_subscription_list<                                                                    \
+            gs1::GameMessageType,                                                                                 \
+            gs1::k_game_message_type_count,                                                                       \
+            &ClassName::subscribes_to>();                                                                         \
     }                                                                                                             \
-    void ClassName::register_host_message_subscriptions(gs1::RuntimeSystemRegistration& registration)            \
+    gs1::HostMessageSubscriptionSpan ClassName::subscribed_host_messages() const noexcept                         \
     {                                                                                                             \
-        for (std::size_t index = 0; index < gs1::k_runtime_host_message_type_count; ++index)                     \
-        {                                                                                                         \
-            const auto type = static_cast<Gs1HostMessageType>(index);                                             \
-            if (ClassName::subscribes_to_host_message(type))                                                      \
-            {                                                                                                     \
-                registration.subscribe_to_host_message(type, *this);                                              \
-            }                                                                                                     \
-        }                                                                                                         \
+        return gs1::runtime_subscription_list<                                                                    \
+            Gs1HostMessageType,                                                                                   \
+            gs1::k_runtime_host_message_type_count,                                                               \
+            &ClassName::subscribes_to_host_message>();                                                            \
     }                                                                                                             \
-    void ClassName::register_feedback_event_subscriptions(gs1::RuntimeSystemRegistration&)                       \
+    gs1::FeedbackEventSubscriptionSpan ClassName::subscribed_feedback_events() const noexcept                     \
     {                                                                                                             \
+        return {};                                                                                                \
     }                                                                                                             \
     std::optional<Gs1RuntimeProfileSystemId> ClassName::profile_system_id() const noexcept                       \
     {                                                                                                             \
@@ -391,14 +356,17 @@ private:
     {                                                                                                             \
         return ClassName::access().system_name.data();                                                            \
     }                                                                                                             \
-    void ClassName::register_game_message_subscriptions(gs1::RuntimeSystemRegistration&)                         \
+    gs1::GameMessageSubscriptionSpan ClassName::subscribed_game_messages() const noexcept                         \
     {                                                                                                             \
+        return {};                                                                                                \
     }                                                                                                             \
-    void ClassName::register_host_message_subscriptions(gs1::RuntimeSystemRegistration&)                         \
+    gs1::HostMessageSubscriptionSpan ClassName::subscribed_host_messages() const noexcept                         \
     {                                                                                                             \
+        return {};                                                                                                \
     }                                                                                                             \
-    void ClassName::register_feedback_event_subscriptions(gs1::RuntimeSystemRegistration&)                       \
+    gs1::FeedbackEventSubscriptionSpan ClassName::subscribed_feedback_events() const noexcept                     \
     {                                                                                                             \
+        return {};                                                                                                \
     }                                                                                                             \
     std::optional<Gs1RuntimeProfileSystemId> ClassName::profile_system_id() const noexcept                       \
     {                                                                                                             \
@@ -432,22 +400,20 @@ private:
     {                                                                                                             \
         return ClassName::access().system_name.data();                                                            \
     }                                                                                                             \
-    void ClassName::register_game_message_subscriptions(gs1::RuntimeSystemRegistration&)                         \
+    gs1::GameMessageSubscriptionSpan ClassName::subscribed_game_messages() const noexcept                         \
     {                                                                                                             \
+        return {};                                                                                                \
     }                                                                                                             \
-    void ClassName::register_host_message_subscriptions(gs1::RuntimeSystemRegistration& registration)            \
+    gs1::HostMessageSubscriptionSpan ClassName::subscribed_host_messages() const noexcept                         \
     {                                                                                                             \
-        for (std::size_t index = 0; index < gs1::k_runtime_host_message_type_count; ++index)                     \
-        {                                                                                                         \
-            const auto type = static_cast<Gs1HostMessageType>(index);                                             \
-            if (ClassName::subscribes_to_host_message(type))                                                      \
-            {                                                                                                     \
-                registration.subscribe_to_host_message(type, *this);                                              \
-            }                                                                                                     \
-        }                                                                                                         \
+        return gs1::runtime_subscription_list<                                                                    \
+            Gs1HostMessageType,                                                                                   \
+            gs1::k_runtime_host_message_type_count,                                                               \
+            &ClassName::subscribes_to_host_message>();                                                            \
     }                                                                                                             \
-    void ClassName::register_feedback_event_subscriptions(gs1::RuntimeSystemRegistration&)                       \
+    gs1::FeedbackEventSubscriptionSpan ClassName::subscribed_feedback_events() const noexcept                     \
     {                                                                                                             \
+        return {};                                                                                                \
     }                                                                                                             \
     std::optional<Gs1RuntimeProfileSystemId> ClassName::profile_system_id() const noexcept                       \
     {                                                                                                             \
