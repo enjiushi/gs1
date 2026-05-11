@@ -77,12 +77,12 @@ struct GameRuntimeProjectionTestAccess
 
     static bool site_protection_selector_open(const GameRuntime& runtime)
     {
-        return runtime.site_protection_selector_open_;
+        return runtime.presentation_.site_protection_selector_open();
     }
 
     static Gs1SiteProtectionOverlayMode site_protection_overlay_mode(const GameRuntime& runtime)
     {
-        return runtime.site_protection_overlay_mode_;
+        return runtime.presentation_.site_protection_overlay_mode();
     }
 
 };

@@ -114,6 +114,7 @@ set(GS1_CONTENT_RUNTIME_SOURCES
     src/content/prototype_content.cpp)
 
 set(GS1_GAMEPLAY_CORE_SOURCES
+    src/app/game_presentation_coordinator.cpp
     src/app/campaign_factory.cpp
     src/app/site_run_factory.cpp
     src/campaign/systems/campaign_flow_system.cpp
