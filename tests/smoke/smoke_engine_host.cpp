@@ -465,6 +465,7 @@ void SmokeEngineHost::update(double delta_seconds)
 
     flush_engine_messages("phase1");
 
+    queue_between_phase_site_scene_ready_if_needed();
     queue_between_phase_ui_action_if_ready();
     submit_host_events(pending_between_phase_host_events_, "between_phases");
 
@@ -693,6 +694,17 @@ void SmokeEngineHost::queue_between_phase_ui_action_if_ready()
     (void)try_queue_ui_action_from_directive(pending_between_phase_host_events_);
 }
 
+void SmokeEngineHost::queue_between_phase_site_scene_ready_if_needed()
+{
+    if (!pending_site_scene_ready_ack_)
+    {
+        return;
+    }
+
+    pending_between_phase_host_events_.push_back(make_site_scene_ready_event());
+    pending_site_scene_ready_ack_ = false;
+}
+
 void SmokeEngineHost::submit_host_events(
     std::vector<Gs1HostEvent>& events,
     const char* stage_label)
@@ -874,6 +886,7 @@ void SmokeEngineHost::flush_engine_messages(const char* stage_label)
                 current_app_state_ == GS1_APP_STATE_CAMPAIGN_SETUP ||
                 current_app_state_ == GS1_APP_STATE_CAMPAIGN_END)
             {
+                pending_site_scene_ready_ack_ = false;
                 active_site_snapshot_.reset();
                 hud_state_.reset();
                 site_action_.reset();
@@ -883,6 +896,7 @@ void SmokeEngineHost::flush_engine_messages(const char* stage_label)
                 current_app_state_ == GS1_APP_STATE_SITE_LOADING ||
                 current_app_state_ == GS1_APP_STATE_SITE_PAUSED)
             {
+                pending_site_scene_ready_ack_ = current_app_state_ == GS1_APP_STATE_SITE_LOADING;
                 site_result_.reset();
             }
             live_state_patch_mask =
@@ -2497,6 +2511,13 @@ Gs1HostEvent SmokeEngineHost::make_ui_action_event(const Gs1UiAction& action) no
     Gs1HostEvent event {};
     event.type = GS1_HOST_EVENT_UI_ACTION;
     event.payload.ui_action.action = action;
+    return event;
+}
+
+Gs1HostEvent SmokeEngineHost::make_site_scene_ready_event() noexcept
+{
+    Gs1HostEvent event {};
+    event.type = GS1_HOST_EVENT_SITE_SCENE_READY;
     return event;
 }
 

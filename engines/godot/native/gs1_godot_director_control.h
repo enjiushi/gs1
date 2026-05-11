@@ -110,5 +110,7 @@ private:
     ScreenKind pending_async_target_kind_ {GS1_GODOT_SCREEN_KIND_NONE};
     godot::String pending_async_scene_path_ {};
     std::vector<godot::String> pending_async_resource_paths_ {};
+    bool pending_async_transition_buffers_engine_messages_ {false};
+    bool pending_async_transition_submits_site_scene_ready_ {false};
     int last_app_state_ {-1};
 };

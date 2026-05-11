@@ -510,6 +510,18 @@ bool Gs1GodotAdapterService::submit_site_inventory_slot_tap(
     return true;
 }
 
+bool Gs1GodotAdapterService::submit_site_scene_ready()
+{
+    Gs1HostEvent event {};
+    event.type = GS1_HOST_EVENT_SITE_SCENE_READY;
+    if (!runtime_session_.submit_host_events(&event, 1U))
+    {
+        last_error_ = runtime_session_.last_error();
+        return false;
+    }
+    return true;
+}
+
 bool Gs1GodotAdapterService::queue_debug_http_command(
     std::string_view path,
     const std::string& body,

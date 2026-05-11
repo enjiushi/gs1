@@ -57,6 +57,13 @@ GameMessage make_start_site_attempt_message(std::uint32_t site_id)
     return message;
 }
 
+Gs1HostEvent make_site_scene_ready_event()
+{
+    Gs1HostEvent event {};
+    event.type = GS1_HOST_EVENT_SITE_SCENE_READY;
+    return event;
+}
+
 GameMessage make_inventory_use_message(
     std::uint32_t item_id,
     std::uint32_t quantity,
@@ -94,6 +101,15 @@ void run_phase1(GameRuntime& runtime, double real_delta_seconds, Gs1Phase1Result
     assert(runtime.run_phase1(request, out_result) == GS1_STATUS_OK);
 }
 
+void run_phase2(GameRuntime& runtime, Gs1Phase2Result& out_result)
+{
+    Gs1Phase2Request request {};
+    request.struct_size = sizeof(Gs1Phase2Request);
+
+    out_result = {};
+    assert(runtime.run_phase2(request, out_result) == GS1_STATUS_OK);
+}
+
 const Gs1EngineMessage* find_site_modifier_message(
     const std::vector<Gs1EngineMessage>& messages,
     std::uint32_t modifier_id)
@@ -125,6 +141,11 @@ void bootstrap_site_one(GameRuntime& runtime)
     const auto site_id = campaign->sites.front().site_id.value;
     assert(runtime.handle_message(make_start_site_attempt_message(site_id)) == GS1_STATUS_OK);
     assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).has_value());
+
+    const auto ready_event = make_site_scene_ready_event();
+    assert(runtime.submit_host_events(&ready_event, 1U) == GS1_STATUS_OK);
+    Gs1Phase2Result ready_result {};
+    run_phase2(runtime, ready_result);
 }
 
 void timed_modifier_projection_only_republishes_on_game_hour_boundaries()

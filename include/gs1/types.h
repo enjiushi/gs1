@@ -57,7 +57,8 @@ enum Gs1HostEventType : std::uint8_t
     GS1_HOST_EVENT_SITE_ACTION_CANCEL = 4,
     GS1_HOST_EVENT_SITE_STORAGE_VIEW = 5,
     GS1_HOST_EVENT_SITE_CONTEXT_REQUEST = 6,
-    GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP = 7
+    GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP = 7,
+    GS1_HOST_EVENT_SITE_SCENE_READY = 8
 };
 
 enum Gs1UiSetupId : std::uint8_t
@@ -609,6 +610,13 @@ struct Gs1HostEventSiteInventorySlotTapData
     std::uint64_t reserved1;
 };
 
+struct Gs1HostEventSiteSceneReadyData
+{
+    std::uint64_t reserved0;
+    std::uint64_t reserved1;
+    std::uint64_t reserved2;
+};
+
 struct Gs1HostEventEmptyData
 {
     std::uint64_t reserved0;
@@ -624,6 +632,7 @@ union Gs1HostEventPayload
     Gs1HostEventSiteStorageViewData site_storage_view;
     Gs1HostEventSiteContextRequestData site_context_request;
     Gs1HostEventSiteInventorySlotTapData site_inventory_slot_tap;
+    Gs1HostEventSiteSceneReadyData site_scene_ready;
     Gs1HostEventEmptyData empty;
 };
 
@@ -1243,6 +1252,7 @@ GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteActionCancelData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteStorageViewData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteContextRequestData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteInventorySlotTapData, 24U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteSceneReadyData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventEmptyData, 16U);
 static_assert(std::is_standard_layout_v<Gs1HostEventPayload>, "Gs1HostEventPayload must remain standard layout.");
 static_assert(std::is_trivial_v<Gs1HostEventPayload>, "Gs1HostEventPayload must remain trivial.");

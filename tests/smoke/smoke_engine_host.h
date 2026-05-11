@@ -471,6 +471,7 @@ private:
     void drain_incoming_commands();
     void queue_pre_phase1_ui_action_if_ready();
     void queue_between_phase_ui_action_if_ready();
+    void queue_between_phase_site_scene_ready_if_needed();
     void submit_host_events(
         std::vector<Gs1HostEvent>& events,
         const char* stage_label);
@@ -536,6 +537,7 @@ private:
         std::uint32_t to_site_id) noexcept;
     [[nodiscard]] static std::string describe_message(const Gs1EngineMessage& message);
     static Gs1HostEvent make_ui_action_event(const Gs1UiAction& action) noexcept;
+    static Gs1HostEvent make_site_scene_ready_event() noexcept;
     static Gs1HostEvent make_site_move_direction_event(
         float world_move_x,
         float world_move_y,
@@ -582,6 +584,7 @@ private:
     FrameTimingSnapshot last_frame_timing_ {};
     std::optional<Gs1AppState> current_app_state_ {};
     std::optional<std::uint32_t> selected_site_id_ {};
+    bool pending_site_scene_ready_ack_ {false};
     std::optional<SmokeScriptDirective> inflight_script_directive_ {};
     bool inflight_script_directive_started_ {false};
     bool script_failed_ {false};

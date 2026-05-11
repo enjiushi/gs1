@@ -126,7 +126,7 @@ int main()
     start_site_attempt.set_payload(StartSiteAttemptMessage {1U});
     assert(CampaignFlowSystem::process_message(flow_context, start_site_attempt) == GS1_STATUS_OK);
     assert(active_site_run.has_value());
-    assert(app_state == GS1_APP_STATE_SITE_ACTIVE);
+    assert(app_state == GS1_APP_STATE_SITE_LOADING);
     assert(site_start_queue.size() == 1U);
     assert(site_start_queue.front().type == GameMessageType::SiteRunStarted);
     assert(site_start_queue.front().payload_as<SiteRunStartedMessage>().site_id == 1U);

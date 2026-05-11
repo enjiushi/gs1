@@ -126,6 +126,13 @@ Gs1HostEvent make_ui_action_event(const Gs1UiAction& action)
     return event;
 }
 
+Gs1HostEvent make_site_scene_ready_event()
+{
+    Gs1HostEvent event {};
+    event.type = GS1_HOST_EVENT_SITE_SCENE_READY;
+    return event;
+}
+
 std::vector<Gs1EngineMessage> drain_engine_messages(GameRuntime& runtime)
 {
     std::vector<Gs1EngineMessage> messages {};
@@ -145,6 +152,15 @@ void run_phase1(GameRuntime& runtime, double real_delta_seconds, Gs1Phase1Result
 
     out_result = {};
     assert(runtime.run_phase1(request, out_result) == GS1_STATUS_OK);
+}
+
+void run_phase2(GameRuntime& runtime, Gs1Phase2Result& out_result)
+{
+    Gs1Phase2Request request {};
+    request.struct_size = sizeof(Gs1Phase2Request);
+
+    out_result = {};
+    assert(runtime.run_phase2(request, out_result) == GS1_STATUS_OK);
 }
 
 std::vector<const Gs1EngineMessage*> collect_messages_of_type(
@@ -310,6 +326,70 @@ void bootstrap_site_one(GameRuntime& runtime)
     const auto site_id = campaign->sites.front().site_id.value;
     assert(runtime.handle_message(make_start_site_attempt_message(site_id)) == GS1_STATUS_OK);
     assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).has_value());
+
+    const auto ready_event = make_site_scene_ready_event();
+    assert(runtime.submit_host_events(&ready_event, 1U) == GS1_STATUS_OK);
+    Gs1Phase2Result ready_result {};
+    run_phase2(runtime, ready_result);
+    assert(gs1::GameRuntimeProjectionTestAccess::app_state(runtime) == GS1_APP_STATE_SITE_ACTIVE);
+}
+
+void site_loading_waits_for_scene_ready_before_bootstrap_and_fixed_steps()
+{
+    Gs1RuntimeCreateDesc create_desc {};
+    create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
+    create_desc.api_version = gs1::k_api_version;
+    create_desc.fixed_step_seconds = 60.0;
+    create_desc.adapter_config_json_utf8 = nullptr;
+
+    GameRuntime runtime {create_desc};
+    assert(runtime.handle_message(make_start_campaign_message()) == GS1_STATUS_OK);
+    auto& campaign = gs1::GameRuntimeProjectionTestAccess::campaign(runtime);
+    assert(campaign.has_value());
+    assert(!campaign->sites.empty());
+    drain_engine_messages(runtime);
+
+    const auto site_id = campaign->sites.front().site_id.value;
+    assert(runtime.handle_message(make_start_site_attempt_message(site_id)) == GS1_STATUS_OK);
+    assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).has_value());
+    assert(gs1::GameRuntimeProjectionTestAccess::app_state(runtime) == GS1_APP_STATE_SITE_LOADING);
+
+    const auto loading_messages = drain_engine_messages(runtime);
+    const auto loading_app_state_messages =
+        collect_messages_of_type(loading_messages, GS1_ENGINE_MESSAGE_SET_APP_STATE);
+    assert(loading_app_state_messages.size() == 1U);
+    assert(
+        loading_app_state_messages.front()->payload_as<Gs1EngineMessageSetAppStateData>().app_state ==
+        GS1_APP_STATE_SITE_LOADING);
+    assert(collect_messages_of_type(loading_messages, GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT).empty());
+    assert(collect_messages_of_type(loading_messages, GS1_ENGINE_MESSAGE_HUD_STATE).empty());
+    assert(collect_messages_of_type(loading_messages, GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES).empty());
+
+    auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
+    assert(site_run.clock.accumulator_real_seconds == 0.0);
+
+    Gs1Phase1Result loading_result {};
+    run_phase1(runtime, 60.0, loading_result);
+    assert(loading_result.fixed_steps_executed == 0U);
+    assert(site_run.clock.accumulator_real_seconds == 0.0);
+    assert(drain_engine_messages(runtime).empty());
+
+    const auto ready_event = make_site_scene_ready_event();
+    assert(runtime.submit_host_events(&ready_event, 1U) == GS1_STATUS_OK);
+    Gs1Phase2Result ready_result {};
+    run_phase2(runtime, ready_result);
+    assert(gs1::GameRuntimeProjectionTestAccess::app_state(runtime) == GS1_APP_STATE_SITE_ACTIVE);
+
+    const auto ready_messages = drain_engine_messages(runtime);
+    const auto ready_app_state_messages =
+        collect_messages_of_type(ready_messages, GS1_ENGINE_MESSAGE_SET_APP_STATE);
+    assert(ready_app_state_messages.size() == 1U);
+    assert(
+        ready_app_state_messages.front()->payload_as<Gs1EngineMessageSetAppStateData>().app_state ==
+        GS1_APP_STATE_SITE_ACTIVE);
+    assert(!collect_messages_of_type(ready_messages, GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT).empty());
+    assert(!collect_messages_of_type(ready_messages, GS1_ENGINE_MESSAGE_HUD_STATE).empty());
+    assert(!collect_messages_of_type(ready_messages, GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES).empty());
 }
 
 void seed_runtime_test_task(GameRuntime& runtime, std::uint32_t site_completion_target)
@@ -830,6 +910,7 @@ void site_weather_changes_emit_hud_wind_warning_codes()
 
 int main()
 {
+    site_loading_waits_for_scene_ready_before_bootstrap_and_fixed_steps();
     inventory_item_use_updates_worker_and_projection();
     inventory_use_request_keeps_singleton_projections_singular_across_immediate_and_flush_paths();
     task_accept_request_does_not_emit_campaign_resource_projection();

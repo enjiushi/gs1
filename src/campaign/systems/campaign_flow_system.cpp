@@ -246,7 +246,7 @@ Gs1Status CampaignFlowSystem::process_message(
         context.campaign->regional_map_state.tech_tree_open = false;
         context.active_site_run = SiteRunFactory::create_site_run(*context.campaign, *site);
         context.campaign->active_site_id = SiteId {payload.site_id};
-        context.app_state = GS1_APP_STATE_SITE_ACTIVE;
+        context.app_state = GS1_APP_STATE_SITE_LOADING;
         context.campaign->app_state = context.app_state;
 
         GameMessage site_run_started {};

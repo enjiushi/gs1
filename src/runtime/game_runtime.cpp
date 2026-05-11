@@ -1598,6 +1598,14 @@ Gs1Status GameRuntime::run_phase1(const Gs1Phase1Request& request, Gs1Phase1Resu
         return GS1_STATUS_OK;
     }
 
+    if (app_state_ == GS1_APP_STATE_SITE_LOADING)
+    {
+        phase1_site_move_direction_ = {};
+        out_result.engine_messages_queued = static_cast<std::uint32_t>(engine_messages_.size());
+        finish_phase();
+        return GS1_STATUS_OK;
+    }
+
     active_site_run_->clock.accumulator_real_seconds += request.real_delta_seconds;
 
     while (active_site_run_->clock.accumulator_real_seconds >= fixed_step_seconds_)
@@ -2297,12 +2305,6 @@ void GameRuntime::sync_after_processed_message(const GameMessage& message)
         break;
 
     case GameMessageType::SiteRunStarted:
-        close_site_protection_ui();
-        queue_site_bootstrap_messages();
-        queue_campaign_resources_message();
-        queue_site_action_update_message();
-        queue_hud_state_message();
-        queue_log_message("Started site attempt.");
         break;
 
     case GameMessageType::ReturnToRegionalMap:
@@ -4715,6 +4717,20 @@ void GameRuntime::queue_site_bootstrap_messages()
     clear_pending_site_inventory_projection_updates();
 }
 
+void GameRuntime::queue_site_ready_bootstrap_messages()
+{
+    if (!active_site_run_.has_value())
+    {
+        return;
+    }
+
+    queue_site_bootstrap_messages();
+    queue_campaign_resources_message();
+    queue_site_action_update_message();
+    queue_hud_state_message();
+    queue_log_message("Started site attempt.");
+}
+
 void GameRuntime::queue_site_delta_messages(std::uint64_t dirty_flags)
 {
     if (!active_site_run_.has_value())
@@ -5059,6 +5075,23 @@ void GameRuntime::close_site_protection_ui() noexcept
 {
     site_protection_selector_open_ = false;
     site_protection_overlay_mode_ = GS1_SITE_PROTECTION_OVERLAY_NONE;
+}
+
+void GameRuntime::activate_loaded_site_scene()
+{
+    if (!active_site_run_.has_value() || app_state_ != GS1_APP_STATE_SITE_LOADING)
+    {
+        return;
+    }
+
+    app_state_ = GS1_APP_STATE_SITE_ACTIVE;
+    if (campaign_.has_value())
+    {
+        campaign_->app_state = app_state_;
+    }
+
+    queue_app_state_message(app_state_);
+    queue_site_ready_bootstrap_messages();
 }
 
 void GameRuntime::mark_site_projection_update_dirty(std::uint64_t dirty_flags) noexcept
@@ -5725,6 +5758,10 @@ Gs1Status GameRuntime::dispatch_host_events(
             }
             break;
         }
+
+        case GS1_HOST_EVENT_SITE_SCENE_READY:
+            activate_loaded_site_scene();
+            break;
 
         case GS1_HOST_EVENT_SITE_CONTEXT_REQUEST:
         {

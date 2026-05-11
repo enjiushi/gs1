@@ -200,6 +200,13 @@ Gs1HostEvent make_ui_action_event(const Gs1UiAction& action)
     return event;
 }
 
+Gs1HostEvent make_site_scene_ready_event()
+{
+    Gs1HostEvent event {};
+    event.type = GS1_HOST_EVENT_SITE_SCENE_READY;
+    return event;
+}
+
 Gs1HostEvent make_storage_view_event(
     std::uint32_t storage_id,
     Gs1InventoryViewEventKind event_kind)
@@ -250,6 +257,23 @@ void run_phase1(GameRuntime& runtime, double real_delta_seconds)
 {
     Gs1Phase1Result result {};
     run_phase1(runtime, real_delta_seconds, result);
+}
+
+void run_phase2(GameRuntime& runtime, Gs1Phase2Result& out_result)
+{
+    Gs1Phase2Request request {};
+    request.struct_size = sizeof(Gs1Phase2Request);
+
+    out_result = {};
+    assert(runtime.run_phase2(request, out_result) == GS1_STATUS_OK);
+}
+
+void complete_site_loading(GameRuntime& runtime)
+{
+    const auto ready_event = make_site_scene_ready_event();
+    assert(runtime.submit_host_events(&ready_event, 1U) == GS1_STATUS_OK);
+    Gs1Phase2Result ready_result {};
+    run_phase2(runtime, ready_result);
 }
 
 float raw_meter_test_value(float value)
@@ -862,6 +886,7 @@ int main()
     assert(find_ui_panel_slot_action_message(loadout_ui_messages, GS1_UI_PANEL_SLOT_PRIMARY, 1U) != nullptr);
 
     assert(runtime.handle_message(make_start_site_attempt_message(campaign_site_id)) == GS1_STATUS_OK);
+    complete_site_loading(runtime);
     drain_engine_messages(runtime);
 
     auto& completed_site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
@@ -1015,6 +1040,7 @@ int main()
         assert(payload.support_preview_mask != 0U);
     }
     assert(support_runtime.handle_message(make_start_site_attempt_message(2U)) == GS1_STATUS_OK);
+    complete_site_loading(support_runtime);
     assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(support_runtime).has_value());
     auto& supported_site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(support_runtime).value();
     assert(supported_site_run.modifier.active_nearby_aura_modifier_ids.size() == 1U);
@@ -1050,7 +1076,7 @@ int main()
     assert(bootstrap_runtime.handle_message(make_select_site_message(first_site_id)) == GS1_STATUS_OK);
     drain_engine_messages(bootstrap_runtime);
     assert(bootstrap_runtime.handle_message(make_start_site_attempt_message(first_site_id)) == GS1_STATUS_OK);
-    run_phase1(bootstrap_runtime, 0.0);
+    complete_site_loading(bootstrap_runtime);
     assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(bootstrap_runtime).has_value());
 
     auto& bootstrap_site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(bootstrap_runtime).value();
@@ -1560,6 +1586,7 @@ int main()
     const auto phone_panel_site_id =
         gs1::GameRuntimeProjectionTestAccess::campaign(phone_panel_runtime)->sites.front().site_id.value;
     assert(phone_panel_runtime.handle_message(make_start_site_attempt_message(phone_panel_site_id)) == GS1_STATUS_OK);
+    complete_site_loading(phone_panel_runtime);
     assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(phone_panel_runtime).has_value());
     auto& phone_panel_site_run =
         gs1::GameRuntimeProjectionTestAccess::active_site_run(phone_panel_runtime).value();
@@ -1653,6 +1680,7 @@ int main()
     const auto panel_state_site_id =
         gs1::GameRuntimeProjectionTestAccess::campaign(panel_state_runtime)->sites.front().site_id.value;
     assert(panel_state_runtime.handle_message(make_start_site_attempt_message(panel_state_site_id)) == GS1_STATUS_OK);
+    complete_site_loading(panel_state_runtime);
     auto& panel_state_site_run =
         gs1::GameRuntimeProjectionTestAccess::active_site_run(panel_state_runtime).value();
     drain_engine_messages(panel_state_runtime);
@@ -1901,6 +1929,7 @@ int main()
     const auto ui_site_id =
         gs1::GameRuntimeProjectionTestAccess::campaign(ui_runtime)->sites.front().site_id.value;
     assert(ui_runtime.handle_message(make_start_site_attempt_message(ui_site_id)) == GS1_STATUS_OK);
+    complete_site_loading(ui_runtime);
     auto& ui_site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(ui_runtime).value();
     drain_engine_messages(ui_runtime);
 
@@ -1984,6 +2013,7 @@ int main()
     const auto water_action_site_id =
         gs1::GameRuntimeProjectionTestAccess::campaign(water_action_runtime)->sites.front().site_id.value;
     assert(water_action_runtime.handle_message(make_start_site_attempt_message(water_action_site_id)) == GS1_STATUS_OK);
+    complete_site_loading(water_action_runtime);
     drain_engine_messages(water_action_runtime);
 
     const TileCoord water_target {2, 2};
@@ -2058,6 +2088,7 @@ int main()
     const auto action_site_id =
         gs1::GameRuntimeProjectionTestAccess::campaign(action_runtime)->sites.front().site_id.value;
     assert(action_runtime.handle_message(make_start_site_attempt_message(action_site_id)) == GS1_STATUS_OK);
+    complete_site_loading(action_runtime);
     assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(action_runtime).has_value());
     drain_engine_messages(action_runtime);
     auto& action_site_run =
@@ -2127,6 +2158,7 @@ int main()
     const auto placement_preview_site_id =
         gs1::GameRuntimeProjectionTestAccess::campaign(placement_preview_runtime)->sites.front().site_id.value;
     assert(placement_preview_runtime.handle_message(make_start_site_attempt_message(placement_preview_site_id)) == GS1_STATUS_OK);
+    complete_site_loading(placement_preview_runtime);
     auto& placement_preview_site_run =
         gs1::GameRuntimeProjectionTestAccess::active_site_run(placement_preview_runtime).value();
     drain_engine_messages(placement_preview_runtime);
@@ -2284,6 +2316,7 @@ int main()
     const auto storage_walk_site_id =
         gs1::GameRuntimeProjectionTestAccess::campaign(storage_walk_runtime)->sites.front().site_id.value;
     assert(storage_walk_runtime.handle_message(make_start_site_attempt_message(storage_walk_site_id)) == GS1_STATUS_OK);
+    complete_site_loading(storage_walk_runtime);
     auto& storage_walk_site_run =
         gs1::GameRuntimeProjectionTestAccess::active_site_run(storage_walk_runtime).value();
     drain_engine_messages(storage_walk_runtime);
@@ -2343,6 +2376,7 @@ int main()
     const auto storage_close_site_id =
         gs1::GameRuntimeProjectionTestAccess::campaign(storage_close_runtime)->sites.front().site_id.value;
     assert(storage_close_runtime.handle_message(make_start_site_attempt_message(storage_close_site_id)) == GS1_STATUS_OK);
+    complete_site_loading(storage_close_runtime);
     auto& storage_close_site_run =
         gs1::GameRuntimeProjectionTestAccess::active_site_run(storage_close_runtime).value();
     drain_engine_messages(storage_close_runtime);

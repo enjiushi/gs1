@@ -18,7 +18,7 @@
 
 namespace gs1
 {
-inline constexpr std::uint32_t k_api_version = 5;
+inline constexpr std::uint32_t k_api_version = 6;
 inline constexpr std::size_t k_feedback_event_type_count = 4U;
 
 class GameRuntime final
@@ -299,6 +299,7 @@ private:
         Gs1EngineMessageType upsert_message_type = GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_UPSERT,
         Gs1EngineMessageType remove_message_type = GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_REMOVE);
     void queue_site_bootstrap_messages();
+    void queue_site_ready_bootstrap_messages();
     void queue_site_delta_messages(std::uint64_t dirty_flags);
     void queue_site_action_update_message();
     void queue_hud_state_message();
@@ -320,6 +321,7 @@ private:
         std::uint32_t detail_id,
         std::uint32_t detail_kind);
     void sync_campaign_unlock_presentations();
+    void activate_loaded_site_scene();
     void close_site_protection_ui() noexcept;
     void mark_site_projection_update_dirty(std::uint64_t dirty_flags) noexcept;
     void mark_site_tile_projection_dirty(TileCoord coord) noexcept;

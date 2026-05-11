@@ -171,6 +171,13 @@ GameMessage make_start_site_attempt_message(std::uint32_t site_id)
     return message;
 }
 
+Gs1HostEvent make_site_scene_ready_event()
+{
+    Gs1HostEvent event {};
+    event.type = GS1_HOST_EVENT_SITE_SCENE_READY;
+    return event;
+}
+
 void drain_engine_messages(GameRuntime& runtime)
 {
     Gs1EngineMessage message {};
@@ -191,6 +198,13 @@ void bootstrap_site_one(GameRuntime& runtime)
     require(
         gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).has_value(),
         "active site run was not created");
+
+    const auto ready_event = make_site_scene_ready_event();
+    require_ok(runtime.submit_host_events(&ready_event, 1U), "submitting site scene ready event");
+    Gs1Phase2Request phase2_request {};
+    phase2_request.struct_size = sizeof(Gs1Phase2Request);
+    Gs1Phase2Result phase2_result {};
+    require_ok(runtime.run_phase2(phase2_request, phase2_result), "running site ready phase2");
 }
 
 void run_boot_phase(GameRuntime& runtime)
