@@ -1810,6 +1810,38 @@ Gs1Status InventorySystem::process_host_message(
 {
     auto access = make_game_state_access<InventorySystem>(invocation);
     (void)access;
+    switch (message.type)
+    {
+    case GS1_HOST_EVENT_SITE_STORAGE_VIEW:
+    {
+        auto translated = GameMessage {};
+        translated.type = GameMessageType::InventoryStorageViewRequest;
+        translated.set_payload(InventoryStorageViewRequestMessage {
+            message.payload.site_storage_view.storage_id,
+            message.payload.site_storage_view.event_kind,
+            {0U, 0U, 0U}});
+        invocation.push_game_message(translated);
+        return GS1_STATUS_OK;
+    }
+
+    case GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP:
+    {
+        auto translated = GameMessage {};
+        translated.type = GameMessageType::InventorySlotTapped;
+        translated.set_payload(InventorySlotTappedMessage {
+            message.payload.site_inventory_slot_tap.storage_id,
+            message.payload.site_inventory_slot_tap.item_instance_id,
+            message.payload.site_inventory_slot_tap.slot_index,
+            message.payload.site_inventory_slot_tap.container_kind,
+            0U});
+        invocation.push_game_message(translated);
+        return GS1_STATUS_OK;
+    }
+
+    default:
+        break;
+    }
+
     return with_inventory_context(
         invocation,
         [&](InventoryContext& context)

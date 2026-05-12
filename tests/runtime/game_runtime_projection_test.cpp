@@ -51,6 +51,7 @@ struct GameRuntimeProjectionTestAccess
             runtime.state_.app_state,
             runtime.state_.campaign,
             runtime.state_.active_site_run,
+            runtime.state_.site_protection_presentation,
             runtime.state_.message_queue,
             runtime.state_.runtime_messages,
             runtime.state_.fixed_step_seconds};
@@ -92,12 +93,12 @@ struct GameRuntimeProjectionTestAccess
 
     static bool site_protection_selector_open(const GameRuntime& runtime)
     {
-        return runtime.presentation_.site_protection_selector_open();
+        return runtime.state_.site_protection_presentation.selector_open;
     }
 
     static Gs1SiteProtectionOverlayMode site_protection_overlay_mode(const GameRuntime& runtime)
     {
-        return runtime.presentation_.site_protection_overlay_mode();
+        return runtime.state_.site_protection_presentation.overlay_mode;
     }
 
 };

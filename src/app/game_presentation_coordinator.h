@@ -3,6 +3,7 @@
 #include "campaign/campaign_state.h"
 #include "messages/game_message.h"
 #include "runtime/message_queue.h"
+#include "runtime/site_protection_presentation_state.h"
 #include "site/site_run_state.h"
 #include "gs1/status.h"
 #include "gs1/types.h"
@@ -21,6 +22,7 @@ struct GamePresentationRuntimeContext final
     Gs1AppState& app_state;
     std::optional<CampaignState>& campaign;
     std::optional<SiteRunState>& active_site_run;
+    SiteProtectionPresentationState& protection_presentation;
     GameMessageQueue& message_queue;
     std::deque<Gs1RuntimeMessage>& engine_messages;
     double fixed_step_seconds {0.0};
@@ -47,12 +49,12 @@ public:
 
     [[nodiscard]] bool site_protection_selector_open() const noexcept
     {
-        return site_protection_selector_open_;
+        return protection_presentation_state().selector_open;
     }
 
     [[nodiscard]] Gs1SiteProtectionOverlayMode site_protection_overlay_mode() const noexcept
     {
-        return site_protection_overlay_mode_;
+        return protection_presentation_state().overlay_mode;
     }
 
 private:
@@ -61,6 +63,14 @@ private:
     [[nodiscard]] Gs1AppState& app_state() noexcept { return context().app_state; }
     [[nodiscard]] std::optional<CampaignState>& campaign() noexcept { return context().campaign; }
     [[nodiscard]] std::optional<SiteRunState>& active_site_run() noexcept { return context().active_site_run; }
+    [[nodiscard]] SiteProtectionPresentationState& protection_presentation_state() noexcept
+    {
+        return context().protection_presentation;
+    }
+    [[nodiscard]] const SiteProtectionPresentationState& protection_presentation_state() const noexcept
+    {
+        return context().protection_presentation;
+    }
     [[nodiscard]] GameMessageQueue& message_queue() noexcept { return context().message_queue; }
     [[nodiscard]] std::deque<Gs1RuntimeMessage>& engine_messages() noexcept { return context().engine_messages; }
     [[nodiscard]] double fixed_step_seconds() const noexcept { return context().fixed_step_seconds; }
@@ -284,8 +294,6 @@ private:
     std::map<Gs1UiSetupId, Gs1UiSetupPresentationType> active_ui_setups_ {};
     std::unordered_set<Gs1UiPanelId> active_ui_panels_ {};
     std::optional<Gs1UiSetupId> active_normal_ui_setup_ {};
-    bool site_protection_selector_open_ {false};
-    Gs1SiteProtectionOverlayMode site_protection_overlay_mode_ {GS1_SITE_PROTECTION_OVERLAY_NONE};
     std::optional<Gs1AppState> last_emitted_app_state_ {};
     std::vector<std::uint32_t> last_emitted_phone_listing_ids_ {};
     CampaignUnlockSnapshot last_campaign_unlock_snapshot_ {};

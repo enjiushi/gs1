@@ -60,6 +60,10 @@ struct RuntimeMoveDirectionTag
 {
 };
 
+struct RuntimeSiteProtectionPresentationTag
+{
+};
+
 template <class System>
 struct system_state_tags;
 
@@ -180,6 +184,13 @@ inline decltype(auto) runtime_invocation_state_ref<RuntimeMoveDirectionTag>(Runt
 }
 
 template <>
+inline decltype(auto) runtime_invocation_state_ref<RuntimeSiteProtectionPresentationTag>(
+    RuntimeInvocation& invocation)
+{
+    return (invocation.owned_state_->site_protection_presentation);
+}
+
+template <>
 inline decltype(auto) runtime_invocation_state_ref<RuntimeAppStateTag>(const RuntimeInvocation& invocation)
 {
     return (*invocation.app_state_);
@@ -207,6 +218,13 @@ template <>
 inline decltype(auto) runtime_invocation_state_ref<RuntimeMoveDirectionTag>(const RuntimeInvocation& invocation)
 {
     return runtime_invocation_state_ref<RuntimeMoveDirectionTag>(const_cast<RuntimeInvocation&>(invocation));
+}
+
+template <>
+inline decltype(auto) runtime_invocation_state_ref<RuntimeSiteProtectionPresentationTag>(
+    const RuntimeInvocation& invocation)
+{
+    return (invocation.owned_state_->site_protection_presentation);
 }
 
 template <class System>

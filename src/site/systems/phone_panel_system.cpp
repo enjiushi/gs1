@@ -480,47 +480,6 @@ bool PhonePanelSystem::subscribes_to_host_message(Gs1HostMessageType type) noexc
     return type == GS1_HOST_EVENT_UI_ACTION;
 }
 
-Gs1Status process_host_message_impl(
-    PhonePanelContext& context,
-    const Gs1HostMessage& message)
-{
-    if (message.type != GS1_HOST_EVENT_UI_ACTION)
-    {
-        return GS1_STATUS_OK;
-    }
-
-    const auto& action = message.payload.ui_action.action;
-    switch (action.type)
-    {
-    case GS1_UI_ACTION_SET_PHONE_PANEL_SECTION:
-    {
-        if (action.arg0 > static_cast<std::uint64_t>(GS1_PHONE_PANEL_SECTION_CART))
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-
-        const PhonePanelSectionRequestedMessage payload {
-            static_cast<Gs1PhonePanelSection>(action.arg0),
-            {0U, 0U, 0U}};
-        auto message_copy = GameMessage {};
-        message_copy.type = GameMessageType::PhonePanelSectionRequested;
-        message_copy.set_payload(payload);
-        return process_game_message_impl(context, message_copy);
-    }
-
-    case GS1_UI_ACTION_CLOSE_PHONE_PANEL:
-    {
-        auto message_copy = GameMessage {};
-        message_copy.type = GameMessageType::ClosePhonePanel;
-        message_copy.set_payload(ClosePhonePanelMessage {});
-        return process_game_message_impl(context, message_copy);
-    }
-
-    default:
-        return GS1_STATUS_OK;
-    }
-}
-
 bool PhonePanelSystem::subscribes_to(GameMessageType type) noexcept
 {
     switch (type)
@@ -663,12 +622,37 @@ Gs1Status PhonePanelSystem::process_host_message(
 {
     auto access = make_game_state_access<PhonePanelSystem>(invocation);
     (void)access;
-    return with_phone_panel_context(
-        invocation,
-        [&](PhonePanelContext& context)
+    if (message.type != GS1_HOST_EVENT_UI_ACTION)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    const auto& action = message.payload.ui_action.action;
+    GameMessage translated {};
+    switch (action.type)
+    {
+    case GS1_UI_ACTION_SET_PHONE_PANEL_SECTION:
+        if (action.arg0 > static_cast<std::uint64_t>(GS1_PHONE_PANEL_SECTION_CART))
         {
-            return process_host_message_impl(context, message);
-        });
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+
+        translated.type = GameMessageType::PhonePanelSectionRequested;
+        translated.set_payload(PhonePanelSectionRequestedMessage {
+            static_cast<Gs1PhonePanelSection>(action.arg0),
+            {0U, 0U, 0U}});
+        invocation.push_game_message(translated);
+        return GS1_STATUS_OK;
+
+    case GS1_UI_ACTION_CLOSE_PHONE_PANEL:
+        translated.type = GameMessageType::ClosePhonePanel;
+        translated.set_payload(ClosePhonePanelMessage {});
+        invocation.push_game_message(translated);
+        return GS1_STATUS_OK;
+
+    default:
+        return GS1_STATUS_OK;
+    }
 }
 
 void PhonePanelSystem::run(RuntimeInvocation& invocation)

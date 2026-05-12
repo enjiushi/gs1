@@ -1050,9 +1050,7 @@ Gs1PhonePanelSection to_phone_panel_section(PhonePanelSection section) noexcept
 
 bool GamePresentationCoordinator::subscribes_to_host_message(Gs1HostMessageType type) noexcept
 {
-    return type == GS1_HOST_EVENT_UI_ACTION ||
-        type == GS1_HOST_EVENT_SITE_STORAGE_VIEW ||
-        type == GS1_HOST_EVENT_SITE_SCENE_READY;
+    return type == GS1_HOST_EVENT_SITE_SCENE_READY;
 }
 
 Gs1Status GamePresentationCoordinator::process_host_message(
@@ -1065,85 +1063,6 @@ Gs1Status GamePresentationCoordinator::process_host_message(
         return GS1_STATUS_OK;
     }
 
-    GameMessage translated {};
-    if (message.type == GS1_HOST_EVENT_SITE_STORAGE_VIEW)
-    {
-        translated.type = GameMessageType::InventoryStorageViewRequest;
-        translated.set_payload(InventoryStorageViewRequestMessage {
-            message.payload.site_storage_view.storage_id,
-            message.payload.site_storage_view.event_kind,
-            {0U, 0U, 0U}});
-        on_message_processed(context, translated);
-        return GS1_STATUS_OK;
-    }
-
-    if (message.type != GS1_HOST_EVENT_UI_ACTION)
-    {
-        return GS1_STATUS_OK;
-    }
-
-    const auto& action = message.payload.ui_action.action;
-    switch (action.type)
-    {
-    case GS1_UI_ACTION_START_NEW_CAMPAIGN:
-        translated.type = GameMessageType::StartNewCampaign;
-        translated.set_payload(StartNewCampaignMessage {
-            action.arg0,
-            static_cast<std::uint32_t>(action.arg1)});
-        break;
-    case GS1_UI_ACTION_SELECT_DEPLOYMENT_SITE:
-        translated.type = GameMessageType::SelectDeploymentSite;
-        translated.set_payload(SelectDeploymentSiteMessage {action.target_id});
-        break;
-    case GS1_UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION:
-        translated.type = GameMessageType::ClearDeploymentSiteSelection;
-        translated.set_payload(ClearDeploymentSiteSelectionMessage {});
-        break;
-    case GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE:
-        translated.type = GameMessageType::OpenRegionalMapTechTree;
-        translated.set_payload(OpenRegionalMapTechTreeMessage {});
-        break;
-    case GS1_UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE:
-        translated.type = GameMessageType::CloseRegionalMapTechTree;
-        translated.set_payload(CloseRegionalMapTechTreeMessage {});
-        break;
-    case GS1_UI_ACTION_SELECT_TECH_TREE_FACTION_TAB:
-        translated.type = GameMessageType::SelectRegionalMapTechTreeFaction;
-        translated.set_payload(SelectRegionalMapTechTreeFactionMessage {action.target_id});
-        break;
-    case GS1_UI_ACTION_START_SITE_ATTEMPT:
-        translated.type = GameMessageType::StartSiteAttempt;
-        translated.set_payload(StartSiteAttemptMessage {action.target_id});
-        break;
-    case GS1_UI_ACTION_RETURN_TO_REGIONAL_MAP:
-        translated.type = GameMessageType::ReturnToRegionalMap;
-        translated.set_payload(ReturnToRegionalMapMessage {});
-        break;
-    case GS1_UI_ACTION_SET_PHONE_PANEL_SECTION:
-        translated.type = GameMessageType::PhonePanelSectionRequested;
-        translated.set_payload(PhonePanelSectionRequestedMessage {
-            static_cast<Gs1PhonePanelSection>(action.arg0),
-            {0U, 0U, 0U}});
-        break;
-    case GS1_UI_ACTION_OPEN_SITE_PROTECTION_SELECTOR:
-        translated.type = GameMessageType::OpenSiteProtectionSelector;
-        translated.set_payload(OpenSiteProtectionSelectorMessage {});
-        break;
-    case GS1_UI_ACTION_CLOSE_SITE_PROTECTION_UI:
-        translated.type = GameMessageType::CloseSiteProtectionUi;
-        translated.set_payload(CloseSiteProtectionUiMessage {});
-        break;
-    case GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE:
-        translated.type = GameMessageType::SetSiteProtectionOverlayMode;
-        translated.set_payload(SetSiteProtectionOverlayModeMessage {
-            static_cast<Gs1SiteProtectionOverlayMode>(action.arg0),
-            {0U, 0U, 0U}});
-        break;
-    default:
-        return GS1_STATUS_OK;
-    }
-
-    on_message_processed(context, translated);
     return GS1_STATUS_OK;
 }
 
@@ -1188,14 +1107,12 @@ void GamePresentationCoordinator::on_message_processed(GamePresentationRuntimeCo
         break;
 
     case GameMessageType::OpenRegionalMapTechTree:
-        if (site_protection_selector_open_)
+        if (site_protection_selector_open())
         {
-            site_protection_selector_open_ = false;
             queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
         }
-        if (site_protection_overlay_mode_ != GS1_SITE_PROTECTION_OVERLAY_NONE)
+        if (site_protection_overlay_mode() != GS1_SITE_PROTECTION_OVERLAY_NONE)
         {
-            site_protection_overlay_mode_ = GS1_SITE_PROTECTION_OVERLAY_NONE;
             queue_site_protection_overlay_state_message();
         }
         queue_close_site_inventory_panels_if_open();
@@ -1238,16 +1155,11 @@ void GamePresentationCoordinator::on_message_processed(GamePresentationRuntimeCo
         break;
 
     case GameMessageType::PhonePanelSectionRequested:
-        if (site_protection_selector_open_)
+        if (active_ui_setups_.contains(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR))
         {
-            site_protection_selector_open_ = false;
             queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
         }
-        if (site_protection_overlay_mode_ != GS1_SITE_PROTECTION_OVERLAY_NONE)
-        {
-            site_protection_overlay_mode_ = GS1_SITE_PROTECTION_OVERLAY_NONE;
-            queue_site_protection_overlay_state_message();
-        }
+        queue_site_protection_overlay_state_message();
         queue_close_site_inventory_panels_if_open();
         if (campaign().has_value() &&
             app_state_supports_technology_tree(app_state()) &&
@@ -1268,16 +1180,11 @@ void GamePresentationCoordinator::on_message_processed(GamePresentationRuntimeCo
         const auto& payload = message.payload_as<InventoryStorageViewRequestMessage>();
         if (payload.event_kind == GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT)
         {
-            if (site_protection_selector_open_)
+            if (active_ui_setups_.contains(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR))
             {
-                site_protection_selector_open_ = false;
                 queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
             }
-            if (site_protection_overlay_mode_ != GS1_SITE_PROTECTION_OVERLAY_NONE)
-            {
-                site_protection_overlay_mode_ = GS1_SITE_PROTECTION_OVERLAY_NONE;
-                queue_site_protection_overlay_state_message();
-            }
+            queue_site_protection_overlay_state_message();
             queue_close_site_phone_panel_if_open();
             if (campaign().has_value() &&
                 app_state_supports_technology_tree(app_state()) &&
@@ -1395,24 +1302,16 @@ void GamePresentationCoordinator::on_message_processed(GamePresentationRuntimeCo
             close_tech_tree.set_payload(CloseRegionalMapTechTreeMessage {});
             message_queue().push_back(close_tech_tree);
         }
-        if (site_protection_overlay_mode_ != GS1_SITE_PROTECTION_OVERLAY_NONE)
-        {
-            site_protection_overlay_mode_ = GS1_SITE_PROTECTION_OVERLAY_NONE;
-            queue_site_protection_overlay_state_message();
-        }
-        site_protection_selector_open_ = true;
         queue_site_protection_selector_ui_messages();
         break;
 
     case GameMessageType::CloseSiteProtectionUi:
-        if (site_protection_selector_open_)
+        if (active_ui_setups_.contains(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR))
         {
-            site_protection_selector_open_ = false;
             queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
         }
-        else if (site_protection_overlay_mode_ != GS1_SITE_PROTECTION_OVERLAY_NONE)
+        else if (site_protection_overlay_mode() != GS1_SITE_PROTECTION_OVERLAY_NONE)
         {
-            site_protection_overlay_mode_ = GS1_SITE_PROTECTION_OVERLAY_NONE;
             queue_site_protection_overlay_state_message();
         }
         break;
@@ -1423,10 +1322,7 @@ void GamePresentationCoordinator::on_message_processed(GamePresentationRuntimeCo
         {
             break;
         }
-        site_protection_selector_open_ = false;
         queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
-        site_protection_overlay_mode_ =
-            message.payload_as<SetSiteProtectionOverlayModeMessage>().mode;
         queue_site_protection_overlay_state_message();
         break;
 
@@ -3555,14 +3451,14 @@ void GamePresentationCoordinator::queue_site_protection_overlay_state_message()
 
     auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE);
     auto& payload = message.emplace_payload<Gs1EngineMessageSiteProtectionOverlayData>();
-    payload.mode = site_protection_overlay_mode_;
+    payload.mode = site_protection_overlay_mode();
     payload.reserved0[0] = 0U;
     payload.reserved0[1] = 0U;
     payload.reserved0[2] = 0U;
     engine_messages().push_back(message);
     queue_ui_surface_visibility_message(
         GS1_UI_SURFACE_SITE_OVERLAY_PANEL,
-        site_protection_overlay_mode_ != GS1_SITE_PROTECTION_OVERLAY_NONE);
+        site_protection_overlay_mode() != GS1_SITE_PROTECTION_OVERLAY_NONE);
 }
 
 void GamePresentationCoordinator::queue_site_phone_listing_remove_message(
@@ -4071,8 +3967,8 @@ void GamePresentationCoordinator::sync_campaign_unlock_presentations()
 
 void GamePresentationCoordinator::close_site_protection_ui() noexcept
 {
-    site_protection_selector_open_ = false;
-    site_protection_overlay_mode_ = GS1_SITE_PROTECTION_OVERLAY_NONE;
+    protection_presentation_state().selector_open = false;
+    protection_presentation_state().overlay_mode = GS1_SITE_PROTECTION_OVERLAY_NONE;
 }
 
 

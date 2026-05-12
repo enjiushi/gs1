@@ -21,6 +21,7 @@ Gs1Status MessageDispatcher::dispatch_all(GameRuntime& runtime)
             runtime.state_.app_state,
             runtime.state_.campaign,
             runtime.state_.active_site_run,
+            runtime.state_.site_protection_presentation,
             runtime.state_.message_queue,
             runtime.state_.runtime_messages,
             runtime.state_.fixed_step_seconds};

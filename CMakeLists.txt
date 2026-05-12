@@ -141,6 +141,7 @@ set(GS1_GAMEPLAY_CORE_SOURCES
     src/site/systems/placement_validation_system.cpp
     src/site/systems/site_completion_system.cpp
     src/site/systems/site_flow_system.cpp
+    src/site/systems/site_protection_presentation_system.cpp
     src/site/systems/site_time_system.cpp
     src/site/systems/task_board_system.cpp
     src/site/systems/weather_event_system.cpp

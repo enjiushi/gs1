@@ -25,6 +25,7 @@
 #include "site/systems/placement_validation_system.h"
 #include "site/systems/site_completion_system.h"
 #include "site/systems/site_flow_system.h"
+#include "site/systems/site_protection_presentation_system.h"
 #include "site/systems/site_time_system.h"
 #include "site/systems/task_board_system.h"
 #include "site/systems/weather_event_system.h"
@@ -473,6 +474,7 @@ void GameRuntime::initialize_system_registry()
     systems_.push_back(std::make_unique<CraftSystem>());
     systems_.push_back(std::make_unique<EconomyPhoneSystem>());
     systems_.push_back(std::make_unique<PhonePanelSystem>());
+    systems_.push_back(std::make_unique<SiteProtectionPresentationSystem>());
     systems_.push_back(std::make_unique<CampDurabilitySystem>());
     systems_.push_back(std::make_unique<DeviceSupportSystem>());
     systems_.push_back(std::make_unique<ModifierSystem>());
@@ -589,6 +591,7 @@ Gs1Status GameRuntime::run_phase1(const Gs1Phase1Request& request, Gs1Phase1Resu
         state_.app_state,
         state_.campaign,
         state_.active_site_run,
+        state_.site_protection_presentation,
         state_.message_queue,
         state_.runtime_messages,
         state_.fixed_step_seconds};
@@ -753,6 +756,7 @@ Gs1Status GameRuntime::dispatch_subscribed_host_message(const Gs1HostMessage& me
             state_.app_state,
             state_.campaign,
             state_.active_site_run,
+            state_.site_protection_presentation,
             state_.message_queue,
             state_.runtime_messages,
             state_.fixed_step_seconds};

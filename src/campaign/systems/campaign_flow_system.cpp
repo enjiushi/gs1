@@ -129,7 +129,8 @@ Gs1Status process_campaign_flow_host_message(
         game_message.set_payload(StartNewCampaignMessage {
             action.arg0,
             static_cast<std::uint32_t>(action.arg1)});
-        return process_campaign_flow_message(context, game_message);
+        context.invocation.push_game_message(game_message);
+        return GS1_STATUS_OK;
 
     case GS1_UI_ACTION_SELECT_DEPLOYMENT_SITE:
         if (action.target_id == 0U)
@@ -138,22 +139,26 @@ Gs1Status process_campaign_flow_host_message(
         }
         game_message.type = GameMessageType::SelectDeploymentSite;
         game_message.set_payload(SelectDeploymentSiteMessage {action.target_id});
-        return process_campaign_flow_message(context, game_message);
+        context.invocation.push_game_message(game_message);
+        return GS1_STATUS_OK;
 
     case GS1_UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION:
         game_message.type = GameMessageType::ClearDeploymentSiteSelection;
         game_message.set_payload(ClearDeploymentSiteSelectionMessage {});
-        return process_campaign_flow_message(context, game_message);
+        context.invocation.push_game_message(game_message);
+        return GS1_STATUS_OK;
 
     case GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE:
         game_message.type = GameMessageType::OpenRegionalMapTechTree;
         game_message.set_payload(OpenRegionalMapTechTreeMessage {});
-        return process_campaign_flow_message(context, game_message);
+        context.invocation.push_game_message(game_message);
+        return GS1_STATUS_OK;
 
     case GS1_UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE:
         game_message.type = GameMessageType::CloseRegionalMapTechTree;
         game_message.set_payload(CloseRegionalMapTechTreeMessage {});
-        return process_campaign_flow_message(context, game_message);
+        context.invocation.push_game_message(game_message);
+        return GS1_STATUS_OK;
 
     case GS1_UI_ACTION_SELECT_TECH_TREE_FACTION_TAB:
         if (action.target_id == 0U)
@@ -162,7 +167,8 @@ Gs1Status process_campaign_flow_host_message(
         }
         game_message.type = GameMessageType::SelectRegionalMapTechTreeFaction;
         game_message.set_payload(SelectRegionalMapTechTreeFactionMessage {action.target_id});
-        return process_campaign_flow_message(context, game_message);
+        context.invocation.push_game_message(game_message);
+        return GS1_STATUS_OK;
 
     case GS1_UI_ACTION_START_SITE_ATTEMPT:
         if (action.target_id == 0U)
@@ -171,12 +177,14 @@ Gs1Status process_campaign_flow_host_message(
         }
         game_message.type = GameMessageType::StartSiteAttempt;
         game_message.set_payload(StartSiteAttemptMessage {action.target_id});
-        return process_campaign_flow_message(context, game_message);
+        context.invocation.push_game_message(game_message);
+        return GS1_STATUS_OK;
 
     case GS1_UI_ACTION_RETURN_TO_REGIONAL_MAP:
         game_message.type = GameMessageType::ReturnToRegionalMap;
         game_message.set_payload(ReturnToRegionalMapMessage {});
-        return process_campaign_flow_message(context, game_message);
+        context.invocation.push_game_message(game_message);
+        return GS1_STATUS_OK;
 
     default:
         return GS1_STATUS_OK;

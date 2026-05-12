@@ -4,6 +4,7 @@
 #include "messages/game_message.h"
 #include "site/site_run_state.h"
 #include "runtime/runtime_clock.h"
+#include "runtime/site_protection_presentation_state.h"
 #include "gs1/types.h"
 
 #include <deque>
@@ -17,6 +18,7 @@ struct GameState final
     Gs1AppState app_state {GS1_APP_STATE_BOOT};
     std::optional<CampaignState> campaign {};
     std::optional<SiteRunState> active_site_run {};
+    SiteProtectionPresentationState site_protection_presentation {};
     GameMessageQueue message_queue {};
     std::deque<Gs1RuntimeMessage> runtime_messages {};
 };
