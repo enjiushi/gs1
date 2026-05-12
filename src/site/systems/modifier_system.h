@@ -31,9 +31,6 @@ public:
                 SiteComponent::Modifier),
             site_component_mask_of(SiteComponent::Modifier)};
     }
-
-    [[nodiscard]] static bool subscribes_to_host_message(Gs1HostMessageType type) noexcept;
-    [[nodiscard]] static bool subscribes_to(GameMessageType type) noexcept;
 };
 
 template <>

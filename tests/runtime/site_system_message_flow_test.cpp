@@ -121,6 +121,13 @@ void initialize_site_world(
             1.0f,
             false});
 }
+
+template <typename System>
+bool system_subscribes_to_message(GameMessageType type)
+{
+    System system {};
+    return gs1::runtime_subscription_contains(system.subscribed_game_messages(), type);
+}
 }  // namespace
 
 int main()
@@ -135,7 +142,7 @@ int main()
     gs1::GameMessage selection_changed {};
     selection_changed.type = GameMessageType::DeploymentSiteSelectionChanged;
     selection_changed.set_payload(DeploymentSiteSelectionChangedMessage {3U});
-    assert(LoadoutPlannerSystem::subscribes_to(selection_changed.type));
+    assert(system_subscribes_to_message<LoadoutPlannerSystem>(selection_changed.type));
     assert(
         invoke_system_message<LoadoutPlannerSystem>(
             selection_changed,

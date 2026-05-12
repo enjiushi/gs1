@@ -33,8 +33,6 @@ public:
                 SiteComponent::Weather),
             site_component_mask_of(SiteComponent::DeviceCondition)};
     }
-
-    [[nodiscard]] static bool subscribes_to(GameMessageType type) noexcept;
 };
 
 template <>

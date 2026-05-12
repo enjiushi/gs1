@@ -1110,12 +1110,6 @@ void handle_site_modifier_end_requested(
 }
 }  // namespace
 
-bool ModifierSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
-{
-    (void)type;
-    return false;
-}
-
 const char* ModifierSystem::name() const noexcept
 {
     return access().system_name.data();
@@ -1123,18 +1117,19 @@ const char* ModifierSystem::name() const noexcept
 
 GameMessageSubscriptionSpan ModifierSystem::subscribed_game_messages() const noexcept
 {
-    return runtime_subscription_list<
-        GameMessageType,
-        k_game_message_type_count,
-        &ModifierSystem::subscribes_to>();
+    static constexpr GameMessageType subscriptions[] = {
+        GameMessageType::SiteRunStarted,
+        GameMessageType::RunModifierAwardRequested,
+        GameMessageType::InventoryItemUseCompleted,
+        GameMessageType::SiteModifierEndRequested,
+    };
+    return subscriptions;
 }
 
 HostMessageSubscriptionSpan ModifierSystem::subscribed_host_messages() const noexcept
 {
-    return runtime_subscription_list<
-        Gs1HostMessageType,
-        k_runtime_host_message_type_count,
-        &ModifierSystem::subscribes_to_host_message>();
+    static constexpr Gs1HostMessageType subscriptions[] = {GS1_HOST_EVENT_UI_ACTION};
+    return subscriptions;
 }
 
 std::optional<Gs1RuntimeProfileSystemId> ModifierSystem::profile_system_id() const noexcept
@@ -1192,14 +1187,6 @@ Gs1Status ModifierSystem::process_host_message(
     (void)invocation;
     (void)message;
     return GS1_STATUS_OK;
-}
-
-bool ModifierSystem::subscribes_to(GameMessageType type) noexcept
-{
-    return type == GameMessageType::SiteRunStarted ||
-        type == GameMessageType::RunModifierAwardRequested ||
-        type == GameMessageType::InventoryItemUseCompleted ||
-        type == GameMessageType::SiteModifierEndRequested;
 }
 
 void ModifierSystem::run(RuntimeInvocation& invocation)

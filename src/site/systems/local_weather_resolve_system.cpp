@@ -347,10 +347,8 @@ const char* LocalWeatherResolveSystem::name() const noexcept
 
 GameMessageSubscriptionSpan LocalWeatherResolveSystem::subscribed_game_messages() const noexcept
 {
-    return runtime_subscription_list<
-        GameMessageType,
-        k_game_message_type_count,
-        &LocalWeatherResolveSystem::subscribes_to>();
+    static constexpr GameMessageType subscriptions[] = {GameMessageType::SiteRunStarted};
+    return subscriptions;
 }
 
 HostMessageSubscriptionSpan LocalWeatherResolveSystem::subscribed_host_messages() const noexcept
@@ -366,11 +364,6 @@ std::optional<Gs1RuntimeProfileSystemId> LocalWeatherResolveSystem::profile_syst
 std::optional<std::uint32_t> LocalWeatherResolveSystem::fixed_step_order() const noexcept
 {
     return 8U;
-}
-
-bool LocalWeatherResolveSystem::subscribes_to(GameMessageType type) noexcept
-{
-    return type == GameMessageType::SiteRunStarted;
 }
 
 Gs1Status LocalWeatherResolveSystem::process_game_message(
@@ -412,5 +405,4 @@ void LocalWeatherResolveSystem::run(RuntimeInvocation& invocation)
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
-
 

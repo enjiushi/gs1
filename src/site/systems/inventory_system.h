@@ -34,8 +34,5 @@ public:
                 SiteComponent::Action),
             site_component_mask_of(SiteComponent::Inventory)};
     }
-
-    [[nodiscard]] static bool subscribes_to_host_message(Gs1HostMessageType type) noexcept;
-    [[nodiscard]] static bool subscribes_to(GameMessageType type) noexcept;
 };
 }  // namespace gs1

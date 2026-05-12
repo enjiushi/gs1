@@ -41,23 +41,19 @@ using RuntimeGameMessageSubscribers = std::array<std::vector<IRuntimeSystem*>, k
 using RuntimeHostMessageSubscribers =
     std::array<std::vector<IRuntimeSystem*>, k_runtime_host_message_type_count>;
 
-template <typename EnumType, std::size_t Count, auto Predicate>
-[[nodiscard]] std::span<const EnumType> runtime_subscription_list() noexcept
+template <typename EnumType>
+[[nodiscard]] constexpr bool runtime_subscription_contains(
+    std::span<const EnumType> subscriptions,
+    EnumType type) noexcept
 {
-    static const std::vector<EnumType> subscriptions = []()
+    for (const EnumType subscribed_type : subscriptions)
     {
-        std::vector<EnumType> result;
-        result.reserve(Count);
-        for (std::size_t index = 0; index < Count; ++index)
+        if (subscribed_type == type)
         {
-            const auto type = static_cast<EnumType>(index);
-            if (Predicate(type))
-            {
-                result.push_back(type);
-            }
+            return true;
         }
-        return result;
-    }();
-    return subscriptions;
+    }
+
+    return false;
 }
 }  // namespace gs1

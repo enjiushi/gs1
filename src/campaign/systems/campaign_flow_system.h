@@ -25,8 +25,5 @@ public:
         RuntimeInvocation& invocation,
         const Gs1HostMessage& message) override;
     void run(RuntimeInvocation& invocation) override;
-
-    [[nodiscard]] static bool subscribes_to_host_message(Gs1HostMessageType type) noexcept;
-    [[nodiscard]] static bool subscribes_to(GameMessageType type) noexcept;
 };
 }  // namespace gs1

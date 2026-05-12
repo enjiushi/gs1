@@ -22,10 +22,8 @@ GameMessageSubscriptionSpan HostUiActionRouterSystem::subscribed_game_messages()
 
 HostMessageSubscriptionSpan HostUiActionRouterSystem::subscribed_host_messages() const noexcept
 {
-    return runtime_subscription_list<
-        Gs1HostMessageType,
-        k_runtime_host_message_type_count,
-        HostUiActionRouterSystem::subscribes_to_host_message>();
+    static constexpr Gs1HostMessageType subscriptions[] = {GS1_HOST_EVENT_UI_ACTION};
+    return subscriptions;
 }
 
 std::optional<Gs1RuntimeProfileSystemId> HostUiActionRouterSystem::profile_system_id() const noexcept
@@ -36,11 +34,6 @@ std::optional<Gs1RuntimeProfileSystemId> HostUiActionRouterSystem::profile_syste
 std::optional<std::uint32_t> HostUiActionRouterSystem::fixed_step_order() const noexcept
 {
     return std::nullopt;
-}
-
-bool HostUiActionRouterSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
-{
-    return type == GS1_HOST_EVENT_UI_ACTION;
 }
 
 Gs1Status HostUiActionRouterSystem::process_game_message(

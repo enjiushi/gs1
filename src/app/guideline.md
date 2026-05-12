@@ -13,8 +13,8 @@ Application-facing glue that assembles campaign/site state and exposes the gamep
 - `campaign_presentation_ops.cpp`: Campaign/regional-map presentation follow-up implementation for menu, regional-map, tech-tree, campaign-resource, unlock-cue, and site-result UI/projection publishing after gameplay messages are processed.
 - `campaign_factory.h`: Factory declarations for creating and wiring campaign state.
 - `campaign_factory.cpp`: Campaign factory implementation and initialization wiring, including derived 8-neighbor regional-map adjacency from authored site tile coordinates.
-- `game_presentation_coordinator.h`: App-layer presentation façade declaration that now delegates campaign/regional and site-specific presentation follow-up into focused helper modules while still owning the low-level runtime-message emitters.
-- `game_presentation_coordinator.cpp`: App-layer façade implementation that keeps the shared runtime-message emit helpers plus site/regional snapshot publishers while delegating higher-level post-message policy and site-dirty flush orchestration into smaller helper modules.
+- `game_presentation_coordinator.h`: App-layer presentation facade declaration that now delegates campaign/regional and site-specific presentation follow-up into focused helper modules while still owning the low-level runtime-message emitters.
+- `game_presentation_coordinator.cpp`: App-layer facade implementation that keeps the shared runtime-message emit helpers plus site/regional snapshot publishers while delegating higher-level post-message policy and site-dirty flush orchestration into smaller helper modules.
 - `game_api.cpp`: Exported C API implementation that bridges hosts into the runtime/app layer.
 - `game_app.h`: Top-level gameplay app container that owns runtime-facing state.
 - `game_bootstrap.h`: Startup/bootstrap helpers for constructing the app and initial scene state.

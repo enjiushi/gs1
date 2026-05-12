@@ -1,6 +1,7 @@
 #include <algorithm>
 
 #include "messages/game_message.h"
+#include "runtime/system_interface.h"
 #include "content/defs/gameplay_tuning_defs.h"
 #include "content/defs/excavation_defs.h"
 #include "content/defs/plant_defs.h"
@@ -332,6 +333,13 @@ void seed_site_one_inventory(gs1::CampaignState& campaign, gs1::SiteRunState& si
             GameMessageType::SiteRunStarted,
             SiteRunStartedMessage {site_run.site_id.value, 1U, site_run.site_archetype_id, 1U, 42ULL}));
     (void)status;
+}
+
+template <typename System>
+bool system_subscribes_to_message(GameMessageType type)
+{
+    System system {};
+    return gs1::runtime_subscription_contains(system.subscribed_game_messages(), type);
 }
 
 void inventory_site_one_seed_is_applied_once(gs1::testing::SystemTestExecutionContext& context)
@@ -2064,7 +2072,7 @@ void start_task_board_with_owner_snapshots(
     {
         const auto message = queue.front();
         queue.pop_front();
-        if (TaskBoardSystem::subscribes_to(message.type))
+        if (system_subscribes_to_message<TaskBoardSystem>(message.type))
         {
             GS1_SYSTEM_TEST_REQUIRE(
                 context,
@@ -2456,7 +2464,7 @@ void task_board_site_one_onboarding_unlocks_ephedra_stew_before_cook_step(
         auto campaign_context = make_campaign_context(campaign);
         for (const auto& message : queue)
         {
-            if (TechnologySystem::subscribes_to(message.type))
+            if (system_subscribes_to_message<TechnologySystem>(message.type))
             {
                 GS1_SYSTEM_TEST_REQUIRE(
                     context,
@@ -3085,7 +3093,7 @@ void task_board_living_plant_duration_task_ignores_straw_and_resets_on_density_d
         {
             const auto message = queue.front();
             queue.pop_front();
-            if (TaskBoardSystem::subscribes_to(message.type))
+            if (system_subscribes_to_message<TaskBoardSystem>(message.type))
             {
                 GS1_SYSTEM_TEST_REQUIRE(
                     context,
@@ -3183,7 +3191,7 @@ void site_one_onboarding_stable_ephedra_task_blocks_starter_density_loss_while_p
         {
             const auto message = queue.front();
             queue.pop_front();
-            if (TaskBoardSystem::subscribes_to(message.type))
+            if (system_subscribes_to_message<TaskBoardSystem>(message.type))
             {
                 GS1_SYSTEM_TEST_REQUIRE(
                     context,

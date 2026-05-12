@@ -98,11 +98,6 @@ struct system_state_tags<CampaignFlowSystem>
     using type = CampaignFlowSystemTags;
 };
 
-bool CampaignFlowSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
-{
-    return type == GS1_HOST_EVENT_SITE_SCENE_READY;
-}
-
 Gs1Status process_campaign_flow_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
@@ -138,15 +133,25 @@ const char* CampaignFlowSystem::name() const noexcept
 
 GameMessageSubscriptionSpan CampaignFlowSystem::subscribed_game_messages() const noexcept
 {
-    return runtime_subscription_list<GameMessageType, k_game_message_type_count, CampaignFlowSystem::subscribes_to>();
+    static constexpr GameMessageType subscriptions[] = {
+        GameMessageType::OpenMainMenu,
+        GameMessageType::StartNewCampaign,
+        GameMessageType::SelectDeploymentSite,
+        GameMessageType::ClearDeploymentSiteSelection,
+        GameMessageType::OpenRegionalMapTechTree,
+        GameMessageType::CloseRegionalMapTechTree,
+        GameMessageType::SelectRegionalMapTechTreeFaction,
+        GameMessageType::StartSiteAttempt,
+        GameMessageType::ReturnToRegionalMap,
+        GameMessageType::SiteAttemptEnded,
+    };
+    return subscriptions;
 }
 
 HostMessageSubscriptionSpan CampaignFlowSystem::subscribed_host_messages() const noexcept
 {
-    return runtime_subscription_list<
-        Gs1HostMessageType,
-        k_runtime_host_message_type_count,
-        CampaignFlowSystem::subscribes_to_host_message>();
+    static constexpr Gs1HostMessageType subscriptions[] = {GS1_HOST_EVENT_SITE_SCENE_READY};
+    return subscriptions;
 }
 
 std::optional<Gs1RuntimeProfileSystemId> CampaignFlowSystem::profile_system_id() const noexcept
@@ -178,33 +183,6 @@ void CampaignFlowSystem::run(RuntimeInvocation& invocation)
     (void)invocation;
 }
 
-bool CampaignFlowSystem::subscribes_to(GameMessageType type) noexcept
-{
-    switch (type)
-    {
-    case GameMessageType::OpenMainMenu:
-    case GameMessageType::StartNewCampaign:
-    case GameMessageType::SelectDeploymentSite:
-    case GameMessageType::ClearDeploymentSiteSelection:
-    case GameMessageType::OpenRegionalMapTechTree:
-    case GameMessageType::CloseRegionalMapTechTree:
-    case GameMessageType::SelectRegionalMapTechTreeFaction:
-    case GameMessageType::StartSiteAttempt:
-    case GameMessageType::ReturnToRegionalMap:
-    case GameMessageType::SiteAttemptEnded:
-        return true;
-
-    case GameMessageType::DeploymentSiteSelectionChanged:
-    case GameMessageType::CampaignReputationAwardRequested:
-    case GameMessageType::FactionReputationAwardRequested:
-    case GameMessageType::TechnologyNodeClaimRequested:
-    case GameMessageType::TechnologyNodeRefundRequested:
-    case GameMessageType::PresentLog:
-    default:
-        return false;
-    }
-}
-
 Gs1Status process_campaign_flow_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
@@ -213,11 +191,6 @@ Gs1Status process_campaign_flow_message(
     auto& campaign = access.template read<RuntimeCampaignTag>();
     auto& active_site_run = access.template read<RuntimeActiveSiteRunTag>();
     auto& app_state = access.template read<RuntimeAppStateTag>();
-
-    if (!CampaignFlowSystem::subscribes_to(message.type))
-    {
-        return GS1_STATUS_OK;
-    }
 
     switch (message.type)
     {

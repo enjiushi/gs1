@@ -356,10 +356,14 @@ const char* DeviceWeatherContributionSystem::name() const noexcept
 
 GameMessageSubscriptionSpan DeviceWeatherContributionSystem::subscribed_game_messages() const noexcept
 {
-    return runtime_subscription_list<
-        GameMessageType,
-        k_game_message_type_count,
-        &DeviceWeatherContributionSystem::subscribes_to>();
+    static constexpr GameMessageType subscriptions[] = {
+        GameMessageType::SiteRunStarted,
+        GameMessageType::SiteDevicePlaced,
+        GameMessageType::SiteDeviceBroken,
+        GameMessageType::SiteDeviceRepaired,
+        GameMessageType::SiteDeviceConditionChanged,
+    };
+    return subscriptions;
 }
 
 HostMessageSubscriptionSpan DeviceWeatherContributionSystem::subscribed_host_messages() const noexcept
@@ -375,15 +379,6 @@ std::optional<Gs1RuntimeProfileSystemId> DeviceWeatherContributionSystem::profil
 std::optional<std::uint32_t> DeviceWeatherContributionSystem::fixed_step_order() const noexcept
 {
     return 7U;
-}
-
-bool DeviceWeatherContributionSystem::subscribes_to(GameMessageType type) noexcept
-{
-    return type == GameMessageType::SiteRunStarted ||
-        type == GameMessageType::SiteDevicePlaced ||
-        type == GameMessageType::SiteDeviceBroken ||
-        type == GameMessageType::SiteDeviceRepaired ||
-        type == GameMessageType::SiteDeviceConditionChanged;
 }
 
 Gs1Status DeviceWeatherContributionSystem::process_game_message(
@@ -425,5 +420,4 @@ void DeviceWeatherContributionSystem::run(RuntimeInvocation& invocation)
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
-
 

@@ -23,6 +23,5 @@ public:
     void run(RuntimeInvocation& invocation) override;
 
     static void initialize_campaign_state(CampaignState& campaign);
-    [[nodiscard]] static bool subscribes_to(GameMessageType type) noexcept;
 };
 }  // namespace gs1

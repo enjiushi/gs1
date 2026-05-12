@@ -1054,33 +1054,6 @@ void seed_site_economy(RuntimeInvocation& invocation, std::uint32_t site_id)
 }
 }  // namespace
 
-bool EconomyPhoneSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
-{
-    (void)type;
-    return false;
-}
-
-bool EconomyPhoneSystem::subscribes_to(GameMessageType type) noexcept
-{
-    switch (type)
-    {
-    case GameMessageType::SiteRunStarted:
-    case GameMessageType::SiteRefreshTick:
-    case GameMessageType::EconomyMoneyAwardRequested:
-    case GameMessageType::PhoneListingPurchaseRequested:
-    case GameMessageType::PhoneListingSaleRequested:
-    case GameMessageType::PhoneListingCartAddRequested:
-    case GameMessageType::PhoneListingCartRemoveRequested:
-    case GameMessageType::PhoneCartCheckoutRequested:
-    case GameMessageType::ContractorHireRequested:
-    case GameMessageType::SiteUnlockableRevealRequested:
-    case GameMessageType::SiteUnlockablePurchaseRequested:
-        return true;
-    default:
-        return false;
-    }
-}
-
 const char* EconomyPhoneSystem::name() const noexcept
 {
     return "EconomyPhoneSystem";
@@ -1088,15 +1061,26 @@ const char* EconomyPhoneSystem::name() const noexcept
 
 GameMessageSubscriptionSpan EconomyPhoneSystem::subscribed_game_messages() const noexcept
 {
-    return runtime_subscription_list<GameMessageType, k_game_message_type_count, &EconomyPhoneSystem::subscribes_to>();
+    static constexpr GameMessageType subscriptions[] = {
+        GameMessageType::SiteRunStarted,
+        GameMessageType::SiteRefreshTick,
+        GameMessageType::EconomyMoneyAwardRequested,
+        GameMessageType::PhoneListingPurchaseRequested,
+        GameMessageType::PhoneListingSaleRequested,
+        GameMessageType::PhoneListingCartAddRequested,
+        GameMessageType::PhoneListingCartRemoveRequested,
+        GameMessageType::PhoneCartCheckoutRequested,
+        GameMessageType::ContractorHireRequested,
+        GameMessageType::SiteUnlockableRevealRequested,
+        GameMessageType::SiteUnlockablePurchaseRequested,
+    };
+    return subscriptions;
 }
 
 HostMessageSubscriptionSpan EconomyPhoneSystem::subscribed_host_messages() const noexcept
 {
-    return runtime_subscription_list<
-        Gs1HostMessageType,
-        k_runtime_host_message_type_count,
-        &EconomyPhoneSystem::subscribes_to_host_message>();
+    static constexpr Gs1HostMessageType subscriptions[] = {GS1_HOST_EVENT_UI_ACTION};
+    return subscriptions;
 }
 
 std::optional<Gs1RuntimeProfileSystemId> EconomyPhoneSystem::profile_system_id() const noexcept
@@ -1271,5 +1255,4 @@ void EconomyPhoneSystem::run(RuntimeInvocation& invocation)
     refresh_dynamic_sell_listings(invocation);
 }
 }  // namespace gs1
-
 

@@ -39,8 +39,6 @@ public:
                 SiteComponent::TileWeather,
                 SiteComponent::LocalWeatherRuntime)};
     }
-
-    [[nodiscard]] static bool subscribes_to(GameMessageType type) noexcept;
 };
 
 template <>

@@ -37,11 +37,6 @@ struct system_state_tags<FactionReputationSystem>
     using type = type_list<RuntimeCampaignTag>;
 };
 
-bool FactionReputationSystem::subscribes_to(GameMessageType type) noexcept
-{
-    return type == GameMessageType::FactionReputationAwardRequested;
-}
-
 const char* FactionReputationSystem::name() const noexcept
 {
     return "FactionReputationSystem";
@@ -49,10 +44,8 @@ const char* FactionReputationSystem::name() const noexcept
 
 GameMessageSubscriptionSpan FactionReputationSystem::subscribed_game_messages() const noexcept
 {
-    return runtime_subscription_list<
-        GameMessageType,
-        k_game_message_type_count,
-        FactionReputationSystem::subscribes_to>();
+    static constexpr GameMessageType subscriptions[] = {GameMessageType::FactionReputationAwardRequested};
+    return subscriptions;
 }
 
 HostMessageSubscriptionSpan FactionReputationSystem::subscribed_host_messages() const noexcept

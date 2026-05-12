@@ -114,10 +114,7 @@ const char* DeviceSupportSystem::name() const noexcept
 
 GameMessageSubscriptionSpan DeviceSupportSystem::subscribed_game_messages() const noexcept
 {
-    return runtime_subscription_list<
-        GameMessageType,
-        k_game_message_type_count,
-        &DeviceSupportSystem::subscribes_to>();
+    return {};
 }
 
 HostMessageSubscriptionSpan DeviceSupportSystem::subscribed_host_messages() const noexcept
@@ -133,12 +130,6 @@ std::optional<Gs1RuntimeProfileSystemId> DeviceSupportSystem::profile_system_id(
 std::optional<std::uint32_t> DeviceSupportSystem::fixed_step_order() const noexcept
 {
     return 12U;
-}
-
-bool DeviceSupportSystem::subscribes_to(GameMessageType type) noexcept
-{
-    (void)type;
-    return false;
 }
 
 Gs1Status DeviceSupportSystem::process_game_message(

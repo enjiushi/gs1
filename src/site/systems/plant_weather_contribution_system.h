@@ -36,8 +36,6 @@ public:
                 SiteComponent::TilePlantWeatherContribution,
                 SiteComponent::PlantWeatherRuntime)};
     }
-
-    [[nodiscard]] static bool subscribes_to(GameMessageType type) noexcept;
 };
 
 template <>

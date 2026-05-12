@@ -2701,43 +2701,6 @@ void handle_money_award_requested(
 }
 }  // namespace
 
-bool TaskBoardSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
-{
-    (void)type;
-    return false;
-}
-
-bool TaskBoardSystem::subscribes_to(GameMessageType type) noexcept
-{
-    switch (type)
-    {
-    case GameMessageType::SiteRunStarted:
-    case GameMessageType::SiteRefreshTick:
-    case GameMessageType::TaskAcceptRequested:
-    case GameMessageType::TaskRewardClaimRequested:
-    case GameMessageType::RestorationProgressChanged:
-    case GameMessageType::TileEcologyChanged:
-    case GameMessageType::TileEcologyBatchChanged:
-    case GameMessageType::LivingPlantStabilityChanged:
-    case GameMessageType::SiteTileStateChanged:
-    case GameMessageType::WorkerMetersChanged:
-    case GameMessageType::PhoneListingPurchased:
-    case GameMessageType::PhoneListingSold:
-    case GameMessageType::InventoryTransferCompleted:
-    case GameMessageType::InventoryItemSubmitted:
-    case GameMessageType::InventoryItemUseCompleted:
-    case GameMessageType::InventoryCraftCompleted:
-    case GameMessageType::SiteTilePlantingCompleted:
-    case GameMessageType::SiteActionCompleted:
-    case GameMessageType::SiteDevicePlaced:
-    case GameMessageType::SiteDeviceConditionChanged:
-    case GameMessageType::EconomyMoneyAwardRequested:
-        return true;
-    default:
-        return false;
-    }
-}
-
 const char* TaskBoardSystem::name() const noexcept
 {
     return "TaskBoardSystem";
@@ -2745,15 +2708,36 @@ const char* TaskBoardSystem::name() const noexcept
 
 GameMessageSubscriptionSpan TaskBoardSystem::subscribed_game_messages() const noexcept
 {
-    return runtime_subscription_list<GameMessageType, k_game_message_type_count, &TaskBoardSystem::subscribes_to>();
+    static constexpr GameMessageType subscriptions[] = {
+        GameMessageType::SiteRunStarted,
+        GameMessageType::SiteRefreshTick,
+        GameMessageType::TaskAcceptRequested,
+        GameMessageType::TaskRewardClaimRequested,
+        GameMessageType::RestorationProgressChanged,
+        GameMessageType::TileEcologyChanged,
+        GameMessageType::TileEcologyBatchChanged,
+        GameMessageType::LivingPlantStabilityChanged,
+        GameMessageType::SiteTileStateChanged,
+        GameMessageType::WorkerMetersChanged,
+        GameMessageType::PhoneListingPurchased,
+        GameMessageType::PhoneListingSold,
+        GameMessageType::InventoryTransferCompleted,
+        GameMessageType::InventoryItemSubmitted,
+        GameMessageType::InventoryItemUseCompleted,
+        GameMessageType::InventoryCraftCompleted,
+        GameMessageType::SiteTilePlantingCompleted,
+        GameMessageType::SiteActionCompleted,
+        GameMessageType::SiteDevicePlaced,
+        GameMessageType::SiteDeviceConditionChanged,
+        GameMessageType::EconomyMoneyAwardRequested,
+    };
+    return subscriptions;
 }
 
 HostMessageSubscriptionSpan TaskBoardSystem::subscribed_host_messages() const noexcept
 {
-    return runtime_subscription_list<
-        Gs1HostMessageType,
-        k_runtime_host_message_type_count,
-        &TaskBoardSystem::subscribes_to_host_message>();
+    static constexpr Gs1HostMessageType subscriptions[] = {GS1_HOST_EVENT_UI_ACTION};
+    return subscriptions;
 }
 
 std::optional<Gs1RuntimeProfileSystemId> TaskBoardSystem::profile_system_id() const noexcept
@@ -2919,5 +2903,4 @@ void TaskBoardSystem::run(RuntimeInvocation& invocation)
     }
 }
 }  // namespace gs1
-
 

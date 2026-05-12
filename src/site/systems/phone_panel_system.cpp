@@ -469,25 +469,6 @@ void sync_phone_panel_projection(
 }
 }  // namespace
 
-bool PhonePanelSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
-{
-    (void)type;
-    return false;
-}
-
-bool PhonePanelSystem::subscribes_to(GameMessageType type) noexcept
-{
-    switch (type)
-    {
-    case GameMessageType::SiteRunStarted:
-    case GameMessageType::PhonePanelSectionRequested:
-    case GameMessageType::ClosePhonePanel:
-        return true;
-    default:
-        return false;
-    }
-}
-
 const char* PhonePanelSystem::name() const noexcept
 {
     return "PhonePanelSystem";
@@ -495,15 +476,18 @@ const char* PhonePanelSystem::name() const noexcept
 
 GameMessageSubscriptionSpan PhonePanelSystem::subscribed_game_messages() const noexcept
 {
-    return runtime_subscription_list<GameMessageType, k_game_message_type_count, &PhonePanelSystem::subscribes_to>();
+    static constexpr GameMessageType subscriptions[] = {
+        GameMessageType::SiteRunStarted,
+        GameMessageType::PhonePanelSectionRequested,
+        GameMessageType::ClosePhonePanel,
+    };
+    return subscriptions;
 }
 
 HostMessageSubscriptionSpan PhonePanelSystem::subscribed_host_messages() const noexcept
 {
-    return runtime_subscription_list<
-        Gs1HostMessageType,
-        k_runtime_host_message_type_count,
-        &PhonePanelSystem::subscribes_to_host_message>();
+    static constexpr Gs1HostMessageType subscriptions[] = {GS1_HOST_EVENT_UI_ACTION};
+    return subscriptions;
 }
 
 std::optional<Gs1RuntimeProfileSystemId> PhonePanelSystem::profile_system_id() const noexcept
@@ -618,5 +602,4 @@ void PhonePanelSystem::run(RuntimeInvocation& invocation)
     sync_phone_panel_projection(invocation);
 }
 }  // namespace gs1
-
 

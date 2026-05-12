@@ -95,18 +95,24 @@ const char* SiteProtectionPresentationSystem::name() const noexcept
 
 GameMessageSubscriptionSpan SiteProtectionPresentationSystem::subscribed_game_messages() const noexcept
 {
-    return runtime_subscription_list<
-        GameMessageType,
-        k_game_message_type_count,
-        SiteProtectionPresentationSystem::subscribes_to>();
+    static constexpr GameMessageType subscriptions[] = {
+        GameMessageType::OpenRegionalMapTechTree,
+        GameMessageType::PhonePanelSectionRequested,
+        GameMessageType::InventoryStorageViewRequest,
+        GameMessageType::StartSiteAttempt,
+        GameMessageType::ReturnToRegionalMap,
+        GameMessageType::SiteAttemptEnded,
+        GameMessageType::OpenSiteProtectionSelector,
+        GameMessageType::CloseSiteProtectionUi,
+        GameMessageType::SetSiteProtectionOverlayMode,
+    };
+    return subscriptions;
 }
 
 HostMessageSubscriptionSpan SiteProtectionPresentationSystem::subscribed_host_messages() const noexcept
 {
-    return runtime_subscription_list<
-        Gs1HostMessageType,
-        k_runtime_host_message_type_count,
-        SiteProtectionPresentationSystem::subscribes_to_host_message>();
+    static constexpr Gs1HostMessageType subscriptions[] = {GS1_HOST_EVENT_SITE_STORAGE_VIEW};
+    return subscriptions;
 }
 
 std::optional<Gs1RuntimeProfileSystemId> SiteProtectionPresentationSystem::profile_system_id() const noexcept
@@ -118,31 +124,6 @@ std::optional<std::uint32_t> SiteProtectionPresentationSystem::fixed_step_order(
 {
     return std::nullopt;
 }
-
-bool SiteProtectionPresentationSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
-{
-    return type == GS1_HOST_EVENT_SITE_STORAGE_VIEW;
-}
-
-bool SiteProtectionPresentationSystem::subscribes_to(GameMessageType type) noexcept
-{
-    switch (type)
-    {
-    case GameMessageType::OpenRegionalMapTechTree:
-    case GameMessageType::PhonePanelSectionRequested:
-    case GameMessageType::InventoryStorageViewRequest:
-    case GameMessageType::StartSiteAttempt:
-    case GameMessageType::ReturnToRegionalMap:
-    case GameMessageType::SiteAttemptEnded:
-    case GameMessageType::OpenSiteProtectionSelector:
-    case GameMessageType::CloseSiteProtectionUi:
-    case GameMessageType::SetSiteProtectionOverlayMode:
-        return true;
-    default:
-        return false;
-    }
-}
-
 Gs1Status SiteProtectionPresentationSystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)

@@ -236,19 +236,6 @@ void handle_reservation_released(const PlacementReservationReleasedMessage& payl
 }
 }  // namespace
 
-bool PlacementValidationSystem::subscribes_to(GameMessageType type) noexcept
-{
-    switch (type)
-    {
-    case GameMessageType::SiteRunStarted:
-    case GameMessageType::PlacementReservationRequested:
-    case GameMessageType::PlacementReservationReleased:
-        return true;
-    default:
-        return false;
-    }
-}
-
 const char* PlacementValidationSystem::name() const noexcept
 {
     return access().system_name.data();
@@ -256,10 +243,12 @@ const char* PlacementValidationSystem::name() const noexcept
 
 GameMessageSubscriptionSpan PlacementValidationSystem::subscribed_game_messages() const noexcept
 {
-    return runtime_subscription_list<
-        GameMessageType,
-        k_game_message_type_count,
-        &PlacementValidationSystem::subscribes_to>();
+    static constexpr GameMessageType subscriptions[] = {
+        GameMessageType::SiteRunStarted,
+        GameMessageType::PlacementReservationRequested,
+        GameMessageType::PlacementReservationReleased,
+    };
+    return subscriptions;
 }
 
 HostMessageSubscriptionSpan PlacementValidationSystem::subscribed_host_messages() const noexcept

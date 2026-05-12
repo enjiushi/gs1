@@ -33,10 +33,15 @@ const char* EcologySystem::name() const noexcept
 
 GameMessageSubscriptionSpan EcologySystem::subscribed_game_messages() const noexcept
 {
-    return runtime_subscription_list<
-        GameMessageType,
-        k_game_message_type_count,
-        &EcologySystem::subscribes_to>();
+    static constexpr GameMessageType subscriptions[] = {
+        GameMessageType::SiteRunStarted,
+        GameMessageType::SiteGroundCoverPlaced,
+        GameMessageType::SiteTilePlantingCompleted,
+        GameMessageType::SiteTileWatered,
+        GameMessageType::SiteTileBurialCleared,
+        GameMessageType::SiteTileHarvested,
+    };
+    return subscriptions;
 }
 
 HostMessageSubscriptionSpan EcologySystem::subscribed_host_messages() const noexcept
@@ -1266,22 +1271,6 @@ void emit_startup_ecology_snapshots(
     update_restoration_progress(world, message_queue, fully_grown_count);
 }
 }  // namespace
-
-bool EcologySystem::subscribes_to(GameMessageType type) noexcept
-{
-    switch (type)
-    {
-    case GameMessageType::SiteRunStarted:
-    case GameMessageType::SiteGroundCoverPlaced:
-    case GameMessageType::SiteTilePlantingCompleted:
-    case GameMessageType::SiteTileWatered:
-    case GameMessageType::SiteTileBurialCleared:
-    case GameMessageType::SiteTileHarvested:
-        return true;
-    default:
-        return false;
-    }
-}
 
 Gs1Status EcologySystem::process_game_message(
     RuntimeInvocation& invocation,

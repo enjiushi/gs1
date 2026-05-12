@@ -39,8 +39,6 @@ public:
                 SiteComponent::TileEcology,
                 SiteComponent::Counters)};
     }
-
-    [[nodiscard]] static bool subscribes_to(GameMessageType type) noexcept;
 };
 
 template <>

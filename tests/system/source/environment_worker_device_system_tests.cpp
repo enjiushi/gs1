@@ -7,6 +7,7 @@
 #include "content/prototype_content.h"
 #include "content/defs/technology_defs.h"
 #include "messages/game_message.h"
+#include "runtime/system_interface.h"
 #include "site/site_projection_update_flags.h"
 #include "site/site_world_access.h"
 #include "site/systems/camp_durability_system.h"
@@ -97,6 +98,13 @@ void run_local_weather_pipeline(
     invoke_system_run<PlantWeatherContributionSystem>(plant_context);
     invoke_system_run<DeviceWeatherContributionSystem>(device_context);
     invoke_system_run<LocalWeatherResolveSystem>(local_weather_context);
+}
+
+template <typename System>
+bool system_subscribes_to_message(GameMessageType type)
+{
+    System system {};
+    return gs1::runtime_subscription_contains(system.subscribed_game_messages(), type);
 }
 
 void prototype_site_run_seeds_site_one_desert_ephedra_patches_near_camp(
@@ -691,8 +699,8 @@ void local_weather_resolve_recomputes_full_grid_each_run(
     site_run.weather.weather_wind = 5.0f;
     site_run.weather.weather_dust = 3.0f;
 
-    GS1_SYSTEM_TEST_CHECK(context, LocalWeatherResolveSystem::subscribes_to(GameMessageType::SiteRunStarted));
-    GS1_SYSTEM_TEST_CHECK(context, !LocalWeatherResolveSystem::subscribes_to(GameMessageType::TileEcologyBatchChanged));
+    GS1_SYSTEM_TEST_CHECK(context, system_subscribes_to_message<LocalWeatherResolveSystem>(GameMessageType::SiteRunStarted));
+    GS1_SYSTEM_TEST_CHECK(context, !system_subscribes_to_message<LocalWeatherResolveSystem>(GameMessageType::TileEcologyBatchChanged));
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         invoke_system_message<LocalWeatherResolveSystem>(
@@ -939,7 +947,7 @@ void local_weather_resolve_straw_checkerboard_planting_completion_projects_wind_
         make_site_context<PlantWeatherContributionSystem>(campaign, site_run, queue);
     for (const auto& message : queue)
     {
-        if (!PlantWeatherContributionSystem::subscribes_to(message.type))
+        if (!system_subscribes_to_message<PlantWeatherContributionSystem>(message.type))
         {
             continue;
         }
@@ -1151,9 +1159,9 @@ void local_weather_resolve_applies_device_wind_protection_value_and_range(
     tile.device.device_efficiency = 0.5f;
     site_run.site_world->set_tile(TileCoord {2, 2}, tile);
 
-    GS1_SYSTEM_TEST_CHECK(context, !LocalWeatherResolveSystem::subscribes_to(GameMessageType::SiteDevicePlaced));
-    GS1_SYSTEM_TEST_CHECK(context, !LocalWeatherResolveSystem::subscribes_to(GameMessageType::SiteDeviceBroken));
-    GS1_SYSTEM_TEST_CHECK(context, !LocalWeatherResolveSystem::subscribes_to(GameMessageType::SiteDeviceRepaired));
+    GS1_SYSTEM_TEST_CHECK(context, !system_subscribes_to_message<LocalWeatherResolveSystem>(GameMessageType::SiteDevicePlaced));
+    GS1_SYSTEM_TEST_CHECK(context, !system_subscribes_to_message<LocalWeatherResolveSystem>(GameMessageType::SiteDeviceBroken));
+    GS1_SYSTEM_TEST_CHECK(context, !system_subscribes_to_message<LocalWeatherResolveSystem>(GameMessageType::SiteDeviceRepaired));
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         invoke_system_message<DeviceWeatherContributionSystem>(

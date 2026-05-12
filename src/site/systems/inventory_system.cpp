@@ -1588,38 +1588,6 @@ void progress_pending_deliveries(RuntimeInvocation& invocation) noexcept
 
 }  // namespace
 
-bool InventorySystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
-{
-    return type == GS1_HOST_EVENT_SITE_MOVE_DIRECTION ||
-        type == GS1_HOST_EVENT_SITE_STORAGE_VIEW ||
-        type == GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP;
-}
-
-bool InventorySystem::subscribes_to(GameMessageType type) noexcept
-{
-    switch (type)
-    {
-    case GameMessageType::StartSiteAction:
-    case GameMessageType::SiteRunStarted:
-    case GameMessageType::SiteDevicePlaced:
-    case GameMessageType::SiteDeviceBroken:
-    case GameMessageType::InventoryDeliveryRequested:
-    case GameMessageType::InventoryDeliveryBatchRequested:
-    case GameMessageType::InventoryWorkerPackInsertRequested:
-    case GameMessageType::InventoryItemUseRequested:
-    case GameMessageType::InventoryItemConsumeRequested:
-    case GameMessageType::InventoryGlobalItemConsumeRequested:
-    case GameMessageType::InventoryTransferRequested:
-    case GameMessageType::InventoryItemSubmitRequested:
-    case GameMessageType::InventoryStorageViewRequest:
-    case GameMessageType::InventorySlotTapped:
-    case GameMessageType::InventoryCraftCommitRequested:
-        return true;
-    default:
-        return false;
-    }
-}
-
 const char* InventorySystem::name() const noexcept
 {
     return "InventorySystem";
@@ -1627,15 +1595,34 @@ const char* InventorySystem::name() const noexcept
 
 GameMessageSubscriptionSpan InventorySystem::subscribed_game_messages() const noexcept
 {
-    return runtime_subscription_list<GameMessageType, k_game_message_type_count, &InventorySystem::subscribes_to>();
+    static constexpr GameMessageType subscriptions[] = {
+        GameMessageType::StartSiteAction,
+        GameMessageType::SiteRunStarted,
+        GameMessageType::SiteDevicePlaced,
+        GameMessageType::SiteDeviceBroken,
+        GameMessageType::InventoryDeliveryRequested,
+        GameMessageType::InventoryDeliveryBatchRequested,
+        GameMessageType::InventoryWorkerPackInsertRequested,
+        GameMessageType::InventoryItemUseRequested,
+        GameMessageType::InventoryItemConsumeRequested,
+        GameMessageType::InventoryGlobalItemConsumeRequested,
+        GameMessageType::InventoryTransferRequested,
+        GameMessageType::InventoryItemSubmitRequested,
+        GameMessageType::InventoryStorageViewRequest,
+        GameMessageType::InventorySlotTapped,
+        GameMessageType::InventoryCraftCommitRequested,
+    };
+    return subscriptions;
 }
 
 HostMessageSubscriptionSpan InventorySystem::subscribed_host_messages() const noexcept
 {
-    return runtime_subscription_list<
-        Gs1HostMessageType,
-        k_runtime_host_message_type_count,
-        &InventorySystem::subscribes_to_host_message>();
+    static constexpr Gs1HostMessageType subscriptions[] = {
+        GS1_HOST_EVENT_SITE_MOVE_DIRECTION,
+        GS1_HOST_EVENT_SITE_STORAGE_VIEW,
+        GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP,
+    };
+    return subscriptions;
 }
 
 std::optional<Gs1RuntimeProfileSystemId> InventorySystem::profile_system_id() const noexcept
@@ -1814,6 +1801,4 @@ void InventorySystem::run(RuntimeInvocation& invocation)
     progress_pending_deliveries(invocation);
 }
 }  // namespace gs1
-
-
 

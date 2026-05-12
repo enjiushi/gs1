@@ -186,25 +186,6 @@ Gs1Status handle_craft_context_requested(
 }
 }  // namespace
 
-bool CraftSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
-{
-    return type == GS1_HOST_EVENT_SITE_CONTEXT_REQUEST;
-}
-
-bool CraftSystem::subscribes_to(GameMessageType type) noexcept
-{
-    switch (type)
-    {
-    case GameMessageType::SiteRunStarted:
-    case GameMessageType::SiteDevicePlaced:
-    case GameMessageType::SiteDeviceBroken:
-    case GameMessageType::InventoryCraftContextRequested:
-        return true;
-    default:
-        return false;
-    }
-}
-
 const char* CraftSystem::name() const noexcept
 {
     return "CraftSystem";
@@ -212,15 +193,19 @@ const char* CraftSystem::name() const noexcept
 
 GameMessageSubscriptionSpan CraftSystem::subscribed_game_messages() const noexcept
 {
-    return runtime_subscription_list<GameMessageType, k_game_message_type_count, &CraftSystem::subscribes_to>();
+    static constexpr GameMessageType subscriptions[] = {
+        GameMessageType::SiteRunStarted,
+        GameMessageType::SiteDevicePlaced,
+        GameMessageType::SiteDeviceBroken,
+        GameMessageType::InventoryCraftContextRequested,
+    };
+    return subscriptions;
 }
 
 HostMessageSubscriptionSpan CraftSystem::subscribed_host_messages() const noexcept
 {
-    return runtime_subscription_list<
-        Gs1HostMessageType,
-        k_runtime_host_message_type_count,
-        &CraftSystem::subscribes_to_host_message>();
+    static constexpr Gs1HostMessageType subscriptions[] = {GS1_HOST_EVENT_SITE_CONTEXT_REQUEST};
+    return subscriptions;
 }
 
 std::optional<Gs1RuntimeProfileSystemId> CraftSystem::profile_system_id() const noexcept

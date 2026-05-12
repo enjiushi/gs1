@@ -2635,28 +2635,6 @@ Gs1Status handle_placement_mode_cursor_moved(
     RuntimeInvocation& invocation,
     const PlacementModeCursorMovedMessage& payload);
 
-bool ActionExecutionSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
-{
-    return type == GS1_HOST_EVENT_SITE_ACTION_REQUEST ||
-        type == GS1_HOST_EVENT_SITE_ACTION_CANCEL ||
-        type == GS1_HOST_EVENT_SITE_CONTEXT_REQUEST;
-}
-
-bool ActionExecutionSystem::subscribes_to(GameMessageType type) noexcept
-{
-    switch (type)
-    {
-    case GameMessageType::StartSiteAction:
-    case GameMessageType::CancelSiteAction:
-    case GameMessageType::PlacementModeCursorMoved:
-    case GameMessageType::PlacementReservationAccepted:
-    case GameMessageType::PlacementReservationRejected:
-        return true;
-    default:
-        return false;
-    }
-}
-
 Gs1Status handle_start_site_action(
     RuntimeInvocation& invocation,
     const StartSiteActionMessage& payload)
@@ -3199,18 +3177,24 @@ const char* ActionExecutionSystem::name() const noexcept
 
 GameMessageSubscriptionSpan ActionExecutionSystem::subscribed_game_messages() const noexcept
 {
-    return runtime_subscription_list<
-        GameMessageType,
-        k_game_message_type_count,
-        &ActionExecutionSystem::subscribes_to>();
+    static constexpr GameMessageType subscriptions[] = {
+        GameMessageType::StartSiteAction,
+        GameMessageType::CancelSiteAction,
+        GameMessageType::PlacementModeCursorMoved,
+        GameMessageType::PlacementReservationAccepted,
+        GameMessageType::PlacementReservationRejected,
+    };
+    return subscriptions;
 }
 
 HostMessageSubscriptionSpan ActionExecutionSystem::subscribed_host_messages() const noexcept
 {
-    return runtime_subscription_list<
-        Gs1HostMessageType,
-        k_runtime_host_message_type_count,
-        &ActionExecutionSystem::subscribes_to_host_message>();
+    static constexpr Gs1HostMessageType subscriptions[] = {
+        GS1_HOST_EVENT_SITE_ACTION_REQUEST,
+        GS1_HOST_EVENT_SITE_ACTION_CANCEL,
+        GS1_HOST_EVENT_SITE_CONTEXT_REQUEST,
+    };
+    return subscriptions;
 }
 
 std::optional<Gs1RuntimeProfileSystemId> ActionExecutionSystem::profile_system_id() const noexcept

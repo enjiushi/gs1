@@ -136,11 +136,6 @@ struct system_state_tags<TechnologySystem>
     using type = type_list<RuntimeCampaignTag>;
 };
 
-bool TechnologySystem::subscribes_to(GameMessageType type) noexcept
-{
-    return type == GameMessageType::CampaignReputationAwardRequested;
-}
-
 const char* TechnologySystem::name() const noexcept
 {
     return "TechnologySystem";
@@ -148,10 +143,8 @@ const char* TechnologySystem::name() const noexcept
 
 GameMessageSubscriptionSpan TechnologySystem::subscribed_game_messages() const noexcept
 {
-    return runtime_subscription_list<
-        GameMessageType,
-        k_game_message_type_count,
-        TechnologySystem::subscribes_to>();
+    static constexpr GameMessageType subscriptions[] = {GameMessageType::CampaignReputationAwardRequested};
+    return subscriptions;
 }
 
 HostMessageSubscriptionSpan TechnologySystem::subscribed_host_messages() const noexcept

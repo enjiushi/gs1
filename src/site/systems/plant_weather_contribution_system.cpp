@@ -658,10 +658,12 @@ const char* PlantWeatherContributionSystem::name() const noexcept
 
 GameMessageSubscriptionSpan PlantWeatherContributionSystem::subscribed_game_messages() const noexcept
 {
-    return runtime_subscription_list<
-        GameMessageType,
-        k_game_message_type_count,
-        &PlantWeatherContributionSystem::subscribes_to>();
+    static constexpr GameMessageType subscriptions[] = {
+        GameMessageType::SiteRunStarted,
+        GameMessageType::TileEcologyChanged,
+        GameMessageType::TileEcologyBatchChanged,
+    };
+    return subscriptions;
 }
 
 HostMessageSubscriptionSpan PlantWeatherContributionSystem::subscribed_host_messages() const noexcept
@@ -677,13 +679,6 @@ std::optional<Gs1RuntimeProfileSystemId> PlantWeatherContributionSystem::profile
 std::optional<std::uint32_t> PlantWeatherContributionSystem::fixed_step_order() const noexcept
 {
     return 6U;
-}
-
-bool PlantWeatherContributionSystem::subscribes_to(GameMessageType type) noexcept
-{
-    return type == GameMessageType::SiteRunStarted ||
-        type == GameMessageType::TileEcologyChanged ||
-        type == GameMessageType::TileEcologyBatchChanged;
 }
 
 Gs1Status PlantWeatherContributionSystem::process_game_message(
@@ -725,5 +720,4 @@ void PlantWeatherContributionSystem::run(RuntimeInvocation& invocation)
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
-
 

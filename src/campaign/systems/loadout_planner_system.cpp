@@ -145,13 +145,6 @@ void LoadoutPlannerSystem::initialize_campaign_state(CampaignState& campaign)
     rebuild_selected_loadout(campaign);
 }
 
-bool LoadoutPlannerSystem::subscribes_to(GameMessageType type) noexcept
-{
-    return type == GameMessageType::SelectDeploymentSite ||
-        type == GameMessageType::ClearDeploymentSiteSelection ||
-        type == GameMessageType::DeploymentSiteSelectionChanged;
-}
-
 const char* LoadoutPlannerSystem::name() const noexcept
 {
     return "LoadoutPlannerSystem";
@@ -159,10 +152,12 @@ const char* LoadoutPlannerSystem::name() const noexcept
 
 GameMessageSubscriptionSpan LoadoutPlannerSystem::subscribed_game_messages() const noexcept
 {
-    return runtime_subscription_list<
-        GameMessageType,
-        k_game_message_type_count,
-        LoadoutPlannerSystem::subscribes_to>();
+    static constexpr GameMessageType subscriptions[] = {
+        GameMessageType::SelectDeploymentSite,
+        GameMessageType::ClearDeploymentSiteSelection,
+        GameMessageType::DeploymentSiteSelectionChanged,
+    };
+    return subscriptions;
 }
 
 HostMessageSubscriptionSpan LoadoutPlannerSystem::subscribed_host_messages() const noexcept
@@ -212,11 +207,6 @@ Gs1Status process_loadout_planner_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    if (!LoadoutPlannerSystem::subscribes_to(message.type))
-    {
-        return GS1_STATUS_OK;
-    }
-
     auto access = make_game_state_access<LoadoutPlannerSystem>(invocation);
     auto& campaign = access.template read<RuntimeCampaignTag>();
     if (!campaign.has_value())

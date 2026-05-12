@@ -311,10 +311,12 @@ const char* DeviceMaintenanceSystem::name() const noexcept
 
 GameMessageSubscriptionSpan DeviceMaintenanceSystem::subscribed_game_messages() const noexcept
 {
-    return runtime_subscription_list<
-        GameMessageType,
-        k_game_message_type_count,
-        &DeviceMaintenanceSystem::subscribes_to>();
+    static constexpr GameMessageType subscriptions[] = {
+        GameMessageType::SiteRunStarted,
+        GameMessageType::SiteDevicePlaced,
+        GameMessageType::SiteDeviceRepaired,
+    };
+    return subscriptions;
 }
 
 HostMessageSubscriptionSpan DeviceMaintenanceSystem::subscribed_host_messages() const noexcept
@@ -330,13 +332,6 @@ std::optional<Gs1RuntimeProfileSystemId> DeviceMaintenanceSystem::profile_system
 std::optional<std::uint32_t> DeviceMaintenanceSystem::fixed_step_order() const noexcept
 {
     return 11U;
-}
-
-bool DeviceMaintenanceSystem::subscribes_to(GameMessageType type) noexcept
-{
-    return type == GameMessageType::SiteRunStarted ||
-        type == GameMessageType::SiteDevicePlaced ||
-        type == GameMessageType::SiteDeviceRepaired;
 }
 
 Gs1Status DeviceMaintenanceSystem::process_game_message(
