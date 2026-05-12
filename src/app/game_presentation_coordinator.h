@@ -19,27 +19,7 @@
 
 namespace gs1
 {
-class GamePresentationCoordinator;
 struct GamePresentationRuntimeContext;
-void campaign_presentation_handle_message(
-    GamePresentationCoordinator& owner,
-    GamePresentationRuntimeContext& context,
-    const GameMessage& message);
-void site_presentation_handle_message(
-    GamePresentationCoordinator& owner,
-    GamePresentationRuntimeContext& context,
-    const GameMessage& message);
-void site_presentation_mark_projection_dirty(
-    GamePresentationCoordinator& owner,
-    GamePresentationRuntimeContext& context,
-    std::uint64_t dirty_flags) noexcept;
-void site_presentation_mark_tile_dirty(
-    GamePresentationCoordinator& owner,
-    GamePresentationRuntimeContext& context,
-    TileCoord coord) noexcept;
-void site_presentation_flush_if_dirty(
-    GamePresentationCoordinator& owner,
-    GamePresentationRuntimeContext& context);
 
 struct GamePresentationRuntimeContext final
 {
@@ -57,9 +37,7 @@ struct GamePresentationRuntimeContext final
 class GamePresentationCoordinator final
 {
 public:
-    void on_message_processed(
-        GamePresentationRuntimeContext& context,
-        const GameMessage& message);
+    void queue_site_bootstrap_messages(GamePresentationRuntimeContext& context);
     void mark_site_projection_update_dirty(
         GamePresentationRuntimeContext& context,
         std::uint64_t dirty_flags) noexcept;
@@ -79,26 +57,6 @@ public:
     }
 
 private:
-    friend void campaign_presentation_handle_message(
-        GamePresentationCoordinator& owner,
-        GamePresentationRuntimeContext& context,
-        const GameMessage& message);
-    friend void site_presentation_handle_message(
-        GamePresentationCoordinator& owner,
-        GamePresentationRuntimeContext& context,
-        const GameMessage& message);
-    friend void site_presentation_mark_projection_dirty(
-        GamePresentationCoordinator& owner,
-        GamePresentationRuntimeContext& context,
-        std::uint64_t dirty_flags) noexcept;
-    friend void site_presentation_mark_tile_dirty(
-        GamePresentationCoordinator& owner,
-        GamePresentationRuntimeContext& context,
-        TileCoord coord) noexcept;
-    friend void site_presentation_flush_if_dirty(
-        GamePresentationCoordinator& owner,
-        GamePresentationRuntimeContext& context);
-
     [[nodiscard]] GamePresentationRuntimeContext& context() noexcept { return *active_context_; }
     [[nodiscard]] const GamePresentationRuntimeContext& context() const noexcept { return *active_context_; }
     [[nodiscard]] Gs1AppState& app_state() noexcept { return context().app_state; }
@@ -132,7 +90,6 @@ private:
     [[nodiscard]] std::deque<Gs1RuntimeMessage>& engine_messages() noexcept { return context().engine_messages; }
     [[nodiscard]] double fixed_step_seconds() const noexcept { return context().fixed_step_seconds; }
 
-    void queue_log_message(const char* message, Gs1LogLevel level = GS1_LOG_LEVEL_INFO);
     void queue_app_state_message(Gs1AppState app_state);
     void queue_ui_setup_begin_message(
         Gs1UiSetupId setup_id,
@@ -208,18 +165,7 @@ private:
     void queue_ui_panel_end_message();
     void queue_clear_ui_setup_messages(Gs1UiSetupId setup_id);
     void queue_clear_ui_panel_messages(Gs1UiPanelId panel_id);
-    void queue_main_menu_ui_messages();
-    void queue_regional_map_menu_ui_messages();
-    void queue_regional_map_selection_ui_messages();
-    void queue_regional_map_tech_tree_ui_messages();
-    void queue_site_result_ui_messages(
-        std::uint32_t site_id,
-        Gs1SiteAttemptResult result);
     void queue_site_protection_selector_ui_messages();
-    void queue_regional_map_snapshot_messages();
-    void queue_regional_map_site_upsert_message(
-        const SiteMetaState& site,
-        Gs1EngineMessageType message_type = GS1_ENGINE_MESSAGE_REGIONAL_MAP_SITE_UPSERT);
     void queue_site_snapshot_begin_message(
         Gs1ProjectionMode mode,
         Gs1EngineMessageType message_type = GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT);
@@ -312,28 +258,9 @@ private:
         Gs1EngineMessageType upsert_message_type = GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_UPSERT,
         Gs1EngineMessageType remove_message_type = GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_REMOVE);
     void queue_site_bootstrap_messages();
-    void queue_site_ready_bootstrap_messages();
     void queue_site_delta_messages(std::uint64_t dirty_flags);
     void queue_site_action_update_message();
     void queue_hud_state_message();
-    void queue_campaign_resources_message();
-    void queue_site_result_ready_message(
-        std::uint32_t site_id,
-        Gs1SiteAttemptResult result,
-        std::uint32_t newly_revealed_site_count);
-    void queue_task_reward_claimed_cue_message(
-        std::uint32_t task_instance_id,
-        std::uint32_t task_template_id,
-        std::uint32_t reward_candidate_count);
-    void queue_craft_output_stored_cue_message(
-        std::uint32_t storage_id,
-        std::uint32_t item_id,
-        std::uint32_t quantity);
-    void queue_campaign_unlock_cue_message(
-        std::uint32_t subject_id,
-        std::uint32_t detail_id,
-        std::uint32_t detail_kind);
-    void sync_campaign_unlock_presentations();
     void clear_pending_site_tile_projection_updates() noexcept;
     void clear_pending_site_inventory_projection_updates() noexcept;
 

@@ -68,6 +68,10 @@ struct RuntimeUiPresentationTag
 {
 };
 
+struct RuntimePresentationRuntimeTag
+{
+};
+
 template <class System>
 struct system_state_tags;
 
@@ -201,6 +205,12 @@ inline decltype(auto) runtime_invocation_state_ref<RuntimeUiPresentationTag>(Run
 }
 
 template <>
+inline decltype(auto) runtime_invocation_state_ref<RuntimePresentationRuntimeTag>(RuntimeInvocation& invocation)
+{
+    return (invocation.owned_state_->presentation_runtime);
+}
+
+template <>
 inline decltype(auto) runtime_invocation_state_ref<RuntimeAppStateTag>(const RuntimeInvocation& invocation)
 {
     return (*invocation.app_state_);
@@ -242,6 +252,13 @@ inline decltype(auto) runtime_invocation_state_ref<RuntimeUiPresentationTag>(
     const RuntimeInvocation& invocation)
 {
     return (invocation.owned_state_->ui_presentation);
+}
+
+template <>
+inline decltype(auto) runtime_invocation_state_ref<RuntimePresentationRuntimeTag>(
+    const RuntimeInvocation& invocation)
+{
+    return (invocation.owned_state_->presentation_runtime);
 }
 
 template <class System>

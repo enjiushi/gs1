@@ -50,6 +50,7 @@ public:
         return state_.runtime_messages;
     }
     [[nodiscard]] Gs1Status handle_message(const GameMessage& message);
+    void flush_site_presentation_if_dirty();
 
     friend struct GameRuntimeProjectionTestAccess;
     friend class RuntimeInvocation;

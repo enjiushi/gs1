@@ -4,6 +4,18 @@ namespace gs1
 {
 namespace
 {
+[[nodiscard]] Gs1RuntimeMessage make_engine_message(Gs1EngineMessageType type)
+{
+    Gs1RuntimeMessage message {};
+    message.type = type;
+    return message;
+}
+
+void queue_runtime_message(RuntimeInvocation& invocation, const Gs1RuntimeMessage& message)
+{
+    invocation.push_runtime_message(message);
+}
+
 [[nodiscard]] bool app_state_supports_technology_tree(Gs1AppState app_state) noexcept
 {
     return app_state == GS1_APP_STATE_REGIONAL_MAP ||
@@ -69,6 +81,123 @@ void clear_protection_ui_state(SiteProtectionPresentationState& protection) noex
 {
     protection.selector_open = false;
     protection.overlay_mode = GS1_SITE_PROTECTION_OVERLAY_NONE;
+}
+
+void queue_close_site_protection_selector_ui(RuntimeInvocation& invocation)
+{
+    auto close_message = make_engine_message(GS1_ENGINE_MESSAGE_CLOSE_UI_SETUP);
+    auto& close_payload = close_message.emplace_payload<Gs1EngineMessageCloseUiSetupData>();
+    close_payload.setup_id = GS1_UI_SETUP_SITE_PROTECTION_SELECTOR;
+    close_payload.presentation_type = GS1_UI_SETUP_PRESENTATION_OVERLAY;
+    queue_runtime_message(invocation, close_message);
+}
+
+void queue_site_protection_overlay_state_message(
+    RuntimeInvocation& invocation,
+    const std::optional<SiteRunState>& active_site_run,
+    const SiteProtectionPresentationState& protection)
+{
+    if (!active_site_run.has_value())
+    {
+        return;
+    }
+
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE);
+    auto& payload = message.emplace_payload<Gs1EngineMessageSiteProtectionOverlayData>();
+    payload.mode = protection.overlay_mode;
+    payload.reserved0[0] = 0U;
+    payload.reserved0[1] = 0U;
+    payload.reserved0[2] = 0U;
+    queue_runtime_message(invocation, message);
+
+    auto visibility_message = make_engine_message(GS1_ENGINE_MESSAGE_SET_UI_SURFACE_VISIBILITY);
+    auto& visibility_payload =
+        visibility_message.emplace_payload<Gs1EngineMessageUiSurfaceVisibilityData>();
+    visibility_payload.surface_id = GS1_UI_SURFACE_SITE_OVERLAY_PANEL;
+    visibility_payload.visible = protection.overlay_mode != GS1_SITE_PROTECTION_OVERLAY_NONE ? 1U : 0U;
+    visibility_payload.reserved0 = 0U;
+    queue_runtime_message(invocation, visibility_message);
+}
+
+void queue_site_protection_selector_ui_messages(
+    RuntimeInvocation& invocation,
+    Gs1AppState app_state,
+    const std::optional<SiteRunState>& active_site_run)
+{
+    if (!active_site_run.has_value() || app_state != GS1_APP_STATE_SITE_ACTIVE)
+    {
+        return;
+    }
+
+    auto close_message = make_engine_message(GS1_ENGINE_MESSAGE_CLOSE_UI_SETUP);
+    auto& close_payload = close_message.emplace_payload<Gs1EngineMessageCloseUiSetupData>();
+    close_payload.setup_id = GS1_UI_SETUP_SITE_PROTECTION_SELECTOR;
+    close_payload.presentation_type = GS1_UI_SETUP_PRESENTATION_OVERLAY;
+    queue_runtime_message(invocation, close_message);
+
+    auto begin_message = make_engine_message(GS1_ENGINE_MESSAGE_BEGIN_UI_SETUP);
+    auto& begin_payload = begin_message.emplace_payload<Gs1EngineMessageUiSetupData>();
+    begin_payload.setup_id = GS1_UI_SETUP_SITE_PROTECTION_SELECTOR;
+    begin_payload.mode = GS1_PROJECTION_MODE_SNAPSHOT;
+    begin_payload.presentation_type = GS1_UI_SETUP_PRESENTATION_OVERLAY;
+    begin_payload.element_count = 6U;
+    begin_payload.context_id = active_site_run->site_id.value;
+    queue_runtime_message(invocation, begin_message);
+
+    const auto queue_element = [&invocation](
+                                   std::uint32_t element_id,
+                                   Gs1UiElementType element_type,
+                                   std::uint32_t flags,
+                                   const Gs1UiAction& action,
+                                   std::uint8_t content_kind,
+                                   std::uint32_t primary_id = 0U,
+                                   std::uint32_t secondary_id = 0U)
+    {
+        auto element_message = make_engine_message(GS1_ENGINE_MESSAGE_UI_ELEMENT_UPSERT);
+        auto& element_payload = element_message.emplace_payload<Gs1EngineMessageUiElementData>();
+        element_payload.element_id = element_id;
+        element_payload.element_type = element_type;
+        element_payload.flags = static_cast<std::uint16_t>(flags);
+        element_payload.action = action;
+        element_payload.content_kind = content_kind;
+        element_payload.primary_id = primary_id;
+        element_payload.secondary_id = secondary_id;
+        element_payload.quantity = 0U;
+        queue_runtime_message(invocation, element_message);
+    };
+
+    Gs1UiAction no_action {};
+    queue_element(1U, GS1_UI_ELEMENT_LABEL, GS1_UI_ELEMENT_FLAG_NONE, no_action, 3U);
+
+    const auto queue_overlay_button = [&queue_element](std::uint32_t element_id, Gs1SiteProtectionOverlayMode mode)
+    {
+        Gs1UiAction action {};
+        action.type = GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE;
+        action.arg0 = mode;
+        queue_element(
+            element_id,
+            GS1_UI_ELEMENT_BUTTON,
+            GS1_UI_ELEMENT_FLAG_PRIMARY,
+            action,
+            4U,
+            mode);
+    };
+
+    queue_overlay_button(2U, GS1_SITE_PROTECTION_OVERLAY_WIND);
+    queue_overlay_button(3U, GS1_SITE_PROTECTION_OVERLAY_HEAT);
+    queue_overlay_button(4U, GS1_SITE_PROTECTION_OVERLAY_DUST);
+    queue_overlay_button(5U, GS1_SITE_PROTECTION_OVERLAY_OCCUPANT_CONDITION);
+
+    Gs1UiAction close_action {};
+    close_action.type = GS1_UI_ACTION_CLOSE_SITE_PROTECTION_UI;
+    queue_element(
+        6U,
+        GS1_UI_ELEMENT_BUTTON,
+        GS1_UI_ELEMENT_FLAG_BACKGROUND_CLICK,
+        close_action,
+        5U);
+
+    queue_runtime_message(invocation, make_engine_message(GS1_ENGINE_MESSAGE_END_UI_SETUP));
 }
 }  // namespace
 
@@ -174,8 +303,13 @@ Gs1Status SiteProtectionPresentationSystem::process_game_message(
     case GameMessageType::OpenRegionalMapTechTree:
         if (protection.selector_open || protection.overlay_mode != GS1_SITE_PROTECTION_OVERLAY_NONE)
         {
+            if (protection.selector_open)
+            {
+                queue_close_site_protection_selector_ui(invocation);
+            }
             clear_protection_ui_state(protection);
         }
+        queue_site_protection_overlay_state_message(invocation, active_site_run, protection);
         if (active_site_run.has_value())
         {
             queue_close_site_inventory_panels(invocation, *active_site_run);
@@ -189,8 +323,13 @@ Gs1Status SiteProtectionPresentationSystem::process_game_message(
     case GameMessageType::PhonePanelSectionRequested:
         if (protection.selector_open || protection.overlay_mode != GS1_SITE_PROTECTION_OVERLAY_NONE)
         {
+            if (protection.selector_open)
+            {
+                queue_close_site_protection_selector_ui(invocation);
+            }
             clear_protection_ui_state(protection);
         }
+        queue_site_protection_overlay_state_message(invocation, active_site_run, protection);
         if (active_site_run.has_value())
         {
             queue_close_site_inventory_panels(invocation, *active_site_run);
@@ -209,8 +348,13 @@ Gs1Status SiteProtectionPresentationSystem::process_game_message(
         {
             if (protection.selector_open || protection.overlay_mode != GS1_SITE_PROTECTION_OVERLAY_NONE)
             {
+                if (protection.selector_open)
+                {
+                    queue_close_site_protection_selector_ui(invocation);
+                }
                 clear_protection_ui_state(protection);
             }
+            queue_site_protection_overlay_state_message(invocation, active_site_run, protection);
             if (active_site_run.has_value() && active_site_run->phone_panel.open)
             {
                 queue_close_phone_panel(invocation);
@@ -227,7 +371,12 @@ Gs1Status SiteProtectionPresentationSystem::process_game_message(
     case GameMessageType::StartSiteAttempt:
     case GameMessageType::ReturnToRegionalMap:
     case GameMessageType::SiteAttemptEnded:
+        if (protection.selector_open)
+        {
+            queue_close_site_protection_selector_ui(invocation);
+        }
         clear_protection_ui_state(protection);
+        queue_site_protection_overlay_state_message(invocation, active_site_run, protection);
         return GS1_STATUS_OK;
 
     case GameMessageType::OpenSiteProtectionSelector:
@@ -248,17 +397,20 @@ Gs1Status SiteProtectionPresentationSystem::process_game_message(
         }
         protection.selector_open = true;
         protection.overlay_mode = GS1_SITE_PROTECTION_OVERLAY_NONE;
+        queue_site_protection_selector_ui_messages(invocation, app_state, active_site_run);
         return GS1_STATUS_OK;
 
     case GameMessageType::CloseSiteProtectionUi:
         if (protection.selector_open)
         {
+            queue_close_site_protection_selector_ui(invocation);
             protection.selector_open = false;
         }
         else if (protection.overlay_mode != GS1_SITE_PROTECTION_OVERLAY_NONE)
         {
             protection.overlay_mode = GS1_SITE_PROTECTION_OVERLAY_NONE;
         }
+        queue_site_protection_overlay_state_message(invocation, active_site_run, protection);
         return GS1_STATUS_OK;
 
     case GameMessageType::SetSiteProtectionOverlayMode:
@@ -266,9 +418,14 @@ Gs1Status SiteProtectionPresentationSystem::process_game_message(
         {
             return GS1_STATUS_OK;
         }
+        if (protection.selector_open)
+        {
+            queue_close_site_protection_selector_ui(invocation);
+        }
         protection.selector_open = false;
         protection.overlay_mode =
             message.payload_as<SetSiteProtectionOverlayModeMessage>().mode;
+        queue_site_protection_overlay_state_message(invocation, active_site_run, protection);
         return GS1_STATUS_OK;
 
     default:

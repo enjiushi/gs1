@@ -1,7 +1,5 @@
 #include "app/game_presentation_coordinator.h"
 
-#include "app/campaign_presentation_ops.h"
-#include "app/site_presentation_ops.h"
 #include "campaign/systems/technology_system.h"
 #include "content/defs/faction_defs.h"
 #include "content/defs/item_defs.h"
@@ -814,6 +812,18 @@ Gs1RuntimeMessage make_engine_message(
     return message;
 }
 
+void queue_log_runtime_message(
+    std::deque<Gs1RuntimeMessage>& engine_messages,
+    const char* message,
+    Gs1LogLevel level)
+{
+    auto engine_message = make_engine_message(GS1_ENGINE_MESSAGE_LOG_TEXT);
+    auto& payload = engine_message.emplace_payload<Gs1EngineMessageLogTextData>();
+    payload.level = level;
+    strncpy_s(payload.text, sizeof(payload.text), message, _TRUNCATE);
+    engine_messages.push_back(engine_message);
+}
+
 Gs1TaskPresentationListKind to_task_presentation_list_kind(TaskRuntimeListKind kind) noexcept
 {
     switch (kind)
@@ -868,26 +878,6 @@ Gs1PhonePanelSection to_phone_panel_section(PhonePanelSection section) noexcept
 }
 
 }  // namespace
-
-void GamePresentationCoordinator::on_message_processed(GamePresentationRuntimeContext& context, const GameMessage& message)
-{
-    campaign_presentation_handle_message(*this, context, message);
-    site_presentation_handle_message(*this, context, message);
-}
-
-
-void GamePresentationCoordinator::queue_log_message(const char* message, Gs1LogLevel level)
-{
-    auto engine_message = make_engine_message(GS1_ENGINE_MESSAGE_LOG_TEXT);
-    auto& payload = engine_message.emplace_payload<Gs1EngineMessageLogTextData>();
-    payload.level = level;
-    strncpy_s(
-        payload.text,
-        sizeof(payload.text),
-        message,
-        _TRUNCATE);
-    engine_messages().push_back(engine_message);
-}
 
 void GamePresentationCoordinator::queue_app_state_message(Gs1AppState app_state)
 {
@@ -1215,57 +1205,6 @@ void GamePresentationCoordinator::queue_clear_ui_panel_messages(Gs1UiPanelId pan
     queue_close_ui_panel_if_open(panel_id);
 }
 
-void GamePresentationCoordinator::queue_main_menu_ui_messages()
-{
-    Gs1UiAction action {};
-    action.type = GS1_UI_ACTION_START_NEW_CAMPAIGN;
-    action.arg0 = 42ULL;
-    action.arg1 = 30ULL;
-    queue_ui_panel_begin_message(
-        GS1_UI_PANEL_MAIN_MENU,
-        0U,
-        0U,
-        1U,
-        0U,
-        0U);
-    queue_ui_panel_slot_action_message(
-        GS1_UI_PANEL_SLOT_PRIMARY,
-        GS1_UI_PANEL_SLOT_FLAG_PRIMARY,
-        action,
-        10U);
-    queue_ui_panel_end_message();
-}
-
-void GamePresentationCoordinator::queue_site_result_ui_messages(std::uint32_t site_id, Gs1SiteAttemptResult result)
-{
-    queue_ui_setup_begin_message(
-        GS1_UI_SETUP_SITE_RESULT,
-        GS1_UI_SETUP_PRESENTATION_OVERLAY,
-        2U,
-        site_id);
-
-    Gs1UiAction no_action {};
-    queue_ui_element_message(
-        1U,
-        GS1_UI_ELEMENT_LABEL,
-        GS1_UI_ELEMENT_FLAG_NONE,
-        no_action,
-        1U,
-        site_id,
-        static_cast<std::uint32_t>(result));
-
-    Gs1UiAction return_action {};
-    return_action.type = GS1_UI_ACTION_RETURN_TO_REGIONAL_MAP;
-    queue_ui_element_message(
-        2U,
-        GS1_UI_ELEMENT_BUTTON,
-        GS1_UI_ELEMENT_FLAG_PRIMARY,
-        return_action,
-        2U);
-
-    queue_ui_setup_end_message();
-}
-
 void GamePresentationCoordinator::queue_site_protection_selector_ui_messages()
 {
     if (!active_site_run().has_value() || app_state() != GS1_APP_STATE_SITE_ACTIVE)
@@ -1413,7 +1352,7 @@ void GamePresentationCoordinator::queue_site_tile_upsert_message(
                 y,
                 tile.ecology.plant_density,
                 static_cast<unsigned>(projected_state.plant_density_quantized));
-            queue_log_message(log_text, GS1_LOG_LEVEL_DEBUG);
+            queue_log_runtime_message(engine_messages(), log_text, GS1_LOG_LEVEL_DEBUG);
         }
         return;
     }
@@ -1452,7 +1391,7 @@ void GamePresentationCoordinator::queue_site_tile_upsert_message(
             payload.plant_type_id,
             payload.plant_density,
             static_cast<unsigned>(projected_state.plant_density_quantized));
-        queue_log_message(log_text, GS1_LOG_LEVEL_DEBUG);
+        queue_log_runtime_message(engine_messages(), log_text, GS1_LOG_LEVEL_DEBUG);
     }
 
     if (tile_index < site_run.last_projected_tile_states.size())
@@ -2629,18 +2568,10 @@ void GamePresentationCoordinator::queue_site_bootstrap_messages()
     clear_pending_site_inventory_projection_updates();
 }
 
-void GamePresentationCoordinator::queue_site_ready_bootstrap_messages()
+void GamePresentationCoordinator::queue_site_bootstrap_messages(GamePresentationRuntimeContext& context)
 {
-    if (!active_site_run().has_value())
-    {
-        return;
-    }
-
+    active_context_ = &context;
     queue_site_bootstrap_messages();
-    queue_campaign_resources_message();
-    queue_site_action_update_message();
-    queue_hud_state_message();
-    queue_log_message("Started site attempt.");
 }
 
 void GamePresentationCoordinator::queue_site_delta_messages(std::uint64_t dirty_flags)
@@ -2856,146 +2787,61 @@ void GamePresentationCoordinator::queue_hud_state_message()
     engine_messages().push_back(hud_message);
 }
 
-void GamePresentationCoordinator::queue_campaign_resources_message()
-{
-    if (!campaign().has_value())
-    {
-        return;
-    }
-
-    auto message = make_engine_message(GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES);
-    auto& payload = message.emplace_payload<Gs1EngineMessageCampaignResourcesData>();
-    payload.current_money = active_site_run().has_value()
-        ? cash_value_from_cash_points(active_site_run()->economy.current_cash)
-        : 0.0f;
-    payload.total_reputation = campaign()->technology_state.total_reputation;
-    payload.village_reputation = TechnologySystem::faction_reputation(
-        *campaign(),
-        FactionId {k_faction_village_committee});
-    payload.forestry_reputation = TechnologySystem::faction_reputation(
-        *campaign(),
-        FactionId {k_faction_forestry_bureau});
-    payload.university_reputation = TechnologySystem::faction_reputation(
-        *campaign(),
-        FactionId {k_faction_agricultural_university});
-    engine_messages().push_back(message);
-}
-
-void GamePresentationCoordinator::queue_site_result_ready_message(
-    std::uint32_t site_id,
-    Gs1SiteAttemptResult result,
-    std::uint32_t newly_revealed_site_count)
-{
-    auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_RESULT_READY);
-    auto& payload = message.emplace_payload<Gs1EngineMessageSiteResultData>();
-    payload.site_id = site_id;
-    payload.result = result;
-    payload.newly_revealed_site_count = static_cast<std::uint16_t>(newly_revealed_site_count);
-    engine_messages().push_back(message);
-}
-
-void GamePresentationCoordinator::queue_task_reward_claimed_cue_message(
-    std::uint32_t task_instance_id,
-    std::uint32_t task_template_id,
-    std::uint32_t reward_candidate_count)
-{
-    auto message = make_engine_message(GS1_ENGINE_MESSAGE_PLAY_ONE_SHOT_CUE);
-    auto& payload = message.emplace_payload<Gs1EngineMessageOneShotCueData>();
-    payload.subject_id = task_instance_id;
-    payload.world_x = 0.0f;
-    payload.world_y = 0.0f;
-    payload.arg0 = task_template_id;
-    payload.arg1 = reward_candidate_count;
-    payload.cue_kind = GS1_ONE_SHOT_CUE_TASK_REWARD_CLAIMED;
-    engine_messages().push_back(message);
-}
-
-void GamePresentationCoordinator::queue_craft_output_stored_cue_message(
-    std::uint32_t storage_id,
-    std::uint32_t item_id,
-    std::uint32_t quantity)
-{
-    auto message = make_engine_message(GS1_ENGINE_MESSAGE_PLAY_ONE_SHOT_CUE);
-    auto& payload = message.emplace_payload<Gs1EngineMessageOneShotCueData>();
-    payload.subject_id = storage_id;
-    payload.world_x = 0.0f;
-    payload.world_y = 0.0f;
-    payload.arg0 = item_id;
-    payload.arg1 = quantity;
-    payload.cue_kind = GS1_ONE_SHOT_CUE_CRAFT_OUTPUT_STORED;
-    engine_messages().push_back(message);
-}
-
-void GamePresentationCoordinator::queue_campaign_unlock_cue_message(
-    std::uint32_t subject_id,
-    std::uint32_t detail_id,
-    std::uint32_t detail_kind)
-{
-    auto message = make_engine_message(GS1_ENGINE_MESSAGE_PLAY_ONE_SHOT_CUE);
-    auto& payload = message.emplace_payload<Gs1EngineMessageOneShotCueData>();
-    payload.subject_id = subject_id;
-    payload.world_x = 0.0f;
-    payload.world_y = 0.0f;
-    payload.arg0 = detail_id;
-    payload.arg1 = detail_kind;
-    payload.cue_kind = GS1_ONE_SHOT_CUE_CAMPAIGN_UNLOCKED;
-    engine_messages().push_back(message);
-}
-
-void GamePresentationCoordinator::sync_campaign_unlock_presentations()
-{
-    if (!campaign().has_value())
-    {
-        presentation_runtime_state().campaign_unlock_snapshot = {};
-        return;
-    }
-
-    auto unlocked_reputation_unlock_ids = capture_unlocked_reputation_unlock_ids(*campaign());
-    auto unlocked_technology_node_ids = capture_unlocked_technology_node_ids(*campaign());
-    std::sort(unlocked_reputation_unlock_ids.begin(), unlocked_reputation_unlock_ids.end());
-    std::sort(unlocked_technology_node_ids.begin(), unlocked_technology_node_ids.end());
-
-    for (const auto unlock_id : unlocked_reputation_unlock_ids)
-    {
-        if (!sorted_contains(
-                presentation_runtime_state().campaign_unlock_snapshot.unlocked_reputation_unlock_ids,
-                unlock_id))
-        {
-            queue_campaign_unlock_cue_message(
-                unlock_id,
-                unlock_id,
-                CAMPAIGN_UNLOCK_CUE_DETAIL_REPUTATION_UNLOCK);
-        }
-    }
-
-    for (const auto tech_node_id : unlocked_technology_node_ids)
-    {
-        if (!sorted_contains(
-                presentation_runtime_state().campaign_unlock_snapshot.unlocked_technology_node_ids,
-                tech_node_id))
-        {
-            queue_campaign_unlock_cue_message(
-                tech_node_id,
-                tech_node_id,
-                CAMPAIGN_UNLOCK_CUE_DETAIL_TECHNOLOGY_NODE);
-        }
-    }
-
-    presentation_runtime_state().campaign_unlock_snapshot.unlocked_reputation_unlock_ids =
-        std::move(unlocked_reputation_unlock_ids);
-    presentation_runtime_state().campaign_unlock_snapshot.unlocked_technology_node_ids =
-        std::move(unlocked_technology_node_ids);
-}
-
 void GamePresentationCoordinator::mark_site_projection_update_dirty(GamePresentationRuntimeContext& context, std::uint64_t dirty_flags) noexcept
 {
-    site_presentation_mark_projection_dirty(*this, context, dirty_flags);
+    active_context_ = &context;
+    if (!active_site_run().has_value())
+    {
+        return;
+    }
+
+    if ((dirty_flags & SITE_PROJECTION_UPDATE_TILES) != 0U)
+    {
+        active_site_run()->pending_full_tile_projection_update = true;
+    }
+    if ((dirty_flags & SITE_PROJECTION_UPDATE_INVENTORY) != 0U)
+    {
+        active_site_run()->pending_full_inventory_projection_update = true;
+        active_site_run()->pending_inventory_storage_descriptor_projection_update = true;
+        if (active_site_run()->inventory.opened_device_storage_id != 0U)
+        {
+            active_site_run()->pending_opened_inventory_storage_full_projection_update = true;
+        }
+    }
+
+    active_site_run()->pending_projection_update_flags |= dirty_flags;
 }
 
 
 void GamePresentationCoordinator::mark_site_tile_projection_dirty(GamePresentationRuntimeContext& context, TileCoord coord) noexcept
 {
-    site_presentation_mark_tile_dirty(*this, context, coord);
+    active_context_ = &context;
+    if (!active_site_run().has_value())
+    {
+        return;
+    }
+
+    auto& site_run = active_site_run().value();
+    if (!site_world_access::tile_coord_in_bounds(site_run, coord))
+    {
+        return;
+    }
+
+    const auto tile_count = site_world_access::tile_count(site_run);
+    if (site_run.pending_tile_projection_update_mask.size() != tile_count)
+    {
+        site_run.pending_tile_projection_update_mask.assign(tile_count, 0U);
+        site_run.pending_tile_projection_updates.clear();
+    }
+
+    const auto index = site_world_access::tile_index(site_run, coord);
+    if (site_run.pending_tile_projection_update_mask[index] == 0U)
+    {
+        site_run.pending_tile_projection_update_mask[index] = 1U;
+        site_run.pending_tile_projection_updates.push_back(coord);
+    }
+
+    site_run.pending_projection_update_flags |= SITE_PROJECTION_UPDATE_TILES;
 }
 
 
@@ -3061,7 +2907,51 @@ void GamePresentationCoordinator::clear_pending_site_inventory_projection_update
 
 void GamePresentationCoordinator::flush_site_presentation_if_dirty(GamePresentationRuntimeContext& context)
 {
-    site_presentation_flush_if_dirty(*this, context);
+    active_context_ = &context;
+    if (!active_site_run().has_value())
+    {
+        return;
+    }
+
+    const auto dirty_flags = active_site_run()->pending_projection_update_flags;
+    if (dirty_flags == 0U)
+    {
+        return;
+    }
+
+    if ((dirty_flags & (SITE_PROJECTION_UPDATE_PHONE |
+            SITE_PROJECTION_UPDATE_TASKS |
+            SITE_PROJECTION_UPDATE_INVENTORY)) != 0U)
+    {
+        RuntimeInvocation invocation {
+            app_state(),
+            campaign(),
+            active_site_run(),
+            engine_messages(),
+            message_queue(),
+            fixed_step_seconds()};
+        PhonePanelSystem system {};
+        system.run(invocation);
+    }
+
+    const auto projected_dirty_flags = active_site_run()->pending_projection_update_flags;
+    if (projected_dirty_flags == 0U)
+    {
+        return;
+    }
+
+    queue_site_delta_messages(projected_dirty_flags);
+
+    if ((projected_dirty_flags & (SITE_PROJECTION_UPDATE_HUD |
+            SITE_PROJECTION_UPDATE_WORKER |
+            SITE_PROJECTION_UPDATE_WEATHER)) != 0U)
+    {
+        queue_hud_state_message();
+    }
+
+    active_site_run()->pending_projection_update_flags = 0U;
+    clear_pending_site_tile_projection_updates();
+    clear_pending_site_inventory_projection_updates();
 }
 
 }  // namespace gs1
