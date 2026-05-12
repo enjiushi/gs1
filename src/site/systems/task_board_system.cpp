@@ -2684,48 +2684,6 @@ bool TaskBoardSystem::subscribes_to_host_message(Gs1HostMessageType type) noexce
     return type == GS1_HOST_EVENT_UI_ACTION;
 }
 
-Gs1Status process_host_message_impl(
-    TaskBoardContext& context,
-    const Gs1HostMessage& message)
-{
-    if (message.type != GS1_HOST_EVENT_UI_ACTION)
-    {
-        return GS1_STATUS_OK;
-    }
-
-    const auto& action = message.payload.ui_action.action;
-    if (action.type == GS1_UI_ACTION_ACCEPT_TASK)
-    {
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-
-        handle_task_accept_requested(
-            context,
-            TaskAcceptRequestedMessage {action.target_id});
-        return GS1_STATUS_OK;
-    }
-
-    if (action.type == GS1_UI_ACTION_CLAIM_TASK_REWARD)
-    {
-        if (action.target_id == 0U ||
-            action.arg0 > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()))
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-
-        handle_task_reward_claim_requested(
-            context,
-            TaskRewardClaimRequestedMessage {
-                action.target_id,
-                static_cast<std::uint32_t>(action.arg0)});
-        return GS1_STATUS_OK;
-    }
-
-    return GS1_STATUS_OK;
-}
-
 bool TaskBoardSystem::subscribes_to(GameMessageType type) noexcept
 {
     switch (type)
@@ -2757,10 +2715,53 @@ bool TaskBoardSystem::subscribes_to(GameMessageType type) noexcept
     }
 }
 
-Gs1Status process_game_message_impl(
-    TaskBoardContext& context,
+const char* TaskBoardSystem::name() const noexcept
+{
+    return "TaskBoardSystem";
+}
+
+GameMessageSubscriptionSpan TaskBoardSystem::subscribed_game_messages() const noexcept
+{
+    return runtime_subscription_list<GameMessageType, k_game_message_type_count, &TaskBoardSystem::subscribes_to>();
+}
+
+HostMessageSubscriptionSpan TaskBoardSystem::subscribed_host_messages() const noexcept
+{
+    return runtime_subscription_list<
+        Gs1HostMessageType,
+        k_runtime_host_message_type_count,
+        &TaskBoardSystem::subscribes_to_host_message>();
+}
+
+std::optional<Gs1RuntimeProfileSystemId> TaskBoardSystem::profile_system_id() const noexcept
+{
+    return GS1_RUNTIME_PROFILE_SYSTEM_TASK_BOARD;
+}
+
+std::optional<std::uint32_t> TaskBoardSystem::fixed_step_order() const noexcept
+{
+    return 16U;
+}
+
+Gs1Status TaskBoardSystem::process_game_message(
+    RuntimeInvocation& invocation,
     const GameMessage& message)
 {
+    auto access = make_game_state_access<TaskBoardSystem>(invocation);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    TaskBoardContext context {
+        *campaign,
+        *site_run,
+        SiteWorldAccess<TaskBoardSystem> {*site_run},
+        invocation.game_message_queue(),
+        fixed_step_seconds};
     switch (message.type)
     {
     case GameMessageType::SiteRunStarted:
@@ -2860,8 +2861,80 @@ Gs1Status process_game_message_impl(
     return GS1_STATUS_OK;
 }
 
-void run_impl(TaskBoardContext& context)
+Gs1Status TaskBoardSystem::process_host_message(
+    RuntimeInvocation& invocation,
+    const Gs1HostMessage& message)
 {
+    auto access = make_game_state_access<TaskBoardSystem>(invocation);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    TaskBoardContext context {
+        *campaign,
+        *site_run,
+        SiteWorldAccess<TaskBoardSystem> {*site_run},
+        invocation.game_message_queue(),
+        fixed_step_seconds};
+    if (message.type != GS1_HOST_EVENT_UI_ACTION)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    const auto& action = message.payload.ui_action.action;
+    if (action.type == GS1_UI_ACTION_ACCEPT_TASK)
+    {
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+
+        handle_task_accept_requested(
+            context,
+            TaskAcceptRequestedMessage {action.target_id});
+        return GS1_STATUS_OK;
+    }
+
+    if (action.type == GS1_UI_ACTION_CLAIM_TASK_REWARD)
+    {
+        if (action.target_id == 0U ||
+            action.arg0 > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()))
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+
+        handle_task_reward_claim_requested(
+            context,
+            TaskRewardClaimRequestedMessage {
+                action.target_id,
+                static_cast<std::uint32_t>(action.arg0)});
+        return GS1_STATUS_OK;
+    }
+
+    return GS1_STATUS_OK;
+}
+
+void TaskBoardSystem::run(RuntimeInvocation& invocation)
+{
+    auto access = make_game_state_access<TaskBoardSystem>(invocation);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return;
+    }
+
+    TaskBoardContext context {
+        *campaign,
+        *site_run,
+        SiteWorldAccess<TaskBoardSystem> {*site_run},
+        invocation.game_message_queue(),
+        fixed_step_seconds};
     auto& board = context.world.own_task_board();
     if (onboarding_chain_effective(context.site_run.site_id, board))
     {
@@ -2883,98 +2956,6 @@ void run_impl(TaskBoardContext& context)
     {
         mark_task_projection_dirty(context);
     }
-}
-
-const char* TaskBoardSystem::name() const noexcept
-{
-    return "TaskBoardSystem";
-}
-
-GameMessageSubscriptionSpan TaskBoardSystem::subscribed_game_messages() const noexcept
-{
-    return runtime_subscription_list<GameMessageType, k_game_message_type_count, &TaskBoardSystem::subscribes_to>();
-}
-
-HostMessageSubscriptionSpan TaskBoardSystem::subscribed_host_messages() const noexcept
-{
-    return runtime_subscription_list<
-        Gs1HostMessageType,
-        k_runtime_host_message_type_count,
-        &TaskBoardSystem::subscribes_to_host_message>();
-}
-
-std::optional<Gs1RuntimeProfileSystemId> TaskBoardSystem::profile_system_id() const noexcept
-{
-    return GS1_RUNTIME_PROFILE_SYSTEM_TASK_BOARD;
-}
-
-std::optional<std::uint32_t> TaskBoardSystem::fixed_step_order() const noexcept
-{
-    return 16U;
-}
-
-Gs1Status TaskBoardSystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    auto access = make_game_state_access<TaskBoardSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
-    if (!campaign.has_value() || !site_run.has_value())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
-    TaskBoardContext context {
-        *campaign,
-        *site_run,
-        SiteWorldAccess<TaskBoardSystem> {*site_run},
-        invocation.game_message_queue(),
-        fixed_step_seconds};
-    return process_game_message_impl(context, message);
-}
-
-Gs1Status TaskBoardSystem::process_host_message(
-    RuntimeInvocation& invocation,
-    const Gs1HostMessage& message)
-{
-    auto access = make_game_state_access<TaskBoardSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
-    if (!campaign.has_value() || !site_run.has_value())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
-    TaskBoardContext context {
-        *campaign,
-        *site_run,
-        SiteWorldAccess<TaskBoardSystem> {*site_run},
-        invocation.game_message_queue(),
-        fixed_step_seconds};
-    return process_host_message_impl(context, message);
-}
-
-void TaskBoardSystem::run(RuntimeInvocation& invocation)
-{
-    auto access = make_game_state_access<TaskBoardSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
-    if (!campaign.has_value() || !site_run.has_value())
-    {
-        return;
-    }
-
-    TaskBoardContext context {
-        *campaign,
-        *site_run,
-        SiteWorldAccess<TaskBoardSystem> {*site_run},
-        invocation.game_message_queue(),
-        fixed_step_seconds};
-    run_impl(context);
 }
 }  // namespace gs1
 

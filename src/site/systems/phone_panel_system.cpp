@@ -452,10 +452,6 @@ void sync_phone_panel_projection(
 }
 }  // namespace
 
-Gs1Status process_game_message_impl(
-    PhonePanelContext& context,
-    const GameMessage& message);
-
 bool PhonePanelSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
 {
     return type == GS1_HOST_EVENT_UI_ACTION;
@@ -474,10 +470,48 @@ bool PhonePanelSystem::subscribes_to(GameMessageType type) noexcept
     }
 }
 
-Gs1Status process_game_message_impl(
-    PhonePanelContext& context,
+const char* PhonePanelSystem::name() const noexcept
+{
+    return "PhonePanelSystem";
+}
+
+GameMessageSubscriptionSpan PhonePanelSystem::subscribed_game_messages() const noexcept
+{
+    return runtime_subscription_list<GameMessageType, k_game_message_type_count, &PhonePanelSystem::subscribes_to>();
+}
+
+HostMessageSubscriptionSpan PhonePanelSystem::subscribed_host_messages() const noexcept
+{
+    return runtime_subscription_list<
+        Gs1HostMessageType,
+        k_runtime_host_message_type_count,
+        &PhonePanelSystem::subscribes_to_host_message>();
+}
+
+std::optional<Gs1RuntimeProfileSystemId> PhonePanelSystem::profile_system_id() const noexcept
+{
+    return GS1_RUNTIME_PROFILE_SYSTEM_PHONE_PANEL;
+}
+
+std::optional<std::uint32_t> PhonePanelSystem::fixed_step_order() const noexcept
+{
+    return 18U;
+}
+
+Gs1Status PhonePanelSystem::process_game_message(
+    RuntimeInvocation& invocation,
     const GameMessage& message)
 {
+    auto access = make_game_state_access<PhonePanelSystem>(invocation);
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    PhonePanelContext context {
+        *site_run,
+        SiteWorldAccess<PhonePanelSystem> {*site_run}};
     switch (message.type)
     {
     case GameMessageType::SiteRunStarted:
@@ -548,56 +582,6 @@ Gs1Status process_game_message_impl(
     default:
         return GS1_STATUS_OK;
     }
-}
-
-void run_impl(PhonePanelContext& context)
-{
-    sync_phone_panel_projection(context);
-}
-
-const char* PhonePanelSystem::name() const noexcept
-{
-    return "PhonePanelSystem";
-}
-
-GameMessageSubscriptionSpan PhonePanelSystem::subscribed_game_messages() const noexcept
-{
-    return runtime_subscription_list<GameMessageType, k_game_message_type_count, &PhonePanelSystem::subscribes_to>();
-}
-
-HostMessageSubscriptionSpan PhonePanelSystem::subscribed_host_messages() const noexcept
-{
-    return runtime_subscription_list<
-        Gs1HostMessageType,
-        k_runtime_host_message_type_count,
-        &PhonePanelSystem::subscribes_to_host_message>();
-}
-
-std::optional<Gs1RuntimeProfileSystemId> PhonePanelSystem::profile_system_id() const noexcept
-{
-    return GS1_RUNTIME_PROFILE_SYSTEM_PHONE_PANEL;
-}
-
-std::optional<std::uint32_t> PhonePanelSystem::fixed_step_order() const noexcept
-{
-    return 18U;
-}
-
-Gs1Status PhonePanelSystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    auto access = make_game_state_access<PhonePanelSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
-    PhonePanelContext context {
-        *site_run,
-        SiteWorldAccess<PhonePanelSystem> {*site_run}};
-    return process_game_message_impl(context, message);
 }
 
 Gs1Status PhonePanelSystem::process_host_message(
@@ -702,7 +686,7 @@ void PhonePanelSystem::run(RuntimeInvocation& invocation)
     PhonePanelContext context {
         *site_run,
         SiteWorldAccess<PhonePanelSystem> {*site_run}};
-    run_impl(context);
+    sync_phone_panel_projection(context);
 }
 }  // namespace gs1
 

@@ -2532,10 +2532,6 @@ SiteActionFailureReason validate_excavation_completion(
 
 }  // namespace
 
-Gs1Status process_game_message_impl(
-    ActionExecutionContext& context,
-    const GameMessage& message);
-
 Gs1Status handle_start_site_action(
     ActionExecutionContext& context,
     const StartSiteActionMessage& payload);
@@ -2555,60 +2551,6 @@ bool ActionExecutionSystem::subscribes_to_host_message(Gs1HostMessageType type) 
         type == GS1_HOST_EVENT_SITE_CONTEXT_REQUEST;
 }
 
-Gs1Status process_host_message_impl(
-    ActionExecutionContext& context,
-    const Gs1HostMessage& message)
-{
-    switch (message.type)
-    {
-    case GS1_HOST_EVENT_SITE_ACTION_REQUEST:
-        if (message.payload.site_action_request.action_kind == GS1_SITE_ACTION_NONE)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        return handle_start_site_action(
-            context,
-            StartSiteActionMessage {
-            message.payload.site_action_request.action_kind,
-            message.payload.site_action_request.flags,
-            message.payload.site_action_request.quantity == 0U ? 1U : message.payload.site_action_request.quantity,
-            message.payload.site_action_request.target_tile_x,
-            message.payload.site_action_request.target_tile_y,
-            message.payload.site_action_request.primary_subject_id,
-            message.payload.site_action_request.secondary_subject_id,
-            message.payload.site_action_request.item_id});
-
-    case GS1_HOST_EVENT_SITE_ACTION_CANCEL:
-        if (message.payload.site_action_cancel.action_id == 0U &&
-            (message.payload.site_action_cancel.flags &
-                (GS1_SITE_ACTION_CANCEL_FLAG_CURRENT_ACTION |
-                    GS1_SITE_ACTION_CANCEL_FLAG_PLACEMENT_MODE)) == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        return handle_cancel_site_action(
-            context,
-            CancelSiteActionMessage {
-            message.payload.site_action_cancel.action_id,
-            message.payload.site_action_cancel.flags});
-
-    case GS1_HOST_EVENT_SITE_CONTEXT_REQUEST:
-        if (!context.site_run.site_action.placement_mode.active)
-        {
-            return GS1_STATUS_OK;
-        }
-        return handle_placement_mode_cursor_moved(
-            context,
-            PlacementModeCursorMovedMessage {
-            message.payload.site_context_request.tile_x,
-            message.payload.site_context_request.tile_y,
-            message.payload.site_context_request.flags});
-
-    default:
-        return GS1_STATUS_OK;
-    }
-}
-
 bool ActionExecutionSystem::subscribes_to(GameMessageType type) noexcept
 {
     switch (type)
@@ -2621,89 +2563,6 @@ bool ActionExecutionSystem::subscribes_to(GameMessageType type) noexcept
         return true;
     default:
         return false;
-    }
-}
-
-Gs1Status process_game_message_impl(
-    ActionExecutionContext& context,
-    const GameMessage& message)
-{
-    auto& action_state = context.world.own_action();
-    const auto& payload_type = message.type;
-    switch (payload_type)
-    {
-    case GameMessageType::StartSiteAction:
-        return handle_start_site_action(
-            context,
-            message.payload_as<StartSiteActionMessage>());
-
-    case GameMessageType::CancelSiteAction:
-        return handle_cancel_site_action(
-            context,
-            message.payload_as<CancelSiteActionMessage>());
-
-    case GameMessageType::PlacementModeCursorMoved:
-        return handle_placement_mode_cursor_moved(
-            context,
-            message.payload_as<PlacementModeCursorMovedMessage>());
-
-    case GameMessageType::PlacementReservationAccepted:
-    {
-        if (!is_action_waiting_for_placement(action_state))
-        {
-            return GS1_STATUS_OK;
-        }
-
-        const auto& payload = message.payload_as<PlacementReservationAcceptedMessage>();
-        if (payload.action_id != action_id_value(action_state))
-        {
-            return GS1_STATUS_OK;
-        }
-
-        action_state.awaiting_placement_reservation = false;
-        action_state.placement_reservation_token = payload.reservation_token;
-        if (!action_requires_worker_approach(action_state.action_kind) ||
-            worker_is_at_action_approach_tile(context, action_state))
-        {
-            begin_action_execution(context, action_state);
-        }
-        else
-        {
-            context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WORKER);
-        }
-        return GS1_STATUS_OK;
-    }
-
-    case GameMessageType::PlacementReservationRejected:
-    {
-        if (!is_action_waiting_for_placement(action_state))
-        {
-            return GS1_STATUS_OK;
-        }
-
-        const auto& payload = message.payload_as<PlacementReservationRejectedMessage>();
-        if (payload.action_id != action_id_value(action_state))
-        {
-            return GS1_STATUS_OK;
-        }
-
-        emit_site_action_failed(
-            context.message_queue,
-            action_id_value(action_state),
-            action_state.action_kind,
-            SiteActionFailureReason::InvalidTarget,
-            action_state.request_flags,
-            action_target_tile(action_state),
-            action_state.primary_subject_id,
-            action_state.secondary_subject_id);
-        clear_action_state(action_state);
-        context.world.mark_projection_dirty(
-            SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
-        return GS1_STATUS_OK;
-    }
-
-    default:
-        return GS1_STATUS_OK;
     }
 }
 
@@ -3233,8 +3092,241 @@ Gs1Status handle_placement_mode_cursor_moved(
         return GS1_STATUS_OK;
 }
 
-void run_impl(ActionExecutionContext& context)
+const char* ActionExecutionSystem::name() const noexcept
 {
+    return "ActionExecutionSystem";
+}
+
+GameMessageSubscriptionSpan ActionExecutionSystem::subscribed_game_messages() const noexcept
+{
+    return runtime_subscription_list<
+        GameMessageType,
+        k_game_message_type_count,
+        &ActionExecutionSystem::subscribes_to>();
+}
+
+HostMessageSubscriptionSpan ActionExecutionSystem::subscribed_host_messages() const noexcept
+{
+    return runtime_subscription_list<
+        Gs1HostMessageType,
+        k_runtime_host_message_type_count,
+        &ActionExecutionSystem::subscribes_to_host_message>();
+}
+
+std::optional<Gs1RuntimeProfileSystemId> ActionExecutionSystem::profile_system_id() const noexcept
+{
+    return GS1_RUNTIME_PROFILE_SYSTEM_ACTION_EXECUTION;
+}
+
+std::optional<std::uint32_t> ActionExecutionSystem::fixed_step_order() const noexcept
+{
+    return 5U;
+}
+
+Gs1Status ActionExecutionSystem::process_game_message(
+    RuntimeInvocation& invocation,
+    const GameMessage& message)
+{
+    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    const auto move_direction = access.template read<RuntimeMoveDirectionTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    ActionExecutionContext context {
+        *campaign,
+        *site_run,
+        SiteWorldAccess<ActionExecutionSystem> {*site_run},
+        invocation.game_message_queue(),
+        fixed_step_seconds,
+        SiteMoveDirectionInput {
+            move_direction.world_move_x,
+            move_direction.world_move_y,
+            move_direction.world_move_z,
+            move_direction.present}};
+    auto& action_state = context.world.own_action();
+    const auto& payload_type = message.type;
+    switch (payload_type)
+    {
+    case GameMessageType::StartSiteAction:
+        return handle_start_site_action(
+            context,
+            message.payload_as<StartSiteActionMessage>());
+
+    case GameMessageType::CancelSiteAction:
+        return handle_cancel_site_action(
+            context,
+            message.payload_as<CancelSiteActionMessage>());
+
+    case GameMessageType::PlacementModeCursorMoved:
+        return handle_placement_mode_cursor_moved(
+            context,
+            message.payload_as<PlacementModeCursorMovedMessage>());
+
+    case GameMessageType::PlacementReservationAccepted:
+    {
+        if (!is_action_waiting_for_placement(action_state))
+        {
+            return GS1_STATUS_OK;
+        }
+
+        const auto& payload = message.payload_as<PlacementReservationAcceptedMessage>();
+        if (payload.action_id != action_id_value(action_state))
+        {
+            return GS1_STATUS_OK;
+        }
+
+        action_state.awaiting_placement_reservation = false;
+        action_state.placement_reservation_token = payload.reservation_token;
+        if (!action_requires_worker_approach(action_state.action_kind) ||
+            worker_is_at_action_approach_tile(context, action_state))
+        {
+            begin_action_execution(context, action_state);
+        }
+        else
+        {
+            context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WORKER);
+        }
+        return GS1_STATUS_OK;
+    }
+
+    case GameMessageType::PlacementReservationRejected:
+    {
+        if (!is_action_waiting_for_placement(action_state))
+        {
+            return GS1_STATUS_OK;
+        }
+
+        const auto& payload = message.payload_as<PlacementReservationRejectedMessage>();
+        if (payload.action_id != action_id_value(action_state))
+        {
+            return GS1_STATUS_OK;
+        }
+
+        emit_site_action_failed(
+            context.message_queue,
+            action_id_value(action_state),
+            action_state.action_kind,
+            SiteActionFailureReason::InvalidTarget,
+            action_state.request_flags,
+            action_target_tile(action_state),
+            action_state.primary_subject_id,
+            action_state.secondary_subject_id);
+        clear_action_state(action_state);
+        context.world.mark_projection_dirty(
+            SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
+        return GS1_STATUS_OK;
+    }
+
+    default:
+        return GS1_STATUS_OK;
+    }
+}
+
+Gs1Status ActionExecutionSystem::process_host_message(
+    RuntimeInvocation& invocation,
+    const Gs1HostMessage& message)
+{
+    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    const auto move_direction = access.template read<RuntimeMoveDirectionTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    ActionExecutionContext context {
+        *campaign,
+        *site_run,
+        SiteWorldAccess<ActionExecutionSystem> {*site_run},
+        invocation.game_message_queue(),
+        fixed_step_seconds,
+        SiteMoveDirectionInput {
+            move_direction.world_move_x,
+            move_direction.world_move_y,
+            move_direction.world_move_z,
+            move_direction.present}};
+    switch (message.type)
+    {
+    case GS1_HOST_EVENT_SITE_ACTION_REQUEST:
+        if (message.payload.site_action_request.action_kind == GS1_SITE_ACTION_NONE)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        return handle_start_site_action(
+            context,
+            StartSiteActionMessage {
+                message.payload.site_action_request.action_kind,
+                message.payload.site_action_request.flags,
+                message.payload.site_action_request.quantity == 0U
+                    ? 1U
+                    : message.payload.site_action_request.quantity,
+                message.payload.site_action_request.target_tile_x,
+                message.payload.site_action_request.target_tile_y,
+                message.payload.site_action_request.primary_subject_id,
+                message.payload.site_action_request.secondary_subject_id,
+                message.payload.site_action_request.item_id});
+
+    case GS1_HOST_EVENT_SITE_ACTION_CANCEL:
+        if (message.payload.site_action_cancel.action_id == 0U &&
+            (message.payload.site_action_cancel.flags &
+                (GS1_SITE_ACTION_CANCEL_FLAG_CURRENT_ACTION |
+                    GS1_SITE_ACTION_CANCEL_FLAG_PLACEMENT_MODE)) == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        return handle_cancel_site_action(
+            context,
+            CancelSiteActionMessage {
+                message.payload.site_action_cancel.action_id,
+                message.payload.site_action_cancel.flags});
+
+    case GS1_HOST_EVENT_SITE_CONTEXT_REQUEST:
+        if (!context.site_run.site_action.placement_mode.active)
+        {
+            return GS1_STATUS_OK;
+        }
+        return handle_placement_mode_cursor_moved(
+            context,
+            PlacementModeCursorMovedMessage {
+                message.payload.site_context_request.tile_x,
+                message.payload.site_context_request.tile_y,
+                message.payload.site_context_request.flags});
+
+    default:
+        return GS1_STATUS_OK;
+    }
+}
+
+void ActionExecutionSystem::run(RuntimeInvocation& invocation)
+{
+    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    const auto move_direction = access.template read<RuntimeMoveDirectionTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return;
+    }
+
+    ActionExecutionContext context {
+        *campaign,
+        *site_run,
+        SiteWorldAccess<ActionExecutionSystem> {*site_run},
+        invocation.game_message_queue(),
+        fixed_step_seconds,
+        SiteMoveDirectionInput {
+            move_direction.world_move_x,
+            move_direction.world_move_y,
+            move_direction.world_move_z,
+            move_direction.present}};
     auto& action_state = context.world.own_action();
     if (is_action_waiting_for_worker_approach(action_state) &&
         worker_is_at_action_approach_tile(context, action_state))
@@ -3395,119 +3487,6 @@ void run_impl(ActionExecutionContext& context)
         dirty_flags |= SITE_PROJECTION_UPDATE_PLACEMENT_PREVIEW;
     }
     context.world.mark_projection_dirty(dirty_flags);
-}
-
-const char* ActionExecutionSystem::name() const noexcept
-{
-    return "ActionExecutionSystem";
-}
-
-GameMessageSubscriptionSpan ActionExecutionSystem::subscribed_game_messages() const noexcept
-{
-    return runtime_subscription_list<
-        GameMessageType,
-        k_game_message_type_count,
-        &ActionExecutionSystem::subscribes_to>();
-}
-
-HostMessageSubscriptionSpan ActionExecutionSystem::subscribed_host_messages() const noexcept
-{
-    return runtime_subscription_list<
-        Gs1HostMessageType,
-        k_runtime_host_message_type_count,
-        &ActionExecutionSystem::subscribes_to_host_message>();
-}
-
-std::optional<Gs1RuntimeProfileSystemId> ActionExecutionSystem::profile_system_id() const noexcept
-{
-    return GS1_RUNTIME_PROFILE_SYSTEM_ACTION_EXECUTION;
-}
-
-std::optional<std::uint32_t> ActionExecutionSystem::fixed_step_order() const noexcept
-{
-    return 5U;
-}
-
-Gs1Status ActionExecutionSystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
-    const auto move_direction = access.template read<RuntimeMoveDirectionTag>();
-    if (!campaign.has_value() || !site_run.has_value())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
-    ActionExecutionContext context {
-        *campaign,
-        *site_run,
-        SiteWorldAccess<ActionExecutionSystem> {*site_run},
-        invocation.game_message_queue(),
-        fixed_step_seconds,
-        SiteMoveDirectionInput {
-            move_direction.world_move_x,
-            move_direction.world_move_y,
-            move_direction.world_move_z,
-            move_direction.present}};
-    return process_game_message_impl(context, message);
-}
-
-Gs1Status ActionExecutionSystem::process_host_message(
-    RuntimeInvocation& invocation,
-    const Gs1HostMessage& message)
-{
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
-    const auto move_direction = access.template read<RuntimeMoveDirectionTag>();
-    if (!campaign.has_value() || !site_run.has_value())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
-    ActionExecutionContext context {
-        *campaign,
-        *site_run,
-        SiteWorldAccess<ActionExecutionSystem> {*site_run},
-        invocation.game_message_queue(),
-        fixed_step_seconds,
-        SiteMoveDirectionInput {
-            move_direction.world_move_x,
-            move_direction.world_move_y,
-            move_direction.world_move_z,
-            move_direction.present}};
-    return process_host_message_impl(context, message);
-}
-
-void ActionExecutionSystem::run(RuntimeInvocation& invocation)
-{
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
-    const auto move_direction = access.template read<RuntimeMoveDirectionTag>();
-    if (!campaign.has_value() || !site_run.has_value())
-    {
-        return;
-    }
-
-    ActionExecutionContext context {
-        *campaign,
-        *site_run,
-        SiteWorldAccess<ActionExecutionSystem> {*site_run},
-        invocation.game_message_queue(),
-        fixed_step_seconds,
-        SiteMoveDirectionInput {
-            move_direction.world_move_x,
-            move_direction.world_move_y,
-            move_direction.world_move_z,
-            move_direction.present}};
-    run_impl(context);
 }
 }  // namespace gs1
 

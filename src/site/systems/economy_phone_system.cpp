@@ -1019,133 +1019,9 @@ void seed_site_economy(EconomyPhoneContext& context, std::uint32_t site_id)
 }
 }  // namespace
 
-Gs1Status process_game_message_impl(
-    EconomyPhoneContext& context,
-    const GameMessage& message);
-
 bool EconomyPhoneSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
 {
     return type == GS1_HOST_EVENT_UI_ACTION;
-}
-
-Gs1Status process_host_message_impl(
-    EconomyPhoneContext& context,
-    const Gs1HostMessage& message)
-{
-    if (message.type != GS1_HOST_EVENT_UI_ACTION)
-    {
-        return GS1_STATUS_OK;
-    }
-
-    const auto& action = message.payload.ui_action.action;
-    switch (action.type)
-    {
-    case GS1_UI_ACTION_BUY_PHONE_LISTING:
-    {
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        auto* listing = find_listing(context.world.own_economy(), action.target_id);
-        if (listing == nullptr)
-        {
-            return GS1_STATUS_NOT_FOUND;
-        }
-        return process_buy_listing(
-            context,
-            *listing,
-            normalize_quantity(static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0)));
-    }
-
-    case GS1_UI_ACTION_ADD_PHONE_LISTING_TO_CART:
-    {
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        auto* listing = find_listing(context.world.own_economy(), action.target_id);
-        if (listing == nullptr)
-        {
-            return GS1_STATUS_NOT_FOUND;
-        }
-        return process_cart_add(
-            context,
-            *listing,
-            normalize_quantity(static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0)));
-    }
-
-    case GS1_UI_ACTION_REMOVE_PHONE_LISTING_FROM_CART:
-    {
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        auto* listing = find_listing(context.world.own_economy(), action.target_id);
-        if (listing == nullptr)
-        {
-            return GS1_STATUS_NOT_FOUND;
-        }
-        return process_cart_remove(
-            context,
-            *listing,
-            normalize_quantity(static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0)));
-    }
-
-    case GS1_UI_ACTION_CHECKOUT_PHONE_CART:
-        return process_cart_checkout(context);
-
-    case GS1_UI_ACTION_SELL_PHONE_LISTING:
-    {
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        auto* listing = find_listing(context.world.own_economy(), action.target_id);
-        if (listing == nullptr)
-        {
-            listing = find_sell_listing_for_item(
-                context.world.own_economy(),
-                action.target_id);
-            if (listing == nullptr)
-            {
-                refresh_dynamic_sell_listings(context, true);
-                return GS1_STATUS_OK;
-            }
-        }
-        return process_sell_listing(
-            context,
-            *listing,
-            normalize_quantity(static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0)));
-    }
-
-    case GS1_UI_ACTION_HIRE_CONTRACTOR:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        return process_contractor_hire(
-            context,
-            ContractorHireRequestedMessage {
-                action.target_id,
-                static_cast<std::uint32_t>(action.arg0)});
-
-    case GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        {
-            const auto* listing = find_unlockable_listing(context.world.own_economy(), action.target_id);
-            if (listing == nullptr)
-            {
-                return GS1_STATUS_NOT_FOUND;
-            }
-            return process_unlockable_purchase(context, action.target_id, listing->price);
-        }
-
-    default:
-        return GS1_STATUS_OK;
-    }
 }
 
 bool EconomyPhoneSystem::subscribes_to(GameMessageType type) noexcept
@@ -1169,10 +1045,59 @@ bool EconomyPhoneSystem::subscribes_to(GameMessageType type) noexcept
     }
 }
 
-Gs1Status process_game_message_impl(
-    EconomyPhoneContext& context,
+const char* EconomyPhoneSystem::name() const noexcept
+{
+    return "EconomyPhoneSystem";
+}
+
+GameMessageSubscriptionSpan EconomyPhoneSystem::subscribed_game_messages() const noexcept
+{
+    return runtime_subscription_list<GameMessageType, k_game_message_type_count, &EconomyPhoneSystem::subscribes_to>();
+}
+
+HostMessageSubscriptionSpan EconomyPhoneSystem::subscribed_host_messages() const noexcept
+{
+    return runtime_subscription_list<
+        Gs1HostMessageType,
+        k_runtime_host_message_type_count,
+        &EconomyPhoneSystem::subscribes_to_host_message>();
+}
+
+std::optional<Gs1RuntimeProfileSystemId> EconomyPhoneSystem::profile_system_id() const noexcept
+{
+    return GS1_RUNTIME_PROFILE_SYSTEM_ECONOMY_PHONE;
+}
+
+std::optional<std::uint32_t> EconomyPhoneSystem::fixed_step_order() const noexcept
+{
+    return 17U;
+}
+
+Gs1Status EconomyPhoneSystem::process_game_message(
+    RuntimeInvocation& invocation,
     const GameMessage& message)
 {
+    auto access = make_game_state_access<EconomyPhoneSystem>(invocation);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    const auto move_direction = access.template read<RuntimeMoveDirectionTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    EconomyPhoneContext context {
+        *campaign,
+        *site_run,
+        SiteWorldAccess<EconomyPhoneSystem> {*site_run},
+        invocation.game_message_queue(),
+        fixed_step_seconds,
+        SiteMoveDirectionInput {
+            move_direction.world_move_x,
+            move_direction.world_move_y,
+            move_direction.world_move_z,
+            move_direction.present}};
     switch (message.type)
     {
     case GameMessageType::SiteRunStarted:
@@ -1303,67 +1228,6 @@ Gs1Status process_game_message_impl(
     }
 }
 
-void run_impl(EconomyPhoneContext& context)
-{
-    refresh_dynamic_sell_listings(context);
-}
-
-const char* EconomyPhoneSystem::name() const noexcept
-{
-    return "EconomyPhoneSystem";
-}
-
-GameMessageSubscriptionSpan EconomyPhoneSystem::subscribed_game_messages() const noexcept
-{
-    return runtime_subscription_list<GameMessageType, k_game_message_type_count, &EconomyPhoneSystem::subscribes_to>();
-}
-
-HostMessageSubscriptionSpan EconomyPhoneSystem::subscribed_host_messages() const noexcept
-{
-    return runtime_subscription_list<
-        Gs1HostMessageType,
-        k_runtime_host_message_type_count,
-        &EconomyPhoneSystem::subscribes_to_host_message>();
-}
-
-std::optional<Gs1RuntimeProfileSystemId> EconomyPhoneSystem::profile_system_id() const noexcept
-{
-    return GS1_RUNTIME_PROFILE_SYSTEM_ECONOMY_PHONE;
-}
-
-std::optional<std::uint32_t> EconomyPhoneSystem::fixed_step_order() const noexcept
-{
-    return 17U;
-}
-
-Gs1Status EconomyPhoneSystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    auto access = make_game_state_access<EconomyPhoneSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
-    const auto move_direction = access.template read<RuntimeMoveDirectionTag>();
-    if (!campaign.has_value() || !site_run.has_value())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
-    EconomyPhoneContext context {
-        *campaign,
-        *site_run,
-        SiteWorldAccess<EconomyPhoneSystem> {*site_run},
-        invocation.game_message_queue(),
-        fixed_step_seconds,
-        SiteMoveDirectionInput {
-            move_direction.world_move_x,
-            move_direction.world_move_y,
-            move_direction.world_move_z,
-            move_direction.present}};
-    return process_game_message_impl(context, message);
-}
-
 Gs1Status EconomyPhoneSystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
@@ -1389,7 +1253,120 @@ Gs1Status EconomyPhoneSystem::process_host_message(
             move_direction.world_move_y,
             move_direction.world_move_z,
             move_direction.present}};
-    return process_host_message_impl(context, message);
+    if (message.type != GS1_HOST_EVENT_UI_ACTION)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    const auto& action = message.payload.ui_action.action;
+    switch (action.type)
+    {
+    case GS1_UI_ACTION_BUY_PHONE_LISTING:
+    {
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        auto* listing = find_listing(context.world.own_economy(), action.target_id);
+        if (listing == nullptr)
+        {
+            return GS1_STATUS_NOT_FOUND;
+        }
+        return process_buy_listing(
+            context,
+            *listing,
+            normalize_quantity(static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0)));
+    }
+
+    case GS1_UI_ACTION_ADD_PHONE_LISTING_TO_CART:
+    {
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        auto* listing = find_listing(context.world.own_economy(), action.target_id);
+        if (listing == nullptr)
+        {
+            return GS1_STATUS_NOT_FOUND;
+        }
+        return process_cart_add(
+            context,
+            *listing,
+            normalize_quantity(static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0)));
+    }
+
+    case GS1_UI_ACTION_REMOVE_PHONE_LISTING_FROM_CART:
+    {
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        auto* listing = find_listing(context.world.own_economy(), action.target_id);
+        if (listing == nullptr)
+        {
+            return GS1_STATUS_NOT_FOUND;
+        }
+        return process_cart_remove(
+            context,
+            *listing,
+            normalize_quantity(static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0)));
+    }
+
+    case GS1_UI_ACTION_CHECKOUT_PHONE_CART:
+        return process_cart_checkout(context);
+
+    case GS1_UI_ACTION_SELL_PHONE_LISTING:
+    {
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        auto* listing = find_listing(context.world.own_economy(), action.target_id);
+        if (listing == nullptr)
+        {
+            listing = find_sell_listing_for_item(
+                context.world.own_economy(),
+                action.target_id);
+            if (listing == nullptr)
+            {
+                refresh_dynamic_sell_listings(context, true);
+                return GS1_STATUS_OK;
+            }
+        }
+        return process_sell_listing(
+            context,
+            *listing,
+            normalize_quantity(static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0)));
+    }
+
+    case GS1_UI_ACTION_HIRE_CONTRACTOR:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        return process_contractor_hire(
+            context,
+            ContractorHireRequestedMessage {
+                action.target_id,
+                static_cast<std::uint32_t>(action.arg0)});
+
+    case GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        {
+            const auto* listing = find_unlockable_listing(context.world.own_economy(), action.target_id);
+            if (listing == nullptr)
+            {
+                return GS1_STATUS_NOT_FOUND;
+            }
+            return process_unlockable_purchase(context, action.target_id, listing->price);
+        }
+
+    default:
+        return GS1_STATUS_OK;
+    }
 }
 
 void EconomyPhoneSystem::run(RuntimeInvocation& invocation)
@@ -1415,7 +1392,7 @@ void EconomyPhoneSystem::run(RuntimeInvocation& invocation)
             move_direction.world_move_y,
             move_direction.world_move_z,
             move_direction.present}};
-    run_impl(context);
+    refresh_dynamic_sell_listings(context);
 }
 }  // namespace gs1
 

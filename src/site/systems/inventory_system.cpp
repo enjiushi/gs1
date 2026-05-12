@@ -1573,49 +1573,6 @@ bool InventorySystem::subscribes_to_host_message(Gs1HostMessageType type) noexce
         type == GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP;
 }
 
-Gs1Status process_host_message_impl(
-    InventoryContext& context,
-    const Gs1HostMessage& message)
-{
-    switch (message.type)
-    {
-    case GS1_HOST_EVENT_SITE_MOVE_DIRECTION:
-    {
-        const auto& payload = message.payload.site_move_direction;
-        const float move_length_squared =
-            payload.world_move_x * payload.world_move_x +
-            payload.world_move_y * payload.world_move_y +
-            payload.world_move_z * payload.world_move_z;
-        if (move_length_squared > 0.0001f)
-        {
-            clear_pending_device_storage_open(context.world.own_inventory());
-        }
-        return GS1_STATUS_OK;
-    }
-
-    case GS1_HOST_EVENT_SITE_STORAGE_VIEW:
-        return handle_inventory_storage_view_request(
-            context,
-            InventoryStorageViewRequestMessage {
-                message.payload.site_storage_view.storage_id,
-                message.payload.site_storage_view.event_kind,
-                {0U, 0U, 0U}});
-
-    case GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP:
-        return handle_inventory_slot_tapped(
-            context,
-            InventorySlotTappedMessage {
-                message.payload.site_inventory_slot_tap.storage_id,
-                message.payload.site_inventory_slot_tap.item_instance_id,
-                message.payload.site_inventory_slot_tap.slot_index,
-                message.payload.site_inventory_slot_tap.container_kind,
-                0U});
-
-    default:
-        return GS1_STATUS_OK;
-    }
-}
-
 bool InventorySystem::subscribes_to(GameMessageType type) noexcept
 {
     switch (type)
@@ -1641,10 +1598,52 @@ bool InventorySystem::subscribes_to(GameMessageType type) noexcept
     }
 }
 
-Gs1Status process_game_message_impl(
-    InventoryContext& context,
+const char* InventorySystem::name() const noexcept
+{
+    return "InventorySystem";
+}
+
+GameMessageSubscriptionSpan InventorySystem::subscribed_game_messages() const noexcept
+{
+    return runtime_subscription_list<GameMessageType, k_game_message_type_count, &InventorySystem::subscribes_to>();
+}
+
+HostMessageSubscriptionSpan InventorySystem::subscribed_host_messages() const noexcept
+{
+    return runtime_subscription_list<
+        Gs1HostMessageType,
+        k_runtime_host_message_type_count,
+        &InventorySystem::subscribes_to_host_message>();
+}
+
+std::optional<Gs1RuntimeProfileSystemId> InventorySystem::profile_system_id() const noexcept
+{
+    return GS1_RUNTIME_PROFILE_SYSTEM_INVENTORY;
+}
+
+std::optional<std::uint32_t> InventorySystem::fixed_step_order() const noexcept
+{
+    return 14U;
+}
+
+Gs1Status InventorySystem::process_game_message(
+    RuntimeInvocation& invocation,
     const GameMessage& message)
 {
+    auto access = make_game_state_access<InventorySystem>(invocation);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    InventoryContext context {
+        *campaign,
+        *site_run,
+        SiteWorldAccess<InventorySystem> {*site_run},
+        invocation.game_message_queue()};
+
     switch (message.type)
     {
     case GameMessageType::StartSiteAction:
@@ -1729,65 +1728,6 @@ Gs1Status process_game_message_impl(
     }
 }
 
-void run_impl(InventoryContext& context)
-{
-    if (ensure_inventory_storage_initialized(context))
-    {
-        context.world.mark_inventory_storage_descriptors_projection_dirty();
-    }
-    close_opened_device_storage_if_out_of_range(context);
-    progress_pending_device_storage_open(context);
-    progress_pending_deliveries(context);
-}
-
-const char* InventorySystem::name() const noexcept
-{
-    return "InventorySystem";
-}
-
-GameMessageSubscriptionSpan InventorySystem::subscribed_game_messages() const noexcept
-{
-    return runtime_subscription_list<GameMessageType, k_game_message_type_count, &InventorySystem::subscribes_to>();
-}
-
-HostMessageSubscriptionSpan InventorySystem::subscribed_host_messages() const noexcept
-{
-    return runtime_subscription_list<
-        Gs1HostMessageType,
-        k_runtime_host_message_type_count,
-        &InventorySystem::subscribes_to_host_message>();
-}
-
-std::optional<Gs1RuntimeProfileSystemId> InventorySystem::profile_system_id() const noexcept
-{
-    return GS1_RUNTIME_PROFILE_SYSTEM_INVENTORY;
-}
-
-std::optional<std::uint32_t> InventorySystem::fixed_step_order() const noexcept
-{
-    return 14U;
-}
-
-Gs1Status InventorySystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    auto access = make_game_state_access<InventorySystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!campaign.has_value() || !site_run.has_value())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
-    InventoryContext context {
-        *campaign,
-        *site_run,
-        SiteWorldAccess<InventorySystem> {*site_run},
-        invocation.game_message_queue()};
-    return process_game_message_impl(context, message);
-}
-
 Gs1Status InventorySystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
@@ -1805,7 +1745,44 @@ Gs1Status InventorySystem::process_host_message(
         *site_run,
         SiteWorldAccess<InventorySystem> {*site_run},
         invocation.game_message_queue()};
-    return process_host_message_impl(context, message);
+
+    switch (message.type)
+    {
+    case GS1_HOST_EVENT_SITE_MOVE_DIRECTION:
+    {
+        const auto& payload = message.payload.site_move_direction;
+        const float move_length_squared =
+            payload.world_move_x * payload.world_move_x +
+            payload.world_move_y * payload.world_move_y +
+            payload.world_move_z * payload.world_move_z;
+        if (move_length_squared > 0.0001f)
+        {
+            clear_pending_device_storage_open(context.world.own_inventory());
+        }
+        return GS1_STATUS_OK;
+    }
+
+    case GS1_HOST_EVENT_SITE_STORAGE_VIEW:
+        return handle_inventory_storage_view_request(
+            context,
+            InventoryStorageViewRequestMessage {
+                message.payload.site_storage_view.storage_id,
+                message.payload.site_storage_view.event_kind,
+                {0U, 0U, 0U}});
+
+    case GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP:
+        return handle_inventory_slot_tapped(
+            context,
+            InventorySlotTappedMessage {
+                message.payload.site_inventory_slot_tap.storage_id,
+                message.payload.site_inventory_slot_tap.item_instance_id,
+                message.payload.site_inventory_slot_tap.slot_index,
+                message.payload.site_inventory_slot_tap.container_kind,
+                0U});
+
+    default:
+        return GS1_STATUS_OK;
+    }
 }
 
 void InventorySystem::run(RuntimeInvocation& invocation)
@@ -1823,7 +1800,14 @@ void InventorySystem::run(RuntimeInvocation& invocation)
         *site_run,
         SiteWorldAccess<InventorySystem> {*site_run},
         invocation.game_message_queue()};
-    run_impl(context);
+
+    if (ensure_inventory_storage_initialized(context))
+    {
+        context.world.mark_inventory_storage_descriptors_projection_dirty();
+    }
+    close_opened_device_storage_if_out_of_range(context);
+    progress_pending_device_storage_open(context);
+    progress_pending_deliveries(context);
 }
 }  // namespace gs1
 

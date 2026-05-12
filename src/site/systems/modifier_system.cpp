@@ -1073,80 +1073,6 @@ void handle_site_modifier_end_requested(
         resolve_modifier_totals(context);
     }
 }
-
-Gs1Status process_host_message_impl(
-    ModifierContext& context,
-    const Gs1HostMessage& message)
-{
-    if (message.type != GS1_HOST_EVENT_UI_ACTION)
-    {
-        return GS1_STATUS_OK;
-    }
-
-    const auto& action = message.payload.ui_action.action;
-    if (action.type != GS1_UI_ACTION_END_SITE_MODIFIER)
-    {
-        return GS1_STATUS_OK;
-    }
-
-    if (action.target_id == 0U)
-    {
-        return GS1_STATUS_INVALID_ARGUMENT;
-    }
-
-    handle_site_modifier_end_requested(
-        context,
-        SiteModifierEndRequestedMessage {action.target_id});
-    return GS1_STATUS_OK;
-}
-
-Gs1Status process_game_message_impl(
-    ModifierContext& context,
-    const GameMessage& message)
-{
-    if (message.type == GameMessageType::SiteRunStarted)
-    {
-        handle_site_run_started(context, message.payload_as<SiteRunStartedMessage>());
-    }
-    else if (message.type == GameMessageType::RunModifierAwardRequested)
-    {
-        handle_run_modifier_award_requested(
-            context,
-            message.payload_as<RunModifierAwardRequestedMessage>());
-    }
-    else if (message.type == GameMessageType::InventoryItemUseCompleted)
-    {
-        handle_inventory_item_use_completed(
-            context,
-            message.payload_as<InventoryItemUseCompletedMessage>());
-    }
-    else if (message.type == GameMessageType::SiteModifierEndRequested)
-    {
-        handle_site_modifier_end_requested(
-            context,
-            message.payload_as<SiteModifierEndRequestedMessage>());
-    }
-
-    return GS1_STATUS_OK;
-}
-
-void run_impl(ModifierContext& context)
-{
-    const auto tick_result = tick_timed_modifiers(
-        context.world.own_modifier(),
-        runtime_minutes_from_real_seconds(context.fixed_step_seconds));
-    if (tick_result.projection_changed)
-    {
-        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_MODIFIERS);
-    }
-    if (tick_result.modifier_set_changed)
-    {
-        resolve_modifier_totals(context);
-        return;
-    }
-
-    resolve_modifier_totals(context);
-}
 }  // namespace
 
 bool ModifierSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
@@ -1202,7 +1128,30 @@ Gs1Status ModifierSystem::process_game_message(
         *campaign,
         SiteWorldAccess<ModifierSystem> {*site_run},
         fixed_step_seconds};
-    return process_game_message_impl(context, message);
+    if (message.type == GameMessageType::SiteRunStarted)
+    {
+        handle_site_run_started(context, message.payload_as<SiteRunStartedMessage>());
+    }
+    else if (message.type == GameMessageType::RunModifierAwardRequested)
+    {
+        handle_run_modifier_award_requested(
+            context,
+            message.payload_as<RunModifierAwardRequestedMessage>());
+    }
+    else if (message.type == GameMessageType::InventoryItemUseCompleted)
+    {
+        handle_inventory_item_use_completed(
+            context,
+            message.payload_as<InventoryItemUseCompletedMessage>());
+    }
+    else if (message.type == GameMessageType::SiteModifierEndRequested)
+    {
+        handle_site_modifier_end_requested(
+            context,
+            message.payload_as<SiteModifierEndRequestedMessage>());
+    }
+
+    return GS1_STATUS_OK;
 }
 
 Gs1Status ModifierSystem::process_host_message(
@@ -1222,7 +1171,26 @@ Gs1Status ModifierSystem::process_host_message(
         *campaign,
         SiteWorldAccess<ModifierSystem> {*site_run},
         fixed_step_seconds};
-    return process_host_message_impl(context, message);
+    if (message.type != GS1_HOST_EVENT_UI_ACTION)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    const auto& action = message.payload.ui_action.action;
+    if (action.type != GS1_UI_ACTION_END_SITE_MODIFIER)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    if (action.target_id == 0U)
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    handle_site_modifier_end_requested(
+        context,
+        SiteModifierEndRequestedMessage {action.target_id});
+    return GS1_STATUS_OK;
 }
 
 bool ModifierSystem::subscribes_to(GameMessageType type) noexcept
@@ -1248,7 +1216,20 @@ void ModifierSystem::run(RuntimeInvocation& invocation)
         *campaign,
         SiteWorldAccess<ModifierSystem> {*site_run},
         fixed_step_seconds};
-    run_impl(context);
+    const auto tick_result = tick_timed_modifiers(
+        context.world.own_modifier(),
+        runtime_minutes_from_real_seconds(context.fixed_step_seconds));
+    if (tick_result.projection_changed)
+    {
+        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_MODIFIERS);
+    }
+    if (tick_result.modifier_set_changed)
+    {
+        resolve_modifier_totals(context);
+        return;
+    }
+
+    resolve_modifier_totals(context);
 }
 }  // namespace gs1
 

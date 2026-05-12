@@ -174,24 +174,6 @@ bool CraftSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
     return type == GS1_HOST_EVENT_SITE_CONTEXT_REQUEST;
 }
 
-Gs1Status process_host_message_impl(
-    CraftContext& context,
-    const Gs1HostMessage& message)
-{
-    if (message.type != GS1_HOST_EVENT_SITE_CONTEXT_REQUEST ||
-        context.site_run.site_action.placement_mode.active)
-    {
-        return GS1_STATUS_OK;
-    }
-
-    return handle_craft_context_requested(
-        context,
-        CraftContextRequestedMessage {
-            message.payload.site_context_request.tile_x,
-            message.payload.site_context_request.tile_y,
-            message.payload.site_context_request.flags});
-}
-
 bool CraftSystem::subscribes_to(GameMessageType type) noexcept
 {
     switch (type)
@@ -204,56 +186,6 @@ bool CraftSystem::subscribes_to(GameMessageType type) noexcept
     default:
         return false;
     }
-}
-
-Gs1Status process_game_message_impl(
-    CraftContext& context,
-    const GameMessage& message)
-{
-    switch (message.type)
-    {
-    case GameMessageType::SiteRunStarted:
-        context.world.own_craft() = CraftState {};
-        return GS1_STATUS_OK;
-
-    case GameMessageType::SiteDevicePlaced:
-    case GameMessageType::SiteDeviceBroken:
-        context.world.own_craft().device_caches_dirty = true;
-        return GS1_STATUS_OK;
-
-    case GameMessageType::InventoryCraftContextRequested:
-        return handle_craft_context_requested(
-            context,
-            message.payload_as<CraftContextRequestedMessage>());
-
-    default:
-        return GS1_STATUS_OK;
-    }
-}
-
-void run_impl(CraftContext& context)
-{
-    if (!context.world.has_world() || context.site_run.site_world == nullptr)
-    {
-        return;
-    }
-
-    const auto membership_revision = context.world.read_inventory().item_membership_revision;
-    auto& craft = context.world.own_craft();
-    if (craft.phone_cache.source_membership_revision != membership_revision)
-    {
-        refresh_phone_cache(context, membership_revision);
-    }
-
-    const TileCoord worker_tile = site_world_access::worker_position(context.site_run).tile_coord;
-    if (!craft.device_caches_dirty &&
-        craft.device_cache_source_membership_revision == membership_revision &&
-        same_tile_coord(craft.device_cache_worker_tile, worker_tile))
-    {
-        return;
-    }
-
-    refresh_device_caches(context, membership_revision, worker_tile);
 }
 
 const char* CraftSystem::name() const noexcept
@@ -300,7 +232,26 @@ Gs1Status CraftSystem::process_game_message(
         *campaign,
         *site_run,
         SiteWorldAccess<CraftSystem> {*site_run}};
-    return process_game_message_impl(context, message);
+
+    switch (message.type)
+    {
+    case GameMessageType::SiteRunStarted:
+        context.world.own_craft() = CraftState {};
+        return GS1_STATUS_OK;
+
+    case GameMessageType::SiteDevicePlaced:
+    case GameMessageType::SiteDeviceBroken:
+        context.world.own_craft().device_caches_dirty = true;
+        return GS1_STATUS_OK;
+
+    case GameMessageType::InventoryCraftContextRequested:
+        return handle_craft_context_requested(
+            context,
+            message.payload_as<CraftContextRequestedMessage>());
+
+    default:
+        return GS1_STATUS_OK;
+    }
 }
 
 Gs1Status CraftSystem::process_host_message(
@@ -319,7 +270,19 @@ Gs1Status CraftSystem::process_host_message(
         *campaign,
         *site_run,
         SiteWorldAccess<CraftSystem> {*site_run}};
-    return process_host_message_impl(context, message);
+
+    if (message.type != GS1_HOST_EVENT_SITE_CONTEXT_REQUEST ||
+        context.site_run.site_action.placement_mode.active)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    return handle_craft_context_requested(
+        context,
+        CraftContextRequestedMessage {
+            message.payload.site_context_request.tile_x,
+            message.payload.site_context_request.tile_y,
+            message.payload.site_context_request.flags});
 }
 
 void CraftSystem::run(RuntimeInvocation& invocation)
@@ -336,7 +299,28 @@ void CraftSystem::run(RuntimeInvocation& invocation)
         *campaign,
         *site_run,
         SiteWorldAccess<CraftSystem> {*site_run}};
-    run_impl(context);
+
+    if (!context.world.has_world() || context.site_run.site_world == nullptr)
+    {
+        return;
+    }
+
+    const auto membership_revision = context.world.read_inventory().item_membership_revision;
+    auto& craft = context.world.own_craft();
+    if (craft.phone_cache.source_membership_revision != membership_revision)
+    {
+        refresh_phone_cache(context, membership_revision);
+    }
+
+    const TileCoord worker_tile = site_world_access::worker_position(context.site_run).tile_coord;
+    if (!craft.device_caches_dirty &&
+        craft.device_cache_source_membership_revision == membership_revision &&
+        same_tile_coord(craft.device_cache_worker_tile, worker_tile))
+    {
+        return;
+    }
+
+    refresh_device_caches(context, membership_revision, worker_tile);
 }
 }  // namespace gs1
 
