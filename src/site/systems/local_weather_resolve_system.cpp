@@ -22,6 +22,33 @@ constexpr std::uint32_t k_site_tile_state_changed_local_weather = 1U << 0U;
 constexpr std::uint32_t k_site_tile_state_changed_support = 1U << 1U;
 constexpr double k_site_one_probe_window_minutes = 0.25;
 
+struct LocalWeatherResolveContext final
+{
+    gs1::SiteRunState& site_run;
+    gs1::SiteWorldAccess<gs1::LocalWeatherResolveSystem> world;
+    gs1::GameMessageQueue& message_queue;
+};
+
+template <typename Fn>
+Gs1Status with_local_weather_resolve_context(
+    gs1::RuntimeInvocation& invocation,
+    Fn&& fn,
+    bool missing_context_is_ok = false)
+{
+    auto access = gs1::make_game_state_access<gs1::LocalWeatherResolveSystem>(invocation);
+    auto& site_run = access.template read<gs1::RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
+    {
+        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
+    }
+
+    LocalWeatherResolveContext context {
+        *site_run,
+        gs1::SiteWorldAccess<gs1::LocalWeatherResolveSystem> {*site_run},
+        invocation.game_message_queue()};
+    return fn(context);
+}
+
 struct BaseLocalWeather final
 {
     float heat {0.0f};
@@ -36,7 +63,7 @@ bool is_site_one_probe_tile(gs1::TileCoord coord) noexcept
 }
 
 void emit_site_one_local_weather_probe_log(
-    gs1::SiteSystemContext<gs1::LocalWeatherResolveSystem>& context,
+    LocalWeatherResolveContext& context,
     gs1::TileCoord coord,
     const BaseLocalWeather& base_weather,
     const gs1::SiteWorld::TileLocalWeatherData& resolved_weather,
@@ -118,7 +145,7 @@ gs1::SiteWorld::TileWeatherContributionData weather_contribution_from_component(
 }
 
 void emit_site_tile_state_changed(
-    gs1::SiteSystemContext<gs1::LocalWeatherResolveSystem>& context,
+    LocalWeatherResolveContext& context,
     gs1::TileCoord coord,
     gs1::PlantId plant_id,
     float plant_density,
@@ -170,7 +197,7 @@ gs1::SiteWorld::TileLocalWeatherData resolve_local_weather(
 }
 
 BaseLocalWeather compute_base_local_weather(
-    gs1::SiteSystemContext<gs1::LocalWeatherResolveSystem>& context)
+    LocalWeatherResolveContext& context)
 {
     const auto& weather = context.world.read_weather();
     const auto& modifiers = context.world.read_modifier().resolved_channel_totals;
@@ -178,6 +205,144 @@ BaseLocalWeather compute_base_local_weather(
         std::clamp(weather.weather_heat * (1.0f + modifiers.heat), 0.0f, 100.0f),
         std::clamp(weather.weather_wind * (1.0f + modifiers.wind), 0.0f, 100.0f),
         std::clamp(weather.weather_dust * (1.0f + modifiers.dust), 0.0f, 100.0f)};
+}
+
+Gs1Status process_message(
+    LocalWeatherResolveContext& context,
+    const gs1::GameMessage& message)
+{
+    if (!context.world.has_world())
+    {
+        return GS1_STATUS_OK;
+    }
+
+    if (message.type == gs1::GameMessageType::SiteRunStarted)
+    {
+        context.world.own_local_weather_runtime().emit_full_snapshot_on_next_run = true;
+    }
+
+    return GS1_STATUS_OK;
+}
+
+void run_context(LocalWeatherResolveContext& context)
+{
+    if (!context.world.has_world())
+    {
+        return;
+    }
+
+    auto& runtime = context.world.own_local_weather_runtime();
+    ensure_local_weather_runtime_buffers(runtime, context.world.tile_count());
+
+    const bool emit_full_snapshot = runtime.emit_full_snapshot_on_next_run;
+    runtime.emit_full_snapshot_on_next_run = false;
+
+    const auto base_weather = compute_base_local_weather(context);
+    auto& ecs_world = context.site_run.site_world->ecs_world();
+    auto tile_query =
+        ecs_world.query_builder<
+            const gs1::site_ecs::TileIndex,
+            const gs1::site_ecs::TileCoordComponent,
+            const gs1::site_ecs::TilePlantSlot,
+            const gs1::site_ecs::TilePlantDensity,
+            const gs1::site_ecs::TileMoisture,
+            gs1::site_ecs::TileHeat,
+            gs1::site_ecs::TileWind,
+            gs1::site_ecs::TileDust,
+            const gs1::site_ecs::TilePlantWeatherContribution,
+            const gs1::site_ecs::TileDeviceWeatherContribution>()
+            .with<gs1::site_ecs::TileTag>()
+            .build();
+
+    // Query only the components this system actually reads or owns.
+    tile_query.each(
+        [&](flecs::entity,
+            const gs1::site_ecs::TileIndex& index_component,
+            const gs1::site_ecs::TileCoordComponent& coord_component,
+            const gs1::site_ecs::TilePlantSlot& plant_slot,
+            const gs1::site_ecs::TilePlantDensity& density_component,
+            const gs1::site_ecs::TileMoisture& moisture_component,
+            gs1::site_ecs::TileHeat& heat_component,
+            gs1::site_ecs::TileWind& wind_component,
+            gs1::site_ecs::TileDust& dust_component,
+            const gs1::site_ecs::TilePlantWeatherContribution& plant_contribution_component,
+            const gs1::site_ecs::TileDeviceWeatherContribution& device_contribution_component) {
+            const std::size_t index = index_component.value;
+            if (index >= runtime.last_total_weather_contributions.size())
+            {
+                return;
+            }
+
+            const auto total_contribution = gs1::clamp_weather_contribution(
+                gs1::sum_weather_contributions(
+                    weather_contribution_from_component(plant_contribution_component),
+                    weather_contribution_from_component(device_contribution_component)));
+            const auto resolved_weather = resolve_local_weather(base_weather, total_contribution);
+            const auto previous_total_contribution = runtime.last_total_weather_contributions[index];
+            const gs1::SiteWorld::TileLocalWeatherData previous_local_weather {
+                heat_component.value,
+                wind_component.value,
+                dust_component.value};
+
+            const bool heat_changed =
+                std::fabs(previous_local_weather.heat - resolved_weather.heat) >
+                gs1::k_weather_contribution_epsilon;
+            const bool wind_changed =
+                std::fabs(previous_local_weather.wind - resolved_weather.wind) >
+                gs1::k_weather_contribution_epsilon;
+            const bool dust_changed =
+                std::fabs(previous_local_weather.dust - resolved_weather.dust) >
+                gs1::k_weather_contribution_epsilon;
+            const bool local_weather_changed = heat_changed || wind_changed || dust_changed;
+            const bool support_changed =
+                gs1::weather_contribution_changed(previous_total_contribution, total_contribution);
+
+            if (local_weather_changed)
+            {
+                heat_component.value = resolved_weather.heat;
+                wind_component.value = resolved_weather.wind;
+                dust_component.value = resolved_weather.dust;
+            }
+
+            if ((emit_full_snapshot || local_weather_changed || support_changed))
+            {
+                const gs1::SiteWorld::TileLocalWeatherData emitted_local_weather = local_weather_changed
+                    ? resolved_weather
+                    : previous_local_weather;
+
+                emit_site_tile_state_changed(
+                    context,
+                    coord_component.value,
+                    plant_slot.plant_id,
+                    density_component.value,
+                    moisture_component.value,
+                    emitted_local_weather,
+                    total_contribution,
+                    emit_full_snapshot || local_weather_changed,
+                    emit_full_snapshot || support_changed);
+            }
+
+            if ((emit_full_snapshot || local_weather_changed || support_changed) &&
+                context.world.read_time().world_time_minutes <= k_site_one_probe_window_minutes)
+            {
+                emit_site_one_local_weather_probe_log(
+                    context,
+                    coord_component.value,
+                    base_weather,
+                    resolved_weather,
+                    total_contribution,
+                    density_component.value);
+            }
+
+            if ((wind_changed &&
+                    ecology_has_projected_plant_visual(plant_slot.plant_id, density_component.value)) ||
+                support_changed)
+            {
+                context.world.mark_tile_projection_dirty(coord_component.value);
+            }
+
+            runtime.last_total_weather_contributions[index] = total_contribution;
+        });
 }
 }  // namespace
 
@@ -216,32 +381,15 @@ bool LocalWeatherResolveSystem::subscribes_to(GameMessageType type) noexcept
     return type == GameMessageType::SiteRunStarted;
 }
 
-Gs1Status LocalWeatherResolveSystem::process_message(
-    SiteSystemContext<LocalWeatherResolveSystem>& context,
-    const GameMessage& message)
-{
-    if (!context.world.has_world())
-    {
-        return GS1_STATUS_OK;
-    }
-
-    if (message.type == GameMessageType::SiteRunStarted)
-    {
-        context.world.own_local_weather_runtime().emit_full_snapshot_on_next_run = true;
-    }
-
-    return GS1_STATUS_OK;
-}
-
 Gs1Status LocalWeatherResolveSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
     auto access = make_game_state_access<LocalWeatherResolveSystem>(invocation);
     (void)access;
-    return with_site_system_context<LocalWeatherResolveSystem>(
+    return with_local_weather_resolve_context(
         invocation,
-        [&](SiteSystemContext<LocalWeatherResolveSystem>& context) -> Gs1Status
+        [&](LocalWeatherResolveContext& context) -> Gs1Status
         {
             return process_message(context, message);
         });
@@ -257,136 +405,15 @@ Gs1Status LocalWeatherResolveSystem::process_host_message(
     return GS1_STATUS_OK;
 }
 
-void LocalWeatherResolveSystem::run(SiteSystemContext<LocalWeatherResolveSystem>& context)
-{
-    if (!context.world.has_world())
-    {
-        return;
-    }
-
-    auto& runtime = context.world.own_local_weather_runtime();
-    ensure_local_weather_runtime_buffers(runtime, context.world.tile_count());
-
-    const bool emit_full_snapshot = runtime.emit_full_snapshot_on_next_run;
-    runtime.emit_full_snapshot_on_next_run = false;
-
-    const auto base_weather = compute_base_local_weather(context);
-    auto& ecs_world = context.site_run.site_world->ecs_world();
-    auto tile_query =
-        ecs_world.query_builder<
-            const site_ecs::TileIndex,
-            const site_ecs::TileCoordComponent,
-            const site_ecs::TilePlantSlot,
-            const site_ecs::TilePlantDensity,
-            const site_ecs::TileMoisture,
-            site_ecs::TileHeat,
-            site_ecs::TileWind,
-            site_ecs::TileDust,
-            const site_ecs::TilePlantWeatherContribution,
-            const site_ecs::TileDeviceWeatherContribution>()
-            .with<site_ecs::TileTag>()
-            .build();
-
-    // Query only the components this system actually reads or owns.
-    tile_query.each(
-        [&](flecs::entity,
-            const site_ecs::TileIndex& index_component,
-            const site_ecs::TileCoordComponent& coord_component,
-            const site_ecs::TilePlantSlot& plant_slot,
-            const site_ecs::TilePlantDensity& density_component,
-            const site_ecs::TileMoisture& moisture_component,
-            site_ecs::TileHeat& heat_component,
-            site_ecs::TileWind& wind_component,
-            site_ecs::TileDust& dust_component,
-            const site_ecs::TilePlantWeatherContribution& plant_contribution_component,
-            const site_ecs::TileDeviceWeatherContribution& device_contribution_component) {
-            const std::size_t index = index_component.value;
-            if (index >= runtime.last_total_weather_contributions.size())
-            {
-                return;
-            }
-
-            const auto total_contribution = clamp_weather_contribution(
-                sum_weather_contributions(
-                    weather_contribution_from_component(plant_contribution_component),
-                    weather_contribution_from_component(device_contribution_component)));
-            const auto resolved_weather = resolve_local_weather(base_weather, total_contribution);
-            const auto previous_total_contribution = runtime.last_total_weather_contributions[index];
-            const SiteWorld::TileLocalWeatherData previous_local_weather {
-                heat_component.value,
-                wind_component.value,
-                dust_component.value};
-
-            const bool heat_changed =
-                std::fabs(previous_local_weather.heat - resolved_weather.heat) >
-                k_weather_contribution_epsilon;
-            const bool wind_changed =
-                std::fabs(previous_local_weather.wind - resolved_weather.wind) >
-                k_weather_contribution_epsilon;
-            const bool dust_changed =
-                std::fabs(previous_local_weather.dust - resolved_weather.dust) >
-                k_weather_contribution_epsilon;
-            const bool local_weather_changed = heat_changed || wind_changed || dust_changed;
-            const bool support_changed =
-                weather_contribution_changed(previous_total_contribution, total_contribution);
-
-            if (local_weather_changed)
-            {
-                heat_component.value = resolved_weather.heat;
-                wind_component.value = resolved_weather.wind;
-                dust_component.value = resolved_weather.dust;
-            }
-
-            if ((emit_full_snapshot || local_weather_changed || support_changed))
-            {
-                const SiteWorld::TileLocalWeatherData emitted_local_weather = local_weather_changed
-                    ? resolved_weather
-                    : previous_local_weather;
-
-                emit_site_tile_state_changed(
-                    context,
-                    coord_component.value,
-                    plant_slot.plant_id,
-                    density_component.value,
-                    moisture_component.value,
-                    emitted_local_weather,
-                    total_contribution,
-                    emit_full_snapshot || local_weather_changed,
-                    emit_full_snapshot || support_changed);
-            }
-
-            if ((emit_full_snapshot || local_weather_changed || support_changed) &&
-                context.world.read_time().world_time_minutes <= k_site_one_probe_window_minutes)
-            {
-                emit_site_one_local_weather_probe_log(
-                    context,
-                    coord_component.value,
-                    base_weather,
-                    resolved_weather,
-                    total_contribution,
-                    density_component.value);
-            }
-
-            if ((wind_changed &&
-                    ecology_has_projected_plant_visual(plant_slot.plant_id, density_component.value)) ||
-                support_changed)
-            {
-                context.world.mark_tile_projection_dirty(coord_component.value);
-            }
-
-            runtime.last_total_weather_contributions[index] = total_contribution;
-        });
-}
-
 void LocalWeatherResolveSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<LocalWeatherResolveSystem>(invocation);
     (void)access;
-    (void)with_site_system_context<LocalWeatherResolveSystem>(
+    (void)with_local_weather_resolve_context(
         invocation,
-        [&](SiteSystemContext<LocalWeatherResolveSystem>& context) -> Gs1Status
+        [&](LocalWeatherResolveContext& context) -> Gs1Status
         {
-            run(context);
+            run_context(context);
             return GS1_STATUS_OK;
         });
 }
@@ -395,3 +422,5 @@ void LocalWeatherResolveSystem::run(RuntimeInvocation& invocation)
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
+
+

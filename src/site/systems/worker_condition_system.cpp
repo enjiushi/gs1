@@ -16,6 +16,39 @@ namespace gs1
 {
 namespace
 {
+struct WorkerConditionContext final
+{
+    const CampaignState& campaign;
+    SiteRunState& site_run;
+    SiteWorldAccess<WorkerConditionSystem> world;
+    GameMessageQueue& message_queue;
+    double fixed_step_seconds {0.0};
+};
+
+template <typename Fn>
+Gs1Status with_worker_condition_context(
+    RuntimeInvocation& invocation,
+    Fn&& fn,
+    bool missing_context_is_ok = false)
+{
+    auto access = make_game_state_access<WorkerConditionSystem>(invocation);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
+    }
+
+    WorkerConditionContext context {
+        *campaign,
+        *site_run,
+        SiteWorldAccess<WorkerConditionSystem> {*site_run},
+        invocation.game_message_queue(),
+        fixed_step_seconds};
+    return fn(context);
+}
+
 struct WorkerMeterSnapshot final
 {
     float health {0.0f};
@@ -271,7 +304,7 @@ std::uint32_t compute_change_mask(
     return mask;
 }
 
-void ensure_memory_for_run(SiteSystemContext<WorkerConditionSystem>& context) noexcept
+void ensure_memory_for_run(WorkerConditionContext& context) noexcept
 {
     auto& memory = g_worker_memory;
     if (!memory.site_run_id.has_value() ||
@@ -282,7 +315,7 @@ void ensure_memory_for_run(SiteSystemContext<WorkerConditionSystem>& context) no
     }
 }
 
-void emit_worker_meters_changed_if_needed(SiteSystemContext<WorkerConditionSystem>& context) noexcept
+void emit_worker_meters_changed_if_needed(WorkerConditionContext& context) noexcept
 {
     ensure_memory_for_run(context);
     if (!context.world.has_world())
@@ -664,9 +697,9 @@ Gs1Status WorkerConditionSystem::process_game_message(
 {
     auto access = make_game_state_access<WorkerConditionSystem>(invocation);
     (void)access;
-    return with_site_system_context<WorkerConditionSystem>(
+    return with_worker_condition_context(
         invocation,
-        [&](SiteSystemContext<WorkerConditionSystem>& context) -> Gs1Status
+        [&](WorkerConditionContext& context) -> Gs1Status
         {
             if (message.type == GameMessageType::SiteRunStarted)
             {
@@ -722,9 +755,9 @@ void WorkerConditionSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<WorkerConditionSystem>(invocation);
     (void)access;
-    (void)with_site_system_context<WorkerConditionSystem>(
+    (void)with_worker_condition_context(
         invocation,
-        [&](SiteSystemContext<WorkerConditionSystem>& context) -> Gs1Status
+        [&](WorkerConditionContext& context) -> Gs1Status
         {
             if (!context.world.has_world())
             {
@@ -763,3 +796,4 @@ void WorkerConditionSystem::run(RuntimeInvocation& invocation)
         });
 }
 }  // namespace gs1
+

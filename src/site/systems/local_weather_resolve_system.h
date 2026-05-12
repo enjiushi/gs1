@@ -41,10 +41,6 @@ public:
     }
 
     [[nodiscard]] static bool subscribes_to(GameMessageType type) noexcept;
-    [[nodiscard]] static Gs1Status process_message(
-        SiteSystemContext<LocalWeatherResolveSystem>& context,
-        const GameMessage& message);
-    static void run(SiteSystemContext<LocalWeatherResolveSystem>& context);
 };
 
 template <>

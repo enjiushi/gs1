@@ -11,6 +11,43 @@ namespace gs1
 {
 namespace
 {
+struct SiteFlowContext final
+{
+    SiteRunState& site_run;
+    SiteWorldAccess<SiteFlowSystem> world;
+    GameMessageQueue& message_queue;
+    SiteMoveDirectionInput move_direction {};
+    double fixed_step_seconds {0.0};
+};
+
+template <typename Fn>
+Gs1Status with_site_flow_context(
+    RuntimeInvocation& invocation,
+    Fn&& fn,
+    bool missing_context_is_ok = false)
+{
+    auto access = make_game_state_access<SiteFlowSystem>(invocation);
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const auto move_direction = access.template read<RuntimeMoveDirectionTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    if (!site_run.has_value())
+    {
+        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
+    }
+
+    SiteFlowContext context {
+        *site_run,
+        SiteWorldAccess<SiteFlowSystem> {*site_run},
+        invocation.game_message_queue(),
+        SiteMoveDirectionInput {
+            move_direction.world_move_x,
+            move_direction.world_move_y,
+            move_direction.world_move_z,
+            move_direction.present},
+        fixed_step_seconds};
+    return fn(context);
+}
+
 constexpr float k_worker_move_speed_tiles_per_second = 3.5f;
 constexpr float k_radians_to_degrees = 57.2957795f;
 constexpr float k_worker_position_epsilon = 0.0001f;
@@ -100,9 +137,9 @@ Gs1Status SiteFlowSystem::process_host_message(
         return GS1_STATUS_OK;
     }
 
-    return with_site_system_context<SiteFlowSystem>(
+    return with_site_flow_context(
         invocation,
-        [&](SiteSystemContext<SiteFlowSystem>& context) -> Gs1Status
+        [&](SiteFlowContext& context) -> Gs1Status
         {
             const auto& payload = message.payload.site_move_direction;
             context.site_run.host_move_direction.world_move_x = payload.world_move_x;
@@ -118,9 +155,9 @@ void SiteFlowSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<SiteFlowSystem>(invocation);
     (void)access;
-    (void)with_site_system_context<SiteFlowSystem>(
+    (void)with_site_flow_context(
         invocation,
-        [&](SiteSystemContext<SiteFlowSystem>& context) -> Gs1Status
+        [&](SiteFlowContext& context) -> Gs1Status
         {
             const std::uint32_t width = context.world.tile_width();
             const std::uint32_t height = context.world.tile_height();
@@ -258,3 +295,4 @@ void SiteFlowSystem::run(RuntimeInvocation& invocation)
         });
 }
 }  // namespace gs1
+

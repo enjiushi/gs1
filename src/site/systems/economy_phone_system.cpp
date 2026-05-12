@@ -30,6 +30,46 @@ struct system_state_tags<EconomyPhoneSystem>
 
 namespace
 {
+struct EconomyPhoneContext final
+{
+    const CampaignState& campaign;
+    SiteRunState& site_run;
+    SiteWorldAccess<EconomyPhoneSystem> world;
+    GameMessageQueue& message_queue;
+    double fixed_step_seconds {0.0};
+    SiteMoveDirectionInput move_direction {};
+};
+
+template <typename Fn>
+Gs1Status with_economy_phone_context(
+    RuntimeInvocation& invocation,
+    Fn&& fn,
+    bool missing_context_is_ok = false)
+{
+    auto access = make_game_state_access<EconomyPhoneSystem>(invocation);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    const auto move_direction = access.template read<RuntimeMoveDirectionTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
+    }
+
+    EconomyPhoneContext context {
+        *campaign,
+        *site_run,
+        SiteWorldAccess<EconomyPhoneSystem> {*site_run},
+        invocation.game_message_queue(),
+        fixed_step_seconds,
+        SiteMoveDirectionInput {
+            move_direction.world_move_x,
+            move_direction.world_move_y,
+            move_direction.world_move_z,
+            move_direction.present}};
+    return fn(context);
+}
+
 constexpr std::uint32_t k_sell_listing_id_base = 1000U;
 
 std::uint32_t normalize_quantity(std::uint16_t value) noexcept
@@ -44,7 +84,7 @@ bool money_delta_fits(std::int64_t amount) noexcept
 }
 
 bool can_apply_site_cash_delta(
-    const SiteSystemContext<EconomyPhoneSystem>& context,
+    const EconomyPhoneContext& context,
     std::int32_t delta) noexcept
 {
     const auto updated = static_cast<std::int64_t>(context.world.read_economy().current_cash) + delta;
@@ -56,19 +96,19 @@ bool can_apply_site_cash_delta(
     return true;
 }
 
-void mark_phone_dirty(SiteSystemContext<EconomyPhoneSystem>& context) noexcept
+void mark_phone_dirty(EconomyPhoneContext& context) noexcept
 {
     context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_PHONE);
 }
 
-void mark_phone_and_hud_dirty(SiteSystemContext<EconomyPhoneSystem>& context) noexcept
+void mark_phone_and_hud_dirty(EconomyPhoneContext& context) noexcept
 {
     context.world.mark_projection_dirty(
         SITE_PROJECTION_UPDATE_PHONE | SITE_PROJECTION_UPDATE_HUD);
 }
 
 bool apply_site_cash_delta(
-    SiteSystemContext<EconomyPhoneSystem>& context,
+    EconomyPhoneContext& context,
     std::int32_t delta) noexcept
 {
     if (!can_apply_site_cash_delta(context, delta))
@@ -188,7 +228,7 @@ std::uint64_t mix_seed(
     return value;
 }
 
-bool onboarding_chain_effective(const SiteSystemContext<EconomyPhoneSystem>& context) noexcept
+bool onboarding_chain_effective(const EconomyPhoneContext& context) noexcept
 {
     for (const auto& task : context.world.read_task_board().visible_tasks)
     {
@@ -211,7 +251,7 @@ bool onboarding_chain_effective(const SiteSystemContext<EconomyPhoneSystem>& con
 }
 
 bool phone_buy_stock_item_available(
-    const SiteSystemContext<EconomyPhoneSystem>& context,
+    const EconomyPhoneContext& context,
     ItemId item_id) noexcept
 {
     const auto* item_def = find_item_def(item_id);
@@ -244,7 +284,7 @@ PhoneListingState* find_generated_stock_listing(
 }
 
 std::vector<std::uint64_t> phone_item_instance_ids(
-    SiteSystemContext<EconomyPhoneSystem>& context)
+    EconomyPhoneContext& context)
 {
     const auto& craft = context.world.read_craft();
     const auto& inventory = context.world.read_inventory();
@@ -259,7 +299,7 @@ std::vector<std::uint64_t> phone_item_instance_ids(
 }
 
 std::uint32_t available_global_item_quantity(
-    SiteSystemContext<EconomyPhoneSystem>& context,
+    EconomyPhoneContext& context,
     ItemId item_id)
 {
     const auto available_quantity = craft_logic::available_cached_item_quantity(
@@ -340,7 +380,7 @@ std::uint32_t cart_item_quantity(const EconomyState& economy) noexcept
 }
 
 bool queue_delivery_batch_message(
-    SiteSystemContext<EconomyPhoneSystem>& context,
+    EconomyPhoneContext& context,
     const InventoryDeliveryBatchEntry* entries,
     std::uint8_t entry_count) noexcept
 {
@@ -368,7 +408,7 @@ bool queue_delivery_batch_message(
 }
 
 bool queue_single_delivery_message(
-    SiteSystemContext<EconomyPhoneSystem>& context,
+    EconomyPhoneContext& context,
     ItemId item_id,
     std::uint32_t quantity) noexcept
 {
@@ -386,7 +426,7 @@ bool queue_single_delivery_message(
 }
 
 void queue_purchase_completed_message(
-    SiteSystemContext<EconomyPhoneSystem>& context,
+    EconomyPhoneContext& context,
     const PhoneListingState& listing,
     std::uint32_t quantity) noexcept
 {
@@ -406,7 +446,7 @@ void queue_purchase_completed_message(
 }
 
 void queue_sale_completed_message(
-    SiteSystemContext<EconomyPhoneSystem>& context,
+    EconomyPhoneContext& context,
     const PhoneListingState& listing,
     std::uint32_t quantity) noexcept
 {
@@ -426,7 +466,7 @@ void queue_sale_completed_message(
 }
 
 std::uint32_t resolved_stock_cash_points(
-    const SiteSystemContext<EconomyPhoneSystem>& context,
+    const EconomyPhoneContext& context,
     const PrototypePhoneBuyStockContent& stock_entry,
     std::uint32_t refresh_generation) noexcept
 {
@@ -444,7 +484,7 @@ std::uint32_t resolved_stock_cash_points(
 }
 
 std::uint32_t resolved_stock_quantity(
-    const SiteSystemContext<EconomyPhoneSystem>& context,
+    const EconomyPhoneContext& context,
     const PrototypePhoneBuyStockContent& stock_entry,
     std::uint32_t refresh_generation) noexcept
 {
@@ -465,7 +505,7 @@ std::uint32_t resolved_stock_quantity(
 }
 
 void refresh_generated_buy_stock_listings(
-    SiteSystemContext<EconomyPhoneSystem>& context,
+    EconomyPhoneContext& context,
     bool force_dirty = false)
 {
     auto& economy = context.world.own_economy();
@@ -529,7 +569,7 @@ void refresh_generated_buy_stock_listings(
 }
 
 void refresh_dynamic_sell_listings(
-    SiteSystemContext<EconomyPhoneSystem>& context,
+    EconomyPhoneContext& context,
     bool force_dirty = false)
 {
     auto& economy = context.world.own_economy();
@@ -595,7 +635,7 @@ void refresh_dynamic_sell_listings(
 }
 
 Gs1Status process_buy_listing(
-    SiteSystemContext<EconomyPhoneSystem>& context,
+    EconomyPhoneContext& context,
     PhoneListingState& listing,
     std::uint32_t quantity)
 {
@@ -643,7 +683,7 @@ Gs1Status process_buy_listing(
 }
 
 Gs1Status process_cart_add(
-    SiteSystemContext<EconomyPhoneSystem>& context,
+    EconomyPhoneContext& context,
     PhoneListingState& listing,
     std::uint32_t quantity)
 {
@@ -673,7 +713,7 @@ Gs1Status process_cart_add(
 }
 
 Gs1Status process_cart_remove(
-    SiteSystemContext<EconomyPhoneSystem>& context,
+    EconomyPhoneContext& context,
     PhoneListingState& listing,
     std::uint32_t quantity)
 {
@@ -693,7 +733,7 @@ Gs1Status process_cart_remove(
     return GS1_STATUS_OK;
 }
 
-Gs1Status process_cart_checkout(SiteSystemContext<EconomyPhoneSystem>& context)
+Gs1Status process_cart_checkout(EconomyPhoneContext& context)
 {
     auto& economy = context.world.own_economy();
     if (cart_item_quantity(economy) == 0U)
@@ -791,7 +831,7 @@ Gs1Status process_cart_checkout(SiteSystemContext<EconomyPhoneSystem>& context)
 }
 
 Gs1Status process_sell_listing(
-    SiteSystemContext<EconomyPhoneSystem>& context,
+    EconomyPhoneContext& context,
     PhoneListingState& listing,
     std::uint32_t quantity)
 {
@@ -836,7 +876,7 @@ Gs1Status process_sell_listing(
 }
 
 Gs1Status process_contractor_hire(
-    SiteSystemContext<EconomyPhoneSystem>& context,
+    EconomyPhoneContext& context,
     const ContractorHireRequestedMessage& payload)
 {
     auto* listing = find_listing(context.world.own_economy(), payload.listing_or_offer_id);
@@ -878,7 +918,7 @@ Gs1Status process_contractor_hire(
 }
 
 Gs1Status process_unlockable_purchase(
-    SiteSystemContext<EconomyPhoneSystem>& context,
+    EconomyPhoneContext& context,
     std::uint32_t unlockable_id,
     std::int32_t price)
 {
@@ -909,7 +949,7 @@ Gs1Status process_unlockable_purchase(
 }
 
 void reveal_unlockable_for_site(
-    SiteSystemContext<EconomyPhoneSystem>& context,
+    EconomyPhoneContext& context,
     std::uint32_t unlockable_id)
 {
     if (unlockable_id == 0U)
@@ -927,7 +967,7 @@ void reveal_unlockable_for_site(
 }
 
 void append_seed_phone_listing(
-    SiteSystemContext<EconomyPhoneSystem>& context,
+    EconomyPhoneContext& context,
     const PrototypePhoneListingContent& listing_content)
 {
     switch (listing_content.kind)
@@ -976,7 +1016,7 @@ void append_seed_phone_listing(
     }
 }
 
-void seed_site_economy(SiteSystemContext<EconomyPhoneSystem>& context, std::uint32_t site_id)
+void seed_site_economy(EconomyPhoneContext& context, std::uint32_t site_id)
 {
     auto& economy = context.world.own_economy();
     const auto* site_content = find_prototype_site_content(SiteId {site_id});
@@ -1010,7 +1050,7 @@ void seed_site_economy(SiteSystemContext<EconomyPhoneSystem>& context, std::uint
 }  // namespace
 
 Gs1Status process_game_message_impl(
-    SiteSystemContext<EconomyPhoneSystem>& context,
+    EconomyPhoneContext& context,
     const GameMessage& message);
 
 bool EconomyPhoneSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
@@ -1019,7 +1059,7 @@ bool EconomyPhoneSystem::subscribes_to_host_message(Gs1HostMessageType type) noe
 }
 
 Gs1Status process_host_message_impl(
-    SiteSystemContext<EconomyPhoneSystem>& context,
+    EconomyPhoneContext& context,
     const Gs1HostMessage& message)
 {
     if (message.type != GS1_HOST_EVENT_UI_ACTION)
@@ -1131,7 +1171,7 @@ bool EconomyPhoneSystem::subscribes_to(GameMessageType type) noexcept
 }
 
 Gs1Status process_game_message_impl(
-    SiteSystemContext<EconomyPhoneSystem>& context,
+    EconomyPhoneContext& context,
     const GameMessage& message)
 {
     switch (message.type)
@@ -1264,7 +1304,7 @@ Gs1Status process_game_message_impl(
     }
 }
 
-void run_impl(SiteSystemContext<EconomyPhoneSystem>& context)
+void run_impl(EconomyPhoneContext& context)
 {
     refresh_dynamic_sell_listings(context);
 }
@@ -1303,9 +1343,9 @@ Gs1Status EconomyPhoneSystem::process_game_message(
 {
     auto access = make_game_state_access<EconomyPhoneSystem>(invocation);
     (void)access;
-    return with_site_system_context<EconomyPhoneSystem>(
+    return with_economy_phone_context(
         invocation,
-        [&](SiteSystemContext<EconomyPhoneSystem>& context)
+        [&](EconomyPhoneContext& context)
         {
             return process_game_message_impl(context, message);
         });
@@ -1317,9 +1357,9 @@ Gs1Status EconomyPhoneSystem::process_host_message(
 {
     auto access = make_game_state_access<EconomyPhoneSystem>(invocation);
     (void)access;
-    return with_site_system_context<EconomyPhoneSystem>(
+    return with_economy_phone_context(
         invocation,
-        [&](SiteSystemContext<EconomyPhoneSystem>& context)
+        [&](EconomyPhoneContext& context)
         {
             return process_host_message_impl(context, message);
         });
@@ -1329,9 +1369,9 @@ void EconomyPhoneSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<EconomyPhoneSystem>(invocation);
     (void)access;
-    (void)with_site_system_context<EconomyPhoneSystem>(
+    (void)with_economy_phone_context(
         invocation,
-        [&](SiteSystemContext<EconomyPhoneSystem>& context)
+        [&](EconomyPhoneContext& context)
         {
             run_impl(context);
             return GS1_STATUS_OK;
@@ -1339,3 +1379,4 @@ void EconomyPhoneSystem::run(RuntimeInvocation& invocation)
         true);
 }
 }  // namespace gs1
+

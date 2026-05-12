@@ -2000,7 +2000,7 @@ std::size_t count_queued_messages(
 
 void complete_seeded_task(
     gs1::testing::SystemTestExecutionContext& context,
-    gs1::SiteSystemContext<gs1::TaskBoardSystem>& site_context,
+    gs1::SiteSystemHarness<gs1::TaskBoardSystem>& site_context,
     gs1::SiteRunState& site_run,
     GameMessageQueue& queue)
 {
@@ -2032,7 +2032,7 @@ void start_task_board_with_owner_snapshots(
     gs1::CampaignState& campaign,
     gs1::SiteRunState& site_run,
     GameMessageQueue& queue,
-    gs1::SiteSystemContext<gs1::TaskBoardSystem>& task_context)
+    gs1::SiteSystemHarness<gs1::TaskBoardSystem>& task_context)
 {
     auto ecology_context = make_site_context<EcologySystem>(campaign, site_run, queue);
     auto local_weather_context = make_site_context<LocalWeatherResolveSystem>(campaign, site_run, queue);
@@ -4121,4 +4121,5 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "task_board",
     "refresh_tick_ignores_onboarding_then_generates_normal_pool",
     task_board_refresh_tick_ignores_onboarding_then_generates_normal_pool);
+
 

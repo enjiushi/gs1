@@ -24,11 +24,36 @@ struct system_state_tags<PhonePanelSystem>
 
 namespace
 {
+struct PhonePanelContext final
+{
+    SiteRunState& site_run;
+    SiteWorldAccess<PhonePanelSystem> world;
+};
+
+template <typename Fn>
+Gs1Status with_phone_panel_context(
+    RuntimeInvocation& invocation,
+    Fn&& fn,
+    bool missing_context_is_ok = false)
+{
+    auto access = make_game_state_access<PhonePanelSystem>(invocation);
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
+    {
+        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
+    }
+
+    PhonePanelContext context {
+        *site_run,
+        SiteWorldAccess<PhonePanelSystem> {*site_run}};
+    return fn(context);
+}
+
 constexpr std::uint32_t k_sell_listing_id_base = 1000U;
 constexpr std::uint64_t k_phone_signature_offset = 14695981039346656037ULL;
 constexpr std::uint64_t k_phone_signature_prime = 1099511628211ULL;
 
-void mark_phone_dirty(SiteSystemContext<PhonePanelSystem>& context) noexcept
+void mark_phone_dirty(PhonePanelContext& context) noexcept
 {
     context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_PHONE);
 }
@@ -110,7 +135,7 @@ void clamp_cart_quantity(PhoneListingState& listing) noexcept
     }
 }
 
-std::vector<std::uint64_t> phone_item_instance_ids(SiteSystemContext<PhonePanelSystem>& context)
+std::vector<std::uint64_t> phone_item_instance_ids(PhonePanelContext& context)
 {
     const auto& craft = context.world.read_craft();
     const auto& inventory = context.world.read_inventory();
@@ -125,7 +150,7 @@ std::vector<std::uint64_t> phone_item_instance_ids(SiteSystemContext<PhonePanelS
 }
 
 std::uint32_t available_global_item_quantity(
-    SiteSystemContext<PhonePanelSystem>& context,
+    PhonePanelContext& context,
     ItemId item_id)
 {
     const auto available_quantity = craft_logic::available_cached_item_quantity(
@@ -235,7 +260,7 @@ PhoneListingState make_sell_listing(ItemId item_id, std::uint32_t quantity) noex
 }
 
 void build_projected_listings(
-    SiteSystemContext<PhonePanelSystem>& context,
+    PhonePanelContext& context,
     std::vector<PhoneListingState>& out_listings)
 {
     out_listings.clear();
@@ -342,7 +367,7 @@ void count_projected_listings(
 }
 
 void sync_phone_panel_projection(
-    SiteSystemContext<PhonePanelSystem>& context,
+    PhonePanelContext& context,
     bool force_dirty = false)
 {
     auto& phone_panel = context.world.own_phone_panel();
@@ -447,7 +472,7 @@ void sync_phone_panel_projection(
 }  // namespace
 
 Gs1Status process_game_message_impl(
-    SiteSystemContext<PhonePanelSystem>& context,
+    PhonePanelContext& context,
     const GameMessage& message);
 
 bool PhonePanelSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
@@ -456,7 +481,7 @@ bool PhonePanelSystem::subscribes_to_host_message(Gs1HostMessageType type) noexc
 }
 
 Gs1Status process_host_message_impl(
-    SiteSystemContext<PhonePanelSystem>& context,
+    PhonePanelContext& context,
     const Gs1HostMessage& message)
 {
     if (message.type != GS1_HOST_EVENT_UI_ACTION)
@@ -510,7 +535,7 @@ bool PhonePanelSystem::subscribes_to(GameMessageType type) noexcept
 }
 
 Gs1Status process_game_message_impl(
-    SiteSystemContext<PhonePanelSystem>& context,
+    PhonePanelContext& context,
     const GameMessage& message)
 {
     switch (message.type)
@@ -585,7 +610,7 @@ Gs1Status process_game_message_impl(
     }
 }
 
-void run_impl(SiteSystemContext<PhonePanelSystem>& context)
+void run_impl(PhonePanelContext& context)
 {
     sync_phone_panel_projection(context);
 }
@@ -624,9 +649,9 @@ Gs1Status PhonePanelSystem::process_game_message(
 {
     auto access = make_game_state_access<PhonePanelSystem>(invocation);
     (void)access;
-    return with_site_system_context<PhonePanelSystem>(
+    return with_phone_panel_context(
         invocation,
-        [&](SiteSystemContext<PhonePanelSystem>& context)
+        [&](PhonePanelContext& context)
         {
             return process_game_message_impl(context, message);
         });
@@ -638,9 +663,9 @@ Gs1Status PhonePanelSystem::process_host_message(
 {
     auto access = make_game_state_access<PhonePanelSystem>(invocation);
     (void)access;
-    return with_site_system_context<PhonePanelSystem>(
+    return with_phone_panel_context(
         invocation,
-        [&](SiteSystemContext<PhonePanelSystem>& context)
+        [&](PhonePanelContext& context)
         {
             return process_host_message_impl(context, message);
         });
@@ -650,9 +675,9 @@ void PhonePanelSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<PhonePanelSystem>(invocation);
     (void)access;
-    (void)with_site_system_context<PhonePanelSystem>(
+    (void)with_phone_panel_context(
         invocation,
-        [&](SiteSystemContext<PhonePanelSystem>& context)
+        [&](PhonePanelContext& context)
         {
             run_impl(context);
             return GS1_STATUS_OK;
@@ -660,3 +685,4 @@ void PhonePanelSystem::run(RuntimeInvocation& invocation)
         true);
 }
 }  // namespace gs1
+

@@ -30,13 +30,41 @@ struct system_state_tags<CraftSystem>
 
 namespace
 {
+struct CraftContext final
+{
+    const CampaignState& campaign;
+    SiteRunState& site_run;
+    SiteWorldAccess<CraftSystem> world;
+};
+
+template <typename Fn>
+Gs1Status with_craft_context(
+    RuntimeInvocation& invocation,
+    Fn&& fn,
+    bool missing_context_is_ok = false)
+{
+    auto access = make_game_state_access<CraftSystem>(invocation);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
+    }
+
+    CraftContext context {
+        *campaign,
+        *site_run,
+        SiteWorldAccess<CraftSystem> {*site_run}};
+    return fn(context);
+}
+
 bool same_tile_coord(TileCoord lhs, TileCoord rhs) noexcept
 {
     return lhs.x == rhs.x && lhs.y == rhs.y;
 }
 
 void refresh_phone_cache(
-    SiteSystemContext<CraftSystem>& context,
+    CraftContext& context,
     std::uint64_t membership_revision)
 {
     auto& phone_cache = context.world.own_craft().phone_cache;
@@ -48,7 +76,7 @@ void refresh_phone_cache(
 }
 
 void refresh_device_caches(
-    SiteSystemContext<CraftSystem>& context,
+    CraftContext& context,
     std::uint64_t membership_revision,
     TileCoord worker_tile)
 {
@@ -86,7 +114,7 @@ void refresh_device_caches(
 }
 
 Gs1Status handle_craft_context_requested(
-    SiteSystemContext<CraftSystem>& context,
+    CraftContext& context,
     const CraftContextRequestedMessage& payload) noexcept
 {
     auto& presentation = context.world.own_craft().context_presentation;
@@ -168,7 +196,7 @@ bool CraftSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
 }
 
 Gs1Status process_host_message_impl(
-    SiteSystemContext<CraftSystem>& context,
+    CraftContext& context,
     const Gs1HostMessage& message)
 {
     if (message.type != GS1_HOST_EVENT_SITE_CONTEXT_REQUEST ||
@@ -200,7 +228,7 @@ bool CraftSystem::subscribes_to(GameMessageType type) noexcept
 }
 
 Gs1Status process_game_message_impl(
-    SiteSystemContext<CraftSystem>& context,
+    CraftContext& context,
     const GameMessage& message)
 {
     switch (message.type)
@@ -224,7 +252,7 @@ Gs1Status process_game_message_impl(
     }
 }
 
-void run_impl(SiteSystemContext<CraftSystem>& context)
+void run_impl(CraftContext& context)
 {
     if (!context.world.has_world() || context.site_run.site_world == nullptr)
     {
@@ -283,9 +311,9 @@ Gs1Status CraftSystem::process_game_message(
 {
     auto access = make_game_state_access<CraftSystem>(invocation);
     (void)access;
-    return with_site_system_context<CraftSystem>(
+    return with_craft_context(
         invocation,
-        [&](SiteSystemContext<CraftSystem>& context)
+        [&](CraftContext& context)
         {
             return process_game_message_impl(context, message);
         });
@@ -297,9 +325,9 @@ Gs1Status CraftSystem::process_host_message(
 {
     auto access = make_game_state_access<CraftSystem>(invocation);
     (void)access;
-    return with_site_system_context<CraftSystem>(
+    return with_craft_context(
         invocation,
-        [&](SiteSystemContext<CraftSystem>& context)
+        [&](CraftContext& context)
         {
             return process_host_message_impl(context, message);
         });
@@ -309,9 +337,9 @@ void CraftSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<CraftSystem>(invocation);
     (void)access;
-    (void)with_site_system_context<CraftSystem>(
+    (void)with_craft_context(
         invocation,
-        [&](SiteSystemContext<CraftSystem>& context)
+        [&](CraftContext& context)
         {
             run_impl(context);
             return GS1_STATUS_OK;
@@ -323,3 +351,4 @@ void CraftSystem::run(RuntimeInvocation& invocation)
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
+

@@ -12,6 +12,36 @@ namespace gs1
 {
 namespace
 {
+struct CampDurabilityContext final
+{
+    SiteRunState& site_run;
+    SiteWorldAccess<CampDurabilitySystem> world;
+    GameMessageQueue& message_queue;
+    double fixed_step_seconds {0.0};
+};
+
+template <typename Fn>
+Gs1Status with_camp_durability_context(
+    RuntimeInvocation& invocation,
+    Fn&& fn,
+    bool missing_context_is_ok = false)
+{
+    auto access = make_game_state_access<CampDurabilitySystem>(invocation);
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    if (!site_run.has_value())
+    {
+        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
+    }
+
+    CampDurabilityContext context {
+        *site_run,
+        SiteWorldAccess<CampDurabilitySystem> {*site_run},
+        invocation.game_message_queue(),
+        fixed_step_seconds};
+    return fn(context);
+}
+
 struct CampDurabilityMemory final
 {
     std::optional<SiteRunId> site_run_id {};
@@ -45,7 +75,7 @@ float compute_event_pressure_ratio(const EventState& event) noexcept
     return std::clamp(total_pressure / tuning.peak_event_pressure_total, 0.0f, 1.0f);
 }
 
-void refresh_memory_with_current_state(SiteSystemContext<CampDurabilitySystem>& context)
+void refresh_memory_with_current_state(CampDurabilityContext& context)
 {
     auto& memory = g_camp_durability_memory;
     const auto& camp = context.world.read_camp();
@@ -56,7 +86,7 @@ void refresh_memory_with_current_state(SiteSystemContext<CampDurabilitySystem>& 
     memory.last_shared_storage_access_enabled = camp.shared_storage_access_enabled;
 }
 
-void ensure_memory_for_run(SiteSystemContext<CampDurabilitySystem>& context)
+void ensure_memory_for_run(CampDurabilityContext& context)
 {
     auto& memory = g_camp_durability_memory;
     if (!memory.site_run_id.has_value() ||
@@ -67,7 +97,7 @@ void ensure_memory_for_run(SiteSystemContext<CampDurabilitySystem>& context)
 }
 
 void apply_projection_if_needed(
-    SiteSystemContext<CampDurabilitySystem>& context,
+    CampDurabilityContext& context,
     float durability,
     bool protection_resolved,
     bool delivery_operational,
@@ -131,9 +161,9 @@ Gs1Status CampDurabilitySystem::process_game_message(
         return GS1_STATUS_OK;
     }
 
-    return with_site_system_context<CampDurabilitySystem>(
+    return with_camp_durability_context(
         invocation,
-        [&](SiteSystemContext<CampDurabilitySystem>& context) -> Gs1Status
+        [&](CampDurabilityContext& context) -> Gs1Status
         {
             auto& camp = context.world.own_camp();
             camp.camp_durability = camp_durability_tuning().durability_max;
@@ -159,9 +189,9 @@ void CampDurabilitySystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<CampDurabilitySystem>(invocation);
     (void)access;
-    (void)with_site_system_context<CampDurabilitySystem>(
+    (void)with_camp_durability_context(
         invocation,
-        [&](SiteSystemContext<CampDurabilitySystem>& context) -> Gs1Status
+        [&](CampDurabilityContext& context) -> Gs1Status
         {
             ensure_memory_for_run(context);
             if (context.fixed_step_seconds <= 0.0)
@@ -201,3 +231,4 @@ void CampDurabilitySystem::run(RuntimeInvocation& invocation)
         });
 }
 }  // namespace gs1
+

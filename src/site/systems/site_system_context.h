@@ -861,31 +861,4 @@ private:
     SiteRunState& site_run_;
 };
 
-template <typename SystemTag>
-struct SiteSystemContext final
-{
-    const CampaignState& campaign;
-    SiteRunState& site_run;
-    SiteWorldAccess<SystemTag> world;
-    GameMessageQueue& message_queue;
-    double fixed_step_seconds {0.0};
-    SiteMoveDirectionInput move_direction {};
-};
-
-template <typename SystemTag>
-[[nodiscard]] inline SiteSystemContext<SystemTag> make_site_system_context(
-    const CampaignState& campaign,
-    SiteRunState& site_run,
-    GameMessageQueue& message_queue,
-    double fixed_step_seconds,
-    SiteMoveDirectionInput move_direction)
-{
-    return SiteSystemContext<SystemTag> {
-        campaign,
-        site_run,
-        SiteWorldAccess<SystemTag> {site_run},
-        message_queue,
-        fixed_step_seconds,
-        move_direction};
-}
 }  // namespace gs1

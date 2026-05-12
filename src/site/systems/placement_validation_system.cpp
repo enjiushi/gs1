@@ -12,6 +12,31 @@ namespace gs1
 {
 namespace
 {
+struct PlacementValidationContext final
+{
+    SiteWorldAccess<PlacementValidationSystem> world;
+    GameMessageQueue& message_queue;
+};
+
+template <typename Fn>
+Gs1Status with_placement_validation_context(
+    RuntimeInvocation& invocation,
+    Fn&& fn,
+    bool missing_context_is_ok = false)
+{
+    auto access = make_game_state_access<PlacementValidationSystem>(invocation);
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
+    {
+        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
+    }
+
+    PlacementValidationContext context {
+        SiteWorldAccess<PlacementValidationSystem> {*site_run},
+        invocation.game_message_queue()};
+    return fn(context);
+}
+
 struct PlacementReservationRecord final
 {
     SiteRunId site_run_id {};
@@ -144,13 +169,13 @@ PlacementReservationRejectionReason validate_request(
     return rejection_reason;
 }
 
-void handle_site_run_started(SiteSystemContext<PlacementValidationSystem>& context) noexcept
+void handle_site_run_started(PlacementValidationContext& context) noexcept
 {
     prune_reservations_for_run(context.world.site_run_id());
 }
 
 void handle_reservation_requested(
-    SiteSystemContext<PlacementValidationSystem>& context,
+    PlacementValidationContext& context,
     const PlacementReservationRequestedMessage& payload)
 {
     const TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
@@ -267,9 +292,9 @@ Gs1Status PlacementValidationSystem::process_game_message(
 {
     auto access = make_game_state_access<PlacementValidationSystem>(invocation);
     (void)access;
-    return with_site_system_context<PlacementValidationSystem>(
+    return with_placement_validation_context(
         invocation,
-        [&](SiteSystemContext<PlacementValidationSystem>& context) -> Gs1Status
+        [&](PlacementValidationContext& context) -> Gs1Status
         {
             switch (message.type)
             {
@@ -309,12 +334,13 @@ void PlacementValidationSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<PlacementValidationSystem>(invocation);
     (void)access;
-    (void)with_site_system_context<PlacementValidationSystem>(
+    (void)with_placement_validation_context(
         invocation,
-        [&](SiteSystemContext<PlacementValidationSystem>& context) -> Gs1Status
+        [&](PlacementValidationContext& context) -> Gs1Status
         {
             (void)context;
             return GS1_STATUS_OK;
         });
 }
 }  // namespace gs1
+

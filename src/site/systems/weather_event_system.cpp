@@ -15,6 +15,34 @@ namespace gs1
 {
 namespace
 {
+struct WeatherEventContext final
+{
+    SiteWorldAccess<WeatherEventSystem> world;
+    GameMessageQueue& message_queue;
+    double fixed_step_seconds {0.0};
+};
+
+template <typename Fn>
+Gs1Status with_weather_event_context(
+    RuntimeInvocation& invocation,
+    Fn&& fn,
+    bool missing_context_is_ok = false)
+{
+    auto access = make_game_state_access<WeatherEventSystem>(invocation);
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    if (!site_run.has_value())
+    {
+        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
+    }
+
+    WeatherEventContext context {
+        SiteWorldAccess<WeatherEventSystem> {*site_run},
+        invocation.game_message_queue(),
+        fixed_step_seconds};
+    return fn(context);
+}
+
 constexpr float k_mild_weather_heat = 15.0f;
 constexpr float k_mild_weather_wind = 10.0f;
 constexpr float k_mild_weather_dust = 5.0f;
@@ -44,7 +72,7 @@ bool has_pending_site_transition_message(
 }
 
 void emit_site_one_weather_probe_log(
-    SiteSystemContext<WeatherEventSystem>& context,
+    WeatherEventContext& context,
     const char* label,
     float heat,
     float wind,
@@ -98,7 +126,7 @@ struct SiteBaselineWeather final
 }
 
 void apply_site_weather(
-    SiteSystemContext<WeatherEventSystem>& context,
+    WeatherEventContext& context,
     float heat,
     float wind,
     float dust,
@@ -164,7 +192,7 @@ float smooth_wind_direction_degrees(float current, float target, float lerp_fact
 }
 
 void smooth_site_weather_toward(
-    SiteSystemContext<WeatherEventSystem>& context,
+    WeatherEventContext& context,
     float target_heat,
     float target_wind,
     float target_dust,
@@ -327,7 +355,7 @@ float resolve_event_pressure_scale(
 }
 
 float resolve_event_wind_direction(
-    const SiteSystemContext<WeatherEventSystem>& context) noexcept
+    const WeatherEventContext& context) noexcept
 {
     const auto& objective = context.world.read_objective();
     if (objective_uses_repeating_weather_waves(objective))
@@ -348,7 +376,7 @@ float resolve_event_wind_direction(
 }
 
 double resolve_next_wave_delay_minutes(
-    const SiteSystemContext<WeatherEventSystem>& context,
+    const WeatherEventContext& context,
     std::uint32_t wave_sequence_index) noexcept
 {
     const float sample =
@@ -371,7 +399,7 @@ void clear_event_timeline(EventState& event) noexcept
     event.event_dust_pressure = 0.0f;
 }
 
-void start_next_wave(SiteSystemContext<WeatherEventSystem>& context)
+void start_next_wave(WeatherEventContext& context)
 {
     auto& event = context.world.own_event();
     const double world_time_minutes = context.world.read_time().world_time_minutes;
@@ -424,9 +452,9 @@ Gs1Status WeatherEventSystem::process_game_message(
         return GS1_STATUS_OK;
     }
 
-    return with_site_system_context<WeatherEventSystem>(
+    return with_weather_event_context(
         invocation,
-        [&](SiteSystemContext<WeatherEventSystem>& context) -> Gs1Status
+        [&](WeatherEventContext& context) -> Gs1Status
         {
             auto& weather = context.world.own_weather();
             auto& event = context.world.own_event();
@@ -498,9 +526,9 @@ void WeatherEventSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<WeatherEventSystem>(invocation);
     (void)access;
-    (void)with_site_system_context<WeatherEventSystem>(
+    (void)with_weather_event_context(
         invocation,
-        [&](SiteSystemContext<WeatherEventSystem>& context) -> Gs1Status
+        [&](WeatherEventContext& context) -> Gs1Status
         {
             const double step_minutes =
                 runtime_minutes_from_real_seconds(context.fixed_step_seconds);
@@ -599,3 +627,4 @@ void WeatherEventSystem::run(RuntimeInvocation& invocation)
         });
 }
 }  // namespace gs1
+

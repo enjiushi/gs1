@@ -17,6 +17,31 @@
 
 namespace
 {
+struct DeviceWeatherContributionContext final
+{
+    gs1::SiteRunState& site_run;
+    gs1::SiteWorldAccess<gs1::DeviceWeatherContributionSystem> world;
+};
+
+template <typename Fn>
+Gs1Status with_device_weather_contribution_context(
+    gs1::RuntimeInvocation& invocation,
+    Fn&& fn,
+    bool missing_context_is_ok = false)
+{
+    auto access = gs1::make_game_state_access<gs1::DeviceWeatherContributionSystem>(invocation);
+    auto& site_run = access.template read<gs1::RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
+    {
+        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
+    }
+
+    DeviceWeatherContributionContext context {
+        *site_run,
+        gs1::SiteWorldAccess<gs1::DeviceWeatherContributionSystem> {*site_run}};
+    return fn(context);
+}
+
 [[nodiscard]] bool device_tile_is_support_anchor(
     gs1::TileCoord coord,
     gs1::StructureId structure_id) noexcept
@@ -85,7 +110,7 @@ void clear_dirty_tiles(gs1::DeviceWeatherContributionState& state) noexcept
 }
 
 void mark_tiles_affected_by_source(
-    gs1::SiteSystemContext<gs1::DeviceWeatherContributionSystem>& context,
+    DeviceWeatherContributionContext& context,
     gs1::DeviceWeatherContributionState& state,
     gs1::TileCoord source_coord)
 {
@@ -107,7 +132,7 @@ void mark_tiles_affected_by_source(
 }
 
 gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
-    gs1::SiteSystemContext<gs1::DeviceWeatherContributionSystem>& context,
+    DeviceWeatherContributionContext& context,
     const gs1::WeatherDirectionStep& wind_direction,
     gs1::TileCoord target_coord)
 {
@@ -198,7 +223,7 @@ gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
 }
 
 void write_tile_contribution(
-    gs1::SiteSystemContext<gs1::DeviceWeatherContributionSystem>& context,
+    DeviceWeatherContributionContext& context,
     std::uint32_t tile_index,
     const gs1::SiteWorld::TileWeatherContributionData& contribution)
 {
@@ -220,6 +245,111 @@ void write_tile_contribution(
         contribution.fertility_improve,
         contribution.salinity_reduction,
         contribution.irrigation});
+}
+
+Gs1Status process_message(
+    DeviceWeatherContributionContext& context,
+    const gs1::GameMessage& message)
+{
+    if (!context.world.has_world())
+    {
+        return GS1_STATUS_OK;
+    }
+
+    auto& runtime = context.world.own_device_weather_runtime();
+    ensure_runtime_buffers(runtime, context.world.tile_count());
+
+    switch (message.type)
+    {
+    case gs1::GameMessageType::SiteRunStarted:
+        runtime.full_rebuild_pending = true;
+        return GS1_STATUS_OK;
+
+    case gs1::GameMessageType::SiteDevicePlaced:
+    {
+        const auto& payload = message.payload_as<gs1::SiteDevicePlacedMessage>();
+        mark_tiles_affected_by_source(
+            context,
+            runtime,
+            gs1::TileCoord {payload.target_tile_x, payload.target_tile_y});
+        return GS1_STATUS_OK;
+    }
+
+    case gs1::GameMessageType::SiteDeviceBroken:
+    {
+        const auto& payload = message.payload_as<gs1::SiteDeviceBrokenMessage>();
+        mark_tiles_affected_by_source(
+            context,
+            runtime,
+            gs1::TileCoord {payload.target_tile_x, payload.target_tile_y});
+        return GS1_STATUS_OK;
+    }
+
+    case gs1::GameMessageType::SiteDeviceRepaired:
+    {
+        const auto& payload = message.payload_as<gs1::SiteDeviceRepairedMessage>();
+        mark_tiles_affected_by_source(
+            context,
+            runtime,
+            gs1::TileCoord {payload.target_tile_x, payload.target_tile_y});
+        return GS1_STATUS_OK;
+    }
+
+    case gs1::GameMessageType::SiteDeviceConditionChanged:
+    {
+        const auto& payload = message.payload_as<gs1::SiteDeviceConditionChangedMessage>();
+        mark_tiles_affected_by_source(
+            context,
+            runtime,
+            gs1::TileCoord {payload.target_tile_x, payload.target_tile_y});
+        return GS1_STATUS_OK;
+    }
+
+    default:
+        return GS1_STATUS_OK;
+    }
+}
+
+void run_context(DeviceWeatherContributionContext& context)
+{
+    if (!context.world.has_world())
+    {
+        return;
+    }
+
+    auto& runtime = context.world.own_device_weather_runtime();
+    ensure_runtime_buffers(runtime, context.world.tile_count());
+
+    const std::uint8_t wind_sector = gs1::quantize_wind_direction_sector(
+        context.world.read_weather().weather_wind_direction_degrees);
+    if (runtime.last_wind_direction_sector != wind_sector)
+    {
+        runtime.last_wind_direction_sector = wind_sector;
+        runtime.full_rebuild_pending = true;
+    }
+
+    if (runtime.full_rebuild_pending)
+    {
+        mark_all_tiles_dirty(runtime, context.world.tile_count());
+    }
+
+    if (runtime.dirty_tile_indices.empty())
+    {
+        return;
+    }
+
+    const gs1::WeatherDirectionStep wind_direction =
+        gs1::resolve_wind_direction_step(context.world.read_weather().weather_wind_direction_degrees);
+    for (const std::uint32_t tile_index : runtime.dirty_tile_indices)
+    {
+        const gs1::TileCoord target_coord = context.world.tile_coord(tile_index);
+        write_tile_contribution(
+            context,
+            tile_index,
+            recompute_tile_contribution(context, wind_direction, target_coord));
+    }
+
+    clear_dirty_tiles(runtime);
 }
 }  // namespace
 
@@ -262,78 +392,15 @@ bool DeviceWeatherContributionSystem::subscribes_to(GameMessageType type) noexce
         type == GameMessageType::SiteDeviceConditionChanged;
 }
 
-Gs1Status DeviceWeatherContributionSystem::process_message(
-    SiteSystemContext<DeviceWeatherContributionSystem>& context,
-    const GameMessage& message)
-{
-    if (!context.world.has_world())
-    {
-        return GS1_STATUS_OK;
-    }
-
-    auto& runtime = context.world.own_device_weather_runtime();
-    ensure_runtime_buffers(runtime, context.world.tile_count());
-
-    switch (message.type)
-    {
-    case GameMessageType::SiteRunStarted:
-        runtime.full_rebuild_pending = true;
-        return GS1_STATUS_OK;
-
-    case GameMessageType::SiteDevicePlaced:
-    {
-        const auto& payload = message.payload_as<SiteDevicePlacedMessage>();
-        mark_tiles_affected_by_source(
-            context,
-            runtime,
-            TileCoord {payload.target_tile_x, payload.target_tile_y});
-        return GS1_STATUS_OK;
-    }
-
-    case GameMessageType::SiteDeviceBroken:
-    {
-        const auto& payload = message.payload_as<SiteDeviceBrokenMessage>();
-        mark_tiles_affected_by_source(
-            context,
-            runtime,
-            TileCoord {payload.target_tile_x, payload.target_tile_y});
-        return GS1_STATUS_OK;
-    }
-
-    case GameMessageType::SiteDeviceRepaired:
-    {
-        const auto& payload = message.payload_as<SiteDeviceRepairedMessage>();
-        mark_tiles_affected_by_source(
-            context,
-            runtime,
-            TileCoord {payload.target_tile_x, payload.target_tile_y});
-        return GS1_STATUS_OK;
-    }
-
-    case GameMessageType::SiteDeviceConditionChanged:
-    {
-        const auto& payload = message.payload_as<SiteDeviceConditionChangedMessage>();
-        mark_tiles_affected_by_source(
-            context,
-            runtime,
-            TileCoord {payload.target_tile_x, payload.target_tile_y});
-        return GS1_STATUS_OK;
-    }
-
-    default:
-        return GS1_STATUS_OK;
-    }
-}
-
 Gs1Status DeviceWeatherContributionSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
     auto access = make_game_state_access<DeviceWeatherContributionSystem>(invocation);
     (void)access;
-    return with_site_system_context<DeviceWeatherContributionSystem>(
+    return with_device_weather_contribution_context(
         invocation,
-        [&](SiteSystemContext<DeviceWeatherContributionSystem>& context) -> Gs1Status
+        [&](DeviceWeatherContributionContext& context) -> Gs1Status
         {
             return process_message(context, message);
         });
@@ -349,57 +416,15 @@ Gs1Status DeviceWeatherContributionSystem::process_host_message(
     return GS1_STATUS_OK;
 }
 
-void DeviceWeatherContributionSystem::run(SiteSystemContext<DeviceWeatherContributionSystem>& context)
-{
-    if (!context.world.has_world())
-    {
-        return;
-    }
-
-    auto& runtime = context.world.own_device_weather_runtime();
-    ensure_runtime_buffers(runtime, context.world.tile_count());
-
-    const std::uint8_t wind_sector = quantize_wind_direction_sector(
-        context.world.read_weather().weather_wind_direction_degrees);
-    if (runtime.last_wind_direction_sector != wind_sector)
-    {
-        runtime.last_wind_direction_sector = wind_sector;
-        runtime.full_rebuild_pending = true;
-    }
-
-    if (runtime.full_rebuild_pending)
-    {
-        mark_all_tiles_dirty(runtime, context.world.tile_count());
-    }
-
-    if (runtime.dirty_tile_indices.empty())
-    {
-        return;
-    }
-
-    const WeatherDirectionStep wind_direction =
-        resolve_wind_direction_step(context.world.read_weather().weather_wind_direction_degrees);
-    for (const std::uint32_t tile_index : runtime.dirty_tile_indices)
-    {
-        const TileCoord target_coord = context.world.tile_coord(tile_index);
-        write_tile_contribution(
-            context,
-            tile_index,
-            recompute_tile_contribution(context, wind_direction, target_coord));
-    }
-
-    clear_dirty_tiles(runtime);
-}
-
 void DeviceWeatherContributionSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<DeviceWeatherContributionSystem>(invocation);
     (void)access;
-    (void)with_site_system_context<DeviceWeatherContributionSystem>(
+    (void)with_device_weather_contribution_context(
         invocation,
-        [&](SiteSystemContext<DeviceWeatherContributionSystem>& context) -> Gs1Status
+        [&](DeviceWeatherContributionContext& context) -> Gs1Status
         {
-            run(context);
+            run_context(context);
             return GS1_STATUS_OK;
         });
 }
@@ -408,3 +433,5 @@ void DeviceWeatherContributionSystem::run(RuntimeInvocation& invocation)
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
+
+

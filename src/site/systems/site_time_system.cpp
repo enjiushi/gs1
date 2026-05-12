@@ -12,6 +12,36 @@ namespace gs1
 {
 namespace
 {
+struct SiteTimeContext final
+{
+    SiteRunState& site_run;
+    SiteWorldAccess<SiteTimeSystem> world;
+    GameMessageQueue& message_queue;
+    double fixed_step_seconds {0.0};
+};
+
+template <typename Fn>
+Gs1Status with_site_time_context(
+    RuntimeInvocation& invocation,
+    Fn&& fn,
+    bool missing_context_is_ok = false)
+{
+    auto access = make_game_state_access<SiteTimeSystem>(invocation);
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    if (!site_run.has_value())
+    {
+        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
+    }
+
+    SiteTimeContext context {
+        *site_run,
+        SiteWorldAccess<SiteTimeSystem> {*site_run},
+        invocation.game_message_queue(),
+        fixed_step_seconds};
+    return fn(context);
+}
+
 DayPhase resolve_day_phase(double world_time_minutes)
 {
     const double minute_in_day = std::fmod(world_time_minutes, k_runtime_minutes_per_day);
@@ -81,9 +111,9 @@ void SiteTimeSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<SiteTimeSystem>(invocation);
     (void)access;
-    (void)with_site_system_context<SiteTimeSystem>(
+    (void)with_site_time_context(
         invocation,
-        [&](SiteSystemContext<SiteTimeSystem>& context) -> Gs1Status
+        [&](SiteTimeContext& context) -> Gs1Status
         {
             auto& clock = context.world.own_time();
             const double step_minutes =
@@ -115,3 +145,4 @@ void SiteTimeSystem::run(RuntimeInvocation& invocation)
         });
 }
 }  // namespace gs1
+

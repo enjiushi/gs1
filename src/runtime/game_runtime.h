@@ -8,7 +8,6 @@
 #include "runtime/runtime_clock.h"
 #include "runtime/system_interface.h"
 #include "site/site_run_state.h"
-#include "site/systems/site_system_context.h"
 #include "gs1/status.h"
 #include "gs1/types.h"
 
@@ -101,33 +100,5 @@ private:
     bool boot_initialized_ {false};
 };
 
-template <typename SystemTag, typename Fn>
-Gs1Status with_site_system_context(
-    RuntimeInvocation& invocation,
-    Fn&& fn,
-    bool missing_context_is_ok = false)
-{
-    auto access = make_game_state_access<SystemTag>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    const auto fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
-    const auto move_direction = access.template read<RuntimeMoveDirectionTag>();
-    if (!campaign.has_value() || !site_run.has_value())
-    {
-        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
-    }
-
-    auto context = make_site_system_context<SystemTag>(
-        *campaign,
-        *site_run,
-        invocation.game_message_queue(),
-        fixed_step_seconds,
-        SiteMoveDirectionInput {
-            move_direction.world_move_x,
-            move_direction.world_move_y,
-            move_direction.world_move_z,
-            move_direction.present});
-    return fn(context);
-}
 }  // namespace gs1
 

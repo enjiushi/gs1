@@ -56,6 +56,36 @@ std::optional<std::uint32_t> EcologySystem::fixed_step_order() const noexcept
 
 namespace
 {
+struct EcologyContext final
+{
+    SiteRunState& site_run;
+    SiteWorldAccess<EcologySystem> world;
+    GameMessageQueue& message_queue;
+    double fixed_step_seconds {0.0};
+};
+
+template <typename Fn>
+Gs1Status with_ecology_context(
+    RuntimeInvocation& invocation,
+    Fn&& fn,
+    bool missing_context_is_ok = false)
+{
+    auto access = make_game_state_access<EcologySystem>(invocation);
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    if (!site_run.has_value())
+    {
+        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
+    }
+
+    EcologyContext context {
+        *site_run,
+        SiteWorldAccess<EcologySystem> {*site_run},
+        invocation.game_message_queue(),
+        fixed_step_seconds};
+    return fn(context);
+}
+
 constexpr float k_density_epsilon = 0.0001f;
 constexpr float k_density_epsilon_raw = 0.01f;
 constexpr float k_meter_scale = 100.0f;
@@ -148,7 +178,7 @@ bool site_one_starter_ephedra_density_lock_active(
 }
 
 bool should_emit_site_one_probe_log(
-    SiteSystemContext<EcologySystem>& context,
+    EcologyContext& context,
     TileCoord coord) noexcept
 {
     return context.world.has_world() &&
@@ -569,7 +599,7 @@ void append_tile_ecology_batch_entry(
 }
 
 flecs::entity tile_entity(
-    SiteSystemContext<EcologySystem>& context,
+    EcologyContext& context,
     TileCoord coord) noexcept
 {
     if (context.site_run.site_world == nullptr || !context.world.tile_coord_in_bounds(coord))
@@ -582,7 +612,7 @@ flecs::entity tile_entity(
 }
 
 float last_reported_tile_density_or(
-    SiteSystemContext<EcologySystem>& context,
+    EcologyContext& context,
     TileCoord coord,
     float fallback) noexcept
 {
@@ -597,7 +627,7 @@ float last_reported_tile_density_or(
 }
 
 void set_last_reported_tile_density(
-    SiteSystemContext<EcologySystem>& context,
+    EcologyContext& context,
     TileCoord coord,
     float density) noexcept
 {
@@ -614,7 +644,7 @@ void set_last_reported_tile_density(
 }
 
 void mark_dirty_tile_ecology(
-    SiteSystemContext<EcologySystem>& context,
+    EcologyContext& context,
     TileCoord coord,
     std::uint32_t changed_mask)
 {
@@ -643,7 +673,7 @@ void mark_dirty_tile_ecology(
 }
 
 std::vector<ActiveEcologyCoord> collect_active_ecology_coords(
-    SiteSystemContext<EcologySystem>& context)
+    EcologyContext& context)
 {
     std::vector<ActiveEcologyCoord> coords {};
     if (context.site_run.site_world == nullptr)
@@ -663,7 +693,7 @@ std::vector<ActiveEcologyCoord> collect_active_ecology_coords(
 }
 
 void flush_dirty_tile_ecology_batches(
-    SiteSystemContext<EcologySystem>& context)
+    EcologyContext& context)
 {
     if (context.site_run.site_world == nullptr)
     {
@@ -742,7 +772,7 @@ void flush_dirty_tile_ecology_batches(
 }
 
 void emit_plant_density_changed_log(
-    SiteSystemContext<EcologySystem>& context,
+    EcologyContext& context,
     TileCoord coord,
     PlantId plant_id,
     float previous_density,
@@ -774,7 +804,7 @@ void emit_plant_density_changed_log(
 }
 
 void emit_site_one_startup_probe_log(
-    SiteSystemContext<EcologySystem>& context,
+    EcologyContext& context,
     TileCoord coord,
     const SiteWorld::TileEcologyData& ecology)
 {
@@ -802,7 +832,7 @@ void emit_site_one_startup_probe_log(
 }
 
 void emit_site_one_ecology_probe_log(
-    SiteSystemContext<EcologySystem>& context,
+    EcologyContext& context,
     TileCoord coord,
     const SiteWorld::TileEcologyData& ecology,
     float density_delta,
@@ -833,7 +863,7 @@ void emit_site_one_ecology_probe_log(
 }
 
 bool density_crosses_report_threshold(
-    SiteSystemContext<EcologySystem>& context,
+    EcologyContext& context,
     TileCoord coord,
     float fallback_last_reported_density,
     float next_density) noexcept
@@ -901,7 +931,7 @@ std::uint32_t apply_ground_cover(
 }
 
 std::uint32_t apply_planting(
-    SiteSystemContext<EcologySystem>& context,
+    EcologyContext& context,
     TileCoord coord,
     const SiteTilePlantingCompletedMessage& payload)
 {
@@ -1007,7 +1037,7 @@ std::uint32_t apply_watering(
 }
 
 std::uint32_t apply_burial_cleared(
-    SiteSystemContext<EcologySystem>& context,
+    EcologyContext& context,
     TileCoord coord,
     const SiteTileBurialClearedMessage& payload)
 {
@@ -1050,7 +1080,7 @@ std::uint32_t apply_burial_cleared(
 }
 
 std::uint32_t apply_harvest(
-    SiteSystemContext<EcologySystem>& context,
+    EcologyContext& context,
     TileCoord coord,
     const SiteTileHarvestedMessage& payload)
 {
@@ -1107,7 +1137,7 @@ std::uint32_t apply_harvest(
 }
 
 void update_restoration_progress(
-    SiteSystemContext<EcologySystem>& context,
+    EcologyContext& context,
     std::uint32_t new_count)
 {
     auto& counters = context.world.own_counters();
@@ -1149,7 +1179,7 @@ float compute_highway_sand_cover_delta(
 }
 
 void update_highway_protection_progress(
-    SiteSystemContext<EcologySystem>& context,
+    EcologyContext& context,
     float average_sand_cover)
 {
     auto& counters = context.world.own_counters();
@@ -1181,7 +1211,7 @@ void update_highway_protection_progress(
 }
 
 void update_living_plant_stability(
-    SiteSystemContext<EcologySystem>& context,
+    EcologyContext& context,
     std::uint32_t tracked_living_plant_count,
     bool any_tracked_plant_withering)
 {
@@ -1216,7 +1246,7 @@ void update_living_plant_stability(
 }
 
 void emit_startup_ecology_snapshots(
-    SiteSystemContext<EcologySystem>& context) noexcept
+    EcologyContext& context) noexcept
 {
     if (!context.world.has_world())
     {
@@ -1274,9 +1304,9 @@ Gs1Status EcologySystem::process_game_message(
 {
     auto access = make_game_state_access<EcologySystem>(invocation);
     (void)access;
-    return with_site_system_context<EcologySystem>(
+    return with_ecology_context(
         invocation,
-        [&](SiteSystemContext<EcologySystem>& context) -> Gs1Status
+        [&](EcologyContext& context) -> Gs1Status
         {
             switch (message.type)
             {
@@ -1382,9 +1412,9 @@ void EcologySystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<EcologySystem>(invocation);
     (void)access;
-    (void)with_site_system_context<EcologySystem>(
+    (void)with_ecology_context(
         invocation,
-        [&](SiteSystemContext<EcologySystem>& context) -> Gs1Status
+        [&](EcologyContext& context) -> Gs1Status
         {
             if (!context.world.has_world())
             {
@@ -1721,3 +1751,4 @@ void EcologySystem::run(RuntimeInvocation& invocation)
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
+

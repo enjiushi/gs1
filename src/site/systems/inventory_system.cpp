@@ -43,6 +43,36 @@ struct system_state_tags<InventorySystem>
 
 namespace
 {
+struct InventoryContext final
+{
+    const CampaignState& campaign;
+    SiteRunState& site_run;
+    SiteWorldAccess<InventorySystem> world;
+    GameMessageQueue& message_queue;
+};
+
+template <typename Fn>
+Gs1Status with_inventory_context(
+    RuntimeInvocation& invocation,
+    Fn&& fn,
+    bool missing_context_is_ok = false)
+{
+    auto access = make_game_state_access<InventorySystem>(invocation);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
+    }
+
+    InventoryContext context {
+        *campaign,
+        *site_run,
+        SiteWorldAccess<InventorySystem> {*site_run},
+        invocation.game_message_queue()};
+    return fn(context);
+}
+
 constexpr std::uint32_t k_delivery_box_storage_flags =
     inventory_storage::k_inventory_storage_flag_delivery_box |
     inventory_storage::k_inventory_storage_flag_retrieval_only;
@@ -53,7 +83,7 @@ std::uint32_t normalize_quantity(std::uint32_t quantity) noexcept
 }
 
 Gs1Status resolve_inventory_item_use(
-    SiteSystemContext<InventorySystem>& context,
+    InventoryContext& context,
     flecs::entity item_entity,
     std::uint32_t quantity) noexcept;
 
@@ -120,7 +150,7 @@ bool storage_has_any_item(SiteRunState& site_run) noexcept
     return false;
 }
 
-bool ensure_device_storage_containers(SiteSystemContext<InventorySystem>& context) noexcept;
+bool ensure_device_storage_containers(InventoryContext& context) noexcept;
 
 bool storage_is_retrieval_only(const StorageContainerState& storage_state) noexcept
 {
@@ -153,7 +183,7 @@ bool clear_pending_device_storage_open_for_storage(
 }
 
 bool open_device_storage_now(
-    SiteSystemContext<InventorySystem>& context,
+    InventoryContext& context,
     std::uint32_t storage_id) noexcept
 {
     auto& inventory = context.world.own_inventory();
@@ -165,7 +195,7 @@ bool open_device_storage_now(
 }
 
 void close_opened_device_storage_if_out_of_range(
-    SiteSystemContext<InventorySystem>& context) noexcept
+    InventoryContext& context) noexcept
 {
     auto& inventory = context.world.own_inventory();
     if (inventory.opened_device_storage_id == 0U)
@@ -189,7 +219,7 @@ void close_opened_device_storage_if_out_of_range(
     }
 }
 
-void progress_pending_device_storage_open(SiteSystemContext<InventorySystem>& context) noexcept
+void progress_pending_device_storage_open(InventoryContext& context) noexcept
 {
     auto& inventory = context.world.own_inventory();
     if (!has_pending_device_storage_open(inventory))
@@ -225,7 +255,7 @@ void progress_pending_device_storage_open(SiteSystemContext<InventorySystem>& co
     (void)open_device_storage_now(context, storage_id);
 }
 
-bool ensure_inventory_storage_initialized(SiteSystemContext<InventorySystem>& context) noexcept
+bool ensure_inventory_storage_initialized(InventoryContext& context) noexcept
 {
     auto& inventory = context.world.own_inventory();
     const bool resized =
@@ -237,7 +267,7 @@ bool ensure_inventory_storage_initialized(SiteSystemContext<InventorySystem>& co
     return resized;
 }
 
-bool ensure_device_storage_containers(SiteSystemContext<InventorySystem>& context) noexcept
+bool ensure_device_storage_containers(InventoryContext& context) noexcept
 {
     if (!context.world.has_world() || context.site_run.site_world == nullptr)
     {
@@ -295,7 +325,7 @@ bool ensure_device_storage_containers(SiteSystemContext<InventorySystem>& contex
     return created_any;
 }
 
-flecs::entity resolve_delivery_box_container(SiteSystemContext<InventorySystem>& context) noexcept
+flecs::entity resolve_delivery_box_container(InventoryContext& context) noexcept
 {
     if (!context.world.has_world() || context.site_run.site_world == nullptr)
     {
@@ -330,7 +360,7 @@ flecs::entity resolve_delivery_box_container(SiteSystemContext<InventorySystem>&
 }
 
 void mark_changed_slot_views(
-    SiteSystemContext<InventorySystem>& context,
+    InventoryContext& context,
     const std::vector<InventorySlot>& before_worker,
     std::uint32_t before_opened_storage_id,
     const std::vector<InventorySlot>& before_opened_storage) noexcept
@@ -404,7 +434,7 @@ void mark_changed_slot_views(
 
 template <typename Func>
 Gs1Status mutate_inventory_storage(
-    SiteSystemContext<InventorySystem>& context,
+    InventoryContext& context,
     Func&& func)
 {
     const bool storage_changed = ensure_inventory_storage_initialized(context);
@@ -500,7 +530,7 @@ std::uint32_t total_reserved_item_quantity(
 }
 
 void emit_item_use_completed(
-    SiteSystemContext<InventorySystem>& context,
+    InventoryContext& context,
     ItemId item_id,
     std::uint32_t quantity) noexcept
 {
@@ -514,7 +544,7 @@ void emit_item_use_completed(
 }
 
 void emit_item_use_action_request(
-    SiteSystemContext<InventorySystem>& context,
+    InventoryContext& context,
     ActionKind action_kind,
     const ItemDef& item_def,
     std::uint16_t quantity) noexcept
@@ -585,7 +615,7 @@ PendingDelivery make_pending_delivery(
 }
 
 void try_add_delivery_to_crate(
-    SiteSystemContext<InventorySystem>& context,
+    InventoryContext& context,
     PendingDelivery& delivery) noexcept
 {
     const auto delivery_box = resolve_delivery_box_container(context);
@@ -620,7 +650,7 @@ void try_add_delivery_to_crate(
     }
 }
 
-void seed_inventory_from_loadout(SiteSystemContext<InventorySystem>& context) noexcept
+void seed_inventory_from_loadout(InventoryContext& context) noexcept
 {
     ensure_inventory_storage_initialized(context);
     if (inventory_has_any_item(context.world.read_inventory()) || storage_has_any_item(context.site_run))
@@ -660,7 +690,7 @@ void seed_inventory_from_loadout(SiteSystemContext<InventorySystem>& context) no
 }
 
 Gs1Status handle_inventory_item_use(
-    SiteSystemContext<InventorySystem>& context,
+    InventoryContext& context,
     const InventoryItemUseRequestedMessage& payload) noexcept
 {
     return mutate_inventory_storage(context, [&]() -> Gs1Status {
@@ -688,7 +718,7 @@ Gs1Status handle_inventory_item_use(
 }
 
 Gs1Status resolve_inventory_item_use(
-    SiteSystemContext<InventorySystem>& context,
+    InventoryContext& context,
     flecs::entity item_entity,
     std::uint32_t quantity) noexcept
 {
@@ -740,7 +770,7 @@ Gs1Status resolve_inventory_item_use(
 }
 
 Gs1Status handle_inventory_item_consume(
-    SiteSystemContext<InventorySystem>& context,
+    InventoryContext& context,
     const InventoryItemConsumeRequestedMessage& payload) noexcept
 {
     return mutate_inventory_storage(context, [&]() -> Gs1Status {
@@ -788,7 +818,7 @@ Gs1Status handle_inventory_item_consume(
 }
 
 Gs1Status handle_inventory_global_item_consume(
-    SiteSystemContext<InventorySystem>& context,
+    InventoryContext& context,
     const InventoryGlobalItemConsumeRequestedMessage& payload) noexcept
 {
     return mutate_inventory_storage(context, [&]() -> Gs1Status {
@@ -836,7 +866,7 @@ Gs1Status handle_inventory_global_item_consume(
 }
 
 Gs1Status handle_inventory_craft_commit(
-    SiteSystemContext<InventorySystem>& context,
+    InventoryContext& context,
     const InventoryCraftCommitRequestedMessage& payload) noexcept
 {
     return mutate_inventory_storage(context, [&]() -> Gs1Status {
@@ -945,7 +975,7 @@ Gs1Status handle_inventory_craft_commit(
 }
 
 Gs1Status handle_site_device_broken(
-    SiteSystemContext<InventorySystem>& context,
+    InventoryContext& context,
     const SiteDeviceBrokenMessage& payload) noexcept
 {
     return mutate_inventory_storage(context, [&]() -> Gs1Status {
@@ -972,7 +1002,7 @@ Gs1Status handle_site_device_broken(
 }
 
 Gs1Status resolve_inventory_transfer(
-    SiteSystemContext<InventorySystem>& context,
+    InventoryContext& context,
     const InventoryTransferRequestedMessage& payload) noexcept
 {
     const bool auto_resolve_destination = transfer_resolves_destination_in_dll(payload);
@@ -1159,7 +1189,7 @@ Gs1Status resolve_inventory_transfer(
 }
 
 Gs1Status handle_inventory_transfer(
-    SiteSystemContext<InventorySystem>& context,
+    InventoryContext& context,
     const InventoryTransferRequestedMessage& payload) noexcept
 {
     return mutate_inventory_storage(context, [&]() -> Gs1Status {
@@ -1168,7 +1198,7 @@ Gs1Status handle_inventory_transfer(
 }
 
 Gs1Status handle_inventory_slot_tapped(
-    SiteSystemContext<InventorySystem>& context,
+    InventoryContext& context,
     const InventorySlotTappedMessage& payload) noexcept
 {
     if (payload.storage_id == 0U ||
@@ -1268,7 +1298,7 @@ Gs1Status handle_inventory_slot_tapped(
 }
 
 Gs1Status handle_inventory_item_submit(
-    SiteSystemContext<InventorySystem>& context,
+    InventoryContext& context,
     const InventoryItemSubmitRequestedMessage& payload) noexcept
 {
     return mutate_inventory_storage(context, [&]() -> Gs1Status {
@@ -1338,7 +1368,7 @@ Gs1Status handle_inventory_item_submit(
 }
 
 Gs1Status handle_inventory_storage_view_request(
-    SiteSystemContext<InventorySystem>& context,
+    InventoryContext& context,
     const InventoryStorageViewRequestMessage& payload) noexcept
 {
     ensure_inventory_storage_initialized(context);
@@ -1419,7 +1449,7 @@ Gs1Status handle_inventory_storage_view_request(
 }
 
 Gs1Status handle_inventory_delivery_requested(
-    SiteSystemContext<InventorySystem>& context,
+    InventoryContext& context,
     const InventoryDeliveryRequestedMessage& payload) noexcept
 {
     return mutate_inventory_storage(context, [&]() -> Gs1Status {
@@ -1451,7 +1481,7 @@ Gs1Status handle_inventory_delivery_requested(
 }
 
 Gs1Status handle_inventory_delivery_batch_requested(
-    SiteSystemContext<InventorySystem>& context,
+    InventoryContext& context,
     const InventoryDeliveryBatchRequestedMessage& payload) noexcept
 {
     return mutate_inventory_storage(context, [&]() -> Gs1Status {
@@ -1489,7 +1519,7 @@ Gs1Status handle_inventory_delivery_batch_requested(
 }
 
 Gs1Status handle_inventory_worker_pack_insert_requested(
-    SiteSystemContext<InventorySystem>& context,
+    InventoryContext& context,
     const InventoryWorkerPackInsertRequestedMessage& payload) noexcept
 {
     return mutate_inventory_storage(context, [&]() -> Gs1Status {
@@ -1521,7 +1551,7 @@ Gs1Status handle_inventory_worker_pack_insert_requested(
     });
 }
 
-void progress_pending_deliveries(SiteSystemContext<InventorySystem>& context) noexcept
+void progress_pending_deliveries(InventoryContext& context) noexcept
 {
     ensure_inventory_storage_initialized(context);
     auto& inventory = context.world.own_inventory();
@@ -1566,7 +1596,7 @@ bool InventorySystem::subscribes_to_host_message(Gs1HostMessageType type) noexce
 }
 
 Gs1Status process_host_message_impl(
-    SiteSystemContext<InventorySystem>& context,
+    InventoryContext& context,
     const Gs1HostMessage& message)
 {
     switch (message.type)
@@ -1634,7 +1664,7 @@ bool InventorySystem::subscribes_to(GameMessageType type) noexcept
 }
 
 Gs1Status process_game_message_impl(
-    SiteSystemContext<InventorySystem>& context,
+    InventoryContext& context,
     const GameMessage& message)
 {
     switch (message.type)
@@ -1721,7 +1751,7 @@ Gs1Status process_game_message_impl(
     }
 }
 
-void run_impl(SiteSystemContext<InventorySystem>& context)
+void run_impl(InventoryContext& context)
 {
     if (ensure_inventory_storage_initialized(context))
     {
@@ -1766,9 +1796,9 @@ Gs1Status InventorySystem::process_game_message(
 {
     auto access = make_game_state_access<InventorySystem>(invocation);
     (void)access;
-    return with_site_system_context<InventorySystem>(
+    return with_inventory_context(
         invocation,
-        [&](SiteSystemContext<InventorySystem>& context)
+        [&](InventoryContext& context)
         {
             return process_game_message_impl(context, message);
         });
@@ -1780,9 +1810,9 @@ Gs1Status InventorySystem::process_host_message(
 {
     auto access = make_game_state_access<InventorySystem>(invocation);
     (void)access;
-    return with_site_system_context<InventorySystem>(
+    return with_inventory_context(
         invocation,
-        [&](SiteSystemContext<InventorySystem>& context)
+        [&](InventoryContext& context)
         {
             return process_host_message_impl(context, message);
         });
@@ -1792,9 +1822,9 @@ void InventorySystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<InventorySystem>(invocation);
     (void)access;
-    (void)with_site_system_context<InventorySystem>(
+    (void)with_inventory_context(
         invocation,
-        [&](SiteSystemContext<InventorySystem>& context)
+        [&](InventoryContext& context)
         {
             run_impl(context);
             return GS1_STATUS_OK;
@@ -1802,3 +1832,4 @@ void InventorySystem::run(RuntimeInvocation& invocation)
         true);
 }
 }  // namespace gs1
+

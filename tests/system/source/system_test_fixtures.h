@@ -27,6 +27,16 @@
 
 namespace gs1
 {
+template <typename SystemTag>
+struct SiteSystemHarness final
+{
+    CampaignState& campaign;
+    SiteRunState& site_run;
+    GameMessageQueue& message_queue;
+    double fixed_step_seconds {0.0};
+    SiteMoveDirectionInput move_direction {};
+};
+
 struct CampaignFlowMessageContext final
 {
     std::optional<CampaignState>& campaign;
@@ -351,19 +361,19 @@ inline void mark_green_wall_connection_goal_tile(SiteRunState& site_run, TileCoo
 }
 
 template <typename SystemTag>
-inline SiteSystemContext<SystemTag> make_site_context(
+inline SiteSystemHarness<SystemTag> make_site_context(
     CampaignState& campaign,
     SiteRunState& site_run,
     GameMessageQueue& message_queue,
     double fixed_step_seconds = k_default_fixed_step_seconds,
     SiteMoveDirectionInput move_direction = {})
 {
-    return make_site_system_context<SystemTag>(
+    return SiteSystemHarness<SystemTag> {
         campaign,
         site_run,
         message_queue,
         fixed_step_seconds,
-        move_direction);
+        move_direction};
 }
 
 inline CampaignSystemContext make_campaign_context(CampaignState& campaign) noexcept
@@ -482,7 +492,7 @@ inline Gs1Status invoke_system_message(
 
 template <typename SystemTag>
 inline Gs1Status invoke_system_message(
-    SiteSystemContext<SystemTag>& context,
+    SiteSystemHarness<SystemTag>& context,
     const GameMessage& message)
 {
     std::optional<CampaignState> campaign {context.campaign};
@@ -588,7 +598,7 @@ inline void invoke_system_run(gs1::CampaignFixedStepContext& context)
 }
 
 template <typename SystemTag>
-inline void invoke_system_run(SiteSystemContext<SystemTag>& context)
+inline void invoke_system_run(SiteSystemHarness<SystemTag>& context)
 {
     std::optional<CampaignState> campaign {context.campaign};
     std::optional<SiteRunState> active_site_run {context.site_run};
@@ -751,3 +761,4 @@ inline const Payload* first_message_payload(
     return message == nullptr ? nullptr : &message->payload_as<Payload>();
 }
 }  // namespace gs1::testing::fixtures
+

@@ -62,6 +62,35 @@ constexpr TechNodeId k_bureau_t20 {base_technology_node_id(k_bureau_faction, 20U
 constexpr TechNodeId k_bureau_t25 {base_technology_node_id(k_bureau_faction, 25U)};
 constexpr TechNodeId k_bureau_t30 {base_technology_node_id(k_bureau_faction, 30U)};
 
+struct ModifierContext final
+{
+    const CampaignState& campaign;
+    SiteWorldAccess<ModifierSystem> world;
+    double fixed_step_seconds {0.0};
+};
+
+template <typename Fn>
+Gs1Status with_modifier_context(
+    RuntimeInvocation& invocation,
+    Fn&& fn,
+    bool missing_context_is_ok = false)
+{
+    auto access = make_game_state_access<ModifierSystem>(invocation);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
+    }
+
+    ModifierContext context {
+        *campaign,
+        SiteWorldAccess<ModifierSystem> {*site_run},
+        fixed_step_seconds};
+    return fn(context);
+}
+
 const ModifierSystemTuning& modifier_system_tuning() noexcept
 {
     return gameplay_tuning_def().modifier_system;
@@ -915,7 +944,7 @@ ResolvedModifierOutputs resolve_owned_modifiers(
     return resolved;
 }
 
-void resolve_modifier_totals(SiteSystemContext<ModifierSystem>& context)
+void resolve_modifier_totals(ModifierContext& context)
 {
     const auto next_outputs =
         resolve_owned_modifiers(context.campaign, context.world.read_modifier(), context.world.read_camp());
@@ -954,7 +983,7 @@ void resolve_modifier_totals(SiteSystemContext<ModifierSystem>& context)
 }
 
 void handle_site_run_started(
-    SiteSystemContext<ModifierSystem>& context,
+    ModifierContext& context,
     const SiteRunStartedMessage& /*payload*/) noexcept
 {
     auto& modifier_state = context.world.own_modifier();
@@ -979,7 +1008,7 @@ void handle_site_run_started(
 }
 
 void handle_inventory_item_use_completed(
-    SiteSystemContext<ModifierSystem>& context,
+    ModifierContext& context,
     const InventoryItemUseCompletedMessage& payload) noexcept
 {
     const ItemId item_id {payload.item_id};
@@ -1024,7 +1053,7 @@ void handle_inventory_item_use_completed(
 }
 
 void handle_run_modifier_award_requested(
-    SiteSystemContext<ModifierSystem>& context,
+    ModifierContext& context,
     const RunModifierAwardRequestedMessage& payload) noexcept
 {
     if (payload.modifier_id == 0U)
@@ -1050,7 +1079,7 @@ void handle_run_modifier_award_requested(
 }
 
 void handle_site_modifier_end_requested(
-    SiteSystemContext<ModifierSystem>& context,
+    ModifierContext& context,
     const SiteModifierEndRequestedMessage& payload) noexcept
 {
     if (payload.modifier_id == 0U)
@@ -1065,6 +1094,80 @@ void handle_site_modifier_end_requested(
         context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_MODIFIERS);
         resolve_modifier_totals(context);
     }
+}
+
+Gs1Status process_host_message_impl(
+    ModifierContext& context,
+    const Gs1HostMessage& message)
+{
+    if (message.type != GS1_HOST_EVENT_UI_ACTION)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    const auto& action = message.payload.ui_action.action;
+    if (action.type != GS1_UI_ACTION_END_SITE_MODIFIER)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    if (action.target_id == 0U)
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    handle_site_modifier_end_requested(
+        context,
+        SiteModifierEndRequestedMessage {action.target_id});
+    return GS1_STATUS_OK;
+}
+
+Gs1Status process_game_message_impl(
+    ModifierContext& context,
+    const GameMessage& message)
+{
+    if (message.type == GameMessageType::SiteRunStarted)
+    {
+        handle_site_run_started(context, message.payload_as<SiteRunStartedMessage>());
+    }
+    else if (message.type == GameMessageType::RunModifierAwardRequested)
+    {
+        handle_run_modifier_award_requested(
+            context,
+            message.payload_as<RunModifierAwardRequestedMessage>());
+    }
+    else if (message.type == GameMessageType::InventoryItemUseCompleted)
+    {
+        handle_inventory_item_use_completed(
+            context,
+            message.payload_as<InventoryItemUseCompletedMessage>());
+    }
+    else if (message.type == GameMessageType::SiteModifierEndRequested)
+    {
+        handle_site_modifier_end_requested(
+            context,
+            message.payload_as<SiteModifierEndRequestedMessage>());
+    }
+
+    return GS1_STATUS_OK;
+}
+
+void run_impl(ModifierContext& context)
+{
+    const auto tick_result = tick_timed_modifiers(
+        context.world.own_modifier(),
+        runtime_minutes_from_real_seconds(context.fixed_step_seconds));
+    if (tick_result.projection_changed)
+    {
+        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_MODIFIERS);
+    }
+    if (tick_result.modifier_set_changed)
+    {
+        resolve_modifier_totals(context);
+        return;
+    }
+
+    resolve_modifier_totals(context);
 }
 }  // namespace
 
@@ -1104,43 +1207,17 @@ std::optional<std::uint32_t> ModifierSystem::fixed_step_order() const noexcept
     return 3U;
 }
 
-Gs1Status ModifierSystem::process_host_message(
-    SiteSystemContext<ModifierSystem>& context,
-    const Gs1HostMessage& message)
-{
-    if (message.type != GS1_HOST_EVENT_UI_ACTION)
-    {
-        return GS1_STATUS_OK;
-    }
-
-    const auto& action = message.payload.ui_action.action;
-    if (action.type != GS1_UI_ACTION_END_SITE_MODIFIER)
-    {
-        return GS1_STATUS_OK;
-    }
-
-    if (action.target_id == 0U)
-    {
-        return GS1_STATUS_INVALID_ARGUMENT;
-    }
-
-    handle_site_modifier_end_requested(
-        context,
-        SiteModifierEndRequestedMessage {action.target_id});
-    return GS1_STATUS_OK;
-}
-
 Gs1Status ModifierSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
     auto access = make_game_state_access<ModifierSystem>(invocation);
     (void)access;
-    return with_site_system_context<ModifierSystem>(
+    return with_modifier_context(
         invocation,
-        [&](SiteSystemContext<ModifierSystem>& context) -> Gs1Status
+        [&](ModifierContext& context) -> Gs1Status
         {
-            return process_message(context, message);
+            return process_game_message_impl(context, message);
         });
 }
 
@@ -1150,11 +1227,11 @@ Gs1Status ModifierSystem::process_host_message(
 {
     auto access = make_game_state_access<ModifierSystem>(invocation);
     (void)access;
-    return with_site_system_context<ModifierSystem>(
+    return with_modifier_context(
         invocation,
-        [&](SiteSystemContext<ModifierSystem>& context) -> Gs1Status
+        [&](ModifierContext& context) -> Gs1Status
         {
-            return process_host_message(context, message);
+            return process_host_message_impl(context, message);
         },
         true);
 }
@@ -1167,64 +1244,17 @@ bool ModifierSystem::subscribes_to(GameMessageType type) noexcept
         type == GameMessageType::SiteModifierEndRequested;
 }
 
-Gs1Status ModifierSystem::process_message(
-    SiteSystemContext<ModifierSystem>& context,
-    const GameMessage& message)
-{
-    if (message.type == GameMessageType::SiteRunStarted)
-    {
-        handle_site_run_started(context, message.payload_as<SiteRunStartedMessage>());
-    }
-    else if (message.type == GameMessageType::RunModifierAwardRequested)
-    {
-        handle_run_modifier_award_requested(
-            context,
-            message.payload_as<RunModifierAwardRequestedMessage>());
-    }
-    else if (message.type == GameMessageType::InventoryItemUseCompleted)
-    {
-        handle_inventory_item_use_completed(
-            context,
-            message.payload_as<InventoryItemUseCompletedMessage>());
-    }
-    else if (message.type == GameMessageType::SiteModifierEndRequested)
-    {
-        handle_site_modifier_end_requested(
-            context,
-            message.payload_as<SiteModifierEndRequestedMessage>());
-    }
-
-    return GS1_STATUS_OK;
-}
-
-void ModifierSystem::run(SiteSystemContext<ModifierSystem>& context)
-{
-    const auto tick_result = tick_timed_modifiers(
-            context.world.own_modifier(),
-            runtime_minutes_from_real_seconds(context.fixed_step_seconds));
-    if (tick_result.projection_changed)
-    {
-        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_MODIFIERS);
-    }
-    if (tick_result.modifier_set_changed)
-    {
-        resolve_modifier_totals(context);
-        return;
-    }
-
-    resolve_modifier_totals(context);
-}
-
 void ModifierSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<ModifierSystem>(invocation);
     (void)access;
-    (void)with_site_system_context<ModifierSystem>(
+    (void)with_modifier_context(
         invocation,
-        [&](SiteSystemContext<ModifierSystem>& context) -> Gs1Status
+        [&](ModifierContext& context) -> Gs1Status
         {
-            run(context);
+            run_impl(context);
             return GS1_STATUS_OK;
         });
 }
 }  // namespace gs1
+

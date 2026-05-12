@@ -217,51 +217,6 @@ constexpr auto record_timing_sample = [](auto& accumulator, double elapsed_ms) n
 };
 
 
-template <typename SiteSystemTag, typename ProcessMessageFn>
-Gs1Status dispatch_site_system_message(
-    ProcessMessageFn process_message_fn,
-    const GameMessage& message,
-    const std::optional<CampaignState>& campaign,
-    std::optional<SiteRunState>& active_site_run,
-    GameMessageQueue& message_queue,
-    double fixed_step_seconds)
-{
-    if (!campaign.has_value() || !active_site_run.has_value())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
-    auto context = make_site_system_context<SiteSystemTag>(
-        *campaign,
-        *active_site_run,
-        message_queue,
-        fixed_step_seconds,
-        SiteMoveDirectionInput {});
-    return process_message_fn(context, message);
-}
-
-template <typename SiteSystemTag, typename ProcessHostMessageFn>
-Gs1Status dispatch_site_system_host_message(
-    ProcessHostMessageFn process_message_fn,
-    const Gs1HostMessage& message,
-    const std::optional<CampaignState>& campaign,
-    std::optional<SiteRunState>& active_site_run,
-    GameMessageQueue& message_queue,
-    double fixed_step_seconds)
-{
-    if (!campaign.has_value() || !active_site_run.has_value())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
-    auto context = make_site_system_context<SiteSystemTag>(
-        *campaign,
-        *active_site_run,
-        message_queue,
-        fixed_step_seconds,
-        SiteMoveDirectionInput {});
-    return process_message_fn(context, message);
-}
 }  // namespace
 
 RuntimeInvocation::RuntimeInvocation(GameRuntime& runtime) noexcept

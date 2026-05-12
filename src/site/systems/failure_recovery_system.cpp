@@ -7,6 +7,33 @@ namespace gs1
 {
 namespace
 {
+struct FailureRecoveryContext final
+{
+    SiteRunState& site_run;
+    SiteWorldAccess<FailureRecoverySystem> world;
+    GameMessageQueue& message_queue;
+};
+
+template <typename Fn>
+Gs1Status with_failure_recovery_context(
+    RuntimeInvocation& invocation,
+    Fn&& fn,
+    bool missing_context_is_ok = false)
+{
+    auto access = make_game_state_access<FailureRecoverySystem>(invocation);
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
+    {
+        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
+    }
+
+    FailureRecoveryContext context {
+        *site_run,
+        SiteWorldAccess<FailureRecoverySystem> {*site_run},
+        invocation.game_message_queue()};
+    return fn(context);
+}
+
 bool has_pending_site_transition_message(
     const GameMessageQueue& message_queue,
     std::uint32_t site_id)
@@ -73,9 +100,9 @@ void FailureRecoverySystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<FailureRecoverySystem>(invocation);
     (void)access;
-    (void)with_site_system_context<FailureRecoverySystem>(
+    (void)with_failure_recovery_context(
         invocation,
-        [&](SiteSystemContext<FailureRecoverySystem>& context) -> Gs1Status
+        [&](FailureRecoveryContext& context) -> Gs1Status
         {
             if (!context.world.has_world())
             {
@@ -102,3 +129,4 @@ void FailureRecoverySystem::run(RuntimeInvocation& invocation)
         });
 }
 }  // namespace gs1
+

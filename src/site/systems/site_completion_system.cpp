@@ -13,6 +13,31 @@ namespace gs1
 {
 namespace
 {
+struct SiteCompletionContext final
+{
+    SiteWorldAccess<SiteCompletionSystem> world;
+    GameMessageQueue& message_queue;
+};
+
+template <typename Fn>
+Gs1Status with_site_completion_context(
+    RuntimeInvocation& invocation,
+    Fn&& fn,
+    bool missing_context_is_ok = false)
+{
+    auto access = make_game_state_access<SiteCompletionSystem>(invocation);
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
+    {
+        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
+    }
+
+    SiteCompletionContext context {
+        SiteWorldAccess<SiteCompletionSystem> {*site_run},
+        invocation.game_message_queue()};
+    return fn(context);
+}
+
 constexpr float k_objective_progress_epsilon = 0.0001f;
 
 bool has_pending_site_transition_message(
@@ -48,7 +73,7 @@ bool tile_has_objective_occupant(const SiteWorld::TileData& tile) noexcept
 }
 
 void update_objective_progress(
-    SiteSystemContext<SiteCompletionSystem>& context,
+    SiteCompletionContext& context,
     float normalized_progress) noexcept
 {
     const float clamped_progress = std::clamp(normalized_progress, 0.0f, 1.0f);
@@ -64,7 +89,7 @@ void update_objective_progress(
 }
 
 float average_target_sand_level(
-    SiteSystemContext<SiteCompletionSystem>& context,
+    SiteCompletionContext& context,
     bool use_highway_cover) noexcept
 {
     const auto& objective = context.world.read_objective();
@@ -91,7 +116,7 @@ float average_target_sand_level(
     return count == 0U ? 0.0f : (total / static_cast<float>(count));
 }
 
-bool green_wall_regions_connected(SiteSystemContext<SiteCompletionSystem>& context)
+bool green_wall_regions_connected(SiteCompletionContext& context)
 {
     const auto& objective = context.world.read_objective();
     const auto tile_count = context.world.tile_count();
@@ -175,7 +200,7 @@ float normalized_cash_target_progress(
 }
 
 void run_green_wall_connection(
-    SiteSystemContext<SiteCompletionSystem>& context,
+    SiteCompletionContext& context,
     const SiteClockState& clock)
 {
     auto& objective = context.world.own_objective();
@@ -304,9 +329,9 @@ void SiteCompletionSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<SiteCompletionSystem>(invocation);
     (void)access;
-    (void)with_site_system_context<SiteCompletionSystem>(
+    (void)with_site_completion_context(
         invocation,
-        [&](SiteSystemContext<SiteCompletionSystem>& context) -> Gs1Status
+        [&](SiteCompletionContext& context) -> Gs1Status
         {
             const auto& counters = context.world.read_counters();
             const auto& objective = context.world.read_objective();
@@ -421,3 +446,4 @@ void SiteCompletionSystem::run(RuntimeInvocation& invocation)
         });
 }
 }  // namespace gs1
+

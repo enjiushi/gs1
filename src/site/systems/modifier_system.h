@@ -33,14 +33,7 @@ public:
     }
 
     [[nodiscard]] static bool subscribes_to_host_message(Gs1HostMessageType type) noexcept;
-    [[nodiscard]] static Gs1Status process_host_message(
-        SiteSystemContext<ModifierSystem>& context,
-        const Gs1HostMessage& message);
     [[nodiscard]] static bool subscribes_to(GameMessageType type) noexcept;
-    [[nodiscard]] static Gs1Status process_message(
-        SiteSystemContext<ModifierSystem>& context,
-        const GameMessage& message);
-    static void run(SiteSystemContext<ModifierSystem>& context);
 };
 
 template <>

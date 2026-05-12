@@ -33,6 +33,39 @@ struct system_state_tags<TaskBoardSystem>
 
 namespace
 {
+struct TaskBoardContext final
+{
+    const CampaignState& campaign;
+    SiteRunState& site_run;
+    SiteWorldAccess<TaskBoardSystem> world;
+    GameMessageQueue& message_queue;
+    double fixed_step_seconds {0.0};
+};
+
+template <typename Fn>
+Gs1Status with_task_board_context(
+    RuntimeInvocation& invocation,
+    Fn&& fn,
+    bool missing_context_is_ok = false)
+{
+    auto access = make_game_state_access<TaskBoardSystem>(invocation);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
+    }
+
+    TaskBoardContext context {
+        *campaign,
+        *site_run,
+        SiteWorldAccess<TaskBoardSystem> {*site_run},
+        invocation.game_message_queue(),
+        fixed_step_seconds};
+    return fn(context);
+}
+
 enum class PlantProtectionChannel : std::uint8_t
 {
     Wind = 0,
@@ -275,7 +308,7 @@ bool item_is_crafted(ItemId item_id) noexcept
 }
 
 bool item_is_buyable_from_authored_phone_stock(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     ItemId item_id) noexcept;
 
 float task_board_refresh_interval_minutes() noexcept
@@ -517,7 +550,7 @@ T choose_candidate(
 }
 
 std::vector<ItemId> collect_item_candidates(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const TaskTemplateDef& task_template_def)
 {
     if (task_template_def.progress_kind == TaskProgressKind::BuyItem)
@@ -597,7 +630,7 @@ std::vector<ItemId> collect_item_candidates(
 }
 
 std::vector<PlantId> collect_plant_candidates(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const TaskTemplateDef& task_template_def)
 {
     if (task_template_def.plant_id.value != 0U)
@@ -647,7 +680,7 @@ std::vector<PlantId> collect_plant_candidates(
 }
 
 std::vector<RecipeId> collect_recipe_candidates(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const TaskTemplateDef& task_template_def)
 {
     if (task_template_def.recipe_id.value != 0U)
@@ -671,7 +704,7 @@ std::vector<RecipeId> collect_recipe_candidates(
 }
 
 std::vector<StructureId> collect_structure_candidates(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     StructureId fixed_structure_id) noexcept
 {
     if (fixed_structure_id.value != 0U)
@@ -710,7 +743,7 @@ std::vector<ActionKind> collect_action_candidates(const TaskTemplateDef& task_te
 }
 
 bool task_template_is_eligible(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const TaskTemplateDef& task_template_def) noexcept
 {
     switch (task_template_def.progress_kind)
@@ -779,7 +812,7 @@ bool task_template_is_eligible(
 }
 
 std::vector<TaskRewardDraftOption> make_reward_draft_options(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     TaskInstanceId task_instance_id,
     const TaskTemplateDef& task_template_def,
     const SiteOnboardingTaskSeedDef* onboarding_seed)
@@ -912,7 +945,7 @@ std::uint32_t next_task_instance_id(const TaskBoardState& board) noexcept
 }
 
 TaskInstanceState make_task_instance(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     TaskInstanceId task_instance_id,
     const TaskTemplateDef& task_template_def,
     const SiteCounters& counters,
@@ -1078,7 +1111,7 @@ void reset_task_board(TaskBoardState& board) noexcept
 }
 
 void initialize_task_tracking_cache(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     TaskBoardState& board) noexcept
 {
     board.tracked_tile_width = context.world.tile_width();
@@ -1102,22 +1135,22 @@ TaskInstanceState* find_task_instance(TaskBoardState& board, TaskInstanceId id) 
 }
 
 bool complete_task(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     TaskBoardState& board,
     TaskInstanceState& task) noexcept;
 
 bool is_snapshot_progress_kind(TaskProgressKind progress_kind) noexcept;
 bool is_duration_progress_kind(TaskProgressKind progress_kind) noexcept;
 bool refresh_snapshot_task_progress(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     TaskBoardState& board,
     TaskInstanceState& task) noexcept;
 bool refresh_duration_task_condition(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     TaskInstanceState& task) noexcept;
 
 void activate_task_instance(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     TaskBoardState& board,
     TaskInstanceState& task) noexcept
 {
@@ -1198,14 +1231,14 @@ bool remove_task_id(std::vector<TaskInstanceId>& list, TaskInstanceId id) noexce
     return true;
 }
 
-void mark_task_projection_dirty(SiteSystemContext<TaskBoardSystem>& context) noexcept
+void mark_task_projection_dirty(TaskBoardContext& context) noexcept
 {
     context.world.mark_projection_dirty(
         SITE_PROJECTION_UPDATE_TASKS | SITE_PROJECTION_UPDATE_PHONE | SITE_PROJECTION_UPDATE_HUD);
 }
 
 bool queue_reward_message(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const RewardCandidateDef& reward_candidate_def)
 {
     GameMessage reward_message {};
@@ -1284,7 +1317,7 @@ bool queue_reward_message(
 }
 
 bool complete_task(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     TaskBoardState& board,
     TaskInstanceState& task) noexcept
 {
@@ -1330,7 +1363,7 @@ bool action_matches_task(
 
 template <typename Matcher>
 void advance_matching_accepted_tasks(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     std::uint32_t amount,
     Matcher matcher)
 {
@@ -1401,7 +1434,7 @@ std::uint32_t popcount_mask(std::uint8_t mask) noexcept
 }
 
 void advance_build_structure_set_tasks(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     StructureId structure_id)
 {
     auto& board = context.world.own_task_board();
@@ -1584,7 +1617,7 @@ std::uint32_t count_nearby_populated_plant_tiles(
 }
 
 std::uint32_t calculate_snapshot_progress(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const TaskTemplateDef& task_template_def,
     const TaskInstanceState& task) noexcept
 {
@@ -1709,7 +1742,7 @@ bool living_plant_duration_condition_met(
 }
 
 bool duration_condition_met(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const TaskTemplateDef& task_template_def,
     TaskInstanceState& task) noexcept
 {
@@ -1735,12 +1768,12 @@ bool duration_condition_met(
 }
 
 bool refresh_snapshot_task_progress(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     TaskBoardState& board,
     TaskInstanceState& task) noexcept;
 
 bool refresh_duration_task_condition(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     TaskInstanceState& task) noexcept
 {
     const auto* task_template_def = find_task_template_def(task.task_template_id);
@@ -1762,7 +1795,7 @@ bool refresh_duration_task_condition(
 
 template <typename Predicate>
 bool refresh_snapshot_tasks_if(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     Predicate predicate) noexcept
 {
     auto& board = context.world.own_task_board();
@@ -1782,7 +1815,7 @@ bool refresh_snapshot_tasks_if(
 
 template <typename Predicate>
 bool refresh_duration_task_conditions_if(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     Predicate predicate) noexcept
 {
     auto& board = context.world.own_task_board();
@@ -1806,7 +1839,7 @@ bool refresh_duration_task_conditions_if(
 }
 
 bool refresh_snapshot_task_progress(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     TaskBoardState& board,
     TaskInstanceState& task) noexcept
 {
@@ -1843,7 +1876,7 @@ bool refresh_snapshot_task_progress(
 }
 
 bool refresh_snapshot_tasks(
-    SiteSystemContext<TaskBoardSystem>& context) noexcept
+    TaskBoardContext& context) noexcept
 {
     auto& board = context.world.own_task_board();
     bool mutated = false;
@@ -1855,7 +1888,7 @@ bool refresh_snapshot_tasks(
 }
 
 bool refresh_normal_task_pool(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     bool force_dirty = false) noexcept
 {
     auto& board = context.world.own_task_board();
@@ -1936,7 +1969,7 @@ bool refresh_normal_task_pool(
 }
 
 bool update_duration_tasks(
-    SiteSystemContext<TaskBoardSystem>& context) noexcept
+    TaskBoardContext& context) noexcept
 {
     auto& board = context.world.own_task_board();
     const double step_minutes =
@@ -1992,7 +2025,7 @@ bool update_duration_tasks(
 }
 
 void handle_site_run_started(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const SiteRunStartedMessage& payload)
 {
     auto& board = context.world.own_task_board();
@@ -2038,7 +2071,7 @@ void handle_site_run_started(
 }
 
 bool item_is_buyable_from_authored_phone_stock(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     ItemId item_id) noexcept
 {
     if (item_id.value == 0U)
@@ -2081,7 +2114,7 @@ bool item_is_buyable_from_authored_phone_stock(
 }
 
 void handle_task_accept_requested(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const TaskAcceptRequestedMessage& payload)
 {
     auto& board = context.world.own_task_board();
@@ -2102,7 +2135,7 @@ void handle_task_accept_requested(
 }
 
 void handle_task_reward_claim_requested(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const TaskRewardClaimRequestedMessage& payload)
 {
     auto& board = context.world.own_task_board();
@@ -2198,7 +2231,7 @@ void handle_task_reward_claim_requested(
 }
 
 void handle_restoration_progress(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const RestorationProgressChangedMessage& payload)
 {
     auto& board = context.world.own_task_board();
@@ -2244,7 +2277,7 @@ void handle_restoration_progress(
 }
 
 void handle_tile_ecology_changed(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const TileEcologyChangedMessage& payload)
 {
     if ((payload.changed_mask &
@@ -2272,7 +2305,7 @@ void handle_tile_ecology_changed(
 }
 
 void handle_tile_ecology_batch_changed(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const TileEcologyBatchChangedMessage& payload)
 {
     auto& board = context.world.own_task_board();
@@ -2316,7 +2349,7 @@ void handle_tile_ecology_batch_changed(
 }
 
 void handle_site_tile_state_changed(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const SiteTileStateChangedMessage& payload)
 {
     auto& board = context.world.own_task_board();
@@ -2354,7 +2387,7 @@ void handle_site_tile_state_changed(
 }
 
 void handle_worker_meters_changed(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const WorkerMetersChangedMessage& payload)
 {
     auto& board = context.world.own_task_board();
@@ -2401,7 +2434,7 @@ void handle_worker_meters_changed(
 }
 
 void handle_site_device_condition_changed(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const SiteDeviceConditionChangedMessage& payload)
 {
     auto& board = context.world.own_task_board();
@@ -2422,7 +2455,7 @@ void handle_site_device_condition_changed(
 }
 
 void handle_living_plant_stability_changed(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const LivingPlantStabilityChangedMessage& payload)
 {
     auto& board = context.world.own_task_board();
@@ -2461,7 +2494,7 @@ void handle_living_plant_stability_changed(
 }
 
 void handle_phone_listing_purchased(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const PhoneListingPurchasedMessage& payload)
 {
     advance_matching_accepted_tasks(
@@ -2474,7 +2507,7 @@ void handle_phone_listing_purchased(
 }
 
 void handle_phone_listing_sold(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const PhoneListingSoldMessage& payload)
 {
     const auto quantity = payload.quantity == 0U ? 1U : payload.quantity;
@@ -2511,7 +2544,7 @@ void handle_phone_listing_sold(
 }
 
 void handle_inventory_transfer_completed(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const InventoryTransferCompletedMessage& payload)
 {
     advance_matching_accepted_tasks(
@@ -2524,7 +2557,7 @@ void handle_inventory_transfer_completed(
 }
 
 void handle_inventory_item_submitted(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const InventoryItemSubmittedMessage& payload)
 {
     advance_matching_accepted_tasks(
@@ -2537,7 +2570,7 @@ void handle_inventory_item_submitted(
 }
 
 void handle_site_tile_planting_completed(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const SiteTilePlantingCompletedMessage& payload)
 {
     advance_matching_accepted_tasks(
@@ -2558,7 +2591,7 @@ void handle_site_tile_planting_completed(
 }
 
 void handle_inventory_craft_completed(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const InventoryCraftCompletedMessage& payload)
 {
     const auto quantity = payload.output_quantity == 0U ? 1U : payload.output_quantity;
@@ -2589,7 +2622,7 @@ void handle_inventory_craft_completed(
 }
 
 void handle_inventory_item_use_completed(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const InventoryItemUseCompletedMessage& payload)
 {
     advance_matching_accepted_tasks(
@@ -2602,7 +2635,7 @@ void handle_inventory_item_use_completed(
 }
 
 void handle_site_action_completed(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const SiteActionCompletedMessage& payload)
 {
     advance_matching_accepted_tasks(
@@ -2629,7 +2662,7 @@ void handle_site_action_completed(
 }
 
 void handle_site_device_placed(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const SiteDevicePlacedMessage& payload)
 {
     advance_matching_accepted_tasks(
@@ -2652,7 +2685,7 @@ void handle_site_device_placed(
 }
 
 void handle_money_award_requested(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const EconomyMoneyAwardRequestedMessage& payload)
 {
     if (payload.delta <= 0)
@@ -2676,7 +2709,7 @@ bool TaskBoardSystem::subscribes_to_host_message(Gs1HostMessageType type) noexce
 }
 
 Gs1Status process_host_message_impl(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const Gs1HostMessage& message)
 {
     if (message.type != GS1_HOST_EVENT_UI_ACTION)
@@ -2749,7 +2782,7 @@ bool TaskBoardSystem::subscribes_to(GameMessageType type) noexcept
 }
 
 Gs1Status process_game_message_impl(
-    SiteSystemContext<TaskBoardSystem>& context,
+    TaskBoardContext& context,
     const GameMessage& message)
 {
     switch (message.type)
@@ -2851,7 +2884,7 @@ Gs1Status process_game_message_impl(
     return GS1_STATUS_OK;
 }
 
-void run_impl(SiteSystemContext<TaskBoardSystem>& context)
+void run_impl(TaskBoardContext& context)
 {
     auto& board = context.world.own_task_board();
     if (onboarding_chain_effective(context.site_run.site_id, board))
@@ -2910,9 +2943,9 @@ Gs1Status TaskBoardSystem::process_game_message(
 {
     auto access = make_game_state_access<TaskBoardSystem>(invocation);
     (void)access;
-    return with_site_system_context<TaskBoardSystem>(
+    return with_task_board_context(
         invocation,
-        [&](SiteSystemContext<TaskBoardSystem>& context)
+        [&](TaskBoardContext& context)
         {
             return process_game_message_impl(context, message);
         });
@@ -2924,9 +2957,9 @@ Gs1Status TaskBoardSystem::process_host_message(
 {
     auto access = make_game_state_access<TaskBoardSystem>(invocation);
     (void)access;
-    return with_site_system_context<TaskBoardSystem>(
+    return with_task_board_context(
         invocation,
-        [&](SiteSystemContext<TaskBoardSystem>& context)
+        [&](TaskBoardContext& context)
         {
             return process_host_message_impl(context, message);
         });
@@ -2936,9 +2969,9 @@ void TaskBoardSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<TaskBoardSystem>(invocation);
     (void)access;
-    (void)with_site_system_context<TaskBoardSystem>(
+    (void)with_task_board_context(
         invocation,
-        [&](SiteSystemContext<TaskBoardSystem>& context)
+        [&](TaskBoardContext& context)
         {
             run_impl(context);
             return GS1_STATUS_OK;
@@ -2946,3 +2979,4 @@ void TaskBoardSystem::run(RuntimeInvocation& invocation)
         true);
 }
 }  // namespace gs1
+
