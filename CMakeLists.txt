@@ -116,6 +116,7 @@ set(GS1_CONTENT_RUNTIME_SOURCES
 set(GS1_GAMEPLAY_CORE_SOURCES
     src/app/campaign_presentation_ops.cpp
     src/app/game_presentation_coordinator.cpp
+    src/app/regional_map_presentation_publisher.cpp
     src/app/campaign_factory.cpp
     src/app/site_presentation_ops.cpp
     src/app/site_run_factory.cpp
