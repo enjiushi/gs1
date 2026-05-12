@@ -221,12 +221,45 @@ constexpr auto record_timing_sample = [](auto& accumulator, double elapsed_ms) n
 
 RuntimeInvocation::RuntimeInvocation(GameRuntime& runtime) noexcept
     : runtime_(&runtime)
-    , app_state_(&runtime.app_state_)
-    , campaign_(&runtime.campaign_)
-    , active_site_run_(&runtime.active_site_run_)
-    , runtime_messages_(&runtime.runtime_messages_)
-    , game_messages_(&runtime.message_queue_)
-    , fixed_step_seconds_(&runtime.fixed_step_seconds_)
+    , owned_state_(&runtime.state_)
+    , app_state_(&runtime.state_.app_state)
+    , campaign_(&runtime.state_.campaign)
+    , active_site_run_(&runtime.state_.active_site_run)
+    , runtime_messages_(&runtime.state_.runtime_messages)
+    , game_messages_(&runtime.state_.message_queue)
+    , fixed_step_seconds_(&runtime.state_.fixed_step_seconds)
+{
+}
+
+RuntimeInvocation::RuntimeInvocation(GameState& state) noexcept
+    : owned_state_(&state)
+    , app_state_(&state.app_state)
+    , campaign_(&state.campaign)
+    , active_site_run_(&state.active_site_run)
+    , runtime_messages_(&state.runtime_messages)
+    , game_messages_(&state.message_queue)
+    , fixed_step_seconds_(&state.fixed_step_seconds)
+{
+}
+
+RuntimeInvocation::RuntimeInvocation(
+    GameState& state,
+    float move_direction_x,
+    float move_direction_y,
+    float move_direction_z,
+    bool move_direction_present) noexcept
+    : owned_state_(&state)
+    , app_state_(&state.app_state)
+    , campaign_(&state.campaign)
+    , active_site_run_(&state.active_site_run)
+    , runtime_messages_(&state.runtime_messages)
+    , game_messages_(&state.message_queue)
+    , fixed_step_seconds_(&state.fixed_step_seconds)
+    , move_direction_ {
+          move_direction_x,
+          move_direction_y,
+          move_direction_z,
+          move_direction_present}
 {
 }
 
@@ -235,12 +268,12 @@ RuntimeInvocation::RuntimeInvocation(
     std::optional<CampaignState>& campaign,
     std::optional<SiteRunState>& active_site_run,
     std::deque<Gs1RuntimeMessage>& runtime_messages,
-    GameMessageQueue& game_messages,
-    double fixed_step_seconds,
-    float move_direction_x,
-    float move_direction_y,
-    float move_direction_z,
-    bool move_direction_present) noexcept
+        GameMessageQueue& game_messages,
+        double fixed_step_seconds,
+        float move_direction_x,
+        float move_direction_y,
+        float move_direction_z,
+        bool move_direction_present) noexcept
     : app_state_(&app_state)
     , campaign_(&campaign)
     , active_site_run_(&active_site_run)
@@ -270,7 +303,7 @@ GameRuntime::GameRuntime(Gs1RuntimeCreateDesc create_desc)
 {
     if (create_desc_.fixed_step_seconds > 0.0)
     {
-        fixed_step_seconds_ = create_desc_.fixed_step_seconds;
+        state_.fixed_step_seconds = create_desc_.fixed_step_seconds;
     }
 
     if (create_desc_.adapter_config_json_utf8 != nullptr)
@@ -504,12 +537,12 @@ Gs1Status GameRuntime::run_phase1(const Gs1Phase1Request& request, Gs1Phase1Resu
     auto status = GS1_STATUS_OK;
     if (!boot_initialized_)
     {
-        if (!campaign_.has_value() && !active_site_run_.has_value())
+        if (!state_.campaign.has_value() && !state_.active_site_run.has_value())
         {
             GameMessage boot_message {};
             boot_message.type = GameMessageType::OpenMainMenu;
             boot_message.set_payload(OpenMainMenuMessage {});
-            message_queue_.push_back(boot_message);
+            state_.message_queue.push_back(boot_message);
 
             status = dispatch_queued_messages();
             if (status != GS1_STATUS_OK)
@@ -529,41 +562,41 @@ Gs1Status GameRuntime::run_phase1(const Gs1Phase1Request& request, Gs1Phase1Resu
         return status;
     }
 
-    if (!active_site_run_.has_value())
+    if (!state_.active_site_run.has_value())
     {
-        out_result.runtime_messages_queued = static_cast<std::uint32_t>(runtime_messages_.size());
+        out_result.runtime_messages_queued = static_cast<std::uint32_t>(state_.runtime_messages.size());
         finish_phase();
         return GS1_STATUS_OK;
     }
 
-    if (app_state_ == GS1_APP_STATE_SITE_LOADING)
+    if (state_.app_state == GS1_APP_STATE_SITE_LOADING)
     {
-        out_result.runtime_messages_queued = static_cast<std::uint32_t>(runtime_messages_.size());
+        out_result.runtime_messages_queued = static_cast<std::uint32_t>(state_.runtime_messages.size());
         finish_phase();
         return GS1_STATUS_OK;
     }
 
-    active_site_run_->clock.accumulator_real_seconds += request.real_delta_seconds;
+    state_.active_site_run->clock.accumulator_real_seconds += request.real_delta_seconds;
 
-    while (active_site_run_->clock.accumulator_real_seconds >= fixed_step_seconds_)
+    while (state_.active_site_run->clock.accumulator_real_seconds >= state_.fixed_step_seconds)
     {
-        active_site_run_->clock.accumulator_real_seconds -= fixed_step_seconds_;
+        state_.active_site_run->clock.accumulator_real_seconds -= state_.fixed_step_seconds;
         run_fixed_step();
         out_result.fixed_steps_executed += 1U;
     }
 
     GamePresentationRuntimeContext presentation_context {
-        app_state_,
-        campaign_,
-        active_site_run_,
-        message_queue_,
-        runtime_messages_,
-        fixed_step_seconds_};
+        state_.app_state,
+        state_.campaign,
+        state_.active_site_run,
+        state_.message_queue,
+        state_.runtime_messages,
+        state_.fixed_step_seconds};
     presentation_.flush_site_presentation_if_dirty(presentation_context);
 
     status = dispatch_queued_messages();
-    active_site_run_->host_move_direction = {};
-    out_result.runtime_messages_queued = static_cast<std::uint32_t>(runtime_messages_.size());
+    state_.active_site_run->host_move_direction = {};
+    out_result.runtime_messages_queued = static_cast<std::uint32_t>(state_.runtime_messages.size());
     finish_phase();
     return status;
 }
@@ -592,26 +625,26 @@ Gs1Status GameRuntime::run_phase2(const Gs1Phase2Request& request, Gs1Phase2Resu
     }
 
     status = dispatch_queued_messages();
-    out_result.runtime_messages_queued = static_cast<std::uint32_t>(runtime_messages_.size());
+    out_result.runtime_messages_queued = static_cast<std::uint32_t>(state_.runtime_messages.size());
     finish_phase();
     return status;
 }
 
 Gs1Status GameRuntime::pop_runtime_message(Gs1RuntimeMessage& out_message)
 {
-    if (runtime_messages_.empty())
+    if (state_.runtime_messages.empty())
     {
         return GS1_STATUS_BUFFER_EMPTY;
     }
 
-    out_message = runtime_messages_.front();
-    runtime_messages_.pop_front();
+    out_message = state_.runtime_messages.front();
+    state_.runtime_messages.pop_front();
     return GS1_STATUS_OK;
 }
 
 Gs1Status GameRuntime::handle_message(const GameMessage& message)
 {
-    message_queue_.push_back(message);
+    state_.message_queue.push_back(message);
     return dispatch_queued_messages();
 }
 
@@ -717,12 +750,12 @@ Gs1Status GameRuntime::dispatch_subscribed_host_message(const Gs1HostMessage& me
     if (GamePresentationCoordinator::subscribes_to_host_message(message.type))
     {
         GamePresentationRuntimeContext context {
-            app_state_,
-            campaign_,
-            active_site_run_,
-            message_queue_,
-            runtime_messages_,
-            fixed_step_seconds_};
+            state_.app_state,
+            state_.campaign,
+            state_.active_site_run,
+            state_.message_queue,
+            state_.runtime_messages,
+            state_.fixed_step_seconds};
         const auto status = presentation_.process_host_message(context, message);
         if (status != GS1_STATUS_OK)
         {
@@ -740,7 +773,7 @@ Gs1Status GameRuntime::dispatch_queued_messages()
 
 void GameRuntime::run_fixed_step()
 {
-    if (!campaign_.has_value() || !active_site_run_.has_value())
+    if (!state_.campaign.has_value() || !state_.active_site_run.has_value())
     {
         return;
     }

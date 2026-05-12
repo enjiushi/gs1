@@ -48,22 +48,22 @@ struct GameRuntimeProjectionTestAccess
     static GamePresentationRuntimeContext presentation_context(GameRuntime& runtime)
     {
         return GamePresentationRuntimeContext {
-            runtime.app_state_,
-            runtime.campaign_,
-            runtime.active_site_run_,
-            runtime.message_queue_,
-            runtime.runtime_messages_,
-            runtime.fixed_step_seconds_};
+            runtime.state_.app_state,
+            runtime.state_.campaign,
+            runtime.state_.active_site_run,
+            runtime.state_.message_queue,
+            runtime.state_.runtime_messages,
+            runtime.state_.fixed_step_seconds};
     }
 
     static std::optional<CampaignState>& campaign(GameRuntime& runtime)
     {
-        return runtime.campaign_;
+        return runtime.state_.campaign;
     }
 
     static std::optional<SiteRunState>& active_site_run(GameRuntime& runtime)
     {
-        return runtime.active_site_run_;
+        return runtime.state_.active_site_run;
     }
 
     static void mark_tile_dirty(GameRuntime& runtime, TileCoord coord)

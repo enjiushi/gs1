@@ -10,9 +10,11 @@ Core runtime services that drive fixed-step execution, queue dispatch, clocks, a
 ## Contents
 - `engine_message_queue.h`: Queue helpers for engine-originated messages entering gameplay.
 - `fixed_step_runner.h`: Fixed-timestep runner used by the runtime update loop.
-- `game_runtime.h`: Main runtime type declarations and update entry points, now exposing `RuntimeInvocation`-based helpers that let systems claim tagged runtime state access while site systems assemble any file-local context they need inside their own `.cpp` files instead of routing through a shared runtime-owned site context helper.
+- `game_runtime.h`: Main runtime type declarations and update entry points, with `GameRuntime` now owning a single aggregate `GameState` struct while still exposing `RuntimeInvocation`-based helpers for tagged runtime-state access.
+- `game_state.h`: Aggregate runtime-owned gameplay/session state container for app state, campaign/site state, gameplay message queue, runtime message queue, and fixed-step timing configuration.
 - `game_runtime.cpp`: Runtime loop implementation and routing core, including direct runtime-owned system creation, host-message subscriber dispatch, internal game-message dispatch, profiling, and fixed-step scheduling, with the old large enum-switch routing replaced by interface-pointer iteration.
-- `system_interface.h`: Shared runtime system interface, tagged runtime-state access declarations, and `RuntimeInvocation` plumbing used by campaign and site systems to declare subscriptions and read/write only their claimed runtime slices.
+- `runtime_state_access.h`: Tagged runtime-state access declarations plus `RuntimeInvocation` plumbing used by campaign and site systems to read/write only their claimed runtime slices from either runtime-owned or test-built state views.
+- `system_interface.h`: Shared runtime system interface and subscriber array declarations layered on top of the separate runtime-state access plumbing.
 - `id_allocator.h`: Lightweight runtime ID allocation helpers.
 - `message_queue.h`: Internal gameplay message queue declarations.
 - `random_service.h`: Runtime random-number service/state wrapper.

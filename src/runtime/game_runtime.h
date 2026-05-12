@@ -1,13 +1,12 @@
 #pragma once
 
 #include "app/game_presentation_coordinator.h"
-#include "campaign/campaign_state.h"
 #include "campaign/systems/campaign_flow_system.h"
 #include "campaign/systems/campaign_time_system.h"
 #include "messages/game_message.h"
+#include "runtime/game_state.h"
 #include "runtime/runtime_clock.h"
 #include "runtime/system_interface.h"
-#include "site/site_run_state.h"
 #include "gs1/status.h"
 #include "gs1/types.h"
 
@@ -41,10 +40,15 @@ public:
         bool enabled) noexcept;
     [[nodiscard]] bool profiled_system_enabled(Gs1RuntimeProfileSystemId system_id) const noexcept;
 
-    [[nodiscard]] GameMessageQueue& message_queue() noexcept { return message_queue_; }
-    [[nodiscard]] const GameMessageQueue& message_queue() const noexcept { return message_queue_; }
-    [[nodiscard]] std::deque<Gs1RuntimeMessage>& runtime_messages() noexcept { return runtime_messages_; }
-    [[nodiscard]] const std::deque<Gs1RuntimeMessage>& runtime_messages() const noexcept { return runtime_messages_; }
+    [[nodiscard]] GameState& state() noexcept { return state_; }
+    [[nodiscard]] const GameState& state() const noexcept { return state_; }
+    [[nodiscard]] GameMessageQueue& message_queue() noexcept { return state_.message_queue; }
+    [[nodiscard]] const GameMessageQueue& message_queue() const noexcept { return state_.message_queue; }
+    [[nodiscard]] std::deque<Gs1RuntimeMessage>& runtime_messages() noexcept { return state_.runtime_messages; }
+    [[nodiscard]] const std::deque<Gs1RuntimeMessage>& runtime_messages() const noexcept
+    {
+        return state_.runtime_messages;
+    }
     [[nodiscard]] Gs1Status handle_message(const GameMessage& message);
 
     friend struct GameRuntimeProjectionTestAccess;
@@ -80,17 +84,12 @@ private:
 private:
     Gs1RuntimeCreateDesc create_desc_ {};
     std::string adapter_config_json_utf8_ {};
-    double fixed_step_seconds_ {k_default_fixed_step_seconds};
-    Gs1AppState app_state_ {GS1_APP_STATE_BOOT};
-    std::optional<CampaignState> campaign_ {};
-    std::optional<SiteRunState> active_site_run_ {};
+    GameState state_ {};
     std::deque<Gs1HostMessage> host_messages_ {};
-    GameMessageQueue message_queue_ {};
     std::vector<std::unique_ptr<IRuntimeSystem>> systems_ {};
     std::vector<IRuntimeSystem*> fixed_step_systems_ {};
     RuntimeHostMessageSubscribers host_message_subscribers_ {};
     RuntimeGameMessageSubscribers message_subscribers_ {};
-    std::deque<Gs1RuntimeMessage> runtime_messages_ {};
     TimingAccumulator phase1_timing_ {};
     TimingAccumulator phase2_timing_ {};
     TimingAccumulator fixed_step_timing_ {};

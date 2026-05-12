@@ -61,12 +61,12 @@ struct GameRuntimeProjectionTestAccess
 {
     static std::optional<CampaignState>& campaign(GameRuntime& runtime)
     {
-        return runtime.campaign_;
+        return runtime.state_.campaign;
     }
 
     static std::optional<SiteRunState>& active_site_run(GameRuntime& runtime)
     {
-        return runtime.active_site_run_;
+        return runtime.state_.active_site_run;
     }
 };
 }  // namespace gs1
